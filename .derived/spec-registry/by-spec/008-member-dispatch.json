@@ -27,10 +27,10 @@
       "11. Resolved decisions"
     ],
     "specPath": "specs/008-member-dispatch/spec.md",
-    "status": "draft",
+    "status": "approved",
     "summary": "Every verb this binary has is a client of a hosted control plane through `api.rs` and `auth.rs`. There is no local-execution verb and no notion of a member, and that gap is the whole of the transition design doc 01 describes in the claude-observatory repository: the orchestrator, its sensor and its Claude driver become member binaries that this CLI dispatches to. This spec gives the umbrella its second face. It discovers `statecraft-*` binaries on PATH and in a managed member directory, reads each one's manifest before trusting it, dispatches an unknown top-level verb to the member whose name matches, passes the member's exit code back verbatim, and does all of it without requiring a login. The local loop has to work for someone who has never authenticated, because that is the product the Encore-model split gives away; coupling dispatch to the control-plane session would make the free half depend on the paid one. The member side of this contract is claude-observatory spec 042; the two were authored as one decision.\n",
     "title": "Member dispatch: the umbrella grows a local, account-less face"
   },
-  "shardHash": "9e2247d40d9f9295c77d7e58169aacd01e0f0b2aac76d76c031299bd53a38104",
+  "shardHash": "4b54524a1c0c89503426c299596988ac1bcbee347420edc8363d8cb7ad9f47a8",
   "specVersion": "1.1.0"
 }

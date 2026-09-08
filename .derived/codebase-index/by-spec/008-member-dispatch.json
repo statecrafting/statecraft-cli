@@ -25,8 +25,8 @@
       }
     ],
     "specId": "008-member-dispatch",
-    "specStatus": "draft"
+    "specStatus": "approved"
   },
   "schemaVersion": "1.1.0",
-  "shardHash": "4e5f81b30d527c46ab8fad2c1eaea1d8928caaa75065195d5d0746bc68bde186"
+  "shardHash": "6f2f01e93078508d8c4e78166ba391a5926e704b281e38905f079de499f32aee"
 }
