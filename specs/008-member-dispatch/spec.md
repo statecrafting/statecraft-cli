@@ -1,7 +1,7 @@
 ---
 id: "008-member-dispatch"
 title: "Member dispatch: the umbrella grows a local, account-less face"
-status: draft
+status: approved
 created: "2026-09-07"
 implementation: pending
 depends_on:
