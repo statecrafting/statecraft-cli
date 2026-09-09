@@ -40,3 +40,17 @@ data/
 .claude/agent-memory/
 
 .worktrees/
+
+# The members' runtime state and build output (spec 110 B-1; the
+# observatory's ignores at their new paths). Captured observations of
+# ~/.claude are never committed: they may reference private activity.
+members/data/
+members/node_modules/
+members/web/dist/
+members/dist/
+*.log
+*.db
+*.db-wal
+*.db-shm
+.derived/**/build-meta.json
+.derived/attestation/

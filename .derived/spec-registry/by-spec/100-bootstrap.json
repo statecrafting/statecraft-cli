@@ -1,0 +1,28 @@
+{
+  "record": {
+    "created": "2026-07-14",
+    "id": "100-bootstrap",
+    "origin": {
+      "retroactive": true
+    },
+    "sectionHeadings": [
+      "100: Bootstrap spec system",
+      "1. The authoring / derived boundary",
+      "2. The typed authority graph"
+    ],
+    "specPath": "specs/100-bootstrap/spec.md",
+    "status": "superseded",
+    "summary": "Foundational contract: authored truth lives only in markdown (+ YAML frontmatter); machine-consumable truth is compiler-emitted JSON only; every artifact is a deterministic function of (config, file contents); a typed authority graph governs who-owns-what. This repository is born governed: the spine exists before the first line of product code.\n",
+    "supersededBy": "000-bootstrap",
+    "title": "Bootstrap spec system (statecraft-cli, before the merge)",
+    "unamendable": [
+      "markdown-truth-boundary",
+      "json-truth-boundary",
+      "determinism-requirement",
+      "typed-authority-graph",
+      "refusal-rule"
+    ]
+  },
+  "shardHash": "4a25bdabf98a21da2d5702b0cd2a998d956fb4948efea28c65a4549659fc94c9",
+  "specVersion": "1.2.0"
+}

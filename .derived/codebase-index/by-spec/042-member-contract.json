@@ -1,0 +1,170 @@
+{
+  "mapping": {
+    "dependsOn": [
+      "005-cli-surface",
+      "023-orchestrator-cli"
+    ],
+    "implementingPaths": [
+      {
+        "path": "members/package.json",
+        "source": "spec-edge"
+      },
+      {
+        "path": "members/src/index.ts",
+        "source": "spec-edge"
+      },
+      {
+        "path": "members/src/members/driver.ts",
+        "source": "spec-edge"
+      },
+      {
+        "path": "members/src/members/engine.ts",
+        "source": "spec-edge"
+      },
+      {
+        "path": "members/src/members/entrypoints.test.ts",
+        "source": "spec-edge"
+      },
+      {
+        "path": "members/src/members/manifest.test.ts",
+        "source": "spec-edge"
+      },
+      {
+        "path": "members/src/members/manifest.ts",
+        "source": "spec-edge"
+      },
+      {
+        "path": "members/src/members/sensor.ts",
+        "source": "spec-edge"
+      }
+    ],
+    "resolvedUnits": [
+      {
+        "locations": [
+          {
+            "file": "members/src/members/driver.ts"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "kind": "file",
+          "path": "members/src/members/driver.ts"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "members/src/members/engine.ts"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "kind": "file",
+          "path": "members/src/members/engine.ts"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "members/src/members/entrypoints.test.ts"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "kind": "file",
+          "path": "members/src/members/entrypoints.test.ts"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "members/src/members/manifest.test.ts"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "kind": "file",
+          "path": "members/src/members/manifest.test.ts"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "members/src/members/manifest.ts"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "kind": "file",
+          "path": "members/src/members/manifest.ts"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "members/src/members/sensor.ts"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "kind": "file",
+          "path": "members/src/members/sensor.ts"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "members/src/index.ts"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "members/src/index.ts"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "members/package.json",
+            "span": {
+              "endLine": 19,
+              "startLine": 10
+            }
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "anchor": "scripts",
+          "file": "members/package.json",
+          "kind": "section"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "docs/design/01-umbrella-cli-and-member-seams.md"
+          }
+        ],
+        "ownership": false,
+        "sourceField": "references",
+        "unit": {
+          "kind": "file",
+          "path": "docs/design/01-umbrella-cli-and-member-seams.md"
+        }
+      }
+    ],
+    "specId": "042-member-contract",
+    "specStatus": "approved"
+  },
+  "schemaVersion": "1.1.0",
+  "shardHash": "82718f7ced233332d0cdb4c14bd974f58cfbe2ac74fdf46fd7573d93bdaeaa6a"
+}

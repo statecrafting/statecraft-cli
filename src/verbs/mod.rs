@@ -1,15 +1,15 @@
-//! The governance verbs (spec 004): the CLI face over the control-plane API.
+//! The governance verbs (spec 104): the CLI face over the control-plane API.
 //!
 //! Each verb resolves the base URL and stored token, calls one control-plane
-//! endpoint through the spec 003 client, and renders the result two ways: the
-//! stable `{ok, data|error}` JSON envelope for `--output json` (spec 004 §5.2,
-//! the shared contract the MCP face reuses in spec 005), or an aligned human
+//! endpoint through the spec 103 client, and renders the result two ways: the
+//! stable `{ok, data|error}` JSON envelope for `--output json` (spec 104 §5.2,
+//! the shared contract the MCP face reuses in spec 105), or an aligned human
 //! table on a TTY. The JSON envelope is passthrough: the plane's payload is
 //! wrapped, never reshaped, so the contract stays stable as fields grow.
 //!
 //! Submodules ([`tenants`], [`stamp`], [`fleet`]) hold one verb family each and
 //! call the private helpers here directly (a child module sees its parent's
-//! private items). [`template`] (spec 006) is the exception: a *local* verb that
+//! private items). [`template`] (spec 106) is the exception: a *local* verb that
 //! never calls the control plane (it operates on a stamped app checkout), yet
 //! still renders through the same `{ok,data|error}` envelope
 //! ([`success_envelope_value`], [`error_envelope`]) so both faces stay uniform.
@@ -27,7 +27,7 @@ use crate::config::ResolvedConfig;
 use crate::error::{AppError, AppResult, EXIT_OPERATIONAL};
 use crate::output::OutputFormat;
 
-/// The success/failure envelope both faces consume (spec 004 §5.2). `data`
+/// The success/failure envelope both faces consume (spec 104 §5.2). `data`
 /// borrows the passthrough value; exactly one of `data`/`error` is present.
 #[derive(Serialize)]
 struct Envelope<'a> {
@@ -38,7 +38,7 @@ struct Envelope<'a> {
     error: Option<ErrorBody>,
 }
 
-/// The `error` arm: the spec 003 taxonomy projected onto stable JSON fields.
+/// The `error` arm: the spec 103 taxonomy projected onto stable JSON fields.
 #[derive(Serialize)]
 struct ErrorBody {
     kind: &'static str,
@@ -133,7 +133,7 @@ fn to_pretty<T: Serialize>(value: &T) -> String {
 /// Interpret a passthrough value as a wrapped list: an object whose `key` holds
 /// a JSON array. Every platform collection is wrapped (`{tenants:[…]}` from
 /// statecraft `ListTenantsResponse`, `{apps:[…]}` from `ListFleetResponse`; spec
-/// 004 §5.3), never a bare array. A decode error names what came back instead.
+/// 104 §5.3), never a bare array. A decode error names what came back instead.
 /// Human path only; JSON passthrough never calls this.
 fn array_field<'a>(v: &'a Value, key: &str) -> AppResult<&'a Vec<Value>> {
     match v.get(key) {
@@ -174,7 +174,7 @@ fn field(v: &Value, key: &str) -> String {
 }
 
 /// A required scalar field for human rendering. Absent or non-scalar means the
-/// plane returned a record the CLI cannot read (spec 004 §5.3: stamp and fleet
+/// plane returned a record the CLI cannot read (spec 104 §5.3: stamp and fleet
 /// records carry at least `id` and `status`): a decode error (exit 1) that
 /// signals drift rather than rendering a silent blank.
 fn require_field(v: &Value, key: &str) -> AppResult<String> {
@@ -263,7 +263,7 @@ fn browser_command(url: &str) -> std::process::Command {
 
 /// Build the success envelope (`{ok:true,data}`) as an owned JSON value: the
 /// same shape [`emit_ok`] prints for `--output json`, produced without touching
-/// stdout. The MCP face (spec 005) returns it as the tool result; per-verb
+/// stdout. The MCP face (spec 105) returns it as the tool result; per-verb
 /// snapshot tests use it to lock the shape.
 pub(crate) fn success_envelope_value(data: &Value) -> Value {
     serde_json::to_value(Envelope {
@@ -293,8 +293,8 @@ pub(crate) fn error_envelope(kind: &'static str, message: String, status: Option
 
 /// Wrap a completed verb request in the passthrough envelope: `{ok:true,data}`
 /// on success, `{ok:false,error}` mapped from the taxonomy on failure. This is
-/// the value the MCP tool result carries (spec 005 §1), byte-for-byte what
-/// `--output json` prints for the CLI face (spec 004 §5.2).
+/// the value the MCP tool result carries (spec 105 §1), byte-for-byte what
+/// `--output json` prints for the CLI face (spec 104 §5.2).
 pub(crate) fn envelope_value(result: Result<Value, ApiError>) -> Value {
     match result {
         Ok(value) => success_envelope_value(&value),

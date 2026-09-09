@@ -1,0 +1,123 @@
+{
+  "mapping": {
+    "dependsOn": [
+      "022-http-api-and-events"
+    ],
+    "implementingPaths": [
+      {
+        "path": "members/package.json",
+        "source": "spec-edge"
+      },
+      {
+        "path": "members/src/orchestrator/api/server.ts",
+        "source": "spec-edge"
+      },
+      {
+        "path": "members/src/orchestrator/api/static.test.ts",
+        "source": "spec-edge"
+      },
+      {
+        "path": "members/src/orchestrator/api/static.ts",
+        "source": "spec-edge"
+      },
+      {
+        "path": "members/web/",
+        "source": "spec-edge"
+      }
+    ],
+    "resolvedUnits": [
+      {
+        "locations": [
+          {
+            "file": "members/src/orchestrator/api/static.test.ts"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "kind": "file",
+          "path": "members/src/orchestrator/api/static.test.ts"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "members/src/orchestrator/api/static.ts"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "kind": "file",
+          "path": "members/src/orchestrator/api/static.ts"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "members/web/"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "kind": "file",
+          "path": "members/web/"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "members/package.json",
+            "span": {
+              "endLine": 34,
+              "startLine": 23
+            }
+          }
+        ],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "anchor": "devDependencies",
+          "file": "members/package.json",
+          "kind": "section"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "members/package.json",
+            "span": {
+              "endLine": 19,
+              "startLine": 10
+            }
+          }
+        ],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "anchor": "scripts",
+          "file": "members/package.json",
+          "kind": "section"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "members/src/orchestrator/api/server.ts"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "members/src/orchestrator/api/server.ts"
+        }
+      }
+    ],
+    "specId": "024-web-ui",
+    "specStatus": "approved"
+  },
+  "schemaVersion": "1.1.0",
+  "shardHash": "036d7d5e4f40429179249eb9bc0329a6ad7294138d3d37bd939c3afd3edd34a2"
+}

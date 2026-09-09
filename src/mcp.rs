@@ -1,15 +1,15 @@
-//! The MCP face (spec 005): `statecraft mcp` runs a Model Context Protocol
+//! The MCP face (spec 105): `statecraft mcp` runs a Model Context Protocol
 //! server over stdio so a coding agent operates under Statecraft governance
 //! natively.
 //!
-//! Transport is hand-rolled JSON-RPC 2.0 over newline-delimited stdio (spec 005
+//! Transport is hand-rolled JSON-RPC 2.0 over newline-delimited stdio (spec 105
 //! §1 Transport decision): one JSON object per line, no embedded newlines. The
 //! server speaks `initialize`, `notifications/initialized`, `tools/list`,
 //! `tools/call`, `ping`, and `shutdown`, and treats stdin EOF as shutdown.
 //!
 //! The MCP face is not a privileged side door: every tool calls the identical
-//! spec 004 verb request (the endpoint and body knowledge lives once, in
-//! [`crate::verbs`]), and the tool result is the spec 004 §5.2 `{ok,data|error}`
+//! spec 104 verb request (the endpoint and body knowledge lives once, in
+//! [`crate::verbs`]), and the tool result is the spec 104 §5.2 `{ok,data|error}`
 //! envelope verbatim, so any attestation/record ids in the plane's payload are
 //! carried through. The destructive guards pass through to the agent unchanged:
 //! `stamp_new` requires an explicit `posture`, `fleet_remove` a `confirm_name`.
@@ -39,9 +39,9 @@ const METHOD_NOT_FOUND: i64 = -32601;
 const INVALID_PARAMS: i64 = -32602;
 
 /// What the server needs to serve tool calls: the resolved base URL, the
-/// credential loaded from the spec 003 store (both optional), and one runtime
+/// credential loaded from the spec 103 store (both optional), and one runtime
 /// reused across the sequential request loop. A `None` token is a
-/// running-but-unauthenticated server (spec 005 §1): it starts and answers every
+/// running-but-unauthenticated server (spec 105 §1): it starts and answers every
 /// tool call with a login instruction rather than refusing to boot.
 struct ServerContext {
     base_url: Option<String>,
@@ -55,11 +55,11 @@ struct ServerContext {
 
 /// `statecraft mcp`: run the stdio server until stdin closes (or a `shutdown`).
 ///
-/// The credential is loaded once, at startup, from the spec 003 store; a client
+/// The credential is loaded once, at startup, from the spec 103 store; a client
 /// that logs in afterward reconnects (Claude Code restarts the server on config
 /// change), which keeps the request loop free of filesystem access and testable.
 /// A missing or unreadable store is not fatal: the server starts unauthenticated
-/// and instructs `statecraft login` per call (spec 005 §1 "if unauthenticated it
+/// and instructs `statecraft login` per call (spec 105 §1 "if unauthenticated it
 /// starts").
 pub fn run(resolved: &ResolvedConfig, debug: bool) -> AppResult<()> {
     let base_url = resolved.base_url.value.as_deref().map(normalize_base_url);
@@ -301,7 +301,7 @@ fn tool_result(envelope: Value) -> Value {
 
 // --- tool registry ----------------------------------------------------------
 
-/// The advertised tools (spec 005 §1): each name maps to one spec 004 verb, with
+/// The advertised tools (spec 105 §1): each name maps to one spec 104 verb, with
 /// a precise input schema so agents get typed parameters. The guard fields carry
 /// loud descriptions: the agent must never guess `posture` or `confirm_name`.
 fn tool_definitions() -> Vec<Value> {
@@ -438,7 +438,7 @@ macro_rules! param {
     };
 }
 
-/// Validate parameters, then run the matching spec 004 verb request. Parameter
+/// Validate parameters, then run the matching spec 104 verb request. Parameter
 /// validation stays in the MCP layer (it is transport concern); the endpoint and
 /// body construction stay in the verb layer (they are the shared contract).
 fn call_tool(ctx: &ServerContext, name: &str, args: &Value) -> Dispatch {
@@ -512,7 +512,7 @@ fn call_tool(ctx: &ServerContext, name: &str, args: &Value) -> Dispatch {
 
 /// Build the client (or the structured error envelope for an unauthenticated /
 /// unconfigured server), run `request` against it, and wrap the outcome in the
-/// shared envelope. `request` owns the endpoint and body (it is the spec 004
+/// shared envelope. `request` owns the endpoint and body (it is the spec 104
 /// verb); the MCP face only chooses which to call.
 fn execute<F, Fut>(ctx: &ServerContext, request: F) -> Value
 where
@@ -580,7 +580,7 @@ fn opt<'a>(args: &'a Value, key: &str) -> Option<&'a str> {
 
 /// Parse the `stamp_new` posture enum by hand (the schema advertises it, but a
 /// hand-rolled server still validates). Unknown tokens are rejected, never
-/// defaulted: neither face invents a posture (spec 004 §5.1, spec 005 §1).
+/// defaulted: neither face invents a posture (spec 104 §5.1, spec 105 §1).
 fn parse_posture(token: &str, tool: &str) -> Result<Posture, String> {
     Posture::from_wire(token)
         .ok_or_else(|| format!("{tool}: `posture` must be one of none, assisted, autonomous"))
@@ -700,7 +700,7 @@ mod tests {
         ] {
             assert!(names.contains(&expected), "missing tool {expected}");
         }
-        assert_eq!(names.len(), 9, "exactly the nine spec 005 tools");
+        assert_eq!(names.len(), 9, "exactly the nine spec 105 tools");
 
         let stamp_new = tools.iter().find(|t| t["name"] == "stamp_new").unwrap();
         assert!(required(stamp_new).contains(&"posture".to_string()));
@@ -779,7 +779,7 @@ mod tests {
     #[test]
     fn unauthenticated_tool_call_instructs_login() {
         // base_url present, no stored token: the server started, and every tool
-        // call returns a structured login instruction (spec 005 §1).
+        // call returns a structured login instruction (spec 105 §1).
         let ctx = ctx(Some("http://localhost:4000"), None);
         match call_tool(&ctx, "tenants_list", &json!({})) {
             Dispatch::Envelope(envelope) => {
@@ -812,7 +812,7 @@ mod tests {
 
     #[test]
     fn round_trip_initialize_list_call_lists_tenants() {
-        // The spec 005 §2 acceptance: initialize -> tools/list -> tools/call.
+        // The spec 105 §2 acceptance: initialize -> tools/list -> tools/call.
         let server = MockServer::start();
         let mock = server.mock(|when, then| {
             when.method(GET).path("/api/v1/tenants");
@@ -926,7 +926,7 @@ mod tests {
     #[test]
     fn api_error_becomes_an_iserror_tool_result() {
         // A missing service (404) is an operational tool error, not a protocol
-        // error: isError true, the envelope explaining it (spec 004 §1).
+        // error: isError true, the envelope explaining it (spec 104 §1).
         let server = MockServer::start();
         server.mock(|when, then| {
             when.method(GET).path("/api/v1/tenants");

@@ -1,0 +1,42 @@
+# The members' stack gate (spec 110 B-4, D-3): the observatory's govern.yml
+# minus the governance steps, which spec-spine.yml runs once over the whole
+# tree. Everything here runs under members/, the bun project spec 110 moved.
+name: members
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  members:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: members
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+      # The synthesis tests scaffold a target with `spec-spine init` (spec 035);
+      # the same binary the governance job installs.
+      - name: Install spec-spine
+        working-directory: .
+        run: |
+          curl -fsSL https://raw.githubusercontent.com/statecrafting/spec-spine/main/install.sh | sh
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+      - run: bun install --frozen-lockfile
+      - run: bun run typecheck
+      # Spec 024 FR-001: the SPA the daemon serves has to build in CI.
+      - name: Build web UI
+        run: bun run web:build
+      # Spec 042 FR-006: the three member binaries build and answer for
+      # themselves; spec 043 FR-005 reads the engine and driver bundles.
+      - name: Build members
+        run: |
+          bun run build:member:sensor && ./dist/statecraft-sensor-claude --member-manifest
+          bun run build:member:engine && ./dist/statecraft-engine --member-manifest
+          bun run build:member:driver && ./dist/statecraft-driver-claude --member-manifest
+      - name: Tests
+        run: bun test

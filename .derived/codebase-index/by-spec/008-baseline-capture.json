@@ -1,0 +1,50 @@
+{
+  "mapping": {
+    "dependsOn": [
+      "001-observed-universe",
+      "004-event-store"
+    ],
+    "implementingPaths": [
+      {
+        "path": "members/scripts/baseline.ts",
+        "source": "spec-edge"
+      },
+      {
+        "path": "members/scripts/import-baseline.ts",
+        "source": "spec-edge"
+      }
+    ],
+    "resolvedUnits": [
+      {
+        "locations": [
+          {
+            "file": "members/scripts/baseline.ts"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "kind": "file",
+          "path": "members/scripts/baseline.ts"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "members/scripts/import-baseline.ts"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "kind": "file",
+          "path": "members/scripts/import-baseline.ts"
+        }
+      }
+    ],
+    "specId": "008-baseline-capture",
+    "specStatus": "approved"
+  },
+  "schemaVersion": "1.1.0",
+  "shardHash": "42bb42f76b90c872c587a22539f6fa6eafac47080b0899872e0c1795736c1f79"
+}

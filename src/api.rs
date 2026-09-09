@@ -1,11 +1,11 @@
-//! The control-plane API client (spec 003 §2).
+//! The control-plane API client (spec 103 §2).
 //!
 //! `base_url` + a stored credential become an authenticated request path with
 //! a uniform error taxonomy (network, auth, api-4xx, api-5xx), retry with
 //! jitter for idempotent GETs only, and a `--debug` metadata dump that never
 //! prints credential material. The `whoami` verb is the first consumer; every
-//! spec-004 verb hangs off the same client. JSON output shapes are API: the
-//! MCP face (spec 005) reuses them.
+//! spec-104 verb hangs off the same client. JSON output shapes are API: the
+//! MCP face (spec 105) reuses them.
 
 use std::time::Duration;
 
@@ -24,10 +24,10 @@ const USER_AGENT: &str = concat!("statecraft/", env!("CARGO_PKG_VERSION"));
 const MAX_ATTEMPTS: u32 = 3;
 /// Backoff base; the nth retry waits `RETRY_BASE * n` plus jitter.
 const RETRY_BASE: Duration = Duration::from_millis(100);
-/// The chassis auth identity endpoint (spec 003 §2).
+/// The chassis auth identity endpoint (spec 103 §2).
 const AUTH_ME_PATH: &str = "/api/v1/auth/me";
 
-/// The failure taxonomy every API call maps onto (spec 003 §2). All variants
+/// The failure taxonomy every API call maps onto (spec 103 §2). All variants
 /// are operational (exit 1): a failed request is never a usage error.
 #[derive(Debug)]
 pub enum ApiError {
@@ -64,8 +64,8 @@ impl std::fmt::Display for ApiError {
 impl std::error::Error for ApiError {}
 
 impl ApiError {
-    /// The stable `kind` token for the JSON error envelope (spec 004 §5.2). One
-    /// token per taxonomy variant; the MCP face keys off these too (spec 005).
+    /// The stable `kind` token for the JSON error envelope (spec 104 §5.2). One
+    /// token per taxonomy variant; the MCP face keys off these too (spec 105).
     pub fn kind(&self) -> &'static str {
         match self {
             ApiError::Network(_) => "network",
@@ -104,7 +104,7 @@ pub struct Identity {
     pub name: Option<String>,
 }
 
-/// The stable `whoami` JSON shape (API; reused by the MCP face, spec 005).
+/// The stable `whoami` JSON shape (API; reused by the MCP face, spec 105).
 #[derive(Debug, Serialize)]
 pub struct Whoami {
     pub base_url: String,
@@ -153,15 +153,15 @@ impl ApiClient {
         format!("{}/{}", self.base_url, path.trim_start_matches('/'))
     }
 
-    /// GET a path and deserialize the 2xx body into `T`: spec 003's typed path,
+    /// GET a path and deserialize the 2xx body into `T`: spec 103's typed path,
     /// used by `fetch_identity`. Routes through the same request pipeline as the
-    /// spec 004 passthrough verbs.
+    /// spec 104 passthrough verbs.
     async fn get_json<T: DeserializeOwned>(&self, path: &str) -> Result<T, ApiError> {
         let value = self.get_value(path).await?;
         serde_json::from_value(value).map_err(|e| ApiError::Decode(e.to_string()))
     }
 
-    /// GET a path as an opaque JSON value: the spec 004 passthrough, wrapped by
+    /// GET a path as an opaque JSON value: the spec 104 passthrough, wrapped by
     /// the verb layer's `{ok,data}` envelope without reshaping the payload.
     pub async fn get_value(&self, path: &str) -> Result<Value, ApiError> {
         self.send_json(Method::GET, path, None).await
@@ -173,7 +173,7 @@ impl ApiClient {
     }
 
     /// DELETE `path` carrying a JSON `body` (the fleet remove confirm guard,
-    /// spec 004 §5.1) and return the 2xx response value.
+    /// spec 104 §5.1) and return the 2xx response value.
     pub async fn delete_value(&self, path: &str, body: Value) -> Result<Value, ApiError> {
         self.send_json(Method::DELETE, path, Some(&body)).await
     }
@@ -284,7 +284,7 @@ impl ApiClient {
 }
 
 /// The `whoami` verb: fetch and render the authenticated identity, or exit 1
-/// when unauthenticated (spec 003 §2).
+/// when unauthenticated (spec 103 §2).
 pub fn run_whoami(resolved: &ResolvedConfig, format: OutputFormat, debug: bool) -> AppResult<()> {
     let base_url = require_base_url(resolved)?;
     let token = crate::auth::load_token(&base_url)?.ok_or_else(|| {
@@ -347,7 +347,7 @@ pub(crate) fn block_on<F: std::future::Future>(future: F) -> AppResult<F::Output
     Ok(runtime.block_on(future))
 }
 
-/// Only idempotent methods are safe to retry (spec 003 §2: GETs only).
+/// Only idempotent methods are safe to retry (spec 103 §2: GETs only).
 fn is_retryable_method(method: &Method) -> bool {
     matches!(*method, Method::GET | Method::HEAD)
 }
@@ -368,7 +368,7 @@ fn jitter_ms() -> u64 {
 }
 
 /// A 404 on a governance endpoint means either the service is not enabled on
-/// this control plane (spec 004 §1: a service that does not exist yet) or the
+/// this control plane (spec 104 §1: a service that does not exist yet) or the
 /// addressed resource is gone. Prefer the plane's own message; when it gives
 /// none, name both possibilities rather than a bare "returned 404".
 fn not_found_message(body: &str) -> String {
@@ -478,7 +478,7 @@ mod tests {
 
     #[test]
     fn whoami_json_shape_is_stable() {
-        // The emitted envelope is API the MCP face reuses (spec 003 §2).
+        // The emitted envelope is API the MCP face reuses (spec 103 §2).
         let payload = Whoami {
             base_url: "http://localhost:4000".to_string(),
             id: "u_1".to_string(),

@@ -1,0 +1,41 @@
+{
+  "record": {
+    "authors": [
+      "Bartek Kus"
+    ],
+    "created": "2026-07-29",
+    "dependsOn": [
+      "011-work-journal"
+    ],
+    "establishes": [
+      {
+        "kind": "file",
+        "path": "members/src/orchestrator/state.ts"
+      },
+      {
+        "kind": "file",
+        "path": "members/src/orchestrator/state.test.ts"
+      }
+    ],
+    "id": "013-run-state-machine",
+    "implementation": "complete",
+    "kind": "kernel",
+    "risk": "high",
+    "sectionHeadings": [
+      "013: Run and stage state machine",
+      "1. Purpose",
+      "2. Territory",
+      "3. Behavior",
+      "4. Functional requirements",
+      "5. Acceptance criteria",
+      "6. Out of scope",
+      "7. Resolved decisions"
+    ],
+    "specPath": "specs/013-run-state-machine/spec.md",
+    "status": "approved",
+    "summary": "The typed state machine for runs, spec executions, and stages, kept as data (an allowed-transitions table) after the statecraft factory pattern: unit-testable, resumable by fold, with invalid transitions as typed errors. A run holds spec executions; a spec execution walks build, ship, shepherd, verify; every stage is independently retryable; terminal and live states are explicit predicates. All transitions go through the journal's intent/outcome bracket.\n",
+    "title": "Run and stage state machine (transitions as data)"
+  },
+  "shardHash": "ee265cdc832d56716c193107d5494505964da75f1889bc3548bf4a636f980552",
+  "specVersion": "1.2.0"
+}

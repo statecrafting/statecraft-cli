@@ -1,0 +1,101 @@
+{
+  "record": {
+    "created": "2026-09-09",
+    "dependsOn": [
+      "000-bootstrap",
+      "042-member-contract",
+      "043-driver-seam",
+      "108-member-dispatch"
+    ],
+    "establishes": [
+      {
+        "kind": "file",
+        "path": "spec-spine.toml"
+      },
+      {
+        "kind": "file",
+        "path": ".github/workflows/spec-spine.yml"
+      },
+      {
+        "kind": "file",
+        "path": ".github/workflows/members.yml"
+      },
+      {
+        "kind": "file",
+        "path": ".gitignore"
+      },
+      {
+        "kind": "directory",
+        "path": "docs/design/"
+      }
+    ],
+    "extends": [
+      {
+        "nature": "additive",
+        "spec": "109-governed-harness",
+        "unit": {
+          "kind": "file",
+          "path": "AGENTS.md"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "109-governed-harness",
+        "unit": {
+          "kind": "file",
+          "path": "CLAUDE.md"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "109-governed-harness",
+        "unit": {
+          "kind": "file",
+          "path": "Makefile"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "102-crate-scaffold",
+        "unit": {
+          "kind": "file",
+          "path": "Cargo.toml"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "024-web-ui",
+        "unit": {
+          "kind": "file",
+          "path": "members/package.json"
+        }
+      }
+    ],
+    "id": "110-corpus-merge",
+    "implementation": "complete",
+    "references": [
+      {
+        "role": "context",
+        "unit": {
+          "kind": "file",
+          "path": "docs/design/02-the-monorepo-and-the-rust-sequence.md"
+        }
+      }
+    ],
+    "sectionHeadings": [
+      "110: The corpus merge",
+      "1. Purpose",
+      "2. Territory",
+      "3. Behavior",
+      "4. Acceptance",
+      "5. Out of scope",
+      "6. Resolved decisions"
+    ],
+    "specPath": "specs/110-corpus-merge/spec.md",
+    "status": "approved",
+    "summary": "Design doc 02 D24 makes statecraft-cli the monorepo for the family's tooling, daemons and CLI packages, and D28 decides how the two governed corpora become one without their ids colliding. This spec is that move, executed as one change with one gate over the result: the claude-observatory tree lands under members/ with its bun project intact, its 44 specs (000-043) import unchanged, its design docs and evidence bundle land under docs/, and statecraft-cli's own ten specs renumber into the 100 band (000-009 become 100-109) with a reference sweep through every file that named them. The old bootstrap is superseded by the observatory's, which becomes the single bootstrap of the merged corpus. Every claim in every imported spec resolves against the new layout, the coupling gate holds both packages, and both test suites run in CI. The claude-observatory repository is left pointing here and retires; the word observatory retires with it (D27).\n",
+    "title": "The corpus merge: claude-observatory moves into statecraft-cli"
+  },
+  "shardHash": "68f720e5302f2171f9b82ab4b14032f685c2f1759651da5fbc257a6518d2d462",
+  "specVersion": "1.2.0"
+}

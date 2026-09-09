@@ -1,0 +1,36 @@
+{
+  "mapping": {
+    "dependsOn": [
+      "104-governance-verbs"
+    ],
+    "implementingPaths": [
+      {
+        "path": "src/main.rs",
+        "source": "spec-edge"
+      }
+    ],
+    "resolvedUnits": [
+      {
+        "locations": [
+          {
+            "file": "src/main.rs",
+            "span": {
+              "endLine": 11,
+              "startLine": 11
+            }
+          }
+        ],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "id": "statecraft_cli::mcp",
+          "kind": "symbol"
+        }
+      }
+    ],
+    "specId": "105-mcp-server",
+    "specStatus": "approved"
+  },
+  "schemaVersion": "1.1.0",
+  "shardHash": "759134fc9dfe5639f77c54dd8ad5fa04c1a7589c42fd009fe4b668c734abe3cf"
+}

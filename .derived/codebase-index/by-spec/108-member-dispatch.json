@@ -1,0 +1,146 @@
+{
+  "mapping": {
+    "dependsOn": [
+      "102-crate-scaffold"
+    ],
+    "implementingPaths": [
+      {
+        "path": "Cargo.lock",
+        "source": "spec-edge"
+      },
+      {
+        "path": "Cargo.toml",
+        "source": "spec-edge"
+      },
+      {
+        "path": "src/cli.rs",
+        "source": "spec-edge"
+      },
+      {
+        "path": "src/commands.rs",
+        "source": "spec-edge"
+      },
+      {
+        "path": "src/main.rs",
+        "source": "spec-edge"
+      },
+      {
+        "path": "src/members.rs",
+        "source": "comment-header"
+      },
+      {
+        "path": "tests/",
+        "source": "spec-edge"
+      }
+    ],
+    "resolvedUnits": [
+      {
+        "locations": [
+          {
+            "file": "src/main.rs",
+            "span": {
+              "endLine": 12,
+              "startLine": 12
+            }
+          }
+        ],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "id": "statecraft_cli::members",
+          "kind": "symbol"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "tests/"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "directory",
+          "path": "tests/"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "Cargo.lock"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "Cargo.lock"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "Cargo.toml"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "Cargo.toml"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "src/main.rs"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "src/main.rs"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "src/cli.rs",
+            "span": {
+              "endLine": 100,
+              "startLine": 49
+            }
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "id": "statecraft_cli::cli::Command",
+          "kind": "symbol"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "src/commands.rs",
+            "span": {
+              "endLine": 68,
+              "startLine": 24
+            }
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "id": "statecraft_cli::commands::dispatch",
+          "kind": "symbol"
+        }
+      }
+    ],
+    "specId": "108-member-dispatch",
+    "specStatus": "approved"
+  },
+  "schemaVersion": "1.1.0",
+  "shardHash": "59a7138ab3287e80719d2e88de886d3bf5e7f67126561e1ffea9166d7514c2d7"
+}

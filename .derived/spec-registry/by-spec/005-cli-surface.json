@@ -1,0 +1,57 @@
+{
+  "record": {
+    "authors": [
+      "Bartek Kus"
+    ],
+    "created": "2026-07-29",
+    "dependsOn": [
+      "001-observed-universe",
+      "002-filesystem-watcher",
+      "003-event-classification",
+      "004-event-store"
+    ],
+    "establishes": [
+      {
+        "kind": "file",
+        "path": "members/src/index.ts"
+      },
+      {
+        "kind": "file",
+        "path": "members/src/format.ts"
+      },
+      {
+        "kind": "file",
+        "path": "members/src/commands/watch.ts"
+      },
+      {
+        "kind": "file",
+        "path": "members/src/commands/query.ts"
+      },
+      {
+        "kind": "file",
+        "path": "members/src/commands/snapshot.ts"
+      }
+    ],
+    "id": "005-cli-surface",
+    "implementation": "complete",
+    "kind": "surface",
+    "origin": {
+      "retroactive": true
+    },
+    "risk": "low",
+    "sectionHeadings": [
+      "005: CLI surface",
+      "1. Purpose",
+      "2. Territory",
+      "3. Behavior",
+      "4. Out of scope",
+      "5. Known defects (recorded, not blessed)"
+    ],
+    "specPath": "specs/005-cli-surface/spec.md",
+    "status": "approved",
+    "summary": "The command dispatcher and the five data-plane commands: live watch with raw/no-db/quiet flags, event-log querying with since/path/kind/action/limit filters, aggregate stats (by kind, hottest paths, biggest churn), snapshot capture/listing, and snapshot diffing (added/removed/changed with replaced-vs-touched discrimination). Also the shared line formatter with NO_COLOR-aware ANSI output.\n",
+    "title": "CLI surface: watch, log, stats, snapshot, diff"
+  },
+  "shardHash": "bf0b74a0d7b3db10f1fbacebc4704a73ed323e49956197d379e54867ab8edf22",
+  "specVersion": "1.2.0"
+}

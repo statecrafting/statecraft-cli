@@ -1,8 +1,8 @@
-# Governance gate (spec 000, harness by spec 009): the same `make gate` chain
+# Governance gate (spec 100, harness by spec 109): the same `make gate` chain
 # a session runs locally, so the gate has one definition rather than two that
 # drift. This is the spec-spine kit's govern.yml kept under the filename spec
-# 000 established. The Rust stack gate (fmt, clippy, test, release build) is
-# ci.yml (spec 002), so the kit's probe and build jobs are not duplicated here.
+# 100 established. The Rust stack gate (fmt, clippy, test, release build) is
+# ci.yml (spec 102), so the kit's probe and build jobs are not duplicated here.
 name: spec-spine
 
 on:

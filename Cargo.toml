@@ -9,22 +9,22 @@ readme = "README.md"
 
 # spec-spine couples this crate's code paths to its owning spec.
 [package.metadata.spec-spine]
-spec = "002-crate-scaffold"
+spec = "102-crate-scaffold"
 
-# One binary named `statecraft` (spec 001: the OPC name retires).
+# One binary named `statecraft` (spec 101: the OPC name retires).
 [[bin]]
 name = "statecraft"
 path = "src/main.rs"
 
 [dependencies]
-# CLI parsing and shell completions (no async; that lands in spec 003).
+# CLI parsing and shell completions (no async; that lands in spec 103).
 clap = { version = "4", features = ["derive"] }
 clap_complete = "4"
 # Serialization: stable JSON output shapes are API from the first verb.
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 toml = "0.8"
-# Semantic-version comparison for the template upgrade verb (spec 006): the
+# Semantic-version comparison for the template upgrade verb (spec 106): the
 # compat gate matches a target against the contract's `[requires]` range.
 # Pure Rust, no TLS surface; keeps the tree rustls-only.
 semver = "1"
@@ -33,7 +33,7 @@ anyhow = "1"
 thiserror = "2"
 # Platform-appropriate config paths.
 directories = "6"
-# Async runtime and HTTP client for the control-plane API (spec 003).
+# Async runtime and HTTP client for the control-plane API (spec 103).
 # rustls only, never native-tls (CLAUDE.md: no OpenSSL on customer machines).
 tokio = { version = "1", features = ["rt-multi-thread", "time", "net"] }
 reqwest = { version = "0.12", default-features = false, features = [
@@ -42,11 +42,11 @@ reqwest = { version = "0.12", default-features = false, features = [
     "rustls-tls",
 ] }
 
-# Signal forwarding to a dispatched member (spec 008 §6): `kill` and `signal`
+# Signal forwarding to a dispatched member (spec 108 §6): `kill` and `signal`
 # only, on unix only. Already in the tree through tokio; no new surface.
 [target.'cfg(unix)'.dependencies]
 libc = "0.2"
 
 [dev-dependencies]
-# Mock HTTP server so `cargo test` never gates on a live control plane (spec 003 §1).
+# Mock HTTP server so `cargo test` never gates on a live control plane (spec 103 §1).
 httpmock = "0.7"

@@ -1,4 +1,4 @@
-# Tag-gated prebuilt-binary release (spec 007). Pushing a `v*` tag builds a
+# Tag-gated prebuilt-binary release (spec 107). Pushing a `v*` tag builds a
 # per-triple archive (with a .sha256 sidecar) for each of the five supported
 # targets, generates a per-target CycloneDX SBOM and a SLSA build-provenance
 # attestation, and attaches everything to the GitHub Release. install.sh
@@ -106,7 +106,7 @@ jobs:
           Get-Content "$base.zip.sha256"
           Add-Content -Path $env:GITHUB_ENV -Value "ARCHIVE_FILE=$base.zip"
 
-      # Supply-chain evidence (spec 007 §3.4): per-target CycloneDX SBOM read
+      # Supply-chain evidence (spec 107 §3.4): per-target CycloneDX SBOM read
       # from the committed Cargo.lock, then a provenance attestation whose
       # subject is the archive itself.
       - name: Generate per-target CycloneDX SBOM

@@ -1,0 +1,39 @@
+{
+  "record": {
+    "authors": [
+      "Bartek Kus"
+    ],
+    "created": "2026-07-29",
+    "dependsOn": [
+      "001-observed-universe",
+      "003-event-classification"
+    ],
+    "establishes": [
+      {
+        "kind": "file",
+        "path": "members/src/watcher.ts"
+      }
+    ],
+    "id": "002-filesystem-watcher",
+    "implementation": "complete",
+    "kind": "engine",
+    "origin": {
+      "retroactive": true
+    },
+    "risk": "medium",
+    "sectionHeadings": [
+      "002: State-diffing filesystem watcher",
+      "1. Purpose",
+      "2. Territory",
+      "3. Behavior",
+      "4. Out of scope",
+      "5. Known defects (recorded, not blessed)"
+    ],
+    "specPath": "specs/002-filesystem-watcher/spec.md",
+    "status": "approved",
+    "summary": "The event engine: two fs.watch handles (recursive over the watch root, non-recursive over the home directory for the state file and its atomic temp siblings), per-path trailing-edge debounce at 200 ms, a shadow state table diffed on flush, inode-change detection distinguishing atomic replace from in-place modification, shallow directory reconcile as the FSEvents coalescing safety net, and subtree adoption/forgetting on directory create/delete. Emits ObservedEvent records into a caller-supplied sink.\n",
+    "title": "State-diffing filesystem watcher"
+  },
+  "shardHash": "86813c7e2911edc60d5abd3019f651c0948e431431a13185b369b5f52cd2042a",
+  "specVersion": "1.2.0"
+}

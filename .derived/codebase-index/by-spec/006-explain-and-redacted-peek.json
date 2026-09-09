@@ -1,0 +1,63 @@
+{
+  "mapping": {
+    "dependsOn": [
+      "001-observed-universe",
+      "004-event-store"
+    ],
+    "implementingPaths": [
+      {
+        "path": "members/src/commands/explain.ts",
+        "source": "spec-edge"
+      },
+      {
+        "path": "members/src/redact.ts",
+        "source": "spec-edge"
+      }
+    ],
+    "resolvedUnits": [
+      {
+        "locations": [
+          {
+            "file": "members/src/commands/explain.ts"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "kind": "file",
+          "path": "members/src/commands/explain.ts"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "members/src/redact.ts"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "kind": "file",
+          "path": "members/src/redact.ts"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "members/FINDINGS.md"
+          }
+        ],
+        "ownership": false,
+        "sourceField": "references",
+        "unit": {
+          "kind": "file",
+          "path": "members/FINDINGS.md"
+        }
+      }
+    ],
+    "specId": "006-explain-and-redacted-peek",
+    "specStatus": "approved"
+  },
+  "schemaVersion": "1.1.0",
+  "shardHash": "7281f39babbf4c4cd50f633204c30dd3a8a750688b41a3691568d2917f782ebe"
+}

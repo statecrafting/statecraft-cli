@@ -1,0 +1,46 @@
+{
+  "mapping": {
+    "dependsOn": [
+      "024-web-ui",
+      "027-api-projects"
+    ],
+    "implementingPaths": [
+      {
+        "path": "members/web/",
+        "source": "spec-edge"
+      }
+    ],
+    "resolvedUnits": [
+      {
+        "locations": [
+          {
+            "file": "members/web/"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "members/web/"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "docs/design/00-ecosystem-analysis.md"
+          }
+        ],
+        "ownership": false,
+        "sourceField": "references",
+        "unit": {
+          "kind": "file",
+          "path": "docs/design/00-ecosystem-analysis.md"
+        }
+      }
+    ],
+    "specId": "029-ui-projects",
+    "specStatus": "approved"
+  },
+  "schemaVersion": "1.1.0",
+  "shardHash": "24c2ed866a063f24c6e034d909d71298ec4e31d5a590d558477aa8fd4d448994"
+}

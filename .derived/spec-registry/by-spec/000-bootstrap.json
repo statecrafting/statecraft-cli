@@ -1,34 +1,36 @@
 {
   "record": {
-    "created": "2026-07-14",
-    "establishes": [
-      {
-        "kind": "file",
-        "path": "spec-spine.toml"
-      },
-      {
-        "kind": "file",
-        "path": ".github/workflows/spec-spine.yml"
-      }
+    "authors": [
+      "Bartek Kus"
     ],
+    "created": "2026-07-29",
     "id": "000-bootstrap",
+    "origin": {
+      "retroactive": true
+    },
     "sectionHeadings": [
       "000: Bootstrap spec system",
       "1. The authoring / derived boundary",
-      "2. The typed authority graph"
+      "2. The typed authority graph",
+      "3. Retroactive adoption",
+      "4. Corpus conventions"
     ],
     "specPath": "specs/000-bootstrap/spec.md",
     "status": "approved",
-    "summary": "Foundational contract: authored truth lives only in markdown (+ YAML frontmatter); machine-consumable truth is compiler-emitted JSON only; every artifact is a deterministic function of (config, file contents); a typed authority graph governs who-owns-what. This repository is born governed: the spine exists before the first line of product code.\n",
+    "summary": "Foundational contract for this repository: authored truth lives only in markdown (+ YAML frontmatter); machine-consumable truth is compiler-emitted JSON only; every artifact is a deterministic function of (config, file contents); a typed authority graph governs who-owns-what. claude-observatory adopted spec-spine retroactively on 2026-07-29: the code under src/ and scripts/ predates this corpus, and specs 001-008 record its behavior as found, defects included, rather than blessing them as contract.\n",
+    "supersedes": [
+      "100-bootstrap"
+    ],
     "title": "Bootstrap spec system",
     "unamendable": [
       "markdown-truth-boundary",
       "json-truth-boundary",
       "determinism-requirement",
+      "directory-name-equals-id",
       "typed-authority-graph",
       "refusal-rule"
     ]
   },
-  "shardHash": "e233c6319046bc4d46dfc913847a32d540e7a0b882d6570354f152484adfafb4",
+  "shardHash": "94c776cbd0cb86ea247cf5b6ed79ec22486a575b634fa9952c40dac800a56097",
   "specVersion": "1.2.0"
 }

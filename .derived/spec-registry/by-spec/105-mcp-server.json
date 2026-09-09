@@ -1,0 +1,30 @@
+{
+  "record": {
+    "created": "2026-07-14",
+    "dependsOn": [
+      "104-governance-verbs"
+    ],
+    "establishes": [
+      {
+        "id": "statecraft_cli::mcp",
+        "kind": "symbol"
+      }
+    ],
+    "id": "105-mcp-server",
+    "implementation": "complete",
+    "sectionHeadings": [
+      "105: MCP server",
+      "1. Behavior",
+      "Transport decision (2026-07-15 amendment)",
+      "2. Acceptance",
+      "3. Out of scope",
+      "4. Status (2026-07-15)"
+    ],
+    "specPath": "specs/105-mcp-server/spec.md",
+    "status": "approved",
+    "summary": "Milestone M4's core: `statecraft mcp` runs a Model Context Protocol server over stdio exposing the governance verbs as tools, so a coding agent (Claude Code first) operates under Statecraft governance natively: listing tenants, launching and watching stamps, inspecting and operating fleets, all with the same auth, the same guards, and the same JSON shapes as the CLI face. The MCP face is not a privileged side door: it calls the identical verb layer from spec 104, and destructive guards (explicit posture, confirm-name) pass through to the agent verbatim.\n",
+    "title": "The MCP face: statecraft mcp (stdio server)"
+  },
+  "shardHash": "bcb2d6e988d649b76d904f98ba426006c63c543a42c4bc3007cb9dfa05d94373",
+  "specVersion": "1.2.0"
+}

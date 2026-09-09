@@ -1,4 +1,4 @@
-//! The `fleet` verb family (spec 004 §5.1): list, deploy, update, backup,
+//! The `fleet` verb family (spec 104 §5.1): list, deploy, update, backup,
 //! remove. `remove` carries the confirm-name guard verbatim (statecraft spec
 //! 006 §3); there is deliberately no `--force`/`--yes` shortcut.
 
@@ -13,7 +13,7 @@ use crate::error::AppResult;
 use crate::output::OutputFormat;
 
 /// GET /api/v1/tenants/:id/fleet: the `fleet list` request, shared by both faces
-/// (spec 005 reuses each of these for the matching MCP tool).
+/// (spec 105 reuses each of these for the matching MCP tool).
 pub(crate) async fn list_request(client: &ApiClient, tenant: &str) -> Result<Value, ApiError> {
     client
         .get_value(&format!("/api/v1/tenants/{tenant}/fleet"))
@@ -131,7 +131,7 @@ pub fn remove(
 
 fn render_list(v: &Value) -> AppResult<String> {
     // GET /tenants/:id/fleet is `{apps:[…]}` (statecraft `ListFleetResponse`),
-    // not a bare array; unwrap the collection key (spec 004 §5.3).
+    // not a bare array; unwrap the collection key (spec 104 §5.3).
     let apps = array_field(v, "apps")?;
     if apps.is_empty() {
         return Ok("no fleet apps".to_string());
@@ -177,7 +177,7 @@ fn render_app(v: &Value) -> AppResult<String> {
 
 /// A backup receipt (`fleet backup` response): the restic `repository`, the
 /// snapshot `tag`, and the Kubernetes `jobName` (statecraft `BackupResponse`,
-/// spec 004 §5.3). This is a completed-backup receipt, not an op record: it
+/// spec 104 §5.3). This is a completed-backup receipt, not an op record: it
 /// carries no `id`/`status`. `repository` is required, so a shape missing it is
 /// a decode error (the drift signal), not a silent blank.
 fn render_op(v: &Value) -> AppResult<String> {
@@ -207,7 +207,7 @@ mod tests {
 
     #[test]
     fn list_renders_a_table() {
-        // The plane wraps the collection under `apps` (spec 004 §5.3).
+        // The plane wraps the collection under `apps` (spec 104 §5.3).
         let v = json!({"apps": [
             {"id": "a_1", "name": "smoke", "status": "running", "image": "ghcr.io/x:1", "createdAt": "2026-07-01"}
         ]});

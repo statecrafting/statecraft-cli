@@ -1,7 +1,7 @@
-//! Command dispatch and handlers (spec 002 §2).
+//! Command dispatch and handlers (spec 102 §2).
 //!
 //! `mcp` is the last stub, returning [`AppError::NotImplemented`] (exit 2, spec
-//! named) until spec 005. The governance verbs (spec 004) live in
+//! named) until spec 105. The governance verbs (spec 104) live in
 //! [`crate::verbs`]; the local verbs (`version`, `config show`, `completions`)
 //! render through the shared output layer so `--output json` is honored
 //! uniformly.
@@ -22,7 +22,7 @@ use crate::output::{self, OutputFormat};
 
 /// Resolve config, then run the selected command.
 pub fn dispatch(cli: Cli) -> AppResult<()> {
-    // Spec 008 §8: a member dispatch reads no config file, no credential and
+    // Spec 108 §8: a member dispatch reads no config file, no credential and
     // no base URL. It is decided before the config layers are even loaded, so
     // an unset or malformed plane configuration cannot touch the local loop.
     if let Command::External(argv) = &cli.command {
@@ -86,7 +86,7 @@ fn load_config(cli: &Cli) -> AppResult<ResolvedConfig> {
     Ok(config::resolve(file, env, flags))
 }
 
-// --- governance verbs (spec 004) -------------------------------------------
+// --- governance verbs (spec 104) -------------------------------------------
 
 fn tenants(
     command: &TenantsCommand,
@@ -156,7 +156,7 @@ fn fleet(
     }
 }
 
-// --- local governed verb (spec 006) ----------------------------------------
+// --- local governed verb (spec 106) ----------------------------------------
 
 /// `template upgrade`: the one verb that never touches the control plane. It
 /// operates on the stamped app checkout in the current working directory, so it

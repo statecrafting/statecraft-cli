@@ -9,8 +9,8 @@ Governance is provided by `spec-spine` **0.18.0 or later** (installed on your
 `PATH`: `cargo install spec-spine-cli --locked`, or the installer at
 statecrafting/spec-spine; `spec-spine.toml [meta] required_version` pins it).
 All governed reads of compiled artifacts go through its CLI. Bootstrap spec:
-`specs/000-bootstrap/spec.md`. The harness this file heads (skills, agents,
-hooks, `Makefile`, the govern workflow) is claimed by spec 009.
+`specs/100-bootstrap/spec.md`. The harness this file heads (skills, agents,
+hooks, `Makefile`, the govern workflow) is claimed by spec 109.
 
 > Keep the protocol in sync by editing this file, never the `/prime` skill.
 
@@ -45,9 +45,10 @@ picked up on the next init.
    - `spec-spine registry plan`: the ready set (spec 038): which specs can be worked on now and what blocks the rest
    - `spec-spine index coverage`: which source files no spec specifically claims (spec 032; non-fatal, exit 2 if the index is stale)
    - `spec-spine registry list --ids-only`: spec inventory (for latest-spec detection)
-   - `ls src/ src/verbs/ tests/`: application surface discovery (the clap
-     command tree and its integration tests)
-   - `specs/001-cli-mcp-thesis/spec.md`: the decided constraints (binary
+   - `ls src/ src/verbs/ tests/ members/src/ members/src/orchestrator/`:
+     application surface discovery (the clap command tree and its tests;
+     the members' sensor, engine and driver)
+   - `specs/101-cli-mcp-thesis/spec.md`: the decided constraints (binary
      name `statecraft`, Rust, stdio MCP, Apache-2.0, rustls only, no TUI)
    - `git log --oneline -10`: recent history
    - `git diff --stat HEAD~1`: last change summary
@@ -171,7 +172,11 @@ work orders.
    cargo fmt --check
    cargo clippy --all-targets -- -D warnings
    cargo test
+   make members       # in members/: bun run typecheck, the member builds, bun test
    ```
+
+   The cargo half applies to a change under `src/` or `tests/`; the bun
+   half to one under `members/`; a change to both runs both.
 
    `make gate` is the read-only half exactly as `.github/workflows/spec-spine.yml`
    runs it; `make refresh` is the writing half (`compile` + `index`). The
@@ -185,7 +190,7 @@ work orders.
    enforces and this list omits is a step every session skips.
    `[coupling] require_ownership` is on, so every new source file must be
    claimed in the implementing spec in the same change (`C-002`).
-   `check --fail-on-unresolved` is deliberately off (spec 050): spec 008 is
+   `check --fail-on-unresolved` is deliberately off (spec 050): spec 108 is
    approved and pending, so its symbol unit is legitimately unresolved until
    it is built. Turn the flag on in `Makefile` and CI once it is.
 6. **Satisfy the spec's acceptance criteria verbatim.** `/verify <id>` runs

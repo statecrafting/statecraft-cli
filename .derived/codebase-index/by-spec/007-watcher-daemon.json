@@ -1,0 +1,33 @@
+{
+  "mapping": {
+    "dependsOn": [
+      "001-observed-universe",
+      "005-cli-surface"
+    ],
+    "implementingPaths": [
+      {
+        "path": "members/src/commands/daemon.ts",
+        "source": "spec-edge"
+      }
+    ],
+    "resolvedUnits": [
+      {
+        "locations": [
+          {
+            "file": "members/src/commands/daemon.ts"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "kind": "file",
+          "path": "members/src/commands/daemon.ts"
+        }
+      }
+    ],
+    "specId": "007-watcher-daemon",
+    "specStatus": "approved"
+  },
+  "schemaVersion": "1.1.0",
+  "shardHash": "77f2b067b613a02545b923d49f35cfeece472a997b01899618e197f4a4e02d55"
+}

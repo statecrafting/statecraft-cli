@@ -1,4 +1,4 @@
-//! The `statecraft` command tree (spec 002 §2).
+//! The `statecraft` command tree (spec 102 §2).
 //!
 //! Stub verbs are present from day one so `--help` is honest: each carries
 //! about-text naming the spec that implements it, and its handler exits 2.
@@ -18,7 +18,7 @@ use crate::output::OutputFormat;
     about = "Statecraft governance verbs: CLI subcommands for humans, MCP server for agents.",
     subcommand_required = true,
     arg_required_else_help = true,
-    // Spec 008 §2: a first token that is not a built-in verb names a member
+    // Spec 108 §2: a first token that is not a built-in verb names a member
     // binary `statecraft-<name>`, git-plugin style, and everything after it
     // is that member's argv.
     allow_external_subcommands = true
@@ -47,31 +47,31 @@ pub struct Cli {
 /// Top-level verbs. Stubs name their owning spec in about-text.
 #[derive(Debug, Subcommand)]
 pub enum Command {
-    /// Authenticate against a Statecraft control plane (spec 003).
+    /// Authenticate against a Statecraft control plane (spec 103).
     Login,
-    /// Show the currently authenticated identity (spec 003).
+    /// Show the currently authenticated identity (spec 103).
     Whoami,
-    /// Inspect tenants (spec 004).
+    /// Inspect tenants (spec 104).
     Tenants {
         #[command(subcommand)]
         command: TenantsCommand,
     },
-    /// Governance stamps (spec 004).
+    /// Governance stamps (spec 104).
     Stamp {
         #[command(subcommand)]
         command: StampCommand,
     },
-    /// Fleet operations (spec 004).
+    /// Fleet operations (spec 104).
     Fleet {
         #[command(subcommand)]
         command: FleetCommand,
     },
-    /// Chassis template upgrades, run in a stamped app checkout (spec 006).
+    /// Chassis template upgrades, run in a stamped app checkout (spec 106).
     Template {
         #[command(subcommand)]
         command: TemplateCommand,
     },
-    /// Run the MCP server over stdio (spec 005).
+    /// Run the MCP server over stdio (spec 105).
     Mcp {
         /// Print the .mcp.json install snippet for this server, then exit.
         #[arg(long)]
@@ -89,25 +89,25 @@ pub enum Command {
         /// Target shell.
         shell: clap_complete::Shell,
     },
-    /// Discover the member binaries the umbrella dispatches to (spec 008).
+    /// Discover the member binaries the umbrella dispatches to (spec 108).
     Members {
         #[command(subcommand)]
         command: MembersCommand,
     },
-    /// `statecraft <name> <args...>`: dispatch to the member `statecraft-<name>` (spec 008).
+    /// `statecraft <name> <args...>`: dispatch to the member `statecraft-<name>` (spec 108).
     #[command(external_subcommand)]
     External(Vec<OsString>),
 }
 
 #[derive(Debug, Subcommand)]
 pub enum MembersCommand {
-    /// One row per discovered member: name, version, contract, tier, location (spec 008 §5).
+    /// One row per discovered member: name, version, contract, tier, location (spec 108 §5).
     List {
         /// Also print each member's declared verbs and exit-code table.
         #[arg(long)]
         verbose: bool,
     },
-    /// Print one member's manifest (spec 008 §5).
+    /// Print one member's manifest (spec 108 §5).
     Show {
         /// Member name, with or without the `statecraft-` prefix.
         name: String,
@@ -116,14 +116,14 @@ pub enum MembersCommand {
 
 #[derive(Debug, Subcommand)]
 pub enum TenantsCommand {
-    /// List the tenants you own (spec 004).
+    /// List the tenants you own (spec 104).
     List,
-    /// Show one tenant, including its installations (spec 004).
+    /// Show one tenant, including its installations (spec 104).
     Show {
         /// Tenant id.
         id: String,
     },
-    /// Print the GitHub App install URL for a tenant (spec 004).
+    /// Print the GitHub App install URL for a tenant (spec 104).
     InstallUrl {
         /// Tenant id.
         id: String,
@@ -134,7 +134,7 @@ pub enum TenantsCommand {
 }
 
 /// Governance posture for a stamp. Required with no default: the platform
-/// rejects a defaulted posture, so the CLI never invents one (spec 004 §5.1).
+/// rejects a defaulted posture, so the CLI never invents one (spec 104 §5.1).
 #[derive(Clone, Copy, Debug, PartialEq, Eq, ValueEnum)]
 pub enum Posture {
     /// No autonomous action; every step is operator-driven.
@@ -156,7 +156,7 @@ impl Posture {
     }
 
     /// Parse a wire token back into a posture (the MCP `stamp_new` tool validates
-    /// its enum by hand, spec 005). Unknown tokens are rejected, not defaulted:
+    /// its enum by hand, spec 105). Unknown tokens are rejected, not defaulted:
     /// the platform never invents a posture and neither does either face.
     pub fn from_wire(token: &str) -> Option<Self> {
         match token {
@@ -170,7 +170,7 @@ impl Posture {
 
 #[derive(Debug, Subcommand)]
 pub enum StampCommand {
-    /// Request a new governance stamp: born-green repo in a customer org (spec 004).
+    /// Request a new governance stamp: born-green repo in a customer org (spec 104).
     New {
         /// Tenant id the stamp is charged to.
         #[arg(long)]
@@ -188,7 +188,7 @@ pub enum StampCommand {
         #[arg(long, value_enum)]
         posture: Posture,
     },
-    /// Check stamp status; `--watch` streams until the job settles (spec 004).
+    /// Check stamp status; `--watch` streams until the job settles (spec 104).
     Status {
         /// Stamp job id.
         job_id: String,
@@ -200,13 +200,13 @@ pub enum StampCommand {
 
 #[derive(Debug, Subcommand)]
 pub enum FleetCommand {
-    /// List a tenant's fleet apps (spec 004).
+    /// List a tenant's fleet apps (spec 104).
     List {
         /// Tenant id whose fleet is listed.
         #[arg(long)]
         tenant: String,
     },
-    /// Deploy an image as a new fleet app (spec 004).
+    /// Deploy an image as a new fleet app (spec 104).
     Deploy {
         /// Tenant id the app belongs to.
         #[arg(long)]
@@ -218,7 +218,7 @@ pub enum FleetCommand {
         #[arg(long)]
         image: String,
     },
-    /// Roll a fleet app to a new image (spec 004).
+    /// Roll a fleet app to a new image (spec 104).
     Update {
         /// Fleet app id.
         app_id: String,
@@ -226,12 +226,12 @@ pub enum FleetCommand {
         #[arg(long)]
         image: String,
     },
-    /// Back up a fleet app's volume (spec 004).
+    /// Back up a fleet app's volume (spec 104).
     Backup {
         /// Fleet app id.
         app_id: String,
     },
-    /// Remove a fleet app; `--confirm <name>` must echo the app name (spec 004).
+    /// Remove a fleet app; `--confirm <name>` must echo the app name (spec 104).
     Remove {
         /// Fleet app id.
         app_id: String,
@@ -243,7 +243,7 @@ pub enum FleetCommand {
 
 #[derive(Debug, Subcommand)]
 pub enum TemplateCommand {
-    /// Upgrade a stamped app's chassis pins to a newer template version (spec 006).
+    /// Upgrade a stamped app's chassis pins to a newer template version (spec 106).
     ///
     /// Run from the repo root of a stamped app. Reads template.toml, bumps the
     /// chassis package pins, refreshes the lockfile, runs template-owned

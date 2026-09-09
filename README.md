@@ -10,17 +10,26 @@ under governance instead of shelling out around it.
 Successor to OPC, the Open Agentic Platform's desktop cockpit; the
 desktop app is retired, the governance verbs live on here.
 
+Since 2026-09-09 this repository is also the monorepo for the family's
+tooling, daemons and CLI packages (design doc 02): the three members
+formerly developed as claude-observatory live under `members/` (the sensor,
+the engine and the Claude driver, a bun project), and `statecraft <name>`
+dispatches to them (spec 108) without an account. The design record is
+under `docs/design/`.
+
 ## Status
 
 Milestone M4 in the Statecraft ladder, implemented: the crate scaffold
-(002), auth + API client (003), the governance verbs (004), the MCP
-stdio server (005), and the template upgrade verb (006). The thesis and
-decided constraints (binary name, Rust, stdio MCP, Apache-2.0, no TUI)
-live in `specs/001-cli-mcp-thesis/spec.md`.
+(102), auth + API client (103), the governance verbs (104), the MCP
+stdio server (105), the template upgrade verb (106), member dispatch
+(108) and the governed harness (109). The thesis and decided constraints
+(binary name, Rust, stdio MCP, Apache-2.0, no TUI) live in
+`specs/101-cli-mcp-thesis/spec.md`. The members' specs are 000-043; the
+corpus merge is spec 110.
 
 ## Install
 
-Prebuilt binaries for macOS and Linux (spec 007):
+Prebuilt binaries for macOS and Linux (spec 107):
 
 ```sh
 curl -fsSL https://raw.githubusercontent.com/statecrafting/statecraft-cli/main/install.sh | sh

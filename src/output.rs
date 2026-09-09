@@ -1,7 +1,7 @@
-//! Output discipline (spec 002 §2): one layer every command renders through.
+//! Output discipline (spec 102 §2): one layer every command renders through.
 //!
 //! Human-readable text on a TTY; stable machine JSON with `--output json`.
-//! The JSON shapes are the contract the MCP face (spec 005) and scripts
+//! The JSON shapes are the contract the MCP face (spec 105) and scripts
 //! consume later, so they are treated as versioned API from the first verb.
 
 use clap::ValueEnum;
