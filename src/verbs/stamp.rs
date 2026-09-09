@@ -1,4 +1,4 @@
-//! The `stamp` verb family (spec 004 §5.1): new, status (with `--watch`).
+//! The `stamp` verb family (spec 104 §5.1): new, status (with `--watch`).
 
 use std::fmt::Write;
 use std::time::Duration;
@@ -14,12 +14,12 @@ use crate::output::OutputFormat;
 
 /// First poll interval for `--watch`; it backs off toward [`WATCH_MAX`].
 const WATCH_INITIAL: Duration = Duration::from_secs(2);
-/// The poll-interval ceiling for `--watch` (spec 004 §5.4).
+/// The poll-interval ceiling for `--watch` (spec 104 §5.4).
 const WATCH_MAX: Duration = Duration::from_secs(10);
 
 /// POST /api/v1/tenants/:id/stamps: the `stamp new` request, shared by both
 /// faces (the CLI renders it, the MCP `stamp_new` tool returns its envelope,
-/// spec 005). `posture` is always sent (it is required, never defaulted);
+/// spec 105). `posture` is always sent (it is required, never defaulted);
 /// `frontend` only when supplied.
 pub(crate) async fn new_request(
     client: &ApiClient,
@@ -44,7 +44,7 @@ pub(crate) async fn new_request(
 }
 
 /// GET /api/v1/stamps/:jobId: a single status poll. The CLI non-watch path and
-/// the MCP `stamp_status` tool share it (spec 005: MCP polls once, the agent
+/// the MCP `stamp_status` tool share it (spec 105: MCP polls once, the agent
 /// loops itself); the CLI `--watch` loop drives the same endpoint below.
 pub(crate) async fn status_request(client: &ApiClient, job_id: &str) -> Result<Value, ApiError> {
     client.get_value(&format!("/api/v1/stamps/{job_id}")).await
@@ -85,7 +85,7 @@ pub fn status(
     }
 }
 
-/// A stamp job's terminal states (spec 005: queued|stamping|pushing|verifying
+/// A stamp job's terminal states (spec 105: queued|stamping|pushing|verifying
 /// are transient; green|failed are terminal).
 enum Terminal {
     Green,
@@ -116,7 +116,7 @@ async fn watch_loop(client: &ApiClient, path: &str, format: OutputFormat) -> App
             Err(err) => return Err(emit_err(format, err)),
         };
         // A response with no readable `status` is a shape the CLI cannot follow
-        // (spec 004 §5.3); abort as a decode error rather than poll forever.
+        // (spec 104 §5.3); abort as a decode error rather than poll forever.
         let status = match value.get("status").and_then(Value::as_str) {
             Some(status) => status.to_string(),
             None => {
@@ -292,7 +292,7 @@ mod tests {
 
     #[test]
     fn render_stamp_errors_on_a_statusless_record() {
-        // Spec 004 §5.3: a stamp record must carry `id` and `status`; a shape
+        // Spec 104 §5.3: a stamp record must carry `id` and `status`; a shape
         // missing them is a decode error, not a silent blank.
         assert!(render_stamp(&json!({"appName": "smoke"})).is_err());
     }

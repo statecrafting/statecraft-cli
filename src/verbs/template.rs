@@ -1,4 +1,4 @@
-//! The `template upgrade` verb (spec 006): the one local governed verb.
+//! The `template upgrade` verb (spec 106): the one local governed verb.
 //!
 //! Every other verb (tenants/stamp/fleet) is a thin wrapper over the
 //! control-plane API. This one never touches the plane. It runs in a stamped
@@ -6,10 +6,10 @@
 //! `template.toml`, bump the chassis package pins in `package.json`, refresh the
 //! lockfile, run any template-owned codemods, run the contract's verify verb,
 //! and commit on a branch. The CLI orchestrates; all structure knowledge stays
-//! in the template and its packages (spec 006 summary). This is the boundary
+//! in the template and its packages (spec 106 summary). This is the boundary
 //! that keeps the CLI from ever becoming a build daemon.
 //!
-//! Design notes (recorded in spec 006 §2 / §5 for the coherence guard):
+//! Design notes (recorded in spec 106 §2 / §5 for the coherence guard):
 //! - Per-package resolution: the chassis packages are versioned independently,
 //!   not in lockstep, so each discovered package resolves its own target. A seed
 //!   (a package the contract names in `[requires]`) resolves the greatest
@@ -27,7 +27,7 @@
 //!   (catching companions like `@statecrafting/hiqlite-native`) with no hardcoded
 //!   scope in the CLI.
 //! - Every git/npm/node side effect sits behind [`Runner`] so `cargo test` runs
-//!   fully offline (the spec 003 §1 discipline: never gate tests on the outside
+//!   fully offline (the spec 103 §1 discipline: never gate tests on the outside
 //!   world). The pure planning is exercised directly.
 
 use std::collections::BTreeMap;
@@ -95,7 +95,7 @@ fn run(
 
     let chassis = discover_chassis(&package, &manifest.requires)?;
 
-    // Preflight (spec 006 §2.1): a real run refuses on a dirty tree, checked
+    // Preflight (spec 106 §2.1): a real run refuses on a dirty tree, checked
     // before target resolution so a dirty tree fails fast with no wasted
     // registry read and the eventual commit is exactly the pin bump and its
     // effects. A dry run mutates nothing, so it does not require a clean tree.
@@ -110,7 +110,7 @@ fn run(
         ));
     }
 
-    // Per-package resolution (spec 006 §2): each discovered chassis package
+    // Per-package resolution (spec 106 §2): each discovered chassis package
     // resolves its own target independently, since the packages no longer move
     // in lockstep. A `--to` overrides the primary seed only; everything else
     // auto-resolves against its own range, so `--to` can never force a companion
@@ -183,7 +183,7 @@ fn run(
         .refresh_lockfile(dir)
         .map_err(|e| Refusal::Io(format!("could not refresh the lockfile: {e}")))?;
 
-    // Codemods are a reserved, template-owned hook (spec 006 §2.3). No template
+    // Codemods are a reserved, template-owned hook (spec 106 §2.3). No template
     // ships them yet, so this is an empty list in practice; the execution path
     // exists so a future template can carry ordered, idempotent codemods.
     let mut codemods_run = Vec::new();
@@ -250,7 +250,7 @@ fn run(
 /// The subset of `template.toml` (spec 009 / enrahitu 018) the upgrade reads:
 /// the chassis version ranges (`[requires]`), the verify verb (`[verbs]`), and
 /// the reserved codemod hook (`[upgrade]`). Everything else on the contract is
-/// deliberately not this verb's business (spec 006 §1).
+/// deliberately not this verb's business (spec 106 §1).
 #[derive(Debug, Default, Deserialize)]
 struct TemplateManifest {
     #[serde(default)]
@@ -270,7 +270,7 @@ struct VerbsTable {
 #[derive(Debug, Default, Deserialize)]
 struct UpgradeTable {
     /// Ordered, idempotent codemod commands the target template ships. Reserved:
-    /// no template ships these yet (spec 006 §2.3).
+    /// no template ships these yet (spec 106 §2.3).
     #[serde(default)]
     codemods: Vec<String>,
 }
@@ -407,7 +407,7 @@ struct ResolvedPin {
     target: String,
 }
 
-/// Resolve each discovered chassis pin to its own target (spec 006 §2). A seed
+/// Resolve each discovered chassis pin to its own target (spec 106 §2). A seed
 /// resolves the greatest published version its `[requires]` range allows; a
 /// companion resolves the greatest published version within a caret of its
 /// current pin, so an unnamed companion never crosses its own major. `--to`
@@ -534,7 +534,7 @@ fn commit_message(from: &str, to: &str, pins: &[PinReport]) -> String {
     for p in pins {
         let _ = writeln!(msg, "- {}: {} -> {} ({})", p.name, p.from, p.to, p.section);
     }
-    let _ = write!(msg, "\nSpec: 006-template-upgrade-verb");
+    let _ = write!(msg, "\nSpec: 106-template-upgrade-verb");
     msg
 }
 
@@ -549,7 +549,7 @@ enum VerifyState {
     Skipped,
 }
 
-/// The upgrade result (spec 006 §2.6): `{from, to, pins, codemodsRun, verify}`
+/// The upgrade result (spec 106 §2.6): `{from, to, pins, codemodsRun, verify}`
 /// plus the branch and PR suggestion. This is the `data` payload of the shared
 /// `{ok,data}` envelope, so the platform (and a later fleet-wide sweep) can
 /// consume an upgrade the same way both faces already consume every other verb.

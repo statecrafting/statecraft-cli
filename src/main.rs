@@ -1,5 +1,5 @@
-//! `statecraft`: one binary, two faces (spec 001). This crate is the scaffold
-//! (spec 002); auth (003), governance verbs (004), and the MCP server (005)
+//! `statecraft`: one binary, two faces (spec 101). This crate is the scaffold
+//! (spec 102); auth (103), governance verbs (104), and the MCP server (105)
 //! hang off the command tree established here.
 
 mod api;
@@ -28,7 +28,7 @@ fn main() -> ExitCode {
     match commands::dispatch(cli) {
         Ok(()) => ExitCode::from(EXIT_OK),
         // A `Rendered` failure already wrote the JSON error envelope to stdout
-        // (spec 004 §5.2); exit with its code without a second, stderr report.
+        // (spec 104 §5.2); exit with its code without a second, stderr report.
         Err(AppError::Rendered { code }) => ExitCode::from(code),
         Err(err) => {
             eprintln!("error: {err}");

@@ -4,9 +4,9 @@
     "kind": "rust-bin",
     "name": "statecraft-cli",
     "path": "",
-    "specRef": "002-crate-scaffold",
+    "specRef": "102-crate-scaffold",
     "version": "0.1.0"
   },
   "schemaVersion": "1.1.0",
-  "shardHash": "6ac577ade9d6de5fa68bb686fc570caaf7398950cca9ab1c13f0ff1d22f56d21"
+  "shardHash": "9de9f2b5ae9188487749f3f276546c237cc99465b77c715a4d8987ef0e038daa"
 }

@@ -1,0 +1,24 @@
+{
+  "mapping": {
+    "implementingPaths": [],
+    "resolvedUnits": [
+      {
+        "locations": [
+          {
+            "file": "docs/design/00-ecosystem-analysis.md"
+          }
+        ],
+        "ownership": false,
+        "sourceField": "references",
+        "unit": {
+          "kind": "file",
+          "path": "docs/design/00-ecosystem-analysis.md"
+        }
+      }
+    ],
+    "specId": "010-orchestrator-thesis",
+    "specStatus": "approved"
+  },
+  "schemaVersion": "1.1.0",
+  "shardHash": "264bfb74a4f4cd7d1c0064c0d948b5b049b1a5357f5fff5086a848c4ef40a09f"
+}

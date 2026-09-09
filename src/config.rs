@@ -1,4 +1,4 @@
-//! Layered configuration (spec 002 §2): flags > env > config file > default.
+//! Layered configuration (spec 102 §2): flags > env > config file > default.
 //!
 //! Resolution is a pure function over three raw layers so precedence is
 //! unit-testable without touching the filesystem or the process environment.

@@ -1,0 +1,38 @@
+{
+  "record": {
+    "authors": [
+      "Bartek Kus"
+    ],
+    "created": "2026-07-29",
+    "dependsOn": [
+      "001-observed-universe"
+    ],
+    "establishes": [
+      {
+        "kind": "file",
+        "path": "members/src/db.ts"
+      }
+    ],
+    "id": "004-event-store",
+    "implementation": "complete",
+    "kind": "engine",
+    "origin": {
+      "retroactive": true
+    },
+    "risk": "medium",
+    "sectionHeadings": [
+      "004: Append-only event store",
+      "1. Purpose",
+      "2. Territory",
+      "3. Behavior",
+      "4. Out of scope",
+      "5. Known defects (recorded, not blessed)"
+    ],
+    "specPath": "specs/004-event-store/spec.md",
+    "status": "approved",
+    "summary": "Persistence for observed events and full-tree snapshots: a WAL-mode bun:sqlite database at data/observatory.db with three tables (events, snapshots, snapshot_entries), append-only by construction (no code path updates or deletes rows), plus the --since parser and the glob-to-LIKE translator the query commands share. Metadata only: no file content is ever persisted.\n",
+    "title": "Append-only SQLite event store and snapshots"
+  },
+  "shardHash": "eb4b41286094cbb38294eb547369854bd4267a564bca9aa4a2d91b28065d5390",
+  "specVersion": "1.2.0"
+}

@@ -31,7 +31,7 @@ statecraft-cli is one Rust binary named `statecraft` with two faces: CLI subcomm
 | Surface | Path | Notes |
 |---------|------|-------|
 | Spec corpus | `specs/NNN-slug/spec.md` | Markdown + YAML frontmatter, the authoritative design record |
-| Code | `Cargo.toml`, `src/`, `tests/` (clap command tree, spec 002 onward) | The single `statecraft` binary the specs govern |
+| Code | `Cargo.toml`, `src/`, `tests/` (clap command tree, spec 102 onward) | The single `statecraft` binary the specs govern |
 | Standard | `standards/spec/{constitution.md,contract.md,templates/}` | Durable principles, normative contract, spec template |
 | Derived | `.derived/` | Compiler output (registry, index), read only through the binary |
 
@@ -120,7 +120,7 @@ Break the work into ordered, atomic steps. For each step specify:
 ## Guidelines
 
 - **DO:** Read broadly before planning: check specs, code, the contract, and existing patterns
-- **DO:** Cite specific spec ids (e.g. `specs/002-crate-scaffold/spec.md`) in your rationale
+- **DO:** Cite specific spec ids (e.g. `specs/102-crate-scaffold/spec.md`) in your rationale
 - **DO:** Flag when a spec should be authored or amended before implementation begins
 - **DO:** Distinguish a spec that is silent (record a decision) from a spec that is wrong (halt and report)
 - **DO:** Keep steps small enough that each can be verified independently

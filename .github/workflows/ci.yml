@@ -1,4 +1,4 @@
-# Rust CI (spec 002 §2): fmt, clippy -D warnings, test, release build.
+# Rust CI (spec 102 §2): fmt, clippy -D warnings, test, release build.
 # The spec-spine governance gate lives in its own workflow (spec-spine.yml)
 # and is unchanged. Actions are pinned to a commit SHA with a version comment.
 name: ci

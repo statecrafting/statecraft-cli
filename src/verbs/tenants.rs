@@ -1,4 +1,4 @@
-//! The `tenants` verb family (spec 004 §5.1): list, show, install-url.
+//! The `tenants` verb family (spec 104 §5.1): list, show, install-url.
 
 use std::fmt::Write;
 
@@ -11,7 +11,7 @@ use crate::error::AppResult;
 use crate::output::OutputFormat;
 
 /// GET /api/v1/tenants: the `tenants list` request, shared by both faces (the
-/// CLI renders it, the MCP `tenants_list` tool returns its envelope, spec 005).
+/// CLI renders it, the MCP `tenants_list` tool returns its envelope, spec 105).
 pub(crate) async fn list_request(client: &ApiClient) -> Result<Value, ApiError> {
     client.get_value("/api/v1/tenants").await
 }
@@ -71,7 +71,7 @@ pub fn install_url(
 
 fn render_list(v: &Value) -> AppResult<String> {
     // GET /tenants is `{tenants:[…]}` (statecraft `ListTenantsResponse`), not a
-    // bare array; unwrap the collection key (spec 004 §5.3).
+    // bare array; unwrap the collection key (spec 104 §5.3).
     let tenants = array_field(v, "tenants")?;
     if tenants.is_empty() {
         return Ok("no tenants".to_string());
@@ -86,7 +86,7 @@ fn render_list(v: &Value) -> AppResult<String> {
 fn render_detail(v: &Value) -> AppResult<String> {
     // GET /tenants/:id is `{tenant:{…}, installations:[…]}` (statecraft
     // `TenantDetailResponse`): the record lives under `tenant`, and
-    // `installations` is a sibling array, not nested in it (spec 004 §5.3).
+    // `installations` is a sibling array, not nested in it (spec 104 §5.3).
     let tenant = v.get("tenant").ok_or_else(|| {
         crate::error::AppError::Operational(anyhow::anyhow!(
             "expected an object carrying a `tenant` record from the control plane, got {}",
@@ -148,7 +148,7 @@ mod tests {
 
     #[test]
     fn list_renders_a_table() {
-        // The plane wraps the collection under `tenants` (spec 004 §5.3).
+        // The plane wraps the collection under `tenants` (spec 104 §5.3).
         let value = json!({"tenants": [
             {"id": "t_1", "name": "Acme", "createdAt": "2026-07-01"},
             {"id": "t_2", "name": "Beta", "createdAt": "2026-07-02"}
@@ -174,7 +174,7 @@ mod tests {
     #[test]
     fn detail_shows_installations() {
         // `{tenant:{…}, installations:[…]}`: record under `tenant`, installations
-        // a sibling (statecraft `TenantDetailResponse`, spec 004 §5.3).
+        // a sibling (statecraft `TenantDetailResponse`, spec 104 §5.3).
         let value = json!({
             "tenant": {
                 "id": "t_1",

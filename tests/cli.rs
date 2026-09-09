@@ -1,4 +1,4 @@
-//! End-to-end checks that drive the built `statecraft` binary (spec 002 §3).
+//! End-to-end checks that drive the built `statecraft` binary (spec 102 §3).
 //!
 //! Cargo sets `CARGO_BIN_EXE_statecraft`, so no extra test crates are needed.
 
@@ -16,7 +16,7 @@ fn run(args: &[&str]) -> Output {
 }
 
 /// Run the binary with its working directory set to `dir`: the `template`
-/// verb operates on the stamped app in the current directory (spec 006).
+/// verb operates on the stamped app in the current directory (spec 106).
 fn run_in(dir: &std::path::Path, args: &[&str]) -> Output {
     Command::new(env!("CARGO_BIN_EXE_statecraft"))
         .args(args)
@@ -68,7 +68,7 @@ fn run_with_stdin(args: &[&str], input: &str) -> Output {
 
 #[test]
 fn mcp_print_config_emits_an_installable_snippet() {
-    // `mcp --print-config` is the install helper (spec 005 §1): a `.mcp.json`
+    // `mcp --print-config` is the install helper (spec 105 §1): a `.mcp.json`
     // snippet on stdout, exit 0. No stubs remain in the command tree.
     let out = run(&["mcp", "--print-config"]);
     assert_eq!(out.status.code(), Some(0), "print-config should exit 0");
@@ -97,7 +97,7 @@ fn mcp_server_answers_initialize_over_stdio() {
 
 #[test]
 fn governance_verbs_without_base_url_are_usage_errors() {
-    // The spec 004 verbs reach the base-URL guard before any network call;
+    // The spec 104 verbs reach the base-URL guard before any network call;
     // omitting it is misuse (exit 2), same contract as login/whoami. Each is
     // given its required flags/args so clap does not reject it first.
     for args in [
@@ -121,7 +121,7 @@ fn governance_verbs_without_base_url_are_usage_errors() {
 
 #[test]
 fn governance_verb_without_a_credential_exits_1_with_login_hint() {
-    // With a base URL but no stored token, a spec 004 verb short-circuits to the
+    // With a base URL but no stored token, a spec 104 verb short-circuits to the
     // unauthenticated error before any network call (hermetic), like whoami.
     let out = run(&[
         "tenants",
@@ -140,7 +140,7 @@ fn governance_verb_without_a_credential_exits_1_with_login_hint() {
 
 #[test]
 fn stamp_new_requires_a_posture() {
-    // Posture is a required flag with no default (spec 004 §5.1): omitting it is
+    // Posture is a required flag with no default (spec 104 §5.1): omitting it is
     // a clap usage error (exit 2), so the CLI never invents a posture.
     let out = run(&[
         "stamp", "new", "--tenant", "t_1", "--app", "x", "--org", "acme",
@@ -275,7 +275,7 @@ fn config_show_reports_env_as_the_base_url_source() {
     assert_eq!(value["base_url"]["source"], "env");
 }
 
-// --- template upgrade (spec 006), offline paths only -----------------------
+// --- template upgrade (spec 106), offline paths only -----------------------
 
 const TOOLCHAIN_TOML: &str =
     "[template]\nname = \"enrahitu\"\nversion = \"0.1.0\"\n\n[requires]\ntoolchain = \"^0.1\"\n\n[verbs]\nverify = \"npm test\"\n";
@@ -283,7 +283,7 @@ const TOOLCHAIN_TOML: &str =
 #[test]
 fn template_upgrade_not_stamped_is_a_refusal() {
     // An empty directory: no template.toml, so it is not a stamped app. The
-    // JSON error envelope lands on stdout (spec 004 §5.2), exit 1.
+    // JSON error envelope lands on stdout (spec 104 §5.2), exit 1.
     let dir = std::env::temp_dir().join(format!("statecraft-cli-empty-{}", std::process::id()));
     std::fs::create_dir_all(&dir).unwrap();
     let out = run_in(

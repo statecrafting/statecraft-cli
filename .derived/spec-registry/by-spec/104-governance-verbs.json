@@ -1,0 +1,35 @@
+{
+  "record": {
+    "created": "2026-07-14",
+    "dependsOn": [
+      "103-auth-api-client"
+    ],
+    "establishes": [
+      {
+        "id": "statecraft_cli::verbs",
+        "kind": "symbol"
+      }
+    ],
+    "id": "104-governance-verbs",
+    "implementation": "complete",
+    "sectionHeadings": [
+      "104: Governance verbs",
+      "1. Cross-repo dependency",
+      "2. Verb surface (all support --output json)",
+      "3. Acceptance",
+      "4. Out of scope",
+      "5. Endpoint map and JSON envelope (2026-07-15 amendment)",
+      "5.1 Endpoint map (all paths under the plane's `/api/v1`)",
+      "5.2 JSON envelope (`--output json`)",
+      "5.3 Response-shape expectations (human rendering only)",
+      "5.4 Watch semantics (`stamp status --watch`)",
+      "6. Status (2026-07-15)"
+    ],
+    "specPath": "specs/104-governance-verbs/spec.md",
+    "status": "approved",
+    "summary": "The CLI face becomes useful: the stub commands from spec 102 gain real implementations over the API client, mirroring the control plane's tenants (statecraft spec 004), factory (spec 005), and fleet (spec 106) services. Every verb has a stable JSON output shape, because spec 105 exposes these same verbs as MCP tools and the JSON is the shared contract between both faces.\n",
+    "title": "Governance verbs v1: tenants, stamps, fleet"
+  },
+  "shardHash": "b962ff083580db878957ebe4362e7388838d9402597d0240590b90f93ddb0f93",
+  "specVersion": "1.2.0"
+}

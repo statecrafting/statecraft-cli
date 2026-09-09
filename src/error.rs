@@ -1,4 +1,4 @@
-//! Process error taxonomy and exit-code contract (spec 002 §2).
+//! Process error taxonomy and exit-code contract (spec 102 §2).
 //!
 //! Exit codes are product surface: `0` ok, `1` operational failure,
 //! `2` usage / not-implemented. Errors print to stderr, never stdout.
@@ -16,8 +16,8 @@ pub const EXIT_USAGE: u8 = 2;
 #[derive(Debug, Error)]
 pub enum AppError {
     /// A stub verb whose real implementation arrives in a later spec. This is
-    /// the "not-implemented" arm of the spec 002 §2 exit-2 taxonomy. With spec
-    /// 005 the last stub (`mcp`) is implemented, so no verb currently constructs
+    /// the "not-implemented" arm of the spec 102 §2 exit-2 taxonomy. With spec
+    /// 105 the last stub (`mcp`) is implemented, so no verb currently constructs
     /// it; it is retained because the spec mandates the taxonomy and a later
     /// spec scaffolds its command as a stub before implementing it.
     #[allow(dead_code)]
@@ -29,7 +29,7 @@ pub enum AppError {
     Usage(String),
 
     /// A failure already written to stdout as the JSON `{ok:false,error}`
-    /// envelope (spec 004 §5.2). `main` exits with `code` and prints nothing
+    /// envelope (spec 104 §5.2). `main` exits with `code` and prints nothing
     /// more, so the envelope is not doubled by a stderr line.
     #[error("")]
     Rendered { code: u8 },
@@ -69,14 +69,14 @@ mod tests {
 
     #[test]
     fn not_implemented_maps_to_usage_exit_code() {
-        let err = AppError::not_implemented("login", "003-auth-api-client");
+        let err = AppError::not_implemented("login", "103-auth-api-client");
         assert_eq!(err.code(), EXIT_USAGE);
     }
 
     #[test]
     fn not_implemented_message_names_the_owning_spec() {
-        let err = AppError::not_implemented("tenants list", "004-governance-verbs");
-        assert!(err.to_string().contains("004-governance-verbs"));
+        let err = AppError::not_implemented("tenants list", "104-governance-verbs");
+        assert!(err.to_string().contains("104-governance-verbs"));
         assert!(err.to_string().contains("tenants list"));
     }
 

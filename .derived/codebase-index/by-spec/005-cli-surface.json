@@ -1,0 +1,103 @@
+{
+  "mapping": {
+    "dependsOn": [
+      "001-observed-universe",
+      "002-filesystem-watcher",
+      "003-event-classification",
+      "004-event-store"
+    ],
+    "implementingPaths": [
+      {
+        "path": "members/src/commands/query.ts",
+        "source": "spec-edge"
+      },
+      {
+        "path": "members/src/commands/snapshot.ts",
+        "source": "spec-edge"
+      },
+      {
+        "path": "members/src/commands/watch.ts",
+        "source": "spec-edge"
+      },
+      {
+        "path": "members/src/format.ts",
+        "source": "spec-edge"
+      },
+      {
+        "path": "members/src/index.ts",
+        "source": "spec-edge"
+      }
+    ],
+    "resolvedUnits": [
+      {
+        "locations": [
+          {
+            "file": "members/src/commands/query.ts"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "kind": "file",
+          "path": "members/src/commands/query.ts"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "members/src/commands/snapshot.ts"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "kind": "file",
+          "path": "members/src/commands/snapshot.ts"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "members/src/commands/watch.ts"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "kind": "file",
+          "path": "members/src/commands/watch.ts"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "members/src/format.ts"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "kind": "file",
+          "path": "members/src/format.ts"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "members/src/index.ts"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "kind": "file",
+          "path": "members/src/index.ts"
+        }
+      }
+    ],
+    "specId": "005-cli-surface",
+    "specStatus": "approved"
+  },
+  "schemaVersion": "1.1.0",
+  "shardHash": "ac06ca58b8ab959af5d105aae4cd6637ce8e83304d2f6a333376025bea146954"
+}

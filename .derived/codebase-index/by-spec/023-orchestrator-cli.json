@@ -1,0 +1,83 @@
+{
+  "mapping": {
+    "dependsOn": [
+      "022-http-api-and-events"
+    ],
+    "implementingPaths": [
+      {
+        "path": "members/src/commands/orchestrator.ts",
+        "source": "spec-edge"
+      },
+      {
+        "path": "members/src/index.ts",
+        "source": "spec-edge"
+      },
+      {
+        "path": "members/start.sh",
+        "source": "spec-edge"
+      },
+      {
+        "path": "members/stop.sh",
+        "source": "spec-edge"
+      }
+    ],
+    "resolvedUnits": [
+      {
+        "locations": [
+          {
+            "file": "members/src/commands/orchestrator.ts"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "kind": "file",
+          "path": "members/src/commands/orchestrator.ts"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "members/start.sh"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "kind": "file",
+          "path": "members/start.sh"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "members/stop.sh"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "kind": "file",
+          "path": "members/stop.sh"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "members/src/index.ts"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "members/src/index.ts"
+        }
+      }
+    ],
+    "specId": "023-orchestrator-cli",
+    "specStatus": "approved"
+  },
+  "schemaVersion": "1.1.0",
+  "shardHash": "3082d7e3e73322ee93212597d1078ad1e8551608dc94e547984e44026f91561b"
+}

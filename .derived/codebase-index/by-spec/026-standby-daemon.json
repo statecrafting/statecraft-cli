@@ -1,0 +1,97 @@
+{
+  "mapping": {
+    "dependsOn": [
+      "021-orchestrator-daemon",
+      "025-project-registry"
+    ],
+    "implementingPaths": [
+      {
+        "path": "members/src/commands/orchestrator.ts",
+        "source": "spec-edge"
+      },
+      {
+        "path": "members/src/orchestrator/daemon.ts",
+        "source": "spec-edge"
+      },
+      {
+        "path": "members/src/orchestrator/standby.test.ts",
+        "source": "spec-edge"
+      },
+      {
+        "path": "members/src/orchestrator/standby.ts",
+        "source": "spec-edge"
+      }
+    ],
+    "resolvedUnits": [
+      {
+        "locations": [
+          {
+            "file": "members/src/orchestrator/standby.test.ts"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "kind": "file",
+          "path": "members/src/orchestrator/standby.test.ts"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "members/src/orchestrator/standby.ts"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "kind": "file",
+          "path": "members/src/orchestrator/standby.ts"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "members/src/commands/orchestrator.ts"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "members/src/commands/orchestrator.ts"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "members/src/orchestrator/daemon.ts"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "members/src/orchestrator/daemon.ts"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "docs/design/00-ecosystem-analysis.md"
+          }
+        ],
+        "ownership": false,
+        "sourceField": "references",
+        "unit": {
+          "kind": "file",
+          "path": "docs/design/00-ecosystem-analysis.md"
+        }
+      }
+    ],
+    "specId": "026-standby-daemon",
+    "specStatus": "approved"
+  },
+  "schemaVersion": "1.1.0",
+  "shardHash": "9efb3530b04a8795bdbb61c7822caa8fa36200feafb5d782bf26283eb61c1e1e"
+}

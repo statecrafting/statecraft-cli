@@ -1,4 +1,4 @@
-//! Authentication and the on-disk credentials store (spec 003 §2).
+//! Authentication and the on-disk credentials store (spec 103 §2).
 //!
 //! `statecraft login` performs the browser-assisted bearer-token handoff
 //! chosen in the spec's 2026-07-14 amendment: the operator signs in through a
@@ -138,7 +138,7 @@ fn write_private(path: &Path, text: &str) -> Result<()> {
     std::fs::write(path, text).with_context(|| format!("writing {}", path.display()))
 }
 
-/// The `login` verb: the browser-assisted bearer-token handoff (spec 003 §2
+/// The `login` verb: the browser-assisted bearer-token handoff (spec 103 §2
 /// amendment). Read a token, validate it against the plane, then store it.
 pub fn run_login(resolved: &ResolvedConfig, format: OutputFormat, debug: bool) -> AppResult<()> {
     let base_url = api::require_base_url(resolved)?;

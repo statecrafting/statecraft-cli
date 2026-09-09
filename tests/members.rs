@@ -1,4 +1,4 @@
-//! Spec 008 acceptance (§9): discovery, dispatch, the reserved exit range and
+//! Spec 108 acceptance (§9): discovery, dispatch, the reserved exit range and
 //! the account-less face, driven through the built `statecraft` binary against
 //! a fixture directory of stub member scripts.
 //!

@@ -1,0 +1,32 @@
+{
+  "mapping": {
+    "dependsOn": [
+      "100-bootstrap"
+    ],
+    "implementingPaths": [
+      {
+        "path": "README.md",
+        "source": "spec-edge"
+      }
+    ],
+    "resolvedUnits": [
+      {
+        "locations": [
+          {
+            "file": "README.md"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "kind": "file",
+          "path": "README.md"
+        }
+      }
+    ],
+    "specId": "101-cli-mcp-thesis",
+    "specStatus": "approved"
+  },
+  "schemaVersion": "1.1.0",
+  "shardHash": "63ec9b9ddd6c0cbd7da0e04f8806356c97f588a5f5dd757c668f88bd81166e63"
+}

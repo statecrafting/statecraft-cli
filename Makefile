@@ -28,13 +28,13 @@ SPEC_SPINE ?= spec-spine
 SPEC_SPINE_DEFAULT_BRANCH ?= $(shell git symbolic-ref --short refs/remotes/origin/HEAD 2>/dev/null | sed 's|^origin/||')
 BASE       ?= origin/$(or $(SPEC_SPINE_DEFAULT_BRANCH),main)
 
-.PHONY: gate refresh verify test build fmt clippy help
+.PHONY: gate refresh verify test build fmt clippy members help
 
 ## The governed loop, read-only throughout. A gate that writes repairs what it
 ## is meant to judge (spec 046), so this uses `compile --check` and never
 ## `compile`.
 ## `--fail-on-unresolved` is opt-in by design (spec 050): a spec ratified before
-## it is built (008 today) legitimately carries an unresolved unit while the
+## it is built (108 today) legitimately carries an unresolved unit while the
 ## work is pending. Add the flag once every approved spec is implemented.
 gate:
 	$(SPEC_SPINE) check --fail-on-warn
@@ -67,8 +67,14 @@ fmt:
 clippy:
 	@test -f Cargo.toml && cargo clippy --workspace --all-targets --locked -- -D warnings || echo "no Cargo.toml, skipping"
 
+## The members' stack gate (spec 110 B-4): the bun project under members/.
+members:
+	@test -f members/package.json || { echo "no members/package.json, skipping"; exit 0; }
+	cd members && bun install --frozen-lockfile && bun run typecheck && bun run build:member:sensor && bun run build:member:engine && bun run build:member:driver && bun test
+
 help:
 	@echo "gate     the governed loop, read-only"
+	@echo "members  the bun stack gate under members/"
 	@echo "refresh  recompute the committed shard trees"
 	@echo "verify   SPEC=<id>, one spec's declared acceptance"
 	@echo "test build fmt clippy   guarded on a manifest probe"

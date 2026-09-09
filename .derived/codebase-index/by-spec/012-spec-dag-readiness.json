@@ -1,0 +1,49 @@
+{
+  "mapping": {
+    "dependsOn": [
+      "010-orchestrator-thesis"
+    ],
+    "implementingPaths": [
+      {
+        "path": "members/src/orchestrator/dag.test.ts",
+        "source": "spec-edge"
+      },
+      {
+        "path": "members/src/orchestrator/dag.ts",
+        "source": "spec-edge"
+      }
+    ],
+    "resolvedUnits": [
+      {
+        "locations": [
+          {
+            "file": "members/src/orchestrator/dag.test.ts"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "kind": "file",
+          "path": "members/src/orchestrator/dag.test.ts"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "members/src/orchestrator/dag.ts"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "kind": "file",
+          "path": "members/src/orchestrator/dag.ts"
+        }
+      }
+    ],
+    "specId": "012-spec-dag-readiness",
+    "specStatus": "approved"
+  },
+  "schemaVersion": "1.1.0",
+  "shardHash": "929f86130ff31d18fb01a47654521d8626f031b7a2261fa1fcf525a5d5f0b163"
+}

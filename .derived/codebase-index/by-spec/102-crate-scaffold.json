@@ -1,0 +1,104 @@
+{
+  "mapping": {
+    "dependsOn": [
+      "101-cli-mcp-thesis"
+    ],
+    "implementingPaths": [
+      {
+        "path": "",
+        "source": "manifest-metadata"
+      },
+      {
+        "path": ".github/workflows/ci.yml",
+        "source": "spec-edge"
+      },
+      {
+        "path": "Cargo.lock",
+        "source": "spec-edge"
+      },
+      {
+        "path": "Cargo.toml",
+        "source": "spec-edge"
+      },
+      {
+        "path": "src/",
+        "source": "spec-edge"
+      },
+      {
+        "path": "tests/",
+        "source": "spec-edge"
+      }
+    ],
+    "resolvedUnits": [
+      {
+        "locations": [
+          {
+            "file": "src/"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "kind": "directory",
+          "path": "src/"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "tests/"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "kind": "directory",
+          "path": "tests/"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": ".github/workflows/ci.yml"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "kind": "file",
+          "path": ".github/workflows/ci.yml"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "Cargo.lock"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "kind": "file",
+          "path": "Cargo.lock"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "Cargo.toml"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "kind": "file",
+          "path": "Cargo.toml"
+        }
+      }
+    ],
+    "specId": "102-crate-scaffold",
+    "specStatus": "approved"
+  },
+  "schemaVersion": "1.1.0",
+  "shardHash": "4edad9e11b5158b02b11d486cefe1a11a6dcf4b45938e7087cfcea2b55f7cdfd"
+}

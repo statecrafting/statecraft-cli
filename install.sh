@@ -3,7 +3,7 @@
 #
 # Detects your platform/arch, downloads the matching release archive and its
 # .sha256 sidecar from GitHub Releases, verifies the checksum, and drops the
-# `statecraft` binary on your PATH. Spec 007 owns this file.
+# `statecraft` binary on your PATH. Spec 107 owns this file.
 #
 # Environment overrides:
 #   STATECRAFT_VERSION            release tag to install (default: latest), e.g. v0.1.0
@@ -102,7 +102,7 @@ say "checksum verified"
 # --- verify provenance attestation (authenticity, not just integrity) --------
 # The .sha256 sidecar is fetched from the same release as the archive, so it
 # proves integrity but NOT authenticity: a rewritten release ships a matching
-# sidecar. GitHub build-provenance attestations (spec 007) close that gap. Use
+# sidecar. GitHub build-provenance attestations (spec 107) close that gap. Use
 # `gh attestation verify` when available. Best-effort by default (many curl|sh
 # users have no authenticated `gh`); set STATECRAFT_REQUIRE_ATTESTATION=1 to
 # make an unverifiable download a hard failure.

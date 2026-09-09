@@ -1,0 +1,63 @@
+{
+  "mapping": {
+    "dependsOn": [
+      "011-work-journal",
+      "012-spec-dag-readiness"
+    ],
+    "implementingPaths": [
+      {
+        "path": "members/src/orchestrator/projects.test.ts",
+        "source": "spec-edge"
+      },
+      {
+        "path": "members/src/orchestrator/projects.ts",
+        "source": "spec-edge"
+      }
+    ],
+    "resolvedUnits": [
+      {
+        "locations": [
+          {
+            "file": "members/src/orchestrator/projects.test.ts"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "kind": "file",
+          "path": "members/src/orchestrator/projects.test.ts"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "members/src/orchestrator/projects.ts"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "kind": "file",
+          "path": "members/src/orchestrator/projects.ts"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "docs/design/00-ecosystem-analysis.md"
+          }
+        ],
+        "ownership": false,
+        "sourceField": "references",
+        "unit": {
+          "kind": "file",
+          "path": "docs/design/00-ecosystem-analysis.md"
+        }
+      }
+    ],
+    "specId": "025-project-registry",
+    "specStatus": "approved"
+  },
+  "schemaVersion": "1.1.0",
+  "shardHash": "6801c79ea5de890a1b776c8a8dc0f8da69cba7b7ad7d06465ac3381044d136a6"
+}

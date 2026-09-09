@@ -1,0 +1,39 @@
+{
+  "record": {
+    "authors": [
+      "Bartek Kus"
+    ],
+    "created": "2026-07-29",
+    "establishes": [
+      {
+        "kind": "file",
+        "path": "members/src/paths.ts"
+      },
+      {
+        "kind": "file",
+        "path": "members/src/walker.ts"
+      }
+    ],
+    "id": "001-observed-universe",
+    "implementation": "complete",
+    "kind": "foundation",
+    "origin": {
+      "retroactive": true
+    },
+    "risk": "medium",
+    "sectionHeadings": [
+      "001: The observed universe",
+      "1. Purpose",
+      "2. Territory",
+      "3. Behavior",
+      "4. Out of scope",
+      "5. Known defects (recorded, not blessed)"
+    ],
+    "specPath": "specs/001-observed-universe/spec.md",
+    "status": "approved",
+    "summary": "Defines what claude-observatory observes and where its own artifacts live. The observed universe is ~/.claude (recursive) plus the sibling state file ~/.claude.json, nothing else. Path resolution, the canonical relative-path key, the ignore list, the lstat-based tree walker, and the layout assertion that refuses to run when the project directory sits inside the watch root. Carries the repository's first invariant: the tool is read-only toward the observed universe.\n",
+    "title": "The observed universe: paths, layout separation, and the walker"
+  },
+  "shardHash": "c5314f89807233b71b816a058c3f65cb21d2606c6c940014285834090ab26774",
+  "specVersion": "1.2.0"
+}

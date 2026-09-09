@@ -1,0 +1,49 @@
+{
+  "mapping": {
+    "dependsOn": [
+      "017-stage-ship"
+    ],
+    "implementingPaths": [
+      {
+        "path": "members/src/orchestrator/stages/shepherd.test.ts",
+        "source": "spec-edge"
+      },
+      {
+        "path": "members/src/orchestrator/stages/shepherd.ts",
+        "source": "spec-edge"
+      }
+    ],
+    "resolvedUnits": [
+      {
+        "locations": [
+          {
+            "file": "members/src/orchestrator/stages/shepherd.test.ts"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "kind": "file",
+          "path": "members/src/orchestrator/stages/shepherd.test.ts"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "members/src/orchestrator/stages/shepherd.ts"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "kind": "file",
+          "path": "members/src/orchestrator/stages/shepherd.ts"
+        }
+      }
+    ],
+    "specId": "018-stage-shepherd",
+    "specStatus": "approved"
+  },
+  "schemaVersion": "1.1.0",
+  "shardHash": "31a379779ec0eecbabfd69056d1b087f029e54a624e30089371553fb8c5c6b13"
+}

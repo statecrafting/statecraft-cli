@@ -1,8 +1,8 @@
-// Spec: 008-member-dispatch
-//! Member dispatch (spec 008): the umbrella's local, account-less face.
+// Spec: 108-member-dispatch
+//! Member dispatch (spec 108): the umbrella's local, account-less face.
 //!
 //! A member is a separately built binary named `statecraft-<name>` that
-//! answers `--member-manifest` with one JSON object (claude-observatory spec
+//! answers `--member-manifest` with one JSON object (spec
 //! 042 B-3). `statecraft <name> <args...>`, where `<name>` is not a built-in
 //! verb, resolves to that binary and hands it the arguments verbatim: argv
 //! only, never a shell (§6); stdio inherited, never buffered (D-5); the exit

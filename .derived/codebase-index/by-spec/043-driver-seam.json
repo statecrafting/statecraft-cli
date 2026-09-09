@@ -1,0 +1,455 @@
+{
+  "mapping": {
+    "dependsOn": [
+      "014-session-driver",
+      "016-stage-build",
+      "019-stage-verify",
+      "021-orchestrator-daemon",
+      "032-execution-profiles",
+      "040-session-models",
+      "042-member-contract"
+    ],
+    "implementingPaths": [
+      {
+        "path": "members/src/commands/orchestrator.test.ts",
+        "source": "spec-edge"
+      },
+      {
+        "path": "members/src/commands/orchestrator.ts",
+        "source": "spec-edge"
+      },
+      {
+        "path": "members/src/index.ts",
+        "source": "spec-edge"
+      },
+      {
+        "path": "members/src/members/dispatch.ts",
+        "source": "spec-edge"
+      },
+      {
+        "path": "members/src/members/driver-session.test.ts",
+        "source": "spec-edge"
+      },
+      {
+        "path": "members/src/members/driver-session.ts",
+        "source": "spec-edge"
+      },
+      {
+        "path": "members/src/members/driver.ts",
+        "source": "spec-edge"
+      },
+      {
+        "path": "members/src/members/engine-bundle.test.ts",
+        "source": "spec-edge"
+      },
+      {
+        "path": "members/src/members/engine.ts",
+        "source": "spec-edge"
+      },
+      {
+        "path": "members/src/members/manifest.ts",
+        "source": "spec-edge"
+      },
+      {
+        "path": "members/src/members/sensor.ts",
+        "source": "spec-edge"
+      },
+      {
+        "path": "members/src/orchestrator/adopt/synthesis.ts",
+        "source": "spec-edge"
+      },
+      {
+        "path": "members/src/orchestrator/daemon.test.ts",
+        "source": "spec-edge"
+      },
+      {
+        "path": "members/src/orchestrator/daemon.ts",
+        "source": "spec-edge"
+      },
+      {
+        "path": "members/src/orchestrator/driver.test.ts",
+        "source": "spec-edge"
+      },
+      {
+        "path": "members/src/orchestrator/driver.ts",
+        "source": "spec-edge"
+      },
+      {
+        "path": "members/src/orchestrator/models.test.ts",
+        "source": "spec-edge"
+      },
+      {
+        "path": "members/src/orchestrator/models.ts",
+        "source": "spec-edge"
+      },
+      {
+        "path": "members/src/orchestrator/profile.test.ts",
+        "source": "spec-edge"
+      },
+      {
+        "path": "members/src/orchestrator/stages/build.ts",
+        "source": "spec-edge"
+      },
+      {
+        "path": "members/src/orchestrator/stages/shepherd.ts",
+        "source": "spec-edge"
+      },
+      {
+        "path": "members/src/orchestrator/stages/ship.ts",
+        "source": "spec-edge"
+      },
+      {
+        "path": "members/src/orchestrator/stages/verify.ts",
+        "source": "spec-edge"
+      },
+      {
+        "path": "members/src/orchestrator/standby.ts",
+        "source": "spec-edge"
+      }
+    ],
+    "resolvedUnits": [
+      {
+        "locations": [
+          {
+            "file": "members/src/members/dispatch.ts"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "kind": "file",
+          "path": "members/src/members/dispatch.ts"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "members/src/members/driver-session.test.ts"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "kind": "file",
+          "path": "members/src/members/driver-session.test.ts"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "members/src/members/driver-session.ts"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "kind": "file",
+          "path": "members/src/members/driver-session.ts"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "members/src/members/engine-bundle.test.ts"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "kind": "file",
+          "path": "members/src/members/engine-bundle.test.ts"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "members/src/orchestrator/driver.test.ts"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "kind": "file",
+          "path": "members/src/orchestrator/driver.test.ts"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "members/src/orchestrator/driver.ts"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "kind": "file",
+          "path": "members/src/orchestrator/driver.ts"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "members/src/commands/orchestrator.test.ts"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "members/src/commands/orchestrator.test.ts"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "members/src/commands/orchestrator.ts"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "members/src/commands/orchestrator.ts"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "members/src/index.ts"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "members/src/index.ts"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "members/src/members/driver.ts"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "members/src/members/driver.ts"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "members/src/members/engine.ts"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "members/src/members/engine.ts"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "members/src/members/manifest.ts"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "members/src/members/manifest.ts"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "members/src/members/sensor.ts"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "members/src/members/sensor.ts"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "members/src/orchestrator/adopt/synthesis.ts"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "members/src/orchestrator/adopt/synthesis.ts"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "members/src/orchestrator/daemon.test.ts"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "members/src/orchestrator/daemon.test.ts"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "members/src/orchestrator/daemon.ts"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "members/src/orchestrator/daemon.ts"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "members/src/orchestrator/models.test.ts"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "members/src/orchestrator/models.test.ts"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "members/src/orchestrator/models.ts"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "members/src/orchestrator/models.ts"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "members/src/orchestrator/profile.test.ts"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "members/src/orchestrator/profile.test.ts"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "members/src/orchestrator/stages/build.ts"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "members/src/orchestrator/stages/build.ts"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "members/src/orchestrator/stages/shepherd.ts"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "members/src/orchestrator/stages/shepherd.ts"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "members/src/orchestrator/stages/ship.ts"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "members/src/orchestrator/stages/ship.ts"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "members/src/orchestrator/stages/verify.ts"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "members/src/orchestrator/stages/verify.ts"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "members/src/orchestrator/standby.ts"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "members/src/orchestrator/standby.ts"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "docs/design/01-umbrella-cli-and-member-seams.md"
+          }
+        ],
+        "ownership": false,
+        "sourceField": "references",
+        "unit": {
+          "kind": "file",
+          "path": "docs/design/01-umbrella-cli-and-member-seams.md"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "docs/design/02-the-monorepo-and-the-rust-sequence.md"
+          }
+        ],
+        "ownership": false,
+        "sourceField": "references",
+        "unit": {
+          "kind": "file",
+          "path": "docs/design/02-the-monorepo-and-the-rust-sequence.md"
+        }
+      }
+    ],
+    "specId": "043-driver-seam",
+    "specStatus": "approved"
+  },
+  "schemaVersion": "1.1.0",
+  "shardHash": "2632fcdda6c666e33f6250f7845a3cc156ea0a1ee83ddc404b35e046497d9f21"
+}
