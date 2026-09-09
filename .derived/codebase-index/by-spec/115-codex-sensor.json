@@ -1,0 +1,224 @@
+{
+  "diagnostics": {
+    "errors": [],
+    "warnings": [
+      {
+        "code": "W-001",
+        "message": "spec '115-codex-sensor' crate unit 'statecraft-sensor-codex' does not match any discovered package"
+      },
+      {
+        "code": "W-001",
+        "message": "spec '115-codex-sensor' directory unit 'crates/statecraft-sensor-codex/' is not a directory",
+        "path": "crates/statecraft-sensor-codex/"
+      }
+    ]
+  },
+  "mapping": {
+    "dependsOn": [
+      "112-sensor-port",
+      "111-contract-crate",
+      "108-member-dispatch"
+    ],
+    "implementingPaths": [
+      {
+        "path": ".github/workflows/members.yml",
+        "source": "spec-edge"
+      },
+      {
+        "path": "Cargo.lock",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/statecraft-sensor-claude/src/main.rs",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/statecraft-sensor-core/src/lib.rs",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/statecraft-sensor-core/src/redact.rs",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/statecraft-sensor-core/src/verbs.rs",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/statecraft-sensor-core/src/watcher.rs",
+        "source": "spec-edge"
+      },
+      {
+        "path": "docs/design/03-the-codex-provider.md",
+        "source": "spec-edge"
+      }
+    ],
+    "resolvedUnits": [
+      {
+        "locations": [],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "id": "statecraft-sensor-codex",
+          "kind": "crate"
+        }
+      },
+      {
+        "locations": [],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "kind": "directory",
+          "path": "crates/statecraft-sensor-codex/"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": ".github/workflows/members.yml"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": ".github/workflows/members.yml"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "Cargo.lock"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "Cargo.lock"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "crates/statecraft-sensor-claude/src/main.rs"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "crates/statecraft-sensor-claude/src/main.rs"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "crates/statecraft-sensor-core/src/lib.rs"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "crates/statecraft-sensor-core/src/lib.rs"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "crates/statecraft-sensor-core/src/redact.rs"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "crates/statecraft-sensor-core/src/redact.rs"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "crates/statecraft-sensor-core/src/verbs.rs"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "crates/statecraft-sensor-core/src/verbs.rs"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "crates/statecraft-sensor-core/src/watcher.rs"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "crates/statecraft-sensor-core/src/watcher.rs"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "docs/design/03-the-codex-provider.md"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "docs/design/03-the-codex-provider.md"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "docs/design/02-the-monorepo-and-the-rust-sequence.md"
+          }
+        ],
+        "ownership": false,
+        "sourceField": "references",
+        "unit": {
+          "kind": "file",
+          "path": "docs/design/02-the-monorepo-and-the-rust-sequence.md"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "specs/001-observed-universe/spec.md"
+          }
+        ],
+        "ownership": false,
+        "sourceField": "references",
+        "unit": {
+          "kind": "file",
+          "path": "specs/001-observed-universe/spec.md"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "specs/003-event-classification/spec.md"
+          }
+        ],
+        "ownership": false,
+        "sourceField": "references",
+        "unit": {
+          "kind": "file",
+          "path": "specs/003-event-classification/spec.md"
+        }
+      }
+    ],
+    "specId": "115-codex-sensor",
+    "specStatus": "approved"
+  },
+  "schemaVersion": "1.1.0",
+  "shardHash": "c0128e091042a60486fb1da5c71768eab993de602c2dcdaa6bd0fae7fd51c2b8"
+}

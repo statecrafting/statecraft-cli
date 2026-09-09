@@ -1,0 +1,129 @@
+{
+  "record": {
+    "created": "2026-09-09",
+    "dependsOn": [
+      "112-sensor-port",
+      "111-contract-crate",
+      "108-member-dispatch"
+    ],
+    "establishes": [
+      {
+        "id": "statecraft-sensor-codex",
+        "kind": "crate"
+      },
+      {
+        "kind": "directory",
+        "path": "crates/statecraft-sensor-codex/"
+      }
+    ],
+    "extends": [
+      {
+        "nature": "additive",
+        "spec": "110-corpus-merge",
+        "unit": {
+          "kind": "file",
+          "path": "docs/design/03-the-codex-provider.md"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "112-sensor-port",
+        "unit": {
+          "kind": "file",
+          "path": "crates/statecraft-sensor-core/src/lib.rs"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "112-sensor-port",
+        "unit": {
+          "kind": "file",
+          "path": "crates/statecraft-sensor-core/src/watcher.rs"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "112-sensor-port",
+        "unit": {
+          "kind": "file",
+          "path": "crates/statecraft-sensor-core/src/verbs.rs"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "112-sensor-port",
+        "unit": {
+          "kind": "file",
+          "path": "crates/statecraft-sensor-core/src/redact.rs"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "112-sensor-port",
+        "unit": {
+          "kind": "file",
+          "path": "crates/statecraft-sensor-claude/src/main.rs"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "102-crate-scaffold",
+        "unit": {
+          "kind": "file",
+          "path": "Cargo.lock"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "110-corpus-merge",
+        "unit": {
+          "kind": "file",
+          "path": ".github/workflows/members.yml"
+        }
+      }
+    ],
+    "id": "115-codex-sensor",
+    "implementation": "in-progress",
+    "references": [
+      {
+        "role": "context",
+        "unit": {
+          "kind": "file",
+          "path": "docs/design/02-the-monorepo-and-the-rust-sequence.md"
+        }
+      },
+      {
+        "role": "context",
+        "unit": {
+          "kind": "file",
+          "path": "specs/001-observed-universe/spec.md"
+        }
+      },
+      {
+        "role": "context",
+        "unit": {
+          "kind": "file",
+          "path": "specs/003-event-classification/spec.md"
+        }
+      }
+    ],
+    "risk": "medium",
+    "sectionHeadings": [
+      "115: The Codex universe",
+      "1. Purpose",
+      "2. Territory",
+      "3. Behavior",
+      "4. Functional requirements",
+      "5. Acceptance",
+      "Verification",
+      "6. Out of scope",
+      "7. Resolved decisions"
+    ],
+    "specPath": "specs/115-codex-sensor/spec.md",
+    "status": "approved",
+    "summary": "The first spec of the Codex sequence doc 03 plans. Spec 112 ended with the sentence \"a Codex sensor is then a second thin crate: a root and a table\", and this spec is that crate, plus the evidence the table is transcribed from. The evidence comes first (doc 03 D31): a FINDINGS file in the crate records what each path family under ~/.codex turned out to mean, citing the three live captures of codex exec that doc 03 §2 reports, and every rule in the table cites an entry. The universe is $CODEX_HOME, else ~/.codex, with the desktop's atom-state file as the state file inside the root rather than beside it, which is the first of three small seams the core did not have and gains here; the other two are a peek deny list, because auth.json is a secret the redactor must refuse rather than mask, and an OpenAI key pattern in the redactor. The table reuses 003's kinds where the meaning is shared and adds kinds only for what the Claude tree does not have: the sqlite family and its WAL and SHM siblings, whose shrink is routine and must not shout; marketplace checkouts; the app bundle; sandbox shims; secrets; identifiers; the desktop's imports of other agents' sessions. The binary is statecraft-sensor-codex, discovered by the umbrella with no umbrella change, and the core still names no provider.\n",
+    "title": "The Codex universe: a second sensor over the same core, transcribed from evidence"
+  },
+  "shardHash": "0b659dae0f9560da99f7e69f793945a4b403e10be39f5d00135e78a99f97c6cc",
+  "specVersion": "1.2.0"
+}
