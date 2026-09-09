@@ -1,0 +1,162 @@
+{
+  "mapping": {
+    "dependsOn": [
+      "111-contract-crate",
+      "042-member-contract",
+      "110-corpus-merge"
+    ],
+    "implementingPaths": [
+      {
+        "path": ".github/workflows/members.yml",
+        "source": "spec-edge"
+      },
+      {
+        "path": "Cargo.lock",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/statecraft-sensor-claude",
+        "source": "multiple"
+      },
+      {
+        "path": "crates/statecraft-sensor-claude/",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/statecraft-sensor-core",
+        "source": "multiple"
+      },
+      {
+        "path": "crates/statecraft-sensor-core/",
+        "source": "spec-edge"
+      },
+      {
+        "path": "members/src/members/sensor-parity.test.ts",
+        "source": "spec-edge"
+      }
+    ],
+    "resolvedUnits": [
+      {
+        "locations": [
+          {
+            "file": "crates/statecraft-sensor-claude"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "id": "statecraft-sensor-claude",
+          "kind": "crate"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "crates/statecraft-sensor-core"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "id": "statecraft-sensor-core",
+          "kind": "crate"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "crates/statecraft-sensor-claude/"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "kind": "directory",
+          "path": "crates/statecraft-sensor-claude/"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "crates/statecraft-sensor-core/"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "kind": "directory",
+          "path": "crates/statecraft-sensor-core/"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "members/src/members/sensor-parity.test.ts"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "kind": "file",
+          "path": "members/src/members/sensor-parity.test.ts"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": ".github/workflows/members.yml"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": ".github/workflows/members.yml"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "Cargo.lock"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "Cargo.lock"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "docs/design/01-umbrella-cli-and-member-seams.md"
+          }
+        ],
+        "ownership": false,
+        "sourceField": "references",
+        "unit": {
+          "kind": "file",
+          "path": "docs/design/01-umbrella-cli-and-member-seams.md"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "docs/design/02-the-monorepo-and-the-rust-sequence.md"
+          }
+        ],
+        "ownership": false,
+        "sourceField": "references",
+        "unit": {
+          "kind": "file",
+          "path": "docs/design/02-the-monorepo-and-the-rust-sequence.md"
+        }
+      }
+    ],
+    "specId": "112-sensor-port",
+    "specStatus": "approved"
+  },
+  "schemaVersion": "1.1.0",
+  "shardHash": "32632568825e6a968809071ca06db136a582fd454d74e48a54f6caf9d6abdb48"
+}

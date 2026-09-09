@@ -1,0 +1,86 @@
+{
+  "record": {
+    "created": "2026-09-09",
+    "dependsOn": [
+      "111-contract-crate",
+      "042-member-contract",
+      "110-corpus-merge"
+    ],
+    "establishes": [
+      {
+        "id": "statecraft-sensor-core",
+        "kind": "crate"
+      },
+      {
+        "kind": "directory",
+        "path": "crates/statecraft-sensor-core/"
+      },
+      {
+        "id": "statecraft-sensor-claude",
+        "kind": "crate"
+      },
+      {
+        "kind": "directory",
+        "path": "crates/statecraft-sensor-claude/"
+      },
+      {
+        "kind": "file",
+        "path": "members/src/members/sensor-parity.test.ts"
+      }
+    ],
+    "extends": [
+      {
+        "nature": "additive",
+        "spec": "102-crate-scaffold",
+        "unit": {
+          "kind": "file",
+          "path": "Cargo.lock"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "110-corpus-merge",
+        "unit": {
+          "kind": "file",
+          "path": ".github/workflows/members.yml"
+        }
+      }
+    ],
+    "id": "112-sensor-port",
+    "implementation": "complete",
+    "references": [
+      {
+        "role": "context",
+        "unit": {
+          "kind": "file",
+          "path": "docs/design/02-the-monorepo-and-the-rust-sequence.md"
+        }
+      },
+      {
+        "role": "context",
+        "unit": {
+          "kind": "file",
+          "path": "docs/design/01-umbrella-cli-and-member-seams.md"
+        }
+      }
+    ],
+    "sectionHeadings": [
+      "112: The sensor in Rust",
+      "1. Purpose",
+      "2. Territory",
+      "3. Behavior",
+      "4. Functional requirements",
+      "5. Acceptance",
+      "Verification",
+      "Status (2026-09-09)",
+      "6. Out of scope",
+      "7. Resolved decisions"
+    ],
+    "specPath": "specs/112-sensor-port/spec.md",
+    "status": "approved",
+    "summary": "The first member port in doc 02 D30's order: the sensor, because it is the smallest, the most self-contained, has no chain-compatibility constraint, and has a clear Rust story in notify and rusqlite. It lands as the two crates D26 calls for. statecraft-sensor-core holds what any provider's sensor needs and names no provider: the walker, the state table that turns coalesced filesystem notifications into created, modified, replaced and deleted events with size deltas, the event store with the schema the TypeScript sensor already writes, snapshots and diffs, the redactor, the formatter, the FINDINGS reader, the daemon plumbing, and the verb set behind the 042 manifest. statecraft-sensor-claude is the observed root, the classification table and the manifest, and builds the binary the umbrella already discovers as statecraft-sensor-claude. Every verb's stdout is byte-identical to the TypeScript sensor's over the same store, proved by a parity test that runs both. A Codex sensor is then a second thin crate: a root and a table.\n",
+    "title": "The sensor in Rust: a provider-neutral core and the Claude table"
+  },
+  "shardHash": "f5ec21e11ecfc6698c4f5836048081736cd60ceaf7990a9db450d2ce6604d075",
+  "specVersion": "1.2.0"
+}

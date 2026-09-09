@@ -1,0 +1,21 @@
+[package]
+name = "statecraft-sensor-claude"
+version = "0.1.0"
+edition = "2021"
+license = "Apache-2.0"
+description = "The Claude Code sensor member: the observed root under ~/.claude, the classification table, and the 042 manifest, over statecraft-sensor-core."
+repository = "https://github.com/statecrafting/statecraft-cli"
+publish = false
+
+[package.metadata.spec-spine]
+spec = "112-sensor-port"
+
+[[bin]]
+name = "statecraft-sensor-claude"
+path = "src/main.rs"
+
+[dependencies]
+statecraft-contract = { path = "../statecraft-contract" }
+statecraft-sensor-core = { path = "../statecraft-sensor-core" }
+regex = "1"
+serde_json = "1"

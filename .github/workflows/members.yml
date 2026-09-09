@@ -19,6 +19,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: oven-sh/setup-bun@v2
+      # Spec 112 FR-003: the sensor parity test builds and runs the Rust
+      # sensor beside the TypeScript one; the runner carries cargo.
+      - name: Build the Rust sensor
+        working-directory: .
+        run: cargo build -p statecraft-sensor-claude --locked
       # The synthesis tests scaffold a target with `spec-spine init` (spec 035);
       # the same binary the governance job installs.
       - name: Install spec-spine
