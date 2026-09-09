@@ -37,6 +37,7 @@
       "4. Functional requirements",
       "5. Acceptance criteria",
       "6. Out of scope",
+      "Status note (2026-09-09)",
       "7. Resolved decisions"
     ],
     "specPath": "specs/014-session-driver/spec.md",
@@ -44,6 +45,6 @@
     "summary": "The one place that spawns Claude Code. A fresh `claude` process per attempt: prompt piped on stdin (never shell-interpolated), -p with --output-format stream-json --verbose, cwd = target repo, pinned CLI version recorded, OAuth token auth with ANTHROPIC_API_KEY explicitly removed from the child env (the documented precedence trap). Streams events to subscribers, journals session start/end with cost and result, and classifies terminations: completed, auth-failure (hard stop), quota-exhausted (park, spec 015), hook-blocked, transient (bounded retry), timeout, killed (daemon shutdown, spec 021 B-6), max-turns (the CLI's own turn-cap verdict), crashed.\n",
     "title": "Claude Code session driver (fresh process, stream-json, classified outcomes)"
   },
-  "shardHash": "5d81bf3f56975f892a7b92014f4a79afd2ac96f4aa2f867a1e3539d232fdb5f0",
+  "shardHash": "8853c1b04412138b15799d1e76a283b8869f2d1dd8d0b1f5b8d1f68d2c460411",
   "specVersion": "1.2.0"
 }

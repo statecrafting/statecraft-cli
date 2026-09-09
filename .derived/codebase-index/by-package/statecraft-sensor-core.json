@@ -1,0 +1,12 @@
+{
+  "package": {
+    "edition": "2021",
+    "kind": "rust-lib",
+    "name": "statecraft-sensor-core",
+    "path": "crates/statecraft-sensor-core",
+    "specRef": "112-sensor-port",
+    "version": "0.1.0"
+  },
+  "schemaVersion": "1.1.0",
+  "shardHash": "de71fdecef5e463daa549741f11a2e3c8b75def63636fe37caf3907d2a209b64"
+}

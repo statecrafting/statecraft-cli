@@ -1,0 +1,12 @@
+{
+  "package": {
+    "edition": "2021",
+    "kind": "rust-bin",
+    "name": "statecraft-sensor-claude",
+    "path": "crates/statecraft-sensor-claude",
+    "specRef": "112-sensor-port",
+    "version": "0.1.0"
+  },
+  "schemaVersion": "1.1.0",
+  "shardHash": "c3d299c99dd18ab5aa0b4ee09da4fddef194352541b340274191b3dde1c2fddf"
+}

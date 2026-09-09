@@ -111,6 +111,15 @@ Prompt construction (stages own their prompts, specs 016-019), PTY/TUI
 driving, resuming sessions with --resume (fresh sessions are the model;
 remediation is a new session with context injected).
 
+## Status note (2026-09-09)
+
+The prompt write tolerates `EPIPE` (spec 112's CI run found the race: a
+child that exits before reading stdin, as a fast fixture does, closes the
+pipe before the prompt lands, and the write threw where the result path
+should have classified the exit). The invariant is unchanged: the prompt
+still reaches the child through stdin only, and a severed child still
+classifies `killed`.
+
 ## 7. Resolved decisions
 
 D-1. `--model` and `--max-turns` are only added to the `claude` invocation
