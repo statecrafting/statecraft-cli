@@ -1,0 +1,119 @@
+{
+  "record": {
+    "created": "2026-09-09",
+    "dependsOn": [
+      "114-driver-port",
+      "115-codex-sensor",
+      "043-driver-seam",
+      "032-execution-profiles"
+    ],
+    "establishes": [
+      {
+        "id": "statecraft-driver-codex",
+        "kind": "crate"
+      },
+      {
+        "kind": "directory",
+        "path": "crates/statecraft-driver-codex/"
+      },
+      {
+        "kind": "file",
+        "path": "members/src/members/driver-codex.test.ts"
+      }
+    ],
+    "extends": [
+      {
+        "nature": "additive",
+        "spec": "114-driver-port",
+        "unit": {
+          "id": "statecraft_driver_core::Provider",
+          "kind": "symbol"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "114-driver-port",
+        "unit": {
+          "id": "statecraft_driver_core::session::run_session",
+          "kind": "symbol"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "114-driver-port",
+        "unit": {
+          "id": "statecraft_driver_core::protocol::manifest",
+          "kind": "symbol"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "114-driver-port",
+        "unit": {
+          "id": "statecraft_driver_core::protocol::models_verb",
+          "kind": "symbol"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "114-driver-port",
+        "unit": {
+          "id": "statecraft_driver_claude::Claude",
+          "kind": "symbol"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "102-crate-scaffold",
+        "unit": {
+          "kind": "file",
+          "path": "Cargo.lock"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "110-corpus-merge",
+        "unit": {
+          "kind": "file",
+          "path": ".github/workflows/members.yml"
+        }
+      }
+    ],
+    "id": "116-codex-driver",
+    "implementation": "in-progress",
+    "references": [
+      {
+        "role": "context",
+        "unit": {
+          "kind": "file",
+          "path": "docs/design/03-the-codex-provider.md"
+        }
+      },
+      {
+        "role": "context",
+        "unit": {
+          "kind": "file",
+          "path": "specs/014-session-driver/spec.md"
+        }
+      }
+    ],
+    "risk": "medium",
+    "sectionHeadings": [
+      "116: The Codex driver",
+      "1. Purpose",
+      "2. Territory",
+      "3. Behavior",
+      "4. Functional requirements",
+      "5. Acceptance",
+      "Verification",
+      "6. Out of scope",
+      "7. Resolved decisions"
+    ],
+    "specPath": "specs/116-codex-driver/spec.md",
+    "status": "approved",
+    "summary": "The second thin crate doc 02 D26 promised and doc 03 §3 designs: statecraft-driver-codex implements statecraft-driver-core's Provider for codex exec --json. The argv is exec on stdin with the posture mapped onto Codex's sandbox flags (D35), the env drops the OpenAI key so the file-based auth wins, the parser reads thread.started, item.completed, turn.completed and turn.failed into the core's init and result boundaries, the transcript is found by its thread id under the sessions tree, the model pair is gpt-6-astra and gpt-5.6-luna, and the termination table is transcribed from the binary's own vocabulary (D36). What Codex cannot do is declared, not hidden (D34): the manifest says basic, and session.init carries the degradations the request incurred (a tool allowlist it cannot apply, a turn cap it cannot set, a cost it cannot report). Building it against the core found three places 114 had shaped around Claude, and each becomes a Provider method with a default: the subtype that means the turn cap was hit, the tier the manifest declares, and the usage line's name. Over a fake codex script the driver emits the events 014 promises for every classification, and 043's engine drives it through the seam with STATECRAFT_DRIVER_BIN. A live smoke drives the real binary once.\n",
+    "title": "The Codex driver: a second Provider over the same core, with the tier and the degradations it declares"
+  },
+  "shardHash": "f42bb414bf1ec8a402c4f22ea6ca3cc822a46c6f421fffb654c98a7447302016",
+  "specVersion": "1.2.0"
+}

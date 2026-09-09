@@ -1,0 +1,225 @@
+{
+  "diagnostics": {
+    "errors": [],
+    "warnings": [
+      {
+        "code": "W-001",
+        "message": "spec '116-codex-driver' crate unit 'statecraft-driver-codex' does not match any discovered package"
+      },
+      {
+        "code": "W-001",
+        "message": "spec '116-codex-driver' directory unit 'crates/statecraft-driver-codex/' is not a directory",
+        "path": "crates/statecraft-driver-codex/"
+      },
+      {
+        "code": "W-001",
+        "message": "spec '116-codex-driver' file unit 'members/src/members/driver-codex.test.ts' does not exist",
+        "path": "members/src/members/driver-codex.test.ts"
+      }
+    ]
+  },
+  "mapping": {
+    "dependsOn": [
+      "114-driver-port",
+      "115-codex-sensor",
+      "043-driver-seam",
+      "032-execution-profiles"
+    ],
+    "implementingPaths": [
+      {
+        "path": ".github/workflows/members.yml",
+        "source": "spec-edge"
+      },
+      {
+        "path": "Cargo.lock",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/statecraft-driver-claude/src/main.rs",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/statecraft-driver-core/src/lib.rs",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/statecraft-driver-core/src/protocol.rs",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/statecraft-driver-core/src/session.rs",
+        "source": "spec-edge"
+      }
+    ],
+    "resolvedUnits": [
+      {
+        "locations": [],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "id": "statecraft-driver-codex",
+          "kind": "crate"
+        }
+      },
+      {
+        "locations": [],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "kind": "directory",
+          "path": "crates/statecraft-driver-codex/"
+        }
+      },
+      {
+        "locations": [],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "kind": "file",
+          "path": "members/src/members/driver-codex.test.ts"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": ".github/workflows/members.yml"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": ".github/workflows/members.yml"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "Cargo.lock"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "Cargo.lock"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "crates/statecraft-driver-claude/src/main.rs",
+            "span": {
+              "endLine": 31,
+              "startLine": 29
+            }
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "id": "statecraft_driver_claude::Claude",
+          "kind": "symbol"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "crates/statecraft-driver-core/src/lib.rs",
+            "span": {
+              "endLine": 151,
+              "startLine": 130
+            }
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "id": "statecraft_driver_core::Provider",
+          "kind": "symbol"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "crates/statecraft-driver-core/src/protocol.rs",
+            "span": {
+              "endLine": 34,
+              "startLine": 23
+            }
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "id": "statecraft_driver_core::protocol::manifest",
+          "kind": "symbol"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "crates/statecraft-driver-core/src/protocol.rs",
+            "span": {
+              "endLine": 67,
+              "startLine": 44
+            }
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "id": "statecraft_driver_core::protocol::models_verb",
+          "kind": "symbol"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "crates/statecraft-driver-core/src/session.rs",
+            "span": {
+              "endLine": 466,
+              "startLine": 159
+            }
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "id": "statecraft_driver_core::session::run_session",
+          "kind": "symbol"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "docs/design/03-the-codex-provider.md"
+          }
+        ],
+        "ownership": false,
+        "sourceField": "references",
+        "unit": {
+          "kind": "file",
+          "path": "docs/design/03-the-codex-provider.md"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "specs/014-session-driver/spec.md"
+          }
+        ],
+        "ownership": false,
+        "sourceField": "references",
+        "unit": {
+          "kind": "file",
+          "path": "specs/014-session-driver/spec.md"
+        }
+      }
+    ],
+    "specId": "116-codex-driver",
+    "specStatus": "approved"
+  },
+  "schemaVersion": "1.1.0",
+  "shardHash": "fc9a6ff38308a6a33a967994a0ab1eda764657ab487fbf9b6109a0ad2678ecee"
+}
