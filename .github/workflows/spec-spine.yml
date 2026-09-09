@@ -1,31 +1,52 @@
-# Governance gate (spec 000): compile -> staleness -> lint -> couple.
-# Mirrors the spec-spine adoption guide's reference workflow.
+# Governance gate (spec 000, harness by spec 009): the same `make gate` chain
+# a session runs locally, so the gate has one definition rather than two that
+# drift. This is the spec-spine kit's govern.yml kept under the filename spec
+# 000 established. The Rust stack gate (fmt, clippy, test, release build) is
+# ci.yml (spec 002), so the kit's probe and build jobs are not duplicated here.
 name: spec-spine
-on: pull_request
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
 permissions:
   contents: read
+
 jobs:
   govern:
     runs-on: ubuntu-latest
     steps:
+      # `fetch-depth: 0` because the coupling gate compares a base to a head,
+      # and a shallow clone has neither.
       - uses: actions/checkout@v4
         with:
-          fetch-depth: 0 # full history so the gate can diff the merge base
-      - name: Install spec-spine (prebuilt, pinned)
+          fetch-depth: 0
+
+      - name: Install spec-spine
         run: |
-          curl -fsSL https://raw.githubusercontent.com/statecrafting/spec-spine/main/install.sh | \
-            SPEC_SPINE_VERSION=v0.10.0 SPEC_SPINE_BIN_DIR="$HOME/.local/bin" sh
+          curl -fsSL https://raw.githubusercontent.com/statecrafting/spec-spine/main/install.sh | sh
           echo "$HOME/.local/bin" >> "$GITHUB_PATH"
-      - run: spec-spine compile
-      - run: spec-spine index check
-      - run: spec-spine lint --fail-on-warn
-      - name: Coupling gate
+
+      # Read-only. `compile --check` and `index check` compare the committed
+      # shards to the corpus without writing, so a stale tree is reported rather
+      # than repaired: a gate that writes hides the defect it exists to find.
+      - name: Governed loop
+        run: make gate BASE=origin/${{ github.base_ref || 'main' }}
+        if: github.event_name != 'pull_request'
+
+      # The coupling gate needs a base and a head, so it runs on pull_request
+      # only. The PR body goes to a file and reaches the gate through
+      # `--pr-body`: a body containing a `Spec-Drift-Waiver:` line has no safe
+      # shell quoting, and a file has no quoting at all.
+      - name: Governed loop (pull request)
+        if: github.event_name == 'pull_request'
         env:
           PR_BODY: ${{ github.event.pull_request.body }}
         run: |
-          set -euo pipefail
-          printf '%s' "${PR_BODY:-}" > /tmp/pr-body.txt
-          spec-spine couple \
-            --base "${{ github.event.pull_request.base.sha }}" \
-            --head HEAD \
-            --pr-body /tmp/pr-body.txt
+          printf '%s' "$PR_BODY" > "$RUNNER_TEMP/pr-body.txt"
+          # --fail-on-unresolved is opt-in (spec 050); see the Makefile gate.
+          spec-spine check --fail-on-warn
+          spec-spine lint --fail-on-warn
+          spec-spine index coverage --fail-on-untraced
+          spec-spine couple --base "origin/${{ github.base_ref }}" --head HEAD --pr-body "$RUNNER_TEMP/pr-body.txt"

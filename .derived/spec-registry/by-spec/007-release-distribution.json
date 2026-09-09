@@ -33,5 +33,5 @@
     "title": "Release distribution: tag-gated prebuilt binaries and installer"
   },
   "shardHash": "0fcb6689c4d1d550042bc6f9ac3c643a6311099bfa955e38bfe47cb5dcc6211e",
-  "specVersion": "1.1.0"
+  "specVersion": "1.2.0"
 }

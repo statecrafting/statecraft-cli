@@ -31,5 +31,5 @@
     "title": "Auth + control-plane API client"
   },
   "shardHash": "a4ebb7d479a77aff10fad99fd38045e42563fe690793de244ab403a0bcf9297c",
-  "specVersion": "1.1.0"
+  "specVersion": "1.2.0"
 }
