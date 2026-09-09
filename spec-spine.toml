@@ -35,6 +35,10 @@ extra_hashed_inputs = [
   ".claude/agents/**/*",
   ".claude/rules/**/*",
   ".claude/skills/**/*",
+  # Spec 118: the Codex face of the same kit.
+  ".codex/**/*",
+  ".agents/**/*",
+  "scripts/**/*",
   ".claude/settings.json",
   ".mcp.json",
   "AGENTS.md",
