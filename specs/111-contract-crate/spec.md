@@ -140,7 +140,10 @@ Implemented. Twelve fixtures under `crates/statecraft-contract/fixtures/`,
 written by `cargo test -p statecraft-contract` and read by the members'
 fixture test (6 tests). `tests/members.rs` passed unedited after
 `src/members.rs` moved onto the crate's `Manifest`, `exit` codes and
-constants. The lockfile gained exactly the new package.
+constants. The lockfile gained exactly the new package. 2026-09-09, later: the
+fixture test's envelope reads are typed `unknown` explicitly; `bun test`
+had passed while `bunx tsc` refused the inferred type, and the members
+workflow caught it after the merge.
 
 ## 5. Out of scope
 
