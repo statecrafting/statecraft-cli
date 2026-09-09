@@ -24,6 +24,11 @@ jobs:
       - name: Build the Rust sensor
         working-directory: .
         run: cargo build -p statecraft-sensor-claude --locked
+      # Spec 113 FR-003: the journal parity test runs the Rust verifier and
+      # exporter beside the TypeScript ones, and extends a chain from Rust.
+      - name: Build the Rust journal
+        working-directory: .
+        run: cargo build -p statecraft-journal --locked && cargo build -p statecraft-journal --example append --locked
       # The synthesis tests scaffold a target with `spec-spine init` (spec 035);
       # the same binary the governance job installs.
       - name: Install spec-spine

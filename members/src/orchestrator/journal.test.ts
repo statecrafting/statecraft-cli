@@ -28,6 +28,19 @@ test("canonicalizeValue sorts object keys recursively and is byte-stable across 
   expect(stableStringify(a)).toBe('{"a":{"b":3,"n":2},"m":[{"x":5,"y":4}],"z":1}');
 });
 
+// Spec 113 B-2, FR-002: the four classes doc 02 measured, decided the way
+// the substrate decides them.
+test("canonicalizeValue sorts integer-like keys lexicographically, as the substrate does (113 B-2)", () => {
+  expect(stableStringify({ a: 1, "9": 2, "10": 3 })).toBe('{"10":3,"9":2,"a":1}');
+  expect(stableStringify({ b: { "2": 1, "10": 2 } })).toBe('{"b":{"10":2,"2":1}}');
+});
+
+test("canonicalizeValue refuses a lone surrogate and an unsafe integer (113 B-2)", () => {
+  expect(() => canonicalizeValue({ s: "ok\ud800" })).toThrow(/lone surrogate/);
+  expect(() => canonicalizeValue({ n: 2 ** 53 })).toThrow(/safe range/);
+  expect(canonicalizeValue({ n: 2 ** 53 - 1 })).toEqual({ n: 2 ** 53 - 1 });
+});
+
 test("canonicalizeValue throws on non-integer numbers", () => {
   expect(() => canonicalizeValue({ x: 1.5 })).toThrow(/non-integer/);
 });

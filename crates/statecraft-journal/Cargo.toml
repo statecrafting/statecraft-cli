@@ -1,0 +1,24 @@
+[package]
+name = "statecraft-journal"
+version = "0.1.0"
+edition = "2021"
+license = "Apache-2.0"
+description = "The Statecraft orchestrator's hash-linked journal, decision ledger and evidence bundle, over canonical-keysort-json: the chain spec 011 defines, verifiable offline by anyone."
+repository = "https://github.com/statecrafting/statecraft-cli"
+publish = false
+
+[package.metadata.spec-spine]
+spec = "113-journal-port"
+
+[[bin]]
+name = "statecraft-journal"
+path = "src/main.rs"
+
+[dependencies]
+statecraft-contract = { path = "../statecraft-contract" }
+canonical-keysort-json = "0.1"
+sha2 = "0.10"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+chrono = { version = "0.4", default-features = false, features = ["clock", "std"] }
+regex = "1"

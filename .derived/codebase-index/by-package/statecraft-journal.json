@@ -1,0 +1,12 @@
+{
+  "package": {
+    "edition": "2021",
+    "kind": "rust-lib-bin",
+    "name": "statecraft-journal",
+    "path": "crates/statecraft-journal",
+    "specRef": "113-journal-port",
+    "version": "0.1.0"
+  },
+  "schemaVersion": "1.1.0",
+  "shardHash": "bafb92071c2fb85679c295b6d9dcb374bd799c6626c89c8719c97baf1d69646c"
+}
