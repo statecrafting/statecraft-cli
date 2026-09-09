@@ -97,6 +97,6 @@
     "summary": "Design doc 02 D24 makes statecraft-cli the monorepo for the family's tooling, daemons and CLI packages, and D28 decides how the two governed corpora become one without their ids colliding. This spec is that move, executed as one change with one gate over the result: the claude-observatory tree lands under members/ with its bun project intact, its 44 specs (000-043) import unchanged, its design docs and evidence bundle land under docs/, and statecraft-cli's own ten specs renumber into the 100 band (000-009 become 100-109) with a reference sweep through every file that named them. The old bootstrap is superseded by the observatory's, which becomes the single bootstrap of the merged corpus. Every claim in every imported spec resolves against the new layout, the coupling gate holds both packages, and both test suites run in CI. The claude-observatory repository is left pointing here and retires; the word observatory retires with it (D27).\n",
     "title": "The corpus merge: claude-observatory moves into statecraft-cli"
   },
-  "shardHash": "cf320edb0f1dfffc2f61cf33e989f2cff506e9d592c9791896d039810feb688a",
+  "shardHash": "9dd52899cf53e6e4f11cc484c17cde23d4f032c35580bdf9c0d36c5d98f5067d",
   "specVersion": "1.2.0"
 }
