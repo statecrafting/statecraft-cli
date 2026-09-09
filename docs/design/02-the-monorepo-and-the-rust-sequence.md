@@ -343,3 +343,36 @@ census, `package.json`, `src/orchestrator/journal.ts`, `src/classify.ts`,
 corpus collision counts in §5 were computed by comparing the two `specs/`
 listings directly. The base-branch defect in §1 was confirmed through the
 GitHub API for PRs #70, #71 and #72.
+
+## 11. Where this stands (2026-09-09)
+
+Recorded the day the sequence ran, so the next reader does not reconstruct
+it from ten pull requests.
+
+| Step | Spec | Landed as |
+|---|---|---|
+| The member contract | claude-observatory 042 | three build targets and the manifest (#77 there) |
+| Umbrella dispatch | statecraft-cli 008, now 108 | `statecraft <name> ...`, the reserved exit range, the account-less face (#15) |
+| The driver seam | 043 | `driver.ts`, `session run`, the engine bundle proven provider-free (#78 there) |
+| The merge | 110 | this repository, `members/`, the 100 band, one gate over two packages (#16) |
+| The contract crate | 111 | `statecraft-contract`, fixtures parsed by both languages (#17) |
+| The sensor | 112 | `statecraft-sensor-core` and `statecraft-sensor-claude`, byte-identical verbs (#19) |
+| The journal | 113 | `statecraft-journal`, one canonical form, every chain reverified (#20) |
+| The driver | 114 | `statecraft-driver-core` and `statecraft-driver-claude`, identical events (#21) |
+
+D30's conditional step, the engine, has not been taken. The three ports it
+was conditioned on proved the ergonomics (each landed behind a parity test
+on the first run), so the condition is met; what remains is the decision,
+which this document leaves to a spec of its own because the engine is the
+machine that does the work and a stalled port stops it.
+
+What "ready for a second provider" now means, concretely: a Codex sensor is
+a `Universe` and a rule table over `statecraft-sensor-core`; a Codex driver
+is a `Provider` over `statecraft-driver-core`; the umbrella discovers both
+by name, and the engine drives any driver the seam names. The one engine
+change a second driver needs is a per-project driver choice (today the seam
+defaults to `claude`), which is a small spec against 032's profile.
+
+The TypeScript sensor, journal writer and driver remain in `members/` and
+still serve `observatory`; each Rust port's spec names its retirement as a
+later, small spec once the Rust member has run live long enough to trust.
