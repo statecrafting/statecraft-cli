@@ -58,6 +58,30 @@
         "nature": "additive",
         "spec": "114-driver-port",
         "unit": {
+          "id": "statecraft_driver_core::classify::reset_patterns",
+          "kind": "symbol"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "114-driver-port",
+        "unit": {
+          "id": "statecraft_driver_core::classify::tests",
+          "kind": "symbol"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "114-driver-port",
+        "unit": {
+          "id": "statecraft_driver_core::session::tests",
+          "kind": "symbol"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "114-driver-port",
+        "unit": {
           "id": "statecraft_driver_claude::Claude",
           "kind": "symbol"
         }
@@ -80,7 +104,7 @@
       }
     ],
     "id": "116-codex-driver",
-    "implementation": "in-progress",
+    "implementation": "complete",
     "references": [
       {
         "role": "context",
@@ -106,6 +130,7 @@
       "4. Functional requirements",
       "5. Acceptance",
       "Verification",
+      "Status (2026-09-09)",
       "6. Out of scope",
       "7. Resolved decisions"
     ],
@@ -114,6 +139,6 @@
     "summary": "The second thin crate doc 02 D26 promised and doc 03 §3 designs: statecraft-driver-codex implements statecraft-driver-core's Provider for codex exec --json. The argv is exec on stdin with the posture mapped onto Codex's sandbox flags (D35), the env drops the OpenAI key so the file-based auth wins, the parser reads thread.started, item.completed, turn.completed and turn.failed into the core's init and result boundaries, the transcript is found by its thread id under the sessions tree, the model pair is gpt-6-astra and gpt-5.6-luna, and the termination table is transcribed from the binary's own vocabulary (D36). What Codex cannot do is declared, not hidden (D34): the manifest says basic, and session.init carries the degradations the request incurred (a tool allowlist it cannot apply, a turn cap it cannot set, a cost it cannot report). Building it against the core found three places 114 had shaped around Claude, and each becomes a Provider method with a default: the subtype that means the turn cap was hit, the tier the manifest declares, and the usage line's name. Over a fake codex script the driver emits the events 014 promises for every classification, and 043's engine drives it through the seam with STATECRAFT_DRIVER_BIN. A live smoke drives the real binary once.\n",
     "title": "The Codex driver: a second Provider over the same core, with the tier and the degradations it declares"
   },
-  "shardHash": "f42bb414bf1ec8a402c4f22ea6ca3cc822a46c6f421fffb654c98a7447302016",
+  "shardHash": "f2c745cea0955ce2c748891e5246a64355c5313097e13c74b16e99cfa18d03cf",
   "specVersion": "1.2.0"
 }

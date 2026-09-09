@@ -2182,6 +2182,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "statecraft-driver-codex"
+version = "0.1.0"
+dependencies = [
+ "serde_json",
+ "statecraft-contract",
+ "statecraft-driver-core",
+]
+
+[[package]]
 name = "statecraft-driver-core"
 version = "0.1.0"
 dependencies = [

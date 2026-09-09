@@ -1,23 +1,4 @@
 {
-  "diagnostics": {
-    "errors": [],
-    "warnings": [
-      {
-        "code": "W-001",
-        "message": "spec '116-codex-driver' crate unit 'statecraft-driver-codex' does not match any discovered package"
-      },
-      {
-        "code": "W-001",
-        "message": "spec '116-codex-driver' directory unit 'crates/statecraft-driver-codex/' is not a directory",
-        "path": "crates/statecraft-driver-codex/"
-      },
-      {
-        "code": "W-001",
-        "message": "spec '116-codex-driver' file unit 'members/src/members/driver-codex.test.ts' does not exist",
-        "path": "members/src/members/driver-codex.test.ts"
-      }
-    ]
-  },
   "mapping": {
     "dependsOn": [
       "114-driver-port",
@@ -39,6 +20,18 @@
         "source": "spec-edge"
       },
       {
+        "path": "crates/statecraft-driver-codex",
+        "source": "multiple"
+      },
+      {
+        "path": "crates/statecraft-driver-codex/",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/statecraft-driver-core/src/classify.rs",
+        "source": "spec-edge"
+      },
+      {
         "path": "crates/statecraft-driver-core/src/lib.rs",
         "source": "spec-edge"
       },
@@ -49,11 +42,19 @@
       {
         "path": "crates/statecraft-driver-core/src/session.rs",
         "source": "spec-edge"
+      },
+      {
+        "path": "members/src/members/driver-codex.test.ts",
+        "source": "spec-edge"
       }
     ],
     "resolvedUnits": [
       {
-        "locations": [],
+        "locations": [
+          {
+            "file": "crates/statecraft-driver-codex"
+          }
+        ],
         "ownership": true,
         "sourceField": "establishes",
         "unit": {
@@ -62,7 +63,11 @@
         }
       },
       {
-        "locations": [],
+        "locations": [
+          {
+            "file": "crates/statecraft-driver-codex/"
+          }
+        ],
         "ownership": true,
         "sourceField": "establishes",
         "unit": {
@@ -71,7 +76,11 @@
         }
       },
       {
-        "locations": [],
+        "locations": [
+          {
+            "file": "members/src/members/driver-codex.test.ts"
+          }
+        ],
         "ownership": true,
         "sourceField": "establishes",
         "unit": {
@@ -127,7 +136,7 @@
           {
             "file": "crates/statecraft-driver-core/src/lib.rs",
             "span": {
-              "endLine": 151,
+              "endLine": 165,
               "startLine": 130
             }
           }
@@ -136,6 +145,40 @@
         "sourceField": "extends",
         "unit": {
           "id": "statecraft_driver_core::Provider",
+          "kind": "symbol"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "crates/statecraft-driver-core/src/classify.rs",
+            "span": {
+              "endLine": 105,
+              "startLine": 95
+            }
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "id": "statecraft_driver_core::classify::reset_patterns",
+          "kind": "symbol"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "crates/statecraft-driver-core/src/classify.rs",
+            "span": {
+              "endLine": 398,
+              "startLine": 279
+            }
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "id": "statecraft_driver_core::classify::tests",
           "kind": "symbol"
         }
       },
@@ -161,7 +204,7 @@
           {
             "file": "crates/statecraft-driver-core/src/protocol.rs",
             "span": {
-              "endLine": 67,
+              "endLine": 70,
               "startLine": 44
             }
           }
@@ -178,7 +221,7 @@
           {
             "file": "crates/statecraft-driver-core/src/session.rs",
             "span": {
-              "endLine": 466,
+              "endLine": 470,
               "startLine": 159
             }
           }
@@ -187,6 +230,23 @@
         "sourceField": "extends",
         "unit": {
           "id": "statecraft_driver_core::session::run_session",
+          "kind": "symbol"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "crates/statecraft-driver-core/src/session.rs",
+            "span": {
+              "endLine": 610,
+              "startLine": 490
+            }
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "id": "statecraft_driver_core::session::tests",
           "kind": "symbol"
         }
       },
@@ -221,5 +281,5 @@
     "specStatus": "approved"
   },
   "schemaVersion": "1.1.0",
-  "shardHash": "fc9a6ff38308a6a33a967994a0ab1eda764657ab487fbf9b6109a0ad2678ecee"
+  "shardHash": "887247d6ca577c85c436a3a3e553331cb603c54c61bf6e47143dd7093ada88ec"
 }

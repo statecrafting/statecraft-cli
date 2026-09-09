@@ -3,7 +3,7 @@ id: "116-codex-driver"
 title: "The Codex driver: a second Provider over the same core, with the tier and the degradations it declares"
 status: approved
 created: "2026-09-09"
-implementation: in-progress
+implementation: complete
 risk: medium
 depends_on:
   - "114-driver-port"
@@ -22,6 +22,9 @@ extends:
   - { spec: "114-driver-port", unit: { kind: symbol, id: "statecraft_driver_core::session::run_session" }, nature: additive }
   - { spec: "114-driver-port", unit: { kind: symbol, id: "statecraft_driver_core::protocol::manifest" }, nature: additive }
   - { spec: "114-driver-port", unit: { kind: symbol, id: "statecraft_driver_core::protocol::models_verb" }, nature: additive }
+  - { spec: "114-driver-port", unit: { kind: symbol, id: "statecraft_driver_core::classify::reset_patterns" }, nature: additive }
+  - { spec: "114-driver-port", unit: { kind: symbol, id: "statecraft_driver_core::classify::tests" }, nature: additive }
+  - { spec: "114-driver-port", unit: { kind: symbol, id: "statecraft_driver_core::session::tests" }, nature: additive }
   - { spec: "114-driver-port", unit: { kind: symbol, id: "statecraft_driver_claude::Claude" }, nature: additive }
   - { spec: "102-crate-scaffold", unit: "Cargo.lock", nature: additive }
   - { spec: "110-corpus-merge", unit: ".github/workflows/members.yml", nature: additive }
@@ -127,7 +130,9 @@ spec 117.
   `Blocked by hook`, `blocked by policy`), transient (`stream
   disconnected`, `server_overloaded`, `http_connection_failed`,
   `response_stream_connection_failed`, `reconnecting`, `502`, `503`).
-  The core's reset extraction already reads `Try again at <time>`.
+  The core's reset extraction gains the `try again at|in <time>` form
+  beside `resets at|in`, the same four shapes after either, so a Codex
+  quota result carries `resetAtMs` the way a Claude one does.
 - **B-8 (declared, not hidden, D34).** The manifest is 042's with name
   `statecraft-driver-codex`, verbs `models` and `session`, tier `basic`.
   `init_extras` is `{"codexBin": <bin>}`. `spawn_extras` is
@@ -182,6 +187,23 @@ cargo test --workspace --locked -p statecraft-driver-core -p statecraft-driver-c
 cd members && bun test src/members/driver-codex.test.ts src/members/driver-parity.test.ts
 ```
 
+## Status (2026-09-09)
+
+Implemented. The crate's six tests and the core's two new ones passed on
+the first run; the members' test (twelve cases: the manifest and `models`,
+seven fixtures through `session run` with the argv and the stdin prompt
+checked, the bypass argv, a bad request, and 043's seam) passed on the
+first run too, and 114's parity test still passes. The umbrella listed
+both drivers from a managed directory. The live smoke drove the real
+bundled Codex through `createProcessDriver({name: "codex"})` with
+`STATECRAFT_DRIVER_BIN` at the binary, guarded posture, fast tier:
+`completed` in 5.8 s on `gpt-5.6-luna`, `session.init` carrying
+`codexBin` and `degraded: ["cost"]`, usage of 16,170 input tokens, cost
+and turn count null, and `transcriptPath` resolved to the rollout under
+`~/.codex/sessions/2026/09/09/`. One thing the build found and the spec
+now records (D-5): the core's reset extraction knew only the `resets at`
+form, so `Try again at` joined it as a core pattern.
+
 ## 6. Out of scope
 
 The engine's per-project driver choice (117). A provider-neutral posture
@@ -203,6 +225,13 @@ D-3 (2026-09-09). Defaults on the new trait methods, not required
 methods. A required method would make every provider name a turn-cap
 subtype most providers do not have; the default is the honest answer
 and the Claude crate's override is one line.
+
+D-5 (2026-09-09). The reset form is a core pattern, not a provider
+rewrite. Building the crate found that the core's extraction knew only
+`resets at`; the Codex form is `Try again at`. Rewriting the result text
+in the provider to fool the core was rejected: the journal would then
+carry words the provider never said. The core's patterns accept both
+prefixes, which names no provider.
 
 D-4 (2026-09-09). `cost` is always in the degradation list. A consumer
 that sums costs across drivers must be able to tell "zero" from "not

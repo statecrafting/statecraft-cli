@@ -185,6 +185,9 @@ pub fn run_session(
         mcp_config_path: opts.mcp_config_path.as_deref(),
     };
     let argv = provider.argv(&spec);
+    // Spec 116 B-1: what the request made the provider give up, journaled
+    // in `session.init` so a degraded session is never silent (01 D22).
+    let spawn_extras = provider.spawn_extras(&spec);
     let parent: BTreeMap<String, String> = std::env::vars().collect();
     let env = provider.child_env(&parent);
 
@@ -299,12 +302,13 @@ pub fn run_session(
                         "sessionId": session_id,
                         "profile": opts.profile.payload(),
                     });
-                    if let (Some(target), Some(extras)) = (
-                        payload.as_object_mut(),
-                        provider.init_extras(&bin).as_object(),
-                    ) {
-                        for (k, v) in extras {
-                            target.insert(k.clone(), v.clone());
+                    for extras in [provider.init_extras(&bin), spawn_extras.clone()] {
+                        if let (Some(target), Some(extras)) =
+                            (payload.as_object_mut(), extras.as_object())
+                        {
+                            for (k, v) in extras {
+                                target.insert(k.clone(), v.clone());
+                            }
                         }
                     }
                     sink.journal("session.init", payload);
@@ -402,7 +406,7 @@ pub fn run_session(
             stderr_tail: &stderr_text,
             timed_out: killed_for_timeout,
             shutdown_killed: killed_for_shutdown,
-            max_turns_subtype: Some("error_max_turns"),
+            max_turns_subtype: provider.max_turns_subtype(),
         },
         provider.termination_rules(),
         now_ms(),
@@ -480,4 +484,127 @@ fn libc_sigterm() -> i32 {
 #[cfg(not(unix))]
 fn libc_sigkill() -> i32 {
     9
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::{CapabilityTier, ProviderEvent, ResultEvent, SpawnSpec, TerminationKind};
+
+    /// A provider that names nothing (spec 116 FR-002): the three defaults
+    /// hold, and its `spawn_extras` reach `session.init`.
+    struct Plain;
+
+    impl Provider for Plain {
+        fn name(&self) -> &'static str {
+            "statecraft-driver-plain"
+        }
+        fn default_bin(&self) -> &'static str {
+            "plain"
+        }
+        fn bin_env_var(&self) -> &'static str {
+            "STATECRAFT_PLAIN_BIN"
+        }
+        fn argv(&self, _spec: &SpawnSpec<'_>) -> Vec<String> {
+            vec![]
+        }
+        fn child_env(&self, parent: &BTreeMap<String, String>) -> BTreeMap<String, String> {
+            parent.clone()
+        }
+        fn parse_event(&self, event: &Value) -> ProviderEvent {
+            match event.get("type").and_then(Value::as_str) {
+                Some("init") => ProviderEvent::Init {
+                    session_id: Some("plain-1".into()),
+                },
+                Some("result") => ProviderEvent::Result(ResultEvent {
+                    is_error: true,
+                    subtype: Some("error_max_turns".into()),
+                    result_text: Some("limit reached".into()),
+                    ..ResultEvent::default()
+                }),
+                _ => ProviderEvent::Other,
+            }
+        }
+        fn transcript_path(&self, _repo: &str, _id: &str) -> Option<String> {
+            None
+        }
+        fn default_models(&self) -> (&'static str, &'static str) {
+            ("s", "f")
+        }
+        fn termination_rules(&self) -> &[crate::Rule] {
+            &[]
+        }
+        fn init_extras(&self, bin: &str) -> Value {
+            json!({ "plainBin": bin })
+        }
+        fn spawn_extras(&self, spec: &SpawnSpec<'_>) -> Value {
+            json!({ "degraded": if spec.max_turns.is_some() { vec!["max-turns"] } else { vec![] } })
+        }
+    }
+
+    struct Capture(Vec<(String, Value)>);
+    impl Sink for Capture {
+        fn journal(&mut self, kind: &str, payload: Value) {
+            self.0.push((kind.to_string(), payload));
+        }
+        fn stream(&mut self, _event: &Value) {}
+    }
+
+    #[test]
+    fn the_defaults_hold_for_a_provider_that_names_none() {
+        let p = Plain;
+        assert_eq!(p.max_turns_subtype(), None);
+        assert_eq!(p.capability_tier(), CapabilityTier::Reference);
+        let profile = Profile::default();
+        let spec = SpawnSpec {
+            profile: &profile,
+            model: None,
+            max_turns: None,
+            mcp_config_path: None,
+        };
+        assert_eq!(p.spawn_extras(&spec), json!({"degraded": []}));
+    }
+
+    #[test]
+    fn spawn_extras_reach_init_and_no_subtype_never_classifies_max_turns() {
+        let dir = std::env::temp_dir().join(format!("driver-core-plain-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let script = dir.join("plain.sh");
+        std::fs::write(
+            &script,
+            "#!/bin/sh\ncat >/dev/null\necho '{\"type\":\"init\"}'\necho '{\"type\":\"result\"}'\nexit 0\n",
+        )
+        .unwrap();
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            std::fs::set_permissions(&script, std::fs::Permissions::from_mode(0o755)).unwrap();
+        }
+        let opts = SessionOptions {
+            repo: dir.to_string_lossy().into_owned(),
+            prompt: "hi".into(),
+            bin: Some(script.to_string_lossy().into_owned()),
+            model: None,
+            max_turns: Some(3),
+            timeout_ms: Some(10_000),
+            mcp_config_path: None,
+            profile: Profile {
+                mode: "bypass".into(),
+                ..Profile::default()
+            },
+            kill_grace_ms: None,
+        };
+        let mut sink = Capture(vec![]);
+        let outcome = run_session(&Plain, &opts, &mut sink, &KillSwitch::new()).unwrap();
+        let (kind, init) = &sink.0[0];
+        assert_eq!(kind, "session.init");
+        assert_eq!(init["degraded"], json!(["max-turns"]));
+        assert_eq!(init["plainBin"], json!(script.to_string_lossy()));
+        // The subtype the Plain provider emits would be max-turns for a
+        // provider that names it; Plain names none, so the table (empty)
+        // and the fallback decide: crashed.
+        assert_eq!(outcome.classification.kind, TerminationKind::Crashed);
+        let _ = std::fs::remove_dir_all(&dir);
+    }
 }

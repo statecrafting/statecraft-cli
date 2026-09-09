@@ -7,7 +7,7 @@ use std::io::{Read, Write};
 
 use serde_json::{json, Value};
 use statecraft_contract::{
-    exit, CapabilityTier, Manifest, ModelTier, CONTRACT, MANIFEST_FLAG, MANIFEST_SCHEMA_VERSION,
+    exit, Manifest, ModelTier, CONTRACT, MANIFEST_FLAG, MANIFEST_SCHEMA_VERSION,
     SESSION_REQUEST_SCHEMA_VERSION,
 };
 
@@ -18,8 +18,8 @@ pub const EXIT_OK: i32 = 0;
 pub const EXIT_FAILURE: i32 = 1;
 pub const EXIT_USAGE: i32 = 3;
 
-/// 042 B-3's manifest for a driver member: `reference` tier, the D-4
-/// taxonomy, the two verbs.
+/// 042 B-3's manifest for a driver member: the tier the provider declares
+/// (spec 116 B-1), the D-4 taxonomy, the two verbs.
 pub fn manifest(provider: &dyn Provider, version: &str) -> Manifest {
     Manifest {
         schema_version: MANIFEST_SCHEMA_VERSION.to_string(),
@@ -27,7 +27,7 @@ pub fn manifest(provider: &dyn Provider, version: &str) -> Manifest {
         version: version.to_string(),
         contract: CONTRACT.to_string(),
         verbs: vec!["models".to_string(), "session".to_string()],
-        capability_tier: CapabilityTier::Reference,
+        capability_tier: provider.capability_tier(),
         exit_codes: exit::d4_taxonomy(),
         envelope: "ok-data".to_string(),
     }
@@ -44,7 +44,10 @@ pub const STAGE_MODEL_TIERS: [(&str, &str); 4] = [
 fn models_verb(provider: &dyn Provider, args: &[String]) -> i32 {
     let json = args.iter().any(|a| a == "--json");
     if let Some(stray) = args.iter().find(|a| *a != "--json") {
-        eprintln!("usage: observatory models [--json] (unexpected argument \"{stray}\")");
+        eprintln!(
+            "usage: {} models [--json] (unexpected argument \"{stray}\")",
+            provider.name()
+        );
         return EXIT_USAGE;
     }
     let (strong, fast) = provider.default_models();

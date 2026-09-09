@@ -196,6 +196,11 @@ impl statecraft_driver_core::Provider for Claude {
     fn init_extras(&self, bin: &str) -> Value {
         json!({ "claudeBin": bin })
     }
+
+    /// The stream-json subtype that means `--max-turns` was hit (014 B-4).
+    fn max_turns_subtype(&self) -> Option<&'static str> {
+        Some("error_max_turns")
+    }
 }
 
 fn main() {

@@ -39,6 +39,11 @@ jobs:
       - name: Build the Codex sensor
         working-directory: .
         run: cargo build -p statecraft-sensor-codex --locked && ./target/debug/statecraft-sensor-codex --member-manifest
+      # Spec 116 FR-003: the Codex driver test drives the Rust binary
+      # through 043's seam over a fake codex script.
+      - name: Build the Codex driver
+        working-directory: .
+        run: cargo build -p statecraft-driver-codex --locked && ./target/debug/statecraft-driver-codex --member-manifest
       # The synthesis tests scaffold a target with `spec-spine init` (spec 035);
       # the same binary the governance job installs.
       - name: Install spec-spine
