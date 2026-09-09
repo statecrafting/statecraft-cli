@@ -129,6 +129,13 @@ observatory spec that claimed it before the move, at its new path.
   `grep -rn 'claude-observatory spec 0' specs/1*/spec.md src` are empty.
 - The claude-observatory repository's README points here.
 
+## Status (2026-09-09)
+
+Landed as #16. The same day, doc 02 §11 was added under this spec's
+`docs/design/` claim to record where the Rust sequence stands after
+specs 111 to 114, so the design record carries the state rather than the
+pull request log.
+
 ## 5. Out of scope
 
 Turning the root into a Cargo workspace with `crates/` (the first Rust
