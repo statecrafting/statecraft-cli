@@ -10,6 +10,7 @@ establishes:
   - "Cargo.toml"
   - "Cargo.lock"
   - { kind: directory, path: "src/" }
+  - { kind: directory, path: "tests/" }
   - ".github/workflows/ci.yml"
 summary: >
   The Rust crate for the single binary named statecraft: clap-based
@@ -28,7 +29,9 @@ summary: >
 Root `Cargo.toml` (crate name `statecraft-cli`, binary `[[bin]] name =
 "statecraft"`, `[package.metadata.spec-spine] spec = "002-crate-scaffold"`,
 license Apache-2.0, edition 2021), `Cargo.lock` (committed; this is a
-binary), `src/`, `.github/workflows/ci.yml`. Update `spec-spine.toml`
+binary), `src/`, `tests/` (integration tests driving the built binary;
+claimed 2026-09-09 so the ownership ratchet sees them), `.github/workflows/ci.yml`.
+Update `spec-spine.toml`
 if the indexer needs the workspace declared (single root crate: the
 defaults should already cover it; verify with `spec-spine index`).
 

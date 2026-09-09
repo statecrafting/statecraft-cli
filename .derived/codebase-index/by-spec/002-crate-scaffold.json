@@ -23,6 +23,10 @@
       {
         "path": "src/",
         "source": "spec-edge"
+      },
+      {
+        "path": "tests/",
+        "source": "spec-edge"
       }
     ],
     "resolvedUnits": [
@@ -37,6 +41,19 @@
         "unit": {
           "kind": "directory",
           "path": "src/"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "tests/"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "kind": "directory",
+          "path": "tests/"
         }
       },
       {
@@ -83,5 +100,5 @@
     "specStatus": "approved"
   },
   "schemaVersion": "1.1.0",
-  "shardHash": "02af7cee124cbb9979d72cb8022a06bbc3632b672553c04b016e0fac8d6ecdf2"
+  "shardHash": "2f4ee0de3d831cf371f929f6f0ef74f610dac10483a79a39487d716b3b1af5ed"
 }

@@ -26,5 +26,5 @@
     "title": "statecraft-cli: one binary, two faces (CLI verbs + MCP server)"
   },
   "shardHash": "2ea06cdbf60d1603ba01e2f2669c549aee3829917a3727d842de654d4b3deaf2",
-  "specVersion": "1.1.0"
+  "specVersion": "1.2.0"
 }

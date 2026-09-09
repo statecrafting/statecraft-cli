@@ -1,0 +1,84 @@
+{
+  "record": {
+    "created": "2026-09-09",
+    "dependsOn": [
+      "000-bootstrap",
+      "002-crate-scaffold"
+    ],
+    "establishes": [
+      {
+        "kind": "file",
+        "path": "AGENTS.md"
+      },
+      {
+        "kind": "file",
+        "path": "CLAUDE.md"
+      },
+      {
+        "kind": "file",
+        "path": "Makefile"
+      },
+      {
+        "kind": "file",
+        "path": ".mcp.json"
+      },
+      {
+        "kind": "file",
+        "path": ".claude/settings.json"
+      },
+      {
+        "kind": "directory",
+        "path": ".claude/skills/"
+      },
+      {
+        "kind": "directory",
+        "path": ".claude/agents/"
+      },
+      {
+        "kind": "directory",
+        "path": ".claude/rules/"
+      }
+    ],
+    "extends": [
+      {
+        "nature": "additive",
+        "spec": "000-bootstrap",
+        "unit": {
+          "kind": "file",
+          "path": ".github/workflows/spec-spine.yml"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "000-bootstrap",
+        "unit": {
+          "kind": "file",
+          "path": "spec-spine.toml"
+        }
+      }
+    ],
+    "id": "009-governed-harness",
+    "implementation": "complete",
+    "sectionHeadings": [
+      "009: Governed harness",
+      "1. Purpose",
+      "2. Territory",
+      "3. Behavior",
+      "3.1 The skills are not customized",
+      "3.2 The gate has one definition",
+      "3.3 The hooks read and never write",
+      "3.4 The binary is pinned",
+      "3.5 The ownership ratchet is on",
+      "3.6 The project layer lives in the agents",
+      "4. Acceptance",
+      "5. Out of scope",
+      "6. Status (2026-09-09)"
+    ],
+    "specPath": "specs/009-governed-harness/spec.md",
+    "status": "draft",
+    "summary": "The harness is what an agent may do in this repository, so it is claimed by a spec and held by the coupling gate. This spec adopts the spec-spine Claude Code kit (spec-spine 0.18.0, kit spec 081): ten repository-invariant skills forming the governed loop, four pipeline agents carrying this repo's project layer, four rules, the read-only hook set, a Makefile whose `make gate` is the one definition of the gate that CI and every session run, and the pin that refuses an older binary. It replaces the hand-copied five-skill harness that predated `spec-spine check`, and turns on the ownership ratchet now that every source file is specifically claimed.\n",
+    "title": "Governed harness: the spec-spine kit as the loop this repo runs"
+  },
+  "shardHash": "aaa8e7141fe1edff57dbb2e9275d917ec9d3c20ccc5a00f2021b43987798546c",
+  "specVersion": "1.2.0"
+}

@@ -6,9 +6,9 @@ The successor to OPC: one Rust binary named `statecraft` with two
 faces, CLI subcommands for humans and an MCP server (stdio) for
 agents, both calling the Statecraft control plane's API under the same
 identity, guards, and JSON shapes. Thesis and decided constraints:
-`specs/001-cli-mcp-thesis/spec.md`. The build order is the spec
-backlog: 002 crate scaffold, 003 auth + API client, 004 governance
-verbs, 005 MCP server.
+`specs/001-cli-mcp-thesis/spec.md`. The backlog is the spec corpus:
+`spec-spine registry plan` names the ready set, and one session
+implements one spec (`AGENTS.md`, "Working the backlog").
 
 ## Repository Structure
 
@@ -16,25 +16,27 @@ verbs, 005 MCP server.
 specs/       Feature specs, the authoritative design record
 standards/   spec-spine constitution, contract, templates
 .derived/    Compiler output (committed shards; never hand-edit)
-.claude/     rules (orchestrator, governed reads, adversarial refusal)
+.claude/     the spec-spine kit: skills, agents, rules, hooks (spec 009)
+src/ tests/  the statecraft crate (spec 002 onward)
+Makefile     `make gate` (read-only governed loop), `make refresh`
 ```
-
-Planned by spec 002: `Cargo.toml`, `src/`, `.github/workflows/ci.yml`.
 
 ## Governance
 
-Governed by spec-spine (`spec-spine.toml`, owned by spec 000): specs
-are the source of truth; read `.derived/**` only through `spec-spine`
-subcommands; after editing any `specs/*/spec.md`, run
-`spec-spine compile && spec-spine index` and commit the shards with
-the edit. Gates before every commit: `spec-spine lint --fail-on-warn`
-and `spec-spine index check`.
+Governed by spec-spine 0.18.0 or later (`spec-spine.toml`, owned by
+spec 000; the harness by spec 009): specs are the source of truth;
+read `.derived/**` only through `spec-spine` subcommands; after editing
+any `specs/*/spec.md`, run `make refresh` and commit the shards with
+the edit. Before every commit, `make gate` and the cargo gates below
+must exit 0. `[coupling] require_ownership` is on: claim every new
+source file in the implementing spec, in the same change.
 
 ## Build Commands
 
 ```bash
-spec-spine compile && spec-spine index && spec-spine lint
-# after spec 002 lands:
+make refresh                 # spec-spine compile && spec-spine index
+make gate                    # check, lint, index coverage, couple (read-only)
+make verify SPEC=00N         # one spec's declared acceptance
 cargo fmt --check && cargo clippy --all-targets -- -D warnings
 cargo test
 cargo build --release        # target/release/statecraft

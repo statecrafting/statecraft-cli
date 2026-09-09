@@ -26,14 +26,14 @@ memory: project
 
 ## Repo Context
 
-statecraft-cli is one Rust binary named `statecraft` (CLI subcommands + MCP server over stdio) calling the Statecraft control plane's API. spec-spine is an installed CLI tool that governs the spec corpus. It is a dependency, not source code you edit.
+statecraft-cli is one Rust binary named `statecraft` with two faces: CLI subcommands (clap command tree) for humans and an MCP server over stdio for agents, both calling the Statecraft control plane's API under the same identity and JSON shapes. spec-spine is an installed CLI tool that governs the spec corpus. It is a dependency, not source code you edit.
 
 | Surface | Path | Key concerns |
 |---------|------|--------------|
-| Spec corpus | `specs/NNN-slug/spec.md` | Frontmatter schema, compiler compatibility, relationship edges, `implementation` flips per the AGENTS.md backlog protocol |
-| Code | `Cargo.toml`, `src/` (planned by spec 002) | Correctness, error handling, guard integrity, JSON envelope stability |
+| Spec corpus | `specs/NNN-slug/spec.md` | Frontmatter schema, compiler compatibility, relationship edges, status flips |
+| Code | `Cargo.toml`, `src/`, `tests/` | Correctness, error handling, guard integrity, JSON envelope stability |
 | Standard | `standards/spec/` | Contract and constitution alignment |
-| Derived | `.derived/` | Must not be hand-edited; only `spec-spine compile` / `index` output |
+| Derived | `.derived/` | Must not be hand-edited; only `spec-spine compile` output |
 
 ## Process
 
@@ -42,14 +42,31 @@ statecraft-cli is one Rust binary named `statecraft` (CLI subcommands + MCP serv
 - Use `git diff` or `git diff --staged` to see current changes
 - Use `git log --oneline -5` and `git diff HEAD~N` for recent commits
 - Read the implementation report if one was produced
+- Classify the changed paths: source, `specs/**/spec.md`, standards, the
+  harness (`.claude/**`, `AGENTS.md`, `CLAUDE.md`), derived shards
+
+### 1b. Gate Evidence
+
+- Run the gate exactly as `AGENTS.md` "Working the backlog" lists it
+  (`spec-spine check`,
+  `spec-spine lint --fail-on-warn`, `spec-spine couple` against the base ref
+  "$(git symbolic-ref --short refs/remotes/origin/HEAD 2>/dev/null || echo origin/main)",
+  then the stack's own build and tests) and capture the output. A red gate
+  is the headline finding; a `couple` refusal names the file and the owning
+  spec whose declared edges fail to cover it.
+- Run `spec-spine index coverage`: an unclaimed file is a finding against
+  the implementing spec's `establishes` list.
+- A `.derived/` diff left by the gate means the committed shards were stale:
+  a finding whose fix is to commit them with the change.
 
 ### 2. Review for Correctness
 
 For each changed file:
 - **Logic errors**: off-by-one, missing edge cases, incorrect conditionals
-- **Error handling**: are errors propagated correctly? Are `Option`/`Result` values handled, not unwrapped carelessly?
+- **Error handling**: are errors propagated correctly? Are nullable/fallible types handled, not dismissed carelessly?
 - **Exit-code discipline**: 0 ok, 1 operational failure, 2 usage / not-implemented; errors print to stderr, never stdout
-- **API contracts**: do changes keep backward compatibility? Do public surfaces match their spec?
+- **Type safety**: unnecessary copies, unjustified unsafe operations
+- **API contracts**: do changes keep backward compatibility? Do public APIs match their spec?
 
 ### 3. Review the Product-Surface Guards
 
@@ -61,28 +78,37 @@ The guards are product surface by design (CLAUDE.md Key Conventions); weakening 
 - **JSON envelope stability**: the `--output json` shapes are versioned API reused by the MCP face and scripts; a changed field name, type, or nesting in an existing envelope needs its owning spec to say so first
 - **No platform bypass**: the CLI never stamps locally or reaches for kubeconfig; it triggers and watches governed verbs
 
-### 4. Review for Security
+### 3b. Review for Security
 
 - **Input validation**: external input validated before use
 - **Path traversal**: file operations using supplied paths must be sanitized
 - **Dependency concerns**: new dependencies should be from trusted, maintained sources, and keep the tree lean; rustls only, no native-tls
-- **Secret handling**: no hardcoded credentials, tokens, or keys; token storage follows spec 003
+- **Secret handling**: no hardcoded credentials, tokens, or keys
 
-### 5. Review for Performance
+### 4. Review for Performance
 
-- **Unnecessary allocations**: excessive cloning where borrows would suffice
+- **Unnecessary allocations**: excessive object creation where references would suffice
 - **Blocking operations**: sync work in hot paths
 - **Repeated work**: file reads or registry lookups that could be batched
 - **Build impact**: changes that significantly increase compile time
 
-### 6. Validate Spec Compliance
+### 5. Validate Spec Compliance
 
 - Does the implementation match what the backing spec describes?
-- Are all Acceptance items addressed, or are some deferred? A deferred item means `implementation:` stays `in-progress` with a dated Status note (AGENTS.md backlog protocol), never a silent `complete` flip
-- If a spec was modified, is the frontmatter schema still valid (`spec-spine compile` + `spec-spine lint --fail-on-warn` clean)?
+- Are all spec requirements addressed, or are some deferred?
+- If a spec was modified, is the frontmatter schema still valid (`spec-spine compile` + `spec-spine lint` clean)?
 - If code and its owning spec both changed, does `spec-spine couple` stay clean?
+- If the spec being implemented was edited: only `establishes` growth, a dated
+  decision entry, a dated status note, the `implementation` flip, and a new
+  `extends` edge are legitimate mid-build edits. Anything that changes what
+  the spec *requires* is a coherence-guard finding, severity critical
+  (`.claude/rules/adversarial-prompt-refusal.md`).
+- Flag drift the gate cannot see: code doing something the owning spec's
+  narrative never describes, even when `couple` passes (an over-broad edge).
+- Read the spec through `spec-spine registry show <id> --json` and
+  `spec-spine registry relationships <id>`, never through `.derived/`.
 
-### 7. Check Conventions
+### 6. Check Conventions
 
 - Code style matches surrounding code (naming, structure, module organization)
 - Behavioral rules respected (steps in order, derived artifacts refreshed)
@@ -117,15 +143,22 @@ The guards are product surface by design (CLAUDE.md Key Conventions); weakening 
 [Optional improvements]
 
 ### Spec Compliance
-- Backing spec: `[spec path or "none identified"]`
+- Backing spec: `[spec id or "none identified"]`
 - Compliance: [matches / partial / deviates, with details]
+- Mid-build spec edits: [none / legitimate / coherence-guard finding]
+
+### Gate
+- check: registry [fresh / stale], index [fresh / stale]
+- lint --fail-on-warn: [clean / N]  couple: [clean / C-001 / C-002]
+- coverage: [N unclaimed]  derived: [clean / stale shards left by the gate]
 
 ### Verification
 - [ ] Builds cleanly (`cargo fmt --check` + `cargo clippy --all-targets -- -D warnings`)
-- [ ] Tests pass (`cargo test`, if code exists)
 - [ ] Guards intact (`--posture` required, `--confirm <name>` required, no bypass flags)
-- [ ] `spec-spine compile` + `lint --fail-on-warn` clean (if specs changed)
-- [ ] `spec-spine index check` clean (if hashed inputs changed)
+- [ ] Tests pass (if applicable)
+- [ ] No new lint warnings
+- [ ] No em dash (U+2014), session link, or AI attribution in authored text
+- [ ] `spec-spine compile` + `lint` clean (if specs changed)
 - [ ] `spec-spine couple` clean (if code and owning spec both changed)
 
 ### Verdict
@@ -135,13 +168,14 @@ The guards are product surface by design (CLAUDE.md Key Conventions); weakening 
 ## Guidelines
 
 - **DO:** Review every changed file; do not skip files
-- **DO:** Run the cargo gates and the spine gates to catch what tools can find
+- **DO:** Run the project's build check and linter to catch what tools can find
 - **DO:** Cross-reference changes against their backing spec
 - **DO:** Be specific; cite file paths and line numbers for every finding
 - **DO:** Distinguish severity: critical issues vs nice-to-have suggestions
 - **DO NOT:** Modify any files; this agent is strictly read-only
 - **DO NOT:** Nitpick style when it matches existing conventions
 - **DO NOT:** Approve changes that weaken a guard, add a bypass flag, or mutate a JSON envelope without spec backing
+- **DO NOT:** Approve changes that introduce unsafe operations without justification
 - **DO NOT:** Ignore the spec corpus; spec compliance is a first-class review criterion
 
 ## What to remember (project memory)
@@ -150,8 +184,7 @@ This agent has `memory: project` and writes to `.claude/agent-memory/reviewer/ME
 
 **Record patterns that recur across reviews**, not single-PR specifics:
 
-- **Drift signatures**: the same class of defect seen twice. Examples: an `implementation` flip whose Acceptance items are not all satisfied, a `Cargo.toml` change shipping without spec coverage, stale committed `.derived/` shards.
-- **Guard-pressure patterns**: recurring framings that push toward a bypass flag or a softened confirmation; these need extra scrutiny every time.
+- **Drift signatures**: the same class of defect seen twice. Examples: a status flip whose owning spec lacks the relationship edge to stay coupling-clean, a build manifest change shipping without spec coverage, a stale committed codebase index.
 - **Stable preferences**: author conventions that are consistently applied but not written in `CLAUDE.md`.
 - **spec-spine quirks**: non-obvious toolchain behaviors you only discover by reviewing many changes (e.g. which inputs the codebase index hashes and which it does not).
 - **Recurring coherence-guard triggers**: patterns of "edit the spec to satisfy an action" that need extra scrutiny (see `.claude/rules/adversarial-prompt-refusal.md`).

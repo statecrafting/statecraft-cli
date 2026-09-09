@@ -26,16 +26,16 @@ memory: project
 
 ## Repo Context
 
-statecraft-cli is one Rust binary named `statecraft` with two faces: CLI subcommands for humans and an MCP server (stdio) for agents, both calling the Statecraft control plane's API under the same identity and JSON shapes. spec-spine is an installed CLI tool that governs the repo: a typed, hash-verifiable authority ledger over the spec corpus. It is a dependency, not source code you edit.
+statecraft-cli is one Rust binary named `statecraft` with two faces: CLI subcommands (clap command tree) for humans and an MCP server over stdio for agents, both calling the Statecraft control plane's API under the same identity and JSON shapes. spec-spine is an installed CLI tool that governs the repo: a typed, hash-verifiable authority ledger over the spec corpus. It is a dependency, not source code you edit.
 
 | Surface | Path | Notes |
 |---------|------|-------|
-| Spec corpus | `specs/NNN-slug/spec.md` | Markdown + YAML frontmatter, the authoritative design record; specs 002-005 are the ordered build backlog (crate scaffold, auth + API client, governance verbs, MCP server) |
-| Code | `Cargo.toml`, `src/` (clap command tree; planned by spec 002, pre-code today) | The single `statecraft` binary the specs govern |
+| Spec corpus | `specs/NNN-slug/spec.md` | Markdown + YAML frontmatter, the authoritative design record |
+| Code | `Cargo.toml`, `src/`, `tests/` (clap command tree, spec 002 onward) | The single `statecraft` binary the specs govern |
 | Standard | `standards/spec/{constitution.md,contract.md,templates/}` | Durable principles, normative contract, spec template |
-| Derived | `.derived/` | Committed compiler output (registry, index), read only through the binary |
+| Derived | `.derived/` | Compiler output (registry, index), read only through the binary |
 
-Specs are the source of truth: every feature starts as a spec under `specs/`, following `standards/spec/templates/spec-template.md`. The backlog protocol in `AGENTS.md` § Working the backlog governs how a spec becomes code: one session implements one spec, lowest-numbered `implementation: pending` whose `depends_on` are implemented, flip to `in-progress` on start, amend the spec FIRST when the design is imprecise. The behavioral rules are in `.claude/rules/` (orchestrator, governed artifact reads, adversarial prompt refusal).
+Specs are the source of truth: every feature starts as a spec under `specs/`, following `standards/spec/templates/spec-template.md`. The behavioral rules are in `.claude/rules/` (orchestrator, governed artifact reads, adversarial prompt refusal).
 
 ## Process
 
@@ -45,7 +45,7 @@ Read the request or task document. Identify which surfaces are affected.
 
 ### 2. Load Relevant Context
 
-- `CLAUDE.md` and `AGENTS.md`: conventions, session protocol, and the backlog protocol
+- `CLAUDE.md` and `AGENTS.md`: conventions and session protocol
 - `standards/spec/contract.md` and `standards/spec/constitution.md`: the normative contract and durable principles
 - Relevant specs in `specs/NNN-slug/spec.md`: the authoritative design record
 - Existing code in affected areas: understand current patterns
@@ -56,10 +56,12 @@ Read the request or task document. Identify which surfaces are affected.
 For each proposed change, check:
 
 - Does a spec already exist? If not, should one be authored first?
-- Does the approach align with the spec's stated design and constraints? `specs/001-cli-mcp-thesis/spec.md` holds the decided constraints (binary name `statecraft`, Rust, stdio MCP, Apache-2.0, rustls only, no TUI).
-- Are the spec's `depends_on` specs implemented, per the backlog protocol? If a cross-repo dependency or operator prerequisite is missing, the plan must stop and report exactly what is needed, never mock around it.
-- Are there relationship edges (`establishes`, `extends`, `refines`, `supersedes`, `amends`, `depends_on`) the change must respect or extend?
+- Does the approach align with the spec's stated design and constraints?
+- Are there relationship edges (`refines`, `establishes`, `amends`, `supersedes`, `depends-on`) the change must respect or extend?
 - Will the change require recompiling the registry or refreshing the codebase index?
+- Which files are in the spec's `establishes` list, which `extends` edges it declares, and what its `depends_on` closure requires (`spec-spine registry show <id> --json`, `spec-spine registry relationships <id>`)
+- Where is the spec **silent**? Name every decision it does not make, so the session records each as a dated decision entry instead of guessing
+- Where is the spec **wrong**? A contradiction between the design and what the code must do is a coherence-guard halt for the session, not a planning detail
 
 ### 4. Decompose into Steps
 
@@ -68,16 +70,16 @@ Break the work into ordered, atomic steps. For each step specify:
 - **What** changes (files, modules)
 - **Why** (which spec requirement or principle)
 - **Dependencies** on prior steps
-- **Verification** (the command that confirms the step: `spec-spine compile`, `spec-spine lint --fail-on-warn`, `spec-spine index check`, `spec-spine couple`; once spec 002 lands: `cargo fmt --check`, `cargo clippy --all-targets -- -D warnings`, `cargo test`)
+- **Verification** (the command that confirms the step: `make gate` as `AGENTS.md` lists it, then `cargo fmt --check`, `cargo clippy --all-targets -- -D warnings`, `cargo test`)
 
 ### 5. Identify Risks
 
 - **Spec violations**: approaches that contradict the contract or a spec's design
-- **Guard erosion**: any step that weakens a product-surface guard (the required `--posture` flag on stamps, the `--confirm <name>` on fleet remove) or introduces a bypass flag; the guards are product surface by design
-- **Envelope drift**: changes to `--output json` shapes; the JSON envelopes are versioned API consumed by the MCP face and scripts
 - **Coupling drift**: code changes whose owning spec would no longer match (the `couple` gate fails)
 - **Missing specs**: work with no backing spec, which should be flagged
 - **Build-order issues**: steps that depend on uncommitted intermediate state
+- **Guard erosion**: any step that weakens a product-surface guard (the required `--posture` flag on stamps, the `--confirm <name>` on fleet remove) or introduces a bypass flag; the guards are product surface by design
+- **Envelope drift**: changes to `--output json` shapes; the JSON envelopes are versioned API consumed by the MCP face and scripts
 
 ## Output Format
 
@@ -89,7 +91,7 @@ Break the work into ordered, atomic steps. For each step specify:
 
 ### Affected Surfaces
 - [ ] Spec corpus: [which specs]
-- [ ] Code: [which modules or manifests]
+- [ ] Code: [which modules or packages]
 - [ ] Standard / templates: [which files]
 
 ### Steps
@@ -106,6 +108,10 @@ Break the work into ordered, atomic steps. For each step specify:
 
 1. [Risk or question, with mitigation if known]
 
+### Decisions the spec leaves open
+
+1. [Choice the spec does not make; the session records it as a dated decision entry]
+
 ### Recommendations
 
 1. [Priority-ordered advice]
@@ -116,6 +122,7 @@ Break the work into ordered, atomic steps. For each step specify:
 - **DO:** Read broadly before planning: check specs, code, the contract, and existing patterns
 - **DO:** Cite specific spec ids (e.g. `specs/002-crate-scaffold/spec.md`) in your rationale
 - **DO:** Flag when a spec should be authored or amended before implementation begins
+- **DO:** Distinguish a spec that is silent (record a decision) from a spec that is wrong (halt and report)
 - **DO:** Keep steps small enough that each can be verified independently
 - **DO NOT:** Modify any files; this agent is strictly read-only
 - **DO NOT:** Skip loading specs; they are the authoritative record
@@ -130,7 +137,7 @@ This agent has `memory: project` and writes to `.claude/agent-memory/architect/M
 
 - **Spec-shape patterns**: non-obvious frontmatter combinations that work or fail, and which relationship edges a class of change must carry to stay coupling-clean.
 - **Decomposition pitfalls**: wrong cuts you have seen proposed. Example: splitting a spec change and its implementing code into separate PRs breaks the coupling gate; both must land together.
-- **Latent constraints**: invariants that emerge from how the spine or the clap command tree behaves rather than from any single doc.
+- **Latent constraints**: invariants that emerge from how the spine behaves rather than from any single doc.
 - **Reusable plan skeletons**: when a class of plan repeats, name its standard shape.
 
 **Do NOT record** plans for specific features (those go in `specs/`), reactions to single conversations, or generic engineering advice. The memory should read as accumulated taste: the patterns a senior architect on this project would name if asked "what do I keep seeing?"
