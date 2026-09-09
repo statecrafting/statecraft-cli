@@ -24,6 +24,9 @@ extends:
   - { spec: "112-sensor-port", unit: { kind: symbol, id: "statecraft_sensor_core::verbs::peek" }, nature: additive }
   - { spec: "112-sensor-port", unit: { kind: symbol, id: "statecraft_sensor_core::redact::rules" }, nature: additive }
   - { spec: "112-sensor-port", unit: { kind: symbol, id: "statecraft_sensor_claude::universe" }, nature: additive }
+  # The core's own tests build a Universe and name the new field.
+  - { spec: "112-sensor-port", unit: { kind: symbol, id: "statecraft_sensor_core::store::tests" }, nature: additive }
+  - { spec: "112-sensor-port", unit: { kind: symbol, id: "statecraft_sensor_core::walker::tests" }, nature: additive }
   - { spec: "102-crate-scaffold", unit: "Cargo.lock", nature: additive }
   # The members workflow builds every Rust member.
   - { spec: "110-corpus-merge", unit: ".github/workflows/members.yml", nature: additive }
