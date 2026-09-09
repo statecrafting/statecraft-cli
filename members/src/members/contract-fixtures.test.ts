@@ -58,9 +58,9 @@ test("the exit codes agree with what the umbrella reserves and what the engine d
 });
 
 test("the envelope fixtures are the family's {ok, data|error} shape", () => {
-  expect(fixture("envelope-ok")).toEqual({ ok: true, data: { members: [] } });
-  expect(fixture("envelope-error")).toEqual({ ok: false, error: { kind: "unreachable", message: "no daemon at http://127.0.0.1:1" } });
-  expect(fixture("envelope-error-status")).toEqual({ ok: false, error: { kind: "api", message: "tenants not enabled on this control plane", status: 404 } });
+  expect(fixture<unknown>("envelope-ok")).toEqual({ ok: true, data: { members: [] } });
+  expect(fixture<unknown>("envelope-error")).toEqual({ ok: false, error: { kind: "unreachable", message: "no daemon at http://127.0.0.1:1" } });
+  expect(fixture<unknown>("envelope-error-status")).toEqual({ ok: false, error: { kind: "api", message: "tenants not enabled on this control plane", status: 404 } });
 });
 
 test("the session requests parse through the driver member's request codec", () => {

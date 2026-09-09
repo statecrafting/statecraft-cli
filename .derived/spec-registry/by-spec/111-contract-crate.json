@@ -74,6 +74,6 @@
     "summary": "Doc 02 §2 names the concrete payment for the merge: the member contract, prose in two corpora until now, becomes a crate both sides depend on, and a divergence becomes a compile error. This spec is that crate. statecraft-contract holds the manifest a member answers with (042 B-3), the reserved dispatch-layer exit range and the members' declared taxonomy (108 §7, 023 D-4), the family envelope (104 §5.2, 023 B-3), and the driver seam's wire request, event stream and session result (043 B-1, B-2), each as a serde type whose wire form is the one the TypeScript members already read and write. The umbrella depends on it today. The TypeScript members cannot, so the crate ships the JSON fixtures its own tests generate and a members test parses every one of them through the TypeScript codecs: the compile error the Rust ports will get is, until then, a test that fails in both languages when either side moves. D30's order starts here because it is new code and because every later port is measured against these shapes.\n",
     "title": "The member contract as a crate: one definition both sides depend on"
   },
-  "shardHash": "e8bcd650b69cca584609d6ea3b9674844a9ed9c964581dc44dc248a5ca8d6e02",
+  "shardHash": "e610f47e2f537fda58609e36d9b53a2b9dc73ad483c6451f373a19355624e71a",
   "specVersion": "1.2.0"
 }
