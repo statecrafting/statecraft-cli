@@ -448,9 +448,11 @@ mod tests {
         );
         assert_eq!(evs[1].delta, Some(3));
 
-        // replaced: a new inode at the same path
-        std::fs::remove_file(dir.join("root/a")).unwrap();
-        std::fs::write(dir.join("root/a"), b"1234567").unwrap();
+        // replaced: a new inode at the same path. Written beside and renamed
+        // over, the way an atomic writer does it; a delete-and-recreate can
+        // hand the same inode number back on some filesystems.
+        std::fs::write(dir.join("root/a.new"), b"1234567").unwrap();
+        std::fs::rename(dir.join("root/a.new"), dir.join("root/a")).unwrap();
         let evs = t.observe(&dir.join("root/a"), vec![], &none);
         assert_eq!(evs[0].action, "replaced");
 

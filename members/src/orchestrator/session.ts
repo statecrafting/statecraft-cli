@@ -312,8 +312,12 @@ async function runSessionOnce(opts: RunSessionOptions): Promise<SessionResult> {
   } catch (err) {
     // A child severed by killLiveSession between spawn and prompt delivery
     // can close the pipe first; the normal result path below still
-    // classifies and journals "killed". Anything else is a real failure.
-    if (!state.killedForShutdown) throw err;
+    // classifies and journals "killed". A child that exited on its own
+    // before reading stdin (an auth refusal, a fixture that answers without
+    // reading) closes it too, and the write reports EPIPE: the result path
+    // classifies whatever it said. Anything else is a real failure.
+    const code = (err as { code?: unknown }).code;
+    if (!state.killedForShutdown && code !== "EPIPE") throw err;
   }
 
   const startedAtMs = Date.now();
