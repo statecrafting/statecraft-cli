@@ -1,14 +1,4 @@
 {
-  "diagnostics": {
-    "errors": [],
-    "warnings": [
-      {
-        "code": "W-001",
-        "message": "spec '117-project-driver' file unit 'members/src/orchestrator/project-driver.test.ts' does not exist",
-        "path": "members/src/orchestrator/project-driver.test.ts"
-      }
-    ]
-  },
   "mapping": {
     "dependsOn": [
       "116-codex-driver",
@@ -18,7 +8,15 @@
     ],
     "implementingPaths": [
       {
-        "path": "crates/statecraft-contract/fixtures/session-request.json",
+        "path": "crates/statecraft-contract/",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/statecraft-driver-claude/src/main.rs",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/statecraft-driver-codex/src/main.rs",
         "source": "spec-edge"
       },
       {
@@ -31,6 +29,10 @@
       },
       {
         "path": "members/src/commands/orchestrator.ts",
+        "source": "spec-edge"
+      },
+      {
+        "path": "members/src/members/contract-fixtures.test.ts",
         "source": "spec-edge"
       },
       {
@@ -56,11 +58,19 @@
       {
         "path": "members/src/orchestrator/profile.ts",
         "source": "spec-edge"
+      },
+      {
+        "path": "members/src/orchestrator/project-driver.test.ts",
+        "source": "spec-edge"
       }
     ],
     "resolvedUnits": [
       {
-        "locations": [],
+        "locations": [
+          {
+            "file": "members/src/orchestrator/project-driver.test.ts"
+          }
+        ],
         "ownership": true,
         "sourceField": "establishes",
         "unit": {
@@ -71,14 +81,14 @@
       {
         "locations": [
           {
-            "file": "crates/statecraft-contract/fixtures/session-request.json"
+            "file": "crates/statecraft-contract/"
           }
         ],
         "ownership": true,
         "sourceField": "extends",
         "unit": {
-          "kind": "file",
-          "path": "crates/statecraft-contract/fixtures/session-request.json"
+          "kind": "directory",
+          "path": "crates/statecraft-contract/"
         }
       },
       {
@@ -105,6 +115,19 @@
         "unit": {
           "kind": "file",
           "path": "members/src/commands/orchestrator.ts"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "members/src/members/contract-fixtures.test.ts"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "members/src/members/contract-fixtures.test.ts"
         }
       },
       {
@@ -188,9 +211,43 @@
       {
         "locations": [
           {
+            "file": "crates/statecraft-driver-claude/src/main.rs",
+            "span": {
+              "endLine": 348,
+              "startLine": 217
+            }
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "id": "statecraft_driver_claude::tests",
+          "kind": "symbol"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "crates/statecraft-driver-codex/src/main.rs",
+            "span": {
+              "endLine": 555,
+              "startLine": 282
+            }
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "id": "statecraft_driver_codex::tests",
+          "kind": "symbol"
+        }
+      },
+      {
+        "locations": [
+          {
             "file": "crates/statecraft-driver-core/src/lib.rs",
             "span": {
-              "endLine": 53,
+              "endLine": 56,
               "startLine": 48
             }
           }
@@ -207,8 +264,8 @@
           {
             "file": "crates/statecraft-driver-core/src/lib.rs",
             "span": {
-              "endLine": 228,
-              "startLine": 190
+              "endLine": 248,
+              "startLine": 200
             }
           }
         ],
@@ -237,5 +294,5 @@
     "specStatus": "approved"
   },
   "schemaVersion": "1.1.0",
-  "shardHash": "dad280f16cce624dfd955972b3901b894578a1c20eb550b2ec745d1e411c4a03"
+  "shardHash": "2a38b20060193d681e88d198f7026f147227b30b2d1d034143e38b5844577592"
 }

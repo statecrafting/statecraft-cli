@@ -68,7 +68,7 @@ import {
   ready,
   statusSchedulable,
 } from "./dag";
-import { createProcessDriver, killLiveSession, type Driver } from "./driver";
+import { createProfileDriver, killLiveSession, type Driver } from "./driver";
 import type { ProfileSource } from "./profile";
 import { resolveProfileSource } from "./profile";
 import type { AnyGateContract, GateBinding } from "./gate-contract";
@@ -341,6 +341,9 @@ export interface CreateProductionDaemonDepsParams {
   // rather than the next daemon; absent derives 032 D-1's default, which is
   // the posture every session had before profiles existed.
   readonly profile?: ProfileSource;
+  // 117 B-3: the environment the profile-following driver discovers members
+  // in; absent is the process's own. Tests point it at a managed directory.
+  readonly driverEnv?: NodeJS.ProcessEnv;
   // 033 B-2: this project's spend limits, late-bound for the same reason the
   // profile is (see DaemonDeps.ceiling).
   readonly ceiling?: CeilingSource;
@@ -352,7 +355,12 @@ export interface CreateProductionDaemonDepsParams {
 
 export function createProductionDaemonDeps(params: CreateProductionDaemonDepsParams): DaemonDeps {
   const { dataDir, repoDir, ghBin, profile } = params;
-  const driver = params.driver ?? createProcessDriver();
+  // 117 B-3: the driver follows the project's profile at every spawn, the
+  // way the posture does, so a driver set mid-flight reaches the next
+  // session rather than the next daemon.
+  const driver =
+    params.driver ??
+    createProfileDriver({ profile, ...(params.driverEnv === undefined ? {} : { env: params.driverEnv }) });
   const runner = createProcessRunner({ repoDir, driver, profile });
   return {
     dataDir,

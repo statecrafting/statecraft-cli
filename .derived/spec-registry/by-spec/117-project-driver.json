@@ -98,13 +98,37 @@
         "nature": "additive",
         "spec": "111-contract-crate",
         "unit": {
+          "kind": "directory",
+          "path": "crates/statecraft-contract/"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "111-contract-crate",
+        "unit": {
           "kind": "file",
-          "path": "crates/statecraft-contract/fixtures/session-request.json"
+          "path": "members/src/members/contract-fixtures.test.ts"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "114-driver-port",
+        "unit": {
+          "id": "statecraft_driver_claude::tests",
+          "kind": "symbol"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "116-codex-driver",
+        "unit": {
+          "id": "statecraft_driver_codex::tests",
+          "kind": "symbol"
         }
       }
     ],
     "id": "117-project-driver",
-    "implementation": "in-progress",
+    "implementation": "complete",
     "references": [
       {
         "role": "context",
@@ -123,6 +147,7 @@
       "4. Functional requirements",
       "5. Acceptance",
       "Verification",
+      "Status (2026-09-09)",
       "6. Out of scope",
       "7. Resolved decisions"
     ],
@@ -131,6 +156,6 @@
     "summary": "Doc 02 §11 named the one engine change a second driver needs, and doc 03 D38 decided where it goes: the execution profile gains an optional driver field, claude or codex, absent meaning claude so every existing chain folds unchanged. It is registry state like mode, set through the same project.profile.set record by the same CLI verb and API route, journaled in session.init with the rest of the profile, and rendered wherever the posture is. The engine reads it late: the daemon's one driver per project becomes a facade that resolves the profile at each spawn and keeps one process driver per name, so a driver set mid-flight reaches the next session rather than the next daemon restart, which is the promise 032 B-4 made for the mode. Nothing else in the engine learns the word codex. The Rust profile emits the field too, so the journal a Rust driver writes and the one the TypeScript driver writes stay identical. Proven by driving the Rust Codex driver from the production wiring over a project whose profile says codex.\n",
     "title": "The driver is part of the posture: a per-project driver choice through the profile, late-bound at every spawn"
   },
-  "shardHash": "5e88f9517bb10aae62cf19c29745bf13cb9eeccd9f0daec38b4e274af0f4edd2",
+  "shardHash": "ee137cd46fa7cc14a97e3baa94a61d971c2b0cbc2f6f8b39a94453e1641a374e",
   "specVersion": "1.2.0"
 }

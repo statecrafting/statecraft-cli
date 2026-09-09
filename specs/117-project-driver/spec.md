@@ -3,7 +3,7 @@ id: "117-project-driver"
 title: "The driver is part of the posture: a per-project driver choice through the profile, late-bound at every spawn"
 status: approved
 created: "2026-09-09"
-implementation: in-progress
+implementation: complete
 risk: medium
 depends_on:
   - "116-codex-driver"
@@ -30,7 +30,13 @@ extends:
   - { spec: "114-driver-port", unit: { kind: symbol, id: "statecraft_driver_core::Profile" }, nature: additive }
   - { spec: "114-driver-port", unit: { kind: symbol, id: "statecraft_driver_core::tests" }, nature: additive }
   # 111 owns the wire fixture both languages parse.
-  - { spec: "111-contract-crate", unit: "crates/statecraft-contract/fixtures/session-request.json", nature: additive }
+  # 111 owns the contract crate whole; the wire fixture and the test that
+  # writes it gain the field.
+  - { spec: "111-contract-crate", unit: { kind: directory, path: "crates/statecraft-contract/" }, nature: additive }
+  - { spec: "111-contract-crate", unit: "members/src/members/contract-fixtures.test.ts", nature: additive }
+  # 114's and 116's crate tests build a Profile and name the new field.
+  - { spec: "114-driver-port", unit: { kind: symbol, id: "statecraft_driver_claude::tests" }, nature: additive }
+  - { spec: "116-codex-driver", unit: { kind: symbol, id: "statecraft_driver_codex::tests" }, nature: additive }
 references:
   - { unit: { kind: file, path: "docs/design/03-the-codex-provider.md" }, role: context }
 summary: >
@@ -163,6 +169,27 @@ cd members && bun test src/orchestrator/project-driver.test.ts src/orchestrator/
 ```verify:cli
 cargo test --workspace --locked -p statecraft-driver-core -p statecraft-contract
 ```
+
+## Status (2026-09-09)
+
+Implemented. The field rides through the profile codec on both sides
+(TypeScript and Rust emit `driver`, the 111 wire fixture carries
+`"driver": "codex"` and both parsers read it); the facade
+`createProfileDriver` replaces the fixed driver in
+`createProductionDaemonDeps` and is exercised by the owned test, which
+built the Rust Codex driver, put it in a managed member directory beside
+a fake Claude member, and watched the first session go to Codex and the
+second to Claude after the profile source flipped, with no rebuild in
+between. The CLI test covers `--driver` on both verbs, the refusal
+naming the accepted drivers, the `via codex` cell and the `driver:`
+line; the list row for a default project is byte-identical to before.
+The whole members suite (887) and the workspace (193 plus the new Rust
+cases) are green. The live smoke registered a project with a guarded
+posture and `driver: "codex"`, rendered `guarded (9 baseline tools) via
+codex`, and drove one fast-tier turn of the real Codex through the
+production deps to `completed` in 6.0 s, `session.init` carrying
+`profile.driver: "codex"`, `codexBin` and `degraded: ["cost"]`, and the
+transcript path resolved to the rollout.
 
 ## 6. Out of scope
 

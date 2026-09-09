@@ -253,6 +253,7 @@ mod tests {
             allowed_tools: Some(vec!["Read".into(), "Bash(git:*)".into()]),
             disallowed_tools: Some(vec!["WebFetch".into()]),
             models: None,
+            driver: None,
         };
         let spec = SpawnSpec {
             profile: &guarded,
