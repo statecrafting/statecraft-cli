@@ -1,9 +1,10 @@
 {
   "mapping": {
     "dependsOn": [
-      "112-sensor-port",
-      "111-contract-crate",
-      "108-member-dispatch"
+      "114-driver-port",
+      "115-codex-sensor",
+      "043-driver-seam",
+      "032-execution-profiles"
     ],
     "implementingPaths": [
       {
@@ -15,43 +16,35 @@
         "source": "spec-edge"
       },
       {
-        "path": "crates/statecraft-sensor-claude/src/main.rs",
+        "path": "crates/statecraft-driver-claude/src/main.rs",
         "source": "spec-edge"
       },
       {
-        "path": "crates/statecraft-sensor-codex",
+        "path": "crates/statecraft-driver-codex",
         "source": "multiple"
       },
       {
-        "path": "crates/statecraft-sensor-codex/",
+        "path": "crates/statecraft-driver-codex/",
         "source": "spec-edge"
       },
       {
-        "path": "crates/statecraft-sensor-core/src/lib.rs",
+        "path": "crates/statecraft-driver-core/src/classify.rs",
         "source": "spec-edge"
       },
       {
-        "path": "crates/statecraft-sensor-core/src/redact.rs",
+        "path": "crates/statecraft-driver-core/src/lib.rs",
         "source": "spec-edge"
       },
       {
-        "path": "crates/statecraft-sensor-core/src/store.rs",
+        "path": "crates/statecraft-driver-core/src/protocol.rs",
         "source": "spec-edge"
       },
       {
-        "path": "crates/statecraft-sensor-core/src/verbs.rs",
+        "path": "crates/statecraft-driver-core/src/session.rs",
         "source": "spec-edge"
       },
       {
-        "path": "crates/statecraft-sensor-core/src/walker.rs",
-        "source": "spec-edge"
-      },
-      {
-        "path": "crates/statecraft-sensor-core/src/watcher.rs",
-        "source": "spec-edge"
-      },
-      {
-        "path": "docs/design/03-the-codex-provider.md",
+        "path": "members/src/members/driver-codex.test.ts",
         "source": "spec-edge"
       }
     ],
@@ -59,27 +52,40 @@
       {
         "locations": [
           {
-            "file": "crates/statecraft-sensor-codex"
+            "file": "crates/statecraft-driver-codex"
           }
         ],
         "ownership": true,
         "sourceField": "establishes",
         "unit": {
-          "id": "statecraft-sensor-codex",
+          "id": "statecraft-driver-codex",
           "kind": "crate"
         }
       },
       {
         "locations": [
           {
-            "file": "crates/statecraft-sensor-codex/"
+            "file": "crates/statecraft-driver-codex/"
           }
         ],
         "ownership": true,
         "sourceField": "establishes",
         "unit": {
           "kind": "directory",
-          "path": "crates/statecraft-sensor-codex/"
+          "path": "crates/statecraft-driver-codex/"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "members/src/members/driver-codex.test.ts"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "kind": "file",
+          "path": "members/src/members/driver-codex.test.ts"
         }
       },
       {
@@ -111,11 +117,147 @@
       {
         "locations": [
           {
-            "file": "docs/design/03-the-codex-provider.md"
+            "file": "crates/statecraft-driver-claude/src/main.rs",
+            "span": {
+              "endLine": 31,
+              "startLine": 29
+            }
           }
         ],
         "ownership": true,
         "sourceField": "extends",
+        "unit": {
+          "id": "statecraft_driver_claude::Claude",
+          "kind": "symbol"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "crates/statecraft-driver-core/src/lib.rs",
+            "span": {
+              "endLine": 165,
+              "startLine": 130
+            }
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "id": "statecraft_driver_core::Provider",
+          "kind": "symbol"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "crates/statecraft-driver-core/src/classify.rs",
+            "span": {
+              "endLine": 105,
+              "startLine": 95
+            }
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "id": "statecraft_driver_core::classify::reset_patterns",
+          "kind": "symbol"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "crates/statecraft-driver-core/src/classify.rs",
+            "span": {
+              "endLine": 398,
+              "startLine": 279
+            }
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "id": "statecraft_driver_core::classify::tests",
+          "kind": "symbol"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "crates/statecraft-driver-core/src/protocol.rs",
+            "span": {
+              "endLine": 34,
+              "startLine": 23
+            }
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "id": "statecraft_driver_core::protocol::manifest",
+          "kind": "symbol"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "crates/statecraft-driver-core/src/protocol.rs",
+            "span": {
+              "endLine": 70,
+              "startLine": 44
+            }
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "id": "statecraft_driver_core::protocol::models_verb",
+          "kind": "symbol"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "crates/statecraft-driver-core/src/session.rs",
+            "span": {
+              "endLine": 470,
+              "startLine": 159
+            }
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "id": "statecraft_driver_core::session::run_session",
+          "kind": "symbol"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "crates/statecraft-driver-core/src/session.rs",
+            "span": {
+              "endLine": 610,
+              "startLine": 490
+            }
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "id": "statecraft_driver_core::session::tests",
+          "kind": "symbol"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "docs/design/03-the-codex-provider.md"
+          }
+        ],
+        "ownership": false,
+        "sourceField": "references",
         "unit": {
           "kind": "file",
           "path": "docs/design/03-the-codex-provider.md"
@@ -124,165 +266,20 @@
       {
         "locations": [
           {
-            "file": "crates/statecraft-sensor-claude/src/main.rs",
-            "span": {
-              "endLine": 63,
-              "startLine": 51
-            }
-          }
-        ],
-        "ownership": true,
-        "sourceField": "extends",
-        "unit": {
-          "id": "statecraft_sensor_claude::universe",
-          "kind": "symbol"
-        }
-      },
-      {
-        "locations": [
-          {
-            "file": "crates/statecraft-sensor-core/src/lib.rs",
-            "span": {
-              "endLine": 43,
-              "startLine": 29
-            }
-          }
-        ],
-        "ownership": true,
-        "sourceField": "extends",
-        "unit": {
-          "id": "statecraft_sensor_core::Universe",
-          "kind": "symbol"
-        }
-      },
-      {
-        "locations": [
-          {
-            "file": "crates/statecraft-sensor-core/src/redact.rs",
-            "span": {
-              "endLine": 55,
-              "startLine": 15
-            }
-          }
-        ],
-        "ownership": true,
-        "sourceField": "extends",
-        "unit": {
-          "id": "statecraft_sensor_core::redact::rules",
-          "kind": "symbol"
-        }
-      },
-      {
-        "locations": [
-          {
-            "file": "crates/statecraft-sensor-core/src/store.rs",
-            "span": {
-              "endLine": 485,
-              "startLine": 419
-            }
-          }
-        ],
-        "ownership": true,
-        "sourceField": "extends",
-        "unit": {
-          "id": "statecraft_sensor_core::store::tests",
-          "kind": "symbol"
-        }
-      },
-      {
-        "locations": [
-          {
-            "file": "crates/statecraft-sensor-core/src/verbs.rs",
-            "span": {
-              "endLine": 514,
-              "startLine": 454
-            }
-          }
-        ],
-        "ownership": true,
-        "sourceField": "extends",
-        "unit": {
-          "id": "statecraft_sensor_core::verbs::peek",
-          "kind": "symbol"
-        }
-      },
-      {
-        "locations": [
-          {
-            "file": "crates/statecraft-sensor-core/src/walker.rs",
-            "span": {
-              "endLine": 140,
-              "startLine": 112
-            }
-          }
-        ],
-        "ownership": true,
-        "sourceField": "extends",
-        "unit": {
-          "id": "statecraft_sensor_core::walker::tests",
-          "kind": "symbol"
-        }
-      },
-      {
-        "locations": [
-          {
-            "file": "crates/statecraft-sensor-core/src/watcher.rs",
-            "span": {
-              "endLine": 256,
-              "startLine": 254
-            }
-          }
-        ],
-        "ownership": true,
-        "sourceField": "extends",
-        "unit": {
-          "id": "statecraft_sensor_core::watcher::Watcher",
-          "kind": "symbol"
-        }
-      },
-      {
-        "locations": [
-          {
-            "file": "docs/design/02-the-monorepo-and-the-rust-sequence.md"
+            "file": "specs/014-session-driver/spec.md"
           }
         ],
         "ownership": false,
         "sourceField": "references",
         "unit": {
           "kind": "file",
-          "path": "docs/design/02-the-monorepo-and-the-rust-sequence.md"
-        }
-      },
-      {
-        "locations": [
-          {
-            "file": "specs/001-observed-universe/spec.md"
-          }
-        ],
-        "ownership": false,
-        "sourceField": "references",
-        "unit": {
-          "kind": "file",
-          "path": "specs/001-observed-universe/spec.md"
-        }
-      },
-      {
-        "locations": [
-          {
-            "file": "specs/003-event-classification/spec.md"
-          }
-        ],
-        "ownership": false,
-        "sourceField": "references",
-        "unit": {
-          "kind": "file",
-          "path": "specs/003-event-classification/spec.md"
+          "path": "specs/014-session-driver/spec.md"
         }
       }
     ],
-    "specId": "115-codex-sensor",
+    "specId": "116-codex-driver",
     "specStatus": "approved"
   },
   "schemaVersion": "1.1.0",
-  "shardHash": "4998564afbf3e85cfd10ad404893b4209f427d281ba58292ed4c20d2caae885a"
+  "shardHash": "887247d6ca577c85c436a3a3e553331cb603c54c61bf6e47143dd7093ada88ec"
 }

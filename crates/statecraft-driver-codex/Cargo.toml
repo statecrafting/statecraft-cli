@@ -1,0 +1,20 @@
+[package]
+name = "statecraft-driver-codex"
+version = "0.1.0"
+edition = "2021"
+license = "Apache-2.0"
+description = "The Codex driver member: codex exec --json behind statecraft-driver-core's Provider, with the tier and the degradations it declares."
+repository = "https://github.com/statecrafting/statecraft-cli"
+publish = false
+
+[package.metadata.spec-spine]
+spec = "116-codex-driver"
+
+[[bin]]
+name = "statecraft-driver-codex"
+path = "src/main.rs"
+
+[dependencies]
+statecraft-contract = { path = "../statecraft-contract" }
+statecraft-driver-core = { path = "../statecraft-driver-core" }
+serde_json = "1"

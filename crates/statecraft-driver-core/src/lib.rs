@@ -17,7 +17,7 @@ use std::collections::BTreeMap;
 use serde_json::Value;
 
 pub use classify::{Rule, TerminationKind};
-pub use statecraft_contract::{ModelTier, SessionRequest, SessionResult};
+pub use statecraft_contract::{CapabilityTier, ModelTier, SessionRequest, SessionResult};
 
 /// What the core learned from one line of the provider's stdout.
 #[derive(Clone, Debug, PartialEq)]
@@ -148,6 +148,20 @@ pub trait Provider: Send + Sync {
     /// The provider's own fields in `session.init` (its binary under its own key,
     /// D-2), given the resolved binary.
     fn init_extras(&self, bin: &str) -> Value;
+    /// The result subtype that means the turn cap was hit, when the provider
+    /// has a turn cap (spec 116 B-1). None: `max-turns` is never classified.
+    fn max_turns_subtype(&self) -> Option<&'static str> {
+        None
+    }
+    /// The tier the manifest declares (spec 116 B-1, 042 B-3).
+    fn capability_tier(&self) -> CapabilityTier {
+        CapabilityTier::Reference
+    }
+    /// What the request made the provider give up, as fields merged into
+    /// `session.init` beside `init_extras` (spec 116 B-1, doc 01 D22).
+    fn spawn_extras(&self, _spec: &SpawnSpec<'_>) -> Value {
+        Value::Object(serde_json::Map::new())
+    }
 }
 
 /// The model an explicit id, the project's pair or the default pair resolves
@@ -196,17 +210,19 @@ mod tests {
     #[test]
     fn the_core_names_no_provider() {
         // FR-005, the way spec 112's core checks itself.
-        let word = ["cl", "aude"].concat();
+        let words = [["cl", "aude"].concat(), ["co", "dex"].concat()];
         let src = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("src");
         for entry in std::fs::read_dir(&src).unwrap() {
             let path = entry.unwrap().path();
             let text = std::fs::read_to_string(&path).unwrap().to_lowercase();
-            assert_eq!(
-                text.matches(&word).count(),
-                0,
-                "{} names a provider",
-                path.display()
-            );
+            for word in &words {
+                assert_eq!(
+                    text.matches(word.as_str()).count(),
+                    0,
+                    "{} names a provider",
+                    path.display()
+                );
+            }
         }
     }
 }

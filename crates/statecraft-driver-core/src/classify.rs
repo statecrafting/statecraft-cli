@@ -95,10 +95,12 @@ struct ResetPatterns {
 fn reset_patterns() -> &'static ResetPatterns {
     static P: std::sync::OnceLock<ResetPatterns> = std::sync::OnceLock::new();
     P.get_or_init(|| ResetPatterns {
-        iso: Regex::new(r"(?i)resets?(?:\s+(?:at|on))?\s+(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(?::\d{2})?(?:\.\d+)?(?:Z|[+-]\d{2}:?\d{2})?)").unwrap(),
-        relative: Regex::new(r"(?i)resets?\s+in\s+(\d+)\s*(hour|hr|minute|min)s?\b").unwrap(),
-        epoch: Regex::new(r"(?i)resets?(?:\s+at)?\s*[:=]?\s*(\d{10,13})\b").unwrap(),
-        clock: Regex::new(r"(?i)resets?\s+at\s+(\d{1,2}):(\d{2})\s*(am|pm)?").unwrap(),
+        // "resets at", "reset in", and the "try again at" form some
+        // providers print (spec 116 B-7): the same four shapes after either.
+        iso: Regex::new(r"(?i)(?:resets?|try again)(?:\s+(?:at|on))?\s+(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(?::\d{2})?(?:\.\d+)?(?:Z|[+-]\d{2}:?\d{2})?)").unwrap(),
+        relative: Regex::new(r"(?i)(?:resets?|try again)\s+in\s+(\d+)\s*(hour|hr|minute|min)s?\b").unwrap(),
+        epoch: Regex::new(r"(?i)(?:resets?|try again)(?:\s+at)?\s*[:=]?\s*(\d{10,13})\b").unwrap(),
+        clock: Regex::new(r"(?i)(?:resets?|try again)\s+at\s+(\d{1,2}):(\d{2})\s*(am|pm)?").unwrap(),
     })
 }
 
@@ -382,6 +384,14 @@ mod tests {
         assert_eq!(
             extract_reset_at_ms("resets at 3:00 pm", now),
             Some(1_700_060_400_000)
+        );
+        assert_eq!(
+            extract_reset_at_ms("You've hit your usage limit. Try again at 3:00 pm.", now),
+            Some(1_700_060_400_000)
+        );
+        assert_eq!(
+            extract_reset_at_ms("try again in 45 minutes", now),
+            Some(now + 2_700_000)
         );
         assert_eq!(extract_reset_at_ms("nothing here", now), None);
     }
