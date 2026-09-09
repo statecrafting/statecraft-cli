@@ -9,6 +9,7 @@ mod commands;
 mod config;
 mod error;
 mod mcp;
+mod members;
 mod output;
 mod verbs;
 

@@ -1849,6 +1849,7 @@ dependencies = [
  "clap_complete",
  "directories",
  "httpmock",
+ "libc",
  "reqwest",
  "semver",
  "serde",
