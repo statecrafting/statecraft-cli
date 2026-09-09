@@ -24,8 +24,8 @@ import { existsSync, statSync } from "fs";
 import { homedir } from "os";
 import { delimiter, join, resolve } from "path";
 import type { JournalHandle, JsonValue } from "./journal";
-import type { ExecutionProfile } from "./profile";
-import { profilePayload } from "./profile";
+import type { ExecutionProfile, ProfileSource } from "./profile";
+import { profilePayload, resolveProfileSource } from "./profile";
 import type { ModelTier } from "./models";
 
 // The result and classification shapes are the driver's to define (014);
@@ -487,6 +487,56 @@ export function createProcessDriver(params: CreateProcessDriverParams = {}): Dri
       if (liveKill === null) return false;
       liveKill(graceMs);
       return true;
+    },
+  };
+}
+
+// --- the per-project driver, late-bound (spec 117 B-3) ----------------------
+
+export interface CreateProfileDriverParams {
+  // The project's profile, as a value or as the function the scheduler's
+  // wiring passes (032 B-4), read at every call rather than once.
+  readonly profile: ProfileSource | undefined;
+  readonly env?: NodeJS.ProcessEnv;
+  readonly deadlineSlackMs?: number;
+  // A factory for tests; production builds process drivers.
+  readonly make?: (name: string) => Driver;
+}
+
+// A Driver that follows the profile: the name is `profile.driver`, else the
+// seam's default, resolved when a call is made, and one process driver per
+// name is kept because each holds its own lazily resolved command and tier
+// (117 D-2). A driver set mid-flight therefore reaches the next spawn, the
+// way a mode set mid-flight does, rather than the next daemon restart.
+export function createProfileDriver(params: CreateProfileDriverParams): Driver {
+  const drivers = new Map<string, Driver>();
+  const make =
+    params.make ??
+    ((name: string) =>
+      createProcessDriver({
+        name,
+        ...(params.env === undefined ? {} : { env: params.env }),
+        ...(params.deadlineSlackMs === undefined ? {} : { deadlineSlackMs: params.deadlineSlackMs }),
+      }));
+  function current(): Driver {
+    const name = resolveProfileSource(params.profile).driver ?? DEFAULT_DRIVER_NAME;
+    let driver = drivers.get(name);
+    if (driver === undefined) {
+      driver = make(name);
+      drivers.set(name, driver);
+    }
+    return driver;
+  }
+  return {
+    get name(): string {
+      return current().name;
+    },
+    tier: () => current().tier(),
+    runSession: (request) => current().runSession(request),
+    killLiveSession(graceMs?: number): boolean {
+      let any = false;
+      for (const driver of drivers.values()) any = driver.killLiveSession(graceMs) || any;
+      return any;
     },
   };
 }

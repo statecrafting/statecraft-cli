@@ -63,7 +63,7 @@ import {
 } from "../orchestrator/api/server";
 import { createProcessInspector, createProductionDaemonDeps, type ProcessInspector } from "../orchestrator/daemon";
 import { StandbyDaemon } from "../orchestrator/standby";
-import { createProcessDriver, killLiveSession } from "../orchestrator/driver";
+import { DEFAULT_DRIVER_NAME, createProcessDriver, killLiveSession } from "../orchestrator/driver";
 import { createProcessDagReader } from "../orchestrator/dag";
 import {
   PROJECTS_CHAIN_BASENAME,
@@ -123,9 +123,12 @@ import {
 } from "../orchestrator/budget";
 import {
   DEFAULT_REGISTRATION_PROFILE,
+  DRIVER_NAMES,
   GUARDED_BASELINE_ALLOWED_TOOLS,
+  isDriverName,
   isExecutionMode,
   profileRefusal,
+  renderDriver,
   renderProfile,
   type ExecutionProfile,
 } from "../orchestrator/profile";
@@ -177,7 +180,8 @@ export const ORCHESTRATOR_USAGE = `usage: observatory orchestrator <command> [--
   projects add <path>          register a project [--name <slug>] [--disarmed]
   projects arm|disarm <name>   let the scheduler drive it, or hold it back
   projects profile <name> <mode>  set the execution posture: bypass | guarded
-                                  and, with both model flags, the model pair
+                                  and, with both model flags, the model pair,
+                                  and with --driver, the driver
   projects gate <name> -- <argv>  set the language gate run after the spec-spine
                                   floor; "--" with nothing after it is governance-only
   projects ceiling <name>      spend limits: --per-run/--per-day <usd>, or "none"
@@ -221,6 +225,7 @@ export const ORCHESTRATOR_USAGE = `usage: observatory orchestrator <command> [--
   --profile <mode>             posture for projects add: bypass | guarded
   --model-strong <id>          build and ship model (both model flags or neither)
   --model-fast <id>            shepherd and verify model
+  --driver <name>              the driver the sessions run on: claude | codex
   --allow <tools>              comma-separated allowlist for a guarded posture
   --deny <tools>               comma-separated disallowlist for a guarded posture
   --per-run <usd>              cost ceiling for one run (projects ceiling)
@@ -339,6 +344,8 @@ interface ParsedArgs {
   // is missing rather than defaulting it.
   readonly modelStrong: string | null;
   readonly modelFast: string | null;
+  // 117 B-2: the driver, or null for the seam's default.
+  readonly driver: string | null;
   // 033 B-1's spend limits, in dollars as typed (see `ceilingFromFlags`).
   readonly perRun: string | null;
   readonly perDay: string | null;
@@ -377,6 +384,7 @@ function parseArgs(argv: readonly string[]): ParseResult {
   let deny: string | null = null;
   let modelStrong: string | null = null;
   let modelFast: string | null = null;
+  let driver: string | null = null;
   let perRun: string | null = null;
   let perDay: string | null = null;
   let out: string | null = null;
@@ -426,6 +434,9 @@ function parseArgs(argv: readonly string[]): ParseResult {
     },
     "--model-fast": (v) => {
       modelFast = v;
+    },
+    "--driver": (v) => {
+      driver = v;
     },
     "--per-run": (v) => {
       perRun = v;
@@ -483,7 +494,7 @@ function parseArgs(argv: readonly string[]): ParseResult {
 
   return {
     ok: true,
-    args: { json, url, dataDir, repoDir, project, dir, name, disarmed, profile, allow, deny, modelStrong, modelFast, perRun, perDay, out, bundle, exclude, corpus, proposal, passthrough, rest },
+    args: { json, url, dataDir, repoDir, project, dir, name, disarmed, profile, allow, deny, modelStrong, modelFast, driver, perRun, perDay, out, bundle, exclude, corpus, proposal, passthrough, rest },
   };
 }
 
@@ -517,11 +528,12 @@ const PROJECTS_ADD_FLAGS: readonly string[] = [
   "--deny",
   "--model-strong",
   "--model-fast",
+  "--driver",
 ];
 // 032 B-2: the posture verb takes its mode as a positional, so only the two
 // list flags belong to it; `--profile` is registration's way of saying the
 // same thing and is refused here rather than silently outranked.
-const PROJECTS_PROFILE_FLAGS: readonly string[] = ["--allow", "--deny", "--model-strong", "--model-fast"];
+const PROJECTS_PROFILE_FLAGS: readonly string[] = ["--allow", "--deny", "--model-strong", "--model-fast", "--driver"];
 // 033 B-1: the ceiling verb's two limits. Neither belongs to any other verb,
 // and the posture flags do not belong to this one.
 const PROJECTS_CEILING_FLAGS: readonly string[] = ["--per-run", "--per-day"];
@@ -568,6 +580,7 @@ function strayFlag(args: ParsedArgs, accepted: readonly string[]): string | null
     args.deny !== null ? "--deny" : null,
     args.modelStrong !== null ? "--model-strong" : null,
     args.modelFast !== null ? "--model-fast" : null,
+    args.driver !== null ? "--driver" : null,
     args.perRun !== null ? "--per-run" : null,
     args.perDay !== null ? "--per-day" : null,
     args.out !== null ? "--out" : null,
@@ -764,6 +777,7 @@ function renderProjectDetail(view: ProjectView): string[] {
   const profile = view.profile;
   lines.push(`posture: ${renderProfile(profile)}`);
   lines.push(`models:  ${renderSessionModels(profile.models)}`);
+  lines.push(`driver:  ${renderDriver(profile)}`);
   if (profile.mode === "bypass") {
     lines.push(
       profile.legacy
@@ -1215,8 +1229,14 @@ function profileFromFlags(
   allow: string | null,
   deny: string | null,
   modelStrong: string | null,
-  modelFast: string | null
+  modelFast: string | null,
+  driver: string | null = null
 ): ProfileFromFlags {
+  // 117 B-2: a driver that is not one of the members' names is refused
+  // before anything else, naming the accepted ones.
+  if (driver !== null && !isDriverName(driver)) {
+    return { ok: false, reason: `"${driver}" is not a driver (expected ${DRIVER_NAMES.join(" or ")})` };
+  }
   // 040 B-4: half a pair is refused before anything else is assembled, so the
   // operator reads which half rather than a downstream mode complaint.
   const modelsRefusal = sessionModelsRefusal(modelStrong, modelFast);
@@ -1233,6 +1253,9 @@ function profileFromFlags(
     if (models !== undefined) {
       return { ok: false, reason: `--model-strong and --model-fast need a posture; name one with --profile bypass` };
     }
+    if (driver !== null) {
+      return { ok: false, reason: `--driver needs a posture; name one with --profile bypass` };
+    }
     return { ok: true, profile: undefined };
   }
   if (!isExecutionMode(mode)) {
@@ -1245,6 +1268,7 @@ function profileFromFlags(
     ...(allowed === undefined ? {} : { allowedTools: allowed }),
     ...(disallowed === undefined ? {} : { disallowedTools: disallowed }),
     ...(models === undefined ? {} : { models }),
+    ...(driver === null ? {} : { driver }),
   };
   const refusal = profileRefusal(profile);
   return refusal === null ? { ok: true, profile } : { ok: false, reason: refusal };
@@ -1375,7 +1399,7 @@ async function cmdProjects(
       return usage(deps, "projects add needs a repository path");
     }
     if (rest.length > 2) return usage(deps, `unexpected argument "${rest[2]}" after projects add`);
-    const posture = profileFromFlags(args.profile, args.allow, args.deny, args.modelStrong, args.modelFast);
+    const posture = profileFromFlags(args.profile, args.allow, args.deny, args.modelStrong, args.modelFast, args.driver);
     if (!posture.ok) return usage(deps, posture.reason);
     return cmdProjectsAdd(deps, client, args.json, path, args.name, args.disarmed, posture.profile);
   }
@@ -1389,7 +1413,7 @@ async function cmdProjects(
     const mode = rest[2];
     if (mode === undefined) return usage(deps, "projects profile needs a mode (bypass or guarded)");
     if (rest.length > 3) return usage(deps, `unexpected argument "${rest[3]}" after projects profile`);
-    const posture = profileFromFlags(mode, args.allow, args.deny, args.modelStrong, args.modelFast);
+    const posture = profileFromFlags(mode, args.allow, args.deny, args.modelStrong, args.modelFast, args.driver);
     if (!posture.ok) return usage(deps, posture.reason);
     // profileFromFlags only answers undefined for a null mode, which the
     // check above has already refused.
@@ -2295,8 +2319,9 @@ async function cmdAdoptSynthesize(deps: OrchestratorCliDeps, json: boolean, proj
         ? deps.makeSynthesisSession(project, journal)
         : async (request) =>
             // 043 B-7: synthesis sessions drive through the same seam every
-            // stage does; the driver is discovered per 043 B-5.
-            createProcessDriver().runSession({
+            // stage does; the driver is discovered per 043 B-5, and 117 B-3
+            // names it from the project's own profile.
+            createProcessDriver({ name: boundProject.profile.driver ?? DEFAULT_DRIVER_NAME }).runSession({
               repo: boundProject.repoDir,
               prompt: request.prompt,
               profile: boundProject.profile,

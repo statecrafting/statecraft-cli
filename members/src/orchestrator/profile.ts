@@ -38,6 +38,18 @@ export function isExecutionMode(value: string): value is ExecutionMode {
   return (EXECUTION_MODES as readonly string[]).includes(value);
 }
 
+// Spec 117 B-1: the driver a project's sessions run on. Absent means the
+// seam's default (043 B-5), so every chain written before 117 folds to
+// exactly what it ran on. The names are the members' dispatch names minus
+// the `statecraft-driver-` prefix.
+export const DRIVER_NAMES = ["claude", "codex"] as const;
+
+export type DriverName = (typeof DRIVER_NAMES)[number];
+
+export function isDriverName(value: string): value is DriverName {
+  return (DRIVER_NAMES as readonly string[]).includes(value);
+}
+
 export interface ExecutionProfile {
   readonly mode: ExecutionMode;
   // Present only on a guarded profile. Absent means the D-2 baseline below;
@@ -52,6 +64,10 @@ export interface ExecutionProfile {
   // run", and folds, sets and renders in the same places (040 D-2). It is
   // orthogonal to the mode: either mode may carry a pair.
   readonly models?: SessionModels;
+  // 117 B-1, doc 03 D38: the driver, or absent for the seam's default. It
+  // rides here for the reason the model pair does (040 D-2): it answers
+  // the same question the mode does, and folds, sets and renders with it.
+  readonly driver?: DriverName;
 }
 
 // A profile as read back off the projects chain. `legacy` is the honest
@@ -168,6 +184,7 @@ export function profilePayload(profile: ExecutionProfile): Record<string, JsonVa
     allowedTools: profile.allowedTools === undefined ? null : [...profile.allowedTools],
     disallowedTools: profile.disallowedTools === undefined ? null : [...profile.disallowedTools],
     models: sessionModelsPayload(profile.models),
+    driver: profile.driver ?? null,
   };
 }
 
@@ -196,12 +213,24 @@ export function parseProfile(value: JsonValue | undefined, label: string): Execu
   // A pre-040 record has no `models` key at all, which parses to undefined and
   // folds to the default pair. A half-written one throws (040 FR-004).
   const models = parseSessionModels(o.models, label);
+  // A pre-117 record has no `driver` key at all; absent and null both
+  // parse to undefined, the seam's default. Anything else must be a name.
+  const driver = parseDriverName(o.driver, label);
   return {
     mode,
     ...(allowedTools === undefined ? {} : { allowedTools }),
     ...(disallowedTools === undefined ? {} : { disallowedTools }),
     ...(models === undefined ? {} : { models }),
+    ...(driver === undefined ? {} : { driver }),
   };
+}
+
+export function parseDriverName(value: JsonValue | undefined, label: string): DriverName | undefined {
+  if (value === undefined || value === null) return undefined;
+  if (typeof value !== "string" || !isDriverName(value)) {
+    throw new Error(`profile: ${label} expected driver ${DRIVER_NAMES.map((n) => `"${n}"`).join(" or ")}, got ${JSON.stringify(value)}`);
+  }
+  return value;
 }
 
 // --- write-verb validation --------------------------------------------------
@@ -234,9 +263,17 @@ export function profileRefusal(profile: ExecutionProfile): string | null {
 // no surface ever renders a blank: an absent profile is impossible by
 // construction (the fold always produces one).
 export function renderProfile(profile: RecordedProfile): string {
-  if (profile.mode === "bypass") return profile.legacy ? "bypass (legacy)" : "bypass";
+  // 117 B-2: a non-default driver shows in the cell; a default one prints
+  // exactly what it printed before 117.
+  const via = profile.driver === undefined ? "" : ` via ${profile.driver}`;
+  if (profile.mode === "bypass") return `${profile.legacy ? "bypass (legacy)" : "bypass"}${via}`;
   const allowed = allowedToolsFor(profile);
   const baseline = profile.allowedTools === undefined ? " baseline" : "";
   const denied = profile.disallowedTools?.length ? `, ${profile.disallowedTools.length} denied` : "";
-  return `guarded (${allowed.length}${baseline} tools${denied})`;
+  return `guarded (${allowed.length}${baseline} tools${denied})${via}`;
+}
+
+// The driver line of a detail view (117 B-2).
+export function renderDriver(profile: ExecutionProfile): string {
+  return profile.driver ?? "claude (default)";
 }

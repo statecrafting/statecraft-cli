@@ -136,8 +136,8 @@
           {
             "file": "crates/statecraft-driver-core/src/lib.rs",
             "span": {
-              "endLine": 165,
-              "startLine": 130
+              "endLine": 175,
+              "startLine": 140
             }
           }
         ],
@@ -281,5 +281,5 @@
     "specStatus": "approved"
   },
   "schemaVersion": "1.1.0",
-  "shardHash": "887247d6ca577c85c436a3a3e553331cb603c54c61bf6e47143dd7093ada88ec"
+  "shardHash": "89cae03158e90fb31924e395bd47094b2f794c66a41f04c9373168c55968424f"
 }

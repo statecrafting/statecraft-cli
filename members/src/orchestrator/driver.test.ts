@@ -7,14 +7,18 @@ import { tmpdir } from "os";
 import { join } from "path";
 import { openJournal } from "./journal";
 import {
+  DEFAULT_DRIVER_NAME,
   DEGRADED_KIND,
   createProcessDriver,
+  createProfileDriver,
   killLiveSession,
   parseDriverEvent,
   resolveDriverCommand,
   toWireRequest,
+  type Driver,
   type SessionResult,
 } from "./driver";
+import type { ExecutionProfile } from "./profile";
 import { createBrowserMcpVerifier } from "./stages/verify";
 
 function freshDir(): string {
@@ -97,7 +101,7 @@ test("FR-001: the request is one JSON object on stdin, argv is `session run`, an
     maxTurns: 4,
     timeoutMs: 5000,
     mcpConfigPath: null,
-    profile: { mode: "guarded", allowedTools: ["Read"], disallowedTools: null, models: null },
+    profile: { mode: "guarded", allowedTools: ["Read"], disallowedTools: null, models: null, driver: null },
     killGraceMs: null,
   });
   // Every stream event reached the sink verbatim; the stray line did not.
@@ -254,4 +258,44 @@ test("B-5: STATECRAFT_DRIVER_BIN wins, then the managed directory, then PATH, th
   expect(source?.location).toBe("source");
   expect(source?.argv[1]).toEndWith("src/members/driver.ts");
   expect(resolveDriverCommand("nonesuch", { STATECRAFT_MEMBER_DIR: join(dir, "empty"), PATH: "" })).toBeNull();
+});
+
+// --- spec 117 B-3: the driver follows the profile ---------------------------
+
+test("117 FR-002: the profile driver resolves the name per call and keeps one driver per name", async () => {
+  const made: string[] = [];
+  const calls: string[] = [];
+  const fake = (name: string): Driver => {
+    made.push(name);
+    return {
+      name,
+      tier: async () => (name === "codex" ? "basic" : "reference"),
+      runSession: async (request) => {
+        calls.push(`${name}:${request.prompt}`);
+        return { classification: { kind: "completed", detail: "", resetAtMs: null }, exitCode: 0, durationMs: 0, numTurns: null, costMicroUsd: null, usage: null, sessionId: null, transcriptPath: null, overflow: { lines: [], truncatedCount: 0 }, stderrTail: "" };
+      },
+      killLiveSession: () => name === "codex",
+    };
+  };
+  let profile: ExecutionProfile = { mode: "bypass" };
+  const driver = createProfileDriver({ profile: () => profile, make: fake });
+  // Nothing is built until a call asks; the default name is the seam's.
+  expect(made).toEqual([]);
+  expect(driver.name).toBe(DEFAULT_DRIVER_NAME);
+  expect(await driver.tier()).toBe("reference");
+  await driver.runSession({ repo: "/r", prompt: "one", profile });
+  // The profile set mid-flight decides the next call, not the next construction.
+  profile = { mode: "guarded", driver: "codex" };
+  expect(driver.name).toBe("codex");
+  expect(await driver.tier()).toBe("basic");
+  await driver.runSession({ repo: "/r", prompt: "two", profile });
+  profile = { mode: "bypass" };
+  await driver.runSession({ repo: "/r", prompt: "three", profile });
+  expect(calls).toEqual(["claude:one", "codex:two", "claude:three"]);
+  // One process driver per name, kept: the second claude call reused the first.
+  expect(made).toEqual(["claude", "codex"]);
+  // The kill reaches every driver built so far.
+  expect(driver.killLiveSession()).toBe(true);
+  // An absent source is the default profile, so the default driver.
+  expect(createProfileDriver({ profile: undefined, make: fake }).name).toBe("claude");
 });

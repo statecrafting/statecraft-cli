@@ -50,6 +50,9 @@ pub struct Profile {
     pub allowed_tools: Option<Vec<String>>,
     pub disallowed_tools: Option<Vec<String>>,
     pub models: Option<(String, String)>,
+    /// The driver the project's sessions run on (spec 117 B-5), carried so
+    /// the journal a Rust driver writes matches the TypeScript one's.
+    pub driver: Option<String>,
 }
 
 impl Profile {
@@ -60,6 +63,7 @@ impl Profile {
             "allowedTools": self.allowed_tools,
             "disallowedTools": self.disallowed_tools,
             "models": self.models.as_ref().map(|(s, f)| serde_json::json!({"strong": s, "fast": f})),
+            "driver": self.driver,
         })
     }
 
@@ -108,11 +112,17 @@ impl Profile {
                 }
             }
         };
+        let driver = match obj.get("driver") {
+            None | Some(Value::Null) => None,
+            Some(Value::String(name)) if !name.trim().is_empty() => Some(name.clone()),
+            Some(_) => return Err("profile: driver must be a name or null".to_string()),
+        };
         Ok(Profile {
             mode,
             allowed_tools: list("allowedTools")?,
             disallowed_tools: list("disallowedTools")?,
             models,
+            driver,
         })
     }
 }
@@ -197,9 +207,19 @@ mod tests {
             allowed_tools: Some(vec!["Read".into()]),
             disallowed_tools: None,
             models: Some(("s".into(), "f".into())),
+            driver: Some("other".into()),
         };
         let back = Profile::from_payload(&p.payload()).unwrap();
         assert_eq!(back, p);
+        assert_eq!(p.payload()["driver"], serde_json::json!("other"));
+        // Spec 117 B-5: absent and null both read as no driver, and the
+        // payload says null out loud.
+        let none = Profile::from_payload(&serde_json::json!({"mode": "bypass"})).unwrap();
+        assert_eq!(none.driver, None);
+        assert_eq!(none.payload()["driver"], Value::Null);
+        assert!(
+            Profile::from_payload(&serde_json::json!({"mode": "bypass", "driver": 3})).is_err()
+        );
         assert!(Profile::from_payload(&serde_json::json!({"mode": "x"})).is_err());
         assert!(Profile::from_payload(
             &serde_json::json!({"mode": "bypass", "models": {"strong": "a"}})

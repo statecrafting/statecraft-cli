@@ -290,6 +290,7 @@ mod tests {
             allowed_tools: allowed.map(|v| v.into_iter().map(String::from).collect()),
             disallowed_tools: None,
             models: None,
+            driver: None,
         }
     }
 

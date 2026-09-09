@@ -1,0 +1,161 @@
+{
+  "record": {
+    "created": "2026-09-09",
+    "dependsOn": [
+      "116-codex-driver",
+      "043-driver-seam",
+      "032-execution-profiles",
+      "040-session-models"
+    ],
+    "establishes": [
+      {
+        "kind": "file",
+        "path": "members/src/orchestrator/project-driver.test.ts"
+      }
+    ],
+    "extends": [
+      {
+        "nature": "additive",
+        "spec": "032-execution-profiles",
+        "unit": {
+          "kind": "file",
+          "path": "members/src/orchestrator/profile.ts"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "032-execution-profiles",
+        "unit": {
+          "kind": "file",
+          "path": "members/src/orchestrator/profile.test.ts"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "043-driver-seam",
+        "unit": {
+          "kind": "file",
+          "path": "members/src/orchestrator/driver.ts"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "043-driver-seam",
+        "unit": {
+          "kind": "file",
+          "path": "members/src/orchestrator/driver.test.ts"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "021-orchestrator-daemon",
+        "unit": {
+          "kind": "file",
+          "path": "members/src/orchestrator/daemon.ts"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "023-orchestrator-cli",
+        "unit": {
+          "kind": "file",
+          "path": "members/src/commands/orchestrator.ts"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "028-cli-projects",
+        "unit": {
+          "kind": "file",
+          "path": "members/src/commands/orchestrator.test.ts"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "022-http-api-and-events",
+        "unit": {
+          "kind": "file",
+          "path": "members/src/orchestrator/api/server.ts"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "114-driver-port",
+        "unit": {
+          "id": "statecraft_driver_core::Profile",
+          "kind": "symbol"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "114-driver-port",
+        "unit": {
+          "id": "statecraft_driver_core::tests",
+          "kind": "symbol"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "111-contract-crate",
+        "unit": {
+          "kind": "directory",
+          "path": "crates/statecraft-contract/"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "111-contract-crate",
+        "unit": {
+          "kind": "file",
+          "path": "members/src/members/contract-fixtures.test.ts"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "114-driver-port",
+        "unit": {
+          "id": "statecraft_driver_claude::tests",
+          "kind": "symbol"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "116-codex-driver",
+        "unit": {
+          "id": "statecraft_driver_codex::tests",
+          "kind": "symbol"
+        }
+      }
+    ],
+    "id": "117-project-driver",
+    "implementation": "complete",
+    "references": [
+      {
+        "role": "context",
+        "unit": {
+          "kind": "file",
+          "path": "docs/design/03-the-codex-provider.md"
+        }
+      }
+    ],
+    "risk": "medium",
+    "sectionHeadings": [
+      "117: The driver is part of the posture",
+      "1. Purpose",
+      "2. Territory",
+      "3. Behavior",
+      "4. Functional requirements",
+      "5. Acceptance",
+      "Verification",
+      "Status (2026-09-09)",
+      "6. Out of scope",
+      "7. Resolved decisions"
+    ],
+    "specPath": "specs/117-project-driver/spec.md",
+    "status": "approved",
+    "summary": "Doc 02 §11 named the one engine change a second driver needs, and doc 03 D38 decided where it goes: the execution profile gains an optional driver field, claude or codex, absent meaning claude so every existing chain folds unchanged. It is registry state like mode, set through the same project.profile.set record by the same CLI verb and API route, journaled in session.init with the rest of the profile, and rendered wherever the posture is. The engine reads it late: the daemon's one driver per project becomes a facade that resolves the profile at each spawn and keeps one process driver per name, so a driver set mid-flight reaches the next session rather than the next daemon restart, which is the promise 032 B-4 made for the mode. Nothing else in the engine learns the word codex. The Rust profile emits the field too, so the journal a Rust driver writes and the one the TypeScript driver writes stay identical. Proven by driving the Rust Codex driver from the production wiring over a project whose profile says codex.\n",
+    "title": "The driver is part of the posture: a per-project driver choice through the profile, late-bound at every spawn"
+  },
+  "shardHash": "ee137cd46fa7cc14a97e3baa94a61d971c2b0cbc2f6f8b39a94453e1641a374e",
+  "specVersion": "1.2.0"
+}

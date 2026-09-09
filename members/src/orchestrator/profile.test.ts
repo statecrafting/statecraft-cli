@@ -148,12 +148,21 @@ test("profile: a payload round-trips, and a malformed one throws rather than def
   // "omitted" from "empty".
   // 040 B-4 adds the model pair to the same payload under the same rule: an
   // absent pair is an explicit null, not a missing key.
+  // 117 B-1: the driver under the same rule.
   expect(profilePayload({ mode: "bypass" })).toEqual({
     mode: "bypass",
     allowedTools: null,
     disallowedTools: null,
     models: null,
+    driver: null,
   });
+  expect(profilePayload({ mode: "bypass", driver: "codex" }).driver).toBe("codex");
+  expect(parseProfile({ mode: "bypass", driver: "codex" }, "test")).toEqual({ mode: "bypass", driver: "codex" });
+  expect(parseProfile({ mode: "bypass", driver: null }, "test")).toEqual({ mode: "bypass" });
+  expect(() => parseProfile({ mode: "bypass", driver: "cursor" }, "test")).toThrow(/expected driver "claude" or "codex"/);
+  expect(renderProfile({ mode: "bypass", legacy: false, driver: "codex" })).toBe("bypass via codex");
+  expect(renderProfile({ mode: "guarded", legacy: false, driver: "codex" })).toBe("guarded (9 baseline tools) via codex");
+  expect(LEGACY_BYPASS_PROFILE.driver).toBeUndefined();
   expect(parseProfile({ mode: "guarded", allowedTools: [] }, "test")).toEqual({ mode: "guarded", allowedTools: [] });
 
   expect(() => parseProfile(undefined, "test")).toThrow(/expected a JSON object/);
@@ -424,6 +433,7 @@ test("the spawn path: the session records the posture it was spawned under (B-5)
       allowedTools: ["Read"],
       disallowedTools: ["WebFetch"],
       models: null,
+      driver: null,
     });
   } finally {
     journal.close();

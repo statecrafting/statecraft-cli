@@ -133,7 +133,8 @@ fn session_request() {
             "mode": "guarded",
             "allowedTools": ["Read", "Bash(git:*)"],
             "disallowedTools": null,
-            "models": null
+            "models": null,
+            "driver": "codex"
         })),
         kill_grace_ms: None,
     };

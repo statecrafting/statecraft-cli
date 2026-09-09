@@ -905,7 +905,7 @@ async function routeProject(
       if (profile === null) {
         return fail(
           "bad-request",
-          `POST ${path} expects a JSON body with a "profile" object ({mode, allowedTools?, disallowedTools?})`
+          `POST ${path} expects a JSON body with a "profile" object ({mode, allowedTools?, disallowedTools?, models?, driver?})`
         );
       }
       return runRegistryControl(deps, registryVerb, name, clock.now(), () =>

@@ -68,7 +68,8 @@ test("the session requests parse through the driver member's request codec", () 
   expect(full.options.repo).toBe("/work/target");
   expect(full.options.maxTurns).toBe(40);
   expect(full.options.timeoutMs).toBe(1_800_000);
-  expect(full.options.profile).toEqual({ mode: "guarded", allowedTools: ["Read", "Bash(git:*)"] });
+  // 117 B-5: the driver rides in the profile on both sides of the seam.
+  expect(full.options.profile).toEqual({ mode: "guarded", allowedTools: ["Read", "Bash(git:*)"], driver: "codex" });
   // A strong tier with no explicit id resolves to the driver's default.
   expect(full.options.model).toBe("claude-opus-5");
   const minimal = parseRequest(JSON.stringify(fixture("session-request-minimal")), {});

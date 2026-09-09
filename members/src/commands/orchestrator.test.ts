@@ -1946,6 +1946,45 @@ test("040 AC-3/AC-4: the profile verb records a model pair, and every detail nam
   });
 });
 
+test("117 FR-003: the profile verb records a driver, the detail names it, and an unknown one is refused", async () => {
+  await withFixtureDaemon("projects-driver", async ({ registry, url, dataDir }) => {
+    // A project that never named a driver says so, rather than a blank.
+    const listed = await run(["projects", "--url", url], { dataDir });
+    expect(listed.out).toContain("alpha  armed     bypass  ");
+    const detail = await run(["projects", "arm", "alpha", "--url", url], { dataDir });
+    expect(detail.out).toContain("driver:  claude (default)");
+
+    // B-2: the driver travels on the posture verb, whole, and shows in the
+    // posture cell of the list row only when it is set.
+    const set = await run(["projects", "profile", "alpha", "guarded", "--driver", "codex", "--url", url], { dataDir });
+    expect(set.code).toBe(EXIT_OK);
+    expect(set.out).toContain("driver:  codex");
+    expect(set.out).toContain("guarded (9 baseline tools) via codex");
+    expect(registry.projects().get("alpha")!.profile.driver).toBe("codex");
+
+    // Refused before the chain moves, naming the accepted drivers.
+    const bad = await run(["projects", "profile", "alpha", "bypass", "--driver", "cursor", "--url", url], { dataDir });
+    expect(bad.code).toBe(EXIT_USAGE);
+    expect(bad.err).toContain('"cursor" is not a driver (expected claude or codex)');
+    expect(registry.projects().get("alpha")!.profile.driver).toBe("codex");
+
+    // Registration takes it too, and a driver with no posture is refused
+    // the way a model pair with none is.
+    const added = await run(
+      ["projects", "add", registry.world("newcomer").repoDir, "--name", "gamma", "--profile", "bypass", "--driver", "codex", "--url", url],
+      { dataDir }
+    );
+    expect(added.code).toBe(EXIT_OK);
+    expect(added.out).toContain("bypass via codex");
+    const modeless = await run(
+      ["projects", "add", registry.world("other").repoDir, "--name", "delta", "--driver", "codex", "--url", url],
+      { dataDir }
+    );
+    expect(modeless.code).toBe(EXIT_USAGE);
+    expect(modeless.err).toContain("--driver needs a posture");
+  });
+});
+
 test("040 FR-005: half a pair is a usage error naming the missing half, before the chain moves", async () => {
   await withFixtureDaemon("projects-models-half", async ({ registry, url, dataDir }) => {
     const half = await run(["projects", "profile", "alpha", "bypass", "--model-strong", "only", "--url", url], {
