@@ -1,0 +1,181 @@
+{
+  "mapping": {
+    "dependsOn": [
+      "111-contract-crate",
+      "011-work-journal",
+      "020-decision-ledger",
+      "031-journal-export",
+      "039-attested-export"
+    ],
+    "implementingPaths": [
+      {
+        "path": ".github/workflows/members.yml",
+        "source": "spec-edge"
+      },
+      {
+        "path": "Cargo.lock",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/statecraft-journal",
+        "source": "multiple"
+      },
+      {
+        "path": "crates/statecraft-journal/",
+        "source": "spec-edge"
+      },
+      {
+        "path": "members/src/members/journal-parity.test.ts",
+        "source": "spec-edge"
+      },
+      {
+        "path": "members/src/orchestrator/export.ts",
+        "source": "spec-edge"
+      },
+      {
+        "path": "members/src/orchestrator/journal.test.ts",
+        "source": "spec-edge"
+      },
+      {
+        "path": "members/src/orchestrator/journal.ts",
+        "source": "spec-edge"
+      }
+    ],
+    "resolvedUnits": [
+      {
+        "locations": [
+          {
+            "file": "crates/statecraft-journal"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "id": "statecraft-journal",
+          "kind": "crate"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "crates/statecraft-journal/"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "kind": "directory",
+          "path": "crates/statecraft-journal/"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "members/src/members/journal-parity.test.ts"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "kind": "file",
+          "path": "members/src/members/journal-parity.test.ts"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": ".github/workflows/members.yml"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": ".github/workflows/members.yml"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "Cargo.lock"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "Cargo.lock"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "members/src/orchestrator/export.ts"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "members/src/orchestrator/export.ts"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "members/src/orchestrator/journal.test.ts"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "members/src/orchestrator/journal.test.ts"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "members/src/orchestrator/journal.ts"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "members/src/orchestrator/journal.ts"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "docs/design/02-the-monorepo-and-the-rust-sequence.md"
+          }
+        ],
+        "ownership": false,
+        "sourceField": "references",
+        "unit": {
+          "kind": "file",
+          "path": "docs/design/02-the-monorepo-and-the-rust-sequence.md"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "docs/evidence/journal-bundle.json"
+          }
+        ],
+        "ownership": false,
+        "sourceField": "references",
+        "unit": {
+          "kind": "file",
+          "path": "docs/evidence/journal-bundle.json"
+        }
+      }
+    ],
+    "specId": "113-journal-port",
+    "specStatus": "approved"
+  },
+  "schemaVersion": "1.1.0",
+  "shardHash": "37e79d7100b9ec01f188d997ca1d3e36618c87df376819c57ab1dd6e5522988f"
+}

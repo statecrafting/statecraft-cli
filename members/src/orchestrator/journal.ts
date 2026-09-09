@@ -67,17 +67,30 @@ export type VerifyResult =
 
 // --- canonical JSON + hashing ------------------------------------------
 
-// Recursive lexicographic key-sort, restricted to the attest-ledger
-// portability set: integers, strings, booleans, null, arrays, and plain
-// objects of the same. Floats and any other JS value throw, so a payload
+// Recursive lexicographic key-sort, restricted to the portability set:
+// integers within 2^53, strings that are valid Unicode, booleans, null,
+// arrays, and plain objects of the same. Anything else throws, so a payload
 // that would hash differently on another runtime is rejected before it ever
-// reaches disk.
+// reaches disk. Spec 113 B-2 pinned the set and the order to the substrate's
+// (canonical-keysort-json): a lone surrogate and an unsafe integer are
+// refused here as they are there, and stableStringify below emits keys in
+// UTF-8 byte order itself rather than through JSON.stringify's enumeration
+// order, which put integer-like keys first.
 export function canonicalizeValue(value: unknown): JsonValue {
   if (value === null) return null;
-  if (typeof value === "boolean" || typeof value === "string") return value;
+  if (typeof value === "boolean") return value;
+  if (typeof value === "string") {
+    if (!value.isWellFormed()) {
+      throw new Error("canonicalize: a string with a lone surrogate is not portable (valid Unicode only)");
+    }
+    return value;
+  }
   if (typeof value === "number") {
     if (!Number.isInteger(value)) {
       throw new Error(`canonicalize: non-integer number ${value} is not portable (integers only)`);
+    }
+    if (!Number.isSafeInteger(value)) {
+      throw new Error(`canonicalize: integer ${value} is outside the safe range (integers within 2^53 only)`);
     }
     return value;
   }
@@ -88,7 +101,7 @@ export function canonicalizeValue(value: unknown): JsonValue {
       throw new Error("canonicalize: only plain objects are portable");
     }
     const out: { [key: string]: JsonValue } = {};
-    for (const key of Object.keys(value as Record<string, unknown>).sort()) {
+    for (const key of Object.keys(value as Record<string, unknown>).sort(compareUtf8)) {
       out[key] = canonicalizeValue((value as Record<string, unknown>)[key]);
     }
     return out;
@@ -96,8 +109,56 @@ export function canonicalizeValue(value: unknown): JsonValue {
   throw new Error(`canonicalize: unsupported value of type ${typeof value}`);
 }
 
+// UTF-8 byte order, which is code point order: the substrate's key order.
+// JavaScript's default sort compares UTF-16 code units, which disagrees only
+// above the basic multilingual plane.
+function compareUtf8(a: string, b: string): number {
+  const la = a.length;
+  const lb = b.length;
+  for (let i = 0, j = 0; i < la && j < lb; ) {
+    const ca = a.codePointAt(i)!;
+    const cb = b.codePointAt(j)!;
+    if (ca !== cb) return ca < cb ? -1 : 1;
+    i += ca > 0xffff ? 2 : 1;
+    j += cb > 0xffff ? 2 : 1;
+  }
+  return la === lb ? 0 : la < lb ? -1 : 1;
+}
+
+// The canonical bytes: JSON.stringify's scalar and string encoding, with
+// object keys emitted in the sorted order canonicalizeValue chose. Going
+// through JSON.stringify on the object would reorder integer-like keys.
+function serializeCanonical(value: JsonValue): string {
+  if (value === null || typeof value !== "object") return JSON.stringify(value);
+  if (Array.isArray(value)) return `[${value.map(serializeCanonical).join(",")}]`;
+  const parts: string[] = [];
+  for (const key of Object.keys(value).sort(compareUtf8)) {
+    parts.push(`${JSON.stringify(key)}:${serializeCanonical(value[key]!)}`);
+  }
+  return `{${parts.join(",")}}`;
+}
+
 export function stableStringify(value: unknown): string {
-  return JSON.stringify(canonicalizeValue(value));
+  return serializeCanonical(canonicalizeValue(value));
+}
+
+// The same bytes with a two-space indent: what `JSON.stringify(v, null, 2)`
+// prints, in canonical key order. Empty containers print as `[]` and `{}`.
+function serializePretty(value: JsonValue, depth: number): string {
+  if (value === null || typeof value !== "object") return JSON.stringify(value);
+  const pad = "  ".repeat(depth + 1);
+  const close = "  ".repeat(depth);
+  if (Array.isArray(value)) {
+    if (value.length === 0) return "[]";
+    return `[\n${value.map((v) => `${pad}${serializePretty(v, depth + 1)}`).join(",\n")}\n${close}]`;
+  }
+  const keys = Object.keys(value).sort(compareUtf8);
+  if (keys.length === 0) return "{}";
+  return `{\n${keys.map((k) => `${pad}${JSON.stringify(k)}: ${serializePretty(value[k]!, depth + 1)}`).join(",\n")}\n${close}}`;
+}
+
+export function stablePrettyStringify(value: unknown): string {
+  return serializePretty(canonicalizeValue(value), 0);
 }
 
 export function sha256Hex(text: string): string {

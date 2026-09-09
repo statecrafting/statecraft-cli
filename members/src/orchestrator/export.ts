@@ -20,8 +20,8 @@
 import * as fs from "fs";
 import { dirname, join } from "path";
 import {
-  canonicalizeValue,
   sha256Hex,
+  stablePrettyStringify,
   stableStringify,
   verifyChain,
   type JournalRecord,
@@ -367,7 +367,9 @@ export function buildBundle(params: {
 // Canonical key order, two-space indent, trailing newline: deterministic
 // bytes (B-5) that still diff readably once the bundle is committed.
 export function serializeBundle(bundle: JournalBundle): string {
-  return JSON.stringify(canonicalizeValue(bundle), null, 2) + "\n";
+  // Spec 113 B-2: canonical key order all the way down, including
+  // integer-like keys, which JSON.stringify would have enumerated first.
+  return stablePrettyStringify(bundle) + "\n";
 }
 
 // --- reading the chains for export (B-4: read-only) --------------------------

@@ -1,0 +1,104 @@
+{
+  "record": {
+    "created": "2026-09-09",
+    "dependsOn": [
+      "111-contract-crate",
+      "011-work-journal",
+      "020-decision-ledger",
+      "031-journal-export",
+      "039-attested-export"
+    ],
+    "establishes": [
+      {
+        "id": "statecraft-journal",
+        "kind": "crate"
+      },
+      {
+        "kind": "directory",
+        "path": "crates/statecraft-journal/"
+      },
+      {
+        "kind": "file",
+        "path": "members/src/members/journal-parity.test.ts"
+      }
+    ],
+    "extends": [
+      {
+        "nature": "additive",
+        "spec": "102-crate-scaffold",
+        "unit": {
+          "kind": "file",
+          "path": "Cargo.lock"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "011-work-journal",
+        "unit": {
+          "kind": "file",
+          "path": "members/src/orchestrator/journal.ts"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "011-work-journal",
+        "unit": {
+          "kind": "file",
+          "path": "members/src/orchestrator/journal.test.ts"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "031-journal-export",
+        "unit": {
+          "kind": "file",
+          "path": "members/src/orchestrator/export.ts"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "110-corpus-merge",
+        "unit": {
+          "kind": "file",
+          "path": ".github/workflows/members.yml"
+        }
+      }
+    ],
+    "id": "113-journal-port",
+    "implementation": "complete",
+    "references": [
+      {
+        "role": "context",
+        "unit": {
+          "kind": "file",
+          "path": "docs/design/02-the-monorepo-and-the-rust-sequence.md"
+        }
+      },
+      {
+        "role": "context",
+        "unit": {
+          "kind": "file",
+          "path": "docs/evidence/journal-bundle.json"
+        }
+      }
+    ],
+    "sectionHeadings": [
+      "113: The journal in Rust",
+      "1. Purpose",
+      "2. Territory",
+      "3. Behavior",
+      "4. Functional requirements",
+      "5. Acceptance",
+      "Verification",
+      "Status (2026-09-09)",
+      "6. Out of scope",
+      "7. Resolved decisions"
+    ],
+    "specPath": "specs/113-journal-port/spec.md",
+    "status": "approved",
+    "summary": "Doc 02 §6 names the one thing a Rust port deletes rather than tidies: underneath a product whose whole claim is offline-verifiable tamper-evident chains sit two implementations of canonical JSON, one of which exists only in journal.ts. This spec is the second step of D30. statecraft-journal is the hash-linked chain of spec 011 (open, recover a torn tail, append with fsync, verify, fold, the intent bracket), the decision record's content hash and validation (020), and the export bundle (031, 039): its redaction policy, its assembly, its serialized bytes and its offline verifier, all over canonical-keysort-json and sha2. It ships as a member binary, statecraft-journal, so the umbrella dispatches `statecraft journal verify` and `verify-bundle` and `export` to a verifier that shares no code with the writer. The gate doc 02 set is met before anything is retired: every chain and bundle this family has written reverifies byte for byte, the committed evidence bundle included, and a bundle exported from one chain by either implementation is the same bytes. The canonicalization divergences doc 02 measured are decided here (D-2): the substrate's order is the canonical one, and the TypeScript writer is tightened to it.\n",
+    "title": "The journal in Rust: one canonical form, the substrate's, verified against every chain that exists"
+  },
+  "shardHash": "79bdc63f41caf7fff214d43ff22457bd7adeec1274f5efb5a05eb01c982e8af6",
+  "specVersion": "1.2.0"
+}
