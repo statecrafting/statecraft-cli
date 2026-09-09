@@ -1,0 +1,12 @@
+{
+  "package": {
+    "edition": "2021",
+    "kind": "rust-bin",
+    "name": "statecraft-sensor-codex",
+    "path": "crates/statecraft-sensor-codex",
+    "specRef": "115-codex-sensor",
+    "version": "0.1.0"
+  },
+  "schemaVersion": "1.1.0",
+  "shardHash": "5e3fb46725b89b2b27eab0f22607e348e7155756cef82a3cda8a97e15e9918a8"
+}

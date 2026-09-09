@@ -37,6 +37,9 @@ pub struct Universe {
     /// Names never reported: the sensor's own noise and editor litter.
     pub ignored_basenames: Vec<String>,
     pub ignored_suffixes: Vec<String>,
+    /// Root-relative paths `peek` refuses to open (spec 115 B-4): secrets a
+    /// redactor must not be trusted to mask. Empty for a tree with none.
+    pub never_peek: Vec<String>,
 }
 
 impl Universe {
@@ -61,6 +64,17 @@ impl Universe {
             return stripped.to_string_lossy().into_owned();
         }
         path.to_string_lossy().into_owned()
+    }
+
+    /// Whether the state file sits inside the watched root (spec 115 B-3),
+    /// in which case the recursive watch already covers it.
+    pub fn state_inside_root(&self) -> bool {
+        self.state_file.starts_with(&self.watch_root)
+    }
+
+    /// Whether `peek` must refuse this path (spec 115 B-4).
+    pub fn is_never_peek(&self, rel_path: &str) -> bool {
+        self.never_peek.iter().any(|p| p == rel_path)
     }
 
     /// The state file's temp siblings share its display prefix.
@@ -232,6 +246,7 @@ mod tests {
             state_display: "~/.root.json".to_string(),
             ignored_basenames: vec![".DS_Store".to_string()],
             ignored_suffixes: vec![".swp".to_string(), "~".to_string()],
+            never_peek: vec![],
         }
     }
 
@@ -257,17 +272,19 @@ mod tests {
         // FR-005: this crate is provider-neutral by construction. The check
         // reads its own sources, so a stray name fails here, not in review.
         // The word is assembled at runtime so this file does not contain it.
-        let word = ["cl", "aude"].concat();
+        let words = [["cl", "aude"].concat(), ["co", "dex"].concat()];
         let src = Path::new(env!("CARGO_MANIFEST_DIR")).join("src");
         for entry in std::fs::read_dir(&src).unwrap() {
             let path = entry.unwrap().path();
             let text = std::fs::read_to_string(&path).unwrap().to_lowercase();
-            assert_eq!(
-                text.matches(&word).count(),
-                0,
-                "{} names a provider",
-                path.display()
-            );
+            for word in &words {
+                assert_eq!(
+                    text.matches(word.as_str()).count(),
+                    0,
+                    "{} names a provider",
+                    path.display()
+                );
+            }
         }
     }
 }

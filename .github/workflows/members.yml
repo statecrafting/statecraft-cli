@@ -34,6 +34,11 @@ jobs:
       - name: Build the Rust driver
         working-directory: .
         run: cargo build -p statecraft-driver-claude --locked
+      # Spec 115: the Codex sensor is a member the umbrella discovers; its
+      # manifest is checked here the way the TypeScript members' are.
+      - name: Build the Codex sensor
+        working-directory: .
+        run: cargo build -p statecraft-sensor-codex --locked && ./target/debug/statecraft-sensor-codex --member-manifest
       # The synthesis tests scaffold a target with `spec-spine init` (spec 035);
       # the same binary the governance job installs.
       - name: Install spec-spine

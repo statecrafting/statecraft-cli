@@ -2217,6 +2217,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "statecraft-sensor-codex"
+version = "0.1.0"
+dependencies = [
+ "regex",
+ "serde_json",
+ "statecraft-contract",
+ "statecraft-sensor-core",
+]
+
+[[package]]
 name = "statecraft-sensor-core"
 version = "0.1.0"
 dependencies = [

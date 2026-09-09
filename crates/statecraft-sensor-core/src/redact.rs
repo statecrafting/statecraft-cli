@@ -17,6 +17,11 @@ fn rules() -> &'static Rules {
     RULES.get_or_init(|| Rules {
         tokens: vec![
             (Regex::new(r"sk-ant-[A-Za-z0-9_-]{8,}").unwrap(), "anthropic-key"),
+            // Spec 115 B-5: the `sk-proj-` and bare `sk-` forms OpenAI issues.
+            (
+                Regex::new(r"\bsk-(?:proj-)?[A-Za-z0-9_-]{20,}").unwrap(),
+                "openai-key",
+            ),
             (
                 Regex::new(r"(?:ghp|gho|ghu|ghs|ghr)_[A-Za-z0-9]{20,}").unwrap(),
                 "github-token",
@@ -88,6 +93,15 @@ mod tests {
         assert_eq!(
             redact("key sk-ant-abcdefghij here"),
             "key [REDACTED:anthropic-key] here"
+        );
+        // Spec 115 B-5: both OpenAI forms, and the Anthropic form still wins first.
+        assert_eq!(
+            redact("k sk-proj-abcdefghijklmnopqrstuvwxyz0123 and sk-abcdefghijklmnopqrstuvwxyz"),
+            "k [REDACTED:openai-key] and [REDACTED:openai-key]"
+        );
+        assert_eq!(
+            redact("sk-ant-abcdefghijklmnopqrstuvwxyz"),
+            "[REDACTED:anthropic-key]"
         );
         assert_eq!(
             redact(r#"{"authToken": "abcd1234"}"#),

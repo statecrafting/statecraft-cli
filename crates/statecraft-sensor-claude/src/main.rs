@@ -58,6 +58,7 @@ pub fn universe() -> Universe {
         state_display: "~/.claude.json".to_string(),
         ignored_basenames: vec![".DS_Store".to_string()],
         ignored_suffixes: vec![".swp".to_string(), ".swo".to_string(), "~".to_string()],
+        never_peek: vec![],
     }
 }
 
