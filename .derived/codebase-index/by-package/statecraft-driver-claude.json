@@ -1,0 +1,12 @@
+{
+  "package": {
+    "edition": "2021",
+    "kind": "rust-bin",
+    "name": "statecraft-driver-claude",
+    "path": "crates/statecraft-driver-claude",
+    "specRef": "114-driver-port",
+    "version": "0.1.0"
+  },
+  "schemaVersion": "1.1.0",
+  "shardHash": "41380c383ff370c8e4dd84113655270fd9ca2241f5d998d13061a446ad973123"
+}

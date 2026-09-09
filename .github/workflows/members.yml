@@ -29,6 +29,11 @@ jobs:
       - name: Build the Rust journal
         working-directory: .
         run: cargo build -p statecraft-journal --locked && cargo build -p statecraft-journal --example append --locked
+      # Spec 114 FR-003: the driver parity test runs both drivers over 014's
+      # fixtures and drives the Rust one through 043's seam.
+      - name: Build the Rust driver
+        working-directory: .
+        run: cargo build -p statecraft-driver-claude --locked
       # The synthesis tests scaffold a target with `spec-spine init` (spec 035);
       # the same binary the governance job installs.
       - name: Install spec-spine

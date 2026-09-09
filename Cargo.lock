@@ -2172,6 +2172,28 @@ dependencies = [
 ]
 
 [[package]]
+name = "statecraft-driver-claude"
+version = "0.1.0"
+dependencies = [
+ "regex",
+ "serde_json",
+ "statecraft-contract",
+ "statecraft-driver-core",
+]
+
+[[package]]
+name = "statecraft-driver-core"
+version = "0.1.0"
+dependencies = [
+ "chrono",
+ "libc",
+ "regex",
+ "serde",
+ "serde_json",
+ "statecraft-contract",
+]
+
+[[package]]
 name = "statecraft-journal"
 version = "0.1.0"
 dependencies = [

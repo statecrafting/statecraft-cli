@@ -1,0 +1,12 @@
+{
+  "package": {
+    "edition": "2021",
+    "kind": "rust-lib",
+    "name": "statecraft-driver-core",
+    "path": "crates/statecraft-driver-core",
+    "specRef": "114-driver-port",
+    "version": "0.1.0"
+  },
+  "schemaVersion": "1.1.0",
+  "shardHash": "61d8bc56e85e8a27bd77f63e771fafd710dd158dd480ad5f0d2e4a6bf445a118"
+}
