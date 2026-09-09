@@ -134,7 +134,8 @@ observatory spec that claimed it before the move, at its new path.
 Landed as #16. The same day, doc 02 §11 was added under this spec's
 `docs/design/` claim to record where the Rust sequence stands after
 specs 111 to 114, so the design record carries the state rather than the
-pull request log.
+pull request log. Doc 03 §8 followed on the same day, under the same
+claim, for the Codex sequence (specs 115 to 118).
 
 ## 5. Out of scope
 

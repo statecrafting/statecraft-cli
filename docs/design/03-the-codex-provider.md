@@ -12,7 +12,7 @@ spec 114. This document continues `02-the-monorepo-and-the-rust-sequence.md`
 and takes up the sentence its §11 ends on: a Codex sensor is a `Universe` and
 a rule table, a Codex driver is a `Provider`, and the one engine change is a
 per-project driver choice. Claims cited here were measured on disk on the
-date above; §8 lists what was not.
+date above; §9 lists what was not.
 
 Decision numbering continues the sequence: 02 owns D24-D30, this document
 owns D31 onward.
@@ -291,7 +291,35 @@ for the sequence to run to completion in one instruction and the decisions
 are recorded here rather than left to the sessions. Each is built, shipped
 and shepherded as its own pull request in the governed loop.
 
-## 8. Not verified
+## 8. Where this stands (2026-09-09)
+
+Recorded the day the sequence ran, as doc 02 §11 was.
+
+| Step | Spec | Landed as |
+|---|---|---|
+| The Codex universe | 115 | `statecraft-sensor-codex` over the core, FINDINGS with four captures, three core seams (state file inside the root, `never_peek`, the OpenAI key rule); 491 live events, none unclassified (#23) |
+| The Codex driver | 116 | `statecraft-driver-codex`, `basic` tier with the degradations declared; three `Provider` defaults and the `try again` reset form in the core; the real Codex driven through the seam (#24) |
+| The driver choice | 117 | `profile.driver`, `--driver` on both verbs, `via codex` in the posture cell, the profile-following facade at the daemon's spawn site, parity kept in the Rust profile and the 111 fixture (#25) |
+| The Codex harness | 118 | `.agents/skills`, `.codex/agents`, `.codex/hooks.json` generated from `.claude/` by `scripts/codex-kit.py`; the hook-trust bypass in the driver's argv; the PR gate observed refusing a driven session (#26) |
+
+Two of §9's open questions closed on the way. A project's hooks are
+skipped silently without trust (118's control run), which is why D40's
+flag is in the driver. A hook refusal ends a Codex turn as
+`turn.completed`, so it classifies `completed` and is read from the
+stream and `resultTextTail`; the `hook-blocked` rule fires only on a turn
+that fails, which is 014 B-4's order and the Claude driver's behavior
+too. What is still open: a native quota or auth refusal on the `--json`
+stream has not been seen, and D36's table waits on the first one.
+
+What "Codex-ready" now means, concretely: register a project with
+`--profile guarded --driver codex` and the scheduler drives it with the
+Rust Codex driver, its sessions journal `profile.driver: "codex"` and
+`degraded: ["cost"]`, the Codex sensor classifies what those sessions
+write under `~/.codex`, and the driven session runs the same skills,
+agents and PR gate the Claude one does. A third provider is the same
+four steps, and D31's capture comes first.
+
+## 9. Not verified
 
 - What a native Codex quota, auth or hook refusal prints on the `--json`
   stream. D36's table is transcribed from the binary and from one 400
@@ -305,7 +333,7 @@ and shepherded as its own pull request in the governed loop.
 - The Cursor tree, which the desktop's import also names as a provider.
   Nothing here is designed against it.
 
-## 9. Sources
+## 10. Sources
 
 Measured on disk 2026-09-09: `~/.codex` (the tree listing, `du`, the file
 type census, `config.toml`, `hooks.json`, `AGENTS.md`,
