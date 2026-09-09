@@ -1,0 +1,88 @@
+{
+  "record": {
+    "created": "2026-09-09",
+    "dependsOn": [
+      "111-contract-crate",
+      "043-driver-seam",
+      "014-session-driver",
+      "040-session-models",
+      "032-execution-profiles"
+    ],
+    "establishes": [
+      {
+        "id": "statecraft-driver-core",
+        "kind": "crate"
+      },
+      {
+        "kind": "directory",
+        "path": "crates/statecraft-driver-core/"
+      },
+      {
+        "id": "statecraft-driver-claude",
+        "kind": "crate"
+      },
+      {
+        "kind": "directory",
+        "path": "crates/statecraft-driver-claude/"
+      },
+      {
+        "kind": "file",
+        "path": "members/src/members/driver-parity.test.ts"
+      }
+    ],
+    "extends": [
+      {
+        "nature": "additive",
+        "spec": "102-crate-scaffold",
+        "unit": {
+          "kind": "file",
+          "path": "Cargo.lock"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "110-corpus-merge",
+        "unit": {
+          "kind": "file",
+          "path": ".github/workflows/members.yml"
+        }
+      }
+    ],
+    "id": "114-driver-port",
+    "implementation": "complete",
+    "references": [
+      {
+        "role": "context",
+        "unit": {
+          "kind": "file",
+          "path": "docs/design/02-the-monorepo-and-the-rust-sequence.md"
+        }
+      },
+      {
+        "role": "context",
+        "unit": {
+          "kind": "file",
+          "path": "docs/design/01-umbrella-cli-and-member-seams.md"
+        }
+      }
+    ],
+    "sectionHeadings": [
+      "114: The driver in Rust",
+      "1. Purpose",
+      "2. Territory",
+      "3. Behavior",
+      "4. Functional requirements",
+      "5. Acceptance",
+      "Verification",
+      "Status (2026-09-09)",
+      "6. Out of scope",
+      "7. Resolved decisions"
+    ],
+    "specPath": "specs/114-driver-port/spec.md",
+    "status": "approved",
+    "summary": "Doc 02 D30 let the Claude driver stay TypeScript indefinitely, on the argument that a polyglot driver family is the strongest evidence the seam is real. Spec 043 proved the seam with exactly that: a Rust umbrella, a TypeScript engine and a TypeScript driver meeting at a process. What D26 still owes is the driver family's own split, a provider-neutral core and a thin per-provider crate, so that a second driver is invocation flags, a stream format, termination signals and a model table, and nothing else. This spec builds that split in Rust and proves it with the provider that exists. statecraft-driver-core is spec 014's session driver with the provider removed: it reads the 043 request, spawns whatever the provider names with argv only, delivers the prompt on stdin, streams the provider's stdout through the provider's parser, enforces the deadline and the shutdown kill, classifies the termination through the provider's rule table, and emits the journal, stream and result events the engine consumes. statecraft-driver-claude is the argv, the env scrub, the stream-json parser, the transcript path, the default model pair, the rule table and the manifest. Over spec 014's own fixture scripts, the Rust driver and the TypeScript driver emit identical event streams, and the TypeScript engine drives the Rust driver through 043's seam unchanged. A Codex driver is then the second thin crate, which is what \"ready for Codex\" means on the driver side; the sensor side was 112.\n",
+    "title": "The driver in Rust: a provider-neutral core and the Claude driver, the last seam before a second provider"
+  },
+  "shardHash": "c1e72aa6a08c56cc2c6fddb0f7d328d2391a13a3887236890e4dc94bbe6964e5",
+  "specVersion": "1.2.0"
+}

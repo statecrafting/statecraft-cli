@@ -1,0 +1,164 @@
+{
+  "mapping": {
+    "dependsOn": [
+      "111-contract-crate",
+      "043-driver-seam",
+      "014-session-driver",
+      "040-session-models",
+      "032-execution-profiles"
+    ],
+    "implementingPaths": [
+      {
+        "path": ".github/workflows/members.yml",
+        "source": "spec-edge"
+      },
+      {
+        "path": "Cargo.lock",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/statecraft-driver-claude",
+        "source": "multiple"
+      },
+      {
+        "path": "crates/statecraft-driver-claude/",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/statecraft-driver-core",
+        "source": "multiple"
+      },
+      {
+        "path": "crates/statecraft-driver-core/",
+        "source": "spec-edge"
+      },
+      {
+        "path": "members/src/members/driver-parity.test.ts",
+        "source": "spec-edge"
+      }
+    ],
+    "resolvedUnits": [
+      {
+        "locations": [
+          {
+            "file": "crates/statecraft-driver-claude"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "id": "statecraft-driver-claude",
+          "kind": "crate"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "crates/statecraft-driver-core"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "id": "statecraft-driver-core",
+          "kind": "crate"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "crates/statecraft-driver-claude/"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "kind": "directory",
+          "path": "crates/statecraft-driver-claude/"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "crates/statecraft-driver-core/"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "kind": "directory",
+          "path": "crates/statecraft-driver-core/"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "members/src/members/driver-parity.test.ts"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "kind": "file",
+          "path": "members/src/members/driver-parity.test.ts"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": ".github/workflows/members.yml"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": ".github/workflows/members.yml"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "Cargo.lock"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "Cargo.lock"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "docs/design/01-umbrella-cli-and-member-seams.md"
+          }
+        ],
+        "ownership": false,
+        "sourceField": "references",
+        "unit": {
+          "kind": "file",
+          "path": "docs/design/01-umbrella-cli-and-member-seams.md"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "docs/design/02-the-monorepo-and-the-rust-sequence.md"
+          }
+        ],
+        "ownership": false,
+        "sourceField": "references",
+        "unit": {
+          "kind": "file",
+          "path": "docs/design/02-the-monorepo-and-the-rust-sequence.md"
+        }
+      }
+    ],
+    "specId": "114-driver-port",
+    "specStatus": "approved"
+  },
+  "schemaVersion": "1.1.0",
+  "shardHash": "0d37d9c6227a9970c9aabd0613c57e2dcc65d7fd0dd90ddaaeb42383f0a60727"
+}
