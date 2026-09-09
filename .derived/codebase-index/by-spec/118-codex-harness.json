@@ -1,0 +1,204 @@
+{
+  "diagnostics": {
+    "errors": [],
+    "warnings": [
+      {
+        "code": "W-001",
+        "message": "spec '118-codex-harness' file unit 'scripts/codex-kit.py' does not exist",
+        "path": "scripts/codex-kit.py"
+      },
+      {
+        "code": "W-001",
+        "message": "spec '118-codex-harness' section unit 'codex-kit' not found in Makefile",
+        "path": "Makefile"
+      }
+    ]
+  },
+  "mapping": {
+    "dependsOn": [
+      "109-governed-harness",
+      "116-codex-driver",
+      "117-project-driver"
+    ],
+    "implementingPaths": [
+      {
+        "path": ".agents/skills/",
+        "source": "spec-edge"
+      },
+      {
+        "path": ".codex/agents/",
+        "source": "spec-edge"
+      },
+      {
+        "path": ".codex/hooks.json",
+        "source": "spec-edge"
+      },
+      {
+        "path": "AGENTS.md",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/statecraft-driver-codex/src/main.rs",
+        "source": "spec-edge"
+      },
+      {
+        "path": "members/src/members/driver-codex.test.ts",
+        "source": "spec-edge"
+      },
+      {
+        "path": "spec-spine.toml",
+        "source": "spec-edge"
+      }
+    ],
+    "resolvedUnits": [
+      {
+        "locations": [
+          {
+            "file": ".agents/skills/"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "kind": "directory",
+          "path": ".agents/skills/"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": ".codex/agents/"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "kind": "directory",
+          "path": ".codex/agents/"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": ".codex/hooks.json"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "kind": "file",
+          "path": ".codex/hooks.json"
+        }
+      },
+      {
+        "locations": [],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "kind": "file",
+          "path": "scripts/codex-kit.py"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "AGENTS.md"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "AGENTS.md"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "members/src/members/driver-codex.test.ts"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "members/src/members/driver-codex.test.ts"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "spec-spine.toml"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "spec-spine.toml"
+        }
+      },
+      {
+        "locations": [],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "anchor": "codex-kit",
+          "file": "Makefile",
+          "kind": "section"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "crates/statecraft-driver-codex/src/main.rs",
+            "span": {
+              "endLine": 34,
+              "startLine": 31
+            }
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "id": "statecraft_driver_codex::Codex",
+          "kind": "symbol"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "crates/statecraft-driver-codex/src/main.rs",
+            "span": {
+              "endLine": 555,
+              "startLine": 282
+            }
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "id": "statecraft_driver_codex::tests",
+          "kind": "symbol"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "docs/design/03-the-codex-provider.md"
+          }
+        ],
+        "ownership": false,
+        "sourceField": "references",
+        "unit": {
+          "kind": "file",
+          "path": "docs/design/03-the-codex-provider.md"
+        }
+      }
+    ],
+    "specId": "118-codex-harness",
+    "specStatus": "approved"
+  },
+  "schemaVersion": "1.1.0",
+  "shardHash": "ebd7e2d6baf5a146226e72879f5c12ff5e77695ac7429105f1db51fa174cc05f"
+}

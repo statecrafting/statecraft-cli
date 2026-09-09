@@ -1,0 +1,108 @@
+{
+  "record": {
+    "created": "2026-09-09",
+    "dependsOn": [
+      "109-governed-harness",
+      "116-codex-driver",
+      "117-project-driver"
+    ],
+    "establishes": [
+      {
+        "kind": "file",
+        "path": ".codex/hooks.json"
+      },
+      {
+        "kind": "directory",
+        "path": ".codex/agents/"
+      },
+      {
+        "kind": "directory",
+        "path": ".agents/skills/"
+      },
+      {
+        "kind": "file",
+        "path": "scripts/codex-kit.py"
+      }
+    ],
+    "extends": [
+      {
+        "nature": "additive",
+        "spec": "109-governed-harness",
+        "unit": {
+          "kind": "file",
+          "path": "AGENTS.md"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "109-governed-harness",
+        "unit": {
+          "anchor": "codex-kit",
+          "file": "Makefile",
+          "kind": "section"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "110-corpus-merge",
+        "unit": {
+          "kind": "file",
+          "path": "spec-spine.toml"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "116-codex-driver",
+        "unit": {
+          "id": "statecraft_driver_codex::Codex",
+          "kind": "symbol"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "116-codex-driver",
+        "unit": {
+          "id": "statecraft_driver_codex::tests",
+          "kind": "symbol"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "116-codex-driver",
+        "unit": {
+          "kind": "file",
+          "path": "members/src/members/driver-codex.test.ts"
+        }
+      }
+    ],
+    "id": "118-codex-harness",
+    "implementation": "in-progress",
+    "references": [
+      {
+        "role": "context",
+        "unit": {
+          "kind": "file",
+          "path": "docs/design/03-the-codex-provider.md"
+        }
+      }
+    ],
+    "risk": "medium",
+    "sectionHeadings": [
+      "118: The Codex harness",
+      "1. Purpose",
+      "2. Territory",
+      "3. Behavior",
+      "4. Functional requirements",
+      "5. Acceptance",
+      "Verification",
+      "6. Out of scope",
+      "7. Resolved decisions"
+    ],
+    "specPath": "specs/118-codex-harness/spec.md",
+    "status": "approved",
+    "summary": "The last spec of doc 03's plan (D40). A driven Codex session reads AGENTS.md, which is already the cross-agent protocol, finds skills under .agents/skills and agents under .codex/agents, and runs hooks from .codex/hooks.json. The desktop app's import wrote stale copies of all three into this checkout, unclaimed; this spec replaces them with a kit generated from the governed Claude kit by one script, so the two faces cannot drift: every skill byte-identical, every agent the same body in Codex's TOML shape, and the four hooks the same commands with two documented substitutions, because Codex exports no project-dir variable and delivers the project root as cwd on stdin instead. Two facts captured while designing it decide the rest. Codex's hook wire is Claude's (hook_event_name, tool_name Bash, tool_input.command, exit 2 with stderr to block), so the PR gate ports unchanged. And a project's hooks run only when trusted, else they are skipped with nothing on the stream, so the Codex driver passes the hook-trust bypass: for a session the orchestrator drives over a governed checkout, the hooks are the guard, and a flag that makes them run adds enforcement rather than removing it. The acceptance is the driven session doc 03 D40 asked for: a Codex session in a fixture checkout attempts gh pr create and the PR gate refuses it, observed on the stream once rather than inferred.\n",
+    "title": "The Codex harness: the governed kit's second face, generated from the first, with its gate proven in a driven session"
+  },
+  "shardHash": "34c7998716b7f0127bb78baf17f6209e928f5d60c55d7d56b6530c13590f7fa3",
+  "specVersion": "1.2.0"
+}
