@@ -472,6 +472,12 @@ fn peek(sensor: &Sensor<'_>, args: &[String]) -> VerbResult {
         ));
         return Ok(1);
     }
+    // Spec 115 B-4: a secret is refused before it is opened, not masked.
+    let rel = u.rel(&abs);
+    if u.is_never_peek(&rel) {
+        err(&format!("refused: {rel} is a secret and is never read"));
+        return Ok(1);
+    }
     let max_bytes: u64 = opt(args, "--bytes")
         .and_then(|b| b.parse().ok())
         .unwrap_or(8192)
@@ -583,5 +589,50 @@ fn daemon_verb(sensor: &Sensor<'_>, args: &[String]) -> VerbResult {
             err("usage: observatory daemon start|stop|status|plist");
             Ok(1)
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::RuleTable;
+
+    /// Spec 115 B-4 / FR-004: a denied path is refused before it is opened.
+    /// The file does not exist, so an open would have failed differently.
+    #[test]
+    fn peek_refuses_a_denied_path_without_opening_it() {
+        let dir = std::env::temp_dir().join(format!("sensor-peek-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(dir.join("root")).unwrap();
+        std::fs::write(dir.join("root/open.txt"), b"hello").unwrap();
+        let universe = Universe {
+            watch_root: dir.join("root"),
+            state_file: dir.join("root/state.json"),
+            state_display: "state.json".into(),
+            ignored_basenames: vec![],
+            ignored_suffixes: vec![],
+            never_peek: vec!["secret.json".into()],
+        };
+        let table = RuleTable { rules: vec![] };
+        let layout = Layout::under(dir.join("data"));
+        let sensor = Sensor {
+            universe: &universe,
+            classifier: &table,
+            layout: &layout,
+            findings: None,
+            usage: "usage",
+            display_name: "test",
+            plist_label: "test",
+        };
+        let denied = peek(&sensor, &["secret.json".to_string()]);
+        assert_eq!(denied, Ok(1));
+        let missing = peek(&sensor, &["missing.json".to_string()]);
+        assert!(
+            missing.is_err(),
+            "an undenied missing file is an open error, not a refusal"
+        );
+        let open = peek(&sensor, &["open.txt".to_string()]);
+        assert_eq!(open, Ok(0));
+        let _ = std::fs::remove_dir_all(&dir);
     }
 }

@@ -353,7 +353,11 @@ impl Watcher {
                 }
             })?;
         watcher.watch(&universe.watch_root, RecursiveMode::Recursive)?;
-        watcher.watch(&state_dir_for_watch, RecursiveMode::NonRecursive)?;
+        // Spec 115 B-3: a state file inside the root is already covered by
+        // the recursive watch; a second watch would report every write twice.
+        if !universe.state_inside_root() {
+            watcher.watch(&state_dir_for_watch, RecursiveMode::NonRecursive)?;
+        }
         started(tracked);
 
         let mut pending: HashMap<PathBuf, (Instant, Vec<RawNote>)> = HashMap::new();
@@ -411,6 +415,7 @@ mod tests {
             state_display: "~/state.json".into(),
             ignored_basenames: vec![".DS_Store".into()],
             ignored_suffixes: vec![],
+            never_peek: vec![],
         }
     }
 
@@ -480,6 +485,57 @@ mod tests {
             kind: String::new(),
             label: String::new(),
         };
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    /// Spec 115 B-3 / FR-004: a state file inside the root is watched once.
+    #[test]
+    fn a_state_file_inside_the_root_yields_one_event_per_write() {
+        use std::sync::{Arc, Mutex};
+        let dir = std::env::temp_dir().join(format!("sensor-inside-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(dir.join("root")).unwrap();
+        std::fs::write(dir.join("root/state.json"), b"{}").unwrap();
+        let u = Universe {
+            watch_root: dir.join("root"),
+            state_file: dir.join("root/state.json"),
+            state_display: "state.json".into(),
+            ignored_basenames: vec![],
+            ignored_suffixes: vec![],
+            never_peek: vec![],
+        };
+        assert!(u.state_inside_root());
+        assert_eq!(u.rel(&u.state_file), "state.json");
+        let table = RuleTable { rules: vec![] };
+        let seen: Arc<Mutex<Vec<String>>> = Arc::new(Mutex::new(vec![]));
+        let (stop_tx, stop_rx) = mpsc::channel();
+        let (ready_tx, ready_rx) = mpsc::channel();
+        let sink_seen = Arc::clone(&seen);
+        let handle = std::thread::scope(|scope| {
+            let u = &u;
+            let table = &table;
+            let worker = scope.spawn(move || {
+                Watcher::default().run(
+                    u,
+                    table,
+                    |e| sink_seen.lock().unwrap().push(e.rel_path.clone()),
+                    |_| {
+                        let _ = ready_tx.send(());
+                    },
+                    stop_rx,
+                )
+            });
+            ready_rx.recv().unwrap();
+            std::thread::sleep(Duration::from_millis(300));
+            std::fs::write(dir.join("root/state.json"), b"{\"grew\":true}").unwrap();
+            std::thread::sleep(Duration::from_millis(1500));
+            let _ = stop_tx.send(());
+            worker.join().unwrap()
+        });
+        handle.unwrap();
+        let seen = seen.lock().unwrap();
+        let state_events = seen.iter().filter(|p| p.as_str() == "state.json").count();
+        assert_eq!(state_events, 1, "events: {seen:?}");
         let _ = std::fs::remove_dir_all(&dir);
     }
 }

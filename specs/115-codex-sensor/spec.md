@@ -3,7 +3,7 @@ id: "115-codex-sensor"
 title: "The Codex universe: a second sensor over the same core, transcribed from evidence"
 status: approved
 created: "2026-09-09"
-implementation: in-progress
+implementation: complete
 risk: medium
 depends_on:
   - "112-sensor-port"
@@ -19,11 +19,11 @@ extends:
   # a state file that sits inside the root (B-3), a peek deny list (B-4)
   # and an OpenAI key pattern in the redactor (B-5); the Claude crate
   # names the new field with an empty list.
-  - { spec: "112-sensor-port", unit: "crates/statecraft-sensor-core/src/lib.rs", nature: additive }
-  - { spec: "112-sensor-port", unit: "crates/statecraft-sensor-core/src/watcher.rs", nature: additive }
-  - { spec: "112-sensor-port", unit: "crates/statecraft-sensor-core/src/verbs.rs", nature: additive }
-  - { spec: "112-sensor-port", unit: "crates/statecraft-sensor-core/src/redact.rs", nature: additive }
-  - { spec: "112-sensor-port", unit: "crates/statecraft-sensor-claude/src/main.rs", nature: additive }
+  - { spec: "112-sensor-port", unit: { kind: symbol, id: "statecraft_sensor_core::Universe" }, nature: additive }
+  - { spec: "112-sensor-port", unit: { kind: symbol, id: "statecraft_sensor_core::watcher::Watcher" }, nature: additive }
+  - { spec: "112-sensor-port", unit: { kind: symbol, id: "statecraft_sensor_core::verbs::peek" }, nature: additive }
+  - { spec: "112-sensor-port", unit: { kind: symbol, id: "statecraft_sensor_core::redact::rules" }, nature: additive }
+  - { spec: "112-sensor-port", unit: { kind: symbol, id: "statecraft_sensor_claude::universe" }, nature: additive }
   - { spec: "102-crate-scaffold", unit: "Cargo.lock", nature: additive }
   # The members workflow builds every Rust member.
   - { spec: "110-corpus-merge", unit: ".github/workflows/members.yml", nature: additive }
@@ -208,6 +208,24 @@ cargo test --workspace --locked -p statecraft-sensor-core -p statecraft-sensor-c
 ```verify:cli
 cd members && bun test src/members/sensor-parity.test.ts
 ```
+
+## Status (2026-09-09)
+
+Implemented. The crate's tests cover every rule (40 examples) and every
+citation; the core's new tests cover the three seams; 112's parity test
+still passes, so the Claude sensor's bytes did not move. The umbrella
+discovered the binary from a managed directory with no umbrella change
+(`members list` showed `sensor-codex 0.1.0 042 basic`, `sensor-codex
+stats` dispatched, `peek auth.json` was refused with exit 1). The live
+smoke watched the real `~/.codex` through one `codex exec --json`: 491
+events in eleven seconds, none unclassified; the rollout was `transcript`
+(created, then one 41 KB append at exit), the `threads` write showed as
+`sqlite-wal` on `state_5`, and `config.toml` was not touched because the
+scratch directory was already trusted by an earlier capture (the append
+itself was observed in capture 2 and is what the `config` rule's label
+names). The smoke added three FINDINGS entries the snapshot diffs could
+not see: the per-thread writer lock, the shim directory's rotation, and
+the marketplace staging checkouts.
 
 ## 6. Out of scope
 

@@ -470,6 +470,7 @@ mod tests {
             state_display: "~/state".into(),
             ignored_basenames: vec![],
             ignored_suffixes: vec![],
+            never_peek: vec![],
         };
         std::fs::create_dir_all(dir.join("root")).unwrap();
         std::fs::write(dir.join("root/f"), b"12345").unwrap();

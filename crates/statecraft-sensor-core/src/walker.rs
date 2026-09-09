@@ -127,6 +127,7 @@ mod tests {
             state_display: "~/state.json".into(),
             ignored_basenames: vec![".DS_Store".into()],
             ignored_suffixes: vec![".swp".into()],
+            never_peek: vec![],
         };
         let entries = walk_universe(&u);
         let rels: Vec<String> = entries.iter().map(|e| u.rel(&e.path)).collect();

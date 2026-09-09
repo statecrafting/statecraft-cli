@@ -29,40 +29,40 @@
         "nature": "additive",
         "spec": "112-sensor-port",
         "unit": {
-          "kind": "file",
-          "path": "crates/statecraft-sensor-core/src/lib.rs"
+          "id": "statecraft_sensor_core::Universe",
+          "kind": "symbol"
         }
       },
       {
         "nature": "additive",
         "spec": "112-sensor-port",
         "unit": {
-          "kind": "file",
-          "path": "crates/statecraft-sensor-core/src/watcher.rs"
+          "id": "statecraft_sensor_core::watcher::Watcher",
+          "kind": "symbol"
         }
       },
       {
         "nature": "additive",
         "spec": "112-sensor-port",
         "unit": {
-          "kind": "file",
-          "path": "crates/statecraft-sensor-core/src/verbs.rs"
+          "id": "statecraft_sensor_core::verbs::peek",
+          "kind": "symbol"
         }
       },
       {
         "nature": "additive",
         "spec": "112-sensor-port",
         "unit": {
-          "kind": "file",
-          "path": "crates/statecraft-sensor-core/src/redact.rs"
+          "id": "statecraft_sensor_core::redact::rules",
+          "kind": "symbol"
         }
       },
       {
         "nature": "additive",
         "spec": "112-sensor-port",
         "unit": {
-          "kind": "file",
-          "path": "crates/statecraft-sensor-claude/src/main.rs"
+          "id": "statecraft_sensor_claude::universe",
+          "kind": "symbol"
         }
       },
       {
@@ -83,7 +83,7 @@
       }
     ],
     "id": "115-codex-sensor",
-    "implementation": "in-progress",
+    "implementation": "complete",
     "references": [
       {
         "role": "context",
@@ -116,6 +116,7 @@
       "4. Functional requirements",
       "5. Acceptance",
       "Verification",
+      "Status (2026-09-09)",
       "6. Out of scope",
       "7. Resolved decisions"
     ],
@@ -124,6 +125,6 @@
     "summary": "The first spec of the Codex sequence doc 03 plans. Spec 112 ended with the sentence \"a Codex sensor is then a second thin crate: a root and a table\", and this spec is that crate, plus the evidence the table is transcribed from. The evidence comes first (doc 03 D31): a FINDINGS file in the crate records what each path family under ~/.codex turned out to mean, citing the three live captures of codex exec that doc 03 §2 reports, and every rule in the table cites an entry. The universe is $CODEX_HOME, else ~/.codex, with the desktop's atom-state file as the state file inside the root rather than beside it, which is the first of three small seams the core did not have and gains here; the other two are a peek deny list, because auth.json is a secret the redactor must refuse rather than mask, and an OpenAI key pattern in the redactor. The table reuses 003's kinds where the meaning is shared and adds kinds only for what the Claude tree does not have: the sqlite family and its WAL and SHM siblings, whose shrink is routine and must not shout; marketplace checkouts; the app bundle; sandbox shims; secrets; identifiers; the desktop's imports of other agents' sessions. The binary is statecraft-sensor-codex, discovered by the umbrella with no umbrella change, and the core still names no provider.\n",
     "title": "The Codex universe: a second sensor over the same core, transcribed from evidence"
   },
-  "shardHash": "0b659dae0f9560da99f7e69f793945a4b403e10be39f5d00135e78a99f97c6cc",
+  "shardHash": "028cddefdf2c6bf5b793dfdb4f8f42bbf1a56a928d7ee86fd3847fd6fe529ddc",
   "specVersion": "1.2.0"
 }
