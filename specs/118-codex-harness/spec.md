@@ -3,7 +3,7 @@ id: "118-codex-harness"
 title: "The Codex harness: the governed kit's second face, generated from the first, with its gate proven in a driven session"
 status: approved
 created: "2026-09-09"
-implementation: in-progress
+implementation: complete
 risk: medium
 depends_on:
   - "109-governed-harness"
@@ -97,11 +97,12 @@ would be discovered unclaimed by the ratchet.
   `.codex/hooks.json` carries the four hooks of `.claude/settings.json`
   (the PR gate on `gh pr create`, the recompile after a spec edit, the
   session freshness line, the stop-time index repair) with the same
-  matchers and the same commands after two mechanical substitutions the
-  generator applies and documents: the stdin JSON is read once into a
-  variable (`in=$(cat)`) and every `jq` reads from it, and
-  `${CLAUDE_PROJECT_DIR:-.}` becomes the `cwd` field of that JSON, because
-  Codex delivers the project root there and exports no variable. The
+  matchers and the same commands, each wrapped once by the generator:
+  the stdin JSON is read into a variable, `CLAUDE_PROJECT_DIR` is
+  exported from its `cwd` field (Codex delivers the project root there
+  and exports no variable), and the original command runs unchanged as
+  a function fed that same JSON, so its own `jq` reads and its exit
+  status (a blocking `exit 2` included) are what they were. The
   PostToolUse staleness pattern list gains the Codex kit's own paths.
 - **B-4 (hooks run, by decision).** The Codex driver's argv gains
   `--dangerously-bypass-hook-trust`, after the sandbox flag and before
@@ -132,10 +133,11 @@ would be discovered unclaimed by the ratchet.
   names the file.
 - **FR-002.** The Codex driver's crate test and the members' test assert
   the new argv element at its position for both postures.
-- **FR-003.** The generated `hooks.json` parses; each command contains no
-  `CLAUDE_PROJECT_DIR`; the PR gate's command, run by hand with the
-  captured PreToolUse JSON on stdin (a `gh pr create` in a checkout
-  whose gate fails), exits 2 with `[pr-gate] BLOCKED` on stderr.
+- **FR-003.** The generated `hooks.json` parses; each command begins
+  with the wrapper and derives `CLAUDE_PROJECT_DIR` from `cwd`; the PR
+  gate's command, run by hand with the captured PreToolUse JSON on stdin
+  (a `gh pr create` in a checkout whose gate fails), exits 2 with
+  `[pr-gate] BLOCKED` on stderr.
 
 ## 5. Acceptance
 
@@ -164,6 +166,30 @@ cargo test --workspace --locked -p statecraft-driver-codex
 cd members && bun test src/members/driver-codex.test.ts
 ```
 
+## Status (2026-09-09)
+
+Implemented. The generator replaced the desktop's import (fifteen files:
+ten skills byte-identical, four agents, one hooks file; the import's
+stale `init` skill removed as not generated), and `--check` passes on the
+committed tree. FR-003 by hand: a clone of this checkout on a branch that
+edits `src/main.rs` without its spec, the generated PR gate fed the
+captured PreToolUse JSON with `gh pr create` and no project-dir variable
+in the environment, exited 2 with `[pr-gate] BLOCKED: a committed shard
+tree is stale`. The driven session (D40): `statecraft-driver-codex
+session run` over that fixture, bypass posture, fast tier, asked to run
+`gh pr create --title t --body b`; the stream carried the refusal as the
+agent's own message, `Command blocked by PreToolUse hook: [pr-gate]
+BLOCKED: ...`, the driver's stderr tail carried Codex's
+`ERROR codex_core::tools::router: error=Command blocked by PreToolUse
+hook`, and `gh` never ran. The control run without the flag ran
+`gh pr create` unrefused (it failed on the fixture's remote, not on the
+gate). What the shape tells 116's table: a hook refusal ends the turn as
+`turn.completed`, so the session classifies `completed` by 014 B-4's
+first rule and the refusal is read from the stream and the journal's
+`resultTextTail`, not from the classification; the table's
+`hook-blocked` rule would match this text only on a turn that fails,
+which is how the Claude driver behaves over the same rule order.
+
 ## 6. Out of scope
 
 A project-level `.codex/config.toml`. Codex's own permission rules
@@ -185,6 +211,12 @@ hash per hook per checkout in the user's config, re-done on every edit
 to `hooks.json`, and a driven session that silently lost its gate when
 someone forgot. The flag is one line, and what it enables is a claimed,
 gated unit.
+
+D-5 (2026-09-09). The hook commands are wrapped, not rewritten. The
+first draft of B-3 rewrote each `jq` read and each project-dir
+reference; the wrapper leaves the Claude command byte-identical inside
+a function, which is what lets a fix to a Claude hook reach Codex
+without a second edit, and is what `--check` compares.
 
 D-4 (2026-09-09). `hooks.json` is generated too, not hand-maintained,
 even though the substitutions are only two. A hand copy is where a

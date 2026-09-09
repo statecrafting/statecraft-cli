@@ -243,6 +243,16 @@ The skills the loop calls:
 - `/commit`: create a git commit with an impact-focused conventional message, spec ordinal as scope. `main` requires signed commits, so PRs merge with `gh pr merge --squash`.
 - `/code-review`: review the working diff for correctness bugs, spec drift, and illegitimate mid-build spec edits.
 
+The Codex face of the same kit (spec 118): a Codex session finds these
+skills under `.agents/skills/`, the four agents as `.codex/agents/*.toml`,
+and the four hooks in `.codex/hooks.json`, all generated from `.claude/` by
+`make codex-kit` and checked by `python3 scripts/codex-kit.py --check`.
+Never edit the generated copies; edit `.claude/` and regenerate. A driven
+Codex session runs the hooks because the Codex driver passes
+`--dangerously-bypass-hook-trust` (118 B-4): without it Codex skips a
+project's hooks silently, and the PR gate would be absent in exactly the
+sessions that need it.
+
 Every skill is repository-invariant: the project layer (the binary
 invocation, the version pin, the gate command list, the stack gate, the
 never-touch artefacts) lives in this file and in the path-scoped rules, and

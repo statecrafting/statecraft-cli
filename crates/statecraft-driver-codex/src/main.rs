@@ -156,6 +156,10 @@ impl Provider for Codex {
             argv.push("--sandbox".to_string());
             argv.push("workspace-write".to_string());
         }
+        // Spec 118 B-4: a project's hooks run only when trusted, else they
+        // are skipped silently; a driven session over a governed checkout
+        // needs its PR gate, so the hooks the checkout declares run.
+        argv.push("--dangerously-bypass-hook-trust".to_string());
         if let Some(model) = spec.model {
             argv.push("-m".to_string());
             argv.push(model.to_string());
@@ -321,6 +325,7 @@ mod tests {
                 "--color",
                 "never",
                 "--dangerously-bypass-approvals-and-sandbox",
+                "--dangerously-bypass-hook-trust",
                 "-"
             ]
         );
@@ -334,6 +339,7 @@ mod tests {
                 "never",
                 "--sandbox",
                 "workspace-write",
+                "--dangerously-bypass-hook-trust",
                 "-m",
                 "gpt-5.6-luna",
                 "-"

@@ -78,3 +78,9 @@ help:
 	@echo "refresh  recompute the committed shard trees"
 	@echo "verify   SPEC=<id>, one spec's declared acceptance"
 	@echo "test build fmt clippy   guarded on a manifest probe"
+
+# Spec 118: the Codex face of the kit, generated from .claude/ (skills verbatim,
+# agents as TOML, hooks wrapped). `--check` is the spec's verification.
+.PHONY: codex-kit
+codex-kit:
+	python3 scripts/codex-kit.py

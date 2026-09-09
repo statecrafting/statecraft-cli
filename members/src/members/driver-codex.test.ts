@@ -141,7 +141,7 @@ for (const [name, body] of Object.entries(FIXTURES)) {
     if (name === "completed") expect(result.result!.usage).toEqual({ input_tokens: 18242, cached_input_tokens: 12928, cache_write_input_tokens: 0, output_tokens: 5, reasoning_output_tokens: 0 });
     // B-2, D35: the posture, the model, the prompt on stdin, never on argv.
     const argv = (await Bun.file(join(dir, "argv.txt")).text()).trim().split("\n");
-    expect(argv).toEqual(["exec", "--json", "--color", "never", "--sandbox", "workspace-write", "-m", "gpt-5.6-luna", "-"]);
+    expect(argv).toEqual(["exec", "--json", "--color", "never", "--sandbox", "workspace-write", "--dangerously-bypass-hook-trust", "-m", "gpt-5.6-luna", "-"]);
     expect(await Bun.file(join(dir, "prompt.txt")).text()).toBe("reply DONE");
   }, 30_000);
 }
@@ -152,7 +152,7 @@ test("B-2: a bypass profile passes the bypass flag and no sandbox", async () => 
   const rs = await run([RUST_BIN, "session", "run"], { STATECRAFT_CODEX_BIN: codex }, request(dir, { profile: { mode: "bypass" }, maxTurns: undefined }));
   expect(rs.code).toBe(0);
   const argv = (await Bun.file(join(dir, "argv.txt")).text()).trim().split("\n");
-  expect(argv).toEqual(["exec", "--json", "--color", "never", "--dangerously-bypass-approvals-and-sandbox", "-m", "gpt-5.6-luna", "-"]);
+  expect(argv).toEqual(["exec", "--json", "--color", "never", "--dangerously-bypass-approvals-and-sandbox", "--dangerously-bypass-hook-trust", "-m", "gpt-5.6-luna", "-"]);
   const init = events(rs.stdout).find((e) => e.kind === "session.init")!;
   expect(init.payload!.degraded).toEqual(["cost"]);
 });
