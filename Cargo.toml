@@ -42,6 +42,11 @@ reqwest = { version = "0.12", default-features = false, features = [
     "rustls-tls",
 ] }
 
+# Signal forwarding to a dispatched member (spec 008 §6): `kill` and `signal`
+# only, on unix only. Already in the tree through tokio; no new surface.
+[target.'cfg(unix)'.dependencies]
+libc = "0.2"
+
 [dev-dependencies]
 # Mock HTTP server so `cargo test` never gates on a live control plane (spec 003 §1).
 httpmock = "0.7"

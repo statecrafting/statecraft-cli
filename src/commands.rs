@@ -13,7 +13,8 @@ use clap::CommandFactory;
 use serde::Serialize;
 
 use crate::cli::{
-    Cli, Command, ConfigCommand, FleetCommand, StampCommand, TemplateCommand, TenantsCommand,
+    Cli, Command, ConfigCommand, FleetCommand, MembersCommand, StampCommand, TemplateCommand,
+    TenantsCommand,
 };
 use crate::config::{self, FlagConfig, ResolvedConfig, Sourced};
 use crate::error::AppResult;
@@ -21,6 +22,17 @@ use crate::output::{self, OutputFormat};
 
 /// Resolve config, then run the selected command.
 pub fn dispatch(cli: Cli) -> AppResult<()> {
+    // Spec 008 §8: a member dispatch reads no config file, no credential and
+    // no base URL. It is decided before the config layers are even loaded, so
+    // an unset or malformed plane configuration cannot touch the local loop.
+    if let Command::External(argv) = &cli.command {
+        let (name, args) = argv
+            .split_first()
+            .expect("clap hands an external subcommand at least its name");
+        let name = name.to_string_lossy();
+        return crate::members::dispatch(&name, args);
+    }
+
     let resolved = load_config(&cli)?;
     let format = resolved.output_format();
 
@@ -47,6 +59,11 @@ pub fn dispatch(cli: Cli) -> AppResult<()> {
             completions(*shell);
             Ok(())
         }
+        Command::Members { command } => match command {
+            MembersCommand::List { verbose } => crate::members::list(format, *verbose),
+            MembersCommand::Show { name } => crate::members::show(format, name),
+        },
+        Command::External(_) => unreachable!("external subcommands return before config loads"),
     }
 }
 

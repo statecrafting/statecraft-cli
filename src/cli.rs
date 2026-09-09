@@ -3,6 +3,7 @@
 //! Stub verbs are present from day one so `--help` is honest: each carries
 //! about-text naming the spec that implements it, and its handler exits 2.
 
+use std::ffi::OsString;
 use std::path::PathBuf;
 
 use clap::{Parser, Subcommand, ValueEnum};
@@ -16,7 +17,11 @@ use crate::output::OutputFormat;
     version,
     about = "Statecraft governance verbs: CLI subcommands for humans, MCP server for agents.",
     subcommand_required = true,
-    arg_required_else_help = true
+    arg_required_else_help = true,
+    // Spec 008 §2: a first token that is not a built-in verb names a member
+    // binary `statecraft-<name>`, git-plugin style, and everything after it
+    // is that member's argv.
+    allow_external_subcommands = true
 )]
 pub struct Cli {
     /// Output format: human-readable text, or stable machine JSON.
@@ -83,6 +88,29 @@ pub enum Command {
     Completions {
         /// Target shell.
         shell: clap_complete::Shell,
+    },
+    /// Discover the member binaries the umbrella dispatches to (spec 008).
+    Members {
+        #[command(subcommand)]
+        command: MembersCommand,
+    },
+    /// `statecraft <name> <args...>`: dispatch to the member `statecraft-<name>` (spec 008).
+    #[command(external_subcommand)]
+    External(Vec<OsString>),
+}
+
+#[derive(Debug, Subcommand)]
+pub enum MembersCommand {
+    /// One row per discovered member: name, version, contract, tier, location (spec 008 §5).
+    List {
+        /// Also print each member's declared verbs and exit-code table.
+        #[arg(long)]
+        verbose: bool,
+    },
+    /// Print one member's manifest (spec 008 §5).
+    Show {
+        /// Member name, with or without the `statecraft-` prefix.
+        name: String,
     },
 }
 

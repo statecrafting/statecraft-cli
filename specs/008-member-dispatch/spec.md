@@ -3,11 +3,22 @@ id: "008-member-dispatch"
 title: "Member dispatch: the umbrella grows a local, account-less face"
 status: approved
 created: "2026-09-07"
-implementation: pending
+implementation: complete
 depends_on:
   - "002-crate-scaffold"
 establishes:
   - { kind: symbol, id: "statecraft_cli::members" }
+extends:
+  # 002 owns the crate scaffold; dispatch is wired into its command tree
+  # (`External` and `Members` arms), its dispatcher, its module list and its
+  # manifest (libc, unix-only, for signal forwarding). The acceptance tests
+  # live beside 002's under tests/. All additive; 002 remains the owner.
+  - { spec: "002-crate-scaffold", unit: "Cargo.toml", nature: additive }
+  - { spec: "002-crate-scaffold", unit: "Cargo.lock", nature: additive }
+  - { spec: "002-crate-scaffold", unit: { kind: symbol, id: "statecraft_cli::cli::Command" }, nature: additive }
+  - { spec: "002-crate-scaffold", unit: { kind: symbol, id: "statecraft_cli::commands::dispatch" }, nature: additive }
+  - { spec: "002-crate-scaffold", unit: "src/main.rs", nature: additive }
+  - { spec: "002-crate-scaffold", unit: { kind: directory, path: "tests/" }, nature: additive }
 summary: >
   Every verb this binary has is a client of a hosted control plane
   through `api.rs` and `auth.rs`. There is no local-execution verb and
@@ -201,7 +212,30 @@ forfeit that spec's only evidence it moved nothing. Any change to the
 existing control-plane verbs, their auth, or their output. Running a member
 under a resource ceiling or a sandbox.
 
-## 11. Resolved decisions
+## 11. Status (2026-09-09)
+
+Implemented in `src/members.rs` against claude-observatory 042 as merged
+(PR #77 there). Verified end to end with the three compiled members from
+that repository in `STATECRAFT_MEMBER_DIR`: `members list` names all three,
+`statecraft engine orchestrator status --json` returns the engine's
+envelope and its exit 2 unchanged, `statecraft driver-claude models` runs
+the driver's one verb. `tests/members.rs` carries the §9 acceptance against
+stub members. Decisions taken while building:
+
+- D-7. The supported contract range is the closed interval `042..=042`
+  (`CONTRACT_MIN`, `CONTRACT_MAX`); a second contract version widens it.
+- D-8. Dispatch resolves only the named member rather than identifying
+  every candidate on every dispatch: the same search order, the same
+  identification, scoped to one name. `members list` still identifies all
+  of them (D-3), and a shadowed candidate is never executed at all.
+- D-9. A leading flag on the member's argv (`statecraft engine --help`) is
+  not a subverb and passes through to the member's own parser; §7's 67
+  applies to a positional first token only.
+- D-10. Signal forwarding (§6) is unix-only and installed after the spawn,
+  so the member inherits default dispositions rather than the umbrella's.
+  On Windows the umbrella simply waits.
+
+## 12. Resolved decisions
 
 D-1. The dispatch key is the member's name, not one of its verbs. Doc 01 D15
 reads `statecraft-<verb>` in the git-plugin idiom, and taken literally that
