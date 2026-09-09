@@ -234,6 +234,10 @@ stub members. Decisions taken while building:
 - D-10. Signal forwarding (§6) is unix-only and installed after the spawn,
   so the member inherits default dispositions rather than the umbrella's.
   On Windows the umbrella simply waits.
+- 2026-09-09, spec 111: the manifest type, the reserved codes and the two
+  constants moved to the `statecraft-contract` crate; `src/members.rs`
+  re-exports them and keeps discovery, dispatch and rendering. Behavior
+  and `tests/members.rs` unchanged.
 
 ## 12. Resolved decisions
 

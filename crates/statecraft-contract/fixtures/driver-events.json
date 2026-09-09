@@ -1,0 +1,53 @@
+[
+  {
+    "event": "stream",
+    "raw": {
+      "session_id": "sess-seam",
+      "subtype": "init",
+      "type": "system"
+    }
+  },
+  {
+    "event": "journal",
+    "kind": "session.init",
+    "payload": {
+      "claudeBin": "claude",
+      "maxTurns": 40,
+      "model": "claude-opus-5",
+      "profile": {
+        "allowedTools": null,
+        "disallowedTools": null,
+        "mode": "bypass",
+        "models": null
+      },
+      "repo": "/work/target",
+      "sessionId": "sess-seam",
+      "timeoutMs": 1800000
+    }
+  },
+  {
+    "event": "result",
+    "result": {
+      "classification": {
+        "detail": "result event reported is_error: false",
+        "kind": "completed",
+        "resetAtMs": null
+      },
+      "costMicroUsd": 12345,
+      "durationMs": 597,
+      "exitCode": 0,
+      "numTurns": 2,
+      "overflow": {
+        "lines": [],
+        "truncatedCount": 0
+      },
+      "sessionId": "sess-seam",
+      "stderrTail": "",
+      "transcriptPath": "/home/u/.claude/projects/-work-target/sess-seam.jsonl",
+      "usage": {
+        "input_tokens": 100,
+        "output_tokens": 42
+      }
+    }
+  }
+]

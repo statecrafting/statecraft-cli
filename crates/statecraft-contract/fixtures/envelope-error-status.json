@@ -1,0 +1,8 @@
+{
+  "error": {
+    "kind": "api",
+    "message": "tenants not enabled on this control plane",
+    "status": 404
+  },
+  "ok": false
+}

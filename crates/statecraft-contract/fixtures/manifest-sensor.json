@@ -1,0 +1,22 @@
+{
+  "capabilityTier": "basic",
+  "contract": "042",
+  "envelope": "ok-data",
+  "exitCodes": {
+    "0": "ok",
+    "1": "operational or usage"
+  },
+  "name": "statecraft-sensor-claude",
+  "schemaVersion": "1",
+  "verbs": [
+    "watch",
+    "log",
+    "stats",
+    "snapshot",
+    "diff",
+    "explain",
+    "peek",
+    "daemon"
+  ],
+  "version": "0.1.0"
+}

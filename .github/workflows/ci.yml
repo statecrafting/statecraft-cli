@@ -23,9 +23,10 @@ jobs:
         run: rustup component add rustfmt clippy
       - name: Format
         run: cargo fmt --check
+      # Spec 111 B-7: the root is a workspace (the umbrella plus crates/).
       - name: Clippy
-        run: cargo clippy --all-targets -- -D warnings
+        run: cargo clippy --workspace --all-targets -- -D warnings
       - name: Test
-        run: cargo test
+        run: cargo test --workspace
       - name: Release build
-        run: cargo build --release
+        run: cargo build --release --workspace

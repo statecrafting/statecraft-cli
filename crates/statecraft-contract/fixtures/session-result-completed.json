@@ -1,0 +1,22 @@
+{
+  "classification": {
+    "detail": "result event reported is_error: false",
+    "kind": "completed",
+    "resetAtMs": null
+  },
+  "costMicroUsd": 12345,
+  "durationMs": 597,
+  "exitCode": 0,
+  "numTurns": 2,
+  "overflow": {
+    "lines": [],
+    "truncatedCount": 0
+  },
+  "sessionId": "sess-seam",
+  "stderrTail": "",
+  "transcriptPath": "/home/u/.claude/projects/-work-target/sess-seam.jsonl",
+  "usage": {
+    "input_tokens": 100,
+    "output_tokens": 42
+  }
+}
