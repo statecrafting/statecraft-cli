@@ -1,0 +1,12 @@
+{
+  "package": {
+    "edition": "2021",
+    "kind": "rust-lib",
+    "name": "statecraft-contract",
+    "path": "crates/statecraft-contract",
+    "specRef": "111-contract-crate",
+    "version": "0.1.0"
+  },
+  "schemaVersion": "1.1.0",
+  "shardHash": "998c455b9f96f5411c18f3bc1a64bd77809530f811ce323daecc6e7d6bce309d"
+}

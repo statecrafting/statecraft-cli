@@ -1854,9 +1854,18 @@ dependencies = [
  "semver",
  "serde",
  "serde_json",
+ "statecraft-contract",
  "thiserror 2.0.18",
  "tokio",
  "toml",
+]
+
+[[package]]
+name = "statecraft-contract"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "serde_json",
 ]
 
 [[package]]

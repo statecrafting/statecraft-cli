@@ -14,25 +14,20 @@
 //! config file (§8): the local loop is the free half of the product and must
 //! not depend on the paid half.
 
-use std::collections::BTreeMap;
 use std::ffi::OsStr;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 
 use serde::{Deserialize, Serialize};
+// Spec 111: the contract's data types come from the crate every Rust member
+// shares; this module keeps discovery, dispatch and rendering (111 D-2).
+pub use statecraft_contract::{exit, Manifest, MANIFEST_FLAG, MEMBER_PREFIX};
 
 use crate::error::{AppError, AppResult};
 use crate::output::{self, OutputFormat};
 use crate::verbs::{error_envelope, success_envelope_value};
 
 // --- the contract ------------------------------------------------------------
-
-/// The member binaries carry this prefix; the umbrella strips it and nothing
-/// else to obtain the dispatch key (§3, D-1).
-pub const MEMBER_PREFIX: &str = "statecraft-";
-
-/// The reserved flag every member answers before any other parsing (042 D-1).
-pub const MANIFEST_FLAG: &str = "--member-manifest";
 
 /// The member-contract versions this umbrella dispatches to (§6). A member
 /// outside the range is refused by name with both versions stated; the range
@@ -43,49 +38,16 @@ pub const CONTRACT_MAX: &str = "042";
 /// `STATECRAFT_MEMBER_DIR` overrides the managed member directory (§4).
 pub const MEMBER_DIR_ENV: &str = "STATECRAFT_MEMBER_DIR";
 
-/// Reserved dispatch-layer exit codes (§7, D-4). Members bind themselves to
-/// codes below 64 (042 B-6), so the two ranges never collide.
-pub const EXIT_MEMBER_NOT_FOUND: u8 = 64;
-pub const EXIT_MANIFEST_REFUSED: u8 = 65;
-pub const EXIT_CONTRACT_SKEW: u8 = 66;
-pub const EXIT_UNKNOWN_SUBVERB: u8 = 67;
+/// Reserved dispatch-layer exit codes (§7, D-4), defined by the contract
+/// crate (111 B-2). Members bind themselves to codes below `exit::FLOOR`.
+pub const EXIT_MEMBER_NOT_FOUND: u8 = exit::MEMBER_NOT_FOUND;
+pub const EXIT_MANIFEST_REFUSED: u8 = exit::MANIFEST_REFUSED;
+pub const EXIT_CONTRACT_SKEW: u8 = exit::CONTRACT_SKEW;
+pub const EXIT_UNKNOWN_SUBVERB: u8 = exit::UNKNOWN_SUBVERB;
 
-/// The manifest as 042 B-3 declares it. Field names are the wire names.
-#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
-#[serde(rename_all = "camelCase")]
-pub struct Manifest {
-    pub schema_version: String,
-    pub name: String,
-    pub version: String,
-    pub contract: String,
-    pub verbs: Vec<String>,
-    pub capability_tier: String,
-    pub exit_codes: BTreeMap<String, String>,
-    pub envelope: String,
-}
-
-impl Manifest {
-    /// Parse one manifest from a member's stdout. The parse error, not a
-    /// generic refusal, is what `members list` shows (§2, §5).
-    pub fn parse(bytes: &[u8]) -> Result<Manifest, String> {
-        let manifest: Manifest =
-            serde_json::from_slice(bytes).map_err(|e| format!("manifest does not parse: {e}"))?;
-        if manifest.name.is_empty() {
-            return Err("manifest is missing a required field: name".to_string());
-        }
-        if manifest.contract.is_empty() {
-            return Err("manifest is missing a required field: contract".to_string());
-        }
-        if manifest.verbs.is_empty() {
-            return Err("manifest declares no verbs".to_string());
-        }
-        Ok(manifest)
-    }
-
-    /// Whether this member's contract version falls inside the supported range.
-    pub fn contract_supported(&self) -> bool {
-        contract_in_range(&self.contract)
-    }
+/// Whether a member's contract version falls inside the supported range.
+pub fn contract_supported(manifest: &Manifest) -> bool {
+    contract_in_range(&manifest.contract)
 }
 
 fn contract_in_range(contract: &str) -> bool {
@@ -347,7 +309,7 @@ fn render_list(members: &[Member], verbose: bool) -> String {
                     member.name,
                     m.version,
                     m.contract,
-                    m.capability_tier,
+                    m.capability_tier.as_str(),
                     member.location.label(),
                     member.path
                 );
@@ -429,7 +391,7 @@ fn render_manifest(member: &Member, m: &Manifest) -> String {
     let _ = writeln!(out, "name:      {}", m.name);
     let _ = writeln!(out, "version:   {}", m.version);
     let _ = writeln!(out, "contract:  {}", m.contract);
-    let _ = writeln!(out, "tier:      {}", m.capability_tier);
+    let _ = writeln!(out, "tier:      {}", m.capability_tier.as_str());
     let _ = writeln!(out, "envelope:  {}", m.envelope);
     let _ = writeln!(out, "verbs:     {}", m.verbs.join(", "));
     let codes: Vec<String> = m
@@ -489,7 +451,7 @@ pub fn dispatch(name: &str, args: &[std::ffi::OsString]) -> AppResult<()> {
             });
         }
     };
-    if !manifest.contract_supported() {
+    if !contract_supported(manifest) {
         eprintln!(
             "error: member `{name}` implements member contract {} but this statecraft supports {}; \
              neither is changed silently, upgrade one of them",
@@ -632,18 +594,9 @@ mod tests {
             m.exit_codes.get("2").map(String::as_str),
             Some("unreachable")
         );
-        assert!(m.contract_supported());
-    }
-
-    #[test]
-    fn manifest_refuses_garbage_and_missing_fields() {
-        assert!(Manifest::parse(b"not json")
-            .unwrap_err()
-            .contains("does not parse"));
-        let missing = r#"{"schemaVersion":"1","name":"x","version":"0","contract":"042","verbs":[],"capabilityTier":"basic","exitCodes":{},"envelope":"ok-data"}"#;
-        assert!(Manifest::parse(missing.as_bytes())
-            .unwrap_err()
-            .contains("no verbs"));
+        assert!(contract_supported(&m));
+        let skewed = Manifest::parse(manifest_json("099").as_bytes()).expect("parses");
+        assert!(!contract_supported(&skewed));
     }
 
     #[test]

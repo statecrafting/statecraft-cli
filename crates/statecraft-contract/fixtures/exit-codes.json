@@ -1,0 +1,13 @@
+{
+  "contractSkew": 66,
+  "d4": {
+    "0": "ok",
+    "1": "operational",
+    "2": "unreachable",
+    "3": "usage"
+  },
+  "floor": 64,
+  "manifestRefused": 65,
+  "memberNotFound": 64,
+  "unknownSubverb": 67
+}

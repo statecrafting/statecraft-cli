@@ -16,7 +16,16 @@ spec = "102-crate-scaffold"
 name = "statecraft"
 path = "src/main.rs"
 
+# The workspace (spec 111 B-7): the umbrella is the root package; the Rust
+# members and the contract they share live under crates/, in doc 02 D30's
+# order.
+[workspace]
+members = ["crates/*"]
+
 [dependencies]
+# The member contract (spec 111): the manifest, the codes, the envelope and
+# the driver seam, one definition shared with every Rust member.
+statecraft-contract = { path = "crates/statecraft-contract" }
 # CLI parsing and shell completions (no async; that lands in spec 103).
 clap = { version = "4", features = ["derive"] }
 clap_complete = "4"

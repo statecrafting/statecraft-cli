@@ -1,0 +1,17 @@
+{
+  "capabilityTier": "basic",
+  "contract": "042",
+  "envelope": "ok-data",
+  "exitCodes": {
+    "0": "ok",
+    "1": "operational",
+    "2": "unreachable",
+    "3": "usage"
+  },
+  "name": "statecraft-engine",
+  "schemaVersion": "1",
+  "verbs": [
+    "orchestrator"
+  ],
+  "version": "0.1.0"
+}

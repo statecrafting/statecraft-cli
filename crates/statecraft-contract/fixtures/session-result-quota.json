@@ -1,0 +1,21 @@
+{
+  "classification": {
+    "detail": "You have hit your usage limit.",
+    "kind": "quota",
+    "resetAtMs": 1700000000000
+  },
+  "costMicroUsd": null,
+  "durationMs": 597,
+  "exitCode": 1,
+  "numTurns": null,
+  "overflow": {
+    "lines": [
+      "not json"
+    ],
+    "truncatedCount": 0
+  },
+  "sessionId": "sess-seam",
+  "stderrTail": "rate limited",
+  "transcriptPath": "/home/u/.claude/projects/-work-target/sess-seam.jsonl",
+  "usage": null
+}

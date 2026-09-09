@@ -1,0 +1,12 @@
+{
+  "killGraceMs": null,
+  "maxTurns": null,
+  "mcpConfigPath": null,
+  "model": null,
+  "profile": null,
+  "prompt": "Implement spec 012.",
+  "repo": "/work/target",
+  "schemaVersion": "1",
+  "tier": null,
+  "timeoutMs": null
+}

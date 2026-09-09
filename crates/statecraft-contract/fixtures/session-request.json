@@ -1,0 +1,20 @@
+{
+  "killGraceMs": null,
+  "maxTurns": 40,
+  "mcpConfigPath": null,
+  "model": null,
+  "profile": {
+    "allowedTools": [
+      "Read",
+      "Bash(git:*)"
+    ],
+    "disallowedTools": null,
+    "mode": "guarded",
+    "models": null
+  },
+  "prompt": "Implement spec 012.",
+  "repo": "/work/target",
+  "schemaVersion": "1",
+  "tier": "strong",
+  "timeoutMs": 1800000
+}
