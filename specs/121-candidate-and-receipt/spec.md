@@ -3,7 +3,7 @@ id: "121-candidate-and-receipt"
 title: "The candidate and the receipt: the build works a worktree with a scrubbed environment, and a passing gate over a stable revision is journaled as an acceptance receipt"
 status: approved
 created: "2026-09-09"
-implementation: pending
+implementation: in-progress
 risk: high
 depends_on:
   - "120-capability-contract"

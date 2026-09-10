@@ -173,7 +173,7 @@
       }
     ],
     "id": "121-candidate-and-receipt",
-    "implementation": "pending",
+    "implementation": "in-progress",
     "references": [
       {
         "role": "context",
@@ -200,6 +200,6 @@
     "summary": "Doc 04 §5. The build stage stops editing the operator's checkout: it adds a worktree for the spec's branch under the daemon's home and drives every session, gate and commit there, and ship and shepherd work the same candidate. The child environment every session receives is scrubbed by a deny list the engine owns. When the post-session gate passes on a candidate whose HEAD did not move and whose tree stayed clean, the engine journals an acceptance receipt binding the repository, the base, the candidate sha, the gate suite, the policy digest, the spec-spine version, every exit code, and the policy-sensitive paths the candidate touched. The receipt is what 122's broker consumes before it publishes.\n",
     "title": "The candidate and the receipt: the build works a worktree with a scrubbed environment, and a passing gate over a stable revision is journaled as an acceptance receipt"
   },
-  "shardHash": "6c8195d072a0c857cfa17b29cbfe57dc3c39b786059c49e16c781325a584eb28",
+  "shardHash": "8a8909e8209abb33d3341ce8d01c01332f37a321ef4196c3fff31dccafe3dddd",
   "specVersion": "1.2.0"
 }
