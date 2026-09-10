@@ -3,7 +3,7 @@ id: "124-provider-conformance"
 title: "Provider conformance: one negative suite every driver runs, a fixture driver that ships with it, and a live qualification record per binary"
 status: approved
 created: "2026-09-09"
-implementation: pending
+implementation: in-progress
 risk: medium
 depends_on:
   - "123-policy-kit-handoff"
