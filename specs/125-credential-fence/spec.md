@@ -1,9 +1,9 @@
 ---
 id: "125-credential-fence"
 title: "The credential fence: the broker is the only path that works, so the journal is complete"
-status: draft
+status: approved
 created: "2026-09-10"
-implementation: pending
+implementation: in-progress
 risk: medium
 depends_on:
   - "122-action-broker"
@@ -247,4 +247,5 @@ the build are recorded here with their date, per `AGENTS.md` step 3.
 
 Authored `draft`, `implementation: pending`. It comes from doc 04 §11's
 open limits and from the known limit 122 recorded three times (B-7, §5, D-4).
-Approval is a human flip.
+
+Approved by the owner on 2026-09-10, as written, and started the same day.
