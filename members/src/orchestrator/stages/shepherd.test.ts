@@ -3,6 +3,9 @@ import { mkdtempSync, mkdirSync, writeFileSync } from "fs";
 import { tmpdir } from "os";
 import { join } from "path";
 import { openJournal } from "../journal";
+import { createRun, transition } from "../state";
+import { latestReceipt, mintReceipt, receiptPayload, RECEIPT_KIND } from "../receipt";
+import type { Broker, BrokerRequest, MergeRequest } from "../broker";
 import { createProcessRunner, type Runner, type RunnerSessionOptions } from "./build";
 import { GATE_COMMANDS, gateSuiteFor, type GateContract } from "../gate-contract";
 import { MergeRefusedError } from "./ship";
@@ -164,6 +167,9 @@ function makeFakeGh(config: FakeGhConfig, state: FakeGhState): GitHubClient {
       const idx = Math.min(state.prForBranchCalls, config.prSequence.length - 1);
       state.prForBranchCalls++;
       return config.prSequence[idx] ?? null;
+    },
+    createPr(_branch: string, _title: string, _body: string): GitHubPr {
+      throw new Error("shepherd.test.ts: createPr is a ship-stage seam, not exercised here");
     },
     commitsForPr(_number: number): readonly GitHubCommit[] {
       return [];
@@ -687,3 +693,157 @@ test("no PR found: shepherding a branch with no open PR fails needsHuman without
 
   journal.close();
 });
+
+// --- 122: the merge and the remediation push go through the broker ----------
+
+interface RecordingBroker extends Broker {
+  readonly pushes: BrokerRequest[];
+  readonly merges: MergeRequest[];
+}
+
+function recordingBroker(): RecordingBroker {
+  const b: RecordingBroker = {
+    pushes: [],
+    merges: [],
+    push(request) {
+      b.pushes.push(request);
+      return { status: "done" };
+    },
+    openPr() {
+      throw new Error("shepherd.test.ts: openPr is ship's");
+    },
+    merge(request) {
+      b.merges.push(request);
+      return { status: "done", mergeSha: "merge-via-broker" };
+    },
+  };
+  return b;
+}
+
+// A journal with a live run and a receipt covering `headSha` for the spec.
+function brokeredJournal(specId: string, headSha: string | null): { journal: ReturnType<typeof openJournal>; runId: string; receiptHash: string | null } {
+  const { journalDir } = openHandles();
+  const journal = openJournal(journalDir);
+  const run = createRun(journal, "/repo");
+  transition(journal, run, "running");
+  let receiptHash: string | null = null;
+  if (headSha !== null) {
+    const receipt = mintReceipt({
+      specId,
+      round: 1,
+      origin: null,
+      baseSha: "base",
+      candidateSha: headSha,
+      branch: specId,
+      suite: [],
+      gate: null,
+      profile: { mode: "bypass" },
+      specSpineVersion: null,
+      results: [],
+      changedPaths: [],
+    });
+    receiptHash = journal.append(RECEIPT_KIND, receiptPayload(receipt)).recordHash;
+  }
+  return { journal, runId: run.id, receiptHash };
+}
+
+test("122 FR-003: the green merge goes through the broker with the receipt covering the PR head", async () => {
+  const { dir, specId } = initFixtureRepo();
+  const runner: Runner = { ...createProcessRunner({ repoDir: dir }), runSession: scriptedSessions([fakeSessionResult()]) };
+  const state = freshFakeGhState();
+  const pr = makePr({ headSha: "sha-a" });
+  const gh = makeFakeGh({ prSequence: [pr], checkRunsBySha: { "sha-a": [[checkRun({ status: "completed", conclusion: "success" })]] } }, state);
+  const { journal, runId, receiptHash } = brokeredJournal(specId, "sha-a");
+  const broker = recordingBroker();
+
+  const result = await runShepherdStage({ runner, gh, specId, journal, clock: makeFakeClock(), broker, runId });
+
+  expect(result.outcome).toBe("passed");
+  expect(result.evidence.mergeSha).toBe("merge-via-broker");
+  expect(broker.merges).toEqual([{ runId, specId, branch: specId, headSha: "sha-a", receiptHash: receiptHash!, prNumber: pr.number, method: "squash" as const }]);
+  // The seam's own mergePr was never called: the broker owns the effect.
+  expect(state.mergeCalls).toEqual([]);
+  journal.close();
+});
+
+test("122 FR-003: a PR head without a receipt is failed with needsHuman and no merge call", async () => {
+  const { dir, specId } = initFixtureRepo();
+  const runner: Runner = { ...createProcessRunner({ repoDir: dir }), runSession: scriptedSessions([fakeSessionResult()]) };
+  const state = freshFakeGhState();
+  const pr = makePr({ headSha: "sha-a" });
+  const gh = makeFakeGh({ prSequence: [pr], checkRunsBySha: { "sha-a": [[checkRun({ status: "completed", conclusion: "success" })]] } }, state);
+  const { journal, runId } = brokeredJournal(specId, null);
+  const broker = recordingBroker();
+
+  const result = await runShepherdStage({ runner, gh, specId, journal, clock: makeFakeClock(), broker, runId });
+
+  expect(result.outcome).toBe("failed");
+  expect(result.evidence.needsHuman).toBe(true);
+  expect(broker.merges).toEqual([]);
+  expect(state.mergeCalls).toEqual([]);
+  const refused = journal.fold().byKind["stage.shepherd.merge-refused"]!.at(-1)!.payload as { reason: string };
+  expect(refused.reason).toContain("no-receipt");
+  journal.close();
+});
+
+test("122 FR-003: a remediation commit is gated, receipted and pushed by the engine, then watched at its new head", async () => {
+  const { dir, specId } = initFixtureRepo();
+  // The remediation session commits a fix and flips the spec complete so the
+  // engine's own gate can receipt it (122 D-5).
+  const fixingSession: Runner["runSession"] = async (_options: RunnerSessionOptions) => {
+    writeFileSync(join(dir, "fix.txt"), "fixed\n");
+    const specPath = join(dir, "specs", specId, "spec.md");
+    writeFileSync(specPath, new TextDecoder().decode(Bun.spawnSync(["cat", specPath]).stdout).replace("implementation: in-progress", "implementation: complete"));
+    git(dir, ["add", "-A"]);
+    git(dir, ["commit", "-q", "-m", "fix: remediation"]);
+    return fakeSessionResult();
+  };
+  const runner: Runner = {
+    ...createProcessRunner({ repoDir: dir }),
+    runGate: () => ({ exitCode: 0, stdoutTail: "", stderrTail: "" }),
+    runSession: fixingSession,
+  };
+  const state = freshFakeGhState();
+  const prA = makePr({ headSha: "sha-a" });
+  const gh = makeFakeGh(
+    {
+      // After the engine pushes, the PR head is the fixed commit; the fake
+      // answers prA first and then whatever head the runner has.
+      prSequence: [prA],
+      checkRunsBySha: { "sha-a": [[checkRun({ status: "completed", conclusion: "failure" })]] },
+    },
+    state
+  );
+  const { journal, runId } = brokeredJournal(specId, "sha-a");
+  const broker = recordingBroker();
+  let fixedHead = "";
+  const original = gh.prForBranch.bind(gh);
+  let reads = 0;
+  gh.prForBranch = (branch: string) => {
+    reads++;
+    if (reads === 1) return original(branch);
+    fixedHead = runner.headSha();
+    return makePr({ headSha: fixedHead });
+  };
+  const withFixed: GitHubClient = {
+    ...gh,
+    checkRunsForSha: (sha: string) =>
+      sha === "sha-a" ? [checkRun({ status: "completed", conclusion: "failure" })] : [checkRun({ id: 2, status: "completed", conclusion: "success" })],
+  };
+
+  const result = await runShepherdStage({ runner, gh: withFixed, specId, journal, clock: makeFakeClock(), broker, runId });
+
+  expect(result.outcome).toBe("passed");
+  expect(broker.pushes.length).toBe(1);
+  expect(broker.pushes[0]!.headSha).toBe(fixedHead);
+  const receipt = latestReceipt(journal.fold().records, specId)!;
+  expect(receipt.receipt.repo.candidateSha).toBe(fixedHead);
+  expect(receipt.receipt.round).toBe(4);
+  expect(broker.pushes[0]!.receiptHash).toBe(receipt.hash);
+  expect(broker.merges.length).toBe(1);
+  expect(broker.merges[0]!.headSha).toBe(fixedHead);
+  expect(broker.merges[0]!.receiptHash).toBe(receipt.hash);
+  expect(result.evidence.watchAttempts.map((a) => a.outcome)).toEqual(["failed", "green"]);
+  journal.close();
+});
+

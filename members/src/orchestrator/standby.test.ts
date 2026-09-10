@@ -114,6 +114,7 @@ function throwingGh(): GitHubClient {
     };
   return {
     prForBranch: fail("prForBranch"),
+    createPr: fail("createPr"),
     commitsForPr: fail("commitsForPr"),
     checksTriggered: fail("checksTriggered"),
     checkRunsForSha: fail("checkRunsForSha"),

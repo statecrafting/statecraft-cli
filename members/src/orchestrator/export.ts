@@ -58,12 +58,16 @@ export interface RedactionPolicy {
 // `acceptance.unstable`, `acceptance.sensitive`) join the allowlist; the
 // receipt's paths are repository-relative, and the unstable record's `dirty`
 // (a git status text) is stripped.
+// Version 4 (spec 122): the broker's records (`broker.action`,
+// `broker.refused`) join the allowlist; their `detail` is stripped as elsewhere.
 export const REDACTION_POLICY: RedactionPolicy = {
-  version: 3,
+  version: 4,
   includedKinds: [
     "acceptance.receipt",
     "acceptance.sensitive",
     "acceptance.unstable",
+    "broker.action",
+    "broker.refused",
     "control.approve",
     "control.forceHumanGate",
     "control.pause",

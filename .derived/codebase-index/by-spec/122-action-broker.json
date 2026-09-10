@@ -1,19 +1,4 @@
 {
-  "diagnostics": {
-    "errors": [],
-    "warnings": [
-      {
-        "code": "W-001",
-        "message": "spec '122-action-broker' file unit 'members/src/orchestrator/broker.ts' does not exist",
-        "path": "members/src/orchestrator/broker.ts"
-      },
-      {
-        "code": "W-001",
-        "message": "spec '122-action-broker' file unit 'members/src/orchestrator/broker.test.ts' does not exist",
-        "path": "members/src/orchestrator/broker.test.ts"
-      }
-    ]
-  },
   "mapping": {
     "dependsOn": [
       "121-candidate-and-receipt",
@@ -33,6 +18,34 @@
       },
       {
         "path": "crates/statecraft-driver-codex/",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/statecraft-journal/",
+        "source": "spec-edge"
+      },
+      {
+        "path": "members/src/members/driver-codex.test.ts",
+        "source": "spec-edge"
+      },
+      {
+        "path": "members/src/members/driver-parity.test.ts",
+        "source": "spec-edge"
+      },
+      {
+        "path": "members/src/members/engine-bundle.test.ts",
+        "source": "spec-edge"
+      },
+      {
+        "path": "members/src/orchestrator/admission.test.ts",
+        "source": "spec-edge"
+      },
+      {
+        "path": "members/src/orchestrator/broker.test.ts",
+        "source": "spec-edge"
+      },
+      {
+        "path": "members/src/orchestrator/broker.ts",
         "source": "spec-edge"
       },
       {
@@ -60,6 +73,10 @@
         "source": "spec-edge"
       },
       {
+        "path": "members/src/orchestrator/stages/build.ts",
+        "source": "spec-edge"
+      },
+      {
         "path": "members/src/orchestrator/stages/shepherd.test.ts",
         "source": "spec-edge"
       },
@@ -74,11 +91,19 @@
       {
         "path": "members/src/orchestrator/stages/ship.ts",
         "source": "spec-edge"
+      },
+      {
+        "path": "members/src/orchestrator/standby.test.ts",
+        "source": "spec-edge"
       }
     ],
     "resolvedUnits": [
       {
-        "locations": [],
+        "locations": [
+          {
+            "file": "members/src/orchestrator/broker.test.ts"
+          }
+        ],
         "ownership": true,
         "sourceField": "establishes",
         "unit": {
@@ -87,7 +112,11 @@
         }
       },
       {
-        "locations": [],
+        "locations": [
+          {
+            "file": "members/src/orchestrator/broker.ts"
+          }
+        ],
         "ownership": true,
         "sourceField": "establishes",
         "unit": {
@@ -132,6 +161,71 @@
         "unit": {
           "kind": "directory",
           "path": "crates/statecraft-driver-codex/"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "crates/statecraft-journal/"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "directory",
+          "path": "crates/statecraft-journal/"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "members/src/members/driver-codex.test.ts"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "members/src/members/driver-codex.test.ts"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "members/src/members/driver-parity.test.ts"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "members/src/members/driver-parity.test.ts"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "members/src/members/engine-bundle.test.ts"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "members/src/members/engine-bundle.test.ts"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "members/src/orchestrator/admission.test.ts"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "members/src/orchestrator/admission.test.ts"
         }
       },
       {
@@ -215,6 +309,19 @@
       {
         "locations": [
           {
+            "file": "members/src/orchestrator/stages/build.ts"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "members/src/orchestrator/stages/build.ts"
+        }
+      },
+      {
+        "locations": [
+          {
             "file": "members/src/orchestrator/stages/shepherd.test.ts"
           }
         ],
@@ -267,6 +374,19 @@
       {
         "locations": [
           {
+            "file": "members/src/orchestrator/standby.test.ts"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "members/src/orchestrator/standby.test.ts"
+        }
+      },
+      {
+        "locations": [
+          {
             "file": "docs/design/04-the-governed-substrate.md"
           }
         ],
@@ -282,5 +402,5 @@
     "specStatus": "approved"
   },
   "schemaVersion": "1.1.0",
-  "shardHash": "5d40b4e45385b2d5b627cd2a3de867ec8112ac818556dec2e33777239ba93f13"
+  "shardHash": "604b28f64d27b12c171794ed70c0367b857464764331358210bc80fe8630aac1"
 }

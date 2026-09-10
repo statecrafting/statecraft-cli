@@ -23,8 +23,15 @@
 // drive this module against a scripted fake GitHubClient (fixtures), never
 // the real `gh` binary, mirroring spec 014's own "never spawn the real
 // claude in tests" convention.
+import { readFileSync, unlinkSync, writeFileSync } from "fs";
+import { tmpdir } from "os";
+import { join } from "path";
 import type { JournalHandle, JsonValue } from "../journal";
-import { DEFAULT_BASE_BRANCH, type Runner } from "./build";
+import { DEFAULT_BASE_BRANCH, evaluateCompletion, type Runner } from "./build";
+import { BrokerRefusedError, type Broker } from "../broker";
+import { latestReceipt, receiptCovers } from "../receipt";
+import { resolveGateBinding, type GateBinding } from "../gate-contract";
+import type { ProfileSource } from "../profile";
 import type { SessionResult } from "../driver";
 import type { ModelTier } from "../models";
 
@@ -36,6 +43,11 @@ export interface GitHubPr {
   readonly headSha: string;
   readonly body: string;
   readonly title: string;
+  // 122 B-5: whether the PR is merged, and at what commit, so a merge retry
+  // after a lost response reconciles instead of repeating. Absent when the
+  // reader did not ask.
+  readonly merged?: boolean;
+  readonly mergeSha?: string;
 }
 
 export interface GitHubCommit {
@@ -81,6 +93,8 @@ export class MergeRefusedError extends Error {
 
 export interface GitHubClient {
   prForBranch(branch: string): GitHubPr | null;
+  // 122 B-3: opens a pull request for `branch` and reads it back.
+  createPr(branch: string, title: string, body: string): GitHubPr;
   commitsForPr(number: number): readonly GitHubCommit[];
   checksTriggered(headSha: string): boolean;
   // --- shepherd extensions (spec 018) ---
@@ -135,7 +149,7 @@ export function createProcessGitHubClient(params: CreateGitHubClientParams): Git
         "view",
         branch,
         "--json",
-        "number,url,headRefOid,body,title",
+        "number,url,headRefOid,body,title,state,mergeCommit",
       ]);
       if (result.exitCode !== 0) return null;
       let parsed: unknown;
@@ -145,15 +159,33 @@ export function createProcessGitHubClient(params: CreateGitHubClientParams): Git
         return null;
       }
       if (!isRecord(parsed)) return null;
-      const { number, url, headRefOid, body, title } = parsed;
+      const { number, url, headRefOid, body, title, state, mergeCommit } = parsed;
       if (typeof number !== "number" || typeof url !== "string" || typeof headRefOid !== "string") return null;
+      const mergeSha = isRecord(mergeCommit) && typeof mergeCommit.oid === "string" ? mergeCommit.oid : undefined;
       return {
         number,
         url,
         headSha: headRefOid,
         body: typeof body === "string" ? body : "",
         title: typeof title === "string" ? title : "",
+        merged: state === "MERGED",
+        ...(mergeSha === undefined ? {} : { mergeSha }),
       };
+    },
+
+    // 122 B-3: the engine opens the pull request. The body goes through a
+    // file (a waiver line has no safe shell quoting), and the PR is read
+    // back so the caller can verify its head.
+    createPr(branch: string, title: string, body: string): GitHubPr {
+      const created = withBodyFile(body, (path) =>
+        runGhSync(repoDir, [ghBin, "pr", "create", "--head", branch, "--title", title, "--body-file", path])
+      );
+      if (created.exitCode !== 0) {
+        throw new Error(`ship: gh pr create for "${branch}" failed: ${created.stderr.trim()}`);
+      }
+      const pr = this.prForBranch(branch);
+      if (pr === null) throw new Error(`ship: gh pr create for "${branch}" succeeded but the PR could not be read back`);
+      return pr;
     },
 
     commitsForPr(number: number): readonly GitHubCommit[] {
@@ -274,6 +306,22 @@ export function createProcessGitHubClient(params: CreateGitHubClientParams): Git
   };
 }
 
+// The body file `gh pr create` reads (122 B-3): a body carrying a waiver
+// line has no safe shell quoting, so it always goes through a file.
+export function withBodyFile<T>(body: string, use: (path: string) => T): T {
+  const path = join(tmpdir(), `statecraft-pr-body-${process.pid}-${Date.now()}.md`);
+  writeFileSync(path, body, "utf8");
+  try {
+    return use(path);
+  } finally {
+    try {
+      unlinkSync(path);
+    } catch {
+      // A body file that will not unlink is a stray temp file, not a failure.
+    }
+  }
+}
+
 // --- forbidden markers (B-3: no session link, no AI attribution) -----------
 
 const SESSION_LINK_PATTERN = /claude\.ai\/code\/session/i;
@@ -281,7 +329,7 @@ const CO_AUTHORED_BY_CLAUDE_PATTERN = /co-authored-by:\s*claude/i;
 const GENERATED_WITH_PATTERN = /generated with/i;
 const ROBOT_EMOJI_PATTERN = /\u{1F916}/u;
 
-function findForbiddenMarkers(text: string): string[] {
+export function findForbiddenMarkers(text: string): string[] {
   const hits: string[] = [];
   if (SESSION_LINK_PATTERN.test(text)) hits.push("a session-link URL (claude.ai/code/session)");
   if (CO_AUTHORED_BY_CLAUDE_PATTERN.test(text)) hits.push('AI attribution ("Co-Authored-By: Claude")');
@@ -328,14 +376,61 @@ function verifyOutside(gh: GitHubClient, pr: GitHubPr, localHeadSha: string): Ve
 
 // --- prompt template (B-1) --------------------------------------------------
 
-export const SHIP_PROMPT_VERSION = 2;
+export const SHIP_PROMPT_VERSION = 3;
 
 export interface ShipPromptParams {
   readonly branch: string;
+  // 122 B-1: where the session drops its proposal. Absent is the pre-122
+  // prompt, in which the session publishes itself (in-place mode, D-7).
+  readonly proposalPath?: string;
+}
+
+// 122 B-1: the session gates, reviews, commits and proposes; publication is
+// the engine's.
+function buildBrokeredShipPrompt(branch: string, proposalPath: string): string {
+  return `You are preparing the current branch ("${branch}") of this repository
+for publication, in this one session. Ship prompt template version: ${SHIP_PROMPT_VERSION}.
+
+## What to do
+
+1. Run the governed gate locally, exactly as this repository's \`/ship\`
+   skill lists it, and make every command exit 0.
+2. Review the diff against the base branch.
+3. Commit anything still uncommitted with a conventional message on this
+   branch (\`type(scope): subject\`). Leave the working tree clean.
+4. Write the pull request's title and body to this file, as one JSON
+   object with two string fields, \`title\` and \`body\`:
+
+   ${proposalPath}
+
+Publication is the engine's: do not push, do not run \`gh pr create\`, do
+not open a pull request. The engine pushes this branch and opens the pull
+request from your proposal after it has verified the branch. If the
+coupling gate fails and \`/ship\` offers the \`Spec-Drift-Waiver:\` path,
+halt and report honestly instead of waiving; a waiver needs an explicit
+human decision.
+
+## PR title and body conventions
+
+- Title: a conventional-commit-style subject (\`type(scope): subject\`).
+- Body: two sections, \`## Summary\` and \`## Testing\`, each a short
+  bulleted list.
+- No session-link URLs (no \`claude.ai/code/session...\`) anywhere in the
+  title, the body, or any commit message.
+- No AI attribution anywhere (no "Generated with", no
+  \`Co-Authored-By: Claude\`, no robot emoji) in the title, the body, or any
+  commit message.
+
+## House style
+
+No em dashes (U+2014) anywhere: chat, code, comments, commit messages, PR
+title, PR body. Match the surrounding repository's style.
+`;
 }
 
 export function buildShipPrompt(params: ShipPromptParams): string {
   const { branch } = params;
+  if (params.proposalPath !== undefined) return buildBrokeredShipPrompt(branch, params.proposalPath);
   return `You are shipping the current branch ("${branch}") of this repository,
 in this one session. Ship prompt template version: ${SHIP_PROMPT_VERSION}.
 
@@ -414,6 +509,9 @@ export interface ShipPrEvidence {
   readonly number: number;
   readonly url: string;
   readonly headSha: string;
+  // 122 B-6: the receipt the broker consumed, and that the engine published.
+  readonly receiptHash?: string;
+  readonly brokered?: boolean;
 }
 
 export interface ShipEvidence {
@@ -460,6 +558,45 @@ export interface RunShipStageOptions {
   // 121 B-2: the branch the candidate's base resolves from; the build's
   // default when absent.
   readonly defaultBranch?: string;
+  // 122 B-6: the broker the engine publishes through, the run that holds
+  // the lease, the drop box the proposal lands in, and what a receipt over
+  // a moved head needs (D-5). All present in production; absent together
+  // is the pre-122 in-place flow (D-7), in which the session publishes.
+  readonly broker?: Broker;
+  readonly runId?: string;
+  readonly dropboxDir?: string;
+  readonly gate?: GateBinding;
+  readonly profile?: ProfileSource;
+}
+
+// 122 B-1: where the ship session drops the pull request text.
+export function proposalPath(dropboxDir: string, specId: string): string {
+  return join(dropboxDir, `proposal-${specId}.json`);
+}
+
+export interface Proposal {
+  readonly title: string;
+  readonly body: string;
+}
+
+export function readProposal(path: string): Proposal | string {
+  let text: string;
+  try {
+    text = readFileSync(path, "utf8");
+  } catch {
+    return `no proposal at ${path}: the session did not write the pull request text`;
+  }
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(text);
+  } catch (err) {
+    return `the proposal at ${path} is not JSON: ${(err as Error).message}`;
+  }
+  if (!isRecord(parsed) || typeof parsed.title !== "string" || typeof parsed.body !== "string") {
+    return `the proposal at ${path} must be an object with string fields "title" and "body"`;
+  }
+  if (parsed.title.trim().length === 0) return `the proposal at ${path} has an empty title`;
+  return { title: parsed.title, body: parsed.body };
 }
 
 export async function runShipStage(options: RunShipStageOptions): Promise<ShipResult> {
@@ -495,14 +632,34 @@ export async function runShipStage(options: RunShipStageOptions): Promise<ShipRe
     };
     journal.append("stage.ship.idempotent-check", idempotentPayload);
 
-    if (precheckVerification.ok) {
+    // 122 B-5: with a broker, the idempotent pass is the broker answering
+    // `already` to the same request, over the receipt covering this head;
+    // without one covering it, the session runs and receipts it.
+    let brokeredReceipt: string | null = null;
+    if (precheckVerification.ok && options.broker !== undefined) {
+      const folded = latestReceipt(journal.fold().records, specId);
+      if (folded === null || !receiptCovers(folded.receipt, localHeadSha)) {
+        journal.append("stage.ship.idempotent-check", { specId, branch, prNumber: precheckPr.number, ok: false, diff: ["no receipt covers the head"] });
+      } else {
+        try {
+          options.broker.push({ runId: options.runId ?? "", specId, branch, headSha: localHeadSha, receiptHash: folded.hash });
+          options.broker.openPr({ runId: options.runId ?? "", specId, branch, headSha: localHeadSha, receiptHash: folded.hash, title: precheckPr.title, body: precheckPr.body });
+          brokeredReceipt = folded.hash;
+        } catch (err) {
+          if (!(err instanceof BrokerRefusedError)) throw err;
+          journal.append("stage.ship.idempotent-check", { specId, branch, prNumber: precheckPr.number, ok: false, diff: [err.message] });
+        }
+      }
+    }
+
+    if (precheckVerification.ok && (options.broker === undefined || brokeredReceipt !== null)) {
       const evidence: ShipEvidence = {
         specId,
         branch,
         localHeadSha,
         promptVersion: null,
         sessions: [],
-        pr: toPrEvidence(precheckPr),
+        pr: brokeredReceipt === null ? toPrEvidence(precheckPr) : { ...toPrEvidence(precheckPr), receiptHash: brokeredReceipt, brokered: true },
         ciTriggered: precheckVerification.ciTriggered,
         ciRunId: null,
         verification: precheckVerification,
@@ -521,7 +678,10 @@ export async function runShipStage(options: RunShipStageOptions): Promise<ShipRe
   }
 
   // --- B-1: drive the /ship session -------------------------------------
-  const prompt = buildShipPrompt({ branch });
+  const prompt = buildShipPrompt({
+    branch,
+    ...(options.broker !== undefined && options.dropboxDir !== undefined ? { proposalPath: proposalPath(options.dropboxDir, specId) } : {}),
+  });
   const promptPayload: Record<string, JsonValue> = { specId, branch, promptVersion: SHIP_PROMPT_VERSION };
   journal.append("stage.ship.prompt", promptPayload);
 
@@ -559,6 +719,11 @@ export async function runShipStage(options: RunShipStageOptions): Promise<ShipRe
     };
     journal.append("stage.ship.result", resultPayload);
     return { outcome: "blocked", evidence };
+  }
+
+  // --- 122 B-6: the engine publishes -------------------------------------
+  if (options.broker !== undefined) {
+    return publishThroughBroker({ options, branch, sessionEvidence, precheckPr });
   }
 
   // --- B-3: outside verification, after the session -----------------------
@@ -600,3 +765,129 @@ export async function runShipStage(options: RunShipStageOptions): Promise<ShipRe
 
   return { outcome, evidence };
 }
+
+// --- 122 B-6: publication through the broker ---------------------------------
+
+interface PublishParams {
+  readonly options: RunShipStageOptions;
+  readonly branch: string;
+  readonly sessionEvidence: ShipSessionEvidence;
+  readonly precheckPr: GitHubPr | null;
+}
+
+function failed(p: PublishParams, refusalDetail: string, pr: GitHubPr | null, receiptHash: string | null): ShipResult {
+  const { options, branch, sessionEvidence } = p;
+  const { specId, journal } = options;
+  const localHeadSha = options.runner.headSha();
+  journal.append("stage.ship.result", {
+    specId,
+    branch,
+    outcome: "failed",
+    prNumber: pr?.number ?? null,
+    sessionIds: [sessionEvidence.sessionId],
+    refusalDetail,
+    receiptHash,
+  });
+  return {
+    outcome: "failed",
+    evidence: {
+      specId,
+      branch,
+      localHeadSha,
+      promptVersion: SHIP_PROMPT_VERSION,
+      sessions: [sessionEvidence],
+      pr: pr ? toPrEvidence(pr) : null,
+      ciTriggered: null,
+      ciRunId: null,
+      verification: { ok: false, diff: [refusalDetail], ciTriggered: false },
+      costMicroUsd: sessionEvidence.costMicroUsd,
+    },
+  };
+}
+
+function publishThroughBroker(p: PublishParams): ShipResult {
+  const { options, branch, sessionEvidence } = p;
+  const { runner, gh, specId, journal } = options;
+  const broker = options.broker!;
+  const runId = options.runId ?? "";
+  if (options.dropboxDir === undefined) return failed(p, "ship: a broker needs a drop box for the proposal", p.precheckPr, null);
+
+  // The proposal (B-1, B-6).
+  const proposal = readProposal(proposalPath(options.dropboxDir, specId));
+  if (typeof proposal === "string") return failed(p, proposal, p.precheckPr, null);
+
+  // The receipt over the head the session left (B-6, D-5): the build's when
+  // the head did not move, else this stage's own gate over the stable
+  // candidate.
+  const headSha = runner.headSha();
+  let folded = latestReceipt(journal.fold().records, specId);
+  if (folded === null || !receiptCovers(folded.receipt, headSha)) {
+    let baseSha: string;
+    try {
+      baseSha = runner.resolveBase(options.defaultBranch ?? DEFAULT_BASE_BRANCH);
+    } catch (err) {
+      return failed(p, `no-receipt: ${(err as Error).message}`, p.precheckPr, null);
+    }
+    const completion = evaluateCompletion({
+      runner,
+      specId,
+      specPath: `specs/${specId}/spec.md`,
+      gate: resolveGateBinding(options.gate),
+      baseSha,
+      branch,
+      round: 3,
+      journal,
+      profile: options.profile,
+    });
+    if (completion.receipt === null) {
+      const red = completion.gates.find((g) => g.exitCode !== 0);
+      const why = red
+        ? `"${red.cmd.join(" ")}" exited ${red.exitCode}`
+        : completion.stable === false
+          ? "the candidate did not hold still across the gate"
+          : "the spec's frontmatter does not read complete";
+      return failed(p, `no-receipt: ${why}`, p.precheckPr, null);
+    }
+    folded = latestReceipt(journal.fold().records, specId);
+    if (folded === null) return failed(p, "no-receipt: the receipt was minted but could not be read back", p.precheckPr, null);
+  }
+  const receiptHash = folded.hash;
+
+  // The effects (B-2, B-3, B-5).
+  let pr: GitHubPr;
+  try {
+    broker.push({ runId, specId, branch, headSha, receiptHash });
+    pr = broker.openPr({ runId, specId, branch, headSha, receiptHash, title: proposal.title, body: proposal.body }).pr;
+  } catch (err) {
+    if (err instanceof BrokerRefusedError) return failed(p, err.message, p.precheckPr, receiptHash);
+    throw err;
+  }
+
+  // B-3's outside verification still stands: what was opened is what was
+  // proposed, at the head the receipt covers, with CI triggered.
+  const verification = verifyOutside(gh, pr, headSha);
+  journal.append("stage.ship.verification", { specId, branch, prNumber: pr.number, ok: verification.ok, diff: [...verification.diff] });
+  const outcome: ShipOutcome = verification.ok ? "passed" : "failed";
+  const evidence: ShipEvidence = {
+    specId,
+    branch,
+    localHeadSha: headSha,
+    promptVersion: SHIP_PROMPT_VERSION,
+    sessions: [sessionEvidence],
+    pr: { ...toPrEvidence(pr), receiptHash, brokered: true },
+    ciTriggered: verification.ciTriggered,
+    ciRunId: null,
+    verification,
+    costMicroUsd: sessionEvidence.costMicroUsd,
+  };
+  journal.append("stage.ship.result", {
+    specId,
+    branch,
+    outcome,
+    prNumber: pr.number,
+    sessionIds: [sessionEvidence.sessionId],
+    receiptHash,
+  });
+  return { outcome, evidence };
+}
+

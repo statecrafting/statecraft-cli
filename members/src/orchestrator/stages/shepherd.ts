@@ -24,7 +24,10 @@
 import type { JournalHandle, JsonValue } from "../journal";
 import type { ModelTier } from "../models";
 import { sha256Hex } from "../journal";
-import { GATE_COMMANDS, DEFAULT_BASE_BRANCH, type Runner } from "./build";
+import { GATE_COMMANDS, DEFAULT_BASE_BRANCH, evaluateCompletion, type Runner } from "./build";
+import { BrokerRefusedError, type Broker } from "../broker";
+import { latestReceipt, receiptCovers } from "../receipt";
+import type { ProfileSource } from "../profile";
 import { gateSuiteFor, resolveGateBinding, type GateBinding } from "../gate-contract";
 import { MergeRefusedError, type GitHubClient, type CheckRun, type MergeMethod, type MergeOutcome } from "./ship";
 
@@ -194,11 +197,26 @@ export interface ShepherdRemediationPromptParams {
   // the target's own gate suite, so a remediation session on a Rust target is
   // told to run cargo rather than this repo's bun.
   readonly gateCommands?: readonly (readonly string[])[];
+  // 122 B-6: the engine publishes; the session only commits.
+  readonly brokered?: boolean;
 }
 
 export function buildRemediationPrompt(params: ShepherdRemediationPromptParams): string {
   const { specBody, branch, attemptNumber, maxRemediations, failing } = params;
   const gateList = (params.gateCommands ?? GATE_COMMANDS).map((cmd) => `  - \`${cmd.join(" ")}\``).join("\n");
+  // 122 B-6: with a broker, the engine pushes the fix after its own gate and
+  // receipt; the session commits and stops.
+  const whatToDo = params.brokered
+    ? `Diagnose and fix the failure above, then commit your fix on this same
+branch ("${branch}") and stop. Do not push and do not open a pull request:
+the engine pushes your commit after it has verified it, and the pull
+request for this branch already exists. Run the governed gate below before
+you commit; every command must exit 0 before you are done:`
+    : `Diagnose and fix the failure above, then commit and push your fix to this
+same branch ("${branch}"). The pull request for this branch already exists;
+do not open a new one and do not force-push over history other than your own
+fix. Push through the governed gate below; every command must exit 0 before
+you are done:`;
   const failureSection = failing
     .map((f) => `### \`${f.name}\` (conclusion: ${f.conclusion ?? "none"})\n\nlog tail:\n${f.logTail}`)
     .join("\n\n");
@@ -218,11 +236,7 @@ ${failureSection}
 
 ## What to do
 
-Diagnose and fix the failure above, then commit and push your fix to this
-same branch ("${branch}"). The pull request for this branch already exists;
-do not open a new one and do not force-push over history other than your own
-fix. Push through the governed gate below; every command must exit 0 before
-you are done:
+${whatToDo}
 
 ${gateList}
 
@@ -334,6 +348,12 @@ export interface RunShepherdStageOptions {
   // 041 B-4: the owning project's gate contract, or a late-bound read of it.
   // The remediation prompt lists the project's gate, not this repo's.
   readonly gate?: GateBinding;
+  // 122 B-6: the broker the merge and the remediation push go through, the
+  // run that holds the lease, and the posture for the receipt. Absent
+  // together is the pre-122 in-place flow (D-7).
+  readonly broker?: Broker;
+  readonly runId?: string;
+  readonly profile?: ProfileSource;
 }
 
 export async function runShepherdStage(options: RunShepherdStageOptions): Promise<ShepherdResult> {
@@ -449,9 +469,34 @@ export async function runShepherdStage(options: RunShepherdStageOptions): Promis
       }
       let mergeOutcome: MergeOutcome;
       try {
-        mergeOutcome = gh.mergePr(pr.number, mergeMethod, headSha);
+        if (options.broker !== undefined) {
+          // 122 B-6: the merge consumes the receipt covering the PR head.
+          const receipt = latestReceipt(journal.fold().records, specId);
+          if (receipt === null || !receiptCovers(receipt.receipt, headSha)) {
+            journal.append("stage.shepherd.merge-refused", {
+              specId,
+              prNumber: pr.number,
+              watchedSha: headSha,
+              currentSha,
+              reason: "no-receipt: no acceptance receipt covers the pull request head",
+            });
+            return finish("failed", true, null, pr.number);
+          }
+          const merged = options.broker.merge({
+            runId: options.runId ?? "",
+            specId,
+            branch,
+            headSha,
+            receiptHash: receipt.hash,
+            prNumber: pr.number,
+            method: mergeMethod,
+          });
+          mergeOutcome = { mergeSha: merged.mergeSha };
+        } else {
+          mergeOutcome = gh.mergePr(pr.number, mergeMethod, headSha);
+        }
       } catch (err) {
-        if (err instanceof MergeRefusedError) {
+        if (err instanceof MergeRefusedError || err instanceof BrokerRefusedError) {
           journal.append("stage.shepherd.merge-refused", {
             specId,
             prNumber: pr.number,
@@ -524,6 +569,7 @@ export async function runShepherdStage(options: RunShepherdStageOptions): Promis
       maxRemediations,
       failing: failureDetails,
       gateCommands: gateSuiteFor(gate, baseSha),
+      brokered: options.broker !== undefined,
     });
     journal.append("stage.shepherd.prompt", { specId, attempt: attemptNumber, promptVersion: SHEPHERD_PROMPT_VERSION });
 
@@ -552,6 +598,43 @@ export async function runShepherdStage(options: RunShepherdStageOptions): Promis
 
     if (session.classification.kind === "quota") {
       return finish("quota", false, null, pr.number);
+    }
+
+    // 122 B-6: with a broker, the fix is the engine's to publish: the gate
+    // over the stable candidate mints the receipt, and the broker pushes.
+    if (options.broker !== undefined) {
+      const fixedHead = runner.headSha();
+      const completion = evaluateCompletion({
+        runner,
+        specId,
+        specPath,
+        gate,
+        baseSha,
+        branch,
+        round: 4,
+        journal,
+        profile: options.profile,
+      });
+      const receipt = latestReceipt(journal.fold().records, specId);
+      if (completion.receipt === null || receipt === null || !receiptCovers(receipt.receipt, fixedHead)) {
+        const red = completion.gates.find((g) => g.exitCode !== 0);
+        journal.append("stage.shepherd.push-refused", {
+          specId,
+          attempt: attemptNumber,
+          headSha: fixedHead,
+          reason: red ? `"${red.cmd.join(" ")}" exited ${red.exitCode}` : "no-receipt",
+        });
+        return finish("failed", true, null, pr.number);
+      }
+      try {
+        options.broker.push({ runId: options.runId ?? "", specId, branch, headSha: fixedHead, receiptHash: receipt.hash });
+      } catch (err) {
+        if (err instanceof BrokerRefusedError) {
+          journal.append("stage.shepherd.push-refused", { specId, attempt: attemptNumber, headSha: fixedHead, reason: err.message });
+          return finish("failed", true, null, pr.number);
+        }
+        throw err;
+      }
     }
 
     // B-3: re-resolve the head sha after the remediation's push, and restart

@@ -157,6 +157,9 @@ test("119 FR-005: shepherd refuses to merge a head that moved after the green wa
   const mergeCalls: { number: number; method: MergeMethod; head: string }[] = [];
   const gh: GitHubClient = {
     prForBranch: () => (reads++ === 0 ? watched : moved),
+    createPr: () => {
+      throw new Error("admission test: createPr is not exercised here");
+    },
     commitsForPr: () => [],
     checksTriggered: () => true,
     checkRunsForSha: (sha: string): readonly CheckRun[] =>

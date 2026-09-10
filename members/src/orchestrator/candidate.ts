@@ -15,7 +15,9 @@ import { join } from "path";
 // What a driven session never inherits. Both Rust providers drop the same
 // names; the contract fixture `child-env-deny.json` is the list both sides
 // assert against. Spec 122 adds the GitHub tokens when the engine publishes.
-export const CHILD_ENV_DENY: readonly string[] = ["ANTHROPIC_API_KEY", "OPENAI_API_KEY"];
+// Spec 122 B-7 added the GitHub tokens: the engine publishes, the candidate
+// does not.
+export const CHILD_ENV_DENY: readonly string[] = ["ANTHROPIC_API_KEY", "OPENAI_API_KEY", "GH_TOKEN", "GITHUB_TOKEN"];
 
 export function scrubEnv(env: NodeJS.ProcessEnv): Record<string, string> {
   const out: Record<string, string> = {};

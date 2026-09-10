@@ -365,8 +365,10 @@ mod tests {
         .collect();
         let env = c.child_env(&parent);
         assert!(!env.contains_key("ANTHROPIC_API_KEY"));
-        // 121 B-3: the deny list is the contract's, both names.
+        // 121 B-3, 122 B-7: the deny list is the contract's, all four names.
         assert!(!env.contains_key("OPENAI_API_KEY"));
+        assert_eq!(CHILD_ENV_DENY.len(), 4);
+        assert!(CHILD_ENV_DENY.contains(&"GH_TOKEN") && CHILD_ENV_DENY.contains(&"GITHUB_TOKEN"));
         assert_eq!(env.get("NO_COLOR").map(String::as_str), Some("1"));
         assert_eq!(env.get("PATH").map(String::as_str), Some("/bin"));
         std::env::set_var("HOME", "/home/u");

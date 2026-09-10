@@ -19,7 +19,7 @@ const PROVIDER_STRINGS = [
 // 121 B-3 (D-6): the environment deny list is the one provider-named thing
 // the engine carries, because scrubbing is the engine's to do before the
 // member is spawned; the driver carries the same list for its own child.
-const DENY_LIST_STRINGS = ["ANTHROPIC_API_KEY", "OPENAI_API_KEY"];
+const DENY_LIST_STRINGS = ["ANTHROPIC_API_KEY", "OPENAI_API_KEY", "GH_TOKEN", "GITHUB_TOKEN"];
 
 async function ensureBuilt(script: string, path: string): Promise<void> {
   if (existsSync(path)) return;

@@ -130,7 +130,9 @@ for (const [name, body] of Object.entries(FIXTURES)) {
   test(`FR-003: the ${name} fixture yields the same event stream from both drivers`, async () => {
     const dir = fresh();
     const claude = fakeClaude(dir, body);
-    const extra = name === "timeout" ? { timeoutMs: 300, killGraceMs: 100 } : {};
+    // A second, not 300 ms: under a loaded machine the fake has to print its
+    // first line before the deadline, or the init record is never journaled.
+    const extra = name === "timeout" ? { timeoutMs: 1000, killGraceMs: 100 } : {};
     const req = request(dir, extra);
     const env = { STATECRAFT_CLAUDE_BIN: claude };
     const [ts, rs] = await Promise.all([

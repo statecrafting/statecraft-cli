@@ -105,6 +105,7 @@ function throwingGh(): GitHubClient {
     };
   return {
     prForBranch: fail("prForBranch"),
+    createPr: fail("createPr"),
     commitsForPr: fail("commitsForPr"),
     checksTriggered: fail("checksTriggered"),
     checkRunsForSha: fail("checkRunsForSha"),
@@ -267,6 +268,7 @@ interface MakeDepsParams {
   // 040 B-1: the project's profile, which callStage reads for the model pair.
   // Absent resolves to the default pair, which is how every test above spawns.
   readonly profile?: ProfileSource;
+  readonly broker?: DaemonDeps["broker"];
   // 041 B-4, B-8: the project's gate contract, and the one write that gives a
   // pre-041 chain one. Absent is the legacy fold and a no-op migration, which
   // is how every test above is driven.
@@ -309,6 +311,7 @@ function makeDeps(p: MakeDepsParams): DaemonDeps {
     killLiveSession: p.killLiveSession,
     ceiling: p.ceiling,
     profile: p.profile,
+    broker: p.broker,
     gate: p.gate,
     migrateGateContract: p.migrateGateContract,
   };
@@ -1361,6 +1364,16 @@ test("a dependent of a pipeline-shipped spec schedules after the flip merge; a p
   // journaled, and the profile reaches the build stage for the receipt.
   const closed: string[] = [];
   const buildProfiles: unknown[] = [];
+  const shipLeases: { runId: string | null; brokered: boolean; dropbox: string | null }[] = [];
+  const shepherdLeases: { runId: string | null; brokered: boolean }[] = [];
+  const brokerJournals: unknown[] = [];
+  const fakeBroker = {
+    push: () => ({ status: "done" as const }),
+    openPr: () => {
+      throw new Error("unused");
+    },
+    merge: () => ({ status: "done" as const, mergeSha: "x" }),
+  };
   const profile = { mode: "guarded" as const, driver: "codex" as const };
   const daemon = new Daemon(
     makeDeps({
@@ -1373,9 +1386,23 @@ test("a dependent of a pipeline-shipped spec schedules after the flip merge; a p
           buildProfiles.push(options.profile);
           return buildResult(options.specId, "passed");
         },
+        // 122 FR-005: the run id and the broker reach ship and shepherd.
+        ship: async (options) => {
+          shipLeases.push({ runId: options.runId ?? null, brokered: options.broker !== undefined, dropbox: options.dropboxDir ?? null });
+          return shipResult(options.specId, "passed");
+        },
+        shepherd: async (options) => {
+          shepherdLeases.push({ runId: options.runId ?? null, brokered: options.broker !== undefined });
+          if (options.specId === "800-base") baseContent = mergedContent;
+          return shepherdResult(options.specId, "passed", `${options.specId}-merge`);
+        },
       },
       runner: { ...throwingRunner(), closeCandidate: (branch: string) => closed.push(branch) },
       profile,
+      broker: (journal) => {
+        brokerJournals.push(journal);
+        return fakeBroker;
+      },
       // The merged content is what the journaled merge sha names.
       readSpecFileAtSha: (sha, specId) =>
         sha === "800-base-merge" && specId === "800-base" ? Buffer.from(mergedContent, "utf8") : null,
@@ -1388,6 +1415,11 @@ test("a dependent of a pipeline-shipped spec schedules after the flip merge; a p
   expect(daemon.runStatus).toBe("completed");
   expect(closed).toEqual(["800-base", "900-dependent"]);
   expect(buildProfiles).toEqual([profile, profile]);
+  expect(shipLeases.map((l) => l.runId)).toEqual([daemon.runId, daemon.runId]);
+  expect(shipLeases.every((l) => l.brokered && l.dropbox !== null)).toBe(true);
+  expect(shepherdLeases.map((l) => l.runId)).toEqual([daemon.runId, daemon.runId]);
+  expect(shepherdLeases.every((l) => l.brokered)).toBe(true);
+  expect(brokerJournals.length).toBe(4);
   await daemon.shutdown();
 
   // A post-merge amendment is not the flip: it must still invalidate.
