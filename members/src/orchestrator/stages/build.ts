@@ -23,6 +23,8 @@ import type { ModelTier } from "../models";
 import { profilePayload, resolveProfileSource, type ProfileSource } from "../profile";
 import { candidatePath, changedPaths, closeCandidate, openCandidate, originUrl } from "../candidate";
 import { latestReceipt, mintReceipt, receiptPayload, RECEIPT_KIND, SENSITIVE_KIND, UNSTABLE_KIND, type Receipt } from "../receipt";
+import { buildCapsule, renderCapsule } from "../handoff";
+import type { CostCeiling } from "../budget";
 import {
   GATE_COMMANDS,
   gatePayload,
@@ -761,7 +763,7 @@ export function evaluateCompletion(p: EvaluateParams): Completion {
   return { gates, frontmatterComplete, passing, stable, receipt };
 }
 
-function remediationPrompt(basePrompt: string, completion: Completion): string {
+function remediationPrompt(basePrompt: string, completion: Completion, capsule: string = ""): string {
   const failingGates = completion.gates.filter((g) => g.exitCode !== 0);
   const gateSection =
     failingGates.length === 0
@@ -783,7 +785,7 @@ This is a second, follow-up session on the same branch, the last one before
 the build stage fails honestly. Fix the following, then finish:
 ${frontmatterNote}
 ${gateSection}
-`;
+${capsule}`;
 }
 
 // --- evidence and outcome (FR-002) ------------------------------------------
@@ -892,6 +894,10 @@ export interface RunBuildStageOptions {
   // 121 B-5: the owning project's posture, folded into the receipt's policy
   // digest. Absent is 032 D-1's default, as the runner's own spawn reads it.
   readonly profile?: ProfileSource;
+  // 123 B-6: what the capsule names the project, and the ceiling its
+  // allowance is measured against.
+  readonly projectName?: string;
+  readonly ceiling?: CostCeiling | null;
 }
 
 export async function runBuildStage(options: RunBuildStageOptions): Promise<BuildResult> {
@@ -1058,7 +1064,18 @@ export async function runBuildStage(options: RunBuildStageOptions): Promise<Buil
     const beforeSha = runner.headSha();
     const beforeGates = completion.gates;
 
-    const secondPrompt = remediationPrompt(promptBase, completion);
+    // 123 B-6: the capsule rides into the remediation prompt, so a session
+    // in either harness starts from the same record.
+    const capsule = renderCapsule(
+      buildCapsule({
+        records: journal.fold().records,
+        decisions: decisionsChain.fold().records,
+        specId,
+        project: { name: options.projectName ?? basename(runner.workDir()), origin: runner.originUrl() },
+        ceiling: options.ceiling ?? null,
+      })
+    );
+    const secondPrompt = remediationPrompt(promptBase, completion, capsule);
     const second = await runner.runSession({
       prompt: secondPrompt,
       timeoutMs,

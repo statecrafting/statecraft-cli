@@ -50,3 +50,5 @@ jobs:
           spec-spine lint --fail-on-warn
           spec-spine index coverage --fail-on-untraced
           spec-spine couple --base "origin/${{ github.base_ref }}" --head HEAD --pr-body "$RUNNER_TEMP/pr-body.txt"
+          # Spec 123 B-4: the Codex kit and its manifest match the Claude kit.
+          python3 scripts/codex-kit.py --check

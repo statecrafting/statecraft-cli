@@ -31,6 +31,14 @@ import type { ExecutionProfile, RecordedProfile } from "./profile";
 import { DEFAULT_REGISTRATION_PROFILE, LEGACY_BYPASS_PROFILE, parseProfile, profilePayload } from "./profile";
 import type { GateContract, RecordedGateContract } from "./gate-contract";
 import { LEGACY_GATE_CONTRACT, gatePayload, parseGateContract, probeGateContract, sameGateCommands } from "./gate-contract";
+import {
+  LEGACY_LIFECYCLE_POLICY,
+  parseRecordedPolicy,
+  policyPayload,
+  probeLifecyclePolicy,
+  type LifecyclePolicy,
+  type RecordedLifecyclePolicy,
+} from "./lifecycle-policy";
 import type { CostCeiling } from "./budget";
 import { ceilingPayload, parseCeiling } from "./budget";
 
@@ -100,6 +108,9 @@ export interface Project {
   // legacy, which is honestly weaker than 016 D-10's live probe and is what
   // B-8's migration exists to replace.
   readonly gate: RecordedGateContract;
+  // 123 B-2: the lifecycle policy, registry state beside the gate. A chain
+  // that predates 123 folds to the default flagged legacy.
+  readonly policy: RecordedLifecyclePolicy;
 }
 
 // Keyed by name, in registration order (a project re-registered after removal
@@ -131,6 +142,7 @@ export const PROJECT_KINDS = {
   // requalification, overridable by an operator, and migrated onto a pre-041
   // chain by B-8 rather than inferred by the fold.
   gateSet: "project.gate.set",
+  policySet: "project.policy.set",
 } as const;
 
 // The projects chain lives in the daemon home: projects.jsonl plus its own
@@ -292,6 +304,7 @@ export function foldProjects(records: readonly JournalRecord[]): ProjectsSnapsho
           // registration read on its own has no language gate, and saying so
           // is different from saying it has none to run.
           gate: LEGACY_GATE_CONTRACT,
+          policy: LEGACY_LIFECYCLE_POLICY,
         });
         break;
       }
@@ -334,6 +347,13 @@ export function foldProjects(records: readonly JournalRecord[]): ProjectsSnapsho
         if (current) {
           projects.set(name, { ...current, gate: { ...parseGateContract(o, kind), legacy: false } });
         }
+        break;
+      }
+      case PROJECT_KINDS.policySet: {
+        const o = asObject(record.payload, kind);
+        const name = asString(o, "name", kind);
+        const current = projects.get(name);
+        if (current) projects.set(name, { ...current, policy: parseRecordedPolicy(o, kind) });
         break;
       }
       case PROJECT_KINDS.removed: {
@@ -382,6 +402,9 @@ export interface RegisterProjectParams {
   // the registration, on the same reasoning the profile is, so `legacy` can
   // only ever describe a chain written before spec 041 existed.
   readonly gate?: GateContract;
+  // 123 B-2: the policy, when the caller has one; absent probes the
+  // target's optional policy file once, at this write.
+  readonly policy?: LifecyclePolicy;
 }
 
 export interface SetProjectArmedParams {
@@ -406,6 +429,20 @@ export interface SetProjectGateParams {
   readonly chain: JournalHandle;
   readonly name: string;
   readonly gate: GateContract;
+}
+
+export interface SetProjectPolicyParams {
+  readonly chain: JournalHandle;
+  readonly name: string;
+  readonly policy: LifecyclePolicy;
+  readonly source: "cli" | "api";
+}
+
+// 123 B-2: sets the lifecycle policy, whole, journaled as its own record.
+export function setProjectPolicy(params: SetProjectPolicyParams): ProjectMutation {
+  requireLive(params.chain, params.name);
+  const record = params.chain.append(PROJECT_KINDS.policySet, { name: params.name, ...policyPayload(params.policy, params.source) });
+  return mutationOf(params.chain, record, params.name);
 }
 
 export interface SetProjectCeilingParams {
@@ -492,6 +529,10 @@ export function registerProject(params: RegisterProjectParams): ProjectMutation 
   // read-only and tolerates a target that does not exist yet, which is a
   // legal registration (it qualifies as unqualified).
   params.chain.append(PROJECT_KINDS.gateSet, { name, ...gatePayload(params.gate ?? probeGateContract(repoDir)) });
+  // 123 B-2: and the lifecycle policy, probed here once from the target's
+  // optional file, for the same reason.
+  const probed = params.policy === undefined ? probeLifecyclePolicy(repoDir) : { policy: params.policy, source: "cli" as const };
+  params.chain.append(PROJECT_KINDS.policySet, { name, ...policyPayload(probed.policy, probed.source) });
   // The registration record is the mutation's answer; the posture it settled
   // on travels on the returned project, which is what every surface renders.
   return mutationOf(params.chain, record, name);

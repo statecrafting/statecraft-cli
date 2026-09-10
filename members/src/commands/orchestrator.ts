@@ -79,6 +79,7 @@ import {
   setProjectCeiling,
   migrateProjectGate,
   setProjectGate,
+  setProjectPolicy,
   setProjectProfile,
   slugifyProjectName,
   type Project,
@@ -135,6 +136,8 @@ import {
 } from "../orchestrator/profile";
 import { parseCapabilityList, type Capability } from "../orchestrator/capabilities";
 import { gateRefusal, renderGate, renderGateDetail, type GateContract } from "../orchestrator/gate-contract";
+import { parseLifecyclePolicy, renderPolicy, type LifecyclePolicy } from "../orchestrator/lifecycle-policy";
+import { renderCapsule } from "../orchestrator/handoff";
 import { renderSessionModels, sessionModelsRefusal, type SessionModels } from "../orchestrator/models";
 import { API_VERSION, API_VERSION_HEADER, projectRoute } from "../orchestrator/api/types";
 import { ECONOMICS_ROUTE, type RunEconomics, type SpecEconomics } from "../orchestrator/economics";
@@ -185,6 +188,7 @@ export const ORCHESTRATOR_USAGE = `usage: observatory orchestrator <command> [--
                                   and, with both model flags, the model pair,
                                   and with --driver, the driver, and with
                                   --require, the capability tokens required
+  projects policy <name>       set the lifecycle policy: --file <path> or --json-policy <text>
   projects gate <name> -- <argv>  set the language gate run after the spec-spine
                                   floor; "--" with nothing after it is governance-only
   projects ceiling <name>      spend limits: --per-run/--per-day <usd>, or "none"
@@ -203,6 +207,7 @@ export const ORCHESTRATOR_USAGE = `usage: observatory orchestrator <command> [--
   economics                    per-spec cost and rework rollups, run totals
   decisions <query>            search the sealed decision ledger
   spec <id> <verb>             skip | retry | reverify | force-gate | approve
+  handoff <id>                 the handoff capsule for a spec (123)
   journal verify               verify both chains offline (no daemon needed)
   journal export               write a redacted, offline-verifiable evidence bundle
   daemon start|stop|status     daemon process lifecycle (identity-checked lock)
@@ -231,6 +236,8 @@ export const ORCHESTRATOR_USAGE = `usage: observatory orchestrator <command> [--
   --driver <name>              the driver the sessions run on: claude | codex
   --require <tokens>           comma-separated capability tokens every session
                                requires; a driver lacking one refuses (120)
+  --file <path>                the lifecycle policy file (projects policy)
+  --json-policy <text>         the lifecycle policy inline (projects policy)
   --allow <tools>              comma-separated allowlist for a guarded posture
   --deny <tools>               comma-separated disallowlist for a guarded posture
   --per-run <usd>              cost ceiling for one run (projects ceiling)
@@ -353,6 +360,9 @@ interface ParsedArgs {
   readonly driver: string | null;
   // 120 B-4: the required capability tokens, or null for none.
   readonly require: string | null;
+  // 123 B-2: the policy verb's two ways in.
+  readonly file: string | null;
+  readonly policyJson: string | null;
   // 033 B-1's spend limits, in dollars as typed (see `ceilingFromFlags`).
   readonly perRun: string | null;
   readonly perDay: string | null;
@@ -393,6 +403,8 @@ function parseArgs(argv: readonly string[]): ParseResult {
   let modelFast: string | null = null;
   let driver: string | null = null;
   let require: string | null = null;
+  let file: string | null = null;
+  let policyJson: string | null = null;
   let perRun: string | null = null;
   let perDay: string | null = null;
   let out: string | null = null;
@@ -448,6 +460,12 @@ function parseArgs(argv: readonly string[]): ParseResult {
     },
     "--require": (v) => {
       require = v;
+    },
+    "--file": (v) => {
+      file = v;
+    },
+    "--json-policy": (v) => {
+      policyJson = v;
     },
     "--per-run": (v) => {
       perRun = v;
@@ -505,7 +523,7 @@ function parseArgs(argv: readonly string[]): ParseResult {
 
   return {
     ok: true,
-    args: { json, url, dataDir, repoDir, project, dir, name, disarmed, profile, allow, deny, modelStrong, modelFast, driver, require, perRun, perDay, out, bundle, exclude, corpus, proposal, passthrough, rest },
+    args: { json, url, dataDir, repoDir, project, dir, name, disarmed, profile, allow, deny, modelStrong, modelFast, driver, require, file, policyJson, perRun, perDay, out, bundle, exclude, corpus, proposal, passthrough, rest },
   };
 }
 
@@ -552,6 +570,8 @@ const PROJECTS_CEILING_FLAGS: readonly string[] = ["--per-run", "--per-day"];
 // 041 B-7: the gate verb's whole payload arrives after a bare `--`, so it
 // takes no flags of its own; every named flag is a stray here.
 const PROJECTS_GATE_FLAGS: readonly string[] = [];
+// 123 B-2: the policy verb's two ways in.
+const PROJECTS_POLICY_FLAGS: readonly string[] = ["--file", "--json-policy"];
 // 031 B-4: `journal export` takes its own flag set, exactly as `projects add`
 // does; `--dir` and `--bundle` belong to verify alone and are refused here.
 const JOURNAL_EXPORT_FLAGS: readonly string[] = ["--project", "--out"];
@@ -574,6 +594,7 @@ function acceptedFlags(command: string, sub: string | undefined): readonly strin
   if (command === "projects" && sub === "profile") return PROJECTS_PROFILE_FLAGS;
   if (command === "projects" && sub === "ceiling") return PROJECTS_CEILING_FLAGS;
   if (command === "projects" && sub === "gate") return PROJECTS_GATE_FLAGS;
+  if (command === "projects" && sub === "policy") return PROJECTS_POLICY_FLAGS;
   if (command === "journal" && sub === "export") return JOURNAL_EXPORT_FLAGS;
   if (command === "adopt" && sub === "preflight") return ADOPT_PREFLIGHT_FLAGS;
   if (command === "adopt" && sub === "validate") return ADOPT_VALIDATE_FLAGS;
@@ -594,6 +615,8 @@ function strayFlag(args: ParsedArgs, accepted: readonly string[]): string | null
     args.modelFast !== null ? "--model-fast" : null,
     args.driver !== null ? "--driver" : null,
     args.require !== null ? "--require" : null,
+    args.file !== null ? "--file" : null,
+    args.policyJson !== null ? "--json-policy" : null,
     args.perRun !== null ? "--per-run" : null,
     args.perDay !== null ? "--per-day" : null,
     args.out !== null ? "--out" : null,
@@ -808,6 +831,8 @@ function renderProjectDetail(view: ProjectView): string[] {
   // allowlist is: "cargo" is a summary, and a gate is a thing you check item
   // by item before you let it certify a merge.
   lines.push(...renderGateDetail(view.gate));
+  // 123 B-2: the policy block after the gate.
+  lines.push(...renderPolicy(view.policy));
   // 033 B-7: the ceiling and the spend evaluated against it, on the surface an
   // operator reads before deciding anything. Both floors are named even when
   // there is no ceiling, because "what has this cost so far" is the question
@@ -1493,11 +1518,38 @@ async function cmdProjects(
     return respond(deps, args.json, await client.setProjectGate(name, commands), renderProjectControl);
   }
 
+  // 123 B-2: the policy travels whole, from a file or inline JSON.
+  if (sub === "policy") {
+    const name = rest[1];
+    if (name === undefined) return usage(deps, "projects policy needs a project name");
+    if (rest.length > 2) return usage(deps, `unexpected argument "${rest[2]}" after projects policy`);
+    if ((args.file === null) === (args.policyJson === null)) {
+      return usage(deps, "projects policy needs exactly one of --file <path> or --json-policy <text>");
+    }
+    let text: string;
+    if (args.file !== null) {
+      try {
+        text = fs.readFileSync(args.file, "utf8");
+      } catch (err) {
+        return usage(deps, `projects policy could not read ${args.file}: ${(err as Error).message}`);
+      }
+    } else {
+      text = args.policyJson!;
+    }
+    let policy: LifecyclePolicy;
+    try {
+      policy = parseLifecyclePolicy(JSON.parse(text), args.file ?? "--json-policy");
+    } catch (err) {
+      return usage(deps, (err as Error).message);
+    }
+    return respond(deps, args.json, await client.setProjectPolicy(name, policy), renderProjectControl);
+  }
+
   const call = Object.hasOwn(PROJECT_REGISTRY_CALLS, sub) ? PROJECT_REGISTRY_CALLS[sub] : undefined;
   if (call === undefined) {
     return usage(
       deps,
-      `unknown projects subcommand "${sub}" (expected add, arm, disarm, profile, ceiling, gate, requalify, or remove)`
+      `unknown projects subcommand "${sub}" (expected add, arm, disarm, profile, ceiling, gate, policy, requalify, or remove)`
     );
   }
   const name = rest[1];
@@ -2734,6 +2786,9 @@ function standbyProjects(standby: StandbyDaemon, probe: ProjectProbe): ProjectsT
     setGate(name: string, gate: GateContract): void {
       setProjectGate({ chain: chain(), name, gate });
     },
+    setPolicy(name: string, policy: LifecyclePolicy, source: "cli" | "api"): void {
+      setProjectPolicy({ chain: chain(), name, policy, source });
+    },
     requalify(name: string, source: ProjectSource): void {
       const project = live(name);
       requalifyProject({ chain: chain(), name, qualification: qualifyProject(probe, project.repoDir), source });
@@ -2806,6 +2861,8 @@ async function cmdDaemonRun(deps: OrchestratorCliDeps, url: string): Promise<num
         // corrected by the operator through `projects gate`, and that
         // correction has to reach the stage that is waiting for it.
         gate: () => standby.projects.get(project.name)?.gate ?? project.gate,
+        // 123 B-3: the lifecycle policy, late-bound for the same reason.
+        policy: () => standby.projects.get(project.name)?.policy ?? project.policy,
         // 041 B-8: a project registered before this spec has no gate record
         // and folds to governance-only; the first daemon to service it probes
         // its tree and writes the record it was missing, before any stage of
@@ -3087,6 +3144,15 @@ async function dispatch(
       const target = await project();
       if (!target.ok) return respond(scoped, args.json, target, () => []);
       return respond(scoped, args.json, await target.data.decisions({ query }), renderDecisions);
+    }
+    // 123 B-6: the handoff capsule, printed as the prompt section or as JSON.
+    case "handoff": {
+      const specId = rest[0];
+      if (specId === undefined) return usage(scoped, "handoff needs a spec id");
+      if (rest.length > 1) return usage(scoped, `unexpected argument "${rest[1]}" after handoff ${specId}`);
+      const target = await project();
+      if (!target.ok) return respond(scoped, args.json, target, () => []);
+      return respond(scoped, args.json, await target.data.handoff(specId), (capsule) => renderCapsule(capsule).split("\n"));
     }
     case "spec": {
       const specId = rest[0];

@@ -1,0 +1,135 @@
+{
+  "generator": "scripts/codex-kit.py",
+  "sourceRoot": ".claude",
+  "files": [
+    {
+      "target": ".agents/skills/build/SKILL.md",
+      "source": ".claude/skills/build/SKILL.md",
+      "sourceSha256": "b67bc87d3afb59712c95a8319a2e60127a0637303cd9531c38863069d3f60415",
+      "transform": "copy",
+      "dropped": []
+    },
+    {
+      "target": ".agents/skills/code-review/SKILL.md",
+      "source": ".claude/skills/code-review/SKILL.md",
+      "sourceSha256": "acfd7133e580734ea3a20d037a40e0c8e5ceb4af46e43ec935587762b15d4d0f",
+      "transform": "copy",
+      "dropped": []
+    },
+    {
+      "target": ".agents/skills/commit/SKILL.md",
+      "source": ".claude/skills/commit/SKILL.md",
+      "sourceSha256": "f8424d82ba47124175ef431cd2bb2b16af09c709ad413ba8702716a13cf0767d",
+      "transform": "copy",
+      "dropped": []
+    },
+    {
+      "target": ".agents/skills/next/SKILL.md",
+      "source": ".claude/skills/next/SKILL.md",
+      "sourceSha256": "6bd284099b2e31a18da968e66745f820a6bdc1fa6f4910a5b2b9a74c4e1e7300",
+      "transform": "copy",
+      "dropped": []
+    },
+    {
+      "target": ".agents/skills/prime/SKILL.md",
+      "source": ".claude/skills/prime/SKILL.md",
+      "sourceSha256": "94d127b27d53c4367053c802c4237e1792669ffa2318678e26fce68ab4c5a6a4",
+      "transform": "copy",
+      "dropped": []
+    },
+    {
+      "target": ".agents/skills/setup/SKILL.md",
+      "source": ".claude/skills/setup/SKILL.md",
+      "sourceSha256": "e7a849cce1473a8f706dd7e4dcefc4f349dcdf67379c29c089215d4000d64947",
+      "transform": "copy",
+      "dropped": []
+    },
+    {
+      "target": ".agents/skills/shepherd/SKILL.md",
+      "source": ".claude/skills/shepherd/SKILL.md",
+      "sourceSha256": "3b0490684e0eb2fee42020c30886cf03d157e96190ba8aa785569856c42ae5f5",
+      "transform": "copy",
+      "dropped": []
+    },
+    {
+      "target": ".agents/skills/ship/SKILL.md",
+      "source": ".claude/skills/ship/SKILL.md",
+      "sourceSha256": "9adccef05acae28e63da77d0c10e45b8549d91cc18877f373bde3f2b3dcee1e8",
+      "transform": "copy",
+      "dropped": []
+    },
+    {
+      "target": ".agents/skills/spec/SKILL.md",
+      "source": ".claude/skills/spec/SKILL.md",
+      "sourceSha256": "28bd59ef07dbb9dd9f4cddbb1b8af34cf7fce045309c01bb6cf916498f537c73",
+      "transform": "copy",
+      "dropped": []
+    },
+    {
+      "target": ".agents/skills/verify/SKILL.md",
+      "source": ".claude/skills/verify/SKILL.md",
+      "sourceSha256": "512c5b11ce3c56658ff2b7daf4f0e515fbc90e917590693fe781546d85a89a85",
+      "transform": "copy",
+      "dropped": []
+    },
+    {
+      "target": ".codex/agents/architect.toml",
+      "source": ".claude/agents/architect.md",
+      "sourceSha256": "085d751ca8301029b381bd6411d94bb6bb1c850965c3521847729295587c0c2e",
+      "transform": "agent-toml",
+      "dropped": [
+        "tools",
+        "model",
+        "safety_tier",
+        "mutation",
+        "memory"
+      ]
+    },
+    {
+      "target": ".codex/agents/explorer.toml",
+      "source": ".claude/agents/explorer.md",
+      "sourceSha256": "2ccf83dc784fe650618d477fe7b798cfb1c82ff28ef243580269980fcb124817",
+      "transform": "agent-toml",
+      "dropped": [
+        "tools",
+        "model",
+        "safety_tier",
+        "mutation"
+      ]
+    },
+    {
+      "target": ".codex/agents/implementer.toml",
+      "source": ".claude/agents/implementer.md",
+      "sourceSha256": "981ddfc3762d74d86e48f986e9c1af0a9d40099371192ef3470292c2a38d1909",
+      "transform": "agent-toml",
+      "dropped": [
+        "tools",
+        "model",
+        "safety_tier",
+        "mutation"
+      ]
+    },
+    {
+      "target": ".codex/agents/reviewer.toml",
+      "source": ".claude/agents/reviewer.md",
+      "sourceSha256": "ed62fd15db1a9442f54b1cddfdf3029e0db4c1febfde4e2493b91cea8513d629",
+      "transform": "agent-toml",
+      "dropped": [
+        "tools",
+        "model",
+        "safety_tier",
+        "mutation",
+        "memory"
+      ]
+    },
+    {
+      "target": ".codex/hooks.json",
+      "source": ".claude/settings.json",
+      "sourceSha256": "cf48fe59c27b964c97589f3b4b579c92f42f19ef022408d6b6509e19c355b9ff",
+      "transform": "hooks-json",
+      "dropped": [
+        "permissions"
+      ]
+    }
+  ]
+}

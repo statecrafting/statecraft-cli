@@ -3,7 +3,7 @@ id: "123-policy-kit-handoff"
 title: "The policy, the kit and the handoff: a typed lifecycle per project, a kit manifest with provenance and declared drops, and a capsule any harness can resume from"
 status: approved
 created: "2026-09-09"
-implementation: in-progress
+implementation: complete
 risk: medium
 depends_on:
   - "122-action-broker"
@@ -46,6 +46,13 @@ extends:
   - { spec: "022-http-api-and-events", unit: { kind: directory, path: "members/src/orchestrator/api/" }, nature: additive }
   # 109 owns the Makefile target list; the kit check joins it.
   - { spec: "109-governed-harness", unit: "Makefile", nature: additive }
+  # 110 owns the CI workflow, whose PR path gains the kit check.
+  - { spec: "110-corpus-merge", unit: ".github/workflows/spec-spine.yml", nature: additive }
+  # Fixtures that build a Project or a ProjectView gain the policy field.
+  - { spec: "034-adoption-preflight", unit: "members/src/orchestrator/adopt/preflight.test.ts", nature: additive }
+  - { spec: "032-execution-profiles", unit: "members/src/orchestrator/profile.test.ts", nature: additive }
+  - { spec: "024-web-ui", unit: "members/web/test/fixtures.ts", nature: additive }
+  - { spec: "024-web-ui", unit: "members/web/test/store.test.tsx", nature: additive }
 references:
   - { unit: { kind: file, path: "docs/design/04-the-governed-substrate.md" }, role: context }
 summary: >
@@ -181,6 +188,34 @@ cd members && bun test src/orchestrator/lifecycle-policy.test.ts src/orchestrato
 python3 scripts/codex-kit.test.py && python3 scripts/codex-kit.py --check
 ```
 
+## Status (2026-09-09)
+
+Implemented. `lifecycle-policy.ts` carries the type, the defaults, the
+parser with its refusals, the payload codec, the registration probe of
+`.statecraft/policy.json` and the detail render; the project record
+gained `policy` (legacy for pre-123 chains), registration appends a
+`project.policy.set` record beside the gate's, `projects policy` takes
+`--file` or `--json-policy`, and `POST .../policy` takes the whole
+policy. Readiness takes the policy's statuses and a named set;
+`run/start` with `{specId}` names a draft through a `nameSpec` control,
+and the daemon passes the names only under `namedDraft`. The daemon
+raises 021's human gate before the policy's `humanGate` stage once per
+spec and before ship when a receipt touched a sensitive prefix under
+`onTouch: "human"`, journaled as `daemon.gate.policy`; shepherd's merge
+method is the policy's. The generator writes `.codex/kit-manifest.json`
+(sixteen files, the drops declared per B-4), its check walks
+directories and found the stray `.agents/skills/init/` doc 04 named,
+`--root` points it at a fixture, `scripts/codex-kit.test.py` exercises
+both modes, and the check joins `make gate` and the CI workflow's PR
+path. `handoff.ts` folds the capsule from the chains; `orchestrator
+handoff <spec>` and `GET .../spec/<id>/handoff` serve it; the build and
+shepherd remediation prompts carry it rendered. The members suite (955)
+and the workspace are green. The live smoke: the capsule over the 122
+smoke's real journal named the candidate branch, base and head, the
+policy digest and the receipt hash covering the head, with no decisions
+in scope and nothing red; the CLI test drives the same verb through a
+fixture daemon with a spec that has decisions.
+
 ## 6. Out of scope
 
 A neutral kit source language (the Claude kit stays the source, doc 04
@@ -200,6 +235,14 @@ judges it by editing the file.
 D-3 (2026-09-09). The capsule is folded from the chains and never from a
 transcript. A transcript is one harness's format and one machine's file;
 the chain is what every harness's driver writes.
+
+D-5 (2026-09-09). The handoff verb is project-scoped like every other
+read verb (`--project <name> handoff <spec>`, or the bound project),
+not a two-positional form: the CLI resolves a project one way.
+
+D-6 (2026-09-09). The policy's `nameSpec` control is a control verb of
+its own on the daemon, reached through `run/start`'s body, so a named
+draft is journaled as a control record like a skip is.
 
 D-4 (2026-09-09). The manifest declares drops rather than the generator
 emulating them. A Codex agent with a `tools:` restriction would be a

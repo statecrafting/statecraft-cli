@@ -1,39 +1,4 @@
 {
-  "diagnostics": {
-    "errors": [],
-    "warnings": [
-      {
-        "code": "W-001",
-        "message": "spec '123-policy-kit-handoff' file unit 'members/src/orchestrator/lifecycle-policy.ts' does not exist",
-        "path": "members/src/orchestrator/lifecycle-policy.ts"
-      },
-      {
-        "code": "W-001",
-        "message": "spec '123-policy-kit-handoff' file unit 'members/src/orchestrator/lifecycle-policy.test.ts' does not exist",
-        "path": "members/src/orchestrator/lifecycle-policy.test.ts"
-      },
-      {
-        "code": "W-001",
-        "message": "spec '123-policy-kit-handoff' file unit 'members/src/orchestrator/handoff.ts' does not exist",
-        "path": "members/src/orchestrator/handoff.ts"
-      },
-      {
-        "code": "W-001",
-        "message": "spec '123-policy-kit-handoff' file unit 'members/src/orchestrator/handoff.test.ts' does not exist",
-        "path": "members/src/orchestrator/handoff.test.ts"
-      },
-      {
-        "code": "W-001",
-        "message": "spec '123-policy-kit-handoff' file unit '.codex/kit-manifest.json' does not exist",
-        "path": ".codex/kit-manifest.json"
-      },
-      {
-        "code": "W-001",
-        "message": "spec '123-policy-kit-handoff' file unit 'scripts/codex-kit.test.py' does not exist",
-        "path": "scripts/codex-kit.test.py"
-      }
-    ]
-  },
   "mapping": {
     "dependsOn": [
       "122-action-broker",
@@ -48,6 +13,14 @@
         "source": "spec-edge"
       },
       {
+        "path": ".codex/kit-manifest.json",
+        "source": "spec-edge"
+      },
+      {
+        "path": ".github/workflows/spec-spine.yml",
+        "source": "spec-edge"
+      },
+      {
         "path": "Makefile",
         "source": "spec-edge"
       },
@@ -57,6 +30,10 @@
       },
       {
         "path": "members/src/commands/orchestrator.ts",
+        "source": "spec-edge"
+      },
+      {
+        "path": "members/src/orchestrator/adopt/preflight.test.ts",
         "source": "spec-edge"
       },
       {
@@ -88,6 +65,26 @@
         "source": "spec-edge"
       },
       {
+        "path": "members/src/orchestrator/handoff.test.ts",
+        "source": "spec-edge"
+      },
+      {
+        "path": "members/src/orchestrator/handoff.ts",
+        "source": "spec-edge"
+      },
+      {
+        "path": "members/src/orchestrator/lifecycle-policy.test.ts",
+        "source": "spec-edge"
+      },
+      {
+        "path": "members/src/orchestrator/lifecycle-policy.ts",
+        "source": "spec-edge"
+      },
+      {
+        "path": "members/src/orchestrator/profile.test.ts",
+        "source": "spec-edge"
+      },
+      {
         "path": "members/src/orchestrator/projects.test.ts",
         "source": "spec-edge"
       },
@@ -112,13 +109,29 @@
         "source": "spec-edge"
       },
       {
+        "path": "members/web/test/fixtures.ts",
+        "source": "spec-edge"
+      },
+      {
+        "path": "members/web/test/store.test.tsx",
+        "source": "spec-edge"
+      },
+      {
         "path": "scripts/codex-kit.py",
+        "source": "spec-edge"
+      },
+      {
+        "path": "scripts/codex-kit.test.py",
         "source": "spec-edge"
       }
     ],
     "resolvedUnits": [
       {
-        "locations": [],
+        "locations": [
+          {
+            "file": ".codex/kit-manifest.json"
+          }
+        ],
         "ownership": true,
         "sourceField": "establishes",
         "unit": {
@@ -127,7 +140,11 @@
         }
       },
       {
-        "locations": [],
+        "locations": [
+          {
+            "file": "members/src/orchestrator/handoff.test.ts"
+          }
+        ],
         "ownership": true,
         "sourceField": "establishes",
         "unit": {
@@ -136,7 +153,11 @@
         }
       },
       {
-        "locations": [],
+        "locations": [
+          {
+            "file": "members/src/orchestrator/handoff.ts"
+          }
+        ],
         "ownership": true,
         "sourceField": "establishes",
         "unit": {
@@ -145,7 +166,11 @@
         }
       },
       {
-        "locations": [],
+        "locations": [
+          {
+            "file": "members/src/orchestrator/lifecycle-policy.test.ts"
+          }
+        ],
         "ownership": true,
         "sourceField": "establishes",
         "unit": {
@@ -154,7 +179,11 @@
         }
       },
       {
-        "locations": [],
+        "locations": [
+          {
+            "file": "members/src/orchestrator/lifecycle-policy.ts"
+          }
+        ],
         "ownership": true,
         "sourceField": "establishes",
         "unit": {
@@ -163,7 +192,11 @@
         }
       },
       {
-        "locations": [],
+        "locations": [
+          {
+            "file": "scripts/codex-kit.test.py"
+          }
+        ],
         "ownership": true,
         "sourceField": "establishes",
         "unit": {
@@ -195,6 +228,19 @@
         "unit": {
           "kind": "directory",
           "path": "members/src/orchestrator/api/"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": ".github/workflows/spec-spine.yml"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": ".github/workflows/spec-spine.yml"
         }
       },
       {
@@ -234,6 +280,19 @@
         "unit": {
           "kind": "file",
           "path": "members/src/commands/orchestrator.ts"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "members/src/orchestrator/adopt/preflight.test.ts"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "members/src/orchestrator/adopt/preflight.test.ts"
         }
       },
       {
@@ -317,6 +376,19 @@
       {
         "locations": [
           {
+            "file": "members/src/orchestrator/profile.test.ts"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "members/src/orchestrator/profile.test.ts"
+        }
+      },
+      {
+        "locations": [
+          {
             "file": "members/src/orchestrator/projects.test.ts"
           }
         ],
@@ -395,6 +467,32 @@
       {
         "locations": [
           {
+            "file": "members/web/test/fixtures.ts"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "members/web/test/fixtures.ts"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "members/web/test/store.test.tsx"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "members/web/test/store.test.tsx"
+        }
+      },
+      {
+        "locations": [
+          {
             "file": "scripts/codex-kit.py"
           }
         ],
@@ -423,5 +521,5 @@
     "specStatus": "approved"
   },
   "schemaVersion": "1.1.0",
-  "shardHash": "997ff66a318e933e1a5fe44311178b12c674bc43ee6100cf301a2b9dbd8f8bf3"
+  "shardHash": "9da5eaaa56deb714a0258729a94198989c1f6746ea614a725dd1f7af68e4a185"
 }

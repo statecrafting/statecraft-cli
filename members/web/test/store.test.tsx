@@ -46,6 +46,7 @@ function projectRow(name: string): ProjectView {
     qualification: { qualified: true, checks: [], warnings: [], checkedAt: "2026-08-01T00:00:00.000Z" },
     profile: { mode: "bypass", legacy: false },
     gate: { commands: [], source: "probe", rule: "none", legacy: false },
+    policy: { schedulable: { statuses: ["approved"], namedDraft: false }, merge: { method: "squash" }, sensitive: { prefixes: [], onTouch: "record" }, humanGate: null, source: "default", legacy: true },
     budget: FIXTURE_NO_CEILING,
     run: null,
     spec: null,
@@ -129,6 +130,7 @@ function gatedClient(): { client: ApiClient; release(name: string): void } {
       forceHumanGate: async () =>
         ok({ project: name, verb: "force-human-gate" as const, specId: null, applied: false, record: null, runStatus: null }),
       approve: async () => ok({ project: name, verb: "approve" as const, specId: null, applied: false, record: null, runStatus: null }),
+      handoff: async () => ({ ok: false as const, error: { kind: "not-found" as const, message: "no capsule in this fixture" } }),
     }) as ReturnType<ApiClient["project"]>;
 
   const registryAnswer = async () =>
@@ -148,6 +150,7 @@ function gatedClient(): { client: ApiClient; release(name: string): void } {
     setProjectCeiling: registryAnswer,
     setProjectProfile: registryAnswer,
     setProjectGate: registryAnswer,
+    setProjectPolicy: registryAnswer,
     project: scoped,
   };
 

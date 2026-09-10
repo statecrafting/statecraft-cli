@@ -29,6 +29,8 @@ import {
   type ProcessInspector,
 } from "./daemon";
 import { nextUtcMidnightMs, type CeilingSource } from "./budget";
+import { DEFAULT_LIFECYCLE_POLICY } from "./lifecycle-policy";
+import { mintReceipt, receiptPayload, RECEIPT_KIND } from "./receipt";
 
 // --- fixtures --------------------------------------------------------------
 
@@ -269,6 +271,7 @@ interface MakeDepsParams {
   // Absent resolves to the default pair, which is how every test above spawns.
   readonly profile?: ProfileSource;
   readonly broker?: DaemonDeps["broker"];
+  readonly policy?: DaemonDeps["policy"];
   // 041 B-4, B-8: the project's gate contract, and the one write that gives a
   // pre-041 chain one. Absent is the legacy fold and a no-op migration, which
   // is how every test above is driven.
@@ -312,6 +315,7 @@ function makeDeps(p: MakeDepsParams): DaemonDeps {
     ceiling: p.ceiling,
     profile: p.profile,
     broker: p.broker,
+    policy: p.policy,
     gate: p.gate,
     migrateGateContract: p.migrateGateContract,
   };
@@ -685,6 +689,102 @@ test("forceHumanGate()/approve(): the next stage transition for that spec waits 
     expect(byKind["daemon.gate.waiting"]?.length).toBe(1);
   } finally {
     journal.close();
+  }
+});
+
+// --- 123 FR-003: the policy's gates and merge method ---------------------------
+
+test("123 FR-003: a policy humanGate pauses before that stage until approved, once; the merge method follows the policy", async () => {
+  const dataDir = freshDir("policy-gate-data");
+  const repoDir = freshDir("policy-gate-repo");
+  const dagReader = fixtureDagReader({ "900-fixture": {} });
+  let shipCalled = false;
+  const mergeMethods: (string | undefined)[] = [];
+  const stageFns: DaemonStageFns = {
+    build: async (options) => buildResult(options.specId, "passed"),
+    ship: async (options) => {
+      shipCalled = true;
+      return shipResult(options.specId, "passed");
+    },
+    shepherd: async (options) => {
+      mergeMethods.push(options.mergeMethod);
+      return shepherdResult(options.specId, "passed", `${options.specId}-merge`);
+    },
+    verify: async (options) => verifyResult(options.specId, options.sha, "not-declared"),
+  };
+  const policy = { ...DEFAULT_LIFECYCLE_POLICY, merge: { method: "rebase" as const }, humanGate: "ship" as const };
+  const daemon = new Daemon(makeDeps({ dataDir, repoDir, dagReader, stageFns, policy }));
+  await daemon.start();
+  await Bun.sleep(80);
+  expect(daemon.runStatus).toBe("paused");
+  expect(shipCalled).toBe(false);
+  daemon.approve("900-fixture", "test-source");
+  await daemon.join();
+  expect(daemon.runStatus).toBe("completed");
+  expect(shipCalled).toBe(true);
+  expect(mergeMethods).toEqual(["rebase"]);
+  await daemon.shutdown();
+  const journal = openJournal(dataDir);
+  try {
+    const byKind = journal.fold().byKind;
+    expect(byKind["daemon.gate.policy"]?.map((r) => (r.payload as { reason: string; stage: string }).reason)).toEqual(["humanGate"]);
+    expect(byKind["daemon.gate.waiting"]?.length).toBe(1);
+  } finally {
+    journal.close();
+  }
+});
+
+test("123 FR-003: onTouch human forces the gate before ship when the receipt touched a sensitive path; record does not", async () => {
+  for (const onTouch of ["human", "record"] as const) {
+    const dataDir = freshDir(`policy-sensitive-${onTouch}-data`);
+    const repoDir = freshDir(`policy-sensitive-${onTouch}-repo`);
+    const dagReader = fixtureDagReader({ "900-fixture": {} });
+    const stageFns: DaemonStageFns = {
+      build: async (options) => {
+        // The build minted a receipt naming a sensitive path.
+        const receipt = mintReceipt({
+          specId: options.specId,
+          round: 1,
+          origin: null,
+          baseSha: "b",
+          candidateSha: "c",
+          branch: options.specId,
+          suite: [],
+          gate: null,
+          profile: { mode: "bypass" },
+          specSpineVersion: null,
+          results: [],
+          changedPaths: ["Makefile", "src/x.ts"],
+        });
+        options.journal.append(RECEIPT_KIND, receiptPayload(receipt));
+        return buildResult(options.specId, "passed");
+      },
+      ship: async (options) => shipResult(options.specId, "passed"),
+      shepherd: async (options) => shepherdResult(options.specId, "passed", `${options.specId}-merge`),
+      verify: async (options) => verifyResult(options.specId, options.sha, "not-declared"),
+    };
+    const policy = { ...DEFAULT_LIFECYCLE_POLICY, sensitive: { prefixes: ["Makefile"], onTouch } };
+    const daemon = new Daemon(makeDeps({ dataDir, repoDir, dagReader, stageFns, policy }));
+    await daemon.start();
+    if (onTouch === "human") {
+      await Bun.sleep(80);
+      expect(daemon.runStatus).toBe("paused");
+      daemon.approve("900-fixture", "test-source");
+    }
+    await daemon.join();
+    expect(daemon.runStatus).toBe("completed");
+    await daemon.shutdown();
+    const journal = openJournal(dataDir);
+    try {
+      const gates = journal.fold().byKind["daemon.gate.policy"] ?? [];
+      if (onTouch === "human") {
+        expect(gates.map((r) => r.payload)).toEqual([{ specId: "900-fixture", stage: "ship", reason: "sensitive", paths: ["Makefile"] }]);
+      } else {
+        expect(gates).toEqual([]);
+      }
+    } finally {
+      journal.close();
+    }
   }
 });
 

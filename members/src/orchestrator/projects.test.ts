@@ -226,9 +226,10 @@ test("registerProject refuses a duplicate name, a duplicate repoDir, and a non-a
     // A refusal appends nothing: the chain still holds only the one
     // registration, and it verifies. That registration is three records since
     // 041 B-2, the registration, the posture it consented to (032 B-2) and the
-    // gate its target probed to, so the head sits at seq 2 with nothing from
+    // gate its target probed to, and since 123 B-2 the lifecycle policy it
+    // probed (four records), so the head sits at seq 3 with nothing from
     // the four refusals above.
-    expect(chain.headSeq).toBe(2);
+    expect(chain.headSeq).toBe(3);
     expect(verifyProjectsChain(home).ok).toBe(true);
   } finally {
     chain.close();
@@ -291,7 +292,8 @@ test("the fold carries register, disarm, arm, requalify, remove and re-register 
     // derived commands differ").
     const verified = verifyProjectsChain(home);
     expect(verified.ok).toBe(true);
-    if (verified.ok) expect(verified.count).toBe(13);
+    // 123 B-2: plus one policy record per registration (sixteen).
+    if (verified.ok) expect(verified.count).toBe(16);
   } finally {
     chain.close();
   }
@@ -533,7 +535,8 @@ test("an unqualified target registers with its reasons and requalifies in place 
     // contract, so it appends nothing.
     const verified = verifyProjectsChain(home);
     expect(verified.ok).toBe(true);
-    if (verified.ok) expect(verified.count).toBe(4);
+    // 123 B-2: plus the policy record (five).
+    if (verified.ok) expect(verified.count).toBe(5);
   } finally {
     chain.close();
   }

@@ -43,6 +43,8 @@ import {
   type RegisterProjectRequest,
   type RunView,
 } from "./types";
+import { policyPayload, type LifecyclePolicy } from "../lifecycle-policy";
+import type { Capsule } from "../handoff";
 import type { ExecutionProfile } from "../profile";
 import type { CostCeiling } from "../budget";
 
@@ -76,6 +78,8 @@ export interface ProjectClient {
   reverify(specId: string): Promise<ApiResponse<ControlResult>>;
   forceHumanGate(specId: string): Promise<ApiResponse<ControlResult>>;
   approve(specId: string): Promise<ApiResponse<ControlResult>>;
+  // 123 B-6: the handoff capsule for one spec.
+  handoff(specId: string): Promise<ApiResponse<Capsule>>;
 }
 
 // The global half: daemon meta, the account's one quota pool, the registry
@@ -106,6 +110,8 @@ export interface ApiClient {
   // is the explicit governance-only contract rather than a request that says
   // nothing.
   setProjectGate(name: string, commands: readonly (readonly string[])[]): Promise<ApiResponse<ProjectControlResult>>;
+  // 123 B-2: sets the lifecycle policy, whole.
+  setProjectPolicy(name: string, policy: LifecyclePolicy): Promise<ApiResponse<ProjectControlResult>>;
   project(name: string): ProjectClient;
 }
 
@@ -200,6 +206,7 @@ export function createApiClient(options: ApiClientOptions): ApiClient {
       evidence: (hash) => request<EvidenceView>(evidencePath(hash)),
       evidenceUrl: (hash) => `${baseUrl}${evidencePath(hash)}?raw=1`,
       startRun: () => post<ControlResult>(projectRoute(name, PROJECT_ROUTES.runStart)),
+      handoff: (specId) => request<Capsule>(projectRoute(name, `${PROJECT_ROUTES.specPrefix}${encodeURIComponent(specId)}/${PROJECT_ROUTES.handoff}`)),
       pauseRun: () => post<ControlResult>(projectRoute(name, PROJECT_ROUTES.runPause)),
       resumeRun: () => post<ControlResult>(projectRoute(name, PROJECT_ROUTES.runResume)),
       skipSpec: (specId) => post<ControlResult>(specControlPath(name, specId, "skip")),
@@ -230,6 +237,8 @@ export function createApiClient(options: ApiClientOptions): ApiClient {
       post<ProjectControlResult>(projectRoute(name, PROJECT_ROUTES.ceiling), { ceiling }),
     setProjectGate: (name, commands) =>
       post<ProjectControlResult>(projectRoute(name, PROJECT_ROUTES.gate), { commands }),
+    setProjectPolicy: (name, policy) =>
+      post<ProjectControlResult>(projectRoute(name, PROJECT_ROUTES.policy), { policy: policyPayload(policy, "api").policy }),
     project: projectClient,
   };
 }

@@ -29,6 +29,7 @@ import {
   setProjectArmed,
   setProjectCeiling,
   setProjectGate,
+  setProjectPolicy,
   setProjectProfile,
   type Project,
   type ProjectSource,
@@ -37,6 +38,7 @@ import {
 } from "../projects";
 import type { ExecutionProfile } from "../profile";
 import type { GateContract } from "../gate-contract";
+import type { LifecyclePolicy } from "../lifecycle-policy";
 import type { CostCeiling } from "../budget";
 import { journalViewFromHandle, type ApiDeps, type ControlTarget, type DaemonStatus, type ProjectApi, type ProjectsTarget } from "./server";
 
@@ -266,6 +268,9 @@ export function fixtureControls(journal: JournalHandle): ControlTarget {
     approve(specId: string, source: string): void {
       journal.append("control.approve", { specId, source });
     },
+    nameSpec(specId: string, source: string): void {
+      journal.append("control.nameSpec", { specId, source });
+    },
   };
 }
 
@@ -381,6 +386,9 @@ export function freshRegistry(prefix: string): FixtureRegistry {
     },
     setGate(name: string, gate: GateContract): void {
       setProjectGate({ chain, name, gate });
+    },
+    setPolicy(name: string, policy: LifecyclePolicy, source: "cli" | "api"): void {
+      setProjectPolicy({ chain, name, policy, source });
     },
     requalify(name: string, source: ProjectSource): void {
       requalifyProject({ chain, name, qualification: fixtureQualification(true), source });
