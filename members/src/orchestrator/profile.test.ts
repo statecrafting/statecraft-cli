@@ -155,9 +155,19 @@ test("profile: a payload round-trips, and a malformed one throws rather than def
     disallowedTools: null,
     models: null,
     driver: null,
+    require: null,
   });
   expect(profilePayload({ mode: "bypass", driver: "codex" }).driver).toBe("codex");
   expect(parseProfile({ mode: "bypass", driver: "codex" }, "test")).toEqual({ mode: "bypass", driver: "codex" });
+  // 120 B-4, FR-004: the require list under the same rule; an unknown token
+  // refuses, and the fold of a pre-120 record carries none.
+  expect(profilePayload({ mode: "guarded", require: ["workspace-write", "cost"] }).require).toEqual(["workspace-write", "cost"]);
+  expect(parseProfile({ mode: "guarded", require: ["cost", "workspace-write"] }, "test")).toEqual({ mode: "guarded", require: ["cost", "workspace-write"] });
+  expect(parseProfile({ mode: "guarded", require: null }, "test")).toEqual({ mode: "guarded" });
+  expect(() => parseProfile({ mode: "guarded", require: ["nope"] }, "test")).toThrow(/unknown capability "nope"/);
+  expect(() => parseProfile({ mode: "guarded", require: "cost" }, "test")).toThrow(/list of capability tokens/);
+  expect(renderProfile({ mode: "bypass", legacy: false, driver: "codex", require: ["workspace-write"] })).toBe("bypass via codex requiring workspace-write");
+  expect(renderProfile({ mode: "bypass", legacy: false })).toBe("bypass");
   expect(parseProfile({ mode: "bypass", driver: null }, "test")).toEqual({ mode: "bypass" });
   expect(() => parseProfile({ mode: "bypass", driver: "cursor" }, "test")).toThrow(/expected driver "claude" or "codex"/);
   expect(renderProfile({ mode: "bypass", legacy: false, driver: "codex" })).toBe("bypass via codex");
@@ -434,7 +444,12 @@ test("the spawn path: the session records the posture it was spawned under (B-5)
       disallowedTools: ["WebFetch"],
       models: null,
       driver: null,
+      require: null,
     });
+    // 120 B-6: the in-process Claude driver applied the request's tokens and
+    // enforces hooks; nothing degraded.
+    expect((init!.payload as Record<string, unknown>).applied).toEqual(["tool-allowlist", "cost", "hook-enforcement"]);
+    expect((init!.payload as Record<string, unknown>).degraded).toEqual([]);
   } finally {
     journal.close();
   }

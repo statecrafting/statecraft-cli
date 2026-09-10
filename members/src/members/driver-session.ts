@@ -15,6 +15,7 @@
 import type { JournalHandle, JournalRecord, JsonValue } from "../orchestrator/journal";
 import type { ModelTier, SessionModels } from "../orchestrator/models";
 import { parseProfile } from "../orchestrator/profile";
+import { parseRequirements, type Requirements } from "../orchestrator/capabilities";
 import type { ExecutionProfile } from "../orchestrator/profile";
 import { killLiveSession, runSession, type RunSessionOptions, type SessionResult } from "../orchestrator/session";
 
@@ -59,6 +60,14 @@ export interface ParsedRequest {
   readonly profile: ExecutionProfile | undefined;
 }
 
+function parseRequirementsOrUsage(value: unknown): Requirements {
+  try {
+    return parseRequirements(value);
+  } catch (err) {
+    throw new RequestError(`request: ${(err as Error).message}`);
+  }
+}
+
 export function parseRequest(text: string, env: NodeJS.ProcessEnv = process.env): ParsedRequest {
   let parsed: unknown;
   try {
@@ -88,6 +97,9 @@ export function parseRequest(text: string, env: NodeJS.ProcessEnv = process.env)
     ...(optionalString(o.mcpConfigPath, "mcpConfigPath") === undefined ? {} : { mcpConfigPath: optionalString(o.mcpConfigPath, "mcpConfigPath") }),
     ...(profile === undefined ? {} : { profile }),
     ...(optionalNumber(o.killGraceMs, "killGraceMs") === undefined ? {} : { killGraceMs: optionalNumber(o.killGraceMs, "killGraceMs") }),
+    // 120 B-3: absent reads as empty (120 D-4); a malformed list is a usage
+    // error like every other field.
+    ...(o.requirements === undefined || o.requirements === null ? {} : { requirements: parseRequirementsOrUsage(o.requirements) }),
   };
   return { options, profile };
 }

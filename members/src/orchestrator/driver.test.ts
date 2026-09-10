@@ -2,13 +2,14 @@
 // fake driver script. Nothing here spawns a provider; the member side is
 // driver-session.test.ts, and the two meet in the profile spawn tests.
 import { test, expect } from "bun:test";
-import { chmodSync, mkdtempSync, readFileSync, writeFileSync } from "fs";
+import { chmodSync, existsSync, mkdtempSync, readFileSync, writeFileSync } from "fs";
 import { tmpdir } from "os";
 import { join } from "path";
 import { openJournal } from "./journal";
 import {
   DEFAULT_DRIVER_NAME,
   DEGRADED_KIND,
+  REFUSED_KIND,
   createProcessDriver,
   createProfileDriver,
   killLiveSession,
@@ -27,14 +28,17 @@ function freshDir(): string {
 
 // A driver member stand-in: records the request it was handed, then plays a
 // scripted event stream. `--member-manifest` answers with the given tier.
-function writeFakeDriver(dir: string, tier: "reference" | "basic", body: string): string {
+function writeFakeDriver(dir: string, tier: "reference" | "basic", body: string, capabilities?: readonly string[]): string {
   const path = join(dir, "fake-driver.sh");
+  // 120 B-2: a manifest may declare its tokens; the pre-120 shape (no
+  // field) is read by its tier alone.
+  const tokens = capabilities === undefined ? "" : `,"capabilities":${JSON.stringify(capabilities)}`;
   writeFileSync(
     path,
     [
       "#!/usr/bin/env bash",
       'if [ "$1" = "--member-manifest" ]; then',
-      `  echo '{"schemaVersion":"1","name":"statecraft-driver-fake","version":"0","contract":"042","verbs":["session"],"capabilityTier":"${tier}","exitCodes":{"0":"ok"},"envelope":"ok-data"}'`,
+      `  echo '{"schemaVersion":"1","name":"statecraft-driver-fake","version":"0","contract":"042","verbs":["session"],"capabilityTier":"${tier}"${tokens},"exitCodes":{"0":"ok"},"envelope":"ok-data"}'`,
       "  exit 0",
       "fi",
       `printf 'argv:%s\\n' "$*" > "${join(dir, "argv")}"`,
@@ -103,8 +107,10 @@ test("FR-001: the request is one JSON object on stdin, argv is `session run`, an
     maxTurns: 4,
     timeoutMs: 5000,
     mcpConfigPath: null,
-    profile: { mode: "guarded", allowedTools: ["Read"], disallowedTools: null, models: null, driver: null },
+    profile: { mode: "guarded", allowedTools: ["Read"], disallowedTools: null, models: null, driver: null, require: null },
     killGraceMs: null,
+    // 120 B-3, B-4: the requirements the seam derived, explicit on the wire.
+    requirements: { required: [], preferred: ["tool-allowlist", "max-turns", "cost"] },
   });
   // Every stream event reached the sink verbatim; the stray line did not.
   expect(sink).toEqual([{ type: "system", subtype: "init", session_id: "sess-1" }, { type: "assistant" }]);
@@ -155,8 +161,10 @@ test("FR-003: killLiveSession severs the member with SIGTERM and the result is `
   try {
     const driver = createProcessDriver({ driverBin: bin });
     const running = driver.runSession({ repo: dir, prompt: "hi", journal, killGraceMs: 500 });
-    // Let the member start and write its init line before severing.
-    await Bun.sleep(300);
+    // Let the member start and write its init line before severing. Since
+    // 120 B-5 the seam reads the manifest first, so wait for the record
+    // rather than a fixed interval.
+    for (let i = 0; i < 100 && !journal.fold().records.some((r) => r.kind === "session.init"); i++) await Bun.sleep(50);
     expect(killLiveSession()).toBe(true);
     const result = await running;
     expect(result.classification.kind).toBe("killed");
@@ -210,7 +218,10 @@ test("FR-004: a basic driver is never spawned for an mcp-config request; the deg
     expect(spawned).toBe(false);
     const records = journal.fold().records.map((r) => ({ kind: r.kind, payload: r.payload }));
     expect(records[0]).toEqual({ kind: DEGRADED_KIND, payload: { driver: "claude", tier: "basic", feature: "mcp-config" } });
-    expect(records[1]?.kind).toBe("session.result");
+    // 120 B-5: the refusal record names what was required and what was
+    // missing; the session result follows.
+    expect(records[1]).toEqual({ kind: REFUSED_KIND, payload: { driver: "claude", tier: "basic", required: ["mcp-config"], unsupported: ["mcp-config"] } });
+    expect(records[2]?.kind).toBe("session.result");
   } finally {
     journal.close();
   }
@@ -301,3 +312,62 @@ test("117 FR-002: the profile driver resolves the name per call and keeps one dr
   // An absent source is the default profile, so the default driver.
   expect(createProfileDriver({ profile: undefined, make: fake }).name).toBe("claude");
 });
+
+// --- 120 FR-003: the capability decision before spawn ------------------------
+
+test("120 FR-003: a required token the manifest lacks refuses the session with driver.refused and no spawn", async () => {
+  const dir = freshDir();
+  const bin = writeFakeDriver(dir, "basic", scriptedStream(), ["workspace-write", "hook-enforcement"]);
+  const journal = openJournal(dir, "orchestrator");
+  try {
+    const driver = createProcessDriver({ driverBin: bin });
+    const result = await driver.runSession({
+      repo: dir,
+      prompt: "hi",
+      profile: { mode: "bypass", require: ["tool-allowlist"] },
+      journal,
+    });
+    expect(result.classification.kind).toBe("crashed");
+    expect(result.classification.detail).toBe('driver "claude" does not support required capabilities: tool-allowlist');
+    expect(existsSync(join(dir, "request.json"))).toBe(false);
+    const records = journal.fold().records.map((r) => ({ kind: r.kind, payload: r.payload }));
+    expect(records.map((r) => r.kind)).toEqual([DEGRADED_KIND, REFUSED_KIND, "session.result"]);
+    expect(records[1]!.payload).toEqual({ driver: "claude", tier: "basic", required: ["tool-allowlist"], unsupported: ["tool-allowlist"] });
+  } finally {
+    journal.close();
+  }
+});
+
+test("120 FR-003: a preferred token the manifest lacks is journaled as degraded and the session runs; a supported required one is silent", async () => {
+  const dir = freshDir();
+  const bin = writeFakeDriver(dir, "basic", scriptedStream(), ["workspace-write", "hook-enforcement"]);
+  const journal = openJournal(dir, "orchestrator");
+  try {
+    const driver = createProcessDriver({ driverBin: bin });
+    const result = await driver.runSession({
+      repo: dir,
+      prompt: "hi",
+      maxTurns: 2,
+      profile: { mode: "guarded", require: ["workspace-write"] },
+      journal,
+    });
+    expect(result.classification.kind).toBe("completed");
+    expect(existsSync(join(dir, "request.json"))).toBe(true);
+    const request = JSON.parse(readFileSync(join(dir, "request.json"), "utf8")) as { requirements: unknown };
+    expect(request.requirements).toEqual({ required: ["workspace-write"], preferred: ["tool-allowlist", "max-turns", "cost"] });
+    const kinds = journal.fold().records.map((r) => r.kind);
+    expect(kinds.slice(0, 3)).toEqual([DEGRADED_KIND, DEGRADED_KIND, DEGRADED_KIND]);
+    expect(journal.fold().records.slice(0, 3).map((r) => (r.payload as { feature: string }).feature)).toEqual(["tool-allowlist", "max-turns", "cost"]);
+    expect(kinds).not.toContain(REFUSED_KIND);
+  } finally {
+    journal.close();
+  }
+});
+
+test("120 B-2: a manifest whose tier disagrees with its tokens is refused by the seam", async () => {
+  const dir = freshDir();
+  const bin = writeFakeDriver(dir, "reference", scriptedStream(), ["workspace-write"]);
+  const driver = createProcessDriver({ driverBin: bin });
+  await expect(driver.tier()).rejects.toThrow(/declares capabilityTier reference but its capabilities derive basic/);
+});
+

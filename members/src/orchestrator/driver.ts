@@ -25,7 +25,17 @@ import { homedir } from "os";
 import { delimiter, join, resolve } from "path";
 import type { JournalHandle, JsonValue } from "./journal";
 import type { ExecutionProfile, ProfileSource } from "./profile";
-import { profilePayload, resolveProfileSource } from "./profile";
+import { DEFAULT_REGISTRATION_PROFILE, profilePayload, resolveProfileSource } from "./profile";
+import {
+  decide,
+  parseCapabilityList,
+  REQUEST_CAPABILITIES,
+  requirementsFor,
+  requirementsPayload,
+  tierFor,
+  type Capability,
+  type Requirements,
+} from "./capabilities";
 import type { ModelTier } from "./models";
 
 // The result and classification shapes are the driver's to define (014);
@@ -53,6 +63,9 @@ export interface DriverSessionRequest {
   readonly mcpConfigPath?: string;
   readonly profile?: ExecutionProfile;
   readonly killGraceMs?: number;
+  // 120 B-3: tokens the caller requires or prefers beyond what the request
+  // implies. The seam derives the rest (120 B-4) and decides before spawn.
+  readonly requirements?: Requirements;
   // The two engine callbacks the process cannot carry.
   readonly journal?: JournalHandle;
   readonly sink?: SessionEventSink;
@@ -82,9 +95,13 @@ export interface DriverWireRequest {
   readonly mcpConfigPath: string | null;
   readonly profile: Record<string, JsonValue> | null;
   readonly killGraceMs: number | null;
+  // 120 B-3: explicit lists, possibly empty; the schema stays "1" because
+  // both parsers read absence as empty (120 D-4).
+  readonly requirements: { required: Capability[]; preferred: Capability[] };
 }
 
 export function toWireRequest(request: DriverSessionRequest): DriverWireRequest {
+  const profile = request.profile ?? DEFAULT_REGISTRATION_PROFILE;
   return {
     schemaVersion: "1",
     repo: resolve(request.repo),
@@ -96,6 +113,7 @@ export function toWireRequest(request: DriverSessionRequest): DriverWireRequest 
     mcpConfigPath: request.mcpConfigPath ?? null,
     profile: request.profile === undefined ? null : profilePayload(request.profile),
     killGraceMs: request.killGraceMs ?? null,
+    requirements: requirementsPayload(requirementsFor(profile, request)),
   };
 }
 
@@ -233,6 +251,10 @@ export interface CreateProcessDriverParams {
   // The tier, when the caller already knows it. Absent asks the member for
   // its manifest once (042 B-3) and caches the answer.
   readonly tier?: CapabilityTier;
+  // 120 B-5: the tokens the driver supports, when the caller already knows
+  // them. Absent reads the manifest; a manifest without the field (an older
+  // member) derives them from its tier.
+  readonly capabilities?: readonly Capability[];
   readonly env?: NodeJS.ProcessEnv;
   // How long past the session deadline plus grace the engine waits for a
   // member's `result` before killing the member (B-4). Tests shorten it.
@@ -248,7 +270,16 @@ export class DriverNotFoundError extends Error {
 
 interface ManifestLike {
   readonly capabilityTier?: unknown;
+  readonly capabilities?: unknown;
 }
+
+// 120 B-5: what an older manifest's tier says about its tokens: a reference
+// driver supports the four request tokens, a basic one none of them.
+function capabilitiesForTier(tier: CapabilityTier): readonly Capability[] {
+  return tier === "reference" ? REQUEST_CAPABILITIES : [];
+}
+
+export const REFUSED_KIND = "driver.refused";
 
 function tailBytes(text: string, max: number): string {
   return text.length <= max ? text : text.slice(text.length - max);
@@ -317,6 +348,8 @@ export function createProcessDriver(params: CreateProcessDriverParams = {}): Dri
   const env = params.env ?? process.env;
   let command: readonly string[] | null = params.driverBin !== undefined ? [params.driverBin] : null;
   let cachedTier: CapabilityTier | null = params.tier ?? null;
+  let cachedCapabilities: readonly Capability[] | null =
+    params.capabilities ?? (params.tier !== undefined ? capabilitiesForTier(params.tier) : null);
   let liveKill: ((graceMs?: number) => void) | null = null;
 
   function resolveCommand(): readonly string[] {
@@ -343,8 +376,26 @@ export function createProcessDriver(params: CreateProcessDriverParams = {}): Dri
     if (declared !== "reference" && declared !== "basic") {
       throw new Error(`driver: ${argv[0]} manifest declares no capability tier`);
     }
+    // 120 B-2: the tokens, when declared, must agree with the tier; an
+    // older manifest without them is read by its tier alone.
+    if (manifest.capabilities !== undefined && manifest.capabilities !== null) {
+      const tokens = parseCapabilityList(manifest.capabilities, `driver: ${argv[0]} manifest capabilities`);
+      const derived = tierFor(tokens);
+      if (derived !== declared) {
+        throw new Error(`driver: ${argv[0]} manifest declares capabilityTier ${declared} but its capabilities derive ${derived}`);
+      }
+      cachedCapabilities = tokens;
+    } else {
+      cachedCapabilities = capabilitiesForTier(declared);
+    }
     cachedTier = declared;
     return cachedTier;
+  }
+
+  async function capabilities(): Promise<readonly Capability[]> {
+    if (cachedCapabilities !== null) return cachedCapabilities;
+    await tier();
+    return cachedCapabilities ?? [];
   }
 
   async function runSession(request: DriverSessionRequest): Promise<SessionResult> {
@@ -352,15 +403,36 @@ export function createProcessDriver(params: CreateProcessDriverParams = {}): Dri
     const timeoutMs = request.timeoutMs ?? DEFAULT_TIMEOUT_MS;
     const killGraceMs = request.killGraceMs ?? KILL_GRACE_MS;
 
-    // B-6: the tier is a declaration the engine honors before spawning.
-    if (request.mcpConfigPath !== undefined) {
+    // 120 B-5 (043 B-6 before it): the manifest is a declaration the engine
+    // honors before spawning. A required token the driver lacks refuses the
+    // session with no process started; a preferred one it lacks is
+    // journaled and the session runs.
+    const requirements = requirementsFor(request.profile ?? DEFAULT_REGISTRATION_PROFILE, request);
+    if (requirements.required.length > 0 || requirements.preferred.length > 0) {
+      const supported = await capabilities();
       const declared = await tier();
-      if (declared !== "reference") {
-        const detail = `driver "${name}" is ${declared} tier and cannot host an MCP server set (mcp-config)`;
-        request.journal?.append(DEGRADED_KIND, { driver: name, tier: declared, feature: "mcp-config" });
+      const decision = decide(supported, requirements);
+      if (decision.refused.length > 0) {
+        // 043 B-6's record keeps its shape for the case it named; the
+        // preferred degradations are moot for a session that never runs.
+        for (const feature of decision.refused) {
+          request.journal?.append(DEGRADED_KIND, { driver: name, tier: declared, feature });
+        }
+        request.journal?.append(REFUSED_KIND, {
+          driver: name,
+          tier: declared,
+          required: [...requirements.required],
+          unsupported: [...decision.refused],
+        });
+        const detail = decision.refused.includes("mcp-config")
+          ? `driver "${name}" is ${declared} tier and cannot host an MCP server set (mcp-config)`
+          : `driver "${name}" does not support required capabilities: ${decision.refused.join(", ")}`;
         const result = synthesizedResult("crashed", detail, 0, "");
         request.journal?.append("session.result", synthesizedResultPayload(result));
         return result;
+      }
+      for (const feature of decision.degraded) {
+        request.journal?.append(DEGRADED_KIND, { driver: name, tier: declared, feature });
       }
     }
 

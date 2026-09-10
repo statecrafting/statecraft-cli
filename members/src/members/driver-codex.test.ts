@@ -202,9 +202,13 @@ test("FR-003: 043's seam drives the Codex driver to journaled init and result re
     expect(result.classification.kind).toBe("completed");
     expect(result.sessionId).toBe(THREAD);
     const records = journal.fold().records.map((r) => ({ kind: r.kind, payload: r.payload as Record<string, unknown> }));
-    expect(records.map((r) => r.kind)).toEqual(["session.init", "session.result"]);
-    expect(records[0]!.payload.degraded).toEqual(["cost"]);
-    expect(records[0]!.payload.codexBin).toBe(codex);
+    // 120 B-5: the seam journals the preferred token the manifest lacks
+    // before spawning; the driver's own init then says what it applied.
+    expect(records.map((r) => r.kind)).toEqual(["driver.degraded", "session.init", "session.result"]);
+    expect(records[0]!.payload).toEqual({ driver: "codex", tier: "basic", feature: "cost" });
+    expect(records[1]!.payload.degraded).toEqual(["cost"]);
+    expect(records[1]!.payload.applied).toEqual(["hook-enforcement"]);
+    expect(records[1]!.payload.codexBin).toBe(codex);
   } finally {
     journal.close();
   }

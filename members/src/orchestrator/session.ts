@@ -21,6 +21,7 @@ import type { JournalHandle, JsonValue } from "./journal";
 import { classifyTermination, TERMINATION_RULES, type Classification, type ResultEventLike } from "./classify-termination";
 import type { ExecutionProfile } from "./profile";
 import { DEFAULT_REGISTRATION_PROFILE, profilePayload, sessionArgsForProfile } from "./profile";
+import { orderedCapabilities, requestedCapabilities, type Capability, type Requirements } from "./capabilities";
 
 // --- stream-json event shapes (the subset this module reads) --------------
 
@@ -76,9 +77,17 @@ export interface RunSessionOptions {
   // SIGTERM-to-SIGKILL grace at the deadline (B-5). Configurable so tests can
   // exercise the escalation deterministically; defaults to KILL_GRACE_MS.
   readonly killGraceMs?: number;
+  // 120 B-3: what the caller requires and prefers beyond what the request
+  // implies. This in-process driver is Claude: it applies every request
+  // token and enforces hooks; whatever else is named degrades (120 B-6).
+  readonly requirements?: Requirements;
   readonly journal?: JournalHandle;
   readonly sink?: SessionEventSink;
 }
+
+// 120 B-2: what the in-process Claude driver supports, the Rust Claude
+// provider's list byte for byte (not workspace-write, 120 D-2).
+export const CLAUDE_CAPABILITIES: readonly Capability[] = ["tool-allowlist", "max-turns", "mcp-config", "cost", "hook-enforcement"];
 
 export interface OverflowInfo {
   // Unparseable stdout lines, kept verbatim, up to OVERFLOW_LINE_CAP; never
@@ -266,6 +275,12 @@ async function runSessionOnce(opts: RunSessionOptions): Promise<SessionResult> {
   // B-3 (032): the permission portion comes from the one derivation, never
   // from a flag composed here.
   const profile = opts.profile ?? DEFAULT_REGISTRATION_PROFILE;
+  const requested = requestedCapabilities(profile, opts);
+  const applied = orderedCapabilities([
+    ...requested.filter((c) => CLAUDE_CAPABILITIES.includes(c)),
+    "hook-enforcement",
+  ]);
+  const degraded = requested.filter((c) => !applied.includes(c));
   const args = [claudeBin, "-p", "--output-format", "stream-json", "--verbose", ...sessionArgsForProfile(profile)];
   if (opts.model !== undefined) args.push("--model", opts.model);
   if (opts.maxTurns !== undefined) args.push("--max-turns", String(opts.maxTurns));
@@ -412,6 +427,11 @@ async function runSessionOnce(opts: RunSessionOptions): Promise<SessionResult> {
           // lists verbatim. What a session was allowed to do is thereafter a
           // journal fact rather than an inference from registry history.
           profile: profilePayload(profile),
+          // 120 B-6: the effective configuration is evidence. Applied is
+          // every requested token this driver supports plus hook
+          // enforcement; degraded is the rest of what was requested.
+          applied: [...applied],
+          degraded: [...degraded],
         };
         opts.journal.append("session.init", initPayload);
       }

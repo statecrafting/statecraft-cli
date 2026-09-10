@@ -130,8 +130,10 @@ import {
   profileRefusal,
   renderDriver,
   renderProfile,
+  renderRequire,
   type ExecutionProfile,
 } from "../orchestrator/profile";
+import { parseCapabilityList, type Capability } from "../orchestrator/capabilities";
 import { gateRefusal, renderGate, renderGateDetail, type GateContract } from "../orchestrator/gate-contract";
 import { renderSessionModels, sessionModelsRefusal, type SessionModels } from "../orchestrator/models";
 import { API_VERSION, API_VERSION_HEADER, projectRoute } from "../orchestrator/api/types";
@@ -181,7 +183,8 @@ export const ORCHESTRATOR_USAGE = `usage: observatory orchestrator <command> [--
   projects arm|disarm <name>   let the scheduler drive it, or hold it back
   projects profile <name> <mode>  set the execution posture: bypass | guarded
                                   and, with both model flags, the model pair,
-                                  and with --driver, the driver
+                                  and with --driver, the driver, and with
+                                  --require, the capability tokens required
   projects gate <name> -- <argv>  set the language gate run after the spec-spine
                                   floor; "--" with nothing after it is governance-only
   projects ceiling <name>      spend limits: --per-run/--per-day <usd>, or "none"
@@ -226,6 +229,8 @@ export const ORCHESTRATOR_USAGE = `usage: observatory orchestrator <command> [--
   --model-strong <id>          build and ship model (both model flags or neither)
   --model-fast <id>            shepherd and verify model
   --driver <name>              the driver the sessions run on: claude | codex
+  --require <tokens>           comma-separated capability tokens every session
+                               requires; a driver lacking one refuses (120)
   --allow <tools>              comma-separated allowlist for a guarded posture
   --deny <tools>               comma-separated disallowlist for a guarded posture
   --per-run <usd>              cost ceiling for one run (projects ceiling)
@@ -346,6 +351,8 @@ interface ParsedArgs {
   readonly modelFast: string | null;
   // 117 B-2: the driver, or null for the seam's default.
   readonly driver: string | null;
+  // 120 B-4: the required capability tokens, or null for none.
+  readonly require: string | null;
   // 033 B-1's spend limits, in dollars as typed (see `ceilingFromFlags`).
   readonly perRun: string | null;
   readonly perDay: string | null;
@@ -385,6 +392,7 @@ function parseArgs(argv: readonly string[]): ParseResult {
   let modelStrong: string | null = null;
   let modelFast: string | null = null;
   let driver: string | null = null;
+  let require: string | null = null;
   let perRun: string | null = null;
   let perDay: string | null = null;
   let out: string | null = null;
@@ -437,6 +445,9 @@ function parseArgs(argv: readonly string[]): ParseResult {
     },
     "--driver": (v) => {
       driver = v;
+    },
+    "--require": (v) => {
+      require = v;
     },
     "--per-run": (v) => {
       perRun = v;
@@ -494,7 +505,7 @@ function parseArgs(argv: readonly string[]): ParseResult {
 
   return {
     ok: true,
-    args: { json, url, dataDir, repoDir, project, dir, name, disarmed, profile, allow, deny, modelStrong, modelFast, driver, perRun, perDay, out, bundle, exclude, corpus, proposal, passthrough, rest },
+    args: { json, url, dataDir, repoDir, project, dir, name, disarmed, profile, allow, deny, modelStrong, modelFast, driver, require, perRun, perDay, out, bundle, exclude, corpus, proposal, passthrough, rest },
   };
 }
 
@@ -529,11 +540,12 @@ const PROJECTS_ADD_FLAGS: readonly string[] = [
   "--model-strong",
   "--model-fast",
   "--driver",
+  "--require",
 ];
 // 032 B-2: the posture verb takes its mode as a positional, so only the two
 // list flags belong to it; `--profile` is registration's way of saying the
 // same thing and is refused here rather than silently outranked.
-const PROJECTS_PROFILE_FLAGS: readonly string[] = ["--allow", "--deny", "--model-strong", "--model-fast", "--driver"];
+const PROJECTS_PROFILE_FLAGS: readonly string[] = ["--allow", "--deny", "--model-strong", "--model-fast", "--driver", "--require"];
 // 033 B-1: the ceiling verb's two limits. Neither belongs to any other verb,
 // and the posture flags do not belong to this one.
 const PROJECTS_CEILING_FLAGS: readonly string[] = ["--per-run", "--per-day"];
@@ -581,6 +593,7 @@ function strayFlag(args: ParsedArgs, accepted: readonly string[]): string | null
     args.modelStrong !== null ? "--model-strong" : null,
     args.modelFast !== null ? "--model-fast" : null,
     args.driver !== null ? "--driver" : null,
+    args.require !== null ? "--require" : null,
     args.perRun !== null ? "--per-run" : null,
     args.perDay !== null ? "--per-day" : null,
     args.out !== null ? "--out" : null,
@@ -778,6 +791,7 @@ function renderProjectDetail(view: ProjectView): string[] {
   lines.push(`posture: ${renderProfile(profile)}`);
   lines.push(`models:  ${renderSessionModels(profile.models)}`);
   lines.push(`driver:  ${renderDriver(profile)}`);
+  lines.push(`require: ${renderRequire(profile)}`);
   if (profile.mode === "bypass") {
     lines.push(
       profile.legacy
@@ -1230,12 +1244,23 @@ function profileFromFlags(
   deny: string | null,
   modelStrong: string | null,
   modelFast: string | null,
-  driver: string | null = null
+  driver: string | null = null,
+  require: string | null = null
 ): ProfileFromFlags {
   // 117 B-2: a driver that is not one of the members' names is refused
   // before anything else, naming the accepted ones.
   if (driver !== null && !isDriverName(driver)) {
     return { ok: false, reason: `"${driver}" is not a driver (expected ${DRIVER_NAMES.join(" or ")})` };
+  }
+  // 120 B-4: a token outside the vocabulary is refused, naming the accepted
+  // ones.
+  let required: readonly Capability[] | undefined;
+  if (require !== null) {
+    try {
+      required = parseCapabilityList(toolList(require) ?? [], "--require");
+    } catch (err) {
+      return { ok: false, reason: (err as Error).message };
+    }
   }
   // 040 B-4: half a pair is refused before anything else is assembled, so the
   // operator reads which half rather than a downstream mode complaint.
@@ -1256,6 +1281,9 @@ function profileFromFlags(
     if (driver !== null) {
       return { ok: false, reason: `--driver needs a posture; name one with --profile bypass` };
     }
+    if (required !== undefined) {
+      return { ok: false, reason: `--require needs a posture; name one with --profile bypass` };
+    }
     return { ok: true, profile: undefined };
   }
   if (!isExecutionMode(mode)) {
@@ -1269,6 +1297,7 @@ function profileFromFlags(
     ...(disallowed === undefined ? {} : { disallowedTools: disallowed }),
     ...(models === undefined ? {} : { models }),
     ...(driver === null ? {} : { driver }),
+    ...(required === undefined || required.length === 0 ? {} : { require: required }),
   };
   const refusal = profileRefusal(profile);
   return refusal === null ? { ok: true, profile } : { ok: false, reason: refusal };
@@ -1399,7 +1428,7 @@ async function cmdProjects(
       return usage(deps, "projects add needs a repository path");
     }
     if (rest.length > 2) return usage(deps, `unexpected argument "${rest[2]}" after projects add`);
-    const posture = profileFromFlags(args.profile, args.allow, args.deny, args.modelStrong, args.modelFast, args.driver);
+    const posture = profileFromFlags(args.profile, args.allow, args.deny, args.modelStrong, args.modelFast, args.driver, args.require);
     if (!posture.ok) return usage(deps, posture.reason);
     return cmdProjectsAdd(deps, client, args.json, path, args.name, args.disarmed, posture.profile);
   }
@@ -1413,7 +1442,7 @@ async function cmdProjects(
     const mode = rest[2];
     if (mode === undefined) return usage(deps, "projects profile needs a mode (bypass or guarded)");
     if (rest.length > 3) return usage(deps, `unexpected argument "${rest[3]}" after projects profile`);
-    const posture = profileFromFlags(mode, args.allow, args.deny, args.modelStrong, args.modelFast, args.driver);
+    const posture = profileFromFlags(mode, args.allow, args.deny, args.modelStrong, args.modelFast, args.driver, args.require);
     if (!posture.ok) return usage(deps, posture.reason);
     // profileFromFlags only answers undefined for a null mode, which the
     // check above has already refused.

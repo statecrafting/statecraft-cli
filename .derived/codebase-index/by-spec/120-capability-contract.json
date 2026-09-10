@@ -1,19 +1,4 @@
 {
-  "diagnostics": {
-    "errors": [],
-    "warnings": [
-      {
-        "code": "W-001",
-        "message": "spec '120-capability-contract' file unit 'members/src/orchestrator/capabilities.ts' does not exist",
-        "path": "members/src/orchestrator/capabilities.ts"
-      },
-      {
-        "code": "W-001",
-        "message": "spec '120-capability-contract' file unit 'members/src/orchestrator/capabilities.test.ts' does not exist",
-        "path": "members/src/orchestrator/capabilities.test.ts"
-      }
-    ]
-  },
   "mapping": {
     "dependsOn": [
       "119-admission-and-outcome",
@@ -37,6 +22,18 @@
       },
       {
         "path": "crates/statecraft-driver-core/",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/statecraft-journal/",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/statecraft-sensor-claude/",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/statecraft-sensor-codex/",
         "source": "spec-edge"
       },
       {
@@ -76,6 +73,14 @@
         "source": "spec-edge"
       },
       {
+        "path": "members/src/orchestrator/capabilities.test.ts",
+        "source": "spec-edge"
+      },
+      {
+        "path": "members/src/orchestrator/capabilities.ts",
+        "source": "spec-edge"
+      },
+      {
         "path": "members/src/orchestrator/driver.test.ts",
         "source": "spec-edge"
       },
@@ -92,6 +97,10 @@
         "source": "spec-edge"
       },
       {
+        "path": "members/src/orchestrator/project-driver.test.ts",
+        "source": "spec-edge"
+      },
+      {
         "path": "members/src/orchestrator/session.test.ts",
         "source": "spec-edge"
       },
@@ -102,7 +111,11 @@
     ],
     "resolvedUnits": [
       {
-        "locations": [],
+        "locations": [
+          {
+            "file": "members/src/orchestrator/capabilities.test.ts"
+          }
+        ],
         "ownership": true,
         "sourceField": "establishes",
         "unit": {
@@ -111,7 +124,11 @@
         }
       },
       {
-        "locations": [],
+        "locations": [
+          {
+            "file": "members/src/orchestrator/capabilities.ts"
+          }
+        ],
         "ownership": true,
         "sourceField": "establishes",
         "unit": {
@@ -169,6 +186,45 @@
         "unit": {
           "kind": "directory",
           "path": "crates/statecraft-driver-core/"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "crates/statecraft-journal/"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "directory",
+          "path": "crates/statecraft-journal/"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "crates/statecraft-sensor-claude/"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "directory",
+          "path": "crates/statecraft-sensor-claude/"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "crates/statecraft-sensor-codex/"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "directory",
+          "path": "crates/statecraft-sensor-codex/"
         }
       },
       {
@@ -343,6 +399,19 @@
       {
         "locations": [
           {
+            "file": "members/src/orchestrator/project-driver.test.ts"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "members/src/orchestrator/project-driver.test.ts"
+        }
+      },
+      {
+        "locations": [
+          {
             "file": "members/src/orchestrator/session.test.ts"
           }
         ],
@@ -384,5 +453,5 @@
     "specStatus": "approved"
   },
   "schemaVersion": "1.1.0",
-  "shardHash": "3ab080f250e55a95fa2d7a3973424819e0d339de22a866fc1beb2c8165ce975b"
+  "shardHash": "06f21bc774a260ec7cc2cdd18ea2f9ead30c8097a7de18ea1e3b777deaaae37e"
 }

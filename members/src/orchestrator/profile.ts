@@ -27,6 +27,7 @@
 import type { JsonValue } from "./journal";
 import type { SessionModels } from "./models";
 import { parseSessionModels, sessionModelsPayload } from "./models";
+import { parseCapabilityList, type Capability } from "./capabilities";
 
 // --- the model (B-1) --------------------------------------------------------
 
@@ -68,6 +69,10 @@ export interface ExecutionProfile {
   // rides here for the reason the model pair does (040 D-2): it answers
   // the same question the mode does, and folds, sets and renders with it.
   readonly driver?: DriverName;
+  // 120 B-4: the capability tokens every session of this project requires.
+  // A driver that does not support one refuses the session before a
+  // process exists (120 B-5). Absent means none required.
+  readonly require?: readonly Capability[];
 }
 
 // A profile as read back off the projects chain. `legacy` is the honest
@@ -185,6 +190,7 @@ export function profilePayload(profile: ExecutionProfile): Record<string, JsonVa
     disallowedTools: profile.disallowedTools === undefined ? null : [...profile.disallowedTools],
     models: sessionModelsPayload(profile.models),
     driver: profile.driver ?? null,
+    require: profile.require === undefined ? null : [...profile.require],
   };
 }
 
@@ -216,13 +222,26 @@ export function parseProfile(value: JsonValue | undefined, label: string): Execu
   // A pre-117 record has no `driver` key at all; absent and null both
   // parse to undefined, the seam's default. Anything else must be a name.
   const driver = parseDriverName(o.driver, label);
+  // A pre-120 record has no `require` key; absent and null both parse to
+  // undefined. Anything else must be a list of known tokens.
+  const require = parseRequire(o.require, label);
   return {
     mode,
     ...(allowedTools === undefined ? {} : { allowedTools }),
     ...(disallowedTools === undefined ? {} : { disallowedTools }),
     ...(models === undefined ? {} : { models }),
     ...(driver === undefined ? {} : { driver }),
+    ...(require === undefined ? {} : { require }),
   };
+}
+
+export function parseRequire(value: JsonValue | undefined, label: string): readonly Capability[] | undefined {
+  if (value === undefined || value === null) return undefined;
+  try {
+    return parseCapabilityList(value, "require");
+  } catch (err) {
+    throw new Error(`profile: ${label} ${(err as Error).message}`);
+  }
 }
 
 export function parseDriverName(value: JsonValue | undefined, label: string): DriverName | undefined {
@@ -266,11 +285,18 @@ export function renderProfile(profile: RecordedProfile): string {
   // 117 B-2: a non-default driver shows in the cell; a default one prints
   // exactly what it printed before 117.
   const via = profile.driver === undefined ? "" : ` via ${profile.driver}`;
-  if (profile.mode === "bypass") return `${profile.legacy ? "bypass (legacy)" : "bypass"}${via}`;
+  // 120 B-4: a project that requires tokens says so after the driver.
+  const requiring = profile.require === undefined || profile.require.length === 0 ? "" : ` requiring ${profile.require.join(",")}`;
+  if (profile.mode === "bypass") return `${profile.legacy ? "bypass (legacy)" : "bypass"}${via}${requiring}`;
   const allowed = allowedToolsFor(profile);
   const baseline = profile.allowedTools === undefined ? " baseline" : "";
   const denied = profile.disallowedTools?.length ? `, ${profile.disallowedTools.length} denied` : "";
-  return `guarded (${allowed.length}${baseline} tools${denied})${via}`;
+  return `guarded (${allowed.length}${baseline} tools${denied})${via}${requiring}`;
+}
+
+// The require line of a detail view (120 B-4).
+export function renderRequire(profile: ExecutionProfile): string {
+  return profile.require === undefined || profile.require.length === 0 ? "(none)" : profile.require.join(", ");
 }
 
 // The driver line of a detail view (117 B-2).

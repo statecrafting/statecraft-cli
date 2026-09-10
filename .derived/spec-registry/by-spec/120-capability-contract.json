@@ -170,10 +170,42 @@
           "kind": "file",
           "path": "members/src/orchestrator/session.test.ts"
         }
+      },
+      {
+        "nature": "additive",
+        "spec": "112-sensor-port",
+        "unit": {
+          "kind": "directory",
+          "path": "crates/statecraft-sensor-claude/"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "113-journal-port",
+        "unit": {
+          "kind": "directory",
+          "path": "crates/statecraft-journal/"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "115-codex-sensor",
+        "unit": {
+          "kind": "directory",
+          "path": "crates/statecraft-sensor-codex/"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "117-project-driver",
+        "unit": {
+          "kind": "file",
+          "path": "members/src/orchestrator/project-driver.test.ts"
+        }
       }
     ],
     "id": "120-capability-contract",
-    "implementation": "in-progress",
+    "implementation": "complete",
     "references": [
       {
         "role": "context",
@@ -192,6 +224,7 @@
       "4. Functional requirements",
       "5. Acceptance",
       "Verification",
+      "Status (2026-09-09)",
       "6. Out of scope",
       "7. Resolved decisions"
     ],
@@ -200,6 +233,6 @@
     "summary": "The design doc 03 D39 deferred, decided in doc 04 §4. The contract crate gains a closed set of six capability tokens: tool-allowlist, max-turns, mcp-config, cost, workspace-write, hook-enforcement. A driver's manifest lists the tokens it supports; a session request carries what the run requires and what it prefers. The engine reads the manifest before spawning and refuses a required token the driver lacks without starting a process, generalizing 043 B-6's mcp-config refusal into the rule it was an instance of; a preferred token the driver lacks is journaled and the session runs. session.init carries the tokens the provider applied beside those it degraded, so the effective configuration is evidence. The tier stays as a summary derived from the token set.\n",
     "title": "The capability contract: a closed token vocabulary, required refuses before spawn, preferred degrades in the journal"
   },
-  "shardHash": "b82c2f6bde48cc8413fc0e3579aef8d960a7ce6619cd3b80451a7d7d2e0155a3",
+  "shardHash": "158eda83d53541f28a661f5ad0d4f3a4eae6f42bf1b66baa4d6350f98123db95",
   "specVersion": "1.2.0"
 }

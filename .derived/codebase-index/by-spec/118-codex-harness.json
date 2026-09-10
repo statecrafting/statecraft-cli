@@ -175,8 +175,8 @@
           {
             "file": "crates/statecraft-driver-codex/src/main.rs",
             "span": {
-              "endLine": 626,
-              "startLine": 324
+              "endLine": 646,
+              "startLine": 328
             }
           }
         ],
@@ -205,5 +205,5 @@
     "specStatus": "approved"
   },
   "schemaVersion": "1.1.0",
-  "shardHash": "fc4174864e3a521cec2f222ee8fcce2f2b7e1ed7ae8a14697077aade3c122272"
+  "shardHash": "486bd2a30154abb552172748a47220ed730ae236f1e581c28640045cf31b02a9"
 }

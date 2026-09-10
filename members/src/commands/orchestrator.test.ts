@@ -1987,6 +1987,46 @@ test("117 FR-003: the profile verb records a driver, the detail names it, and an
   });
 });
 
+test("120 FR-004: the profile verb records a require list, the detail and the posture cell name it, and an unknown token is refused", async () => {
+  await withFixtureDaemon("projects-require", async ({ registry, url, dataDir }) => {
+    // A project that never required anything says so, and its list row is
+    // byte-identical to before 120.
+    const listed = await run(["projects", "--url", url], { dataDir });
+    expect(listed.out).toContain("alpha  armed     bypass  ");
+    const detail = await run(["projects", "arm", "alpha", "--url", url], { dataDir });
+    expect(detail.out).toContain("require: (none)");
+
+    // B-4: the list travels on the posture verb, is stored in wire order,
+    // and shows after the driver in the posture cell.
+    const set = await run(
+      ["projects", "profile", "alpha", "guarded", "--driver", "codex", "--require", "hook-enforcement,workspace-write", "--url", url],
+      { dataDir }
+    );
+    expect(set.code).toBe(EXIT_OK);
+    expect(set.out).toContain("require: workspace-write, hook-enforcement");
+    expect(set.out).toContain("guarded (9 baseline tools) via codex requiring workspace-write,hook-enforcement");
+    expect(registry.projects().get("alpha")!.profile.require).toEqual(["workspace-write", "hook-enforcement"]);
+
+    // Refused before the chain moves, naming the accepted tokens.
+    const bad = await run(["projects", "profile", "alpha", "bypass", "--require", "sandbox", "--url", url], { dataDir });
+    expect(bad.code).toBe(EXIT_USAGE);
+    expect(bad.err).toContain('--require: unknown capability "sandbox"; accepted: tool-allowlist, max-turns, mcp-config, cost, workspace-write, hook-enforcement');
+    expect(registry.projects().get("alpha")!.profile.require).toEqual(["workspace-write", "hook-enforcement"]);
+
+    // Registration takes it too; a list with no posture is refused the way
+    // a driver with none is.
+    const added = await run(
+      ["projects", "add", registry.world("newcomer").repoDir, "--name", "gamma", "--profile", "bypass", "--require", "cost", "--url", url],
+      { dataDir }
+    );
+    expect(added.code).toBe(EXIT_OK);
+    expect(added.out).toContain("bypass requiring cost");
+    const modeless = await run(["projects", "add", registry.world("other").repoDir, "--name", "delta", "--require", "cost", "--url", url], { dataDir });
+    expect(modeless.code).toBe(EXIT_USAGE);
+    expect(modeless.err).toContain("--require needs a posture");
+  });
+});
+
 test("040 FR-005: half a pair is a usage error naming the missing half, before the chain moves", async () => {
   await withFixtureDaemon("projects-models-half", async ({ registry, url, dataDir }) => {
     const half = await run(["projects", "profile", "alpha", "bypass", "--model-strong", "only", "--url", url], {
