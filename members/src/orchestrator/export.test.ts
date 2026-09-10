@@ -231,7 +231,7 @@ test("session.result keeps costs, counts, and classification; tails, transcript 
 });
 
 test("119 B-6: the denial count survives the export and its samples are stripped; the denial records are allowlisted", () => {
-  expect(REDACTION_POLICY.version).toBe(2);
+  expect(REDACTION_POLICY.version).toBe(3);
   const result = redactPayload("session.result", { classification: "completed", denials: 2, denialSamples: ["[pr-gate] BLOCKED: /Users/x/repo"] });
   expect(result.withheldPayload).toBe(false);
   expect((result.payload as Record<string, JsonValue>).denials).toBe(2);
@@ -247,6 +247,28 @@ test("119 B-6: the denial count survives the export and its samples are stripped
   expect(refused.withheldPayload).toBe(false);
   expect((refused.payload as Record<string, JsonValue>).watchedSha).toBe("a");
   expect(refused.withheldFields).toEqual(["reason"]);
+});
+
+test("121 B-6: the acceptance records are exported whole but for the unstable record's status text", () => {
+  const receipt = redactPayload("acceptance.receipt", {
+    schemaVersion: 1,
+    specId: "121-x",
+    round: 1,
+    repo: { origin: "git@github.com:o/r.git", baseSha: "a", candidateSha: "b", branch: "121-x" },
+    suite: { commands: [["spec-spine", "check", "--fail-on-warn"]], digest: "d" },
+    policy: { gate: { commands: [], source: "cli", rule: null }, profile: { mode: "bypass" }, digest: "p" },
+    verifier: { specSpine: "spec-spine 0.18.0" },
+    results: [{ cmd: ["spec-spine", "check", "--fail-on-warn"], exitCode: 0 }],
+    sensitivePaths: [".claude/settings.json"],
+    passing: true,
+  });
+  expect(receipt.withheldPayload).toBe(false);
+  expect(receipt.withheldFields).toEqual([]);
+  expect((receipt.payload as Record<string, JsonValue>).sensitivePaths).toEqual([".claude/settings.json"]);
+  const unstable = redactPayload("acceptance.unstable", { specId: "121-x", round: 1, headBefore: "a", headAfter: "a", dirty: " M src/x.ts" });
+  expect(unstable.withheldPayload).toBe(false);
+  expect(unstable.withheldFields).toEqual(["dirty"]);
+  expect((unstable.payload as Record<string, JsonValue>).headAfter).toBe("a");
 });
 
 test("named fields are stripped at any nesting depth: a gate's tails go, its command and exit code stay", () => {

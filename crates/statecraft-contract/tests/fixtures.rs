@@ -13,8 +13,8 @@ use std::path::PathBuf;
 use serde_json::{json, Value};
 use statecraft_contract::{
     exit, Capability, CapabilityTier, Classification, DriverEvent, Envelope, Manifest, ModelTier,
-    OverflowInfo, Requirements, SessionRequest, SessionResult, TerminationKind, CONTRACT,
-    MANIFEST_SCHEMA_VERSION, SESSION_REQUEST_SCHEMA_VERSION,
+    OverflowInfo, Requirements, SessionRequest, SessionResult, TerminationKind, CHILD_ENV_DENY,
+    CONTRACT, MANIFEST_SCHEMA_VERSION, SESSION_REQUEST_SCHEMA_VERSION,
 };
 
 fn fixtures_dir() -> PathBuf {
@@ -120,6 +120,12 @@ fn manifests_of_the_three_members() {
         ..driver.clone()
     };
     assert!(Manifest::parse(serde_json::to_string(&older).unwrap().as_bytes()).is_ok());
+}
+
+/// Spec 121 B-3: the environment deny list, as both sides assert it.
+#[test]
+fn child_env_deny() {
+    check("child-env-deny", &json!(CHILD_ENV_DENY));
 }
 
 /// Spec 120 B-1: the vocabulary, in wire order, as both sides assert it.

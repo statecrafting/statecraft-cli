@@ -404,6 +404,18 @@ export interface HistoryEntry {
   readonly verifyVerdict: string | null;
   // Content hashes servable from /api/projects/<name>/evidence/<hash>.
   readonly evidenceRefs: readonly string[];
+  // 121 B-6: the newest acceptance receipt this execution minted, or null.
+  readonly receipt: HistoryReceipt | null;
+}
+
+export interface HistoryReceipt {
+  // The journal record's hash: the receipt's identity (121 B-5).
+  readonly hash: string;
+  readonly round: number;
+  readonly baseSha: string;
+  readonly candidateSha: string;
+  readonly policyDigest: string;
+  readonly sensitivePaths: readonly string[];
 }
 
 export interface HistoryView {

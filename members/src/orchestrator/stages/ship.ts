@@ -24,7 +24,7 @@
 // the real `gh` binary, mirroring spec 014's own "never spawn the real
 // claude in tests" convention.
 import type { JournalHandle, JsonValue } from "../journal";
-import type { Runner } from "./build";
+import { DEFAULT_BASE_BRANCH, type Runner } from "./build";
 import type { SessionResult } from "../driver";
 import type { ModelTier } from "../models";
 
@@ -457,6 +457,9 @@ export interface RunShipStageOptions {
   readonly maxTurns?: number;
   readonly tier?: ModelTier;
   readonly model?: string;
+  // 121 B-2: the branch the candidate's base resolves from; the build's
+  // default when absent.
+  readonly defaultBranch?: string;
 }
 
 export async function runShipStage(options: RunShipStageOptions): Promise<ShipResult> {
@@ -464,6 +467,13 @@ export async function runShipStage(options: RunShipStageOptions): Promise<ShipRe
   const deadlineMs = options.deadlineMs ?? DEFAULT_SHIP_DEADLINE_MS;
   const maxTurns = options.maxTurns ?? DEFAULT_SHIP_MAX_TURNS;
 
+  // 121 B-2: with a candidate home, this stage works the spec's candidate,
+  // reopened as it was left (a daemon restart between stages loses the
+  // runner's pointer, never the worktree). In place, the checkout's branch
+  // is the spec's, as before.
+  if (runner.candidateHome() !== null) {
+    runner.openCandidate(specId, runner.resolveBase(options.defaultBranch ?? DEFAULT_BASE_BRANCH));
+  }
   const branch = runner.currentBranch();
   const localHeadSha = runner.headSha();
 

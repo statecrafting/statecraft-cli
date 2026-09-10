@@ -54,9 +54,16 @@ export interface RedactionPolicy {
 // `stage.shepherd.merge-refused`, `stage.shepherd.base`) join the allowlist
 // and their samples join the stripped set; a sample is a tool result's text,
 // which may quote a path.
+// Version 3 (spec 121): the acceptance records (`acceptance.receipt`,
+// `acceptance.unstable`, `acceptance.sensitive`) join the allowlist; the
+// receipt's paths are repository-relative, and the unstable record's `dirty`
+// (a git status text) is stripped.
 export const REDACTION_POLICY: RedactionPolicy = {
-  version: 2,
+  version: 3,
   includedKinds: [
+    "acceptance.receipt",
+    "acceptance.sensitive",
+    "acceptance.unstable",
     "control.approve",
     "control.forceHumanGate",
     "control.pause",
@@ -97,6 +104,7 @@ export const REDACTION_POLICY: RedactionPolicy = {
   strippedFields: [
     "denialSamples",
     "detail",
+    "dirty",
     "error",
     "firstFailure",
     "invalidFiles",

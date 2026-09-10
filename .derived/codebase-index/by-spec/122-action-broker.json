@@ -11,16 +11,6 @@
         "code": "W-001",
         "message": "spec '122-action-broker' file unit 'members/src/orchestrator/broker.test.ts' does not exist",
         "path": "members/src/orchestrator/broker.test.ts"
-      },
-      {
-        "code": "W-001",
-        "message": "spec '122-action-broker' file unit 'members/src/orchestrator/candidate.ts' does not exist",
-        "path": "members/src/orchestrator/candidate.ts"
-      },
-      {
-        "code": "W-001",
-        "message": "spec '122-action-broker' file unit 'members/src/orchestrator/candidate.test.ts' does not exist",
-        "path": "members/src/orchestrator/candidate.test.ts"
       }
     ]
   },
@@ -43,6 +33,14 @@
       },
       {
         "path": "crates/statecraft-driver-codex/",
+        "source": "spec-edge"
+      },
+      {
+        "path": "members/src/orchestrator/candidate.test.ts",
+        "source": "spec-edge"
+      },
+      {
+        "path": "members/src/orchestrator/candidate.ts",
         "source": "spec-edge"
       },
       {
@@ -137,7 +135,11 @@
         }
       },
       {
-        "locations": [],
+        "locations": [
+          {
+            "file": "members/src/orchestrator/candidate.test.ts"
+          }
+        ],
         "ownership": true,
         "sourceField": "extends",
         "unit": {
@@ -146,7 +148,11 @@
         }
       },
       {
-        "locations": [],
+        "locations": [
+          {
+            "file": "members/src/orchestrator/candidate.ts"
+          }
+        ],
         "ownership": true,
         "sourceField": "extends",
         "unit": {

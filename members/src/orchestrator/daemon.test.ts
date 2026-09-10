@@ -17,6 +17,7 @@ import type { VerifyRunner, BrowserVerifier, VerifyResult } from "./stages/verif
 import type { SessionResult } from "./session";
 import { runSession as realRunSession } from "./session";
 import {
+  createProductionDaemonDeps,
   Daemon,
   createProcessInspector,
   acquireDaemonLock,
@@ -80,6 +81,13 @@ function throwingRunner(): Runner {
     headSha: fail("headSha"),
     pullFfOnly: fail("pullFfOnly"),
     resolveBase: fail("resolveBase"),
+    candidateHome: () => null,
+    openCandidate: fail("openCandidate"),
+    workDir: fail("workDir"),
+    closeCandidate: () => {},
+    changedPaths: fail("changedPaths"),
+    originUrl: () => null,
+    statusText: fail("statusText"),
     runGate: fail("runGate"),
     readFile: fail("readFile"),
     writeFile: fail("writeFile"),
@@ -164,6 +172,8 @@ function buildResult(specId: string, outcome: BuildResult["outcome"], opts: { qu
       gates: [],
       frontmatterComplete: outcome === "passed",
       decisions: null,
+      receipt: null,
+      sensitivePaths: [],
       stalled: null,
     },
   };
@@ -1347,12 +1357,25 @@ test("a dependent of a pipeline-shipped spec schedules after the flip merge; a p
     verify: async (options) => verifyResult(options.specId, options.sha, "not-declared"),
   };
 
+  // 121 FR-005: the daemon closes a spec's candidate once its merge sha is
+  // journaled, and the profile reaches the build stage for the receipt.
+  const closed: string[] = [];
+  const buildProfiles: unknown[] = [];
+  const profile = { mode: "guarded" as const, driver: "codex" as const };
   const daemon = new Daemon(
     makeDeps({
       dataDir,
       repoDir,
       dagReader,
-      stageFns,
+      stageFns: {
+        ...stageFns,
+        build: async (options) => {
+          buildProfiles.push(options.profile);
+          return buildResult(options.specId, "passed");
+        },
+      },
+      runner: { ...throwingRunner(), closeCandidate: (branch: string) => closed.push(branch) },
+      profile,
       // The merged content is what the journaled merge sha names.
       readSpecFileAtSha: (sha, specId) =>
         sha === "800-base-merge" && specId === "800-base" ? Buffer.from(mergedContent, "utf8") : null,
@@ -1363,6 +1386,8 @@ test("a dependent of a pipeline-shipped spec schedules after the flip merge; a p
   // Without merge-sha pin resolution, 800 reads as drifted after its own
   // flip and 900 is born blocked, failing the run.
   expect(daemon.runStatus).toBe("completed");
+  expect(closed).toEqual(["800-base", "900-dependent"]);
+  expect(buildProfiles).toEqual([profile, profile]);
   await daemon.shutdown();
 
   // A post-merge amendment is not the flip: it must still invalidate.
@@ -2210,3 +2235,36 @@ test("a build that fails without the stall signal still spends its retry budget 
   expect(buildAttempts).toBe(2);
   await daemon.shutdown();
 });
+
+// --- 121 FR-005: the production deps have two faces ---------------------------
+
+test("121 FR-005: the production runner works a candidate under the data dir while the checkout reads stay on the operator's checkout", () => {
+  const repoDir = mkdtempSync(join(tmpdir(), "daemon-candidate-repo-"));
+  const dataDir = mkdtempSync(join(tmpdir(), "daemon-candidate-data-"));
+  const git = (args: string[]): string => {
+    const r = Bun.spawnSync(["git", ...args], { cwd: repoDir });
+    if (r.exitCode !== 0) throw new Error(new TextDecoder().decode(r.stderr));
+    return new TextDecoder().decode(r.stdout).trim();
+  };
+  git(["init", "-q", "-b", "main"]);
+  git(["config", "user.email", "t@example.com"]);
+  git(["config", "user.name", "t"]);
+  fs.writeFileSync(join(repoDir, "README.md"), "x\n");
+  git(["add", "-A"]);
+  git(["commit", "-q", "-m", "init"]);
+  const base = git(["rev-parse", "HEAD"]);
+
+  const deps = createProductionDaemonDeps({ dataDir, repoDir });
+  expect(deps.runner.candidateHome()).toBe(dataDir);
+  const opened = deps.runner.openCandidate("900-x", base);
+  expect(opened.path.startsWith(join(dataDir, "candidates"))).toBe(true);
+  expect(deps.runner.workDir()).toBe(opened.path);
+  expect(deps.runner.currentBranch()).toBe("900-x");
+  // The checkout face never followed the candidate.
+  expect(deps.readCheckoutBranch!()).toBe("main");
+  expect(deps.readHeadSha!()).toBe(base);
+  deps.runner.closeCandidate("900-x");
+  expect(fs.existsSync(opened.path)).toBe(false);
+  expect(deps.runner.workDir()).toBe(repoDir);
+});
+

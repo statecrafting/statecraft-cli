@@ -11,6 +11,7 @@ use std::path::{Path, PathBuf};
 use std::sync::Mutex;
 
 use serde_json::{json, Value};
+use statecraft_contract::CHILD_ENV_DENY;
 use statecraft_driver_core::{
     Capability, Provider, ProviderEvent, ResultEvent, Rule, SpawnSpec, TerminationKind,
 };
@@ -170,8 +171,11 @@ impl Provider for Codex {
 
     /// B-3: the OpenAI key leaves so `auth.json` decides; colors off.
     fn child_env(&self, parent: &BTreeMap<String, String>) -> BTreeMap<String, String> {
+        // 121 B-3: the deny list is the contract's, the same on both sides.
         let mut env = parent.clone();
-        env.remove("OPENAI_API_KEY");
+        for key in CHILD_ENV_DENY {
+            env.remove(key);
+        }
         env.insert("NO_COLOR".to_string(), "1".to_string());
         env
     }
@@ -402,9 +406,12 @@ mod tests {
         let c = Codex::new();
         let mut parent = BTreeMap::new();
         parent.insert("OPENAI_API_KEY".to_string(), "sk-x".to_string());
+        parent.insert("ANTHROPIC_API_KEY".to_string(), "sk-a".to_string());
         parent.insert("HOME".to_string(), "/h".to_string());
         let env = c.child_env(&parent);
         assert!(!env.contains_key("OPENAI_API_KEY"));
+        // 121 B-3: the deny list is the contract's, both names.
+        assert!(!env.contains_key("ANTHROPIC_API_KEY"));
         assert_eq!(env.get("NO_COLOR").map(String::as_str), Some("1"));
         assert_eq!(env.get("HOME").map(String::as_str), Some("/h"));
     }
