@@ -1,14 +1,4 @@
 {
-  "diagnostics": {
-    "errors": [],
-    "warnings": [
-      {
-        "code": "W-001",
-        "message": "spec '119-admission-and-outcome' file unit 'members/src/orchestrator/admission.test.ts' does not exist",
-        "path": "members/src/orchestrator/admission.test.ts"
-      }
-    ]
-  },
   "mapping": {
     "dependsOn": [
       "118-codex-harness",
@@ -38,6 +28,18 @@
         "source": "spec-edge"
       },
       {
+        "path": "crates/statecraft-journal/",
+        "source": "spec-edge"
+      },
+      {
+        "path": "docs/design/04-the-governed-substrate.md",
+        "source": "spec-edge"
+      },
+      {
+        "path": "members/src/commands/orchestrator.test.ts",
+        "source": "spec-edge"
+      },
+      {
         "path": "members/src/members/contract-fixtures.test.ts",
         "source": "spec-edge"
       },
@@ -47,6 +49,22 @@
       },
       {
         "path": "members/src/members/driver-parity.test.ts",
+        "source": "spec-edge"
+      },
+      {
+        "path": "members/src/orchestrator/admission.test.ts",
+        "source": "spec-edge"
+      },
+      {
+        "path": "members/src/orchestrator/adopt/defects.test.ts",
+        "source": "spec-edge"
+      },
+      {
+        "path": "members/src/orchestrator/adopt/synthesis.test.ts",
+        "source": "spec-edge"
+      },
+      {
+        "path": "members/src/orchestrator/daemon.test.ts",
         "source": "spec-edge"
       },
       {
@@ -108,11 +126,19 @@
       {
         "path": "members/src/orchestrator/stages/ship.ts",
         "source": "spec-edge"
+      },
+      {
+        "path": "members/src/orchestrator/standby.test.ts",
+        "source": "spec-edge"
       }
     ],
     "resolvedUnits": [
       {
-        "locations": [],
+        "locations": [
+          {
+            "file": "members/src/orchestrator/admission.test.ts"
+          }
+        ],
         "ownership": true,
         "sourceField": "establishes",
         "unit": {
@@ -175,6 +201,45 @@
       {
         "locations": [
           {
+            "file": "crates/statecraft-journal/"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "directory",
+          "path": "crates/statecraft-journal/"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "docs/design/04-the-governed-substrate.md"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "docs/design/04-the-governed-substrate.md"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "members/src/commands/orchestrator.test.ts"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "members/src/commands/orchestrator.test.ts"
+        }
+      },
+      {
+        "locations": [
+          {
             "file": "members/src/members/contract-fixtures.test.ts"
           }
         ],
@@ -209,6 +274,45 @@
         "unit": {
           "kind": "file",
           "path": "members/src/members/driver-parity.test.ts"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "members/src/orchestrator/adopt/defects.test.ts"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "members/src/orchestrator/adopt/defects.test.ts"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "members/src/orchestrator/adopt/synthesis.test.ts"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "members/src/orchestrator/adopt/synthesis.test.ts"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "members/src/orchestrator/daemon.test.ts"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "members/src/orchestrator/daemon.test.ts"
         }
       },
       {
@@ -409,6 +513,19 @@
       {
         "locations": [
           {
+            "file": "members/src/orchestrator/standby.test.ts"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "members/src/orchestrator/standby.test.ts"
+        }
+      },
+      {
+        "locations": [
+          {
             "file": "docs/design/04-the-governed-substrate.md"
           }
         ],
@@ -424,5 +541,5 @@
     "specStatus": "approved"
   },
   "schemaVersion": "1.1.0",
-  "shardHash": "2565c05dc8153f8a9b9aaf56e622eab098d8f24a98e58f12785fd5d9c94222bb"
+  "shardHash": "ffd283c49f952179ba3a36c19c6b2e7adfd8f91dea332eaef799bb0f3f37eb33"
 }

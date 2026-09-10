@@ -67,6 +67,18 @@ export interface MergeOutcome {
   readonly mergeSha: string;
 }
 
+// 119 B-4: the remote refused to merge the head the caller named (a moved
+// head answers 409, a blocked merge 405), or answered without a merge sha.
+// Shepherd turns this into a human's decision, never a retry.
+export class MergeRefusedError extends Error {
+  readonly expectedHeadSha: string;
+  constructor(expectedHeadSha: string, message: string) {
+    super(message);
+    this.name = "MergeRefusedError";
+    this.expectedHeadSha = expectedHeadSha;
+  }
+}
+
 export interface GitHubClient {
   prForBranch(branch: string): GitHubPr | null;
   commitsForPr(number: number): readonly GitHubCommit[];
@@ -74,7 +86,9 @@ export interface GitHubClient {
   // --- shepherd extensions (spec 018) ---
   checkRunsForSha(sha: string): readonly CheckRun[];
   jobLogTail(runId: number, maxBytes: number): string;
-  mergePr(number: number, method: MergeMethod): MergeOutcome;
+  // 119 B-4: sends `sha=<expectedHeadSha>`; the remote refuses a head that
+  // is not the one named. Throws MergeRefusedError on that refusal.
+  mergePr(number: number, method: MergeMethod, expectedHeadSha: string): MergeOutcome;
   branchContains(branch: string, sha: string): boolean;
   deleteRemoteBranch(branch: string): void;
 }
@@ -205,7 +219,7 @@ export function createProcessGitHubClient(params: CreateGitHubClientParams): Git
       return tailText(result.stdout, maxBytes);
     },
 
-    mergePr(number: number, method: MergeMethod): MergeOutcome {
+    mergePr(number: number, method: MergeMethod, expectedHeadSha: string): MergeOutcome {
       const result = runGhSync(repoDir, [
         ghBin,
         "api",
@@ -214,9 +228,16 @@ export function createProcessGitHubClient(params: CreateGitHubClientParams): Git
         `repos/{owner}/{repo}/pulls/${number}/merge`,
         "-f",
         `merge_method=${method}`,
+        "-f",
+        `sha=${expectedHeadSha}`,
       ]);
       if (result.exitCode !== 0) {
-        throw new Error(`ship: gh pr merge (#${number}, ${method}) failed: ${result.stderr.trim()}`);
+        const stderr = result.stderr.trim();
+        // gh api reports the HTTP status in its stderr ("HTTP 409: ...").
+        if (/HTTP (405|409)\b/.test(stderr)) {
+          throw new MergeRefusedError(expectedHeadSha, `merge of #${number} at ${expectedHeadSha} refused: ${stderr}`);
+        }
+        throw new Error(`ship: gh pr merge (#${number}, ${method}) failed: ${stderr}`);
       }
       let parsed: unknown;
       try {
@@ -225,7 +246,7 @@ export function createProcessGitHubClient(params: CreateGitHubClientParams): Git
         throw new Error(`ship: gh pr merge (#${number}, ${method}) returned unparseable output`);
       }
       if (!isRecord(parsed) || typeof parsed.sha !== "string") {
-        throw new Error(`ship: gh pr merge (#${number}, ${method}) response carried no merge sha`);
+        throw new MergeRefusedError(expectedHeadSha, `merge of #${number} at ${expectedHeadSha} answered without a merge sha`);
       }
       return { mergeSha: parsed.sha };
     },
@@ -366,6 +387,9 @@ export interface ShipSessionEvidence {
   readonly costMicroUsd: number | null;
   readonly numTurns: number | null;
   readonly durationMs: number;
+  // 119 B-6: the refusals the harness reported, beside the classification.
+  readonly denials: number;
+  readonly denialSamples: readonly string[];
 }
 
 function toShipSessionEvidence(result: SessionResult): ShipSessionEvidence {
@@ -377,6 +401,8 @@ function toShipSessionEvidence(result: SessionResult): ShipSessionEvidence {
     costMicroUsd: result.costMicroUsd,
     numTurns: result.numTurns,
     durationMs: result.durationMs,
+    denials: result.denials,
+    denialSamples: [...result.denialSamples],
   };
 }
 

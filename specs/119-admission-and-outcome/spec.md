@@ -3,7 +3,7 @@ id: "119-admission-and-outcome"
 title: "The floor reads before it writes, the merge names its head, and a denial survives a completed turn"
 status: approved
 created: "2026-09-09"
-implementation: in-progress
+implementation: complete
 risk: high
 depends_on:
   - "118-codex-harness"
@@ -50,6 +50,18 @@ extends:
   # 116 owns the Codex provider.
   - { spec: "116-codex-driver", unit: { kind: directory, path: "crates/statecraft-driver-codex/" }, nature: additive }
   - { spec: "116-codex-driver", unit: "members/src/members/driver-codex.test.ts", nature: additive }
+  # The test fixtures that build a SessionResult by hand gain the two fields
+  # (the type is total): 037, 035, 028 own theirs; 021 and 026 own the
+  # daemon and standby fakes.
+  - { spec: "037-defect-capture", unit: "members/src/orchestrator/adopt/defects.test.ts", nature: additive }
+  - { spec: "035-corpus-synthesis", unit: "members/src/orchestrator/adopt/synthesis.test.ts", nature: additive }
+  - { spec: "028-cli-projects", unit: "members/src/commands/orchestrator.test.ts", nature: additive }
+  - { spec: "021-orchestrator-daemon", unit: "members/src/orchestrator/daemon.test.ts", nature: additive }
+  - { spec: "026-standby-daemon", unit: "members/src/orchestrator/standby.test.ts", nature: additive }
+  # 113 mirrors the export policy in Rust; the version bump is on both sides.
+  - { spec: "113-journal-port", unit: { kind: directory, path: "crates/statecraft-journal/" }, nature: additive }
+  # 110 owns docs/design/; doc 04 is this sequence's record, as 115 claimed doc 03.
+  - { spec: "110-corpus-merge", unit: "docs/design/04-the-governed-substrate.md", nature: additive }
 references:
   - { unit: { kind: file, path: "docs/design/04-the-governed-substrate.md" }, role: context }
 summary: >
@@ -195,6 +207,34 @@ cd members && bun test src/orchestrator/admission.test.ts src/orchestrator/gate-
 cargo test --workspace --locked -p statecraft-driver-core -p statecraft-driver-claude -p statecraft-driver-codex -p statecraft-contract
 ```
 
+## Status (2026-09-09)
+
+Implemented. The floor is `gateFloor(base)`: check, lint, couple at a sha
+the stage resolved (`resolveBaseSha`, origin first, the local branch when
+no remote answers, D-5), journaled in `stage.build.bracket`,
+`stage.build.gate` and `stage.shepherd.base`; `compile` and `index` run
+only in the bracket. `mergePr` sends `sha=<head>` and raises
+`MergeRefusedError` on 405 or 409; shepherd re-reads the head after the
+green watch and journals `stage.shepherd.merge-refused` on a move or a
+refusal, finishing `failed` with `needsHuman`. The result carries
+`denials` and `denialSamples` on both sides of the wire (contract
+fixtures regenerated, the completed fixture carrying one), read by
+`denial_in_event` (Claude: a flagged `tool_result` matching the
+hook-blocked rule; Codex: a refused `command_execution` item) and, per
+D-6, by `denials_in_stderr` over the bounded tail (Codex's router line).
+Build journals `stage.build.denials` and sums `denials` into the result;
+the export policy is version 2 on both sides with the samples stripped.
+The members suite (900) and the workspace are green; the parity suites
+carry a `denied` fixture on each driver. The live smoke: the real Codex
+(0.153.4) over a clone of this checkout with `src/main.rs` edited on a
+branch, asked to run `gh pr create`, was refused by the generated PR
+gate; the stream carried no `command_execution` item for the blocked
+command, only two `agent_message` items quoting the refusal and the
+router's line on stderr, and `session.result` read `classification:
+completed`, `denials: 1`, the sample being that line. The 118
+observation is therefore exact, and D-6 is the reader the evidence
+requires.
+
 ## 6. Out of scope
 
 The candidate worktree and the receipt (121). The broker (122). A
@@ -222,3 +262,18 @@ are stripped from the export.
 D-4 (2026-09-09). A merge refusal needs a human. The alternative, waiting
 for the new head's checks and merging that, would merge a revision no
 receipt (121) and no remediation round examined.
+
+D-5 (2026-09-09). A repository with no reachable origin resolves the base
+from its local default branch. B-2 names the fetch and the remote ref; a
+fixture world and a checkout without a remote have neither, and refusing
+them would take every stage test offline. The sha is journaled either
+way, so which one answered is in the record.
+
+D-6 (2026-09-09). The Codex harness reports a refusal on its own stderr
+(the tool router's log line 118 observed), not on the stream, where only
+the agent's quotation appears. The `Provider` trait therefore gains a
+second reader over the bounded stderr tail beside the per-event one; a
+refusal early in a very noisy stderr can fall off the 16 KiB tail, which
+the bound makes explicit rather than hidden. The export policy moved to
+version 2 for the new records and their stripped samples, mirrored in
+the Rust journal so the parity test stays byte-equal.

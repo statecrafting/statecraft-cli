@@ -172,6 +172,18 @@ pub trait Provider: Send + Sync {
     fn spawn_extras(&self, _spec: &SpawnSpec<'_>) -> Value {
         Value::Object(serde_json::Map::new())
     }
+    /// Spec 119 B-5 (doc 04 D41): the text of a refused tool call when this
+    /// stdout line is the harness's structured event for one, else None.
+    /// Never the model's prose: a quotation of "blocked" is not a denial.
+    fn denial_in_event(&self, _event: &Value) -> Option<String> {
+        None
+    }
+    /// Spec 119 D-6: the refusals a harness reports on its own stderr rather
+    /// than on the stream (a tool router that logs one line per blocked
+    /// command). Read once over the bounded stderr tail at session end.
+    fn denials_in_stderr(&self, _stderr_tail: &str) -> Vec<String> {
+        Vec::new()
+    }
 }
 
 /// The model an explicit id, the project's pair or the default pair resolves

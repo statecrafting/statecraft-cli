@@ -18,7 +18,7 @@
 import { resolve, join } from "path";
 import { homedir } from "os";
 import type { JournalHandle, JsonValue } from "./journal";
-import { classifyTermination, type Classification, type ResultEventLike } from "./classify-termination";
+import { classifyTermination, TERMINATION_RULES, type Classification, type ResultEventLike } from "./classify-termination";
 import type { ExecutionProfile } from "./profile";
 import { DEFAULT_REGISTRATION_PROFILE, profilePayload, sessionArgsForProfile } from "./profile";
 
@@ -101,6 +101,43 @@ export interface SessionResult {
   readonly transcriptPath: string | null;
   readonly overflow: OverflowInfo;
   readonly stderrTail: string;
+  // 119 B-5 (doc 04 D41): the refusals the harness reported, read from its
+  // structured event for a refused tool call, never from the model's prose.
+  // Independent of the classification: a completed turn with denials is
+  // still `completed`. The samples are bounded (DENIAL_SAMPLE_CAP of them,
+  // DENIAL_SAMPLE_BYTES each) and stripped from the export like every tail.
+  readonly denials: number;
+  readonly denialSamples: readonly string[];
+}
+
+export const DENIAL_SAMPLE_CAP = 3;
+export const DENIAL_SAMPLE_BYTES = 512;
+
+// The Claude stream's shape for a refused tool call: a `user` event whose
+// tool_result content is flagged is_error and reads as a hook refusal
+// (the hook-blocked rule's pattern, 014 B-4). Anything else, an ordinary
+// failing tool included, is not a denial.
+export function denialInClaudeEvent(event: unknown): string | null {
+  if (!isRecord(event) || event.type !== "user") return null;
+  const message = event.message;
+  if (!isRecord(message) || !Array.isArray(message.content)) return null;
+  const rule = TERMINATION_RULES.find((r) => r.kind === "hook-blocked");
+  if (!rule) return null;
+  for (const item of message.content) {
+    if (!isRecord(item) || item.type !== "tool_result" || item.is_error !== true) continue;
+    const text = toolResultText(item.content);
+    if (rule.pattern.test(text)) return text;
+  }
+  return null;
+}
+
+function toolResultText(content: unknown): string {
+  if (typeof content === "string") return content;
+  if (!Array.isArray(content)) return "";
+  return content
+    .map((part) => (isRecord(part) && typeof part.text === "string" ? part.text : ""))
+    .filter((t) => t.length > 0)
+    .join("\n");
 }
 
 // --- defaults (B-5) ----------------------------------------------------------
@@ -245,6 +282,8 @@ async function runSessionOnce(opts: RunSessionOptions): Promise<SessionResult> {
     initJournaled: boolean;
     overflowLines: string[];
     overflowTruncated: number;
+    denials: number;
+    denialSamples: string[];
     killedForTimeout: boolean;
     killedForShutdown: boolean;
     exited: boolean;
@@ -257,6 +296,8 @@ async function runSessionOnce(opts: RunSessionOptions): Promise<SessionResult> {
     initJournaled: false,
     overflowLines: [],
     overflowTruncated: 0,
+    denials: 0,
+    denialSamples: [],
     killedForTimeout: false,
     killedForShutdown: false,
     exited: false,
@@ -349,6 +390,12 @@ async function runSessionOnce(opts: RunSessionOptions): Promise<SessionResult> {
     // Every parsed event goes to the injected sink; only init/result are
     // journaled boundaries (B-3).
     opts.sink?.(parsed);
+
+    const denial = denialInClaudeEvent(parsed);
+    if (denial !== null) {
+      state.denials++;
+      if (state.denialSamples.length < DENIAL_SAMPLE_CAP) state.denialSamples.push(tailBytes(denial, DENIAL_SAMPLE_BYTES));
+    }
 
     if (isInitEvent(parsed)) {
       if (typeof parsed.session_id === "string") state.sessionId = parsed.session_id;
@@ -462,6 +509,8 @@ async function runSessionOnce(opts: RunSessionOptions): Promise<SessionResult> {
     transcriptPath,
     overflow: { lines: overflowLines, truncatedCount: overflowTruncated },
     stderrTail,
+    denials: state.denials,
+    denialSamples: [...state.denialSamples],
   };
 
   // B-6: session end journals the evidence bundle. A killed session still
@@ -493,6 +542,8 @@ async function runSessionOnce(opts: RunSessionOptions): Promise<SessionResult> {
       overflowTruncatedCount: overflowTruncated,
       stderrTail,
       resultTextTail: resultText.length > 0 ? tailBytes(resultText, STDERR_TAIL_BYTES) : null,
+      denials: state.denials,
+      denialSamples: [...state.denialSamples],
     };
     opts.journal.append("session.result", resultPayload);
   }

@@ -168,6 +168,10 @@ fn completed() -> SessionResult {
         transcript_path: Some("/home/u/.claude/projects/-work-target/sess-seam.jsonl".to_string()),
         overflow: OverflowInfo::default(),
         stderr_tail: String::new(),
+        // Spec 119 B-6: the completed fixture carries one denial so both
+        // parsers prove they read the field; the quota one carries none.
+        denials: 1,
+        denial_samples: vec!["Bash operation blocked by hook: [pr-gate] BLOCKED".to_string()],
     }
 }
 
@@ -189,6 +193,8 @@ fn session_results_and_events() {
             truncated_count: 0,
         },
         stderr_tail: "rate limited".to_string(),
+        denials: 0,
+        denial_samples: Vec::new(),
         ..completed()
     };
     check("session-result-quota", &to_value(&quota));

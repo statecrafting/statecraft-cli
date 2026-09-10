@@ -34,6 +34,10 @@
         "resetAtMs": null
       },
       "costMicroUsd": 12345,
+      "denialSamples": [
+        "Bash operation blocked by hook: [pr-gate] BLOCKED"
+      ],
+      "denials": 1,
       "durationMs": 597,
       "exitCode": 0,
       "numTurns": 2,

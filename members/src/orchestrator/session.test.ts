@@ -10,6 +10,9 @@ import {
   deriveTranscriptPath,
   SessionsSerialError,
   OVERFLOW_LINE_CAP,
+  DENIAL_SAMPLE_CAP,
+  DENIAL_SAMPLE_BYTES,
+  denialInClaudeEvent,
 } from "./session";
 
 function freshDir(): string {
@@ -57,6 +60,89 @@ test("runSession: a completed result event carries cost, usage, and turns; forwa
   expect(result.sessionId).toBe("sess-completed");
   expect(result.transcriptPath).toBe(deriveTranscriptPath(dir, "sess-completed"));
   expect(events.map((e) => (e as { type: string }).type)).toEqual(["system", "assistant", "result"]);
+});
+
+// --- denials (119 B-5, B-8) --------------------------------------------------
+
+const DENIED_TOOL_RESULT =
+  '{"type":"user","message":{"role":"user","content":[{"type":"tool_result","tool_use_id":"t1","is_error":true,"content":"Bash operation blocked by hook:\\n- [pr-gate] BLOCKED: a committed shard tree is stale"}]}}';
+
+test("denialInClaudeEvent: reads a flagged tool_result that is a hook refusal, and nothing else", () => {
+  expect(denialInClaudeEvent(JSON.parse(DENIED_TOOL_RESULT))).toContain("[pr-gate] BLOCKED");
+  // An ordinary failing tool is not a denial.
+  expect(
+    denialInClaudeEvent({
+      type: "user",
+      message: { content: [{ type: "tool_result", is_error: true, content: "cargo test: 1 failed" }] },
+    })
+  ).toBeNull();
+  // A successful tool result that quotes the word is not a denial.
+  expect(
+    denialInClaudeEvent({
+      type: "user",
+      message: { content: [{ type: "tool_result", is_error: false, content: "PreToolUse hook blocked nothing" }] },
+    })
+  ).toBeNull();
+  // The model's prose is never a denial (119 D-3).
+  expect(
+    denialInClaudeEvent({
+      type: "assistant",
+      message: { content: [{ type: "text", text: "The hook blocked my command: [pr-gate] BLOCKED" }] },
+    })
+  ).toBeNull();
+  // Text parts are joined.
+  expect(
+    denialInClaudeEvent({
+      type: "user",
+      message: { content: [{ type: "tool_result", is_error: true, content: [{ type: "text", text: "hook denied" }] }] },
+    })
+  ).toBe("hook denied");
+});
+
+test("runSession: a hook refusal followed by a completed turn stays completed, and the denial is counted and journaled (119 B-5)", async () => {
+  const dir = freshDir();
+  const long = "x".repeat(DENIAL_SAMPLE_BYTES * 2);
+  const script = writeFakeClaude(
+    dir,
+    [
+      'echo \'{"type":"system","subtype":"init","session_id":"sess-denied"}\'',
+      `echo '${DENIED_TOOL_RESULT}'`,
+      `echo '${DENIED_TOOL_RESULT}'`,
+      `echo '${DENIED_TOOL_RESULT}'`,
+      `echo '{"type":"user","message":{"content":[{"type":"tool_result","is_error":true,"content":"hook blocked ${long}"}]}}'`,
+      'echo \'{"type":"assistant","message":{"role":"assistant","content":[{"type":"text","text":"the hook blocked me, so I stopped"}]}}\'',
+      'echo \'{"type":"result","subtype":"success","is_error":false,"result":"DONE","num_turns":3,"session_id":"sess-denied"}\'',
+      "exit 0",
+    ].join("\n")
+  );
+  const journalDir = freshDir();
+  const journal = openJournal(journalDir);
+  const result = await runSession({ repo: dir, prompt: "p", claudeBin: script, journal });
+  journal.close();
+
+  expect(result.classification.kind).toBe("completed");
+  expect(result.denials).toBe(4);
+  expect(result.denialSamples.length).toBe(DENIAL_SAMPLE_CAP);
+  for (const sample of result.denialSamples) expect(Buffer.byteLength(sample)).toBeLessThanOrEqual(DENIAL_SAMPLE_BYTES);
+  const record = openJournal(journalDir).fold().byKind["session.result"]![0]!.payload as Record<string, unknown>;
+  expect(record.classification).toBe("completed");
+  expect(record.denials).toBe(4);
+  expect(record.denialSamples).toEqual(result.denialSamples);
+});
+
+test("runSession: an ordinary completed session reports zero denials", async () => {
+  const dir = freshDir();
+  const script = writeFakeClaude(
+    dir,
+    [
+      'echo \'{"type":"system","subtype":"init","session_id":"s"}\'',
+      'echo \'{"type":"result","subtype":"success","is_error":false,"result":"DONE","session_id":"s"}\'',
+      "exit 0",
+    ].join("\n")
+  );
+  const result = await runSession({ repo: dir, prompt: "p", claudeBin: script });
+  expect(result.denials).toBe(0);
+  expect(result.denialSamples).toEqual([]);
 });
 
 test("runSession: an auth failure with no result event classifies auth (B-4)", async () => {

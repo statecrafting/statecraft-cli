@@ -5,6 +5,8 @@
     "resetAtMs": 1700000000000
   },
   "costMicroUsd": null,
+  "denialSamples": [],
+  "denials": 0,
   "durationMs": 597,
   "exitCode": 1,
   "numTurns": null,

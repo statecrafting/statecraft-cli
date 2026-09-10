@@ -193,10 +193,66 @@
           "kind": "file",
           "path": "members/src/members/driver-codex.test.ts"
         }
+      },
+      {
+        "nature": "additive",
+        "spec": "037-defect-capture",
+        "unit": {
+          "kind": "file",
+          "path": "members/src/orchestrator/adopt/defects.test.ts"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "035-corpus-synthesis",
+        "unit": {
+          "kind": "file",
+          "path": "members/src/orchestrator/adopt/synthesis.test.ts"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "028-cli-projects",
+        "unit": {
+          "kind": "file",
+          "path": "members/src/commands/orchestrator.test.ts"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "021-orchestrator-daemon",
+        "unit": {
+          "kind": "file",
+          "path": "members/src/orchestrator/daemon.test.ts"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "026-standby-daemon",
+        "unit": {
+          "kind": "file",
+          "path": "members/src/orchestrator/standby.test.ts"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "113-journal-port",
+        "unit": {
+          "kind": "directory",
+          "path": "crates/statecraft-journal/"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "110-corpus-merge",
+        "unit": {
+          "kind": "file",
+          "path": "docs/design/04-the-governed-substrate.md"
+        }
       }
     ],
     "id": "119-admission-and-outcome",
-    "implementation": "in-progress",
+    "implementation": "complete",
     "references": [
       {
         "role": "context",
@@ -215,6 +271,7 @@
       "4. Functional requirements",
       "5. Acceptance",
       "Verification",
+      "Status (2026-09-09)",
       "6. Out of scope",
       "7. Resolved decisions"
     ],
@@ -223,6 +280,6 @@
     "summary": "Three corrections doc 04 §2 found in the loop that every later boundary stands on. The engine's gate floor becomes read-only (spec-spine check, lint, couple) with its base resolved to a commit at stage start and journaled, so a stale committed registry is refused rather than repaired and the coupling verdict names the revision it compared against (D42). The merge sends the head sha shepherd watched go green and refuses one it did not (D43). A session's result carries the refusals its harness reported as a count and a bounded sample read from the provider's structured event, independent of the classification, so a hook refusal followed by a completed turn is evidence and not silence (D41).\n",
     "title": "The floor reads before it writes, the merge names its head, and a denial survives a completed turn"
   },
-  "shardHash": "74cce96adf5b7f240757d47bc80b4c39587b027df8a49ab13a1f2eb2f2ebcaaf",
+  "shardHash": "7c13dfae0f9c05d3bb1e1ad095bf9015e31364c7b4947f171fa0d280be15b25b",
   "specVersion": "1.2.0"
 }

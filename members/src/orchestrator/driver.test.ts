@@ -57,6 +57,8 @@ const COMPLETED_RESULT: SessionResult = {
   transcriptPath: "/tmp/sess-1.jsonl",
   overflow: { lines: [], truncatedCount: 0 },
   stderrTail: "",
+  denials: 0,
+  denialSamples: [],
 };
 
 const INIT_PAYLOAD = { claudeBin: "claude", repo: "/r", model: "m", maxTurns: null, timeoutMs: 1, sessionId: "sess-1", profile: { mode: "bypass", allowedTools: null, disallowedTools: null, models: null } };
@@ -272,7 +274,7 @@ test("117 FR-002: the profile driver resolves the name per call and keeps one dr
       tier: async () => (name === "codex" ? "basic" : "reference"),
       runSession: async (request) => {
         calls.push(`${name}:${request.prompt}`);
-        return { classification: { kind: "completed", detail: "", resetAtMs: null }, exitCode: 0, durationMs: 0, numTurns: null, costMicroUsd: null, usage: null, sessionId: null, transcriptPath: null, overflow: { lines: [], truncatedCount: 0 }, stderrTail: "" };
+        return { classification: { kind: "completed", detail: "", resetAtMs: null }, exitCode: 0, durationMs: 0, numTurns: null, costMicroUsd: null, usage: null, sessionId: null, transcriptPath: null, overflow: { lines: [], truncatedCount: 0 }, stderrTail: "", denials: 0, denialSamples: [] };
       },
       killLiveSession: () => name === "codex",
     };

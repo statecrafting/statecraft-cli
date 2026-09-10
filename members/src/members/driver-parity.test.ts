@@ -73,6 +73,16 @@ const FIXTURES: Record<string, string> = {
   transient: ["echo 'upstream ECONNRESET while talking to the API' >&2", "exit 1"].join("\n"),
   crashed: ["echo 'segfault-ish nonsense' >&2", "exit 139"].join("\n"),
   timeout: ["exec sleep 30"].join("\n"),
+  // 119 B-5/B-8: a hook refusal followed by a completed turn. Both drivers
+  // classify completed and both count the one denial from the flagged
+  // tool_result; the agent's prose quoting it is not counted.
+  denied: [
+    'echo \'{"type":"system","subtype":"init","session_id":"sess-denied"}\'',
+    'echo \'{"type":"user","message":{"role":"user","content":[{"type":"tool_result","tool_use_id":"t1","is_error":true,"content":"Bash operation blocked by hook:\\n- [pr-gate] BLOCKED: stale shards"}]}}\'',
+    'echo \'{"type":"assistant","message":{"role":"assistant","content":[{"type":"text","text":"the hook blocked it: [pr-gate] BLOCKED"}]}}\'',
+    'echo \'{"type":"result","subtype":"success","is_error":false,"result":"DONE","total_cost_usd":0.01,"usage":{"input_tokens":10,"output_tokens":4},"num_turns":2,"session_id":"sess-denied"}\'',
+    "exit 0",
+  ].join("\n"),
 };
 
 function normalize(text: string): unknown[] {
@@ -132,9 +142,12 @@ for (const [name, body] of Object.entries(FIXTURES)) {
     const tsEvents = normalize(ts.stdout);
     const rsEvents = normalize(rs.stdout);
     expect(rsEvents).toEqual(tsEvents);
-    const result = tsEvents.at(-1) as { event: string; result: { classification: { kind: string } } };
+    const result = tsEvents.at(-1) as { event: string; result: { classification: { kind: string }; denials: number; denialSamples: string[] } };
     expect(result.event).toBe("result");
-    expect(result.result.classification.kind).toBe(name === "timeout" ? "timeout" : name);
+    const expectedKind = name === "timeout" ? "timeout" : name === "denied" ? "completed" : name;
+    expect(result.result.classification.kind).toBe(expectedKind);
+    expect(result.result.denials).toBe(name === "denied" ? 1 : 0);
+    if (name === "denied") expect(result.result.denialSamples[0]).toContain("[pr-gate] BLOCKED");
   }, 30_000);
 }
 

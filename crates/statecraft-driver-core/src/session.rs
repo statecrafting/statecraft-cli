@@ -22,6 +22,10 @@ pub const KILL_GRACE_MS: u64 = 5000;
 pub const PIPE_DRAIN_GRACE_MS: u64 = 2000;
 pub const STDERR_TAIL_BYTES: usize = 16 * 1024;
 pub const OVERFLOW_LINE_CAP: usize = 256;
+/// Spec 119 B-5: how many denial samples ride on the result, and how long
+/// each may be. session.ts carries the same two numbers.
+pub const DENIAL_SAMPLE_CAP: usize = 3;
+pub const DENIAL_SAMPLE_BYTES: usize = 512;
 
 pub fn now_ms() -> i64 {
     SystemTime::now()
@@ -65,6 +69,9 @@ pub struct SessionOutcome {
     pub transcript_path: Option<String>,
     pub overflow: Overflow,
     pub stderr_tail: String,
+    /// Spec 119 B-5: refusals the harness reported, beside the classification.
+    pub denials: u64,
+    pub denial_samples: Vec<String>,
 }
 
 #[derive(Clone, Debug, Default, PartialEq, serde::Serialize)]
@@ -261,6 +268,8 @@ pub fn run_session(
     let mut init_journaled = false;
     let mut overflow_lines: Vec<String> = Vec::new();
     let mut overflow_truncated: u64 = 0;
+    let mut denials: u64 = 0;
+    let mut denial_samples: Vec<String> = Vec::new();
     let mut killed_for_timeout = false;
     let mut killed_for_shutdown = false;
     let mut term_sent_at: Option<Instant> = None;
@@ -274,6 +283,8 @@ pub fn run_session(
                            init_journaled: &mut bool,
                            overflow_lines: &mut Vec<String>,
                            overflow_truncated: &mut u64,
+                           denials: &mut u64,
+                           denial_samples: &mut Vec<String>,
                            deadline_armed: &mut bool| {
         let parsed: Value = match serde_json::from_str(line) {
             Ok(v) => v,
@@ -287,6 +298,12 @@ pub fn run_session(
             }
         };
         sink.stream(&parsed);
+        if let Some(text) = provider.denial_in_event(&parsed) {
+            *denials += 1;
+            if denial_samples.len() < DENIAL_SAMPLE_CAP {
+                denial_samples.push(tail_bytes(&text, DENIAL_SAMPLE_BYTES));
+            }
+        }
         match provider.parse_event(&parsed) {
             ProviderEvent::Init { session_id: id } => {
                 if id.is_some() {
@@ -337,6 +354,8 @@ pub fn run_session(
                 &mut init_journaled,
                 &mut overflow_lines,
                 &mut overflow_truncated,
+                &mut denials,
+                &mut denial_samples,
                 &mut deadline_armed,
             );
         }
@@ -385,6 +404,8 @@ pub fn run_session(
             &mut init_journaled,
             &mut overflow_lines,
             &mut overflow_truncated,
+            &mut denials,
+            &mut denial_samples,
             &mut deadline_armed,
         );
     }
@@ -392,6 +413,13 @@ pub fn run_session(
         let acc = stderr_tail.lock().unwrap();
         acc.clone()
     };
+    // 119 D-6: refusals the harness logged on stderr instead of the stream.
+    for text in provider.denials_in_stderr(&stderr_text) {
+        denials += 1;
+        if denial_samples.len() < DENIAL_SAMPLE_CAP {
+            denial_samples.push(tail_bytes(&text, DENIAL_SAMPLE_BYTES));
+        }
+    }
     // The reader threads end when the pipes close; an orphaned grandchild
     // can hold them, so they are not joined past the drain grace.
     drop(stdout_thread);
@@ -433,6 +461,8 @@ pub fn run_session(
             truncated_count: overflow_truncated,
         },
         stderr_tail: stderr_text.clone(),
+        denials,
+        denial_samples,
     };
 
     // B-6: session end journals the evidence bundle, with the result text
@@ -464,6 +494,8 @@ pub fn run_session(
             "overflowTruncatedCount": outcome.overflow.truncated_count,
             "stderrTail": outcome.stderr_tail,
             "resultTextTail": if result_text.is_empty() { Value::Null } else { Value::String(tail_bytes(&result_text, STDERR_TAIL_BYTES)) },
+            "denials": outcome.denials,
+            "denialSamples": outcome.denial_samples,
         }),
     );
     Ok(outcome)
@@ -540,6 +572,24 @@ mod tests {
         fn spawn_extras(&self, spec: &SpawnSpec<'_>) -> Value {
             json!({ "degraded": if spec.max_turns.is_some() { vec!["max-turns"] } else { vec![] } })
         }
+        // 119 B-5: a `deny` event is a refusal; the text is its payload.
+        fn denial_in_event(&self, event: &Value) -> Option<String> {
+            (event.get("type").and_then(Value::as_str) == Some("deny")).then(|| {
+                event
+                    .get("text")
+                    .and_then(Value::as_str)
+                    .unwrap_or("denied")
+                    .to_string()
+            })
+        }
+        // 119 D-6: a stderr line naming the router is a refusal too.
+        fn denials_in_stderr(&self, stderr_tail: &str) -> Vec<String> {
+            stderr_tail
+                .lines()
+                .filter(|l| l.contains("router: blocked"))
+                .map(str::to_string)
+                .collect()
+        }
     }
 
     struct Capture(Vec<(String, Value)>);
@@ -605,6 +655,63 @@ mod tests {
         // provider that names it; Plain names none, so the table (empty)
         // and the fallback decide: crashed.
         assert_eq!(outcome.classification.kind, TerminationKind::Crashed);
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn denials_are_counted_and_sampled_beside_a_completed_classification() {
+        let dir = std::env::temp_dir().join(format!("driver-core-deny-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let script = dir.join("deny.sh");
+        let long = "x".repeat(DENIAL_SAMPLE_BYTES * 2);
+        std::fs::write(
+            &script,
+            format!(
+                "#!/bin/sh\ncat >/dev/null\necho '{{\"type\":\"init\"}}'\n\
+                 echo '{{\"type\":\"deny\",\"text\":\"one\"}}'\n\
+                 echo '{{\"type\":\"deny\",\"text\":\"two\"}}'\n\
+                 echo '{{\"type\":\"deny\",\"text\":\"{long}\"}}'\n\
+                 echo 'router: blocked four' 1>&2\n\
+                 echo '{{\"type\":\"ok\"}}'\n\
+                 exit 0\n"
+            ),
+        )
+        .unwrap();
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            std::fs::set_permissions(&script, std::fs::Permissions::from_mode(0o755)).unwrap();
+        }
+        let opts = SessionOptions {
+            repo: dir.to_string_lossy().into_owned(),
+            prompt: "hi".into(),
+            bin: Some(script.to_string_lossy().into_owned()),
+            model: None,
+            max_turns: None,
+            timeout_ms: Some(10_000),
+            mcp_config_path: None,
+            profile: Profile {
+                mode: "bypass".into(),
+                ..Profile::default()
+            },
+            kill_grace_ms: None,
+        };
+        let mut sink = Capture(vec![]);
+        let outcome = run_session(&Plain, &opts, &mut sink, &KillSwitch::new()).unwrap();
+        // Three on the stream, one on stderr; the cap keeps three samples,
+        // each bounded.
+        assert_eq!(outcome.denials, 4);
+        assert_eq!(outcome.denial_samples.len(), DENIAL_SAMPLE_CAP);
+        assert_eq!(outcome.denial_samples[0], "one");
+        assert!(outcome.denial_samples[2].len() <= DENIAL_SAMPLE_BYTES);
+        let (kind, result) = sink.0.last().unwrap();
+        assert_eq!(kind, "session.result");
+        assert_eq!(result["denials"], json!(4));
+        assert_eq!(
+            result["denialSamples"].as_array().unwrap().len(),
+            DENIAL_SAMPLE_CAP
+        );
         let _ = std::fs::remove_dir_all(&dir);
     }
 }

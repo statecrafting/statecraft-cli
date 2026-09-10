@@ -5,6 +5,7 @@ import { join } from "path";
 import { openJournal } from "../journal";
 import { createProcessRunner, type Runner, type RunnerSessionOptions } from "./build";
 import { GATE_COMMANDS, gateSuiteFor, type GateContract } from "../gate-contract";
+import { MergeRefusedError } from "./ship";
 import type { SessionResult } from "../session";
 import type { GitHubClient, GitHubPr, GitHubCommit, CheckRun, MergeMethod, MergeOutcome } from "./ship";
 import {
@@ -88,6 +89,8 @@ function fakeSessionResult(overrides: Partial<SessionResult> = {}): SessionResul
     transcriptPath: null,
     overflow: { lines: [], truncatedCount: 0 },
     stderrTail: "",
+    denials: 0,
+    denialSamples: [],
     ...overrides,
   };
 }
@@ -126,6 +129,8 @@ interface FakeGhConfig {
   readonly logTails?: Readonly<Record<number, string>>;
   readonly mergeSha?: string;
   readonly branchContainsResult?: boolean;
+  // 119 B-4: the remote refuses the merge for the named head.
+  mergeRefuses?: boolean;
 }
 
 interface FakeGhState {
@@ -136,6 +141,8 @@ interface FakeGhState {
   mergeCalls: { number: number; method: MergeMethod }[];
   deleteBranchCalls: string[];
   branchContainsCalls: { branch: string; sha: string }[];
+  // 119 B-4: the head each merge call named.
+  mergeHeads: string[];
 }
 
 function freshFakeGhState(): FakeGhState {
@@ -145,6 +152,7 @@ function freshFakeGhState(): FakeGhState {
     checkRunsCallCountBySha: {},
     jobLogTailCalls: [],
     mergeCalls: [],
+    mergeHeads: [],
     deleteBranchCalls: [],
     branchContainsCalls: [],
   };
@@ -176,8 +184,12 @@ function makeFakeGh(config: FakeGhConfig, state: FakeGhState): GitHubClient {
       const text = config.logTails?.[runId] ?? `log tail for run ${runId}`;
       return text.length > maxBytes ? text.slice(-maxBytes) : text;
     },
-    mergePr(number: number, method: MergeMethod): MergeOutcome {
+    mergePr(number: number, method: MergeMethod, expectedHeadSha: string): MergeOutcome {
       state.mergeCalls.push({ number, method });
+      state.mergeHeads.push(expectedHeadSha);
+      if (config.mergeRefuses) {
+        throw new MergeRefusedError(expectedHeadSha, `HTTP 409: Head branch was modified (fake)`);
+      }
       return { mergeSha: config.mergeSha ?? "merged-sha" };
     },
     branchContains(branch: string, sha: string): boolean {
@@ -349,8 +361,74 @@ test("green-first-try: all required checks pass on the first poll, so the stage 
   expect(result.evidence.watchAttempts[0]!.outcome).toBe("green");
   expect(result.evidence.remediations.length).toBe(0);
   expect(state.mergeCalls).toEqual([{ number: pr.number, method: "squash" }]);
+  // 119 B-4: the merge named the head the watch followed.
+  expect(state.mergeHeads).toEqual(["sha-a"]);
   expect(state.deleteBranchCalls).toEqual([branch]);
   expect(state.branchContainsCalls).toEqual([{ branch: "main", sha: "merge-sha-1" }]);
+
+  journal.close();
+});
+
+// --- runShepherdStage: the merge names its head (119 B-4) --------------------
+
+test("119 FR-003: a head that moved after the last green watch is not merged; the refusal is journaled and needs a human", async () => {
+  const { dir, specId } = initFixtureRepo();
+  const runner: Runner = { ...createProcessRunner({ repoDir: dir }), runSession: scriptedSessions([fakeSessionResult()]) };
+  const state = freshFakeGhState();
+  const watched = makePr({ headSha: "sha-a" });
+  const moved = makePr({ headSha: "sha-b" });
+  const gh = makeFakeGh(
+    {
+      // The first read is the head the watch follows; the re-read before the
+      // merge sees a push nobody watched.
+      prSequence: [watched, moved],
+      checkRunsBySha: { "sha-a": [[checkRun({ status: "completed", conclusion: "success" })]] },
+    },
+    state
+  );
+  const { journalDir } = openHandles();
+  const journal = openJournal(journalDir);
+
+  const result = await runShepherdStage({ runner, gh, specId, journal, clock: makeFakeClock() });
+
+  expect(result.outcome).toBe("failed");
+  expect(result.evidence.needsHuman).toBe(true);
+  expect(result.evidence.mergeSha).toBeNull();
+  expect(state.mergeCalls).toEqual([]);
+  expect(state.deleteBranchCalls).toEqual([]);
+  const refused = journal.fold().byKind["stage.shepherd.merge-refused"] ?? [];
+  expect(refused.length).toBe(1);
+  expect(refused[0]!.payload).toMatchObject({ specId, prNumber: watched.number, watchedSha: "sha-a", currentSha: "sha-b" });
+
+  journal.close();
+});
+
+test("119 FR-003: a merge the remote refuses for the named head is journaled, needs a human, and is attempted exactly once", async () => {
+  const { dir, specId } = initFixtureRepo();
+  const runner: Runner = { ...createProcessRunner({ repoDir: dir }), runSession: scriptedSessions([fakeSessionResult()]) };
+  const state = freshFakeGhState();
+  const pr = makePr({ headSha: "sha-a" });
+  const gh = makeFakeGh(
+    {
+      prSequence: [pr],
+      checkRunsBySha: { "sha-a": [[checkRun({ status: "completed", conclusion: "success" })]] },
+      mergeRefuses: true,
+    },
+    state
+  );
+  const { journalDir } = openHandles();
+  const journal = openJournal(journalDir);
+
+  const result = await runShepherdStage({ runner, gh, specId, journal, clock: makeFakeClock() });
+
+  expect(result.outcome).toBe("failed");
+  expect(result.evidence.needsHuman).toBe(true);
+  expect(state.mergeCalls.length).toBe(1);
+  expect(state.mergeHeads).toEqual(["sha-a"]);
+  expect(state.deleteBranchCalls).toEqual([]);
+  const refused = journal.fold().byKind["stage.shepherd.merge-refused"] ?? [];
+  expect(refused.length).toBe(1);
+  expect((refused[0]!.payload as { reason: string }).reason).toContain("409");
 
   journal.close();
 });
@@ -392,6 +470,15 @@ test("fail-fix-green: one remediation restarts the watch on the new head sha and
   ]);
   expect(state.jobLogTailCalls).toEqual([1]);
   expect(state.mergeCalls).toEqual([{ number: prB.number, method: "squash" }]);
+  // 119 B-4: the merge named the head the second watch went green on.
+  expect(state.mergeHeads).toEqual(["sha-b"]);
+  // 119 B-2: the remediation's suite was judged against a resolved base,
+  // journaled before the prompt went out.
+  const base = journal.fold().byKind["stage.shepherd.base"] ?? [];
+  expect(base.length).toBe(1);
+  const baseSha = (base[0]!.payload as { baseSha: string }).baseSha;
+  expect(baseSha).toMatch(/^[0-9a-f]{40}$/);
+  expect(baseSha).toBe(runner.resolveBase("main"));
 
   journal.close();
 });

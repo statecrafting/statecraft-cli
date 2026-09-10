@@ -50,8 +50,12 @@ export interface RedactionPolicy {
 // results, quota events, control records, adoption and requalification
 // records, and decision seals. Costs, counts, classifications, exit codes,
 // shas, pins, spec ids, and timestamps all pass through untouched.
+// Version 2 (spec 119): the denial records (`stage.build.denials`,
+// `stage.shepherd.merge-refused`, `stage.shepherd.base`) join the allowlist
+// and their samples join the stripped set; a sample is a tool result's text,
+// which may quote a path.
 export const REDACTION_POLICY: RedactionPolicy = {
-  version: 1,
+  version: 2,
   includedKinds: [
     "control.approve",
     "control.forceHumanGate",
@@ -77,9 +81,12 @@ export const REDACTION_POLICY: RedactionPolicy = {
     "spec.requalify.refused",
     "specexec.created",
     "stage.build.bracket",
+    "stage.build.denials",
     "stage.build.gate",
     "stage.build.result",
     "stage.crashed",
+    "stage.shepherd.base",
+    "stage.shepherd.merge-refused",
     "stage.shepherd.result",
     "stage.ship.result",
     "stage.verify.result",
@@ -88,6 +95,7 @@ export const REDACTION_POLICY: RedactionPolicy = {
     "state.transition.outcome",
   ],
   strippedFields: [
+    "denialSamples",
     "detail",
     "error",
     "firstFailure",
@@ -96,6 +104,7 @@ export const REDACTION_POLICY: RedactionPolicy = {
     "reason",
     "refusalDetail",
     "resultTextTail",
+    "samples",
     "stderrTail",
     "stdoutTail",
     "transcriptPath",

@@ -6,6 +6,7 @@ import {
   GATE_COMMANDS,
   LEGACY_GATE_CONTRACT,
   gatePayload,
+  gateFloor,
   gateRefusal,
   gateSuiteFor,
   parseGateContract,
@@ -188,12 +189,28 @@ test("probeGateContract records the probe as the contract's source", () => {
 
 // --- FR-003: the one derivation ---------------------------------------------
 
-test("FR-003: the suite always begins with the four spec-spine floor commands, in order", () => {
+test("FR-003: the suite always begins with the three read-only spec-spine floor commands, in order (119 B-1)", () => {
   const contract: GateContract = { commands: [["make", "ci"]], source: "probe", rule: "make-ci" };
   const suite = gateSuiteFor(contract);
   expect(suite.slice(0, GATE_COMMANDS.length)).toEqual(GATE_COMMANDS as string[][]);
   expect(GATE_COMMANDS.every((cmd) => cmd[0] === "spec-spine")).toBe(true);
-  expect(GATE_COMMANDS.length).toBe(4);
+  expect(GATE_COMMANDS.length).toBe(3);
+  // The floor reads; it never regenerates (doc 04 D42).
+  for (const cmd of GATE_COMMANDS) {
+    expect(cmd[1]).not.toBe("compile");
+    expect(cmd.join(" ")).not.toBe("spec-spine index");
+  }
+  expect(GATE_COMMANDS[0]).toEqual(["spec-spine", "check", "--fail-on-warn"]);
+});
+
+test("119 FR-001: gateFloor splices the resolved base into the coupling command and gateSuiteFor carries it", () => {
+  const sha = "0123456789abcdef0123456789abcdef01234567";
+  const floor = gateFloor(sha);
+  expect(floor.length).toBe(3);
+  expect(floor[2]).toEqual(["spec-spine", "couple", "--base", sha, "--head", "HEAD"]);
+  const contract: GateContract = { commands: [["make", "ci"]], source: "probe", rule: "make-ci" };
+  expect(gateSuiteFor(contract, sha).slice(0, 3)).toEqual(floor as string[][]);
+  expect(gateSuiteFor(contract, sha)[3]).toEqual(["make", "ci"]);
 });
 
 test("FR-003: the contract's commands follow the floor verbatim, in order", () => {
