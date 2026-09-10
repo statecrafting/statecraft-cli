@@ -145,7 +145,12 @@ test("B-3: the records the engine journals through the seam equal the ones runSe
   try {
     const driver = createProcessDriver({ env: { ...process.env, STATECRAFT_CLAUDE_BIN: claude, STATECRAFT_MEMBER_DIR: join(dir, "none"), PATH: "/usr/bin:/bin" } });
     await driver.runSession({ repo: dir, prompt: "reply DONE", tier: "strong", maxTurns: 3, timeoutMs: 10_000, profile, journal });
-    const viaSeam = journal.fold().records.map((r) => ({ kind: r.kind, payload: r.payload }));
+    // 124 B-6: the seam's own qualification record is about the evidence,
+    // not the session; the driver's records are what parity compares.
+    const viaSeam = journal
+      .fold()
+      .records.filter((r) => r.kind !== "driver.unqualified")
+      .map((r) => ({ kind: r.kind, payload: r.payload }));
     expect(normalize(viaSeam)).toEqual(normalize(inProcess));
     expect((viaSeam[0]!.payload as Record<string, JsonValue>).model).toBe(DEFAULT_SESSION_MODELS.strong);
   } finally {

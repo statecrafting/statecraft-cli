@@ -122,11 +122,16 @@ test("FR-001: journal events are appended by the engine with their payloads inta
   const bin = writeFakeDriver(dir, "reference", scriptedStream());
   const journal = openJournal(dir, "orchestrator");
   try {
-    const driver = createProcessDriver({ driverBin: bin });
+    // 124 B-6: judged against an empty evidence directory, so the committed
+    // records for the real drivers do not enter this fixture's world.
+    const driver = createProcessDriver({ driverBin: bin, env: { ...process.env, STATECRAFT_QUALIFICATION_DIR: join(dir, "no-evidence") } });
     await driver.runSession({ repo: dir, prompt: "hi", journal });
     const records = journal.fold().records.map((r) => ({ kind: r.kind, payload: r.payload }));
+    // The fake driver's binary has no qualification record; the seam says so
+    // once, after the init, and the session runs.
     expect(records).toEqual([
       { kind: "session.init", payload: INIT_PAYLOAD },
+      { kind: "driver.unqualified", payload: { driver: "claude", binaryVersion: null, recorded: null } },
       { kind: "session.result", payload: RESULT_PAYLOAD },
     ]);
   } finally {
@@ -171,7 +176,7 @@ test("FR-003: killLiveSession severs the member with SIGTERM and the result is `
     expect(result.classification.detail).toContain("severed by the engine");
     expect(readFileSync(join(dir, "signal"), "utf8").trim()).toBe("signalled");
     const kinds = journal.fold().records.map((r) => r.kind);
-    expect(kinds).toEqual(["session.init", "session.result"]);
+    expect(kinds).toEqual(["session.init", "driver.unqualified", "session.result"]);
     expect(driver.killLiveSession()).toBe(false);
   } finally {
     journal.close();

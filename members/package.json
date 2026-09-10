@@ -15,7 +15,9 @@
     "web:build": "bunx vite build --config web/vite.config.ts",
     "build:member:sensor": "bun build --compile src/members/sensor.ts --outfile dist/statecraft-sensor-claude",
     "build:member:engine": "bun build --compile src/members/engine.ts --outfile dist/statecraft-engine",
-    "build:member:driver": "bun build --compile src/members/driver.ts --outfile dist/statecraft-driver-claude"
+    "build:member:driver": "bun build --compile src/members/driver.ts --outfile dist/statecraft-driver-claude",
+    "build:member:driver-fixture": "bun build --compile src/members/driver-fixture.ts --outfile dist/statecraft-driver-fixture",
+    "conformance": "bun test src/members/conformance.test.ts"
   },
   "spec-spine": {
     "spec": "000-bootstrap"

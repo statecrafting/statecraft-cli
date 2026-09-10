@@ -206,11 +206,17 @@ test("FR-003: 043's seam drives the Codex driver to journaled init and result re
     const records = journal.fold().records.map((r) => ({ kind: r.kind, payload: r.payload as Record<string, unknown> }));
     // 120 B-5: the seam journals the preferred token the manifest lacks
     // before spawning; the driver's own init then says what it applied.
-    expect(records.map((r) => r.kind)).toEqual(["driver.degraded", "session.init", "session.result"]);
+    // 124 B-6: a fake codex has no qualification record, so the seam says so
+    // once, after the init that named the binary version.
+    expect(records.map((r) => r.kind)).toEqual(["driver.degraded", "session.init", "driver.unqualified", "session.result"]);
     expect(records[0]!.payload).toEqual({ driver: "codex", tier: "basic", feature: "cost" });
     expect(records[1]!.payload.degraded).toEqual(["cost"]);
     expect(records[1]!.payload.applied).toEqual(["hook-enforcement"]);
     expect(records[1]!.payload.codexBin).toBe(codex);
+    // The fake codex answers `--version` with its first stream line, which is
+    // no version the committed record names.
+    expect(records[2]!.payload).toMatchObject({ driver: "codex" });
+    expect((records[2]!.payload as { binaryVersion: string }).binaryVersion).not.toBe("codex-cli 0.153.4");
   } finally {
     journal.close();
   }

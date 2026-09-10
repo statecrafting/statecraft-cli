@@ -1,0 +1,27 @@
+{
+  "schemaVersion": 1,
+  "driver": "codex",
+  "binary": {
+    "path": "/Applications/ChatGPT.app/Contents/Resources/codex",
+    "version": "codex-cli 0.153.4"
+  },
+  "platform": {
+    "os": "darwin",
+    "arch": "arm64"
+  },
+  "capabilities": {
+    "declared": [
+      "workspace-write",
+      "hook-enforcement"
+    ],
+    "applied": [
+      "hook-enforcement"
+    ],
+    "degraded": [
+      "cost"
+    ]
+  },
+  "denials": 1,
+  "classification": "completed",
+  "recordedAt": "2026-09-10T05:45:53.080Z"
+}

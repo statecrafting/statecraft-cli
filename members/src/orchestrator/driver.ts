@@ -27,6 +27,7 @@ import type { JournalHandle, JsonValue } from "./journal";
 import type { ExecutionProfile, ProfileSource } from "./profile";
 import { DEFAULT_REGISTRATION_PROFILE, profilePayload, resolveProfileSource } from "./profile";
 import { scrubEnv } from "./candidate";
+import { qualificationDir, qualificationFor, UNQUALIFIED_KIND } from "./qualification";
 import {
   decide,
   parseCapabilityList,
@@ -338,6 +339,26 @@ export const DEGRADED_KIND = "driver.degraded";
 // session.ts's killLiveSession had, over the seam instead of the provider.
 const liveKills = new Set<(graceMs?: number) => void>();
 
+// 124 B-6: once per process driver (one per driver name for a daemon's
+// life, 117 B-3), so the record says it once and a test can count on it.
+function noteQualification(
+  driver: string,
+  initPayload: JsonValue,
+  journal: JournalHandle,
+  reported: { done: boolean },
+  env: NodeJS.ProcessEnv
+): void {
+  if (reported.done) return;
+  const version =
+    typeof initPayload === "object" && initPayload !== null && !Array.isArray(initPayload) && typeof initPayload.binaryVersion === "string"
+      ? initPayload.binaryVersion
+      : null;
+  const verdict = qualificationFor(driver, version, qualificationDir(env));
+  if (verdict.qualified) return;
+  reported.done = true;
+  journal.append(UNQUALIFIED_KIND, { driver, binaryVersion: version, recorded: verdict.record?.binary.version ?? null });
+}
+
 export function killLiveSession(graceMs?: number): boolean {
   if (liveKills.size === 0) return false;
   for (const kill of [...liveKills]) kill(graceMs);
@@ -354,6 +375,7 @@ export function createProcessDriver(params: CreateProcessDriverParams = {}): Dri
   let cachedCapabilities: readonly Capability[] | null =
     params.capabilities ?? (params.tier !== undefined ? capabilitiesForTier(params.tier) : null);
   let liveKill: ((graceMs?: number) => void) | null = null;
+  const unqualifiedReported = { done: false };
 
   function resolveCommand(): readonly string[] {
     if (command !== null) return command;
@@ -532,6 +554,12 @@ export function createProcessDriver(params: CreateProcessDriverParams = {}): Dri
       switch (event.event) {
         case "journal":
           request.journal?.append(event.kind, event.payload);
+          // 124 B-6: the init names the binary version; a version with no
+          // qualification record is journaled once per driver per process,
+          // and the session runs.
+          if (event.kind === "session.init" && request.journal !== undefined) {
+            noteQualification(name, event.payload, request.journal, unqualifiedReported, env);
+          }
           return;
         case "stream":
           request.sink?.(event.raw);

@@ -46,7 +46,7 @@ export interface MemberManifest {
 export const UMBRELLA_EXIT_FLOOR = 64;
 
 // 023 D-4's taxonomy, carried verbatim by the engine and driver members (B-6).
-const ENGINE_EXIT_CODES: Readonly<Record<string, string>> = {
+export const ENGINE_EXIT_CODES: Readonly<Record<string, string>> = {
   "0": "ok",
   "1": "operational",
   "2": "unreachable",

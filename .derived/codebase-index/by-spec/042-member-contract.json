@@ -135,7 +135,7 @@
           {
             "file": "members/package.json",
             "span": {
-              "endLine": 19,
+              "endLine": 21,
               "startLine": 10
             }
           }
@@ -166,5 +166,5 @@
     "specStatus": "approved"
   },
   "schemaVersion": "1.1.0",
-  "shardHash": "49eaf4866b843b6b28b832a03d61c409e6f4a10b72015d88778cce423e4c5da4"
+  "shardHash": "cecec5790536e4a5069b8af9dae7ee3d230dafb739d60e9a001f53c6369dbe96"
 }

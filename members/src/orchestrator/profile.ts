@@ -28,6 +28,7 @@ import type { JsonValue } from "./journal";
 import type { SessionModels } from "./models";
 import { parseSessionModels, sessionModelsPayload } from "./models";
 import { parseCapabilityList, type Capability } from "./capabilities";
+import { renderQualification, type QualificationVerdict } from "./qualification";
 
 // --- the model (B-1) --------------------------------------------------------
 
@@ -281,10 +282,11 @@ export function profileRefusal(profile: ExecutionProfile): string | null {
 // A legacy-derived bypass is distinguishable from an operator-set one, and
 // no surface ever renders a blank: an absent profile is impossible by
 // construction (the fold always produces one).
-export function renderProfile(profile: RecordedProfile): string {
+export function renderProfile(profile: RecordedProfile, qualification: QualificationVerdict | null = null): string {
   // 117 B-2: a non-default driver shows in the cell; a default one prints
-  // exactly what it printed before 117.
-  const via = profile.driver === undefined ? "" : ` via ${profile.driver}`;
+  // exactly what it printed before 117. 124 B-6: a driver whose binary has
+  // no qualification record says so after its name.
+  const via = `${profile.driver === undefined ? "" : ` via ${profile.driver}`}${renderQualification(qualification)}`;
   // 120 B-4: a project that requires tokens says so after the driver.
   const requiring = profile.require === undefined || profile.require.length === 0 ? "" : ` requiring ${profile.require.join(",")}`;
   if (profile.mode === "bypass") return `${profile.legacy ? "bypass (legacy)" : "bypass"}${via}${requiring}`;

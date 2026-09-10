@@ -16,6 +16,14 @@ const PROVIDER_STRINGS = [
   "claude-sonnet",
 ];
 
+// 124 B-4: the Codex invocation strings, and the fixture driver's own
+// marker. The engine bundle carries none of them; the Codex driver is a Rust
+// binary, checked when it is built. `workspace-write` is not here: it is a
+// capability token (120 B-1) both sides carry, as the deny list's names are
+// (121 D-6); the Codex flag it maps onto is `--sandbox`.
+const CODEX_STRINGS = ["--sandbox", "--dangerously-bypass-approvals-and-sandbox", "--dangerously-bypass-hook-trust"];
+const FIXTURE_STRINGS = ["STATECRAFT_FIXTURE_MARKER", "STATECRAFT_FIXTURE_BREAK"];
+
 // 121 B-3 (D-6): the environment deny list is the one provider-named thing
 // the engine carries, because scrubbing is the engine's to do before the
 // member is spawned; the driver carries the same list for its own child.
@@ -41,5 +49,19 @@ test("FR-005: the engine bundle names no provider; the driver bundle names every
   for (const needle of DENY_LIST_STRINGS) {
     expect(engineBytes.includes(needle)).toBe(true);
     expect(driverBytes.includes(needle)).toBe(true);
+  }
+  // 124 B-4: the engine names no Codex string and nothing of the fixture's;
+  // the Claude driver bundle names neither either.
+  for (const needle of [...CODEX_STRINGS, ...FIXTURE_STRINGS]) {
+    expect(engineBytes.includes(needle)).toBe(false);
+  }
+  for (const needle of CODEX_STRINGS) {
+    expect(driverBytes.includes(needle)).toBe(false);
+  }
+  const codex = join(ROOT, "..", "target", "release", "statecraft-driver-codex");
+  if (existsSync(codex)) {
+    const codexBytes = readFileSync(codex).toString("latin1");
+    for (const needle of CODEX_STRINGS) expect(codexBytes.includes(needle)).toBe(true);
+    for (const needle of PROVIDER_STRINGS) expect(codexBytes.includes(needle)).toBe(false);
   }
 }, 120_000);

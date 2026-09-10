@@ -227,6 +227,9 @@ export interface ProjectView {
   // 123 B-2: the lifecycle policy, on the same row, legacy-flagged the way
   // the gate is.
   readonly policy: RecordedLifecyclePolicy;
+  // 124 B-6: whether the driver's binary, as the seam last saw it, has a
+  // qualification record. Null before any session named a version.
+  readonly driverQualified: boolean | null;
   // null when this project has no run yet, or when `readError` says its state
   // root could not be read. Never a fabricated idle run (022 B-6).
   readonly run: RunSummary | null;
