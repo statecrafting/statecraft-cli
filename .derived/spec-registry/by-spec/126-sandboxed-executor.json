@@ -102,6 +102,6 @@
     "summary": "Spec 125 fenced the credential path a driven session would reach for first, and recorded three residuals it could not close: HOME stays readable, an absolute path bypasses PATH, and ~/.ssh keys stay on disk. All three go around PATH, so nothing built out of shims and environment variables reaches them; what refuses a read of a path is the operating system. This spec makes the engine apply an OS confinement at the one place it already constructs the child's world, the session spawn in driver.ts, with a deny-list profile written beside the candidate. It turns 125's integrity property into a containment property for the reaches 125 enumerated, and says plainly which reaches remain.\n",
     "title": "The sandboxed executor: the OS refuses what a shim could only discourage"
   },
-  "shardHash": "dce0031bca7b2d49aa43c0d9fd8075c14b73027eb659a2f76919615b51e37bd1",
+  "shardHash": "02e8bba97f84d86350626b9e87a6e0f9d6734b67b31052b8eea2804bb649e586",
   "specVersion": "1.2.0"
 }

@@ -120,8 +120,10 @@ than an allow-list that has to be widened until it closes none of them.
 Denied for reading:
 
 - `~/.ssh` (subpath): the keys, `known_hosts` and any `config` naming them;
-- `~/.config/gh` and `~/.config/gh-*` (subpath): where `gh` stores a token
-  in plaintext;
+- `~/.config/gh` (subpath): where `gh` stores a token in plaintext.
+  125 already points the session's `GH_CONFIG_DIR` at an empty directory;
+  this denies the real one, which is what an absolute read would have
+  reached around that;
 - `~/.git-credentials` and `~/.config/git/credentials` (literal).
 
 Denied for execution:
