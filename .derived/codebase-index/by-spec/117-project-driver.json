@@ -213,7 +213,7 @@
           {
             "file": "crates/statecraft-driver-claude/src/main.rs",
             "span": {
-              "endLine": 446,
+              "endLine": 448,
               "startLine": 260
             }
           }
@@ -230,7 +230,7 @@
           {
             "file": "crates/statecraft-driver-codex/src/main.rs",
             "span": {
-              "endLine": 653,
+              "endLine": 655,
               "startLine": 332
             }
           }
@@ -294,5 +294,5 @@
     "specStatus": "approved"
   },
   "schemaVersion": "1.1.0",
-  "shardHash": "bbd302099f837c819d9367a7615de2a0177caef7f3240bea159e8c42894ca2bb"
+  "shardHash": "20a0364184a13b706276e5a2b4eef12bd2e83d0a6b6f2d27d1cf27f6538ba296"
 }

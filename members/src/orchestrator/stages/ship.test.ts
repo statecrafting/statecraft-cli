@@ -1,8 +1,11 @@
 import { test, expect } from "bun:test";
-import { mkdtempSync, writeFileSync, chmodSync } from "fs";
+import { mkdirSync, mkdtempSync, writeFileSync, chmodSync } from "fs";
 import { tmpdir } from "os";
 import { join } from "path";
 import { openJournal } from "../journal";
+import { createRun, transition } from "../state";
+import { latestReceipt } from "../receipt";
+import { BrokerRefusedError, type Broker, type BrokerRefusal, type BrokerRequest, type OpenPrRequest } from "../broker";
 import { createProcessRunner, type Runner } from "./build";
 import type { SessionResult } from "../session";
 import {
@@ -10,6 +13,7 @@ import {
   buildShipPrompt,
   SHIP_PROMPT_VERSION,
   createProcessGitHubClient,
+  proposalPath,
   type GitHubClient,
   type GitHubPr,
   type GitHubCommit,
@@ -104,6 +108,9 @@ function makeFakeGh(
       state.prForBranchCalls++;
       return params.prSequence[index] ?? null;
     },
+    createPr(_branch: string, _title: string, _body: string): GitHubPr {
+      throw new Error("ship.test.ts: createPr is the broker's seam (122), not exercised in the in-place scenarios");
+    },
     commitsForPr(_number: number): readonly GitHubCommit[] {
       state.commitsForPrCalls++;
       return commits;
@@ -135,13 +142,24 @@ function makeFakeGh(
 
 // --- prompt template (B-1) ----------------------------------------------------
 
-test("buildShipPrompt carries the operator's standing authorization through /ship's PR checkpoint", () => {
+test("buildShipPrompt (in place) carries the operator's standing authorization through /ship's PR checkpoint", () => {
   const prompt = buildShipPrompt({ branch: "017-stage-ship" });
-  expect(SHIP_PROMPT_VERSION).toBe(2);
+  expect(SHIP_PROMPT_VERSION).toBe(3);
   expect(prompt).toContain("Standing authorization");
   expect(prompt).toContain("do not stop to ask");
   // The authorization is scoped to PR creation: a drift waiver still halts.
   expect(prompt).toContain("waiver");
+});
+
+test("122 FR-002: the brokered prompt carries no push and no gh pr create; the session proposes into the drop box", () => {
+  const prompt = buildShipPrompt({ branch: "017-stage-ship", proposalPath: "/tmp/dropbox/proposal-017-stage-ship.json" });
+  expect(prompt).toContain("/tmp/dropbox/proposal-017-stage-ship.json");
+  expect(prompt).toContain("Publication is the engine's");
+  expect(prompt).toContain("do not push");
+  expect(prompt).not.toContain("Standing authorization");
+  expect(prompt).not.toContain("open the pull request through");
+  expect(prompt).toContain("waiver");
+  expect(prompt.indexOf(String.fromCharCode(0x2014))).toBe(-1);
 });
 
 test("buildShipPrompt embeds the branch, the prompt version, and the house style rules", () => {
@@ -178,7 +196,18 @@ test("createProcessGitHubClient: prForBranch parses gh pr view --json output", (
     headSha: "abc123",
     body: "## Summary",
     title: "feat: x",
+    merged: false,
   });
+});
+
+test("122 B-5: prForBranch reads the merge state and commit when gh reports them", () => {
+  const dir = mkdtempSync(join(tmpdir(), "ship-gh-test-"));
+  const script = writeFakeGhScript(
+    dir,
+    'echo \'{"number":7,"url":"u","headRefOid":"abc123","body":"","title":"t","state":"MERGED","mergeCommit":{"oid":"m1"}}\''
+  );
+  const client = createProcessGitHubClient({ repoDir: dir, ghBin: script });
+  expect(client.prForBranch("some-branch")).toMatchObject({ merged: true, mergeSha: "m1" });
 });
 
 test("createProcessGitHubClient: prForBranch returns null when gh exits non-zero (no PR for branch)", () => {
@@ -416,3 +445,140 @@ test("no PR opened: the session ran but no PR exists afterward, so the stage fai
 
   journal.close();
 });
+
+// --- 122: the engine publishes -------------------------------------------------
+
+// A fixture whose spec.md reads complete, so the ship stage's own gate can
+// mint a receipt over the head the session left (122 D-5).
+function initBrokeredFixture(specId: string): { dir: string; headSha: string } {
+  const { dir } = initFixtureRepo(specId);
+  mkdirSync(join(dir, "specs", specId), { recursive: true });
+  writeFileSync(join(dir, "specs", specId, "spec.md"), `---\nid: "${specId}"\nimplementation: complete\n---\n`);
+  git(dir, ["add", "-A"]);
+  git(dir, ["commit", "-q", "-m", `chore(${specId}): spec`]);
+  const headSha = new TextDecoder().decode(Bun.spawnSync(["git", "rev-parse", "HEAD"], { cwd: dir }).stdout).trim();
+  return { dir, headSha };
+}
+
+interface RecordingBroker extends Broker {
+  readonly pushes: BrokerRequest[];
+  readonly opened: OpenPrRequest[];
+}
+
+function recordingBroker(refuse?: BrokerRefusal): RecordingBroker {
+  const b: RecordingBroker = {
+    pushes: [],
+    opened: [],
+    push(request) {
+      if (refuse !== undefined) throw new BrokerRefusedError("push", refuse, `broker: push refused (${refuse})`);
+      b.pushes.push(request);
+      return { status: "done" };
+    },
+    openPr(request) {
+      b.opened.push(request);
+      return {
+        status: "done",
+        pr: { number: 77, url: "https://example.invalid/pr/77", headSha: request.headSha, title: request.title, body: request.body },
+      };
+    },
+    merge() {
+      throw new Error("ship.test.ts: merge is shepherd's");
+    },
+  };
+  return b;
+}
+
+function brokeredWorld(specId: string): { dir: string; headSha: string; journal: ReturnType<typeof openJournal>; runId: string; dropboxDir: string } {
+  const { dir, headSha } = initBrokeredFixture(specId);
+  const { journalDir } = openHandles();
+  const journal = openJournal(journalDir);
+  const run = createRun(journal, dir);
+  transition(journal, run, "running");
+  const dropboxDir = mkdtempSync(join(tmpdir(), "ship-dropbox-"));
+  return { dir, headSha, journal, runId: run.id, dropboxDir };
+}
+
+function greenRunner(dir: string, session: Runner["runSession"]): Runner {
+  return {
+    ...createProcessRunner({ repoDir: dir }),
+    runGate: () => ({ exitCode: 0, stdoutTail: "", stderrTail: "" }),
+    runSession: session,
+  };
+}
+
+test("122 FR-002: a session that proposes yields one push, one PR opened by the engine, and evidence naming the receipt", async () => {
+  const specId = "900-brokered-ship";
+  const w = brokeredWorld(specId);
+  const runner = greenRunner(w.dir, async () => {
+    writeFileSync(proposalPath(w.dropboxDir, specId), JSON.stringify({ title: `feat(900): fixture`, body: "## Summary\n\n- x\n\n## Testing\n\n- y\n" }));
+    return fakeSessionResult();
+  });
+  const broker = recordingBroker();
+  const state = freshFakeGhState();
+  // The PR the broker "opened" is what gh reads back for verification.
+  const pr = cleanPr({ number: 77, headSha: w.headSha, title: "feat(900): fixture", body: "## Summary\n\n- x\n" });
+  const gh = makeFakeGh({ prSequence: [null, pr], commits: [cleanCommit({ sha: w.headSha })], ciTriggered: true }, state);
+
+  const result = await runShipStage({ runner, gh, specId, journal: w.journal, broker, runId: w.runId, dropboxDir: w.dropboxDir });
+
+  expect(result.outcome).toBe("passed");
+  expect(broker.pushes.length).toBe(1);
+  expect(broker.opened.length).toBe(1);
+  expect(broker.pushes[0]).toMatchObject({ runId: w.runId, specId, branch: specId, headSha: w.headSha });
+  expect(broker.opened[0]).toMatchObject({ title: "feat(900): fixture", headSha: w.headSha });
+  const receipt = latestReceipt(w.journal.fold().records, specId)!;
+  expect(receipt.receipt.repo.candidateSha).toBe(w.headSha);
+  expect(receipt.receipt.round).toBe(3);
+  expect(broker.pushes[0]!.receiptHash).toBe(receipt.hash);
+  expect(result.evidence.pr).toEqual({ number: 77, url: "https://example.invalid/pr/77", headSha: w.headSha, receiptHash: receipt.hash, brokered: true });
+  expect(result.evidence.promptVersion).toBe(SHIP_PROMPT_VERSION);
+  const resultRecord = w.journal.fold().byKind["stage.ship.result"]!.at(-1)!.payload as Record<string, unknown>;
+  expect(resultRecord).toMatchObject({ outcome: "passed", prNumber: 77, receiptHash: receipt.hash });
+  w.journal.close();
+});
+
+test("122 FR-002: no proposal is failed with the reason and no effect; a red gate is failed no-receipt with no effect", async () => {
+  const specId = "900-brokered-ship";
+  const w = brokeredWorld(specId);
+  const broker = recordingBroker();
+  const gh = makeFakeGh({ prSequence: [null] }, freshFakeGhState());
+
+  const silent = greenRunner(w.dir, async () => fakeSessionResult());
+  const noProposal = await runShipStage({ runner: silent, gh, specId, journal: w.journal, broker, runId: w.runId, dropboxDir: w.dropboxDir });
+  expect(noProposal.outcome).toBe("failed");
+  expect(noProposal.evidence.verification?.diff[0]).toContain("no proposal");
+  expect(broker.pushes).toEqual([]);
+
+  const red: Runner = {
+    ...greenRunner(w.dir, async () => {
+      writeFileSync(proposalPath(w.dropboxDir, specId), JSON.stringify({ title: "feat: x", body: "" }));
+      return fakeSessionResult();
+    }),
+    runGate: (cmd) => ({ exitCode: cmd[1] === "lint" ? 1 : 0, stdoutTail: "", stderrTail: "L-001" }),
+  };
+  const redResult = await runShipStage({ runner: red, gh, specId, journal: w.journal, broker, runId: w.runId, dropboxDir: w.dropboxDir });
+  expect(redResult.outcome).toBe("failed");
+  expect(redResult.evidence.verification?.diff[0]).toContain("no-receipt");
+  expect(redResult.evidence.verification?.diff[0]).toContain("spec-spine lint --fail-on-warn");
+  expect(broker.pushes).toEqual([]);
+  expect(broker.opened).toEqual([]);
+  expect(latestReceipt(w.journal.fold().records, specId)).toBeNull();
+  w.journal.close();
+});
+
+test("122 FR-002: a broker refusal fails the stage with the refusal in evidence", async () => {
+  const specId = "900-brokered-ship";
+  const w = brokeredWorld(specId);
+  const runner = greenRunner(w.dir, async () => {
+    writeFileSync(proposalPath(w.dropboxDir, specId), JSON.stringify({ title: "feat: x", body: "" }));
+    return fakeSessionResult();
+  });
+  const broker = recordingBroker("lease-lost");
+  const gh = makeFakeGh({ prSequence: [null] }, freshFakeGhState());
+  const result = await runShipStage({ runner, gh, specId, journal: w.journal, broker, runId: w.runId, dropboxDir: w.dropboxDir });
+  expect(result.outcome).toBe("failed");
+  expect(result.evidence.verification?.diff[0]).toContain("lease-lost");
+  expect(broker.opened).toEqual([]);
+  w.journal.close();
+});
+

@@ -3,7 +3,7 @@ id: "122-action-broker"
 title: "The action boundary: the engine publishes on a receipt and a lease, the session proposes the text, and the candidate holds no publish credential"
 status: approved
 created: "2026-09-09"
-implementation: pending
+implementation: complete
 risk: critical
 depends_on:
   - "121-candidate-and-receipt"
@@ -34,6 +34,18 @@ extends:
   # 031 owns the export allowlist, which admits the broker records.
   - { spec: "031-journal-export", unit: "members/src/orchestrator/export.ts", nature: additive }
   - { spec: "031-journal-export", unit: "members/src/orchestrator/export.test.ts", nature: additive }
+  # 016 exports its completion evaluation for ship and shepherd's receipts (D-5).
+  - { spec: "016-stage-build", unit: "members/src/orchestrator/stages/build.ts", nature: additive }
+  # 116's members test widens a load-sensitive timeout fixture; 114's likewise.
+  - { spec: "116-codex-driver", unit: "members/src/members/driver-codex.test.ts", nature: additive }
+  - { spec: "114-driver-port", unit: "members/src/members/driver-parity.test.ts", nature: additive }
+  # 113 mirrors the export policy; the broker records bump it to 4.
+  - { spec: "113-journal-port", unit: { kind: directory, path: "crates/statecraft-journal/" }, nature: additive }
+  # 043's bundle rule lists the four deny-list names.
+  - { spec: "043-driver-seam", unit: "members/src/members/engine-bundle.test.ts", nature: additive }
+  # Fakes that implement GitHubClient gain createPr.
+  - { spec: "026-standby-daemon", unit: "members/src/orchestrator/standby.test.ts", nature: additive }
+  - { spec: "119-admission-and-outcome", unit: "members/src/orchestrator/admission.test.ts", nature: additive }
 references:
   - { unit: { kind: file, path: "docs/design/04-the-governed-substrate.md" }, role: context }
 summary: >
@@ -168,6 +180,35 @@ cd members && bun test src/orchestrator/broker.test.ts src/orchestrator/stages/s
 cargo test --workspace --locked -p statecraft-driver-claude -p statecraft-driver-codex -p statecraft-contract
 ```
 
+## Status (2026-09-09)
+
+Implemented. `broker.ts` carries the `Broker` interface, `createBroker`
+over the `GitHubClient` and a `GitPush` seam (`createProcessGitPush`
+over the candidate the runner has open), `holdsLease` over the folded
+run state, the reconciliations of B-5 and the `broker.action` and
+`broker.refused` records. `GitHubClient` gained `createPr` (through a
+body file) and `prForBranch` reads the merge state. The ship stage,
+with a broker, drives a prompt (version 3) that proposes into
+`<dropbox>/proposal-<spec>.json` (D-6), reads the proposal, receipts the
+head the session left when the build's receipt does not cover it
+(D-5), pushes and opens through the broker, and keeps B-3's outside
+verification; its idempotent precheck is the broker answering
+`already`. Shepherd merges through the broker on the receipt covering
+the PR head, and after a remediation session gates, receipts and pushes
+the fix itself (prompt told to commit and stop). The daemon builds the
+broker over the work journal and passes the run id, drop box, gate and
+profile to both stages; without a broker both stages keep the pre-122
+in-place flow (D-7). The deny list has four names on both sides;
+export policy is version 4. The members suite (943) and the workspace
+are green. The live smoke over a bare remote on disk with `gh` faked: a
+build round receipted the candidate, the ship round pushed it (the
+remote head equal to the candidate head) and journaled
+`broker.action` intent and outcome for `push` and `openPr` naming the
+receipt hash, the operator's checkout stayed clean on main, and a second
+ship round answered `already` for both. Known limit, as B-7 says: a
+`gh` authenticated through a keyring remains reachable to the
+candidate; the scrub is the boundary where the environment is.
+
 ## 6. Out of scope
 
 A permit format for the hosted plane (doc 04 D52). Signing the receipt
@@ -187,6 +228,23 @@ existing shape for exactly that.
 D-3 (2026-09-09). The lease is the folded run state, not a new record.
 013 already answers "which run is live"; a second lease record would
 have to be kept consistent with it.
+
+D-5 (2026-09-09). Ship and shepherd mint their own receipt when the
+head they hold is not the one the build receipted: a ship session that
+commits after review, or a remediation commit, moves the head, and B-6's
+rule (publish only on a receipt covering the head) would otherwise fail
+every such round. The receipt is the same gate over the same stable
+candidate (121 B-4, B-5), journaled with round 3 (ship) or 4 (shepherd).
+
+D-6 (2026-09-09). The proposal lands in the decisions' drop box, not in
+the candidate: a file under `<candidate>/.statecraft/` would dirty the
+tree 121 B-4 requires clean before a receipt, and "as 020 drops
+decisions" is the drop box.
+
+D-7 (2026-09-09). Without a broker the stages keep the pre-122 flow, in
+which the session publishes; the production deps always pass one. This
+is 121 D-5's shape for the same reason: fixture worlds without a remote
+or a run.
 
 D-4 (2026-09-09). The GitHub tokens leave the environment now, though a
 keyring-backed `gh` still answers. The limit is recorded rather than the

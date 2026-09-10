@@ -410,8 +410,10 @@ mod tests {
         parent.insert("HOME".to_string(), "/h".to_string());
         let env = c.child_env(&parent);
         assert!(!env.contains_key("OPENAI_API_KEY"));
-        // 121 B-3: the deny list is the contract's, both names.
+        // 121 B-3, 122 B-7: the deny list is the contract's, all four names.
         assert!(!env.contains_key("ANTHROPIC_API_KEY"));
+        parent.insert("GH_TOKEN".to_string(), "gh".to_string());
+        assert!(!c.child_env(&parent).contains_key("GH_TOKEN"));
         assert_eq!(env.get("NO_COLOR").map(String::as_str), Some("1"));
         assert_eq!(env.get("HOME").map(String::as_str), Some("/h"));
     }

@@ -689,7 +689,7 @@ frontmatter to \`implementation: complete\` before finishing.
 `;
 }
 
-interface Completion {
+export interface Completion {
   readonly gates: readonly GateEvidence[];
   readonly frontmatterComplete: boolean;
   readonly passing: boolean;
@@ -700,7 +700,7 @@ interface Completion {
   readonly receipt: Receipt | null;
 }
 
-interface EvaluateParams {
+export interface EvaluateParams {
   readonly runner: Runner;
   readonly specId: string;
   readonly specPath: string;
@@ -716,7 +716,7 @@ interface EvaluateParams {
 // passes. Head and status are read before and after the suite; a candidate
 // that moved or dirtied across it is journaled `acceptance.unstable` and the
 // round does not pass, whatever the commands said.
-function evaluateCompletion(p: EvaluateParams): Completion {
+export function evaluateCompletion(p: EvaluateParams): Completion {
   const { runner, specId, specPath, gate, baseSha, round, journal } = p;
   const headBefore = runner.headSha();
   const dirtyBefore = runner.statusText();

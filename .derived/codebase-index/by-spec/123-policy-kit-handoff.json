@@ -31,16 +31,6 @@
         "code": "W-001",
         "message": "spec '123-policy-kit-handoff' file unit 'scripts/codex-kit.test.py' does not exist",
         "path": "scripts/codex-kit.test.py"
-      },
-      {
-        "code": "W-001",
-        "message": "spec '123-policy-kit-handoff' file unit 'members/src/orchestrator/broker.ts' does not exist",
-        "path": "members/src/orchestrator/broker.ts"
-      },
-      {
-        "code": "W-001",
-        "message": "spec '123-policy-kit-handoff' file unit 'members/src/orchestrator/broker.test.ts' does not exist",
-        "path": "members/src/orchestrator/broker.test.ts"
       }
     ]
   },
@@ -71,6 +61,14 @@
       },
       {
         "path": "members/src/orchestrator/api/",
+        "source": "spec-edge"
+      },
+      {
+        "path": "members/src/orchestrator/broker.test.ts",
+        "source": "spec-edge"
+      },
+      {
+        "path": "members/src/orchestrator/broker.ts",
         "source": "spec-edge"
       },
       {
@@ -239,7 +237,11 @@
         }
       },
       {
-        "locations": [],
+        "locations": [
+          {
+            "file": "members/src/orchestrator/broker.test.ts"
+          }
+        ],
         "ownership": true,
         "sourceField": "extends",
         "unit": {
@@ -248,7 +250,11 @@
         }
       },
       {
-        "locations": [],
+        "locations": [
+          {
+            "file": "members/src/orchestrator/broker.ts"
+          }
+        ],
         "ownership": true,
         "sourceField": "extends",
         "unit": {

@@ -231,7 +231,14 @@ test("session.result keeps costs, counts, and classification; tails, transcript 
 });
 
 test("119 B-6: the denial count survives the export and its samples are stripped; the denial records are allowlisted", () => {
-  expect(REDACTION_POLICY.version).toBe(3);
+  expect(REDACTION_POLICY.version).toBe(4);
+  const action = redactPayload("broker.action", { action: "push", phase: "outcome", runId: "r", specId: "122-x", target: "122-x", headSha: "h", receiptHash: "rh", ok: true, detail: "pushed" });
+  expect(action.withheldPayload).toBe(false);
+  expect(action.withheldFields).toEqual(["detail"]);
+  expect((action.payload as Record<string, JsonValue>).receiptHash).toBe("rh");
+  const brokerRefused = redactPayload("broker.refused", { action: "merge", reason: "lease-lost", runId: "r", specId: "122-x", target: "#4", headSha: "h", receiptHash: "rh", detail: "run r is not live" });
+  expect(brokerRefused.withheldPayload).toBe(false);
+  expect(brokerRefused.withheldFields).toEqual(["detail", "reason"]);
   const result = redactPayload("session.result", { classification: "completed", denials: 2, denialSamples: ["[pr-gate] BLOCKED: /Users/x/repo"] });
   expect(result.withheldPayload).toBe(false);
   expect((result.payload as Record<string, JsonValue>).denials).toBe(2);

@@ -22,17 +22,19 @@ pub struct RedactionPolicy {
     pub stripped_fields: Vec<&'static str>,
 }
 
-/// 031's policy at version 3 (spec 119 added the denial records and their
-/// samples; spec 121 the acceptance records): the kind allowlist and the
+/// 031's policy at version 4 (spec 119 added the denial records and their
+/// samples; spec 121 the acceptance records; spec 122 the broker's): the kind allowlist and the
 /// fields stripped at any depth. Reviewable data; a change is a version
 /// bump, mirrored in export.ts.
 pub fn redaction_policy() -> RedactionPolicy {
     RedactionPolicy {
-        version: 3,
+        version: 4,
         included_kinds: vec![
             "acceptance.receipt",
             "acceptance.sensitive",
             "acceptance.unstable",
+            "broker.action",
+            "broker.refused",
             "control.approve",
             "control.forceHumanGate",
             "control.pause",

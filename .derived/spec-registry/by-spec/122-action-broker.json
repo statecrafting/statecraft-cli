@@ -122,10 +122,66 @@
           "kind": "file",
           "path": "members/src/orchestrator/export.test.ts"
         }
+      },
+      {
+        "nature": "additive",
+        "spec": "016-stage-build",
+        "unit": {
+          "kind": "file",
+          "path": "members/src/orchestrator/stages/build.ts"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "116-codex-driver",
+        "unit": {
+          "kind": "file",
+          "path": "members/src/members/driver-codex.test.ts"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "114-driver-port",
+        "unit": {
+          "kind": "file",
+          "path": "members/src/members/driver-parity.test.ts"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "113-journal-port",
+        "unit": {
+          "kind": "directory",
+          "path": "crates/statecraft-journal/"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "043-driver-seam",
+        "unit": {
+          "kind": "file",
+          "path": "members/src/members/engine-bundle.test.ts"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "026-standby-daemon",
+        "unit": {
+          "kind": "file",
+          "path": "members/src/orchestrator/standby.test.ts"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "119-admission-and-outcome",
+        "unit": {
+          "kind": "file",
+          "path": "members/src/orchestrator/admission.test.ts"
+        }
       }
     ],
     "id": "122-action-broker",
-    "implementation": "pending",
+    "implementation": "complete",
     "references": [
       {
         "role": "context",
@@ -144,6 +200,7 @@
       "4. Functional requirements",
       "5. Acceptance",
       "Verification",
+      "Status (2026-09-09)",
       "6. Out of scope",
       "7. Resolved decisions"
     ],
@@ -152,6 +209,6 @@
     "summary": "Doc 04 §6. The push and the pull request move from the driven session to the engine. The ship session gates, reviews and commits in the candidate and drops the PR title and body into a drop box, as 020 drops decisions; the broker validates the text with 017's marker rules, requires an acceptance receipt covering the candidate head, checks the run holds the project's lease, pushes, and opens the PR. Shepherd's merge consumes the same receipt beside the green checks and 119's head. Every effect is journaled before and after with the action, the target, the head and the receipt it consumed; a retry reconciles before it acts. The GitHub tokens join the environment deny list, so the candidate can no longer publish on its own. The hosted plane's verbs already sit behind their guards and are not changed.\n",
     "title": "The action boundary: the engine publishes on a receipt and a lease, the session proposes the text, and the candidate holds no publish credential"
   },
-  "shardHash": "4ade048359535cfad3c38bdde7d0e9350372be749c507be4e52e36d7987c08e7",
+  "shardHash": "ae28ae6ae5a0f6d6fa62c3ec7bfa89a21a6ce6d61d065a2c417827367ab81127",
   "specVersion": "1.2.0"
 }

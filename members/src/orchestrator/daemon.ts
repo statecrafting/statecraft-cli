@@ -83,6 +83,7 @@ import type {
 import { createProcessRunner, DEFAULT_BASE_BRANCH, runBuildStage } from "./stages/build";
 import type { GitHubClient, RunShipStageOptions, ShipResult } from "./stages/ship";
 import { createProcessGitHubClient, runShipStage } from "./stages/ship";
+import { createBroker, createProcessGitPush, type Broker } from "./broker";
 import type { RunShepherdStageOptions, ShepherdResult } from "./stages/shepherd";
 import { runShepherdStage } from "./stages/shepherd";
 import type { BrowserVerifier, RunVerifyStageOptions, VerifyResult, VerifyRunner } from "./stages/verify";
@@ -232,6 +233,10 @@ export interface DaemonDeps {
   readonly dagReader: DagReader;
   readonly runner: Runner;
   readonly gh: GitHubClient;
+  // 122 B-6: builds the broker over this run's work journal (the lease and
+  // the receipts are read from it). Absent is the in-place flow (122 D-7),
+  // in which the driven session publishes; production always passes one.
+  readonly broker?: (journal: JournalHandle) => Broker;
   readonly verifyRunner: VerifyRunner;
   readonly browserVerifier: BrowserVerifier;
   // Structural seam only (B-5): the daemon itself never calls this. It is
@@ -366,6 +371,7 @@ export function createProductionDaemonDeps(params: CreateProductionDaemonDepsPar
   // branch and head the scheduler wants, and is never written to.
   const runner = createProcessRunner({ repoDir, driver, profile, candidateHome: dataDir });
   const checkout = createProcessRunner({ repoDir, driver, profile });
+  const gh = createProcessGitHubClient({ repoDir, ghBin });
   return {
     dataDir,
     repoDir,
@@ -407,7 +413,9 @@ export function createProductionDaemonDeps(params: CreateProductionDaemonDepsPar
         // the checkout stays on a non-default branch.
       }
     },
-    gh: createProcessGitHubClient({ repoDir, ghBin }),
+    gh,
+    // 122 B-3: the push runs in the candidate the runner has open.
+    broker: (journal) => createBroker({ journal, gh, git: createProcessGitPush(() => runner.workDir()) }),
     verifyRunner: createProcessVerifyRunner({ repoDir }),
     browserVerifier: createBrowserMcpVerifier({ repo: repoDir, driver, profile }),
     runSession: (request) => driver.runSession(request),
@@ -1775,6 +1783,13 @@ export class Daemon {
           specId: specExec.specId,
           journal: this.workJournal,
           defaultBranch: this.deps.defaultBranch,
+          // 122 B-6: the engine publishes through the broker, on this run's
+          // lease, from the proposal in the drop box.
+          ...(this.deps.broker === undefined ? {} : { broker: this.deps.broker(this.workJournal) }),
+          runId: specExec.runId,
+          dropboxDir: this.dropboxDir,
+          gate: this.deps.gate,
+          profile: this.deps.profile,
         };
         const result = await this.deps.stageFns.ship(options);
         return { stage, result };
@@ -1792,6 +1807,10 @@ export class Daemon {
           // 041 B-4: the remediation prompt lists the project's gate, not
           // this repo's.
           gate: this.deps.gate,
+          // 122 B-6: the merge and the remediation push go through the broker.
+          ...(this.deps.broker === undefined ? {} : { broker: this.deps.broker(this.workJournal) }),
+          runId: specExec.runId,
+          profile: this.deps.profile,
         };
         const result = await this.deps.stageFns.shepherd(options);
         return { stage, result };
