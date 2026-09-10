@@ -3,7 +3,7 @@ id: "125-credential-fence"
 title: "The credential fence: the broker is the only path that works, so the journal is complete"
 status: approved
 created: "2026-09-10"
-implementation: in-progress
+implementation: complete
 risk: medium
 depends_on:
   - "122-action-broker"
@@ -292,5 +292,36 @@ machine.
 
 Authored `draft`, `implementation: pending`. It comes from doc 04 §11's
 open limits and from the known limit 122 recorded three times (B-7, §5, D-4).
+Approved by the owner on 2026-09-10, as written, and built the same day.
 
-Approved by the owner on 2026-09-10, as written, and started the same day.
+Complete. §5's four criteria, each with its evidence:
+
+- `bun test` in `members/` is green: 976 pass, 0 fail across 60 files, which
+  includes the 13 new fence cases and every broker, ship and shepherd suite
+  running with the fence wired in.
+- `cargo test` is green and the contract fixture asserts six names;
+  `crates/statecraft-journal` carries the same policy bump, because 039
+  FR-003's parity is byte-for-byte and the export test caught the two copies
+  disagreeing before this landed.
+- `make gate` exits 0 and `make members` exits 0.
+- The live round, on a host whose `gh auth status` reports keyring storage
+  and whose `origin` is an ssh URL. Outside the fence `gh auth token` exits 0
+  and yields a token; inside a fence built by `openCandidate` the same
+  command exits 127, yields nothing, prints the broker message and is
+  tallied. `gh api user` inside the fence exits 127 with an empty body. In
+  the same round the broker pushed the candidate to a real bare remote
+  through its production git seam (the remote head equals the candidate
+  head) and journaled `broker.action` intent and outcome for both `push`
+  and `openPr`, `ok=true`. GitHub's API was faked exactly as 122's own live
+  smoke faked it; the git half is real.
+
+What this does not do is unchanged from §6 and worth repeating where a
+reader will meet it: `HOME` stays readable, an absolute path bypasses
+`PATH`, and `~/.ssh` keys stay on disk. The fence closes the ergonomic
+path, which is what makes 122's journal complete; it does not contain a
+session that means to escape. That remains doc 04 §11's sandboxed executor.
+
+One observation from the build, recorded because it will recur: the members
+suite showed a single unnamed failure on two runs under load and then ran
+976/0 twice, matching the load-sensitive timeout fixtures already noted
+against 124. It is not related to the fence.
