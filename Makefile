@@ -36,11 +36,15 @@ BASE       ?= origin/$(or $(SPEC_SPINE_DEFAULT_BRANCH),main)
 ## `--fail-on-unresolved` is opt-in by design (spec 050): a spec ratified before
 ## it is built (108 today) legitimately carries an unresolved unit while the
 ## work is pending. Add the flag once every approved spec is implemented.
+## Spec 123 B-4: the kit check joins the read-only gate, so a Codex face
+## that drifted from the Claude one, or a manifest that no longer says what
+## was dropped, is red before a commit.
 gate:
 	$(SPEC_SPINE) check --fail-on-warn
 	$(SPEC_SPINE) lint --fail-on-warn
 	$(SPEC_SPINE) index coverage --fail-on-untraced
 	$(SPEC_SPINE) couple --base $(BASE) --head HEAD
+	python3 scripts/codex-kit.py --check
 
 ## The writing half, for a live session that has edited a spec and can commit
 ## the regenerated shards with the change that made them stale.
@@ -81,6 +85,11 @@ help:
 
 # Spec 118: the Codex face of the kit, generated from .claude/ (skills verbatim,
 # agents as TOML, hooks wrapped). `--check` is the spec's verification.
-.PHONY: codex-kit
+.PHONY: codex-kit kit-check
 codex-kit:
 	python3 scripts/codex-kit.py
+
+# Spec 123 B-4: the read-only check with its manifest, and the generator's test.
+kit-check:
+	python3 scripts/codex-kit.py --check
+	python3 scripts/codex-kit.test.py

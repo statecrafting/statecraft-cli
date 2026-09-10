@@ -24,6 +24,9 @@ import type { ExecutionProfile } from "../profile";
 import { parseProfile, profileRefusal } from "../profile";
 import type { GateContract } from "../gate-contract";
 import { gateRefusal } from "../gate-contract";
+import { parseLifecyclePolicy, type LifecyclePolicy } from "../lifecycle-policy";
+import { buildCapsule, capsulePayload } from "../handoff";
+import { originUrl } from "../candidate";
 import type { CostCeiling } from "../budget";
 import { ceilingRefusal, parseCeiling } from "../budget";
 import {
@@ -124,6 +127,8 @@ export interface ControlTarget {
   reverify(specId: string, source: string): void;
   forceHumanGate(specId: string, source: string): void;
   approve(specId: string, source: string): void;
+  // 123 B-3: names a draft the run may build when the policy allows it.
+  nameSpec(specId: string, source: string): void;
 }
 
 // Everything the API reads or drives for one registered project. Its journals
@@ -168,6 +173,8 @@ export interface ProjectsTarget {
   // universal governance floor. An empty list is the explicit governance-only
   // contract, not an absent request.
   setGate(name: string, gate: GateContract, source: ProjectSource): void;
+  // 123 B-2: the lifecycle policy, whole.
+  setPolicy(name: string, policy: LifecyclePolicy, source: "cli" | "api"): void;
   requalify(name: string, source: ProjectSource): void;
   remove(name: string, source: ProjectSource): void;
 }
@@ -472,10 +479,17 @@ function controlResponse(outcome: ControlOutcome | ApiError): Response {
 // running": a paused run resumes, an already-running run is an idempotent
 // no-op, and parked/completed/failed are refused, because those are the quota
 // scheduler's and the state machine's to leave, not a control verb's.
-function handleRunStart(scoped: Scoped, source: string): Response {
+function handleRunStart(scoped: Scoped, source: string, specId: string | null = null): Response {
   const status = statusOf(scoped.api.journal.records(), scoped.name);
   if (status === null) {
     return fail("conflict", `project "${scoped.name}" has no run yet; the scheduler creates one when it takes the flight slot`);
+  }
+  // 123 B-3: a named draft is remembered by the daemon; the policy decides
+  // at the pick whether it may build.
+  if (specId !== null) {
+    const named = runControl(scoped, "start", specId, (c) => c.nameSpec(specId, source));
+    if ("kind" in named) return fail(named.kind, named.message);
+    if (status === "running") return ok(named.result);
   }
   if (status === "running") return ok(noop(scoped.name, "start", null, status));
   if (status === "paused") {
@@ -767,6 +781,7 @@ const REGISTRY_VERB_FOR_ROUTE: Readonly<Record<string, ProjectControlVerb | unde
   [PROJECT_ROUTES.profile]: "profile",
   [PROJECT_ROUTES.ceiling]: "ceiling",
   [PROJECT_ROUTES.gate]: "gate",
+  [PROJECT_ROUTES.policy]: "policy",
 };
 
 // A fresh Response every time: a body can only be consumed once, so a shared
@@ -834,6 +849,7 @@ function metaView(deps: ApiDeps, nowMs: number): ApiMeta {
       projectRoute(NAMED, PROJECT_ROUTES.runPause),
       projectRoute(NAMED, PROJECT_ROUTES.runResume),
       ...SPEC_CONTROL_VERBS.map((verb) => projectRoute(NAMED, `${PROJECT_ROUTES.specPrefix}<id>/${verb}`)),
+      projectRoute(NAMED, `${PROJECT_ROUTES.specPrefix}<id>/${PROJECT_ROUTES.handoff}`),
     ],
   };
 }
@@ -933,6 +949,20 @@ async function routeProject(
     // explicit empty list is the governance-only contract; omitting the field
     // entirely is a request that says nothing, which is refused rather than
     // read as either one.
+    // 123 B-2: the fourth registry verb with state of its own: the whole
+    // policy, parsed by the same reader the registration probe uses.
+    if (registryVerb === "policy") {
+      if (body === null || !Object.hasOwn(body, "policy")) {
+        return fail("bad-request", `POST ${path} expects a JSON body with a "policy" object`);
+      }
+      let policy: LifecyclePolicy;
+      try {
+        policy = parseLifecyclePolicy(body.policy, "the request body");
+      } catch (err) {
+        return fail("bad-request", (err as Error).message);
+      }
+      return runRegistryControl(deps, registryVerb, name, clock.now(), () => deps.projects.setPolicy(name, policy, "api"));
+    }
     if (registryVerb === "gate") {
       if (body === null || !Object.hasOwn(body, "commands")) {
         return fail(
@@ -996,10 +1026,11 @@ async function routeProject(
       // request exactly like the views above; generatedAt is this daemon's
       // clock at response time (030 FR-002).
       return requireGet() ?? ok(servedEconomicsView(scoped.api.journal.records(), scoped.name, clock.now()));
-    case PROJECT_ROUTES.runStart:
-      return (
-        requirePost() ?? requireControls() ?? handleRunStart(scoped, controlSourceFrom(request, await readJsonBody(request)))
-      );
+    case PROJECT_ROUTES.runStart: {
+      const startBody = await readJsonBody(request);
+      const named = startBody !== null && typeof startBody.specId === "string" && startBody.specId.length > 0 ? startBody.specId : null;
+      return requirePost() ?? requireControls() ?? handleRunStart(scoped, controlSourceFrom(request, startBody), named);
+    }
     case PROJECT_ROUTES.runPause:
       return (
         requirePost() ?? requireControls() ?? handleRunPause(scoped, controlSourceFrom(request, await readJsonBody(request)))
@@ -1021,12 +1052,28 @@ async function routeProject(
   }
 
   if (suffix.startsWith(PROJECT_ROUTES.specPrefix)) {
-    const guard = requirePost() ?? requireControls();
-    if (guard) return guard;
     const parts = suffix
       .slice(PROJECT_ROUTES.specPrefix.length)
       .split("/")
       .filter((p) => p.length > 0);
+    // 123 B-6: the one read under the spec prefix, the handoff capsule.
+    if (parts.length === 2 && parts[1] === PROJECT_ROUTES.handoff) {
+      const handoffGuard = requireGet();
+      if (handoffGuard) return handoffGuard;
+      const specId = safeDecode(parts[0]!);
+      if (specId === null || !SPEC_ID_SHAPE.test(specId)) return fail("bad-request", `"${parts[0]}" is not a valid spec id`);
+      const capsule = buildCapsule({
+        records: scoped.api.journal.records(),
+        decisions: scoped.api.decisions.records(),
+        specId,
+        project: { name: scoped.name, origin: originUrl(scoped.api.repoDir) },
+        ceiling: scoped.project.ceiling,
+        nowMs: clock.now(),
+      });
+      return ok(capsulePayload(capsule));
+    }
+    const guard = requirePost() ?? requireControls();
+    if (guard) return guard;
     if (parts.length !== 2) {
       return fail("bad-request", `expected ${projectRoute(NAMED, `${PROJECT_ROUTES.specPrefix}<id>/<verb>`)}, got ${path}`);
     }

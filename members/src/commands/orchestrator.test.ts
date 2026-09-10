@@ -845,7 +845,9 @@ test("the projects controls journal their records with the cli as the source", a
     // terminal that asked for the registration, and its source says so.
     for (const record of registry.chain.fold().records.slice(1)) {
       const source = (record.payload as { source: string }).source;
-      expect(source).toBe(record.kind === "project.gate.set" ? "probe" : "cli");
+      // 123 B-2: likewise the policy record, authored by the probe of the
+      // target's (absent) policy file, so its source is the default.
+      expect(source).toBe(record.kind === "project.gate.set" ? "probe" : record.kind === "project.policy.set" ? "default" : "cli");
     }
 
     const remove = await run(["projects", "remove", "alpha", "--url", url], { dataDir });
@@ -2024,6 +2026,55 @@ test("120 FR-004: the profile verb records a require list, the detail and the po
     const modeless = await run(["projects", "add", registry.world("other").repoDir, "--name", "delta", "--require", "cost", "--url", url], { dataDir });
     expect(modeless.code).toBe(EXIT_USAGE);
     expect(modeless.err).toContain("--require needs a posture");
+  });
+});
+
+test("123 FR-001, FR-005: projects policy sets the policy from a file or inline and the detail shows it; handoff prints the capsule", async () => {
+  await withFixtureDaemon("projects-policy", async ({ registry, url, dataDir }) => {
+    const detail = await run(["projects", "arm", "alpha", "--url", url], { dataDir });
+    expect(detail.out).toContain("policy:  default");
+    expect(detail.out).toContain("schedules: approved");
+
+    // Inline JSON, whole; the record names the CLI.
+    const inline = await run(
+      ["projects", "policy", "alpha", "--json-policy", JSON.stringify({ merge: { method: "rebase" }, humanGate: "ship" }), "--url", url],
+      { dataDir }
+    );
+    expect(inline.code).toBe(EXIT_OK);
+    expect(inline.out).toContain("policy:  api");
+    expect(inline.out).toContain("merges: rebase");
+    expect(inline.out).toContain("human gate: ship");
+    expect(registry.projects().get("alpha")!.policy.merge.method).toBe("rebase");
+
+    // A file, and a refusal that names the bad key before the chain moves.
+    const file = join(dataDir, "policy.json");
+    fs.writeFileSync(file, JSON.stringify({ schedulable: { statuses: ["approved", "draft"], namedDraft: true } }));
+    const fromFile = await run(["projects", "policy", "alpha", "--file", file, "--url", url], { dataDir });
+    expect(fromFile.code).toBe(EXIT_OK);
+    expect(fromFile.out).toContain("approved, draft (a named draft may build)");
+    expect(registry.projects().get("alpha")!.policy.schedulable.namedDraft).toBe(true);
+    const bad = await run(["projects", "policy", "alpha", "--json-policy", JSON.stringify({ merge: { method: "ff" } }), "--url", url], { dataDir });
+    expect(bad.code).toBe(EXIT_USAGE);
+    expect(bad.err).toContain("merge.method");
+    // The policy travels whole: the file's policy replaced the inline one,
+    // so the merge method is the default again, and the refusal left it so.
+    expect(registry.projects().get("alpha")!.policy.merge.method).toBe("squash");
+    const neither = await run(["projects", "policy", "alpha", "--url", url], { dataDir });
+    expect(neither.code).toBe(EXIT_USAGE);
+    expect(neither.err).toContain("exactly one of --file");
+
+    // The capsule, rendered and as JSON.
+    const handoff = await run(["--project", "alpha", "handoff", "002-beta", "--url", url], { dataDir });
+    expect(handoff.code).toBe(EXIT_OK);
+    expect(handoff.out).toContain("## Handoff capsule");
+    expect(handoff.out).toContain("project: alpha");
+    expect(handoff.out).toContain("spec: 002-beta");
+    const asJson = await run(["--project", "alpha", "handoff", "002-beta", "--json", "--url", url], { dataDir });
+    expect(asJson.code).toBe(EXIT_OK);
+    const envelope = JSON.parse(asJson.out) as { ok: boolean; data: { schemaVersion: number; spec: { id: string } } };
+    expect(envelope.ok).toBe(true);
+    expect(envelope.data.schemaVersion).toBe(1);
+    expect(envelope.data.spec.id).toBe("002-beta");
   });
 });
 

@@ -178,10 +178,50 @@
           "kind": "file",
           "path": "Makefile"
         }
+      },
+      {
+        "nature": "additive",
+        "spec": "110-corpus-merge",
+        "unit": {
+          "kind": "file",
+          "path": ".github/workflows/spec-spine.yml"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "034-adoption-preflight",
+        "unit": {
+          "kind": "file",
+          "path": "members/src/orchestrator/adopt/preflight.test.ts"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "032-execution-profiles",
+        "unit": {
+          "kind": "file",
+          "path": "members/src/orchestrator/profile.test.ts"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "024-web-ui",
+        "unit": {
+          "kind": "file",
+          "path": "members/web/test/fixtures.ts"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "024-web-ui",
+        "unit": {
+          "kind": "file",
+          "path": "members/web/test/store.test.tsx"
+        }
       }
     ],
     "id": "123-policy-kit-handoff",
-    "implementation": "pending",
+    "implementation": "complete",
     "references": [
       {
         "role": "context",
@@ -200,6 +240,7 @@
       "4. Functional requirements",
       "5. Acceptance",
       "Verification",
+      "Status (2026-09-09)",
       "6. Out of scope",
       "7. Resolved decisions"
     ],
@@ -208,6 +249,6 @@
     "summary": "Doc 04 §7. Three things that today live in prose or in one provider's head become typed. A LifecyclePolicy on the projects chain, beside the gate contract, says which statuses a project schedules, whether a named draft may build, how it merges, which paths are policy-sensitive and what a receipt touching them does; absent, it is today's behavior. The Codex kit gains a manifest naming every generated file, its source and hash, and every field the generator dropped, and the check walks directories too. A handoff capsule built from the journal carries what a new session in any harness needs, is printed by a verb, and rides into every remediation prompt.\n",
     "title": "The policy, the kit and the handoff: a typed lifecycle per project, a kit manifest with provenance and declared drops, and a capsule any harness can resume from"
   },
-  "shardHash": "fd32984b721ee6d261e55ab1928222e59eaefc9ea4660205c75a3bed96ece135",
+  "shardHash": "8e2fc22ba754e56daac47f0c0fee4bb5ed26c54a9a4fe1f79014ea10d1e81c3b",
   "specVersion": "1.2.0"
 }

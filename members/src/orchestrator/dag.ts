@@ -32,8 +32,21 @@ export interface RegistrySpecEntry {
 // generated draft must pass through a human's approval to reach the
 // scheduler. Absent status is trusted (the fixture convention every other
 // seam follows); production readers always emit it.
-export function statusSchedulable(entry: RegistrySpecEntry): boolean {
-  return entry.status === undefined || entry.status === "approved";
+export function statusSchedulable(entry: RegistrySpecEntry, statuses: readonly string[] = DEFAULT_SCHEDULABLE_STATUSES): boolean {
+  return entry.status === undefined || statuses.includes(entry.status);
+}
+
+// 123 B-3: the statuses the default policy schedules; a project's lifecycle
+// policy may name others (spec-spine's own loop builds a named draft).
+export const DEFAULT_SCHEDULABLE_STATUSES: readonly string[] = ["approved"];
+
+export interface NextReadyOptions {
+  // The policy's schedulable statuses (123 B-3); default: approved only.
+  readonly statuses?: readonly string[];
+  // Draft specs the operator named through run/start, schedulable when the
+  // policy allows a named draft (123 B-3). Never an adoption: a named
+  // draft may build, not be trusted as shipped.
+  readonly named?: ReadonlySet<string>;
 }
 
 // Keyed by spec id; the pure functions below only ever need lookup by id, so
@@ -344,7 +357,9 @@ function cycleBlocksScheduling(cyclePath: readonly string[], shipped: ShippedMap
 // blocking reasons for every pending spec (honest blockers for the UI).
 // Cycle detection runs first (B-5): a cycle among specs that are not all
 // shipped refuses scheduling entirely, naming the path.
-export function nextReady(snapshot: RegistrySnapshot, shipped: ShippedMap, pinOf: PinLookup): NextReadyResult {
+export function nextReady(snapshot: RegistrySnapshot, shipped: ShippedMap, pinOf: PinLookup, options: NextReadyOptions = {}): NextReadyResult {
+  const statuses = options.statuses ?? DEFAULT_SCHEDULABLE_STATUSES;
+  const named = options.named ?? new Set<string>();
   const cycle = findCycle(snapshot);
   if (cycle && cycleBlocksScheduling(cycle, shipped)) {
     throw new Error(`dag: dependency cycle refuses scheduling: ${cycle.join(" -> ")}`);
@@ -361,8 +376,8 @@ export function nextReady(snapshot: RegistrySnapshot, shipped: ShippedMap, pinOf
     const entry = snapshot.get(id)!;
     // D-3: an unapproved spec is reported, never offered. The blocker keeps
     // it visible instead of silently vanishing from the schedule.
-    if (!statusSchedulable(entry)) {
-      blockers.push({ specId: id, reasons: [`status ${entry.status} is not approved`] });
+    if (!statusSchedulable(entry, statuses) && !(entry.status === "draft" && named.has(id))) {
+      blockers.push({ specId: id, reasons: [`status ${entry.status} is not ${statuses.join(" or ")}`] });
       continue;
     }
     const unmetDeps = entry.dependsOn.filter((dep) => !isValidlyShipped(dep, shipped, invalid));

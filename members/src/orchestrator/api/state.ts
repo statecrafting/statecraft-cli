@@ -495,6 +495,7 @@ export function projectsView(rows: readonly ProjectRowInput[], nowMs: number): P
       // 041 B-6: and the gate beside it, for the same reason and on the same
       // path. Registry state, so an unreadable state root does not lose it.
       gate: project.gate,
+      policy: project.policy,
     };
     try {
       const records = row.records();

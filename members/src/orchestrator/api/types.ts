@@ -21,6 +21,7 @@ import type { DecisionRecord } from "../decisions";
 import type { RecordedQualification } from "../projects";
 import type { ExecutionProfile, RecordedProfile } from "../profile";
 import type { RecordedGateContract } from "../gate-contract";
+import type { RecordedLifecyclePolicy } from "../lifecycle-policy";
 import type { CostCeiling, ProjectBudgetView } from "../budget";
 
 // --- version (B-1) ----------------------------------------------------------
@@ -96,10 +97,14 @@ export const PROJECT_ROUTES = {
   // 041 B-7: the operator override. Setting and clearing are the same route;
   // an empty command list is the explicit governance-only contract.
   gate: "gate",
+  // 123 B-2: the lifecycle policy, whole, on one route.
+  policy: "policy",
   runStart: "run/start",
   runPause: "run/pause",
   runResume: "run/resume",
   specPrefix: "spec/",
+  // 123 B-6: GET spec/<id>/handoff, the capsule.
+  handoff: "handoff",
 } as const;
 
 // D-1: spec 025's slug grammar (lowercase alphanumerics and hyphens) has no
@@ -118,7 +123,7 @@ export type SpecControlVerb = (typeof SPEC_CONTROL_VERBS)[number];
 
 export type ControlVerbToken = "start" | "pause" | "resume" | SpecControlVerb;
 
-export const PROJECT_CONTROL_VERBS = ["register", "arm", "disarm", "requalify", "remove", "profile", "ceiling", "gate"] as const;
+export const PROJECT_CONTROL_VERBS = ["register", "arm", "disarm", "requalify", "remove", "profile", "ceiling", "gate", "policy"] as const;
 export type ProjectControlVerb = (typeof PROJECT_CONTROL_VERBS)[number];
 
 // --- /api/meta (B-4) --------------------------------------------------------
@@ -219,6 +224,9 @@ export interface ProjectView {
   // from a probed or operator-set one, so a client never has to guess whether
   // an empty gate was chosen or never asked about.
   readonly gate: RecordedGateContract;
+  // 123 B-2: the lifecycle policy, on the same row, legacy-flagged the way
+  // the gate is.
+  readonly policy: RecordedLifecyclePolicy;
   // null when this project has no run yet, or when `readError` says its state
   // root could not be read. Never a fabricated idle run (022 B-6).
   readonly run: RunSummary | null;

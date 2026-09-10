@@ -10,6 +10,7 @@ import { tmpdir } from "os";
 import { join } from "path";
 import { openJournal, verifyChain } from "../journal";
 import type { Project } from "../projects";
+import { LEGACY_LIFECYCLE_POLICY } from "../lifecycle-policy";
 import {
   DEFAULT_EXCLUSIONS,
   DEFAULT_HISTORY_WINDOW,
@@ -450,6 +451,8 @@ function projectWith(qualified: boolean, adoptable: boolean): Project {
     // carries one too. Legacy here, because this fixture stands in for a
     // registration that predates every later registry field.
     gate: { commands: [], source: null, rule: null, legacy: true },
+    // 123 B-2: likewise the lifecycle policy.
+    policy: LEGACY_LIFECYCLE_POLICY,
   };
 }
 

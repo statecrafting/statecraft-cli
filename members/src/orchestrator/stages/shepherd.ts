@@ -28,6 +28,9 @@ import { GATE_COMMANDS, DEFAULT_BASE_BRANCH, evaluateCompletion, type Runner } f
 import { BrokerRefusedError, type Broker } from "../broker";
 import { latestReceipt, receiptCovers } from "../receipt";
 import type { ProfileSource } from "../profile";
+import { buildCapsule, renderCapsule } from "../handoff";
+import type { CostCeiling } from "../budget";
+import { basename } from "path";
 import { gateSuiteFor, resolveGateBinding, type GateBinding } from "../gate-contract";
 import { MergeRefusedError, type GitHubClient, type CheckRun, type MergeMethod, type MergeOutcome } from "./ship";
 
@@ -199,6 +202,8 @@ export interface ShepherdRemediationPromptParams {
   readonly gateCommands?: readonly (readonly string[])[];
   // 122 B-6: the engine publishes; the session only commits.
   readonly brokered?: boolean;
+  // 123 B-6: the handoff capsule, rendered.
+  readonly capsule?: string;
 }
 
 export function buildRemediationPrompt(params: ShepherdRemediationPromptParams): string {
@@ -240,6 +245,7 @@ ${whatToDo}
 
 ${gateList}
 
+${params.capsule ?? ""}
 ## House style
 
 No em dashes (U+2014) anywhere: chat, code, comments, commit messages.
@@ -354,6 +360,9 @@ export interface RunShepherdStageOptions {
   readonly broker?: Broker;
   readonly runId?: string;
   readonly profile?: ProfileSource;
+  // 123 B-6: what the capsule names the project, and the ceiling.
+  readonly projectName?: string;
+  readonly ceiling?: CostCeiling | null;
 }
 
 export async function runShepherdStage(options: RunShepherdStageOptions): Promise<ShepherdResult> {
@@ -570,6 +579,15 @@ export async function runShepherdStage(options: RunShepherdStageOptions): Promis
       failing: failureDetails,
       gateCommands: gateSuiteFor(gate, baseSha),
       brokered: options.broker !== undefined,
+      // 123 B-6: the capsule rides into the remediation prompt.
+      capsule: renderCapsule(
+        buildCapsule({
+          records: journal.fold().records,
+          specId,
+          project: { name: options.projectName ?? basename(runner.workDir()), origin: runner.originUrl() },
+          ceiling: options.ceiling ?? null,
+        })
+      ),
     });
     journal.append("stage.shepherd.prompt", { specId, attempt: attemptNumber, promptVersion: SHEPHERD_PROMPT_VERSION });
 

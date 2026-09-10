@@ -663,8 +663,10 @@ test("AC-2: passed with complete evidence when the session writes the file and f
 test("AC-2: a failing lint after the session triggers one remediation, then fails with the lint tail in evidence", async () => {
   const { dir, specId } = initFixtureRepo();
   const state = { sessionCalls: 0 };
+  const prompts: string[] = [];
   const runSession: Runner["runSession"] = async (opts) => {
     state.sessionCalls++;
+    prompts.push(opts.prompt);
     return fakeWritingSession(dir, specId)(opts);
   };
   const runGate: Runner["runGate"] = (cmd) => {
@@ -695,6 +697,13 @@ test("AC-2: a failing lint after the session triggers one remediation, then fail
 
   expect(result.outcome).toBe("failed");
   expect(result.evidence.sessions.length).toBe(2);
+  // 123 B-6: the remediation prompt carries the capsule: the red gate and
+  // the project, folded from the journal; the first prompt does not.
+  expect(prompts[0]).not.toContain("## Handoff capsule");
+  expect(prompts[1]).toContain("## Handoff capsule");
+  expect(prompts[1]).toContain("`spec-spine lint --fail-on-warn` exited 1");
+  expect(prompts[1]).toContain("FR-001 style violation");
+  expect(prompts[1]).toContain(`spec: ${specId}`);
   const lintEvidence = result.evidence.gates.find((g) => g.cmd.join(" ").includes("lint"));
   expect(lintEvidence?.exitCode).toBe(1);
   expect(lintEvidence?.stderrTail).toContain("FR-001 style violation");

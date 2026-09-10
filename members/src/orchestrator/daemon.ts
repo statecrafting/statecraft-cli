@@ -27,7 +27,7 @@
 // not a yield: the account's quota is one pool, so that wait belongs where
 // nothing else can start (026 B-5).
 import * as fs from "fs";
-import { join } from "path";
+import { basename, join } from "path";
 import type { JournalHandle, JournalRecord, JsonValue } from "./journal";
 import { openJournal } from "./journal";
 import { openDecisionsChain } from "./decisions";
@@ -84,6 +84,22 @@ import { createProcessRunner, DEFAULT_BASE_BRANCH, runBuildStage } from "./stage
 import type { GitHubClient, RunShipStageOptions, ShipResult } from "./stages/ship";
 import { createProcessGitHubClient, runShipStage } from "./stages/ship";
 import { createBroker, createProcessGitPush, type Broker } from "./broker";
+import { latestReceipt } from "./receipt";
+import { DEFAULT_LIFECYCLE_POLICY, type LifecyclePolicy, type RecordedLifecyclePolicy } from "./lifecycle-policy";
+
+// 123 B-3: the policy binding, late-bound like the gate (041 B-4).
+export type PolicyBinding = RecordedLifecyclePolicy | LifecyclePolicy | (() => RecordedLifecyclePolicy | LifecyclePolicy);
+
+export function resolvePolicyBinding(binding: PolicyBinding | undefined): LifecyclePolicy {
+  if (binding === undefined) return DEFAULT_LIFECYCLE_POLICY;
+  return typeof binding === "function" ? binding() : binding;
+}
+
+// The receipt's sensitive paths, re-filtered by the policy's own prefixes
+// (a project may name fewer or more than 121's default set).
+function sensitivePathsFor(paths: readonly string[], prefixes: readonly string[]): string[] {
+  return paths.filter((p) => prefixes.some((prefix) => (prefix.endsWith("/") ? p.startsWith(prefix) : p === prefix)));
+}
 import type { RunShepherdStageOptions, ShepherdResult } from "./stages/shepherd";
 import { runShepherdStage } from "./stages/shepherd";
 import type { BrowserVerifier, RunVerifyStageOptions, VerifyResult, VerifyRunner } from "./stages/verify";
@@ -268,6 +284,9 @@ export interface DaemonDeps {
   // next stage rather than the next daemon. Absent is 041 B-3's legacy fold,
   // which is the spec-spine floor and nothing else.
   readonly gate?: GateBinding;
+  // 123 B-3: this project's lifecycle policy, late-bound for the same reason
+  // the gate is. Absent is the default policy (today's loop).
+  readonly policy?: PolicyBinding;
   // 041 B-8: append this project's missing gate record, probing its tree, if
   // and only if its chain holds none. Called once at start(), before any
   // stage of this run is scheduled; the record's existence is the idempotence
@@ -356,6 +375,8 @@ export interface CreateProductionDaemonDepsParams {
   // gives a pre-041 chain one (see DaemonDeps.gate, DaemonDeps.migrateGateContract).
   readonly gate?: GateBinding;
   readonly migrateGateContract?: () => void;
+  // 123 B-3: this project's lifecycle policy, late-bound like the gate.
+  readonly policy?: PolicyBinding;
 }
 
 export function createProductionDaemonDeps(params: CreateProductionDaemonDepsParams): DaemonDeps {
@@ -380,6 +401,7 @@ export function createProductionDaemonDeps(params: CreateProductionDaemonDepsPar
     ceiling: params.ceiling,
     gate: params.gate,
     migrateGateContract: params.migrateGateContract,
+    policy: params.policy,
     dagReader: createProcessDagReader(),
     runner,
     readCheckoutBranch: () => {
@@ -451,7 +473,7 @@ export function shouldEmitHeartbeat(lastHeartbeatMs: number | null, nowMs: numbe
 
 // --- control queue (B-4) ------------------------------------------------
 
-export type ControlVerb = "pause" | "resume" | "skipSpec" | "retryStage" | "reverify" | "forceHumanGate" | "approve";
+export type ControlVerb = "pause" | "resume" | "skipSpec" | "retryStage" | "reverify" | "forceHumanGate" | "approve" | "nameSpec";
 
 export interface ControlCommand {
   readonly verb: ControlVerb;
@@ -603,6 +625,10 @@ export class Daemon {
 
   private readonly pendingControls: ControlCommand[] = [];
   private readonly skippedSpecIds = new Set<string>();
+  // 123 B-3: drafts the operator named through run/start.
+  private readonly namedSpecIds = new Set<string>();
+  // 123 B-3: the policy gates already raised, so an approval is asked once.
+  private readonly policyGatedOnce = new Set<string>();
   private readonly forcedGateSpecIds = new Set<string>();
   private readonly approvedGateSpecIds = new Set<string>();
   private readonly reverifyQueue: string[] = [];
@@ -975,6 +1001,13 @@ export class Daemon {
     this.pendingControls.push({ verb: "resume", source, seq: record.seq });
   }
 
+  // 123 B-3: names a draft the run may build when the policy allows it.
+  nameSpec(specId: string, source: string): void {
+    if (specId.length === 0) throw new Error("daemon: nameSpec() requires a non-empty specId");
+    const record = this.workJournal.append("control.nameSpec", { specId, source, restorable: true });
+    this.pendingControls.push({ verb: "nameSpec", specId, source, seq: record.seq });
+  }
+
   skipSpec(specId: string, source: string): void {
     if (specId.length === 0) throw new Error("daemon: skipSpec() requires a non-empty specId");
     const record = this.workJournal.append("control.skipSpec", { specId, source, restorable: true });
@@ -1081,6 +1114,12 @@ export class Daemon {
           break;
         case "skipSpec":
           if (cmd.specId) this.skippedSpecIds.add(cmd.specId);
+          break;
+        case "nameSpec":
+          // 123 B-3: a named draft is schedulable when the policy allows it;
+          // the name is remembered either way and the policy decides at the
+          // pick.
+          if (cmd.specId) this.namedSpecIds.add(cmd.specId);
           break;
         case "retryStage":
           if (cmd.specId && this.run.status === "paused") {
@@ -1367,7 +1406,11 @@ export class Daemon {
           .map((se) => se.specId)
       );
       const workingSnapshot = this.buildWorkingSnapshot(snapshot, new Set(shipped.keys()), resumable);
-      const next = nextReady(workingSnapshot, shipped, pinOf);
+      const policy = resolvePolicyBinding(this.deps.policy);
+      const next = nextReady(workingSnapshot, shipped, pinOf, {
+        statuses: policy.schedulable.statuses,
+        named: policy.schedulable.namedDraft ? this.namedSpecIds : new Set<string>(),
+      });
 
       if (typeof next === "string") {
         await this.runSpec(next, snapshot, shipped, pinOf);
@@ -1549,6 +1592,24 @@ export class Daemon {
       // stage attempt from starting, not merely be recorded for later.
       if (this.run.status !== "running") return { kind: "paused" };
 
+      // 123 B-3: the policy's standing human gate before a stage, and the
+      // gate a sensitive receipt forces before ship, are 021's gate with a
+      // journaled reason.
+      const policy = resolvePolicyBinding(this.deps.policy);
+      if (policy.humanGate === stage && !this.policyGatedOnce.has(`${specExec.specId}:${stage}`) && !this.approvedGateSpecIds.has(specExec.specId)) {
+        this.policyGatedOnce.add(`${specExec.specId}:${stage}`);
+        this.workJournal.append("daemon.gate.policy", { specId: specExec.specId, stage, reason: "humanGate" });
+        this.forcedGateSpecIds.add(specExec.specId);
+      }
+      if (stage === "ship" && policy.sensitive.onTouch === "human" && !this.approvedGateSpecIds.has(specExec.specId)) {
+        const receipt = latestReceipt(this.workJournal.fold().records, specExec.specId);
+        const touched = receipt === null ? [] : sensitivePathsFor(receipt.receipt.sensitivePaths, policy.sensitive.prefixes);
+        if (touched.length > 0 && !this.policyGatedOnce.has(`${specExec.specId}:sensitive`)) {
+          this.policyGatedOnce.add(`${specExec.specId}:sensitive`);
+          this.workJournal.append("daemon.gate.policy", { specId: specExec.specId, stage, reason: "sensitive", paths: touched });
+          this.forcedGateSpecIds.add(specExec.specId);
+        }
+      }
       if (this.forcedGateSpecIds.has(specExec.specId) && !this.approvedGateSpecIds.has(specExec.specId)) {
         this.workJournal.append("daemon.gate.waiting", { specId: specExec.specId, stage });
         this.pauseRun(`${specExec.specId}: awaiting human approval before ${stage}`);
@@ -1770,6 +1831,9 @@ export class Daemon {
           gate: this.deps.gate,
           // 121 B-5: the posture, folded into the receipt's policy digest.
           profile: this.deps.profile,
+          // 123 B-6: the capsule's project name and allowance.
+          projectName: basename(this.deps.repoDir),
+          ceiling: resolveCeilingSource(this.deps.ceiling),
         };
         const result = await this.deps.stageFns.build(options);
         return { stage, result };
@@ -1811,6 +1875,11 @@ export class Daemon {
           ...(this.deps.broker === undefined ? {} : { broker: this.deps.broker(this.workJournal) }),
           runId: specExec.runId,
           profile: this.deps.profile,
+          // 123 B-3: the policy's merge method.
+          mergeMethod: resolvePolicyBinding(this.deps.policy).merge.method,
+          // 123 B-6: the capsule's project name and allowance.
+          projectName: basename(this.deps.repoDir),
+          ceiling: resolveCeilingSource(this.deps.ceiling),
         };
         const result = await this.deps.stageFns.shepherd(options);
         return { stage, result };

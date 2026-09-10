@@ -345,6 +345,42 @@ test("D-3: an unapproved pending spec is never offered by nextReady and blocks w
   }
 });
 
+// --- 123 FR-002: the lifecycle policy's statuses and the named draft ---------
+
+test("123 FR-002: a draft is not ready under the default, is ready when named under a namedDraft policy, and a status outside the list is not", () => {
+  const snapshot = snapshotFrom([
+    spec("010-a", [], "complete"),
+    spec("011-draft", ["010-a"], "pending", "draft"),
+    spec("012-c", ["010-a"], "pending", "proposed"),
+  ]);
+  const shipped = shippedFrom({ "010-a": { pin: "pin-a", source: "adopted" } });
+  const pinOf: PinLookup = () => "pin-a";
+
+  // Default policy: neither the draft nor the proposed spec is offered.
+  const none = nextReady(snapshot, shipped, pinOf);
+  expect(typeof none).not.toBe("string");
+  // Named (the daemon passes the name set only when the policy allows a
+  // named draft): offered, with its dependencies still required.
+  expect(nextReady(snapshot, shipped, pinOf, { named: new Set(["011-draft"]) })).toBe("011-draft");
+  const named = nextReady(snapshotFrom([spec("010-a", [], "complete"), spec("011-draft", ["010-a"], "pending", "draft")]), shipped, pinOf, {
+    statuses: ["approved"],
+    named: new Set(["011-draft"]),
+  });
+  expect(named).toBe("011-draft");
+  // A policy that schedules "proposed" offers 012-c under the default name set.
+  expect(nextReady(snapshot, shipped, pinOf, { statuses: ["approved", "proposed"] })).toBe("012-c");
+  // The blocker names the statuses the policy schedules.
+  const blocked = nextReady(snapshot, shipped, pinOf, { statuses: ["approved", "ratified"] });
+  if (typeof blocked !== "string") {
+    expect(blocked.blockers.map((b) => b.reasons[0])).toEqual(["status draft is not approved or ratified", "status proposed is not approved or ratified"]);
+  }
+  // A named draft whose dependency is unmet stays blocked.
+  const unmet = nextReady(snapshotFrom([spec("010-a"), spec("011-draft", ["010-a"], "pending", "draft")]), shippedFrom({}), pinOf, {
+    named: new Set(["011-draft"]),
+  });
+  expect(unmet).toBe("010-a");
+});
+
 test("D-3: ready() is false for an unapproved spec regardless of its dependencies", () => {
   const snapshot = snapshotFrom([spec("010-a", [], "complete"), spec("011-draft", ["010-a"], "pending", "draft")]);
   const shipped = shippedFrom({ "010-a": { pin: "pin-a", source: "adopted" } });

@@ -345,10 +345,12 @@ test("POST /api/projects registers a target and answers with the chain's own rec
     // helper wrote are in the chain (022 D-2), which since 032 B-2 is the
     // registration plus the posture it consented to, and since 041 B-2 the
     // gate its target probed to as well.
-    expect(registry.chain.fold().records.length).toBe(before + 3);
-    expect(registry.chain.fold().records.slice(-2).map((r) => r.kind)).toEqual([
+    // 123 B-2 adds the policy the target's file (absent here) probed to.
+    expect(registry.chain.fold().records.length).toBe(before + 4);
+    expect(registry.chain.fold().records.slice(-3).map((r) => r.kind)).toEqual([
       "project.profile.set",
       "project.gate.set",
+      "project.policy.set",
     ]);
     expect(registry.projects().has("gamma")).toBe(true);
   });

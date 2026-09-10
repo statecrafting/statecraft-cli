@@ -443,7 +443,15 @@ test("119 FR-003: a merge the remote refuses for the named head is journaled, ne
 
 test("fail-fix-green: one remediation restarts the watch on the new head sha and then merges", async () => {
   const { dir, specId, branch } = initFixtureRepo();
-  const runner: Runner = { ...createProcessRunner({ repoDir: dir }), runSession: scriptedSessions([fakeSessionResult()]) };
+  const prompts: string[] = [];
+  const scripted = scriptedSessions([fakeSessionResult()]);
+  const runner: Runner = {
+    ...createProcessRunner({ repoDir: dir }),
+    runSession: async (options) => {
+      prompts.push(options.prompt);
+      return scripted(options);
+    },
+  };
   const state = freshFakeGhState();
   const prA = makePr({ headSha: "sha-a" });
   const prB = makePr({ headSha: "sha-b" });
@@ -478,6 +486,10 @@ test("fail-fix-green: one remediation restarts the watch on the new head sha and
   expect(state.mergeCalls).toEqual([{ number: prB.number, method: "squash" }]);
   // 119 B-4: the merge named the head the second watch went green on.
   expect(state.mergeHeads).toEqual(["sha-b"]);
+  // 123 B-6: the remediation prompt carries the capsule.
+  expect(prompts.length).toBe(1);
+  expect(prompts[0]).toContain("## Handoff capsule");
+  expect(prompts[0]).toContain(`spec: ${specId}`);
   // 119 B-2: the remediation's suite was judged against a resolved base,
   // journaled before the prompt went out.
   const base = journal.fold().byKind["stage.shepherd.base"] ?? [];

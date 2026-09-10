@@ -11,6 +11,7 @@
 // half the panels take, `fixtureClient` the global half the shell takes, and
 // both record into the same `calls` array so a test can assert what a panel
 // issued no matter which half it was handed.
+import { LEGACY_LIFECYCLE_POLICY } from "../../src/orchestrator/lifecycle-policy";
 import type {
   ApiClient,
   ApiMeta,
@@ -231,6 +232,7 @@ export const FIXTURE_PROJECT_VIEW: ProjectView = {
     rule: "typescript",
     legacy: false,
   },
+  policy: LEGACY_LIFECYCLE_POLICY,
   budget: FIXTURE_NO_CEILING,
   run: FIXTURE_RUN.run,
   spec: FIXTURE_RUN.spec,
@@ -258,6 +260,7 @@ export function fixtureProjectView(name: string, overrides: Partial<ProjectView>
     },
     profile: { mode: "bypass", legacy: false },
     gate: { commands: [["make", "ci"]], source: "probe", rule: "make-ci", legacy: false },
+    policy: LEGACY_LIFECYCLE_POLICY,
     budget: FIXTURE_NO_CEILING,
     run: null,
     spec: null,
@@ -411,6 +414,7 @@ const REGISTRY_KIND: Readonly<Record<ProjectControlVerb, string>> = {
   profile: "project.profile.set",
   ceiling: "project.ceiling.set",
   gate: "project.gate.set",
+  policy: "project.policy.set",
 };
 
 export function registryAnswerFor(verb: ProjectControlVerb, name: string | null, seq: number = 12): ProjectControlResult {
@@ -464,6 +468,7 @@ function projectClient(name: string, calls: RecordedCall[], options: FixtureClie
     reverify: (specId) => issue("reverify", "reverify", specId),
     forceHumanGate: (specId) => issue("forceHumanGate", "force-human-gate", specId),
     approve: (specId) => issue("approve", "approve", specId),
+    handoff: async () => ({ ok: false as const, error: { kind: "not-found" as const, message: "no capsule in this fixture" } }),
   };
 }
 
@@ -500,6 +505,7 @@ export function fixtureApiClient(options: FixtureClientOptions = {}): FixtureCli
     setProjectProfile: (name) => registryAnswer("profile", name),
     setProjectCeiling: (name) => registryAnswer("ceiling", name),
     setProjectGate: (name) => registryAnswer("gate", name),
+    setProjectPolicy: (name) => registryAnswer("policy", name),
     project: (name) => projectClient(name, calls, options),
   };
 }
