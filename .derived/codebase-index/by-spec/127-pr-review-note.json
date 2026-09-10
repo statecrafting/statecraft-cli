@@ -1,0 +1,80 @@
+{
+  "diagnostics": {
+    "errors": [],
+    "warnings": [
+      {
+        "code": "W-001",
+        "message": "spec '127-pr-review-note' file unit 'scripts/pr-note.py' does not exist",
+        "path": "scripts/pr-note.py"
+      },
+      {
+        "code": "W-001",
+        "message": "spec '127-pr-review-note' file unit 'scripts/pr-note.test.py' does not exist",
+        "path": "scripts/pr-note.test.py"
+      },
+      {
+        "code": "W-001",
+        "message": "spec '127-pr-review-note' section unit 'pr-note' not found in Makefile",
+        "path": "Makefile"
+      }
+    ]
+  },
+  "mapping": {
+    "dependsOn": [
+      "109-governed-harness"
+    ],
+    "implementingPaths": [
+      {
+        "path": "AGENTS.md",
+        "source": "spec-edge"
+      }
+    ],
+    "resolvedUnits": [
+      {
+        "locations": [],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "kind": "file",
+          "path": "scripts/pr-note.py"
+        }
+      },
+      {
+        "locations": [],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "kind": "file",
+          "path": "scripts/pr-note.test.py"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "AGENTS.md"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "AGENTS.md"
+        }
+      },
+      {
+        "locations": [],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "anchor": "pr-note",
+          "file": "Makefile",
+          "kind": "section"
+        }
+      }
+    ],
+    "specId": "127-pr-review-note",
+    "specStatus": "draft"
+  },
+  "schemaVersion": "1.1.0",
+  "shardHash": "7a7c95d28004d6eb4d2cbe30e7236fec4e26085fedbc48942d3631f6e859897e"
+}
