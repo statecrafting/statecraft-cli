@@ -13,6 +13,7 @@
 // unchanged; a project's journal is still just a journal.
 import type { JournalRecord, JsonValue } from "../journal";
 import { foldState } from "../journal";
+import { parseReceipt, RECEIPT_KIND } from "../receipt";
 import type { OrchestratorState, FoldedStageExec } from "../state";
 import { foldOrchestratorState } from "../state";
 import type { DagReader, PinLookup, RegistrySnapshot, RegistrySpecEntry, ShippedEntry, ShippedMap } from "../dag";
@@ -29,6 +30,7 @@ import type {
   DecisionQueryParams,
   DecisionsView,
   HistoryEntry,
+  HistoryReceipt,
   HistoryStage,
   HistoryView,
   ProjectView,
@@ -629,10 +631,12 @@ interface EvidenceAccumulator {
   ciConclusion: string | null;
   verifyVerdict: string | null;
   evidenceRefs: string[];
+  // 121 B-6: the newest receipt this execution minted, by record hash.
+  receipt: HistoryReceipt | null;
 }
 
 function emptyAccumulator(): EvidenceAccumulator {
-  return { prNumber: null, mergeSha: null, ciConclusion: null, verifyVerdict: null, evidenceRefs: [] };
+  return { prNumber: null, mergeSha: null, ciConclusion: null, verifyVerdict: null, evidenceRefs: [], receipt: null };
 }
 
 // Stage result records carry a specId, not a specExecId, so attribution is
@@ -707,6 +711,20 @@ export function historyView(records: readonly JournalRecord[], project: string):
         if (mergeSha !== null) acc.mergeSha = mergeSha;
         break;
       }
+      case RECEIPT_KIND: {
+        const receipt = parseReceipt(record.payload);
+        if (receipt !== null) {
+          acc.receipt = {
+            hash: record.recordHash,
+            round: receipt.round,
+            baseSha: receipt.repo.baseSha,
+            candidateSha: receipt.repo.candidateSha,
+            policyDigest: receipt.policy.digest,
+            sensitivePaths: [...receipt.sensitivePaths],
+          };
+        }
+        break;
+      }
       case "stage.verify.result": {
         acc.verifyVerdict = stringField(record.payload, "outcome");
         break;
@@ -745,6 +763,7 @@ export function historyView(records: readonly JournalRecord[], project: string):
       ciConclusion: acc.ciConclusion,
       verifyVerdict: acc.verifyVerdict,
       evidenceRefs: acc.evidenceRefs,
+      receipt: acc.receipt,
     });
   }
 

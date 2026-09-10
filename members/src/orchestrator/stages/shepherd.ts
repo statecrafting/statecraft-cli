@@ -351,6 +351,13 @@ export async function runShepherdStage(options: RunShepherdStageOptions): Promis
   const maxTurns = options.maxTurns ?? DEFAULT_SHEPHERD_MAX_TURNS;
   const gate = resolveGateBinding(options.gate);
 
+  // 121 B-2: with a candidate home, this stage works the spec's candidate,
+  // reopened as it was left (a daemon restart between stages loses the
+  // runner's pointer, never the worktree). In place, the checkout's branch
+  // is the spec's, as before.
+  if (runner.candidateHome() !== null) {
+    runner.openCandidate(specId, runner.resolveBase(options.defaultBranch ?? DEFAULT_BASE_BRANCH));
+  }
   const branch = runner.currentBranch();
   const specPath = `specs/${specId}/spec.md`;
 

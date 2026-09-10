@@ -361,7 +361,11 @@ export function createProductionDaemonDeps(params: CreateProductionDaemonDepsPar
   const driver =
     params.driver ??
     createProfileDriver({ profile, ...(params.driverEnv === undefined ? {} : { env: params.driverEnv }) });
-  const runner = createProcessRunner({ repoDir, driver, profile });
+  // 121 B-1, B-2: the stages work a candidate worktree under the daemon's
+  // home; the operator's checkout is read by a runner of its own for the
+  // branch and head the scheduler wants, and is never written to.
+  const runner = createProcessRunner({ repoDir, driver, profile, candidateHome: dataDir });
+  const checkout = createProcessRunner({ repoDir, driver, profile });
   return {
     dataDir,
     repoDir,
@@ -374,7 +378,7 @@ export function createProductionDaemonDeps(params: CreateProductionDaemonDepsPar
     runner,
     readCheckoutBranch: () => {
       try {
-        return runner.currentBranch();
+        return checkout.currentBranch();
       } catch {
         return null;
       }
@@ -382,18 +386,18 @@ export function createProductionDaemonDeps(params: CreateProductionDaemonDepsPar
     readSpecFileAtSha: createProcessSpecFileAtShaReader(repoDir),
     readHeadSha: () => {
       try {
-        return runner.headSha();
+        return checkout.headSha();
       } catch {
         return null;
       }
     },
     normalizeCheckoutForScheduling: () => {
       try {
-        if (!runner.statusClean()) return;
-        if (runner.currentBranch() === DEFAULT_BASE_BRANCH) return;
-        runner.checkout(DEFAULT_BASE_BRANCH);
+        if (!checkout.statusClean()) return;
+        if (checkout.currentBranch() === DEFAULT_BASE_BRANCH) return;
+        checkout.checkout(DEFAULT_BASE_BRANCH);
         try {
-          runner.pullFfOnly();
+          checkout.pullFfOnly();
         } catch {
           // A failed fast-forward leaves the checkout on the default branch
           // with older content, which the adoption guard treats honestly.
@@ -1460,6 +1464,13 @@ export class Daemon {
           specId: specExec.specId,
           mergeSha: outcome.result.result.evidence.mergeSha,
         });
+        // 121 B-1: a merged candidate is closed; its branch stays.
+        try {
+          this.deps.runner.closeCandidate(specExec.specId);
+        } catch {
+          // Best-effort: a worktree that will not remove is left for the
+          // next open to reuse or report.
+        }
       }
 
       specExec = { ...transition(this.workJournal, specExec, NEXT_STATUS_AFTER_STAGE[stage]), needsReconcile: false };
@@ -1749,6 +1760,8 @@ export class Daemon {
           // preflight and its post-session evidence read the same contract at
           // the moment they run.
           gate: this.deps.gate,
+          // 121 B-5: the posture, folded into the receipt's policy digest.
+          profile: this.deps.profile,
         };
         const result = await this.deps.stageFns.build(options);
         return { stage, result };
@@ -1761,6 +1774,7 @@ export class Daemon {
           gh: this.deps.gh,
           specId: specExec.specId,
           journal: this.workJournal,
+          defaultBranch: this.deps.defaultBranch,
         };
         const result = await this.deps.stageFns.ship(options);
         return { stage, result };

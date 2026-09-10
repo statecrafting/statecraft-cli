@@ -21,6 +21,7 @@ test("every fixture file is claimed by a test below", () => {
   const files = readdirSync(FIXTURES).filter((f) => f.endsWith(".json")).sort();
   expect(files).toEqual([
     "capabilities.json",
+    "child-env-deny.json",
     "driver-events.json",
     "envelope-error-status.json",
     "envelope-error.json",

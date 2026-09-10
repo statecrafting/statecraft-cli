@@ -1,5 +1,5 @@
 import { test, expect } from "bun:test";
-import { mkdtempSync, mkdirSync, rmSync, writeFileSync, readFileSync } from "fs";
+import { existsSync, mkdtempSync, mkdirSync, rmSync, writeFileSync, readFileSync } from "fs";
 import { tmpdir } from "os";
 import { join } from "path";
 import { openJournal } from "../journal";
@@ -19,6 +19,7 @@ import {
   type RunnerSessionOptions,
 } from "./build";
 import { gateSuiteFor, LEGACY_GATE_CONTRACT, type GateContract } from "../gate-contract";
+import { latestReceipt, policyDigest, RECEIPT_KIND, suiteDigest } from "../receipt";
 
 // --- fixture repo -----------------------------------------------------------
 
@@ -1134,3 +1135,178 @@ test("D-13: a stage that never needed a remediation reports stalled as null, not
   journal.close();
   decisionsChain.close();
 });
+
+// --- 121: the candidate and the receipt --------------------------------------
+
+// A session that works wherever the runner points it (the candidate), as a
+// driven session does.
+function gitOut(cwd: string, args: string[]): string {
+  return new TextDecoder().decode(Bun.spawnSync(["git", ...args], { cwd }).stdout).trim();
+}
+
+function candidateWritingSession(runner: Runner, specId: string): Runner["runSession"] {
+  return async (_options: RunnerSessionOptions) => {
+    const dir = runner.workDir();
+    mkdirSync(join(dir, "src"), { recursive: true });
+    writeFileSync(join(dir, "src", "example.ts"), "export const example = 1;\n");
+    writeFileSync(join(dir, "Makefile"), "ci:\n\ttrue\n");
+    const specPath = join(dir, "specs", specId, "spec.md");
+    writeFileSync(specPath, readFileSync(specPath, "utf8").replace("implementation: in-progress", "implementation: complete"));
+    git(dir, ["add", "-A"]);
+    git(dir, ["commit", "-q", "-m", "session work"]);
+    return fakeSessionResult("fake-candidate-session");
+  };
+}
+
+test("121 FR-002: with a candidate home the round runs in the worktree, the checkout never moves, and a stable pass mints a receipt", async () => {
+  const { dir, specId } = initFixtureRepo();
+  const home = mkdtempSync(join(tmpdir(), "build-candidate-home-"));
+  const asked: string[][] = [];
+  const base = createProcessRunner({ repoDir: dir, candidateHome: home, project: "fixture" });
+  const runner: Runner = {
+    ...base,
+    runGate: (cmd) => {
+      asked.push([...cmd]);
+      return { exitCode: 0, stdoutTail: cmd[1] === "--version" ? "spec-spine 0.18.0\n" : "", stderrTail: "" };
+    },
+    runSession: candidateWritingSession(base, specId),
+  };
+  // The operator's checkout stays dirty and on another branch throughout.
+  git(dir, ["checkout", "-q", "-b", "operator-work"]);
+  writeFileSync(join(dir, "scratch.txt"), "uncommitted\n");
+  const checkoutBefore = { head: gitOut(dir, ["rev-parse", "HEAD"]), status: Bun.spawnSync(["git", "status", "--porcelain"], { cwd: dir }).stdout.toString() };
+  const baseSha = gitOut(dir, ["rev-parse", "main"]);
+  const { journalDir } = openHandles(dir);
+  const journal = openJournal(journalDir);
+  const decisionsChain = openDecisionsChain(journalDir);
+
+  const result = await runBuildStage({
+    runner,
+    specId,
+    journal,
+    decisionsChain,
+    dropboxDir: join(journalDir, "decision-dropbox"),
+    knownSpecIds: new Set([specId]),
+    isSpecReady: () => true,
+    gate: { commands: [["make", "ci"]], source: "cli", rule: null },
+    profile: { mode: "guarded", driver: "codex" },
+  });
+
+  expect(result.outcome).toBe("passed");
+  const candidate = join(home, "candidates", "fixture", specId);
+  expect(runner.workDir()).toBe(candidate);
+  expect(existsSync(join(candidate, "src", "example.ts"))).toBe(true);
+  expect(existsSync(join(dir, "src", "example.ts"))).toBe(false);
+  expect(gitOut(dir, ["rev-parse", "HEAD"])).toBe(checkoutBefore.head);
+  expect(gitOut(dir, ["branch", "--show-current"])).toBe("operator-work");
+  expect(Bun.spawnSync(["git", "status", "--porcelain"], { cwd: dir }).stdout.toString()).toBe(checkoutBefore.status);
+
+  // The receipt names the candidate's head and base, the suite it ran, the
+  // policy it ran under, and the one sensitive path the session touched.
+  const receipt = result.evidence.receipt;
+  expect(receipt).not.toBeNull();
+  expect(receipt!.repo.candidateSha).toBe(gitOut(candidate, ["rev-parse", "HEAD"]));
+  expect(receipt!.repo.baseSha).toBe(baseSha);
+  expect(receipt!.repo.branch).toBe(specId);
+  expect(receipt!.suite.commands.map((c) => c.join(" "))).toEqual([
+    "spec-spine check --fail-on-warn",
+    "spec-spine lint --fail-on-warn",
+    `spec-spine couple --base ${baseSha} --head HEAD`,
+    "make ci",
+  ]);
+  expect(receipt!.suite.digest).toBe(suiteDigest(receipt!.suite.commands));
+  expect(receipt!.policy.digest).toBe(policyDigest(receipt!.policy.gate, receipt!.policy.profile));
+  expect((receipt!.policy.profile as { driver: string }).driver).toBe("codex");
+  expect(receipt!.verifier.specSpine).toBe("spec-spine 0.18.0");
+  expect(receipt!.sensitivePaths).toEqual(["Makefile"]);
+  expect(result.evidence.sensitivePaths).toEqual(["Makefile"]);
+  const folded = journal.fold().byKind;
+  expect(folded[RECEIPT_KIND]!.length).toBe(1);
+  expect(latestReceipt(journal.fold().records, specId)!.receipt).toEqual(receipt!);
+  expect(folded["acceptance.sensitive"]![0]!.payload).toEqual({ specId, round: 1, paths: ["Makefile"] });
+  expect(folded["acceptance.unstable"]).toBeUndefined();
+  expect(folded["stage.build.result"]![0]!.payload).toMatchObject({ stable: true, receipt: true, sensitivePaths: ["Makefile"] });
+
+  // Reopen for the next stage: the same worktree, as it was left.
+  const again = base.openCandidate(specId, baseSha);
+  expect(again).toEqual({ path: candidate, reused: true });
+  base.closeCandidate(specId);
+  expect(existsSync(candidate)).toBe(false);
+
+  journal.close();
+  decisionsChain.close();
+});
+
+test("121 FR-002: a session that leaves the candidate dirty is unstable: no receipt, the round does not pass", async () => {
+  const { dir, specId } = initFixtureRepo();
+  const home = mkdtempSync(join(tmpdir(), "build-candidate-home-"));
+  const base = createProcessRunner({ repoDir: dir, candidateHome: home, project: "fixture" });
+  let calls = 0;
+  const runner: Runner = {
+    ...base,
+    runGate: greenGate(),
+    runSession: async () => {
+      calls++;
+      const work = base.workDir();
+      const specPath = join(work, "specs", specId, "spec.md");
+      writeFileSync(specPath, readFileSync(specPath, "utf8").replace("implementation: in-progress", "implementation: complete"));
+      git(work, ["add", "-A"]);
+      git(work, ["commit", "-q", "-m", `work ${calls}`]);
+      // A writer that outlives the session: the tree is dirty when the gate runs.
+      mkdirSync(join(work, "src"), { recursive: true });
+      writeFileSync(join(work, "src", "leftover.ts"), `export const late = ${calls};\n`);
+      return fakeSessionResult(`s-${calls}`);
+    },
+  };
+  const { journalDir } = openHandles(dir);
+  const journal = openJournal(journalDir);
+  const decisionsChain = openDecisionsChain(journalDir);
+
+  const result = await runBuildStage({
+    runner,
+    specId,
+    journal,
+    decisionsChain,
+    dropboxDir: join(journalDir, "decision-dropbox"),
+    knownSpecIds: new Set([specId]),
+    isSpecReady: () => true,
+  });
+
+  expect(result.outcome).toBe("failed");
+  expect(result.evidence.receipt).toBeNull();
+  const folded = journal.fold().byKind;
+  expect(folded[RECEIPT_KIND]).toBeUndefined();
+  const unstable = folded["acceptance.unstable"]!;
+  expect(unstable.length).toBe(2);
+  expect(unstable[0]!.payload).toMatchObject({ specId, round: 1 });
+  expect((unstable[0]!.payload as { dirty: string }).dirty).toContain("?? src/");
+  expect(folded["stage.build.result"]![0]!.payload).toMatchObject({ stable: false, receipt: false });
+
+  base.closeCandidate(specId);
+  journal.close();
+  decisionsChain.close();
+});
+
+test("121 B-2: a candidate whose branch the operator has checked out is refused as candidate-unavailable", async () => {
+  const { dir, specId } = initFixtureRepo();
+  const home = mkdtempSync(join(tmpdir(), "build-candidate-home-"));
+  git(dir, ["checkout", "-q", "-b", specId]);
+  const runner: Runner = { ...createProcessRunner({ repoDir: dir, candidateHome: home, project: "fixture" }), runGate: greenGate() };
+  const { journalDir } = openHandles(dir);
+  const journal = openJournal(journalDir);
+  const decisionsChain = openDecisionsChain(journalDir);
+  const result = await runBuildStage({
+    runner,
+    specId,
+    journal,
+    decisionsChain,
+    dropboxDir: join(journalDir, "decision-dropbox"),
+    knownSpecIds: new Set([specId]),
+    isSpecReady: () => true,
+  });
+  expect(result.outcome).toBe("refused");
+  expect(result.evidence.refusal?.kind).toBe("candidate-unavailable");
+  journal.close();
+  decisionsChain.close();
+});
+

@@ -16,13 +16,16 @@
 // look real, a fake `claude` script per spec 014's own convention), never
 // the real `claude` binary.
 import * as fs from "fs";
-import { join } from "path";
+import { basename, join } from "path";
 import type { JournalHandle, JsonValue } from "../journal";
 import { createProcessDriver, type Driver, type SessionResult } from "../driver";
 import type { ModelTier } from "../models";
-import { resolveProfileSource, type ProfileSource } from "../profile";
+import { profilePayload, resolveProfileSource, type ProfileSource } from "../profile";
+import { candidatePath, changedPaths, closeCandidate, openCandidate, originUrl } from "../candidate";
+import { latestReceipt, mintReceipt, receiptPayload, RECEIPT_KIND, SENSITIVE_KIND, UNSTABLE_KIND, type Receipt } from "../receipt";
 import {
   GATE_COMMANDS,
+  gatePayload,
   gateSuiteFor,
   resolveGateBinding,
   type AnyGateContract,
@@ -75,6 +78,27 @@ export interface Runner {
   // commit once per stage run. Fetches `origin/<branch>` when a remote
   // answers, else the local branch (119 D-5); throws when neither resolves.
   resolveBase(defaultBranch: string): string;
+
+  // --- the candidate (121 B-1, B-2) ---
+  // Null when this runner works the checkout in place (a fixture world, or
+  // a runner built without a candidate home, 121 D-5); otherwise the
+  // candidate operations below apply and every other operation works the
+  // open candidate.
+  candidateHome(): string | null;
+  // Opens (or reopens) the candidate worktree for `branch` from `baseSha`
+  // and points every other operation at it. Returns 016 B-2's `reused`.
+  openCandidate(branch: string, baseSha: string): { path: string; reused: boolean };
+  // The open candidate's path, or the checkout when none is open.
+  workDir(): string;
+  // Removes the candidate worktree for `branch` and points the runner back
+  // at the checkout.
+  closeCandidate(branch: string): void;
+  // Repository-relative paths changed between two revisions (121 B-5).
+  changedPaths(baseSha: string, headSha: string): readonly string[];
+  // The repository's origin URL, or null (121 B-5).
+  originUrl(): string | null;
+  // `git status --porcelain` verbatim, for the stability check (121 B-4).
+  statusText(): string;
 
   // --- gate commands ---
   runGate(cmd: readonly string[]): GateResult;
@@ -138,6 +162,13 @@ export interface CreateProcessRunnerParams {
   // shepherd drive their sessions through this same Runner, so threading it
   // here covers all three stages.
   readonly profile?: ProfileSource;
+  // 121 B-1: where candidates live. Present, the build opens a worktree per
+  // spec branch under <candidateHome>/candidates/<project>/<branch> and every
+  // stage works it; absent, the runner works the checkout in place (121 D-5).
+  readonly candidateHome?: string;
+  // The project name the candidate path is keyed by; the checkout's
+  // basename when absent.
+  readonly project?: string;
 }
 
 // The production Runner: Bun.spawnSync for git and gate commands, fs for
@@ -149,51 +180,94 @@ export interface CreateProcessRunnerParams {
 export function createProcessRunner(params: CreateProcessRunnerParams): Runner {
   const { repoDir } = params;
   const driver = params.driver ?? createProcessDriver();
+  const candidateHome = params.candidateHome ?? null;
+  const project = params.project ?? basename(repoDir);
+  // 121 B-2: the directory every operation below works. The checkout until
+  // a candidate is opened; the candidate thereafter.
+  let workDir = repoDir;
 
   return {
+    candidateHome(): string | null {
+      return candidateHome;
+    },
+
+    openCandidate(branch: string, baseSha: string): { path: string; reused: boolean } {
+      if (candidateHome === null) {
+        // In-place mode (D-5): the branch is created or reused in the
+        // checkout, as 016 B-2 did before candidates existed.
+        const reused = this.createBranch(branch);
+        return { path: repoDir, reused };
+      }
+      const candidate = openCandidate({ repoDir, homeDir: candidateHome, project, branch, baseSha });
+      workDir = candidate.path;
+      return { path: candidate.path, reused: candidate.reused };
+    },
+
+    workDir(): string {
+      return workDir;
+    },
+
+    closeCandidate(branch: string): void {
+      if (candidateHome === null) return;
+      closeCandidate(repoDir, candidatePath(candidateHome, project, branch));
+      if (workDir !== repoDir) workDir = repoDir;
+    },
+
+    changedPaths(baseSha: string, headSha: string): readonly string[] {
+      return changedPaths(workDir, baseSha, headSha);
+    },
+
+    originUrl(): string | null {
+      return originUrl(repoDir);
+    },
+
+    statusText(): string {
+      return runProcessSync(workDir, ["git", "status", "--porcelain"]).stdout.trim();
+    },
+
     statusClean(): boolean {
-      const result = runProcessSync(repoDir, ["git", "status", "--porcelain"]);
+      const result = runProcessSync(workDir, ["git", "status", "--porcelain"]);
       return result.stdout.trim().length === 0;
     },
 
     currentBranch(): string {
-      const result = runProcessSync(repoDir, ["git", "branch", "--show-current"]);
+      const result = runProcessSync(workDir, ["git", "branch", "--show-current"]);
       return result.stdout.trim();
     },
 
     createBranch(branch: string): boolean {
       const exists =
-        runProcessSync(repoDir, ["git", "show-ref", "--verify", "--quiet", `refs/heads/${branch}`]).exitCode === 0;
+        runProcessSync(workDir, ["git", "show-ref", "--verify", "--quiet", `refs/heads/${branch}`]).exitCode === 0;
       if (exists) {
-        requireOk(repoDir, ["git", "checkout", branch], `git checkout ${branch}`);
+        requireOk(workDir, ["git", "checkout", branch], `git checkout ${branch}`);
         return true;
       }
-      requireOk(repoDir, ["git", "checkout", "-b", branch], `git checkout -b ${branch}`);
+      requireOk(workDir, ["git", "checkout", "-b", branch], `git checkout -b ${branch}`);
       return false;
     },
 
     checkout(branch: string): void {
-      requireOk(repoDir, ["git", "checkout", branch], `git checkout ${branch}`);
+      requireOk(workDir, ["git", "checkout", branch], `git checkout ${branch}`);
     },
 
     pullFfOnly(): void {
-      const upstream = runProcessSync(repoDir, ["git", "rev-parse", "--abbrev-ref", "@{u}"]);
+      const upstream = runProcessSync(workDir, ["git", "rev-parse", "--abbrev-ref", "@{u}"]);
       if (upstream.exitCode !== 0) return; // no upstream: nothing to be stale against
-      requireOk(repoDir, ["git", "pull", "--ff-only"], "git pull --ff-only");
+      requireOk(workDir, ["git", "pull", "--ff-only"], "git pull --ff-only");
     },
 
     add(paths: readonly string[]): void {
-      const existing = paths.filter((p) => fs.existsSync(join(repoDir, p)));
+      const existing = paths.filter((p) => fs.existsSync(join(workDir, p)));
       if (existing.length === 0) return;
-      requireOk(repoDir, ["git", "add", "--", ...existing], "git add");
+      requireOk(workDir, ["git", "add", "--", ...existing], "git add");
     },
 
     commit(message: string): void {
-      requireOk(repoDir, ["git", "commit", "-m", message], "git commit");
+      requireOk(workDir, ["git", "commit", "-m", message], "git commit");
     },
 
     headSha(): string {
-      const result = runProcessSync(repoDir, ["git", "rev-parse", "HEAD"]);
+      const result = runProcessSync(workDir, ["git", "rev-parse", "HEAD"]);
       return result.stdout.trim();
     },
 
@@ -202,7 +276,7 @@ export function createProcessRunner(params: CreateProcessRunnerParams): Runner {
     },
 
     runGate(cmd: readonly string[]): GateResult {
-      const result = runProcessSync(repoDir, cmd);
+      const result = runProcessSync(workDir, cmd);
       return {
         exitCode: result.exitCode,
         stdoutTail: tailText(result.stdout, GATE_TAIL_BYTES),
@@ -212,17 +286,17 @@ export function createProcessRunner(params: CreateProcessRunnerParams): Runner {
 
     readFile(path: string): string {
       try {
-        return fs.readFileSync(join(repoDir, path), "utf8");
+        return fs.readFileSync(join(workDir, path), "utf8");
       } catch (err) {
-        throw new Error(`build: could not read "${path}" under ${repoDir}: ${(err as Error).message}`);
+        throw new Error(`build: could not read "${path}" under ${workDir}: ${(err as Error).message}`);
       }
     },
 
     writeFile(path: string, content: string): void {
       try {
-        fs.writeFileSync(join(repoDir, path), content, "utf8");
+        fs.writeFileSync(join(workDir, path), content, "utf8");
       } catch (err) {
-        throw new Error(`build: could not write "${path}" under ${repoDir}: ${(err as Error).message}`);
+        throw new Error(`build: could not write "${path}" under ${workDir}: ${(err as Error).message}`);
       }
     },
 
@@ -230,14 +304,20 @@ export function createProcessRunner(params: CreateProcessRunnerParams): Runner {
       // The profile is applied after the caller's options, not merged with
       // them: a stage asks for a prompt, a model, and a deadline; what the
       // session may do on the operator's machine is not a stage's to name.
-      return driver.runSession({ repo: repoDir, ...options, profile: resolveProfileSource(params.profile) });
+      return driver.runSession({ repo: workDir, ...options, profile: resolveProfileSource(params.profile) });
     },
   };
 }
 
 // --- preflight refusals (B-1) -----------------------------------------------
 
-export type RefusalKind = "dirty-tree" | "wrong-branch" | "base-unresolved" | "gate-red-at-base" | "spec-not-ready";
+export type RefusalKind =
+  | "dirty-tree"
+  | "wrong-branch"
+  | "base-unresolved"
+  | "candidate-unavailable"
+  | "gate-red-at-base"
+  | "spec-not-ready";
 
 export interface Refusal {
   readonly kind: RefusalKind;
@@ -298,7 +378,9 @@ function sameGateAnswer(a: readonly GateEvidence[], b: readonly GateEvidence[]):
   });
 }
 
-type Preflight = { refusal: Refusal; baseSha: null } | { refusal: null; baseSha: string };
+type Preflight =
+  | { refusal: Refusal; baseSha: null; reused: null }
+  | { refusal: null; baseSha: string; reused: boolean | null };
 
 function preflightRefusal(
   runner: Runner,
@@ -307,7 +389,43 @@ function preflightRefusal(
   isSpecReady: ReadinessCheck,
   gate: AnyGateContract
 ): Preflight {
-  const refuse = (refusal: Refusal): Preflight => ({ refusal, baseSha: null });
+  const refuse = (refusal: Refusal): Preflight => ({ refusal, baseSha: null, reused: null });
+
+  // 121 B-2: with a candidate home, the operator's checkout is read for its
+  // base and its `.git` and nothing else; the candidate is what the
+  // dirty-tree refusal and the gate apply to.
+  if (runner.candidateHome() !== null) {
+    let baseSha: string;
+    try {
+      baseSha = runner.resolveBase(defaultBranch);
+    } catch (err) {
+      return refuse({ kind: "base-unresolved", message: (err as Error).message });
+    }
+    let reused: boolean;
+    try {
+      reused = runner.openCandidate(specId, baseSha).reused;
+    } catch (err) {
+      return refuse({ kind: "candidate-unavailable", message: (err as Error).message });
+    }
+    if (!runner.statusClean()) {
+      return refuse({ kind: "dirty-tree", message: `the candidate for ${specId} is not clean; refusing to start` });
+    }
+    const gates = runGateSuite(runner, gate, baseSha);
+    const failing = gates.find((g) => g.exitCode !== 0);
+    if (failing) {
+      return refuse({
+        kind: "gate-red-at-base",
+        message: `"${failing.cmd.join(" ")}" exited ${failing.exitCode} at the candidate's base: ${
+          failing.stderrTail || failing.stdoutTail
+        }`,
+      });
+    }
+    if (!isSpecReady(specId)) {
+      return refuse({ kind: "spec-not-ready", message: `${specId} is not ready (unmet or invalidated dependencies)` });
+    }
+    return { refusal: null, baseSha, reused };
+  }
+
   if (!runner.statusClean()) {
     return refuse({ kind: "dirty-tree", message: "the target repo's working tree is not clean; refusing to start" });
   }
@@ -364,7 +482,7 @@ function preflightRefusal(
     return refuse({ kind: "spec-not-ready", message: `${specId} is not ready (unmet or invalidated dependencies)` });
   }
 
-  return { refusal: null, baseSha };
+  return { refusal: null, baseSha, reused: null };
 }
 
 // --- frontmatter helpers (B-2, B-5) ----------------------------------------
@@ -575,13 +693,72 @@ interface Completion {
   readonly gates: readonly GateEvidence[];
   readonly frontmatterComplete: boolean;
   readonly passing: boolean;
+  // 121 B-4: whether the candidate held still across the gate (head and
+  // status equal before and after, both clean). Null when no gate ran.
+  readonly stable: boolean | null;
+  // 121 B-5: the receipt minted for a passing, stable round, else null.
+  readonly receipt: Receipt | null;
 }
 
-function evaluateCompletion(runner: Runner, specPath: string, gate: AnyGateContract, baseSha: string): Completion {
+interface EvaluateParams {
+  readonly runner: Runner;
+  readonly specId: string;
+  readonly specPath: string;
+  readonly gate: AnyGateContract;
+  readonly baseSha: string;
+  readonly branch: string;
+  readonly round: number;
+  readonly journal: JournalHandle;
+  readonly profile: ProfileSource | undefined;
+}
+
+// 121 B-4, B-5: the gate over a stable candidate, and the receipt when it
+// passes. Head and status are read before and after the suite; a candidate
+// that moved or dirtied across it is journaled `acceptance.unstable` and the
+// round does not pass, whatever the commands said.
+function evaluateCompletion(p: EvaluateParams): Completion {
+  const { runner, specId, specPath, gate, baseSha, round, journal } = p;
+  const headBefore = runner.headSha();
+  const dirtyBefore = runner.statusText();
   const gates = runGateSuite(runner, gate, baseSha);
+  const headAfter = runner.headSha();
+  const dirtyAfter = runner.statusText();
   const allGreen = gates.every((g) => g.exitCode === 0);
   const frontmatterComplete = readImplementationStatus(runner.readFile(specPath)) === "complete";
-  return { gates, frontmatterComplete, passing: allGreen && frontmatterComplete };
+  const stable = headBefore === headAfter && dirtyBefore.length === 0 && dirtyAfter.length === 0;
+  if (!stable) {
+    const payload: Record<string, JsonValue> = {
+      specId,
+      round,
+      headBefore,
+      headAfter,
+      dirty: dirtyAfter.length > 0 ? dirtyAfter : dirtyBefore,
+    };
+    journal.append(UNSTABLE_KIND, payload);
+    return { gates, frontmatterComplete, passing: false, stable, receipt: null };
+  }
+  const passing = allGreen && frontmatterComplete;
+  if (!passing) return { gates, frontmatterComplete, passing, stable, receipt: null };
+  const version = runner.runGate(["spec-spine", "--version"]);
+  const receipt = mintReceipt({
+    specId,
+    round,
+    origin: runner.originUrl(),
+    baseSha,
+    candidateSha: headAfter,
+    branch: p.branch,
+    suite: gates.map((g) => g.cmd),
+    gate: gatePayload(gate),
+    profile: profilePayload(resolveProfileSource(p.profile)),
+    specSpineVersion: version.exitCode === 0 ? version.stdoutTail.trim() : null,
+    results: gates.map((g) => ({ cmd: g.cmd, exitCode: g.exitCode })),
+    changedPaths: runner.changedPaths(baseSha, headAfter),
+  });
+  journal.append(RECEIPT_KIND, receiptPayload(receipt));
+  if (receipt.sensitivePaths.length > 0) {
+    journal.append(SENSITIVE_KIND, { specId, round, paths: [...receipt.sensitivePaths] });
+  }
+  return { gates, frontmatterComplete, passing, stable, receipt };
 }
 
 function remediationPrompt(basePrompt: string, completion: Completion): string {
@@ -634,6 +811,10 @@ export interface BuildEvidence {
   readonly gates: readonly GateEvidence[];
   readonly frontmatterComplete: boolean | null;
   readonly decisions: SealDropboxResult | null;
+  // 121 B-5, B-7: the receipt the passing round minted, and the
+  // policy-sensitive paths it names. Null and empty when no receipt.
+  readonly receipt: Receipt | null;
+  readonly sensitivePaths: readonly string[];
   // D-13: true when the remediation session left the branch head untouched
   // and the gate answered identically, so another attempt would re-ask a
   // question already answered twice. Null when no remediation session ran.
@@ -708,6 +889,9 @@ export interface RunBuildStageOptions {
   // nothing else, and is what a fixture world that never registered a project
   // is honestly judged by.
   readonly gate?: GateBinding;
+  // 121 B-5: the owning project's posture, folded into the receipt's policy
+  // digest. Absent is 032 D-1's default, as the runner's own spawn reads it.
+  readonly profile?: ProfileSource;
 }
 
 export async function runBuildStage(options: RunBuildStageOptions): Promise<BuildResult> {
@@ -739,6 +923,8 @@ export async function runBuildStage(options: RunBuildStageOptions): Promise<Buil
         gates: [],
         frontmatterComplete: null,
         decisions: null,
+        receipt: null,
+        sensitivePaths: [],
         stalled: null,
       },
     };
@@ -748,7 +934,9 @@ export async function runBuildStage(options: RunBuildStageOptions): Promise<Buil
 
   // --- B-2: orchestrator-owned bracket ---
   const branch = specId;
-  const reused = runner.createBranch(branch);
+  // 121 B-1: with a candidate, the branch was opened by the preflight; in
+  // place, it is created or reused here as 016 B-2 did.
+  const reused = preflight.reused ?? runner.createBranch(branch);
 
   const beforeContent = runner.readFile(specPath);
   const flip = flipImplementation(beforeContent, "pending", "in-progress");
@@ -799,6 +987,8 @@ export async function runBuildStage(options: RunBuildStageOptions): Promise<Buil
         gates: bracketEvidence,
         frontmatterComplete: false,
         decisions: null,
+        receipt: null,
+        sensitivePaths: [],
         stalled: null,
       },
     };
@@ -841,20 +1031,23 @@ export async function runBuildStage(options: RunBuildStageOptions): Promise<Buil
   sessions.push(toSessionEvidence(first));
   journalDenials(journal, specId, 1, first);
 
+  const evaluate = (round: number): Completion =>
+    evaluateCompletion({ runner, specId, specPath, gate, baseSha, branch, round, journal, profile: options.profile });
+
   let blocked = first.classification.kind === "hook-blocked";
   let completion: Completion = blocked
-    ? { gates: [], frontmatterComplete: false, passing: false }
-    : evaluateCompletion(runner, specPath, gate, baseSha);
+    ? { gates: [], frontmatterComplete: false, passing: false, stable: null, receipt: null }
+    : evaluate(1);
 
   if (!blocked) {
-    const gatePayload: Record<string, JsonValue> = {
+    const gateRecord: Record<string, JsonValue> = {
       specId,
       round: 1,
       baseSha,
       gates: completion.gates.map(gateEvidenceToJson),
       frontmatterComplete: completion.frontmatterComplete,
     };
-    journal.append("stage.build.gate", gatePayload);
+    journal.append("stage.build.gate", gateRecord);
   }
 
   // D-13: what the remediation session was given, and what it changed, so a
@@ -879,16 +1072,16 @@ export async function runBuildStage(options: RunBuildStageOptions): Promise<Buil
 
     blocked = second.classification.kind === "hook-blocked";
     if (!blocked) {
-      completion = evaluateCompletion(runner, specPath, gate, baseSha);
+      completion = evaluate(2);
       stalled = !completion.passing && runner.headSha() === beforeSha && sameGateAnswer(beforeGates, completion.gates);
-      const gatePayload: Record<string, JsonValue> = {
+      const gateRecord: Record<string, JsonValue> = {
         specId,
         round: 2,
         baseSha,
         gates: completion.gates.map(gateEvidenceToJson),
         frontmatterComplete: completion.frontmatterComplete,
       };
-      journal.append("stage.build.gate", gatePayload);
+      journal.append("stage.build.gate", gateRecord);
     }
   }
 
@@ -908,6 +1101,8 @@ export async function runBuildStage(options: RunBuildStageOptions): Promise<Buil
     gates: completion.gates,
     frontmatterComplete: completion.frontmatterComplete,
     decisions: sealResult,
+    receipt: completion.receipt,
+    sensitivePaths: completion.receipt?.sensitivePaths ?? [],
     stalled,
   };
 
@@ -922,6 +1117,9 @@ export async function runBuildStage(options: RunBuildStageOptions): Promise<Buil
     decisionsInvalid: sealResult.invalid.map((i) => i.file),
     stalled,
     denials: sessions.reduce((sum, s) => sum + s.denials, 0),
+    stable: completion.stable,
+    receipt: completion.receipt !== null,
+    sensitivePaths: completion.receipt === null ? [] : [...completion.receipt.sensitivePaths],
   };
   journal.append("stage.build.result", resultPayload);
 

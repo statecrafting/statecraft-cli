@@ -7,6 +7,7 @@ use std::collections::BTreeMap;
 use std::path::Path;
 
 use serde_json::{json, Value};
+use statecraft_contract::CHILD_ENV_DENY;
 use statecraft_driver_core::classify::{Rule, TerminationKind};
 use statecraft_driver_core::{ProviderEvent, ResultEvent, SpawnSpec};
 
@@ -128,9 +129,10 @@ impl statecraft_driver_core::Provider for Claude {
 
     fn child_env(&self, parent: &BTreeMap<String, String>) -> BTreeMap<String, String> {
         // 014 B-2: an empty or unset key must not shadow OAuth, and no color.
+        // 121 B-3: the deny list is the contract's, the same on both sides.
         let mut env: BTreeMap<String, String> = parent
             .iter()
-            .filter(|(k, _)| k.as_str() != "ANTHROPIC_API_KEY")
+            .filter(|(k, _)| !CHILD_ENV_DENY.contains(&k.as_str()))
             .map(|(k, v)| (k.clone(), v.clone()))
             .collect();
         env.insert("NO_COLOR".into(), "1".into());
@@ -353,12 +355,18 @@ mod tests {
     #[test]
     fn env_scrub_and_transcript_slug() {
         let c = Claude::new();
-        let parent: BTreeMap<String, String> = [("ANTHROPIC_API_KEY", "x"), ("PATH", "/bin")]
-            .into_iter()
-            .map(|(k, v)| (k.to_string(), v.to_string()))
-            .collect();
+        let parent: BTreeMap<String, String> = [
+            ("ANTHROPIC_API_KEY", "x"),
+            ("OPENAI_API_KEY", "y"),
+            ("PATH", "/bin"),
+        ]
+        .into_iter()
+        .map(|(k, v)| (k.to_string(), v.to_string()))
+        .collect();
         let env = c.child_env(&parent);
         assert!(!env.contains_key("ANTHROPIC_API_KEY"));
+        // 121 B-3: the deny list is the contract's, both names.
+        assert!(!env.contains_key("OPENAI_API_KEY"));
         assert_eq!(env.get("NO_COLOR").map(String::as_str), Some("1"));
         assert_eq!(env.get("PATH").map(String::as_str), Some("/bin"));
         std::env::set_var("HOME", "/home/u");

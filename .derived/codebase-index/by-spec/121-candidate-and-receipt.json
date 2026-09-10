@@ -1,29 +1,4 @@
 {
-  "diagnostics": {
-    "errors": [],
-    "warnings": [
-      {
-        "code": "W-001",
-        "message": "spec '121-candidate-and-receipt' file unit 'members/src/orchestrator/candidate.ts' does not exist",
-        "path": "members/src/orchestrator/candidate.ts"
-      },
-      {
-        "code": "W-001",
-        "message": "spec '121-candidate-and-receipt' file unit 'members/src/orchestrator/candidate.test.ts' does not exist",
-        "path": "members/src/orchestrator/candidate.test.ts"
-      },
-      {
-        "code": "W-001",
-        "message": "spec '121-candidate-and-receipt' file unit 'members/src/orchestrator/receipt.ts' does not exist",
-        "path": "members/src/orchestrator/receipt.ts"
-      },
-      {
-        "code": "W-001",
-        "message": "spec '121-candidate-and-receipt' file unit 'members/src/orchestrator/receipt.test.ts' does not exist",
-        "path": "members/src/orchestrator/receipt.test.ts"
-      }
-    ]
-  },
   "mapping": {
     "dependsOn": [
       "120-capability-contract",
@@ -33,6 +8,10 @@
       "041-project-gate-contract"
     ],
     "implementingPaths": [
+      {
+        "path": "crates/statecraft-contract/",
+        "source": "spec-edge"
+      },
       {
         "path": "crates/statecraft-driver-claude/",
         "source": "spec-edge"
@@ -46,7 +25,27 @@
         "source": "spec-edge"
       },
       {
+        "path": "crates/statecraft-journal/",
+        "source": "spec-edge"
+      },
+      {
+        "path": "members/src/members/contract-fixtures.test.ts",
+        "source": "spec-edge"
+      },
+      {
+        "path": "members/src/members/engine-bundle.test.ts",
+        "source": "spec-edge"
+      },
+      {
         "path": "members/src/orchestrator/api/",
+        "source": "spec-edge"
+      },
+      {
+        "path": "members/src/orchestrator/candidate.test.ts",
+        "source": "spec-edge"
+      },
+      {
+        "path": "members/src/orchestrator/candidate.ts",
         "source": "spec-edge"
       },
       {
@@ -71,6 +70,14 @@
       },
       {
         "path": "members/src/orchestrator/export.ts",
+        "source": "spec-edge"
+      },
+      {
+        "path": "members/src/orchestrator/receipt.test.ts",
+        "source": "spec-edge"
+      },
+      {
+        "path": "members/src/orchestrator/receipt.ts",
         "source": "spec-edge"
       },
       {
@@ -104,11 +111,23 @@
       {
         "path": "members/src/orchestrator/stages/ship.ts",
         "source": "spec-edge"
+      },
+      {
+        "path": "members/src/orchestrator/standby.test.ts",
+        "source": "spec-edge"
+      },
+      {
+        "path": "members/web/test/fixtures.ts",
+        "source": "spec-edge"
       }
     ],
     "resolvedUnits": [
       {
-        "locations": [],
+        "locations": [
+          {
+            "file": "members/src/orchestrator/candidate.test.ts"
+          }
+        ],
         "ownership": true,
         "sourceField": "establishes",
         "unit": {
@@ -117,7 +136,11 @@
         }
       },
       {
-        "locations": [],
+        "locations": [
+          {
+            "file": "members/src/orchestrator/candidate.ts"
+          }
+        ],
         "ownership": true,
         "sourceField": "establishes",
         "unit": {
@@ -126,7 +149,11 @@
         }
       },
       {
-        "locations": [],
+        "locations": [
+          {
+            "file": "members/src/orchestrator/receipt.test.ts"
+          }
+        ],
         "ownership": true,
         "sourceField": "establishes",
         "unit": {
@@ -135,12 +162,29 @@
         }
       },
       {
-        "locations": [],
+        "locations": [
+          {
+            "file": "members/src/orchestrator/receipt.ts"
+          }
+        ],
         "ownership": true,
         "sourceField": "establishes",
         "unit": {
           "kind": "file",
           "path": "members/src/orchestrator/receipt.ts"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "crates/statecraft-contract/"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "directory",
+          "path": "crates/statecraft-contract/"
         }
       },
       {
@@ -185,6 +229,19 @@
       {
         "locations": [
           {
+            "file": "crates/statecraft-journal/"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "directory",
+          "path": "crates/statecraft-journal/"
+        }
+      },
+      {
+        "locations": [
+          {
             "file": "members/src/orchestrator/api/"
           }
         ],
@@ -193,6 +250,32 @@
         "unit": {
           "kind": "directory",
           "path": "members/src/orchestrator/api/"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "members/src/members/contract-fixtures.test.ts"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "members/src/members/contract-fixtures.test.ts"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "members/src/members/engine-bundle.test.ts"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "members/src/members/engine-bundle.test.ts"
         }
       },
       {
@@ -380,6 +463,32 @@
       {
         "locations": [
           {
+            "file": "members/src/orchestrator/standby.test.ts"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "members/src/orchestrator/standby.test.ts"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "members/web/test/fixtures.ts"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "members/web/test/fixtures.ts"
+        }
+      },
+      {
+        "locations": [
+          {
             "file": "docs/design/04-the-governed-substrate.md"
           }
         ],
@@ -395,5 +504,5 @@
     "specStatus": "approved"
   },
   "schemaVersion": "1.1.0",
-  "shardHash": "bf7fe4544ef2e56ec7e3a6f4ccaa6523235be1d3fe9ae77bbaab2f90ac13b4d7"
+  "shardHash": "c5fab79353dd39eaefdab4b9d53b74d114c22b3fc3a1bc35d67de563a28e032f"
 }

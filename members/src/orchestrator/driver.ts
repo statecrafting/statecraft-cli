@@ -26,6 +26,7 @@ import { delimiter, join, resolve } from "path";
 import type { JournalHandle, JsonValue } from "./journal";
 import type { ExecutionProfile, ProfileSource } from "./profile";
 import { DEFAULT_REGISTRATION_PROFILE, profilePayload, resolveProfileSource } from "./profile";
+import { scrubEnv } from "./candidate";
 import {
   decide,
   parseCapabilityList,
@@ -345,7 +346,9 @@ export function killLiveSession(graceMs?: number): boolean {
 
 export function createProcessDriver(params: CreateProcessDriverParams = {}): Driver {
   const name = params.name ?? DEFAULT_DRIVER_NAME;
-  const env = params.env ?? process.env;
+  // 121 B-3: the member is spawned with a scrubbed environment, and scrubs
+  // again for its own child; the deny list is one list, in candidate.ts.
+  const env = scrubEnv(params.env ?? process.env);
   let command: readonly string[] | null = params.driverBin !== undefined ? [params.driverBin] : null;
   let cachedTier: CapabilityTier | null = params.tier ?? null;
   let cachedCapabilities: readonly Capability[] | null =

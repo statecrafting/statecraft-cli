@@ -331,6 +331,11 @@ impl<'de> Deserialize<'de> for False {
 
 // --- the driver seam (043 B-1, B-2; 014's shapes) -----------------------------
 
+/// Spec 121 B-3: what a driven session never inherits. The engine's
+/// `candidate.ts` carries the same list; the fixture `child-env-deny.json`
+/// is what both sides assert against. Spec 122 adds the GitHub tokens.
+pub const CHILD_ENV_DENY: [&str; 2] = ["ANTHROPIC_API_KEY", "OPENAI_API_KEY"];
+
 /// The driver protocol's request schema version.
 pub const SESSION_REQUEST_SCHEMA_VERSION: &str = "1";
 

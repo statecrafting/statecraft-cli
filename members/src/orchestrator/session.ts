@@ -22,6 +22,7 @@ import { classifyTermination, TERMINATION_RULES, type Classification, type Resul
 import type { ExecutionProfile } from "./profile";
 import { DEFAULT_REGISTRATION_PROFILE, profilePayload, sessionArgsForProfile } from "./profile";
 import { orderedCapabilities, requestedCapabilities, type Capability, type Requirements } from "./capabilities";
+import { scrubEnv } from "./candidate";
 
 // --- stream-json event shapes (the subset this module reads) --------------
 
@@ -223,13 +224,9 @@ export async function claudeVersion(claudeBin: string): Promise<string> {
 
 // --- env hygiene (B-2) -------------------------------------------------------
 
+// 121 B-3: the deny list the engine owns, the same on both sides of the wire.
 function buildChildEnv(): Record<string, string> {
-  const env: Record<string, string> = {};
-  for (const [key, value] of Object.entries(process.env)) {
-    if (value !== undefined && key !== "ANTHROPIC_API_KEY") env[key] = value;
-  }
-  env.NO_COLOR = "1";
-  return env;
+  return scrubEnv(process.env);
 }
 
 // --- small pure helpers -------------------------------------------------------

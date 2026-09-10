@@ -169,6 +169,7 @@ export const FIXTURE_HISTORY: HistoryView = {
       ciConclusion: "passed",
       verifyVerdict: "passed",
       evidenceRefs: [EVIDENCE_HASH],
+      receipt: null,
     },
   ],
 };

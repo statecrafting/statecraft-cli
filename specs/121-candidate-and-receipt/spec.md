@@ -3,7 +3,7 @@ id: "121-candidate-and-receipt"
 title: "The candidate and the receipt: the build works a worktree with a scrubbed environment, and a passing gate over a stable revision is journaled as an acceptance receipt"
 status: approved
 created: "2026-09-09"
-implementation: in-progress
+implementation: complete
 risk: high
 depends_on:
   - "120-capability-contract"
@@ -42,6 +42,16 @@ extends:
   - { spec: "031-journal-export", unit: "members/src/orchestrator/export.test.ts", nature: additive }
   # 022 owns the API, which exposes the latest receipt per spec.
   - { spec: "022-http-api-and-events", unit: { kind: directory, path: "members/src/orchestrator/api/" }, nature: additive }
+  # 111 owns the contract, which carries the deny list and its fixture.
+  - { spec: "111-contract-crate", unit: { kind: directory, path: "crates/statecraft-contract/" }, nature: additive }
+  - { spec: "111-contract-crate", unit: "members/src/members/contract-fixtures.test.ts", nature: additive }
+  # 113 mirrors the export policy; the acceptance records bump it to 3.
+  - { spec: "113-journal-port", unit: { kind: directory, path: "crates/statecraft-journal/" }, nature: additive }
+  # 043's bundle rule learns the deny list is the engine's to carry (D-6).
+  - { spec: "043-driver-seam", unit: "members/src/members/engine-bundle.test.ts", nature: additive }
+  # Fakes that implement Runner or build evidence literals gain the new members.
+  - { spec: "026-standby-daemon", unit: "members/src/orchestrator/standby.test.ts", nature: additive }
+  - { spec: "024-web-ui", unit: "members/web/test/fixtures.ts", nature: additive }
 references:
   - { unit: { kind: file, path: "docs/design/04-the-governed-substrate.md" }, role: context }
 summary: >
@@ -177,6 +187,35 @@ cd members && bun test src/orchestrator/candidate.test.ts src/orchestrator/recei
 cargo test --workspace --locked -p statecraft-driver-core -p statecraft-driver-claude -p statecraft-driver-codex
 ```
 
+## Status (2026-09-09)
+
+Implemented. `candidate.ts` opens, reopens and closes the worktree at
+`<home>/candidates/<project>/<branch>` and owns `CHILD_ENV_DENY`;
+`receipt.ts` mints, serializes, parses and folds the receipt. The runner
+gained a candidate face (`candidateHome`, `openCandidate`, `workDir`,
+`closeCandidate`, `changedPaths`, `originUrl`, `statusText`) and every
+other operation follows the open candidate; the production deps build the
+stage runner with the data dir as its home and a second runner for the
+checkout reads the scheduler makes. The build preflight, with a
+candidate, resolves the base, opens the candidate, and applies the
+dirty-tree and gate refusals to it; a branch the operator has checked
+out is `candidate-unavailable`. Completion reads head and status before
+and after the suite, journals `acceptance.unstable` when they differ,
+and mints `acceptance.receipt` (and `acceptance.sensitive`) on a stable
+pass, with the profile threaded from the daemon for the policy digest.
+Ship and shepherd reopen the candidate at their start; the daemon closes
+it after the merge sha is journaled. The history view carries the
+receipt's hash, shas, policy digest and sensitive paths. Both drivers'
+`child_env` filter by the contract's `CHILD_ENV_DENY`, the fixture
+`child-env-deny.json` pins the list, and the engine and member spawn
+paths scrub through one function. Export policy is version 3 on both
+sides. The members suite (927) and the workspace are green. The live
+smoke (FR-002's worktree test over a real repository): the round ran at
+the candidate path, the operator's checkout kept its branch, head and
+dirty scratch file, and the journal held one receipt whose
+`candidateSha` was the candidate's HEAD and whose `sensitivePaths` named
+the Makefile the session wrote.
+
 ## 6. Out of scope
 
 Process containment (a sandboxed executor, a brokered file service): the
@@ -196,6 +235,22 @@ D-3 (2026-09-09). The receipt is a journal record, not a signed
 document. The chain's hash discipline (011) is the authority the engine
 has; external anchoring is the attested export's concern (039) and a
 signing authority outside the writer is doc 04 §10's open question.
+
+D-5 (2026-09-09). A runner built without a candidate home works the
+checkout in place, as 016 B-2 did. The production deps always pass one;
+the in-place mode is what a fixture world without a daemon home runs
+under, and every pre-121 stage test keeps its meaning through it.
+
+D-6 (2026-09-09). The environment deny list names two providers' keys
+and lives in the engine, because scrubbing is the engine's to do before
+a member is spawned. 043 FR-005's rule that the engine bundle names no
+provider string is amended for exactly those two names, and the test
+now asserts they appear in both bundles rather than in neither.
+
+D-7 (2026-09-09). Ship and shepherd reopen the candidate themselves
+rather than trusting the runner's pointer, because the deps are cached
+per project for the process's life (026) and a daemon restart between
+stages loses the pointer but never the worktree.
 
 D-4 (2026-09-09). Stability is head-and-status equality across the gate,
 not a snapshot. Copying a candidate before checking it would double the

@@ -14,8 +14,12 @@ const PROVIDER_STRINGS = [
   "--permission-mode",
   "claude-opus",
   "claude-sonnet",
-  "ANTHROPIC_API_KEY",
 ];
+
+// 121 B-3 (D-6): the environment deny list is the one provider-named thing
+// the engine carries, because scrubbing is the engine's to do before the
+// member is spawned; the driver carries the same list for its own child.
+const DENY_LIST_STRINGS = ["ANTHROPIC_API_KEY", "OPENAI_API_KEY"];
 
 async function ensureBuilt(script: string, path: string): Promise<void> {
   if (existsSync(path)) return;
@@ -32,6 +36,10 @@ test("FR-005: the engine bundle names no provider; the driver bundle names every
   const driverBytes = readFileSync(driver).toString("latin1");
   for (const needle of PROVIDER_STRINGS) {
     expect(engineBytes.includes(needle)).toBe(false);
+    expect(driverBytes.includes(needle)).toBe(true);
+  }
+  for (const needle of DENY_LIST_STRINGS) {
+    expect(engineBytes.includes(needle)).toBe(true);
     expect(driverBytes.includes(needle)).toBe(true);
   }
 }, 120_000);
