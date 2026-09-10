@@ -1,7 +1,7 @@
 ---
 id: "109-governed-harness"
 title: "Governed harness: the spec-spine kit as the loop this repo runs"
-status: draft
+status: approved
 created: "2026-09-09"
 implementation: complete
 depends_on:
@@ -164,7 +164,24 @@ is the one merge step a kit update needs.
 - Codex and other-agent harness directories (`.agents/`, `.codex/`) that
   are not part of the kit; they are not claimed here.
 
-## 6. Status (2026-09-09)
+## 6. Status (2026-09-10)
 
 Adopted from spec-spine 0.18.0 / kit at spec 081. Born `draft` with
 `implementation: complete`; approval is a human flip.
+
+Approved 2026-09-10 by the owner. The harness this spec claims has run
+every session since it landed: specs 110 through 124 were built, shipped
+and shepherded through the loop it defines. §4's acceptance holds on the
+tree at approval: `spec-spine check` and `make gate` exit 0, coverage is
+198/198 specifically claimed, and `couple` reports no drift. Nothing
+about the kit changed at the flip; `draft` had become the corpus's only
+untrue status.
+
+One §4 criterion has to be read against the baseline this spec adopted.
+`diff -r <spec-spine>/kit/.claude/skills .claude/skills` is empty against
+the kit at spec 081, which is what §1 adopted. spec-spine `main` has since
+advanced one skill: its spec 082, "a refusal is not a remediation round",
+rewrote `shepherd` to route a red check by severity and to spend no
+remediation round on a refusal. Nine of the ten skills remain
+byte-identical. Adopting 082 is a kit update and a separate decision, not
+a condition of this approval.
