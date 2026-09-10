@@ -98,12 +98,18 @@ through and are unchanged).
   provider confines writes to the repository; `hook-enforcement`, the
   project's hooks run.
 - **B-2 (the manifest declares support).** `Manifest` gains
-  `capabilities: Vec<Capability>`. The Claude driver declares all six;
-  the Codex driver declares `workspace-write` and `hook-enforcement`;
-  the sensor and engine declare none. `capabilityTier` is kept and must
-  equal `reference` when all six are present and `basic` otherwise;
-  `Manifest::parse` and `parseManifest` refuse a manifest whose tier
-  disagrees with its tokens. The fixtures gain `manifest-driver-codex.json`.
+  `capabilities: Vec<Capability>`. The Claude driver declares the four
+  request tokens and `hook-enforcement` (its permission modes do not
+  confine writes to the repository, so it does not claim
+  `workspace-write`); the Codex driver declares `workspace-write` and
+  `hook-enforcement`; the sensor and engine declare none.
+  `capabilityTier` is kept and must equal `reference` when the four
+  request tokens (`tool-allowlist`, `max-turns`, `mcp-config`, `cost`)
+  are all present and `basic` otherwise; the two boundary tokens do not
+  enter the tier. `Manifest::parse` and `parseManifest` refuse a manifest
+  whose tier disagrees with its tokens; a manifest without the field is
+  an older member and is not checked. The fixtures gain
+  `manifest-driver-codex.json`.
 - **B-3 (the request states needs).** `SessionRequest` gains
   `requirements: { required: Vec<Capability>, preferred: Vec<Capability> }`,
   explicit and possibly empty; the schema version stays `1` because both
@@ -132,14 +138,18 @@ through and are unchanged).
   core is replaced by `applied(&SpawnSpec) -> Vec<Capability>`; the core
   computes `degraded` as the request's preferred and required tokens
   minus `applied`, and emits both as top-level `session.init` fields
-  `applied` and `degraded`. The Claude provider applies every token the
-  request uses; the Codex provider applies `workspace-write` under
-  `guarded` and `hook-enforcement` always, and its `degraded` list is
-  what 116 B-8 fixed, in the same order. `session.ts` emits the same two
+  `applied` and `degraded`. The Claude provider applies every request
+  token the request uses and `hook-enforcement`; the Codex provider
+  applies `workspace-write` under `guarded` and `hook-enforcement`
+  always, and its `degraded` list is what 116 B-8 fixed, in the same
+  order. The tokens a request uses are: `tool-allowlist` when the
+  profile is `guarded` or carries a list, `max-turns` when a cap is set,
+  `mcp-config` when a path is set, `cost` always, plus whatever
+  `requirements` names. `session.ts` emits the same two
   fields for the in-process session.
 - **B-7 (the tier is derived).** `capability_tier()` on the `Provider`
   trait is replaced by `capabilities() -> &[Capability]`; the manifest's
-  tier is computed from it. Nothing in the engine reads the tier for a
+  tier is computed from it by B-2's rule. Nothing in the engine reads the tier for a
   decision; `tier()` on the `Driver` interface remains for the posture
   cell and the tests that quote it.
 
@@ -196,7 +206,13 @@ sandbox-refusing startup mode for Claude.
 
 D-1 (2026-09-09). Born approved on doc 04 §9's authority (119 D-1).
 
-D-2 (2026-09-09). Six tokens, not a grammar. The four are what the Codex
+D-2 (2026-09-09). Six tokens, not a grammar. `workspace-write` is a
+claim about confinement, and the Claude driver does not make it: its
+permission modes gate prompts, they do not fence the filesystem, so a
+Claude manifest naming the token would be the false evidence this spec
+exists to prevent. The tier is therefore derived from the four request
+tokens alone, which keeps 042 B-8's meaning (the richest driver for the
+engine's requests) and every fixture that says `reference`. The four are what the Codex
 driver already declares; the two are what 121 and 122 need to require.
 A token is added by a spec that names its enforcement, never by a driver
 that wants to advertise one.

@@ -119,9 +119,12 @@ included, then is instructed to push and run `gh pr create` itself
   rule rather than a special case. `session.init` carries `applied` beside
   `degraded`, so the effective configuration is evidence, not a claim.
 - **D46 (the tier stays, as a summary):** `reference` and `basic` remain
-  on the manifest for compatibility; they are derived from the token set
-  (reference means all six), never consulted for a decision the tokens
-  can make.
+  on the manifest for compatibility; they are derived from the four
+  request tokens (reference means all four are supported; the two
+  boundary tokens are claims about confinement and enforcement that no
+  tier summarizes), never consulted for a decision the tokens can make.
+  The Claude driver does not claim `workspace-write`: its permission
+  modes gate prompts and do not fence the filesystem.
 
 ## 5. The candidate and the receipt
 
