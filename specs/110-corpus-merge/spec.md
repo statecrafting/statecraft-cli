@@ -135,7 +135,8 @@ Landed as #16. The same day, doc 02 §11 was added under this spec's
 `docs/design/` claim to record where the Rust sequence stands after
 specs 111 to 114, so the design record carries the state rather than the
 pull request log. Doc 03 §8 followed on the same day, under the same
-claim, for the Codex sequence (specs 115 to 118).
+claim, for the Codex sequence (specs 115 to 118), and doc 04 §10 for the
+governed-substrate sequence (specs 119 to 124).
 
 ## 5. Out of scope
 

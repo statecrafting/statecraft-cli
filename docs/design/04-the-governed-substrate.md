@@ -238,7 +238,43 @@ decisions are recorded here rather than left to the sessions. All six
 land as specs with 119's pull request; each is then built, shipped and
 shepherded as its own pull request in the governed loop.
 
-## 10. Not decided here
+## 10. Where this stands (2026-09-09)
+
+Recorded the day the sequence ran, as doc 02 §11 and doc 03 §8 were.
+
+| Step | Spec | Landed as |
+|---|---|---|
+| The floor, the head, the denial | 119 | a read-only floor at a resolved base, `mergePr` with `sha=`, `denials` on the result read from the harness's structured event (and Codex's router line, D-6), doc 04 and all six specs (#28) |
+| The capability contract | 120 | six tokens in the contract crate, `capabilities` on the manifest with the tier derived, `requirements` on the request and `require` on the profile, `driver.refused` before spawn, `applied` beside `degraded` in `session.init`; Claude does not claim `workspace-write` (#29) |
+| The candidate and the receipt | 121 | a worktree per spec branch under the daemon's home, one deny list on both sides, `acceptance.receipt` over a stable pass with digests and sensitive paths, `acceptance.unstable` otherwise (#30) |
+| The action boundary | 122 | the broker over lease and receipt, push and PR and merge journaled as intent and outcome, the ship session proposing into the drop box, the GitHub tokens denied (#31) |
+| The policy, the kit, the handoff | 123 | `LifecyclePolicy` on the projects chain, named drafts, the policy's gates and merge method, `.codex/kit-manifest.json` with declared drops and a directory-walking check in the gate, the handoff capsule on a verb, a route and every remediation prompt (#32) |
+| Provider conformance | 124 | the fixture driver, seven cases over three targets, the process-group kill the suite found missing, `binaryVersion` journaled, two live qualification records committed (#33) |
+
+Three things the build changed about the design, each recorded as a
+decision in its spec: the Claude driver does not claim `workspace-write`
+(120 D-2, corrected in this document before 120 was built); ship and
+shepherd mint their own receipt when a session moved the head (122 D-5),
+and the proposal lands in the drop box rather than the candidate (122
+D-6); and the deny list's names are the one provider-named thing the
+engine carries (121 D-6). Two things the sequence found that no
+assessment had named: a guarded Codex posture degrades `tool-allowlist`
+even without an explicit list, because the baseline is a list (120 D-5);
+and neither Rust driver reached a hung provider's descendants until 124
+made the provider a process group leader (124 D-6).
+
+What "governed" now means, concretely: a run's session works a candidate
+worktree with no publish credential in its environment; the floor reads
+before it writes and names the commit it compared against; a passing
+gate over a candidate that held still is a receipt; the engine pushes,
+opens and merges only on a receipt covering the head and a lease the run
+holds, and journals every effect before and after; a refusal the harness
+reported survives a completed turn; what a run requires is stated in
+tokens a driver either supports or refuses before it spawns; a
+project's lifecycle is a typed record; and a third provider is admitted
+by a suite and a live record, not by resemblance. What remains is §11.
+
+## 11. Not decided here
 
 Process containment beyond the worktree (a sandboxed executor with a
 brokered file service), a custom agent loop over model APIs, per-stage
@@ -247,7 +283,7 @@ port to Rust (doc 02 D30) remain open. The assessment's shutdown-test
 failure did not reproduce on the machine this was written on (the
 driver, session and standby suites pass); it is noted, not acted on.
 
-## 11. Sources
+## 12. Sources
 
 The external assessment of 2026-09-09 and its evidence snapshot; this
 repository at `b7baf2d`: `members/src/orchestrator/gate-contract.ts`,
