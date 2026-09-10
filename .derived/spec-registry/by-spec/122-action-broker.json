@@ -125,7 +125,7 @@
       }
     ],
     "id": "122-action-broker",
-    "implementation": "pending",
+    "implementation": "in-progress",
     "references": [
       {
         "role": "context",
@@ -152,6 +152,6 @@
     "summary": "Doc 04 §6. The push and the pull request move from the driven session to the engine. The ship session gates, reviews and commits in the candidate and drops the PR title and body into a drop box, as 020 drops decisions; the broker validates the text with 017's marker rules, requires an acceptance receipt covering the candidate head, checks the run holds the project's lease, pushes, and opens the PR. Shepherd's merge consumes the same receipt beside the green checks and 119's head. Every effect is journaled before and after with the action, the target, the head and the receipt it consumed; a retry reconciles before it acts. The GitHub tokens join the environment deny list, so the candidate can no longer publish on its own. The hosted plane's verbs already sit behind their guards and are not changed.\n",
     "title": "The action boundary: the engine publishes on a receipt and a lease, the session proposes the text, and the candidate holds no publish credential"
   },
-  "shardHash": "4ade048359535cfad3c38bdde7d0e9350372be749c507be4e52e36d7987c08e7",
+  "shardHash": "6e4146f8a4f35b73dddef6e3e1fdfe600d2e01cc65d11c8f03e38b1c70d6c766",
   "specVersion": "1.2.0"
 }

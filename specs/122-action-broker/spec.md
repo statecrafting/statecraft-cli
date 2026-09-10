@@ -3,7 +3,7 @@ id: "122-action-broker"
 title: "The action boundary: the engine publishes on a receipt and a lease, the session proposes the text, and the candidate holds no publish credential"
 status: approved
 created: "2026-09-09"
-implementation: pending
+implementation: in-progress
 risk: critical
 depends_on:
   - "121-candidate-and-receipt"
