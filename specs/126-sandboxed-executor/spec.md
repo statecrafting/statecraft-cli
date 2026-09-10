@@ -11,15 +11,21 @@ depends_on:
 establishes:
   - "members/src/orchestrator/sandbox.ts"
   - "members/src/orchestrator/sandbox.test.ts"
+  - "members/src/orchestrator/signer.ts"
+  - "members/src/orchestrator/signer.test.ts"
 extends:
   # 043 owns the driver seam; the sandbox wraps argv at the same spawn where
   # 125 overlays the fence on the environment.
   - { spec: "043-driver-seam", unit: "members/src/orchestrator/driver.ts", nature: additive }
-  # 121 owns the candidate; the profile is written beside the fence, on open.
+  # 121 owns the candidate; the profile and the signing helper are written
+  # beside the fence, on open.
   - { spec: "121-candidate-and-receipt", unit: "members/src/orchestrator/candidate.ts", nature: additive }
   # 014 owns the session; evidence gains the denial tally, as 125 gave it
   # `fenceRefusals`.
   - { spec: "014-session-driver", unit: "members/src/orchestrator/session.ts", nature: additive }
+  # 122 owns the broker; signing joins publishing as an act the engine
+  # performs on the candidate's behalf.
+  - { spec: "122-action-broker", unit: "members/src/orchestrator/broker.ts", nature: additive }
   # The three stages that open a candidate and spawn a session.
   - { spec: "016-stage-build", unit: "members/src/orchestrator/stages/build.ts", nature: additive }
   - { spec: "017-stage-ship", unit: "members/src/orchestrator/stages/ship.ts", nature: additive }
@@ -27,16 +33,19 @@ extends:
 references:
   - { unit: { kind: file, path: "docs/design/04-the-governed-substrate.md" }, role: context }
 summary: >
-  Spec 125 fenced the credential path a driven session would reach for
-  first, and recorded three residuals it could not close: HOME stays
-  readable, an absolute path bypasses PATH, and ~/.ssh keys stay on disk.
-  All three go around PATH, so nothing built out of shims and environment
-  variables reaches them; what refuses a read of a path is the operating
-  system. This spec makes the engine apply an OS confinement at the one
-  place it already constructs the child's world, the session spawn in
-  driver.ts, with a deny-list profile written beside the candidate. It
-  turns 125's integrity property into a containment property for the
-  reaches 125 enumerated, and says plainly which reaches remain.
+  Spec 125 fenced the credential path a driven session reaches for first,
+  and recorded three residuals it could not close: HOME stays readable, an
+  absolute path bypasses PATH, and ~/.ssh keys stay on disk. All three go
+  around PATH, so nothing built from shims and environment variables
+  reaches them; what refuses a read of a path is the operating system.
+  This spec makes the engine apply an OS confinement at the session spawn
+  in driver.ts, with a deny-list profile written beside the candidate. It
+  closes the ~/.ssh read, the gh config read and the absolute-path exec
+  outright, and closes the keyring only ergonomically, because the Claude
+  provider authenticates out of that same keyring. Signing moves to the
+  engine rather than being abandoned, so the candidate holds no signing
+  key and publication stays autonomous. Containment is an operator policy
+  with a required setting, not a best effort.
 ---
 
 # 126: The sandboxed executor
@@ -66,29 +75,35 @@ Neither provider can be asked to do it. The Claude driver's permission modes
 gate prompts and do not fence the filesystem, which is exactly why it does
 not claim `workspace-write` (120 D-2). Codex does confine, but
 `--sandbox workspace-write` confines *writes* to the workspace, and every
-residual here is a read or an exec. A confinement that only one of the two
-providers has, and that covers the wrong direction, is not a boundary the
-engine can build on. So the engine applies its own, at the one place it
-already constructs the child's world: the spawn in `driver.ts` where 125
-overlays the fence.
+residual here is a read or an exec. So the engine applies its own, at the
+one place it already constructs the child's world: the spawn in `driver.ts`
+where 125 overlays the fence.
 
-This spec closes 125 §6's three residuals. It does not claim to close every
-reach, and §6 below says which remain.
+**What this spec does not do is take publication away from the engine.**
+The point of confining the session is that the broker keeps working while
+the session cannot reach a credential. A run still pushes, opens and merges
+by itself, on a receipt and a lease (122). Losing credential access inside
+the coding session must not turn into a human pushing by hand, and B-5 and
+B-7 exist to keep that true.
 
 ## 2. Territory
 
 - `members/src/orchestrator/sandbox.ts`: the profile builder, the argv
-  wrapper, the platform probe and the denial tally.
+  wrapper, the platform probe, the policy check and the denial tally.
 - `members/src/orchestrator/sandbox.test.ts`: the suite.
-- `members/src/orchestrator/candidate.ts` (extends 121): the profile is
-  written on `openCandidate`, beside the fence.
+- `members/src/orchestrator/signer.ts`: the signing helper and the
+  daemon-side signing service (B-5).
+- `members/src/orchestrator/signer.test.ts`: its suite.
+- `members/src/orchestrator/candidate.ts` (extends 121): the profile and the
+  helper are written on `openCandidate`, beside the fence.
 - `members/src/orchestrator/driver.ts` (extends 043): argv is wrapped at the
   session spawn, where the fence is already overlaid on the environment.
 - `members/src/orchestrator/session.ts` (extends 014): `SessionEvidence`
-  gains `sandboxDenials`, as 125 gave it `fenceRefusals`.
+  gains `sandboxDenials` and `sandboxMode`.
+- `members/src/orchestrator/broker.ts` (extends 122): signing joins push,
+  openPr and merge as an act the engine performs on the candidate's behalf.
 - `members/src/orchestrator/stages/{build,ship,shepherd}.ts` (extends
-  016, 017, 018): each carries the count to its result, as it does the
-  fence's.
+  016, 017, 018): each carries the counts and the mode to its result.
 
 ## 3. Behavior
 
@@ -107,23 +122,20 @@ The profile opens `(allow default)` and then denies, by name, the credential
 material 125 §6 enumerated. It does not enumerate what a session may read.
 
 This is a deliberate weakening of the obvious design, and D-1 records why:
-both providers authenticate out of `HOME` (`~/.claude`, `~/.codex`), the
-session's own toolchain is spread across the machine, and an allow-list
-tight enough to be worth calling containment breaks the session it is
-protecting. 125 §6 already named that trade ("Closing that needs a different
-`HOME` per session, which would break both providers' own authentication").
-A deny-list that provably closes the four enumerated reaches is worth more
-than an allow-list that has to be widened until it closes none of them.
+both providers authenticate out of `HOME`, the session's own toolchain is
+spread across the machine, and an allow-list tight enough to be worth
+calling containment breaks the session it is protecting. 125 §6 already
+named that trade. A deny-list that provably closes the reaches it names is
+worth more than an allow-list that has to be widened until it closes none.
 
 ### B-3. The deny set
 
 Denied for reading:
 
 - `~/.ssh` (subpath): the keys, `known_hosts` and any `config` naming them;
-- `~/.config/gh` (subpath): where `gh` stores a token in plaintext.
-  125 already points the session's `GH_CONFIG_DIR` at an empty directory;
-  this denies the real one, which is what an absolute read would have
-  reached around that;
+- `~/.config/gh` (subpath): where `gh` stores a token in plaintext. 125
+  already points the session's `GH_CONFIG_DIR` at an empty directory; this
+  denies the real one, which is what an absolute read reached around;
 - `~/.git-credentials` and `~/.config/git/credentials` (literal).
 
 Denied for execution:
@@ -133,15 +145,20 @@ Denied for execution:
   (`/usr/bin/ssh`, `/opt/homebrew/bin/gh`, `/usr/local/bin/gh`);
 - `/usr/bin/security` (macOS), the keyring CLI 125 §6 names.
 
-Denied for service lookup:
-
-- `com.apple.SecurityServer` (macOS), so a process linking the Security
-  framework directly does not reach the keychain the CLI was denied.
+**Not denied: the keychain itself.** An earlier draft of this spec denied
+`mach-lookup` on `com.apple.SecurityServer`, which would have closed the
+keyring completely. It is not in the deny set because it breaks the Claude
+provider outright: Claude Code keeps no credentials file on macOS and reads
+its own credential from that keychain (`Claude Code-credentials`). D-6
+records the measurement. Denying the CLI closes the ergonomic path; a
+session that links the Security framework directly still reaches the
+keyring, and §6 carries that as a residual this spec does not close rather
+than a claim it quietly drops.
 
 The fence (125) stays on top of all of this. It is not made redundant: the
-fence is what produces a *legible refusal* naming the broker, and the
-sandbox is what makes the refusal unavoidable. A session that runs `gh`
-from `PATH` should meet 125's message, not an opaque OS denial.
+fence produces a *legible refusal* naming the broker, and the sandbox makes
+the refusal unavoidable. A session that runs `gh` from `PATH` should meet
+125's message, not an opaque OS denial.
 
 ### B-4. The wrapper is applied at the session spawn
 
@@ -151,42 +168,63 @@ to the member spawn that already receives `applyFence(env, fenceDir)`, so
 the provider inherits the confinement the same way it inherits the fence,
 without the member knowing about it.
 
-### B-5. The candidate commits unsigned
+### B-5. Signing moves to the engine, and is not abandoned
 
 Denying `~/.ssh` denies the SSH signing key this repository's
-`commit.gpgsign` + `gpg.format=ssh` configuration uses, so a session inside
-the sandbox cannot sign. The candidate's git configuration therefore sets
-`commit.gpgsign=false` for the candidate only.
+`commit.gpgsign` + `gpg.format=ssh` configuration uses. The candidate must
+therefore not sign with that key, and the naive answers are both wrong:
+handing the key to the session re-opens the reach this spec exists to
+close, and committing unsigned assumes an answer about branch protection
+this spec has no business assuming (D-3).
 
-This costs nothing that is currently being paid for. Every commit on `main`
-is created by GitHub's squash merge and signed with GitHub's key; the local
-key never signs anything that lands. D-3 records the evidence and the
-condition under which this stops being true.
+Signing becomes a brokered act, the same shape 122 gave publication. The
+candidate's fence-local `GIT_CONFIG_GLOBAL` (125) sets `gpg.ssh.program` to
+a helper on the fence `PATH`. The helper holds no key: it forwards the
+payload to the daemon over the seam the broker already uses, the daemon
+signs **outside** the sandbox with the operator's key, and the signature
+returns. The session's commits are signed, provenance is preserved, and the
+key never enters the confined process.
 
-### B-6. An unsupported platform degrades and is journaled, never refuses
+Every signature the daemon issues is journaled as `broker.sign` with the
+commit it covers, so a signature is as accountable as a push.
+
+If the signing service is unreachable, the run does not silently produce
+unsigned commits: the stage fails with the reason, which is the same
+posture 122 takes when a receipt or a lease is missing.
+
+### B-6. Containment is an operator policy, with a required setting
 
 `sandboxSupport()` reports `seatbelt` where `/usr/bin/sandbox-exec` is
-executable, `bwrap` where `bwrap` is on `PATH`, and `none` otherwise. On
-`none` the session runs unsandboxed and the engine journals
-`sandbox.unavailable` with the platform and the reason, exactly as 124
-journals an unqualified binary and 120 journals a degraded capability. A
-run is not refused for want of a sandbox: the engine's job is to record
-what protection was actually in force, not to stop work on a machine that
-cannot offer it.
+executable, `bwrap` where `bwrap` is on `PATH`, and `none` otherwise.
 
-`bwrap` support is declared here and built here only to the extent the
-Linux path is exercised by the suite; the live evidence in §5 is macOS,
-and D-4 says so rather than implying a confinement nobody has run.
+What happens on `none` is the operator's decision, not this spec's, and it
+is expressed in the profile vocabulary 120 already established:
+
+- **`required`**: a run whose containment is unavailable does not start.
+  The stage refuses with the platform and the reason, journaled. This is
+  the setting for unattended operation, where "Statecraft is running" must
+  imply "containment is in force".
+- **`preferred`**: the session runs unsandboxed and the engine journals
+  `sandbox.unavailable` with the platform and the reason, exactly as 124
+  journals an unqualified binary and 120 journals a degraded capability.
+
+`sandboxMode` on `SessionEvidence` records which of the two was in force
+and what was actually applied, so a reader never has to infer containment
+from the absence of a complaint. D-7 records why `required` is not simply
+the only behavior.
 
 ### B-7. The blast radius is the provider session only
 
 The sandbox wraps the member the driver spawns and nothing else. The
 daemon's own processes are untouched, which is what keeps the broker
-working: the broker pushes, opens and merges from the daemon (122), and it
-must keep the credentials the candidate is denied. This is 125 B-6's
-property restated for the OS boundary, and it is asserted in
-`sandbox.test.ts` for the same reason 125 D-4 put that case beside the
-fence's own suite.
+working: the broker pushes, opens and merges from the daemon (122), and the
+signing service of B-5 runs there too. It must keep the credentials the
+candidate is denied. This is 125 B-6's property restated for the OS
+boundary, and it is asserted in `sandbox.test.ts` for the reason 125 D-4
+put that case beside the fence's own suite.
+
+This is also the property that keeps publication autonomous: confining the
+session removes no capability from the engine.
 
 ### B-8. A denial is counted and reaches the evidence
 
@@ -201,62 +239,96 @@ read as "nothing was denied" to a consumer downstream.
   of its inputs, and that a hand-edited profile is overwritten on the next
   `openCandidate`.
 - **FR-002.** Deny-set tests: each B-3 entry is present in the built
-  profile, and the profile parses (`sandbox-exec` accepts it) on a machine
-  reporting `seatbelt`.
-- **FR-003.** Wrapper tests: `wrapArgv` returns argv unchanged when support
-  is `none`, and the `sandbox-exec` form otherwise.
+  profile, `com.apple.SecurityServer` is **absent** from it (D-6), and the
+  profile parses on a machine reporting `seatbelt`.
+- **FR-003.** Wrapper tests: `wrapArgv` returns argv unchanged when the
+  policy is `preferred` and support is `none`, and the `sandbox-exec` form
+  otherwise.
 - **FR-004.** Blast-radius test: a process the daemon spawns itself is
   unwrapped (B-7), asserted beside the broker's own publish path.
 - **FR-005.** Evidence tests: `sandboxDenials` is present with an explicit
-  zero on a clean run and reaches each of the three stage results.
-- **FR-006.** Degradation test: with support forced to `none`, a session
-  runs and `sandbox.unavailable` is journaled once.
-- **FR-007.** Signing test: a candidate opened under a supported sandbox has
-  `commit.gpgsign=false` in its candidate-local configuration (B-5).
+  zero on a clean run, `sandboxMode` names the policy and what was applied,
+  and both reach each of the three stage results.
+- **FR-006.** Policy tests: with support forced to `none`, `required`
+  refuses the run and journals the refusal, and `preferred` runs and
+  journals `sandbox.unavailable` exactly once.
+- **FR-007.** Signing tests: the helper carries no key material; a commit
+  made through it verifies against the operator's public key; the daemon
+  journals `broker.sign`; and an unreachable signing service fails the
+  stage rather than producing an unsigned commit.
 
 ## 5. Acceptance
 
-- `bun test` in `members/` is green, including the new suite.
+Shell probes establish that a mechanism *can* deny a path. They do not
+establish that a provider still works, and this spec is not accepted on
+them.
+
+- `bun test` in `members/` is green, including the two new suites.
 - `make gate` exits 0 and `make members` exits 0.
-- A live round on this repository, on a machine reporting `seatbelt`, with
-  the four reaches confirmed open on the host beforehand: inside the
-  sandbox, reading `~/.ssh` fails, reading `~/.config/gh/hosts.yml` fails,
+- **A live round for each provider.** A build session driven by Claude and
+  a build session driven by Codex each, inside the sandbox: authenticate,
+  read the repository, make a change, run the project's gate, and commit
+  through the B-5 signing helper with a signature that verifies. A failure
+  to authenticate is a failure of this criterion, not a note.
+- **A live brokered publication.** The same round's ship stage pushes and
+  opens a pull request through the broker, and the journal shows
+  `broker.action` for `push` and `openPr` and `broker.sign` for the
+  commits. No human pushes or merges by hand.
+- **The four reaches, confirmed closed from inside a real session** (not a
+  shell probe): reading `~/.ssh` fails, reading `~/.config/gh` fails,
   executing `gh` by absolute path fails, and executing `/usr/bin/security`
-  fails, while ordinary work in the worktree succeeds.
-- The same round's ship stage publishes through the broker, and the journal
-  shows `broker.action` for `push` and `openPr`: the boundary confined the
-  session without disarming the engine (B-7).
+  fails, while the session's own provider credential still resolves.
+- **The policy is exercised both ways** on a machine reporting `none`:
+  `required` refuses, `preferred` proceeds and journals.
 
 ## Verification
 
 ```sh
 cd members && bun test src/orchestrator/sandbox.test.ts
+cd members && bun test src/orchestrator/signer.test.ts
 cd members && bun test src/orchestrator/candidate.test.ts
 cd members && bun test src/orchestrator/driver.test.ts
 make gate
 ```
 
-## 6. Out of scope
+## 6. Out of scope, and what stays open
 
 The other half of doc 04 §11. This spec is the sandboxed executor; the
 **brokered file service** is not built here. The profile denies, it does not
 mediate: there is no path by which a session asks the engine for a file it
-was refused, and no record of such a request. That remains open.
+was refused, and no record of such a request.
 
-Also out of scope, and still open after this spec:
+Reaches this spec does **not** close, stated so that "sandboxed" is not read
+as "contained":
 
-- **Network confinement.** The session keeps general network access, which
-  it needs to be a coding agent at all. A session that means to exfiltrate
-  or to publish over HTTPS with a token it obtained some other way is not
-  stopped by a filesystem profile.
-- **A token already in the session's context.** The sandbox denies reads of
-  credential material on disk. It cannot un-know a secret that reached the
-  session another way.
+- **The keyring through the Security framework.** B-3 denies the
+  `/usr/bin/security` CLI and deliberately not the keychain service,
+  because Claude Code authenticates from it (D-6). A session that links the
+  framework directly still reaches every item the user's keychain holds,
+  including `gh`'s. This is the one residual of 125 §6 that 126 closes only
+  ergonomically, and it is the strongest argument for the brokered file
+  service that follows.
+- **Network access.** The session keeps it, needing it to be a coding agent
+  at all. A session that means to exfiltrate, or to publish over HTTPS with
+  a token obtained another way, is not stopped by a filesystem profile.
+- **A secret already in the session's context.** The sandbox denies reads
+  of credential material on disk. It cannot un-know what has been read.
+- **Anything not launched by this engine.** The wrapper applies to provider
+  sessions the driver spawns. An agent the operator starts directly is
+  outside it, and this spec hardens no machine.
 - **Linux as a qualified platform.** See B-6 and D-4.
-- **`sandbox-exec` being a supported Apple interface.** It is deprecated and
-  present; D-2 records the bet and the fallback.
-- Signing the action record (122 §6), a permit format for the hosted plane,
-  and per-stage driver routing.
+- **`sandbox-exec` being a supported Apple interface.** It is deprecated
+  and present; D-2 records the bet and the fallback.
+
+Known compatibility effects, accepted rather than discovered later:
+
+- **SSH-authenticated dependency fetching inside the session breaks.**
+  Denying `~/.ssh` and the `ssh` binary denies a private dependency fetched
+  over SSH. Projects that need one must fetch over HTTPS, or vendor it, or
+  run `preferred`. §5's live rounds are the check.
+
+Also out of scope: signing the action record (122 §6), a permit format for
+the hosted plane, and per-stage driver routing.
 
 ## 7. Resolved decisions
 
@@ -264,58 +336,90 @@ D-1 (2026-09-10). Deny-list, not allow-list. An allow-list is the stronger
 shape and was rejected on evidence: both providers authenticate out of
 `HOME`, the session's toolchain is spread across the machine, and the
 allow-list would have to be widened on every provider upgrade until it
-enumerated most of the filesystem. 125 §6 had already identified the same
-trade from the other side. The deny-list's weakness is stated rather than
-finessed: it closes the reaches it names, and a reach nobody enumerated
-stays open. The four in B-3 are the four 125 §6 enumerated, which is the
-scope this spec claims and no more.
+enumerated most of the filesystem. 125 §6 identified the same trade from the
+other side. The weakness is stated rather than finessed: it closes the
+reaches it names, and a reach nobody enumerated stays open.
 
 D-2 (2026-09-10). Seatbelt (`/usr/bin/sandbox-exec`) on macOS, not a
-container. A container changes the developer's loop, the worktree's
-identity and the provider's own installation, for a spec whose entire job is
-to deny four reads. Seatbelt is deprecated by Apple and still shipped
-(present on macOS 26.5.1, the machine this was written on) and is what
-Codex's own sandbox uses on macOS, so the bet is one the ecosystem is
-already making. If Apple removes it, `sandboxSupport()` reports `none` and
-B-6's degradation is the fallback, which is why that path exists rather than
-a refusal.
+container. A container changes the developer's loop, the worktree's identity
+and the provider's own installation, for a spec whose job is to deny a small
+set of reads. Seatbelt is deprecated by Apple, still shipped (present on
+macOS 26.5.1, the machine this was written on), and is what Codex's own
+sandbox uses on macOS, so the bet is one the ecosystem already makes. If
+Apple removes it, `sandboxSupport()` reports `none` and B-6's policy decides.
 
-D-3 (2026-09-10). The candidate commits unsigned (B-5). Denying `~/.ssh`
-denies the signing key, so signing inside the sandbox is impossible, and the
-question is only whether anything depends on it. Nothing does: every commit
-on `main` is committed by `GitHub <noreply@github.com>` and signed with
-GitHub's key, because the squash merge is created server-side. The local
-key's signature on a feature-branch commit is never what satisfies branch
-protection. This stops being true if the protection rule is changed to
-require every commit in a pull request to be signed, or if merges stop being
-squashes; either change makes B-5 wrong and this spec must be revisited
-rather than worked around.
+D-3 (2026-09-10). Signing is brokered, and this spec asserts nothing about
+unsigned commits. An earlier draft had the candidate commit unsigned, on the
+grounds that every commit on `main` is committed by
+`GitHub <noreply@github.com>` and signed with GitHub's key because the squash
+merge is created server-side. That observation is true and it is not
+sufficient: it describes what a *merged* commit looks like, not whether a
+head branch carrying unsigned commits is accepted. This repository has
+`required_signatures` enabled on `main` with `enforce_admins` enabled, and
+GitHub documents that unsigned head-branch commits can block a merge. Rather
+than resolve that question by experiment on a protected branch, B-5 removes
+the dependency on the answer: the commits are signed, by the engine, with
+the key kept outside the sandbox. Handing the key to the session was
+rejected outright, and is not the only alternative to unsigned.
 
 D-4 (2026-09-10). macOS is qualified, Linux is declared. The `bwrap` branch
-is written and unit-tested, but §5's live criterion is macOS only, and this
+is written and unit-tested, but §5's live criteria are macOS only, and this
 spec does not claim a Linux confinement it has not run. That mirrors 124's
-distinction between a claimed capability and a qualified one: a claim
-nobody exercised is a claim, and the record should say which it is.
+distinction between a claimed capability and a qualified one: a claim nobody
+exercised is a claim, and the record should say which it is.
 
-D-5 (2026-09-10). The fence (125) stays, and is not folded into the
-profile. They do different jobs: the fence produces a legible refusal that
-names the broker and is tallied as `fence.refused`, and the sandbox makes
-the refusal unavoidable. Removing the fence would replace a message a
-session can act on with an OS denial it cannot interpret, and would lose the
-journal kind 125 added to the export policy at version 5.
+D-5 (2026-09-10). The fence (125) stays, and is not folded into the profile.
+They do different jobs: the fence produces a legible refusal naming the
+broker, tallied as `fence.refused`, and the sandbox makes the refusal
+unavoidable. Removing the fence would replace a message a session can act on
+with an OS denial it cannot interpret, and would lose the journal kind 125
+added to the export policy at version 5.
+
+D-6 (2026-09-10). The keychain service is not denied, and the keyring is
+therefore closed only ergonomically. This reverses an earlier draft of B-3,
+on a measurement taken on the authoring machine: Claude Code keeps **no**
+credentials file (`~/.claude/.credentials.json` is absent) and holds its
+credential in the macOS keychain as `Claude Code-credentials`. Under a
+profile denying `mach-lookup` on `com.apple.SecurityServer`, a lookup of
+that item returns 44 rather than 0: the deny would break the Claude
+provider's own authentication on every driven session. Codex is unaffected,
+authenticating from `~/.codex/auth.json`. Closing the keyring properly
+therefore requires either a provider that authenticates without it or the
+brokered file service, and until then §6 carries it as open. The general
+lesson is recorded because it will recur: a deny that closes a reach is not
+adopted until a live provider session has run behind it.
+
+D-7 (2026-09-10). Two policy settings, and `preferred` is not the default
+for unattended work. `required` is what makes containment a property a
+reader can rely on. `preferred` exists because this engine also runs on
+machines that cannot offer a sandbox, and refusing every run there would
+make the spec undeployable rather than safe. The choice is the operator's
+and is recorded per run in `sandboxMode`, so a session that ran without
+containment is legible as such rather than indistinguishable from one that
+ran with it.
 
 ## Status (2026-09-10)
 
 Authored `draft`, `implementation: pending`. It comes from doc 04 §11's
 first open item and from the three residuals 125 §6 recorded.
 
-The four reaches in B-3 were probed on the authoring machine (macOS 26.5.1)
-before this spec was written, to establish that the mechanism closes them
-rather than to assume it: under a profile of the B-2 shape, reading `~/.ssh`
-was denied, reading `~/.config/gh/hosts.yml` was denied, executing `gh` by
-absolute path was denied, and `/usr/bin/security` exited 71 (denied) against
-44 (permitted, item not found) outside the profile, while an ordinary
-command in the worktree still ran. That probe is evidence for feasibility,
-not the §5 acceptance round, which runs against a real candidate.
+Revised before approval, on owner review, in three places: D-3 (the signing
+justification was insufficient, and signing is now brokered rather than
+abandoned), D-6 and B-3 (the keychain deny would have broken Claude's own
+authentication, measured), and B-6 and D-7 (containment is an operator
+policy with a `required` setting, not a best effort). §5 was rewritten at
+the same time: shell probes are feasibility evidence, and acceptance now
+requires live Claude and Codex sessions authenticating, building and
+publishing through the broker under the sandbox.
+
+Measurements taken on the authoring machine (macOS 26.5.1) that the spec
+rests on, recorded so a later reader can retake them: under a profile of the
+B-2 shape, reading `~/.ssh` was denied, reading `~/.config/gh/hosts.yml` was
+denied, executing `gh` by absolute path was denied, and `/usr/bin/security`
+exited 71 against 44 outside the profile, while an ordinary command still
+ran; `Claude Code-credentials` resolved at 0 on the host and 44 under a
+`SecurityServer` deny; `main` reports `required_signatures` enabled and
+`enforce_admins` enabled. These establish feasibility and the two
+constraints, not acceptance.
 
 Approval is a human flip.

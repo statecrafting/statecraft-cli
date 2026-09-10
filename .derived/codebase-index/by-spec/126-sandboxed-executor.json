@@ -11,6 +11,16 @@
         "code": "W-001",
         "message": "spec '126-sandboxed-executor' file unit 'members/src/orchestrator/sandbox.test.ts' does not exist",
         "path": "members/src/orchestrator/sandbox.test.ts"
+      },
+      {
+        "code": "W-001",
+        "message": "spec '126-sandboxed-executor' file unit 'members/src/orchestrator/signer.ts' does not exist",
+        "path": "members/src/orchestrator/signer.ts"
+      },
+      {
+        "code": "W-001",
+        "message": "spec '126-sandboxed-executor' file unit 'members/src/orchestrator/signer.test.ts' does not exist",
+        "path": "members/src/orchestrator/signer.test.ts"
       }
     ]
   },
@@ -21,6 +31,10 @@
       "121-candidate-and-receipt"
     ],
     "implementingPaths": [
+      {
+        "path": "members/src/orchestrator/broker.ts",
+        "source": "spec-edge"
+      },
       {
         "path": "members/src/orchestrator/candidate.ts",
         "source": "spec-edge"
@@ -63,6 +77,37 @@
         "unit": {
           "kind": "file",
           "path": "members/src/orchestrator/sandbox.ts"
+        }
+      },
+      {
+        "locations": [],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "kind": "file",
+          "path": "members/src/orchestrator/signer.test.ts"
+        }
+      },
+      {
+        "locations": [],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "kind": "file",
+          "path": "members/src/orchestrator/signer.ts"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "members/src/orchestrator/broker.ts"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "members/src/orchestrator/broker.ts"
         }
       },
       {
@@ -161,5 +206,5 @@
     "specStatus": "draft"
   },
   "schemaVersion": "1.1.0",
-  "shardHash": "e31c7c724dd4bc9b5ce0ab2c487286198a4fac1860ef86459654f94dae919c86"
+  "shardHash": "9bcdc650502ee40fec943af1276b8b34ecceab94d42f8ffe3dd61c5fbb7c9e17"
 }
