@@ -47,7 +47,7 @@
     {
       "target": ".agents/skills/shepherd/SKILL.md",
       "source": ".claude/skills/shepherd/SKILL.md",
-      "sourceSha256": "3b0490684e0eb2fee42020c30886cf03d157e96190ba8aa785569856c42ae5f5",
+      "sourceSha256": "4f2bbbf1b7c2ad7f4b44dda3c97c456ec4d80765b4e2651ba5fafd9fc6065f06",
       "transform": "copy",
       "dropped": []
     },
