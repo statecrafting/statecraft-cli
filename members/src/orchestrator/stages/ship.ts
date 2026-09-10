@@ -484,10 +484,14 @@ export interface ShipSessionEvidence {
   readonly durationMs: number;
   // 119 B-6: the refusals the harness reported, beside the classification.
   readonly denials: number;
+  // 125 B-7: fence refusals during the ship round. A ship session reaching
+  // for `gh` is the exact move 122 moved to the broker, so it is the round
+  // where a non-zero count matters most.
+  readonly fenceRefusals: number;
   readonly denialSamples: readonly string[];
 }
 
-function toShipSessionEvidence(result: SessionResult): ShipSessionEvidence {
+function toShipSessionEvidence(result: SessionResult, fenceRefusals: number): ShipSessionEvidence {
   return {
     sessionId: result.sessionId,
     classification: result.classification.kind,
@@ -497,6 +501,7 @@ function toShipSessionEvidence(result: SessionResult): ShipSessionEvidence {
     numTurns: result.numTurns,
     durationMs: result.durationMs,
     denials: result.denials,
+    fenceRefusals,
     denialSamples: [...result.denialSamples],
   };
 }
@@ -686,7 +691,16 @@ export async function runShipStage(options: RunShipStageOptions): Promise<ShipRe
   journal.append("stage.ship.prompt", promptPayload);
 
   const session = await runner.runSession({ prompt, timeoutMs: deadlineMs, maxTurns, tier: options.tier, model: options.model, journal });
-  const sessionEvidence = toShipSessionEvidence(session);
+  const shipFenceRefusals = runner.fenceRefusals?.() ?? 0;
+  const sessionEvidence = toShipSessionEvidence(session, shipFenceRefusals);
+  if (shipFenceRefusals > 0) {
+    journal.append("fence.refused", {
+      specId,
+      round: 3,
+      sessionId: session.sessionId,
+      refusals: shipFenceRefusals,
+    });
+  }
 
   // --- B-2: a hook-blocked session is terminal for the stage. No outside
   // verification (B-3) is attempted in response: a refusal is not a claim

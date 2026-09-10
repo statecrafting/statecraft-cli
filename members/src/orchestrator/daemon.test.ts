@@ -169,7 +169,7 @@ function buildResult(specId: string, outcome: BuildResult["outcome"], opts: { qu
           costMicroUsd: 10,
           numTurns: 1,
           durationMs: 1,
-          denials: 0,
+          denials: 0, fenceRefusals: 0,
         },
       ],
       gates: [],
@@ -191,7 +191,7 @@ function shipResult(specId: string, outcome: ShipResult["outcome"]): ShipResult 
       localHeadSha: `${specId}-head`,
       promptVersion: 1,
       sessions: [
-        { sessionId: `s-${specId}-ship`, classification: "completed", detail: "ok", stderrTail: "", costMicroUsd: 5, numTurns: 1, durationMs: 1, denials: 0, denialSamples: [] },
+        { sessionId: `s-${specId}-ship`, classification: "completed", detail: "ok", stderrTail: "", costMicroUsd: 5, numTurns: 1, durationMs: 1, denials: 0, denialSamples: [], fenceRefusals: 0 },
       ],
       pr: { number: 1, url: "https://example.invalid/pr/1", headSha: `${specId}-head` },
       ciTriggered: true,

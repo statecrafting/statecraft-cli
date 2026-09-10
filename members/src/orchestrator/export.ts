@@ -60,8 +60,12 @@ export interface RedactionPolicy {
 // (a git status text) is stripped.
 // Version 4 (spec 122): the broker's records (`broker.action`,
 // `broker.refused`) join the allowlist; their `detail` is stripped as elsewhere.
+// Version 5 (spec 125): `fence.refused` joins the allowlist. It carries a
+// count and the tool that was refused, which is the fact worth exporting: a
+// session that tried to publish around the broker. Its `detail` is stripped
+// as `broker.refused`'s is.
 export const REDACTION_POLICY: RedactionPolicy = {
-  version: 4,
+  version: 5,
   includedKinds: [
     "acceptance.receipt",
     "acceptance.sensitive",
@@ -81,6 +85,7 @@ export const REDACTION_POLICY: RedactionPolicy = {
     "dag.adoption.deferred",
     "decision.sealed",
     "decision.sealed.outcome",
+    "fence.refused",
     "quota.parked",
     "quota.resumed",
     "run.created",

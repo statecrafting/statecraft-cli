@@ -335,12 +335,21 @@ impl<'de> Deserialize<'de> for False {
 /// `candidate.ts` carries the same list; the fixture `child-env-deny.json`
 /// is what both sides assert against. Spec 122 adds the GitHub tokens.
 /// Spec 122 B-7 added the GitHub tokens: the engine publishes, the
-/// candidate does not.
-pub const CHILD_ENV_DENY: [&str; 4] = [
+/// candidate does not. Spec 125 B-4 adds the ssh agent: a repository whose
+/// origin is an ssh URL is pushed to from the agent socket, which no token
+/// name reaches.
+///
+/// This list is the subtractive half of the credential fence and can only
+/// remove what it names. The additive half (a PATH whose `gh` and `ssh`
+/// refuse, git redirected away from every inherited credential helper)
+/// lives engine-side in `fence.ts`, because it is per-candidate state.
+pub const CHILD_ENV_DENY: [&str; 6] = [
     "ANTHROPIC_API_KEY",
     "OPENAI_API_KEY",
     "GH_TOKEN",
     "GITHUB_TOKEN",
+    "SSH_AUTH_SOCK",
+    "SSH_AGENT_PID",
 ];
 
 /// The driver protocol's request schema version.

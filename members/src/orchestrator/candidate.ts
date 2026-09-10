@@ -10,14 +10,29 @@
 import * as fs from "fs";
 import { join } from "path";
 
+import { buildFence, fencePath } from "./fence";
+
 // --- the environment deny list (B-3) ----------------------------------------
 
 // What a driven session never inherits. Both Rust providers drop the same
 // names; the contract fixture `child-env-deny.json` is the list both sides
 // assert against. Spec 122 adds the GitHub tokens when the engine publishes.
 // Spec 122 B-7 added the GitHub tokens: the engine publishes, the candidate
-// does not.
-export const CHILD_ENV_DENY: readonly string[] = ["ANTHROPIC_API_KEY", "OPENAI_API_KEY", "GH_TOKEN", "GITHUB_TOKEN"];
+// does not. Spec 125 B-4 adds the ssh agent: a repository whose origin is an
+// ssh URL is pushed to from the agent socket, which no token name reaches.
+//
+// The list is the subtractive half of the fence and can only remove what it
+// names. The additive half, which closes the reaches that are not
+// environment-variable shaped at all (a keyring-backed `gh`, a credential
+// helper, a key on disk), is `fence.ts`.
+export const CHILD_ENV_DENY: readonly string[] = [
+  "ANTHROPIC_API_KEY",
+  "OPENAI_API_KEY",
+  "GH_TOKEN",
+  "GITHUB_TOKEN",
+  "SSH_AUTH_SOCK",
+  "SSH_AGENT_PID",
+];
 
 export function scrubEnv(env: NodeJS.ProcessEnv): Record<string, string> {
   const out: Record<string, string> = {};
@@ -47,6 +62,9 @@ export interface Candidate {
   // True when the branch already existed (016 B-2's reconcile): a crashed
   // prior attempt, or an earlier run of the same spec.
   readonly reused: boolean;
+  // 125 B-2: the fence built beside this candidate, whose shims and git
+  // config the session's environment points at. Never inside `path`.
+  readonly fenceDir: string;
 }
 
 function git(cwd: string, args: readonly string[]): { exitCode: number; stdout: string; stderr: string } {
@@ -77,12 +95,15 @@ export function candidatePath(homeDir: string, project: string, branch: string):
 export function openCandidate(params: OpenCandidateParams): Candidate {
   const { repoDir, branch, baseSha } = params;
   const path = candidatePath(params.homeDir, params.project, branch);
+  // 125 B-2: the fence is rebuilt on every open, before the worktree is
+  // touched, so a session never runs against shims left by a crashed round.
+  const fenceDir = buildFence(fencePath(params.homeDir, params.project, branch));
   if (fs.existsSync(join(path, ".git"))) {
     const current = requireGit(path, ["branch", "--show-current"], "git branch --show-current");
     if (current !== branch) {
       throw new Error(`candidate: ${path} is a worktree on "${current}", not "${branch}"; remove it before reopening`);
     }
-    return { path, branch, reused: true };
+    return { path, branch, reused: true, fenceDir };
   }
   // A stale directory with no worktree behind it (a pruned or half-removed
   // one) is cleared so `git worktree add` can claim the path.
@@ -94,10 +115,10 @@ export function openCandidate(params: OpenCandidateParams): Candidate {
   const exists = git(repoDir, ["show-ref", "--verify", "--quiet", `refs/heads/${branch}`]).exitCode === 0;
   if (exists) {
     requireGit(repoDir, ["worktree", "add", path, branch], `git worktree add ${branch}`);
-    return { path, branch, reused: true };
+    return { path, branch, reused: true, fenceDir };
   }
   requireGit(repoDir, ["worktree", "add", "-b", branch, path, baseSha], `git worktree add -b ${branch}`);
-  return { path, branch, reused: false };
+  return { path, branch, reused: false, fenceDir };
 }
 
 // Removes the worktree and prunes; the branch stays (it is the run's
