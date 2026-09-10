@@ -209,6 +209,21 @@ export function deriveTranscriptPath(repo: string, sessionId: string): string {
 // decides when "once per run" is (e.g. once per daemon lifetime) and
 // journals the result itself, rather than runSession spawning an extra
 // process on every single session just to re-read the same version string.
+// 124 B-6: the first line of `<bin> --version`, or null. Synchronous, so the
+// spawn path stays in order; the Rust core does the same.
+export const VERSION_PROBE_MS = 1500;
+
+export function binaryVersionOf(bin: string): string | null {
+  try {
+    const result = Bun.spawnSync([bin, "--version"], { stdout: "pipe", stderr: "pipe", timeout: VERSION_PROBE_MS, killSignal: "SIGKILL" });
+    if (result.exitCode !== 0) return null;
+    const line = new TextDecoder().decode(result.stdout).split("\n")[0]?.trim() ?? "";
+    return line.length === 0 ? null : line;
+  } catch {
+    return null;
+  }
+}
+
 export async function claudeVersion(claudeBin: string): Promise<string> {
   const proc = Bun.spawn([claudeBin, "--version"], { stdout: "pipe", stderr: "pipe" });
   const [stdout, stderr, exitCode] = await Promise.all([
@@ -278,6 +293,9 @@ async function runSessionOnce(opts: RunSessionOptions): Promise<SessionResult> {
     "hook-enforcement",
   ]);
   const degraded = requested.filter((c) => !applied.includes(c));
+  // 124 B-6: which binary version this run's evidence is about; a binary
+  // that does not answer `--version` is journaled as null, never guessed.
+  const binaryVersion = binaryVersionOf(claudeBin);
   const args = [claudeBin, "-p", "--output-format", "stream-json", "--verbose", ...sessionArgsForProfile(profile)];
   if (opts.model !== undefined) args.push("--model", opts.model);
   if (opts.maxTurns !== undefined) args.push("--max-turns", String(opts.maxTurns));
@@ -429,6 +447,7 @@ async function runSessionOnce(opts: RunSessionOptions): Promise<SessionResult> {
           // enforcement; degraded is the rest of what was requested.
           applied: [...applied],
           degraded: [...degraded],
+          binaryVersion,
         };
         opts.journal.append("session.init", initPayload);
       }

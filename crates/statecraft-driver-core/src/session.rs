@@ -153,9 +153,15 @@ fn sanitize_usage(usage: Option<&Value>) -> Option<BTreeMap<String, i64>> {
 
 #[cfg(unix)]
 fn signal(pid: u32, sig: i32) {
-    // SAFETY: a signal to our own child, whose pid we recorded at spawn.
+    // Spec 124 B-2 (`hang-killed`): the provider runs in its own process
+    // group, so the signal reaches every descendant it spawned, not only
+    // the child we recorded. A descendant that outlived the child would
+    // otherwise hold the pipes open and, worse, keep working after the
+    // deadline the engine enforced.
+    // SAFETY: a signal to the process group of our own child, whose pid we
+    // recorded at spawn and made the group's leader.
     unsafe {
-        libc::kill(pid as i32, sig);
+        libc::kill(-(pid as i32), sig);
     }
 }
 
@@ -209,18 +215,28 @@ pub fn run_session(
     let spawn_extras = json!({
         "applied": applied.iter().map(|c| c.as_str()).collect::<Vec<_>>(),
         "degraded": degraded.iter().map(|c| c.as_str()).collect::<Vec<_>>(),
+        // Spec 124 B-6: which binary version this run's evidence is about.
+        "binaryVersion": provider.binary_version(&bin),
     });
     let parent: BTreeMap<String, String> = std::env::vars().collect();
     let env = provider.child_env(&parent);
 
-    let mut child = Command::new(&bin)
+    let mut command = Command::new(&bin);
+    command
         .args(&argv)
         .current_dir(&abs_repo)
         .env_clear()
         .envs(&env)
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
+        .stderr(Stdio::piped());
+    // Spec 124 B-2: the provider leads its own process group (see `signal`).
+    #[cfg(unix)]
+    {
+        use std::os::unix::process::CommandExt;
+        command.process_group(0);
+    }
+    let mut child = command
         .spawn()
         .map_err(|e| format!("cannot spawn {bin}: {e}"))?;
     let pid = child.id();

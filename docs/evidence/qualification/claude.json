@@ -1,0 +1,29 @@
+{
+  "schemaVersion": 1,
+  "driver": "claude",
+  "binary": {
+    "path": "claude",
+    "version": "2.1.267 (Claude Code)"
+  },
+  "platform": {
+    "os": "darwin",
+    "arch": "arm64"
+  },
+  "capabilities": {
+    "declared": [
+      "tool-allowlist",
+      "max-turns",
+      "mcp-config",
+      "cost",
+      "hook-enforcement"
+    ],
+    "applied": [
+      "cost",
+      "hook-enforcement"
+    ],
+    "degraded": []
+  },
+  "denials": 1,
+  "classification": "completed",
+  "recordedAt": "2026-09-10T05:45:25.673Z"
+}

@@ -141,6 +141,50 @@ impl Profile {
     }
 }
 
+/// The first line of `<bin> --version`, bounded: a binary that does not
+/// answer within `limit` is killed and reads as no version (spec 124 B-6).
+pub fn probe_version(bin: &str, limit: std::time::Duration) -> Option<String> {
+    use std::io::Read;
+    use std::process::{Command, Stdio};
+    let mut child = Command::new(bin)
+        .arg("--version")
+        .stdin(Stdio::null())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::null())
+        .spawn()
+        .ok()?;
+    let mut stdout = child.stdout.take()?;
+    let reader = std::thread::spawn(move || {
+        let mut buf = String::new();
+        let _ = stdout.read_to_string(&mut buf);
+        buf
+    });
+    let started = std::time::Instant::now();
+    let status = loop {
+        match child.try_wait() {
+            Ok(Some(status)) => break status,
+            Ok(None) if started.elapsed() < limit => {
+                std::thread::sleep(std::time::Duration::from_millis(20))
+            }
+            _ => {
+                // A binary that will not answer is killed and reads as no
+                // version. The reader thread is not joined: a descendant the
+                // kill did not reach may hold the pipe open, and waiting on
+                // it would be the hang this bound exists to prevent.
+                let _ = child.kill();
+                let _ = child.wait();
+                return None;
+            }
+        }
+    };
+    let text = reader.join().ok()?;
+    if !status.success() {
+        return None;
+    }
+    let line = text.lines().next()?.trim();
+    (!line.is_empty()).then(|| line.to_string())
+}
+
 /// What the core hands a provider to build its argv.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct SpawnSpec<'a> {
@@ -219,6 +263,13 @@ pub trait Provider: Send + Sync {
     /// The provider's own fields in `session.init` (its binary under its own key,
     /// D-2), given the resolved binary.
     fn init_extras(&self, bin: &str) -> Value;
+    /// Spec 124 B-6: the binary's version, journaled in `session.init` as
+    /// `binaryVersion` so a qualification record can be matched to the run.
+    /// Default: the first line of `<bin> --version`, or None when it does
+    /// not answer.
+    fn binary_version(&self, bin: &str) -> Option<String> {
+        probe_version(bin, std::time::Duration::from_millis(1500))
+    }
     /// The result subtype that means the turn cap was hit, when the provider
     /// has a turn cap (spec 116 B-1). None: `max-turns` is never classified.
     fn max_turns_subtype(&self) -> Option<&'static str> {

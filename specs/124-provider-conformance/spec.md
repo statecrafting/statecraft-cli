@@ -3,7 +3,7 @@ id: "124-provider-conformance"
 title: "Provider conformance: one negative suite every driver runs, a fixture driver that ships with it, and a live qualification record per binary"
 status: approved
 created: "2026-09-09"
-implementation: in-progress
+implementation: complete
 risk: medium
 depends_on:
   - "123-policy-kit-handoff"
@@ -38,6 +38,15 @@ extends:
   - { spec: "110-corpus-merge", unit: "members/package.json", nature: additive }
   # 109 owns the Makefile target list.
   - { spec: "109-governed-harness", unit: "Makefile", nature: additive }
+  # The verdict is served on the project row and rendered by the CLI.
+  - { spec: "022-http-api-and-events", unit: { kind: directory, path: "members/src/orchestrator/api/" }, nature: additive }
+  - { spec: "023-orchestrator-cli", unit: "members/src/commands/orchestrator.ts", nature: additive }
+  - { spec: "024-web-ui", unit: "members/web/test/fixtures.ts", nature: additive }
+  - { spec: "024-web-ui", unit: "members/web/test/store.test.tsx", nature: additive }
+  # The in-process session journals the binary version too (parity).
+  - { spec: "014-session-driver", unit: "members/src/orchestrator/session.ts", nature: additive }
+  - { spec: "043-driver-seam", unit: "members/src/members/driver-session.test.ts", nature: additive }
+  - { spec: "117-project-driver", unit: "members/src/orchestrator/project-driver.test.ts", nature: additive }
 references:
   - { unit: { kind: file, path: "docs/design/04-the-governed-substrate.md" }, role: context }
 summary: >
@@ -173,6 +182,35 @@ cd members && bun test src/members/conformance.test.ts src/members/engine-bundle
 cd members && bun run build:member:driver-fixture && bun run conformance
 ```
 
+## Status (2026-09-09)
+
+Implemented. `statecraft-driver-fixture` speaks the 043 wire with a
+scriptable provider, a manifest from its environment, a marker file at
+spawn and a break knob; `conformance.ts` carries the seven cases and the
+harness, with the fixture target and the Claude and Codex targets over
+fake providers per case; `conformance.test.ts` runs the fixture always,
+each Rust driver it can build, and the broken fixture for four cases.
+Building the suite found the gap doc 04's table predicted: neither Rust
+driver reached a hung provider's descendants, so the core now spawns the
+provider as its own process group leader and signals the group
+(`hang-killed` passes on all three targets, and the broken fixture that
+keeps its child alive fails it). The core and the in-process session
+journal `binaryVersion` in `session.init`, read through a bounded
+`--version` probe (1.5 s, a descendant holding the pipe is not waited
+for); `qualification.ts` folds the evidence directory and the seam
+journals `driver.unqualified` once per process driver when no record
+names the version; the project row serves `driverQualified` and the
+posture cell appends ` (unqualified)`. `scripts/qualify-provider.ts`
+drove one live turn of each real provider over a drifting clone of this
+checkout: Claude Code 2.1.267 wrote the file and was refused once by the
+PR gate, `completed` in 27.6 s; Codex 0.153.4 likewise, `completed` in
+18.2 s with `applied: ["hook-enforcement"]` and `degraded: ["cost"]`.
+Both records are committed under `docs/evidence/qualification/`. The
+bundle test's forbidden set is the Codex driver's three flags:
+`workspace-write` is a capability token both sides carry (120 B-1) and
+`OPENAI_API_KEY` is the deny list's (121 D-6), so neither is forbidden.
+The members suite (963) and the workspace are green.
+
 ## 6. Out of scope
 
 A sensor conformance suite beyond 115 FR-003. Qualifying against a
@@ -193,6 +231,16 @@ as the parity tests do; the live binary runs once, in qualification,
 and its record is committed. A suite that needed a live harness would
 not run in CI, and one that never touched a live harness would qualify
 nothing.
+
+D-5 (2026-09-09). The fixture driver's manifest is computed in its own
+module rather than added to `MEMBER_MANIFESTS`, whose entrypoint test
+walks the shipped members' binaries; the fixture ships for the suite,
+not as a member the umbrella dispatches to.
+
+D-6 (2026-09-09). The provider runs as its own process group leader and
+the kill signals the group. The alternative, walking descendants by
+parent pid, races the fork the descendant is in the middle of; a group
+is what the kernel gives for exactly this.
 
 D-4 (2026-09-09). Unqualified runs. A new binary version on the
 operator's machine is a routine event; refusing it would stall every

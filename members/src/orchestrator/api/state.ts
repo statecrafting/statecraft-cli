@@ -14,6 +14,7 @@
 import type { JournalRecord, JsonValue } from "../journal";
 import { foldState } from "../journal";
 import { parseReceipt, RECEIPT_KIND } from "../receipt";
+import { qualificationFor } from "../qualification";
 import type { OrchestratorState, FoldedStageExec } from "../state";
 import { foldOrchestratorState } from "../state";
 import type { DagReader, PinLookup, RegistrySnapshot, RegistrySpecEntry, ShippedEntry, ShippedMap } from "../dag";
@@ -503,6 +504,9 @@ export function projectsView(rows: readonly ProjectRowInput[], nowMs: number): P
         ...base,
         budget: projectBudgetView(records, project.ceiling, nowMs),
         ...pick(runView(records, project.name)),
+        // 124 B-6: whether the binary the seam last saw for this project's
+        // driver has a qualification record; null before any session.
+        driverQualified: driverQualifiedFor(records, project.profile.driver ?? "claude"),
         readError: null,
       });
     } catch (err) {
@@ -517,11 +521,26 @@ export function projectsView(rows: readonly ProjectRowInput[], nowMs: number): P
         run: null,
         spec: null,
         stage: null,
+        driverQualified: null,
         readError: reason,
       });
     }
   }
   return { projects };
+}
+
+// The newest session.init's binary version, judged against the evidence
+// directory (124 B-6). Null when no session has named one.
+function driverQualifiedFor(records: readonly JournalRecord[], driver: string): boolean | null {
+  let version: string | null | undefined;
+  for (const record of records) {
+    if (record.kind !== "session.init") continue;
+    const payload = record.payload;
+    if (typeof payload !== "object" || payload === null || Array.isArray(payload)) continue;
+    version = typeof payload.binaryVersion === "string" ? payload.binaryVersion : null;
+  }
+  if (version === undefined) return null;
+  return qualificationFor(driver, version).qualified;
 }
 
 function pick(view: RunView): Pick<ProjectView, "run" | "spec" | "stage"> {

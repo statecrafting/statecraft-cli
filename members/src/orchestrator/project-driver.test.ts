@@ -94,12 +94,16 @@ test("117 FR-004: the daemon's deps drive the driver the project's profile names
     // 120 B-5: the Codex session's two preferred tokens were journaled as
     // degraded before its spawn; the fake Claude member declares the
     // reference tokens and degrades nothing.
+    // 124 B-6: each process driver (one per name) reports its unqualified
+    // binary once, after its first init.
     expect(records().map((r) => r.kind)).toEqual([
       "driver.degraded",
       "driver.degraded",
       "session.init",
+      "driver.unqualified",
       "session.result",
       "session.init",
+      "driver.unqualified",
       "session.result",
     ]);
   } finally {

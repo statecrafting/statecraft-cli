@@ -47,6 +47,7 @@ function projectRow(name: string): ProjectView {
     profile: { mode: "bypass", legacy: false },
     gate: { commands: [], source: "probe", rule: "none", legacy: false },
     policy: { schedulable: { statuses: ["approved"], namedDraft: false }, merge: { method: "squash" }, sensitive: { prefixes: [], onTouch: "record" }, humanGate: null, source: "default", legacy: true },
+    driverQualified: null,
     budget: FIXTURE_NO_CEILING,
     run: null,
     spec: null,

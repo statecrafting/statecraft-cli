@@ -134,10 +134,66 @@
           "kind": "file",
           "path": "Makefile"
         }
+      },
+      {
+        "nature": "additive",
+        "spec": "022-http-api-and-events",
+        "unit": {
+          "kind": "directory",
+          "path": "members/src/orchestrator/api/"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "023-orchestrator-cli",
+        "unit": {
+          "kind": "file",
+          "path": "members/src/commands/orchestrator.ts"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "024-web-ui",
+        "unit": {
+          "kind": "file",
+          "path": "members/web/test/fixtures.ts"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "024-web-ui",
+        "unit": {
+          "kind": "file",
+          "path": "members/web/test/store.test.tsx"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "014-session-driver",
+        "unit": {
+          "kind": "file",
+          "path": "members/src/orchestrator/session.ts"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "043-driver-seam",
+        "unit": {
+          "kind": "file",
+          "path": "members/src/members/driver-session.test.ts"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "117-project-driver",
+        "unit": {
+          "kind": "file",
+          "path": "members/src/orchestrator/project-driver.test.ts"
+        }
       }
     ],
     "id": "124-provider-conformance",
-    "implementation": "in-progress",
+    "implementation": "complete",
     "references": [
       {
         "role": "context",
@@ -156,6 +212,7 @@
       "4. Functional requirements",
       "5. Acceptance",
       "Verification",
+      "Status (2026-09-09)",
       "6. Out of scope",
       "7. Resolved decisions"
     ],
@@ -164,6 +221,6 @@
     "summary": "Doc 04 §8. A third provider is admitted by passing a suite, not by resembling the second. conformance.ts drives every discoverable driver through one negative table: a denial retained beside a completed result, a required capability refused before spawn, a hang killed with its descendants, a malformed stream and an absent cost left explicit, a manifest whose tokens agree with its tier, the same records from the Rust binary and the engine seam. A fixture driver ships in the members package so the suite runs without any real harness; the Claude and Codex drivers run it too. A qualification script drives one live turn of a named provider and writes a record under docs/evidence/qualification/; a driver whose binary version has no record runs as unqualified, shown in the posture and journaled, never refused.\n",
     "title": "Provider conformance: one negative suite every driver runs, a fixture driver that ships with it, and a live qualification record per binary"
   },
-  "shardHash": "7de0b9039029e2c7415b74fbf782aa2544084844d32d88ea5d027c9211ff11c4",
+  "shardHash": "8bc9b61755b8ae624fca16368ae83571db8d8ac95e2174049e8313b6e82329cd",
   "specVersion": "1.2.0"
 }

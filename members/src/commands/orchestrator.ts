@@ -138,6 +138,7 @@ import { parseCapabilityList, type Capability } from "../orchestrator/capabiliti
 import { gateRefusal, renderGate, renderGateDetail, type GateContract } from "../orchestrator/gate-contract";
 import { parseLifecyclePolicy, renderPolicy, type LifecyclePolicy } from "../orchestrator/lifecycle-policy";
 import { renderCapsule } from "../orchestrator/handoff";
+import type { QualificationVerdict } from "../orchestrator/qualification";
 import { renderSessionModels, sessionModelsRefusal, type SessionModels } from "../orchestrator/models";
 import { API_VERSION, API_VERSION_HEADER, projectRoute } from "../orchestrator/api/types";
 import { ECONOMICS_ROUTE, type RunEconomics, type SpecEconomics } from "../orchestrator/economics";
@@ -792,14 +793,19 @@ function projectRunCell(view: ProjectView): string {
 // 041 B-6: the gate takes the next column on the same reasoning. What a target
 // is judged by after its session ends is not a detail an operator should have
 // to open the project to learn.
+// 124 B-6: the served verdict, as the posture cell renders it.
+function verdictOf(view: ProjectView): QualificationVerdict | null {
+  return view.driverQualified === null ? null : { qualified: view.driverQualified, record: null };
+}
+
 function renderProjectRows(projects: readonly ProjectView[]): string[] {
   if (projects.length === 0) return ["no projects are registered with this daemon"];
   const nameWidth = projects.reduce((max, view) => Math.max(max, view.name.length), 0);
-  const postureWidth = projects.reduce((max, view) => Math.max(max, renderProfile(view.profile).length), 0);
+  const postureWidth = projects.reduce((max, view) => Math.max(max, renderProfile(view.profile, verdictOf(view)).length), 0);
   const gateWidth = projects.reduce((max, view) => Math.max(max, renderGate(view.gate).length), 0);
   return projects.map((view) =>
     `${view.name.padEnd(nameWidth)}  ${(view.armed ? "armed" : "disarmed").padEnd(8)}  ` +
-    `${renderProfile(view.profile).padEnd(postureWidth)}  ` +
+    `${renderProfile(view.profile, verdictOf(view)).padEnd(postureWidth)}  ` +
     `${renderGate(view.gate).padEnd(gateWidth)}  ` +
     `${qualificationCell(view.qualification).padEnd(11)}  ${projectRunCell(view)}`.trimEnd()
   );
@@ -811,7 +817,7 @@ function renderProjectRows(projects: readonly ProjectView[]): string[] {
 function renderProjectDetail(view: ProjectView): string[] {
   const lines = [...renderProjectRows([view])];
   const profile = view.profile;
-  lines.push(`posture: ${renderProfile(profile)}`);
+  lines.push(`posture: ${renderProfile(profile, verdictOf(view))}`);
   lines.push(`models:  ${renderSessionModels(profile.models)}`);
   lines.push(`driver:  ${renderDriver(profile)}`);
   lines.push(`require: ${renderRequire(profile)}`);

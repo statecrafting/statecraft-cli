@@ -188,7 +188,12 @@ test("B-4: the engine's seam drives the Rust driver to the same journal records 
         journal,
       });
       expect(result.classification.kind).toBe("completed");
-      return journal.fold().records.map((r) => scrub({ kind: r.kind, payload: r.payload as JsonValue }));
+      // 124 B-6: the seam's own qualification record is about the evidence,
+      // not the driver; the drivers' records are what parity compares.
+      return journal
+        .fold()
+        .records.filter((r) => r.kind !== "driver.unqualified")
+        .map((r) => scrub({ kind: r.kind, payload: r.payload as JsonValue }));
     } finally {
       journal.close();
     }

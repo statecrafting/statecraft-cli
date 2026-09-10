@@ -89,6 +89,14 @@ help:
 codex-kit:
 	python3 scripts/codex-kit.py
 
+# Spec 124: the provider conformance suite over the fixture driver and every
+# built real driver, and the live qualification of one named provider.
+.PHONY: conformance qualify
+conformance:
+	cd members && bun run conformance
+qualify:
+	bun scripts/qualify-provider.ts $(DRIVER)
+
 # Spec 123 B-4: the read-only check with its manifest, and the generator's test.
 kit-check:
 	python3 scripts/codex-kit.py --check

@@ -1,44 +1,4 @@
 {
-  "diagnostics": {
-    "errors": [],
-    "warnings": [
-      {
-        "code": "W-001",
-        "message": "spec '124-provider-conformance' file unit 'members/src/members/conformance.ts' does not exist",
-        "path": "members/src/members/conformance.ts"
-      },
-      {
-        "code": "W-001",
-        "message": "spec '124-provider-conformance' file unit 'members/src/members/conformance.test.ts' does not exist",
-        "path": "members/src/members/conformance.test.ts"
-      },
-      {
-        "code": "W-001",
-        "message": "spec '124-provider-conformance' file unit 'members/src/members/driver-fixture.ts' does not exist",
-        "path": "members/src/members/driver-fixture.ts"
-      },
-      {
-        "code": "W-001",
-        "message": "spec '124-provider-conformance' file unit 'scripts/qualify-provider.ts' does not exist",
-        "path": "scripts/qualify-provider.ts"
-      },
-      {
-        "code": "W-001",
-        "message": "spec '124-provider-conformance' directory unit 'docs/evidence/qualification/' is not a directory",
-        "path": "docs/evidence/qualification/"
-      },
-      {
-        "code": "W-001",
-        "message": "spec '124-provider-conformance' file unit 'members/src/orchestrator/qualification.ts' does not exist",
-        "path": "members/src/orchestrator/qualification.ts"
-      },
-      {
-        "code": "W-001",
-        "message": "spec '124-provider-conformance' file unit 'members/src/orchestrator/qualification.test.ts' does not exist",
-        "path": "members/src/orchestrator/qualification.test.ts"
-      }
-    ]
-  },
   "mapping": {
     "dependsOn": [
       "123-policy-kit-handoff",
@@ -57,7 +17,23 @@
         "source": "spec-edge"
       },
       {
+        "path": "docs/evidence/qualification/",
+        "source": "spec-edge"
+      },
+      {
         "path": "members/package.json",
+        "source": "spec-edge"
+      },
+      {
+        "path": "members/src/commands/orchestrator.ts",
+        "source": "spec-edge"
+      },
+      {
+        "path": "members/src/members/conformance.test.ts",
+        "source": "spec-edge"
+      },
+      {
+        "path": "members/src/members/conformance.ts",
         "source": "spec-edge"
       },
       {
@@ -65,7 +41,15 @@
         "source": "spec-edge"
       },
       {
+        "path": "members/src/members/driver-fixture.ts",
+        "source": "spec-edge"
+      },
+      {
         "path": "members/src/members/driver-parity.test.ts",
+        "source": "spec-edge"
+      },
+      {
+        "path": "members/src/members/driver-session.test.ts",
         "source": "spec-edge"
       },
       {
@@ -78,6 +62,10 @@
       },
       {
         "path": "members/src/members/manifest.ts",
+        "source": "spec-edge"
+      },
+      {
+        "path": "members/src/orchestrator/api/",
         "source": "spec-edge"
       },
       {
@@ -95,11 +83,43 @@
       {
         "path": "members/src/orchestrator/profile.ts",
         "source": "spec-edge"
+      },
+      {
+        "path": "members/src/orchestrator/project-driver.test.ts",
+        "source": "spec-edge"
+      },
+      {
+        "path": "members/src/orchestrator/qualification.test.ts",
+        "source": "spec-edge"
+      },
+      {
+        "path": "members/src/orchestrator/qualification.ts",
+        "source": "spec-edge"
+      },
+      {
+        "path": "members/src/orchestrator/session.ts",
+        "source": "spec-edge"
+      },
+      {
+        "path": "members/web/test/fixtures.ts",
+        "source": "spec-edge"
+      },
+      {
+        "path": "members/web/test/store.test.tsx",
+        "source": "spec-edge"
+      },
+      {
+        "path": "scripts/qualify-provider.ts",
+        "source": "spec-edge"
       }
     ],
     "resolvedUnits": [
       {
-        "locations": [],
+        "locations": [
+          {
+            "file": "docs/evidence/qualification/"
+          }
+        ],
         "ownership": true,
         "sourceField": "establishes",
         "unit": {
@@ -108,7 +128,11 @@
         }
       },
       {
-        "locations": [],
+        "locations": [
+          {
+            "file": "members/src/members/conformance.test.ts"
+          }
+        ],
         "ownership": true,
         "sourceField": "establishes",
         "unit": {
@@ -117,7 +141,11 @@
         }
       },
       {
-        "locations": [],
+        "locations": [
+          {
+            "file": "members/src/members/conformance.ts"
+          }
+        ],
         "ownership": true,
         "sourceField": "establishes",
         "unit": {
@@ -126,7 +154,11 @@
         }
       },
       {
-        "locations": [],
+        "locations": [
+          {
+            "file": "members/src/members/driver-fixture.ts"
+          }
+        ],
         "ownership": true,
         "sourceField": "establishes",
         "unit": {
@@ -135,7 +167,11 @@
         }
       },
       {
-        "locations": [],
+        "locations": [
+          {
+            "file": "members/src/orchestrator/qualification.test.ts"
+          }
+        ],
         "ownership": true,
         "sourceField": "establishes",
         "unit": {
@@ -144,7 +180,11 @@
         }
       },
       {
-        "locations": [],
+        "locations": [
+          {
+            "file": "members/src/orchestrator/qualification.ts"
+          }
+        ],
         "ownership": true,
         "sourceField": "establishes",
         "unit": {
@@ -153,7 +193,11 @@
         }
       },
       {
-        "locations": [],
+        "locations": [
+          {
+            "file": "scripts/qualify-provider.ts"
+          }
+        ],
         "ownership": true,
         "sourceField": "establishes",
         "unit": {
@@ -172,6 +216,19 @@
         "unit": {
           "kind": "directory",
           "path": "crates/statecraft-driver-core/"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "members/src/orchestrator/api/"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "directory",
+          "path": "members/src/orchestrator/api/"
         }
       },
       {
@@ -203,6 +260,19 @@
       {
         "locations": [
           {
+            "file": "members/src/commands/orchestrator.ts"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "members/src/commands/orchestrator.ts"
+        }
+      },
+      {
+        "locations": [
+          {
             "file": "members/src/members/driver-codex.test.ts"
           }
         ],
@@ -224,6 +294,19 @@
         "unit": {
           "kind": "file",
           "path": "members/src/members/driver-parity.test.ts"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "members/src/members/driver-session.test.ts"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "members/src/members/driver-session.test.ts"
         }
       },
       {
@@ -320,6 +403,58 @@
       {
         "locations": [
           {
+            "file": "members/src/orchestrator/project-driver.test.ts"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "members/src/orchestrator/project-driver.test.ts"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "members/src/orchestrator/session.ts"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "members/src/orchestrator/session.ts"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "members/web/test/fixtures.ts"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "members/web/test/fixtures.ts"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "members/web/test/store.test.tsx"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "members/web/test/store.test.tsx"
+        }
+      },
+      {
+        "locations": [
+          {
             "file": "docs/design/04-the-governed-substrate.md"
           }
         ],
@@ -335,5 +470,5 @@
     "specStatus": "approved"
   },
   "schemaVersion": "1.1.0",
-  "shardHash": "c36dfeef55262fe03d918220b9d1a59e2a66d637c8acad6f363145e563a01fe2"
+  "shardHash": "f47c15b09526f2465bad91e8506a6b2eca101c9db30b16884cc0f017be2e1a19"
 }
