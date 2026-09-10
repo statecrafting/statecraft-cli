@@ -12,9 +12,9 @@ use std::path::PathBuf;
 
 use serde_json::{json, Value};
 use statecraft_contract::{
-    exit, CapabilityTier, Classification, DriverEvent, Envelope, Manifest, ModelTier, OverflowInfo,
-    SessionRequest, SessionResult, TerminationKind, CONTRACT, MANIFEST_SCHEMA_VERSION,
-    SESSION_REQUEST_SCHEMA_VERSION,
+    exit, Capability, CapabilityTier, Classification, DriverEvent, Envelope, Manifest, ModelTier,
+    OverflowInfo, Requirements, SessionRequest, SessionResult, TerminationKind, CONTRACT,
+    MANIFEST_SCHEMA_VERSION, SESSION_REQUEST_SCHEMA_VERSION,
 };
 
 fn fixtures_dir() -> PathBuf {
@@ -58,6 +58,8 @@ fn manifests_of_the_three_members() {
         contract: CONTRACT.to_string(),
         verbs: vec!["orchestrator".to_string()],
         capability_tier: CapabilityTier::Basic,
+        // Spec 120 B-2: the engine supports no session token.
+        capabilities: Some(Vec::new()),
         exit_codes: exit::d4_taxonomy(),
         envelope: "ok-data".to_string(),
     };
@@ -65,7 +67,25 @@ fn manifests_of_the_three_members() {
         name: "statecraft-driver-claude".to_string(),
         verbs: vec!["models".to_string(), "session".to_string()],
         capability_tier: CapabilityTier::Reference,
+        // Spec 120 B-2: the four request tokens and hook enforcement; not
+        // workspace-write (D-2).
+        capabilities: Some(vec![
+            Capability::ToolAllowlist,
+            Capability::MaxTurns,
+            Capability::McpConfig,
+            Capability::Cost,
+            Capability::HookEnforcement,
+        ]),
         ..engine.clone()
+    };
+    let codex = Manifest {
+        name: "statecraft-driver-codex".to_string(),
+        capability_tier: CapabilityTier::Basic,
+        capabilities: Some(vec![
+            Capability::WorkspaceWrite,
+            Capability::HookEnforcement,
+        ]),
+        ..driver.clone()
     };
     let sensor = Manifest {
         name: "statecraft-sensor-claude".to_string(),
@@ -80,12 +100,61 @@ fn manifests_of_the_three_members() {
     };
     check("manifest-engine", &to_value(&engine));
     check("manifest-driver", &to_value(&driver));
+    check("manifest-driver-codex", &to_value(&codex));
     check("manifest-sensor", &to_value(&sensor));
     // Round trip through the parser 108 applies.
-    for m in [&engine, &driver, &sensor] {
+    for m in [&engine, &driver, &codex, &sensor] {
         let text = serde_json::to_string(m).unwrap();
         assert_eq!(&Manifest::parse(text.as_bytes()).unwrap(), m);
     }
+    // Spec 120 B-2: a tier that disagrees with its tokens is refused; an
+    // older manifest without the field is not checked.
+    let lying = Manifest {
+        capability_tier: CapabilityTier::Reference,
+        ..codex.clone()
+    };
+    let err = Manifest::parse(serde_json::to_string(&lying).unwrap().as_bytes()).unwrap_err();
+    assert!(err.contains("derive basic"), "{err}");
+    let older = Manifest {
+        capabilities: None,
+        ..driver.clone()
+    };
+    assert!(Manifest::parse(serde_json::to_string(&older).unwrap().as_bytes()).is_ok());
+}
+
+/// Spec 120 B-1: the vocabulary, in wire order, as both sides assert it.
+#[test]
+fn capabilities() {
+    check(
+        "capabilities",
+        &json!(Capability::ALL
+            .iter()
+            .map(|c| c.as_str())
+            .collect::<Vec<_>>()),
+    );
+    assert_eq!(
+        CapabilityTier::for_capabilities(&Capability::ALL),
+        CapabilityTier::Reference
+    );
+    assert_eq!(
+        CapabilityTier::for_capabilities(&Capability::REQUEST),
+        CapabilityTier::Reference
+    );
+    assert_eq!(
+        CapabilityTier::for_capabilities(&[
+            Capability::WorkspaceWrite,
+            Capability::HookEnforcement
+        ]),
+        CapabilityTier::Basic
+    );
+    assert_eq!(
+        Capability::ordered(&[
+            Capability::Cost,
+            Capability::Cost,
+            Capability::ToolAllowlist
+        ]),
+        vec![Capability::ToolAllowlist, Capability::Cost]
+    );
 }
 
 #[test]
@@ -134,9 +203,15 @@ fn session_request() {
             "allowedTools": ["Read", "Bash(git:*)"],
             "disallowedTools": null,
             "models": null,
-            "driver": "codex"
+            "driver": "codex",
+            "require": ["workspace-write"]
         })),
         kill_grace_ms: None,
+        // Spec 120 B-3.
+        requirements: Some(Requirements {
+            required: vec![Capability::WorkspaceWrite],
+            preferred: vec![Capability::Cost],
+        }),
     };
     check("session-request", &to_value(&request));
     let minimal = SessionRequest {
@@ -144,6 +219,7 @@ fn session_request() {
         max_turns: None,
         timeout_ms: None,
         profile: None,
+        requirements: None,
         ..request
     };
     check("session-request-minimal", &to_value(&minimal));

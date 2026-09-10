@@ -257,7 +257,13 @@ fn tool_result_text(content: Option<&Value>) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use statecraft_driver_core::{Capability, CapabilityTier, Requirements};
     use statecraft_driver_core::{Profile, Provider};
+
+    static NONE: Requirements = Requirements {
+        required: Vec::new(),
+        preferred: Vec::new(),
+    };
 
     #[test]
     fn argv_is_032s_derivation_byte_for_byte() {
@@ -271,7 +277,21 @@ mod tests {
             model: Some("m"),
             max_turns: Some(3),
             mcp_config_path: Some("/x/mcp.json"),
+            requirements: &NONE,
         };
+        // Spec 120 B-2, B-6: every request token this request uses is
+        // applied, and hook enforcement rides along; the tier is reference.
+        assert_eq!(
+            c.applied(&spec),
+            vec![
+                Capability::MaxTurns,
+                Capability::McpConfig,
+                Capability::Cost,
+                Capability::HookEnforcement
+            ]
+        );
+        assert_eq!(c.capability_tier(), CapabilityTier::Reference);
+        assert!(!c.capabilities().contains(&Capability::WorkspaceWrite));
         assert_eq!(
             c.argv(&spec),
             vec![
@@ -295,12 +315,14 @@ mod tests {
             disallowed_tools: Some(vec!["WebFetch".into()]),
             models: None,
             driver: None,
+            require: None,
         };
         let spec = SpawnSpec {
             profile: &guarded,
             model: None,
             max_turns: None,
             mcp_config_path: None,
+            requirements: &NONE,
         };
         assert_eq!(
             c.argv(&spec),
@@ -323,6 +345,7 @@ mod tests {
             model: None,
             max_turns: None,
             mcp_config_path: None,
+            requirements: &NONE,
         };
         assert!(c.argv(&spec).contains(&"--allowed-tools=Bash(git:*),Bash(gh:*),Bash(bun:*),Bash(spec-spine:*),Read,Write,Edit,Glob,Grep".to_string()));
     }

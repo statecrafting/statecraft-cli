@@ -126,8 +126,8 @@
           {
             "file": "crates/statecraft-sensor-claude/src/main.rs",
             "span": {
-              "endLine": 63,
-              "startLine": 51
+              "endLine": 65,
+              "startLine": 53
             }
           }
         ],
@@ -284,5 +284,5 @@
     "specStatus": "approved"
   },
   "schemaVersion": "1.1.0",
-  "shardHash": "d55c063caa207c3e54dc6082bfbe080be09fdc36d1fb2fa1793e2bba58899ed3"
+  "shardHash": "8724589e47895b816edd0967b0f58ca00550e11783344c34dfeb9eabab57ae87"
 }

@@ -3,7 +3,7 @@ id: "120-capability-contract"
 title: "The capability contract: a closed token vocabulary, required refuses before spawn, preferred degrades in the journal"
 status: approved
 created: "2026-09-09"
-implementation: pending
+implementation: complete
 risk: high
 depends_on:
   - "119-admission-and-outcome"
@@ -42,6 +42,12 @@ extends:
   # 014 owns the in-process session, which reports what it applied.
   - { spec: "014-session-driver", unit: "members/src/orchestrator/session.ts", nature: additive }
   - { spec: "014-session-driver", unit: "members/src/orchestrator/session.test.ts", nature: additive }
+  # Every member builds a Manifest literal; the field is total on the type.
+  - { spec: "112-sensor-port", unit: { kind: directory, path: "crates/statecraft-sensor-claude/" }, nature: additive }
+  - { spec: "113-journal-port", unit: { kind: directory, path: "crates/statecraft-journal/" }, nature: additive }
+  - { spec: "115-codex-sensor", unit: { kind: directory, path: "crates/statecraft-sensor-codex/" }, nature: additive }
+  # 117's production-wiring test pins the Codex session.init, which gains applied.
+  - { spec: "117-project-driver", unit: "members/src/orchestrator/project-driver.test.ts", nature: additive }
 references:
   - { unit: { kind: file, path: "docs/design/04-the-governed-substrate.md" }, role: context }
 summary: >
@@ -195,6 +201,39 @@ cd members && bun test src/orchestrator/capabilities.test.ts src/orchestrator/dr
 cargo test --workspace --locked -p statecraft-contract -p statecraft-driver-core -p statecraft-driver-claude -p statecraft-driver-codex
 ```
 
+## Status (2026-09-09)
+
+Implemented. `Capability` and `Requirements` live in the contract crate
+with `CapabilityTier::for_capabilities`; the manifest carries
+`capabilities` (optional on the wire, D-4) and `Manifest::parse` refuses
+a tier that disagrees with declared tokens; `SessionRequest` carries
+`requirements`. The core's `Provider` gained `capabilities()` and
+`applied()` in place of `capability_tier()` and `spawn_extras()`, and
+`SpawnSpec::requested()` is the one derivation of what a request uses,
+so `session.init` carries `applied` and `degraded` disjoint and covering
+it on both drivers; the TypeScript in-process session emits the same two
+fields and the parity records stay identical. The engine's
+`capabilities.ts` mirrors the vocabulary against the `capabilities.json`
+fixture; `driver.ts` reads the manifest before every first session,
+journals `driver.degraded` per missing preferred token and
+`driver.refused` with a synthesized `crashed` for a missing required one,
+and 043 B-6's mcp-config case is the same path (its record shape kept).
+The profile carries `require`, set by `--require` on both verbs, shown as
+`require:` in the detail and ` requiring <tokens>` in the posture cell.
+The members suite (912) and the workspace are green; fourteen fixtures.
+Two observations from the build: a guarded Codex posture now reports
+`tool-allowlist` degraded even without an explicit list, because the
+guarded baseline is a list the driver cannot apply (117's test updated to
+say so); and every driver's first session is preceded by a manifest
+read, which the kill test now waits for instead of sleeping. The live
+smoke through the production deps: a guarded project with `--driver
+codex --require tool-allowlist` had its first session refused with
+`driver.refused` naming the token and no process spawned; the same
+project with `--require workspace-write` drove one fast-tier turn of the
+real Codex (0.153.4) to `completed` in 7.1 s, `session.init` reading
+`applied: ["workspace-write", "hook-enforcement"]` and `degraded:
+["tool-allowlist", "cost"]`.
+
 ## 6. Out of scope
 
 Renaming the profile's tool lists to neutral names (the payload of
@@ -222,6 +261,12 @@ did, rather than a new termination kind. The journal record
 `driver.refused` is the authoritative fact; the classification enum is
 consumed by nine tables and a tenth value would touch them all for a
 case the record already distinguishes.
+
+D-5 (2026-09-09). A guarded posture without an explicit list still asks
+for `tool-allowlist`: the guarded baseline is a list, and a driver that
+cannot apply it has degraded the posture whether or not the operator
+typed the list. 116 B-8's order is kept; its content widens by this one
+case, which the journal now says out loud.
 
 D-4 (2026-09-09). The schema version stays at `1`. Both parsers treat an
 absent `requirements` as empty and an absent `capabilities` as none, so

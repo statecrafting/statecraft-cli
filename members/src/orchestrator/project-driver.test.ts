@@ -77,7 +77,11 @@ test("117 FR-004: the daemon's deps drive the driver the project's profile names
     const init = records().find((r) => r.kind === "session.init")!;
     expect(init.payload.codexBin).toBe(codex);
     expect((init.payload.profile as Record<string, unknown>).driver).toBe("codex");
-    expect(init.payload.degraded).toEqual(["cost"]);
+    // 120 B-6: a guarded posture asks for the tool allowlist (the baseline
+    // list), which Codex cannot apply; the sandbox and the hooks are what
+    // it did apply.
+    expect(init.payload.degraded).toEqual(["tool-allowlist", "cost"]);
+    expect(init.payload.applied).toEqual(["workspace-write", "hook-enforcement"]);
 
     // The profile flips between spawns; the deps were built once, above, and
     // the second session goes to the fake Claude driver member.
@@ -87,7 +91,17 @@ test("117 FR-004: the daemon's deps drive the driver the project's profile names
     const request = JSON.parse(await Bun.file(join(dir, "claude-request.json")).text()) as { prompt: string; profile: { driver: string | null } };
     expect(request.prompt).toBe("two");
     expect(request.profile.driver).toBeNull();
-    expect(records().map((r) => r.kind)).toEqual(["session.init", "session.result", "session.init", "session.result"]);
+    // 120 B-5: the Codex session's two preferred tokens were journaled as
+    // degraded before its spawn; the fake Claude member declares the
+    // reference tokens and degrades nothing.
+    expect(records().map((r) => r.kind)).toEqual([
+      "driver.degraded",
+      "driver.degraded",
+      "session.init",
+      "session.result",
+      "session.init",
+      "session.result",
+    ]);
   } finally {
     journal.close();
   }

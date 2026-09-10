@@ -11,10 +11,21 @@
     "disallowedTools": null,
     "driver": "codex",
     "mode": "guarded",
-    "models": null
+    "models": null,
+    "require": [
+      "workspace-write"
+    ]
   },
   "prompt": "Implement spec 012.",
   "repo": "/work/target",
+  "requirements": {
+    "preferred": [
+      "cost"
+    ],
+    "required": [
+      "workspace-write"
+    ]
+  },
   "schemaVersion": "1",
   "tier": "strong",
   "timeoutMs": 1800000

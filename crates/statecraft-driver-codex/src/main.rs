@@ -12,7 +12,7 @@ use std::sync::Mutex;
 
 use serde_json::{json, Value};
 use statecraft_driver_core::{
-    CapabilityTier, Provider, ProviderEvent, ResultEvent, Rule, SpawnSpec, TerminationKind,
+    Capability, Provider, ProviderEvent, ResultEvent, Rule, SpawnSpec, TerminationKind,
 };
 
 pub const NAME: &str = "statecraft-driver-codex";
@@ -64,20 +64,16 @@ impl Codex {
     }
 
     /// B-8: what the request made this driver give up, in a fixed order.
+    /// Since spec 120 B-6 the core derives it as the tokens the request
+    /// uses minus `applied`; this is the same list, kept for the test that
+    /// pins 116's order.
     pub fn degradations(spec: &SpawnSpec<'_>) -> Vec<&'static str> {
-        let mut out = Vec::new();
-        let has_list = |l: &Option<Vec<String>>| l.as_ref().is_some_and(|v| !v.is_empty());
-        if has_list(&spec.profile.allowed_tools) || has_list(&spec.profile.disallowed_tools) {
-            out.push("tool-allowlist");
-        }
-        if spec.max_turns.is_some() {
-            out.push("max-turns");
-        }
-        if spec.mcp_config_path.is_some() {
-            out.push("mcp-config");
-        }
-        out.push("cost");
-        out
+        let applied = Codex::new().applied(spec);
+        spec.requested()
+            .into_iter()
+            .filter(|c| !applied.contains(c))
+            .map(Capability::as_str)
+            .collect()
     }
 
     /// B-5: the rollout under `<home>/sessions/<yyyy>/<mm>/<dd>/` whose name
@@ -300,13 +296,21 @@ impl Provider for Codex {
         json!({ "codexBin": bin })
     }
 
-    /// B-8, D34: `basic`, because MCP configuration is not a file here.
-    fn capability_tier(&self) -> CapabilityTier {
-        CapabilityTier::Basic
+    /// Spec 120 B-2 (116 B-8, D34 before it): no tool allowlist, no turn
+    /// cap, no MCP file, no cost; the sandbox confines writes and the
+    /// hooks run by 118 B-4's flag. The tier derives to `basic`.
+    fn capabilities(&self) -> &'static [Capability] {
+        &[Capability::WorkspaceWrite, Capability::HookEnforcement]
     }
 
-    fn spawn_extras(&self, spec: &SpawnSpec<'_>) -> Value {
-        json!({ "degraded": Codex::degradations(spec) })
+    /// Spec 120 B-6: `workspace-write` under `guarded` (the sandbox flag),
+    /// `hook-enforcement` always.
+    fn applied(&self, spec: &SpawnSpec<'_>) -> Vec<Capability> {
+        let mut applied = vec![Capability::HookEnforcement];
+        if spec.profile.mode != "bypass" {
+            applied.push(Capability::WorkspaceWrite);
+        }
+        Capability::ordered(&applied)
     }
 }
 
@@ -325,6 +329,7 @@ mod tests {
     use super::*;
     use statecraft_driver_core::classify::{classify, ClassifyInput};
     use statecraft_driver_core::Profile;
+    use statecraft_driver_core::{CapabilityTier, Requirements};
 
     fn profile(mode: &str, allowed: Option<Vec<&str>>) -> Profile {
         Profile {
@@ -333,6 +338,7 @@ mod tests {
             disallowed_tools: None,
             models: None,
             driver: None,
+            require: None,
         }
     }
 
@@ -347,8 +353,13 @@ mod tests {
             model,
             max_turns,
             mcp_config_path: mcp,
+            requirements: &NO_REQUIREMENTS,
         }
     }
+    static NO_REQUIREMENTS: Requirements = Requirements {
+        required: Vec::new(),
+        preferred: Vec::new(),
+    };
 
     /// FR-001: argv for both postures, with and without a model.
     #[test]
@@ -413,10 +424,19 @@ mod tests {
         );
         let c = Codex::new();
         assert_eq!(
-            c.spawn_extras(&spec(&plain, None, Some(1), None)),
-            json!({"degraded": ["max-turns", "cost"]})
+            Codex::degradations(&spec(&plain, None, Some(1), None)),
+            vec!["max-turns", "cost"]
         );
+        // Spec 120 B-2, B-6: two tokens supported, applied by posture.
         assert_eq!(c.capability_tier(), CapabilityTier::Basic);
+        assert_eq!(
+            c.applied(&spec(&plain, None, None, None)),
+            vec![Capability::HookEnforcement]
+        );
+        assert_eq!(
+            c.applied(&spec(&listed, None, None, None)),
+            vec![Capability::WorkspaceWrite, Capability::HookEnforcement]
+        );
         assert_eq!(c.max_turns_subtype(), None);
     }
 

@@ -11,6 +11,7 @@
 import { dispatch, type DispatchScope, type VerbTable } from "./dispatch";
 import pkg from "../../package.json";
 import { EXIT_USAGE } from "../commands/orchestrator";
+import type { Capability } from "../orchestrator/capabilities";
 
 // B-3: `contract` is the id of this spec, so a member states which version of
 // the member contract it implements rather than leaving the umbrella to infer
@@ -31,6 +32,9 @@ export interface MemberManifest {
   // both offer a `status`; the name is what keeps them apart.
   readonly verbs: readonly string[];
   readonly capabilityTier: CapabilityTier;
+  // 120 B-2: the tokens the member supports; the tier is derived from them
+  // (reference when the four request tokens are all present).
+  readonly capabilities: readonly Capability[];
   // B-6: declared, never remapped. The umbrella reports a member's taxonomy
   // rather than guessing it, and returns the code verbatim.
   readonly exitCodes: Readonly<Record<string, string>>;
@@ -69,6 +73,7 @@ export const SENSOR_MANIFEST: MemberManifest = {
   contract: MEMBER_CONTRACT,
   verbs: ["watch", "log", "stats", "snapshot", "diff", "explain", "peek", "daemon"],
   capabilityTier: "basic",
+  capabilities: [],
   exitCodes: SENSOR_EXIT_CODES,
   envelope: "ok-data",
 };
@@ -82,6 +87,7 @@ export const ENGINE_MANIFEST: MemberManifest = {
   contract: MEMBER_CONTRACT,
   verbs: ["orchestrator"],
   capabilityTier: "basic",
+  capabilities: [],
   exitCodes: ENGINE_EXIT_CODES,
   envelope: "ok-data",
 };
@@ -96,6 +102,9 @@ export const DRIVER_MANIFEST: MemberManifest = {
   contract: MEMBER_CONTRACT,
   verbs: ["models", "session"],
   capabilityTier: "reference",
+  // 120 B-2, D-2: the four request tokens and hook enforcement; the Claude
+  // harness does not confine writes, so not workspace-write.
+  capabilities: ["tool-allowlist", "max-turns", "mcp-config", "cost", "hook-enforcement"],
   exitCodes: ENGINE_EXIT_CODES,
   envelope: "ok-data",
 };

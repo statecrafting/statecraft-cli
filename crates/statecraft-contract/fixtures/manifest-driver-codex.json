@@ -1,12 +1,9 @@
 {
   "capabilities": [
-    "tool-allowlist",
-    "max-turns",
-    "mcp-config",
-    "cost",
+    "workspace-write",
     "hook-enforcement"
   ],
-  "capabilityTier": "reference",
+  "capabilityTier": "basic",
   "contract": "042",
   "envelope": "ok-data",
   "exitCodes": {
@@ -15,7 +12,7 @@
     "2": "unreachable",
     "3": "usage"
   },
-  "name": "statecraft-driver-claude",
+  "name": "statecraft-driver-codex",
   "schemaVersion": "1",
   "verbs": [
     "models",

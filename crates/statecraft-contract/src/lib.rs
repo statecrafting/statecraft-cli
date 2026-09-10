@@ -36,6 +36,9 @@ pub const CONTRACT: &str = "042";
 pub const MANIFEST_SCHEMA_VERSION: &str = "1";
 
 /// Declared, never probed (042 B-8): the richest driver is `reference`.
+/// Since spec 120 the tier is a summary derived from the capability tokens
+/// (`CapabilityTier::for_capabilities`), never consulted for a decision the
+/// tokens can make.
 #[derive(Clone, Copy, Debug, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(rename_all = "lowercase")]
 pub enum CapabilityTier {
@@ -51,6 +54,92 @@ impl CapabilityTier {
             CapabilityTier::Basic => "basic",
         }
     }
+
+    /// Spec 120 B-2: `reference` when the four request tokens are all
+    /// supported, `basic` otherwise. The two boundary tokens are claims
+    /// about confinement and enforcement that no tier summarizes (doc 04 D46).
+    pub fn for_capabilities(capabilities: &[Capability]) -> CapabilityTier {
+        if Capability::REQUEST.iter().all(|c| capabilities.contains(c)) {
+            CapabilityTier::Reference
+        } else {
+            CapabilityTier::Basic
+        }
+    }
+}
+
+/// Spec 120 B-1 (doc 04 D44): the closed vocabulary a run states its needs
+/// in and a driver states its support in. A token is added by a spec that
+/// names its enforcement, never by a driver that wants to advertise one.
+///
+/// - `tool-allowlist`: the request's tool lists are enforced.
+/// - `max-turns`: the turn cap is enforced.
+/// - `mcp-config`: an MCP server set is hosted.
+/// - `cost`: the provider reports cost.
+/// - `workspace-write`: the provider confines writes to the repository.
+/// - `hook-enforcement`: the project's hooks run.
+#[derive(Clone, Copy, Debug, Deserialize, Serialize, PartialEq, Eq, PartialOrd, Ord)]
+#[serde(rename_all = "kebab-case")]
+pub enum Capability {
+    ToolAllowlist,
+    MaxTurns,
+    McpConfig,
+    Cost,
+    WorkspaceWrite,
+    HookEnforcement,
+}
+
+impl Capability {
+    /// Every token, in wire order. Lists derived from this set (`applied`,
+    /// `degraded`) keep this order.
+    pub const ALL: [Capability; 6] = [
+        Capability::ToolAllowlist,
+        Capability::MaxTurns,
+        Capability::McpConfig,
+        Capability::Cost,
+        Capability::WorkspaceWrite,
+        Capability::HookEnforcement,
+    ];
+    /// The four request tokens the tier summarizes (B-2).
+    pub const REQUEST: [Capability; 4] = [
+        Capability::ToolAllowlist,
+        Capability::MaxTurns,
+        Capability::McpConfig,
+        Capability::Cost,
+    ];
+
+    /// The wire token.
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Capability::ToolAllowlist => "tool-allowlist",
+            Capability::MaxTurns => "max-turns",
+            Capability::McpConfig => "mcp-config",
+            Capability::Cost => "cost",
+            Capability::WorkspaceWrite => "workspace-write",
+            Capability::HookEnforcement => "hook-enforcement",
+        }
+    }
+
+    /// The tokens of `ALL` that `set` contains, in wire order and without
+    /// duplicates.
+    pub fn ordered(set: &[Capability]) -> Vec<Capability> {
+        Capability::ALL
+            .iter()
+            .copied()
+            .filter(|c| set.contains(c))
+            .collect()
+    }
+}
+
+/// Spec 120 B-3: what a run needs. A required token the driver lacks
+/// refuses the session before a process exists; a preferred one it lacks
+/// is journaled as degraded and the session runs (doc 04 D45).
+#[derive(Clone, Debug, Default, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct Requirements {
+    #[serde(default)]
+    pub required: Vec<Capability>,
+    #[serde(default)]
+    pub preferred: Vec<Capability>,
 }
 
 /// The manifest as 042 B-3 declares it.
@@ -67,6 +156,10 @@ pub struct Manifest {
     /// may both offer a `status`; the name is what keeps them apart.
     pub verbs: Vec<String>,
     pub capability_tier: CapabilityTier,
+    /// Spec 120 B-2: the tokens this member supports. Absent on the wire is
+    /// an older member and is not checked against the tier.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub capabilities: Option<Vec<Capability>>,
     /// 042 B-6: declared, never remapped. The umbrella reports a member's
     /// taxonomy rather than guessing it, and returns the code verbatim.
     pub exit_codes: BTreeMap<String, String>,
@@ -89,7 +182,22 @@ impl Manifest {
         if manifest.verbs.is_empty() {
             return Err("manifest declares no verbs".to_string());
         }
+        if let Some(capabilities) = &manifest.capabilities {
+            let derived = CapabilityTier::for_capabilities(capabilities);
+            if derived != manifest.capability_tier {
+                return Err(format!(
+                    "manifest declares capabilityTier {} but its capabilities derive {}",
+                    manifest.capability_tier.as_str(),
+                    derived.as_str()
+                ));
+            }
+        }
         Ok(manifest)
+    }
+
+    /// The declared tokens, none for an older member.
+    pub fn capabilities(&self) -> &[Capability] {
+        self.capabilities.as_deref().unwrap_or(&[])
     }
 
     /// The dispatch key: the name with the member prefix stripped, or the
@@ -250,6 +358,9 @@ pub struct SessionRequest {
     pub mcp_config_path: Option<String>,
     pub profile: Option<Value>,
     pub kill_grace_ms: Option<u64>,
+    /// Spec 120 B-3. Absent on the wire reads as empty (D-4).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub requirements: Option<Requirements>,
 }
 
 /// How a session ended (014 B-4, classified, never guessed).

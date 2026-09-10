@@ -136,8 +136,8 @@
           {
             "file": "crates/statecraft-driver-core/src/lib.rs",
             "span": {
-              "endLine": 187,
-              "startLine": 140
+              "endLine": 268,
+              "startLine": 201
             }
           }
         ],
@@ -187,7 +187,7 @@
           {
             "file": "crates/statecraft-driver-core/src/protocol.rs",
             "span": {
-              "endLine": 34,
+              "endLine": 35,
               "startLine": 23
             }
           }
@@ -204,8 +204,8 @@
           {
             "file": "crates/statecraft-driver-core/src/protocol.rs",
             "span": {
-              "endLine": 70,
-              "startLine": 44
+              "endLine": 71,
+              "startLine": 45
             }
           }
         ],
@@ -221,8 +221,8 @@
           {
             "file": "crates/statecraft-driver-core/src/session.rs",
             "span": {
-              "endLine": 502,
-              "startLine": 166
+              "endLine": 517,
+              "startLine": 168
             }
           }
         ],
@@ -238,8 +238,8 @@
           {
             "file": "crates/statecraft-driver-core/src/session.rs",
             "span": {
-              "endLine": 717,
-              "startLine": 522
+              "endLine": 765,
+              "startLine": 537
             }
           }
         ],
@@ -281,5 +281,5 @@
     "specStatus": "approved"
   },
   "schemaVersion": "1.1.0",
-  "shardHash": "b48a66766ee86a3ca44b9fa906a0dd9c56a41bea28b3a952b30a6c855a7667e8"
+  "shardHash": "372e6d83c0170797403144e58503f2466b54c03045ba32148f34af681ee82538"
 }

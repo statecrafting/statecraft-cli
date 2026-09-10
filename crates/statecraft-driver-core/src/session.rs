@@ -15,7 +15,7 @@ use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 use serde_json::{json, Value};
 
 use crate::classify::{classify, Classification, ClassifyInput};
-use crate::{Profile, Provider, ProviderEvent, ResultEvent, SpawnSpec};
+use crate::{Capability, Profile, Provider, ProviderEvent, Requirements, ResultEvent, SpawnSpec};
 
 pub const DEFAULT_TIMEOUT_MS: u64 = 30 * 60 * 1000;
 pub const KILL_GRACE_MS: u64 = 5000;
@@ -46,6 +46,8 @@ pub struct SessionOptions {
     pub mcp_config_path: Option<String>,
     pub profile: Profile,
     pub kill_grace_ms: Option<u64>,
+    /// Spec 120 B-3; empty when the request carried none.
+    pub requirements: Requirements,
 }
 
 /// Where the events go: one append (kind, payload) for the chain, every
@@ -190,11 +192,24 @@ pub fn run_session(
         model: opts.model.as_deref(),
         max_turns: opts.max_turns,
         mcp_config_path: opts.mcp_config_path.as_deref(),
+        requirements: &opts.requirements,
     };
     let argv = provider.argv(&spec);
-    // Spec 116 B-1: what the request made the provider give up, journaled
-    // in `session.init` so a degraded session is never silent (01 D22).
-    let spawn_extras = provider.spawn_extras(&spec);
+    // Spec 120 B-6 (116 B-1 before it): what the provider applied and what
+    // the request made it give up, journaled in `session.init` so a
+    // degraded session is never silent (01 D22). Degraded is what the
+    // request used minus what was applied, in wire order.
+    let applied = provider.applied(&spec);
+    let requested = spec.requested();
+    let degraded: Vec<Capability> = requested
+        .iter()
+        .copied()
+        .filter(|c| !applied.contains(c))
+        .collect();
+    let spawn_extras = json!({
+        "applied": applied.iter().map(|c| c.as_str()).collect::<Vec<_>>(),
+        "degraded": degraded.iter().map(|c| c.as_str()).collect::<Vec<_>>(),
+    });
     let parent: BTreeMap<String, String> = std::env::vars().collect();
     let env = provider.child_env(&parent);
 
@@ -521,7 +536,10 @@ fn libc_sigkill() -> i32 {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{CapabilityTier, ProviderEvent, ResultEvent, SpawnSpec, TerminationKind};
+    use crate::{
+        Capability, CapabilityTier, ProviderEvent, Requirements, ResultEvent, SpawnSpec,
+        TerminationKind,
+    };
 
     /// A provider that names nothing (spec 116 FR-002): the three defaults
     /// hold, and its `spawn_extras` reach `session.init`.
@@ -569,8 +587,9 @@ mod tests {
         fn init_extras(&self, bin: &str) -> Value {
             json!({ "plainBin": bin })
         }
-        fn spawn_extras(&self, spec: &SpawnSpec<'_>) -> Value {
-            json!({ "degraded": if spec.max_turns.is_some() { vec!["max-turns"] } else { vec![] } })
+        // Spec 120: Plain supports cost only, so a turn cap degrades.
+        fn capabilities(&self) -> &'static [Capability] {
+            &[Capability::Cost]
         }
         // 119 B-5: a `deny` event is a refusal; the text is its payload.
         fn denial_in_event(&self, event: &Value) -> Option<String> {
@@ -604,15 +623,39 @@ mod tests {
     fn the_defaults_hold_for_a_provider_that_names_none() {
         let p = Plain;
         assert_eq!(p.max_turns_subtype(), None);
-        assert_eq!(p.capability_tier(), CapabilityTier::Reference);
+        // Spec 120 B-7: the tier derives from the tokens; Plain's one token
+        // is not the four, so basic.
+        assert_eq!(p.capability_tier(), CapabilityTier::Basic);
         let profile = Profile::default();
+        let none = Requirements::default();
         let spec = SpawnSpec {
             profile: &profile,
             model: None,
             max_turns: None,
             mcp_config_path: None,
+            requirements: &none,
         };
-        assert_eq!(p.spawn_extras(&spec), json!({"degraded": []}));
+        assert_eq!(spec.requested(), vec![Capability::Cost]);
+        assert_eq!(p.applied(&spec), vec![Capability::Cost]);
+        // A request that names tokens uses them, in wire order, deduplicated.
+        let named = Requirements {
+            required: vec![Capability::HookEnforcement],
+            preferred: vec![Capability::Cost, Capability::ToolAllowlist],
+        };
+        let spec = SpawnSpec {
+            requirements: &named,
+            max_turns: Some(2),
+            ..spec
+        };
+        assert_eq!(
+            spec.requested(),
+            vec![
+                Capability::ToolAllowlist,
+                Capability::MaxTurns,
+                Capability::Cost,
+                Capability::HookEnforcement
+            ]
+        );
     }
 
     #[test]
@@ -644,12 +687,16 @@ mod tests {
                 ..Profile::default()
             },
             kill_grace_ms: None,
+            requirements: Requirements::default(),
         };
         let mut sink = Capture(vec![]);
         let outcome = run_session(&Plain, &opts, &mut sink, &KillSwitch::new()).unwrap();
         let (kind, init) = &sink.0[0];
         assert_eq!(kind, "session.init");
+        // Spec 120 B-6: applied and degraded are disjoint and cover the
+        // request's tokens.
         assert_eq!(init["degraded"], json!(["max-turns"]));
+        assert_eq!(init["applied"], json!(["cost"]));
         assert_eq!(init["plainBin"], json!(script.to_string_lossy()));
         // The subtype the Plain provider emits would be max-turns for a
         // provider that names it; Plain names none, so the table (empty)
@@ -696,6 +743,7 @@ mod tests {
                 ..Profile::default()
             },
             kill_grace_ms: None,
+            requirements: Requirements::default(),
         };
         let mut sink = Capture(vec![]);
         let outcome = run_session(&Plain, &opts, &mut sink, &KillSwitch::new()).unwrap();

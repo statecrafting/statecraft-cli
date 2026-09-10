@@ -17,7 +17,9 @@ use std::collections::BTreeMap;
 use serde_json::Value;
 
 pub use classify::{Rule, TerminationKind};
-pub use statecraft_contract::{CapabilityTier, ModelTier, SessionRequest, SessionResult};
+pub use statecraft_contract::{
+    Capability, CapabilityTier, ModelTier, Requirements, SessionRequest, SessionResult,
+};
 
 /// What the core learned from one line of the provider's stdout.
 #[derive(Clone, Debug, PartialEq)]
@@ -53,6 +55,8 @@ pub struct Profile {
     /// The driver the project's sessions run on (spec 117 B-5), carried so
     /// the journal a Rust driver writes matches the TypeScript one's.
     pub driver: Option<String>,
+    /// Spec 120 B-4: the tokens the project requires of every session.
+    pub require: Option<Vec<Capability>>,
 }
 
 impl Profile {
@@ -64,6 +68,7 @@ impl Profile {
             "disallowedTools": self.disallowed_tools,
             "models": self.models.as_ref().map(|(s, f)| serde_json::json!({"strong": s, "fast": f})),
             "driver": self.driver,
+            "require": self.require,
         })
     }
 
@@ -117,12 +122,21 @@ impl Profile {
             Some(Value::String(name)) if !name.trim().is_empty() => Some(name.clone()),
             Some(_) => return Err("profile: driver must be a name or null".to_string()),
         };
+        let require = match obj.get("require") {
+            None | Some(Value::Null) => None,
+            Some(v @ Value::Array(_)) => Some(
+                serde_json::from_value::<Vec<Capability>>(v.clone())
+                    .map_err(|e| format!("profile: require must name capability tokens: {e}"))?,
+            ),
+            Some(_) => return Err("profile: require must be an array or null".to_string()),
+        };
         Ok(Profile {
             mode,
             allowed_tools: list("allowedTools")?,
             disallowed_tools: list("disallowedTools")?,
             models,
             driver,
+            require,
         })
     }
 }
@@ -134,6 +148,53 @@ pub struct SpawnSpec<'a> {
     pub model: Option<&'a str>,
     pub max_turns: Option<u64>,
     pub mcp_config_path: Option<&'a str>,
+    /// Spec 120 B-3: what the request requires and prefers.
+    pub requirements: &'a Requirements,
+}
+
+impl SpawnSpec<'_> {
+    /// Spec 120 B-6: the tokens this request uses, whether or not it named
+    /// them: the four request tokens by what the spec carries, plus every
+    /// token `requirements` names. Wire order.
+    pub fn requested(&self) -> Vec<Capability> {
+        let mut set = Vec::new();
+        let lists = self
+            .profile
+            .allowed_tools
+            .as_ref()
+            .is_some_and(|l| !l.is_empty())
+            || self
+                .profile
+                .disallowed_tools
+                .as_ref()
+                .is_some_and(|l| !l.is_empty());
+        if lists || self.profile.mode == "guarded" {
+            set.push(Capability::ToolAllowlist);
+        }
+        if self.max_turns.is_some() {
+            set.push(Capability::MaxTurns);
+        }
+        if self.mcp_config_path.is_some() {
+            set.push(Capability::McpConfig);
+        }
+        set.push(Capability::Cost);
+        set.extend(self.requirements.required.iter().copied());
+        set.extend(self.requirements.preferred.iter().copied());
+        Capability::ordered(&set)
+    }
+
+    /// Of the request tokens this request uses, those in `supported`, in
+    /// wire order: the shape a provider's `applied` answers with when it
+    /// enforces what it declares.
+    pub fn applied_of(&self, supported: &[Capability]) -> Vec<Capability> {
+        let requested = self.requested();
+        Capability::ordered(
+            &requested
+                .into_iter()
+                .filter(|c| supported.contains(c))
+                .collect::<Vec<_>>(),
+        )
+    }
 }
 
 /// The thin crate's contract (spec 114 B-1).
@@ -163,14 +224,34 @@ pub trait Provider: Send + Sync {
     fn max_turns_subtype(&self) -> Option<&'static str> {
         None
     }
-    /// The tier the manifest declares (spec 116 B-1, 042 B-3).
-    fn capability_tier(&self) -> CapabilityTier {
-        CapabilityTier::Reference
+    /// Spec 120 B-2, B-7: the tokens this provider supports. The manifest's
+    /// tier is derived from them (`CapabilityTier::for_capabilities`).
+    /// Default: the four request tokens and hook enforcement.
+    fn capabilities(&self) -> &'static [Capability] {
+        &[
+            Capability::ToolAllowlist,
+            Capability::MaxTurns,
+            Capability::McpConfig,
+            Capability::Cost,
+            Capability::HookEnforcement,
+        ]
     }
-    /// What the request made the provider give up, as fields merged into
-    /// `session.init` beside `init_extras` (spec 116 B-1, doc 01 D22).
-    fn spawn_extras(&self, _spec: &SpawnSpec<'_>) -> Value {
-        Value::Object(serde_json::Map::new())
+    /// Spec 120 B-6: the tokens this provider applied to this request. The
+    /// core journals them in `session.init` as `applied`, and what the
+    /// request used minus this list as `degraded` (doc 01 D22, 116 B-8).
+    /// Default: every requested token the provider supports, plus hook
+    /// enforcement when supported.
+    fn applied(&self, spec: &SpawnSpec<'_>) -> Vec<Capability> {
+        let supported = self.capabilities();
+        let mut applied = spec.applied_of(supported);
+        if supported.contains(&Capability::HookEnforcement) {
+            applied.push(Capability::HookEnforcement);
+        }
+        Capability::ordered(&applied)
+    }
+    /// The tier the manifest declares (042 B-3), derived (spec 120 B-7).
+    fn capability_tier(&self) -> CapabilityTier {
+        CapabilityTier::for_capabilities(self.capabilities())
     }
     /// Spec 119 B-5 (doc 04 D41): the text of a refused tool call when this
     /// stdout line is the harness's structured event for one, else None.
@@ -220,10 +301,21 @@ mod tests {
             disallowed_tools: None,
             models: Some(("s".into(), "f".into())),
             driver: Some("other".into()),
+            require: Some(vec![Capability::WorkspaceWrite]),
         };
         let back = Profile::from_payload(&p.payload()).unwrap();
         assert_eq!(back, p);
         assert_eq!(p.payload()["driver"], serde_json::json!("other"));
+        // Spec 120 B-4: the require list rides the profile; an unknown
+        // token refuses.
+        assert_eq!(
+            p.payload()["require"],
+            serde_json::json!(["workspace-write"])
+        );
+        assert!(
+            Profile::from_payload(&serde_json::json!({"mode": "bypass", "require": ["nope"]}))
+                .is_err()
+        );
         // Spec 117 B-5: absent and null both read as no driver, and the
         // payload says null out loud.
         let none = Profile::from_payload(&serde_json::json!({"mode": "bypass"})).unwrap();

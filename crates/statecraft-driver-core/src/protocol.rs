@@ -7,7 +7,7 @@ use std::io::{Read, Write};
 
 use serde_json::{json, Value};
 use statecraft_contract::{
-    exit, Manifest, ModelTier, CONTRACT, MANIFEST_FLAG, MANIFEST_SCHEMA_VERSION,
+    exit, Manifest, ModelTier, Requirements, CONTRACT, MANIFEST_FLAG, MANIFEST_SCHEMA_VERSION,
     SESSION_REQUEST_SCHEMA_VERSION,
 };
 
@@ -28,6 +28,7 @@ pub fn manifest(provider: &dyn Provider, version: &str) -> Manifest {
         contract: CONTRACT.to_string(),
         verbs: vec!["models".to_string(), "session".to_string()],
         capability_tier: provider.capability_tier(),
+        capabilities: Some(provider.capabilities().to_vec()),
         exit_codes: exit::d4_taxonomy(),
         envelope: "ok-data".to_string(),
     }
@@ -144,6 +145,11 @@ fn parse_request(provider: &dyn Provider, text: &str) -> Result<SessionOptions, 
     };
     let explicit = string("model")?;
     let model = resolve_model(provider, tier, explicit.as_deref(), &profile);
+    let requirements = match obj.get("requirements") {
+        None | Some(Value::Null) => Requirements::default(),
+        Some(v) => serde_json::from_value::<Requirements>(v.clone())
+            .map_err(|e| format!("request: \"requirements\" must name capability tokens: {e}"))?,
+    };
     Ok(SessionOptions {
         repo,
         prompt,
@@ -154,6 +160,7 @@ fn parse_request(provider: &dyn Provider, text: &str) -> Result<SessionOptions, 
         mcp_config_path: string("mcpConfigPath")?,
         profile,
         kill_grace_ms: number("killGraceMs")?,
+        requirements,
     })
 }
 

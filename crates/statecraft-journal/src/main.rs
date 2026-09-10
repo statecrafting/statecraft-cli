@@ -38,6 +38,8 @@ fn manifest() -> Manifest {
         contract: CONTRACT.to_string(),
         verbs: VERBS.iter().map(|v| v.to_string()).collect(),
         capability_tier: CapabilityTier::Basic,
+        // Spec 120 B-2: a sensor or journal member supports no session token.
+        capabilities: Some(Vec::new()),
         exit_codes: exit::d4_taxonomy(),
         envelope: "ok-data".to_string(),
     }
