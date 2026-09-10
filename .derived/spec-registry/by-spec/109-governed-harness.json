@@ -72,13 +72,13 @@
       "3.6 The project layer lives in the agents",
       "4. Acceptance",
       "5. Out of scope",
-      "6. Status (2026-09-09)"
+      "6. Status (2026-09-10)"
     ],
     "specPath": "specs/109-governed-harness/spec.md",
-    "status": "draft",
+    "status": "approved",
     "summary": "The harness is what an agent may do in this repository, so it is claimed by a spec and held by the coupling gate. This spec adopts the spec-spine Claude Code kit (spec-spine 0.18.0, kit spec 081): ten repository-invariant skills forming the governed loop, four pipeline agents carrying this repo's project layer, four rules, the read-only hook set, a Makefile whose `make gate` is the one definition of the gate that CI and every session run, and the pin that refuses an older binary. It replaces the hand-copied five-skill harness that predated `spec-spine check`, and turns on the ownership ratchet now that every source file is specifically claimed.\n",
     "title": "Governed harness: the spec-spine kit as the loop this repo runs"
   },
-  "shardHash": "0945e55c1a95f11aa7a6b83e87521ff8201cf2ae4211c91f1851feca23abff5c",
+  "shardHash": "3b65e2bcb44b56f7eda847881662c7d1bd1569a49c33a5678cfdaed6fa94f317",
   "specVersion": "1.2.0"
 }
