@@ -1,0 +1,169 @@
+{
+  "record": {
+    "created": "2026-09-09",
+    "dependsOn": [
+      "123-policy-kit-handoff",
+      "120-capability-contract",
+      "114-driver-port",
+      "116-codex-driver",
+      "043-driver-seam"
+    ],
+    "establishes": [
+      {
+        "kind": "file",
+        "path": "members/src/members/conformance.ts"
+      },
+      {
+        "kind": "file",
+        "path": "members/src/members/conformance.test.ts"
+      },
+      {
+        "kind": "file",
+        "path": "members/src/members/driver-fixture.ts"
+      },
+      {
+        "kind": "file",
+        "path": "scripts/qualify-provider.ts"
+      },
+      {
+        "kind": "directory",
+        "path": "docs/evidence/qualification/"
+      },
+      {
+        "kind": "file",
+        "path": "members/src/orchestrator/qualification.ts"
+      },
+      {
+        "kind": "file",
+        "path": "members/src/orchestrator/qualification.test.ts"
+      }
+    ],
+    "extends": [
+      {
+        "nature": "additive",
+        "spec": "043-driver-seam",
+        "unit": {
+          "kind": "file",
+          "path": "members/src/members/engine-bundle.test.ts"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "043-driver-seam",
+        "unit": {
+          "kind": "file",
+          "path": "members/src/orchestrator/driver.ts"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "043-driver-seam",
+        "unit": {
+          "kind": "file",
+          "path": "members/src/orchestrator/driver.test.ts"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "042-member-contract",
+        "unit": {
+          "kind": "file",
+          "path": "members/src/members/manifest.ts"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "042-member-contract",
+        "unit": {
+          "kind": "file",
+          "path": "members/src/members/manifest.test.ts"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "032-execution-profiles",
+        "unit": {
+          "kind": "file",
+          "path": "members/src/orchestrator/profile.ts"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "032-execution-profiles",
+        "unit": {
+          "kind": "file",
+          "path": "members/src/orchestrator/profile.test.ts"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "114-driver-port",
+        "unit": {
+          "kind": "directory",
+          "path": "crates/statecraft-driver-core/"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "114-driver-port",
+        "unit": {
+          "kind": "file",
+          "path": "members/src/members/driver-parity.test.ts"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "116-codex-driver",
+        "unit": {
+          "kind": "file",
+          "path": "members/src/members/driver-codex.test.ts"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "110-corpus-merge",
+        "unit": {
+          "kind": "file",
+          "path": "members/package.json"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "109-governed-harness",
+        "unit": {
+          "kind": "file",
+          "path": "Makefile"
+        }
+      }
+    ],
+    "id": "124-provider-conformance",
+    "implementation": "pending",
+    "references": [
+      {
+        "role": "context",
+        "unit": {
+          "kind": "file",
+          "path": "docs/design/04-the-governed-substrate.md"
+        }
+      }
+    ],
+    "risk": "medium",
+    "sectionHeadings": [
+      "124: Provider conformance",
+      "1. Purpose",
+      "2. Territory",
+      "3. Behavior",
+      "4. Functional requirements",
+      "5. Acceptance",
+      "Verification",
+      "6. Out of scope",
+      "7. Resolved decisions"
+    ],
+    "specPath": "specs/124-provider-conformance/spec.md",
+    "status": "approved",
+    "summary": "Doc 04 §8. A third provider is admitted by passing a suite, not by resembling the second. conformance.ts drives every discoverable driver through one negative table: a denial retained beside a completed result, a required capability refused before spawn, a hang killed with its descendants, a malformed stream and an absent cost left explicit, a manifest whose tokens agree with its tier, the same records from the Rust binary and the engine seam. A fixture driver ships in the members package so the suite runs without any real harness; the Claude and Codex drivers run it too. A qualification script drives one live turn of a named provider and writes a record under docs/evidence/qualification/; a driver whose binary version has no record runs as unqualified, shown in the posture and journaled, never refused.\n",
+    "title": "Provider conformance: one negative suite every driver runs, a fixture driver that ships with it, and a live qualification record per binary"
+  },
+  "shardHash": "aa680a4ff8c48f84025a1f9d2ea28f5095c6a5d873b1c801a66e690b06ee475b",
+  "specVersion": "1.2.0"
+}

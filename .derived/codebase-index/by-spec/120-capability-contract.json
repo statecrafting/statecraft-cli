@@ -1,0 +1,388 @@
+{
+  "diagnostics": {
+    "errors": [],
+    "warnings": [
+      {
+        "code": "W-001",
+        "message": "spec '120-capability-contract' file unit 'members/src/orchestrator/capabilities.ts' does not exist",
+        "path": "members/src/orchestrator/capabilities.ts"
+      },
+      {
+        "code": "W-001",
+        "message": "spec '120-capability-contract' file unit 'members/src/orchestrator/capabilities.test.ts' does not exist",
+        "path": "members/src/orchestrator/capabilities.test.ts"
+      }
+    ]
+  },
+  "mapping": {
+    "dependsOn": [
+      "119-admission-and-outcome",
+      "111-contract-crate",
+      "043-driver-seam",
+      "032-execution-profiles",
+      "042-member-contract"
+    ],
+    "implementingPaths": [
+      {
+        "path": "crates/statecraft-contract/",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/statecraft-driver-claude/",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/statecraft-driver-codex/",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/statecraft-driver-core/",
+        "source": "spec-edge"
+      },
+      {
+        "path": "members/src/commands/orchestrator.test.ts",
+        "source": "spec-edge"
+      },
+      {
+        "path": "members/src/commands/orchestrator.ts",
+        "source": "spec-edge"
+      },
+      {
+        "path": "members/src/members/contract-fixtures.test.ts",
+        "source": "spec-edge"
+      },
+      {
+        "path": "members/src/members/driver-codex.test.ts",
+        "source": "spec-edge"
+      },
+      {
+        "path": "members/src/members/driver-parity.test.ts",
+        "source": "spec-edge"
+      },
+      {
+        "path": "members/src/members/driver-session.test.ts",
+        "source": "spec-edge"
+      },
+      {
+        "path": "members/src/members/driver-session.ts",
+        "source": "spec-edge"
+      },
+      {
+        "path": "members/src/members/manifest.test.ts",
+        "source": "spec-edge"
+      },
+      {
+        "path": "members/src/members/manifest.ts",
+        "source": "spec-edge"
+      },
+      {
+        "path": "members/src/orchestrator/driver.test.ts",
+        "source": "spec-edge"
+      },
+      {
+        "path": "members/src/orchestrator/driver.ts",
+        "source": "spec-edge"
+      },
+      {
+        "path": "members/src/orchestrator/profile.test.ts",
+        "source": "spec-edge"
+      },
+      {
+        "path": "members/src/orchestrator/profile.ts",
+        "source": "spec-edge"
+      },
+      {
+        "path": "members/src/orchestrator/session.test.ts",
+        "source": "spec-edge"
+      },
+      {
+        "path": "members/src/orchestrator/session.ts",
+        "source": "spec-edge"
+      }
+    ],
+    "resolvedUnits": [
+      {
+        "locations": [],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "kind": "file",
+          "path": "members/src/orchestrator/capabilities.test.ts"
+        }
+      },
+      {
+        "locations": [],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "kind": "file",
+          "path": "members/src/orchestrator/capabilities.ts"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "crates/statecraft-contract/"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "directory",
+          "path": "crates/statecraft-contract/"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "crates/statecraft-driver-claude/"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "directory",
+          "path": "crates/statecraft-driver-claude/"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "crates/statecraft-driver-codex/"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "directory",
+          "path": "crates/statecraft-driver-codex/"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "crates/statecraft-driver-core/"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "directory",
+          "path": "crates/statecraft-driver-core/"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "members/src/commands/orchestrator.test.ts"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "members/src/commands/orchestrator.test.ts"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "members/src/commands/orchestrator.ts"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "members/src/commands/orchestrator.ts"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "members/src/members/contract-fixtures.test.ts"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "members/src/members/contract-fixtures.test.ts"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "members/src/members/driver-codex.test.ts"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "members/src/members/driver-codex.test.ts"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "members/src/members/driver-parity.test.ts"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "members/src/members/driver-parity.test.ts"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "members/src/members/driver-session.test.ts"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "members/src/members/driver-session.test.ts"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "members/src/members/driver-session.ts"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "members/src/members/driver-session.ts"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "members/src/members/manifest.test.ts"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "members/src/members/manifest.test.ts"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "members/src/members/manifest.ts"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "members/src/members/manifest.ts"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "members/src/orchestrator/driver.test.ts"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "members/src/orchestrator/driver.test.ts"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "members/src/orchestrator/driver.ts"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "members/src/orchestrator/driver.ts"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "members/src/orchestrator/profile.test.ts"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "members/src/orchestrator/profile.test.ts"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "members/src/orchestrator/profile.ts"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "members/src/orchestrator/profile.ts"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "members/src/orchestrator/session.test.ts"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "members/src/orchestrator/session.test.ts"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "members/src/orchestrator/session.ts"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "members/src/orchestrator/session.ts"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "docs/design/04-the-governed-substrate.md"
+          }
+        ],
+        "ownership": false,
+        "sourceField": "references",
+        "unit": {
+          "kind": "file",
+          "path": "docs/design/04-the-governed-substrate.md"
+        }
+      }
+    ],
+    "specId": "120-capability-contract",
+    "specStatus": "approved"
+  },
+  "schemaVersion": "1.1.0",
+  "shardHash": "f2d526ca4bc9268c5c4e264ed3e47d34a3ca7478aabb64c6d1d2ec46bf516ced"
+}
