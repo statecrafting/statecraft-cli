@@ -196,7 +196,7 @@
       }
     ],
     "id": "119-admission-and-outcome",
-    "implementation": "pending",
+    "implementation": "in-progress",
     "references": [
       {
         "role": "context",
@@ -223,6 +223,6 @@
     "summary": "Three corrections doc 04 §2 found in the loop that every later boundary stands on. The engine's gate floor becomes read-only (spec-spine check, lint, couple) with its base resolved to a commit at stage start and journaled, so a stale committed registry is refused rather than repaired and the coupling verdict names the revision it compared against (D42). The merge sends the head sha shepherd watched go green and refuses one it did not (D43). A session's result carries the refusals its harness reported as a count and a bounded sample read from the provider's structured event, independent of the classification, so a hook refusal followed by a completed turn is evidence and not silence (D41).\n",
     "title": "The floor reads before it writes, the merge names its head, and a denial survives a completed turn"
   },
-  "shardHash": "d9f61e9fc202fbe54d3b4f2b21db10473957c4c61e800d666dad8f17126234d9",
+  "shardHash": "74cce96adf5b7f240757d47bc80b4c39587b027df8a49ab13a1f2eb2f2ebcaaf",
   "specVersion": "1.2.0"
 }

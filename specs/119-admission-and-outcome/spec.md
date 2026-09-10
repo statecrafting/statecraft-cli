@@ -3,7 +3,7 @@ id: "119-admission-and-outcome"
 title: "The floor reads before it writes, the merge names its head, and a denial survives a completed turn"
 status: approved
 created: "2026-09-09"
-implementation: pending
+implementation: in-progress
 risk: high
 depends_on:
   - "118-codex-harness"
