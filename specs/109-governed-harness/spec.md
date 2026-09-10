@@ -25,10 +25,18 @@ extends:
   # 110 owns the configuration file; 109 adds the version pin, the hashed
   # governance inputs and the ownership ratchet, which are harness policy.
   - { spec: "110-corpus-merge", unit: "spec-spine.toml", nature: additive }
+  # 118 owns the Codex skill mirror and 123 owns its manifest, but both are
+  # generated from the Claude kit this spec owns: a kit update rewrites them
+  # mechanically through scripts/codex-kit.py, which `make gate` then verifies.
+  # The crossing belongs to the generator, and amends neither spec. Claimed at
+  # directory granularity so every future kit update is covered, not just the
+  # one skill 082 happened to change (D-1).
+  - { spec: "118-codex-harness", unit: { kind: directory, path: ".agents/skills/" }, nature: additive }
+  - { spec: "123-policy-kit-handoff", unit: ".codex/kit-manifest.json", nature: additive }
 summary: >
   The harness is what an agent may do in this repository, so it is
   claimed by a spec and held by the coupling gate. This spec adopts the
-  spec-spine Claude Code kit (spec-spine 0.18.0, kit spec 081): ten
+  spec-spine Claude Code kit (spec-spine 0.18.0, kit spec 082): ten
   repository-invariant skills forming the governed loop, four pipeline
   agents carrying this repo's project layer, four rules, the read-only
   hook set, a Makefile whose `make gate` is the one definition of the
@@ -49,10 +57,10 @@ workflow pinned to spec-spine 0.10.0 while `/setup` installed whatever was
 current. Nothing owned those files, so nothing refused a drift between what
 CI enforced and what a session was told to run.
 
-The kit that spec-spine ships since its spec 048 (revised by 064, 074, 075
-and 081) is the same loop this repo runs one spec per session: prime, pick,
-build, verify, ship, shepherd. Adopting it wholesale, and claiming it here,
-gives the harness one owner and the gate one definition.
+The kit that spec-spine ships since its spec 048 (revised by 064, 074, 075,
+081 and 082) is the same loop this repo runs one spec per session: prime,
+pick, build, verify, ship, shepherd. Adopting it wholesale, and claiming
+it here, gives the harness one owner and the gate one definition.
 
 ## 2. Territory
 
@@ -177,11 +185,49 @@ tree at approval: `spec-spine check` and `make gate` exit 0, coverage is
 about the kit changed at the flip; `draft` had become the corpus's only
 untrue status.
 
-One §4 criterion has to be read against the baseline this spec adopted.
-`diff -r <spec-spine>/kit/.claude/skills .claude/skills` is empty against
-the kit at spec 081, which is what §1 adopted. spec-spine `main` has since
-advanced one skill: its spec 082, "a refusal is not a remediation round",
-rewrote `shepherd` to route a red check by severity and to spend no
-remediation round on a refusal. Nine of the ten skills remain
-byte-identical. Adopting 082 is a kit update and a separate decision, not
-a condition of this approval.
+At approval, one §4 criterion had to be read against the baseline this spec
+adopted: `diff -r <spec-spine>/kit/.claude/skills .claude/skills` was empty
+against the kit at spec 081, which is what §1 adopted, while spec-spine
+`main` had advanced one skill. That gap is closed by D-1 below; the adopted
+baseline is now kit spec 082 and the byte-identity criterion holds against
+it across all ten skills.
+
+## 7. Resolved decisions
+
+D-1 (2026-09-10). Kit spec 082, "a refusal is not a remediation round", is
+adopted, on the owner's explicit instruction, as the separate decision §6
+said it would take. `.claude/skills/shepherd/SKILL.md` is copied verbatim
+from `<spec-spine>/kit/.claude/skills/shepherd/SKILL.md` at spec-spine
+`9438a06`. That is the only kit file 082 changed and the newest commit
+touching `kit/` at adoption time: spec-spine 083 (`17c368e`) files a draft
+against `spec-spine attest` and ships no kit change, so adopting 082 leaves
+the kit fully caught up rather than one skill behind again.
+
+What changes in the loop this repository runs: `/shepherd` classifies a red
+required check before it edits anything, and a CRITICAL finding is reported
+to a human having consumed no remediation round. Exactly four things are
+CRITICAL: a coupling refusal whose only remedy is editing a foreign spec or
+writing a `Spec-Drift-Waiver:`, a hand-edited derived artefact, a dependency
+cycle, and an ambient input reaching a hashed path. The two-round bound
+(spec-spine 048 §3.1) is unchanged; what changed is that a refusal no longer
+spends one of the two. The handoff report gains a `Classification:` line,
+and its thread line reads `not read` when the run stopped at CRITICAL,
+rather than `none`, which would claim an absence the run never checked.
+
+This is skill prose only: no verb, flag, or pinned version moves, and
+`[meta] required_version` stays at 0.18.0. §3.6's project layer lives in the
+agents, which 082 does not touch, so the kit update needed no merge step
+this time.
+
+The adoption does reach outside this spec's territory, because the Codex
+face is generated from the Claude one: `scripts/codex-kit.py` rewrites
+`.agents/skills/shepherd/SKILL.md` (118) and `.codex/kit-manifest.json`
+(123), and `make gate` refuses until it has. That crossing is declared as
+two `extends` edges here rather than by editing 118 or 123, which is the
+door `.claude/rules/adversarial-prompt-refusal.md` names for touching a
+unit another spec owns, and it amends neither. The skills edge is claimed
+at directory granularity (`.agents/skills/`, the same shape 118 uses to
+establish it) rather than at the one file 082 changed: every kit update
+regenerates whichever skills moved, so a per-file edge would have to be
+widened by hand on each one, and the durable statement is that adopting a
+kit legitimately rewrites the generated mirror.

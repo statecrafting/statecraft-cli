@@ -6,6 +6,10 @@
     ],
     "implementingPaths": [
       {
+        "path": ".agents/skills/",
+        "source": "spec-edge"
+      },
+      {
         "path": ".claude/agents/",
         "source": "spec-edge"
       },
@@ -19,6 +23,10 @@
       },
       {
         "path": ".claude/skills/",
+        "source": "spec-edge"
+      },
+      {
+        "path": ".codex/kit-manifest.json",
         "source": "spec-edge"
       },
       {
@@ -154,6 +162,32 @@
       {
         "locations": [
           {
+            "file": ".agents/skills/"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "directory",
+          "path": ".agents/skills/"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": ".codex/kit-manifest.json"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": ".codex/kit-manifest.json"
+        }
+      },
+      {
+        "locations": [
+          {
             "file": ".github/workflows/spec-spine.yml"
           }
         ],
@@ -182,5 +216,5 @@
     "specStatus": "approved"
   },
   "schemaVersion": "1.1.0",
-  "shardHash": "fec367a44d0a09ed3fd3a67d296d752e7af8c41c8dcd8dc623962f69e564d11d"
+  "shardHash": "261b291fee0163e9ed24e1518a329702415324523a4e98aabaefdea23d428573"
 }

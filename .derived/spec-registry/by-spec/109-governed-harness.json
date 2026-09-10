@@ -55,6 +55,22 @@
           "kind": "file",
           "path": "spec-spine.toml"
         }
+      },
+      {
+        "nature": "additive",
+        "spec": "118-codex-harness",
+        "unit": {
+          "kind": "directory",
+          "path": ".agents/skills/"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "123-policy-kit-handoff",
+        "unit": {
+          "kind": "file",
+          "path": ".codex/kit-manifest.json"
+        }
       }
     ],
     "id": "109-governed-harness",
@@ -72,13 +88,14 @@
       "3.6 The project layer lives in the agents",
       "4. Acceptance",
       "5. Out of scope",
-      "6. Status (2026-09-10)"
+      "6. Status (2026-09-10)",
+      "7. Resolved decisions"
     ],
     "specPath": "specs/109-governed-harness/spec.md",
     "status": "approved",
-    "summary": "The harness is what an agent may do in this repository, so it is claimed by a spec and held by the coupling gate. This spec adopts the spec-spine Claude Code kit (spec-spine 0.18.0, kit spec 081): ten repository-invariant skills forming the governed loop, four pipeline agents carrying this repo's project layer, four rules, the read-only hook set, a Makefile whose `make gate` is the one definition of the gate that CI and every session run, and the pin that refuses an older binary. It replaces the hand-copied five-skill harness that predated `spec-spine check`, and turns on the ownership ratchet now that every source file is specifically claimed.\n",
+    "summary": "The harness is what an agent may do in this repository, so it is claimed by a spec and held by the coupling gate. This spec adopts the spec-spine Claude Code kit (spec-spine 0.18.0, kit spec 082): ten repository-invariant skills forming the governed loop, four pipeline agents carrying this repo's project layer, four rules, the read-only hook set, a Makefile whose `make gate` is the one definition of the gate that CI and every session run, and the pin that refuses an older binary. It replaces the hand-copied five-skill harness that predated `spec-spine check`, and turns on the ownership ratchet now that every source file is specifically claimed.\n",
     "title": "Governed harness: the spec-spine kit as the loop this repo runs"
   },
-  "shardHash": "3b65e2bcb44b56f7eda847881662c7d1bd1569a49c33a5678cfdaed6fa94f317",
+  "shardHash": "3eb05e520258d23ee4eb7e88b9bbee4c7c5e9808fc3c66d7eed89f9effc5850e",
   "specVersion": "1.2.0"
 }
