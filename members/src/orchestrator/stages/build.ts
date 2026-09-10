@@ -71,6 +71,10 @@ export interface Runner {
   // throws on divergence (the preflight treats that as a refusal, never a
   // silent merge). A branch with no upstream cannot be stale: no-op.
   pullFfOnly(): void;
+  // 119 B-2: the base the coupling gate compares against, resolved to a
+  // commit once per stage run. Fetches `origin/<branch>` when a remote
+  // answers, else the local branch (119 D-5); throws when neither resolves.
+  resolveBase(defaultBranch: string): string;
 
   // --- gate commands ---
   runGate(cmd: readonly string[]): GateResult;
@@ -105,6 +109,22 @@ function requireOk(cwd: string, cmd: readonly string[], label: string): void {
   if (result.exitCode !== 0) {
     throw new Error(`build: ${label} failed (exit ${result.exitCode}): ${result.stderr.trim()}`);
   }
+}
+
+// 119 B-2 / D-5: `origin/<branch>` after a fetch when the remote answers,
+// else the local branch (a fixture world, or a checkout with no remote).
+// Neither resolving is an error the preflight turns into `base-unresolved`.
+export function resolveBaseSha(repoDir: string, defaultBranch: string): string {
+  const remote = runProcessSync(repoDir, ["git", "fetch", "--quiet", "origin", defaultBranch]);
+  if (remote.exitCode === 0) {
+    const ref = runProcessSync(repoDir, ["git", "rev-parse", "--verify", `origin/${defaultBranch}^{commit}`]);
+    if (ref.exitCode === 0) return ref.stdout.trim();
+  }
+  const local = runProcessSync(repoDir, ["git", "rev-parse", "--verify", `${defaultBranch}^{commit}`]);
+  if (local.exitCode === 0) return local.stdout.trim();
+  throw new Error(
+    `base "${defaultBranch}" resolves neither at origin nor locally: ${(remote.stderr || local.stderr).trim()}`
+  );
 }
 
 export interface CreateProcessRunnerParams {
@@ -177,6 +197,10 @@ export function createProcessRunner(params: CreateProcessRunnerParams): Runner {
       return result.stdout.trim();
     },
 
+    resolveBase(defaultBranch: string): string {
+      return resolveBaseSha(repoDir, defaultBranch);
+    },
+
     runGate(cmd: readonly string[]): GateResult {
       const result = runProcessSync(repoDir, cmd);
       return {
@@ -213,7 +237,7 @@ export function createProcessRunner(params: CreateProcessRunnerParams): Runner {
 
 // --- preflight refusals (B-1) -----------------------------------------------
 
-export type RefusalKind = "dirty-tree" | "wrong-branch" | "gate-red-at-base" | "spec-not-ready";
+export type RefusalKind = "dirty-tree" | "wrong-branch" | "base-unresolved" | "gate-red-at-base" | "spec-not-ready";
 
 export interface Refusal {
   readonly kind: RefusalKind;
@@ -242,18 +266,19 @@ export type ReadinessCheck = (specId: string) => boolean;
 // reach this repo's own suite through this repo's own contract.
 export { GATE_COMMANDS };
 
-// The bracket's index REGENERATION (D-8): distinct from GATE_COMMANDS[1],
-// which only checks staleness. The gate list stays read-only; only the
-// bracket, which just changed a hashed input (the spec's frontmatter),
-// rewrites derived artifacts.
+// The bracket's two REGENERATION commands (D-8, 119 B-1): the only writing
+// spec-spine invocations in the engine. The gate floor is read-only since
+// 119; only the bracket, which just changed a hashed input (the spec's
+// frontmatter), rewrites derived artifacts.
+export const COMPILE_REGENERATE_COMMAND: readonly string[] = ["spec-spine", "compile"];
 export const INDEX_REGENERATE_COMMAND: readonly string[] = ["spec-spine", "index"];
 
 export interface GateEvidence extends GateResult {
   readonly cmd: readonly string[];
 }
 
-function runGateSuite(runner: Runner, gate: AnyGateContract): GateEvidence[] {
-  return gateSuiteFor(gate).map((cmd) => ({ cmd, ...runner.runGate(cmd) }));
+function runGateSuite(runner: Runner, gate: AnyGateContract, baseSha: string): GateEvidence[] {
+  return gateSuiteFor(gate, baseSha).map((cmd) => ({ cmd, ...runner.runGate(cmd) }));
 }
 
 // D-13: whether two gate sweeps are the same answer, tails included. The
@@ -273,15 +298,18 @@ function sameGateAnswer(a: readonly GateEvidence[], b: readonly GateEvidence[]):
   });
 }
 
+type Preflight = { refusal: Refusal; baseSha: null } | { refusal: null; baseSha: string };
+
 function preflightRefusal(
   runner: Runner,
   specId: string,
   defaultBranch: string,
   isSpecReady: ReadinessCheck,
   gate: AnyGateContract
-): Refusal | null {
+): Preflight {
+  const refuse = (refusal: Refusal): Preflight => ({ refusal, baseSha: null });
   if (!runner.statusClean()) {
-    return { kind: "dirty-tree", message: "the target repo's working tree is not clean; refusing to start" };
+    return refuse({ kind: "dirty-tree", message: "the target repo's working tree is not clean; refusing to start" });
   }
 
   // A clean tree on some other branch is the normal aftermath of the
@@ -296,38 +324,47 @@ function preflightRefusal(
       runner.checkout(defaultBranch);
       runner.pullFfOnly();
     } catch (err) {
-      return {
+      return refuse({
         kind: "wrong-branch",
         message: `on branch "${branch}" and could not normalize to "${defaultBranch}": ${(err as Error).message}`,
-      };
+      });
     }
   } else {
     try {
       runner.pullFfOnly();
     } catch (err) {
-      return {
+      return refuse({
         kind: "wrong-branch",
         message: `on "${defaultBranch}" but could not fast-forward it: ${(err as Error).message}`,
-      };
+      });
     }
   }
 
-  const gates = runGateSuite(runner, gate);
+  // 119 B-2: the base is a commit, resolved once and judged against by
+  // every floor this stage runs.
+  let baseSha: string;
+  try {
+    baseSha = runner.resolveBase(defaultBranch);
+  } catch (err) {
+    return refuse({ kind: "base-unresolved", message: (err as Error).message });
+  }
+
+  const gates = runGateSuite(runner, gate, baseSha);
   const failing = gates.find((g) => g.exitCode !== 0);
   if (failing) {
-    return {
+    return refuse({
       kind: "gate-red-at-base",
       message: `"${failing.cmd.join(" ")}" exited ${failing.exitCode} at the base branch: ${
         failing.stderrTail || failing.stdoutTail
       }`,
-    };
+    });
   }
 
   if (!isSpecReady(specId)) {
-    return { kind: "spec-not-ready", message: `${specId} is not ready (unmet or invalidated dependencies)` };
+    return refuse({ kind: "spec-not-ready", message: `${specId} is not ready (unmet or invalidated dependencies)` });
   }
 
-  return null;
+  return { refusal: null, baseSha };
 }
 
 // --- frontmatter helpers (B-2, B-5) ----------------------------------------
@@ -540,8 +577,8 @@ interface Completion {
   readonly passing: boolean;
 }
 
-function evaluateCompletion(runner: Runner, specPath: string, gate: AnyGateContract): Completion {
-  const gates = runGateSuite(runner, gate);
+function evaluateCompletion(runner: Runner, specPath: string, gate: AnyGateContract, baseSha: string): Completion {
+  const gates = runGateSuite(runner, gate, baseSha);
   const allGreen = gates.every((g) => g.exitCode === 0);
   const frontmatterComplete = readImplementationStatus(runner.readFile(specPath)) === "complete";
   return { gates, frontmatterComplete, passing: allGreen && frontmatterComplete };
@@ -582,6 +619,9 @@ export interface SessionEvidence {
   readonly costMicroUsd: number | null;
   readonly numTurns: number | null;
   readonly durationMs: number;
+  // 119 B-6: the refusals the harness reported, independent of the
+  // classification (doc 04 D41). Zero for a synthesized result.
+  readonly denials: number;
 }
 
 export interface BuildEvidence {
@@ -612,7 +652,24 @@ function toSessionEvidence(result: SessionResult): SessionEvidence {
     costMicroUsd: result.costMicroUsd,
     numTurns: result.numTurns,
     durationMs: result.durationMs,
+    denials: result.denials,
   };
+}
+
+// 119 B-7: a session that completed with refusals leaves them in the
+// evidence before completion is evaluated (doc 04 D41). The hook-blocked
+// short-circuit above is unchanged; this is the case it does not cover, a
+// harness that refused and then finished.
+function journalDenials(journal: JournalHandle, specId: string, round: number, result: SessionResult): void {
+  if (result.denials === 0) return;
+  const payload: Record<string, JsonValue> = {
+    specId,
+    round,
+    sessionId: result.sessionId,
+    denials: result.denials,
+    samples: [...result.denialSamples],
+  };
+  journal.append("stage.build.denials", payload);
 }
 
 function gateEvidenceToJson(g: GateEvidence): Record<string, JsonValue> {
@@ -665,8 +722,9 @@ export async function runBuildStage(options: RunBuildStageOptions): Promise<Buil
   const specPath = `specs/${specId}/spec.md`;
 
   // --- B-1: preflight refusals ---
-  const refusal = preflightRefusal(runner, specId, defaultBranch, isSpecReady, gate);
-  if (refusal) {
+  const preflight = preflightRefusal(runner, specId, defaultBranch, isSpecReady, gate);
+  if (preflight.refusal) {
+    const refusal = preflight.refusal;
     const payload: Record<string, JsonValue> = { specId, kind: refusal.kind, message: refusal.message };
     journal.append("stage.build.refused", payload);
     return {
@@ -686,6 +744,8 @@ export async function runBuildStage(options: RunBuildStageOptions): Promise<Buil
     };
   }
 
+  const baseSha = preflight.baseSha;
+
   // --- B-2: orchestrator-owned bracket ---
   const branch = specId;
   const reused = runner.createBranch(branch);
@@ -696,7 +756,7 @@ export async function runBuildStage(options: RunBuildStageOptions): Promise<Buil
   let bracketIndex: GateEvidence | null = null;
   if (flip.changed) {
     runner.writeFile(specPath, flip.content);
-    bracketGate = { cmd: GATE_COMMANDS[0]!, ...runner.runGate(GATE_COMMANDS[0]!) };
+    bracketGate = { cmd: COMPILE_REGENERATE_COMMAND, ...runner.runGate(COMPILE_REGENERATE_COMMAND) };
     // D-8: the flip touches the codebase-index shards too, so the bracket
     // regenerates them before its commit. A flip commit carrying the
     // pre-flip shard is absorbed by the session's final commit on the happy
@@ -717,6 +777,7 @@ export async function runBuildStage(options: RunBuildStageOptions): Promise<Buil
     reused,
     flipped: flip.changed,
     headSha: bracketHeadSha,
+    baseSha,
     compileExitCode: bracketGate?.exitCode ?? null,
     indexExitCode: bracketIndex?.exitCode ?? null,
   };
@@ -778,16 +839,18 @@ export async function runBuildStage(options: RunBuildStageOptions): Promise<Buil
 
   const first = await runner.runSession({ prompt: promptBase, timeoutMs, maxTurns, tier: options.tier, model: options.model, journal });
   sessions.push(toSessionEvidence(first));
+  journalDenials(journal, specId, 1, first);
 
   let blocked = first.classification.kind === "hook-blocked";
   let completion: Completion = blocked
     ? { gates: [], frontmatterComplete: false, passing: false }
-    : evaluateCompletion(runner, specPath, gate);
+    : evaluateCompletion(runner, specPath, gate, baseSha);
 
   if (!blocked) {
     const gatePayload: Record<string, JsonValue> = {
       specId,
       round: 1,
+      baseSha,
       gates: completion.gates.map(gateEvidenceToJson),
       frontmatterComplete: completion.frontmatterComplete,
     };
@@ -812,14 +875,16 @@ export async function runBuildStage(options: RunBuildStageOptions): Promise<Buil
       journal,
     });
     sessions.push(toSessionEvidence(second));
+    journalDenials(journal, specId, 2, second);
 
     blocked = second.classification.kind === "hook-blocked";
     if (!blocked) {
-      completion = evaluateCompletion(runner, specPath, gate);
+      completion = evaluateCompletion(runner, specPath, gate, baseSha);
       stalled = !completion.passing && runner.headSha() === beforeSha && sameGateAnswer(beforeGates, completion.gates);
       const gatePayload: Record<string, JsonValue> = {
         specId,
         round: 2,
+        baseSha,
         gates: completion.gates.map(gateEvidenceToJson),
         frontmatterComplete: completion.frontmatterComplete,
       };
@@ -856,6 +921,7 @@ export async function runBuildStage(options: RunBuildStageOptions): Promise<Buil
     decisionsSealed: sealResult.sealed.map((d) => d.id),
     decisionsInvalid: sealResult.invalid.map((i) => i.file),
     stalled,
+    denials: sessions.reduce((sum, s) => sum + s.denials, 0),
   };
   journal.append("stage.build.result", resultPayload);
 

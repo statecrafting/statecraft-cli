@@ -56,6 +56,8 @@ function fakeSessionResult(overrides: Partial<SessionResult> = {}): SessionResul
     transcriptPath: null,
     overflow: { lines: [], truncatedCount: 0 },
     stderrTail: "",
+    denials: 0,
+    denialSamples: [],
     ...overrides,
   };
 }

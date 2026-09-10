@@ -1,0 +1,285 @@
+{
+  "record": {
+    "created": "2026-09-09",
+    "dependsOn": [
+      "118-codex-harness",
+      "041-project-gate-contract",
+      "016-stage-build",
+      "017-stage-ship",
+      "018-stage-shepherd",
+      "014-session-driver",
+      "114-driver-port",
+      "116-codex-driver"
+    ],
+    "establishes": [
+      {
+        "kind": "file",
+        "path": "members/src/orchestrator/admission.test.ts"
+      }
+    ],
+    "extends": [
+      {
+        "nature": "additive",
+        "spec": "041-project-gate-contract",
+        "unit": {
+          "kind": "file",
+          "path": "members/src/orchestrator/gate-contract.ts"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "041-project-gate-contract",
+        "unit": {
+          "kind": "file",
+          "path": "members/src/orchestrator/gate-contract.test.ts"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "016-stage-build",
+        "unit": {
+          "kind": "file",
+          "path": "members/src/orchestrator/stages/build.ts"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "016-stage-build",
+        "unit": {
+          "kind": "file",
+          "path": "members/src/orchestrator/stages/build.test.ts"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "017-stage-ship",
+        "unit": {
+          "kind": "file",
+          "path": "members/src/orchestrator/stages/ship.ts"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "017-stage-ship",
+        "unit": {
+          "kind": "file",
+          "path": "members/src/orchestrator/stages/ship.test.ts"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "018-stage-shepherd",
+        "unit": {
+          "kind": "file",
+          "path": "members/src/orchestrator/stages/shepherd.ts"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "018-stage-shepherd",
+        "unit": {
+          "kind": "file",
+          "path": "members/src/orchestrator/stages/shepherd.test.ts"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "014-session-driver",
+        "unit": {
+          "kind": "file",
+          "path": "members/src/orchestrator/session.ts"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "014-session-driver",
+        "unit": {
+          "kind": "file",
+          "path": "members/src/orchestrator/session.test.ts"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "043-driver-seam",
+        "unit": {
+          "kind": "file",
+          "path": "members/src/orchestrator/driver.ts"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "043-driver-seam",
+        "unit": {
+          "kind": "file",
+          "path": "members/src/orchestrator/driver.test.ts"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "021-orchestrator-daemon",
+        "unit": {
+          "kind": "file",
+          "path": "members/src/orchestrator/daemon.ts"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "031-journal-export",
+        "unit": {
+          "kind": "file",
+          "path": "members/src/orchestrator/export.ts"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "031-journal-export",
+        "unit": {
+          "kind": "file",
+          "path": "members/src/orchestrator/export.test.ts"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "111-contract-crate",
+        "unit": {
+          "kind": "directory",
+          "path": "crates/statecraft-contract/"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "111-contract-crate",
+        "unit": {
+          "kind": "file",
+          "path": "members/src/members/contract-fixtures.test.ts"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "114-driver-port",
+        "unit": {
+          "kind": "directory",
+          "path": "crates/statecraft-driver-core/"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "114-driver-port",
+        "unit": {
+          "kind": "directory",
+          "path": "crates/statecraft-driver-claude/"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "114-driver-port",
+        "unit": {
+          "kind": "file",
+          "path": "members/src/members/driver-parity.test.ts"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "116-codex-driver",
+        "unit": {
+          "kind": "directory",
+          "path": "crates/statecraft-driver-codex/"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "116-codex-driver",
+        "unit": {
+          "kind": "file",
+          "path": "members/src/members/driver-codex.test.ts"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "037-defect-capture",
+        "unit": {
+          "kind": "file",
+          "path": "members/src/orchestrator/adopt/defects.test.ts"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "035-corpus-synthesis",
+        "unit": {
+          "kind": "file",
+          "path": "members/src/orchestrator/adopt/synthesis.test.ts"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "028-cli-projects",
+        "unit": {
+          "kind": "file",
+          "path": "members/src/commands/orchestrator.test.ts"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "021-orchestrator-daemon",
+        "unit": {
+          "kind": "file",
+          "path": "members/src/orchestrator/daemon.test.ts"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "026-standby-daemon",
+        "unit": {
+          "kind": "file",
+          "path": "members/src/orchestrator/standby.test.ts"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "113-journal-port",
+        "unit": {
+          "kind": "directory",
+          "path": "crates/statecraft-journal/"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "110-corpus-merge",
+        "unit": {
+          "kind": "file",
+          "path": "docs/design/04-the-governed-substrate.md"
+        }
+      }
+    ],
+    "id": "119-admission-and-outcome",
+    "implementation": "complete",
+    "references": [
+      {
+        "role": "context",
+        "unit": {
+          "kind": "file",
+          "path": "docs/design/04-the-governed-substrate.md"
+        }
+      }
+    ],
+    "risk": "high",
+    "sectionHeadings": [
+      "119: The floor, the head, the denial",
+      "1. Purpose",
+      "2. Territory",
+      "3. Behavior",
+      "4. Functional requirements",
+      "5. Acceptance",
+      "Verification",
+      "Status (2026-09-09)",
+      "6. Out of scope",
+      "7. Resolved decisions"
+    ],
+    "specPath": "specs/119-admission-and-outcome/spec.md",
+    "status": "approved",
+    "summary": "Three corrections doc 04 §2 found in the loop that every later boundary stands on. The engine's gate floor becomes read-only (spec-spine check, lint, couple) with its base resolved to a commit at stage start and journaled, so a stale committed registry is refused rather than repaired and the coupling verdict names the revision it compared against (D42). The merge sends the head sha shepherd watched go green and refuses one it did not (D43). A session's result carries the refusals its harness reported as a count and a bounded sample read from the provider's structured event, independent of the classification, so a hook refusal followed by a completed turn is evidence and not silence (D41).\n",
+    "title": "The floor reads before it writes, the merge names its head, and a denial survives a completed turn"
+  },
+  "shardHash": "7c13dfae0f9c05d3bb1e1ad095bf9015e31364c7b4947f171fa0d280be15b25b",
+  "specVersion": "1.2.0"
+}

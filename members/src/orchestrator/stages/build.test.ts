@@ -106,6 +106,8 @@ function fakeSessionResult(sessionId: string, overrides: Partial<SessionResult> 
     transcriptPath: null,
     overflow: { lines: [], truncatedCount: 0 },
     stderrTail: "",
+    denials: 0,
+    denialSamples: [],
     ...overrides,
   };
 }
@@ -250,7 +252,7 @@ test("the build prompt lists the target's own gate program, not the constant (04
     dropboxDir: "/tmp/dropbox",
     gateCommands: GATE_COMMANDS,
   });
-  expect(prompt).toContain("spec-spine compile");
+  expect(prompt).toContain("spec-spine check --fail-on-warn");
   expect(prompt).not.toContain("bun run typecheck");
   expect(prompt).not.toContain("bun test");
 });
@@ -371,6 +373,74 @@ test("B-1: refuses with gate-red-at-base when a gate command is red before start
   decisionsChain.close();
 });
 
+test("119 FR-002: refuses with base-unresolved when the default branch resolves neither at origin nor locally", async () => {
+  const { dir, specId } = initFixtureRepo();
+  const runner: Runner = {
+    ...createProcessRunner({ repoDir: dir }),
+    runGate: greenGate(),
+    resolveBase: (branch: string) => {
+      throw new Error(`base "${branch}" resolves neither at origin nor locally: fixture`);
+    },
+  };
+  const { journalDir } = openHandles(dir);
+  const journal = openJournal(journalDir);
+  const decisionsChain = openDecisionsChain(journalDir);
+
+  const refused = await runBuildStage({
+    runner,
+    specId,
+    journal,
+    decisionsChain,
+    dropboxDir: join(journalDir, "decision-dropbox"),
+    knownSpecIds: new Set([specId]),
+    isSpecReady: () => true,
+  });
+  expect(refused.outcome).toBe("refused");
+  expect(refused.evidence.refusal?.kind).toBe("base-unresolved");
+  expect(refused.evidence.refusal?.message).toContain("resolves neither");
+  expect(journal.fold().byKind["stage.build.refused"]![0]!.payload).toMatchObject({ kind: "base-unresolved" });
+
+  journal.close();
+  decisionsChain.close();
+});
+
+test("119 FR-002 (B-3): a stale committed registry is a gate-red-at-base refusal, never a repair", async () => {
+  const { dir, specId } = initFixtureRepo();
+  const asked: string[][] = [];
+  const runner: Runner = {
+    ...createProcessRunner({ repoDir: dir }),
+    runGate: (cmd) => {
+      asked.push([...cmd]);
+      if (cmd[1] === "check") return { exitCode: 2, stdoutTail: "spec-registry: stale\n", stderrTail: "  stale: 001-x.json" };
+      return { exitCode: 0, stdoutTail: "", stderrTail: "" };
+    },
+  };
+  const { journalDir } = openHandles(dir);
+  const journal = openJournal(journalDir);
+  const decisionsChain = openDecisionsChain(journalDir);
+
+  const result = await runBuildStage({
+    runner,
+    specId,
+    journal,
+    decisionsChain,
+    dropboxDir: join(journalDir, "decision-dropbox"),
+    knownSpecIds: new Set([specId]),
+    isSpecReady: () => true,
+  });
+
+  expect(result.outcome).toBe("refused");
+  expect(result.evidence.refusal?.kind).toBe("gate-red-at-base");
+  expect(result.evidence.refusal?.message).toContain("spec-spine check --fail-on-warn");
+  expect(result.evidence.refusal?.message).toContain("exited 2");
+  // Nothing regenerated: the floor asked `check`, and no `compile` or
+  // `index` ran before the refusal.
+  expect(asked.some((cmd) => cmd.join(" ") === "spec-spine compile" || cmd.join(" ") === "spec-spine index")).toBe(false);
+
+  journal.close();
+  decisionsChain.close();
+});
+
 test("B-1: refuses with spec-not-ready when the injected readiness predicate says no", async () => {
   const { dir, specId } = initFixtureRepo();
   const runner: Runner = { ...createProcessRunner({ repoDir: dir }), runGate: greenGate() };
@@ -417,6 +487,9 @@ test("FR-004: under a `make ci` contract, `make ci` runs in the preflight and ag
     runGate: recordingGate(asked),
     runSession: fakeWritingSession(dir, specId),
   };
+  // 119 B-2: the floor is judged against the base resolved to a commit, which
+  // for a fixture with no remote is the local main (119 D-5).
+  const baseSha = runner.headSha();
   const { journalDir } = openHandles(dir);
   const journal = openJournal(journalDir);
   const decisionsChain = openDecisionsChain(journalDir);
@@ -436,7 +509,7 @@ test("FR-004: under a `make ci` contract, `make ci` runs in the preflight and ag
 
   // Two full sweeps, plus the bracket's own compile and index regeneration
   // between them (016 D-8), which are not gate commands.
-  const suite = gateSuiteFor(MAKE_CI_CONTRACT).map((cmd) => cmd.join(" "));
+  const suite = gateSuiteFor(MAKE_CI_CONTRACT, baseSha).map((cmd) => cmd.join(" "));
   const sweeps = asked
     .map((cmd) => cmd.join(" "))
     .filter((cmd) => cmd === "make ci" || cmd.startsWith("spec-spine"));
@@ -457,6 +530,7 @@ test("FR-004: the same fixture under a legacy empty contract runs exactly the sp
     runGate: recordingGate(asked),
     runSession: fakeWritingSession(dir, specId),
   };
+  const baseSha = runner.headSha();
   const { journalDir } = openHandles(dir);
   const journal = openJournal(journalDir);
   const decisionsChain = openDecisionsChain(journalDir);
@@ -476,8 +550,18 @@ test("FR-004: the same fixture under a legacy empty contract runs exactly the sp
   // The fixture repo does carry a tsconfig.json, and 016 D-10 would have run
   // the Bun pair against it. 041 B-3 does not: what a target is judged by is
   // what its chain says, and a chain that says nothing earns the floor.
-  expect(result.evidence.gates.map((g) => g.cmd.join(" "))).toEqual(GATE_COMMANDS.map((cmd) => cmd.join(" ")));
+  expect(result.evidence.gates.map((g) => g.cmd.join(" "))).toEqual(
+    gateSuiteFor(LEGACY_GATE_CONTRACT, baseSha).map((cmd) => cmd.join(" "))
+  );
   expect(asked.some((cmd) => cmd[0] === "bun")).toBe(false);
+  // 119 B-1: the floor is read-only; regeneration is the bracket's alone.
+  const floor = asked.filter((cmd) => cmd[0] === "spec-spine").map((cmd) => cmd.join(" "));
+  expect(floor.filter((cmd) => cmd === "spec-spine compile" || cmd === "spec-spine index").length).toBe(2);
+  expect(floor.some((cmd) => cmd.startsWith("spec-spine check --fail-on-warn"))).toBe(true);
+  // 119 B-2: the gate record names the base it judged against.
+  const gateRecords = journal.fold().byKind["stage.build.gate"] ?? [];
+  expect(gateRecords.length).toBe(1);
+  expect((gateRecords[0]!.payload as { baseSha: string }).baseSha).toBe(baseSha);
 
   journal.close();
   decisionsChain.close();

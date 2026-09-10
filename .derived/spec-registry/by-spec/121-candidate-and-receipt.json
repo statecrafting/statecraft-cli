@@ -1,0 +1,205 @@
+{
+  "record": {
+    "created": "2026-09-09",
+    "dependsOn": [
+      "120-capability-contract",
+      "016-stage-build",
+      "019-stage-verify",
+      "011-work-journal",
+      "041-project-gate-contract"
+    ],
+    "establishes": [
+      {
+        "kind": "file",
+        "path": "members/src/orchestrator/candidate.ts"
+      },
+      {
+        "kind": "file",
+        "path": "members/src/orchestrator/candidate.test.ts"
+      },
+      {
+        "kind": "file",
+        "path": "members/src/orchestrator/receipt.ts"
+      },
+      {
+        "kind": "file",
+        "path": "members/src/orchestrator/receipt.test.ts"
+      }
+    ],
+    "extends": [
+      {
+        "nature": "additive",
+        "spec": "016-stage-build",
+        "unit": {
+          "kind": "file",
+          "path": "members/src/orchestrator/stages/build.ts"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "016-stage-build",
+        "unit": {
+          "kind": "file",
+          "path": "members/src/orchestrator/stages/build.test.ts"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "017-stage-ship",
+        "unit": {
+          "kind": "file",
+          "path": "members/src/orchestrator/stages/ship.ts"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "017-stage-ship",
+        "unit": {
+          "kind": "file",
+          "path": "members/src/orchestrator/stages/ship.test.ts"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "018-stage-shepherd",
+        "unit": {
+          "kind": "file",
+          "path": "members/src/orchestrator/stages/shepherd.ts"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "018-stage-shepherd",
+        "unit": {
+          "kind": "file",
+          "path": "members/src/orchestrator/stages/shepherd.test.ts"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "021-orchestrator-daemon",
+        "unit": {
+          "kind": "file",
+          "path": "members/src/orchestrator/daemon.ts"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "021-orchestrator-daemon",
+        "unit": {
+          "kind": "file",
+          "path": "members/src/orchestrator/daemon.test.ts"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "014-session-driver",
+        "unit": {
+          "kind": "file",
+          "path": "members/src/orchestrator/session.ts"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "014-session-driver",
+        "unit": {
+          "kind": "file",
+          "path": "members/src/orchestrator/session.test.ts"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "043-driver-seam",
+        "unit": {
+          "kind": "file",
+          "path": "members/src/orchestrator/driver.ts"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "043-driver-seam",
+        "unit": {
+          "kind": "file",
+          "path": "members/src/orchestrator/driver.test.ts"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "114-driver-port",
+        "unit": {
+          "kind": "directory",
+          "path": "crates/statecraft-driver-core/"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "114-driver-port",
+        "unit": {
+          "kind": "directory",
+          "path": "crates/statecraft-driver-claude/"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "116-codex-driver",
+        "unit": {
+          "kind": "directory",
+          "path": "crates/statecraft-driver-codex/"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "031-journal-export",
+        "unit": {
+          "kind": "file",
+          "path": "members/src/orchestrator/export.ts"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "031-journal-export",
+        "unit": {
+          "kind": "file",
+          "path": "members/src/orchestrator/export.test.ts"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "022-http-api-and-events",
+        "unit": {
+          "kind": "directory",
+          "path": "members/src/orchestrator/api/"
+        }
+      }
+    ],
+    "id": "121-candidate-and-receipt",
+    "implementation": "pending",
+    "references": [
+      {
+        "role": "context",
+        "unit": {
+          "kind": "file",
+          "path": "docs/design/04-the-governed-substrate.md"
+        }
+      }
+    ],
+    "risk": "high",
+    "sectionHeadings": [
+      "121: The candidate and the receipt",
+      "1. Purpose",
+      "2. Territory",
+      "3. Behavior",
+      "4. Functional requirements",
+      "5. Acceptance",
+      "Verification",
+      "6. Out of scope",
+      "7. Resolved decisions"
+    ],
+    "specPath": "specs/121-candidate-and-receipt/spec.md",
+    "status": "approved",
+    "summary": "Doc 04 §5. The build stage stops editing the operator's checkout: it adds a worktree for the spec's branch under the daemon's home and drives every session, gate and commit there, and ship and shepherd work the same candidate. The child environment every session receives is scrubbed by a deny list the engine owns. When the post-session gate passes on a candidate whose HEAD did not move and whose tree stayed clean, the engine journals an acceptance receipt binding the repository, the base, the candidate sha, the gate suite, the policy digest, the spec-spine version, every exit code, and the policy-sensitive paths the candidate touched. The receipt is what 122's broker consumes before it publishes.\n",
+    "title": "The candidate and the receipt: the build works a worktree with a scrubbed environment, and a passing gate over a stable revision is journaled as an acceptance receipt"
+  },
+  "shardHash": "6c8195d072a0c857cfa17b29cbfe57dc3c39b786059c49e16c781325a584eb28",
+  "specVersion": "1.2.0"
+}

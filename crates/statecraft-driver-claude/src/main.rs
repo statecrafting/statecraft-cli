@@ -165,6 +165,34 @@ impl statecraft_driver_core::Provider for Claude {
         }
     }
 
+    /// Spec 119 B-5: a `user` event whose tool_result is flagged is_error
+    /// and reads as a hook refusal (the hook-blocked rule's own pattern).
+    /// An ordinary failing tool is not a denial; the model's prose never is.
+    fn denial_in_event(&self, event: &Value) -> Option<String> {
+        let obj = event.as_object()?;
+        if obj.get("type").and_then(Value::as_str) != Some("user") {
+            return None;
+        }
+        let content = obj.get("message")?.get("content")?.as_array()?;
+        let rule = self
+            .rules
+            .iter()
+            .find(|r| r.kind == TerminationKind::HookBlocked)?;
+        for item in content {
+            let item = item.as_object()?;
+            if item.get("type").and_then(Value::as_str) != Some("tool_result")
+                || item.get("is_error").and_then(Value::as_bool) != Some(true)
+            {
+                continue;
+            }
+            let text = tool_result_text(item.get("content"));
+            if rule.pattern.is_match(&text) {
+                return Some(text);
+            }
+        }
+        None
+    }
+
     /// Claude Code writes transcripts under
     /// `~/.claude/projects/<cwd with "/" and "." replaced by "-">/<id>.jsonl`.
     /// Computed only; `~/.claude` is observed, never written.
@@ -211,6 +239,19 @@ fn main() {
         env!("CARGO_PKG_VERSION"),
         &argv,
     ));
+}
+
+/// A tool_result's content is a string or a list of text parts.
+fn tool_result_text(content: Option<&Value>) -> String {
+    match content {
+        Some(Value::String(s)) => s.clone(),
+        Some(Value::Array(parts)) => parts
+            .iter()
+            .filter_map(|p| p.get("text").and_then(Value::as_str))
+            .collect::<Vec<_>>()
+            .join("\n"),
+        _ => String::new(),
+    }
 }
 
 #[cfg(test)]
@@ -344,5 +385,31 @@ mod tests {
                 .map(|r| r.kind);
             assert_eq!(hit, Some(kind), "{text}");
         }
+    }
+    #[test]
+    fn a_denial_is_a_flagged_tool_result_that_reads_as_a_hook_refusal_and_nothing_else() {
+        let c = Claude::new();
+        let denied = json!({"type": "user", "message": {"role": "user", "content": [
+            {"type": "tool_result", "tool_use_id": "t1", "is_error": true,
+             "content": "Bash operation blocked by hook:\n- [pr-gate] BLOCKED: stale"}]}});
+        assert!(c
+            .denial_in_event(&denied)
+            .unwrap()
+            .contains("[pr-gate] BLOCKED"));
+        let parts = json!({"type": "user", "message": {"content": [
+            {"type": "tool_result", "is_error": true, "content": [{"type": "text", "text": "hook denied"}]}]}});
+        assert_eq!(c.denial_in_event(&parts), Some("hook denied".to_string()));
+        // An ordinary failing tool, a passing tool that quotes the word, and
+        // the model's prose are not denials (119 D-3).
+        let failing = json!({"type": "user", "message": {"content": [
+            {"type": "tool_result", "is_error": true, "content": "cargo test: 1 failed"}]}});
+        assert_eq!(c.denial_in_event(&failing), None);
+        let quoted = json!({"type": "user", "message": {"content": [
+            {"type": "tool_result", "is_error": false, "content": "PreToolUse hook blocked nothing"}]}});
+        assert_eq!(c.denial_in_event(&quoted), None);
+        let prose = json!({"type": "assistant", "message": {"content": [
+            {"type": "text", "text": "the hook blocked me: [pr-gate] BLOCKED"}]}});
+        assert_eq!(c.denial_in_event(&prose), None);
+        assert!(c.denials_in_stderr("anything").is_empty());
     }
 }

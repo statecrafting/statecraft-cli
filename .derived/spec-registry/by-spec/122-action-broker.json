@@ -1,0 +1,157 @@
+{
+  "record": {
+    "created": "2026-09-09",
+    "dependsOn": [
+      "121-candidate-and-receipt",
+      "017-stage-ship",
+      "018-stage-shepherd",
+      "020-decision-ledger",
+      "013-run-state-machine"
+    ],
+    "establishes": [
+      {
+        "kind": "file",
+        "path": "members/src/orchestrator/broker.ts"
+      },
+      {
+        "kind": "file",
+        "path": "members/src/orchestrator/broker.test.ts"
+      }
+    ],
+    "extends": [
+      {
+        "nature": "additive",
+        "spec": "017-stage-ship",
+        "unit": {
+          "kind": "file",
+          "path": "members/src/orchestrator/stages/ship.ts"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "017-stage-ship",
+        "unit": {
+          "kind": "file",
+          "path": "members/src/orchestrator/stages/ship.test.ts"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "018-stage-shepherd",
+        "unit": {
+          "kind": "file",
+          "path": "members/src/orchestrator/stages/shepherd.ts"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "018-stage-shepherd",
+        "unit": {
+          "kind": "file",
+          "path": "members/src/orchestrator/stages/shepherd.test.ts"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "021-orchestrator-daemon",
+        "unit": {
+          "kind": "file",
+          "path": "members/src/orchestrator/daemon.ts"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "021-orchestrator-daemon",
+        "unit": {
+          "kind": "file",
+          "path": "members/src/orchestrator/daemon.test.ts"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "121-candidate-and-receipt",
+        "unit": {
+          "kind": "file",
+          "path": "members/src/orchestrator/candidate.ts"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "121-candidate-and-receipt",
+        "unit": {
+          "kind": "file",
+          "path": "members/src/orchestrator/candidate.test.ts"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "114-driver-port",
+        "unit": {
+          "kind": "directory",
+          "path": "crates/statecraft-driver-claude/"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "116-codex-driver",
+        "unit": {
+          "kind": "directory",
+          "path": "crates/statecraft-driver-codex/"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "111-contract-crate",
+        "unit": {
+          "kind": "directory",
+          "path": "crates/statecraft-contract/"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "031-journal-export",
+        "unit": {
+          "kind": "file",
+          "path": "members/src/orchestrator/export.ts"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "031-journal-export",
+        "unit": {
+          "kind": "file",
+          "path": "members/src/orchestrator/export.test.ts"
+        }
+      }
+    ],
+    "id": "122-action-broker",
+    "implementation": "pending",
+    "references": [
+      {
+        "role": "context",
+        "unit": {
+          "kind": "file",
+          "path": "docs/design/04-the-governed-substrate.md"
+        }
+      }
+    ],
+    "risk": "critical",
+    "sectionHeadings": [
+      "122: The action boundary",
+      "1. Purpose",
+      "2. Territory",
+      "3. Behavior",
+      "4. Functional requirements",
+      "5. Acceptance",
+      "Verification",
+      "6. Out of scope",
+      "7. Resolved decisions"
+    ],
+    "specPath": "specs/122-action-broker/spec.md",
+    "status": "approved",
+    "summary": "Doc 04 §6. The push and the pull request move from the driven session to the engine. The ship session gates, reviews and commits in the candidate and drops the PR title and body into a drop box, as 020 drops decisions; the broker validates the text with 017's marker rules, requires an acceptance receipt covering the candidate head, checks the run holds the project's lease, pushes, and opens the PR. Shepherd's merge consumes the same receipt beside the green checks and 119's head. Every effect is journaled before and after with the action, the target, the head and the receipt it consumed; a retry reconciles before it acts. The GitHub tokens join the environment deny list, so the candidate can no longer publish on its own. The hosted plane's verbs already sit behind their guards and are not changed.\n",
+    "title": "The action boundary: the engine publishes on a receipt and a lease, the session proposes the text, and the candidate holds no publish credential"
+  },
+  "shardHash": "4ade048359535cfad3c38bdde7d0e9350372be749c507be4e52e36d7987c08e7",
+  "specVersion": "1.2.0"
+}

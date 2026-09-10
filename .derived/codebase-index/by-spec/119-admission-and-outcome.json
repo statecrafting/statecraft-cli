@@ -1,0 +1,545 @@
+{
+  "mapping": {
+    "dependsOn": [
+      "118-codex-harness",
+      "041-project-gate-contract",
+      "016-stage-build",
+      "017-stage-ship",
+      "018-stage-shepherd",
+      "014-session-driver",
+      "114-driver-port",
+      "116-codex-driver"
+    ],
+    "implementingPaths": [
+      {
+        "path": "crates/statecraft-contract/",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/statecraft-driver-claude/",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/statecraft-driver-codex/",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/statecraft-driver-core/",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/statecraft-journal/",
+        "source": "spec-edge"
+      },
+      {
+        "path": "docs/design/04-the-governed-substrate.md",
+        "source": "spec-edge"
+      },
+      {
+        "path": "members/src/commands/orchestrator.test.ts",
+        "source": "spec-edge"
+      },
+      {
+        "path": "members/src/members/contract-fixtures.test.ts",
+        "source": "spec-edge"
+      },
+      {
+        "path": "members/src/members/driver-codex.test.ts",
+        "source": "spec-edge"
+      },
+      {
+        "path": "members/src/members/driver-parity.test.ts",
+        "source": "spec-edge"
+      },
+      {
+        "path": "members/src/orchestrator/admission.test.ts",
+        "source": "spec-edge"
+      },
+      {
+        "path": "members/src/orchestrator/adopt/defects.test.ts",
+        "source": "spec-edge"
+      },
+      {
+        "path": "members/src/orchestrator/adopt/synthesis.test.ts",
+        "source": "spec-edge"
+      },
+      {
+        "path": "members/src/orchestrator/daemon.test.ts",
+        "source": "spec-edge"
+      },
+      {
+        "path": "members/src/orchestrator/daemon.ts",
+        "source": "spec-edge"
+      },
+      {
+        "path": "members/src/orchestrator/driver.test.ts",
+        "source": "spec-edge"
+      },
+      {
+        "path": "members/src/orchestrator/driver.ts",
+        "source": "spec-edge"
+      },
+      {
+        "path": "members/src/orchestrator/export.test.ts",
+        "source": "spec-edge"
+      },
+      {
+        "path": "members/src/orchestrator/export.ts",
+        "source": "spec-edge"
+      },
+      {
+        "path": "members/src/orchestrator/gate-contract.test.ts",
+        "source": "spec-edge"
+      },
+      {
+        "path": "members/src/orchestrator/gate-contract.ts",
+        "source": "spec-edge"
+      },
+      {
+        "path": "members/src/orchestrator/session.test.ts",
+        "source": "spec-edge"
+      },
+      {
+        "path": "members/src/orchestrator/session.ts",
+        "source": "spec-edge"
+      },
+      {
+        "path": "members/src/orchestrator/stages/build.test.ts",
+        "source": "spec-edge"
+      },
+      {
+        "path": "members/src/orchestrator/stages/build.ts",
+        "source": "spec-edge"
+      },
+      {
+        "path": "members/src/orchestrator/stages/shepherd.test.ts",
+        "source": "spec-edge"
+      },
+      {
+        "path": "members/src/orchestrator/stages/shepherd.ts",
+        "source": "spec-edge"
+      },
+      {
+        "path": "members/src/orchestrator/stages/ship.test.ts",
+        "source": "spec-edge"
+      },
+      {
+        "path": "members/src/orchestrator/stages/ship.ts",
+        "source": "spec-edge"
+      },
+      {
+        "path": "members/src/orchestrator/standby.test.ts",
+        "source": "spec-edge"
+      }
+    ],
+    "resolvedUnits": [
+      {
+        "locations": [
+          {
+            "file": "members/src/orchestrator/admission.test.ts"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "kind": "file",
+          "path": "members/src/orchestrator/admission.test.ts"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "crates/statecraft-contract/"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "directory",
+          "path": "crates/statecraft-contract/"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "crates/statecraft-driver-claude/"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "directory",
+          "path": "crates/statecraft-driver-claude/"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "crates/statecraft-driver-codex/"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "directory",
+          "path": "crates/statecraft-driver-codex/"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "crates/statecraft-driver-core/"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "directory",
+          "path": "crates/statecraft-driver-core/"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "crates/statecraft-journal/"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "directory",
+          "path": "crates/statecraft-journal/"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "docs/design/04-the-governed-substrate.md"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "docs/design/04-the-governed-substrate.md"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "members/src/commands/orchestrator.test.ts"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "members/src/commands/orchestrator.test.ts"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "members/src/members/contract-fixtures.test.ts"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "members/src/members/contract-fixtures.test.ts"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "members/src/members/driver-codex.test.ts"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "members/src/members/driver-codex.test.ts"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "members/src/members/driver-parity.test.ts"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "members/src/members/driver-parity.test.ts"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "members/src/orchestrator/adopt/defects.test.ts"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "members/src/orchestrator/adopt/defects.test.ts"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "members/src/orchestrator/adopt/synthesis.test.ts"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "members/src/orchestrator/adopt/synthesis.test.ts"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "members/src/orchestrator/daemon.test.ts"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "members/src/orchestrator/daemon.test.ts"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "members/src/orchestrator/daemon.ts"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "members/src/orchestrator/daemon.ts"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "members/src/orchestrator/driver.test.ts"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "members/src/orchestrator/driver.test.ts"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "members/src/orchestrator/driver.ts"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "members/src/orchestrator/driver.ts"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "members/src/orchestrator/export.test.ts"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "members/src/orchestrator/export.test.ts"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "members/src/orchestrator/export.ts"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "members/src/orchestrator/export.ts"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "members/src/orchestrator/gate-contract.test.ts"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "members/src/orchestrator/gate-contract.test.ts"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "members/src/orchestrator/gate-contract.ts"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "members/src/orchestrator/gate-contract.ts"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "members/src/orchestrator/session.test.ts"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "members/src/orchestrator/session.test.ts"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "members/src/orchestrator/session.ts"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "members/src/orchestrator/session.ts"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "members/src/orchestrator/stages/build.test.ts"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "members/src/orchestrator/stages/build.test.ts"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "members/src/orchestrator/stages/build.ts"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "members/src/orchestrator/stages/build.ts"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "members/src/orchestrator/stages/shepherd.test.ts"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "members/src/orchestrator/stages/shepherd.test.ts"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "members/src/orchestrator/stages/shepherd.ts"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "members/src/orchestrator/stages/shepherd.ts"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "members/src/orchestrator/stages/ship.test.ts"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "members/src/orchestrator/stages/ship.test.ts"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "members/src/orchestrator/stages/ship.ts"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "members/src/orchestrator/stages/ship.ts"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "members/src/orchestrator/standby.test.ts"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "members/src/orchestrator/standby.test.ts"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "docs/design/04-the-governed-substrate.md"
+          }
+        ],
+        "ownership": false,
+        "sourceField": "references",
+        "unit": {
+          "kind": "file",
+          "path": "docs/design/04-the-governed-substrate.md"
+        }
+      }
+    ],
+    "specId": "119-admission-and-outcome",
+    "specStatus": "approved"
+  },
+  "schemaVersion": "1.1.0",
+  "shardHash": "bf3268ed3bf077b743b06618d201a0c1f100cd78dfe049fe8fa345d7622c2196"
+}

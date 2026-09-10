@@ -230,6 +230,25 @@ test("session.result keeps costs, counts, and classification; tails, transcript 
   expect(redacted.withheldFields).toEqual(["detail", "resultTextTail", "stderrTail", "transcriptPath"]);
 });
 
+test("119 B-6: the denial count survives the export and its samples are stripped; the denial records are allowlisted", () => {
+  expect(REDACTION_POLICY.version).toBe(2);
+  const result = redactPayload("session.result", { classification: "completed", denials: 2, denialSamples: ["[pr-gate] BLOCKED: /Users/x/repo"] });
+  expect(result.withheldPayload).toBe(false);
+  expect((result.payload as Record<string, JsonValue>).denials).toBe(2);
+  expect((result.payload as Record<string, JsonValue>).denialSamples).toBeUndefined();
+  expect(result.withheldFields).toEqual(["denialSamples"]);
+
+  const denials = redactPayload("stage.build.denials", { specId: "119-x", round: 1, sessionId: "s", denials: 1, samples: ["hook blocked /tmp/x"] });
+  expect(denials.withheldPayload).toBe(false);
+  expect((denials.payload as Record<string, JsonValue>).denials).toBe(1);
+  expect(denials.withheldFields).toEqual(["samples"]);
+
+  const refused = redactPayload("stage.shepherd.merge-refused", { specId: "119-x", prNumber: 4, watchedSha: "a", currentSha: "b", reason: "moved" });
+  expect(refused.withheldPayload).toBe(false);
+  expect((refused.payload as Record<string, JsonValue>).watchedSha).toBe("a");
+  expect(refused.withheldFields).toEqual(["reason"]);
+});
+
 test("named fields are stripped at any nesting depth: a gate's tails go, its command and exit code stay", () => {
   const redacted = redactPayload("stage.build.gate", {
     specId: "031-journal-export",

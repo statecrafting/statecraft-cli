@@ -26,7 +26,7 @@ import type { ModelTier } from "../models";
 import { sha256Hex } from "../journal";
 import { GATE_COMMANDS, DEFAULT_BASE_BRANCH, type Runner } from "./build";
 import { gateSuiteFor, resolveGateBinding, type GateBinding } from "../gate-contract";
-import type { GitHubClient, CheckRun, MergeMethod } from "./ship";
+import { MergeRefusedError, type GitHubClient, type CheckRun, type MergeMethod, type MergeOutcome } from "./ship";
 
 // --- clock seam (B-1: no real sleeps in unit tests) --------------------------
 
@@ -425,9 +425,39 @@ export async function runShepherdStage(options: RunShepherdStageOptions): Promis
     }
 
     if (watch.kind === "green") {
-      const mergeOutcome = gh.mergePr(pr.number, mergeMethod);
+      // 119 B-4 (doc 04 D43): the merge names the head the watch followed.
+      // A head that moved after the last green poll, or a merge the remote
+      // refuses for that head, is a human's to look at; no second attempt.
+      const current = gh.prForBranch(branch);
+      const currentSha = current ? current.headSha : null;
+      if (currentSha !== headSha) {
+        journal.append("stage.shepherd.merge-refused", {
+          specId,
+          prNumber: pr.number,
+          watchedSha: headSha,
+          currentSha,
+          reason: "the pull request head moved after the last green watch",
+        });
+        return finish("failed", true, null, pr.number);
+      }
+      let mergeOutcome: MergeOutcome;
+      try {
+        mergeOutcome = gh.mergePr(pr.number, mergeMethod, headSha);
+      } catch (err) {
+        if (err instanceof MergeRefusedError) {
+          journal.append("stage.shepherd.merge-refused", {
+            specId,
+            prNumber: pr.number,
+            watchedSha: headSha,
+            currentSha,
+            reason: err.message,
+          });
+          return finish("failed", true, null, pr.number);
+        }
+        throw err;
+      }
       mergeSha = mergeOutcome.mergeSha;
-      journal.append("stage.shepherd.merge", { specId, prNumber: pr.number, method: mergeMethod, mergeSha });
+      journal.append("stage.shepherd.merge", { specId, prNumber: pr.number, method: mergeMethod, mergeSha, headSha });
 
       gh.deleteRemoteBranch(branch);
       journal.append("stage.shepherd.branch-deleted", { specId, branch });
@@ -468,6 +498,17 @@ export async function runShepherdStage(options: RunShepherdStageOptions): Promis
       failing: failingEvidence.map((f) => ({ id: f.id, name: f.name, conclusion: f.conclusion, logTailHash: f.logTailHash })),
     });
 
+    // 119 B-2: the base the session's coupling gate compares against,
+    // resolved to a commit and journaled before the suite is handed out.
+    let baseSha: string;
+    try {
+      baseSha = runner.resolveBase(defaultBranch);
+    } catch (err) {
+      journal.append("stage.shepherd.base", { specId, attempt: attemptNumber, baseSha: null, error: (err as Error).message });
+      return finish("failed", true, null, pr.number);
+    }
+    journal.append("stage.shepherd.base", { specId, attempt: attemptNumber, baseSha });
+
     const specBody = runner.readFile(specPath);
     const prompt = buildRemediationPrompt({
       specBody,
@@ -475,7 +516,7 @@ export async function runShepherdStage(options: RunShepherdStageOptions): Promis
       attemptNumber,
       maxRemediations,
       failing: failureDetails,
-      gateCommands: gateSuiteFor(gate),
+      gateCommands: gateSuiteFor(gate, baseSha),
     });
     journal.append("stage.shepherd.prompt", { specId, attempt: attemptNumber, promptVersion: SHEPHERD_PROMPT_VERSION });
 

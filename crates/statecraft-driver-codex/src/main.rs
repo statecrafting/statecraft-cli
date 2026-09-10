@@ -18,6 +18,10 @@ use statecraft_driver_core::{
 pub const NAME: &str = "statecraft-driver-codex";
 pub const BIN_ENV: &str = "STATECRAFT_CODEX_BIN";
 pub const DEFAULT_BIN: &str = "codex";
+/// The tool router's log line for a command a PreToolUse hook refused
+/// (118 status note, observed live on 2026-09-09).
+const CODEX_ROUTER_DENIAL: &str =
+    "codex_core::tools::router: error=Command blocked by PreToolUse hook";
 pub const MODELS: (&str, &str) = ("gpt-6-astra", "gpt-5.6-luna");
 
 /// The parser's memory (D-2): Codex's final text and its error message
@@ -239,6 +243,40 @@ impl Provider for Codex {
             }
             _ => ProviderEvent::Other,
         }
+    }
+
+    /// Spec 119 B-5: a completed `command_execution` item whose output reads
+    /// as a hook refusal (the hook-blocked rule's own pattern). The agent's
+    /// message quoting the refusal is prose and is never read here.
+    fn denial_in_event(&self, event: &Value) -> Option<String> {
+        let obj = event.as_object()?;
+        if obj.get("type").and_then(Value::as_str) != Some("item.completed") {
+            return None;
+        }
+        let item = obj.get("item")?.as_object()?;
+        if item.get("type").and_then(Value::as_str) != Some("command_execution") {
+            return None;
+        }
+        let output = item
+            .get("aggregated_output")
+            .or_else(|| item.get("output"))
+            .and_then(Value::as_str)?;
+        let rule = self
+            .rules
+            .iter()
+            .find(|r| r.kind == TerminationKind::HookBlocked)?;
+        rule.pattern.is_match(output).then(|| output.to_string())
+    }
+
+    /// Spec 119 D-6: what 118 observed on a live refusal is the tool
+    /// router's log line on stderr, one per blocked command; the stream
+    /// carried only the agent's own message. Read over the bounded tail.
+    fn denials_in_stderr(&self, stderr_tail: &str) -> Vec<String> {
+        stderr_tail
+            .lines()
+            .filter(|line| line.contains(CODEX_ROUTER_DENIAL))
+            .map(|line| line.trim().to_string())
+            .collect()
     }
 
     /// B-5: found, not computed; `~/.codex` is observed, never written.
@@ -557,5 +595,32 @@ mod tests {
         }
         let quota = classify_text(&c, "You've hit your usage limit. Try again at 3:00 pm.");
         assert_eq!(quota.reset_at_ms, Some(1_700_060_400_000));
+    }
+    #[test]
+    fn a_denial_is_a_refused_command_item_or_the_routers_stderr_line_never_the_agents_message() {
+        let c = Codex::new();
+        let item = json!({"type": "item.completed", "item": {"id": "i1", "type": "command_execution",
+            "command": "gh pr create", "aggregated_output": "Command blocked by PreToolUse hook: [pr-gate] BLOCKED",
+            "exit_code": 2, "status": "failed"}});
+        assert!(c
+            .denial_in_event(&item)
+            .unwrap()
+            .contains("blocked by PreToolUse hook"));
+        let plain_failure = json!({"type": "item.completed", "item": {"type": "command_execution",
+            "aggregated_output": "cargo test: 1 failed", "exit_code": 101, "status": "failed"}});
+        assert_eq!(c.denial_in_event(&plain_failure), None);
+        // The agent quoting the refusal is prose (119 D-3); 118 saw exactly
+        // this message on the stream and it is not what is counted.
+        let message = json!({"type": "item.completed", "item": {"type": "agent_message",
+            "text": "Command blocked by PreToolUse hook: [pr-gate] BLOCKED"}});
+        assert_eq!(c.denial_in_event(&message), None);
+        // What 118 observed the harness itself write: the router's log line.
+        let stderr = format!(
+            "2026-09-09T00:00:00Z  INFO codex_core: starting\n2026-09-09T00:00:01Z ERROR {CODEX_ROUTER_DENIAL}\nother noise\n"
+        );
+        let found = c.denials_in_stderr(&stderr);
+        assert_eq!(found.len(), 1);
+        assert!(found[0].contains("blocked by PreToolUse hook"));
+        assert!(c.denials_in_stderr("no refusals here").is_empty());
     }
 }

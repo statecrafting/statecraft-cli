@@ -98,6 +98,8 @@ function completedSession(overrides: Partial<SessionResult> = {}): SessionResult
     transcriptPath: null,
     overflow: { lines: [], truncatedCount: 0 },
     stderrTail: "",
+    denials: 0,
+    denialSamples: [],
     ...overrides,
   };
 }

@@ -110,24 +110,35 @@ export function resolveGateBinding(binding: GateBinding | undefined): AnyGateCon
 
 // --- the one derivation (B-4) -----------------------------------------------
 
-// The universal governance floor: spec 016's four spec-spine commands, in
-// 016's order, unchanged and out of this spec's scope. The two Bun commands
-// 016 carried here are this repo's own language gate and now reach the suite
-// through claude-observatory's own contract, probed by rule 2, like every
-// other target's.
-export const GATE_COMMANDS: readonly (readonly string[])[] = [
-  ["spec-spine", "compile"],
-  ["spec-spine", "index", "check"],
-  ["spec-spine", "lint", "--fail-on-warn"],
-  ["spec-spine", "couple", "--base", "origin/main", "--head", "HEAD"],
-];
+// The universal governance floor, read-only since spec 119 (doc 04 D42):
+// the freshness read for both committed trees, lint, and the coupling gate
+// against a base the stage resolved to a commit. Regeneration (`compile`,
+// `index`) is the bracket's (016 D-8), never the floor's: a floor that
+// repairs the registry before reading it cannot say the submitted registry
+// was fresh (119 B-1, B-3).
+export const GATE_FLOOR_BASE_PLACEHOLDER = "origin/main";
 
-// The gate list a stage runs: the floor, then the contract's commands
-// verbatim. The only source of that list anywhere in this codebase (B-4);
-// the preflight's "gate green at base" (016 B-1), the post-session evidence
-// (016 B-5), and shepherd's remediation prompt all consume this output.
-export function gateSuiteFor(contract: AnyGateContract): readonly (readonly string[])[] {
-  return [...GATE_COMMANDS, ...contract.commands.map((cmd) => [...cmd])];
+export function gateFloor(base: string): readonly (readonly string[])[] {
+  return [
+    ["spec-spine", "check", "--fail-on-warn"],
+    ["spec-spine", "lint", "--fail-on-warn"],
+    ["spec-spine", "couple", "--base", base, "--head", "HEAD"],
+  ];
+}
+
+// The floor with its placeholder base, for prompt text and for tests that
+// quote the shape. Nothing runs this list: a stage runs gateSuiteFor() with
+// the base it resolved (119 B-2).
+export const GATE_COMMANDS: readonly (readonly string[])[] = gateFloor(GATE_FLOOR_BASE_PLACEHOLDER);
+
+// The gate list a stage runs: the floor at `base`, then the contract's
+// commands verbatim. The only source of that list anywhere in this codebase
+// (B-4); the preflight's "gate green at base" (016 B-1), the post-session
+// evidence (016 B-5), and shepherd's remediation prompt all consume this
+// output. `base` defaults to the placeholder so a caller that only wants the
+// shape (a prompt) need not resolve one.
+export function gateSuiteFor(contract: AnyGateContract, base: string = GATE_FLOOR_BASE_PLACEHOLDER): readonly (readonly string[])[] {
+  return [...gateFloor(base), ...contract.commands.map((cmd) => [...cmd])];
 }
 
 // --- the probe (B-2) --------------------------------------------------------

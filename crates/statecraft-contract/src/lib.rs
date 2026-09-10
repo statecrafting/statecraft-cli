@@ -300,11 +300,20 @@ pub struct SessionResult {
     pub transcript_path: Option<String>,
     pub overflow: OverflowInfo,
     pub stderr_tail: String,
+    /// Spec 119 B-5 (doc 04 D41): the refusals the harness reported, read
+    /// from its structured event for a refused tool call. Independent of the
+    /// classification. Absent on the wire reads as none (`default`).
+    #[serde(default)]
+    pub denials: u64,
+    #[serde(default)]
+    pub denial_samples: Vec<String>,
 }
 
-/// One line of the driver's stdout (043 B-2).
+/// One line of the driver's stdout (043 B-2). The result variant grew two
+/// fields in spec 119; one event per line, so the size gap is immaterial.
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
 #[serde(tag = "event", rename_all = "lowercase")]
+#[allow(clippy::large_enum_variant)]
 pub enum DriverEvent {
     /// One append spec 014 would have made in-process, kind and payload
     /// verbatim; the engine journals it (043 B-3).

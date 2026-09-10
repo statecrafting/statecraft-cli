@@ -1783,6 +1783,8 @@ function scriptedSynthesisSession(repo: string): (request: { purpose: string; pr
       transcriptPath: null,
       overflow: { lines: [], truncatedCount: 0 },
       stderrTail: "",
+      denials: 0,
+      denialSamples: [],
     };
   };
 }

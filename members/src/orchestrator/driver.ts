@@ -124,9 +124,17 @@ export function parseDriverEvent(line: string): DriverEvent | null {
       return { event: "journal", kind: parsed.kind, payload: parsed.payload as JsonValue };
     case "stream":
       return { event: "stream", raw: parsed.raw };
-    case "result":
+    case "result": {
       if (!isRecord(parsed.result)) return null;
-      return { event: "result", result: parsed.result as unknown as SessionResult };
+      // 119 B-6: a driver built before the denial fields existed answers
+      // without them; absence reads as none, never as unknown.
+      const raw = parsed.result;
+      const denials = typeof raw.denials === "number" ? raw.denials : 0;
+      const denialSamples = Array.isArray(raw.denialSamples)
+        ? raw.denialSamples.filter((v): v is string => typeof v === "string")
+        : [];
+      return { event: "result", result: { ...raw, denials, denialSamples } as unknown as SessionResult };
+    }
     default:
       return null;
   }
@@ -261,6 +269,8 @@ function synthesizedResult(kind: TerminationKind, detail: string, durationMs: nu
     transcriptPath: null,
     overflow: { lines: [], truncatedCount: 0 },
     stderrTail,
+    denials: 0,
+    denialSamples: [],
   };
 }
 
@@ -283,6 +293,8 @@ function synthesizedResultPayload(result: SessionResult): Record<string, JsonVal
     overflowTruncatedCount: result.overflow.truncatedCount,
     stderrTail: result.stderrTail,
     resultTextTail: null,
+    denials: result.denials,
+    denialSamples: [...result.denialSamples],
   };
 }
 

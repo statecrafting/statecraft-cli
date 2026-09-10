@@ -73,6 +73,18 @@ const FIXTURES: Record<string, string> = {
   transient: [started, failed("stream disconnected before completion")].join("\n"),
   crashed: [started, "echo 'segfault-ish' >&2", "exit 139"].join("\n"),
   timeout: [started, "sleep 30", "exit 0"].join("\n"),
+  // 119 B-5 and D-6: what 118 observed live. The refused command's item, the
+  // router's line on stderr, the agent quoting the refusal (prose, not
+  // counted), then turn.completed: classified completed with two denials
+  // (one from the item, one from stderr).
+  denied: [
+    started,
+    `echo '{"type":"item.completed","item":{"id":"item_0","type":"command_execution","command":"gh pr create","aggregated_output":"Command blocked by PreToolUse hook: [pr-gate] BLOCKED","exit_code":2,"status":"failed"}}'`,
+    `echo '2026-09-09T00:00:01Z ERROR codex_core::tools::router: error=Command blocked by PreToolUse hook' >&2`,
+    `echo '{"type":"item.completed","item":{"id":"item_1","type":"agent_message","text":"Command blocked by PreToolUse hook: [pr-gate] BLOCKED, so I stopped."}}'`,
+    `echo '{"type":"turn.completed","usage":{"input_tokens":1,"cached_input_tokens":0,"cache_write_input_tokens":0,"output_tokens":1,"reasoning_output_tokens":0}}'`,
+    "exit 0",
+  ].join("\n"),
 };
 
 function request(repo: string, extra: Record<string, unknown> = {}): string {
@@ -92,7 +104,7 @@ interface Event {
   event: string;
   kind?: string;
   payload?: Record<string, unknown>;
-  result?: { classification: { kind: string; detail: string; resetAtMs: number | null }; sessionId: string | null; costMicroUsd: number | null; numTurns: number | null; usage: Record<string, number> | null };
+  result?: { classification: { kind: string; detail: string; resetAtMs: number | null }; sessionId: string | null; costMicroUsd: number | null; numTurns: number | null; usage: Record<string, number> | null; denials: number; denialSamples: string[] };
 }
 
 function events(stdout: string): Event[] {
@@ -134,7 +146,12 @@ for (const [name, body] of Object.entries(FIXTURES)) {
     expect(init!.payload!.model).toBe("gpt-5.6-luna");
     const result = all.at(-1)!;
     expect(result.event).toBe("result");
-    expect(result.result!.classification.kind).toBe(name);
+    expect(result.result!.classification.kind).toBe(name === "denied" ? "completed" : name);
+    expect(result.result!.denials).toBe(name === "denied" ? 2 : 0);
+    if (name === "denied") {
+      expect(result.result!.denialSamples.length).toBe(2);
+      expect(result.result!.denialSamples.every((s) => s.includes("blocked by PreToolUse hook"))).toBe(true);
+    }
     expect(result.result!.costMicroUsd).toBeNull();
     expect(result.result!.numTurns).toBeNull();
     if (name === "quota") expect(result.result!.classification.resetAtMs).toBe(1_700_060_400_000);

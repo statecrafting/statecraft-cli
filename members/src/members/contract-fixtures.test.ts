@@ -80,9 +80,12 @@ test("the session requests parse through the driver member's request codec", () 
 test("the session results carry every field session.ts produces, and the events parse", () => {
   const completed = fixture<SessionResult>("session-result-completed");
   expect(Object.keys(completed).sort()).toEqual(
-    ["classification", "costMicroUsd", "durationMs", "exitCode", "numTurns", "overflow", "sessionId", "stderrTail", "transcriptPath", "usage"].sort()
+    ["classification", "costMicroUsd", "denialSamples", "denials", "durationMs", "exitCode", "numTurns", "overflow", "sessionId", "stderrTail", "transcriptPath", "usage"].sort()
   );
   expect(completed.classification.kind).toBe("completed");
+  // 119 B-6: a completed result with a denial is still completed.
+  expect(completed.denials).toBe(1);
+  expect(completed.denialSamples.length).toBe(1);
   const quota = fixture<SessionResult>("session-result-quota");
   expect(quota.classification.kind).toBe("quota");
   expect(quota.classification.resetAtMs).toBe(1_700_000_000_000);

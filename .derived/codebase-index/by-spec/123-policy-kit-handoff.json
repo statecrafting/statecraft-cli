@@ -1,0 +1,421 @@
+{
+  "diagnostics": {
+    "errors": [],
+    "warnings": [
+      {
+        "code": "W-001",
+        "message": "spec '123-policy-kit-handoff' file unit 'members/src/orchestrator/lifecycle-policy.ts' does not exist",
+        "path": "members/src/orchestrator/lifecycle-policy.ts"
+      },
+      {
+        "code": "W-001",
+        "message": "spec '123-policy-kit-handoff' file unit 'members/src/orchestrator/lifecycle-policy.test.ts' does not exist",
+        "path": "members/src/orchestrator/lifecycle-policy.test.ts"
+      },
+      {
+        "code": "W-001",
+        "message": "spec '123-policy-kit-handoff' file unit 'members/src/orchestrator/handoff.ts' does not exist",
+        "path": "members/src/orchestrator/handoff.ts"
+      },
+      {
+        "code": "W-001",
+        "message": "spec '123-policy-kit-handoff' file unit 'members/src/orchestrator/handoff.test.ts' does not exist",
+        "path": "members/src/orchestrator/handoff.test.ts"
+      },
+      {
+        "code": "W-001",
+        "message": "spec '123-policy-kit-handoff' file unit '.codex/kit-manifest.json' does not exist",
+        "path": ".codex/kit-manifest.json"
+      },
+      {
+        "code": "W-001",
+        "message": "spec '123-policy-kit-handoff' file unit 'scripts/codex-kit.test.py' does not exist",
+        "path": "scripts/codex-kit.test.py"
+      },
+      {
+        "code": "W-001",
+        "message": "spec '123-policy-kit-handoff' file unit 'members/src/orchestrator/broker.ts' does not exist",
+        "path": "members/src/orchestrator/broker.ts"
+      },
+      {
+        "code": "W-001",
+        "message": "spec '123-policy-kit-handoff' file unit 'members/src/orchestrator/broker.test.ts' does not exist",
+        "path": "members/src/orchestrator/broker.test.ts"
+      }
+    ]
+  },
+  "mapping": {
+    "dependsOn": [
+      "122-action-broker",
+      "118-codex-harness",
+      "025-project-registry",
+      "012-spec-dag-readiness",
+      "033-cost-ceiling"
+    ],
+    "implementingPaths": [
+      {
+        "path": ".agents/skills/",
+        "source": "spec-edge"
+      },
+      {
+        "path": "Makefile",
+        "source": "spec-edge"
+      },
+      {
+        "path": "members/src/commands/orchestrator.test.ts",
+        "source": "spec-edge"
+      },
+      {
+        "path": "members/src/commands/orchestrator.ts",
+        "source": "spec-edge"
+      },
+      {
+        "path": "members/src/orchestrator/api/",
+        "source": "spec-edge"
+      },
+      {
+        "path": "members/src/orchestrator/daemon.test.ts",
+        "source": "spec-edge"
+      },
+      {
+        "path": "members/src/orchestrator/daemon.ts",
+        "source": "spec-edge"
+      },
+      {
+        "path": "members/src/orchestrator/dag.test.ts",
+        "source": "spec-edge"
+      },
+      {
+        "path": "members/src/orchestrator/dag.ts",
+        "source": "spec-edge"
+      },
+      {
+        "path": "members/src/orchestrator/projects.test.ts",
+        "source": "spec-edge"
+      },
+      {
+        "path": "members/src/orchestrator/projects.ts",
+        "source": "spec-edge"
+      },
+      {
+        "path": "members/src/orchestrator/stages/build.test.ts",
+        "source": "spec-edge"
+      },
+      {
+        "path": "members/src/orchestrator/stages/build.ts",
+        "source": "spec-edge"
+      },
+      {
+        "path": "members/src/orchestrator/stages/shepherd.test.ts",
+        "source": "spec-edge"
+      },
+      {
+        "path": "members/src/orchestrator/stages/shepherd.ts",
+        "source": "spec-edge"
+      },
+      {
+        "path": "scripts/codex-kit.py",
+        "source": "spec-edge"
+      }
+    ],
+    "resolvedUnits": [
+      {
+        "locations": [],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "kind": "file",
+          "path": ".codex/kit-manifest.json"
+        }
+      },
+      {
+        "locations": [],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "kind": "file",
+          "path": "members/src/orchestrator/handoff.test.ts"
+        }
+      },
+      {
+        "locations": [],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "kind": "file",
+          "path": "members/src/orchestrator/handoff.ts"
+        }
+      },
+      {
+        "locations": [],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "kind": "file",
+          "path": "members/src/orchestrator/lifecycle-policy.test.ts"
+        }
+      },
+      {
+        "locations": [],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "kind": "file",
+          "path": "members/src/orchestrator/lifecycle-policy.ts"
+        }
+      },
+      {
+        "locations": [],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "kind": "file",
+          "path": "scripts/codex-kit.test.py"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": ".agents/skills/"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "directory",
+          "path": ".agents/skills/"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "members/src/orchestrator/api/"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "directory",
+          "path": "members/src/orchestrator/api/"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "Makefile"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "Makefile"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "members/src/commands/orchestrator.test.ts"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "members/src/commands/orchestrator.test.ts"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "members/src/commands/orchestrator.ts"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "members/src/commands/orchestrator.ts"
+        }
+      },
+      {
+        "locations": [],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "members/src/orchestrator/broker.test.ts"
+        }
+      },
+      {
+        "locations": [],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "members/src/orchestrator/broker.ts"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "members/src/orchestrator/daemon.test.ts"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "members/src/orchestrator/daemon.test.ts"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "members/src/orchestrator/daemon.ts"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "members/src/orchestrator/daemon.ts"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "members/src/orchestrator/dag.test.ts"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "members/src/orchestrator/dag.test.ts"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "members/src/orchestrator/dag.ts"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "members/src/orchestrator/dag.ts"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "members/src/orchestrator/projects.test.ts"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "members/src/orchestrator/projects.test.ts"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "members/src/orchestrator/projects.ts"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "members/src/orchestrator/projects.ts"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "members/src/orchestrator/stages/build.test.ts"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "members/src/orchestrator/stages/build.test.ts"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "members/src/orchestrator/stages/build.ts"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "members/src/orchestrator/stages/build.ts"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "members/src/orchestrator/stages/shepherd.test.ts"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "members/src/orchestrator/stages/shepherd.test.ts"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "members/src/orchestrator/stages/shepherd.ts"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "members/src/orchestrator/stages/shepherd.ts"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "scripts/codex-kit.py"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "scripts/codex-kit.py"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "docs/design/04-the-governed-substrate.md"
+          }
+        ],
+        "ownership": false,
+        "sourceField": "references",
+        "unit": {
+          "kind": "file",
+          "path": "docs/design/04-the-governed-substrate.md"
+        }
+      }
+    ],
+    "specId": "123-policy-kit-handoff",
+    "specStatus": "approved"
+  },
+  "schemaVersion": "1.1.0",
+  "shardHash": "1bbfa3161066da2bdce27d7d10ac3ee7d5b08b447e17943adbc441a8c4983774"
+}
