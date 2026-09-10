@@ -3,7 +3,7 @@ id: "123-policy-kit-handoff"
 title: "The policy, the kit and the handoff: a typed lifecycle per project, a kit manifest with provenance and declared drops, and a capsule any harness can resume from"
 status: approved
 created: "2026-09-09"
-implementation: pending
+implementation: in-progress
 risk: medium
 depends_on:
   - "122-action-broker"

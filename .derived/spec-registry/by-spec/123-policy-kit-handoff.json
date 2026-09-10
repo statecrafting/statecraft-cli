@@ -181,7 +181,7 @@
       }
     ],
     "id": "123-policy-kit-handoff",
-    "implementation": "pending",
+    "implementation": "in-progress",
     "references": [
       {
         "role": "context",
@@ -208,6 +208,6 @@
     "summary": "Doc 04 §7. Three things that today live in prose or in one provider's head become typed. A LifecyclePolicy on the projects chain, beside the gate contract, says which statuses a project schedules, whether a named draft may build, how it merges, which paths are policy-sensitive and what a receipt touching them does; absent, it is today's behavior. The Codex kit gains a manifest naming every generated file, its source and hash, and every field the generator dropped, and the check walks directories too. A handoff capsule built from the journal carries what a new session in any harness needs, is printed by a verb, and rides into every remediation prompt.\n",
     "title": "The policy, the kit and the handoff: a typed lifecycle per project, a kit manifest with provenance and declared drops, and a capsule any harness can resume from"
   },
-  "shardHash": "fd32984b721ee6d261e55ab1928222e59eaefc9ea4660205c75a3bed96ece135",
+  "shardHash": "0b3eade92c692683adbd26386cad1fdc8871a6354aaced7ca3e2ffd39eb5e40a",
   "specVersion": "1.2.0"
 }
