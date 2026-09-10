@@ -173,7 +173,7 @@
       }
     ],
     "id": "120-capability-contract",
-    "implementation": "pending",
+    "implementation": "in-progress",
     "references": [
       {
         "role": "context",
@@ -200,6 +200,6 @@
     "summary": "The design doc 03 D39 deferred, decided in doc 04 §4. The contract crate gains a closed set of six capability tokens: tool-allowlist, max-turns, mcp-config, cost, workspace-write, hook-enforcement. A driver's manifest lists the tokens it supports; a session request carries what the run requires and what it prefers. The engine reads the manifest before spawning and refuses a required token the driver lacks without starting a process, generalizing 043 B-6's mcp-config refusal into the rule it was an instance of; a preferred token the driver lacks is journaled and the session runs. session.init carries the tokens the provider applied beside those it degraded, so the effective configuration is evidence. The tier stays as a summary derived from the token set.\n",
     "title": "The capability contract: a closed token vocabulary, required refuses before spawn, preferred degrades in the journal"
   },
-  "shardHash": "85d109668bf5ecaf7b5fc9ed2c0cb69414cef5f9606f24a20012fbe8ac760ce3",
+  "shardHash": "b82c2f6bde48cc8413fc0e3579aef8d960a7ce6619cd3b80451a7d7d2e0155a3",
   "specVersion": "1.2.0"
 }

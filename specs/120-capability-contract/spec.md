@@ -3,7 +3,7 @@ id: "120-capability-contract"
 title: "The capability contract: a closed token vocabulary, required refuses before spawn, preferred degrades in the journal"
 status: approved
 created: "2026-09-09"
-implementation: pending
+implementation: in-progress
 risk: high
 depends_on:
   - "119-admission-and-outcome"
