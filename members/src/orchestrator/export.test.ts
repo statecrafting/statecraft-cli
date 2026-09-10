@@ -231,7 +231,8 @@ test("session.result keeps costs, counts, and classification; tails, transcript 
 });
 
 test("119 B-6: the denial count survives the export and its samples are stripped; the denial records are allowlisted", () => {
-  expect(REDACTION_POLICY.version).toBe(4);
+  // 125 D-6: `fence.refused` joined the allowlist, which is a version bump.
+  expect(REDACTION_POLICY.version).toBe(5);
   const action = redactPayload("broker.action", { action: "push", phase: "outcome", runId: "r", specId: "122-x", target: "122-x", headSha: "h", receiptHash: "rh", ok: true, detail: "pushed" });
   expect(action.withheldPayload).toBe(false);
   expect(action.withheldFields).toEqual(["detail"]);

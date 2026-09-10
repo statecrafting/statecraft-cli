@@ -27,6 +27,7 @@ import type { JournalHandle, JsonValue } from "./journal";
 import type { ExecutionProfile, ProfileSource } from "./profile";
 import { DEFAULT_REGISTRATION_PROFILE, profilePayload, resolveProfileSource } from "./profile";
 import { scrubEnv } from "./candidate";
+import { applyFence } from "./fence";
 import { qualificationDir, qualificationFor, UNQUALIFIED_KIND } from "./qualification";
 import {
   decide,
@@ -68,6 +69,12 @@ export interface DriverSessionRequest {
   // 120 B-3: tokens the caller requires or prefers beyond what the request
   // implies. The seam derives the rest (120 B-4) and decides before spawn.
   readonly requirements?: Requirements;
+  // 125 B-3: the credential fence built beside this session's candidate.
+  // Present, the member (and through it the provider) is spawned with the
+  // fence overlay: refusing `gh` and `ssh` first on PATH, and git pointed
+  // away from every inherited credential helper. Absent, the session gets
+  // the plain scrub, which is the in-place mode 121 D-5 keeps.
+  readonly fenceDir?: string;
   // The two engine callbacks the process cannot carry.
   readonly journal?: JournalHandle;
   readonly sink?: SessionEventSink;
@@ -471,12 +478,15 @@ export function createProcessDriver(params: CreateProcessDriverParams = {}): Dri
       return result;
     }
 
+    // 125 B-3: the overlay rides on top of the scrub for this session only.
+    // The member re-scrubs for its own child and forwards the rest, so the
+    // provider inherits the fence without the member knowing about it.
     const proc = Bun.spawn([...argv], {
       cwd: resolve(request.repo),
       stdin: "pipe",
       stdout: "pipe",
       stderr: "pipe",
-      env,
+      env: applyFence(env, request.fenceDir ?? null),
     });
 
     const state = {

@@ -1,9 +1,9 @@
 ---
 id: "125-credential-fence"
 title: "The credential fence: the broker is the only path that works, so the journal is complete"
-status: draft
+status: approved
 created: "2026-09-10"
-implementation: pending
+implementation: complete
 risk: medium
 depends_on:
   - "122-action-broker"
@@ -20,16 +20,25 @@ extends:
   - { spec: "121-candidate-and-receipt", unit: "members/src/orchestrator/candidate.test.ts", nature: additive }
   # 111 owns the contract crate; CHILD_ENV_DENY grows and the fixture with it.
   - { spec: "111-contract-crate", unit: { kind: directory, path: "crates/statecraft-contract/" }, nature: additive }
-  # 114 and 116 own the providers, which read the contract's list on both sides.
-  - { spec: "114-driver-port", unit: { kind: directory, path: "crates/statecraft-driver-core/" }, nature: additive }
-  - { spec: "116-codex-driver", unit: "members/src/members/driver-codex.test.ts", nature: additive }
-  # 122 owns the broker, which keeps the daemon's unfenced environment.
-  - { spec: "122-action-broker", unit: "members/src/orchestrator/broker.ts", nature: additive }
-  - { spec: "122-action-broker", unit: "members/src/orchestrator/broker.test.ts", nature: additive }
-  # The three publishing stages pass the fence to the session they spawn.
+  # 114 owns the Claude provider, whose deny-list assertion counts the names.
+  - { spec: "114-driver-port", unit: { kind: directory, path: "crates/statecraft-driver-claude/" }, nature: additive }
+  # 043 owns the driver seam: the session request carries the fence directory,
+  # and the member spawn applies the overlay over the scrub.
+  - { spec: "043-driver-seam", unit: "members/src/orchestrator/driver.ts", nature: additive }
+  # 031 owns the export policy, which gains `fence.refused` at version 5.
+  - { spec: "031-journal-export", unit: "members/src/orchestrator/export.ts", nature: additive }
+  - { spec: "031-journal-export", unit: "members/src/orchestrator/export.test.ts", nature: additive }
+  # 113 owns the Rust journal crate, which carries the policy's second copy.
+  # Parity is byte-for-byte (039 FR-003), so the bump lands on both or neither.
+  - { spec: "113-journal-port", unit: { kind: directory, path: "crates/statecraft-journal/" }, nature: additive }
+  # The three publishing stages pass the fence to the session they spawn and
+  # fold the tally into their evidence.
   - { spec: "016-stage-build", unit: "members/src/orchestrator/stages/build.ts", nature: additive }
   - { spec: "017-stage-ship", unit: "members/src/orchestrator/stages/ship.ts", nature: additive }
   - { spec: "018-stage-shepherd", unit: "members/src/orchestrator/stages/shepherd.ts", nature: additive }
+  # 021 and 026 own fixture runners and evidence literals that gain the field.
+  - { spec: "021-orchestrator-daemon", unit: "members/src/orchestrator/daemon.test.ts", nature: additive }
+  - { spec: "026-standby-daemon", unit: "members/src/orchestrator/standby.test.ts", nature: additive }
 summary: >
   Spec 122 moved publishing to the broker so every push, pull request and
   merge is journaled as intent and outcome over a receipt and a lease. It
@@ -240,11 +249,79 @@ plane, and removing `gh` from the operator's machine.
 
 ## 7. Resolved decisions
 
-None yet; this spec is authored ahead of its build. Decisions taken during
-the build are recorded here with their date, per `AGENTS.md` step 3.
+D-1 (2026-09-10). The fence is built in `openCandidate` and returned on the
+`Candidate` record, so it exists before the first session and is rebuilt on
+every open. No candidate home means no fence, which is 121 D-5 and 122 D-7's
+shape for the same reason: a fixture world without a candidate keeps the
+pre-spec flow rather than growing a second code path.
+
+D-2 (2026-09-10). The fence rides on `DriverSessionRequest`, not on
+`createProcessDriver`. The daemon constructs the driver once at startup
+(`daemon.ts`) and the candidate does not exist yet, so a fence fixed at
+construction would always be the wrong one or none. Per session is also the
+truer statement: the fence belongs to the candidate a session works, not to
+the driver.
+
+D-3 (2026-09-10). `Runner.fenceRefusals` is optional; `SessionEvidence
+.fenceRefusals` is required. A Runner is an interface that fixtures in specs
+021 and 026 implement, and requiring the method would make this spec edit
+test doubles for no behavior. The evidence is a record this stage produces,
+where a required field with an explicit zero is what lets a consumer rely on
+it. The alternative, optional in both places, was rejected: it would let a
+missing tally read as "no refusals" to every reader downstream.
+
+D-4 (2026-09-10). B-6's case lives in `fence.test.ts`, not `broker.test.ts`.
+What is under test is the fence's blast radius (a process the daemon spawns
+itself is untouched), not the broker's logic, and asserting it beside the
+other fence cases keeps the claim next to the thing that could break it.
+`broker.ts` is therefore not touched by this spec and holds no `extends`
+edge, which is the honest record of what changed.
+
+D-5 (2026-09-10). `buildFence` truncates `refusals.log`, so the tally is per
+round rather than cumulative across a candidate's life. Build, ship and
+shepherd each open the candidate, so each gets its own count; a cumulative
+log would make a ship round inherit the build round's number and report a
+refusal that had already been journaled.
+
+D-6 (2026-09-10). The export policy goes to version 5 rather than extending
+version 4 in place. 031 FR-002 makes the allowlist reviewable data whose
+change is a version bump, and `fence.refused` is a new kind leaving the
+machine.
 
 ## Status (2026-09-10)
 
 Authored `draft`, `implementation: pending`. It comes from doc 04 §11's
 open limits and from the known limit 122 recorded three times (B-7, §5, D-4).
-Approval is a human flip.
+Approved by the owner on 2026-09-10, as written, and built the same day.
+
+Complete. §5's four criteria, each with its evidence:
+
+- `bun test` in `members/` is green: 976 pass, 0 fail across 60 files, which
+  includes the 13 new fence cases and every broker, ship and shepherd suite
+  running with the fence wired in.
+- `cargo test` is green and the contract fixture asserts six names;
+  `crates/statecraft-journal` carries the same policy bump, because 039
+  FR-003's parity is byte-for-byte and the export test caught the two copies
+  disagreeing before this landed.
+- `make gate` exits 0 and `make members` exits 0.
+- The live round, on a host whose `gh auth status` reports keyring storage
+  and whose `origin` is an ssh URL. Outside the fence `gh auth token` exits 0
+  and yields a token; inside a fence built by `openCandidate` the same
+  command exits 127, yields nothing, prints the broker message and is
+  tallied. `gh api user` inside the fence exits 127 with an empty body. In
+  the same round the broker pushed the candidate to a real bare remote
+  through its production git seam (the remote head equals the candidate
+  head) and journaled `broker.action` intent and outcome for both `push`
+  and `openPr`, `ok=true`. GitHub's API was faked exactly as 122's own live
+  smoke faked it; the git half is real.
+
+What this does not do is unchanged from §6 and worth repeating where a
+reader will meet it: `HOME` stays readable, an absolute path bypasses
+`PATH`, and `~/.ssh` keys stay on disk. The fence closes the ergonomic
+path, which is what makes 122's journal complete; it does not contain a
+session that means to escape. That remains doc 04 §11's sandboxed executor.
+
+One observation from the build, recorded because it will recur: the members
+suite showed a single unnamed failure on two runs under load and then ran
+976/0 twice, matching the load-sensitive timeout fixtures already noted
+against 124. It is not related to the fence.

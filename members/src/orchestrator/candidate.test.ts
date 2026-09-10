@@ -108,8 +108,19 @@ test("B-3 / FR-004: scrubEnv drops exactly the deny list and sets NO_COLOR; the 
     readFileSync(join(import.meta.dir, "..", "..", "..", "crates", "statecraft-contract", "fixtures", "child-env-deny.json"), "utf8")
   ) as string[];
   expect(fixture).toEqual([...CHILD_ENV_DENY]);
-  const env = scrubEnv({ ANTHROPIC_API_KEY: "a", OPENAI_API_KEY: "o", GH_TOKEN: "g", GITHUB_TOKEN: "t", HOME: "/h", PATH: "/bin", EMPTY: undefined });
+  const env = scrubEnv({
+    ANTHROPIC_API_KEY: "a",
+    OPENAI_API_KEY: "o",
+    GH_TOKEN: "g",
+    GITHUB_TOKEN: "t",
+    SSH_AUTH_SOCK: "/tmp/agent.sock",
+    SSH_AGENT_PID: "42",
+    HOME: "/h",
+    PATH: "/bin",
+    EMPTY: undefined,
+  });
   expect(env).toEqual({ HOME: "/h", PATH: "/bin", NO_COLOR: "1" });
-  // 122 B-7: four names.
-  expect(CHILD_ENV_DENY.length).toBe(4);
+  // 122 B-7 made it four; 125 B-4 adds the ssh agent, because a repository
+  // whose origin is an ssh URL is pushed to from the socket, not a token.
+  expect(CHILD_ENV_DENY.length).toBe(6);
 });

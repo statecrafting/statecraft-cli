@@ -367,8 +367,12 @@ mod tests {
         assert!(!env.contains_key("ANTHROPIC_API_KEY"));
         // 121 B-3, 122 B-7: the deny list is the contract's, all four names.
         assert!(!env.contains_key("OPENAI_API_KEY"));
-        assert_eq!(CHILD_ENV_DENY.len(), 4);
+        assert_eq!(CHILD_ENV_DENY.len(), 6);
         assert!(CHILD_ENV_DENY.contains(&"GH_TOKEN") && CHILD_ENV_DENY.contains(&"GITHUB_TOKEN"));
+        // 125 B-4: the ssh agent is the reach a token name cannot close.
+        assert!(
+            CHILD_ENV_DENY.contains(&"SSH_AUTH_SOCK") && CHILD_ENV_DENY.contains(&"SSH_AGENT_PID")
+        );
         assert_eq!(env.get("NO_COLOR").map(String::as_str), Some("1"));
         assert_eq!(env.get("PATH").map(String::as_str), Some("/bin"));
         std::env::set_var("HOME", "/home/u");

@@ -600,6 +600,19 @@ export async function runShepherdStage(options: RunShepherdStageOptions): Promis
       journal,
     });
 
+    // 125 B-7: a remediation session that reached for `gh` tried to publish
+    // around the broker, exactly as a ship session can. Journaled here; the
+    // remediation record keeps the shape 018 gave it.
+    const shepherdFenceRefusals = runner.fenceRefusals?.() ?? 0;
+    if (shepherdFenceRefusals > 0) {
+      journal.append("fence.refused", {
+        specId,
+        round: 4,
+        sessionId: session.sessionId,
+        refusals: shepherdFenceRefusals,
+      });
+    }
+
     remediations.push({
       attempt: attemptNumber,
       headSha,

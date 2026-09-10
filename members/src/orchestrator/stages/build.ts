@@ -22,6 +22,7 @@ import { createProcessDriver, type Driver, type SessionResult } from "../driver"
 import type { ModelTier } from "../models";
 import { profilePayload, resolveProfileSource, type ProfileSource } from "../profile";
 import { candidatePath, changedPaths, closeCandidate, openCandidate, originUrl } from "../candidate";
+import { readFenceRefusals } from "../fence";
 import { latestReceipt, mintReceipt, receiptPayload, RECEIPT_KIND, SENSITIVE_KIND, UNSTABLE_KIND, type Receipt } from "../receipt";
 import { buildCapsule, renderCapsule } from "../handoff";
 import type { CostCeiling } from "../budget";
@@ -111,6 +112,16 @@ export interface Runner {
 
   // --- session driving (delegates to spec 014's driver) ---
   runSession(options: RunnerSessionOptions): Promise<SessionResult>;
+
+  // 125 B-7: how many times the fence refused during the round just run. A
+  // non-zero count is a session that tried to publish around the broker,
+  // which is the signal that a prompt still asks for what the boundary
+  // forbids. Zero in the in-place mode, which has no fence (121 D-5).
+  //
+  // Optional for the same reason `candidateHome` may be null: a fixture
+  // Runner is a world without candidates, and requiring the method would
+  // make 125 edit test doubles owned by 021 and 026 for no behavior.
+  fenceRefusals?(): number;
 }
 
 const GATE_TAIL_BYTES = 16 * 1024;
@@ -187,6 +198,9 @@ export function createProcessRunner(params: CreateProcessRunnerParams): Runner {
   // 121 B-2: the directory every operation below works. The checkout until
   // a candidate is opened; the candidate thereafter.
   let workDir = repoDir;
+  // 125 B-2: the fence beside the open candidate, null until one is opened
+  // and in the in-place mode that never opens one.
+  let fenceDir: string | null = null;
 
   return {
     candidateHome(): string | null {
@@ -202,6 +216,7 @@ export function createProcessRunner(params: CreateProcessRunnerParams): Runner {
       }
       const candidate = openCandidate({ repoDir, homeDir: candidateHome, project, branch, baseSha });
       workDir = candidate.path;
+      fenceDir = candidate.fenceDir;
       return { path: candidate.path, reused: candidate.reused };
     },
 
@@ -213,6 +228,7 @@ export function createProcessRunner(params: CreateProcessRunnerParams): Runner {
       if (candidateHome === null) return;
       closeCandidate(repoDir, candidatePath(candidateHome, project, branch));
       if (workDir !== repoDir) workDir = repoDir;
+      fenceDir = null;
     },
 
     changedPaths(baseSha: string, headSha: string): readonly string[] {
@@ -306,7 +322,18 @@ export function createProcessRunner(params: CreateProcessRunnerParams): Runner {
       // The profile is applied after the caller's options, not merged with
       // them: a stage asks for a prompt, a model, and a deadline; what the
       // session may do on the operator's machine is not a stage's to name.
-      return driver.runSession({ repo: workDir, ...options, profile: resolveProfileSource(params.profile) });
+      // 125 B-3: the fence rides alongside for the same reason. Which
+      // credentials a session can reach is not a stage's to name either.
+      return driver.runSession({
+        repo: workDir,
+        ...options,
+        ...(fenceDir === null ? {} : { fenceDir }),
+        profile: resolveProfileSource(params.profile),
+      });
+    },
+
+    fenceRefusals(): number {
+      return readFenceRefusals(fenceDir);
     },
   };
 }
@@ -801,6 +828,9 @@ export interface SessionEvidence {
   // 119 B-6: the refusals the harness reported, independent of the
   // classification (doc 04 D41). Zero for a synthesized result.
   readonly denials: number;
+  // 125 B-7: how many times the credential fence refused during this round.
+  // Zero in the in-place mode, which has no fence (121 D-5).
+  readonly fenceRefusals: number;
 }
 
 export interface BuildEvidence {
@@ -828,7 +858,7 @@ export interface BuildResult {
   readonly evidence: BuildEvidence;
 }
 
-function toSessionEvidence(result: SessionResult): SessionEvidence {
+function toSessionEvidence(result: SessionResult, fenceRefusals: number): SessionEvidence {
   return {
     sessionId: result.sessionId,
     classification: result.classification.kind,
@@ -836,6 +866,7 @@ function toSessionEvidence(result: SessionResult): SessionEvidence {
     numTurns: result.numTurns,
     durationMs: result.durationMs,
     denials: result.denials,
+    fenceRefusals,
   };
 }
 
@@ -853,6 +884,21 @@ function journalDenials(journal: JournalHandle, specId: string, round: number, r
     samples: [...result.denialSamples],
   };
   journal.append("stage.build.denials", payload);
+}
+
+// 125 B-7: a session that reached for `gh` or `ssh` tried to publish around
+// the broker, and the journal is the only place that fact survives. It does
+// not refuse the round: the session may well have finished its actual work.
+// It is the signal that a prompt still asks for what the boundary forbids.
+function journalFenceRefusals(
+  journal: JournalHandle,
+  specId: string,
+  round: number,
+  sessionId: string | null,
+  count: number
+): void {
+  if (count === 0) return;
+  journal.append("fence.refused", { specId, round, sessionId, refusals: count });
 }
 
 function gateEvidenceToJson(g: GateEvidence): Record<string, JsonValue> {
@@ -1034,8 +1080,10 @@ export async function runBuildStage(options: RunBuildStageOptions): Promise<Buil
   const sessions: SessionEvidence[] = [];
 
   const first = await runner.runSession({ prompt: promptBase, timeoutMs, maxTurns, tier: options.tier, model: options.model, journal });
-  sessions.push(toSessionEvidence(first));
+  const firstFence = runner.fenceRefusals?.() ?? 0;
+  sessions.push(toSessionEvidence(first, firstFence));
   journalDenials(journal, specId, 1, first);
+  journalFenceRefusals(journal, specId, 1, first.sessionId, firstFence);
 
   const evaluate = (round: number): Completion =>
     evaluateCompletion({ runner, specId, specPath, gate, baseSha, branch, round, journal, profile: options.profile });
@@ -1084,8 +1132,10 @@ export async function runBuildStage(options: RunBuildStageOptions): Promise<Buil
       model: options.model,
       journal,
     });
-    sessions.push(toSessionEvidence(second));
+    const secondFence = runner.fenceRefusals?.() ?? 0;
+    sessions.push(toSessionEvidence(second, secondFence));
     journalDenials(journal, specId, 2, second);
+    journalFenceRefusals(journal, specId, 2, second.sessionId, secondFence);
 
     blocked = second.classification.kind === "hook-blocked";
     if (!blocked) {
