@@ -1,0 +1,303 @@
+{
+  "diagnostics": {
+    "errors": [],
+    "warnings": [
+      {
+        "code": "W-001",
+        "message": "spec '130-member-distribution' file unit '.github/workflows/dist-smoke.yml' does not exist",
+        "path": ".github/workflows/dist-smoke.yml"
+      },
+      {
+        "code": "W-001",
+        "message": "spec '130-member-distribution' file unit 'members/scripts/package-members.ts' does not exist",
+        "path": "members/scripts/package-members.ts"
+      }
+    ]
+  },
+  "mapping": {
+    "dependsOn": [
+      "107-release-distribution",
+      "108-member-dispatch",
+      "042-member-contract",
+      "024-web-ui",
+      "124-provider-conformance"
+    ],
+    "implementingPaths": [
+      {
+        "path": ".github/workflows/release.yml",
+        "source": "spec-edge"
+      },
+      {
+        "path": "Cargo.lock",
+        "source": "spec-edge"
+      },
+      {
+        "path": "Cargo.toml",
+        "source": "spec-edge"
+      },
+      {
+        "path": "docs/design/",
+        "source": "spec-edge"
+      },
+      {
+        "path": "install.sh",
+        "source": "spec-edge"
+      },
+      {
+        "path": "members/package.json",
+        "source": "spec-edge"
+      },
+      {
+        "path": "members/src/commands/orchestrator.ts",
+        "source": "spec-edge"
+      },
+      {
+        "path": "members/src/orchestrator/api/static.test.ts",
+        "source": "spec-edge"
+      },
+      {
+        "path": "members/src/orchestrator/api/static.ts",
+        "source": "spec-edge"
+      },
+      {
+        "path": "members/src/orchestrator/qualification.ts",
+        "source": "spec-edge"
+      },
+      {
+        "path": "src/cli.rs",
+        "source": "spec-edge"
+      },
+      {
+        "path": "src/commands.rs",
+        "source": "spec-edge"
+      },
+      {
+        "path": "src/main.rs",
+        "source": "spec-edge"
+      }
+    ],
+    "resolvedUnits": [
+      {
+        "locations": [],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "kind": "file",
+          "path": ".github/workflows/dist-smoke.yml"
+        }
+      },
+      {
+        "locations": [],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "kind": "file",
+          "path": "members/scripts/package-members.ts"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "docs/design/"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "directory",
+          "path": "docs/design/"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": ".github/workflows/release.yml"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": ".github/workflows/release.yml"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "Cargo.lock"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "Cargo.lock"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "Cargo.toml"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "Cargo.toml"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "install.sh"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "install.sh"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "members/src/commands/orchestrator.ts"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "members/src/commands/orchestrator.ts"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "members/src/orchestrator/api/static.test.ts"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "members/src/orchestrator/api/static.test.ts"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "members/src/orchestrator/api/static.ts"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "members/src/orchestrator/api/static.ts"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "members/src/orchestrator/qualification.ts"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "members/src/orchestrator/qualification.ts"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "members/package.json",
+            "span": {
+              "endLine": 21,
+              "startLine": 10
+            }
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "anchor": "scripts",
+          "file": "members/package.json",
+          "kind": "section"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "src/cli.rs",
+            "span": {
+              "endLine": 115,
+              "startLine": 103
+            }
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "id": "statecraft_cli::cli::MembersCommand",
+          "kind": "symbol"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "src/commands.rs",
+            "span": {
+              "endLine": 68,
+              "startLine": 24
+            }
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "id": "statecraft_cli::commands::dispatch",
+          "kind": "symbol"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "src/main.rs",
+            "span": {
+              "endLine": 12,
+              "startLine": 12
+            }
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "id": "statecraft_cli::members",
+          "kind": "symbol"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "docs/design/05-the-realignment-checked.md"
+          }
+        ],
+        "ownership": false,
+        "sourceField": "references",
+        "unit": {
+          "kind": "file",
+          "path": "docs/design/05-the-realignment-checked.md"
+        }
+      }
+    ],
+    "specId": "130-member-distribution",
+    "specStatus": "draft"
+  },
+  "schemaVersion": "1.1.0",
+  "shardHash": "47c219ce0f7ab68dca03cc24bf952b29c47f13e3513d28b59555d67c8a623fb5"
+}

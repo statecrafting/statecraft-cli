@@ -27,10 +27,15 @@
   "mapping": {
     "dependsOn": [
       "125-credential-fence",
+      "129-gate-fence",
       "122-action-broker",
       "121-candidate-and-receipt"
     ],
     "implementingPaths": [
+      {
+        "path": "docs/design/",
+        "source": "spec-edge"
+      },
       {
         "path": "members/src/orchestrator/broker.ts",
         "source": "spec-edge"
@@ -95,6 +100,19 @@
         "unit": {
           "kind": "file",
           "path": "members/src/orchestrator/signer.ts"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "docs/design/"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "directory",
+          "path": "docs/design/"
         }
       },
       {
@@ -200,11 +218,24 @@
           "kind": "file",
           "path": "docs/design/04-the-governed-substrate.md"
         }
+      },
+      {
+        "locations": [
+          {
+            "file": "docs/design/05-the-realignment-checked.md"
+          }
+        ],
+        "ownership": false,
+        "sourceField": "references",
+        "unit": {
+          "kind": "file",
+          "path": "docs/design/05-the-realignment-checked.md"
+        }
       }
     ],
     "specId": "126-sandboxed-executor",
     "specStatus": "draft"
   },
   "schemaVersion": "1.1.0",
-  "shardHash": "9bcdc650502ee40fec943af1276b8b34ecceab94d42f8ffe3dd61c5fbb7c9e17"
+  "shardHash": "9e7111455622c4b0d23e6cf56a51d9fbe082c9d7555f5e7b48c939aeb7b5fd7b"
 }

@@ -2,7 +2,10 @@
   "record": {
     "created": "2026-09-10",
     "dependsOn": [
-      "109-governed-harness"
+      "109-governed-harness",
+      "122-action-broker",
+      "017-stage-ship",
+      "018-stage-shepherd"
     ],
     "establishes": [
       {
@@ -12,6 +15,18 @@
       {
         "kind": "file",
         "path": "scripts/pr-note.test.py"
+      },
+      {
+        "kind": "directory",
+        "path": "scripts/pr-note-fixtures/"
+      },
+      {
+        "kind": "file",
+        "path": "members/src/orchestrator/review-note.ts"
+      },
+      {
+        "kind": "file",
+        "path": "members/src/orchestrator/review-note.test.ts"
       }
     ],
     "extends": [
@@ -31,10 +46,59 @@
           "file": "Makefile",
           "kind": "section"
         }
+      },
+      {
+        "nature": "additive",
+        "spec": "122-action-broker",
+        "unit": {
+          "kind": "file",
+          "path": "members/src/orchestrator/broker.ts"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "122-action-broker",
+        "unit": {
+          "kind": "file",
+          "path": "members/src/orchestrator/broker.test.ts"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "017-stage-ship",
+        "unit": {
+          "kind": "file",
+          "path": "members/src/orchestrator/stages/ship.ts"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "018-stage-shepherd",
+        "unit": {
+          "kind": "file",
+          "path": "members/src/orchestrator/stages/shepherd.ts"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "110-corpus-merge",
+        "unit": {
+          "kind": "directory",
+          "path": "docs/design/"
+        }
       }
     ],
     "id": "127-pr-review-note",
     "implementation": "pending",
+    "references": [
+      {
+        "role": "context",
+        "unit": {
+          "kind": "file",
+          "path": "docs/design/05-the-realignment-checked.md"
+        }
+      }
+    ],
     "sectionHeadings": [
       "127: The review note",
       "1. Purpose",
@@ -46,18 +110,22 @@
       "B-4. The note never invents a verdict",
       "B-5. Posting is not a gate",
       "B-6. The note carries no credential",
+      "B-7. A driven session submits the review; it does not post",
+      "B-8. The broker posts the note as its fourth action",
+      "B-9. The note is bound to a head and says when it is stale",
       "4. Functional requirements",
       "5. Acceptance",
       "Verification",
       "6. Out of scope",
       "7. Resolved decisions",
+      "Status (2026-09-11)",
       "Status (2026-09-10)"
     ],
     "specPath": "specs/127-pr-review-note/spec.md",
     "status": "draft",
-    "summary": "This repository reviews locally. `/code-review` runs in the session, before the push, and its findings never leave the terminal: the pull request shows three green checks and no reasoning. The checks UI already reports what CI can know, so the gap is not a CI summary but the thing only the session holds, namely what the review found, what was fixed and what was accepted. This spec adds one sticky comment per pull request, updated in place on every push, carrying the head sha, what changed, the gate verdicts that actually ran, and the review's findings with their disposition. It is posted by the session, it never invents a verdict, and failing to post it never blocks a ship.\n",
+    "summary": "This repository reviews locally. `/code-review` runs in the session, before the push, and its findings never leave the terminal: the pull request shows three green checks and no reasoning. The checks UI already reports what CI can know, so the gap is not a CI summary but the thing only the session holds, namely what the review found, what was fixed and what was accepted. This spec adds one sticky comment per pull request, updated in place on every push, carrying the head sha, what changed, the gate verdicts that actually ran, and the review's findings with their disposition. The session writes the note's content; who posts it depends on where the session runs. An interactive session posts with the operator's own credentials. A driven session is fenced (125) and holds no publish credential, so it submits the review in its proposal and the engine's broker posts the note as a fourth action, admitted on the receipt and lease and journaled like a push. Machine results come from the receipt and are marked receipted; the review is marked narrative; the note names the head and the receipt it describes. It never invents a verdict, and failing to post it never blocks a ship.\n",
     "title": "The review note: what the local cycle found, posted where the pull request can see it"
   },
-  "shardHash": "892c5b7da002784edb481b2ea4566ce54f27bc9b7cfe44887004f188f80e04a4",
+  "shardHash": "bdb78bfec3651edb86c159865f7f312b63084e6d79969b273ad7b9b96630c65d",
   "specVersion": "1.2.0"
 }

@@ -14,6 +14,21 @@
       },
       {
         "code": "W-001",
+        "message": "spec '127-pr-review-note' directory unit 'scripts/pr-note-fixtures/' is not a directory",
+        "path": "scripts/pr-note-fixtures/"
+      },
+      {
+        "code": "W-001",
+        "message": "spec '127-pr-review-note' file unit 'members/src/orchestrator/review-note.ts' does not exist",
+        "path": "members/src/orchestrator/review-note.ts"
+      },
+      {
+        "code": "W-001",
+        "message": "spec '127-pr-review-note' file unit 'members/src/orchestrator/review-note.test.ts' does not exist",
+        "path": "members/src/orchestrator/review-note.test.ts"
+      },
+      {
+        "code": "W-001",
         "message": "spec '127-pr-review-note' section unit 'pr-note' not found in Makefile",
         "path": "Makefile"
       }
@@ -21,15 +36,65 @@
   },
   "mapping": {
     "dependsOn": [
-      "109-governed-harness"
+      "109-governed-harness",
+      "122-action-broker",
+      "017-stage-ship",
+      "018-stage-shepherd"
     ],
     "implementingPaths": [
       {
         "path": "AGENTS.md",
         "source": "spec-edge"
+      },
+      {
+        "path": "docs/design/",
+        "source": "spec-edge"
+      },
+      {
+        "path": "members/src/orchestrator/broker.test.ts",
+        "source": "spec-edge"
+      },
+      {
+        "path": "members/src/orchestrator/broker.ts",
+        "source": "spec-edge"
+      },
+      {
+        "path": "members/src/orchestrator/stages/shepherd.ts",
+        "source": "spec-edge"
+      },
+      {
+        "path": "members/src/orchestrator/stages/ship.ts",
+        "source": "spec-edge"
       }
     ],
     "resolvedUnits": [
+      {
+        "locations": [],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "kind": "directory",
+          "path": "scripts/pr-note-fixtures/"
+        }
+      },
+      {
+        "locations": [],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "kind": "file",
+          "path": "members/src/orchestrator/review-note.test.ts"
+        }
+      },
+      {
+        "locations": [],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "kind": "file",
+          "path": "members/src/orchestrator/review-note.ts"
+        }
+      },
       {
         "locations": [],
         "ownership": true,
@@ -51,6 +116,19 @@
       {
         "locations": [
           {
+            "file": "docs/design/"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "directory",
+          "path": "docs/design/"
+        }
+      },
+      {
+        "locations": [
+          {
             "file": "AGENTS.md"
           }
         ],
@@ -62,6 +140,58 @@
         }
       },
       {
+        "locations": [
+          {
+            "file": "members/src/orchestrator/broker.test.ts"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "members/src/orchestrator/broker.test.ts"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "members/src/orchestrator/broker.ts"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "members/src/orchestrator/broker.ts"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "members/src/orchestrator/stages/shepherd.ts"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "members/src/orchestrator/stages/shepherd.ts"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "members/src/orchestrator/stages/ship.ts"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "members/src/orchestrator/stages/ship.ts"
+        }
+      },
+      {
         "locations": [],
         "ownership": true,
         "sourceField": "extends",
@@ -70,11 +200,24 @@
           "file": "Makefile",
           "kind": "section"
         }
+      },
+      {
+        "locations": [
+          {
+            "file": "docs/design/05-the-realignment-checked.md"
+          }
+        ],
+        "ownership": false,
+        "sourceField": "references",
+        "unit": {
+          "kind": "file",
+          "path": "docs/design/05-the-realignment-checked.md"
+        }
       }
     ],
     "specId": "127-pr-review-note",
     "specStatus": "draft"
   },
   "schemaVersion": "1.1.0",
-  "shardHash": "7a7c95d28004d6eb4d2cbe30e7236fec4e26085fedbc48942d3631f6e859897e"
+  "shardHash": "8bdaf86e6a067cd22d8d5bc5c6298d9c666c3ca61a353768aaf63179528f63cb"
 }

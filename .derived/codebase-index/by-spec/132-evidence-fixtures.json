@@ -1,0 +1,178 @@
+{
+  "diagnostics": {
+    "errors": [],
+    "warnings": [
+      {
+        "code": "W-001",
+        "message": "spec '132-evidence-fixtures' directory unit 'docs/evidence/fixtures/' is not a directory",
+        "path": "docs/evidence/fixtures/"
+      },
+      {
+        "code": "W-001",
+        "message": "spec '132-evidence-fixtures' file unit 'members/scripts/mint-evidence-fixtures.ts' does not exist",
+        "path": "members/scripts/mint-evidence-fixtures.ts"
+      },
+      {
+        "code": "W-001",
+        "message": "spec '132-evidence-fixtures' file unit 'members/src/orchestrator/evidence-fixtures.test.ts' does not exist",
+        "path": "members/src/orchestrator/evidence-fixtures.test.ts"
+      }
+    ]
+  },
+  "mapping": {
+    "dependsOn": [
+      "031-journal-export",
+      "039-attested-export",
+      "113-journal-port",
+      "121-candidate-and-receipt",
+      "122-action-broker",
+      "125-credential-fence"
+    ],
+    "implementingPaths": [
+      {
+        "path": "crates/statecraft-journal/",
+        "source": "spec-edge"
+      },
+      {
+        "path": "docs/design/",
+        "source": "spec-edge"
+      },
+      {
+        "path": "members/src/commands/orchestrator.ts",
+        "source": "spec-edge"
+      },
+      {
+        "path": "members/src/orchestrator/receipt.test.ts",
+        "source": "spec-edge"
+      },
+      {
+        "path": "members/src/orchestrator/receipt.ts",
+        "source": "spec-edge"
+      }
+    ],
+    "resolvedUnits": [
+      {
+        "locations": [],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "kind": "directory",
+          "path": "docs/evidence/fixtures/"
+        }
+      },
+      {
+        "locations": [],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "kind": "file",
+          "path": "members/scripts/mint-evidence-fixtures.ts"
+        }
+      },
+      {
+        "locations": [],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "kind": "file",
+          "path": "members/src/orchestrator/evidence-fixtures.test.ts"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "crates/statecraft-journal/"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "directory",
+          "path": "crates/statecraft-journal/"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "docs/design/"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "directory",
+          "path": "docs/design/"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "members/src/commands/orchestrator.ts"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "members/src/commands/orchestrator.ts"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "members/src/orchestrator/receipt.test.ts"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "members/src/orchestrator/receipt.test.ts"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "members/src/orchestrator/receipt.ts"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "members/src/orchestrator/receipt.ts"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "docs/design/05-the-realignment-checked.md"
+          }
+        ],
+        "ownership": false,
+        "sourceField": "references",
+        "unit": {
+          "kind": "file",
+          "path": "docs/design/05-the-realignment-checked.md"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "docs/evidence/journal-bundle.json"
+          }
+        ],
+        "ownership": false,
+        "sourceField": "references",
+        "unit": {
+          "kind": "file",
+          "path": "docs/evidence/journal-bundle.json"
+        }
+      }
+    ],
+    "specId": "132-evidence-fixtures",
+    "specStatus": "draft"
+  },
+  "schemaVersion": "1.1.0",
+  "shardHash": "57c78ae26722913bf7cb37ebc507861bb9add3c6e3c1b4756c8554017dee2f9e"
+}

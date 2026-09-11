@@ -1,0 +1,147 @@
+{
+  "diagnostics": {
+    "errors": [],
+    "warnings": [
+      {
+        "code": "W-001",
+        "message": "spec '129-gate-fence' file unit 'members/src/orchestrator/gate-fence.test.ts' does not exist",
+        "path": "members/src/orchestrator/gate-fence.test.ts"
+      }
+    ]
+  },
+  "mapping": {
+    "dependsOn": [
+      "125-credential-fence",
+      "121-candidate-and-receipt",
+      "016-stage-build"
+    ],
+    "implementingPaths": [
+      {
+        "path": "docs/design/",
+        "source": "spec-edge"
+      },
+      {
+        "path": "members/src/orchestrator/daemon.test.ts",
+        "source": "spec-edge"
+      },
+      {
+        "path": "members/src/orchestrator/stages/build.test.ts",
+        "source": "spec-edge"
+      },
+      {
+        "path": "members/src/orchestrator/stages/build.ts",
+        "source": "spec-edge"
+      },
+      {
+        "path": "members/src/orchestrator/standby.test.ts",
+        "source": "spec-edge"
+      }
+    ],
+    "resolvedUnits": [
+      {
+        "locations": [],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "kind": "file",
+          "path": "members/src/orchestrator/gate-fence.test.ts"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "docs/design/"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "directory",
+          "path": "docs/design/"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "members/src/orchestrator/daemon.test.ts"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "members/src/orchestrator/daemon.test.ts"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "members/src/orchestrator/stages/build.test.ts"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "members/src/orchestrator/stages/build.test.ts"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "members/src/orchestrator/stages/build.ts"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "members/src/orchestrator/stages/build.ts"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "members/src/orchestrator/standby.test.ts"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "members/src/orchestrator/standby.test.ts"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "docs/design/05-the-realignment-checked.md"
+          }
+        ],
+        "ownership": false,
+        "sourceField": "references",
+        "unit": {
+          "kind": "file",
+          "path": "docs/design/05-the-realignment-checked.md"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "specs/125-credential-fence/spec.md"
+          }
+        ],
+        "ownership": false,
+        "sourceField": "references",
+        "unit": {
+          "kind": "file",
+          "path": "specs/125-credential-fence/spec.md"
+        }
+      }
+    ],
+    "specId": "129-gate-fence",
+    "specStatus": "draft"
+  },
+  "schemaVersion": "1.1.0",
+  "shardHash": "99bda66f7c01fd46ffb6e6fbc9e8c0372a12029ca6776e808d2d1ccae92605fa"
+}
