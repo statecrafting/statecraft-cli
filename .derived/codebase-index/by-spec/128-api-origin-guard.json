@@ -1,0 +1,217 @@
+{
+  "diagnostics": {
+    "errors": [],
+    "warnings": [
+      {
+        "code": "W-001",
+        "message": "spec '128-api-origin-guard' file unit 'members/src/orchestrator/api/origin-guard.ts' does not exist",
+        "path": "members/src/orchestrator/api/origin-guard.ts"
+      },
+      {
+        "code": "W-001",
+        "message": "spec '128-api-origin-guard' file unit 'members/src/orchestrator/api/origin-guard.test.ts' does not exist",
+        "path": "members/src/orchestrator/api/origin-guard.test.ts"
+      }
+    ]
+  },
+  "mapping": {
+    "dependsOn": [
+      "022-http-api-and-events",
+      "027-api-projects",
+      "121-candidate-and-receipt",
+      "031-journal-export"
+    ],
+    "implementingPaths": [
+      {
+        "path": "crates/statecraft-journal/",
+        "source": "spec-edge"
+      },
+      {
+        "path": "docs/design/",
+        "source": "spec-edge"
+      },
+      {
+        "path": "members/src/orchestrator/api/server.test.ts",
+        "source": "spec-edge"
+      },
+      {
+        "path": "members/src/orchestrator/api/server.ts",
+        "source": "spec-edge"
+      },
+      {
+        "path": "members/src/orchestrator/api/types.ts",
+        "source": "spec-edge"
+      },
+      {
+        "path": "members/src/orchestrator/candidate.test.ts",
+        "source": "spec-edge"
+      },
+      {
+        "path": "members/src/orchestrator/candidate.ts",
+        "source": "spec-edge"
+      },
+      {
+        "path": "members/src/orchestrator/export.test.ts",
+        "source": "spec-edge"
+      },
+      {
+        "path": "members/src/orchestrator/export.ts",
+        "source": "spec-edge"
+      }
+    ],
+    "resolvedUnits": [
+      {
+        "locations": [],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "kind": "file",
+          "path": "members/src/orchestrator/api/origin-guard.test.ts"
+        }
+      },
+      {
+        "locations": [],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "kind": "file",
+          "path": "members/src/orchestrator/api/origin-guard.ts"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "crates/statecraft-journal/"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "directory",
+          "path": "crates/statecraft-journal/"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "docs/design/"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "directory",
+          "path": "docs/design/"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "members/src/orchestrator/api/server.test.ts"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "members/src/orchestrator/api/server.test.ts"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "members/src/orchestrator/api/server.ts"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "members/src/orchestrator/api/server.ts"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "members/src/orchestrator/api/types.ts"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "members/src/orchestrator/api/types.ts"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "members/src/orchestrator/candidate.test.ts"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "members/src/orchestrator/candidate.test.ts"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "members/src/orchestrator/candidate.ts"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "members/src/orchestrator/candidate.ts"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "members/src/orchestrator/export.test.ts"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "members/src/orchestrator/export.test.ts"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "members/src/orchestrator/export.ts"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "members/src/orchestrator/export.ts"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "docs/design/05-the-realignment-checked.md"
+          }
+        ],
+        "ownership": false,
+        "sourceField": "references",
+        "unit": {
+          "kind": "file",
+          "path": "docs/design/05-the-realignment-checked.md"
+        }
+      }
+    ],
+    "specId": "128-api-origin-guard",
+    "specStatus": "draft"
+  },
+  "schemaVersion": "1.1.0",
+  "shardHash": "65ebd8424729ba5184feff90589563c14d77bb7a7258236182e7c74f15e265c4"
+}

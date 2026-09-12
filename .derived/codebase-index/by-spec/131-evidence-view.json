@@ -1,0 +1,186 @@
+{
+  "diagnostics": {
+    "errors": [],
+    "warnings": [
+      {
+        "code": "W-001",
+        "message": "spec '131-evidence-view' file unit 'members/src/orchestrator/explain.ts' does not exist",
+        "path": "members/src/orchestrator/explain.ts"
+      },
+      {
+        "code": "W-001",
+        "message": "spec '131-evidence-view' file unit 'members/src/orchestrator/explain.test.ts' does not exist",
+        "path": "members/src/orchestrator/explain.test.ts"
+      }
+    ]
+  },
+  "mapping": {
+    "dependsOn": [
+      "121-candidate-and-receipt",
+      "122-action-broker",
+      "120-capability-contract",
+      "124-provider-conformance",
+      "125-credential-fence",
+      "129-gate-fence",
+      "027-api-projects"
+    ],
+    "implementingPaths": [
+      {
+        "path": "docs/design/",
+        "source": "spec-edge"
+      },
+      {
+        "path": "members/src/commands/orchestrator.ts",
+        "source": "spec-edge"
+      },
+      {
+        "path": "members/src/orchestrator/api/api-client.ts",
+        "source": "spec-edge"
+      },
+      {
+        "path": "members/src/orchestrator/api/server.test.ts",
+        "source": "spec-edge"
+      },
+      {
+        "path": "members/src/orchestrator/api/server.ts",
+        "source": "spec-edge"
+      },
+      {
+        "path": "members/src/orchestrator/api/types.ts",
+        "source": "spec-edge"
+      },
+      {
+        "path": "members/web/",
+        "source": "spec-edge"
+      }
+    ],
+    "resolvedUnits": [
+      {
+        "locations": [],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "kind": "file",
+          "path": "members/src/orchestrator/explain.test.ts"
+        }
+      },
+      {
+        "locations": [],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "kind": "file",
+          "path": "members/src/orchestrator/explain.ts"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "docs/design/"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "directory",
+          "path": "docs/design/"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "members/src/commands/orchestrator.ts"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "members/src/commands/orchestrator.ts"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "members/src/orchestrator/api/api-client.ts"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "members/src/orchestrator/api/api-client.ts"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "members/src/orchestrator/api/server.test.ts"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "members/src/orchestrator/api/server.test.ts"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "members/src/orchestrator/api/server.ts"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "members/src/orchestrator/api/server.ts"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "members/src/orchestrator/api/types.ts"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "members/src/orchestrator/api/types.ts"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "members/web/"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "members/web/"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "docs/design/05-the-realignment-checked.md"
+          }
+        ],
+        "ownership": false,
+        "sourceField": "references",
+        "unit": {
+          "kind": "file",
+          "path": "docs/design/05-the-realignment-checked.md"
+        }
+      }
+    ],
+    "specId": "131-evidence-view",
+    "specStatus": "draft"
+  },
+  "schemaVersion": "1.1.0",
+  "shardHash": "998e7747b2d3f5b77bb8025c0afcce2b53fc058e79a334a05a9253b62b1c8a24"
+}

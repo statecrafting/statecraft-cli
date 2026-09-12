@@ -1,0 +1,166 @@
+{
+  "record": {
+    "created": "2026-09-11",
+    "dependsOn": [
+      "107-release-distribution",
+      "108-member-dispatch",
+      "042-member-contract",
+      "024-web-ui",
+      "124-provider-conformance"
+    ],
+    "establishes": [
+      {
+        "kind": "file",
+        "path": ".github/workflows/dist-smoke.yml"
+      },
+      {
+        "kind": "file",
+        "path": "members/scripts/package-members.ts"
+      }
+    ],
+    "extends": [
+      {
+        "nature": "additive",
+        "spec": "107-release-distribution",
+        "unit": {
+          "kind": "file",
+          "path": ".github/workflows/release.yml"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "107-release-distribution",
+        "unit": {
+          "kind": "file",
+          "path": "install.sh"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "108-member-dispatch",
+        "unit": {
+          "id": "statecraft_cli::members",
+          "kind": "symbol"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "102-crate-scaffold",
+        "unit": {
+          "id": "statecraft_cli::cli::MembersCommand",
+          "kind": "symbol"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "102-crate-scaffold",
+        "unit": {
+          "id": "statecraft_cli::commands::dispatch",
+          "kind": "symbol"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "102-crate-scaffold",
+        "unit": {
+          "kind": "file",
+          "path": "Cargo.toml"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "102-crate-scaffold",
+        "unit": {
+          "kind": "file",
+          "path": "Cargo.lock"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "024-web-ui",
+        "unit": {
+          "kind": "file",
+          "path": "members/src/orchestrator/api/static.ts"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "024-web-ui",
+        "unit": {
+          "kind": "file",
+          "path": "members/src/orchestrator/api/static.test.ts"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "023-orchestrator-cli",
+        "unit": {
+          "kind": "file",
+          "path": "members/src/commands/orchestrator.ts"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "124-provider-conformance",
+        "unit": {
+          "kind": "file",
+          "path": "members/src/orchestrator/qualification.ts"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "024-web-ui",
+        "unit": {
+          "anchor": "scripts",
+          "file": "members/package.json",
+          "kind": "section"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "110-corpus-merge",
+        "unit": {
+          "kind": "directory",
+          "path": "docs/design/"
+        }
+      }
+    ],
+    "id": "130-member-distribution",
+    "implementation": "pending",
+    "references": [
+      {
+        "role": "context",
+        "unit": {
+          "kind": "file",
+          "path": "docs/design/05-the-realignment-checked.md"
+        }
+      }
+    ],
+    "risk": "medium",
+    "sectionHeadings": [
+      "130: Member distribution",
+      "1. Purpose",
+      "2. Territory",
+      "3. Behavior",
+      "B-1. What ships",
+      "B-2. The manifest names every byte",
+      "B-3. The installer verifies before it replaces",
+      "B-4. A packaged engine finds its files at run time",
+      "B-5. `daemon start` re-spawns what is running",
+      "B-6. `statecraft members doctor`",
+      "B-7. The smoke job has no checkout",
+      "4. Functional requirements",
+      "5. Acceptance",
+      "Verification",
+      "6. Out of scope",
+      "7. Resolved decisions",
+      "Status (2026-09-11)"
+    ],
+    "specPath": "specs/130-member-distribution/spec.md",
+    "status": "draft",
+    "summary": "Spec 107 made the umbrella installable; 042 packaged the members and 108 taught the umbrella to discover them, and both put installing members out of scope for \"a later spec\". This is that spec. A compiled engine run outside the checkout was measured on 2026-09-11: its API answers, but its UI answers 503 with assets expected at /web/dist, and `daemon start` fails because it re-spawns itself as if it were a source file (042 D-10 recorded the cause and deferred the fix to here). A tag now also builds a member archive per macOS and Linux triple holding the engine, the native sensor and drivers, the built UI, the provider qualification records, and a manifest of every file's digest, with the same checksum, SBOM and provenance the umbrella's archives carry. The installer installs it into the managed member directory, verifying before it replaces, and keeps the previous set. A packaged engine finds its assets, its data and itself at run time. `statecraft members doctor` names what is missing, refused or altered and which provider prerequisites are absent. A CI job that never checks the repository out proves the result.\n",
+    "title": "Member distribution: one release installs a working engine, its members and its UI, with no checkout"
+  },
+  "shardHash": "865d781965a8852e90ca628447f0f59517986c502ddb627278d92d233e90990a",
+  "specVersion": "1.2.0"
+}

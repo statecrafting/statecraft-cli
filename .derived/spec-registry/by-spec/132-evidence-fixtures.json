@@ -1,0 +1,112 @@
+{
+  "record": {
+    "created": "2026-09-11",
+    "dependsOn": [
+      "031-journal-export",
+      "039-attested-export",
+      "113-journal-port",
+      "121-candidate-and-receipt",
+      "122-action-broker",
+      "125-credential-fence"
+    ],
+    "establishes": [
+      {
+        "kind": "directory",
+        "path": "docs/evidence/fixtures/"
+      },
+      {
+        "kind": "file",
+        "path": "members/scripts/mint-evidence-fixtures.ts"
+      },
+      {
+        "kind": "file",
+        "path": "members/src/orchestrator/evidence-fixtures.test.ts"
+      }
+    ],
+    "extends": [
+      {
+        "nature": "additive",
+        "spec": "121-candidate-and-receipt",
+        "unit": {
+          "kind": "file",
+          "path": "members/src/orchestrator/receipt.ts"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "121-candidate-and-receipt",
+        "unit": {
+          "kind": "file",
+          "path": "members/src/orchestrator/receipt.test.ts"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "023-orchestrator-cli",
+        "unit": {
+          "kind": "file",
+          "path": "members/src/commands/orchestrator.ts"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "113-journal-port",
+        "unit": {
+          "kind": "directory",
+          "path": "crates/statecraft-journal/"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "110-corpus-merge",
+        "unit": {
+          "kind": "directory",
+          "path": "docs/design/"
+        }
+      }
+    ],
+    "id": "132-evidence-fixtures",
+    "implementation": "pending",
+    "references": [
+      {
+        "role": "context",
+        "unit": {
+          "kind": "file",
+          "path": "docs/design/05-the-realignment-checked.md"
+        }
+      },
+      {
+        "role": "context",
+        "unit": {
+          "kind": "file",
+          "path": "docs/evidence/journal-bundle.json"
+        }
+      }
+    ],
+    "risk": "low",
+    "sectionHeadings": [
+      "132: Evidence fixtures",
+      "1. Purpose",
+      "2. Territory",
+      "3. Behavior",
+      "B-1. Positive fixtures are minted once and frozen",
+      "B-2. Every fixture has a manifest entry",
+      "B-3. The negative set, and the mutation behind each",
+      "B-4. Two receipt checks, both pure",
+      "B-5. Verification has an input cap, and executes nothing",
+      "B-6. Schemas describe version 1 as the code reads it",
+      "4. Functional requirements",
+      "5. Acceptance",
+      "Verification",
+      "6. Out of scope",
+      "7. Resolved decisions",
+      "Status (2026-09-11)"
+    ],
+    "specPath": "specs/132-evidence-fixtures/spec.md",
+    "status": "draft",
+    "summary": "Other repositories are about to read this repository's evidence: Statecraft to admit it, hqgit to reference it, a neutral verifier to check it. The only committed bundle is export policy version 1, predates the attestation block, and holds no acceptance receipt and no broker action, so there are no original bytes of the records they would read. This spec mints them once, through the real code paths, and freezes them: a journal and its export at policy version 5 carrying a receipt, the broker's intents, outcomes and refusals, and a fence refusal, with and without an attestation, beside the existing policy-1 bundle. It derives a negative set by stated mutations, and writes a manifest giving each fixture's expected outcome in four dimensions (integrity, subject binding, issuer trust, policy), each pass, fail, unknown or not-applicable. Both existing verifiers run the manifest. JSON Schemas describe version 1 exactly as the code parses it. A verifier never executes what a bundle carries, never takes the bundle's own anchor as its trust root, and today reports every issuer as unknown, because nothing is signed.\n",
+    "title": "Evidence fixtures: the receipt and the bundle as frozen bytes, with a verdict manifest every verifier is held to"
+  },
+  "shardHash": "15730bd64061cdb82812ed9218bff7d30fa8bf45e8f66a3fad296f3cb63e8d08",
+  "specVersion": "1.2.0"
+}

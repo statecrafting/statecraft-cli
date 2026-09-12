@@ -6,6 +6,7 @@ created: "2026-09-10"
 implementation: pending
 depends_on:
   - "125-credential-fence"
+  - "129-gate-fence"
   - "122-action-broker"
   - "121-candidate-and-receipt"
 establishes:
@@ -30,22 +31,28 @@ extends:
   - { spec: "016-stage-build", unit: "members/src/orchestrator/stages/build.ts", nature: additive }
   - { spec: "017-stage-ship", unit: "members/src/orchestrator/stages/ship.ts", nature: additive }
   - { spec: "018-stage-shepherd", unit: "members/src/orchestrator/stages/shepherd.ts", nature: additive }
+  # Doc 05 D61 is the revision this draft carries (2026-09-11).
+  - { spec: "110-corpus-merge", unit: { kind: directory, path: "docs/design/" }, nature: additive }
 references:
   - { unit: { kind: file, path: "docs/design/04-the-governed-substrate.md" }, role: context }
+  - { unit: { kind: file, path: "docs/design/05-the-realignment-checked.md" }, role: context }
 summary: >
   Spec 125 fenced the credential path a driven session reaches for first,
   and recorded three residuals it could not close: HOME stays readable, an
   absolute path bypasses PATH, and ~/.ssh keys stay on disk. All three go
   around PATH, so nothing built from shims and environment variables
   reaches them; what refuses a read of a path is the operating system.
-  This spec makes the engine apply an OS confinement at the session spawn
-  in driver.ts, with a deny-list profile written beside the candidate. It
-  closes the ~/.ssh read, the gh config read and the absolute-path exec
-  outright, and closes the keyring only ergonomically, because the Claude
-  provider authenticates out of that same keyring. Signing moves to the
-  engine rather than being abandoned, so the candidate holds no signing
-  key and publication stays autonomous. Containment is an operator policy
-  with a required setting, not a best effort.
+  This spec makes the engine apply an OS deny profile at the session spawn
+  in driver.ts and at the gate's spawn (after 129 fenced it), written beside
+  the candidate. It closes the ~/.ssh read, the gh config read and the
+  absolute-path exec outright, and closes the keyring only ergonomically,
+  because the Claude provider authenticates out of that same keyring. The
+  threat model is 125's: a capable session, not a hostile one, and the
+  property is a complete journal, not confinement of source authority; the
+  profile confines no writes and claims no capability token. Signing moves
+  to the engine rather than being abandoned, so the candidate holds no
+  signing key and publication stays autonomous. Whether the profile must be
+  in force is an operator policy with a required setting, not a best effort.
 ---
 
 # 126: The sandboxed executor
@@ -79,6 +86,17 @@ residual here is a read or an exec. So the engine applies its own, at the
 one place it already constructs the child's world: the spawn in `driver.ts`
 where 125 overlays the fence.
 
+**The threat model, stated so the name is not read as more.** The adversary
+is 125's: a capable session told to finish, which takes the obvious path when
+the obvious path works. It is not a hostile process trying to escape, and the
+property bought is 125's too, a complete journal, not confidentiality and not
+confinement. "Sandboxed" here means "the named credential reaches are refused
+by the operating system", and nothing wider: the profile confines no writes,
+so it neither lets the Claude driver claim `workspace-write` (120 D-2) nor
+enforces a spec's territory, a work scope or a set of symbols. A later
+executor that does confine source authority is a different spec with a
+different profile shape (doc 05 D70), and this one does not grow into it.
+
 **What this spec does not do is take publication away from the engine.**
 The point of confining the session is that the broker keeps working while
 the session cannot reach a credential. A run still pushes, opens and merges
@@ -103,7 +121,8 @@ B-7 exist to keep that true.
 - `members/src/orchestrator/broker.ts` (extends 122): signing joins push,
   openPr and merge as an act the engine performs on the candidate's behalf.
 - `members/src/orchestrator/stages/{build,ship,shepherd}.ts` (extends
-  016, 017, 018): each carries the counts and the mode to its result.
+  016, 017, 018): each carries the counts and the mode to its result, and
+  build's `runGate` wraps each gate and bracket command (B-7).
 
 ## 3. Behavior
 
@@ -200,23 +219,32 @@ executable, `bwrap` where `bwrap` is on `PATH`, and `none` otherwise.
 What happens on `none` is the operator's decision, not this spec's, and it
 is expressed in the profile vocabulary 120 already established:
 
-- **`required`**: a run whose containment is unavailable does not start.
+- **`required`**: a run whose deny profile is unavailable does not start.
   The stage refuses with the platform and the reason, journaled. This is
   the setting for unattended operation, where "Statecraft is running" must
-  imply "containment is in force".
+  imply "the B-3 deny set is in force". It does not imply containment:
+  §6's reaches stay open under `required` exactly as under `preferred`.
 - **`preferred`**: the session runs unsandboxed and the engine journals
   `sandbox.unavailable` with the platform and the reason, exactly as 124
   journals an unqualified binary and 120 journals a degraded capability.
 
-`sandboxMode` on `SessionEvidence` records which of the two was in force
-and what was actually applied, so a reader never has to infer containment
-from the absence of a complaint. D-7 records why `required` is not simply
-the only behavior.
+`sandboxMode` on `SessionEvidence` records which of the two was in force,
+what was actually applied, and the SHA-256 of the profile text applied (null
+when none was), so a reader never has to infer the deny set from the absence
+of a complaint and can tell which deny set a run had. Declared (the policy)
+and enforced (the digest) are two fields, not one. D-7 records why
+`required` is not simply the only behavior.
 
-### B-7. The blast radius is the provider session only
+### B-7. The blast radius is the candidate's processes, and only those
 
-The sandbox wraps the member the driver spawns and nothing else. The
-daemon's own processes are untouched, which is what keeps the broker
+The profile wraps two spawns: the member the driver spawns for a session,
+and each gate and bracket command the build runs in the candidate. The gate
+belongs inside because it executes code the session wrote (the Makefile, the
+tests, the build scripts), and 129 established that it runs with the
+session's fenced environment; this spec adds the profile to the same spawn,
+so the gate can do nothing the session could not.
+
+The daemon's own processes are untouched, which is what keeps the broker
 working: the broker pushes, opens and merges from the daemon (122), and the
 signing service of B-5 runs there too. It must keep the credentials the
 candidate is denied. This is 125 B-6's property restated for the OS
@@ -224,7 +252,7 @@ boundary, and it is asserted in `sandbox.test.ts` for the reason 125 D-4
 put that case beside the fence's own suite.
 
 This is also the property that keeps publication autonomous: confining the
-session removes no capability from the engine.
+candidate's processes removes no capability from the engine.
 
 ### B-8. A denial is counted and reaches the evidence
 
@@ -245,10 +273,13 @@ read as "nothing was denied" to a consumer downstream.
   policy is `preferred` and support is `none`, and the `sandbox-exec` form
   otherwise.
 - **FR-004.** Blast-radius test: a process the daemon spawns itself is
-  unwrapped (B-7), asserted beside the broker's own publish path.
+  unwrapped (B-7), asserted beside the broker's own publish path; a gate
+  command the build runs in the candidate is wrapped, and a gate command
+  that reads `~/.ssh` fails.
 - **FR-005.** Evidence tests: `sandboxDenials` is present with an explicit
-  zero on a clean run, `sandboxMode` names the policy and what was applied,
-  and both reach each of the three stage results.
+  zero on a clean run, `sandboxMode` names the policy, what was applied and
+  the profile's digest (null when nothing was applied), and all three reach
+  each of the three stage results.
 - **FR-006.** Policy tests: with support forced to `none`, `required`
   refuses the run and journals the refusal, and `preferred` runs and
   journals `sandbox.unavailable` exactly once.
@@ -256,6 +287,10 @@ read as "nothing was denied" to a consumer downstream.
   made through it verifies against the operator's public key; the daemon
   journals `broker.sign`; and an unreachable signing service fails the
   stage rather than producing an unsigned commit.
+- **FR-008.** No claim widens: neither driver's manifest gains a capability
+  token because of this spec, and the Claude driver's manifest still omits
+  `workspace-write` with the profile applied (asserted against the contract
+  crate's token set).
 
 ## 5. Acceptance
 
@@ -278,6 +313,8 @@ them.
   shell probe): reading `~/.ssh` fails, reading `~/.config/gh` fails,
   executing `gh` by absolute path fails, and executing `/usr/bin/security`
   fails, while the session's own provider credential still resolves.
+- **The same four, confirmed closed from the gate** of the same round, by a
+  gate command added for the check and removed after it.
 - **The policy is exercised both ways** on a machine reporting `none`:
   `required` refuses, `preferred` proceeds and journals.
 
@@ -314,8 +351,16 @@ as "contained":
 - **A secret already in the session's context.** The sandbox denies reads
   of credential material on disk. It cannot un-know what has been read.
 - **Anything not launched by this engine.** The wrapper applies to provider
-  sessions the driver spawns. An agent the operator starts directly is
-  outside it, and this spec hardens no machine.
+  sessions the driver spawns and to the build's gate. An agent the operator
+  starts directly is outside it, and this spec hardens no machine.
+- **The verify stage.** It runs a merged spec's declared acceptance after
+  publication, with the daemon's environment; 129 §6 records why, and this
+  spec does not wrap it either.
+- **Source authority.** The profile denies credential reads and execs. It
+  does not confine writes to the candidate, to a spec's territory, to a work
+  scope or to a set of symbols, and no reader of `sandboxMode` should take it
+  to. An operating-system rule fences a file, not a symbol, so symbol-level
+  authority would be checked after the change in any case (doc 05 D70).
 - **Linux as a qualified platform.** See B-6 and D-4.
 - **`sandbox-exec` being a supported Apple interface.** It is deprecated
   and present; D-2 records the bet and the fallback.
@@ -397,6 +442,40 @@ make the spec undeployable rather than safe. The choice is the operator's
 and is recorded per run in `sandboxMode`, so a session that ran without
 containment is legible as such rather than indistinguishable from one that
 ran with it.
+
+D-8 (2026-09-11, proposed revision). The threat model is stated, and
+`required` promises the deny set, not containment. The earlier text let
+"containment is in force" stand for what `required` guarantees, while §6
+listed the network, the keyring through the Security framework and a secret
+already read as open under every setting. A reader relying on `required` for
+unattended operation needs the narrower sentence, and doc 05 D61 records why
+the name "sandboxed executor" must not be read as authority confinement.
+
+D-9 (2026-09-11, proposed revision). The gate is inside the blast radius.
+The earlier B-7 wrapped only the provider session, and the gate executes
+code the session wrote, with (until 129) the daemon's full environment. A
+profile that denies the session `~/.ssh` and leaves the session's own tests
+free to read it closes nothing the session could not route around by
+writing a test. 129 fences the gate's environment first because it needs no
+OS mechanism; this spec adds the profile to the same spawn.
+
+D-10 (2026-09-11, proposed revision). No capability token is claimed or
+widened. The capability vocabulary (120) makes claims about what a driver
+enforces, and `workspace-write` means writes confined to the candidate. A
+read and exec deny-list confines no writes, so it must not become the reason
+a driver claims that token, and a future token for "credential reads
+denied", if one is wanted, is a change to 120's vocabulary in its own spec.
+
+## Status (2026-09-11)
+
+Still `draft`, `implementation: pending`. Revised on 2026-09-11 from doc 05
+D61, and **the revision is a proposal for the owner's review, not a change the
+owner has accepted**: the summary and §1 state the threat model; B-6 narrows
+what `required` guarantees; B-7, FR-004 and §5 bring the build's gate inside
+the blast radius; B-6 and FR-005 record the profile's digest; FR-008, §6 and
+D-10 rule out any capability claim. The dependency on 129 is new, because 129
+fences the gate's environment and this spec wraps the same spawn. Nothing the
+2026-09-10 revision decided is reversed.
 
 ## Status (2026-09-10)
 

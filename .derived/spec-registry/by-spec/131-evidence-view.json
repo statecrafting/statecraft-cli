@@ -1,0 +1,119 @@
+{
+  "record": {
+    "created": "2026-09-11",
+    "dependsOn": [
+      "121-candidate-and-receipt",
+      "122-action-broker",
+      "120-capability-contract",
+      "124-provider-conformance",
+      "125-credential-fence",
+      "129-gate-fence",
+      "027-api-projects"
+    ],
+    "establishes": [
+      {
+        "kind": "file",
+        "path": "members/src/orchestrator/explain.ts"
+      },
+      {
+        "kind": "file",
+        "path": "members/src/orchestrator/explain.test.ts"
+      }
+    ],
+    "extends": [
+      {
+        "nature": "additive",
+        "spec": "022-http-api-and-events",
+        "unit": {
+          "kind": "file",
+          "path": "members/src/orchestrator/api/server.ts"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "022-http-api-and-events",
+        "unit": {
+          "kind": "file",
+          "path": "members/src/orchestrator/api/types.ts"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "022-http-api-and-events",
+        "unit": {
+          "kind": "file",
+          "path": "members/src/orchestrator/api/api-client.ts"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "022-http-api-and-events",
+        "unit": {
+          "kind": "file",
+          "path": "members/src/orchestrator/api/server.test.ts"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "023-orchestrator-cli",
+        "unit": {
+          "kind": "file",
+          "path": "members/src/commands/orchestrator.ts"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "029-ui-projects",
+        "unit": {
+          "kind": "file",
+          "path": "members/web/"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "110-corpus-merge",
+        "unit": {
+          "kind": "directory",
+          "path": "docs/design/"
+        }
+      }
+    ],
+    "id": "131-evidence-view",
+    "implementation": "pending",
+    "references": [
+      {
+        "role": "context",
+        "unit": {
+          "kind": "file",
+          "path": "docs/design/05-the-realignment-checked.md"
+        }
+      }
+    ],
+    "risk": "low",
+    "sectionHeadings": [
+      "131: The evidence view",
+      "1. Purpose",
+      "2. Territory",
+      "3. Behavior",
+      "B-1. Every value carries its source",
+      "B-2. Four labels, never collapsed",
+      "B-3. The sections",
+      "B-4. Declared beside enforced",
+      "B-5. Narrative is labelled",
+      "B-6. Reserved fields",
+      "B-7. One version, owned here",
+      "4. Functional requirements",
+      "5. Acceptance",
+      "Verification",
+      "6. Out of scope",
+      "7. Resolved decisions",
+      "Status (2026-09-11)"
+    ],
+    "specPath": "specs/131-evidence-view/spec.md",
+    "status": "draft",
+    "summary": "Specs 119 to 125 made a run write the evidence a reviewer needs: gate commands and exit codes, a receipt with its suite and policy digests, denials, fence refusals, the capabilities a driver applied, degraded or refused, a provider's qualification, approvals, and the broker's intents, outcomes and refusals. No surface shows any of it: the UI's panels predate them, and the only verdict on screen is a project's qualification. This spec adds one read-only account per spec, reached by a verb, a route and a UI panel, folded from the existing journals and nothing else. Every value names the record it came from. Absence has three names and never reads as success: none (the run recorded that nothing happened), not recorded (no record of this kind exists, including every field a future scope, context or permit contract will add), and stale (a receipt for a head that is no longer the branch's). What a profile declared sits beside what a session says was applied, and a model's narrative is labelled as narrative, apart from what a machine observed.\n",
+    "title": "The evidence view: one account of a change, joined from the records a run already writes, with every gap labelled"
+  },
+  "shardHash": "d2b9bc637f6511471d0e29e005682e519de83dc96f9f7f398d63fbe8e945ccc9",
+  "specVersion": "1.2.0"
+}

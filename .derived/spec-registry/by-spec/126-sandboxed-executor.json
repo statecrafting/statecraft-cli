@@ -3,6 +3,7 @@
     "created": "2026-09-10",
     "dependsOn": [
       "125-credential-fence",
+      "129-gate-fence",
       "122-action-broker",
       "121-candidate-and-receipt"
     ],
@@ -80,6 +81,14 @@
           "kind": "file",
           "path": "members/src/orchestrator/stages/shepherd.ts"
         }
+      },
+      {
+        "nature": "additive",
+        "spec": "110-corpus-merge",
+        "unit": {
+          "kind": "directory",
+          "path": "docs/design/"
+        }
       }
     ],
     "id": "126-sandboxed-executor",
@@ -90,6 +99,13 @@
         "unit": {
           "kind": "file",
           "path": "docs/design/04-the-governed-substrate.md"
+        }
+      },
+      {
+        "role": "context",
+        "unit": {
+          "kind": "file",
+          "path": "docs/design/05-the-realignment-checked.md"
         }
       }
     ],
@@ -104,20 +120,21 @@
       "B-4. The wrapper is applied at the session spawn",
       "B-5. Signing moves to the engine, and is not abandoned",
       "B-6. Containment is an operator policy, with a required setting",
-      "B-7. The blast radius is the provider session only",
+      "B-7. The blast radius is the candidate's processes, and only those",
       "B-8. A denial is counted and reaches the evidence",
       "4. Functional requirements",
       "5. Acceptance",
       "Verification",
       "6. Out of scope, and what stays open",
       "7. Resolved decisions",
+      "Status (2026-09-11)",
       "Status (2026-09-10)"
     ],
     "specPath": "specs/126-sandboxed-executor/spec.md",
     "status": "draft",
-    "summary": "Spec 125 fenced the credential path a driven session reaches for first, and recorded three residuals it could not close: HOME stays readable, an absolute path bypasses PATH, and ~/.ssh keys stay on disk. All three go around PATH, so nothing built from shims and environment variables reaches them; what refuses a read of a path is the operating system. This spec makes the engine apply an OS confinement at the session spawn in driver.ts, with a deny-list profile written beside the candidate. It closes the ~/.ssh read, the gh config read and the absolute-path exec outright, and closes the keyring only ergonomically, because the Claude provider authenticates out of that same keyring. Signing moves to the engine rather than being abandoned, so the candidate holds no signing key and publication stays autonomous. Containment is an operator policy with a required setting, not a best effort.\n",
+    "summary": "Spec 125 fenced the credential path a driven session reaches for first, and recorded three residuals it could not close: HOME stays readable, an absolute path bypasses PATH, and ~/.ssh keys stay on disk. All three go around PATH, so nothing built from shims and environment variables reaches them; what refuses a read of a path is the operating system. This spec makes the engine apply an OS deny profile at the session spawn in driver.ts and at the gate's spawn (after 129 fenced it), written beside the candidate. It closes the ~/.ssh read, the gh config read and the absolute-path exec outright, and closes the keyring only ergonomically, because the Claude provider authenticates out of that same keyring. The threat model is 125's: a capable session, not a hostile one, and the property is a complete journal, not confinement of source authority; the profile confines no writes and claims no capability token. Signing moves to the engine rather than being abandoned, so the candidate holds no signing key and publication stays autonomous. Whether the profile must be in force is an operator policy with a required setting, not a best effort.\n",
     "title": "The sandboxed executor: the OS refuses what a shim could only discourage"
   },
-  "shardHash": "6bf71a3949cdc7870fab05c7e741c0e5345b1f12fe658e5508c3b95e87868fde",
+  "shardHash": "bb022de8e5fdc9e5f02dfa963733b551b899549ca52ea937c1daea8578fb1e3e",
   "specVersion": "1.2.0"
 }
