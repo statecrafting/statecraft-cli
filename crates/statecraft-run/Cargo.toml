@@ -1,0 +1,38 @@
+# Spec: specs/003-work-and-run-semantics/spec.md
+#
+# Work selection, workspace preparation, the run record, and recovery.
+#
+# A library, for the same reason spec 002's crate is one: the operator verbs
+# belong to spec 006, which owns the binary and is not yet ratified.
+[package]
+name = "statecraft-run"
+description = "Work selection, isolated workspaces, the run record, and recovery"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+publish.workspace = true
+
+[dependencies]
+# The record envelope, reused rather than reimplemented (spec 001 section 3.2).
+# A git dependency pinned to a revision: attest-ledger is public and unpublished,
+# and vendoring a copy of a hash-linked ledger into the product that depends on
+# it would defeat the reuse. `publish = false` already holds for this workspace,
+# so the usual objection to a git dependency does not apply yet. Un-pinning it,
+# or moving to a released version, is its own change.
+attest-ledger-core = { git = "https://github.com/statecrafting/attest-ledger", rev = "a9c3595" }
+serde = { version = "1.0.229", features = ["derive"] }
+serde_json = "1.0.151"
+thiserror = "2.0.20"
+statecraft-environment = { path = "../statecraft-environment" }
+
+[dev-dependencies]
+tempfile = "3.27.0"
+
+[lints.rust]
+missing_docs = "warn"
+
+[lints.clippy]
+all = { level = "warn", priority = -1 }

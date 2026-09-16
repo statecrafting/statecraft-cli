@@ -1,24 +1,23 @@
 {
-  "diagnostics": {
-    "errors": [],
-    "warnings": [
-      {
-        "code": "W-001",
-        "message": "spec '003-work-and-run-semantics' directory unit 'crates/statecraft-run/' is not a directory",
-        "path": "crates/statecraft-run/"
-      }
-    ]
-  },
   "mapping": {
     "dependsOn": [
       "000-bootstrap",
       "001-boundaries-and-authority",
       "002-environment-lifecycle"
     ],
-    "implementingPaths": [],
+    "implementingPaths": [
+      {
+        "path": "crates/statecraft-run/",
+        "source": "spec-edge"
+      }
+    ],
     "resolvedUnits": [
       {
-        "locations": [],
+        "locations": [
+          {
+            "file": "crates/statecraft-run/"
+          }
+        ],
         "ownership": true,
         "sourceField": "establishes",
         "unit": {
@@ -31,5 +30,5 @@
     "specStatus": "approved"
   },
   "schemaVersion": "1.1.0",
-  "shardHash": "f9cd52088db9aaa0ca8acb82c7f20d674a77a29f0feaf1b9e26aa574dcbd45f8"
+  "shardHash": "3c5bfeaa5774abb504cb4a01a290b81b5ef58b14c55bbcc0a0dd69df6259262e"
 }

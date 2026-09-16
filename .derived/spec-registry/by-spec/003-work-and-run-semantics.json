@@ -13,7 +13,7 @@
       }
     ],
     "id": "003-work-and-run-semantics",
-    "implementation": "pending",
+    "implementation": "complete",
     "sectionHeadings": [
       "003: Work selection, workspace preparation, the run record, and recovery",
       "1. Purpose",
@@ -29,6 +29,7 @@
       "3.7 Concurrency bounds for the first slice",
       "3.8 Observable negative cases",
       "4. Out of scope",
+      "5. Decisions recorded during implementation",
       "Verification"
     ],
     "specPath": "specs/003-work-and-run-semantics/spec.md",
@@ -36,6 +37,6 @@
     "summary": "The core loop's semantics. How a unit of work is identified by reading spec-spine's structured report rather than re-deriving it; how an isolated workspace is prepared so the operator's checkout is never edited; the append-only hash-linked run record with intent written before an effect and outcome after it; the closed outcome set (completed, failed, refused, interrupted, cancelled) and the rule that a retry appends an attempt rather than replacing history; supervisor-owned refusal accounting a supervised process cannot erase; and reconciliation of an ambiguous effect before any retry, with no exactly-once promise.\n",
     "title": "Work selection, workspace preparation, the run record, and recovery after interruption"
   },
-  "shardHash": "297573e8529c13c70050304b1d2ac9234cbc6b54158a0f57f3c6fad0168edf9f",
+  "shardHash": "50af6b60785b4ba4c0202baa76f67ec69e8168cdc731a84c9b9e7cb66822e67c",
   "specVersion": "1.2.0"
 }
