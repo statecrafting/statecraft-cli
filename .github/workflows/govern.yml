@@ -85,6 +85,40 @@ jobs:
       - name: Coverage report (informational)
         run: spec-spine index coverage || true
 
+  # The workspace half of the check surface, as its own job so a clippy failure
+  # names clippy in the job list rather than hiding inside the governance job.
+  # It runs `make code`, which is the same definition a local run uses: two
+  # spellings of one check surface is how the two drift.
+  #
+  # Every `cargo --workspace` verb refuses a virtual manifest with no members,
+  # so the target is guarded on a crate existing. Until the first crate lands
+  # this job passes having judged nothing, and says so in the log. That is the
+  # deliberate cost of deciding the check surface BEFORE the work it judges
+  # (AGENTS.md, Approval semantics): the alternative is a build job arriving in
+  # the same change as the code it is supposed to hold to account.
+  #
+  # The guard is a file test, not an event condition, so nothing has to remember
+  # to turn this on. rust-toolchain.toml pins the exact channel, so the runner
+  # resolves the same rustc and clippy a local run does.
+  code:
+    name: code (build · test · clippy · fmt)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Report whether a crate exists yet
+        run: |
+          if compgen -G "crates/*/Cargo.toml" > /dev/null; then
+            echo "crate(s) found; cargo will run:"
+            ls -1 crates/*/Cargo.toml
+          else
+            echo "::notice::No crate exists yet. The cargo verbs are guarded and this job judges nothing until the first crate lands."
+          fi
+        shell: bash
+      - name: Show toolchain
+        run: rustc --version && cargo --version
+      - name: Build, test, clippy, fmt
+        run: make code
+
   # The single required status check, the same shape spec-spine uses. Branch
   # protection names this one context instead of an enumerated list that drifts
   # every time a job is added here, and the aggregation is what makes adding a
@@ -98,14 +132,14 @@ jobs:
   ci-gate:
     name: ci-gate
     if: ${{ always() }}
-    needs: [govern]
+    needs: [govern, code]
     runs-on: ubuntu-latest
     steps:
-      - name: Require every govern job to have passed
+      - name: Require every job to have passed
         if: ${{ contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled') }}
         run: |
           echo "A required job failed or was cancelled:"
-          echo "  govern=${{ needs.govern.result }}"
+          echo "  govern=${{ needs.govern.result }}  code=${{ needs.code.result }}"
           exit 1
       # A block scalar, not a plain one. `run: echo "ci-gate passed: govern..."`
       # parses as a mapping key, and an unparseable workflow is not a failing
@@ -113,4 +147,4 @@ jobs:
       # pull request shows no checks at all, which reads as "CI has not started".
       - name: All required jobs passed
         run: |
-          echo "ci-gate passed: govern is green or skipped"
+          echo "ci-gate passed: govern and code are green or skipped"

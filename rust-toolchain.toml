@@ -1,0 +1,8 @@
+# The exact toolchain this repository is built and checked with, so a local run
+# and a CI run disagree about a clippy lint only when the pin changes.
+#
+# `rust-version` in Cargo.toml is the separate, lower floor a consumer needs;
+# this pin is not that floor and must never be read as one.
+[toolchain]
+channel = "1.96.0"
+components = ["rustfmt", "clippy"]
