@@ -107,5 +107,10 @@ jobs:
           echo "A required job failed or was cancelled:"
           echo "  govern=${{ needs.govern.result }}"
           exit 1
+      # A block scalar, not a plain one. `run: echo "ci-gate passed: govern..."`
+      # parses as a mapping key, and an unparseable workflow is not a failing
+      # check: GitHub reports a 0s startup failure under the file's path and the
+      # pull request shows no checks at all, which reads as "CI has not started".
       - name: All required jobs passed
-        run: echo "ci-gate passed: govern is green or skipped"
+        run: |
+          echo "ci-gate passed: govern is green or skipped"
