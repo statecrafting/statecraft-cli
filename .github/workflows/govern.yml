@@ -4,12 +4,24 @@ on:
   push:
     branches: [main]
   pull_request:
+  # GitHub merge queue, the same wiring spec-spine carries. Each queued pull
+  # request is checked against the speculative merged tree, so a green branch
+  # cannot be silently invalidated by the one ahead of it (two branches adding
+  # the same spec id is the case this repository will hit first). INERT until a
+  # repository admin enables the queue in branch protection.
+  #
+  # The coupling gate stays `pull_request`-only even here: it reads the
+  # `Spec-Drift-Waiver:` line out of the pull-request body, which a merge_group
+  # event does not carry, so a legitimately waived change would resurface as a
+  # false drift refusal inside the queue.
+  merge_group:
 
 permissions:
   contents: read
 
 jobs:
   govern:
+    name: govern (check · lint · authored content · couple)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -72,3 +84,28 @@ jobs:
       # joins the gate with the first source file (see AGENTS.md, The gate).
       - name: Coverage report (informational)
         run: spec-spine index coverage || true
+
+  # The single required status check, the same shape spec-spine uses. Branch
+  # protection names this one context instead of an enumerated list that drifts
+  # every time a job is added here, and the aggregation is what makes adding a
+  # job a change to CI alone rather than a change to CI and to the protection
+  # configuration a human has to remember.
+  #
+  # `always()` is what makes it report at all when a dependency failed. A
+  # skipped job counts as a pass (the coupling step is event-gated inside
+  # `govern`, and a future event-gated job would be too); a failed or cancelled
+  # one fails the gate.
+  ci-gate:
+    name: ci-gate
+    if: ${{ always() }}
+    needs: [govern]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Require every govern job to have passed
+        if: ${{ contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled') }}
+        run: |
+          echo "A required job failed or was cancelled:"
+          echo "  govern=${{ needs.govern.result }}"
+          exit 1
+      - name: All required jobs passed
+        run: echo "ci-gate passed: govern is green or skipped"
