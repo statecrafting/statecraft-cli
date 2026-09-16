@@ -24,14 +24,17 @@ owner's act. See AGENTS.md, "New sessions".
 ## Commands
 
 ```sh
-make gate                  # the whole check surface: freshness, lint, authored content
+make gate                  # the corpus surface: freshness, lint, authored content
+make code                  # the workspace surface: build, test, clippy, fmt
 make refresh               # spec-spine compile && spec-spine index, after editing a spec.md
 make verify SPEC=001       # one spec's declared acceptance
 spec-spine registry plan   # what is schedulable
 ```
 
-There is no build, no `cargo` target and no test runner, because there is no code.
-If a task seems to need one, the missing thing is a spec.
+`make code` exists but judges nothing yet: the workspace has no members, so each
+cargo verb is guarded on `crates/*/Cargo.toml` and skips with a note. It becomes
+real with the first crate, which is spec 002's `crates/statecraft-environment/`.
+Both surfaces are required through the `ci-gate` status check.
 
 ## Conventions that bite
 

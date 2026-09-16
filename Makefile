@@ -10,8 +10,12 @@
 #   make verify SPEC=001 one spec's declared acceptance
 #   make couple          the coupling gate against BASE
 #
-# There is no build, test, fmt or clippy target: this repository holds no code.
-# Adding one is a change to whichever spec claims the code it would build.
+#   make code            build, test, clippy and fmt across the workspace
+#
+# `gate` and `code` are two surfaces, not one. `gate` judges the corpus and is
+# meaningful with no code at all; `code` judges the workspace and is inert until
+# a crate exists. CI runs both as separate jobs and requires both through
+# `ci-gate`, which is why neither is nested inside the other.
 
 SPEC_SPINE ?= spec-spine
 
@@ -20,7 +24,14 @@ SPEC_SPINE ?= spec-spine
 SPEC_SPINE_DEFAULT_BRANCH ?= $(shell git symbolic-ref --short refs/remotes/origin/HEAD 2>/dev/null | sed 's|^origin/||')
 BASE ?= origin/$(or $(SPEC_SPINE_DEFAULT_BRANCH),main)
 
-.PHONY: gate refresh verify couple status help
+.PHONY: gate code build test clippy fmt refresh verify couple status help
+
+# Every `cargo --workspace` verb refuses a virtual manifest with no members, so
+# the Rust targets are guarded on a crate existing rather than simply run. The
+# guard is a wildcard over the workspace's own member glob, so it goes live with
+# the first crate and needs no edit to do it.
+CRATE_MANIFESTS := $(wildcard crates/*/Cargo.toml)
+SKIP_NOTE := no crate exists yet, so the workspace has no members and cargo has nothing to judge
 
 ## The whole check surface, read-only throughout. A gate that writes repairs what
 ## it is meant to judge, so this uses `check` and never `compile`.
@@ -37,6 +48,26 @@ gate:
 	$(SPEC_SPINE) check --fail-on-warn
 	$(SPEC_SPINE) lint --fail-on-warn
 	scripts/check-authored-content.sh
+
+## The Rust half of the check surface, in the order that fails fastest.
+##
+## The guard is one shell per recipe LINE, so it has to be one `if` rather than
+## a `test ... || exit 0` followed by the command: the early exit would end only
+## its own line and make would run the next one anyway. That bug is why the
+## first draft of these targets ran cargo against a workspace with no members.
+code: build test clippy fmt
+
+build:
+	@if [ -z "$(CRATE_MANIFESTS)" ]; then echo "$(SKIP_NOTE)"; else set -x; cargo build --workspace --locked; fi
+
+test:
+	@if [ -z "$(CRATE_MANIFESTS)" ]; then echo "$(SKIP_NOTE)"; else set -x; cargo test --workspace --locked; fi
+
+clippy:
+	@if [ -z "$(CRATE_MANIFESTS)" ]; then echo "$(SKIP_NOTE)"; else set -x; cargo clippy --workspace --all-targets --locked -- -D warnings; fi
+
+fmt:
+	@if [ -z "$(CRATE_MANIFESTS)" ]; then echo "$(SKIP_NOTE)"; else set -x; cargo fmt --all --check; fi
 
 ## The writing half, for a session that has edited a spec and can commit the
 ## regenerated shards with the change that made them stale. Never run this
@@ -67,7 +98,8 @@ status:
 	$(SPEC_SPINE) registry plan
 
 help:
-	@echo "gate     the read-only check surface: check, lint, authored content"
+	@echo "gate     the corpus check surface: check, lint, authored content"
+	@echo "code     the workspace check surface: build, test, clippy, fmt"
 	@echo "refresh  recompute the committed shard trees"
 	@echo "verify   SPEC=<id>, one spec's declared acceptance"
 	@echo "couple   the coupling gate against BASE ($(BASE)); CI-only, compares commits"

@@ -1,0 +1,30 @@
+# The workspace root. It has no members yet: `crates/*` matches nothing until
+# the first spec is implemented, and spec 002's forward claim
+# `crates/statecraft-environment/` is the one that will match first.
+#
+# A virtual manifest with no members is valid to Cargo and to spec-spine's
+# package discovery (`cargo_workspace` in spec-spine.toml), but every
+# `cargo --workspace` verb REFUSES it: "the manifest is virtual, and the
+# workspace has no members". That refusal is why the Rust half of the check
+# surface is guarded on a crate existing rather than simply run.
+#
+# Layout adopted 2026-09-16 as decision D-02: crates match the spec boundaries,
+# so the coupling gate holds a real compile unit per spec rather than a
+# convention. The binary crate is not created here; D-01's binary NAME is not
+# adopted, and creating a crate claims territory that a ratified spec has to own.
+[workspace]
+resolver = "3"
+members = ["crates/*"]
+
+# Inherited by each member with `field.workspace = true`, so a member cannot
+# drift on license or edition. Apache-2.0 is adopted (D-01, language and layout
+# half); `version` stays at 0.0.0 because nothing is released and F-02 defers
+# publication.
+[workspace.package]
+version = "0.0.0"
+edition = "2024"
+rust-version = "1.85"
+license = "Apache-2.0"
+repository = "https://github.com/statecrafting/statecraft-cli"
+authors = ["The statecraft Authors"]
+publish = false
