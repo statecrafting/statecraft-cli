@@ -1,0 +1,74 @@
+name: govern
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  govern:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # Full history so the coupling gate can diff the merge base.
+          fetch-depth: 0
+
+      # The exact release spec-spine.toml pins with `=0.18.0`. Installing a
+      # different one makes the binary refuse on its own version check, which is
+      # the intended failure rather than a silently different verdict: the
+      # coupling gate's bypass floor is compiled in, so two versions can judge
+      # the same diff differently.
+      #
+      # Cached on the installed binary rather than rebuilt every run. The key
+      # carries the version, so bumping the pin is a cache miss and a fresh
+      # build, which is exactly when a rebuild is wanted.
+      - name: Cache spec-spine
+        id: cache-spec-spine
+        uses: actions/cache@v4
+        with:
+          path: ~/.cargo/bin/spec-spine
+          key: spec-spine-cli-0.18.0-${{ runner.os }}-${{ runner.arch }}
+
+      - name: Install spec-spine 0.18.0
+        if: steps.cache-spec-spine.outputs.cache-hit != 'true'
+        run: cargo install spec-spine-cli --version 0.18.0 --locked
+
+      - run: spec-spine --version
+
+      # `check` proves the COMMITTED shard trees match what the corpus compiles
+      # to. It is never preceded by a writing `compile` or `index` in this job:
+      # that would compare the shards against files the job just overwrote and
+      # pass unconditionally.
+      - name: Freshness and validation
+        run: spec-spine check --fail-on-warn
+
+      - name: Corpus lint
+        run: spec-spine lint --fail-on-warn
+
+      - name: Authored-content rules
+        run: scripts/check-authored-content.sh
+
+      # The coupling gate against the pull request's real merge base. On a tree
+      # with no code it has nothing to refuse; it is wired now so the first crate
+      # is governed from its first commit rather than from a later remembering.
+      - name: Coupling gate
+        if: github.event_name == 'pull_request'
+        env:
+          PR_BODY: ${{ github.event.pull_request.body }}
+        run: |
+          set -euo pipefail
+          printf '%s' "${PR_BODY:-}" > "${RUNNER_TEMP}/pr-body.txt"
+          spec-spine couple \
+            --base "${{ github.event.pull_request.base.sha }}" \
+            --head HEAD \
+            --pr-body "${RUNNER_TEMP}/pr-body.txt"
+
+      # Reported, not gated. On a code-free tree the universe is empty, and
+      # --fail-on-untraced would refuse rather than pass vacuously. The flag
+      # joins the gate with the first source file (see AGENTS.md, The gate).
+      - name: Coverage report (informational)
+        run: spec-spine index coverage || true

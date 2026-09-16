@@ -1,0 +1,140 @@
+{
+  "mapping": {
+    "implementingPaths": [
+      {
+        "path": "standards/spec/constitution.md",
+        "source": "spec-edge"
+      },
+      {
+        "path": "standards/spec/contract.md",
+        "source": "spec-edge"
+      },
+      {
+        "path": "standards/spec/templates/",
+        "source": "spec-edge"
+      }
+    ],
+    "resolvedUnits": [
+      {
+        "locations": [
+          {
+            "file": "standards/spec/templates/"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "kind": "directory",
+          "path": "standards/spec/templates/"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "standards/spec/contract.md"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "kind": "file",
+          "path": "standards/spec/contract.md"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "standards/spec/constitution.md",
+            "span": {
+              "endLine": 35,
+              "startLine": 30
+            }
+          }
+        ],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "anchor": "i-markdown-only-authored-truth",
+          "file": "standards/spec/constitution.md",
+          "kind": "section"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "standards/spec/constitution.md",
+            "span": {
+              "endLine": 43,
+              "startLine": 36
+            }
+          }
+        ],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "anchor": "ii-compiler-owned-json-machine-truth",
+          "file": "standards/spec/constitution.md",
+          "kind": "section"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "standards/spec/constitution.md",
+            "span": {
+              "endLine": 50,
+              "startLine": 44
+            }
+          }
+        ],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "anchor": "iii-spec-first-development",
+          "file": "standards/spec/constitution.md",
+          "kind": "section"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "standards/spec/constitution.md",
+            "span": {
+              "endLine": 56,
+              "startLine": 51
+            }
+          }
+        ],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "anchor": "iv-determinism-and-validation",
+          "file": "standards/spec/constitution.md",
+          "kind": "section"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "standards/spec/constitution.md",
+            "span": {
+              "endLine": 67,
+              "startLine": 57
+            }
+          }
+        ],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "anchor": "v-legacy-as-evidence",
+          "file": "standards/spec/constitution.md",
+          "kind": "section"
+        }
+      }
+    ],
+    "specId": "000-bootstrap",
+    "specStatus": "approved"
+  },
+  "schemaVersion": "1.1.0",
+  "shardHash": "54f1bc119f3e8d8dd3c78164cc3a3afa12d20b1192d630e3299a1e27d882b056"
+}

@@ -19,3 +19,18 @@ target
 #  and can be added to the global gitignore or merged into this file.  For a more nuclear
 #  option (not recommended) you can uncomment the following to ignore the entire idea folder.
 #.idea/
+
+# spec-spine writes wall-clock metadata here. It is the one non-deterministic
+# artifact, excluded from every determinism and golden check, so it must never
+# be committed.
+.derived/**/build-meta.json
+
+# NOT ignored, deliberately: .derived/spec-registry/ and .derived/codebase-index/
+# are the committed shard trees. Committing them is what makes `spec-spine check`
+# a freshness gate on a pull request: CI compares the corpus against what the
+# branch committed.
+
+# The CLI's own runtime state inside a governed repository (spec 002). Managed
+# bytes are declared in .statecraft/environment.json, which IS committed; the
+# run state, worktrees and records under .statecraft/state/ are not.
+.statecraft/state/
