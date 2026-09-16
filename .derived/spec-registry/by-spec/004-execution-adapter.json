@@ -31,10 +31,10 @@
       "Verification"
     ],
     "specPath": "specs/004-execution-adapter/spec.md",
-    "status": "draft",
+    "status": "approved",
     "summary": "The single seam through which this product runs an agent, and the only place a provider is named. Fixes the three-part protocol (a request the supervisor writes, an event stream it reads, a result it records), the closed capability vocabulary with required tokens refusing before any process starts and preferred tokens degrading visibly, the negative suite that qualifies an adapter binary version, and the constructed rather than filtered child environment whose property is a complete record and explicitly not containment of hostile code.\n",
     "title": "The execution adapter boundary: one protocol, declared capabilities, a qualification suite, and a constructed child environment"
   },
-  "shardHash": "f6c22a73e3ae4a0bf81a8ac7c1a7e3beaea619472dd1f5e1c0d93912568a39fc",
+  "shardHash": "7c456d04921d003be5735ea2489ffde653c47c9a6ce24fbdf9253d24d5c69b50",
   "specVersion": "1.2.0"
 }

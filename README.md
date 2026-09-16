@@ -8,15 +8,15 @@ It runs on one machine, on one repository, with no account and no hosted service
 
 ## Status: specification only
 
-**No code exists in this repository.** There is no binary, nothing to install,
-and nothing to run but the corpus checks below.
+**There is no binary yet.** `crates/statecraft-environment/` implements spec
+002: registration, the manifest, plan and apply and remove, and the diagnostic.
+It is a library, so there is nothing to install and nothing to invoke from a
+terminal. Binding those operations to commands is what `006` proposes.
 
-The corpus is partly ratified. Three specs are approved: `000-bootstrap` (what a
-spec is), `001-boundaries-and-authority` (the product boundary) and
-`002-environment-lifecycle` (the first work order). Specs `003` to `005` are
-still `draft`, which here means read but not agreed, and not dispatchable. The
-constitution's product principles VI to XIII were ratified on 2026-09-16, and
-three of them are frozen as spec 000 anchors.
+The corpus is ratified. `000` to `005` are approved, and the constitution's
+product principles VI to XIII were ratified on 2026-09-16, three of them frozen
+as spec 000 anchors. `006-command-surface` is a proposal and is `draft`, which
+here means read but not agreed, and not dispatchable.
 
 The language and the layout are decided: Rust, one Cargo workspace, crates
 matching the spec boundaries. The packaging, the distribution and the first
@@ -25,7 +25,10 @@ recorded with what has been adopted in
 [docs/decisions/00-founding-decisions.md](docs/decisions/00-founding-decisions.md).
 
 This repository distinguishes four claims and makes them separately: *specified*,
-*implemented*, *tested*, *released*. Today it is specified, and not completely.
+*implemented*, *tested*, *released*. Today `000` to `005` are specified; `002`
+is additionally implemented and tested within its own territory, with 59 tests
+and every negative case in its section 3.10 covered by one named after it.
+Nothing is released.
 
 ## The idea
 

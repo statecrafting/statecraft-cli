@@ -4,8 +4,10 @@ The cross-agent authority for this repository, read by Claude Code, Codex CLI an
 any other agent through the `AGENTS.md` convention. Edit this file to evolve the
 protocol.
 
-This repository is **specification only**. There is no code, no binary and no
-test suite. Do not add one without a spec that claims it.
+This repository holds one crate, `crates/statecraft-environment/`, claimed by
+spec `002`. There is no binary. Do not add code, a crate or a test runner
+without a spec that claims it: `crates/**` is claimed by the spec whose boundary
+the crate is, and the coverage gate refuses an unclaimed source file.
 
 ## Where authority lives
 
@@ -55,10 +57,9 @@ agreed to exactly as it names one the owner has. What `draft` withholds is
 *ratification*, which is why an unratified spec's unresolved units warn instead
 of refusing.
 
-`002-environment-lifecycle` is the one `plan` names ready today, and it is
-ratified (`approved` plus `pending`), so it is a real work order. The next spec
-`plan` offers, `003`, is `draft` and will not be. Check the `status` field, not
-the plan output.
+`000` to `005` are ratified, so what `plan` offers from that range is a real work
+order. `006-command-surface` is `draft` and `plan` will offer it as ready
+anyway. Check the `status` field, not the plan output.
 
 spec-spine does not enforce the difference, so this repository does. Until the
 owner ratifies a spec (see Approval semantics), `plan` naming it is a reading

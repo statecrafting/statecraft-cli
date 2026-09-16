@@ -14,10 +14,10 @@ wrote this file. Section 3 is a set of engineering recommendations that need the
 owner's decision before anything is built on them. Section 5 is what has been
 decided since, and is the only place a row becomes binding.
 
-As of 2026-09-16, `000-bootstrap`, `001-boundaries-and-authority` and
-`002-environment-lifecycle` are `approved`; `003` to `005` are still `draft`.
-The constitution's principles VI to XIII are ratified, and VI, VII and IX are
-frozen as spec 000 anchors. No code exists.
+As of 2026-09-16, every spec in the corpus is `approved` except
+`006-command-surface`, which is a proposal written the same day. The
+constitution's principles VI to XIII are ratified, and VI, VII and IX are frozen
+as spec 000 anchors. `002` is implemented; `003` to `005` are specified and not.
 
 ## 1. Stated intent, as given
 
@@ -308,6 +308,31 @@ rather than a separate act:
 - spec 000's and spec 001's `verify:cli` blocks, which asserted the unratified
   state, now assert the ratified one. A ratification that left them alone would
   have had spec 000 accepting a state the same change had just ended.
+
+### 2026-09-16: D-03, adopted in full
+
+The owner ratified `003-work-and-run-semantics`, `004-execution-adapter` and
+`005-acceptance-and-evidence`, completing the row. All three keep
+`implementation: pending`, so each is a work order and none is a claim about
+code. `registry plan` now offers `003`, and offering it is finally the same
+thing as permission, which it was not for the whole of this repository's first
+day.
+
+`002` moved to `implementation: complete` in the change that implemented it. The
+grade that claims is *implemented for its own territory*: the crate. The
+operator commands `002` names were deliberately not bound to a process there,
+which is what `006` below exists to fix.
+
+### 2026-09-16: spec 006 proposed, not ratified
+
+Specs `002` to `005` each describe operator verbs and each own a library crate,
+so the product is specified, partly implemented, and not runnable. `006` claims
+`crates/statecraft-cli/` and binds the verbs to a process, with a closed
+exit-code vocabulary that separates a refusal from a failure from a finding.
+
+It is `draft`. It was written as a proposal rather than as part of any
+implementing change precisely because a binary that appears as a side effect of
+a feature is a binary nobody designed.
 
 ### 2026-09-16: D-01 and D-02, adopted for language and layout only
 
