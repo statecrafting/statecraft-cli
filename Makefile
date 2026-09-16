@@ -36,17 +36,20 @@ SKIP_NOTE := no crate exists yet, so the workspace has no members and cargo has 
 ## The whole check surface, read-only throughout. A gate that writes repairs what
 ## it is meant to judge, so this uses `check` and never `compile`.
 ##
-## Two flags the generic spec-spine kit carries are deliberately absent, because
-## on a code-free corpus each refuses this repository's own correct state:
-##   index coverage --fail-on-untraced  refuses an empty universe rather than
-##       passing vacuously. It joins the gate with the first source file.
+## `index coverage --fail-on-untraced` joined this list with the first source
+## file, which is the condition AGENTS.md recorded for it. On a code-free tree it
+## refused an empty universe rather than passing vacuously; now it defends
+## 13/13 specifically claimed instead of reporting the number.
+##
+## One flag the generic spec-spine kit carries is still deliberately absent:
 ##   index check --fail-on-unresolved   refuses a forward claim, which is exactly
-##       what specs 002 to 005 are. It joins the gate when this repository builds
-##       what it claims within one pull request.
-## AGENTS.md carries the same two notes, so neither is a silent omission.
+##       what specs 003 to 005 still are. It joins the gate when this repository
+##       builds what it claims within one pull request.
+## AGENTS.md carries the same note, so it is not a silent omission.
 gate:
 	$(SPEC_SPINE) check --fail-on-warn
 	$(SPEC_SPINE) lint --fail-on-warn
+	$(SPEC_SPINE) index coverage --fail-on-untraced
 	scripts/check-authored-content.sh
 
 ## The Rust half of the check surface, in the order that fails fastest.

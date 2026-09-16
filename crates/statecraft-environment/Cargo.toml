@@ -1,0 +1,34 @@
+# Spec: specs/002-environment-lifecycle/spec.md
+#
+# The environment lifecycle: registration and qualification, the three ownership
+# classes, the committed manifest, plan / apply / upgrade / remove, and doctor.
+#
+# A library, not a binary. Spec 002's territory is this crate; the binary that
+# would expose `project register` and `env apply` as commands belongs to a spec
+# that does not exist yet, and creating it here would claim territory nothing
+# owns.
+[package]
+name = "statecraft-environment"
+description = "Registration, the managed working environment, and its diagnostics"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+publish.workspace = true
+
+[dependencies]
+serde = { version = "1.0.229", features = ["derive"] }
+serde_json = "1.0.151"
+sha2 = "0.11.0"
+thiserror = "2.0.20"
+
+[dev-dependencies]
+tempfile = "3.27.0"
+
+[lints.rust]
+missing_docs = "warn"
+
+[lints.clippy]
+all = { level = "warn", priority = -1 }

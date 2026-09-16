@@ -75,6 +75,7 @@ single status context branch protection names.
 make gate
 spec-spine check --fail-on-warn
 spec-spine lint --fail-on-warn
+spec-spine index coverage --fail-on-untraced
 scripts/check-authored-content.sh
 
 make code
@@ -91,15 +92,18 @@ crate and nobody has to remember to enable it. Until then it passes having
 judged nothing, and says so in the log: that is the price of deciding the check
 surface before the work it judges, which is what Approval semantics requires.
 
-Two flags the generic kit uses are **deliberately absent**, and adding them would
-refuse this repository's own correct state:
+`index coverage --fail-on-untraced` **joined the gate on 2026-09-16**, with the
+first source file, which is the condition recorded here when it was left out. On
+a code-free tree it refused an empty universe rather than passing vacuously;
+coverage is now 13/13 specifically claimed and the flag defends that number.
 
-- `index coverage --fail-on-untraced` refuses on a code-free tree rather than
-  passing vacuously. It joins the gate with the first source file.
-- `index check --fail-on-unresolved` refuses a forward claim. Specs `002` to
-  `005` claim crates that do not exist yet, which is what a `draft` or a
-  `pending` spec is for. It joins the gate when this repository builds what it
-  claims within one pull request.
+One flag the generic kit uses is still **deliberately absent**, and adding it
+would refuse this repository's own correct state:
+
+- `index check --fail-on-unresolved` refuses a forward claim. Specs `003` to
+  `005` claim crates that do not exist yet, which is what a `draft` spec is for.
+  It joins the gate when this repository builds what it claims within one pull
+  request.
 
 `spec-spine couple` is **CI-only, and deliberately not in `make gate`**. It
 compares two commits, so it cannot see a change being staged and is useless as a

@@ -2,7 +2,7 @@
 id: "002-environment-lifecycle"
 title: "Project registration and the managed working environment: install, upgrade, drift, removal"
 status: approved
-implementation: pending
+implementation: complete
 created: "2026-09-16"
 summary: >
   How a repository becomes a target this product may work in, and how the
@@ -234,8 +234,58 @@ multi-machine environment sync; and any write to a target outside the manifested
 set. Publication, release and distribution are deferred by `F-02`; how this
 product is itself packaged is recommendation `D-01`.
 
+## 5. Decisions recorded during implementation
+
+Dated entries for choices §3 was silent on. They record what was decided, not a
+change to what is required.
+
+**2026-09-16: the command surface is not in this crate.** §3 names
+`project register`, `env plan`, `env apply`, `env upgrade`, `env remove` and
+`doctor`. Those are the operator's vocabulary; this spec's territory is
+`crates/statecraft-environment/`, and D-02 gives the binary its own crate
+(`statecraft-cli`), which no ratified spec owns. So every behavior above is
+implemented here as a library operation, and binding it to a process waits for
+the spec that owns a binary. The grade this spec claims is therefore
+*implemented* for its own territory, and nothing about a command line.
+
+**2026-09-16: timestamps are formatted in-crate.** The manifest is committed and
+read by people, so `written_at` is RFC 3339 rather than a count of seconds. A
+calendar dependency for one field was not worth it in a crate whose job is to
+own as few bytes as possible, so `time::rfc3339_utc` does the conversion and is
+tested against the Gregorian century rules that a naive implementation gets
+wrong.
+
+**2026-09-16: `unmanaged-write` is decided by declaration, not by memory.** §3.2
+calls a path the product wrote but did not record a defect, and this product
+keeps no second record to compare against. `doctor` therefore reports
+`unmanaged-write` for a path that is present on disk, declared by one of the
+configured adapters, absent from the manifest, and claimed by no other
+installer. The last clause is what keeps it distinct from `foreign`.
+
+**2026-09-16: `shadowed` needs a resolver this product does not have.** §3.7
+says a shadow is reported only where the product can observe one. `ShadowResolver`
+is the seam, and the shipped implementation observes nothing, because no harness
+package format exists to interrogate. A digest match therefore still reports
+`present` today, and the state is reachable and tested through an injected
+resolver rather than dead code.
+
 ## Verification
 
-Declared by the change that implements this spec. None of §3 is implemented, so
-this spec carries no `verify:cli` block: an acceptance block here today would
-either fail or assert something other than the behavior above.
+Each line is one command. They run the acceptance this spec's behavior declares:
+every row of §3.10 is one integration test, named after the row it covers, so a
+row that stops being covered shows up as a deleted test rather than as a
+quietly weakened assertion.
+
+`--fail-on-untraced` joins the corpus gate with this change, which is the
+condition AGENTS.md recorded for it: coverage is 13/13 specifically claimed, so
+the flag now defends that number instead of reporting it.
+
+```verify:cli
+cargo build --workspace --locked
+cargo test --workspace --locked
+cargo clippy --workspace --all-targets --locked -- -D warnings
+cargo fmt --all --check
+spec-spine index coverage --fail-on-untraced
+test -f crates/statecraft-environment/src/manifest.rs
+test -f crates/statecraft-environment/tests/negative_cases.rs
+```

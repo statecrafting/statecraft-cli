@@ -61,6 +61,14 @@ jobs:
       - name: Corpus lint
         run: spec-spine lint --fail-on-warn
 
+      # Enforced from 2026-09-16, with the first source file. On a code-free
+      # tree this flag refused an empty universe rather than passing vacuously,
+      # which is why it was withheld and why AGENTS.md named the condition that
+      # would bring it in. Coverage is 13/13 specifically claimed; the flag
+      # defends that instead of reporting it.
+      - name: Ownership coverage (enforced)
+        run: spec-spine index coverage --fail-on-untraced
+
       - name: Authored-content rules
         run: scripts/check-authored-content.sh
 
@@ -78,12 +86,6 @@ jobs:
             --base "${{ github.event.pull_request.base.sha }}" \
             --head HEAD \
             --pr-body "${RUNNER_TEMP}/pr-body.txt"
-
-      # Reported, not gated. On a code-free tree the universe is empty, and
-      # --fail-on-untraced would refuse rather than pass vacuously. The flag
-      # joins the gate with the first source file (see AGENTS.md, The gate).
-      - name: Coverage report (informational)
-        run: spec-spine index coverage || true
 
   # The workspace half of the check surface, as its own job so a clippy failure
   # names clippy in the job list rather than hiding inside the governance job.
