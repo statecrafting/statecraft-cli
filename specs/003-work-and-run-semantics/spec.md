@@ -2,7 +2,7 @@
 id: "003-work-and-run-semantics"
 title: "Work selection, workspace preparation, the run record, and recovery after interruption"
 status: approved
-implementation: pending
+implementation: complete
 created: "2026-09-16"
 summary: >
   The core loop's semantics. How a unit of work is identified by reading
@@ -219,7 +219,61 @@ capability negotiation (`004`); any publication effect; quota, cost or spend
 control; scheduling across repositories; and human-approval workflow beyond
 recording that an approval was required.
 
+## 5. Decisions recorded during implementation
+
+Dated entries for choices §3 was silent on. None changes what it requires.
+
+**2026-09-16: the chain lives in the product home, not in the target.** §3.3
+says one chain per registered repository and does not say where. §3.5 does
+constrain it: the refusal count is written where the supervised process cannot
+reach it, and that process runs inside a worktree under the target's
+`.statecraft/state/`. A chain inside the target would be a chain the thing being
+judged can edit, so the chain is in the product home, keyed by a digest of the
+target's absolute path. An integration test asserts the chain path is under
+neither the target nor the workspace.
+
+**2026-09-16: two reports are joined, because one does not carry status.**
+§3.1.1 turns on a spec's `status`, and `registry plan --json` under 0.18.0
+carries only `id` and `title`. `registry list --json` carries `status` and
+`implementation`. Both are spec-spine's structured output, so joining them is
+still reading rather than deriving. A ready spec absent from the lifecycle
+report is excluded with "status is unknown" rather than assumed approved.
+
+**2026-09-16: a torn tail is truncated before the next append.** §3.8 requires
+recovery to read to the last complete record, report the tear, and append after
+it, without rewriting earlier records. The trailing partial bytes are truncated
+at the first append after the tear. That is not rewriting a record: those bytes
+were never acknowledged, because acknowledgement is what `fsync` and a
+terminating newline together mean here. A test asserts the earlier bytes are
+identical before and after.
+
+**2026-09-16: an empty chain is not a broken one.** `attest-ledger`'s
+`verify_chain` reports `EmptyChain` for an empty slice, correctly for a ledger
+that should have an anchor. On a repository's first run there is nothing to link
+yet, so verification begins once there is a record. Reported here because it is
+a behavior of a reused component this spec depends on, not a local invention.
+
+**2026-09-16: attest-ledger is a pinned git dependency.** It is public and
+unpublished, and `001` §3.2 says the record envelope is reused rather than
+reimplemented. Vendoring a copy of a hash-linked ledger into the product that
+depends on it would defeat the reuse. The workspace is `publish = false` and
+`F-02` defers publication, so the usual objection does not apply yet;
+un-pinning it, or moving to a released version, is its own change.
+
 ## Verification
 
-Declared by the change that implements this spec. None of §3 is implemented, so
-this spec carries no `verify:cli` block.
+Each line is one command. §3.8's fifteen rows are integration tests named after
+the rows they cover, including the ones that need a real git repository: the
+workspace rows build one in a temporary directory rather than mocking git,
+because "the operator's checkout is never edited" is not a claim a mock can
+support.
+
+```verify:cli
+cargo build --workspace --locked
+cargo test --workspace --locked
+cargo clippy --workspace --all-targets --locked -- -D warnings
+cargo fmt --all --check
+spec-spine index coverage --fail-on-untraced
+test -f crates/statecraft-run/src/record.rs
+test -f crates/statecraft-run/tests/negative_cases.rs
+```
