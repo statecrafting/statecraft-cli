@@ -1,23 +1,22 @@
 {
-  "diagnostics": {
-    "errors": [],
-    "warnings": [
-      {
-        "code": "W-001",
-        "message": "spec '002-environment-lifecycle' directory unit 'crates/statecraft-environment/' is not a directory",
-        "path": "crates/statecraft-environment/"
-      }
-    ]
-  },
   "mapping": {
     "dependsOn": [
       "000-bootstrap",
       "001-boundaries-and-authority"
     ],
-    "implementingPaths": [],
+    "implementingPaths": [
+      {
+        "path": "crates/statecraft-environment/",
+        "source": "spec-edge"
+      }
+    ],
     "resolvedUnits": [
       {
-        "locations": [],
+        "locations": [
+          {
+            "file": "crates/statecraft-environment/"
+          }
+        ],
         "ownership": true,
         "sourceField": "establishes",
         "unit": {
@@ -30,5 +29,5 @@
     "specStatus": "approved"
   },
   "schemaVersion": "1.1.0",
-  "shardHash": "b47404540214c5fd33120f9bad4fb03d4437558c4c41d5455f1b45f7b83ef9ee"
+  "shardHash": "5abe7a05e1a59a9bc253f53f0061d49896c30330e58e196783de4b3b163d9b23"
 }
