@@ -5,16 +5,19 @@
 Prepared 2026-09-16, at the founding of this repository. Owned by spec
 `001-boundaries-and-authority`.
 
-**Adoption status: nothing in section 3 is adopted.** This record exists so the
-three kinds of statement below are never confused with each other. Section 1 is
-the repository owner's stated intent, recorded as given. Section 2 is inherited
-technical constraint: facts about tools, licenses and a predecessor, each
-verified in the session that wrote this file. Section 3 is a set of engineering
-recommendations that need the owner's decision before anything is built on them.
+**Adoption status: one row of section 3 is adopted in part. Every other row is
+still a recommendation.** This record exists so the three kinds of statement
+below are never confused with each other. Section 1 is the repository owner's
+stated intent, recorded as given. Section 2 is inherited technical constraint:
+facts about tools, licenses and a predecessor, each verified in the session that
+wrote this file. Section 3 is a set of engineering recommendations that need the
+owner's decision before anything is built on them. Section 5 is what has been
+decided since, and is the only place a row becomes binding.
 
-No spec in this corpus is `approved` except `000-bootstrap`, which defines what a
-spec is and owns no code. The constitution's principles VI to XIII are `draft`.
-No code exists.
+As of 2026-09-16, `000-bootstrap`, `001-boundaries-and-authority` and
+`002-environment-lifecycle` are `approved`; `003` to `005` are still `draft`.
+The constitution's principles VI to XIII are ratified, and VI, VII and IX are
+frozen as spec 000 anchors. No code exists.
 
 ## 1. Stated intent, as given
 
@@ -123,6 +126,11 @@ something real to hold, and spec 004's rule that no provider name appears in the
 adapter seam becomes a compile-unit fact rather than a review convention.
 
 ### D-03: The corpus itself
+
+**Status: adopted in part, 2026-09-16.** The owner ratified `001` and `002`,
+and the three anchors this row carries were added to spec 000 in the same
+change. `003` to `005` were deliberately left `draft`, so each meets one more
+reading before code is written against it. The remainder of this row stays open.
 
 **Recommendation.** Ratify specs `001` to `005` as a set, or amend them first.
 Until then this repository is specified only, and partially.
@@ -281,12 +289,50 @@ oversight, and reopened by a concrete consumer need rather than by availability.
 
 ## 5. Adoption record
 
-Empty. Nothing in section 3 has been adopted.
+### 2026-09-16: D-03, adopted in part
 
-To adopt, the owner can state which `D-` rows are accepted and with what
-amendments, and separately whether specs `001` to `005` are ratified (D-03).
-Adoption is then recorded here as plain text with its date, and each ratified
-spec's frontmatter is flipped in the change that dispatches it.
+The owner ratified `001-boundaries-and-authority` and `002-environment-lifecycle`.
+Both are now `approved`; `002` keeps `implementation: pending`, which is what
+makes it a work order rather than a settled claim (`C-03`). `003` to `005`
+remain `draft` and are **not** dispatchable: `registry plan` will offer `003`
+once `002` reports complete, and that offer is still not permission.
+
+Three consequences landed in the same change, because each is part of this row
+rather than a separate act:
+
+- spec 000's `unamendable` list gained `independent-acceptance`,
+  `no-self-granted-authority` and `evidence-outside-the-child`, and its section
+  5 now records when they were frozen instead of why they were withheld;
+- the constitution's ratification banner and the three per-principle notes on
+  VI, VII and IX say frozen rather than proposed;
+- spec 000's and spec 001's `verify:cli` blocks, which asserted the unratified
+  state, now assert the ratified one. A ratification that left them alone would
+  have had spec 000 accepting a state the same change had just ended.
+
+### 2026-09-16: D-01 and D-02, adopted for language and layout only
+
+Ratifying `002` is not layout-neutral: its territory is the forward claim
+`crates/statecraft-environment/`, which presumes a Cargo workspace and therefore
+Rust. Leaving that implicit would have let a layout be adopted by implication
+rather than by decision, which is the confusion this whole record exists to
+prevent. The owner decided it explicitly on the same day, so it is recorded
+here.
+
+**Adopted.** Rust, one Cargo workspace, crates matching the spec boundaries
+(`D-02` as written), Apache-2.0.
+
+**Not adopted, and still open.** Everything in `D-01` about distribution:
+prebuilt per-target archives, checksums, the shell installer, publishing to
+crates.io, and the binary's name. `F-02` defers publication and release, so
+nothing here authorizes a tag or a registry push. The read-only observation
+surface stays deferred as `F-04`.
+
+No other `D-` row is adopted.
+
+To adopt a further row, the owner can state which `D-` rows are accepted and
+with what amendments. Adoption is then recorded here as plain text with its
+date, and each ratified spec's frontmatter is flipped in the change that
+dispatches it.
 
 Publication, merges, releases and deployments are not covered by adopting any row
 here. F-02 holds until it is separately lifted.

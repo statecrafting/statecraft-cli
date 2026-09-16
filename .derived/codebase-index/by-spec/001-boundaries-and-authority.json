@@ -66,8 +66,8 @@
           {
             "file": "standards/spec/constitution.md",
             "span": {
-              "endLine": 124,
-              "startLine": 109
+              "endLine": 130,
+              "startLine": 114
             }
           }
         ],
@@ -84,8 +84,8 @@
           {
             "file": "standards/spec/constitution.md",
             "span": {
-              "endLine": 81,
-              "startLine": 68
+              "endLine": 85,
+              "startLine": 71
             }
           }
         ],
@@ -102,8 +102,8 @@
           {
             "file": "standards/spec/constitution.md",
             "span": {
-              "endLine": 96,
-              "startLine": 82
+              "endLine": 101,
+              "startLine": 86
             }
           }
         ],
@@ -120,8 +120,8 @@
           {
             "file": "standards/spec/constitution.md",
             "span": {
-              "endLine": 108,
-              "startLine": 97
+              "endLine": 113,
+              "startLine": 102
             }
           }
         ],
@@ -138,8 +138,8 @@
           {
             "file": "standards/spec/constitution.md",
             "span": {
-              "endLine": 137,
-              "startLine": 125
+              "endLine": 143,
+              "startLine": 131
             }
           }
         ],
@@ -156,8 +156,8 @@
           {
             "file": "standards/spec/constitution.md",
             "span": {
-              "endLine": 148,
-              "startLine": 138
+              "endLine": 154,
+              "startLine": 144
             }
           }
         ],
@@ -174,8 +174,8 @@
           {
             "file": "standards/spec/constitution.md",
             "span": {
-              "endLine": 155,
-              "startLine": 149
+              "endLine": 161,
+              "startLine": 155
             }
           }
         ],
@@ -192,8 +192,8 @@
           {
             "file": "standards/spec/constitution.md",
             "span": {
-              "endLine": 164,
-              "startLine": 156
+              "endLine": 170,
+              "startLine": 162
             }
           }
         ],
@@ -207,8 +207,8 @@
       }
     ],
     "specId": "001-boundaries-and-authority",
-    "specStatus": "draft"
+    "specStatus": "approved"
   },
   "schemaVersion": "1.1.0",
-  "shardHash": "642be4153610c9f468ce14a8ef4f70fc6f352fb3cf889d0a3c4e37e2722056df"
+  "shardHash": "abe0dd37a24d404b5c7bf52203d66cdc6afe9951b2f5e1678cb2ebf2bf6dbe32"
 }

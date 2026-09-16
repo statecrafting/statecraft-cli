@@ -46,8 +46,8 @@
           {
             "file": "standards/spec/constitution.md",
             "span": {
-              "endLine": 35,
-              "startLine": 30
+              "endLine": 38,
+              "startLine": 33
             }
           }
         ],
@@ -64,8 +64,8 @@
           {
             "file": "standards/spec/constitution.md",
             "span": {
-              "endLine": 43,
-              "startLine": 36
+              "endLine": 46,
+              "startLine": 39
             }
           }
         ],
@@ -82,8 +82,8 @@
           {
             "file": "standards/spec/constitution.md",
             "span": {
-              "endLine": 50,
-              "startLine": 44
+              "endLine": 53,
+              "startLine": 47
             }
           }
         ],
@@ -100,8 +100,8 @@
           {
             "file": "standards/spec/constitution.md",
             "span": {
-              "endLine": 56,
-              "startLine": 51
+              "endLine": 59,
+              "startLine": 54
             }
           }
         ],
@@ -118,8 +118,8 @@
           {
             "file": "standards/spec/constitution.md",
             "span": {
-              "endLine": 67,
-              "startLine": 57
+              "endLine": 70,
+              "startLine": 60
             }
           }
         ],
@@ -136,5 +136,5 @@
     "specStatus": "approved"
   },
   "schemaVersion": "1.1.0",
-  "shardHash": "fe73a6bc124bc53b9e8c3b7d11f85bb3c4227ec7737d2f7c9aef40379b8008f1"
+  "shardHash": "15df0d9cd5529ccc125ad81d84d6e7624053359a391136940c4a79288fa8ac41"
 }

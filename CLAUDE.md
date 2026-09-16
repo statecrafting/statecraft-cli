@@ -14,10 +14,12 @@ is a local environment for governed agent work; the boundary is
 and what is proposed versus adopted is
 [docs/decisions/00-founding-decisions.md](docs/decisions/00-founding-decisions.md).
 
-`spec-spine registry plan` will name `002-environment-lifecycle` ready. That is
-spec-spine's lifecycle answer (`draft` plus `pending` is schedulable), **not
-permission to build it**: every product spec here is unratified. Ratification is
-the owner's act. See AGENTS.md, "New sessions".
+`spec-spine registry plan` names `002-environment-lifecycle` ready, and since
+2026-09-16 that one **is** dispatchable: the owner ratified `001` and `002`.
+`003` to `005` are still `draft`, and `plan` will offer `003` the moment `002`
+reports complete. That offer is spec-spine's lifecycle answer (`draft` plus
+`pending` is schedulable), **not permission to build it**. Ratification is the
+owner's act. See AGENTS.md, "New sessions".
 
 ## Commands
 
