@@ -26,14 +26,22 @@ establishes:
   - { kind: section, file: "standards/spec/constitution.md", anchor: "iii-spec-first-development" }
   - { kind: section, file: "standards/spec/constitution.md", anchor: "iv-determinism-and-validation" }
   - { kind: section, file: "standards/spec/constitution.md", anchor: "v-legacy-as-evidence" }
-# These five are spec-spine's corpus anchors, scaffolded by `spec-spine init`
-# and kept as written. This list holds NO product anchor: see section 5.
+# The first five are spec-spine's corpus anchors, scaffolded by `spec-spine init`
+# and kept as written. The three product anchors below them were added when the
+# owner ratified `001`, which is what made freezing their text legitimate: see
+# section 5.
 unamendable:
   - "markdown-truth-boundary"
   - "json-truth-boundary"
   - "determinism-requirement"
   - "typed-authority-graph"
   - "refusal-rule"
+  # Added 2026-09-16 with the owner's ratification of `001`, per decision D-03.
+  # Until that ratification these three were deliberately absent: freezing prose
+  # owned by a `draft` spec would have been the corpus granting itself authority.
+  - "independent-acceptance"
+  - "no-self-granted-authority"
+  - "evidence-outside-the-child"
 ---
 
 # 000: Bootstrap spec system
@@ -78,27 +86,30 @@ owning spec is refused at pull-request time, unless a human records a named,
 scoped waiver in the pull-request body. An agent never writes that waiver on its
 own authority. Anchor: `refusal-rule`.
 
-## 5. No product anchor is frozen yet
+## 5. The three product anchors, and when they were frozen
 
 Three of this product's principles are the ones a later amendment could not be
 recovered from, because such an amendment would destroy the very record that
 would have shown it happened:
 
-- constitution VI, independent acceptance;
-- constitution VII, no self-granted authority;
-- constitution IX, evidence recorded outside the child.
+- constitution VI, independent acceptance, frozen as `independent-acceptance`;
+- constitution VII, no self-granted authority, frozen as
+  `no-self-granted-authority`;
+- constitution IX, evidence recorded outside the child, frozen as
+  `evidence-outside-the-child`.
 
-**They are deliberately not in this spec's `unamendable` list.** Their text is
-owned by `001-boundaries-and-authority`, which is `draft`: an `approved` spec
-freezing unratified prose would be exactly the self-granted authority
-constitution VII forbids, performed by the corpus on itself.
+**They were deliberately absent from this spec's `unamendable` list until
+2026-09-16.** Their text is owned by `001-boundaries-and-authority`, which was
+`draft`: an `approved` spec freezing unratified prose would have been exactly
+the self-granted authority constitution VII forbids, performed by the corpus on
+itself. The absence was the corpus declining to grant itself something.
 
-Adding the three anchors `independent-acceptance`,
-`no-self-granted-authority` and `evidence-outside-the-child` to this spec is
-therefore **proposed**, and is part of ratifying `001` (decision `D-03` in
-`docs/decisions/00-founding-decisions.md`). Until the owner ratifies, the
-principles are ordinary draft constitution text, amendable by the ordinary
-route.
+On 2026-09-16 the repository's owner ratified `001`, which is the act decision
+`D-03` named as the precondition. Adding the three anchors was part of that
+row rather than a separate step, and it is recorded in the same change. What
+freezes here is the *principle*, not its wording: an anchor forbids
+contradiction, and ordinary editorial amendment of the surrounding prose
+remains available to an `approved` spec that claims the heading.
 
 ## 6. What this spec does not do
 
@@ -112,13 +123,24 @@ Each line below is one command; no line may depend on a variable another set.
 These assert the corpus's own shape, which exists today. They assert nothing
 about product behavior, because none is implemented.
 
+The last three lines of the previous revision were written inverted, asserting that the three product
+anchors were **absent** and that the constitution carried no freeze marker. That
+was the acceptance of the unratified state, and the owner's ratification of
+`001` on 2026-09-16 is what made inverting them correct. A ratification that did
+not touch this block would have left spec 000 asserting a state the same change
+had just ended.
+
 ```verify:cli
 spec-spine compile --check
 spec-spine lint
 spec-spine registry list
 test -f standards/spec/constitution.md
 test -f standards/spec/contract.md
-grep -qF 'No product anchor is frozen yet' specs/000-bootstrap/spec.md
-! grep -qE '^  - "(independent-acceptance|no-self-granted-authority|evidence-outside-the-child)"$' specs/000-bootstrap/spec.md
-! grep -qF 'Frozen by spec 000' standards/spec/constitution.md
+grep -qE '^## 5\. The three product anchors' specs/000-bootstrap/spec.md
+grep -qE '^  - "independent-acceptance"$' specs/000-bootstrap/spec.md
+grep -qE '^  - "no-self-granted-authority"$' specs/000-bootstrap/spec.md
+grep -qE '^  - "evidence-outside-the-child"$' specs/000-bootstrap/spec.md
+grep -qF 'Frozen by spec 000 as `independent-acceptance`' standards/spec/constitution.md
+grep -qF 'Frozen by spec 000 as `no-self-granted-authority`' standards/spec/constitution.md
+grep -qF 'Frozen by spec 000 as `evidence-outside-the-child`' standards/spec/constitution.md
 ```

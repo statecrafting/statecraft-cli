@@ -32,10 +32,10 @@
       "Verification"
     ],
     "specPath": "specs/002-environment-lifecycle/spec.md",
-    "status": "draft",
+    "status": "approved",
     "summary": "How a repository becomes a target this product may work in, and how the product installs and maintains the working environment inside it. Fixes the three ownership classes (managed, adopted, user), the committed manifest that records every managed byte with its source and digest, the pins the environment records, what an upgrade does when a managed file has drifted, what removal leaves behind, how an agent-harness adapter declares what it owns, and the transition contract that keeps this product and `spec-spine init --with-kit` from both claiming the same harness files. Preserving a pre-existing user instruction file is a refusal, not a merge.\n",
     "title": "Project registration and the managed working environment: install, upgrade, drift, removal"
   },
-  "shardHash": "93013afb7309cab629d5a442cf2eba2292ef03c7a0e10eed51f0c0fb21596bef",
+  "shardHash": "7fd465cfbf291b90ca3ef3251005f9fe78a350dfb67a089ca1c4c4bef395d45b",
   "specVersion": "1.2.0"
 }

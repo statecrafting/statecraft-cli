@@ -4,14 +4,17 @@ Durable principles that govern this corpus. This document is **tier 2**: it is
 subordinate to the bootstrap spec, whose `unamendable` anchors it may not
 contradict, and it governs all ordinary specs.
 
-> **Ratification status, 2026-09-16: principles VI to XIII are DRAFT.**
+> **Ratification status, 2026-09-16: principles VI to XIII are RATIFIED.**
 > Principles I to V are spec-spine's corpus principles, scaffolded by
 > `spec-spine init` and adopted as written. Principles VI to XIII are this
 > project's own, drafted from the founding handoff and from constraints
-> inherited from the archived predecessor; they are claimed by spec
-> `001-boundaries-and-authority`, which is itself `draft`. Nothing below has
-> been ratified by the repository's owner, and **no principle below is frozen**:
-> spec 000 deliberately holds no product anchor until `001` is ratified. The decision record is
+> inherited from the archived predecessor. They are claimed by spec
+> `001-boundaries-and-authority`, which the repository's owner ratified on
+> 2026-09-16 (decision `D-03`, adopted in part). Three of them are now frozen:
+> VI, VII and IX are spec 000's `independent-acceptance`,
+> `no-self-granted-authority` and `evidence-outside-the-child`, and no later
+> spec may contradict them. The other five are ordinary ratified text, amendable
+> by an `approved` spec claiming the heading. The decision record is
 > [docs/decisions/00-founding-decisions.md](../../docs/decisions/00-founding-decisions.md);
 > what each principle answers is traced there.
 
@@ -76,8 +79,9 @@ A run whose acceptance was not independently evaluated records **no** acceptance
 It never records a passing one. Where a richer structured outcome exists, that
 outcome is what is read; a zero exit code is not inferred to mean accepted.
 
-Proposed for freezing as `independent-acceptance` when this principle is
-ratified; spec 000 section 5 says why it is not frozen yet.
+Frozen by spec 000 as `independent-acceptance`, with the owner's ratification of `001`
+on 2026-09-16. The anchor forbids contradiction, not editorial
+amendment; spec 000 section 5 records why it was withheld until then.
 
 ## VII. A candidate cannot enlarge its own authority
 
@@ -91,8 +95,9 @@ A candidate that modifies its own governing rules has not widened its
 permissions; it has produced a change that cannot be accepted by the rules it
 was judged under.
 
-Proposed for freezing as `no-self-granted-authority` when this principle is
-ratified; spec 000 section 5 says why it is not frozen yet.
+Frozen by spec 000 as `no-self-granted-authority`, with the owner's ratification of `001`
+on 2026-09-16. The anchor forbids contradiction, not editorial
+amendment; spec 000 section 5 records why it was withheld until then.
 
 ## VIII. Name the enforcement, or do not claim the protection
 
@@ -119,8 +124,9 @@ whose outcome is unknown is **reconciled before** it is retried. This product
 makes no exactly-once promise about an external effect unless it names the
 mechanism that delivers it.
 
-Proposed for freezing as `evidence-outside-the-child` when this principle is
-ratified; spec 000 section 5 says why it is not frozen yet.
+Frozen by spec 000 as `evidence-outside-the-child`, with the owner's ratification of `001`
+on 2026-09-16. The anchor forbids contradiction, not editorial
+amendment; spec 000 section 5 records why it was withheld until then.
 
 ## X. Intent, execution, verification and acceptance are separate records
 

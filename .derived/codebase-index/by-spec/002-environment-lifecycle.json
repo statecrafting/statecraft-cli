@@ -27,8 +27,8 @@
       }
     ],
     "specId": "002-environment-lifecycle",
-    "specStatus": "draft"
+    "specStatus": "approved"
   },
   "schemaVersion": "1.1.0",
-  "shardHash": "7861d928bba887f8a8075f9be8544f0e32cf95535420a201a9b097c18b5a64f4"
+  "shardHash": "64692d11a637fa248703409e79431c008374bd3fb811f8af98c5e3ec90884a76"
 }

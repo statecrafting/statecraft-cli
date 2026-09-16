@@ -1,7 +1,7 @@
 ---
 id: "002-environment-lifecycle"
 title: "Project registration and the managed working environment: install, upgrade, drift, removal"
-status: draft
+status: approved
 implementation: pending
 created: "2026-09-16"
 summary: >

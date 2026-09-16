@@ -50,10 +50,15 @@ as a local edit rather than as a defect on the branch.
 
 **`registry plan` offers a `draft` spec as ready, and that is not permission to
 build it.** Verified against 0.18.0 on 2026-09-16: the lifecycle table makes
-`draft` plus `pending` schedulable, so `plan` currently names
-`002-environment-lifecycle` ready. What `draft` withholds is *ratification*: the
-corpus has not agreed to the spec, which is why its unresolved units warn instead
+`draft` plus `pending` schedulable, so `plan` names a spec the owner has not
+agreed to exactly as it names one the owner has. What `draft` withholds is
+*ratification*, which is why an unratified spec's unresolved units warn instead
 of refusing.
+
+`002-environment-lifecycle` is the one `plan` names ready today, and it is
+ratified (`approved` plus `pending`), so it is a real work order. The next spec
+`plan` offers, `003`, is `draft` and will not be. Check the `status` field, not
+the plan output.
 
 spec-spine does not enforce the difference, so this repository does. Until the
 owner ratifies a spec (see Approval semantics), `plan` naming it is a reading

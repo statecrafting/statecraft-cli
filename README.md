@@ -11,11 +11,17 @@ It runs on one machine, on one repository, with no account and no hosted service
 **No code exists in this repository.** There is no binary, nothing to install,
 and nothing to run but the corpus checks below.
 
-The corpus is a draft. One spec is approved (`000-bootstrap`, which defines what
-a spec is and owns no code); specs `001` to `005` are `draft`, and the
-constitution's product principles VI to XIII are drafted and unratified. The
-language, the packaging and the first workflow are **recommendations awaiting the
-owner's decision**, recorded in
+The corpus is partly ratified. Three specs are approved: `000-bootstrap` (what a
+spec is), `001-boundaries-and-authority` (the product boundary) and
+`002-environment-lifecycle` (the first work order). Specs `003` to `005` are
+still `draft`, which here means read but not agreed, and not dispatchable. The
+constitution's product principles VI to XIII were ratified on 2026-09-16, and
+three of them are frozen as spec 000 anchors.
+
+The language and the layout are decided: Rust, one Cargo workspace, crates
+matching the spec boundaries. The packaging, the distribution and the first
+interaction mode are still **recommendations awaiting the owner's decision**,
+recorded with what has been adopted in
 [docs/decisions/00-founding-decisions.md](docs/decisions/00-founding-decisions.md).
 
 This repository distinguishes four claims and makes them separately: *specified*,

@@ -1,7 +1,7 @@
 ---
 id: "001-boundaries-and-authority"
 title: "The product boundary, the component owners, and the separation of authority"
-status: draft
+status: approved
 # Records decisions and owns prose. There is no code behind it and never
 # will be, so `n-a` keeps it out of the ready set (spec-spine 045).
 implementation: n-a
@@ -200,7 +200,7 @@ test -x scripts/check-authored-content.sh
 scripts/check-authored-content.sh
 grep -qF 'XII. Public claims are graded' standards/spec/constitution.md
 grep -qiF 'specified' standards/spec/constitution.md
-grep -qF 'Proposed for freezing as `independent-acceptance`' standards/spec/constitution.md
+grep -qF 'Frozen by spec 000 as `independent-acceptance`' standards/spec/constitution.md
 grep -qF 'D-01' docs/decisions/00-founding-decisions.md
 grep -qF 'D-05' docs/decisions/00-founding-decisions.md
 ```

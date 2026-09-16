@@ -44,7 +44,7 @@
       "2. The typed authority graph",
       "3. Determinism",
       "4. Refusal",
-      "5. No product anchor is frozen yet",
+      "5. The three product anchors, and when they were frozen",
       "6. What this spec does not do",
       "Verification"
     ],
@@ -57,9 +57,12 @@
       "json-truth-boundary",
       "determinism-requirement",
       "typed-authority-graph",
-      "refusal-rule"
+      "refusal-rule",
+      "independent-acceptance",
+      "no-self-granted-authority",
+      "evidence-outside-the-child"
     ]
   },
-  "shardHash": "e9b5e7c963139be0f428dd9ff0e347e69e8ded6c551c9e7453d8a476f875cc29",
+  "shardHash": "afa5b09e3dacf416ccd5c1839d7e9ef5b5a13d0610c0809616a27a16c84e3de2",
   "specVersion": "1.2.0"
 }
