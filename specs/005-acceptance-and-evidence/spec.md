@@ -1,7 +1,7 @@
 ---
 id: "005-acceptance-and-evidence"
 title: "Independent acceptance, the receipt, and the separately reported evidence dimensions"
-status: draft
+status: approved
 implementation: pending
 created: "2026-09-16"
 summary: >

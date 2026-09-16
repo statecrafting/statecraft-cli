@@ -99,9 +99,21 @@ Four grades, stated separately, never inferred from one another:
 
 Observable rule: a document in this repository that calls a behavior
 implemented, tested or released names the evidence in the same sentence. A spec
-being `approved` grants no grade above *specified*. Today this repository is
-**specified only, and not fully**: no spec but `000` is approved, and no code
-exists.
+being `approved` grants no grade above *specified*.
+
+Where this repository stands, restated whenever it changes rather than left to
+age:
+
+| Date | Grade |
+|---|---|
+| 2026-09-16 | Specified only, and not fully: no spec but `000` was approved, and no code existed. |
+| 2026-09-16 | `000` to `005` specified. `002` additionally **implemented and tested within its own territory**, the evidence being `crates/statecraft-environment/`, 59 tests, and one integration test per row of `002` section 3.10 named after the row it covers. Nothing released; `F-02` defers publication. |
+
+The second row is deliberately narrower than "002 is implemented". The commands
+`002` names are not bound to a process by that crate, so the grade it claims is
+*implemented for its own territory* and nothing about a command line. `006`
+proposes the binary that would change that, and until `006` is ratified and
+implemented, no document here may call this product runnable.
 
 ### 3.4 The two interaction modes
 

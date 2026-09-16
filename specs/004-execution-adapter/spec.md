@@ -1,7 +1,7 @@
 ---
 id: "004-execution-adapter"
 title: "The execution adapter boundary: one protocol, declared capabilities, a qualification suite, and a constructed child environment"
-status: draft
+status: approved
 implementation: pending
 created: "2026-09-16"
 summary: >

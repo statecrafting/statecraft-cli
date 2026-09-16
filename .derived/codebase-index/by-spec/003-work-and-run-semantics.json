@@ -28,8 +28,8 @@
       }
     ],
     "specId": "003-work-and-run-semantics",
-    "specStatus": "draft"
+    "specStatus": "approved"
   },
   "schemaVersion": "1.1.0",
-  "shardHash": "050e07a78ee82714b9c31c45652336ee42e4912364cdbd92e87bd456a76e2579"
+  "shardHash": "f9cd52088db9aaa0ca8acb82c7f20d674a77a29f0feaf1b9e26aa574dcbd45f8"
 }

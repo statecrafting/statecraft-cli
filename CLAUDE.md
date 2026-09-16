@@ -14,12 +14,12 @@ is a local environment for governed agent work; the boundary is
 and what is proposed versus adopted is
 [docs/decisions/00-founding-decisions.md](docs/decisions/00-founding-decisions.md).
 
-`spec-spine registry plan` names `002-environment-lifecycle` ready, and since
-2026-09-16 that one **is** dispatchable: the owner ratified `001` and `002`.
-`003` to `005` are still `draft`, and `plan` will offer `003` the moment `002`
-reports complete. That offer is spec-spine's lifecycle answer (`draft` plus
-`pending` is schedulable), **not permission to build it**. Ratification is the
-owner's act. See AGENTS.md, "New sessions".
+`000` to `005` are ratified, so what `registry plan` offers from that range is
+dispatchable. `006-command-surface` is `draft`: `plan` will offer it as ready
+anyway, because `draft` plus `pending` is schedulable, and that offer is
+spec-spine's lifecycle answer rather than permission. Check the `status` field,
+not the plan output. Ratification is the owner's act; see AGENTS.md,
+"New sessions".
 
 ## Commands
 
@@ -31,10 +31,10 @@ make verify SPEC=001       # one spec's declared acceptance
 spec-spine registry plan   # what is schedulable
 ```
 
-`make code` exists but judges nothing yet: the workspace has no members, so each
-cargo verb is guarded on `crates/*/Cargo.toml` and skips with a note. It becomes
-real with the first crate, which is spec 002's `crates/statecraft-environment/`.
-Both surfaces are required through the `ci-gate` status check.
+`make code` judges `crates/statecraft-environment/`, the first crate. Both
+surfaces are required through the `ci-gate` status check. The guard that made
+the cargo verbs skip on an empty workspace is still there and still correct; it
+simply no longer fires.
 
 ## Conventions that bite
 

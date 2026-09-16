@@ -1,7 +1,7 @@
 ---
 id: "003-work-and-run-semantics"
 title: "Work selection, workspace preparation, the run record, and recovery after interruption"
-status: draft
+status: approved
 implementation: pending
 created: "2026-09-16"
 summary: >

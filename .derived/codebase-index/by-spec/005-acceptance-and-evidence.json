@@ -29,8 +29,8 @@
       }
     ],
     "specId": "005-acceptance-and-evidence",
-    "specStatus": "draft"
+    "specStatus": "approved"
   },
   "schemaVersion": "1.1.0",
-  "shardHash": "27682ac32e72794750d388d15ec471565bdfdf2b93c413b4e4ed645484415191"
+  "shardHash": "43ca9cbd1741e9b5f9304e88b4d0d4cc4b5d015fa904b2183c7698f8e37234d0"
 }

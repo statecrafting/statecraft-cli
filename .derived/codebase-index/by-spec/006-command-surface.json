@@ -4,8 +4,8 @@
     "warnings": [
       {
         "code": "W-001",
-        "message": "spec '004-execution-adapter' directory unit 'crates/statecraft-adapter/' is not a directory",
-        "path": "crates/statecraft-adapter/"
+        "message": "spec '006-command-surface' directory unit 'crates/statecraft-cli/' is not a directory",
+        "path": "crates/statecraft-cli/"
       }
     ]
   },
@@ -13,7 +13,7 @@
     "dependsOn": [
       "000-bootstrap",
       "001-boundaries-and-authority",
-      "003-work-and-run-semantics"
+      "002-environment-lifecycle"
     ],
     "implementingPaths": [],
     "resolvedUnits": [
@@ -23,13 +23,13 @@
         "sourceField": "establishes",
         "unit": {
           "kind": "directory",
-          "path": "crates/statecraft-adapter/"
+          "path": "crates/statecraft-cli/"
         }
       }
     ],
-    "specId": "004-execution-adapter",
-    "specStatus": "approved"
+    "specId": "006-command-surface",
+    "specStatus": "draft"
   },
   "schemaVersion": "1.1.0",
-  "shardHash": "0942668b6d7eb7c4b1aa98f84ba343da3638b70197a2eafb92f07144915802a8"
+  "shardHash": "376d1540b964bcd753842029016a08c6ef92c5178bcbf489a9e9db0cda676b23"
 }
