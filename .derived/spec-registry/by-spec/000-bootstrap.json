@@ -1,0 +1,65 @@
+{
+  "record": {
+    "created": "2026-09-16",
+    "establishes": [
+      {
+        "kind": "file",
+        "path": "standards/spec/contract.md"
+      },
+      {
+        "kind": "directory",
+        "path": "standards/spec/templates/"
+      },
+      {
+        "anchor": "i-markdown-only-authored-truth",
+        "file": "standards/spec/constitution.md",
+        "kind": "section"
+      },
+      {
+        "anchor": "ii-compiler-owned-json-machine-truth",
+        "file": "standards/spec/constitution.md",
+        "kind": "section"
+      },
+      {
+        "anchor": "iii-spec-first-development",
+        "file": "standards/spec/constitution.md",
+        "kind": "section"
+      },
+      {
+        "anchor": "iv-determinism-and-validation",
+        "file": "standards/spec/constitution.md",
+        "kind": "section"
+      },
+      {
+        "anchor": "v-legacy-as-evidence",
+        "file": "standards/spec/constitution.md",
+        "kind": "section"
+      }
+    ],
+    "id": "000-bootstrap",
+    "implementation": "n-a",
+    "sectionHeadings": [
+      "000: Bootstrap spec system",
+      "1. The authoring / derived boundary",
+      "2. The typed authority graph",
+      "3. Determinism",
+      "4. Refusal",
+      "5. No product anchor is frozen yet",
+      "6. What this spec does not do",
+      "Verification"
+    ],
+    "specPath": "specs/000-bootstrap/spec.md",
+    "status": "approved",
+    "summary": "Foundational contract for this repository: authored truth lives only in markdown (+ YAML frontmatter); machine-consumable truth is compiler-emitted JSON only; every artifact is a deterministic function of (config, file contents); a typed authority graph governs who-owns-what. This repository is born governed and currently holds no product code: the corpus exists before the first line is written, and no spec here may claim otherwise.\n",
+    "title": "Bootstrap spec system",
+    "unamendable": [
+      "markdown-truth-boundary",
+      "json-truth-boundary",
+      "determinism-requirement",
+      "typed-authority-graph",
+      "refusal-rule"
+    ]
+  },
+  "shardHash": "e9b5e7c963139be0f428dd9ff0e347e69e8ded6c551c9e7453d8a476f875cc29",
+  "specVersion": "1.2.0"
+}

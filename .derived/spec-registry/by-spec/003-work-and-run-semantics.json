@@ -1,0 +1,41 @@
+{
+  "record": {
+    "created": "2026-09-16",
+    "dependsOn": [
+      "000-bootstrap",
+      "001-boundaries-and-authority",
+      "002-environment-lifecycle"
+    ],
+    "establishes": [
+      {
+        "kind": "directory",
+        "path": "crates/statecraft-run/"
+      }
+    ],
+    "id": "003-work-and-run-semantics",
+    "implementation": "pending",
+    "sectionHeadings": [
+      "003: Work selection, workspace preparation, the run record, and recovery",
+      "1. Purpose",
+      "2. Territory",
+      "3. Behavior",
+      "3.1 A unit of work",
+      "3.1.1 Ready is not ratified",
+      "3.2 Workspace preparation",
+      "3.3 The run record",
+      "3.4 The closed outcome set",
+      "3.5 Refusal accounting belongs to the supervisor",
+      "3.6 Recovery and reconciliation",
+      "3.7 Concurrency bounds for the first slice",
+      "3.8 Observable negative cases",
+      "4. Out of scope",
+      "Verification"
+    ],
+    "specPath": "specs/003-work-and-run-semantics/spec.md",
+    "status": "draft",
+    "summary": "The core loop's semantics. How a unit of work is identified by reading spec-spine's structured report rather than re-deriving it; how an isolated workspace is prepared so the operator's checkout is never edited; the append-only hash-linked run record with intent written before an effect and outcome after it; the closed outcome set (completed, failed, refused, interrupted, cancelled) and the rule that a retry appends an attempt rather than replacing history; supervisor-owned refusal accounting a supervised process cannot erase; and reconciliation of an ambiguous effect before any retry, with no exactly-once promise.\n",
+    "title": "Work selection, workspace preparation, the run record, and recovery after interruption"
+  },
+  "shardHash": "3569ae6c64c44d38aa8cf2a860b180d821b99a4f2435ccdcacd8385b431632db",
+  "specVersion": "1.2.0"
+}

@@ -1,0 +1,36 @@
+{
+  "diagnostics": {
+    "errors": [],
+    "warnings": [
+      {
+        "code": "W-001",
+        "message": "spec '005-acceptance-and-evidence' directory unit 'crates/statecraft-acceptance/' is not a directory",
+        "path": "crates/statecraft-acceptance/"
+      }
+    ]
+  },
+  "mapping": {
+    "dependsOn": [
+      "000-bootstrap",
+      "001-boundaries-and-authority",
+      "003-work-and-run-semantics",
+      "004-execution-adapter"
+    ],
+    "implementingPaths": [],
+    "resolvedUnits": [
+      {
+        "locations": [],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "kind": "directory",
+          "path": "crates/statecraft-acceptance/"
+        }
+      }
+    ],
+    "specId": "005-acceptance-and-evidence",
+    "specStatus": "draft"
+  },
+  "schemaVersion": "1.1.0",
+  "shardHash": "96c999fef104e977509e4c1be8a74e548f806a14b8bc3ab7a4196faef190e657"
+}
