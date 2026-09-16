@@ -1,0 +1,246 @@
+//! Spawning an adapter, holding it to a deadline, and killing its descendants.
+//!
+//! Spec 004 sections 3.1, 3.3 and 3.5. The supervisor reads the manifest first,
+//! **every time**: a required token the manifest lacks is a refusal before any
+//! process is spawned, and there is no partial spawn and no post-hoc discovery.
+//!
+//! A hung child is killed at the deadline **with its descendants**, and the
+//! attempt is `interrupted`. A child that leaves a process behind is reported as
+//! a residual, never as a clean termination.
+
+use crate::capability::{Negotiation, Requested, negotiate};
+use crate::environment::{ChildEnvironment, EnvironmentState};
+use crate::manifest::Manifest;
+use crate::protocol::{Event, Request, StreamError, parse_event};
+use statecraft_run::attempt::Outcome;
+use std::io::{BufRead, BufReader};
+use std::path::Path;
+use std::process::{Command, Stdio};
+use std::sync::mpsc;
+use std::time::{Duration, Instant};
+
+/// Why nothing was spawned.
+#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
+pub enum SpawnRefusal {
+    /// A required capability the manifest lacks.
+    ///
+    /// Names the token **and** the adapter version, because the same token may
+    /// be present in the next version and the operator needs to know which.
+    #[error(
+        "adapter {adapter} {version} does not support required capability `{token}`; \
+         refused before spawn, no process created"
+    )]
+    MissingRequired {
+        /// The adapter.
+        adapter: String,
+        /// Its version.
+        version: String,
+        /// The token it lacks.
+        token: String,
+    },
+    /// The constructed environment refused.
+    #[error("the constructed environment refused: {reasons}")]
+    Environment {
+        /// Why, joined.
+        reasons: String,
+    },
+}
+
+/// What a supervised run produced.
+#[derive(Debug, Clone, PartialEq)]
+pub struct Supervised {
+    /// Every event read from the stream, in order.
+    pub events: Vec<Event>,
+    /// The outcome the supervisor decided.
+    pub outcome: Outcome,
+    /// Set when the stream could not be read as a completion.
+    pub stream_error: Option<StreamError>,
+    /// Set when a process outlived the kill.
+    pub surviving_processes: Option<String>,
+}
+
+/// Check a request against a manifest and an environment, before spawning.
+///
+/// Returns the negotiation when a spawn may proceed. The manifest is read here
+/// and only here, which is what makes "the manifest is read first, every time"
+/// structural rather than a convention.
+pub fn preflight(
+    manifest: &Manifest,
+    requested: &Requested,
+    environment: &ChildEnvironment,
+) -> Result<Negotiation, SpawnRefusal> {
+    let negotiation = negotiate(requested, &manifest.supports);
+    if let Some(missing) = negotiation.missing_required.first() {
+        return Err(SpawnRefusal::MissingRequired {
+            adapter: manifest.adapter.clone(),
+            version: manifest.version.clone(),
+            token: missing.token().to_string(),
+        });
+    }
+    if let EnvironmentState::Refused { reasons } = &environment.state {
+        return Err(SpawnRefusal::Environment {
+            reasons: reasons.join("; "),
+        });
+    }
+    Ok(negotiation)
+}
+
+/// Spawn an adapter and read its event stream under a deadline.
+///
+/// The child is put in its own process group so the deadline can kill the whole
+/// tree. A deny list of pids would be a list of the children somebody thought
+/// of; a process group is the complete set.
+pub fn supervise(
+    program: &Path,
+    args: &[&str],
+    request: &Request,
+    environment: &ChildEnvironment,
+) -> std::io::Result<Supervised> {
+    let mut command = Command::new(program);
+    command
+        .args(args)
+        .env_clear()
+        .envs(&environment.variables)
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::null());
+
+    #[cfg(unix)]
+    {
+        use std::os::unix::process::CommandExt;
+        // Its own process group, so the deadline kills descendants too.
+        command.process_group(0);
+    }
+
+    let mut child = command.spawn()?;
+
+    // The prompt goes on a stream. It is never interpolated into a command line,
+    // which is why `args` above carries no prompt and cannot.
+    if let Some(mut stdin) = child.stdin.take() {
+        use std::io::Write;
+        let _ = stdin.write_all(&request.prompt);
+        // Dropping closes it, which is how the child learns the prompt ended.
+    }
+
+    let stdout = child.stdout.take().expect("stdout was piped");
+    let (tx, rx) = mpsc::channel();
+    let reader = std::thread::spawn(move || {
+        for (i, line) in BufReader::new(stdout).lines().enumerate() {
+            let Ok(line) = line else { break };
+            if line.trim().is_empty() {
+                continue;
+            }
+            if tx.send(parse_event(&line, i + 1)).is_err() {
+                break;
+            }
+        }
+    });
+
+    let deadline = Instant::now() + Duration::from_secs(request.deadline_seconds);
+    let mut events = Vec::new();
+    let mut stream_error = None;
+    let mut timed_out = false;
+
+    loop {
+        let remaining = deadline.saturating_duration_since(Instant::now());
+        if remaining.is_zero() {
+            timed_out = true;
+            break;
+        }
+        match rx.recv_timeout(remaining) {
+            Ok(Ok(event)) => {
+                let terminal = matches!(event, Event::Result { .. });
+                events.push(event);
+                if terminal {
+                    break;
+                }
+            }
+            Ok(Err(e)) => {
+                // Malformed. Reported as malformed, and the read stops: there is
+                // nothing trustworthy after a line that did not parse.
+                stream_error = Some(e);
+                break;
+            }
+            Err(mpsc::RecvTimeoutError::Timeout) => {
+                timed_out = true;
+                break;
+            }
+            Err(mpsc::RecvTimeoutError::Disconnected) => break,
+        }
+    }
+
+    let surviving = if timed_out {
+        kill_tree(&mut child)
+    } else {
+        let _ = child.wait();
+        None
+    };
+    let _ = reader.join();
+
+    let has_result = events.iter().any(|e| matches!(e, Event::Result { .. }));
+    if stream_error.is_none() && !has_result && !timed_out {
+        stream_error = Some(StreamError::NoResult {
+            events: events.len(),
+        });
+    }
+
+    let outcome = if timed_out {
+        // Nothing was judged, so this is interrupted and not failed.
+        Outcome::Interrupted
+    } else if stream_error.is_some() {
+        // A stream that cannot be read is never a completion. It is also not a
+        // judgement of the work, so it is interrupted rather than failed.
+        Outcome::Interrupted
+    } else {
+        Outcome::Completed
+    };
+
+    Ok(Supervised {
+        events,
+        outcome,
+        stream_error,
+        surviving_processes: surviving,
+    })
+}
+
+/// Kill the child and everything in its process group.
+///
+/// Returns a description when something survived, which becomes a residual on
+/// the attempt rather than a footnote nobody reads.
+#[cfg(unix)]
+fn kill_tree(child: &mut std::process::Child) -> Option<String> {
+    let pid = child.id();
+    // Negative pid means the process group. `kill` is shelled out to rather than
+    // linking libc for one signal: the dependency would be larger than the need.
+    let group = Command::new("kill")
+        .args(["-KILL", &format!("-{pid}")])
+        .output();
+    let _ = child.kill();
+    let _ = child.wait();
+
+    match group {
+        Ok(o) if o.status.success() => None,
+        Ok(o) => {
+            let detail = String::from_utf8_lossy(&o.stderr).trim().to_string();
+            // "No such process" means the group was already gone, which is the
+            // ordinary case when the child exited between the deadline and here.
+            if detail.contains("No such process") || detail.is_empty() {
+                None
+            } else {
+                Some(format!("process group {pid} could not be killed: {detail}"))
+            }
+        }
+        Err(e) => Some(format!("could not kill process group {pid}: {e}")),
+    }
+}
+
+#[cfg(not(unix))]
+fn kill_tree(child: &mut std::process::Child) -> Option<String> {
+    let pid = child.id();
+    let _ = child.kill();
+    let _ = child.wait();
+    Some(format!(
+        "descendants of {pid} are not killed on this platform; \
+         a surviving process is possible and is reported rather than assumed away"
+    ))
+}

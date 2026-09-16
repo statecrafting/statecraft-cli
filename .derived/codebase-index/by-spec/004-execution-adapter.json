@@ -1,24 +1,23 @@
 {
-  "diagnostics": {
-    "errors": [],
-    "warnings": [
-      {
-        "code": "W-001",
-        "message": "spec '004-execution-adapter' directory unit 'crates/statecraft-adapter/' is not a directory",
-        "path": "crates/statecraft-adapter/"
-      }
-    ]
-  },
   "mapping": {
     "dependsOn": [
       "000-bootstrap",
       "001-boundaries-and-authority",
       "003-work-and-run-semantics"
     ],
-    "implementingPaths": [],
+    "implementingPaths": [
+      {
+        "path": "crates/statecraft-adapter/",
+        "source": "spec-edge"
+      }
+    ],
     "resolvedUnits": [
       {
-        "locations": [],
+        "locations": [
+          {
+            "file": "crates/statecraft-adapter/"
+          }
+        ],
         "ownership": true,
         "sourceField": "establishes",
         "unit": {
@@ -31,5 +30,5 @@
     "specStatus": "approved"
   },
   "schemaVersion": "1.1.0",
-  "shardHash": "0942668b6d7eb7c4b1aa98f84ba343da3638b70197a2eafb92f07144915802a8"
+  "shardHash": "6a9892b34a9839c5509bb3451fe3d5034dd2e28e9bf1ca253fcf7a8ded0cdfd3"
 }
