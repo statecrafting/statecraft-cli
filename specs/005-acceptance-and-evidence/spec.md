@@ -108,18 +108,40 @@ report once released, and do not invent current support.
 
 So the split is:
 
-1. For every authority-set member spec-spine can see (policy, check suite,
-   verifier, hooks, acceptance instructions inside the corpus), the classification
-   comes from **spec-spine's delta report** once a release carries it. Until then
-   this product records the authority-set verdict as `not-recorded`, names the
-   missing spec-spine capability and its own pinned version, and **still refuses
-   to accept** on the candidate's own suite. Refusing without the report is
-   available; classifying without it is not.
-2. The environment manifest (`002` section 3.3) is the one member spec-spine
-   cannot know about, because it is this product's own record of what it manages.
-   Its diff is computed here, and only that.
+1. **Corpus-side members**: the specs themselves and the spec-spine
+   configuration. The classification comes from **spec-spine's delta report**
+   once a release carries it. Until then this product records the authority-set
+   verdict as `not-recorded`, names the missing spec-spine capability and its own
+   pinned version, and **still refuses to accept** on the candidate's own suite.
+   Refusing without the report is available; classifying without it is not.
+2. **Repository-artifact members**: the check suite, the verifier, the hooks, and
+   any acceptance instructions that live outside a `spec.md`. Membership is
+   declared **here, by path**. The delta report gives each such path a structural
+   class, which is useful detail and is not a membership answer.
+3. **The environment manifest** (`002` section 3.3), which spec-spine cannot know
+   about at all, because it is this product's own record of what it manages. Its
+   diff is computed here, and only that.
 
-This product does not build a second change classifier for case 1 while waiting.
+**What the delta report answers, and what it does not.** Spec 088 classifies
+**structurally, by path, under the base's rules**, and its class names are not
+this product's member names. Its `policy` is `spec-spine.toml` and the paths the
+base lists in `[index] extra_hashed_inputs`; its `verification` is a spec's own
+`verify:cli` plan; there is no `hooks` class at all. A repository's hook scripts,
+`Makefile` or CI workflow therefore arrive as `implementation`, `unowned`,
+`bypassed`, or `policy` when the base happens to hash them, and none of those
+answers whether the path is an authority-set member **here**.
+
+So this product MUST define authority-set membership **by path** for the members
+that are repository artifacts: the check suite, the verifier, the hooks, and any
+acceptance instructions that live outside a `spec.md`. The delta report is used
+for the corpus-side classes only. Membership is this product's question;
+classification under the base's rules is spec-spine's, and reading the second as
+an answer to the first would leave the repository-artifact members unchecked
+while the verdict still read as complete.
+
+This product does not build a second change classifier for case 1 while waiting,
+and declaring membership by path in case 2 is not one: it says which paths matter
+here, never how the base would classify a change to them.
 A local reimplementation would answer a slightly different question than the
 verifier the family will standardise on, which is the failure `001` section 3.2
 exists to prevent.

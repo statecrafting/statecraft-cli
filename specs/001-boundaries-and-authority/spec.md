@@ -129,9 +129,14 @@ This ordering is a **proposed decision** (`D-05`), not an adopted one.
 
 ### 3.5 An authority change is not an implementation change
 
-The **authority set** of a registered repository is: its policy, its check
-suite, its verifier, its hooks, the acceptance instructions the product reads,
-and the environment manifest that says which files this product manages.
+The **authority set** of a registered repository is: its policy, **including the
+lifecycle policy `003` section 3.1.1 reads from it**, its check suite, its
+verifier, its hooks, the acceptance instructions the product reads, and the
+environment manifest that says which files this product manages.
+
+Membership here is a question about *this* product's trust boundary. It is not
+the same question as how a base's rules would classify a change to one of these
+paths, and `005` section 3.3 fixes which of the two answers each member takes.
 
 Three observable rules:
 

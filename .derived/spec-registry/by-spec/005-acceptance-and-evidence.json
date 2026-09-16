@@ -39,6 +39,6 @@
     "summary": "How a claim of completion becomes, or fails to become, an acceptance. Fixes the identification of candidate bytes and the trusted base, the authority-set rule that stops a candidate from being judged by rules it wrote, the receipt that binds repository, base, candidate, suite, exit codes and policy digest, the four evidence dimensions reported separately from admission with closed value sets, independently supplied trust roots, the preservation of original bytes and named hash constructions, and the three names for absence, none of which reads as success.\n",
     "title": "Independent acceptance, the receipt, and the separately reported evidence dimensions"
   },
-  "shardHash": "d916c19f44ccb25c2d67abd0d68e03f5513b12a2fcc1cb719efaafbe241735a1",
+  "shardHash": "908e5c200d1af314cc26e36fcc4dbe9e1f06da776eb25a07ea8de14b641c6573",
   "specVersion": "1.2.0"
 }
