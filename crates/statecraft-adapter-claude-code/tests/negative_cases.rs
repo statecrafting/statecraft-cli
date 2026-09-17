@@ -29,6 +29,179 @@ fn recorded(name: &str) -> Vec<ProviderEvent> {
     read_jsonl(&text).expect("a recorded stream is well formed")
 }
 
+// Replay recorded native bytes through a real child, including its exit code.
+fn replay(text: &str, code: u8) -> provider::execution::Execution {
+    let workspace = tempfile::tempdir().unwrap();
+    let fixture = workspace.path().join("stream.jsonl");
+    std::fs::write(&fixture, text).unwrap();
+    let request = statecraft_adapter::Request {
+        workspace: workspace.path().to_path_buf(),
+        base_commit: "recorded".into(),
+        prompt: b"prompt through stdin".to_vec(),
+        capabilities: Requested::none(),
+        deadline_seconds: 5,
+        attempt: statecraft_adapter::protocol::AttemptIdentity {
+            run_id: "native-replay".into(),
+            number: 1,
+        },
+    };
+    let environment = statecraft_adapter::environment::construct(
+        &statecraft_adapter::environment::Blueprint::empty(),
+        &statecraft_adapter::environment::CheckSuiteCommands::default(),
+    );
+    let execution = provider::execution::supervise(
+        std::path::Path::new("/bin/sh"),
+        &[
+            "-c",
+            "/bin/cat > prompt.txt; /bin/cat stream.jsonl; exit \"$1\"",
+            "replay",
+            &code.to_string(),
+        ],
+        &request,
+        &environment,
+        &granted_everything(),
+    )
+    .unwrap();
+    // The child consumed stdin and used relative paths in the request's cwd.
+    assert_eq!(
+        std::fs::read(workspace.path().join("prompt.txt")).unwrap(),
+        request.prompt
+    );
+    execution
+}
+
+fn recorded_text(name: &str) -> String {
+    std::fs::read_to_string(
+        std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("testdata/stream")
+            .join(name),
+    )
+    .unwrap()
+}
+
+#[test]
+fn native_recorded_success_crosses_the_process_seam() {
+    let text = recorded_text("success.jsonl");
+    // A native line remains invalid at the strict generic adapter boundary.
+    assert!(statecraft_adapter::protocol::parse_event(text.lines().next().unwrap(), 1).is_err());
+    let execution = replay(&text, 0);
+    assert_eq!(execution.supervised.stream_error, None);
+    assert_eq!(execution.supervised.outcome, Outcome::Completed);
+    assert_eq!(
+        execution.supervised.events,
+        map_stream(&recorded("success.jsonl"), &granted_everything())
+            .unwrap()
+            .events
+    );
+    let result = read_stream(&execution.supervised.events, &[]).unwrap();
+    assert_eq!(result.provider_version, provider::MEASURED_PROVIDER_VERSION);
+    assert!(result.cost.is_known());
+}
+
+#[test]
+fn native_denied_success_keeps_progress_claim_turns_and_exactly_one_refusal() {
+    let execution = replay(&recorded_text("denied.jsonl"), 0);
+    assert_eq!(execution.supervised.stream_error, None);
+    assert_eq!(execution.supervised.outcome, Outcome::Refused);
+    assert_eq!(execution.termination().adapter_claimed, Outcome::Completed);
+    let refusals = statecraft_adapter::protocol::refusals(&execution.supervised.events);
+    assert_eq!(refusals.len(), 1);
+    let denial: serde_json::Value = serde_json::from_str(&refusals[0].detail).unwrap();
+    assert_eq!(
+        denial,
+        serde_json::to_value(&execution.result.as_ref().unwrap().permission_denials[0]).unwrap()
+    );
+    assert!(execution.supervised.events.iter().any(
+        |e| matches!(e, Event::Progress { message } if message == "system/permission_denied")
+    ));
+    assert!(
+        execution.evidence()["providerTerminal"]["num_turns"]
+            .as_u64()
+            .unwrap()
+            > 0
+    );
+}
+
+#[test]
+fn native_turn_cap_is_interrupted_even_when_the_process_exits_one() {
+    let execution = replay(&recorded_text("max-turns.jsonl"), 1);
+    assert_eq!(execution.supervised.stream_error, None);
+    assert_eq!(execution.supervised.outcome, Outcome::Interrupted);
+    assert_eq!(execution.termination().observed, Outcome::Interrupted);
+    assert_eq!(
+        execution.terminal.unwrap().provider_claim,
+        Classification::Stopped
+    );
+}
+
+#[test]
+fn native_tool_removal_produces_no_invented_refusal() {
+    let execution = replay(&recorded_text("tool-removed.jsonl"), 0);
+    assert_eq!(execution.supervised.stream_error, None);
+    assert_eq!(execution.supervised.outcome, Outcome::Completed);
+    assert!(statecraft_adapter::protocol::refusals(&execution.supervised.events).is_empty());
+}
+
+#[test]
+fn native_malformed_and_truncated_streams_retain_progress_and_report_the_error() {
+    let text = recorded_text("success.jsonl");
+    let mut lines: Vec<_> = text.lines().collect();
+    lines.pop();
+    let prefix = lines.join("\n");
+    let truncated = replay(&prefix, 0);
+    assert_eq!(truncated.supervised.outcome, Outcome::Interrupted);
+    assert!(matches!(
+        truncated.supervised.stream_error,
+        Some(statecraft_adapter::StreamError::NoResult { .. })
+    ));
+    assert!(!truncated.supervised.events.is_empty());
+    let malformed = replay(&format!("{prefix}\n\nnot json\n"), 0);
+    assert_eq!(malformed.supervised.outcome, Outcome::Interrupted);
+    assert_eq!(malformed.supervised.events, truncated.supervised.events);
+    assert!(
+        matches!(malformed.supervised.stream_error, Some(statecraft_adapter::StreamError::Malformed { line, .. }) if line == lines.len() + 2)
+    );
+}
+
+#[test]
+fn native_unknown_terminal_is_reported_with_its_claim_and_physical_line() {
+    let text = recorded_text("success.jsonl");
+    let mut lines: Vec<String> = text.lines().map(str::to_string).collect();
+    let mut result: serde_json::Value = serde_json::from_str(lines.last().unwrap()).unwrap();
+    result["subtype"] = "unmeasured".into();
+    lines.pop();
+    lines.push(String::new());
+    lines.push(result.to_string());
+    let execution = replay(&lines.join("\n"), 0);
+    assert_eq!(execution.supervised.outcome, Outcome::Interrupted);
+    assert!(
+        matches!(execution.supervised.stream_error, Some(statecraft_adapter::StreamError::Malformed { line, .. }) if line == lines.len())
+    );
+    assert!(
+        execution.evidence()["streamError"]
+            .as_str()
+            .unwrap()
+            .contains("not in spec 008")
+    );
+    assert_eq!(
+        execution.evidence()["providerTerminal"]["subtype"],
+        "unmeasured"
+    );
+    assert!(execution.terminal.is_none());
+}
+
+#[test]
+fn native_stream_without_init_is_never_completed() {
+    let text = recorded_text("success.jsonl");
+    let execution = replay(text.lines().last().unwrap(), 0);
+    assert_eq!(execution.supervised.outcome, Outcome::Interrupted);
+    assert_eq!(
+        execution.supervised.stream_error,
+        Some(statecraft_adapter::StreamError::NoInit)
+    );
+    assert!(execution.result.is_some());
+}
+
 fn granted_everything() -> Vec<Capability> {
     provider::supported()
 }
