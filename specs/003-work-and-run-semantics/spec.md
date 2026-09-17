@@ -253,6 +253,31 @@ carries only `id` and `title`. `registry list --json` carries `status` and
 still reading rather than deriving. A ready spec absent from the lifecycle
 report is excluded with "status is unknown" rather than assumed approved.
 
+**2026-09-17: both reports are envelopes, and only one of them was read as
+one.** §3.1 requires the product to parse spec-spine's structured output and
+§3.1.1 fixes the join, and neither says what the outer shape of either answer
+is. Measured against the pinned spec-spine 0.20.0 on 2026-09-17, against this
+repository's own corpus and against a scratch one: `registry plan --json`
+answers `{"ready": [...], "blocked": [...], "notSchedulable": N,
+"schemaVersion": ...}` and `registry list --json` answers `{"items": [...],
+"schemaVersion": ...}`. The plan half was already read through its own key; the
+lifecycle half was read as a bare array, so every `work`, `run` and `accept`
+invocation against a real corpus exited 4 with "expected an array of specs".
+No test caught it because every fixture was a hand-built bare array, which is
+the shape the parser wanted rather than the shape spec-spine gives it. The
+lifecycle half is now read through `items`, a bare array is still accepted
+because an older report that is one carries the same rows, and the tests carry
+the measured envelope. Nothing §3 requires changed: this is the same read, of
+the same two reports, finally performed on the bytes they actually contain.
+
+**2026-09-17: the version a refusal names is the version.** §3.1 requires a
+refusal to name the missing field and the spec-spine version, and
+`spec-spine --version` prints `spec-spine 0.20.0`. Keeping the whole line made
+every refusal read "spec-spine spec-spine 0.20.0 report ..." and put a program
+name inside `specSpineVersion`, which `006` §3.4 makes a contract. The last
+whitespace-separated token is taken, which is what this product already does
+where it asks spec-spine the same question for the environment manifest's pins.
+
 **2026-09-16: a torn tail is truncated before the next append.** §3.8 requires
 recovery to read to the last complete record, report the tear, and append after
 it, without rewriting earlier records. The trailing partial bytes are truncated
