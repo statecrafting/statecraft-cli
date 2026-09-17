@@ -57,7 +57,10 @@ esac
         &bin.path().join("claude"),
         r#"#!/bin/sh
 if [ "$1" = --version ]; then /bin/cat "$(dirname "$0")/version"; exit 0; fi
-[ "$*" = '--print --output-format stream-json --verbose' ] || exit 3
+[ "$#" = 6 ] || exit 3
+[ "$1 $2 $3 $4" = '--print --output-format stream-json --verbose' ] || exit 3
+[ "$5" = --settings ] || exit 3
+[ "$(/bin/cat "$6")" = '{"permissions":{"deny":[]}}' ] || exit 3
 [ "${USER+x}" != x ] || exit 3
 [ "${HOME+x}" != x ] || exit 3
 /bin/cat > child-prompt

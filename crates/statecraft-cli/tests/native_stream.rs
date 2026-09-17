@@ -78,7 +78,12 @@ esac
         &bin.path().join("claude"),
         r#"#!/bin/sh
 if [ "$1" = --version ]; then echo '2.1.267'; exit 0; fi
-[ "$*" = '--print --output-format stream-json --verbose' ] || exit 3
+[ "$#" = 6 ] || exit 3
+[ "$1 $2 $3 $4" = '--print --output-format stream-json --verbose' ] || exit 3
+[ "$5" = --settings ] || exit 3
+[ "$(/bin/cat "$6")" = '{"permissions":{"deny":[]}}' ] || exit 3
+/bin/cat "$6" > child-settings
+printf '%s' "$6" > child-settings-path
 [ "${USER+x}" != x ] || exit 3
 [ "${HOME+x}" != x ] || exit 3
 /bin/cat > child-prompt
@@ -130,6 +135,12 @@ esac
         "Implement replay in this workspace."
     );
     assert!(!target.path().join("child-cwd").exists());
+    let settings: serde_json::Value =
+        serde_json::from_slice(&std::fs::read(workspace.join("child-settings")).unwrap()).unwrap();
+    assert_eq!(settings, serde_json::json!({"permissions":{"deny":[]}}));
+    let settings_path = std::fs::read_to_string(workspace.join("child-settings-path")).unwrap();
+    assert!(!Path::new(&settings_path).exists());
+    assert!(!Path::new(&settings_path).starts_with(workspace));
 
     let (chain, _) = statecraft_run::record::Chain::open(home.path(), target.path()).unwrap();
     let entries = chain.entries();

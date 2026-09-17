@@ -29,8 +29,6 @@ statecraft-adapter = { path = "../statecraft-adapter" }
 statecraft-envelope = { path = "../statecraft-envelope" }
 statecraft-environment = { path = "../statecraft-environment" }
 statecraft-run = { path = "../statecraft-run" }
-
-[dev-dependencies]
 tempfile = "3.27.0"
 
 [lints.rust]

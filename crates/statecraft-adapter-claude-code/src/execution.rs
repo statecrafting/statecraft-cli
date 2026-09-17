@@ -1,6 +1,7 @@
 //! Connect the native stream to the existing mapping without teaching the
 //! generic protocol a provider's spelling. Spec 008 sections 3.1 to 3.5.
 
+use crate::Invocation;
 use crate::outcome::TerminalReading;
 use crate::stream::{MapError, ProviderEvent, ResultEvent, map_stream};
 use statecraft_adapter::capability::Capability;
@@ -19,6 +20,8 @@ pub struct Execution {
     pub terminal: Option<TerminalReading>,
     /// The terminal fields as read, also retained for an unmapped terminal state.
     pub result: Option<ResultEvent>,
+    /// A settings cleanup failure, retained beside any terminal evidence.
+    pub settings_cleanup_error: Option<String>,
 }
 
 impl Execution {
@@ -61,22 +64,77 @@ impl Execution {
             "providerTerminal": terminal,
             "streamError": self.supervised.stream_error.as_ref().map(ToString::to_string),
             "survivingProcesses": self.supervised.surviving_processes,
+            "settingsCleanupError": self.settings_cleanup_error,
         })
     }
 }
 
 /// Supervise native JSONL, then use the provider's existing stream and outcome
 /// mappings. The generic supervisor alone creates and controls the process.
+///
+/// The invocation's settings are an additional command-line settings source,
+/// using the provider's native precedence and list merging. No settings source
+/// or hook is disabled. The private file lives outside the request workspace
+/// until supervision returns, and is removed on success, timeout or error.
 pub fn supervise(
-    program: &Path,
-    args: &[&str],
+    invocation: &Invocation,
     request: &Request,
     environment: &ChildEnvironment,
     granted: &[Capability],
 ) -> std::io::Result<Execution> {
+    supervise_in(
+        invocation,
+        request,
+        environment,
+        granted,
+        &std::env::temp_dir(),
+    )
+}
+
+fn supervise_in(
+    invocation: &Invocation,
+    request: &Request,
+    environment: &ChildEnvironment,
+    granted: &[Capability],
+    temporary_root: &Path,
+) -> std::io::Result<Execution> {
+    // --settings is singular. Do not silently change the precedence of a
+    // caller's second document by appending ours or merging it ourselves.
+    if invocation
+        .args
+        .iter()
+        .any(|arg| arg == "--settings" || arg.starts_with("--settings="))
+    {
+        return Err(std::io::Error::new(
+            std::io::ErrorKind::InvalidInput,
+            "Invocation.settings owns --settings; a second settings argument is ambiguous",
+        ));
+    }
+    let temporary_root = temporary_root.canonicalize()?;
+    if temporary_root.starts_with(request.workspace.canonicalize()?) {
+        return Err(std::io::Error::new(
+            std::io::ErrorKind::InvalidInput,
+            "temporary settings storage must be outside the request workspace",
+        ));
+    }
+    // tempfile uses exclusive creation and mode 0600 on Unix. Each attempt
+    // owns a distinct file; no path in the target checkout is opened or reused.
+    let mut settings = tempfile::Builder::new()
+        .prefix("statecraft-settings-")
+        .suffix(".json")
+        .tempfile_in(temporary_root)?;
+    serde_json::to_writer(settings.as_file_mut(), &invocation.settings)?;
+    let settings_path = settings.path().to_str().ok_or_else(|| {
+        std::io::Error::new(
+            std::io::ErrorKind::InvalidInput,
+            "temporary settings path is not UTF-8",
+        )
+    })?;
+    let mut args = invocation.args();
+    args.extend(["--settings", settings_path]);
     let native = supervise_stream(
-        program,
-        args,
+        Path::new(&invocation.program),
+        &args,
         request,
         environment,
         |line, number| {
@@ -89,6 +147,14 @@ pub fn supervise(
         },
         |(_, event)| matches!(event, ProviderEvent::Result(_)),
     )?;
+    // Cleanup must not discard a readable terminal denial. Keep a failure as
+    // a residual alongside the execution evidence rather than returning early.
+    // An already removed file needs no further cleanup.
+    let settings_cleanup_error = settings
+        .close()
+        .err()
+        .filter(|error| error.kind() != std::io::ErrorKind::NotFound)
+        .map(|error| error.to_string());
     let mut supervised = Supervised {
         events: Vec::new(),
         outcome: native.outcome,
@@ -147,5 +213,94 @@ pub fn supervise(
         supervised,
         terminal,
         result,
+        settings_cleanup_error,
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use statecraft_adapter::capability::Requested;
+    use statecraft_adapter::environment::{Blueprint, CheckSuiteCommands, construct};
+    use statecraft_adapter::protocol::AttemptIdentity;
+
+    fn request(workspace: &Path) -> Request {
+        Request {
+            workspace: workspace.to_path_buf(),
+            base_commit: "fixture".into(),
+            prompt: b"private stdin".to_vec(),
+            capabilities: Requested::none(),
+            deadline_seconds: 1,
+            attempt: AttemptIdentity {
+                run_id: "settings-cleanup".into(),
+                number: 1,
+            },
+        }
+    }
+
+    #[test]
+    fn settings_are_removed_when_the_invocations_program_cannot_spawn() {
+        let workspace = tempfile::tempdir().unwrap();
+        let temporary_root = tempfile::tempdir().unwrap();
+        let invocation = Invocation::new(
+            workspace.path().join("absent-program").to_str().unwrap(),
+            &["Bash(echo:*)".into()],
+            None,
+        );
+        let environment = construct(&Blueprint::empty(), &CheckSuiteCommands::default());
+        let error = supervise_in(
+            &invocation,
+            &request(workspace.path()),
+            &environment,
+            &[],
+            temporary_root.path(),
+        )
+        .unwrap_err();
+        assert_eq!(error.kind(), std::io::ErrorKind::NotFound);
+        assert_eq!(std::fs::read_dir(temporary_root.path()).unwrap().count(), 0);
+        assert_eq!(std::fs::read_dir(workspace.path()).unwrap().count(), 0);
+    }
+
+    #[test]
+    fn duplicate_settings_arguments_refuse_instead_of_changing_precedence() {
+        let workspace = tempfile::tempdir().unwrap();
+        let temporary_root = tempfile::tempdir().unwrap();
+        let environment = construct(&Blueprint::empty(), &CheckSuiteCommands::default());
+        for args in [
+            vec!["--settings", "other.json"],
+            vec!["--settings=other.json"],
+        ] {
+            let mut invocation = Invocation::new("unused", &[], None);
+            invocation.args.extend(args.into_iter().map(str::to_string));
+            let error = supervise_in(
+                &invocation,
+                &request(workspace.path()),
+                &environment,
+                &[],
+                temporary_root.path(),
+            )
+            .unwrap_err();
+            assert_eq!(error.kind(), std::io::ErrorKind::InvalidInput);
+            assert!(error.to_string().contains("second settings argument"));
+        }
+        assert_eq!(std::fs::read_dir(temporary_root.path()).unwrap().count(), 0);
+    }
+
+    #[test]
+    fn temporary_storage_in_the_workspace_is_refused_before_writing() {
+        let workspace = tempfile::tempdir().unwrap();
+        let invocation = Invocation::new("unused", &[], None);
+        let environment = construct(&Blueprint::empty(), &CheckSuiteCommands::default());
+        let error = supervise_in(
+            &invocation,
+            &request(workspace.path()),
+            &environment,
+            &[],
+            workspace.path(),
+        )
+        .unwrap_err();
+        assert_eq!(error.kind(), std::io::ErrorKind::InvalidInput);
+        assert!(error.to_string().contains("outside the request workspace"));
+        assert_eq!(std::fs::read_dir(workspace.path()).unwrap().count(), 0);
+    }
 }
