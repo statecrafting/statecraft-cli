@@ -228,12 +228,27 @@ a caller introduce a seventh; an enum means a seventh requires editing this
 crate, which the coupling gate ties to editing this spec. A test asserts the set
 has exactly six members.
 
+**2026-09-16: a supervisor is never held past its own deadline, even by a
+survivor.** §3.5.3 requires the kill; it does not say what happens if the kill
+misses. CI answered that: a backgrounded process in the fixture survived the
+group kill on Linux, still held the stdout pipe open, and the supervisor's
+reader thread waited out the full 300 seconds after the deadline had correctly
+fired at one. So the reader is dropped rather than joined when a deadline
+fires. A supervisor that the supervised process can hold past its own deadline
+is not one, and the surviving process is reported as a residual (§3.8) rather
+than waited for.
+
 **2026-09-16: descendants are killed with a process group, and `kill` is shelled
 out to.** §3.5.3 requires the kill to reach descendants. The child is spawned
 into its own process group and the group is signalled, which is the same
 argument §3.6 makes about environments: a list of the pids somebody thought of
 is not the set. Sending the signal shells out to `kill` rather than linking a
-libc binding, because the dependency would be larger than the need. On a
+libc binding, because the dependency would be larger than the need. The form is
+`kill -s KILL -- -PID`: the `--` is load-bearing, because a bare negative pid is
+ambiguous with an option and the BSD and procps implementations disagree about
+which it is. That disagreement is what made the failure above invisible on a
+developer's machine and real on the runner. After the kill the group is probed
+with signal 0, so a residual is observed rather than assumed absent. On a
 non-Unix platform the descendants are not killed and the attempt says so, rather
 than reporting a clean termination it did not achieve.
 

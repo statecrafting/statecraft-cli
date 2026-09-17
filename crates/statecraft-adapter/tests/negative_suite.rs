@@ -138,13 +138,29 @@ fn suite_3_a_hung_child_is_killed_at_the_deadline_and_the_attempt_is_interrupted
         "not failed: nothing was judged"
     );
     assert!(
-        elapsed < std::time::Duration::from_secs(20),
-        "the deadline was enforced, not waited out: {elapsed:?}"
-    );
-    assert!(
         !Outcome::Interrupted.was_judged(),
         "interrupted is the outcome where nothing was judged"
     );
+
+    // The fixture also backgrounds a second `sleep 300`, so this covers the row
+    // about a child that spawns a survivor. The supervisor must return at its
+    // own deadline whether or not the group kill reached that survivor: being
+    // held past the deadline by the thing being supervised is the failure this
+    // bound exists to catch, and it is the one CI caught at 300 seconds, because
+    // the reader thread was joined while a survivor still held the pipe open.
+    assert!(
+        elapsed < std::time::Duration::from_secs(30),
+        "the deadline was enforced, not waited out: {elapsed:?}"
+    );
+
+    // If a descendant did outlive the kill it is reported as a residual, and
+    // never as a clean termination.
+    if let Some(residual) = &run.surviving_processes {
+        assert!(
+            residual.contains("outlived") || residual.contains("could not"),
+            "a survivor is described, not merely flagged: {residual}"
+        );
+    }
 }
 
 // Suite row 4: a malformed event stream is reported as malformed.

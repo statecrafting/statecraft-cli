@@ -170,12 +170,24 @@ pub fn supervise(
     }
 
     let surviving = if timed_out {
-        kill_tree(&mut child)
+        let residual = kill_tree(&mut child);
+        // The reader is NOT joined here, deliberately. It is blocked on a pipe
+        // whose writers include anything the child left behind, so joining it
+        // would wait exactly as long as the deadline was supposed to prevent.
+        // CI found this the expensive way: a backgrounded `sleep 300` in the
+        // fixture survived the group kill on Linux, and the join then waited out
+        // all 300 seconds after the deadline had correctly fired at one.
+        //
+        // A supervisor that can be held past its own deadline by the thing it is
+        // supervising is not one, so the thread is dropped and the survivor is
+        // reported as a residual instead.
+        drop(reader);
+        residual
     } else {
         let _ = child.wait();
+        let _ = reader.join();
         None
     };
-    let _ = reader.join();
 
     let has_result = events.iter().any(|e| matches!(e, Event::Result { .. }));
     if stream_error.is_none() && !has_result && !timed_out {
@@ -212,25 +224,40 @@ fn kill_tree(child: &mut std::process::Child) -> Option<String> {
     let pid = child.id();
     // Negative pid means the process group. `kill` is shelled out to rather than
     // linking libc for one signal: the dependency would be larger than the need.
+    //
+    // `-s KILL -- -PID`, not `-KILL -PID`. The `--` is load-bearing: without it
+    // a negative pid is ambiguous with an option, and the two `kill`
+    // implementations this runs on disagree about which it is. The BSD one on a
+    // developer's machine killed the group; the procps one on the Linux runner
+    // did not, and the difference was invisible until a backgrounded process
+    // outlived the deadline in CI.
     let group = Command::new("kill")
-        .args(["-KILL", &format!("-{pid}")])
+        .args(["-s", "KILL", "--", &format!("-{pid}")])
         .output();
     let _ = child.kill();
     let _ = child.wait();
 
-    match group {
-        Ok(o) if o.status.success() => None,
-        Ok(o) => {
-            let detail = String::from_utf8_lossy(&o.stderr).trim().to_string();
-            // "No such process" means the group was already gone, which is the
-            // ordinary case when the child exited between the deadline and here.
-            if detail.contains("No such process") || detail.is_empty() {
-                None
-            } else {
-                Some(format!("process group {pid} could not be killed: {detail}"))
-            }
-        }
-        Err(e) => Some(format!("could not kill process group {pid}: {e}")),
+    if let Err(e) = group {
+        return Some(format!("could not kill process group {pid}: {e}"));
+    }
+
+    // Ask whether the group still answers. Signal 0 delivers nothing and
+    // succeeds only if something is there to receive it, so this checks that the
+    // kill took, rather than that the command was well formed. A `kill` that
+    // exits zero has said nothing about whether the descendants are gone.
+    let still_there = Command::new("kill")
+        .args(["-s", "0", "--", &format!("-{pid}")])
+        .output()
+        .map(|o| o.status.success())
+        .unwrap_or(false);
+
+    if still_there {
+        Some(format!(
+            "process group {pid} still answers after SIGKILL; at least one descendant \
+             outlived the deadline"
+        ))
+    } else {
+        None
     }
 }
 

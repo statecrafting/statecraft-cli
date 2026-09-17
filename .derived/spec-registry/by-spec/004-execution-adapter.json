@@ -36,6 +36,6 @@
     "summary": "The single seam through which this product runs an agent, and the only place a provider is named. Fixes the three-part protocol (a request the supervisor writes, an event stream it reads, a result it records), the closed capability vocabulary with required tokens refusing before any process starts and preferred tokens degrading visibly, the negative suite that qualifies an adapter binary version, and the constructed rather than filtered child environment whose property is a complete record and explicitly not containment of hostile code.\n",
     "title": "The execution adapter boundary: one protocol, declared capabilities, a qualification suite, and a constructed child environment"
   },
-  "shardHash": "4e5f0f7c454a68a6c22224f1fa6ba716a7317e965200758d79f5e2b035c43df1",
+  "shardHash": "e791d425cb5a5406866a936fe809e494e984b0ca8e9b34ebbfe16057e1641bfa",
   "specVersion": "1.2.0"
 }
