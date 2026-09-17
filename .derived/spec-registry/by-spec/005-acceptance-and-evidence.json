@@ -14,7 +14,7 @@
       }
     ],
     "id": "005-acceptance-and-evidence",
-    "implementation": "pending",
+    "implementation": "complete",
     "sectionHeadings": [
       "005: Independent acceptance, the receipt, and the evidence dimensions",
       "1. Purpose",
@@ -32,6 +32,7 @@
       "3.9 The reviewable outcome",
       "3.10 Observable negative cases",
       "4. Out of scope",
+      "5. Decisions recorded during implementation",
       "Verification"
     ],
     "specPath": "specs/005-acceptance-and-evidence/spec.md",
@@ -39,6 +40,6 @@
     "summary": "How a claim of completion becomes, or fails to become, an acceptance. Fixes the identification of candidate bytes and the trusted base, the authority-set rule that stops a candidate from being judged by rules it wrote, the receipt that binds repository, base, candidate, suite, exit codes and policy digest, the four evidence dimensions reported separately from admission with closed value sets, independently supplied trust roots, the preservation of original bytes and named hash constructions, and the three names for absence, none of which reads as success.\n",
     "title": "Independent acceptance, the receipt, and the separately reported evidence dimensions"
   },
-  "shardHash": "eb4f4f22dea7c6e7c0166499d66825b9a4c70d37cde8117816145566cbec4f4e",
+  "shardHash": "7aa71da22ee799d390fa51535720d5c4006745b64d2941a90d11cda080a32818",
   "specVersion": "1.2.0"
 }

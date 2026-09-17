@@ -2,7 +2,7 @@
 id: "005-acceptance-and-evidence"
 title: "Independent acceptance, the receipt, and the separately reported evidence dimensions"
 status: approved
-implementation: pending
+implementation: complete
 created: "2026-09-16"
 summary: >
   How a claim of completion becomes, or fails to become, an acceptance. Fixes
@@ -300,8 +300,61 @@ so the obligation has no home here. It is neither quietly satisfied nor quietly
 dropped: `D-10` in the decision record is the choice between dropping it and
 re-adopting it against a named consumer.
 
+## 5. Decisions recorded during implementation
+
+Dated entries for choices §3 was silent on. None changes what it requires.
+
+**2026-09-16: the vocabulary rules are types, not conventions.** §3.5 says
+`unsigned` belongs only to `signature` and `not-applicable` only to
+`subjectBinding`. Each dimension is therefore its own enum, so neither value is
+constructible in the wrong place. A single shared value enum with a rule in
+prose would have made both mistakes reachable, and the rules are described as
+part of the vocabulary rather than as commentary on it.
+
+**2026-09-16: `admission` is a separate type from the dimensions.** §3.5 keeps
+it apart, and the reason is worth stating: a dimension says what a check found,
+admission says what a policy decided about those findings. One type carrying
+both would make "this evidence is intact" and "this evidence is acceptable" the
+same sentence, which is exactly what §3.10's two-policy row exists to
+distinguish.
+
+**2026-09-16: `Recorded<T>` carries an absence rather than an `Option`.** §3.8
+fixes three names for absence and says none reads as success. An `Option::None`
+carries no name, so every optional field in a reported outcome is
+`Recorded<T>`: present, or absent as one of the three. That is what makes "a
+field a future contract will add reads `not-recorded`, never `none`, never
+omitted" a property of the serialization rather than a rule somebody remembers.
+
+**2026-09-16: the authority verdict refuses on `not-recorded`.** §3.3 says the
+verdict reads `not-recorded` and that acceptance is still refused on the
+candidate's own suite. Those are two statements, and the implementation makes
+the second follow from the first: `may_accept_on_own_suite` is false whenever
+the corpus-side answer is absent, not only when a member was touched. Refusing
+without the report is available; classifying without it is not.
+
+**2026-09-16: integrity is answered only under the construction the reference
+names.** §3.7 forbids a canonical record hash substituting for a file-byte
+digest. A reference under a construction this build cannot evaluate reports
+`unknown` rather than falling back to a file-byte hash, because the fallback
+would answer a different question and look like an answer to this one.
+
+**2026-09-16: nothing in this crate acts.** §3.9 says publication is not part of
+this spec and that no verb in this corpus publishes. The crate has no function
+with an external effect: a receipt is a value, `mint` returns one, and there is
+nothing to call that would do anything with it. That is the implementation of
+"a receipt is not a permission".
+
 ## Verification
 
-Declared by the change that implements this spec. None of §3 is implemented, so
-this spec carries no `verify:cli` block. §3.10's last two rows are the pair the
-first acceptance fixture must show.
+Each line is one command. §3.10's seventeen rows are integration tests named
+after the rows they cover, in `tests/negative_cases.rs`.
+
+```verify:cli
+cargo build --workspace --locked
+cargo test --workspace --locked
+cargo clippy --workspace --all-targets --locked -- -D warnings
+cargo fmt --all --check
+spec-spine index coverage --fail-on-untraced
+cargo test -p statecraft-acceptance --test negative_cases
+test -f crates/statecraft-acceptance/src/receipt.rs
+```

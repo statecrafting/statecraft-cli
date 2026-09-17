@@ -397,6 +397,17 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "28d567dcbaf0049cb8ac2608a76cd95ff9e4412e1899d389ee400918ca7537f5"
 
 [[package]]
+name = "statecraft-acceptance"
+version = "0.0.0"
+dependencies = [
+ "serde",
+ "serde_json",
+ "statecraft-environment",
+ "statecraft-run",
+ "tempfile",
+]
+
+[[package]]
 name = "statecraft-adapter"
 version = "0.0.0"
 dependencies = [
