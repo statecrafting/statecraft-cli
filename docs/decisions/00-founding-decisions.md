@@ -79,30 +79,44 @@ code. "Available" means: carried by a release this repository's pin admits.
 **Available is not consumed.** Under the 0.20.0 pin every row below is available,
 which is a different statement from every row being used. Two rows changed
 behaviour by being available at all (092 at the coupling gate, 098 with 101 at
-the exit code); the rest need a spec amendment before anything reads them.
+the exit code); 088 has since had its amendment and is read (#20); the rest
+still need one before anything reads them.
 
 **Two approved specs held a release claim this pin made false. The owner decided
 both on 2026-09-17 and both are corrected:**
 
 - `005` section 3.3 said 088 is carried by no release and conditioned its
-  `not-recorded` behaviour on that with an explicit "until then". The wait is
-  over and the obligation is not discharged, so the verdict is unchanged and the
-  **reason** is now attributed to this product rather than to spec-spine. The
-  falsehood had reached the record: the note this product wrote said the
-  installed spec-spine carried no such report, and no test held it. One now does.
+  `not-recorded` behaviour on that with an explicit "until then". The wait was
+  over, so the **reason** was re-attributed to this product rather than to
+  spec-spine. The falsehood had reached the record: the note this product wrote
+  said the installed spec-spine carried no such report, and no test held it. One
+  now does. **Superseded on 2026-09-17 by #20**, which discharged the obligation
+  itself: `not-recorded` is now what a missing or unusable report produces, not
+  the standing verdict.
 - `003` section 3.7 said the same of 091, while resting on it only as the future
   answer to `F-10`. Only the sentence was stale; the concurrency bound never
   rested on tool support.
 
-Reading the released report is still **not** done, and is still the owner's to
-schedule. It is an authority change, which `AGENTS.md` requires to be separated
-from the work it would authorize.
+**2026-09-17: reading the released report is done, and using it end to end is
+not.** It was scheduled as its own authority change and merged as #20
+(`571354d`): `005` section 3.3 now fixes how the report is obtained and which
+structural class witnesses which member, and the acceptance crate reads the
+envelope's bytes. Implemented and tested is the grade claimed, and the evidence
+is `make verify SPEC=005` on the merged sha, whose plan runs
+`cargo test -p statecraft-acceptance --test negative_cases` and asserts
+`crates/statecraft-acceptance/src/delta.rs` exists.
+
+What is not done is the caller side. Section 3.3.1 rule 3 keeps the invocation
+out of the acceptance library, and no verb runs `spec-spine delta` yet: that is
+`009`'s integration slice, which is `approved` with `implementation: pending`.
+So nothing here claims the integration works end to end, and no run has produced
+an authority-set verdict from a live report.
 
 | Fact needed | spec-spine source | Available at =0.18.0 | What this product does meanwhile |
 |---|---|---|---|
 | Corpus compiles; registry and index freshness | `compile`, `index`, `check` | **Yes** | Consumed directly. |
 | The ready set and its blockers | `registry plan` | **Yes** | Consumed directly; eligibility is filtered by `003` section 3.1.1. |
-| Which authority-set members a change touched | **088** | **Yes**, from `v0.19.0` | **Available and not yet consumed, and the record now says so correctly.** Spec `005` section 3.3 was corrected on 2026-09-17: the verdict is still `not-recorded` and acceptance is still refused on the candidate's own suite, but the reason names this product's gap instead of claiming something about what a release carries. Revision 4 row CLI-08's obligation, integrate the report once released, is **due and outstanding**. |
+| Which authority-set members a change touched | **088** | **Yes**, from `v0.19.0` | **Consumed by the acceptance library, and not yet invoked by any verb.** Spec `005` section 3.3 was amended and implemented on 2026-09-17 (#20, `571354d`): the crate reads a `spec-spine delta --json` envelope and maps its structural classes onto the authority-set members `001` section 3.5 enumerates, so a report naming no member now lets acceptance rest on the candidate's own suite. Revision 4 row CLI-08's obligation, integrate the report once released, is **discharged**. Obtaining the report is deliberately not the library's act (section 3.3.1 rule 3), and the verb that would perform it belongs to `009`, `approved` and pending, so `not-recorded` is still what every real run produces today. |
 | What the verifier read, as a snapshot | **087** | **Yes**, from `v0.19.0` | Not consumed. No local substitute, and none needed to consume it later. |
 | Two ready specs collide | **091** | **Yes**, from `v0.20.0` | Still not needed: one live attempt per repository (`003` section 3.7, corrected 2026-09-17). `F-10`'s tool-support condition is met; its other condition, a single-repository loop that works, is not. |
 | A mode-only or binary change is a change | **092** | **Yes**, from `v0.20.0` | Consumed by construction: the gate now completes diff membership from `git diff --name-status`, so a mode-only or binary change is judged rather than dropped. Strictly more paths checked, never fewer. |
