@@ -28,8 +28,8 @@
       }
     ],
     "specId": "006-command-surface",
-    "specStatus": "draft"
+    "specStatus": "approved"
   },
   "schemaVersion": "1.1.0",
-  "shardHash": "906dfa30c77317587c39825d340cd2d650f8dba7a10114276becfcbcec57a62d"
+  "shardHash": "ab2be9c0e2fd8bef4ce17ebeee28a8b32b241a69cacfae7f807132498e94595a"
 }

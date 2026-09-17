@@ -1,7 +1,7 @@
 ---
 id: "006-command-surface"
 title: "The command surface: one binary, the verbs the other specs name, and what an exit code means"
-status: draft
+status: approved
 implementation: pending
 created: "2026-09-16"
 summary: >

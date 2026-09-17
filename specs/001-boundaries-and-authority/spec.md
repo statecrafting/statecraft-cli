@@ -108,12 +108,13 @@ age:
 |---|---|
 | 2026-09-16 | Specified only, and not fully: no spec but `000` was approved, and no code existed. |
 | 2026-09-16 | `000` to `005` specified. `002` additionally **implemented and tested within its own territory**, the evidence being `crates/statecraft-environment/`, 59 tests, and one integration test per row of `002` section 3.10 named after the row it covers. Nothing released; `F-02` defers publication. |
+| 2026-09-16 | `000` to `006` specified. `002` to `005` additionally **implemented and tested within their own territories**: four crates, 221 tests, and one integration test per row of each spec's observable-negative-cases table, named after the row it covers. `006` is ratified and not yet implemented, so the product is still not runnable. Nothing released. |
 
-The second row is deliberately narrower than "002 is implemented". The commands
-`002` names are not bound to a process by that crate, so the grade it claims is
-*implemented for its own territory* and nothing about a command line. `006`
-proposes the binary that would change that, and until `006` is ratified and
-implemented, no document here may call this product runnable.
+Each row is narrower than "the spec is implemented". The commands `002` to `005`
+name are not bound to a process by those crates, so the grade they claim is
+*implemented for their own territory* and nothing about a command line. `006` is
+the binary that changes that, and **until `006` is implemented no document here
+may call this product runnable.**
 
 ### 3.4 The two interaction modes
 
