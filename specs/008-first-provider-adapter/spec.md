@@ -276,6 +276,43 @@ measurement this spec did not take.
 
 Dated entries for choices §3 was silent on. None changes what §3 requires.
 
+**2026-09-17: the execution boundary owns the invocation's settings transport.**
+Section 3.1 declares a settings document but leaves its transport unspecified.
+Installed Claude Code 2.1.267's `--help` accepts `--settings <file-or-json>` as
+additional settings. The adapter supplies the complete `Invocation` to its
+execution boundary, including its program identity, and adds one `--settings`
+argument naming an absolute, randomly named private temporary JSON file outside
+the request workspace. The file is created exclusively (0600 on Unix), written
+before spawn and held by the library until supervision returns, including an
+interruption or spawn error. It is then removed. Temporary storage resolving
+inside the workspace is refused. Forced termination of the supervisor itself
+can leave the file behind; this is scoped cleanup, not hostile-child isolation.
+A cleanup error after execution is retained as `settingsCleanupError` in the
+execution evidence, alongside the existing terminal and refusal records. It
+does not erase them or change the provider's claim or the outcome mapping.
+
+The document is serialized as declared, never interpolated into shell text or
+put in the environment. A second `--settings` in the invocation's argument
+vector is rejected rather than silently selecting one document over the other.
+The provider's native command-line precedence applies: managed settings remain
+above this source, omitted keys retain their lower-source values, and permission
+lists merge across scopes, per the provider's
+[settings documentation](https://code.claude.com/docs/en/settings#settings-precedence)
+read on this date. The constructed document contains only `permissions.deny`;
+no hook, settings-source selector or environment entry is added. An empty deny
+list follows the same transport and adds no denial policy. This discharges the
+missing settings wiring recorded below, without changing qualification or the
+unresolved mid-stream event wording.
+
+Before repair, `cargo test -p statecraft-adapter-claude-code --test
+settings_transport --locked` failed all three settings-reading child cases:
+the real execution boundary passed no settings argument, so the fixture could
+not read its declared document. After repair, the same command passes five
+cases: special-character denial delivery, concurrent attempts, timeout after
+a terminal denial, malformed-stream cleanup, and retention of denial evidence
+when settings cleanup itself fails. These are synthetic transport checks, not
+a provider qualification measurement.
+
 **2026-09-17: run qualification is persisted posture, not target qualification.**
 Sections 3.8 and 3.9 and `004` sections 3.4 and 3.7 already require the labels.
 The run binding reads the provider probe's paired qualification answer and uses

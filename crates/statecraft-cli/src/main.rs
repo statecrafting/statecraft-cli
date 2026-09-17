@@ -354,8 +354,7 @@ fn run_verb(
     };
 
     let execution = match statecraft_adapter_claude_code::execution::supervise(
-        &program,
-        &invocation.args(),
+        &invocation,
         &request,
         &environment,
         &negotiation.granted,

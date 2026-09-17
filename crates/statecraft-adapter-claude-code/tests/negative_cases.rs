@@ -49,19 +49,18 @@ fn replay(text: &str, code: u8) -> provider::execution::Execution {
         &statecraft_adapter::environment::Blueprint::empty(),
         &statecraft_adapter::environment::CheckSuiteCommands::default(),
     );
-    let execution = provider::execution::supervise(
-        std::path::Path::new("/bin/sh"),
-        &[
-            "-c",
-            "/bin/cat > prompt.txt; /bin/cat stream.jsonl; exit \"$1\"",
-            "replay",
-            &code.to_string(),
-        ],
-        &request,
-        &environment,
-        &granted_everything(),
-    )
-    .unwrap();
+    let mut invocation = provider::Invocation::new("/bin/sh", &[], None);
+    invocation.args = [
+        "-c",
+        "/bin/cat > prompt.txt; /bin/cat stream.jsonl; exit \"$1\"",
+        "replay",
+        &code.to_string(),
+    ]
+    .map(str::to_string)
+    .to_vec();
+    let execution =
+        provider::execution::supervise(&invocation, &request, &environment, &granted_everything())
+            .unwrap();
     // The child consumed stdin and used relative paths in the request's cwd.
     assert_eq!(
         std::fs::read(workspace.path().join("prompt.txt")).unwrap(),
