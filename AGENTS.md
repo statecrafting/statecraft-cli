@@ -116,6 +116,58 @@ reaching the default branch is a claim nobody wrote. A spec that genuinely needs
 to claim ahead of its implementation is the case for removing the flag again,
 deliberately, as its own change.
 
+## What a green gate means
+
+The invariant: **the exact integration candidate must pass every required
+governance check before it lands.** Two properties are needed for that, and they
+are independent. Conflating them is easy and was done here once already.
+
+**Freshness**: the checks ran against a candidate reconciled with the current
+`main`. Enforced by branch protection, which requires a branch to be up to date
+before merging. How a branch becomes up to date is not prescribed: rebase,
+merge, or the forge's own update button all satisfy it, and the one to prefer is
+whichever keeps history legible for the change at hand.
+
+**Comparison scope**: the check evaluated *this* candidate's changes and no
+others. Enforced by which two commits the check is given, not by freshness.
+Re-running a stale check against a moved base makes it fresh and still wrong.
+
+The coupling gate is where scope bites. `spec-spine couple` takes a **three-dot**
+diff, so its merge base is derived from the two endpoints it is handed:
+
+- `base.sha...head.sha`, both frozen event SHAs, has this pull request's own fork
+  point as its merge base. It evaluates exactly this pull request's changes and
+  is stable across re-runs. **This is what CI uses.**
+- `base.sha...HEAD`, where `HEAD` is the checked-out `refs/pull/N/merge`, has
+  `base.sha` as its merge base and folds in everything merged after the event
+  fired. Measured here: 15 changed paths where the pull request changed 1.
+
+The second form is not merely noisy. A waiver is scoped to the diff the gate
+evaluated, so a `Spec-Drift-Waiver:` in the body would have covered all 15.
+
+## Before enabling a merge queue
+
+A queue is an optimization for when concurrent work causes repeated
+update-and-retest cycles. It must preserve the same guarantees, and today it
+would not. Three things it needs first:
+
+1. **Coupling evaluated against the queued integration candidate**, not only
+   against the pull request in isolation. The queue's whole value is testing the
+   speculative merged tree, and a coupling verdict from PR time does not cover
+   it.
+2. **Waivers bound to the specific changes and to the authority that approved
+   them.** A `merge_group` event carries no pull-request body, which is where a
+   waiver lives today. That gap needs a deliberate waiver contract: something
+   the queue can read, scoped to the change it was granted for. It is not solved
+   by skipping coupling in the queue, and not by refusing every waived change.
+3. **`ci-gate` refusing success when a required governance check was skipped.**
+   It currently treats a skipped job as a pass, which is correct while the only
+   event-gated check is one that cannot apply. Under a queue that rule would let
+   an absent coupling verdict read as a green one.
+
+Until those hold, an up-to-date branch is the mechanism, and it is sufficient
+for sequential merges.
+
 `spec-spine couple` is **CI-only, and deliberately not in `make gate`**. It
 compares two commits, so it cannot see a change being staged and is useless as a
 pre-commit check (`C-18`). CI runs it against the pull request's merge base. On a
