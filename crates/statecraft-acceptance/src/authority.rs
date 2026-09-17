@@ -8,13 +8,13 @@
 //! # The split that matters
 //!
 //! Classifying a change under the base's rules is spec-spine's job (its spec
-//! 088), and no release carries it. Declaring which paths are members **here**
-//! is this product's job, and is done by path.
+//! 088), and this product does not read its report. Declaring which paths are
+//! members **here** is this product's job, and is done by path.
 //!
 //! Reading the second as an answer to the first would leave the
 //! repository-artifact members unchecked while the verdict still read as
-//! complete. So: corpus-side members wait for the delta report and read
-//! `not-recorded` until it exists, repository artifacts are declared by path
+//! complete. So: corpus-side members read `not-recorded` until this product
+//! reads the delta report, repository artifacts are declared by path
 //! here, and the environment manifest is computed here because spec-spine cannot
 //! know about it at all.
 //!
@@ -79,10 +79,12 @@ pub trait DeltaReport {
     fn version(&self) -> String;
 }
 
-/// The delta report the pinned spec-spine does not carry.
+/// The delta report this product does not read.
 ///
-/// Correct today and deliberately empty-handed. Spec 088 is approved and
-/// complete on spec-spine main and in no release, including the pinned 0.18.0.
+/// Correct today and deliberately empty-handed. Spec-spine 088 landed in
+/// `v0.19.0` and the `=0.20.0` pin carries it, so the report exists and nothing
+/// here asks for it. Integrating it is its own change (spec 005 section 5,
+/// 2026-09-17); until then the answer is a named absence and never a guess.
 #[derive(Debug, Clone)]
 pub struct NoDeltaReport {
     /// The pinned version, named in the verdict.
@@ -178,10 +180,16 @@ pub fn evaluate(changed_paths: &[String], declared: &Declared, delta: &dyn Delta
         !repository_members_touched.is_empty() || environment_manifest_touched || corpus_touched;
 
     let note = if corpus_unknown {
+        // Spec 005 section 3.3: the absence is attributed to THIS product, not to
+        // spec-spine. The older wording said the installed spec-spine carried no
+        // such report, which the `=0.20.0` pin falsified; this wording is true
+        // whichever version is installed, so an old record and a new one make
+        // the same claim about the same thing.
         format!(
-            "corpus-side authority classification is not-recorded: the installed spec-spine \
-             ({}) carries no change-classification report (its spec 088 is in no release), so \
-             acceptance is refused on the candidate's own suite rather than classified locally",
+            "corpus-side authority classification is not-recorded: this product does not read \
+             spec-spine's change-classification report (its spec 088), so acceptance is refused \
+             on the candidate's own suite rather than classified locally; the installed \
+             spec-spine is {}",
             delta.version()
         )
     } else if authority_change {

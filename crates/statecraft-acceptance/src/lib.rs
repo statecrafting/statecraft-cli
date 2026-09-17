@@ -29,10 +29,10 @@
 //! absence of any verb that acts is how this crate keeps to it.
 //!
 //! It also builds no change classifier. Classifying a change under the base's
-//! rules is spec-spine's job, its spec 088 is in no release, and until then the
-//! corpus-side verdict reads `not-recorded` and acceptance is refused rather
-//! than guessed. Refusing without the report is available; classifying without
-//! it is not.
+//! rules is spec-spine's job; its spec 088 is released and the pin carries it,
+//! and this product does not read the report, so the corpus-side verdict reads
+//! `not-recorded` and acceptance is refused rather than guessed. Refusing
+//! without the report is available; classifying without it is not.
 
 #![forbid(unsafe_code)]
 

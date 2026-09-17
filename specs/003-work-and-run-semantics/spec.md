@@ -186,9 +186,15 @@ budget are out of scope.
 **When parallelism reopens, it consumes an upstream report rather than inventing
 a format.** Two ready specs can claim overlapping territory, and spec-spine's
 spec 091 (`two ready specs can collide`) is the collision report for exactly that
-question; it is approved and complete on spec-spine main and in no release
-(`C-16`). `F-10` reopens parallelism by consuming that report, not by adding a
-locally invented footprint declaration. Frame's footprint field is the shape of
+question. It landed in spec-spine `v0.20.0` and the pin carries it (`C-16`,
+corrected 2026-09-17).
+
+**Its availability is not a reason to reopen `F-10`.** That deferral has two
+conditions and the report was only one of them; the other is a single-repository
+loop that works, which does not exist yet. The bound in this section is
+unchanged: one live attempt per registered repository, and the workspace is the
+lock. When `F-10` does reopen, it reopens by consuming that report, not by adding
+a locally invented footprint declaration. Frame's footprint field is the shape of
 the idea, not a format to copy: Frame computes it from its own spec files, and
 this product's specs are spec-spine's.
 
@@ -231,6 +237,14 @@ reach it, and that process runs inside a worktree under the target's
 judged can edit, so the chain is in the product home, keyed by a digest of the
 target's absolute path. An integration test asserts the chain path is under
 neither the target nor the workspace.
+
+**2026-09-17: the correction to section 3.7 removes a wait, not a bound.**
+Spec-spine 091 was described here as carried by no release, which the move to the
+`=0.20.0` pin falsified. Only the sentence was stale: this section rests on 091
+as the future answer to `F-10` and never conditioned the concurrency bound on it,
+so nothing it requires changed and no behavior did. The bound stays one live
+attempt per repository because its reason was never tool support; it was that
+cross-repository scheduling is out of scope for the first slice.
 
 **2026-09-16: two reports are joined, because one does not carry status.**
 §3.1.1 turns on a spec's `status`, and `registry plan --json` under 0.18.0

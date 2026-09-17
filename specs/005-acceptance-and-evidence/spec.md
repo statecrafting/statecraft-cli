@@ -101,19 +101,37 @@ This holds even when the candidate's suite passes, and especially then.
 
 **Who computes "which members were touched", and who must not.** Classifying a
 change under the base's rules is spec-spine's job, not this product's: its spec
-088, `a change is classified under the base's rules`, is approved and complete on
-spec-spine main and **in no release**, including the pinned 0.18.0 (constraint
-`C-16`). Revision 4 row CLI-08 already ruled on exactly this: integrate 088's
-report once released, and do not invent current support.
+088, `a change is classified under the base's rules`. Revision 4 row CLI-08 ruled
+on exactly this: integrate 088's report once released, and do not invent current
+support.
+
+**2026-09-17: it is released, and this product does not read it yet.** Spec 088
+landed in spec-spine `v0.19.0` and is carried by the pinned `=0.20.0`
+(constraint `C-16`, corrected with the pin). The half of CLI-08 that was a wait
+is over; the half that is an obligation is now due, and is not discharged here.
+
+That changes the reason this section gives, and changes nothing it requires. The
+corpus-side verdict is still `not-recorded` and acceptance is still refused on
+the candidate's own suite. What must not survive the correction is the **stated
+reason**: a record saying no release carries the report is now false, and a false
+sentence in evidence is worse than a missing one. The reason names this
+product's gap instead.
 
 So the split is:
 
 1. **Corpus-side members**: the specs themselves and the spec-spine
-   configuration. The classification comes from **spec-spine's delta report**
-   once a release carries it. Until then this product records the authority-set
-   verdict as `not-recorded`, names the missing spec-spine capability and its own
-   pinned version, and **still refuses to accept** on the candidate's own suite.
+   configuration. The classification comes from **spec-spine's delta report**.
+   Until this product reads that report it records the authority-set verdict as
+   `not-recorded`, names the report it does not read and the installed spec-spine
+   version, and **still refuses to accept** on the candidate's own suite.
    Refusing without the report is available; classifying without it is not.
+
+   The recorded reason MUST attribute the absence to this product, not to
+   spec-spine. "The installed spec-spine carries no such report" was true until
+   2026-09-17 and is false under the current pin; "this product does not read
+   the report" is true whichever spec-spine is installed, and stays true if the
+   pin ever moves back. A reader of an old record and a reader of a new one are
+   then reading the same claim about the same thing.
 2. **Repository-artifact members**: the check suite, the verifier, the hooks, and
    any acceptance instructions that live outside a `spec.md`. Membership is
    declared **here, by path**. The delta report gives each such path a structural
@@ -139,9 +157,10 @@ classification under the base's rules is spec-spine's, and reading the second as
 an answer to the first would leave the repository-artifact members unchecked
 while the verdict still read as complete.
 
-This product does not build a second change classifier for case 1 while waiting,
-and declaring membership by path in case 2 is not one: it says which paths matter
-here, never how the base would classify a change to them.
+This product does not build a second change classifier for case 1, and declaring
+membership by path in case 2 is not one: it says which paths matter here, never
+how the base would classify a change to them. That prohibition was never
+conditional on the report being unreleased, and the release does not soften it.
 A local reimplementation would answer a slightly different question than the
 verifier the family will standardise on, which is the failure `001` section 3.2
 exists to prevent.
@@ -268,7 +287,7 @@ and no verb in this corpus publishes.
 | The agent reports success; the suite fails | Outcome `failed`, no receipt. The claim is retained in a field named for a claim. |
 | The agent reports success; the suite never ran | **No acceptance** recorded, and the unrun checks counted. Not a pass, not a fail. |
 | The attempt outcome is `refused`, `failed`, `interrupted` or `cancelled` | Acceptance `not-attempted` with the reason named. Never an empty result a reader must interpret. |
-| The installed spec-spine carries no delta report | Authority-set verdict `not-recorded`, naming the missing capability; acceptance still refused on the candidate's own suite. No locally built classifier. |
+| This product does not read spec-spine's delta report | Authority-set verdict `not-recorded`. The reason names the report and the **installed spec-spine version**, and attributes the absence to this product rather than to spec-spine (section 3.3). Acceptance still refused on the candidate's own suite. No locally built classifier. |
 | No harness package exists | The receipt's harness-revision field reads `not-recorded`. It is never omitted. |
 | HEAD moved during the suite | No receipt; the attempt is `interrupted` (`003` §3.4). |
 | The work tree was dirty at the end of the suite | No receipt, naming the dirty paths. |
@@ -303,6 +322,26 @@ re-adopting it against a named consumer.
 ## 5. Decisions recorded during implementation
 
 Dated entries for choices §3 was silent on. None changes what it requires.
+
+**2026-09-17: the corrected reason is attributed to this product, and is not a
+new capability.** Section 3.3 named spec-spine 088 as carried by no release,
+which the move to the `=0.20.0` pin falsified, and the falsehood had reached the
+record: the corpus-side note this crate wrote said in so many words that the
+installed spec-spine carries no change-classification report. Under the current
+pin it does.
+
+Two answers were available. Reading the report is what CLI-08 asks for and is a
+capability this change does not add: it is its own change, and `AGENTS.md`
+requires an authority change to be separated from the work it would authorize, so
+bundling it here is the thing that rule forbids. The other is to say the true
+thing about what this product does, which is that it does not read the report.
+That is what the note now says, and it carries the installed version beside it so
+a reader can see which spec-spine was asked and told nothing.
+
+What did not change: the verdict is still `not-recorded`, acceptance is still
+refused on the candidate's own suite, and this crate still builds no classifier
+of its own. The prohibition in section 3.3 was never conditional on the report
+being unreleased.
 
 **2026-09-16: the vocabulary rules are types, not conventions.** §3.5 says
 `unsigned` belongs only to `signature` and `not-applicable` only to
