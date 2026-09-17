@@ -101,9 +101,18 @@ fn every_verb_this_slice_adds_is_reachable_from_a_command_line() {
 fn work_list_on_a_target_whose_corpus_cannot_answer_refuses_and_derives_nothing() {
     let (home, _target, path) = registered();
     let out = run_in(home.path(), &["work", "list", &path]);
-    // Refused (2) or a finding (1) depending on what spec-spine said, and never
-    // 0: an answer this product made up would be the defect.
-    assert!(code(&out) == 1 || code(&out) == 2, "{}", stdout(&out));
+    // Refused (2) when spec-spine is absent or a report lacks a field, a
+    // finding (1) when the corpus does not compile, and **never 0**: an answer
+    // this product made up would be the defect this row exists to catch. Both
+    // readings are reached on a real machine: a developer's has spec-spine on
+    // PATH and the check runner does not, so the row is checked on the
+    // property they share rather than on the one that varies.
+    assert!(
+        code(&out) == 1 || code(&out) == 2,
+        "exit {}: {}",
+        code(&out),
+        stdout(&out)
+    );
     let text = stdout(&out);
     assert!(
         text.contains("refus") || text.contains("does not compile") || text.contains("spec-spine"),

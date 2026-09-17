@@ -176,8 +176,13 @@ pub fn report_error_answer(e: &ReportError) -> Answer<String> {
         // A corpus that does not compile is the target's state, reported as
         // itself: the operation ran and found it.
         ReportError::CorpusDoesNotCompile { .. } => Exit::Finding,
-        // spec-spine absent or unreadable is nobody's request.
-        ReportError::NotRunnable { .. } | ReportError::Unreadable { .. } => Exit::Failed,
+        // spec-spine absent is a precondition, and nothing was done: spec 001
+        // section 3.2 makes it the only thing that may answer a specification
+        // question here, so without it there is no answer to have. An operator
+        // can install it, which is what distinguishes 2 from 4.
+        ReportError::NotRunnable { .. } => Exit::Refused,
+        // A report this build cannot read is nobody's request.
+        ReportError::Unreadable { .. } => Exit::Failed,
     };
     Answer::new(e.to_string(), exit, e.to_string())
 }
@@ -522,6 +527,23 @@ mod tests {
         assert_eq!(a.exit, Exit::Refused);
         assert!(a.summary.contains("status"));
         assert!(a.summary.contains("0.20.0"));
+    }
+
+    #[test]
+    fn an_absent_spec_spine_is_a_precondition_and_a_report_it_cannot_read_is_a_failure() {
+        let absent = report_error_answer(&ReportError::NotRunnable {
+            path: "/t".into(),
+            detail: "no such file".into(),
+        });
+        assert_eq!(absent.exit, Exit::Refused);
+        assert!(absent.summary.contains("spec-spine"));
+
+        let unreadable = report_error_answer(&ReportError::Unreadable {
+            command: "registry plan --json".into(),
+            version: "0.20.0".into(),
+            detail: "not the JSON this build reads".into(),
+        });
+        assert_eq!(unreadable.exit, Exit::Failed);
     }
 
     #[test]
