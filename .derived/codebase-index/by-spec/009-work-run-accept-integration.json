@@ -65,8 +65,8 @@
       }
     ],
     "specId": "009-work-run-accept-integration",
-    "specStatus": "draft"
+    "specStatus": "approved"
   },
   "schemaVersion": "1.1.0",
-  "shardHash": "f4fb798112108f09fed1b8e5db575da34389f300c65b2d02ab3320ae3c09b900"
+  "shardHash": "01b021ef37b11c9ff2be31683923b11839f5f649ad0849b328971a59d815e37b"
 }

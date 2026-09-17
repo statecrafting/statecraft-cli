@@ -1,7 +1,7 @@
 ---
 id: "009-work-run-accept-integration"
 title: "The integration slice: work, run and accept bound to a process, with discovery and inspection"
-status: draft
+status: approved
 implementation: pending
 created: "2026-09-17"
 summary: >
