@@ -142,33 +142,46 @@ pub fn supervise_stream<E: Send + 'static>(
     }
 
     let mut child = command.spawn()?;
+    let deadline = Instant::now() + Duration::from_secs(request.deadline_seconds);
 
     // The prompt goes on a stream. It is never interpolated into a command line,
-    // which is why `args` above carries no prompt and cannot.
-    if let Some(mut stdin) = child.stdin.take() {
+    // which is why `args` above carries no prompt and cannot. A child that does
+    // not read it must not hold the supervisor outside its deadline loop.
+    let mut stdin = child.stdin.take().expect("stdin was piped");
+    let prompt = request.prompt.clone();
+    let writer = std::thread::spawn(move || {
         use std::io::Write;
-        let _ = stdin.write_all(&request.prompt);
+        let _ = stdin.write_all(&prompt);
         // Dropping closes it, which is how the child learns the prompt ended.
-    }
+    });
 
     let stdout = child.stdout.take().expect("stdout was piped");
-    let (tx, rx) = mpsc::channel();
+    let (tx, rx) = mpsc::sync_channel(16);
     let reader = std::thread::spawn(move || {
-        for (i, line) in BufReader::new(stdout).lines().enumerate() {
-            let Ok(line) = line else { break };
+        let mut stdout = BufReader::new(stdout);
+        for (i, line) in (&mut stdout).lines().enumerate() {
+            let Ok(line) = line else { return };
             if line.trim().is_empty() {
                 continue;
             }
-            if tx.send(decode(&line, i + 1)).is_err() {
+            let event = decode(&line, i + 1);
+            let stop_parsing = event.as_ref().map_or(true, is_terminal);
+            if tx.send(event).is_err() {
+                return;
+            }
+            if stop_parsing {
                 break;
             }
         }
+        // A terminal event or malformed line ends the trusted prefix. Drain
+        // raw bytes after it, keeping the channel open until the pipe closes.
+        let _ = std::io::copy(&mut stdout, &mut std::io::sink());
     });
 
-    let deadline = Instant::now() + Duration::from_secs(request.deadline_seconds);
     let mut events = Vec::new();
     let mut stream_error = None;
     let mut timed_out = false;
+    let mut eof = false;
 
     loop {
         let remaining = deadline.saturating_duration_since(Instant::now());
@@ -176,25 +189,28 @@ pub fn supervise_stream<E: Send + 'static>(
             timed_out = true;
             break;
         }
-        match rx.recv_timeout(remaining) {
+        // Neither EOF nor a terminal event says the child has exited. Likewise,
+        // child exit does not close a pipe still held by a descendant. Keep all
+        // of these observations under the same deadline, without blocking on
+        // wait or join. The exit code is not a verdict on the work.
+        if eof && child.try_wait()?.is_some() && reader.is_finished() && writer.is_finished() {
+            break;
+        }
+        let interval = remaining.min(Duration::from_millis(10));
+        if eof {
+            std::thread::sleep(interval);
+            continue;
+        }
+        match rx.recv_timeout(interval) {
             Ok(Ok(event)) => {
-                let terminal = is_terminal(&event);
                 events.push(event);
-                if terminal {
-                    break;
-                }
             }
             Ok(Err(e)) => {
-                // Malformed. Reported as malformed, and the read stops: there is
-                // nothing trustworthy after a line that did not parse.
+                // Keep the diagnostic and preceding evidence through cleanup.
                 stream_error = Some(e);
-                break;
             }
-            Err(mpsc::RecvTimeoutError::Timeout) => {
-                timed_out = true;
-                break;
-            }
-            Err(mpsc::RecvTimeoutError::Disconnected) => break,
+            Err(mpsc::RecvTimeoutError::Timeout) => {}
+            Err(mpsc::RecvTimeoutError::Disconnected) => eof = true,
         }
     }
 
@@ -211,10 +227,13 @@ pub fn supervise_stream<E: Send + 'static>(
         // supervising is not one, so the thread is dropped and the survivor is
         // reported as a residual instead.
         drop(reader);
+        drop(writer);
         residual
     } else {
-        let _ = child.wait();
+        // All three finished inside the deadline; neither join can now block
+        // on a pipe. try_wait already reaped the child.
         let _ = reader.join();
+        let _ = writer.join();
         None
     };
 

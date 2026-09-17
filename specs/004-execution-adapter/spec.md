@@ -222,6 +222,27 @@ record.
 
 Dated entries for choices §3 was silent on. None changes what it requires.
 
+**2026-09-17: terminal parsing and process completion are separate.** The
+deadline in §3.5.3 and the no-blocking-reader decision below cover the attempt
+through pipe draining and child exit. A terminal event ends the trusted event
+prefix, not deadline enforcement; a malformed line likewise ends parsing while
+retaining the preceding events and the diagnostic. Cleanup continues under the
+same deadline, and expiration interrupts even a child that already claimed
+completion. Child exit is observed without blocking, and the remaining output
+is drained without interpreting it. EOF alone cannot release
+the deadline while the child is alive; child exit alone cannot release it while
+a descendant holds the pipe. Exit status supplies no success authority. Prompt
+delivery also belongs to that lifetime, so a child that does not read stdin
+cannot delay the start of enforcement. These are implementation choices within
+§3.1, §3.5.3 and §3.8, with no change to the ratified outcomes or qualification
+contract. `cargo test -p statecraft-adapter --test deadline --locked` reproduced
+five pre-repair hangs at the six-second outer limit for a one-second attempt:
+terminal, malformed, inherited stdout, EOF with a live child, and unread prompt.
+The repaired implementation passes that command's ten tests, including inherited
+stdin, trailing-output draining, ordinary success, evidence preservation and
+refusal precedence. Each fixture runs behind an independent outer timeout that
+cleans up its process group and reaps the disposable supervisor process.
+
 **2026-09-16: the closed vocabulary is an enum, not a string.** §3.2 says adding
 a token is an amendment and not a configuration change. A string token would let
 a caller introduce a seventh; an enum means a seventh requires editing this
