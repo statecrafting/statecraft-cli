@@ -215,3 +215,46 @@ Any scheduling policy beyond "the operator names a unit of work". Release and
 distribution (`F-02`). Whether `work` should ever accept a unit that is not a
 spec-spine-ready spec, which would be a change to `003` section 3.1 and not to
 this spec.
+
+## Verification
+
+Each line is one command. §3.7's ten rows are integration tests named after the
+rows they cover, in `crates/statecraft-cli/tests/integration_slice.rs`. A
+separate file from that crate's existing `negative_cases.rs`, which covers
+`006`'s own rows: two specs' rows in one file would make a deleted row look like
+a refactor.
+
+**Three of the ten rows are review obligations and not tests, and saying so is
+part of declaring the acceptance.** Rows 6, 9 and 10 require that an inspection
+verb which repaired the record, a verb that answered a specification question
+itself, and a CLI-crate answer an owning crate could have returned are each
+"refused as a defect". A defect that is refused in review is refused by a
+reader, and a test asserting the absence of code nobody wrote passes for the
+wrong reason. `006` §3.2 already makes the structural half mechanical: the
+coupling gate refuses a change to `crates/statecraft-cli/` that does not edit an
+owning spec, so a rule that leaked into a command has to be written down where
+it visibly does not belong. The other seven rows are tests.
+
+The three `--help` commands are the only ones that check what this spec is
+*for*. Every verb it names is implemented already, inside a territory no command
+line reaches; the slice is the edge that makes them reachable. A verb that is
+absent from the tree exits `3` under `006` §3.3, so these three commands fail
+loudly on exactly the defect this spec exists to remove, and they do it without
+running anything, spawning a provider or touching a target.
+
+They check reachability and nothing else. `run --help` says the verb is bound;
+it says nothing about whether an attempt would succeed, which is §3.4's own
+warning that `run` exiting 0 carries no acceptance claim whatever.
+
+```verify:cli
+cargo build --workspace --locked
+cargo test --workspace --locked
+cargo clippy --workspace --all-targets --locked -- -D warnings
+cargo fmt --all --check
+spec-spine index coverage --fail-on-untraced
+cargo test -p statecraft-cli --test integration_slice
+test -f crates/statecraft-cli/tests/integration_slice.rs
+cargo run -q -p statecraft-cli -- work --help
+cargo run -q -p statecraft-cli -- run --help
+cargo run -q -p statecraft-cli -- accept --help
+```
