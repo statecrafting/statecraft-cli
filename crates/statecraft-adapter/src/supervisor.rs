@@ -7,6 +7,10 @@
 //! A hung child is killed at the deadline **with its descendants**, and the
 //! attempt is `interrupted`. A child that leaves a process behind is reported as
 //! a residual, never as a clean termination.
+//!
+//! The child runs **in the request's workspace**. Spec 003 section 3.2 prepares
+//! an isolated worktree so the operator's checkout is never edited and no
+//! session runs in it, and the spawn is where that holds or does not.
 
 use crate::capability::{Negotiation, Requested, negotiate};
 use crate::environment::{ChildEnvironment, EnvironmentState};
@@ -90,15 +94,21 @@ pub fn preflight(
 /// The child is put in its own process group so the deadline can kill the whole
 /// tree. A deny list of pids would be a list of the children somebody thought
 /// of; a process group is the complete set.
+///
+/// The child's working directory is the request's workspace, and a workspace
+/// that is not an existing directory is refused before anything is spawned.
 pub fn supervise(
     program: &Path,
     args: &[&str],
     request: &Request,
     environment: &ChildEnvironment,
 ) -> std::io::Result<Supervised> {
+    let workspace = workspace_to_enter(&request.workspace)?;
+
     let mut command = Command::new(program);
     command
         .args(args)
+        .current_dir(workspace)
         .env_clear()
         .envs(&environment.variables)
         .stdin(Stdio::piped())
@@ -213,6 +223,47 @@ pub fn supervise(
         stream_error,
         surviving_processes: surviving,
     })
+}
+
+/// The directory the child is spawned in, or why it is not one.
+///
+/// Spec 003 section 3.2 prepares an isolated worktree and says the operator's
+/// checkout is never edited and no session runs in it; section 3.1 of this
+/// spec puts that workspace in the request. Without this the request carries
+/// the path and the child inherits the supervisor's own directory instead,
+/// which is the operator's checkout whenever the command was started there.
+/// A live provider run measured exactly that: the caller's directory in the
+/// child's init event.
+///
+/// The check is here rather than left to the spawn because the platform's own
+/// answer is a bare `ENOENT` raised in the forked child, which reads the same
+/// as an adapter binary that is not there. Naming the path is the shape
+/// section 3.3 already uses for a required capability, and no process is
+/// created in either case. A workspace removed between this check and the
+/// spawn still fails at the spawn, which is the honest answer for a directory
+/// that stopped existing.
+fn workspace_to_enter(workspace: &Path) -> std::io::Result<&Path> {
+    if !workspace.exists() {
+        return Err(std::io::Error::new(
+            std::io::ErrorKind::NotFound,
+            format!(
+                "the request's workspace {} does not exist; refused before spawn, \
+                 no process created",
+                workspace.display()
+            ),
+        ));
+    }
+    if !workspace.is_dir() {
+        return Err(std::io::Error::new(
+            std::io::ErrorKind::NotADirectory,
+            format!(
+                "the request's workspace {} is not a directory; refused before spawn, \
+                 no process created",
+                workspace.display()
+            ),
+        ));
+    }
+    Ok(workspace)
 }
 
 /// Kill the child and everything in its process group.

@@ -27,7 +27,23 @@ pub enum Behavior {
     HangsForever,
     /// Init declaring less than the manifest promised, then a result.
     AppliesLessThanDeclared,
+    /// Init, then a progress event carrying the directory the child is actually
+    /// running in, and a marker file written there.
+    ///
+    /// Two observations rather than one, because they answer different
+    /// questions: the progress line says where the child *was*, and the marker
+    /// says where its writes *landed*. A supervisor that named a working
+    /// directory the child never entered would pass the first and fail the
+    /// second.
+    ReportsWorkingDirectory,
 }
+
+/// The file [`Behavior::ReportsWorkingDirectory`] writes into the child's
+/// working directory.
+///
+/// Interpolated into the script rather than spelled twice, so the suite looks
+/// for the file the fixture actually writes.
+pub const WORKING_DIRECTORY_MARKER: &str = "child-working-directory.txt";
 
 /// Write the fixture adapter into `dir` and return its path.
 ///
@@ -35,19 +51,21 @@ pub enum Behavior {
 /// and every platform this repository's CI runs on has one.
 pub fn write(dir: &Path, behavior: Behavior) -> std::io::Result<PathBuf> {
     let path = dir.join("fixture-adapter.sh");
-    let body = match behavior {
+    let body: String = match behavior {
         Behavior::RefusalThenCompleted => {
             r#"
 echo '{"event":"init","applied":["turn-limit"],"adapterVersion":"1.0.0","providerVersion":"fixture"}'
 echo '{"event":"refusal","guard":"write-outside-workspace","detail":"refused a write above the workspace"}'
 echo '{"event":"result","classification":"completed","cost":null}'
 "#
+            .to_string()
         }
         Behavior::CompletedWithNoCost => {
             r#"
 echo '{"event":"init","applied":["turn-limit"],"adapterVersion":"1.0.0","providerVersion":"fixture"}'
 echo '{"event":"result","classification":"completed","cost":null}'
 "#
+            .to_string()
         }
         Behavior::MalformedStream => {
             r#"
@@ -55,12 +73,14 @@ echo '{"event":"init","applied":["turn-limit"],"adapterVersion":"1.0.0","provide
 echo 'this line is not an event'
 echo '{"event":"result","classification":"completed","cost":null}'
 "#
+            .to_string()
         }
         Behavior::NoResultEvent => {
             r#"
 echo '{"event":"init","applied":["turn-limit"],"adapterVersion":"1.0.0","providerVersion":"fixture"}'
 echo '{"event":"progress","message":"working"}'
 "#
+            .to_string()
         }
         Behavior::HangsForever => {
             r#"
@@ -68,13 +88,27 @@ echo '{"event":"init","applied":["turn-limit"],"adapterVersion":"1.0.0","provide
 sleep 300 &
 sleep 300
 "#
+            .to_string()
         }
         Behavior::AppliesLessThanDeclared => {
             r#"
 echo '{"event":"init","applied":[],"adapterVersion":"1.0.0","providerVersion":"fixture"}'
 echo '{"event":"result","classification":"completed","cost":null}'
 "#
+            .to_string()
         }
+        // `pwd` is a shell builtin, so this asks nothing of the constructed
+        // environment beyond the `sh` the fixture already needs. The marker is
+        // written through a relative path deliberately: an absolute one would
+        // prove only that a path can be spelled, not that the child is in it.
+        Behavior::ReportsWorkingDirectory => format!(
+            r#"
+echo '{{"event":"init","applied":["turn-limit"],"adapterVersion":"1.0.0","providerVersion":"fixture"}}'
+printf '{{"event":"progress","message":"%s"}}\n' "$(pwd)"
+pwd > {WORKING_DIRECTORY_MARKER}
+echo '{{"event":"result","classification":"completed","cost":null}}'
+"#
+        ),
     };
 
     let mut file = std::fs::File::create(&path)?;
