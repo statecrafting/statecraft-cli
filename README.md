@@ -107,12 +107,19 @@ with its acceptance stated as refusals in
 ## Governance
 
 Governed by [spec-spine](https://github.com/statecrafting/spec-spine), pinned to
-**0.18.0** exactly in `spec-spine.toml`. Specs are the source of truth; the
+**0.20.0** exactly in `spec-spine.toml`. Specs are the source of truth; the
 derived shards under `.derived/` are compiler output, committed, and read only
 through `spec-spine` subcommands.
 
+The binary is installed **into this repository**, at the gitignored
+`.tooling/bin`, and `make` prefers it over anything on `PATH`. A shared
+`~/.cargo/bin/spec-spine` is one binary for every project on the machine, so
+whichever project built it last governs all of them; a local copy cannot be
+replaced by another project's work. `make tools` reads the exact version from
+`required_version`, so the pin is the only place the number is written.
+
 ```sh
-cargo install spec-spine-cli --version 0.18.0
+make tools       # install the pinned spec-spine into .tooling/bin
 make gate        # read-only: freshness, lint, coverage, the authored-content rules
 make code        # read-only: build, test, clippy, fmt across the six crates
 make refresh     # writing: recompute the committed shard trees

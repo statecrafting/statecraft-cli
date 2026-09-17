@@ -11,11 +11,17 @@
 # the binary, so two versions can judge the same diff differently.
 # Cargo semantics: a bare version is a caret range, `=` is exact.
 #
-# Pinned to the release this corpus was authored and checked against on
-# 2026-09-16. `=` is deliberate: 0.19.0 exists and is NOT adopted here, and a
-# caret range on a 0.x line would not admit it anyway. Adopting a newer spine
-# is its own change, with its own re-index (see docs/decisions).
-required_version = "=0.18.0"
+# Pinned to 0.20.0 on 2026-09-17, adopted as its own change with its own
+# re-index (see docs/decisions, `D-06`). `=` is deliberate: 0.21.0 does not
+# exist yet, and a caret range on a 0.x line would not admit it anyway.
+#
+# The floor was compared before the pin moved: `DEFAULT_BYPASS_PREFIXES` is
+# byte-identical between 0.18.0 and 0.20.0, and the one coupling change that
+# widens what the gate asks about (spec 097's governed scope) is inert while
+# `[coverage] governed_scope` is unset here. `make tools` installs this exact
+# version into `.tooling/bin`, so a binary elsewhere on PATH cannot answer for
+# this repository.
+required_version = "=0.20.0"
 
 [manifest]
 # Drives the Cargo `[package.metadata.spec-spine].spec` and package.json `"spec-spine".spec` reads.
@@ -79,7 +85,7 @@ extra_hashed_inputs = [
   ".gitignore",
 ]
 # Directories the symbol resolver and the coverage walk skip.
-resolver_exclusions = ["target", "node_modules", ".derived", "dist", "build", ".next"]
+resolver_exclusions = ["target", "node_modules", ".derived", "dist", "build", ".next", ".tooling"]
 # Named path sets `index check --slice <name>` can gate on their own.
 # [index.slices]
 # api = ["crates/*/src/lib.rs"]

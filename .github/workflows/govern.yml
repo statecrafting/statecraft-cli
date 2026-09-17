@@ -23,17 +23,39 @@ jobs:
   govern:
     name: govern (check · lint · authored content · couple)
     runs-on: ubuntu-latest
+    # Every governed read in this job goes through the repository-local binary,
+    # so a `spec-spine` that happened to be on the runner's PATH cannot answer
+    # for this repository. The same resolution the Makefile does, spelled once.
+    env:
+      SS: .tooling/bin/spec-spine
     steps:
       - uses: actions/checkout@v4
         with:
           # Full history so the coupling gate can diff the merge base.
           fetch-depth: 0
 
-      # The exact release spec-spine.toml pins with `=0.18.0`. Installing a
-      # different one makes the binary refuse on its own version check, which is
-      # the intended failure rather than a silently different verdict: the
-      # coupling gate's bypass floor is compiled in, so two versions can judge
-      # the same diff differently.
+      # The version is READ from the pin, never repeated here. A second spelling
+      # of the number is how a workflow installs one version while the binary
+      # enforces another; the only place `required_version` is authored is
+      # spec-spine.toml. Printed so the log says which version judged the run.
+      - name: Resolve the pinned spec-spine version
+        run: |
+          set -euo pipefail
+          v=$(sed -n 's/^required_version = "=\(.*\)"/\1/p' spec-spine.toml)
+          test -n "$v" || { echo "no required_version in spec-spine.toml"; exit 3; }
+          echo "SPEC_SPINE_VERSION=$v" >> "$GITHUB_ENV"
+          echo "pinned spec-spine: $v"
+
+      # Installed INTO THE REPOSITORY, at `.tooling/bin`, not into the shared
+      # `~/.cargo/bin`. On a runner the two are equivalent; locally they are not,
+      # and the workflow is the definition a session copies. One shared binary is
+      # replaced by whichever project built it last, and this repository was
+      # measurably governed by the wrong version that way.
+      #
+      # Installing a version the pin does not admit makes the binary refuse on
+      # its own version check, which is the intended failure rather than a
+      # silently different verdict: the coupling gate's bypass floor is compiled
+      # in, so two versions can judge the same diff differently.
       #
       # Cached on the installed binary rather than rebuilt every run. The key
       # carries the version, so bumping the pin is a cache miss and a fresh
@@ -42,24 +64,24 @@ jobs:
         id: cache-spec-spine
         uses: actions/cache@v4
         with:
-          path: ~/.cargo/bin/spec-spine
-          key: spec-spine-cli-0.18.0-${{ runner.os }}-${{ runner.arch }}
+          path: .tooling/bin/spec-spine
+          key: spec-spine-cli-${{ env.SPEC_SPINE_VERSION }}-${{ runner.os }}-${{ runner.arch }}
 
-      - name: Install spec-spine 0.18.0
+      - name: Install the pinned spec-spine
         if: steps.cache-spec-spine.outputs.cache-hit != 'true'
-        run: cargo install spec-spine-cli --version 0.18.0 --locked
+        run: make tools
 
-      - run: spec-spine --version
+      - run: $SS --version
 
       # `check` proves the COMMITTED shard trees match what the corpus compiles
       # to. It is never preceded by a writing `compile` or `index` in this job:
       # that would compare the shards against files the job just overwrote and
       # pass unconditionally.
       - name: Freshness and validation
-        run: spec-spine check --fail-on-warn
+        run: $SS check --fail-on-warn
 
       - name: Corpus lint
-        run: spec-spine lint --fail-on-warn
+        run: $SS lint --fail-on-warn
 
       # Enforced from 2026-09-16, with the first source file. On a code-free
       # tree this flag refused an empty universe rather than passing vacuously,
@@ -67,7 +89,7 @@ jobs:
       # would bring it in. Coverage is 13/13 specifically claimed; the flag
       # defends that instead of reporting it.
       - name: Ownership coverage (enforced)
-        run: spec-spine index coverage --fail-on-untraced
+        run: $SS index coverage --fail-on-untraced
 
       # Enforced from the change that built the last forward claim. Before that
       # it would have refused specs 002 to 006 for correctly claiming crates
@@ -75,7 +97,7 @@ jobs:
       # none outstanding, an unresolved unit reaching main is a claim nobody
       # wrote.
       - name: Unresolved claims (enforced)
-        run: spec-spine index check --fail-on-unresolved
+        run: $SS index check --fail-on-unresolved
 
       - name: Authored-content rules
         run: scripts/check-authored-content.sh
@@ -112,7 +134,7 @@ jobs:
           set -euo pipefail
           echo "coupling base: $BASE_SHA -> head: $HEAD_SHA"
           printf '%s' "${PR_BODY:-}" > "${RUNNER_TEMP}/pr-body.txt"
-          spec-spine couple \
+          "$SS" couple \
             --base "$BASE_SHA" \
             --head "$HEAD_SHA" \
             --pr-body "${RUNNER_TEMP}/pr-body.txt"

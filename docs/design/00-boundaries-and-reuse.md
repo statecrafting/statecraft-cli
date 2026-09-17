@@ -14,7 +14,7 @@ built.
 
 | Component | State today | This product's relationship | Kind |
 |---|---|---|---|
-| spec-spine 0.18.0 | Implemented, released, installed | Invokes its supported commands, parses its structured reports | **actual dependency**, on a released binary |
+| spec-spine 0.20.0 | Implemented, released, installed locally at `.tooling/bin` | Invokes its supported commands, parses its structured reports | **actual dependency**, on a released binary |
 | `attest-ledger` 0.1.0 | Implemented, Apache-2.0 | Record envelope, chain hashing, verification | **proposed reuse** |
 | `canonical-keysort-json` 0.1.0 | Implemented, Apache-2.0, Rust only | Canonical serialization at the hashing boundary | **proposed reuse** |
 | `action-gate` 0.1.0 | Implemented, Apache-2.0 | Check composition only, with required checks and the deny ceiling supplied here | **proposed adaptation at the boundary** |

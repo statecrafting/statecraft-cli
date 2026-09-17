@@ -24,11 +24,12 @@ field, not the plan output. Ratification is the owner's act; see AGENTS.md,
 ## Commands
 
 ```sh
+make tools                 # install the pinned spec-spine into .tooling/bin
 make gate                  # the corpus surface: freshness, lint, authored content
 make code                  # the workspace surface: build, test, clippy, fmt
 make refresh               # spec-spine compile && spec-spine index, after editing a spec.md
 make verify SPEC=001       # one spec's declared acceptance
-spec-spine registry plan   # what is schedulable
+make status                # version, lifecycle counts, what is schedulable
 ```
 
 `make code` judges six crates. Both surfaces are required through the `ci-gate`
@@ -48,14 +49,22 @@ AGENTS.md records what to do if a spec genuinely needs to claim ahead.
   `spec.md`, run `make refresh` and commit the shards alongside the edit. Running
   `compile` and then `compile --check` in the same breath passes unconditionally
   and proves nothing.
-- **A forward claim is expected.** Specs `002` to `005` claim crates that do not
-  exist. Those unresolved units are warnings by design; do not "fix" them by
-  narrowing a spec's territory or by adding an empty crate.
+- **There are no forward claims left, and the gate now refuses one.** Specs `002`
+  to `005` once claimed crates that did not exist; all six crates are written, and
+  `index check --fail-on-unresolved` is in the gate. Under the 0.20.0 pin an
+  unresolved claim exits **1**, the validation code, not 2: it is a corpus that
+  does not describe its tree, and `make refresh` cannot cure it. Do not "fix" one
+  by narrowing a spec's territory or by adding an empty crate; see AGENTS.md,
+  which records what a spec that genuinely needs to claim ahead should do.
 - **Do not install the spec-spine kit here.** `spec-spine init --with-kit` writes
   a harness this repository deliberately does not carry: who owns the harness is
   an open question (`D-04`), and spec `002` section 3.7 is the contract that keeps
   two installers from claiming the same files.
-- **The pin is exact.** `required_version = "=0.18.0"`. 0.19.0 exists and is not
-  adopted; adopting it is its own change with its own re-index.
+- **The pin is exact, and the binary is local.** `required_version = "=0.20.0"`,
+  installed at the gitignored `.tooling/bin` by `make tools`, which reads the
+  version from the pin. Run spec-spine through `make` or as
+  `.tooling/bin/spec-spine`; a bare `spec-spine` is the shared `~/.cargo/bin`
+  copy that any project on this machine replaces. Adopting a newer spine is its
+  own change, with its own re-index and its own bypass-floor review (`D-06`).
 - **No em dash, no session links.** `make gate` enforces both. This applies to
   commit messages and pull-request bodies too, where the gate cannot see them.
