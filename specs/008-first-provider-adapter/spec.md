@@ -22,6 +22,12 @@ establishes:
   # written yet fails.
   - { kind: directory, path: "crates/statecraft-adapter-claude-code/" }
 extends:
+  # The native reader needs the existing process supervisor with a typed
+  # decoder. The generic protocol stays strict; no provider is named in 004.
+  - { spec: "004-execution-adapter", unit: { kind: directory, path: "crates/statecraft-adapter/" }, nature: additive }
+  # Keep the provider claim separate from the mapped termination when the
+  # run supervisor records both in its existing outcome shape.
+  - { spec: "003-work-and-run-semantics", unit: { kind: directory, path: "crates/statecraft-run/" }, nature: additive }
   # The environment half of this adapter (002 section 3.9) registers a harness
   # adapter, its managed paths and its prerequisites, which is a declaration
   # inside the crate 002 owns as one directory unit. Nothing 002 requires
@@ -266,6 +272,62 @@ measurement this spec did not take.
 ## 5. Decisions recorded during implementation
 
 Dated entries for choices §3 was silent on. None changes what §3 requires.
+
+**2026-09-17: missing initialization does not erase a readable terminal denial.**
+The native execution bridge's `map_stream` error path discarded the mapped
+events when initialization was missing, even with a parsed terminal result
+carrying denials. The result survived in detail while the supervisor counted
+zero refusals. The repair shares the terminal denial-to-event mapping between
+the successful and error paths. The error path retains only those independently
+readable refusal events; it invents no initialization and keeps `NoInit`, an
+`interrupted` execution and the provider's unchanged completed claim. The run
+supervisor then counts the events and records `refused` under `003` sections
+3.4 and 3.5 and this spec's section 3.3. Missing initialization without a denial
+remains `interrupted`, as `004` section 5's malformed-stream decision requires.
+
+This is implemented in `execution.rs` and `stream.rs` and tested by
+`native_denied_success_without_init_keeps_refusals_and_the_stream_error` in the
+provider negative suite and
+`run_without_init_persists_denial_accounting_claim_and_diagnostic` in the CLI
+native-stream suite. Both replay the recorded denied terminal event through a
+real child with initialization removed. The CLI test reopens the persisted
+accounting and outcome, checks the verbatim denial and diagnostic, and verifies
+that acceptance does not run. Its undenied missing-init control stays interrupted.
+No ratified requirement, ownership edge or acceptance command changes.
+
+**Separate pre-existing finding, not repaired here:** the generic supervisor
+leaves its deadline loop on a result or malformed line before calling
+`child.wait()` and joining its reader. Either wait can therefore outlive the
+deadline. This requires a separate supervisor repair under `004`, not an
+extension of this refusal-accounting remediation.
+
+**2026-09-17: native stream decoding belongs beside the provider mapping.**
+The `run` binding sent native JSONL straight to `004`'s `event`-tagged parser,
+although this provider emits `type`-tagged lines. The existing `map_stream` and
+`outcome` bridge therefore never received a running child's output. The repair
+uses `004`'s same process supervisor with a typed reader and terminal predicate,
+then calls both existing mappings in this crate. The generic entry point still
+uses its strict parser. Process creation, workspace cwd, environment, deadline
+and descendant handling remain in `004`; the binding calls this provider's
+entry point under the existing corrective edge on `006`.
+
+The provider claim remains separate from refusal accounting: a denied success
+is passed to `003` with its completed claim, mapped termination and refusal
+events, so the supervisor counts the denials once and records `refused`.
+An additive conclusion entry point separates that claim from the mapped
+termination without changing the existing record fields. A turn cap supplies
+`interrupted`. Unmapped terminal states and malformed or truncated streams
+retain a diagnostic and cannot produce a completed outcome. Mapped events,
+terminal fields and process diagnostics are retained in the outcome record's
+existing extensible detail.
+The closed outcomes and the command's serialized view are unchanged.
+
+This wiring does not forward `Invocation.settings`, supply missing
+`unqualified` labels, or widen the constructed environment with `USER`. Those
+are separate findings and dependencies for live qualification, not claims this
+repair discharges. Section 3.1's mid-stream refusal-event contradiction remains
+an owner amendment; the existing mapper still carries that event as progress
+and takes refusal evidence from the terminal `permission_denials` only.
 
 **2026-09-17: the applied set reports what the invocation put into effect, minus
 what the init event contradicts.** Spec 004 §3.3 wants the init event to carry

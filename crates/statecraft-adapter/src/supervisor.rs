@@ -52,9 +52,9 @@ pub enum SpawnRefusal {
 
 /// What a supervised run produced.
 #[derive(Debug, Clone, PartialEq)]
-pub struct Supervised {
+pub struct Supervised<E = Event> {
     /// Every event read from the stream, in order.
-    pub events: Vec<Event>,
+    pub events: Vec<E>,
     /// The outcome the supervisor decided.
     pub outcome: Outcome,
     /// Set when the stream could not be read as a completion.
@@ -103,6 +103,25 @@ pub fn supervise(
     request: &Request,
     environment: &ChildEnvironment,
 ) -> std::io::Result<Supervised> {
+    supervise_stream(program, args, request, environment, parse_event, |event| {
+        matches!(event, Event::Result { .. })
+    })
+}
+
+/// Supervise a typed stream using its owning adapter's decoder.
+///
+/// Only decoding and terminal recognition vary. The process, cwd, constructed
+/// environment, deadline and descendant handling are the same as [`supervise`].
+/// The caller maps the returned events and terminal fields at its own boundary;
+/// this function's outcome describes transport completion, not the work's result.
+pub fn supervise_stream<E: Send + 'static>(
+    program: &Path,
+    args: &[&str],
+    request: &Request,
+    environment: &ChildEnvironment,
+    decode: fn(&str, usize) -> Result<E, StreamError>,
+    is_terminal: fn(&E) -> bool,
+) -> std::io::Result<Supervised<E>> {
     let workspace = workspace_to_enter(&request.workspace)?;
 
     let mut command = Command::new(program);
@@ -140,7 +159,7 @@ pub fn supervise(
             if line.trim().is_empty() {
                 continue;
             }
-            if tx.send(parse_event(&line, i + 1)).is_err() {
+            if tx.send(decode(&line, i + 1)).is_err() {
                 break;
             }
         }
@@ -159,7 +178,7 @@ pub fn supervise(
         }
         match rx.recv_timeout(remaining) {
             Ok(Ok(event)) => {
-                let terminal = matches!(event, Event::Result { .. });
+                let terminal = is_terminal(&event);
                 events.push(event);
                 if terminal {
                     break;
@@ -199,7 +218,7 @@ pub fn supervise(
         None
     };
 
-    let has_result = events.iter().any(|e| matches!(e, Event::Result { .. }));
+    let has_result = events.iter().any(is_terminal);
     if stream_error.is_none() && !has_result && !timed_out {
         stream_error = Some(StreamError::NoResult {
             events: events.len(),

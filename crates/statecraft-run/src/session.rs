@@ -229,6 +229,27 @@ pub struct Concluded {
     pub workspace_retained: String,
 }
 
+/// The mapped termination beside the adapter's own claim about it.
+///
+/// These are distinct inputs: a provider's error flag need not mean the work
+/// failed, and a completed claim need not survive the supervisor's accounting.
+#[derive(Debug, Clone, Copy)]
+pub struct Termination {
+    /// The termination observed through the adapter's protocol mapping.
+    pub observed: Outcome,
+    /// The adapter's claim, retained in the existing `adapterClaimed` field.
+    pub adapter_claimed: Outcome,
+}
+
+impl From<Outcome> for Termination {
+    fn from(outcome: Outcome) -> Self {
+        Self {
+            observed: outcome,
+            adapter_claimed: outcome,
+        }
+    }
+}
+
 /// Conclude an attempt: decide, record the accounting and the outcome.
 ///
 /// `detail` is whatever the caller wants the outcome record to carry for a later
@@ -239,6 +260,30 @@ pub fn conclude(
     target: &Path,
     session: &Session,
     adapter_said: Outcome,
+    accounting: &Accounting,
+    detail: serde_json::Value,
+    clock: &dyn Clock,
+) -> Result<Concluded, SessionError> {
+    conclude_observed(
+        chain,
+        target,
+        session,
+        adapter_said.into(),
+        accounting,
+        detail,
+        clock,
+    )
+}
+
+/// Conclude with a mapped termination independent of the adapter's claim.
+///
+/// Uses the same refusal accounting, base-movement rule and record shape as
+/// [`conclude`], whose callers supply the same value for both inputs.
+pub fn conclude_observed(
+    chain: &mut Chain,
+    target: &Path,
+    session: &Session,
+    termination: Termination,
     accounting: &Accounting,
     detail: serde_json::Value,
     clock: &dyn Clock,
@@ -269,7 +314,7 @@ pub fn conclude(
     let decided = if moved {
         Outcome::Interrupted
     } else {
-        decide(adapter_said, accounting)
+        decide(termination.observed, accounting)
     };
 
     chain.append(
@@ -284,7 +329,7 @@ pub fn conclude(
             detail: merge(
                 serde_json::json!({
                     "outcome": decided.word(),
-                    "adapterClaimed": adapter_said.word(),
+                    "adapterClaimed": termination.adapter_claimed.word(),
                     "refusals": accounting.count,
                     "baseMoved": moved,
                     "baseCommit": session.workspace.base_commit,
@@ -299,7 +344,7 @@ pub fn conclude(
         run_id: session.run_id.clone(),
         attempt: session.attempt,
         outcome: decided,
-        adapter_claimed: adapter_said,
+        adapter_claimed: termination.adapter_claimed,
         refusals: accounting.count,
         base_moved: moved,
         workspace_retained: session.workspace.path.display().to_string(),

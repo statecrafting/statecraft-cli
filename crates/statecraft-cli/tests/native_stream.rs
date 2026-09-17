@@ -1,0 +1,236 @@
+//! Spec 008's provider binding through the real CLI and run record. Discovery
+//! is a test double; provider output is the committed redacted native stream.
+//! No provider executable or credential is used.
+
+#![cfg(unix)]
+
+use std::os::unix::fs::PermissionsExt;
+use std::path::Path;
+use std::process::{Command, Output};
+
+fn executable(path: &Path, script: &str) {
+    std::fs::write(path, script).unwrap();
+    std::fs::set_permissions(path, std::fs::Permissions::from_mode(0o755)).unwrap();
+}
+
+fn git(path: &Path, args: &[&str]) {
+    let output = Command::new("git")
+        .current_dir(path)
+        .args(args)
+        .output()
+        .unwrap();
+    assert!(output.status.success(), "{output:?}");
+}
+
+fn native_run(
+    fixture: &str,
+    expected: &str,
+    claim: &str,
+    refusals: u32,
+    subtype: Option<&str>,
+    missing_init: bool,
+) {
+    let target = tempfile::tempdir().unwrap();
+    let home = tempfile::tempdir().unwrap();
+    let bin = tempfile::tempdir().unwrap();
+    git(target.path(), &["init", "--quiet"]);
+    git(target.path(), &["config", "user.name", "fixture"]);
+    git(
+        target.path(),
+        &["config", "user.email", "fixture@example.com"],
+    );
+    std::fs::write(target.path().join("source.txt"), "base").unwrap();
+    git(target.path(), &["add", "source.txt"]);
+    git(target.path(), &["commit", "--quiet", "-m", "fixture base"]);
+
+    // Synthetic scheduler input keeps this regression independent of discovery.
+    // It does not create or ratify a spec in the governed repository.
+    executable(
+        &bin.path().join("spec-spine"),
+        r#"#!/bin/sh
+case "$*" in
+  --version) echo 'spec-spine 0.20.0' ;;
+  check) exit 0 ;;
+  'registry plan --json') echo '{"ready":[{"id":"replay","title":"recorded stream"}]}' ;;
+  'registry list --json') echo '{"items":[{"id":"replay","status":"approved","implementation":"pending"}]}' ;;
+  *) exit 3 ;;
+esac
+"#,
+    );
+    let fixture_path = Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../statecraft-adapter-claude-code/testdata/stream")
+        .join(fixture);
+    let mut native = std::fs::read_to_string(&fixture_path).unwrap();
+    if let Some(subtype) = subtype {
+        // An explicitly synthetic perturbation of the recorded terminal state.
+        let mut lines: Vec<String> = native.lines().map(str::to_string).collect();
+        let mut result: serde_json::Value = serde_json::from_str(lines.last().unwrap()).unwrap();
+        result["subtype"] = subtype.into();
+        *lines.last_mut().unwrap() = result.to_string();
+        native = lines.join("\n");
+    }
+    if missing_init {
+        // Keep only the recorded result, without inventing initialization.
+        native = native.lines().last().unwrap().to_string();
+    }
+    std::fs::write(bin.path().join("native.jsonl"), native).unwrap();
+    executable(
+        &bin.path().join("claude"),
+        r#"#!/bin/sh
+if [ "$1" = --version ]; then echo '2.1.267'; exit 0; fi
+[ "$*" = '--print --output-format stream-json --verbose' ] || exit 3
+[ "${USER+x}" != x ] || exit 3
+[ "${HOME+x}" != x ] || exit 3
+/bin/cat > child-prompt
+pwd > child-cwd
+/bin/cat "$(dirname "$0")/native.jsonl"
+case "$(/bin/cat "$(dirname "$0")/native.jsonl")" in
+  *error_max_turns*) exit 1 ;;
+esac
+"#,
+    );
+    let path = format!("{}:/usr/bin:/bin", bin.path().display());
+    let run = |args: &[&str]| -> Output {
+        Command::new(env!("CARGO_BIN_EXE_statecraft-cli"))
+            .args(args)
+            .env("STATECRAFT_HOME", home.path())
+            .env("PATH", &path)
+            .output()
+            .unwrap()
+    };
+    let root = target.path().to_str().unwrap();
+    let registered = run(&["project", "register", root]);
+    assert!(registered.status.code().unwrap() <= 1, "{registered:?}");
+    let output = run(&["run", root, "replay", "--json"]);
+    assert_eq!(
+        output.status.code(),
+        Some(if expected == "completed" { 0 } else { 1 }),
+        "{output:?}"
+    );
+    let answer: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
+    assert_eq!(answer["value"]["outcome"], expected);
+    assert_eq!(answer["value"]["adapterClaimed"], claim);
+    assert_eq!(answer["value"]["refusals"], refusals);
+    // The existing closed command view has exactly its original seven fields.
+    assert_eq!(answer["value"].as_object().unwrap().len(), 7);
+
+    let workspace = Path::new(answer["value"]["workspaceRetained"].as_str().unwrap());
+    let cwd = std::fs::read_to_string(workspace.join("child-cwd")).unwrap();
+    assert_eq!(
+        Path::new(cwd.trim()).canonicalize().unwrap(),
+        workspace.canonicalize().unwrap()
+    );
+    assert_eq!(
+        std::fs::read_to_string(workspace.join("child-prompt")).unwrap(),
+        "Implement replay in this workspace."
+    );
+    assert!(!target.path().join("child-cwd").exists());
+
+    let (chain, _) = statecraft_run::record::Chain::open(home.path(), target.path()).unwrap();
+    let entries = chain.entries();
+    let outcome = entries.iter().find(|e| e.subject == "attempt").unwrap();
+    assert_eq!(outcome.detail["outcome"], expected);
+    assert_eq!(outcome.detail["refusals"], refusals);
+    assert_eq!(outcome.detail["adapterClaimed"], claim);
+    assert_eq!(
+        statecraft_run::session::runs(&chain)[0].attempts[0]
+            .outcome
+            .unwrap()
+            .word(),
+        expected
+    );
+    let evidence = &outcome.detail["execution"];
+    if missing_init {
+        assert_eq!(
+            evidence["streamError"],
+            statecraft_adapter::StreamError::NoInit.to_string()
+        );
+        assert_eq!(
+            evidence["events"].as_array().unwrap().len(),
+            refusals as usize
+        );
+    } else if subtype.is_some() {
+        assert!(
+            evidence["streamError"]
+                .as_str()
+                .unwrap()
+                .contains("not in spec 008")
+        );
+    } else {
+        assert!(evidence["streamError"].is_null());
+    }
+    if !missing_init {
+        assert!(evidence["events"].as_array().unwrap().len() > 2);
+    }
+    assert!(evidence["providerTerminal"]["num_turns"].as_u64().unwrap() > 0);
+    let accounting = entries.iter().find(|e| e.subject == "refusals").unwrap();
+    assert_eq!(accounting.detail["count"], refusals);
+    if refusals > 0 {
+        let denial: serde_json::Value =
+            serde_json::from_str(accounting.detail["sample"][0]["detail"].as_str().unwrap())
+                .unwrap();
+        assert_eq!(
+            denial,
+            evidence["providerTerminal"]["permission_denials"][0]
+        );
+        if !missing_init {
+            assert!(
+                evidence["events"]
+                    .as_array()
+                    .unwrap()
+                    .iter()
+                    .any(|e| e["message"] == "system/permission_denied")
+            );
+        }
+    }
+    if expected != "completed" {
+        let accepted = run(&["accept", root, "replay", "--json"]);
+        assert_eq!(accepted.status.code(), Some(1), "{accepted:?}");
+        let answer: serde_json::Value = serde_json::from_slice(&accepted.stdout).unwrap();
+        assert_eq!(answer["value"]["reason"], format!("attempt-{expected}"));
+    }
+}
+
+#[test]
+fn run_maps_recorded_success_and_keeps_the_workspace_cwd() {
+    native_run("success.jsonl", "completed", "completed", 0, None, false);
+}
+
+#[test]
+fn run_counts_recorded_denial_once_and_accept_does_not_run() {
+    native_run("denied.jsonl", "refused", "completed", 1, None, false);
+}
+
+#[test]
+fn run_maps_recorded_turn_cap_to_interrupted_and_accept_does_not_run() {
+    native_run(
+        "max-turns.jsonl",
+        "interrupted",
+        "interrupted",
+        0,
+        None,
+        false,
+    );
+}
+
+#[test]
+fn run_retains_an_unmapped_completed_claim_beside_interrupted_and_its_diagnostic() {
+    native_run(
+        "success.jsonl",
+        "interrupted",
+        "completed",
+        0,
+        Some("unmeasured"),
+        false,
+    );
+}
+
+#[test]
+fn run_without_init_persists_denial_accounting_claim_and_diagnostic() {
+    native_run("denied.jsonl", "refused", "completed", 1, None, true);
+}
+
+#[test]
+fn run_without_init_or_denials_stays_interrupted() {
+    native_run("success.jsonl", "interrupted", "completed", 0, None, true);
+}

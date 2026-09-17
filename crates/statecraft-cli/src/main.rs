@@ -340,11 +340,12 @@ fn run_verb(
         },
     };
 
-    let supervised = match statecraft_adapter::supervisor::supervise(
+    let execution = match statecraft_adapter_claude_code::execution::supervise(
         &program,
         &invocation.args(),
         &request,
         &environment,
+        &negotiation.granted,
     ) {
         Ok(s) => s,
         Err(e) => {
@@ -365,6 +366,7 @@ fn run_verb(
         }
     };
 
+    let supervised = &execution.supervised;
     let mut accounting = statecraft_run::refusal::Accounting::default();
     for refusal in statecraft_adapter::protocol::refusals(&supervised.events) {
         accounting.observe(refusal);
@@ -374,7 +376,7 @@ fn run_verb(
         &mut chain,
         root,
         &session,
-        supervised.outcome,
+        execution.termination(),
         &accounting,
         serde_json::json!({
             "requested": negotiation
@@ -385,6 +387,7 @@ fn run_verb(
             "applied": applied_tokens(&supervised.events),
             "degraded": negotiation.degraded.iter().map(|c| c.token()).collect::<Vec<_>>(),
             "specId": spec_id,
+            "execution": execution.evidence(),
         }),
         format,
     )
@@ -406,16 +409,16 @@ fn conclude_and_emit(
     chain: &mut Chain,
     root: &std::path::Path,
     session: &statecraft_run::session::Session,
-    adapter_said: statecraft_run::attempt::Outcome,
+    termination: impl Into<statecraft_run::session::Termination>,
     accounting: &statecraft_run::refusal::Accounting,
     detail: serde_json::Value,
     format: Format,
 ) -> i32 {
-    match statecraft_run::session::conclude(
+    match statecraft_run::session::conclude_observed(
         chain,
         root,
         session,
-        adapter_said,
+        termination.into(),
         accounting,
         detail,
         &SystemClock,
