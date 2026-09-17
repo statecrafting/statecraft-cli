@@ -37,6 +37,6 @@
     "summary": "The core loop's semantics. How a unit of work is identified by reading spec-spine's structured report rather than re-deriving it; how an isolated workspace is prepared so the operator's checkout is never edited; the append-only hash-linked run record with intent written before an effect and outcome after it; the closed outcome set (completed, failed, refused, interrupted, cancelled) and the rule that a retry appends an attempt rather than replacing history; supervisor-owned refusal accounting a supervised process cannot erase; and reconciliation of an ambiguous effect before any retry, with no exactly-once promise.\n",
     "title": "Work selection, workspace preparation, the run record, and recovery after interruption"
   },
-  "shardHash": "3915d7173ab847386f02336fd23aece23a98c7e00850c617e16a8cec4c3f3272",
+  "shardHash": "924228ea1bdbb7e46082305114262418918c610853153b5e29691a7ccc6ffd75",
   "specVersion": "1.3.0"
 }

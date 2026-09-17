@@ -140,8 +140,25 @@ impl SpecSpineCli {
 
     fn version(&self, target: &Path) -> Result<String, ReportError> {
         let out = self.run(target, &["--version"])?;
-        Ok(String::from_utf8_lossy(&out.stdout).trim().to_string())
+        // `spec-spine --version` prints `spec-spine 0.20.0`: the version is the
+        // last whitespace-separated token. Keeping the whole line made every
+        // refusal read `spec-spine spec-spine 0.20.0 report ...` and put a
+        // program name inside a field spec 003 section 3.1 requires to name a
+        // version.
+        Ok(version_token(&String::from_utf8_lossy(&out.stdout)))
     }
+}
+
+/// The version out of `spec-spine --version`'s line.
+///
+/// Separate and testable without a process, because it is what every refusal in
+/// [`ReportError`] names and spec 003 section 3.1 requires that to be a version.
+pub fn version_token(stdout: &str) -> String {
+    stdout
+        .split_whitespace()
+        .next_back()
+        .unwrap_or_default()
+        .to_string()
 }
 
 impl ReportSource for SpecSpineCli {
@@ -217,11 +234,23 @@ pub fn parse_lifecycle(
     value: &serde_json::Value,
     version: &str,
 ) -> Result<Vec<SpecLifecycle>, ReportError> {
-    let rows = value.as_array().ok_or_else(|| ReportError::Unreadable {
-        command: "registry list --json".into(),
-        version: version.to_string(),
-        detail: "expected an array of specs".into(),
-    })?;
+    // Both reports are envelopes, and only one of them was read as such.
+    // Measured against the pinned spec-spine 0.20.0 on 2026-09-17:
+    // `registry list --json` answers `{"items": [...], "schemaVersion": ...}`,
+    // the way `registry plan --json` answers `{"ready": [...], ...}` and is
+    // already read through its own key above. Reading this one as a bare array
+    // made every `work`, `run` and `accept` invocation exit 4 against a real
+    // corpus. A bare array is still accepted, because an older report that is
+    // one carries the same rows.
+    let rows = value
+        .get("items")
+        .and_then(serde_json::Value::as_array)
+        .or_else(|| value.as_array())
+        .ok_or_else(|| ReportError::Unreadable {
+            command: "registry list --json".into(),
+            version: version.to_string(),
+            detail: "expected `items` to be an array of specs".into(),
+        })?;
     let mut out = Vec::with_capacity(rows.len());
     for row in rows {
         for field in ["id", "status"] {
@@ -289,5 +318,41 @@ mod tests {
             parse_lifecycle(&v, "0.18.0"),
             Err(ReportError::Unreadable { .. })
         ));
+    }
+
+    // The shape the pinned spec-spine actually emits, measured on 2026-09-17.
+    // The hand-built bare arrays above are what let this go unnoticed: they are
+    // the shape this parser wanted rather than the shape it is given.
+    #[test]
+    fn the_pinned_reports_envelope_is_read_through_its_items_key() {
+        let v = serde_json::json!({
+            "items": [
+                {"id": "000-bootstrap", "status": "approved", "implementation": "n-a"},
+                {"id": "001-x", "status": "approved", "implementation": "pending"}
+            ],
+            "schemaVersion": "0.1.0"
+        });
+        let rows = parse_lifecycle(&v, "0.20.0").unwrap();
+        assert_eq!(rows.len(), 2);
+        assert_eq!(rows[1].id, "001-x");
+        assert_eq!(rows[1].status, "approved");
+    }
+
+    #[test]
+    fn a_row_inside_the_envelope_without_status_still_refuses_naming_the_field() {
+        let v = serde_json::json!({"items": [{"id": "001-x", "title": "x"}]});
+        match parse_lifecycle(&v, "0.20.0") {
+            Err(ReportError::MissingField { field, version, .. }) => {
+                assert_eq!(field, "status");
+                assert_eq!(version, "0.20.0");
+            }
+            other => panic!("expected a missing-field refusal, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn the_version_a_refusal_names_is_the_version_and_not_the_program_name() {
+        assert_eq!(version_token("spec-spine 0.20.0\n"), "0.20.0");
+        assert_eq!(version_token(""), "");
     }
 }
