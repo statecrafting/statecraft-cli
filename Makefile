@@ -42,9 +42,9 @@ SKIP_NOTE := no crate exists yet, so the workspace has no members and cargo has 
 ## 13/13 specifically claimed instead of reporting the number.
 ##
 ## One flag the generic spec-spine kit carries is still deliberately absent:
-##   index check --fail-on-unresolved   refuses a forward claim, which is exactly
-##       what specs 003 to 005 still are. It joins the gate when this repository
-##       builds what it claims within one pull request.
+##   index check --fail-on-unresolved   refuses a forward claim. One is left:
+##       006 claims crates/statecraft-cli/, which is what a draft proposal is
+##       for. The flag joins the gate when that last claim is built.
 ## AGENTS.md carries the same note, so it is not a silent omission.
 gate:
 	$(SPEC_SPINE) check --fail-on-warn

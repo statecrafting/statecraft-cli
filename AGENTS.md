@@ -101,10 +101,10 @@ coverage is now 13/13 specifically claimed and the flag defends that number.
 One flag the generic kit uses is still **deliberately absent**, and adding it
 would refuse this repository's own correct state:
 
-- `index check --fail-on-unresolved` refuses a forward claim. Specs `003` to
-  `005` claim crates that do not exist yet, which is what a `draft` spec is for.
-  It joins the gate when this repository builds what it claims within one pull
-  request.
+- `index check --fail-on-unresolved` refuses a forward claim. One claim is still
+  unresolved: `006-command-surface` claims `crates/statecraft-cli/`, which is
+  what a `draft` proposal is for. The flag joins the gate when the last forward
+  claim is built, which is now one pull request away.
 
 `spec-spine couple` is **CI-only, and deliberately not in `make gate`**. It
 compares two commits, so it cannot see a change being staged and is useless as a
