@@ -273,6 +273,29 @@ refused, with the withholding recorded as a degradation. The list names the
 credential families that exist today; it is a backstop against a well-meaning
 blueprint, not a containment boundary, and §3.6's residuals still stand.
 
+**2026-09-17: the request's workspace is the child's working directory, and a
+workspace that is not one is refused before spawn.** §3.1 puts the prepared
+workspace in the request, and spec `003` §3.2 says the operator's checkout is
+never edited and that no session runs in it. Neither says which line makes that
+true of a spawned process, and nothing did: the supervisor built the child's
+program, arguments, constructed environment and pipes, and never set a working
+directory, so the child inherited the supervisor's own. That is the operator's
+checkout whenever the command was started there, and a live provider run
+measured exactly it, reporting the caller's directory in the child's init
+event. The path was carried through the protocol and dropped at the boundary,
+which is worse than never carrying it: every reader of the request had reason
+to believe it was honored. The child is now spawned with the request's
+workspace as its working directory. A workspace that does not exist, or that
+exists and is not a directory, is refused before anything is spawned, naming
+the path, on the error channel the supervisor already returns and in the shape
+§3.3 uses for a required capability: the platform's own answer is an `ENOENT`
+raised after the fork, which reads the same as an adapter binary that is not
+there. Nothing §3 requires changed. This is §3.1's workspace and `003` §3.2's
+isolation, enforced where a process actually acquires a directory. The suite
+covers it with a fixture that reports the directory it is running in and writes
+a marker there through a relative path, so a caller in one directory and a
+workspace in another are separated by observation rather than by argument.
+
 **2026-09-16: the provider-name rule is a test that greps this crate.** §3.8
 makes a provider name in this territory a defect. A rule nobody can run is a
 rule that decays, so `tests/no_provider_names.rs` scans the crate's own sources

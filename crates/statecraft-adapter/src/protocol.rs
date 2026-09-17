@@ -13,6 +13,10 @@ use std::path::PathBuf;
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Request {
     /// The prepared workspace the child works in.
+    ///
+    /// Applied by the supervisor as the child's **working directory**, which is
+    /// what makes spec 003 section 3.2's "no session runs in the operator's
+    /// checkout" a property of the spawn rather than of the prompt.
     pub workspace: PathBuf,
     /// The base revision, already resolved to a commit by spec 003.
     pub base_commit: String,

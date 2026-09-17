@@ -455,3 +455,144 @@ fn the_prompt_reaches_the_child_on_a_stream_and_no_argument_carries_it() {
     assert_eq!(run.outcome, Outcome::Completed);
     assert_eq!(std::fs::read(&seen).unwrap(), req.prompt);
 }
+
+// The request's workspace is the child's working directory.
+//
+// Section 3.1 makes the workspace part of the request and spec 003 section 3.2
+// says the operator's checkout is never edited and no session runs in it. A
+// supervisor that spawns without a working directory hands the child its own,
+// which is the operator's checkout whenever the command was started there: the
+// path is then carried and ignored, which is worse than not carrying it.
+#[test]
+fn the_child_runs_in_the_requests_workspace_and_not_in_the_callers_directory() {
+    // The caller's directory: this test process runs in the crate root, which is
+    // inside the operator's checkout. That is the directory the child must not
+    // inherit, and the one the assertions below hold untouched.
+    let caller = std::env::current_dir().expect("the test process has a working directory");
+    let workspace = tempfile::tempdir().unwrap();
+    // The adapter lives somewhere else again, so nothing about where the program
+    // sits can be what puts the child in the workspace.
+    let elsewhere = tempfile::tempdir().unwrap();
+    let adapter = fixture::write(elsewhere.path(), Behavior::ReportsWorkingDirectory).unwrap();
+    let env = env_for(&["sh"]);
+
+    let run = supervise(
+        &adapter,
+        &[],
+        &request(workspace.path(), 30, Requested::none()),
+        &env,
+    )
+    .unwrap();
+    assert_eq!(run.outcome, Outcome::Completed);
+
+    // Canonicalized on both sides: a temporary directory is reached through a
+    // symlink on macOS, and the child's `pwd` answers with the resolved path.
+    let expected = std::fs::canonicalize(workspace.path()).unwrap();
+    let reported = run
+        .events
+        .iter()
+        .find_map(|e| match e {
+            Event::Progress { message } => Some(message.clone()),
+            _ => None,
+        })
+        .expect("the fixture reports the directory it is running in");
+    assert_eq!(
+        Path::new(&reported),
+        expected,
+        "the child ran in the workspace the request named"
+    );
+
+    // And its writes landed there, through a relative path.
+    let marker = workspace.path().join(fixture::WORKING_DIRECTORY_MARKER);
+    assert!(marker.is_file(), "the child wrote into the workspace");
+    assert_eq!(
+        Path::new(std::fs::read_to_string(&marker).unwrap().trim()),
+        expected
+    );
+
+    // Neither the operator's checkout nor the adapter's own directory was
+    // touched, which is the property spec 003 section 3.2 states.
+    assert!(
+        !caller.join(fixture::WORKING_DIRECTORY_MARKER).exists(),
+        "the operator's checkout is untouched"
+    );
+    assert!(
+        !elsewhere
+            .path()
+            .join(fixture::WORKING_DIRECTORY_MARKER)
+            .exists(),
+        "and so is the directory the adapter was found in"
+    );
+
+    // The supervisor moved the child, not itself. Changing the supervisor's own
+    // directory would be process-global and would reach every other run in it.
+    assert_eq!(
+        std::env::current_dir().unwrap(),
+        caller,
+        "the supervisor never changes its own working directory"
+    );
+}
+
+// A workspace that does not exist is refused before spawn, naming the path.
+//
+// The alternative is worth stating, because it is what the platform does on its
+// own: the spawn fails inside the child after the fork with a bare "No such file
+// or directory", indistinguishable from an adapter binary that is missing. A
+// refusal that names the path is the same shape section 3.3 uses for a required
+// capability, and no process is created either way.
+#[test]
+fn a_workspace_that_does_not_exist_is_refused_before_spawn() {
+    let dir = tempfile::tempdir().unwrap();
+    let adapter = fixture::write(dir.path(), Behavior::ReportsWorkingDirectory).unwrap();
+    let env = env_for(&["sh"]);
+    let missing = dir.path().join("no-such-workspace");
+
+    let error = supervise(
+        &adapter,
+        &[],
+        &request(&missing, 30, Requested::none()),
+        &env,
+    )
+    .expect_err("an absent workspace is not something to spawn into");
+
+    assert_eq!(error.kind(), std::io::ErrorKind::NotFound);
+    assert!(
+        error.to_string().contains(&missing.display().to_string()),
+        "the refusal names the path: {error}"
+    );
+
+    // Nothing ran anywhere: the marker is in neither candidate directory.
+    assert!(!dir.path().join(fixture::WORKING_DIRECTORY_MARKER).exists());
+    assert!(
+        !std::env::current_dir()
+            .unwrap()
+            .join(fixture::WORKING_DIRECTORY_MARKER)
+            .exists(),
+        "and certainly not in the caller's directory"
+    );
+}
+
+// A workspace path that is not a directory is refused before spawn too.
+#[test]
+fn a_workspace_that_is_not_a_directory_is_refused_before_spawn() {
+    let dir = tempfile::tempdir().unwrap();
+    let adapter = fixture::write(dir.path(), Behavior::ReportsWorkingDirectory).unwrap();
+    let env = env_for(&["sh"]);
+    let a_file = dir.path().join("workspace-that-is-a-file");
+    std::fs::write(&a_file, b"not a worktree").unwrap();
+
+    let error = supervise(
+        &adapter,
+        &[],
+        &request(&a_file, 30, Requested::none()),
+        &env,
+    )
+    .expect_err("a file is not a workspace");
+
+    assert_eq!(error.kind(), std::io::ErrorKind::NotADirectory);
+    assert!(
+        error.to_string().contains(&a_file.display().to_string()),
+        "the refusal names the path: {error}"
+    );
+    assert!(!dir.path().join(fixture::WORKING_DIRECTORY_MARKER).exists());
+}
