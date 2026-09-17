@@ -19,6 +19,13 @@
 //! asked for. A `partial` apply is 1, a removal with no manifest is 2, an
 //! unreadable manifest is 4.
 //!
+//! # The configured adapter set
+//!
+//! [`adapters`] names it. Spec 008 ratified the first provider adapter, so the
+//! environment verbs have an input where they previously had none; what that
+//! adapter declares and how its prerequisites are detected is spec 008's, in
+//! the adapter's own crate.
+//!
 //! # Nothing here publishes
 //!
 //! There is no verb that publishes, releases or tags, and a test asserts the
@@ -26,6 +33,7 @@
 
 #![forbid(unsafe_code)]
 
+pub mod adapters;
 pub mod bind;
 pub mod commands;
 pub mod exit;

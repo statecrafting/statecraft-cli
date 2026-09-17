@@ -6,7 +6,7 @@
 //! than as a quietly weakened assertion.
 
 use statecraft_environment::adapter::{
-    Declaration, ManagedFile, Prerequisite, Readiness, StaticProbe,
+    Declaration, ManagedFile, Prerequisite, Readiness, StaticProbe, readiness,
 };
 use statecraft_environment::apply::{NO_MANIFEST, Outcome, apply, remove};
 use statecraft_environment::claimant::{Claimant, ForeignClaims, StaticShadows, UnobservedShadows};
@@ -592,4 +592,137 @@ fn doctor_reports_every_state_exits_non_zero_and_repairs_nothing() {
         b"edited"
     );
     assert!(!target.path().join("gone.md").exists());
+}
+
+// The two rows of spec 008 section 3.9 that are this crate's behavior.
+//
+// Spec 008's `extends` edge names `crates/statecraft-environment/` as an
+// additive unit, and its `## Verification` block runs this suite for these two
+// rows: an absent prerequisite and a colliding declared path are things the
+// ADAPTER MODEL does, not things a provider's stream does. The declaration under
+// test is the real one, reached through a dev-dependency (see `Cargo.toml`), so
+// these rows cannot pass against a copy that has drifted from it.
+
+// Spec 008 section 3.9: `claude` is absent from the constructed environment.
+#[test]
+fn spec_008_an_absent_provider_executable_refuses_to_claim_and_names_the_prerequisite() {
+    use statecraft_adapter_claude_code::environment as provider_env;
+
+    let declaration = provider_env::declaration();
+    let probe = StaticProbe::new()
+        .with_harness(provider_env::HARNESS)
+        .with_prerequisite(provider_env::HARNESS, provider_env::QUALIFICATION_RECORD)
+        .with_prerequisite(provider_env::HARNESS, provider_env::CREDENTIAL_PATH);
+
+    match readiness(&declaration, &probe) {
+        Readiness::Refused { missing } => {
+            assert_eq!(missing, [provider_env::PROVIDER_EXECUTABLE]);
+        }
+        other => panic!("expected a refusal naming the prerequisite, got {other:?}"),
+    }
+
+    // "It does not write files for a harness that is not there" is the part that
+    // matters, so it is checked as an absence on disk and not only as a verdict.
+    let target = tempfile::tempdir().unwrap();
+    let computed = plan(
+        target.path(),
+        None,
+        std::slice::from_ref(&declaration),
+        &probe,
+        &ForeignClaims::none(),
+    )
+    .unwrap();
+    assert!(computed.writes.is_empty());
+
+    let mut manifest = Manifest::new(pins());
+    let outcome = apply(
+        target.path(),
+        &mut manifest,
+        std::slice::from_ref(&declaration),
+        &probe,
+        &ForeignClaims::none(),
+        &FixedClock(0),
+    )
+    .unwrap();
+    assert_eq!(outcome, Outcome::Applied { written: vec![] });
+    for file in &declaration.files {
+        assert!(
+            !target.path().join(&file.path).exists(),
+            "{} was written for a harness whose prerequisite is absent",
+            file.path
+        );
+    }
+    assert!(manifest.entries.is_empty());
+}
+
+// Spec 008 section 3.9: a second provider adapter declaring a path this one
+// declares. Refused at PLAN time, naming both adapters and the path.
+#[test]
+fn spec_008_a_second_adapter_declaring_this_ones_path_is_refused_at_plan_time() {
+    use statecraft_adapter_claude_code::environment as provider_env;
+
+    let first = provider_env::declaration();
+    let contested = first.files[0].path.clone();
+    let second = Declaration {
+        name: "some-other-provider".into(),
+        harness: provider_env::HARNESS.into(),
+        version: "1".into(),
+        files: vec![ManagedFile::owned(&contested, b"theirs".to_vec())],
+        unexpressible: vec![],
+        prerequisites: vec![],
+    };
+
+    let collisions = statecraft_environment::adapter::collisions(&[first.clone(), second.clone()]);
+    assert_eq!(collisions.len(), 1);
+    assert_eq!(collisions[0].path, contested);
+    assert_eq!(
+        collisions[0].adapters,
+        (first.name.clone(), second.name.clone())
+    );
+
+    // At plan time, before anything is written, and with a probe under which
+    // both adapters would otherwise have claimed: a collision is a configuration
+    // defect whether or not either could write today.
+    let mut probe = StaticProbe::new().with_harness(provider_env::HARNESS);
+    for p in &first.prerequisites {
+        probe = probe.with_prerequisite(provider_env::HARNESS, &p.id);
+    }
+    let target = tempfile::tempdir().unwrap();
+    let computed = plan(
+        target.path(),
+        None,
+        &[first.clone(), second.clone()],
+        &probe,
+        &ForeignClaims::none(),
+    )
+    .unwrap();
+
+    assert!(computed.refused());
+    let rendered = computed.render();
+    assert!(rendered.contains(&contested));
+    assert!(rendered.contains(&first.name));
+    assert!(rendered.contains(&second.name));
+
+    // The plan still SHOWS what it would have done, which is what makes it a
+    // preview. What the refusal buys is that apply writes nothing, so that is
+    // where the absence is checked, on disk.
+    let mut manifest = Manifest::new(pins());
+    let outcome = apply(
+        target.path(),
+        &mut manifest,
+        &[first.clone(), second],
+        &probe,
+        &ForeignClaims::none(),
+        &FixedClock(0),
+    )
+    .unwrap();
+    assert!(outcome.refused());
+    for file in &first.files {
+        assert!(
+            !target.path().join(&file.path).exists(),
+            "{} was written despite a plan-time collision",
+            file.path
+        );
+    }
+    assert!(manifest.entries.is_empty());
 }

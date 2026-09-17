@@ -1,0 +1,40 @@
+# Spec: specs/008-first-provider-adapter/spec.md
+#
+# The first provider adapter. This is the ONE crate in the workspace permitted
+# to name a provider: spec 004 section 3.8 makes a provider name in the seam a
+# defect, and spec 008 is the spec that names the first one.
+#
+# Everything here is a fact about Claude Code 2.1.267 on darwin, measured
+# 2026-09-17. Spec 008 section 3.8 binds the qualification to that pair: a
+# provider upgrade invalidates it even when this crate is byte-identical.
+[package]
+name = "statecraft-adapter-claude-code"
+description = "The first provider adapter: what Claude Code's stream can and cannot witness"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+publish.workspace = true
+
+[package.metadata.spec-spine]
+spec = "008-first-provider-adapter"
+
+[dependencies]
+serde = { version = "1.0.229", features = ["derive"] }
+serde_json = "1.0.151"
+thiserror = "2.0.20"
+statecraft-adapter = { path = "../statecraft-adapter" }
+statecraft-envelope = { path = "../statecraft-envelope" }
+statecraft-environment = { path = "../statecraft-environment" }
+statecraft-run = { path = "../statecraft-run" }
+
+[dev-dependencies]
+tempfile = "3.27.0"
+
+[lints.rust]
+missing_docs = "warn"
+
+[lints.clippy]
+all = { level = "warn", priority = -1 }

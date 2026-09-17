@@ -585,12 +585,29 @@ dependencies = [
 ]
 
 [[package]]
+name = "statecraft-adapter-claude-code"
+version = "0.0.0"
+dependencies = [
+ "serde",
+ "serde_json",
+ "statecraft-adapter",
+ "statecraft-envelope",
+ "statecraft-environment",
+ "statecraft-run",
+ "tempfile",
+ "thiserror",
+]
+
+[[package]]
 name = "statecraft-cli"
 version = "0.0.0"
 dependencies = [
  "serde",
  "serde_json",
  "statecraft-acceptance",
+ "statecraft-adapter",
+ "statecraft-adapter-claude-code",
+ "statecraft-envelope",
  "statecraft-environment",
  "statecraft-run",
  "tempfile",
@@ -616,6 +633,7 @@ dependencies = [
  "serde",
  "serde_json",
  "sha2 0.11.0",
+ "statecraft-adapter-claude-code",
  "tempfile",
  "thiserror",
 ]
