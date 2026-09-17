@@ -47,8 +47,8 @@
       }
     ],
     "specId": "008-first-provider-adapter",
-    "specStatus": "draft"
+    "specStatus": "approved"
   },
   "schemaVersion": "1.1.0",
-  "shardHash": "a9bdce6c3db03067d395b7e76b2043c946edf4aa07d2a999f6f4ef4d2f0272ec"
+  "shardHash": "875ba19628bc88a59072b7b55e0fc53df718516c808e1b5f0ebfcea40ce88b26"
 }

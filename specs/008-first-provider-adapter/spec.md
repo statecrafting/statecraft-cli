@@ -1,7 +1,7 @@
 ---
 id: "008-first-provider-adapter"
 title: "The first provider adapter: naming a provider, and what its stream can and cannot witness"
-status: draft
+status: approved
 implementation: pending
 created: "2026-09-17"
 summary: >

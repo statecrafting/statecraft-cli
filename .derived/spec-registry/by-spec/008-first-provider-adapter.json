@@ -46,10 +46,10 @@
       "4. Out of scope"
     ],
     "specPath": "specs/008-first-provider-adapter/spec.md",
-    "status": "draft",
+    "status": "approved",
     "summary": "Spec 004 fixed the seam and forbade a provider name inside it, so nothing in this corpus names one and the environment verbs refuse for want of a ratified adapter set. This spec names the first: Claude Code. It fixes which of 004 section 3.2's six capability tokens the manifest may declare, each against a measurement rather than a reading of the flags; it fixes the mapping from the provider's event stream onto 004 section 3.1's three parts, including the finding that there is no mid-stream refusal event and that a denied session still classifies itself as a success; it fixes which denial mechanism the adapter must use, because the two available mechanisms have opposite evidence properties; and it fixes what a qualification record binds to.\n",
     "title": "The first provider adapter: naming a provider, and what its stream can and cannot witness"
   },
-  "shardHash": "62914f89bfb1b0646137e6f24ba1d6558a02b2637e4bdd6f3fa147e1302aae1c",
+  "shardHash": "db236c069d7d3eb02e5bcb1d7e2f73224d183c7cbd43fbbbe1c6235c88c6e5db",
   "specVersion": "1.3.0"
 }
