@@ -1,0 +1,9 @@
+{
+  "package": {
+    "kind": "rust-lib-bin",
+    "name": "statecraft-cli",
+    "path": "crates/statecraft-cli"
+  },
+  "schemaVersion": "1.1.0",
+  "shardHash": "c74b1a1c3f5bd89cc86896415170bc423782b663d42447974bf09e5fff2e036b"
+}

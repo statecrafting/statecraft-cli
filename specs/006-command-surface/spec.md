@@ -2,7 +2,7 @@
 id: "006-command-surface"
 title: "The command surface: one binary, the verbs the other specs name, and what an exit code means"
 status: approved
-implementation: pending
+implementation: complete
 created: "2026-09-16"
 summary: >
   The binary. Specs 002 to 005 each describe operator verbs and then own only a
@@ -151,8 +151,61 @@ configuration files; an interactive mode; and any read-only observation surface
 (`F-04`). Distribution is deferred by `F-02`, and `D-01`'s packaging half is not
 adopted.
 
+## 5. Decisions recorded during implementation
+
+Dated entries for choices §3 was silent on. None changes what it requires.
+
+**2026-09-16: the JSON contract has its own view types.** §3.4 makes this
+crate's JSON a contract. The library types behind the verbs are not that
+contract, and deriving `Serialize` onto spec 002's `Outcome` and `Report` from
+here would have been a change to 002's territory made by 006's change, which the
+coupling gate refuses and should. So the wire shapes are declared here, where
+the contract is, and the bindings map onto them. The two reasons point the same
+way, which is usually the sign a boundary is in the right place.
+
+**2026-09-16: the environment verbs refuse, and that is not a stub.** §3.1 says a
+verb joins the tree as the behavior behind it lands, and `env plan`, `env
+apply`, `env upgrade`, `env remove` and `doctor` all need a configured adapter
+set. No spec ratifies a provider adapter, so there is nothing for them to plan
+against. They exit 2 with the reason, which is the correct answer to a
+precondition that is not met, rather than exit 0 having done nothing or a
+"not implemented" message that reads like a defect. The verbs that need no
+adapter, the four `project` verbs, work.
+
+**2026-09-16: the product home is overridable by `STATECRAFT_HOME`.** §3.6 says
+the binary reads its arguments, the target and the product home, and that no
+configuration file may change a rule. An environment variable naming *where the
+product's own state lives* changes no rule: it relocates the register. It earns
+its place by making the end-to-end tests possible at all, since they must not
+write into the developer's real home to check that registration writes nothing
+into a target.
+
+**2026-09-16: a relative path is resolved, not refused.** Spec 002 refuses a
+relative path, and that refusal is about what the register stores. An operator
+typing `project register .` has not made an error, so the binding makes the path
+absolute against the working directory first. It does not canonicalize:
+resolving symlinks would record a path the operator did not name.
+
+**2026-09-16: the last gate flag joined with this change.**
+`index check --fail-on-unresolved` was withheld while specs claimed crates they
+had not written. `006` built the last one, so it is now enforced in `make gate`
+and in CI. The cost is recorded in AGENTS.md: a new spec claiming a crate ahead
+of its implementation now fails the gate, and removing the flag again would be
+its own deliberate change.
+
 ## Verification
 
-Declared by the change that implements this spec. None of section 3 is
-implemented, so this spec carries no `verify:cli` block: an acceptance block
-here today would assert something other than the behavior above.
+Each line is one command. §3.7's rows are integration tests that **spawn the
+built binary**: an exit code is a property of a process, and a test that called
+a function and inspected a returned enum would check the mapping without ever
+checking that the binary uses it.
+
+```verify:cli
+cargo build --workspace --locked
+cargo test --workspace --locked
+cargo clippy --workspace --all-targets --locked -- -D warnings
+cargo fmt --all --check
+spec-spine index coverage --fail-on-untraced
+spec-spine index check --fail-on-unresolved
+cargo test -p statecraft-cli --test negative_cases
+```

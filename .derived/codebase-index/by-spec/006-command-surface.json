@@ -1,24 +1,23 @@
 {
-  "diagnostics": {
-    "errors": [],
-    "warnings": [
-      {
-        "code": "W-001",
-        "message": "spec '006-command-surface' directory unit 'crates/statecraft-cli/' is not a directory",
-        "path": "crates/statecraft-cli/"
-      }
-    ]
-  },
   "mapping": {
     "dependsOn": [
       "000-bootstrap",
       "001-boundaries-and-authority",
       "002-environment-lifecycle"
     ],
-    "implementingPaths": [],
+    "implementingPaths": [
+      {
+        "path": "crates/statecraft-cli/",
+        "source": "spec-edge"
+      }
+    ],
     "resolvedUnits": [
       {
-        "locations": [],
+        "locations": [
+          {
+            "file": "crates/statecraft-cli/"
+          }
+        ],
         "ownership": true,
         "sourceField": "establishes",
         "unit": {
@@ -31,5 +30,5 @@
     "specStatus": "approved"
   },
   "schemaVersion": "1.1.0",
-  "shardHash": "ab2be9c0e2fd8bef4ce17ebeee28a8b32b241a69cacfae7f807132498e94595a"
+  "shardHash": "9676965e44f65478c27708daa38eac760329b19ffe92b15b1ad4c5de8918b7cb"
 }
