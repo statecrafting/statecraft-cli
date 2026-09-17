@@ -334,6 +334,21 @@ It is `draft`. It was written as a proposal rather than as part of any
 implementing change precisely because a binary that appears as a side effect of
 a feature is a binary nobody designed.
 
+### 2026-09-16: spec 006 ratified
+
+The owner ratified `006-command-surface` the same day it was proposed. It keeps
+`implementation: pending`, so it is a work order.
+
+Ratifying it settles one thing `D-01` deliberately left open only in part: the
+**executable's name** is `statecraft-cli`, stated in `006` section 3.5 rather
+than inherited from Cargo's package-name default. `D-01`'s recommendation of
+`statecraft` is still not adopted, and adopting it later is a change to that
+section and to one `[[bin]]` stanza. What is refused is the name being settled
+by a build-tool default nobody recorded agreeing to.
+
+Everything else in `D-01`'s packaging half remains open, and `F-02` still defers
+publication and release.
+
 ### 2026-09-16: D-01 and D-02, adopted for language and layout only
 
 Ratifying `002` is not layout-neutral: its territory is the forward claim
