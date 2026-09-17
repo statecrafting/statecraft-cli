@@ -63,7 +63,7 @@ fn declared() -> Declared {
 
 fn no_report() -> NoDeltaReport {
     NoDeltaReport {
-        spec_spine_version: "spec-spine 0.18.0".into(),
+        spec_spine_version: "spec-spine 0.20.0".into(),
     }
 }
 
@@ -143,7 +143,7 @@ fn a_refused_attempt_carries_the_refusal_count_beside_the_reason() {
     assert!(json.contains("attempt-refused") && json.contains('2'));
 }
 
-// Row 4: the installed spec-spine carries no delta report.
+// Row 4: this product does not read spec-spine's delta report.
 #[test]
 fn with_no_delta_report_the_verdict_is_not_recorded_and_acceptance_is_still_refused() {
     let v = evaluate(
@@ -156,12 +156,48 @@ fn with_no_delta_report_the_verdict_is_not_recorded_and_acceptance_is_still_refu
         v.corpus_members,
         CorpusVerdict::Absent(Absence::NotRecorded)
     );
-    assert!(v.note.contains("0.18.0"), "names its own pinned version");
-    assert!(v.note.contains("spec 088"), "names the missing capability");
+    assert!(v.note.contains("0.20.0"), "names the installed version");
+    assert!(
+        v.note.contains("spec 088"),
+        "names the report it does not read"
+    );
     assert!(
         !v.may_accept_on_own_suite,
         "refusing without the report is available; classifying without it is not"
     );
+}
+
+// Row 4, the half that was measurably unprotected: the recorded reason
+// attributes the absence to THIS product, never to spec-spine. The earlier
+// wording said the installed spec-spine carried no such report, which the
+// `=0.20.0` pin falsified, and no test held it, so a false sentence sat in the
+// record until someone read it. Spec 005 section 3.3 now requires the
+// attribution, and this is what holds it.
+#[test]
+fn the_not_recorded_reason_blames_this_product_and_not_the_installed_spec_spine() {
+    let v = evaluate(
+        &["crates/x/src/lib.rs".to_string()],
+        &declared(),
+        &no_report(),
+    );
+
+    assert!(
+        v.note.contains("this product does not read"),
+        "the absence is this product's gap: {}",
+        v.note
+    );
+    for false_claim in [
+        "is in no release",
+        "carries no change-classification report",
+        "no release carries",
+    ] {
+        assert!(
+            !v.note.contains(false_claim),
+            "the reason must not claim anything about what a release carries, \
+             because the pin can move under it: found {false_claim:?} in {}",
+            v.note
+        );
+    }
 }
 
 // Row 5: no harness package exists.
