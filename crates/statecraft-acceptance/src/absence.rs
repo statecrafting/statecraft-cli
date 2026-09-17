@@ -4,78 +4,30 @@
 //! **none reads as success**. The distinction is the whole reason a reader can
 //! trust a report: a blank field could mean anything, and these three cannot be
 //! confused with each other or with a pass.
+//!
+//! # Where these types live now
+//!
+//! [`Absence`] and [`Recorded`] are defined in `statecraft-envelope` and
+//! re-exported here, so the name a reader of this crate uses is unchanged.
+//! Spec 007 moved them because the platform reads and writes the same bytes: a
+//! second definition of a wire type is a second answer to the same question,
+//! and the two answers had already diverged on how `"not-recorded"` reads.
+//!
+//! The envelope's [`Recorded`] carries the resolution of that divergence: the
+//! three words are reserved, a present value that would serialize to one is
+//! refused rather than written, and every reader takes a reserved word as the
+//! absence. The encoding is byte for byte what this crate wrote before;
+//! `statecraft-envelope::absence` documents the contract and how records
+//! written under the old reading decode.
+//!
+//! [`Statement`] stays here. It is spec 005's own vocabulary, nothing outside
+//! this product writes it, and it is not part of the shared envelope.
 
 use serde::{Deserialize, Serialize};
 
-/// Why something is not here.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "kebab-case")]
-pub enum Absence {
-    /// The run recorded that nothing of this kind happened.
-    ///
-    /// A positive statement: somebody looked, and there was nothing.
-    None,
-    /// No record of this kind exists.
-    ///
-    /// Including **every field a future contract will add**. A field that will
-    /// exist later is present today reading `not-recorded`, never omitted, so a
-    /// record minted before the contract is not silently unanswerable on the
-    /// point.
-    NotRecorded,
-    /// A record exists for a revision that is no longer current.
-    ///
-    /// A reported state, not an error and not a pass.
-    Stale,
-}
-
-impl Absence {
-    /// The word this is written as.
-    pub fn word(self) -> &'static str {
-        match self {
-            Absence::None => "none",
-            Absence::NotRecorded => "not-recorded",
-            Absence::Stale => "stale",
-        }
-    }
-
-    /// Every name. A test asserts there are exactly three.
-    pub fn all() -> [Absence; 3] {
-        [Absence::None, Absence::NotRecorded, Absence::Stale]
-    }
-}
-
-/// A value that may be absent, carrying which kind of absence.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "kebab-case", untagged)]
-pub enum Recorded<T> {
-    /// A value was recorded.
-    Present(T),
-    /// It was not, and this says which kind of absence that is.
-    Absent(Absence),
-}
-
-impl<T> Recorded<T> {
-    /// Whether a value is actually here.
-    pub fn is_present(&self) -> bool {
-        matches!(self, Recorded::Present(_))
-    }
-
-    /// The value, if there is one.
-    pub fn value(&self) -> Option<&T> {
-        match self {
-            Recorded::Present(v) => Some(v),
-            Recorded::Absent(_) => None,
-        }
-    }
-
-    /// The kind of absence, if absent.
-    pub fn absence(&self) -> Option<Absence> {
-        match self {
-            Recorded::Present(_) => None,
-            Recorded::Absent(a) => Some(*a),
-        }
-    }
-}
+pub use statecraft_envelope::absence::{
+    Absence, RESERVED_WORDS, Recordable, Recorded, ReservedValue,
+};
 
 /// Where a statement came from.
 ///
@@ -98,6 +50,10 @@ pub enum Statement {
         text: String,
     },
 }
+
+/// A statement is a tagged object on the wire, so it can never be mistaken for
+/// one of the reserved absence words.
+impl Recordable for Statement {}
 
 impl Statement {
     /// Whether this is something a machine observed rather than something a
@@ -145,5 +101,30 @@ mod tests {
         assert!(!claim.is_observed());
         assert!(observed.is_observed());
         assert!(serde_json::to_string(&claim).unwrap().contains("narrative"));
+    }
+
+    #[test]
+    fn a_statement_survives_the_recorded_wrapper_in_both_directions() {
+        let r = Recorded::present(Statement::Narrative {
+            text: "all done".into(),
+        })
+        .unwrap();
+        let text = serde_json::to_string(&r).unwrap();
+        assert_eq!(text, r#"{"source":"narrative","text":"all done"}"#);
+        assert_eq!(
+            serde_json::from_str::<Recorded<Statement>>(&text).unwrap(),
+            r
+        );
+        assert_eq!(
+            serde_json::from_str::<Recorded<Statement>>("\"not-recorded\"").unwrap(),
+            Recorded::Absent(Absence::NotRecorded)
+        );
+    }
+
+    #[test]
+    fn a_harness_revision_named_after_an_absence_is_refused_rather_than_written() {
+        // The collision spec 007 closes, at the field that motivated the type.
+        assert!(Recorded::<String>::present("not-recorded".into()).is_err());
+        assert!(Recorded::<String>::present("harness-2026.09".into()).is_ok());
     }
 }

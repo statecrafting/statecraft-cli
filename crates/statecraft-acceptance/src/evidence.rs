@@ -8,109 +8,32 @@
 //! A canonical record hash **never substitutes** for a file-byte digest, and the
 //! construction is part of the reference's identity. Any new construction is
 //! versioned; historical records are never rewritten to satisfy a newer rule.
+//!
+//! # Where these types live now
+//!
+//! [`Reference`], [`Construction`] and [`Embedded`] are defined in
+//! `statecraft-envelope` and re-exported here (spec 007). A reference is the
+//! most widely exchanged value in the pair of products, and it now has one
+//! definition. The field names, their order and the construction spellings are
+//! the ones this crate established; the envelope adds three optional fields
+//! and one construction, each omitted when absent, so a reference written here
+//! is byte for byte what it was.
+//!
+//! What stays here is this product's judgment: [`integrity`] answers the
+//! dimension from a reference and the bytes in hand, under the construction the
+//! reference names and no other.
 
-use serde::{Deserialize, Serialize};
+use crate::dimensions::Integrity;
 
-/// How a digest was produced.
-///
-/// Part of a reference's identity, not a detail of it. Two references to the
-/// same bytes under different constructions are different references, which is
-/// what keeps a historical record verifiable under the rule it was written
-/// under.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "kebab-case")]
-pub enum Construction {
-    /// SHA-256 over the file's bytes exactly as stored.
-    FileBytesSha256,
-    /// SHA-256 over a canonicalized record.
-    ///
-    /// **Never a substitute for [`Construction::FileBytesSha256`]**: it answers
-    /// a different question, and the two agreeing is a coincidence of the input.
-    CanonicalRecordSha256 {
-        /// The canonicalization rule's version.
-        canonicalization_version: String,
-    },
-}
-
-impl Construction {
-    /// The name this construction is written under.
-    pub fn name(&self) -> String {
-        match self {
-            Construction::FileBytesSha256 => "file-bytes-sha256".to_string(),
-            Construction::CanonicalRecordSha256 {
-                canonicalization_version,
-            } => format!("canonical-record-sha256/{canonicalization_version}"),
-        }
-    }
-}
-
-/// Where an embedded record sits inside a container.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct Embedded {
-    /// The container's type.
-    pub container: String,
-    /// How the record is selected from it.
-    pub selector: String,
-}
-
-/// A reference to preserved evidence bytes.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct Reference {
-    /// What kind of evidence this is.
-    pub evidence_type: String,
-    /// The schema version it was written under.
-    pub schema_version: String,
-    /// SHA-256 of the bytes.
-    pub digest: String,
-    /// Their length.
-    pub bytes: u64,
-    /// The construction that produced the digest.
-    pub construction: Construction,
-    /// Set when the evidence is embedded in a container.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub embedded: Option<Embedded>,
-}
-
-impl Reference {
-    /// A reference over raw file bytes.
-    pub fn over_file_bytes(evidence_type: &str, schema_version: &str, content: &[u8]) -> Self {
-        Self {
-            evidence_type: evidence_type.to_string(),
-            schema_version: schema_version.to_string(),
-            digest: statecraft_environment::digest::digest_bytes(content),
-            bytes: content.len() as u64,
-            construction: Construction::FileBytesSha256,
-            embedded: None,
-        }
-    }
-
-    /// Whether some bytes still match this reference.
-    ///
-    /// The only way this crate answers the integrity question: by rehashing
-    /// under the construction the reference names, never under the current
-    /// favourite.
-    pub fn matches(&self, content: &[u8]) -> bool {
-        match &self.construction {
-            Construction::FileBytesSha256 => {
-                statecraft_environment::digest::digest_bytes(content) == self.digest
-                    && content.len() as u64 == self.bytes
-            }
-            // A canonical construction needs the canonicalizer that produced it.
-            // Answering with a file-byte hash here is exactly the substitution
-            // section 3.7 forbids, so this reports that it cannot answer.
-            Construction::CanonicalRecordSha256 { .. } => false,
-        }
-    }
-
-    /// Whether this reference can be checked by this build.
-    pub fn checkable_here(&self) -> bool {
-        matches!(self.construction, Construction::FileBytesSha256)
-    }
-}
+pub use statecraft_envelope::reference::{Construction, Embedded, Reference};
 
 /// Judge integrity of preserved bytes against their reference.
-pub fn integrity(reference: &Reference, content: Option<&[u8]>) -> crate::dimensions::Integrity {
-    use crate::dimensions::Integrity;
+///
+/// `unknown` covers two different situations and says so in one word on
+/// purpose: there were no bytes to check, or this build cannot evaluate the
+/// construction the reference names. Neither is a failure, and neither is a
+/// pass.
+pub fn integrity(reference: &Reference, content: Option<&[u8]>) -> Integrity {
     match content {
         None => Integrity::Unknown,
         Some(_) if !reference.checkable_here() => Integrity::Unknown,
@@ -128,7 +51,6 @@ pub fn integrity(reference: &Reference, content: Option<&[u8]>) -> crate::dimens
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::dimensions::Integrity;
 
     #[test]
     fn intact_bytes_pass_integrity() {
@@ -156,14 +78,10 @@ mod tests {
     #[test]
     fn a_canonical_construction_is_not_answered_with_a_file_byte_hash() {
         let r = Reference {
-            evidence_type: "record".into(),
-            schema_version: "1".into(),
-            digest: statecraft_environment::digest::digest_bytes(b"x"),
-            bytes: 1,
             construction: Construction::CanonicalRecordSha256 {
                 canonicalization_version: "1".into(),
             },
-            embedded: None,
+            ..Reference::over_file_bytes("record", "1", b"x")
         };
         assert!(!r.checkable_here());
         assert_eq!(
@@ -190,5 +108,26 @@ mod tests {
             canonicalization_version: "2".into(),
         };
         assert_eq!(c.name(), "canonical-record-sha256/2");
+    }
+
+    #[test]
+    fn a_construction_this_build_does_not_know_is_unknown_and_never_guessed_at() {
+        // The envelope preserves an unrecognized construction rather than
+        // failing the read; section 3.7's rule is then this product's answer
+        // to it, which is the same answer it gives a canonical record.
+        let text = r#"{"evidence_type":"x","schema_version":"1","digest":"00","bytes":1,"construction":{"canonical-record-blake3":{"canonicalization_version":"9"}}}"#;
+        let r: Reference = serde_json::from_str(text).unwrap();
+        assert!(matches!(r.construction, Construction::Unknown(_)));
+        assert_eq!(integrity(&r, Some(b"x")), Integrity::Unknown);
+    }
+
+    #[test]
+    fn the_digest_is_the_sha256_this_product_has_always_written() {
+        let r = Reference::over_file_bytes("receipt", "1", b"test");
+        assert_eq!(
+            r.digest,
+            statecraft_environment::digest::digest_bytes(b"test")
+        );
+        assert_eq!(r.bytes, 4);
     }
 }

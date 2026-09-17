@@ -80,6 +80,6 @@
     "summary": "What this product is, what it is not, and who owns each capability it depends on. Fixes the claim vocabulary (specified / implemented / tested / released), the two interaction modes and which one is built first, the rule that separates an authority change from an implementation change, and the reuse disposition for every shared component this repository would otherwise reimplement. Owns the product half of the constitution and the two founding records under docs/. It owns no code.\n",
     "title": "The product boundary, the component owners, and the separation of authority"
   },
-  "shardHash": "0fd8f1bb096aa65656019415db338d176df4e2b67c5ea1155bf3fb77a85b1d2d",
+  "shardHash": "cc227a5927a8f6c3a698f095d50540b662824db8e75f187e0632e81c797664dc",
   "specVersion": "1.2.0"
 }

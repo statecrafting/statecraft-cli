@@ -16,10 +16,11 @@ configured adapter set and no spec ratifies a provider adapter yet.
 Nothing is installed or released: `F-02` defers publication, so the way to run
 it is from a checkout.
 
-The corpus is ratified in full. `000` to `006` are approved, and the
-constitution's product principles VI to XIII were ratified on 2026-09-16, three
-of them frozen as spec 000 anchors. Every spec that claims code has built it:
-five crates, and no forward claim outstanding.
+`000` to `006` are approved, and the constitution's product principles VI to
+XIII were ratified on 2026-09-16, three of them frozen as spec 000 anchors.
+`007-shared-evidence-envelope` is **draft**: it is written and built, and
+ratifying it is the owner's act. Every spec that claims code has built it: six
+crates, and no forward claim outstanding.
 
 The language and the layout are decided: Rust, one Cargo workspace, crates
 matching the spec boundaries. The packaging, the distribution and the first
@@ -29,10 +30,11 @@ recorded with what has been adopted in
 
 This repository distinguishes four claims and makes them separately: *specified*,
 *implemented*, *tested*, *released*. Today `000` to `006` are specified, and
-`002` to `006` are additionally implemented and tested: five crates, 253 tests,
+`002` to `006` are additionally implemented and tested: six crates, 320 tests,
 and every row of every spec's observable-negative-cases table covered by one
-test named after the row. **Nothing is released**, and `F-02` defers
-publication.
+test named after the row. `007` is drafted, implemented and tested on the same
+terms, and is not yet specified, because that word means ratified here.
+**Nothing is released**, and `F-02` defers publication.
 
 ## The idea
 
