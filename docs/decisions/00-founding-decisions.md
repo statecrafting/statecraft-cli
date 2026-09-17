@@ -81,23 +81,30 @@ which is a different statement from every row being used. Two rows changed
 behaviour by being available at all (092 at the coupling gate, 098 with 101 at
 the exit code); the rest need a spec amendment before anything reads them.
 
-**Two approved specs now hold a release claim this pin made false**, and neither
-was corrected here, because correcting one changes what the spec requires and
-that is the owner's act:
+**Two approved specs held a release claim this pin made false. The owner decided
+both on 2026-09-17 and both are corrected:**
 
-- `005` section 3.3 says 088 is carried by no release, and conditions its
-  `not-recorded` behaviour on that with an explicit "until then".
-- `003` section 3.7 says the same of 091, while resting on it only as the future
-  answer to `F-10`. Nothing behaves differently, so this one is stale prose
-  rather than a stale requirement.
+- `005` section 3.3 said 088 is carried by no release and conditioned its
+  `not-recorded` behaviour on that with an explicit "until then". The wait is
+  over and the obligation is not discharged, so the verdict is unchanged and the
+  **reason** is now attributed to this product rather than to spec-spine. The
+  falsehood had reached the record: the note this product wrote said the
+  installed spec-spine carried no such report, and no test held it. One now does.
+- `003` section 3.7 said the same of 091, while resting on it only as the future
+  answer to `F-10`. Only the sentence was stale; the concurrency bound never
+  rested on tool support.
+
+Reading the released report is still **not** done, and is still the owner's to
+schedule. It is an authority change, which `AGENTS.md` requires to be separated
+from the work it would authorize.
 
 | Fact needed | spec-spine source | Available at =0.18.0 | What this product does meanwhile |
 |---|---|---|---|
 | Corpus compiles; registry and index freshness | `compile`, `index`, `check` | **Yes** | Consumed directly. |
 | The ready set and its blockers | `registry plan` | **Yes** | Consumed directly; eligibility is filtered by `003` section 3.1.1. |
-| Which authority-set members a change touched | **088** | **Yes**, from `v0.19.0` | **Available and not yet consumed.** Spec `005` section 3.3 still records `not-recorded` and still refuses to accept on the candidate's own suite, because that section is written against "no release carries it" and a release now does. Integrating 088's report is an amendment to `005`, which is the owner's act, not a refresh. |
+| Which authority-set members a change touched | **088** | **Yes**, from `v0.19.0` | **Available and not yet consumed, and the record now says so correctly.** Spec `005` section 3.3 was corrected on 2026-09-17: the verdict is still `not-recorded` and acceptance is still refused on the candidate's own suite, but the reason names this product's gap instead of claiming something about what a release carries. Revision 4 row CLI-08's obligation, integrate the report once released, is **due and outstanding**. |
 | What the verifier read, as a snapshot | **087** | **Yes**, from `v0.19.0` | Not consumed. No local substitute, and none needed to consume it later. |
-| Two ready specs collide | **091** | **Yes**, from `v0.20.0` | Still not needed: one live attempt per repository (`003` section 3.7). `F-10` stays open on the design question, not on tool support. |
+| Two ready specs collide | **091** | **Yes**, from `v0.20.0` | Still not needed: one live attempt per repository (`003` section 3.7, corrected 2026-09-17). `F-10`'s tool-support condition is met; its other condition, a single-repository loop that works, is not. |
 | A mode-only or binary change is a change | **092** | **Yes**, from `v0.20.0` | Consumed by construction: the gate now completes diff membership from `git diff --name-status`, so a mode-only or binary change is judged rather than dropped. Strictly more paths checked, never fewer. |
 | Declared governed scope | **097** | **Yes**, from `v0.20.0` | Not consumed, and inert: it widens the `C-002` universe only when `[coverage] governed_scope` is non-empty, and this repository leaves it empty. Verified by diffing `config show` across the two versions. |
 | Exit 2 can mean a blocking claim, not a stale shard | **098**, with **101** | **Yes**, from `v0.20.0` | Consumed. An unresolved claim exits 1 and a stale shard exits 2, so `AGENTS.md` states one reading per code instead of two readings of one code. |
@@ -351,7 +358,7 @@ oversight, and reopened by a concrete consumer need rather than by availability.
 | F-07 | Breadth across providers. One adapter boundary and one adapter first. | A second provider, admitted by passing spec 004's suite. |
 | F-08 | aicortex integration. Spec 005 describes a narrow optional one-way interface and implements none of it. | An aicortex producer contract that exists. |
 | F-09 | Operating-system enforcement of spec 004's named residuals. | Its own spec, naming the mechanism and its own residuals. |
-| F-10 | Scheduling across repositories, parallelism, and any work queue. | A single-repository loop that works, **and** a spec-spine release carrying spec 091's collision report (`C-16`). Parallelism is reopened by consuming that report, never by inventing a local footprint format. |
+| F-10 | Scheduling across repositories, parallelism, and any work queue. | Two conditions. The second, **a spec-spine release carrying spec 091's collision report**, was met by `v0.20.0` on 2026-09-17 (`C-16`). The first, **a single-repository loop that works**, is not met: specs `008` and `009` are drafts. Parallelism is reopened by consuming that report, never by inventing a local footprint format. |
 | F-11 | Adoption of `tenant-emit` and `tenant-tail`, and of the predecessor's export bundle and attestation formats. | A mapping from a real outcome of this product to their inputs (C-14). |
 
 ## 5. Adoption record
