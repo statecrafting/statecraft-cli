@@ -8,19 +8,26 @@
 //! # The split that matters
 //!
 //! Classifying a change under the base's rules is spec-spine's job (its spec
-//! 088), and this product does not read its report. Declaring which paths are
+//! 088), and this product **reads** its report rather than answering the
+//! question itself: [`crate::delta`] is the reader. Declaring which paths are
 //! members **here** is this product's job, and is done by path.
 //!
 //! Reading the second as an answer to the first would leave the
 //! repository-artifact members unchecked while the verdict still read as
-//! complete. So: corpus-side members read `not-recorded` until this product
-//! reads the delta report, repository artifacts are declared by path
-//! here, and the environment manifest is computed here because spec-spine cannot
-//! know about it at all.
+//! complete. So: corpus-side members come from the delta report, repository
+//! artifacts are declared by path here, and the environment manifest is
+//! computed here because spec-spine cannot know about it at all.
+//!
+//! # When there is no answer
+//!
+//! A corpus-side answer can still be absent: no report was supplied, the report
+//! is about a different change, or it carries a class this build will not
+//! place. The verdict then reads `not-recorded` and **acceptance is still
+//! refused** on the candidate's own suite.
 //!
 //! **Refusing without the report is available; classifying without it is not.**
 
-use crate::absence::Absence;
+use crate::absence::{Absence, Recorded};
 use serde::{Deserialize, Serialize};
 
 /// A member of the authority set that is a repository artifact.
@@ -67,41 +74,69 @@ impl Declared {
     }
 }
 
-/// Whether the installed spec-spine can classify corpus-side changes.
+/// What a delta report had to say about the corpus-side members.
 ///
-/// A trait so the day a release carries spec 088's delta report, the
-/// implementation changes here and nowhere else.
+/// Two cases, and the second carries **why** in words, because the reason is
+/// what reaches the record. Spec 005 section 3.3 constrains that reason: it
+/// states what this product asked for and what came back, and never asserts
+/// anything about what a spec-spine release carries.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum CorpusAnswer {
+    /// The report answered.
+    Answered {
+        /// The authority-set members its classes witness, in this product's
+        /// vocabulary.
+        members: Vec<String>,
+        /// Every class token the report used, verbatim. Useful detail, and not
+        /// a membership answer (spec 005 section 3.3).
+        classes: Vec<String>,
+        /// spec-spine's own `priorPolicy.required`, recorded verbatim.
+        prior_policy_required: bool,
+    },
+    /// There is no answer, and this is why.
+    Unavailable {
+        /// The reason, as it reaches the record.
+        reason: String,
+    },
+}
+
+/// A source of spec-spine's change classification for corpus-side members.
+///
+/// A trait so the way the report is obtained stays outside this module. The
+/// implementation that reads a real report is [`crate::delta`].
 pub trait DeltaReport {
-    /// The corpus-side authority members a diff touched, if this spec-spine can
-    /// say. `None` means it cannot, which is a recorded fact and not a zero.
-    fn corpus_members_touched(&self, changed_paths: &[String]) -> Option<Vec<String>>;
-    /// The spec-spine version, so a `not-recorded` verdict can name it.
+    /// What the report says about the corpus-side members of this diff.
+    fn corpus_answer(&self, changed_paths: &[String]) -> CorpusAnswer;
+    /// The spec-spine version, so a verdict can name what answered.
     fn version(&self) -> String;
 }
 
-/// The delta report this product does not read.
+/// No report was supplied for this candidate.
 ///
-/// Correct today and deliberately empty-handed. Spec-spine 088 landed in
-/// `v0.19.0` and the `=0.20.0` pin carries it, so the report exists and nothing
-/// here asks for it. Integrating it is its own change (spec 005 section 5,
-/// 2026-09-17); until then the answer is a named absence and never a guess.
+/// Correct whenever the caller has none, and deliberately empty-handed. The
+/// absence is attributed to this product: spec-spine 088 is released and the
+/// `=0.20.0` pin carries it, so the report exists and this instance is the case
+/// where nothing asked for it.
 #[derive(Debug, Clone)]
 pub struct NoDeltaReport {
-    /// The pinned version, named in the verdict.
+    /// The installed version, named in the verdict.
     pub spec_spine_version: String,
 }
 
 impl DeltaReport for NoDeltaReport {
-    fn corpus_members_touched(&self, _changed_paths: &[String]) -> Option<Vec<String>> {
-        None
+    fn corpus_answer(&self, _changed_paths: &[String]) -> CorpusAnswer {
+        CorpusAnswer::Unavailable {
+            reason: "this product does not read spec-spine's change-classification report \
+                     (its spec 088) for this candidate, because none was supplied"
+                .to_string(),
+        }
     }
     fn version(&self) -> String {
         self.spec_spine_version.clone()
     }
 }
 
-/// A delta report backed by an explicit answer, for tests and for the day a
-/// release carries one.
+/// A delta report backed by an explicit answer, for tests.
 #[derive(Debug, Clone)]
 pub struct StaticDeltaReport {
     /// What it reports.
@@ -111,8 +146,12 @@ pub struct StaticDeltaReport {
 }
 
 impl DeltaReport for StaticDeltaReport {
-    fn corpus_members_touched(&self, _changed_paths: &[String]) -> Option<Vec<String>> {
-        Some(self.members.clone())
+    fn corpus_answer(&self, _changed_paths: &[String]) -> CorpusAnswer {
+        CorpusAnswer::Answered {
+            members: self.members.clone(),
+            classes: vec![],
+            prior_policy_required: !self.members.is_empty(),
+        }
     }
     fn version(&self) -> String {
         self.version.clone()
@@ -128,6 +167,15 @@ pub struct Verdict {
     pub environment_manifest_touched: bool,
     /// Corpus-side members, or the absence that stands in for them.
     pub corpus_members: CorpusVerdict,
+    /// Every class the delta report used, verbatim, or empty when there is no
+    /// report. Detail for a reviewer; never read as a membership answer.
+    pub corpus_classes: Vec<String>,
+    /// spec-spine's own `priorPolicy.required`, recorded as it answered it.
+    ///
+    /// Spec 088 section 3.5: `false` means only that no structural class above
+    /// `implementation` changed. It does not mean the change is safe, correct
+    /// or approved, and nothing here reads it as an acceptance.
+    pub prior_policy_required: Recorded<bool>,
     /// Whether this is an authority change.
     pub authority_change: bool,
     /// Whether acceptance may rest on the candidate's own suite.
@@ -165,45 +213,74 @@ pub fn evaluate(changed_paths: &[String], declared: &Declared, delta: &dyn Delta
 
     let environment_manifest_touched = changed_paths.iter().any(|p| p == ENVIRONMENT_MANIFEST);
 
-    let corpus = match delta.corpus_members_touched(changed_paths) {
-        Some(members) => CorpusVerdict::Members(members),
-        None => CorpusVerdict::Absent(Absence::NotRecorded),
+    let answer = delta.corpus_answer(changed_paths);
+
+    let (corpus, corpus_classes, prior_policy_required, absence_reason) = match answer {
+        CorpusAnswer::Answered {
+            members,
+            classes,
+            prior_policy_required,
+        } => (
+            CorpusVerdict::Members(members),
+            classes,
+            Recorded::Present(prior_policy_required),
+            None,
+        ),
+        CorpusAnswer::Unavailable { reason } => (
+            CorpusVerdict::Absent(Absence::NotRecorded),
+            Vec::new(),
+            Recorded::Absent(Absence::NotRecorded),
+            Some(reason),
+        ),
     };
 
-    let corpus_touched = match &corpus {
-        CorpusVerdict::Members(m) => !m.is_empty(),
-        CorpusVerdict::Absent(_) => false,
+    let corpus_members: Vec<String> = match &corpus {
+        CorpusVerdict::Members(m) => m.clone(),
+        CorpusVerdict::Absent(_) => Vec::new(),
     };
+    let corpus_touched = !corpus_members.is_empty();
     let corpus_unknown = matches!(corpus, CorpusVerdict::Absent(_));
 
     let authority_change =
         !repository_members_touched.is_empty() || environment_manifest_touched || corpus_touched;
 
-    let note = if corpus_unknown {
-        // Spec 005 section 3.3: the absence is attributed to THIS product, not to
-        // spec-spine. The older wording said the installed spec-spine carried no
-        // such report, which the `=0.20.0` pin falsified; this wording is true
-        // whichever version is installed, so an old record and a new one make
-        // the same claim about the same thing.
-        format!(
-            "corpus-side authority classification is not-recorded: this product does not read \
-             spec-spine's change-classification report (its spec 088), so acceptance is refused \
-             on the candidate's own suite rather than classified locally; the installed \
+    let note = match absence_reason {
+        // Spec 005 section 3.3: the recorded reason says what this product
+        // asked for and what came back. It never claims that no release carries
+        // the report, because the pin can move under a record that said so.
+        Some(reason) => format!(
+            "corpus-side authority classification is not-recorded: {reason}, so acceptance is \
+             refused on the candidate's own suite rather than classified locally; the installed \
              spec-spine is {}",
             delta.version()
-        )
-    } else if authority_change {
-        "the candidate's diff touches the authority set; a human decision recorded outside \
-         the candidate is required, and the candidate's own suite does not settle it"
-            .to_string()
-    } else {
-        "no authority-set member was touched".to_string()
+        ),
+        None if authority_change => {
+            let mut touched: Vec<String> = repository_members_touched
+                .iter()
+                .cloned()
+                .chain(corpus_members.iter().cloned())
+                .collect();
+            if environment_manifest_touched {
+                touched.push("environment-manifest".to_string());
+            }
+            touched.sort();
+            touched.dedup();
+            format!(
+                "the candidate's diff touches the authority set; a human decision recorded \
+                 outside the candidate is required, and the candidate's own suite does not \
+                 settle it. Members touched: {}",
+                touched.join(", ")
+            )
+        }
+        None => "no authority-set member was touched".to_string(),
     };
 
     Verdict {
         repository_members_touched,
         environment_manifest_touched,
         corpus_members: corpus,
+        corpus_classes,
+        prior_policy_required,
         authority_change,
         may_accept_on_own_suite: !authority_change && !corpus_unknown,
         note,
@@ -237,6 +314,10 @@ mod tests {
         );
         assert!(v.note.contains("0.18.0"));
         assert!(v.note.contains("spec 088"));
+        assert_eq!(
+            v.prior_policy_required,
+            Recorded::Absent(Absence::NotRecorded)
+        );
     }
 
     #[test]
@@ -275,6 +356,7 @@ mod tests {
         let v = evaluate(&["README.md".to_string()], &declared(), &delta);
         assert!(!v.authority_change);
         assert!(v.may_accept_on_own_suite);
+        assert_eq!(v.prior_policy_required, Recorded::Present(false));
     }
 
     #[test]
@@ -286,5 +368,6 @@ mod tests {
         let v = evaluate(&["spec-spine.toml".to_string()], &declared(), &delta);
         assert!(v.authority_change);
         assert!(!v.may_accept_on_own_suite);
+        assert!(v.note.contains("policy"), "the note names what was touched");
     }
 }

@@ -197,6 +197,8 @@ mod tests {
                     repository_members_touched: vec![],
                     environment_manifest_touched: false,
                     corpus_members: crate::authority::CorpusVerdict::Absent(Absence::NotRecorded),
+                    corpus_classes: vec![],
+                    prior_policy_required: Recorded::Absent(Absence::NotRecorded),
                     authority_change: false,
                     may_accept_on_own_suite: false,
                     note: "not-recorded".into(),

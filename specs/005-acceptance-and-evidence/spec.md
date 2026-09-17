@@ -105,33 +105,22 @@ change under the base's rules is spec-spine's job, not this product's: its spec
 on exactly this: integrate 088's report once released, and do not invent current
 support.
 
-**2026-09-17: it is released, and this product does not read it yet.** Spec 088
-landed in spec-spine `v0.19.0` and is carried by the pinned `=0.20.0`
-(constraint `C-16`, corrected with the pin). The half of CLI-08 that was a wait
-is over; the half that is an obligation is now due, and is not discharged here.
-
-That changes the reason this section gives, and changes nothing it requires. The
-corpus-side verdict is still `not-recorded` and acceptance is still refused on
-the candidate's own suite. What must not survive the correction is the **stated
-reason**: a record saying no release carries the report is now false, and a false
-sentence in evidence is worse than a missing one. The reason names this
-product's gap instead.
+**2026-09-17: it is released, and this product reads it.** Spec 088 landed in
+spec-spine `v0.19.0` and is carried by the pinned `=0.20.0` (constraint `C-16`).
+The half of CLI-08 that was a wait ended when the pin moved; the half that is an
+obligation is discharged here. Reading spec-spine's answer and computing one are
+different acts, and only the second is forbidden: this product still builds no
+classifier of its own.
 
 So the split is:
 
 1. **Corpus-side members**: the specs themselves and the spec-spine
-   configuration. The classification comes from **spec-spine's delta report**.
-   Until this product reads that report it records the authority-set verdict as
-   `not-recorded`, names the report it does not read and the installed spec-spine
-   version, and **still refuses to accept** on the candidate's own suite.
-   Refusing without the report is available; classifying without it is not.
-
-   The recorded reason MUST attribute the absence to this product, not to
-   spec-spine. "The installed spec-spine carries no such report" was true until
-   2026-09-17 and is false under the current pin; "this product does not read
-   the report" is true whichever spec-spine is installed, and stays true if the
-   pin ever moves back. A reader of an old record and a reader of a new one are
-   then reading the same claim about the same thing.
+   configuration. The classification comes from **spec-spine's delta report**,
+   obtained as §3.3.1 requires and read as §3.3.2 fixes. Where no usable report
+   is in hand (§3.3.3) the verdict reads `not-recorded`, names why and the
+   installed spec-spine version, and **still refuses to accept** on the
+   candidate's own suite. Refusing without the report is available; classifying
+   without it is not.
 2. **Repository-artifact members**: the check suite, the verifier, the hooks, and
    any acceptance instructions that live outside a `spec.md`. Membership is
    declared **here, by path**. The delta report gives each such path a structural
@@ -140,30 +129,114 @@ So the split is:
    about at all, because it is this product's own record of what it manages. Its
    diff is computed here, and only that.
 
-**What the delta report answers, and what it does not.** Spec 088 classifies
-**structurally, by path, under the base's rules**, and its class names are not
-this product's member names. Its `policy` is `spec-spine.toml` and the paths the
-base lists in `[index] extra_hashed_inputs`; its `verification` is a spec's own
-`verify:cli` plan; there is no `hooks` class at all. A repository's hook scripts,
-`Makefile` or CI workflow therefore arrive as `implementation`, `unowned`,
-`bypassed`, or `policy` when the base happens to hash them, and none of those
-answers whether the path is an authority-set member **here**.
+#### 3.3.1 How the report is obtained
 
-So this product MUST define authority-set membership **by path** for the members
-that are repository artifacts: the check suite, the verifier, the hooks, and any
-acceptance instructions that live outside a `spec.md`. The delta report is used
-for the corpus-side classes only. Membership is this product's question;
-classification under the base's rules is spec-spine's, and reading the second as
-an answer to the first would leave the repository-artifact members unchecked
-while the verdict still read as complete.
+`001` §3.5 rule 1 requires every member of the authority set to be read at the
+**trusted base revision**, never from the candidate. The classifier is part of
+that, so three things are fixed rather than left to a caller:
+
+1. The report is `spec-spine delta --base <trusted base> --head <candidate>
+   --json`, whose envelope is spec-spine's own (its spec 037).
+2. The **binary is resolved independently of the candidate**, from the pin the
+   registered repository declares at the base. A candidate that chose the binary
+   that classifies it would be classifying itself, which is what 088's own `D-1`
+   exists to prevent on the configuration side and what this rule prevents on the
+   binary side.
+3. The acceptance library does **not** run it. It reads the envelope's bytes.
+   §3.9 is why: nothing in this spec's crate acts, and the invocation belongs to
+   the caller that already holds both revisions (`003` §3.2).
+
+#### 3.3.2 Which class witnesses which member
+
+Spec 088 classifies **structurally, by path, under the base's rules**, and its
+class names are not this product's member names. Its `policy` is
+`spec-spine.toml` and the paths the base lists in `[index] extra_hashed_inputs`;
+its `verification` is a spec's own `verify:cli` plan; there is no `hooks` class
+at all. A repository's hook scripts, `Makefile` or CI workflow therefore arrive
+as `implementation`, `unowned`, `bypassed`, or `policy` when the base happens to
+hash them, and none of those answers whether the path is an authority-set member
+**here**.
+
+So the mapping is written down, and every member it names is one `001` §3.5
+already enumerates. Nothing here adds a member to that set.
+
+| 088 class | Read here as |
+|---|---|
+| `policy` on the base's own `spec-spine.toml` | the **policy** member. |
+| `policy` on any other path | **no member.** The path carries the class because the base hashes it (`[index] extra_hashed_inputs`), and whether it is a member here is case 2's declaration by path. Reading the class as membership would let this repository widen its own authority set by extending a configuration list, and would put `README.md` in it. |
+| `constitutional` | the **policy** member: the tier-2 document that governs every spec. |
+| `lifecycle` | the **policy** member, named by `001` §3.5 in as many words: the lifecycle policy `003` §3.1.1 reads. |
+| `authority` | the **policy** member: the ownership and dependency edges that decide which spec governs a unit, and therefore which acceptance instructions judge it. |
+| `verification` | the **acceptance instructions** member, for the instructions that live inside a `spec.md`: a spec's `verify:cli` plan. |
+| `requirement` | no member. See below. |
+| `implementation`, `derived`, `bypassed`, `unowned` | no member. |
+| `unknown` | no answer at all (§3.3.3). |
+
+The `policy` split is the one that would have gone wrong silently. Its two rows
+are one class doing two jobs: spec-spine's configuration is corpus-side and is
+this product's to refuse on, while every other hashed input is a repository
+artifact whose membership case 2 keeps here, by path. This repository hashes
+`README.md`, `AGENTS.md`, `docs/**` and `.claude/rules/**`, none of which `001`
+§3.5 makes a member, so a path-blind reading would have made a README edit an
+authority change and would have made the authority set editable from
+`spec-spine.toml`.
+
+`requirement` is the row to read twice, because excluding it is a choice and not
+an oversight. A spec body edit is the ordinary shape of work in this corpus: the
+coupling gate requires the owning `spec.md` in the same diff, so nearly every
+candidate carries one. Reading it as an authority change would refuse every
+candidate this product could ever judge, which is not a stricter rule but an
+inoperative one. What a spec *requires* is settled by review of that spec; what
+*judges* the candidate is the member set above, and a candidate that weakens its
+own acceptance arrives as `verification`, which is a member.
+
+That exclusion is a **membership** answer, which case 2 above keeps as this
+product's own. 088 supplies the class; it never supplies the membership.
+
+#### 3.3.3 When there is no answer
+
+Four conditions make the corpus-side verdict `not-recorded`, and under every one
+of them acceptance is **still refused** on the candidate's own suite:
+
+1. no report was supplied;
+2. the report declares a schema this build does not read;
+3. the report uses a class this build cannot place, including 088's own
+   `unknown`, which is a path spec-spine could not place either;
+4. the report does not cover a path the acceptance is judging, which makes it a
+   report about some other change.
+
+The recorded reason MUST say what this product asked for and what came back, and
+MUST name the spec-spine version that answered. It MUST NOT assert anything about
+what a spec-spine **release** carries. "The installed spec-spine carries no such
+report" was true until 2026-09-17 and is false under the current pin: a record
+making a claim of that shape becomes false when the pin moves under it, and a
+false sentence in evidence is worse than a missing one. Where the absence is that
+nothing asked, the reason attributes it to this product. A reader of an old
+record and a reader of a new one are then reading the same claim about the same
+thing.
+
+#### 3.3.4 What reading the report permits, and what it does not
+
+With a usable report in hand, no corpus-side member witnessed, no declared
+repository artifact in the diff and the environment manifest untouched,
+acceptance **may** rest on the candidate's own suite. That conclusion was
+unreachable before: the corpus-side answer was always absent, so every candidate
+was refused for want of it. It is the only conclusion this integration adds.
+
+It adds nothing else. Acceptance is not publication (§3.9) and a receipt is not a
+permission. Spec 088 §3.5 is explicit that its own `priorPolicy.required: false`
+means only that no structural class changed, and not that a change is safe,
+correct or approved; that field is recorded verbatim beside the verdict, because
+it is spec-spine's answer to spec-spine's question, and it is never read as an
+acceptance.
 
 This product does not build a second change classifier for case 1, and declaring
 membership by path in case 2 is not one: it says which paths matter here, never
 how the base would classify a change to them. That prohibition was never
-conditional on the report being unreleased, and the release does not soften it.
-A local reimplementation would answer a slightly different question than the
-verifier the family will standardise on, which is the failure `001` section 3.2
-exists to prevent.
+conditional on the report being unreleased, and reading the report does not
+soften it. A local reimplementation would answer a slightly different question
+than the verifier the family will standardise on, which is the failure `001`
+section 3.2 exists to prevent.
 
 ### 3.4 The receipt
 
@@ -287,7 +360,12 @@ and no verb in this corpus publishes.
 | The agent reports success; the suite fails | Outcome `failed`, no receipt. The claim is retained in a field named for a claim. |
 | The agent reports success; the suite never ran | **No acceptance** recorded, and the unrun checks counted. Not a pass, not a fail. |
 | The attempt outcome is `refused`, `failed`, `interrupted` or `cancelled` | Acceptance `not-attempted` with the reason named. Never an empty result a reader must interpret. |
-| This product does not read spec-spine's delta report | Authority-set verdict `not-recorded`. The reason names the report and the **installed spec-spine version**, and attributes the absence to this product rather than to spec-spine (section 3.3). Acceptance still refused on the candidate's own suite. No locally built classifier. |
+| No usable delta report: none supplied, a schema this build does not read, a class it cannot place, or a report about a different change | Authority-set verdict `not-recorded`. The reason names what was asked for, what came back and the **installed spec-spine version**, and never what a release carries (§3.3.3). Acceptance still refused on the candidate's own suite. No locally built classifier. |
+| The delta report names a corpus-side member | `authority change` recorded, naming the member. No acceptance on the candidate's own suite. |
+| The delta report classes a hashed input (`README.md`, `docs/**`) as `policy` | **Not** a corpus-side member. The class is recorded as detail; membership for that path is case 2's declaration (§3.3.2). |
+| The delta report is read, names no member, and the diff touches no repository artifact and not the environment manifest | Acceptance **may** rest on the candidate's own suite. The only conclusion reading the report adds (§3.3.4). |
+| A spec's `verify:cli` plan changed | The **acceptance instructions** member is touched, so it is an authority change, even though a body edit to the same file alone is not (§3.3.2). |
+| spec-spine's `priorPolicy.required` is `false` | Recorded verbatim beside the verdict, and never read as an acceptance: 088 §3.5 says it means only that no structural class changed. |
 | No harness package exists | The receipt's harness-revision field reads `not-recorded`. It is never omitted. |
 | HEAD moved during the suite | No receipt; the attempt is `interrupted` (`003` §3.4). |
 | The work tree was dirty at the end of the suite | No receipt, naming the dirty paths. |
@@ -322,6 +400,48 @@ re-adopting it against a named consumer.
 ## 5. Decisions recorded during implementation
 
 Dated entries for choices §3 was silent on. None changes what it requires.
+
+**2026-09-17: the report is read, and what that decided.** The owner authorized
+the 088 integration as an authority change on its own, which is the authority the
+entry below said this section did not have. Four choices §3 was silent on were
+made in the course of it, and each is here rather than in a commit message
+because each is a choice a reviewer could reasonably have made differently.
+
+*The class-to-member mapping is fixed in the spec, not in the code.* 088's eleven
+classes are structural and are not this product's member names, so somebody had
+to say which witnesses which. Leaving it to the implementation would have put an
+authority decision in a match arm. §3.3.2 is that mapping, and every member it
+names is one `001` §3.5 already enumerates: the integration reads a new answer,
+it does not widen the set the answer is about.
+
+*`policy` is read against the path, not the class alone.* The first mapping
+written here was path-blind, and it was wrong in a way that would not have shown
+up in a test: this repository hashes `README.md`, `AGENTS.md`, `docs/**` and
+`.claude/rules/**`, so every one of them arrives classed `policy`, and a blind
+reading would have made a README edit an authority change and made the authority
+set extendable by editing a list in `spec-spine.toml`. §3.3.2 splits the class:
+the base's own configuration is corpus-side, and every other hashed input keeps
+its membership where case 2 put it, which is here, by path.
+
+*`requirement` is not a member, and that is the load-bearing half.* Including it
+would have been the conservative-looking choice and would have made the
+integration inoperative: the coupling gate puts an owning `spec.md` in nearly
+every diff, so every candidate would have been an authority change and nothing
+would ever rest on its own suite. The candidate that weakens the acceptance
+judging it is not lost by the exclusion; it arrives as `verification`, which is a
+member. `unknown` is the opposite case and is treated as no answer at all.
+
+*The crate reads the report and does not run spec-spine.* The 2026-09-16 entry
+below records that nothing in this crate acts, and that property is kept: the
+bytes are handed in. It is not only tidiness. `001` §3.5 rule 1 reads every
+authority-set member at the trusted base, and which binary classifies is part of
+what must not come from the candidate, so §3.3.1 fixes the invocation contract
+for the caller instead of burying a process spawn in the library that judges.
+
+*A report about another change is refused.* §3.3.3 case 4 is not in 088 and is
+not a doubt about it: the report answers about the diff it was given, and
+checking that it covers the paths being judged is what stops a stale or
+misaddressed report from being read as an answer about this candidate.
 
 **2026-09-17: the corrected reason is attributed to this product, and is not a
 new capability.** Section 3.3 named spec-spine 088 as carried by no release,
@@ -385,8 +505,10 @@ nothing to call that would do anything with it. That is the implementation of
 
 ## Verification
 
-Each line is one command. §3.10's seventeen rows are integration tests named
-after the rows they cover, in `tests/negative_cases.rs`.
+Each line is one command. §3.10's twenty-two rows are integration tests named
+after the rows they cover, in `tests/negative_cases.rs`. The delta reader's row
+is tested against a captured envelope the **pinned binary itself** wrote
+(`testdata/delta/`), so a reader that agreed only with invented JSON would fail.
 
 ```verify:cli
 cargo build --workspace --locked
@@ -396,4 +518,5 @@ cargo fmt --all --check
 spec-spine index coverage --fail-on-untraced
 cargo test -p statecraft-acceptance --test negative_cases
 test -f crates/statecraft-acceptance/src/receipt.rs
+test -f crates/statecraft-acceptance/src/delta.rs
 ```

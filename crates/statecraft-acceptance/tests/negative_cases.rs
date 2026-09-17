@@ -5,8 +5,10 @@
 
 use statecraft_acceptance::absence::{Absence, Recorded, Statement};
 use statecraft_acceptance::authority::{
-    CorpusVerdict, Declared, ENVIRONMENT_MANIFEST, NoDeltaReport, StaticDeltaReport, evaluate,
+    CorpusVerdict, Declared, DeltaReport, ENVIRONMENT_MANIFEST, NoDeltaReport, StaticDeltaReport,
+    evaluate,
 };
+use statecraft_acceptance::delta::SpecSpineDeltaReport;
 use statecraft_acceptance::dimensions::{
     Admission, AdmissionPolicy, Dimensions, Integrity, IssuerTrust, RefusalCode, Signature,
     SubjectBinding, admit,
@@ -196,6 +198,257 @@ fn the_not_recorded_reason_blames_this_product_and_not_the_installed_spec_spine(
             "the reason must not claim anything about what a release carries, \
              because the pin can move under it: found {false_claim:?} in {}",
             v.note
+        );
+    }
+}
+
+// Row 4b: the report is read, and it is read from bytes spec-spine actually
+// wrote. The fixture is the `--json` envelope the pinned 0.20.0 binary emitted
+// for the two correction commits on `main`, captured verbatim. A reader tested
+// only against JSON this repository invented would pass while disagreeing with
+// the tool it claims to read.
+const REAL_REPORT: &[u8] = include_bytes!("../testdata/delta/spec-spine-0.20.0-corrections.json");
+
+fn real_report() -> SpecSpineDeltaReport {
+    SpecSpineDeltaReport::from_envelope_json(REAL_REPORT).expect("the pinned binary's own output")
+}
+
+fn paths_of(r: &SpecSpineDeltaReport) -> Vec<String> {
+    r.report().changes.iter().map(|c| c.path.clone()).collect()
+}
+
+fn report_from(json: &str) -> SpecSpineDeltaReport {
+    SpecSpineDeltaReport::from_envelope_json(json.as_bytes()).expect("a well formed envelope")
+}
+
+fn envelope(changes: &str, counts: &str, required: bool) -> String {
+    format!(
+        r#"{{"verb":"delta","exitCode":0,"ok":true,"schemaVersion":"0.4.0","report":{{
+           "schemaVersion":"0.1.0","tool":{{"name":"spec-spine","version":"0.20.0"}},
+           "classifiedUnder":"base","base":"{b}","mergeBase":"{b}","head":"{h}",
+           "changes":[{changes}],"counts":{{{counts}}},
+           "priorPolicy":{{"required":{required},"classes":[]}}}}}}"#,
+        b = "b".repeat(40),
+        h = "h".repeat(40),
+    )
+}
+
+#[test]
+fn the_delta_report_reads_the_bytes_the_pinned_binary_writes() {
+    let r = real_report();
+
+    assert_eq!(r.version(), "spec-spine 0.20.0");
+    assert_eq!(r.report().classified_under, "base");
+    assert!(r.classes_used().contains(&"policy".to_string()));
+    assert!(r.classes_used().contains(&"requirement".to_string()));
+    assert!(
+        r.report().prior_policy.required,
+        "spec-spine's own summary, recorded verbatim"
+    );
+}
+
+// Row 4c: the report answers, and a `policy` class on a **hashed input** is
+// detail rather than a membership answer. The real report's one `policy` path
+// is `docs/decisions/00-founding-decisions.md`, which is classed that way
+// because the base hashes it, not because `001` section 3.5 makes it a member.
+// Reading the class as membership would let the authority set be widened by
+// editing a configuration list, and would put `README.md` in it.
+#[test]
+fn a_hashed_input_classed_policy_in_a_real_report_is_not_a_corpus_member() {
+    let r = real_report();
+    let v = evaluate(&paths_of(&r), &declared(), &r);
+
+    assert!(
+        r.report()
+            .changes
+            .iter()
+            .any(|c| c.path.starts_with("docs/") && c.classes.contains(&"policy".to_string())),
+        "the fixture is the one with a hashed input in it"
+    );
+    assert_eq!(v.corpus_members, CorpusVerdict::Members(vec![]));
+    assert!(
+        v.corpus_classes.contains(&"policy".to_string()),
+        "the class is kept as detail for the reviewer"
+    );
+    assert_eq!(v.prior_policy_required, Recorded::Present(true));
+}
+
+// Row 4c, the other half: the base's own configuration **is** the corpus-side
+// policy member, and a candidate that edits it is an authority change.
+#[test]
+fn a_change_to_the_bases_own_configuration_is_an_authority_change() {
+    let r = report_from(&envelope(
+        r#"{"path":"spec-spine.toml","change":"modified","classes":["policy"]}"#,
+        r#""policy":1"#,
+        true,
+    ));
+    let v = evaluate(&paths_of(&r), &declared(), &r);
+
+    assert_eq!(
+        v.corpus_members,
+        CorpusVerdict::Members(vec!["policy".into()])
+    );
+    assert!(v.authority_change);
+    assert!(!v.may_accept_on_own_suite);
+    assert!(v.note.contains("policy"));
+}
+
+// Row 4d: **the conclusion the integration newly permits.** With a report in
+// hand that names no corpus-side member, and no repository artifact and no
+// environment manifest in the diff, acceptance may rest on the candidate's own
+// suite. Before the report was read this was unreachable: every candidate was
+// refused for want of an answer.
+#[test]
+fn a_report_naming_no_corpus_member_lets_acceptance_rest_on_the_candidates_own_suite() {
+    let r = report_from(&envelope(
+        r#"{"path":"crates/x/src/lib.rs","change":"modified","classes":["implementation"]},
+           {"path":"specs/00x-y/spec.md","change":"modified","classes":["requirement"]}"#,
+        r#""implementation":1,"requirement":1"#,
+        true,
+    ));
+    let v = evaluate(&paths_of(&r), &declared(), &r);
+
+    assert_eq!(v.corpus_members, CorpusVerdict::Members(vec![]));
+    assert!(!v.authority_change);
+    assert!(
+        v.may_accept_on_own_suite,
+        "with an answer in hand and no member touched, the suite settles it"
+    );
+    assert!(
+        v.prior_policy_required == Recorded::Present(true),
+        "spec-spine's `required` is recorded even where this product concludes no member \
+         was touched: the two answer different questions (spec 088 section 3.5)"
+    );
+}
+
+// Row 4e: a spec's `verify:cli` plan is an acceptance instruction, so changing
+// it is an authority change even though the same file's body edit is not.
+#[test]
+fn a_changed_verification_plan_is_an_authority_change() {
+    let r = report_from(&envelope(
+        r#"{"path":"specs/00x-y/spec.md","change":"modified","classes":["requirement","verification"]}"#,
+        r#""requirement":1,"verification":1"#,
+        true,
+    ));
+    let v = evaluate(&paths_of(&r), &declared(), &r);
+
+    assert_eq!(
+        v.corpus_members,
+        CorpusVerdict::Members(vec!["acceptance-instructions".into()])
+    );
+    assert!(v.authority_change);
+    assert!(!v.may_accept_on_own_suite);
+}
+
+// Row 4f: a class token this build does not know could be a member. The answer
+// is an absence naming the token, never a member list computed as though the
+// token were not there.
+#[test]
+fn a_class_this_build_cannot_place_makes_the_verdict_not_recorded() {
+    for class in ["unknown", "quorum"] {
+        let r = report_from(&envelope(
+            &format!(r#"{{"path":"odd.md","change":"modified","classes":["{class}"]}}"#),
+            &format!(r#""{class}":1"#),
+            true,
+        ));
+        let v = evaluate(&paths_of(&r), &declared(), &r);
+
+        assert_eq!(
+            v.corpus_members,
+            CorpusVerdict::Absent(Absence::NotRecorded),
+            "for class {class}"
+        );
+        assert!(!v.may_accept_on_own_suite, "for class {class}");
+        assert!(v.note.contains(class), "the reason names it: {}", v.note);
+    }
+}
+
+// Row 4g: a report about some other change is not an answer about this one.
+#[test]
+fn a_report_that_does_not_cover_the_candidates_paths_is_not_read_as_an_answer() {
+    let r = report_from(&envelope(
+        r#"{"path":"a.rs","change":"modified","classes":["implementation"]}"#,
+        r#""implementation":1"#,
+        false,
+    ));
+    let v = evaluate(
+        &["a.rs".to_string(), "crates/x/src/b.rs".to_string()],
+        &declared(),
+        &r,
+    );
+
+    assert_eq!(
+        v.corpus_members,
+        CorpusVerdict::Absent(Absence::NotRecorded)
+    );
+    assert!(!v.may_accept_on_own_suite);
+    assert!(v.note.contains("crates/x/src/b.rs"));
+}
+
+// Row 4, the half that stays protected after the integration: every reason the
+// product can record names what it asked for and what came back, and none of
+// them claims anything about what a spec-spine release carries. The pin can
+// move under a record that made such a claim, which is how the last one became
+// false.
+#[test]
+fn no_recorded_absence_reason_claims_anything_about_what_a_release_carries() {
+    let unplaceable = report_from(&envelope(
+        r#"{"path":"odd.md","change":"modified","classes":["quorum"]}"#,
+        r#""quorum":1"#,
+        true,
+    ));
+    let uncovered = report_from(&envelope(
+        r#"{"path":"a.rs","change":"modified","classes":["implementation"]}"#,
+        r#""implementation":1"#,
+        false,
+    ));
+
+    let notes = [
+        evaluate(&["x.rs".to_string()], &declared(), &no_report()).note,
+        evaluate(&paths_of(&unplaceable), &declared(), &unplaceable).note,
+        evaluate(
+            &["a.rs".to_string(), "b.rs".to_string()],
+            &declared(),
+            &uncovered,
+        )
+        .note,
+    ];
+
+    for note in notes {
+        assert!(note.contains("0.20.0"), "names the version: {note}");
+        for false_claim in [
+            "is in no release",
+            "carries no change-classification report",
+            "no release carries",
+        ] {
+            assert!(
+                !note.contains(false_claim),
+                "found {false_claim:?} in {note}"
+            );
+        }
+    }
+}
+
+// Row 4h: an envelope the reader will not accept is refused rather than read
+// partially. Each case names what came back.
+#[test]
+fn an_envelope_this_build_does_not_read_is_refused_and_says_why() {
+    let wrong_schema =
+        envelope("", "", false).replace(r#""schemaVersion":"0.1.0""#, r#""schemaVersion":"0.2.0""#);
+    let wrong_side = envelope("", "", false)
+        .replace(r#""classifiedUnder":"base""#, r#""classifiedUnder":"head""#);
+    let wrong_verb = envelope("", "", false).replace(r#""verb":"delta""#, r#""verb":"couple""#);
+
+    for (bytes, expected) in [
+        (wrong_schema, "0.2.0"),
+        (wrong_side, "head"),
+        (wrong_verb, "couple"),
+    ] {
+        let err = SpecSpineDeltaReport::from_envelope_json(bytes.as_bytes())
+            .expect_err("this build does not read it");
+        assert!(
+            err.to_string().contains(expected),
+            "the refusal names what came back: {err}"
         );
     }
 }

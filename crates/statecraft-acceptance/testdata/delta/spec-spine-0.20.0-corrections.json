@@ -1,0 +1,207 @@
+{
+  "exitCode": 0,
+  "ok": true,
+  "report": {
+    "base": "1574803bdd0fe7df93b29b2b1205204751734332",
+    "changes": [
+      {
+        "change": "modified",
+        "classes": [
+          "derived"
+        ],
+        "path": ".derived/codebase-index/by-package/statecraft-acceptance.json"
+      },
+      {
+        "change": "modified",
+        "classes": [
+          "derived"
+        ],
+        "path": ".derived/codebase-index/by-package/statecraft-adapter.json"
+      },
+      {
+        "change": "modified",
+        "classes": [
+          "derived"
+        ],
+        "path": ".derived/codebase-index/by-package/statecraft-cli.json"
+      },
+      {
+        "change": "modified",
+        "classes": [
+          "derived"
+        ],
+        "path": ".derived/codebase-index/by-package/statecraft-envelope.json"
+      },
+      {
+        "change": "modified",
+        "classes": [
+          "derived"
+        ],
+        "path": ".derived/codebase-index/by-package/statecraft-environment.json"
+      },
+      {
+        "change": "modified",
+        "classes": [
+          "derived"
+        ],
+        "path": ".derived/codebase-index/by-package/statecraft-run.json"
+      },
+      {
+        "change": "modified",
+        "classes": [
+          "derived"
+        ],
+        "path": ".derived/codebase-index/by-spec/000-bootstrap.json"
+      },
+      {
+        "change": "modified",
+        "classes": [
+          "derived"
+        ],
+        "path": ".derived/codebase-index/by-spec/001-boundaries-and-authority.json"
+      },
+      {
+        "change": "modified",
+        "classes": [
+          "derived"
+        ],
+        "path": ".derived/codebase-index/by-spec/002-environment-lifecycle.json"
+      },
+      {
+        "change": "modified",
+        "classes": [
+          "derived"
+        ],
+        "path": ".derived/codebase-index/by-spec/003-work-and-run-semantics.json"
+      },
+      {
+        "change": "modified",
+        "classes": [
+          "derived"
+        ],
+        "path": ".derived/codebase-index/by-spec/004-execution-adapter.json"
+      },
+      {
+        "change": "modified",
+        "classes": [
+          "derived"
+        ],
+        "path": ".derived/codebase-index/by-spec/005-acceptance-and-evidence.json"
+      },
+      {
+        "change": "modified",
+        "classes": [
+          "derived"
+        ],
+        "path": ".derived/codebase-index/by-spec/006-command-surface.json"
+      },
+      {
+        "change": "modified",
+        "classes": [
+          "derived"
+        ],
+        "path": ".derived/codebase-index/by-spec/007-shared-evidence-envelope.json"
+      },
+      {
+        "change": "modified",
+        "classes": [
+          "derived"
+        ],
+        "path": ".derived/codebase-index/by-spec/008-first-provider-adapter.json"
+      },
+      {
+        "change": "modified",
+        "classes": [
+          "derived"
+        ],
+        "path": ".derived/codebase-index/by-spec/009-work-run-accept-integration.json"
+      },
+      {
+        "change": "modified",
+        "classes": [
+          "derived"
+        ],
+        "path": ".derived/spec-registry/by-spec/003-work-and-run-semantics.json"
+      },
+      {
+        "change": "modified",
+        "classes": [
+          "derived"
+        ],
+        "path": ".derived/spec-registry/by-spec/005-acceptance-and-evidence.json"
+      },
+      {
+        "change": "modified",
+        "classes": [
+          "implementation"
+        ],
+        "path": "crates/statecraft-acceptance/src/authority.rs"
+      },
+      {
+        "change": "modified",
+        "classes": [
+          "implementation"
+        ],
+        "path": "crates/statecraft-acceptance/src/lib.rs"
+      },
+      {
+        "change": "modified",
+        "classes": [
+          "implementation"
+        ],
+        "path": "crates/statecraft-acceptance/tests/negative_cases.rs"
+      },
+      {
+        "change": "modified",
+        "classes": [
+          "policy"
+        ],
+        "path": "docs/decisions/00-founding-decisions.md"
+      },
+      {
+        "change": "modified",
+        "classes": [
+          "requirement"
+        ],
+        "path": "specs/003-work-and-run-semantics/spec.md"
+      },
+      {
+        "change": "modified",
+        "classes": [
+          "requirement"
+        ],
+        "path": "specs/005-acceptance-and-evidence/spec.md"
+      }
+    ],
+    "classifiedUnder": "base",
+    "counts": {
+      "authority": 0,
+      "bypassed": 0,
+      "constitutional": 0,
+      "derived": 18,
+      "implementation": 3,
+      "lifecycle": 0,
+      "policy": 1,
+      "requirement": 2,
+      "unknown": 0,
+      "unowned": 0,
+      "verification": 0
+    },
+    "head": "abd9fe6c65207fa1ae3f70354fa09aa20d349d55",
+    "mergeBase": "1574803bdd0fe7df93b29b2b1205204751734332",
+    "priorPolicy": {
+      "classes": [
+        "policy",
+        "requirement"
+      ],
+      "required": true
+    },
+    "schemaVersion": "0.1.0",
+    "tool": {
+      "name": "spec-spine",
+      "version": "0.20.0"
+    }
+  },
+  "schemaVersion": "0.4.0",
+  "verb": "delta"
+}
