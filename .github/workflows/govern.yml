@@ -83,16 +83,38 @@ jobs:
       # The coupling gate against the pull request's real merge base. On a tree
       # with no code it has nothing to refuse; it is wired now so the first crate
       # is governed from its first commit rather than from a later remembering.
+      # Both endpoints are FROZEN event SHAs. `--head HEAD` was wrong, and
+      # measurably so: on a pull_request event the checkout is
+      # `refs/pull/N/merge`, which GitHub recomputes against the current base
+      # every time the job runs. `couple` takes a three-dot diff, so
+      # `base.sha...<merge ref>` has merge base `base.sha` and folds in
+      # everything merged into main after this event fired.
+      #
+      # Measured on this repository: with the base two commits behind, the
+      # merge-ref form reported 15 changed paths where the PR itself changed 1.
+      # The 14 extra were other changes already on main. Two consequences, and
+      # the second is the serious one: unrelated paths are reported as this
+      # pull request's drift, and a `Spec-Drift-Waiver:` in this body would
+      # cover them, because a waiver is scoped to the diff the gate evaluated.
+      #
+      # `base.sha...head.sha` has this pull request's own fork point as its
+      # merge base, so it evaluates exactly this pull request's changes and is
+      # stable across re-runs. Freshness is a separate property, enforced by
+      # branch protection's `strict`, and it does not fix scope: see AGENTS.md,
+      # "What a green gate means".
       - name: Coupling gate
         if: github.event_name == 'pull_request'
         env:
           PR_BODY: ${{ github.event.pull_request.body }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
         run: |
           set -euo pipefail
+          echo "coupling base: $BASE_SHA -> head: $HEAD_SHA"
           printf '%s' "${PR_BODY:-}" > "${RUNNER_TEMP}/pr-body.txt"
           spec-spine couple \
-            --base "${{ github.event.pull_request.base.sha }}" \
-            --head HEAD \
+            --base "$BASE_SHA" \
+            --head "$HEAD_SHA" \
             --pr-body "${RUNNER_TEMP}/pr-body.txt"
 
   # The workspace half of the check surface, as its own job so a clippy failure
