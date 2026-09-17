@@ -79,10 +79,17 @@ code. "Available" means: carried by a release this repository's pin admits.
 **Available is not consumed.** Under the 0.20.0 pin every row below is available,
 which is a different statement from every row being used. Two rows changed
 behaviour by being available at all (092 at the coupling gate, 098 with 101 at
-the exit code); the rest need a spec amendment before anything reads them, and
-`005` section 3.3 in particular now holds a release claim that this upgrade made
-false. Correcting it changes what `005` requires, so it is the owner's, not a
-session's.
+the exit code); the rest need a spec amendment before anything reads them.
+
+**Two approved specs now hold a release claim this pin made false**, and neither
+was corrected here, because correcting one changes what the spec requires and
+that is the owner's act:
+
+- `005` section 3.3 says 088 is carried by no release, and conditions its
+  `not-recorded` behaviour on that with an explicit "until then".
+- `003` section 3.7 says the same of 091, while resting on it only as the future
+  answer to `F-10`. Nothing behaves differently, so this one is stale prose
+  rather than a stale requirement.
 
 | Fact needed | spec-spine source | Available at =0.18.0 | What this product does meanwhile |
 |---|---|---|---|
