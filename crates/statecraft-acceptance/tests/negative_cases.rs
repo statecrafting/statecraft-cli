@@ -284,6 +284,7 @@ fn a_self_anchored_chain_may_pass_signature_but_never_establishes_issuer_trust()
     match admit(&d, &AdmissionPolicy::strict()) {
         Admission::Refuse {
             reason: RefusalCode::IncompleteEvidence { missing },
+            ..
         } => assert!(missing.contains(&"issuerTrust".to_string())),
         other => panic!("expected admission refused with a reason, got {other:?}"),
     }
@@ -298,6 +299,7 @@ fn the_same_intact_unsigned_evidence_is_admitted_by_one_policy_and_refused_by_an
     match admit(&d, &AdmissionPolicy::strict()) {
         Admission::Refuse {
             reason: RefusalCode::RequiredDimensionNotPassed { dimension, value },
+            ..
         } => {
             assert_eq!(dimension, "signature");
             assert_eq!(value, "unsigned");
@@ -332,14 +334,12 @@ fn a_byte_level_mutation_fails_integrity_and_is_never_repaired() {
 #[test]
 fn a_record_under_an_older_construction_stays_verifiable_under_that_construction() {
     let older = Reference {
-        evidence_type: "record".into(),
-        schema_version: "1".into(),
         digest: "whatever the old rule produced".into(),
         bytes: 3,
         construction: Construction::CanonicalRecordSha256 {
             canonicalization_version: "1".into(),
         },
-        embedded: None,
+        ..Reference::over_file_bytes("record", "1", b"abc")
     };
 
     // This build cannot check that construction, and says so rather than

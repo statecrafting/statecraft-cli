@@ -1,0 +1,43 @@
+# Spec: specs/007-shared-evidence-envelope/spec.md
+#
+# The shared evidence envelope: the wire types two products read and write.
+#
+# PROVENANCE. This crate was written in the statecraft platform repository and
+# staged there under its P-03 condition, at commit `d7dc24b`, explicitly
+# pending transfer to this workspace. Spec 007 is the claim that receives it;
+# PROVENANCE.md records what arrived and what changed on the way in. The
+# platform now consumes this copy, and there is no second one.
+#
+# LICENSE. Stated literally rather than inherited from the workspace. The
+# crate crossed a repository boundary whose LICENSE is not Apache-2.0, and the
+# term it crossed under is a property of the crate, not of wherever it happens
+# to be vendored. `license.workspace = true` would say the same words today
+# and would stop saying them the moment the workspace changed.
+[package]
+name = "statecraft-envelope"
+description = "Shared evidence envelope: canonical encoding, identity, entry, attestation, reference, verdict"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license = "Apache-2.0"
+repository.workspace = true
+authors.workspace = true
+publish.workspace = true
+
+[package.metadata.spec-spine]
+spec = "007-shared-evidence-envelope"
+
+[dependencies]
+serde = { version = "1.0.229", features = ["derive"] }
+serde_json = "1.0.151"
+blake3 = "1.8.7"
+sha2 = "0.11.0"
+ed25519-dalek = "2.2.0"
+hex = "0.4.3"
+thiserror = "2.0.20"
+
+[lints.rust]
+missing_docs = "warn"
+
+[lints.clippy]
+all = { level = "warn", priority = -1 }

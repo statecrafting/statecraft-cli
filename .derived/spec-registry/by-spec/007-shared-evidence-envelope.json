@@ -1,0 +1,50 @@
+{
+  "record": {
+    "created": "2026-09-16",
+    "dependsOn": [
+      "000-bootstrap",
+      "001-boundaries-and-authority",
+      "005-acceptance-and-evidence"
+    ],
+    "establishes": [
+      {
+        "kind": "directory",
+        "path": "crates/statecraft-envelope/"
+      }
+    ],
+    "extends": [
+      {
+        "nature": "additive",
+        "spec": "005-acceptance-and-evidence",
+        "unit": {
+          "kind": "directory",
+          "path": "crates/statecraft-acceptance/"
+        }
+      }
+    ],
+    "id": "007-shared-evidence-envelope",
+    "implementation": "complete",
+    "sectionHeadings": [
+      "007: The shared evidence envelope",
+      "1. Purpose",
+      "2. Territory",
+      "3. Behavior",
+      "3.1 One owner, and who re-exports",
+      "3.2 `Recorded<T>`: the three words are reserved",
+      "3.3 The reference",
+      "3.4 What a compatibility fixture must prove",
+      "3.5 Provenance and the licence",
+      "3.6 The native golden vectors stay provisional",
+      "3.7 The platform's dependency",
+      "4. Out of scope",
+      "5. Decisions recorded during implementation",
+      "Verification"
+    ],
+    "specPath": "specs/007-shared-evidence-envelope/spec.md",
+    "status": "draft",
+    "summary": "The statecraft platform wrote an evidence envelope against this product's serializations and staged it pending transfer. This spec receives it: it claims crates/statecraft-envelope/, records its provenance and the Apache-2.0 term it crossed under, and makes it the single owner of the reference, the four evidence dimensions, admission and the three names for absence, which 005 declared and the platform had copied. It resolves the wire ambiguity in Recorded<T> by reserving the three absence words and refusing a present value that would collide with one, rather than by ordering the variants; it fixes what a compatibility fixture must prove, and emits the fixtures from this product's own serializer; and it fixes how the platform depends on this crate so the staged copy does not become a fork.\n",
+    "title": "The shared evidence envelope: one owner for the bytes two products exchange"
+  },
+  "shardHash": "42dba82a44b6b009816d39f2d04481be9cc2f09f9159c392f97fb58db59dc465",
+  "specVersion": "1.2.0"
+}
