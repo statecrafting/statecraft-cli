@@ -31,20 +31,29 @@ deserializer instead of silently encoding a stale assumption.
 Read before working. None of these writes.
 
 ```sh
-spec-spine --version                      # must satisfy the =0.18.0 pin
-spec-spine check                          # both freshness reads; see the exit-2 note below
-spec-spine lint
-spec-spine registry status-report --nonzero-only
-spec-spine registry plan                  # what spec-spine offers as ready
+make tools                                # install the pinned spec-spine locally
+.tooling/bin/spec-spine --version         # must satisfy the =0.20.0 pin
+make gate                                 # the whole read-only corpus surface
+make status                               # version, lifecycle counts, schedulable set
 git log --oneline -10
 ```
 
-**Exit 2 does not only mean stale.** Under the pinned 0.18.0 it also covers a
-claim that cannot be resolved, which re-indexing cannot cure: running `refresh`
-against it produces identical shards and the check still exits 2. So read the
-message, not the code. If `refresh` leaves `check` at 2, the cause is a claim, not
-a stale shard, and the fix is in the spec. spec-spine's spec 098 separates the two
-readings; it is not in any release (`C-16` in the decision record).
+Run `spec-spine` through `make`, or as `.tooling/bin/spec-spine`. A bare
+`spec-spine` resolves to the shared `~/.cargo/bin` copy, which any project on
+this machine replaces, and this repository has been governed by the wrong
+version that way more than once. `make` prefers the local binary automatically.
+
+**Exit 2 means stale, and only stale, under the pinned 0.20.0.** A claim that
+cannot be resolved exits **1**, the validation code, because it is a corpus that
+does not describe its tree rather than a ledger that has fallen behind:
+re-indexing cannot cure it, and `refresh` against it produces shards that say the
+same thing. spec-spine's specs 098 and 101 separate the two readings, and 0.20.0
+carries both (`C-16`). Under the previous 0.18.0 pin both conditions exited 2 and
+the message was the only way to tell them apart.
+
+Read the message anyway. The codes are now distinct, so exit 1 from `check` sends
+you to the spec and exit 2 sends you to `make refresh`, but neither code says
+which spec or which shard.
 
 A genuinely stale tree is reported and then fixed as committed work. Do **not**
 substitute a writing `compile` or `index` for a check: a read that repairs the
@@ -52,9 +61,12 @@ tree hides the fact that the *committed* copy was stale, so the drift then reads
 as a local edit rather than as a defect on the branch.
 
 **`registry plan` offers a `draft` spec as ready, and that is not permission to
-build it.** Verified against 0.18.0 on 2026-09-16: the lifecycle table makes
-`draft` plus `pending` schedulable, so `plan` names a spec the owner has not
-agreed to exactly as it names one the owner has. What `draft` withholds is
+build it.** Verified against 0.18.0 on 2026-09-16, and re-verified against
+0.20.0 on 2026-09-17 by forcing one spec to `draft` plus `pending` in a scratch
+worktree: the lifecycle table makes that combination schedulable, so `plan`
+names a spec the owner has not agreed to exactly as it names one the owner has.
+`plan --json` still carries only `id` and `title`, which is why spec `003`
+section 3.1.1 joins it with `registry list --json` to read `status`. What `draft` withholds is
 *ratification*, which is why an unratified spec's unresolved units warn instead
 of refusing.
 
@@ -196,8 +208,10 @@ One spec per pull request, then stop.
    the regenerated shards with the change that made them stale. `make gate` before
    every commit. The codebase index hashes the authored tree, not only the specs:
    editing a root document such as this one or `README.md` turns `check` stale
-   with no shard content change, and the fix is the same refresh in the same
-   commit.
+   with no structural change, and the fix is the same refresh in the same commit.
+   The shards do change, and visibly: each one's `shardHash` moves, because that
+   hash covers the global inputs. What does not change is what the shard says
+   about the corpus.
 6. **Verify.** `make verify SPEC=<id>` runs the spec's declared acceptance. A spec
    with no `## Verification` block declares none, which is honest for an
    unimplemented spec and is not a passing acceptance.

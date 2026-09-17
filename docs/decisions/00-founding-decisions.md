@@ -39,13 +39,21 @@ they are the frame the rest was drafted inside.
 
 ## 2. Inherited technical constraints
 
-Facts, each verified on 2026-09-16 in the local checkouts named. A fact here
-constrains design; it does not authorize anything.
+Facts, each verified on 2026-09-16 in the local checkouts named, except where a
+row names a later date. A fact here constrains design; it does not authorize
+anything.
+
+**Re-established on 2026-09-17, under the 0.20.0 pin.** Moving the pin (`D-06`)
+made four rows false as written, and a false constraint is worse than no
+constraint because the specs cite it: `C-01` and `C-02` named the installed
+version, `C-16` counted seven spec-spine specs as unreleased, and `C-18` said the
+coupling gate cannot see a change being staged. Each is corrected below with the
+date and the command that established it. Nothing else in this section moved.
 
 | ID | Constraint | How it was established |
 |---|---|---|
-| C-01 | The installed spec-spine binary is **0.18.0**, and it is the one this corpus was compiled, linted and pinned against. | `spec-spine --version` at `~/.cargo/bin/spec-spine`. |
-| C-02 | **0.19.0 exists** and is not installed: the development checkout at `~/DevWork/spec-spine` is version 0.19.0 with tag `v0.19.0` present. No feature of that tree may be described here as available. | `git tag`, `Cargo.toml` in that checkout. |
+| C-01 | **2026-09-17:** the binary this corpus is compiled, linted and pinned against is **0.20.0**, installed at the repository-local `.tooling/bin/spec-spine`. The shared `~/.cargo/bin/spec-spine` is no longer this repository's binary and is not consulted by `make`. Until 2026-09-16 the row read 0.18.0 at the shared path. | `.tooling/bin/spec-spine --version`; `make tools` installs it from `required_version`. |
+| C-02 | **2026-09-17:** 0.19.0 and 0.20.0 are both released and 0.20.0 is adopted (`D-06`). The development checkout at `~/DevWork/spec-spine` is ahead of both and sits on an unmerged branch; **no feature of that tree may be described here as available**, which is the part of this row that did not change. The rule is about unreleased work, not about 0.19.0 in particular. | `git tag --sort=-creatordate` and `git branch --show-current` in that checkout; `cargo search spec-spine-cli` reports 0.20.0. |
 | C-03 | spec-spine 0.18.0's lifecycle is `status` in {draft, approved, superseded, retired} and `implementation` in {pending, in-progress, complete, n-a, deferred} or absent. `approved` plus `pending` is a work order; `draft` is never a claim about code; `approved` with an absent `implementation` makes an unresolved unit an **error**. | `standards/spec/contract.md`, scaffolded by the installed binary. |
 | C-04 | A corpus with no code is a supported steady state. `index coverage --fail-on-untraced` **refuses** on a code-free tree rather than passing vacuously, so it must not be in this repository's gate yet. | `~/DevWork/spec-spine/docs/specify-first.md`. |
 | C-05 | `compile --check` compares the corpus against the **committed** shard trees. Running it immediately after a plain `compile` in the same job passes unconditionally and proves nothing. | Same source, and the adoption guide's CI note. |
@@ -59,25 +67,33 @@ constrains design; it does not authorize anything.
 | C-13 | The ecosystem decision package's rows G-05 to G-07 fixed the four evidence dimensions, the independent-trust rule and the byte-reference rule. Its CLI rows were adopted by the owner on 2026-09-12 **for the predecessor repository**. | `~/DevWork/grand-refactor/07-revision-4-decision-package.md` sections 2 and 5. |
 | C-14 | `tenant-tail` and `tenant-emit` are implemented and released (reported v0.4.0 and v0.3.0), and their contracts are tied to the retired factory's run-directory, stage and certificate model. Release existence is not registry availability or fitness. | Reuse assessment; releases not independently re-verified here. |
 | C-15 | **spec-spine offers a `draft` spec as ready.** `registry plan` on this corpus names `002-environment-lifecycle` ready while every product spec is `draft`, because the lifecycle table makes `draft` plus `pending` schedulable. Ratification is therefore a project rule, not something the tool withholds. The predecessor reached the same conclusion and answered it with a per-project lifecycle policy (its spec 123). | `spec-spine registry plan` run against this corpus on 2026-09-16. |
-| C-16 | **Seven spec-spine specs this product wants are approved and complete on spec-spine `main` and in no release**, including the pinned 0.18.0 and the newer 0.19.0: 087 authority snapshot, 088 change classified under the base's rules, 090 commit-boundary hook, 091 two ready specs can collide, 092 a mode-only or binary change is a change, 097 governed scope is declared. 098 (a blocking claim is not a stale shard) is `draft` and complete, landed 2026-09-16. | `git tag --contains` on each spec's first commit in `~/DevWork/spec-spine` returned no tag; `v0.19.0` is dated 2026-09-13. |
+| C-16 | **2026-09-17: all seven are released, and the pin now admits them.** 087 authority snapshot and 088 change classified under the base's rules landed in `v0.19.0`; 090 commit-boundary hook, 091 two ready specs can collide, 092 a mode-only or binary change is a change, 097 governed scope is declared and 098 a blocking claim is not a stale shard landed in `v0.20.0`, where 098 is also `approved` rather than `draft`. **101** (an unresolved claim exits as a validation failure) arrived with them and was not in the original count: it moves an unresolved claim from exit 2 to exit 1, which is the change this repository's own instructions had to follow. Availability is not consumption: the table below says what this product does with each, and adopting one is its own change. | `git tag --contains <first commit>` on each spec's directory in `~/DevWork/spec-spine`, run 2026-09-17; the earlier reading returned no tag because it predated both releases. |
 | C-17 | spec-spine's design note 06 (`docs/design/06-harness-and-distribution-2026-09.md`, 2026-09-15, **proposed, nothing filed**) assigns: repository lifecycle policy and gate commands to the adopting repository; harness package identity to spec-spine; and **recording which harness revision a worker actually resolved to this product**. It proposes a versioned namespaced package pinned by a repository declaration, and records the name-precedence trap (a personal skill resolves before a project skill of the same name). It explicitly does **not** choose how a lifecycle policy is spelled. | That file, sections 2, 3.2, 3.3, 3.6, 3.7. |
-| C-18 | `spec-spine couple` compares two commits (`--base`/`--head`), so it cannot see a change being staged. It is a pull-request gate, not a pre-commit one. | Its flags, and the adoption guide's CI example. |
+| C-18 | **2026-09-17:** `spec-spine couple` still compares two commits by default, and 0.20.0 adds `--include-uncommitted` (spec 102), which unions `git diff HEAD` into the range so a pre-commit run judges the change being committed. The capability now exists; **this repository has not adopted it**, in CI or in a hook, and `make couple` does not pass it. So the operative fact is unchanged for anyone reading the gate: what CI judges is a pushed range. | `spec-spine couple --help` under 0.20.0; spec 102 §3.1 and §3.4 in `~/DevWork/spec-spine`. |
 
 ### The spec-spine facts this product consumes, and their release state
 
 Kept as a table so specs `003` and `005` cannot quietly fill a gap with local
 code. "Available" means: carried by a release this repository's pin admits.
 
+**Available is not consumed.** Under the 0.20.0 pin every row below is available,
+which is a different statement from every row being used. Two rows changed
+behaviour by being available at all (092 at the coupling gate, 098 with 101 at
+the exit code); the rest need a spec amendment before anything reads them, and
+`005` section 3.3 in particular now holds a release claim that this upgrade made
+false. Correcting it changes what `005` requires, so it is the owner's, not a
+session's.
+
 | Fact needed | spec-spine source | Available at =0.18.0 | What this product does meanwhile |
 |---|---|---|---|
 | Corpus compiles; registry and index freshness | `compile`, `index`, `check` | **Yes** | Consumed directly. |
 | The ready set and its blockers | `registry plan` | **Yes** | Consumed directly; eligibility is filtered by `003` section 3.1.1. |
-| Which authority-set members a change touched | **088** | No (C-16) | Records `not-recorded`, names the gap, and still refuses to accept on the candidate's own suite. Builds no classifier (`005` section 3.3). |
-| What the verifier read, as a snapshot | **087** | No (C-16) | Not consumed. No local substitute. |
-| Two ready specs collide | **091** | No (C-16) | Not needed: one live attempt per repository (`003` section 3.7). Reopens `F-10`. |
-| A mode-only or binary change is a change | **092** | No (C-16) | Not consumed; noted because it affects what `couple` sees. |
-| Declared governed scope | **097** | No (C-16) | Not consumed. |
-| Exit 2 can mean a blocking claim, not a stale shard | **098** | No, and `draft` (C-16) | `AGENTS.md` states both readings of exit 2 rather than the one 0.18.0 implies. |
+| Which authority-set members a change touched | **088** | **Yes**, from `v0.19.0` | **Available and not yet consumed.** Spec `005` section 3.3 still records `not-recorded` and still refuses to accept on the candidate's own suite, because that section is written against "no release carries it" and a release now does. Integrating 088's report is an amendment to `005`, which is the owner's act, not a refresh. |
+| What the verifier read, as a snapshot | **087** | **Yes**, from `v0.19.0` | Not consumed. No local substitute, and none needed to consume it later. |
+| Two ready specs collide | **091** | **Yes**, from `v0.20.0` | Still not needed: one live attempt per repository (`003` section 3.7). `F-10` stays open on the design question, not on tool support. |
+| A mode-only or binary change is a change | **092** | **Yes**, from `v0.20.0` | Consumed by construction: the gate now completes diff membership from `git diff --name-status`, so a mode-only or binary change is judged rather than dropped. Strictly more paths checked, never fewer. |
+| Declared governed scope | **097** | **Yes**, from `v0.20.0` | Not consumed, and inert: it widens the `C-002` universe only when `[coverage] governed_scope` is non-empty, and this repository leaves it empty. Verified by diffing `config show` across the two versions. |
+| Exit 2 can mean a blocking claim, not a stale shard | **098**, with **101** | **Yes**, from `v0.20.0` | Consumed. An unresolved claim exits 1 and a stale shard exits 2, so `AGENTS.md` states one reading per code instead of two readings of one code. |
 | Harness package identity and revision | note 06 section 3.2 | No, unfiled (C-17) | Receipt field present, reading `not-recorded` (`005` section 3.4). |
 | Lifecycle policy as a queryable fact | note 06 section 3.6 | No, unfiled (C-17) | Read from the target where declared; otherwise default plus an explicit override (`003` section 3.1.1). |
 
@@ -186,14 +202,58 @@ follows from the same verbs without a second surface.
 
 ### D-06: The spec-spine pin
 
-**Recommendation.** Pin `required_version = "=0.18.0"`, the release this corpus
-was authored and checked against. Adopting 0.19.0 is a separate change with its
-own re-index and its own record.
+**Recommendation.** Pin `required_version` exactly, and install the pinned binary
+**into the repository**. Adopting a newer spine is a separate change with its own
+re-index, its own bypass-floor review and its own record.
 
 **Reason.** C-01 and C-02. A pin is also not only about features: the coupling
 gate's bypass floor is compiled into the binary, so two versions can judge the
 same diff differently. The predecessor's CI broke on the day 0.19.0 was released
 because its pin was a caret range; an exact pin cannot fail that way.
+
+An exact pin is only half of it, and 2026-09-17 measured the other half. The pin
+was satisfied by whatever `~/.cargo/bin/spec-spine` held, which is one binary
+shared by every project on the machine: work in the spec-spine checkout replaced
+it with 0.20.0, and every governed read in this repository then refused on the
+version check. The refusal is the good case. The bad one is a project whose pin
+happens to admit the replacement, which is then governed by a version it never
+adopted and cannot tell. So the binary is installed at `.tooling/bin`,
+gitignored, by `make tools`, which reads the version from `required_version` so
+the number is authored once. `make` prefers the local copy; CI uses only it.
+
+**2026-09-17: the pin moves to `=0.20.0`.** The floor was reviewed before the pin
+moved, because this row is the reason to review it.
+
+- `DEFAULT_BYPASS_PREFIXES` is **byte-identical** between `v0.18.0` and
+  `v0.20.0`: the same thirteen entries in the same order.
+- `spec-spine config show`, which prints the merged and attributed floor the gate
+  actually matches on, differs between the two versions only by the pin line
+  itself and a new, empty `[coverage] governed_scope` block.
+- The one coupling change that widens what the gate asks about is spec 097's
+  governed scope, and it is **inert while `governed_scope` is empty**, which it
+  is here. The code takes the empty-scope path, which is the 0.18.0 behaviour.
+- Spec 092 makes the gate **stricter**, not looser: diff membership is completed
+  from `git diff --name-status`, so a mode-only or binary change is judged rather
+  than silently dropped. A floor review is about paths escaping judgement; this
+  is a path that stops escaping.
+- Measured, not only read: `couple` over four merged ranges of this repository
+  returns the same verdict and the same checked-path count under both versions.
+
+The re-index the pin change requires is small and worth stating exactly, because
+it is the shape a future pin move will take too. Eight spec-registry shards moved
+one field, `specVersion` 1.2.0 to 1.3.0, and their `shardHash` did not move at
+all: the compiled content is identical and only the schema label advanced.
+Fourteen codebase-index shards moved one field, `shardHash`, because
+`spec-spine.toml` and the root documents are in the global-inputs hash and this
+change edits both. No shard said anything different about the corpus. That
+containment is a consequence of reading `.derived/` only through `spec-spine`
+subcommands: a schema label a consumer never parses cannot break the consumer.
+
+**Consequence if rejected.** The pin returns to `=0.18.0` and `make tools`
+installs that instead, since the version is read from the pin. The rows corrected
+under C-16 would have to go back to naming those seven specs unreleased, which
+would then be false: their release is a fact about spec-spine, not about this
+pin.
 
 ### D-07: The inherited evidence vocabulary
 

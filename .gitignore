@@ -34,3 +34,10 @@ target
 # bytes are declared in .statecraft/environment.json, which IS committed; the
 # run state, worktrees and records under .statecraft/state/ are not.
 .statecraft/state/
+
+# The repository-local spec-spine, installed by `make tools` from the exact
+# `required_version` in spec-spine.toml. It is deliberately NOT a shared
+# `~/.cargo/bin` install: one binary on PATH is replaced by whichever project
+# built it last, and a governed read then either refuses on the pin or, worse,
+# answers under a version this repository never adopted.
+.tooling/

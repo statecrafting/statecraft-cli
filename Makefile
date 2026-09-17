@@ -1,10 +1,13 @@
 # The check surface for this repository. Two variables, both overridable:
 #
-#   SPEC_SPINE  the binary to govern with. The pin in spec-spine.toml
-#               (=0.18.0) is checked by the binary itself on every run.
+#   SPEC_SPINE  the binary to govern with. It resolves to the repository-local
+#               .tooling/bin/spec-spine when that exists, and only otherwise to
+#               whatever is on PATH. The pin in spec-spine.toml is checked by
+#               the binary itself on every run.
 #   BASE        the ref the coupling gate compares against, resolved from the
 #               repository rather than assumed to be origin/main.
 #
+#   make tools           install the pinned spec-spine into .tooling/bin
 #   make gate            read-only: everything CI runs, in order
 #   make refresh         writing: recompute the committed shard trees
 #   make verify SPEC=001 one spec's declared acceptance
@@ -17,14 +20,26 @@
 # a crate exists. CI runs both as separate jobs and requires both through
 # `ci-gate`, which is why neither is nested inside the other.
 
-SPEC_SPINE ?= spec-spine
+# The pinned version, read from the single place it is authored. Nothing here
+# repeats the number: a second spelling is how a pin and its installer drift.
+# spec-spine.toml is authored configuration, not compiler output, so reading it
+# with sed is not a governed-artifact read.
+SPEC_SPINE_VERSION := $(shell sed -n 's/^required_version = "=\(.*\)"/\1/p' spec-spine.toml)
+
+# A repository-local install, not a shared one. `~/.cargo/bin/spec-spine` is a
+# single binary every project on this machine shares, so whichever project built
+# it last answers for all of them; this repository was measurably governed by the
+# wrong version that way. The local copy is gitignored, installed by `make tools`
+# at the exact pinned version, and preferred automatically when present.
+SPEC_SPINE_LOCAL := .tooling/bin/spec-spine
+SPEC_SPINE ?= $(if $(wildcard $(SPEC_SPINE_LOCAL)),$(SPEC_SPINE_LOCAL),spec-spine)
 
 # The same resolution order the push gate uses: an exported default branch, then
 # the remote's own HEAD, then main. An explicit BASE= on the command line wins.
 SPEC_SPINE_DEFAULT_BRANCH ?= $(shell git symbolic-ref --short refs/remotes/origin/HEAD 2>/dev/null | sed 's|^origin/||')
 BASE ?= origin/$(or $(SPEC_SPINE_DEFAULT_BRANCH),main)
 
-.PHONY: gate code build test clippy fmt refresh verify couple status help
+.PHONY: tools gate code build test clippy fmt refresh verify couple status help
 
 # Every `cargo --workspace` verb refuses a virtual manifest with no members, so
 # the Rust targets are guarded on a crate existing rather than simply run. The
@@ -47,7 +62,17 @@ SKIP_NOTE := no crate exists yet, so the workspace has no members and cargo has 
 ## coverage with the first source file, unresolved with the last unbuilt claim.
 ## A new spec claiming a crate it has not written yet will now fail the gate,
 ## which is the intended cost of having none outstanding.
+## Install the pinned spec-spine into .tooling/bin. Idempotent: `cargo install`
+## is a no-op when the same version is already there, so CI and a local session
+## run the same line. --locked builds spec-spine's own lockfile rather than a
+## freshly resolved one, so two installs of one version are the same binary.
+tools:
+	@test -n "$(SPEC_SPINE_VERSION)" || { echo "no required_version in spec-spine.toml"; exit 3; }
+	cargo install spec-spine-cli --version $(SPEC_SPINE_VERSION) --locked --root .tooling
+	$(SPEC_SPINE_LOCAL) --version
+
 gate:
+	@echo "governing with: $(SPEC_SPINE) (pin =$(SPEC_SPINE_VERSION))"
 	$(SPEC_SPINE) check --fail-on-warn
 	$(SPEC_SPINE) lint --fail-on-warn
 	$(SPEC_SPINE) index coverage --fail-on-untraced
@@ -89,10 +114,15 @@ verify:
 	@test -n "$(SPEC)" || { echo "usage: make verify SPEC=<id>"; exit 3; }
 	$(SPEC_SPINE) verify $(SPEC)
 
-## The coupling gate. CI-only by design: it compares two COMMITS, so it cannot see
-## a change being staged and is useless as a pre-commit check. This target is for
-## reproducing a CI verdict locally, against a commit. Meaningless today (no code
-## to drift), correct from the first crate.
+## The coupling gate, over two COMMITS. This target reproduces a verdict locally;
+## the authoritative one is what CI recorded against the pull request's own
+## frozen endpoints, which a later run on merged main cannot reconstruct.
+##
+## 0.20.0 adds `--include-uncommitted` (spec 102), which unions `git diff HEAD`
+## into the range so a pre-commit run judges the change being committed. It is
+## off here and off in CI, deliberately: CI judges a pushed range, where the
+## working tree is irrelevant and must stay so. Wiring it into a commit-boundary
+## hook is its own change, and this repository has adopted no hook.
 couple:
 	$(SPEC_SPINE) couple --base $(BASE) --head HEAD
 
@@ -103,9 +133,10 @@ status:
 	$(SPEC_SPINE) registry plan
 
 help:
+	@echo "tools    install the pinned spec-spine ($(SPEC_SPINE_VERSION)) into .tooling/bin"
 	@echo "gate     the corpus check surface: check, lint, authored content"
 	@echo "code     the workspace check surface: build, test, clippy, fmt"
 	@echo "refresh  recompute the committed shard trees"
 	@echo "verify   SPEC=<id>, one spec's declared acceptance"
-	@echo "couple   the coupling gate against BASE ($(BASE)); CI-only, compares commits"
+	@echo "couple   the coupling gate against BASE ($(BASE)); compares two commits"
 	@echo "status   version, lifecycle counts, schedulable set"
