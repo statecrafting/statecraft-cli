@@ -399,10 +399,17 @@ satisfy a newer rule. If a future contract needs a present value equal to one of
 the three words, that is a new schema version, not a second reinterpretation of
 these bytes.
 
-**What ratification does not settle.** `D-10` stays dropped. Section 3.4's
-compatibility suite runs from two products and both are Rust, so it is not the
-two-language parity `G-04` asked for and is not to be read as satisfying it. The
-three questions section 5 leaves open (whether the two `RootSet` models
+**What ratification does not settle.** `D-10` stays dropped, and the reason is
+narrower than the new fixture suite might suggest. Section 3.4's suite runs from
+two crates of **this** repository, `statecraft-envelope` reading the fixtures
+through the shared types and `statecraft-acceptance` checking that the functions
+this product calls still produce those bytes. Both are Rust, both are here, and
+the platform consumes the same crate rather than reading the fixtures with an
+independent implementation. That is a useful check and it is not the
+two-language parity `G-04` asked for, so nothing here is to be read as
+satisfying that obligation.
+
+The three questions section 5 leaves open (whether the two `RootSet` models
 converge, whether the shared structs carry an extras map, whether
 `VerifierRecord` and the envelope's verifier identity are one type) stay open
 and are the owner's. The native golden vectors stay provisional: freezing them
