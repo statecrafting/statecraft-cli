@@ -86,6 +86,13 @@ cargo clippy --workspace --all-targets --locked -- -D warnings
 cargo fmt    --all --check
 ```
 
+CI caches `~/.cargo/registry`, `~/.cargo/git` and `target/` for the `code` job,
+keyed on `rust-toolchain.toml` plus `Cargo.lock`: those two are exactly what
+invalidates a build. A dependency or toolchain bump misses the cache and is
+meant to; an ordinary source edit hits it and recompiles only this workspace's
+crates. Nothing in the governance job is cached beyond the spec-spine binary,
+because `check` must judge the committed tree and not a restored one.
+
 Each `make code` target is guarded on `crates/*/Cargo.toml` existing, because
 every `cargo --workspace` verb refuses a virtual manifest with no members. The
 guard is a file test rather than a flag, so the job goes live with the first

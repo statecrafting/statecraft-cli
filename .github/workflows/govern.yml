@@ -107,6 +107,32 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
+      # Without this the runner rebuilt the whole dependency tree every run,
+      # including ed25519-dalek and curve25519-dalek, and the job took over five
+      # minutes to judge a workspace that compiles locally in seconds.
+      #
+      # Three paths, one key. The registry and git caches hold what was
+      # downloaded (the pinned attest-ledger checkout among them); `target/`
+      # holds what was compiled. The key is the lockfile plus the toolchain pin,
+      # which are exactly the two inputs that invalidate a build: a dependency
+      # bump misses, a toolchain bump misses, and an ordinary source edit hits
+      # and recompiles only this workspace's own crates.
+      #
+      # `restore-keys` lets a miss start from the nearest previous cache rather
+      # than from nothing, so the first run after a bump is still faster than a
+      # cold one.
+      - name: Cache cargo registry and build
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: cargo-${{ runner.os }}-${{ hashFiles('rust-toolchain.toml', 'Cargo.lock') }}
+          restore-keys: |
+            cargo-${{ runner.os }}-
+
       - name: Report whether a crate exists yet
         run: |
           if compgen -G "crates/*/Cargo.toml" > /dev/null; then
