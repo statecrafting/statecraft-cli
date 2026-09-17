@@ -1,0 +1,53 @@
+{
+  "mapping": {
+    "dependsOn": [
+      "000-bootstrap",
+      "001-boundaries-and-authority",
+      "002-environment-lifecycle",
+      "003-work-and-run-semantics",
+      "004-execution-adapter"
+    ],
+    "implementingPaths": [
+      {
+        "path": "crates/statecraft-cli/",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/statecraft-environment/",
+        "source": "spec-edge"
+      }
+    ],
+    "resolvedUnits": [
+      {
+        "locations": [
+          {
+            "file": "crates/statecraft-cli/"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "directory",
+          "path": "crates/statecraft-cli/"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "crates/statecraft-environment/"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "directory",
+          "path": "crates/statecraft-environment/"
+        }
+      }
+    ],
+    "specId": "008-first-provider-adapter",
+    "specStatus": "draft"
+  },
+  "schemaVersion": "1.1.0",
+  "shardHash": "c2cc1128f162dca7d938a33a83995b01410516929e548e60670bd95d5767d36b"
+}
