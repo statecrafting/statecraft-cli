@@ -6,21 +6,25 @@ result independently, and keep a reviewable account of what happened.
 
 It runs on one machine, on one repository, with no account and no hosted service.
 
-## Status: specification only
+## Status: specified and implemented, not released
 
-**There is a binary.** `cargo run -p statecraft-cli -- project register <path>`
-records a repository and prints its verdict with reasons. The four `project`
-verbs work; the `env` verbs and `doctor` refuse with exit 2, because they need a
-configured adapter set and no spec ratifies a provider adapter yet.
+`cargo run -p statecraft-cli -- project register <path>` records a repository and
+prints its verdict with reasons. The four `project` verbs work. The `env` verbs
+and `doctor` are bound and **refuse with exit 2**, because they need a configured
+adapter set and no spec ratifies a provider adapter yet. The `work`, `run` and
+`accept` verbs **do not exist**: spec `006` section 3.1 admits a verb only by the
+change that implements the behavior behind it, through an `extends` edge from the
+spec that owns it, so `003`, `004` and `005` are libraries with no command
+surface.
 
 Nothing is installed or released: `F-02` defers publication, so the way to run
 it is from a checkout.
 
-`000` to `006` are approved, and the constitution's product principles VI to
+`000` to `007` are approved, and the constitution's product principles VI to
 XIII were ratified on 2026-09-16, three of them frozen as spec 000 anchors.
-`007-shared-evidence-envelope` is **draft**: it is written and built, and
-ratifying it is the owner's act. Every spec that claims code has built it: six
-crates, and no forward claim outstanding.
+`007-shared-evidence-envelope` was ratified on 2026-09-17. Every spec that
+claims code has built it: six crates, no forward claim outstanding, and
+`spec-spine registry plan` reports nothing schedulable.
 
 The language and the layout are decided: Rust, one Cargo workspace, crates
 matching the spec boundaries. The packaging, the distribution and the first
@@ -29,12 +33,10 @@ recorded with what has been adopted in
 [docs/decisions/00-founding-decisions.md](docs/decisions/00-founding-decisions.md).
 
 This repository distinguishes four claims and makes them separately: *specified*,
-*implemented*, *tested*, *released*. Today `000` to `006` are specified, and
-`002` to `006` are additionally implemented and tested: six crates, 320 tests,
+*implemented*, *tested*, *released*. Today `000` to `007` are specified, and
+`002` to `007` are additionally implemented and tested: six crates, 320 tests,
 and every row of every spec's observable-negative-cases table covered by one
-test named after the row. `007` is drafted, implemented and tested on the same
-terms, and is not yet specified, because that word means ratified here.
-**Nothing is released**, and `F-02` defers publication.
+test named after the row. **Nothing is released**, and `F-02` defers publication.
 
 ## The idea
 
@@ -96,7 +98,9 @@ statecraft accept --run <id>          # the suite at the trusted base; a receipt
 statecraft run show <id>              # one account, every value naming its record
 ```
 
-None of these verbs exists. They are the slice specs `002` to `005` describe,
+Two of these verbs are bound today: `project register` works, and `env apply`
+refuses with exit 2 until a provider adapter is ratified. The other four do not
+exist. They are the slice specs `002` to `005` describe and spec `006` binds,
 with its acceptance stated as refusals in
 [docs/design/00-boundaries-and-reuse.md](docs/design/00-boundaries-and-reuse.md#4-the-bounded-first-vertical-slice).
 
@@ -109,13 +113,15 @@ through `spec-spine` subcommands.
 
 ```sh
 cargo install spec-spine-cli --version 0.18.0
-make gate        # read-only: freshness, lint, the authored-content rules
+make gate        # read-only: freshness, lint, coverage, the authored-content rules
+make code        # read-only: build, test, clippy, fmt across the six crates
 make refresh     # writing: recompute the committed shard trees
 make verify SPEC=001
 ```
 
-`make gate` is the whole check surface today, because the corpus is the only thing
-that exists. See [AGENTS.md](AGENTS.md) for the working protocol.
+`make gate` judges the corpus and `make code` judges the workspace; CI requires
+both through the single `ci-gate` status check. See [AGENTS.md](AGENTS.md) for
+the working protocol.
 
 ## The predecessor
 

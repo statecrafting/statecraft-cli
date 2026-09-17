@@ -4,17 +4,18 @@ The cross-agent authority for this repository, read by Claude Code, Codex CLI an
 any other agent through the `AGENTS.md` convention. Edit this file to evolve the
 protocol.
 
-This repository holds one crate, `crates/statecraft-environment/`, claimed by
-spec `002`. There is no binary. Do not add code, a crate or a test runner
-without a spec that claims it: `crates/**` is claimed by the spec whose boundary
-the crate is, and the coverage gate refuses an unclaimed source file.
+This repository holds six crates and one binary, each crate claimed by the spec
+whose boundary it is. Do not add code, a crate or a test runner without a spec
+that claims it: `crates/**` is claimed by the spec whose boundary the crate is,
+and the coverage gate refuses an unclaimed source file.
 
 ## Where authority lives
 
 1. `specs/000-bootstrap/spec.md`: what a spec is. Its `unamendable` anchors
    cannot be contradicted.
 2. `standards/spec/constitution.md`: the durable principles. I to V are
-   spec-spine's; VI to XIII are this product's and are **draft**.
+   spec-spine's; VI to XIII are this product's and were **ratified on
+   2026-09-16**, three of them frozen as spec `000` anchors.
 3. `standards/spec/contract.md`: the normative summary, including the lifecycle
    table that decides what is schedulable.
 4. `specs/NNN-slug/spec.md`: ordinary specs.
@@ -57,9 +58,10 @@ agreed to exactly as it names one the owner has. What `draft` withholds is
 *ratification*, which is why an unratified spec's unresolved units warn instead
 of refusing.
 
-`000` to `005` are ratified, so what `plan` offers from that range is a real work
-order. `006-command-surface` is `draft` and `plan` will offer it as ready
-anyway. Check the `status` field, not the plan output.
+`000` to `007` are ratified, so what `plan` offers from that range is a real work
+order. Today it offers nothing: all eight are `approved` and `complete`, and
+`plan` reports 0 ready, 0 blocked. The next `draft` written here will be offered
+as ready anyway. Check the `status` field, not the plan output.
 
 spec-spine does not enforce the difference, so this repository does. Until the
 owner ratifies a spec (see Approval semantics), `plan` naming it is a reading
@@ -68,15 +70,16 @@ suggestion, not a work order. Do not open an implementation branch for a `draft`
 ## The gate
 
 Two surfaces, not one. `make gate` judges the **corpus** and is meaningful with
-no code at all. `make code` judges the **workspace** and is inert until a crate
-exists. CI runs them as separate jobs and requires both through `ci-gate`, the
-single status context branch protection names.
+no code at all. `make code` judges the **workspace**, which is six crates today.
+CI runs them as separate jobs and requires both through `ci-gate`, the single
+status context branch protection names.
 
 ```sh
 make gate
 spec-spine check --fail-on-warn
 spec-spine lint --fail-on-warn
 spec-spine index coverage --fail-on-untraced
+spec-spine index check --fail-on-unresolved
 scripts/check-authored-content.sh
 
 make code
@@ -95,10 +98,10 @@ because `check` must judge the committed tree and not a restored one.
 
 Each `make code` target is guarded on `crates/*/Cargo.toml` existing, because
 every `cargo --workspace` verb refuses a virtual manifest with no members. The
-guard is a file test rather than a flag, so the job goes live with the first
-crate and nobody has to remember to enable it. Until then it passes having
-judged nothing, and says so in the log: that is the price of deciding the check
-surface before the work it judges, which is what Approval semantics requires.
+guard is a file test rather than a flag, so the job went live with the first
+crate and nobody had to remember to enable it. It no longer fires, and it stays:
+the reason it was written, deciding the check surface before the work it judges,
+is what Approval semantics requires.
 
 **Both flags the generic kit carries are now in the gate**, and each arrived on
 the condition recorded here when it was left out, not on a whim:
@@ -170,9 +173,9 @@ for sequential merges.
 
 `spec-spine couple` is **CI-only, and deliberately not in `make gate`**. It
 compares two commits, so it cannot see a change being staged and is useless as a
-pre-commit check (`C-18`). CI runs it against the pull request's merge base. On a
-tree with no code it has nothing to refuse; it becomes meaningful with the first
-crate. `make couple` exists for reproducing a CI verdict locally, against a
+pre-commit check (`C-18`). CI runs it against the pull request's merge base. It
+became meaningful with the first crate and judges every `crates/**` change
+today. `make couple` exists for reproducing a CI verdict locally, against a
 commit, not for gating a commit you are about to make.
 
 ## Working the backlog
@@ -191,7 +194,10 @@ One spec per pull request, then stop.
    that spec and unit.
 5. **Refresh and gate.** `make refresh` after editing any `spec.md`, and commit
    the regenerated shards with the change that made them stale. `make gate` before
-   every commit.
+   every commit. The codebase index hashes the authored tree, not only the specs:
+   editing a root document such as this one or `README.md` turns `check` stale
+   with no shard content change, and the fix is the same refresh in the same
+   commit.
 6. **Verify.** `make verify SPEC=<id>` runs the spec's declared acceptance. A spec
    with no `## Verification` block declares none, which is honest for an
    unimplemented spec and is not a passing acceptance.
