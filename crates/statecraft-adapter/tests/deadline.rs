@@ -134,7 +134,12 @@ fn deadline_worker() {
         "eof-hang" => "exec 1>&-\nexec sleep 300".into(),
         "unread-prompt" => "exec sleep 300".into(),
         "inherited-input" => {
-            format!("{terminal}\nsleep 300 <&0 >/dev/null &\necho $! > descendant\nexit 0")
+            // dash replaces an asynchronous command's stdin with /dev/null
+            // before applying <&0. Save the pipe before backgrounding so the
+            // descendant holds it open without reading on both dash and sh.
+            format!(
+                "{terminal}\nexec 3<&0\nsleep 300 <&3 3<&- >/dev/null &\necho $! > descendant\nexit 0"
+            )
         }
         "success" => terminal.into(),
         "drain" => format!(
@@ -182,6 +187,13 @@ fn deadline_worker() {
     )
     .unwrap();
     assert!(started.elapsed() < Duration::from_secs(4));
+    if case == "inherited-input" {
+        assert!(
+            started.elapsed() >= Duration::from_secs(request.deadline_seconds),
+            "the descendant must hold prompt delivery until the deadline"
+        );
+        assert!(dir.join("descendant").is_file());
+    }
     let completed = case == "success" || case == "drain";
     assert_eq!(
         run.outcome,

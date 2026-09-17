@@ -243,6 +243,21 @@ stdin, trailing-output draining, ordinary success, evidence preservation and
 refusal precedence. Each fixture runs behind an independent outer timeout that
 cleans up its process group and reaps the disposable supervisor process.
 
+**2026-09-17: the inherited-input fixture saves stdin before backgrounding.**
+Linux dash replaces an asynchronous command's stdin with `/dev/null` before
+`<&0` can preserve it. The unchanged deadline suite reproduced PR #31's failure
+in a disposable Debian bookworm container with Rust 1.96.0: nine tests passed,
+but inherited stdin returned `completed` in approximately 11 ms. A bounded pipe
+probe observed `/dev/null` at the descendant's fd 0 and a broken prompt pipe.
+Saving the parent's stdin with `exec 3<&0`, then starting
+`sleep 300 <&3 3<&- >/dev/null &`, retained the same pipe at the descendant's fd 0
+after parent exit and kept the writer blocked. The probe confirmed blocking on
+macOS sh too. With that fixture correction, the deadline command above passes
+all ten tests on both platforms; inherited input additionally asserts that the
+deadline elapsed and the descendant marker exists before checking cleanup.
+The expected interruption, descendant cleanup and evidence assertions remain;
+the supervisor implementation and ratified contract do not change.
+
 **2026-09-16: the closed vocabulary is an enum, not a string.** §3.2 says adding
 a token is an amendment and not a configuration change. A string token would let
 a caller introduce a seventh; an enum means a seventh requires editing this
