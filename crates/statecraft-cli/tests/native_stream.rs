@@ -22,7 +22,14 @@ fn git(path: &Path, args: &[&str]) {
     assert!(output.status.success(), "{output:?}");
 }
 
-fn native_run(fixture: &str, expected: &str, claim: &str, refusals: u32, subtype: Option<&str>) {
+fn native_run(
+    fixture: &str,
+    expected: &str,
+    claim: &str,
+    refusals: u32,
+    subtype: Option<&str>,
+    missing_init: bool,
+) {
     let target = tempfile::tempdir().unwrap();
     let home = tempfile::tempdir().unwrap();
     let bin = tempfile::tempdir().unwrap();
@@ -61,6 +68,10 @@ esac
         result["subtype"] = subtype.into();
         *lines.last_mut().unwrap() = result.to_string();
         native = lines.join("\n");
+    }
+    if missing_init {
+        // Keep only the recorded result, without inventing initialization.
+        native = native.lines().last().unwrap().to_string();
     }
     std::fs::write(bin.path().join("native.jsonl"), native).unwrap();
     executable(
@@ -118,9 +129,27 @@ esac
     let (chain, _) = statecraft_run::record::Chain::open(home.path(), target.path()).unwrap();
     let entries = chain.entries();
     let outcome = entries.iter().find(|e| e.subject == "attempt").unwrap();
+    assert_eq!(outcome.detail["outcome"], expected);
+    assert_eq!(outcome.detail["refusals"], refusals);
     assert_eq!(outcome.detail["adapterClaimed"], claim);
+    assert_eq!(
+        statecraft_run::session::runs(&chain)[0].attempts[0]
+            .outcome
+            .unwrap()
+            .word(),
+        expected
+    );
     let evidence = &outcome.detail["execution"];
-    if subtype.is_some() {
+    if missing_init {
+        assert_eq!(
+            evidence["streamError"],
+            statecraft_adapter::StreamError::NoInit.to_string()
+        );
+        assert_eq!(
+            evidence["events"].as_array().unwrap().len(),
+            refusals as usize
+        );
+    } else if subtype.is_some() {
         assert!(
             evidence["streamError"]
                 .as_str()
@@ -130,7 +159,9 @@ esac
     } else {
         assert!(evidence["streamError"].is_null());
     }
-    assert!(evidence["events"].as_array().unwrap().len() > 2);
+    if !missing_init {
+        assert!(evidence["events"].as_array().unwrap().len() > 2);
+    }
     assert!(evidence["providerTerminal"]["num_turns"].as_u64().unwrap() > 0);
     let accounting = entries.iter().find(|e| e.subject == "refusals").unwrap();
     assert_eq!(accounting.detail["count"], refusals);
@@ -142,13 +173,15 @@ esac
             denial,
             evidence["providerTerminal"]["permission_denials"][0]
         );
-        assert!(
-            evidence["events"]
-                .as_array()
-                .unwrap()
-                .iter()
-                .any(|e| e["message"] == "system/permission_denied")
-        );
+        if !missing_init {
+            assert!(
+                evidence["events"]
+                    .as_array()
+                    .unwrap()
+                    .iter()
+                    .any(|e| e["message"] == "system/permission_denied")
+            );
+        }
     }
     if expected != "completed" {
         let accepted = run(&["accept", root, "replay", "--json"]);
@@ -160,17 +193,24 @@ esac
 
 #[test]
 fn run_maps_recorded_success_and_keeps_the_workspace_cwd() {
-    native_run("success.jsonl", "completed", "completed", 0, None);
+    native_run("success.jsonl", "completed", "completed", 0, None, false);
 }
 
 #[test]
 fn run_counts_recorded_denial_once_and_accept_does_not_run() {
-    native_run("denied.jsonl", "refused", "completed", 1, None);
+    native_run("denied.jsonl", "refused", "completed", 1, None, false);
 }
 
 #[test]
 fn run_maps_recorded_turn_cap_to_interrupted_and_accept_does_not_run() {
-    native_run("max-turns.jsonl", "interrupted", "interrupted", 0, None);
+    native_run(
+        "max-turns.jsonl",
+        "interrupted",
+        "interrupted",
+        0,
+        None,
+        false,
+    );
 }
 
 #[test]
@@ -181,5 +221,16 @@ fn run_retains_an_unmapped_completed_claim_beside_interrupted_and_its_diagnostic
         "completed",
         0,
         Some("unmeasured"),
+        false,
     );
+}
+
+#[test]
+fn run_without_init_persists_denial_accounting_claim_and_diagnostic() {
+    native_run("denied.jsonl", "refused", "completed", 1, None, true);
+}
+
+#[test]
+fn run_without_init_or_denials_stays_interrupted() {
+    native_run("success.jsonl", "interrupted", "completed", 0, None, true);
 }

@@ -200,6 +200,46 @@ fn native_stream_without_init_is_never_completed() {
         Some(statecraft_adapter::StreamError::NoInit)
     );
     assert!(execution.result.is_some());
+    assert!(statecraft_adapter::protocol::refusals(&execution.supervised.events).is_empty());
+    assert_eq!(execution.termination().adapter_claimed, Outcome::Completed);
+}
+
+#[test]
+fn native_denied_success_without_init_keeps_refusals_and_the_stream_error() {
+    let text = recorded_text("denied.jsonl");
+    // Retain only the recorded terminal event: no init and no mid-stream denial.
+    let execution = replay(text.lines().last().unwrap(), 0);
+    assert_eq!(execution.termination().observed, Outcome::Interrupted);
+    assert_eq!(execution.termination().adapter_claimed, Outcome::Completed);
+    assert_eq!(
+        execution.supervised.stream_error,
+        Some(statecraft_adapter::StreamError::NoInit)
+    );
+    assert!(execution.terminal.is_none());
+    assert!(
+        !execution
+            .supervised
+            .events
+            .iter()
+            .any(|e| matches!(e, Event::Init { .. }))
+    );
+    let refusals = statecraft_adapter::protocol::refusals(&execution.supervised.events);
+    assert_eq!(refusals.len(), 1);
+    assert_eq!(refusals[0].guard, "permission-deny-rule/Bash");
+    let denial: serde_json::Value = serde_json::from_str(&refusals[0].detail).unwrap();
+    assert_eq!(
+        denial,
+        execution.evidence()["providerTerminal"]["permission_denials"][0]
+    );
+    let mut accounting = Accounting::default();
+    for refusal in refusals {
+        accounting.observe(refusal);
+    }
+    assert_eq!(accounting.count, 1);
+    assert_eq!(
+        statecraft_run::refusal::decide(execution.termination().observed, &accounting),
+        Outcome::Refused
+    );
 }
 
 fn granted_everything() -> Vec<Capability> {

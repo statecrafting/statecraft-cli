@@ -183,6 +183,15 @@ impl ResultEvent {
     pub fn refused_anything(&self) -> bool {
         !self.permission_denials.is_empty()
     }
+
+    /// Section 3.3 rule 1's refusal record, independent of initialization.
+    /// The run supervisor counts these events, never an adapter-supplied count.
+    pub(crate) fn refusal_events(&self) -> impl Iterator<Item = Event> + '_ {
+        self.permission_denials.iter().map(|denial| Event::Refusal {
+            guard: format!("permission-deny-rule/{}", denial.tool_name),
+            detail: serde_json::to_string(denial).unwrap_or_else(|_| denial.tool_use_id.clone()),
+        })
+    }
 }
 
 /// Why a stream could not be mapped.
@@ -300,13 +309,7 @@ pub fn map_stream(events: &[ProviderEvent], granted: &[Capability]) -> Result<Ma
                 // event stream, so they are put on the stream here rather than
                 // handed over as a side channel, and they are put there exactly
                 // once.
-                for denial in &r.permission_denials {
-                    out.push(Event::Refusal {
-                        guard: format!("permission-deny-rule/{}", denial.tool_name),
-                        detail: serde_json::to_string(&denial)
-                            .unwrap_or_else(|_| denial.tool_use_id.clone()),
-                    });
-                }
+                out.extend(r.refusal_events());
                 out.push(Event::Result {
                     // The provider's claim about itself, as an input. Section
                     // 3.5's mapping is [`crate::outcome`] and the supervisor's

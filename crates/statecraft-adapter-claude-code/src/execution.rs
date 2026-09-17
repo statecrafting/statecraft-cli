@@ -124,6 +124,13 @@ pub fn supervise(
             }
         }
         Err(error) => {
+            // Missing initialization cannot erase independently readable
+            // terminal denials (008 section 3.3). Preserve their events for
+            // the run supervisor's accounting without inventing an init or
+            // treating this stream as a completed execution.
+            if let Some(result) = &result {
+                supervised.events.extend(result.refusal_events());
+            }
             // Preserve a transport diagnostic's exact physical line number.
             if supervised.stream_error.is_none() {
                 supervised.stream_error = Some(match error {

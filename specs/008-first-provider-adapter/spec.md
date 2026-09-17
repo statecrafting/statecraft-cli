@@ -273,6 +273,34 @@ measurement this spec did not take.
 
 Dated entries for choices §3 was silent on. None changes what §3 requires.
 
+**2026-09-17: missing initialization does not erase a readable terminal denial.**
+The native execution bridge's `map_stream` error path discarded the mapped
+events when initialization was missing, even with a parsed terminal result
+carrying denials. The result survived in detail while the supervisor counted
+zero refusals. The repair shares the terminal denial-to-event mapping between
+the successful and error paths. The error path retains only those independently
+readable refusal events; it invents no initialization and keeps `NoInit`, an
+`interrupted` execution and the provider's unchanged completed claim. The run
+supervisor then counts the events and records `refused` under `003` sections
+3.4 and 3.5 and this spec's section 3.3. Missing initialization without a denial
+remains `interrupted`, as `004` section 5's malformed-stream decision requires.
+
+This is implemented in `execution.rs` and `stream.rs` and tested by
+`native_denied_success_without_init_keeps_refusals_and_the_stream_error` in the
+provider negative suite and
+`run_without_init_persists_denial_accounting_claim_and_diagnostic` in the CLI
+native-stream suite. Both replay the recorded denied terminal event through a
+real child with initialization removed. The CLI test reopens the persisted
+accounting and outcome, checks the verbatim denial and diagnostic, and verifies
+that acceptance does not run. Its undenied missing-init control stays interrupted.
+No ratified requirement, ownership edge or acceptance command changes.
+
+**Separate pre-existing finding, not repaired here:** the generic supervisor
+leaves its deadline loop on a result or malformed line before calling
+`child.wait()` and joining its reader. Either wait can therefore outlive the
+deadline. This requires a separate supervisor repair under `004`, not an
+extension of this refusal-accounting remediation.
+
 **2026-09-17: native stream decoding belongs beside the provider mapping.**
 The `run` binding sent native JSONL straight to `004`'s `event`-tagged parser,
 although this provider emits `type`-tagged lines. The existing `map_stream` and
