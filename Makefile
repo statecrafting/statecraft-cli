@@ -114,7 +114,13 @@ verify:
 	@test -n "$(SPEC)" || { echo "usage: make verify SPEC=<id>"; exit 3; }
 	$(SPEC_SPINE) verify $(SPEC)
 
-## The coupling gate, over two COMMITS. This target reproduces a verdict locally;
+## The coupling gate, over two COMMITS. **Commit first.** Run against BASE while
+## HEAD is still BASE and the diff is empty: the gate reports "0 path(s)
+## checked, no drift" and exits 0, which reads exactly like a pass and proves
+## nothing. Measured here on 2026-09-17, on a staged-but-uncommitted tree that
+## CI then refused for two real C-001 violations.
+##
+## This target reproduces a verdict locally;
 ## the authoritative one is what CI recorded against the pull request's own
 ## frozen endpoints, which a later run on merged main cannot reconstruct.
 ##

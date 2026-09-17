@@ -212,6 +212,13 @@ One spec per pull request, then stop.
    The shards do change, and visibly: each one's `shardHash` moves, because that
    hash covers the global inputs. What does not change is what the shard says
    about the corpus.
+   **`make couple` before committing proves nothing.** The gate compares two
+   commits, so with `HEAD` still at `BASE` it judges an empty diff and reports
+   "0 path(s) checked, no drift", which reads exactly like a pass. Commit, then
+   couple. The same reasoning applies after a merge: a verdict on merged `main`
+   cannot establish that the pull request was correctly coupled, because the
+   endpoints it judged are gone. The verdict that counts is the one CI recorded
+   against that pull request's own frozen endpoints.
 6. **Verify.** `make verify SPEC=<id>` runs the spec's declared acceptance. A spec
    with no `## Verification` block declares none, which is honest for an
    unimplemented spec and is not a passing acceptance.
