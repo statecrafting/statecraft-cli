@@ -2,7 +2,7 @@
 id: "008-first-provider-adapter"
 title: "The first provider adapter: naming a provider, and what its stream can and cannot witness"
 status: approved
-implementation: pending
+implementation: complete
 created: "2026-09-17"
 summary: >
   Spec 004 fixed the seam and forbade a provider name inside it, so nothing in
@@ -15,6 +15,12 @@ summary: >
   still classifies itself as a success; it fixes which denial mechanism the
   adapter must use, because the two available mechanisms have opposite evidence
   properties; and it fixes what a qualification record binds to.
+establishes:
+  # Claimed by the change that writes it, which is this one. Section 2 says why
+  # the claim could not be in the draft: the gate carries
+  # `index check --fail-on-unresolved`, so a spec claiming a crate it has not
+  # written yet fails.
+  - { kind: directory, path: "crates/statecraft-adapter-claude-code/" }
 extends:
   # The environment half of this adapter (002 section 3.9) registers a harness
   # adapter, its managed paths and its prerequisites, which is a declaration
@@ -256,6 +262,66 @@ interactive mode of this provider. Authentication setup, credential rotation and
 anything that would write a credential. Publication and distribution (`F-02`).
 Whether the supervisor should ever require `workspace-write`, which needs a
 measurement this spec did not take.
+
+## 5. Decisions recorded during implementation
+
+Dated entries for choices §3 was silent on. None changes what §3 requires.
+
+**2026-09-17: the applied set reports what the invocation put into effect, minus
+what the init event contradicts.** Spec 004 §3.3 wants the init event to carry
+what was *actually applied*, and §3.5.6 makes a declared-but-unapplied token a
+qualification failure. §3.4 measured that this provider's init event witnesses
+**one** of the five tokens directly, the tool set, and only under removal. So
+neither extreme works: reporting everything granted would make §3.5.6 vacuous,
+and reporting only what init proves would fail qualification on every real run.
+The adapter reports what it put into effect and drops what init contradicts,
+which today is exactly one thing (`hook-enforcement` before any hook event is
+seen). The applied **tool set** stays `not-recorded`, which is §3.4's own answer
+and is unaffected by this entry.
+
+**2026-09-17: a terminal state §3.5's table does not list is reported, not
+mapped.** The table covers `success` and `max_turns`. A subtype nobody measured
+(`error_during_execution`, say) is returned as an unmapped terminal state, the
+way spec 004 §3.5 case 4 returns a malformed stream. An outcome this adapter
+invented would be an outcome nobody measured.
+
+**2026-09-17: `credential-path` is the presence of the mechanism, not of a
+credential.** §3.6 measured `apiKeySource: "none"` and concluded the keychain
+answers on `darwin`. Checking that a credential *works* means spending one,
+which §4 puts out of scope, so the observable fact is the platform. On a
+platform where §3 took no measurement the prerequisite reads **absent** rather
+than assumed, because every finding in §3.1 to §3.6 is a fact about `darwin`.
+
+**2026-09-17: `D-09`'s pointer prerequisite is not a fourth prerequisite here.**
+Spec 002 §3.8 makes "this harness loads a pointer at this path" a declared
+prerequisite, and §3.7 of this spec lists three that are not it. For this
+harness the mechanism is the `@path` import in `CLAUDE.md`, which this provider
+loads, so it is satisfied by construction and cannot be absent. The three §3.7
+names are the ones that can be, and the declaration names exactly those.
+
+**2026-09-17: the environment half's two rows reach the real declaration through
+a dev-dependency.** §3.9's absent-prerequisite and colliding-path rows are
+behaviors of the adapter model spec 002 owns, so the `## Verification` block runs
+them in that crate's suite. Testing them against a declaration restated in the
+test file would test a copy, and the copy is what drifts, so
+`statecraft-environment` dev-depends on this adapter's crate. Cargo permits a
+cycle through dev-dependencies; the library's own dependency graph is unchanged
+and nothing in its `src/` may name the adapter.
+
+**2026-09-17: the five verbs this spec unbinds take the exit the operation
+returns.** The `extends` edge on spec 006's crate changes a refusal whose reason
+this spec falsified, and 006 §3.7 fixes the exits for three of the five cases.
+For the rest the exit is derived rather than chosen: `env plan` takes the exit
+the apply it previews would take (a plan-level refusal is 2, a withheld path is
+1, otherwise 0), because a preview whose exit disagrees with the operation it
+previews is the one thing the verb exists to prevent. `env upgrade` is `env
+apply` against the current declarations, which is spec 002 §3.6's own position.
+
+**2026-09-17: a target must be registered before any environment verb runs.**
+006 §3.7 requires `env apply` against an unregistered target to refuse naming the
+path, and registration is the precondition all five verbs share. The binding
+applies it to all five rather than to apply alone, which adds no rule: it applies
+one 002 already has to the four verbs whose row 006 did not spell out.
 
 ## Verification
 

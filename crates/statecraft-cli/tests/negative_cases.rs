@@ -76,28 +76,141 @@ fn no_arguments_at_all_is_also_a_usage_error() {
 }
 
 // Row 2: `env apply` against an unregistered target.
+//
+// Every environment verb, not only apply: registration is the precondition all
+// five share, and a test covering one of them would leave the other four free
+// to answer differently.
 #[test]
-fn an_environment_verb_with_no_configured_adapter_set_refuses_with_exit_2() {
+fn an_environment_verb_against_an_unregistered_target_refuses_naming_the_path() {
+    let home = tempfile::tempdir().unwrap();
+    let target = git_repo_without_corpus();
+    let path = target.path().to_string_lossy().to_string();
+
+    for verb in [
+        vec!["env", "plan"],
+        vec!["env", "apply"],
+        vec!["env", "upgrade"],
+        vec!["env", "remove"],
+        vec!["doctor"],
+    ] {
+        let mut args = verb.clone();
+        args.push(&path);
+        let out = run_in(home.path(), &args);
+        assert_eq!(code(&out), 2, "{verb:?} refuses");
+        let text = stdout(&out);
+        assert!(text.contains("not registered"), "{verb:?}: {text}");
+        assert!(text.contains(&path), "{verb:?} names the path");
+    }
+
+    // No write, which is the half of the row an exit code cannot carry.
+    assert!(!target.path().join(".statecraft").exists());
+}
+
+#[test]
+fn an_environment_verb_with_no_target_at_all_is_a_usage_error() {
     let home = tempfile::tempdir().unwrap();
     for verb in [
         vec!["env", "plan"],
         vec!["env", "apply"],
         vec!["env", "upgrade"],
         vec!["env", "remove"],
+        vec!["doctor"],
     ] {
         let out = run_in(home.path(), &verb);
-        assert_eq!(code(&out), 2, "{verb:?} refuses");
-        assert!(stdout(&out).contains("refused"));
+        assert_eq!(code(&out), 3, "{verb:?} is a usage error");
+        assert!(stdout(&out).is_empty(), "nothing else happens");
     }
 }
 
-// Row 5 and 6: doctor's exits.
+// Row 4: `env remove` with no manifest.
 #[test]
-fn doctor_without_a_selected_target_refuses_rather_than_reporting_nothing() {
+fn env_remove_with_no_manifest_refuses_and_deletes_nothing() {
     let home = tempfile::tempdir().unwrap();
-    let out = run_in(home.path(), &["doctor"]);
+    let target = git_repo_without_corpus();
+    let path = target.path().to_string_lossy().to_string();
+    let registered = run_in(home.path(), &["project", "register", &path]);
+    assert!(code(&registered) <= 1, "registration reports a verdict");
+
+    let out = run_in(home.path(), &["env", "remove", &path]);
     assert_eq!(code(&out), 2);
-    assert!(stdout(&out).contains("refused"));
+    let text = stdout(&out);
+    assert!(text.contains("refused"));
+    // Spec 002 section 3.6's own reason, not one this binding invented.
+    assert!(
+        text.contains("will not guess which files were ours"),
+        "{text}"
+    );
+    assert!(!target.path().join(".statecraft").exists());
+}
+
+// Row 6: `doctor` on any finding.
+//
+// Row 5, a clean environment exiting 0, needs the configured adapter to be
+// available, which on this provider means a resolvable `claude`, a
+// qualification record for the version in front of it and a darwin credential
+// path. Two of those cannot be arranged portably, so the clean-report mapping is
+// covered where it is a function of the report alone, in `bind`'s own suite.
+// What is checked here is the half a process can show: a finding exits 1 and
+// nothing is repaired.
+#[test]
+fn doctor_reports_an_unavailable_adapter_as_a_finding_and_repairs_nothing() {
+    let home = tempfile::tempdir().unwrap();
+    let target = git_repo_without_corpus();
+    let path = target.path().to_string_lossy().to_string();
+    run_in(home.path(), &["project", "register", &path]);
+
+    let out = run_in(home.path(), &["doctor", &path]);
+    // No qualification record exists under this temporary product home, so the
+    // adapter is unavailable whichever platform this runs on.
+    assert_eq!(code(&out), 1, "{}", stdout(&out));
+    let text = stdout(&out);
+    assert!(text.contains("claude-code"), "{text}");
+    assert!(text.contains("missing"), "{text}");
+    // Diagnoses, and repairs nothing.
+    assert!(!target.path().join(".claude").exists());
+    assert!(!target.path().join("CLAUDE.md").exists());
+}
+
+// `env plan` writes nothing, and reports the ratified adapter by name.
+#[test]
+fn env_plan_writes_nothing_and_names_the_configured_adapter() {
+    let home = tempfile::tempdir().unwrap();
+    let target = git_repo_without_corpus();
+    let path = target.path().to_string_lossy().to_string();
+    run_in(home.path(), &["project", "register", &path]);
+
+    let out = run_in(home.path(), &["env", "plan", &path, "--json"]);
+    // No plan-level refusal: one adapter cannot collide with itself. So the
+    // previewed apply writes nothing and reports `applied` with an empty list,
+    // and the plan takes the same exit.
+    assert_eq!(code(&out), 0, "{}", stdout(&out));
+    assert!(!target.path().join(".claude").exists());
+    assert!(!target.path().join("CLAUDE.md").exists());
+
+    let parsed: serde_json::Value = serde_json::from_str(&stdout(&out)).expect("valid json");
+    let adapters = parsed["value"]["adapters"]
+        .as_array()
+        .expect("the plan reports every configured adapter");
+    assert_eq!(adapters.len(), 1, "one ratified adapter");
+    assert_eq!(adapters[0]["name"], "claude-code");
+
+    // No qualification record under this temporary product home, so it refuses
+    // to claim its paths and names what is absent, on every platform.
+    assert_eq!(adapters[0]["readiness"], "refused");
+    assert!(
+        !adapters[0]["missing"]
+            .as_array()
+            .expect("names what is absent")
+            .is_empty()
+    );
+    // And the facts it cannot express are stated rather than dropped.
+    assert!(
+        !adapters[0]["unexpressible"]
+            .as_array()
+            .expect("stated rather than dropped")
+            .is_empty()
+    );
+    assert!(parsed["value"]["writes"].as_array().unwrap().is_empty());
 }
 
 // Row 7: a command given `--json`.
