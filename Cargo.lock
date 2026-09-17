@@ -566,6 +566,7 @@ version = "0.0.0"
 dependencies = [
  "serde",
  "serde_json",
+ "statecraft-adapter",
  "statecraft-envelope",
  "statecraft-environment",
  "statecraft-run",

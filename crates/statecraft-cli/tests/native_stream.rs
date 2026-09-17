@@ -111,8 +111,13 @@ esac
     assert_eq!(answer["value"]["outcome"], expected);
     assert_eq!(answer["value"]["adapterClaimed"], claim);
     assert_eq!(answer["value"]["refusals"], refusals);
-    // The existing closed command view has exactly its original seven fields.
-    assert_eq!(answer["value"].as_object().unwrap().len(), 7);
+    // Spec 006 section 3.4 permits additive fields. The original seven stay,
+    // and the run now exposes its recorded posture alongside them.
+    assert_eq!(answer["value"].as_object().unwrap().len(), 8);
+    assert_eq!(
+        answer["value"]["posture"]["value"]["qualification"],
+        "unqualified"
+    );
 
     let workspace = Path::new(answer["value"]["workspaceRetained"].as_str().unwrap());
     let cwd = std::fs::read_to_string(workspace.join("child-cwd")).unwrap();
@@ -139,6 +144,10 @@ esac
             .word(),
         expected
     );
+    let posture = &outcome.detail["posture"];
+    assert_eq!(*posture, answer["value"]["posture"]["value"]);
+    assert_eq!(posture["qualification"], "unqualified");
+    assert_eq!(posture["applied"], outcome.detail["applied"]);
     let evidence = &outcome.detail["execution"];
     if missing_init {
         assert_eq!(

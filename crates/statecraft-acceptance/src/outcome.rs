@@ -16,6 +16,7 @@ use crate::dimensions::{Admission, Dimensions};
 use crate::judged::{NoAcceptance, NotAttemptedReason};
 use crate::receipt::{NoReceipt, Receipt};
 use serde::{Deserialize, Serialize};
+use statecraft_adapter::posture::Posture;
 
 /// What acceptance concluded.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -78,6 +79,30 @@ pub struct Sourced<T> {
     pub from_record: String,
 }
 
+// A sourced value always serializes as an object, never an absence word.
+impl<T> crate::absence::Recordable for Sourced<T> {}
+
+/// An attempt's posture and the durable record it came from, or named absence.
+pub type RecordedPosture = Recorded<Sourced<Posture>>;
+
+fn unrecorded_posture() -> RecordedPosture {
+    Recorded::Absent(Absence::NotRecorded)
+}
+
+/// Render the persisted posture without consulting present-day qualification.
+pub fn render_posture(posture: &RecordedPosture) -> String {
+    match posture {
+        Recorded::Present(sourced) => {
+            format!(
+                "posture ({}):\n{}",
+                sourced.from_record,
+                sourced.value.render()
+            )
+        }
+        Recorded::Absent(absence) => format!("posture: {}\n", absence.word()),
+    }
+}
+
 impl<T> Sourced<T> {
     /// A value and its record.
     pub fn new(value: T, from_record: &str) -> Self {
@@ -93,6 +118,9 @@ impl<T> Sourced<T> {
 pub struct ReviewableOutcome {
     /// Which run.
     pub run_id: String,
+    /// The adapter posture recorded for the attempt, never requalified on read.
+    #[serde(default = "unrecorded_posture")]
+    pub posture: RecordedPosture,
     /// What the agent claimed, kept apart from what was observed.
     pub claim: Recorded<Statement>,
     /// What an independent run of the suite found.
@@ -124,6 +152,7 @@ impl ReviewableOutcome {
     /// A rendering for a reader.
     pub fn render(&self) -> String {
         let mut out = format!("run {}\n", self.run_id);
+        out.push_str(&render_posture(&self.posture));
         out.push_str(&match &self.claim {
             Recorded::Present(Statement::Narrative { text }) => {
                 format!("claim (narrative, not a result): {text}\n")
@@ -181,6 +210,7 @@ mod tests {
     fn outcome(acceptance: Acceptance, freshness: Recorded<String>) -> ReviewableOutcome {
         ReviewableOutcome {
             run_id: "run-1".into(),
+            posture: unrecorded_posture(),
             claim: Recorded::Present(Statement::Narrative {
                 text: "all done".into(),
             }),

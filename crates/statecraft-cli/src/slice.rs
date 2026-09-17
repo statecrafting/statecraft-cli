@@ -16,7 +16,9 @@ use crate::exit::Exit;
 use crate::render::Answer;
 use serde::Serialize;
 use statecraft_acceptance::judged::NoAcceptance;
-use statecraft_acceptance::outcome::{Acceptance, ReviewableOutcome};
+use statecraft_acceptance::outcome::{
+    Acceptance, RecordedPosture, ReviewableOutcome, render_posture,
+};
 use statecraft_run::attempt::{Outcome, Run};
 use statecraft_run::report::ReportError;
 use statecraft_run::session::{Concluded, SessionError};
@@ -191,6 +193,8 @@ pub fn report_error_answer(e: &ReportError) -> Answer<String> {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ConcludedView {
+    /// The posture folded from this attempt's durable outcome record.
+    pub posture: RecordedPosture,
     /// The run.
     pub run_id: String,
     /// The attempt number.
@@ -208,8 +212,9 @@ pub struct ConcludedView {
 }
 
 impl ConcludedView {
-    fn of(c: &Concluded) -> Self {
+    fn of(c: &Concluded, posture: RecordedPosture) -> Self {
         Self {
+            posture,
             run_id: c.run_id.clone(),
             attempt: c.attempt,
             outcome: c.outcome.word().to_string(),
@@ -227,6 +232,19 @@ impl ConcludedView {
 /// attempt reached its own end, and carries no acceptance claim whatever.** A
 /// caller that wants an acceptance runs `accept` and reads its code.
 pub fn run_answer(concluded: Concluded) -> Answer<ConcludedView> {
+    run_answer_with_posture(
+        concluded,
+        statecraft_acceptance::absence::Recorded::Absent(
+            statecraft_acceptance::absence::Absence::NotRecorded,
+        ),
+    )
+}
+
+/// Render a concluded attempt beside the posture read from its durable record.
+pub fn run_answer_with_posture(
+    concluded: Concluded,
+    posture: RecordedPosture,
+) -> Answer<ConcludedView> {
     let exit = match concluded.outcome {
         Outcome::Completed => Exit::Ok,
         // The operation ran and reports an outcome that is not clean. Nothing
@@ -257,7 +275,8 @@ pub fn run_answer(concluded: Concluded) -> Answer<ConcludedView> {
     if concluded.outcome == Outcome::Completed {
         summary.push_str("  completed says nothing about acceptance; run `accept` for that\n");
     }
-    Answer::new(ConcludedView::of(&concluded), exit, summary)
+    summary.push_str(&render_posture(&posture));
+    Answer::new(ConcludedView::of(&concluded, posture), exit, summary)
 }
 
 /// A session that could not begin or conclude, mapped.

@@ -22,6 +22,8 @@ establishes:
   # written yet fails.
   - { kind: directory, path: "crates/statecraft-adapter-claude-code/" }
 extends:
+  # Inspection folds the recorded posture through the reviewable account.
+  - { spec: "005-acceptance-and-evidence", unit: { kind: directory, path: "crates/statecraft-acceptance/" }, nature: additive }
   # The native reader needs the existing process supervisor with a typed
   # decoder. The generic protocol stays strict; no provider is named in 004.
   - { spec: "004-execution-adapter", unit: { kind: directory, path: "crates/statecraft-adapter/" }, nature: additive }
@@ -45,6 +47,7 @@ depends_on:
   - "002-environment-lifecycle"
   - "003-work-and-run-semantics"
   - "004-execution-adapter"
+  - "005-acceptance-and-evidence"
   # The `extends` edge above changes a binding inside the crate 006 owns, so
   # 006 is a dependency and not only a unit this spec reaches into. 007 and
   # 009 both declare the spec they extend; this one did not, and the omission
@@ -272,6 +275,28 @@ measurement this spec did not take.
 ## 5. Decisions recorded during implementation
 
 Dated entries for choices §3 was silent on. None changes what §3 requires.
+
+**2026-09-17: run qualification is persisted posture, not target qualification.**
+Sections 3.8 and 3.9 and `004` sections 3.4 and 3.7 already require the labels.
+The run binding reads the provider probe's paired qualification answer and uses
+`004`'s `Posture`, including observed capabilities and process residuals. That
+posture is stored in the attempt outcome's extensible detail. It is not the
+environment's target verdict, and no qualification record is created by running.
+
+The immediate outcome and `run show` expose the same recorded posture with its
+source record, through an additive `posture` field. `006` section 3.4 explicitly
+permits additive JSON fields; the existing seven run fields, their types, exit
+codes and closed outcome words stay unchanged. The previous native-stream test's
+exact field count describes that repair's scope, not a ratified prohibition on
+additions. The acceptance library owns the read-only fold under the additive
+edge above, reusing the seam's posture type and rendering. Historical attempts
+with no posture report `not-recorded`; inspection never requalifies them from
+current files. `cargo test -p statecraft-cli --test qualification --locked`
+reproduced six missing-label failures before repair: all fixture runs completed,
+but their JSON posture qualification was absent. The same six tests pass after
+repair, exercising absent and mismatched records and matching synthetic evidence,
+human and JSON output, retries and read-only inspection after removing the
+provider and changing the qualification file. They confer no live qualification.
 
 **2026-09-17: missing initialization does not erase a readable terminal denial.**
 The native execution bridge's `map_stream` error path discarded the mapped
