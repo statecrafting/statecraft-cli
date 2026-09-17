@@ -11,6 +11,9 @@
 //!   structured report beats an exit code, and an unrun check is `unknown`.
 //! - [`authority`] applies the authority-set rule, and refuses to build the
 //!   change classifier that belongs to spec-spine.
+//! - [`delta`] reads spec-spine's change-classification report (its spec 088)
+//!   and maps its structural classes onto the authority-set members `001`
+//!   section 3.5 enumerates.
 //! - [`receipt`] mints a receipt, or says precisely why it did not.
 //! - [`dimensions`] is the four evidence dimensions and the admission decision
 //!   kept apart from them.
@@ -29,15 +32,21 @@
 //! absence of any verb that acts is how this crate keeps to it.
 //!
 //! It also builds no change classifier. Classifying a change under the base's
-//! rules is spec-spine's job; its spec 088 is released and the pin carries it,
-//! and this product does not read the report, so the corpus-side verdict reads
-//! `not-recorded` and acceptance is refused rather than guessed. Refusing
-//! without the report is available; classifying without it is not.
+//! rules is spec-spine's job; its spec 088 is released, the pin carries it, and
+//! this product now **reads** that report rather than answering the question
+//! itself. What it still does not do is obtain the report: `001` section 3.5
+//! requires every authority-set member to be read at the trusted base revision,
+//! and a candidate that chose its own classifier would classify itself, so the
+//! bytes are handed in by the caller. Where there is no usable report the
+//! corpus-side verdict reads `not-recorded` and acceptance is refused rather
+//! than guessed. Refusing without the report is available; classifying without
+//! it is not.
 
 #![forbid(unsafe_code)]
 
 pub mod absence;
 pub mod authority;
+pub mod delta;
 pub mod dimensions;
 pub mod evidence;
 pub mod independence;
@@ -47,7 +56,8 @@ pub mod receipt;
 pub mod trust;
 
 pub use absence::{Absence, Recorded, Statement};
-pub use authority::{Declared, Verdict as AuthorityVerdict};
+pub use authority::{CorpusAnswer, Declared, DeltaReport, Verdict as AuthorityVerdict};
+pub use delta::{ClassReading, SpecSpineDeltaReport, reading_of};
 pub use dimensions::{Admission, AdmissionPolicy, Dimensions, admit};
 pub use evidence::{Construction, Reference};
 pub use independence::{Check, SuiteResult};

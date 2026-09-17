@@ -570,6 +570,7 @@ dependencies = [
  "statecraft-environment",
  "statecraft-run",
  "tempfile",
+ "thiserror",
 ]
 
 [[package]]
