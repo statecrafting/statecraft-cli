@@ -1,0 +1,45 @@
+# Spec: specs/006-command-surface/spec.md
+#
+# The binary. The verbs specs 002 to 005 name, bound to a process, with a closed
+# exit-code vocabulary that separates a refusal from a failure from a finding.
+#
+# A command here is a BINDING and never a second implementation. The coupling
+# gate enforces it: this crate is spec 006's territory, so a rule that leaked in
+# would have to be written into 006, where it visibly does not belong.
+[package]
+name = "statecraft-cli"
+description = "The statecraft command surface"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+publish.workspace = true
+
+# The executable's name, stated rather than inherited.
+#
+# D-02 gives the package `statecraft-cli` and D-01 recommends `statecraft` and is
+# NOT adopted for naming. Cargo would settle the question by defaulting the
+# binary to the package name, and nobody would have agreed to the answer. Spec
+# 006 section 3.5 states it instead, and this stanza is where that statement
+# lands: renaming later is a change to that section and to this name.
+[[bin]]
+name = "statecraft-cli"
+path = "src/main.rs"
+
+[dependencies]
+serde = { version = "1.0.229", features = ["derive"] }
+serde_json = "1.0.151"
+statecraft-acceptance = { path = "../statecraft-acceptance" }
+statecraft-environment = { path = "../statecraft-environment" }
+statecraft-run = { path = "../statecraft-run" }
+
+[dev-dependencies]
+tempfile = "3.27.0"
+
+[lints.rust]
+missing_docs = "warn"
+
+[lints.clippy]
+all = { level = "warn", priority = -1 }

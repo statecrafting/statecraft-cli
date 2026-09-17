@@ -419,6 +419,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "statecraft-cli"
+version = "0.0.0"
+dependencies = [
+ "serde",
+ "serde_json",
+ "statecraft-acceptance",
+ "statecraft-environment",
+ "statecraft-run",
+ "tempfile",
+]
+
+[[package]]
 name = "statecraft-environment"
 version = "0.0.0"
 dependencies = [

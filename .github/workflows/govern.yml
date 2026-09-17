@@ -69,6 +69,14 @@ jobs:
       - name: Ownership coverage (enforced)
         run: spec-spine index coverage --fail-on-untraced
 
+      # Enforced from the change that built the last forward claim. Before that
+      # it would have refused specs 002 to 006 for correctly claiming crates
+      # they had not written yet, which is what a forward claim is for. With
+      # none outstanding, an unresolved unit reaching main is a claim nobody
+      # wrote.
+      - name: Unresolved claims (enforced)
+        run: spec-spine index check --fail-on-unresolved
+
       - name: Authored-content rules
         run: scripts/check-authored-content.sh
 

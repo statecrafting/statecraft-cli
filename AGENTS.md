@@ -100,18 +100,21 @@ crate and nobody has to remember to enable it. Until then it passes having
 judged nothing, and says so in the log: that is the price of deciding the check
 surface before the work it judges, which is what Approval semantics requires.
 
-`index coverage --fail-on-untraced` **joined the gate on 2026-09-16**, with the
-first source file, which is the condition recorded here when it was left out. On
-a code-free tree it refused an empty universe rather than passing vacuously;
-coverage is now 13/13 specifically claimed and the flag defends that number.
+**Both flags the generic kit carries are now in the gate**, and each arrived on
+the condition recorded here when it was left out, not on a whim:
 
-One flag the generic kit uses is still **deliberately absent**, and adding it
-would refuse this repository's own correct state:
+- `index coverage --fail-on-untraced` joined with the first source file. On a
+  code-free tree it refused an empty universe rather than passing vacuously.
+- `index check --fail-on-unresolved` joined when `006` built the last forward
+  claim. Until then it would have refused specs that were correctly claiming
+  crates they had not written yet.
 
-- `index check --fail-on-unresolved` refuses a forward claim. One claim is still
-  unresolved: `006-command-surface` claims `crates/statecraft-cli/`, which is
-  what a `draft` proposal is for. The flag joins the gate when the last forward
-  claim is built, which is now one pull request away.
+The second has a cost worth knowing before you pay it: **a new spec that claims
+a crate it has not written yet now fails the gate.** That is intended. This
+corpus builds what it claims within one pull request, so an unresolved unit
+reaching the default branch is a claim nobody wrote. A spec that genuinely needs
+to claim ahead of its implementation is the case for removing the flag again,
+deliberately, as its own change.
 
 `spec-spine couple` is **CI-only, and deliberately not in `make gate`**. It
 compares two commits, so it cannot see a change being staged and is useless as a

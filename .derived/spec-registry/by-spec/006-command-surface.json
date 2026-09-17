@@ -13,7 +13,7 @@
       }
     ],
     "id": "006-command-surface",
-    "implementation": "pending",
+    "implementation": "complete",
     "sectionHeadings": [
       "006: The command surface",
       "1. Purpose",
@@ -27,6 +27,7 @@
       "3.6 What the binary reads, and what it does not",
       "3.7 Observable negative cases",
       "4. Out of scope",
+      "5. Decisions recorded during implementation",
       "Verification"
     ],
     "specPath": "specs/006-command-surface/spec.md",
@@ -34,6 +35,6 @@
     "summary": "The binary. Specs 002 to 005 each describe operator verbs and then own only a library crate, so nothing they specify is runnable. This spec owns crates/statecraft-cli/ and binds those verbs to a process: the command tree, the rule that a command is a thin binding and never a second implementation, the closed exit-code vocabulary that distinguishes a refusal from a failure from a finding, human and --json output as two renderings of one value, and the binary's name being a recorded decision rather than a Cargo default.\n",
     "title": "The command surface: one binary, the verbs the other specs name, and what an exit code means"
   },
-  "shardHash": "e77e43ec9e642f7f7ff4edd198730ab942820bbbfdabfa9a69efad790f519793",
+  "shardHash": "1eeebc4ad3b913f7174091985d4c92f22fcc575348f5ef7250c616c89912f28d",
   "specVersion": "1.2.0"
 }

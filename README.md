@@ -8,15 +8,18 @@ It runs on one machine, on one repository, with no account and no hosted service
 
 ## Status: specification only
 
-**There is no binary yet.** `crates/statecraft-environment/` implements spec
-002: registration, the manifest, plan and apply and remove, and the diagnostic.
-It is a library, so there is nothing to install and nothing to invoke from a
-terminal. Binding those operations to commands is what `006` proposes.
+**There is a binary.** `cargo run -p statecraft-cli -- project register <path>`
+records a repository and prints its verdict with reasons. The four `project`
+verbs work; the `env` verbs and `doctor` refuse with exit 2, because they need a
+configured adapter set and no spec ratifies a provider adapter yet.
 
-The corpus is ratified. `000` to `005` are approved, and the constitution's
-product principles VI to XIII were ratified on 2026-09-16, three of them frozen
-as spec 000 anchors. `006-command-surface` is a proposal and is `draft`, which
-here means read but not agreed, and not dispatchable.
+Nothing is installed or released: `F-02` defers publication, so the way to run
+it is from a checkout.
+
+The corpus is ratified in full. `000` to `006` are approved, and the
+constitution's product principles VI to XIII were ratified on 2026-09-16, three
+of them frozen as spec 000 anchors. Every spec that claims code has built it:
+five crates, and no forward claim outstanding.
 
 The language and the layout are decided: Rust, one Cargo workspace, crates
 matching the spec boundaries. The packaging, the distribution and the first
@@ -25,10 +28,11 @@ recorded with what has been adopted in
 [docs/decisions/00-founding-decisions.md](docs/decisions/00-founding-decisions.md).
 
 This repository distinguishes four claims and makes them separately: *specified*,
-*implemented*, *tested*, *released*. Today `000` to `005` are specified; `002`
-is additionally implemented and tested within its own territory, with 59 tests
-and every negative case in its section 3.10 covered by one named after it.
-Nothing is released.
+*implemented*, *tested*, *released*. Today `000` to `006` are specified, and
+`002` to `006` are additionally implemented and tested: five crates, 253 tests,
+and every row of every spec's observable-negative-cases table covered by one
+test named after the row. **Nothing is released**, and `F-02` defers
+publication.
 
 ## The idea
 

@@ -41,15 +41,17 @@ SKIP_NOTE := no crate exists yet, so the workspace has no members and cargo has 
 ## refused an empty universe rather than passing vacuously; now it defends
 ## 13/13 specifically claimed instead of reporting the number.
 ##
-## One flag the generic spec-spine kit carries is still deliberately absent:
-##   index check --fail-on-unresolved   refuses a forward claim. One is left:
-##       006 claims crates/statecraft-cli/, which is what a draft proposal is
-##       for. The flag joins the gate when that last claim is built.
-## AGENTS.md carries the same note, so it is not a silent omission.
+## `index check --fail-on-unresolved` joined this list when 006 built the last
+## forward claim. Both flags the generic spec-spine kit carries are now present,
+## and each arrived on the condition recorded for it rather than on a whim:
+## coverage with the first source file, unresolved with the last unbuilt claim.
+## A new spec claiming a crate it has not written yet will now fail the gate,
+## which is the intended cost of having none outstanding.
 gate:
 	$(SPEC_SPINE) check --fail-on-warn
 	$(SPEC_SPINE) lint --fail-on-warn
 	$(SPEC_SPINE) index coverage --fail-on-untraced
+	$(SPEC_SPINE) index check --fail-on-unresolved
 	scripts/check-authored-content.sh
 
 ## The Rust half of the check surface, in the order that fails fastest.

@@ -14,12 +14,11 @@ is a local environment for governed agent work; the boundary is
 and what is proposed versus adopted is
 [docs/decisions/00-founding-decisions.md](docs/decisions/00-founding-decisions.md).
 
-`000` to `005` are ratified, so what `registry plan` offers from that range is
-dispatchable. `006-command-surface` is `draft`: `plan` will offer it as ready
-anyway, because `draft` plus `pending` is schedulable, and that offer is
-spec-spine's lifecycle answer rather than permission. Check the `status` field,
-not the plan output. Ratification is the owner's act; see AGENTS.md,
-"New sessions".
+Every spec in the corpus is ratified and implemented, so `registry plan` offers
+nothing today. The next spec added here will be `draft`, and `plan` will offer
+it as ready anyway, because `draft` plus `pending` is schedulable: that is
+spec-spine's lifecycle answer, not permission. Check the `status` field, not the
+plan output. Ratification is the owner's act; see AGENTS.md, "New sessions".
 
 ## Commands
 
@@ -31,10 +30,13 @@ make verify SPEC=001       # one spec's declared acceptance
 spec-spine registry plan   # what is schedulable
 ```
 
-`make code` judges `crates/statecraft-environment/`, the first crate. Both
-surfaces are required through the `ci-gate` status check. The guard that made
-the cargo verbs skip on an empty workspace is still there and still correct; it
-simply no longer fires.
+`make code` judges five crates. Both surfaces are required through the `ci-gate`
+status check. The guard that made the cargo verbs skip on an empty workspace is
+still there and still correct; it simply no longer fires.
+
+`spec-spine index check --fail-on-unresolved` is now in the gate, so **a new
+spec that claims a crate before writing it will fail**. That is deliberate, and
+AGENTS.md records what to do if a spec genuinely needs to claim ahead.
 
 ## Conventions that bite
 
