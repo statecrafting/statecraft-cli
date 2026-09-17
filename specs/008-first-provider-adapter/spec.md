@@ -256,3 +256,53 @@ interactive mode of this provider. Authentication setup, credential rotation and
 anything that would write a credential. Publication and distribution (`F-02`).
 Whether the supervisor should ever require `workspace-write`, which needs a
 measurement this spec did not take.
+
+## Verification
+
+Each line is one command. §3.9's eleven rows are integration tests named after
+the rows they cover. Nine live in this adapter's own crate, in
+`tests/negative_cases.rs`. Two are the environment half (§3.7): the absent
+prerequisite and the colliding declared path are behaviors of the environment
+adapter, so they live in the crate `002` owns, under the `extends` edge this
+spec's frontmatter declares, and the second `cargo test` line is what runs them.
+
+**The provider is not spawned by the acceptance, and that is a decision rather
+than a shortfall.** Every finding in §3.1 to §3.6 was measured against a live
+Claude Code 2.1.267, and §3.8 binds the qualification to that pair. A command
+here that spawned the provider would need a credential, and §3.6 measured that
+this provider resolves credentials through the operating system keychain on
+`darwin`, which no check runner has. Such a command would not run, and `005`
+§3.2 rule 3 says a check that did not run is `unknown` and never a pass. An
+acceptance whose central commands are structurally `unknown` is worse than one
+that says plainly what it covers.
+
+So the stream mapping is checked against **recorded** provider streams, captured
+from the measured version and committed under `testdata/stream/`, the way `005`
+checks its delta reader against bytes the pinned spec-spine wrote. A fixture is
+evidence of what the provider emitted on a named version. It is not evidence
+that the provider still emits it, and nothing here claims otherwise.
+
+The live measurement stays where §3.8 puts it: a qualification act performed by
+an operator against a named binary version and recorded, never re-derived by a
+check. What the suite checks is the consequence rather than the act. An adapter
+whose qualification record does not name the provider binary in front of it is
+labelled `unqualified` everywhere it appears, and still runs.
+
+The last command is `004` §3.8's guard, run from here on purpose. This is the
+first spec in the corpus permitted to name a provider, and the way that goes
+wrong is not that the name appears here. It is that the name leaks back into the
+seam. Naming a provider and re-checking that the seam still names none belong in
+one acceptance.
+
+```verify:cli
+cargo build --workspace --locked
+cargo test --workspace --locked
+cargo clippy --workspace --all-targets --locked -- -D warnings
+cargo fmt --all --check
+spec-spine index coverage --fail-on-untraced
+cargo test -p statecraft-adapter-claude-code --test negative_cases
+cargo test -p statecraft-environment --test negative_cases
+test -f crates/statecraft-adapter-claude-code/src/lib.rs
+test -d crates/statecraft-adapter-claude-code/testdata/stream
+cargo test -p statecraft-adapter --test no_provider_names
+```
