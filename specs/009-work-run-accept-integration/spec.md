@@ -2,7 +2,7 @@
 id: "009-work-run-accept-integration"
 title: "The integration slice: work, run and accept bound to a process, with discovery and inspection"
 status: approved
-implementation: pending
+implementation: complete
 created: "2026-09-17"
 summary: >
   Specs 003, 004 and 005 each own a library crate and name operator verbs, and
@@ -215,6 +215,72 @@ Any scheduling policy beyond "the operator names a unit of work". Release and
 distribution (`F-02`). Whether `work` should ever accept a unit that is not a
 spec-spine-ready spec, which would be a change to `003` section 3.1 and not to
 this spec.
+
+## 5. Decisions recorded during implementation
+
+Dated entries for choices §3 was silent on. None changes what §3 requires.
+
+**2026-09-17: every verb takes the target path as its first argument.** §3.1
+names the verbs and not their arguments, and §3.4's last row makes arguments
+naming no operation a usage error. The product works in *registered* targets, so
+every verb needs to know which one; taking it as an argument rather than
+inferring it from the working directory keeps it visible in the invocation that
+produced a run record, which is §006 3.6's rule about ambient state.
+
+**2026-09-17: `list` and `show` are reserved after `run`.** `run <id>` and `run
+list` are ambiguous, so a run id may not be spelled either word. Stated here
+rather than discovered: the alternative is an id that silently becomes a
+subcommand.
+
+**2026-09-17: the run id is the spec id.** §3.1 says the operator names a unit
+of work, and `003` §3.4 makes a retry an appended attempt of the same run. A
+fresh id per invocation would turn every retry into a new run and defeat that.
+
+**2026-09-17: `--help` is answered before a verb is resolved.** `work --help`
+has to work, and `work` alone is a group rather than a verb, so a help request
+is recognised first and its topic may be a group. Exit 0: the question was asked
+and answered. Help is not in the command tree's own list, because a usage error
+listing it would offer help as a thing to do.
+
+**2026-09-17: concluding an attempt does not release the workspace.**
+`003`'s `workspace::release` says "used when a run ends; never during one", and
+concluding an *attempt* is not a run ending. Measured while implementing: the
+release removed the worktree and left the branch it had created, so the next
+attempt could not prepare, which §3.6's "no automatic retry" rule depends on
+working. The workspace is retained and the outcome record says so. When a run
+ends is a question §3 does not answer and this entry does not answer either.
+
+**2026-09-17: the slice's JSON carries an owning crate's own type where that
+crate already derives it.** `006` §3.4 makes this crate's JSON a contract and
+`006` §5 records why the environment verbs got view types: deriving `Serialize`
+onto spec 002's `Outcome` from here would have been a change to 002's territory.
+That reason does not apply to `Eligibility`, `ReviewableOutcome` and
+`Acceptance`: each is already serialisable in its owning crate and each is the
+shape its own spec fixed, and `005` §3.9's account in particular must not have a
+second shape. So only wire shapes this crate had to invent get a view type
+here. The visible consequence is that those three serialise their fields in
+snake case while this crate's own views use camel case, which is recorded rather
+than hidden; unifying it is a change to `006` §3.4.
+
+**2026-09-17: a preflight refusal concludes the attempt rather than leaving it
+live.** `004` §3.3 refuses before any process is created, and the intent is
+already durable by then (`003` §3.6). An intent with no outcome would send the
+next run to reconciliation for an attempt that never started, so the refusal is
+recorded as the attempt's outcome with the guard named.
+
+**2026-09-17: the delta report is obtained in the target, not in the
+workspace.** `005` §3.3.1 rule 2 requires the classifying binary to be resolved
+independently of the candidate, and rule 3 keeps the invocation out of the
+acceptance library. This is the caller side the decision record assigns to this
+spec: the reader landed in #20 and `accept` is the verb that obtains a report.
+Base and candidate are named explicitly so the report is about this change.
+
+**2026-09-17: the policy digest is computed over the base's bytes, read with
+`git show`.** `005` §3.3 requires every authority-set member to be read at the
+trusted base. A base that carries no declared authority-set path at all is a
+**refusal**, because a digest nobody can compute identifies no policy. Which
+paths are members is `005` §3.3 case 2's declaration, by path, and the five this
+repository declares are listed in the binding.
 
 ## Verification
 

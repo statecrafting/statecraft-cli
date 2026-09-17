@@ -23,6 +23,10 @@
 //!   overrule.
 //! - [`recovery`] folds the record, reconciles every intent with no outcome, and
 //!   blocks a retry it cannot resolve.
+//! - [`session`] is one run from intent to outcome, and the fold that reads runs
+//!   back out of the record. Added by spec 009's additive edge, because a
+//!   command may not be a second implementation and a binding needs an entry
+//!   point.
 //!
 //! # What it does not do
 //!
@@ -39,6 +43,7 @@ pub mod record;
 pub mod recovery;
 pub mod refusal;
 pub mod report;
+pub mod session;
 pub mod work;
 pub mod workspace;
 
@@ -47,5 +52,6 @@ pub use policy::{Overrides, Policy, PolicySource};
 pub use record::{Chain, Entry, Kind};
 pub use recovery::{Verdict, reconcile};
 pub use report::{CorpusReport, ReportError};
+pub use session::{Concluded, Session, SessionError, begin, conclude, runs};
 pub use work::{WorkItem, WorkList, select};
 pub use workspace::Workspace;

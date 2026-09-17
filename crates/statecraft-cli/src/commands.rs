@@ -34,6 +34,24 @@ pub enum Verb {
     EnvRemove,
     /// `doctor`
     Doctor,
+    /// `work list <path>`
+    WorkList,
+    /// `work show <path> <id>`
+    WorkShow,
+    /// `run <path> <id>`
+    Run,
+    /// `run list <path>`
+    RunList,
+    /// `run show <path> <run>`
+    RunShow,
+    /// `accept <path> <run>`
+    Accept,
+    /// `--help`, optionally with a group or a verb as its topic.
+    ///
+    /// Not part of the command tree: [`Verb::all`] lists the operations, and a
+    /// help request is not one. It is a verb here only so one dispatch handles
+    /// every invocation.
+    Help,
 }
 
 impl Verb {
@@ -49,19 +67,47 @@ impl Verb {
             Verb::EnvUpgrade => "env upgrade",
             Verb::EnvRemove => "env remove",
             Verb::Doctor => "doctor",
+            Verb::WorkList => "work list",
+            Verb::WorkShow => "work show",
+            Verb::Run => "run",
+            Verb::RunList => "run list",
+            Verb::RunShow => "run show",
+            Verb::Accept => "accept",
+            Verb::Help => "--help",
         }
     }
 
     /// Which spec owns the behavior behind it.
+    ///
+    /// Spec 009's edge added the verbs 003, 004 and 005 name, so this is no
+    /// longer one answer. Spec 006 section 3.1's table is where the mapping
+    /// lives; this is that table, in code.
     pub fn owning_spec(self) -> &'static str {
-        // Every verb in the tree today is spec 002's. That is not a coincidence
-        // to be tidied away: 003 to 005 own behavior that has no operator verb
-        // bound yet, and adding one is the change that binds it.
-        "002-environment-lifecycle"
+        match self {
+            Verb::ProjectRegister
+            | Verb::ProjectList
+            | Verb::ProjectArm
+            | Verb::ProjectDisarm
+            | Verb::EnvPlan
+            | Verb::EnvApply
+            | Verb::EnvUpgrade
+            | Verb::EnvRemove
+            | Verb::Doctor => "002-environment-lifecycle",
+            Verb::WorkList | Verb::WorkShow | Verb::RunList => "003-work-and-run-semantics",
+            // `run` is 003's semantics through 004's adapter, and 009 section
+            // 3.1 names both. The record and the outcome are 003's, so that is
+            // the owner; the adapter is how the attempt happens.
+            Verb::Run => "003-work-and-run-semantics",
+            Verb::RunShow | Verb::Accept => "005-acceptance-and-evidence",
+            Verb::Help => "006-command-surface",
+        }
     }
 
-    /// Every verb, in the order the help text lists them.
-    pub fn all() -> [Verb; 9] {
+    /// Every operation, in the order the help text lists them.
+    ///
+    /// [`Verb::Help`] is deliberately absent: it is not an operation, and a
+    /// usage error listing it would offer help as a thing to do.
+    pub fn all() -> [Verb; 15] {
         [
             Verb::ProjectRegister,
             Verb::ProjectList,
@@ -72,8 +118,17 @@ impl Verb {
             Verb::EnvUpgrade,
             Verb::EnvRemove,
             Verb::Doctor,
+            Verb::WorkList,
+            Verb::WorkShow,
+            Verb::Run,
+            Verb::RunList,
+            Verb::RunShow,
+            Verb::Accept,
         ]
     }
+
+    /// The groups a help topic may name.
+    pub const GROUPS: [&'static str; 5] = ["project", "env", "work", "run", "accept"];
 
     /// Parse a verb from the leading arguments, returning how many it consumed.
     pub fn parse(args: &[String]) -> Option<(Verb, usize)> {
@@ -89,6 +144,15 @@ impl Verb {
             ("env", Some("upgrade")) => Some((Verb::EnvUpgrade, 2)),
             ("env", Some("remove")) => Some((Verb::EnvRemove, 2)),
             ("doctor", _) => Some((Verb::Doctor, 1)),
+            ("work", Some("list")) => Some((Verb::WorkList, 2)),
+            ("work", Some("show")) => Some((Verb::WorkShow, 2)),
+            // `list` and `show` are reserved after `run`, so a run id may not
+            // be spelled either of them. Stated here rather than discovered:
+            // the alternative is an id that silently becomes a subcommand.
+            ("run", Some("list")) => Some((Verb::RunList, 2)),
+            ("run", Some("show")) => Some((Verb::RunShow, 2)),
+            ("run", _) => Some((Verb::Run, 1)),
+            ("accept", _) => Some((Verb::Accept, 1)),
             _ => None,
         }
     }
@@ -103,6 +167,8 @@ pub struct Invocation {
     pub rest: Vec<String>,
     /// Whether `--json` was given.
     pub json: bool,
+    /// Whether this is a help request rather than an operation.
+    pub help: bool,
 }
 
 /// Why the arguments do not name an operation.
@@ -140,6 +206,24 @@ pub fn parse(args: &[String]) -> Result<Invocation, UsageError> {
         .map(|v| v.spelling().to_string())
         .collect();
 
+    // A help request is answered before a verb is resolved, because its topic
+    // may be a GROUP (`work`, `run`) that is not a verb. `work --help` has to
+    // work: it is the only thing that tells an operator which `work` verbs
+    // exist, and a usage error would be the wrong answer to a right question.
+    if args.iter().any(|a| a == "--help" || a == "-h") {
+        let topic: Vec<String> = args
+            .iter()
+            .filter(|a| !a.starts_with('-'))
+            .cloned()
+            .collect();
+        return Ok(Invocation {
+            verb: Verb::Help,
+            rest: topic,
+            json: args.iter().any(|a| a == "--json"),
+            help: true,
+        });
+    }
+
     match Verb::parse(args) {
         Some((verb, consumed)) => {
             let tail = &args[consumed..];
@@ -147,6 +231,7 @@ pub fn parse(args: &[String]) -> Result<Invocation, UsageError> {
                 verb,
                 rest: tail.iter().filter(|a| *a != "--json").cloned().collect(),
                 json: tail.iter().any(|a| a == "--json"),
+                help: false,
             })
         }
         None => Err(UsageError {
@@ -154,6 +239,34 @@ pub fn parse(args: &[String]) -> Result<Invocation, UsageError> {
             available,
         }),
     }
+}
+
+/// The help text for a topic: a group, a verb, or everything.
+///
+/// A rendering of [`Verb::all`] rather than a second list, so a verb that joins
+/// the tree appears here without anyone remembering to add it.
+pub fn help_text(topic: &[String]) -> String {
+    let prefix = topic.first().map(String::as_str).unwrap_or("");
+    let matching: Vec<Verb> = Verb::all()
+        .into_iter()
+        .filter(|v| prefix.is_empty() || v.spelling().split(' ').next() == Some(prefix))
+        .collect();
+
+    let mut out = String::new();
+    if matching.is_empty() {
+        out.push_str(&format!("no verbs match `{prefix}`\n"));
+        out.push_str("groups:\n");
+        for g in Verb::GROUPS {
+            out.push_str(&format!("  {g}\n"));
+        }
+        return out;
+    }
+    out.push_str("verbs:\n");
+    for v in matching {
+        out.push_str(&format!("  {:<18} {}\n", v.spelling(), v.owning_spec()));
+    }
+    out.push_str("\nEvery verb takes a registered target path, and every verb accepts --json.\n");
+    out
 }
 
 #[cfg(test)]

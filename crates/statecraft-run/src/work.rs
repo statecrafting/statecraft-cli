@@ -66,6 +66,67 @@ impl WorkList {
     }
 }
 
+/// What `work show` found for one spec id.
+///
+/// Added by spec 009's additive edge. Spec 009 section 3.5 forbids the CLI crate
+/// from deriving an answer an owning crate could have returned, and "is this
+/// spec eligible, and if not why" is exactly such an answer: [`WorkList`]
+/// already holds both halves, so the lookup belongs beside them.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case", tag = "eligibility")]
+pub enum Eligibility {
+    /// The policy admits it, and here is the row.
+    Eligible(WorkItem),
+    /// It was offered as ready and the policy did not admit it.
+    ///
+    /// A finding rather than a refusal: the reason **is** the answer.
+    Excluded(Excluded),
+    /// spec-spine did not offer it as ready at all.
+    ///
+    /// Distinct from excluded, because nothing about this spec was judged: it
+    /// was never in the ready set to judge.
+    NotOffered {
+        /// The id that was asked about.
+        id: String,
+    },
+}
+
+impl Eligibility {
+    /// Whether work may be scheduled for this spec.
+    pub fn schedulable(&self) -> bool {
+        matches!(self, Eligibility::Eligible(_))
+    }
+
+    /// A one-line rendering naming the report field each answer came from.
+    pub fn describe(&self) -> String {
+        match self {
+            Eligibility::Eligible(item) => format!(
+                "{} eligible, status {} (from {})",
+                item.id, item.status, item.from_field
+            ),
+            Eligibility::Excluded(e) => {
+                format!("{} excluded, status {}: {}", e.id, e.status, e.reason)
+            }
+            Eligibility::NotOffered { id } => format!(
+                "{id} is not in `registry plan --json: ready[]`, so nothing about it was judged"
+            ),
+        }
+    }
+}
+
+impl WorkList {
+    /// What this list says about one spec id.
+    pub fn eligibility_of(&self, id: &str) -> Eligibility {
+        if let Some(item) = self.eligible.iter().find(|i| i.id == id) {
+            return Eligibility::Eligible(item.clone());
+        }
+        if let Some(e) = self.excluded.iter().find(|e| e.id == id) {
+            return Eligibility::Excluded(e.clone());
+        }
+        Eligibility::NotOffered { id: id.to_string() }
+    }
+}
+
 /// Select work from a report under a policy.
 ///
 /// Every ready spec lands in exactly one of `eligible` or `excluded`, which is
@@ -135,6 +196,75 @@ pub fn select(
         policy: policy.clone(),
         policy_disagreement: disagreement,
         spec_spine_version: report.spec_spine_version.clone(),
+    }
+}
+
+#[cfg(test)]
+mod eligibility_tests {
+    use super::*;
+    use crate::report::{CorpusReport, ReadySpec, SpecLifecycle};
+
+    fn report() -> CorpusReport {
+        CorpusReport {
+            spec_spine_version: "0.20.0".into(),
+            ready: vec![
+                ReadySpec {
+                    id: "010".into(),
+                    title: "approved".into(),
+                },
+                ReadySpec {
+                    id: "011".into(),
+                    title: "draft".into(),
+                },
+            ],
+            lifecycle: vec![
+                SpecLifecycle {
+                    id: "010".into(),
+                    status: "approved".into(),
+                    implementation: Some("pending".into()),
+                },
+                SpecLifecycle {
+                    id: "011".into(),
+                    status: "draft".into(),
+                    implementation: Some("pending".into()),
+                },
+            ],
+        }
+    }
+
+    fn list() -> WorkList {
+        select(
+            &report(),
+            &Policy::default_policy(),
+            &Overrides::none(),
+            None,
+        )
+    }
+
+    #[test]
+    fn an_admitted_spec_is_eligible_and_names_the_report_field() {
+        let e = list().eligibility_of("010");
+        assert!(e.schedulable());
+        assert!(e.describe().contains("registry plan --json: ready[]"));
+    }
+
+    #[test]
+    fn a_draft_the_policy_excluded_is_a_reason_and_not_a_refusal() {
+        let e = list().eligibility_of("011");
+        assert!(!e.schedulable());
+        match &e {
+            Eligibility::Excluded(x) => assert_eq!(x.status, "draft"),
+            other => panic!("expected excluded, got {other:?}"),
+        }
+        assert!(e.describe().contains("excluded"));
+    }
+
+    #[test]
+    fn a_spec_the_ready_set_never_offered_is_distinct_from_one_it_excluded() {
+        let e = list().eligibility_of("999");
+        assert!(!e.schedulable());
+        assert!(matches!(e, Eligibility::NotOffered { .. }));
+        assert!(e.describe().contains("nothing about it was judged"));
     }
 }
 
