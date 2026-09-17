@@ -12,11 +12,15 @@ use statecraft_cli::commands::{Verb, parse};
 use statecraft_cli::exit::Exit;
 use statecraft_cli::product_home;
 use statecraft_cli::render::{Answer, Format};
+use statecraft_cli::slice;
 use statecraft_environment::claimant::{ForeignClaims, UnobservedShadows};
 use statecraft_environment::manifest::Manifest;
 use statecraft_environment::probe::CommandProbe;
 use statecraft_environment::registry::Registry;
 use statecraft_environment::time::SystemClock;
+use statecraft_run::policy::{NoDeclarationFiled, Overrides};
+use statecraft_run::record::Chain;
+use statecraft_run::report::{ReportSource, SpecSpineCli};
 use std::path::PathBuf;
 
 fn main() -> std::process::ExitCode {
@@ -100,7 +104,401 @@ fn run(args: &[String]) -> i32 {
             }
             environment_verb(invocation.verb, &root, &home, format)
         }
+        // Spec 009's edge: the verbs 003, 004 and 005 name, bound here for the
+        // first time. Same precondition as the environment verbs, for the same
+        // reason: this product works in registered targets.
+        Verb::WorkList
+        | Verb::WorkShow
+        | Verb::Run
+        | Verb::RunList
+        | Verb::RunShow
+        | Verb::Accept => {
+            let Some(path) = invocation.rest.first() else {
+                eprintln!(
+                    "usage: {} <path>{}",
+                    invocation.verb.spelling(),
+                    argument_hint(invocation.verb)
+                );
+                return Exit::Usage.code();
+            };
+            let root = absolute(path);
+            if registry.get(&root).is_none() {
+                return emit(&bind::unregistered_answer(&root), format);
+            }
+            slice_verb(invocation.verb, &root, &home, &invocation.rest[1..], format)
+        }
+        // A help request is not an operation, so it consults nothing and
+        // changes nothing. Exit 0: the question was asked and answered.
+        Verb::Help => {
+            print!("{}", statecraft_cli::commands::help_text(&invocation.rest));
+            Exit::Ok.code()
+        }
     }
+}
+
+/// What each 009 verb needs after the target path.
+fn argument_hint(verb: Verb) -> &'static str {
+    match verb {
+        Verb::WorkShow => " <spec-id>",
+        Verb::Run => " <spec-id>",
+        Verb::RunShow | Verb::Accept => " <run-id>",
+        _ => "",
+    }
+}
+
+/// One `work`, `run` or `accept` verb against one registered target.
+///
+/// Each arm calls entry points the owning crates expose and maps what they
+/// return. Spec 009 section 3.5: nothing here derives an answer an owning crate
+/// could have returned.
+fn slice_verb(
+    verb: Verb,
+    root: &std::path::Path,
+    home: &std::path::Path,
+    rest: &[String],
+    format: Format,
+) -> i32 {
+    // Discovery is the join spec 003 section 3.1.1 prescribes, performed by the
+    // crate that owns it. Both halves come from spec-spine's structured output.
+    let needs_report = matches!(verb, Verb::WorkList | Verb::WorkShow | Verb::Run);
+    let work = if needs_report {
+        match SpecSpineCli::default().corpus_report(root) {
+            Ok(report) => {
+                let (policy, disagreement) =
+                    statecraft_run::policy::resolve(root, &NoDeclarationFiled, None);
+                Some(statecraft_run::work::select(
+                    &report,
+                    &policy,
+                    &Overrides::none(),
+                    disagreement,
+                ))
+            }
+            Err(e) => return emit(&slice::report_error_answer(&e), format),
+        }
+    } else {
+        None
+    };
+
+    match verb {
+        Verb::WorkList => emit(&slice::work_list_answer(work.expect("read above")), format),
+        Verb::WorkShow => {
+            let Some(id) = rest.first() else {
+                eprintln!("usage: work show <path> <spec-id>");
+                return Exit::Usage.code();
+            };
+            emit(
+                &slice::work_show_answer(work.expect("read above").eligibility_of(id)),
+                format,
+            )
+        }
+        Verb::Run => {
+            let Some(id) = rest.first() else {
+                eprintln!("usage: run <path> <spec-id>");
+                return Exit::Usage.code();
+            };
+            run_verb(root, home, id, work.expect("read above"), format)
+        }
+        Verb::RunList => match Chain::open(home, root) {
+            Ok((chain, _)) => emit(
+                &slice::run_list_answer(statecraft_run::session::runs(&chain)),
+                format,
+            ),
+            Err(e) => fail(&e.to_string(), format),
+        },
+        Verb::RunShow => {
+            let Some(run_id) = rest.first() else {
+                eprintln!("usage: run show <path> <run-id>");
+                return Exit::Usage.code();
+            };
+            match Chain::open(home, root) {
+                Ok((chain, _)) => {
+                    if !statecraft_run::session::runs(&chain)
+                        .iter()
+                        .any(|r| r.id == *run_id)
+                    {
+                        return emit(&slice::no_such_run_answer(run_id), format);
+                    }
+                    emit(
+                        &slice::run_show_answer(statecraft_acceptance::suite::fold(
+                            run_id,
+                            &chain.entries(),
+                        )),
+                        format,
+                    )
+                }
+                Err(e) => fail(&e.to_string(), format),
+            }
+        }
+        Verb::Accept => {
+            let Some(run_id) = rest.first() else {
+                eprintln!("usage: accept <path> <run-id>");
+                return Exit::Usage.code();
+            };
+            accept_verb(root, home, run_id, format)
+        }
+        _ => Exit::Usage.code(),
+    }
+}
+
+/// `run <path> <spec-id>`
+///
+/// The three calls spec 009 section 3.5 leaves to the caller, in order: begin,
+/// supervise, conclude. The supervision is the adapter's; the other two are
+/// `statecraft_run::session`'s.
+fn run_verb(
+    root: &std::path::Path,
+    home: &std::path::Path,
+    spec_id: &str,
+    work: statecraft_run::work::WorkList,
+    format: Format,
+) -> i32 {
+    // A unit of work the policy did not admit is never run, and the reason is
+    // the answer (spec 003 section 3.1.1).
+    let eligibility = work.eligibility_of(spec_id);
+    if !eligibility.schedulable() {
+        return emit(&slice::work_show_answer(eligibility), format);
+    }
+
+    let (mut chain, _) = match Chain::open(home, root) {
+        Ok(c) => c,
+        Err(e) => return fail(&e.to_string(), format),
+    };
+
+    // The run id is the spec id: spec 009 section 3.1 says the operator names a
+    // unit of work, and spec 003 section 3.4 makes a retry an appended attempt
+    // of the same run, so a fresh id per invocation would turn every retry into
+    // a new run.
+    let run_id = spec_id.to_string();
+    let session =
+        match statecraft_run::session::begin(&mut chain, root, &run_id, "HEAD", &SystemClock) {
+            Ok(s) => s,
+            Err(e) => return emit(&slice::session_error_answer(&e), format),
+        };
+
+    // Preflight refuses before any process is created, naming the token (spec
+    // 004 section 3.3). The manifest is read here and only here.
+    let manifest = statecraft_adapter_claude_code::manifest();
+    let environment = adapters::child_environment();
+    let requested = statecraft_adapter::capability::Requested::none()
+        .requiring(statecraft_adapter::capability::Capability::StructuredRefusals)
+        .preferring(statecraft_adapter::capability::Capability::TurnLimit)
+        .preferring(statecraft_adapter::capability::Capability::CostReport);
+
+    let negotiation =
+        match statecraft_adapter::supervisor::preflight(&manifest, &requested, &environment) {
+            Ok(n) => n,
+            Err(refusal) => {
+                // No process was created, so the attempt is concluded as
+                // refused rather than left live: an intent with no outcome
+                // would send the next run to reconciliation for something that
+                // never started.
+                let mut accounting = statecraft_run::refusal::Accounting::default();
+                accounting.observe(statecraft_run::refusal::RefusalEvent {
+                    guard: "adapter-preflight".to_string(),
+                    detail: refusal.to_string(),
+                });
+                return conclude_and_emit(
+                    &mut chain,
+                    root,
+                    &session,
+                    statecraft_run::attempt::Outcome::Refused,
+                    &accounting,
+                    serde_json::json!({ "preflightRefusal": refusal.to_string() }),
+                    format,
+                );
+            }
+        };
+
+    let Some(program) = adapters::probe(home).resolved_executable() else {
+        let mut accounting = statecraft_run::refusal::Accounting::default();
+        accounting.observe(statecraft_run::refusal::RefusalEvent {
+            guard: "constructed-environment".to_string(),
+            detail: "the provider executable does not resolve on the child's PATH".to_string(),
+        });
+        return conclude_and_emit(
+            &mut chain,
+            root,
+            &session,
+            statecraft_run::attempt::Outcome::Refused,
+            &accounting,
+            serde_json::json!({ "preflightRefusal": "provider executable unresolvable" }),
+            format,
+        );
+    };
+
+    let invocation =
+        statecraft_adapter_claude_code::Invocation::new(&program.display().to_string(), &[], None);
+    let request = statecraft_adapter::protocol::Request {
+        workspace: session.workspace.path.clone(),
+        base_commit: session.workspace.base_commit.clone(),
+        prompt: format!("Implement {spec_id} in this workspace.").into_bytes(),
+        capabilities: requested.clone(),
+        deadline_seconds: 900,
+        attempt: statecraft_adapter::protocol::AttemptIdentity {
+            run_id: run_id.clone(),
+            number: session.attempt,
+        },
+    };
+
+    let supervised = match statecraft_adapter::supervisor::supervise(
+        &program,
+        &invocation.args(),
+        &request,
+        &environment,
+    ) {
+        Ok(s) => s,
+        Err(e) => {
+            let mut accounting = statecraft_run::refusal::Accounting::default();
+            accounting.observe(statecraft_run::refusal::RefusalEvent {
+                guard: "supervisor".to_string(),
+                detail: e.to_string(),
+            });
+            return conclude_and_emit(
+                &mut chain,
+                root,
+                &session,
+                statecraft_run::attempt::Outcome::Interrupted,
+                &accounting,
+                serde_json::json!({ "supervisorError": e.to_string() }),
+                format,
+            );
+        }
+    };
+
+    let mut accounting = statecraft_run::refusal::Accounting::default();
+    for refusal in statecraft_adapter::protocol::refusals(&supervised.events) {
+        accounting.observe(refusal);
+    }
+
+    conclude_and_emit(
+        &mut chain,
+        root,
+        &session,
+        supervised.outcome,
+        &accounting,
+        serde_json::json!({
+            "requested": negotiation
+                .granted
+                .iter()
+                .map(|c| c.token())
+                .collect::<Vec<_>>(),
+            "applied": applied_tokens(&supervised.events),
+            "degraded": negotiation.degraded.iter().map(|c| c.token()).collect::<Vec<_>>(),
+            "specId": spec_id,
+        }),
+        format,
+    )
+}
+
+fn applied_tokens(events: &[statecraft_adapter::protocol::Event]) -> Vec<&'static str> {
+    events
+        .iter()
+        .find_map(|e| match e {
+            statecraft_adapter::protocol::Event::Init { applied, .. } => {
+                Some(applied.iter().map(|c| c.token()).collect())
+            }
+            _ => None,
+        })
+        .unwrap_or_default()
+}
+
+fn conclude_and_emit(
+    chain: &mut Chain,
+    root: &std::path::Path,
+    session: &statecraft_run::session::Session,
+    adapter_said: statecraft_run::attempt::Outcome,
+    accounting: &statecraft_run::refusal::Accounting,
+    detail: serde_json::Value,
+    format: Format,
+) -> i32 {
+    match statecraft_run::session::conclude(
+        chain,
+        root,
+        session,
+        adapter_said,
+        accounting,
+        detail,
+        &SystemClock,
+    ) {
+        Ok(concluded) => emit(&slice::run_answer(concluded), format),
+        Err(e) => emit(&slice::session_error_answer(&e), format),
+    }
+}
+
+/// `accept <path> <run-id>`
+fn accept_verb(
+    root: &std::path::Path,
+    home: &std::path::Path,
+    run_id: &str,
+    format: Format,
+) -> i32 {
+    let (chain, _) = match Chain::open(home, root) {
+        Ok(c) => c,
+        Err(e) => return fail(&e.to_string(), format),
+    };
+    let Some(run) = statecraft_run::session::runs(&chain)
+        .into_iter()
+        .find(|r| r.id == run_id)
+    else {
+        return emit(&slice::no_such_run_answer(run_id), format);
+    };
+    let Some(attempt) = run.attempts.last().cloned() else {
+        return emit(&slice::no_such_run_answer(run_id), format);
+    };
+
+    // Exactly one of spec 003's five outcomes is eligible, and the other four
+    // are recorded reasons rather than blanks (spec 005 section 3.1.1).
+    let Some(outcome) = attempt.outcome else {
+        return emit(
+            &slice::accept_answer(statecraft_acceptance::outcome::Acceptance::None {
+                reason: statecraft_acceptance::judged::NoAcceptance::CandidateUnidentified {
+                    detail: format!(
+                        "run {run_id} attempt {} is live, so nothing identifies stable candidate bytes",
+                        attempt.number
+                    ),
+                },
+            }),
+            format,
+        );
+    };
+    if let Err(reason) = statecraft_acceptance::judged::eligibility(outcome) {
+        let refusal_count = chain
+            .entries()
+            .iter()
+            .rev()
+            .find(|e| e.run_id == run_id && e.kind == statecraft_run::record::Kind::Accounting)
+            .and_then(|e| e.detail.get("count"))
+            .and_then(|v| v.as_u64())
+            .map(|c| c as u32);
+        return emit(
+            &slice::accept_answer(statecraft_acceptance::outcome::Acceptance::NotAttempted {
+                reason,
+                refusal_count,
+            }),
+            format,
+        );
+    }
+
+    let workspace = statecraft_run::workspace::workspace_path(root, run_id);
+    let context = statecraft_cli::accept::Context {
+        repository: root.display().to_string(),
+        spec_spine_version: adapters::observed()
+            .spec_spine
+            .unwrap_or_else(|| "not-recorded".to_string()),
+        adapter_version: statecraft_adapter_claude_code::manifest().version,
+        attempt: format!("{run_id}/{}", attempt.number),
+        spec_id: run_id.to_string(),
+    };
+    let (acceptance, _suite, _freshness) = statecraft_cli::accept::judge(
+        root,
+        &workspace,
+        &attempt.base_commit,
+        // The attempt concluded `completed`, which spec 003 section 3.8 makes
+        // impossible when the base moved: a moved base is `interrupted`.
+        true,
+        &context,
+    );
+    emit(&slice::accept_answer(acceptance), format)
 }
 
 /// One environment verb against one registered target.

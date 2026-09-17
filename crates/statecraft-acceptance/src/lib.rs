@@ -23,6 +23,9 @@
 //!   them.
 //! - [`absence`] is the three names for absence, none of which reads as success.
 //! - [`outcome`] folds the reviewable account.
+//! - [`suite`] runs the declared acceptance and folds one run's account out of
+//!   the record. Added by spec 009's additive edge: a command may not be a
+//!   second implementation, so the entry point a binding needs lives here.
 //!
 //! # What it does not do
 //!
@@ -53,6 +56,7 @@ pub mod independence;
 pub mod judged;
 pub mod outcome;
 pub mod receipt;
+pub mod suite;
 pub mod trust;
 
 pub use absence::{Absence, Recorded, Statement};

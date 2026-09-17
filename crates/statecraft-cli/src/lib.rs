@@ -26,6 +26,12 @@
 //! adapter declares and how its prerequisites are detected is spec 008's, in
 //! the adapter's own crate.
 //!
+//! # The integration slice
+//!
+//! [`slice`] holds the `work`, `run` and `accept` bindings spec 009 added. Same
+//! rule as [`bind`], and spec 009 section 3.5 sharpens it: where a verb needed
+//! something an owning library did not expose, the entry point was added there.
+//!
 //! # Nothing here publishes
 //!
 //! There is no verb that publishes, releases or tags, and a test asserts the
@@ -33,11 +39,13 @@
 
 #![forbid(unsafe_code)]
 
+pub mod accept;
 pub mod adapters;
 pub mod bind;
 pub mod commands;
 pub mod exit;
 pub mod render;
+pub mod slice;
 
 pub use commands::{Invocation, UsageError, Verb, parse};
 pub use exit::Exit;
