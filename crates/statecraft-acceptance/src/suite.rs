@@ -241,6 +241,11 @@ pub fn fold(run_id: &str, entries: &[Entry]) -> ReviewableOutcome {
 
     ReviewableOutcome {
         run_id: run_id.to_string(),
+        posture: outcome_entry
+            .and_then(|e| e.detail.get("posture"))
+            .and_then(|value| serde_json::from_value(value.clone()).ok())
+            .map(|posture| Recorded::Present(Sourced::new(posture, &outcome_record)))
+            .unwrap_or(Recorded::Absent(Absence::NotRecorded)),
         claim,
         independent_result: Sourced::new(independent, &outcome_record),
         requested: Sourced::new(strings(outcome_entry, "requested"), &outcome_record),
@@ -355,6 +360,12 @@ mod tests {
         let account = fold("r1", &entries);
         assert_eq!(account.independent_result.value, "completed");
         assert_eq!(account.requested.value, ["turn-limit"]);
+        assert_eq!(account.posture, Recorded::Absent(Absence::NotRecorded));
+        assert_eq!(
+            serde_json::to_value(&account).unwrap()["posture"],
+            "not-recorded"
+        );
+        assert!(account.render().contains("posture: not-recorded"));
         // Every value names the record it came from.
         assert!(account.independent_result.from_record.contains("attempt"));
         // And acceptance is absent BY NAME, never implied by a completed run.

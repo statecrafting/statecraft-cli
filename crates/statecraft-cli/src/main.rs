@@ -284,32 +284,45 @@ fn run_verb(
         .preferring(statecraft_adapter::capability::Capability::TurnLimit)
         .preferring(statecraft_adapter::capability::Capability::CostReport);
 
-    let negotiation =
-        match statecraft_adapter::supervisor::preflight(&manifest, &requested, &environment) {
-            Ok(n) => n,
-            Err(refusal) => {
-                // No process was created, so the attempt is concluded as
-                // refused rather than left live: an intent with no outcome
-                // would send the next run to reconciliation for something that
-                // never started.
-                let mut accounting = statecraft_run::refusal::Accounting::default();
-                accounting.observe(statecraft_run::refusal::RefusalEvent {
-                    guard: "adapter-preflight".to_string(),
-                    detail: refusal.to_string(),
-                });
-                return conclude_and_emit(
-                    &mut chain,
-                    root,
-                    &session,
-                    statecraft_run::attempt::Outcome::Refused,
-                    &accounting,
-                    serde_json::json!({ "preflightRefusal": refusal.to_string() }),
-                    format,
-                );
-            }
-        };
+    let mut posture = statecraft_adapter::posture::Posture::new(
+        &manifest,
+        statecraft_adapter::manifest::Qualification::Unqualified,
+        &requested,
+        &statecraft_adapter::capability::negotiate(&requested, &manifest.supports),
+        &[],
+        &environment,
+    );
+    let negotiation = match statecraft_adapter::supervisor::preflight(
+        &manifest,
+        &requested,
+        &environment,
+    ) {
+        Ok(n) => n,
+        Err(refusal) => {
+            // No process was created, so the attempt is concluded as
+            // refused rather than left live: an intent with no outcome
+            // would send the next run to reconciliation for something that
+            // never started.
+            let mut accounting = statecraft_run::refusal::Accounting::default();
+            accounting.observe(statecraft_run::refusal::RefusalEvent {
+                guard: "adapter-preflight".to_string(),
+                detail: refusal.to_string(),
+            });
+            return conclude_and_emit(
+                &mut chain,
+                root,
+                &session,
+                statecraft_run::attempt::Outcome::Refused,
+                &accounting,
+                serde_json::json!({ "preflightRefusal": refusal.to_string(), "posture": posture }),
+                format,
+            );
+        }
+    };
 
-    let Some(program) = adapters::probe(home).resolved_executable() else {
+    let probe = adapters::probe(home);
+    posture.qualification = probe.qualification();
+    let Some(program) = probe.resolved_executable() else {
         let mut accounting = statecraft_run::refusal::Accounting::default();
         accounting.observe(statecraft_run::refusal::RefusalEvent {
             guard: "constructed-environment".to_string(),
@@ -321,7 +334,7 @@ fn run_verb(
             &session,
             statecraft_run::attempt::Outcome::Refused,
             &accounting,
-            serde_json::json!({ "preflightRefusal": "provider executable unresolvable" }),
+            serde_json::json!({ "preflightRefusal": "provider executable unresolvable", "posture": posture }),
             format,
         );
     };
@@ -360,13 +373,14 @@ fn run_verb(
                 &session,
                 statecraft_run::attempt::Outcome::Interrupted,
                 &accounting,
-                serde_json::json!({ "supervisorError": e.to_string() }),
+                serde_json::json!({ "supervisorError": e.to_string(), "posture": posture }),
                 format,
             );
         }
     };
 
     let supervised = &execution.supervised;
+    let posture = posture.with_execution(supervised);
     let mut accounting = statecraft_run::refusal::Accounting::default();
     for refusal in statecraft_adapter::protocol::refusals(&supervised.events) {
         accounting.observe(refusal);
@@ -384,25 +398,14 @@ fn run_verb(
                 .iter()
                 .map(|c| c.token())
                 .collect::<Vec<_>>(),
-            "applied": applied_tokens(&supervised.events),
+            "applied": posture.applied.iter().map(|c| c.token()).collect::<Vec<_>>(),
+            "posture": posture,
             "degraded": negotiation.degraded.iter().map(|c| c.token()).collect::<Vec<_>>(),
             "specId": spec_id,
             "execution": execution.evidence(),
         }),
         format,
     )
-}
-
-fn applied_tokens(events: &[statecraft_adapter::protocol::Event]) -> Vec<&'static str> {
-    events
-        .iter()
-        .find_map(|e| match e {
-            statecraft_adapter::protocol::Event::Init { applied, .. } => {
-                Some(applied.iter().map(|c| c.token()).collect())
-            }
-            _ => None,
-        })
-        .unwrap_or_default()
 }
 
 fn conclude_and_emit(
@@ -423,7 +426,13 @@ fn conclude_and_emit(
         detail,
         &SystemClock,
     ) {
-        Ok(concluded) => emit(&slice::run_answer(concluded), format),
+        Ok(concluded) => {
+            let account = statecraft_acceptance::suite::fold(&session.run_id, &chain.entries());
+            emit(
+                &slice::run_answer_with_posture(concluded, account.posture),
+                format,
+            )
+        }
         Err(e) => emit(&slice::session_error_answer(&e), format),
     }
 }

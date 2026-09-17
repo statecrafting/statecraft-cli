@@ -46,6 +46,23 @@ pub struct Posture {
 }
 
 impl Posture {
+    /// Record the supervisor's observed applied set and process residuals.
+    /// Missing initialization records no applied capabilities, never the
+    /// manifest's declarations as observations.
+    #[must_use]
+    pub fn with_execution(mut self, supervised: &crate::supervisor::Supervised) -> Self {
+        self.applied = supervised
+            .events
+            .iter()
+            .find_map(|event| match event {
+                crate::protocol::Event::Init { applied, .. } => Some(applied.clone()),
+                _ => None,
+            })
+            .unwrap_or_default();
+        self.surviving_processes = supervised.surviving_processes.clone();
+        self
+    }
+
     /// Build a posture from the parts an attempt already has.
     pub fn new(
         manifest: &Manifest,
