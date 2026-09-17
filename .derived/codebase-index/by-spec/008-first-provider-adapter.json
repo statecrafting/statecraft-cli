@@ -5,7 +5,8 @@
       "001-boundaries-and-authority",
       "002-environment-lifecycle",
       "003-work-and-run-semantics",
-      "004-execution-adapter"
+      "004-execution-adapter",
+      "006-command-surface"
     ],
     "implementingPaths": [
       {
@@ -49,5 +50,5 @@
     "specStatus": "draft"
   },
   "schemaVersion": "1.1.0",
-  "shardHash": "3f344301f492f2b3d4fcf8e115b3c37f3a9da75bd338f09c69cf5bfa18e9ad43"
+  "shardHash": "a9bdce6c3db03067d395b7e76b2043c946edf4aa07d2a999f6f4ef4d2f0272ec"
 }

@@ -33,6 +33,11 @@ depends_on:
   - "002-environment-lifecycle"
   - "003-work-and-run-semantics"
   - "004-execution-adapter"
+  # The `extends` edge above changes a binding inside the crate 006 owns, so
+  # 006 is a dependency and not only a unit this spec reaches into. 007 and
+  # 009 both declare the spec they extend; this one did not, and the omission
+  # was an oversight rather than a position.
+  - "006-command-surface"
 ---
 
 # 008: The first provider adapter
