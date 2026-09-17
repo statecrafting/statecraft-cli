@@ -2,7 +2,7 @@
 id: "004-execution-adapter"
 title: "The execution adapter boundary: one protocol, declared capabilities, a qualification suite, and a constructed child environment"
 status: approved
-implementation: pending
+implementation: complete
 created: "2026-09-16"
 summary: >
   The single seam through which this product runs an agent, and the only place a
@@ -218,7 +218,80 @@ sandbox profiles; adaptive autonomy or trust scoring; cost ceilings and quota
 parking; and model selection policy. Each is deferred by name in the decision
 record.
 
+## 5. Decisions recorded during implementation
+
+Dated entries for choices §3 was silent on. None changes what it requires.
+
+**2026-09-16: the closed vocabulary is an enum, not a string.** §3.2 says adding
+a token is an amendment and not a configuration change. A string token would let
+a caller introduce a seventh; an enum means a seventh requires editing this
+crate, which the coupling gate ties to editing this spec. A test asserts the set
+has exactly six members.
+
+**2026-09-16: a supervisor is never held past its own deadline, even by a
+survivor.** §3.5.3 requires the kill; it does not say what happens if the kill
+misses. CI answered that: a backgrounded process in the fixture survived the
+group kill on Linux, still held the stdout pipe open, and the supervisor's
+reader thread waited out the full 300 seconds after the deadline had correctly
+fired at one. So the reader is dropped rather than joined when a deadline
+fires. A supervisor that the supervised process can hold past its own deadline
+is not one, and the surviving process is reported as a residual (§3.8) rather
+than waited for.
+
+**2026-09-16: descendants are killed with a process group, and `kill` is shelled
+out to.** §3.5.3 requires the kill to reach descendants. The child is spawned
+into its own process group and the group is signalled, which is the same
+argument §3.6 makes about environments: a list of the pids somebody thought of
+is not the set. Sending the signal shells out to `kill` rather than linking a
+libc binding, because the dependency would be larger than the need. The form is
+`kill -s KILL -- -PID`: the `--` is load-bearing, because a bare negative pid is
+ambiguous with an option and the BSD and procps implementations disagree about
+which it is. That disagreement is what made the failure above invisible on a
+developer's machine and real on the runner. After the kill the group is probed
+with signal 0, so a residual is observed rather than assumed absent. On a
+non-Unix platform the descendants are not killed and the attempt says so, rather
+than reporting a clean termination it did not achieve.
+
+**2026-09-16: the fixture adapter is a real child process.** §3.5 requires a
+fixture that ships with the suite. It is a `sh` script this crate writes and
+spawns, not a function the suite calls: the stream, the deadline and the kill
+are properties of a process, and a fixture that skipped the boundary would let
+all three regress unnoticed. The fixture reads and discards the prompt from
+stdin, so a regression to a command-line prompt fails a test.
+
+**2026-09-16: a malformed stream and a missing result event are both
+`interrupted`.** §3.8 gives the second explicitly and says only that the first
+is "not `completed`". They land on the same outcome for the same reason: spec
+003 §3.4 defines `failed` as the work having been judged and not held, and a
+stream the supervisor cannot read judged nothing. Calling either `failed` would
+claim an assessment nobody made.
+
+**2026-09-16: the withheld-credential list is a refusal on construction, not a
+filter.** §3.6 says publication credentials are not placed in the child. The
+child inherits nothing, so the only route in is a blueprint, and that is what is
+refused, with the withholding recorded as a degradation. The list names the
+credential families that exist today; it is a backstop against a well-meaning
+blueprint, not a containment boundary, and §3.6's residuals still stand.
+
+**2026-09-16: the provider-name rule is a test that greps this crate.** §3.8
+makes a provider name in this territory a defect. A rule nobody can run is a
+rule that decays, so `tests/no_provider_names.rs` scans the crate's own sources
+for the provider names that exist today. It cannot catch a provider nobody has
+heard of, and it does catch the one a future change would reach for.
+
 ## Verification
 
-Declared by the change that implements this spec. None of §3 is implemented, so
-this spec carries no `verify:cli` block. §3.5 is the suite that will supply it.
+Each line is one command. §3.5's suite is eight tests named `suite_1` to
+`suite_8`, and §3.8's remaining rows are tests beside them. They run against the
+fixture adapter, so the table runs with no real provider installed, which is
+what §3.5 requires of it.
+
+```verify:cli
+cargo build --workspace --locked
+cargo test --workspace --locked
+cargo clippy --workspace --all-targets --locked -- -D warnings
+cargo fmt --all --check
+spec-spine index coverage --fail-on-untraced
+cargo test -p statecraft-adapter --test no_provider_names
+cargo test -p statecraft-adapter --test negative_suite
+```
