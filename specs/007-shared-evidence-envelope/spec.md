@@ -1,7 +1,7 @@
 ---
 id: "007-shared-evidence-envelope"
 title: "The shared evidence envelope: one owner for the bytes two products exchange"
-status: draft
+status: approved
 implementation: complete
 created: "2026-09-16"
 summary: >

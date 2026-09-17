@@ -369,6 +369,53 @@ surface stays deferred as `F-04`.
 
 No other `D-` row is adopted.
 
+### 2026-09-17: spec 007 ratified, and its reading of ambiguous bytes accepted
+
+The owner ratified `007-shared-evidence-envelope`. Its frontmatter flips to
+`approved` in this change. `implementation: complete` was already true, the code
+having landed with the spec rather than after it.
+
+**What ratification accepts beyond the spec itself.** Section 3.2 reserves
+`"none"`, `"not-recorded"` and `"stale"` for every `Recorded<T>` and refuses a
+present value that would serialize to one of them. The consequence that needs
+saying in the owner's voice is the backward one: a record this product wrote at
+or before `8f6591f` carrying a present string equal to one of those words now
+decodes as the absence, in both products. That is accepted here as a **decision
+taken under ambiguity, not a recovery of what the writer meant**. The bytes
+cannot say which reading was intended and nothing later can make them say it.
+For `harness_revision` the writing convention does settle it (005 section 3.4
+writes `"not-recorded"` precisely to say no revision was observed); for an
+arbitrary `Recorded<String>` field it does not. So the reading is chosen rather
+than discovered, and is recorded as chosen.
+`testdata/fixtures/cli/recorded-collision-legacy.json` holds the bytes a pre-007
+build would have written, and a test on each side asserts that the old reader
+said present and every reader now says absent, so the cost is pinned by evidence
+rather than by this paragraph.
+
+The alternative of a tagged or versioned representation is rejected for the
+reason section 3.2 gives: it rewrites every `harness_revision` in every receipt
+already written, and 005 section 3.7 forbids rewriting historical records to
+satisfy a newer rule. If a future contract needs a present value equal to one of
+the three words, that is a new schema version, not a second reinterpretation of
+these bytes.
+
+**What ratification does not settle.** `D-10` stays dropped. Section 3.4's
+compatibility suite runs from two products and both are Rust, so it is not the
+two-language parity `G-04` asked for and is not to be read as satisfying it. The
+three questions section 5 leaves open (whether the two `RootSet` models
+converge, whether the shared structs carry an extras map, whether
+`VerifierRecord` and the envelope's verifier identity are one type) stay open
+and are the owner's. The native golden vectors stay provisional: freezing them
+needs a first signed entry under the platform's constitution VIII, and none
+exists. No `D-` row is adopted by this ratification.
+
+**Publication, scoped to this change.** The owner authorized publishing this
+change on 2026-09-17: the branch, its pull request and its merge, so the
+platform can pin its dependency to the commit this lands as. That authorization
+covers this change and no other. `F-02` is not lifted: nothing here tags a
+release or pushes to a registry, and `crates/statecraft-envelope/` stays
+`publish = false` at version `0.0.0`.
+
 To adopt a further row, the owner can state which `D-` rows are accepted and
 with what amendments. Adoption is then recorded here as plain text with its
 date, and each ratified spec's frontmatter is flipped in the change that

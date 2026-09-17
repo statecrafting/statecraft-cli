@@ -41,10 +41,10 @@
       "Verification"
     ],
     "specPath": "specs/007-shared-evidence-envelope/spec.md",
-    "status": "draft",
+    "status": "approved",
     "summary": "The statecraft platform wrote an evidence envelope against this product's serializations and staged it pending transfer. This spec receives it: it claims crates/statecraft-envelope/, records its provenance and the Apache-2.0 term it crossed under, and makes it the single owner of the reference, the four evidence dimensions, admission and the three names for absence, which 005 declared and the platform had copied. It resolves the wire ambiguity in Recorded<T> by reserving the three absence words and refusing a present value that would collide with one, rather than by ordering the variants; it fixes what a compatibility fixture must prove, and emits the fixtures from this product's own serializer; and it fixes how the platform depends on this crate so the staged copy does not become a fork.\n",
     "title": "The shared evidence envelope: one owner for the bytes two products exchange"
   },
-  "shardHash": "42dba82a44b6b009816d39f2d04481be9cc2f09f9159c392f97fb58db59dc465",
+  "shardHash": "0f5d8d00d77d740e5dbe4eb00f04e1a5d5005ad05820bf0acfe0a019e11d57d1",
   "specVersion": "1.2.0"
 }
