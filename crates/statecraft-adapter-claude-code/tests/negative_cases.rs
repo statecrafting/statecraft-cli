@@ -134,6 +134,29 @@ fn native_turn_cap_is_interrupted_even_when_the_process_exits_one() {
 }
 
 #[test]
+fn native_api_error_is_interrupted_and_never_the_completion_its_subtype_claims() {
+    // The provider exits 1 here, and the exit code is still not what decides
+    // this: the terminal event's error flag is.
+    let execution = replay(&recorded_text("api-error.jsonl"), 1);
+    assert_eq!(execution.supervised.stream_error, None);
+    assert_eq!(execution.supervised.outcome, Outcome::Interrupted);
+    assert_eq!(execution.termination().observed, Outcome::Interrupted);
+    assert_ne!(execution.supervised.outcome, Outcome::Completed);
+    assert_ne!(execution.supervised.outcome, Outcome::Failed);
+
+    let terminal = execution.terminal.clone().unwrap();
+    // Section 3.3 rule 2: the provider's own reading survives beside the
+    // correction rather than being resolved away.
+    assert_eq!(terminal.provider_claim, Classification::Failed);
+    assert_eq!(terminal.refusal_entries, 0);
+
+    let evidence = execution.evidence();
+    assert_eq!(evidence["providerTerminal"]["subtype"], "success");
+    assert_eq!(evidence["providerTerminal"]["is_error"], true);
+    assert_eq!(evidence["providerTerminal"]["terminal_reason"], "api_error");
+}
+
+#[test]
 fn native_tool_removal_produces_no_invented_refusal() {
     let execution = replay(&recorded_text("tool-removed.jsonl"), 0);
     assert_eq!(execution.supervised.stream_error, None);
@@ -322,6 +345,28 @@ fn a_turn_cap_is_interrupted_and_not_failed() {
     // That reading is not adopted.
     assert_eq!(reading.outcome, Outcome::Interrupted);
     assert_ne!(reading.outcome, Outcome::Failed);
+}
+
+// Row 4b. `subtype: "success"` carrying `is_error: true`.
+#[test]
+fn an_api_error_wearing_a_success_subtype_is_interrupted_and_not_completed() {
+    let events = recorded("api-error.jsonl");
+    let mapped = map_stream(&events, &granted_everything()).unwrap();
+    let result = mapped.result.unwrap();
+
+    // The shape the measurement rests on: the provider calls this a success and
+    // flags it an error in the same event.
+    assert_eq!(result.subtype, "success");
+    assert!(result.is_error);
+    assert_eq!(result.terminal_reason.as_deref(), Some("api_error"));
+    assert!(result.permission_denials.is_empty());
+
+    let reading = provider::outcome(&result).unwrap();
+    assert_eq!(reading.outcome, Outcome::Interrupted);
+    // Neither of the two readings the fields invite on their own.
+    assert_ne!(reading.outcome, Outcome::Completed);
+    assert_ne!(reading.outcome, Outcome::Failed);
+    assert_eq!(reading.provider_claim, Classification::Failed);
 }
 
 // Row 5. The provider exits 0 with a denial recorded.

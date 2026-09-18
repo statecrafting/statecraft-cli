@@ -2,9 +2,10 @@
 //!
 //! | Provider terminal state | `003` section 3.4 outcome | Why |
 //! |---|---|---|
-//! | `success`, no denials | `completed` | Reached its own end. Says nothing about acceptance. |
-//! | `success`, denials present | `refused` | Section 3.3. The completed turns are retained beside the refusal. |
+//! | `success`, not an error, no denials | `completed` | Reached its own end. Says nothing about acceptance. |
+//! | `success`, denials present | `refused` | Section 3.3. The completed turns are retained beside the refusal. Read before `is_error`, because a denial entry is evidence and an error flag is a claim. |
 //! | `terminal_reason: "max_turns"` | `interrupted` | The cap stopped the attempt before anything was judged. **Not** `failed`: nothing about the work was found not to hold. The provider calls it an error and that reading is not adopted. |
+//! | `success`, `is_error: true`, no denials | `interrupted` | The provider stopped on its own error before anything about the work was judged. Measured shape of an `api_error`, including a failed authentication. **Not** `failed`, for the same reason the turn cap is not. |
 //! | deadline passed, child killed with descendants | `interrupted` | Spec 004 section 3.5 case 3, decided by the supervisor and not here. |
 //! | malformed or truncated stream | reported as malformed | Spec 004 section 3.5 case 4. Never a clean completion with missing fields. |
 //!
@@ -89,7 +90,15 @@ pub fn outcome(result: &ResultEvent) -> Result<TerminalReading, UnmappedTerminal
     }
 
     match result.subtype.as_str() {
+        // Before the error flag: section 3.3's denial entries are evidence, and
+        // `is_error` is the same provider claim section 3.3 refuses to promote.
         "success" if result.refused_anything() => reading(Outcome::Refused),
+        // The provider reports an API-side error, a failed authentication among
+        // them, as a `success` subtype with this flag set. Section 3.5: the
+        // attempt stopped before anything about the work was judged, so it is
+        // `interrupted` and not `failed`, and not the completion the subtype
+        // alone would have claimed.
+        "success" if result.is_error => reading(Outcome::Interrupted),
         "success" => reading(Outcome::Completed),
         _ => Err(UnmappedTerminalState {
             subtype: result.subtype.clone(),
@@ -151,6 +160,29 @@ mod tests {
         // The provider calls it an error; that reading is not adopted as the
         // outcome, and it is still recorded as the provider's claim.
         assert_eq!(r.provider_claim, Classification::Stopped);
+    }
+
+    #[test]
+    fn an_api_error_is_interrupted_and_never_the_completion_its_subtype_claims() {
+        // The measured shape of a failed authentication on Claude Code 2.1.267:
+        // the subtype says success and the error flag says otherwise.
+        let r = outcome(&result("success", Some("api_error"), 0, true)).unwrap();
+        assert_eq!(r.outcome, Outcome::Interrupted);
+        assert_ne!(r.outcome, Outcome::Completed);
+        // Section 3.5: not `failed` either. Nothing about the work was judged.
+        assert_ne!(r.outcome, Outcome::Failed);
+        // The provider's own reading is retained beside the correction.
+        assert_eq!(r.provider_claim, Classification::Failed);
+    }
+
+    #[test]
+    fn a_denied_session_stays_refused_even_when_the_provider_also_flags_an_error() {
+        // Section 3.3's denial entries are evidence; the error flag is a claim,
+        // so the refusal is read first and the attempt is never `interrupted`.
+        let r = outcome(&result("success", Some("api_error"), 1, true)).unwrap();
+        assert_eq!(r.outcome, Outcome::Refused);
+        assert_eq!(r.refusal_entries, 1);
+        assert_eq!(r.provider_claim, Classification::Failed);
     }
 
     #[test]

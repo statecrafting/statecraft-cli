@@ -18,11 +18,20 @@ check that did not run `unknown` and never a pass.
 | `denied.jsonl` | `permissions.deny: ["Bash(echo:*)"]` | One `permission_denials` entry with the tool, the id and the full input, **and** `subtype: "success"`, `is_error: false`, `terminal_reason: "completed"`, exit 0. Section 3.3's load-bearing finding. |
 | `max-turns.jsonl` | `--max-turns 1` on a prompt needing three tool calls | `subtype: "error_max_turns"`, `terminal_reason: "max_turns"`, `is_error: true`, exit 1. Section 3.5 maps it `interrupted`, not `failed`. |
 | `tool-removed.jsonl` | `--disallowedTools Bash` | `tools` has **89** entries and `Bash` is absent, and `permission_denials` is **empty**. Section 3.4's observable-but-unrecorded mechanism. |
+| `api-error.jsonl` | plain, in a constructed environment carrying only `PATH` | `subtype: "success"` with `is_error: true`, `terminal_reason: "api_error"`, `permission_denials: []`, `num_turns: 1`, `total_cost_usd: 0`, `result: "Not logged in"`, exit 1. Section 3.5 maps it `interrupted`, not the completion its subtype claims and not `failed`. |
 
 The two tool counts are the measurement section 3.4 rests on and they are
 preserved exactly: 88 entries with `Bash` present under a deny rule, 89 entries
 with `Bash` absent under removal. The count going up when a tool is removed is
 what the provider did; it is recorded rather than tidied.
+
+`api-error.jsonl` was captured on the same date and the same provider version,
+under the environment spec 008 section 3.6 describes: a child given `PATH` alone
+cannot reach the operating-system keychain, so the provider terminated
+unauthenticated. The authentication is the *cause* and not the finding. What the
+fixture records is the **shape** every API-side error of this provider arrives
+in, a `success` subtype carrying an error flag, which is why section 3.5 cannot
+key its completion row on the subtype alone.
 
 ## What was dropped, and what was redacted
 
