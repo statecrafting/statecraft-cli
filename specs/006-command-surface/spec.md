@@ -172,6 +172,18 @@ precondition that is not met, rather than exit 0 having done nothing or a
 "not implemented" message that reads like a defect. The verbs that need no
 adapter, the four `project` verbs, work.
 
+**2026-09-17: the entry above is superseded by spec 008.** It is kept rather than
+rewritten, because it records what was true on its own date and this section is
+a history. What has changed is its premise: spec `008` ratified Claude Code as
+the first provider adapter and declares the corrective edge on this spec's
+command crate. The configured adapter set is `declarations` in
+`crates/statecraft-cli/src/adapters.rs`, and the environment verbs are bound to
+it in `environment_verb` in `crates/statecraft-cli/src/main.rs`. So the
+unconditional refusal for want of a ratified adapter no longer applies. A
+prerequisite that is genuinely absent still refuses, under `002` section 3.9 and
+`008` section 3.6, and that is the same correct answer to an unmet precondition
+the entry above describes.
+
 **2026-09-16: the product home is overridable by `STATECRAFT_HOME`.** §3.6 says
 the binary reads its arguments, the target and the product home, and that no
 configuration file may change a rule. An environment variable naming *where the
