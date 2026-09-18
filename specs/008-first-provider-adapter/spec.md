@@ -243,6 +243,30 @@ remove and cannot record. Two consequences, both stated rather than fixed:
    the attempt. This is the residual `004` section 3.6 already declared, named
    here concretely for this provider rather than left general.
 
+**Rule 1 fired, and `USER` is what it turns on.** A constructed environment
+carrying `PATH` alone was measured on 2026-09-17 to break exactly as rule 1
+anticipated: the provider terminated with the `api_error` shape section 3.5
+records, whose `result` read `Not logged in`. Bisected on the same date, against
+the same provider version: adding `USER` to `PATH` completes the attempt
+cleanly; `HOME` and `SECURITYSESSIONID` do not, and `USER` set to an account
+name that is not the operator's fails the same way as omitting it. So the
+keychain lookup is keyed by the account name and `USER` is the name it reads.
+
+The constructed environment therefore carries `USER`, with the operator's own
+value, and that carriage is part of the credential path this section names. The
+environment is still constructed and not filtered: the allowed set is now two
+names rather than one, and everything else in the supervising process's
+environment is still dropped, `HOME` among them. This widens no residual that
+`004` section 3.6 has not already declared. Its third residual is exactly this
+one, stated there as a general fact about keychains and made concrete here: the
+product hands the child the name, the operating system hands it the credential,
+and a publish that goes around the supervisor still leaves no record.
+
+`USER` is not itself a credential and carries none: it is an account name the
+child could read from the operating system by other means. What the product is
+choosing here is to let the provider authenticate at all, and the alternative
+measured on the same date is that it cannot.
+
 ### 3.7 The environment half
 
 Per `002` section 3.9 the adapter declares the harness it targets, the exact set
@@ -252,9 +276,9 @@ this is the first, so nothing collides yet and the check still runs.
 
 Its prerequisites are: a `claude` executable resolvable by the constructed
 environment, a version it has a qualification record for (section 3.8), and the
-credential path of section 3.6. Absent any of them it **refuses to claim its
-paths and names which one is absent**. It does not write files for a harness that
-is not there.
+credential path of section 3.6, whose `USER` carriage that section fixes. Absent
+any of them it **refuses to claim its paths and names which one is absent**. It
+does not write files for a harness that is not there.
 
 ### 3.8 Qualification binds to a version, and to nothing else
 
@@ -283,6 +307,7 @@ qualified was the pair.
 | The applied tool allowlist is asked for | `not-recorded`, never the requested list restated as applied. Section 3.4. |
 | A tool restriction expressed as tool-set removal where a refusal record is required | Fails qualification: the manifest declared `structured-refusals` and this path produces none. Section 3.4. |
 | `claude` is absent from the constructed environment | The environment adapter refuses to claim its paths and names the absent prerequisite. No files written. |
+| The constructed environment carries `PATH` without `USER` | The provider cannot reach the keychain and terminates with section 3.5's `api_error` shape. The environment carries `USER` so that this does not happen. Section 3.6. |
 | The provider binary version differs from the qualification record | Labelled `unqualified` in the posture, the attempt record and the outcome. It still runs. |
 | A second provider adapter declaring a path this one declares | Refused at plan time, naming both adapters and the path (`002` section 3.10). |
 
