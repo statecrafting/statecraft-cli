@@ -6,25 +6,26 @@
 //! |---|---|
 //! | The request | Process arguments and a settings document, plus the prompt on stdin. |
 //! | The init event | `{"type":"system","subtype":"init"}` |
-//! | Progress events | `assistant` and `user` events, and `system` events including `hook_started` and `hook_response`. |
-//! | Refusal events | There are none; see [`ResultEvent::permission_denials`]. |
+//! | Progress events | `assistant` and `user` events, and `system` events including `hook_started`, `hook_response` and `permission_denied`. |
+//! | Refusal events | Derived from [`ResultEvent::permission_denials`], verbatim. |
 //! | The result | `{"type":"result"}` |
 //!
-//! # A measured event section 3.1's table does not account for
+//! # The mid-stream denial notification, and why it is not a second refusal
 //!
 //! The recorded deny-rule stream carries a mid-stream
 //! `{"type":"system","subtype":"permission_denied"}` event, with `tool_name`,
-//! `tool_use_id`, `decision_reason_type` and a prose `message`. Section 3.1's
-//! table says there are no refusal events, and
-//! `tests/negative_cases.rs` records the contradiction as a fact rather than
-//! resolving it: **deciding what section 3.1 should say is the owner's, not an
-//! implementation's** (`.claude/rules/adversarial-prompt-refusal.md`).
+//! `tool_use_id`, `decision_reason_type` and a prose `message`, and its
+//! tool-use id is the same one the terminal `permission_denials` entry names.
+//! Section 3.1's table said there were no refusal events at all; the owner
+//! amended it on 2026-09-17 to say what the recording shows, which is that the
+//! notification is progress and the terminal entries are the refusal record.
 //!
-//! What this module does meanwhile is exactly what section 3.3 rule 1 requires
-//! and nothing beyond it: the refusal record is `permission_denials`, read
-//! verbatim off the result event, and the mid-stream event is carried through
-//! as a progress event the way section 3.1 classifies every other `system`
-//! event. Nothing is counted twice, and nothing is invented.
+//! What this module does is section 3.3 rule 1 and nothing beyond it, and the
+//! amendment did not change it: the refusal record is `permission_denials`,
+//! read verbatim off the result event, and the mid-stream event is carried
+//! through as a progress event the way section 3.1 classifies every other
+//! `system` event. Counting both would count one denied tool use twice.
+//! Nothing is counted twice, and nothing is invented.
 
 use crate::capabilities;
 use serde::{Deserialize, Serialize};
@@ -119,7 +120,8 @@ impl SystemEvent {
         self.subtype == "hook_started" || self.subtype == "hook_response"
     }
 
-    /// Whether this is the mid-stream denial event section 3.1 does not list.
+    /// Whether this is the mid-stream denial notification section 3.1 lists as
+    /// a progress event rather than as a refusal.
     pub fn is_permission_denied(&self) -> bool {
         self.subtype == "permission_denied"
     }
