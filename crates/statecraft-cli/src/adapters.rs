@@ -41,16 +41,27 @@ pub fn declarations() -> Vec<Declaration> {
 /// The child environment the adapter's prerequisites are probed against.
 ///
 /// **Constructed, not filtered** (spec 004 section 3.6): the child gets exactly
-/// what the blueprint allows. `PATH` is allowed because an adapter that cannot
-/// resolve its own executable has nothing to probe, and it is the one variable
-/// spec 008 section 3.7's first prerequisite is about. Everything else in this
-/// process's environment is dropped, including the credential paths spec 004
-/// section 3.6 refuses to place in a child at all.
+/// what the blueprint allows. Everything else in this process's environment is
+/// dropped, including the credential paths spec 004 section 3.6 refuses to place
+/// in a child at all, and including `HOME`.
+///
+/// Two names are allowed, and each is a prerequisite spec 008 section 3.7 names:
+///
+/// - `PATH`, because an adapter that cannot resolve its own executable has
+///   nothing to probe.
+/// - `USER`, because spec 008 section 3.6's credential path runs through the
+///   operating-system keychain and the lookup is keyed by the account name.
+///   Measured: `PATH` alone terminates the provider with section 3.5's
+///   `api_error` shape, reading `Not logged in`. This is not a credential and
+///   carries none; it is the name under which the operating system answers one.
 pub fn child_environment() -> ChildEnvironment {
     let manifest = provider::manifest();
     let mut blueprint = Blueprint::empty();
     if let Ok(path) = std::env::var("PATH") {
         blueprint = blueprint.allowing("PATH", &path);
+    }
+    if let Ok(user) = std::env::var("USER") {
+        blueprint = blueprint.allowing("USER", &user);
     }
     for command in &manifest.requires_commands {
         blueprint = blueprint.needing_command(command);
@@ -159,8 +170,26 @@ mod tests {
         for name in statecraft_adapter::environment::WITHHELD_PREFIXES {
             assert!(!environment.variables.contains_key(name));
         }
-        // Constructed, so at most the one name the blueprint allowed.
-        assert!(environment.variables.len() <= 1);
+        // Constructed, so at most the two names the blueprint allowed, and
+        // nothing this process happens to be carrying beside them.
+        assert!(environment.variables.len() <= 2);
+        for name in environment.variables.keys() {
+            assert!(name == "PATH" || name == "USER", "unexpected name {name}");
+        }
+        // Spec 008 section 3.6: the home directory is not among them, so the
+        // keychain is reached by the account name and not by a home path.
+        assert!(!environment.variables.contains_key("HOME"));
+    }
+
+    #[test]
+    fn the_account_name_is_carried_with_the_operators_own_value() {
+        // Spec 008 section 3.6 measured that the keychain lookup is keyed by the
+        // account name, so a placeholder or an empty value is not a substitute.
+        let Ok(user) = std::env::var("USER") else {
+            return;
+        };
+        let environment = child_environment();
+        assert_eq!(environment.variables.get("USER"), Some(&user));
     }
 
     #[test]

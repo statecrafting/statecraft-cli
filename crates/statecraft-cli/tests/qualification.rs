@@ -61,7 +61,7 @@ if [ "$1" = --version ]; then /bin/cat "$(dirname "$0")/version"; exit 0; fi
 [ "$1 $2 $3 $4" = '--print --output-format stream-json --verbose' ] || exit 3
 [ "$5" = --settings ] || exit 3
 [ "$(/bin/cat "$6")" = '{"permissions":{"deny":[]}}' ] || exit 3
-[ "${USER+x}" != x ] || exit 3
+[ "$USER" = fixture-operator ] || exit 3
 [ "${HOME+x}" != x ] || exit 3
 /bin/cat > child-prompt
 /bin/cat "$(dirname "$0")/stream.jsonl"
@@ -78,6 +78,9 @@ if [ "$1" = --version ]; then /bin/cat "$(dirname "$0")/version"; exit 0; fi
             .env_clear()
             .env("STATECRAFT_HOME", home.path())
             .env("PATH", &path)
+            // Spec 008 section 3.6: the account name is carried to the child
+            // with this process's own value, and `HOME` still is not.
+            .env("USER", "fixture-operator")
             .output()
             .unwrap()
     };

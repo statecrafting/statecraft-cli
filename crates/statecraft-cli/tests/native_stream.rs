@@ -84,7 +84,7 @@ if [ "$1" = --version ]; then echo '2.1.267'; exit 0; fi
 [ "$(/bin/cat "$6")" = '{"permissions":{"deny":[]}}' ] || exit 3
 /bin/cat "$6" > child-settings
 printf '%s' "$6" > child-settings-path
-[ "${USER+x}" != x ] || exit 3
+[ "$USER" = fixture-operator ] || exit 3
 [ "${HOME+x}" != x ] || exit 3
 /bin/cat > child-prompt
 pwd > child-cwd
@@ -99,8 +99,12 @@ esac
     let run = |args: &[&str]| -> Output {
         Command::new(env!("CARGO_BIN_EXE_statecraft-cli"))
             .args(args)
+            .env_clear()
             .env("STATECRAFT_HOME", home.path())
             .env("PATH", &path)
+            // Spec 008 section 3.6: the account name is carried to the child
+            // with this process's own value, and `HOME` still is not.
+            .env("USER", "fixture-operator")
             .output()
             .unwrap()
     };
