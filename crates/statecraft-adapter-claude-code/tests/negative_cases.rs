@@ -551,16 +551,16 @@ fn the_supervisors_refusal_count_is_derived_from_the_stream_and_counts_each_deni
     assert!(accounting.sample[0].detail.contains("echo hello"));
 }
 
-// The measured event section 3.1's table does not account for.
+// The mid-stream denial notification, which is progress and not a refusal.
 //
-// Not resolved here. Section 3.1 says there are no refusal events; the recorded
-// deny-rule stream carries a mid-stream `system/permission_denied`. This test
-// records the contradiction as a fact, because amending what a spec REQUIRES is
-// the owner's act and not an implementation's
-// (`.claude/rules/adversarial-prompt-refusal.md`). What the mapping does
-// meanwhile is section 3.3 rule 1 and nothing beyond it: the refusal record is
-// `permission_denials`, and this event is carried as progress like every other
-// `system` event, so nothing is counted twice.
+// Section 3.1 once said there were no refusal events at all; the recorded
+// deny-rule stream carries a mid-stream `system/permission_denied` whose
+// tool-use id is the one the terminal entry names. This test recorded that
+// contradiction as a fact until the owner amended section 3.1 on 2026-09-17,
+// and it now asserts what the amended table says. The mapping did not change
+// and never did: the refusal record is `permission_denials`, this event is
+// carried as progress like every other `system` event, and counting both would
+// count one denied tool use twice.
 #[test]
 fn the_recorded_deny_stream_carries_a_mid_stream_permission_denied_event() {
     let mapped = map_stream(&recorded("denied.jsonl"), &granted_everything()).unwrap();

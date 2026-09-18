@@ -11,10 +11,11 @@ summary: >
   section 3.2's six capability tokens the manifest may declare, each against a
   measurement rather than a reading of the flags; it fixes the mapping from the
   provider's event stream onto 004 section 3.1's three parts, including the
-  finding that there is no mid-stream refusal event and that a denied session
-  still classifies itself as a success; it fixes which denial mechanism the
-  adapter must use, because the two available mechanisms have opposite evidence
-  properties; and it fixes what a qualification record binds to.
+  finding that a mid-stream denial notification accompanies the terminal
+  refusal record and that a denied session still classifies itself as a
+  success; it fixes which denial mechanism the adapter must use, because the two
+  available mechanisms have opposite evidence properties; and it fixes what a
+  qualification record binds to.
 establishes:
   # Claimed by the change that writes it, which is this one. Section 2 says why
   # the claim could not be in the draft: the gate carries
@@ -98,9 +99,24 @@ prompt is delivered on a stream and never interpolated into a command line
 |---|---|
 | The request | Process arguments and a settings document, plus the prompt on stdin. |
 | The init event | `{"type":"system","subtype":"init"}`, carrying `claude_code_version`, `model`, `permissionMode`, `tools`, `mcp_servers`, `skills`, `agents`, `cwd` and `apiKeySource`. |
-| Progress events | `assistant` and `user` events, and `system` events including `hook_started` and `hook_response`. |
-| Refusal events | **There are none.** See section 3.3. |
+| Progress events | `assistant` and `user` events, and `system` events including `hook_started`, `hook_response` and `permission_denied`. |
+| Refusal events | Derived from the result event's `permission_denials`, verbatim, as section 3.3 requires. The mid-stream `system/permission_denied` notification is carried as progress and is not counted as an additional refusal. |
 | The result | `{"type":"result"}`, carrying `subtype`, `is_error`, `terminal_reason`, `stop_reason`, `num_turns`, `total_cost_usd`, `usage`, `modelUsage` and `permission_denials`. |
+
+The recorded
+`crates/statecraft-adapter-claude-code/testdata/stream/denied.jsonl` contains a
+mid-stream `system/permission_denied` notification with `tool_name`,
+`tool_use_id`, `decision_reason_type` and `message`, and its tool-use id also
+appears in the terminal `permission_denials` entry. The original claim that
+there were no refusal events was therefore incorrect, and this table now says
+what the recording shows.
+
+The notification is observable progress; section 3.3's terminal entries remain
+the refusal record. Counting both as separate refusals would count the same
+denied tool use twice in this very recording, which is why the distinction is
+between the two forms and not between two refusals. It makes no claim that every
+denial on every provider version has both forms, and it does not change section
+3.5's treatment of a malformed or truncated stream.
 
 ### 3.2 The capability tokens, each against a measurement
 
@@ -349,7 +365,8 @@ read on this date. The constructed document contains only `permissions.deny`;
 no hook, settings-source selector or environment entry is added. An empty deny
 list follows the same transport and adds no denial policy. This discharges the
 missing settings wiring recorded below, without changing qualification or the
-unresolved mid-stream event wording.
+mid-stream event wording, which was still unresolved on that date and which
+section 3.1 now settles.
 
 Before repair, `cargo test -p statecraft-adapter-claude-code --test
 settings_transport --locked` failed all three settings-reading child cases:
@@ -434,9 +451,11 @@ The closed outcomes and the command's serialized view are unchanged.
 This wiring does not forward `Invocation.settings`, supply missing
 `unqualified` labels, or widen the constructed environment with `USER`. Those
 are separate findings and dependencies for live qualification, not claims this
-repair discharges. Section 3.1's mid-stream refusal-event contradiction remains
-an owner amendment; the existing mapper still carries that event as progress
-and takes refusal evidence from the terminal `permission_denials` only.
+repair discharges. At the time of this repair, section 3.1's mid-stream
+refusal-event contradiction remained an owner amendment. Section 3.1 now
+distinguishes the mid-stream notification from the terminal refusal record;
+the mapper carries the former as progress and takes refusal evidence from
+terminal `permission_denials` only.
 
 **2026-09-17: the applied set reports what the invocation put into effect, minus
 what the init event contradicts.** Spec 004 §3.3 wants the init event to carry
