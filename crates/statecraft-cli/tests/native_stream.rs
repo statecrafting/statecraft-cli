@@ -91,6 +91,7 @@ pwd > child-cwd
 /bin/cat "$(dirname "$0")/native.jsonl"
 case "$(/bin/cat "$(dirname "$0")/native.jsonl")" in
   *error_max_turns*) exit 1 ;;
+  *api_error*) exit 1 ;;
 esac
 "#,
     );
@@ -231,6 +232,14 @@ fn run_maps_recorded_turn_cap_to_interrupted_and_accept_does_not_run() {
         None,
         false,
     );
+}
+
+#[test]
+fn run_maps_a_recorded_api_error_to_interrupted_and_never_to_its_success_subtype() {
+    // The recorded terminal calls itself a success and flags an error. The run
+    // records `interrupted`, keeps the provider's `failed` claim beside it, and
+    // `accept` refuses for `attempt-interrupted`.
+    native_run("api-error.jsonl", "interrupted", "failed", 0, None, false);
 }
 
 #[test]

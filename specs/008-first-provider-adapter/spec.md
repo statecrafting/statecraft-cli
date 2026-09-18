@@ -193,14 +193,35 @@ here so two adapters cannot disagree about it:
 
 | Provider terminal state | `003` section 3.4 outcome | Why |
 |---|---|---|
-| `subtype: "success"`, `permission_denials` empty | `completed` | Reached its own end. Says nothing about acceptance. |
-| `subtype: "success"`, `permission_denials` non-empty | `refused` | Section 3.3. The completed turns are retained beside the refusal. |
+| `subtype: "success"`, `is_error: false`, `permission_denials` empty | `completed` | Reached its own end. Says nothing about acceptance. |
+| `subtype: "success"`, `permission_denials` non-empty | `refused` | Section 3.3. The completed turns are retained beside the refusal. Read before `is_error`, because a denial entry is evidence and an error flag is a claim. |
 | `terminal_reason: "max_turns"` | `interrupted` | The cap stopped the attempt before anything was judged. It is **not** `failed`: nothing about the work was found not to hold. The provider calls it an error and that reading is not adopted. |
+| `subtype: "success"`, `is_error: true`, `permission_denials` empty | `interrupted` | The provider stopped on its own error before anything about the work was judged. Same reasoning as the row above, and for the same reason it is not `failed`. |
 | The deadline passed and the child was killed with its descendants | `interrupted` | `004` section 3.5, case 3. |
 | A malformed or truncated stream | Reported as malformed | `004` section 3.5, case 4. Never read as a clean completion with missing fields. |
 
 `cancelled` is never produced by the adapter: it means an operator stopped the
 attempt deliberately, which the supervisor knows and the provider does not.
+
+**A provider error is a success subtype, and it is not a completion.** Measured
+on 2026-09-17 against Claude Code 2.1.267: an attempt that could not
+authenticate terminated with `subtype: "success"`, `is_error: true`,
+`terminal_reason: "api_error"`, `permission_denials` empty and a `result` of
+`Not logged in`. This table's first version keyed its success row on the subtype
+alone, so that state mapped to `completed`, and a run in which nothing happened
+was recorded as an attempt that ran to its own end. `003` section 3.4 reserves
+`completed` for an attempt that did run to its own end, so the mapping and the
+closed set it maps onto disagreed on a state the provider really produces.
+
+The owner resolved it on 2026-09-17 in favour of `interrupted`, by the reasoning
+this table already applies to `max_turns`: the provider stopped before anything
+about the work was judged, so nothing was found not to hold, and `failed` stays
+what `003` says it is, a judgement about the work. The provider's own `is_error`
+reading is still carried as its claim, so the disagreement stays visible in the
+record instead of being resolved silently in a match arm. This is not confined
+to authentication: every API-side error this provider reports arrives in the
+same shape, so before this amendment a transient one would have been recorded as
+a completed attempt.
 
 ### 3.6 Credentials, and what the constructed environment cannot drop
 
@@ -258,6 +279,7 @@ qualified was the pair.
 | `terminal_reason: "max_turns"` | Attempt `interrupted`, not `failed`. Acceptance `not-attempted`, reason `attempt-interrupted` (`005` section 3.1.1). |
 | The provider exits 0 with a denial recorded | The exit code is not read. Section 3.3. |
 | The provider exits 1 on a turn cap | The exit code is not read. Section 3.5. |
+| `subtype: "success"` with `is_error: true` and no denials | Attempt `interrupted`, never `completed`. The provider's `failed` claim is retained beside it. Section 3.5. |
 | The applied tool allowlist is asked for | `not-recorded`, never the requested list restated as applied. Section 3.4. |
 | A tool restriction expressed as tool-set removal where a refusal record is required | Fails qualification: the manifest declared `structured-refusals` and this path produces none. Section 3.4. |
 | `claude` is absent from the constructed environment | The environment adapter refuses to claim its paths and names the absent prerequisite. No files written. |
