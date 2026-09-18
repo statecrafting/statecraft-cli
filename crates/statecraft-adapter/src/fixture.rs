@@ -49,6 +49,25 @@ pub const WORKING_DIRECTORY_MARKER: &str = "child-working-directory.txt";
 ///
 /// A `sh` script: the suite needs a child process, not a particular language,
 /// and every platform this repository's CI runs on has one.
+///
+/// # Why the script is staged and copied rather than written in place
+///
+/// The suite's rows run as threads in one test binary, and each of them ends by
+/// exec'ing the script this function just wrote. Writing the script directly at
+/// the path that is about to be exec'd opens a window: a sibling thread that
+/// forks while this file is open for writing hands its child a duplicate of
+/// that descriptor, and `execve` refuses a file any process holds open for
+/// writing (`ETXTBSY`, "text file busy") until that child reaches its own
+/// `exec` and `O_CLOEXEC` clears it. Measured as an intermittent Linux CI
+/// failure across several unrelated rows of the suite.
+///
+/// So this process never opens the executed path for writing at all. It writes
+/// a staged file it will not exec, and a **child process** copies that file into
+/// place. The only descriptor that was ever open for writing on the executed
+/// path belonged to a process that has already exited, so no fork of this one
+/// can be holding it. Nothing about the product was involved in the race and
+/// nothing about it changes here: the fixture is still a real script, still
+/// exec'd through the same supervisor path.
 pub fn write(dir: &Path, behavior: Behavior) -> std::io::Result<PathBuf> {
     let path = dir.join("fixture-adapter.sh");
     let body: String = match behavior {
@@ -111,20 +130,54 @@ echo '{{"event":"result","classification":"completed","cost":null}}'
         ),
     };
 
-    let mut file = std::fs::File::create(&path)?;
+    // Staged, and never exec'd: see this function's note on `ETXTBSY`.
+    let staged = dir.join("fixture-adapter.staged");
+    let mut file = std::fs::File::create(&staged)?;
     // Read the prompt off stdin and discard it: the point is that the prompt
     // arrives on a stream, and a fixture that never read it would let a
     // regression to a command-line prompt pass unnoticed.
     write!(file, "#!/bin/sh\ncat > /dev/null\n{body}")?;
+    file.sync_all()?;
     drop(file);
+
+    copy_through_a_child(&staged, &path)?;
+    std::fs::remove_file(&staged)?;
 
     #[cfg(unix)]
     {
         use std::os::unix::fs::PermissionsExt;
+        // Changing a mode does not open the file for writing, so this adds no
+        // window of its own.
         std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o755))?;
     }
 
     Ok(path)
+}
+
+/// Copy `from` to `to` in a child process, so this process never holds a
+/// descriptor open for writing on `to`.
+///
+/// `std::fs::copy` would defeat the purpose: it opens the destination here.
+#[cfg(unix)]
+fn copy_through_a_child(from: &Path, to: &Path) -> std::io::Result<()> {
+    let status = std::process::Command::new("/bin/cp")
+        .arg(from)
+        .arg(to)
+        .status()?;
+    if !status.success() {
+        return Err(std::io::Error::other(format!(
+            "/bin/cp {} {} exited {status}",
+            from.display(),
+            to.display()
+        )));
+    }
+    Ok(())
+}
+
+/// Off Unix there is no `ETXTBSY` to avoid and no `/bin/cp` to avoid it with.
+#[cfg(not(unix))]
+fn copy_through_a_child(from: &Path, to: &Path) -> std::io::Result<()> {
+    std::fs::copy(from, to).map(|_| ())
 }
 
 /// The manifest the fixture adapter declares.
