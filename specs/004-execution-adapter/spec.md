@@ -243,6 +243,29 @@ stdin, trailing-output draining, ordinary success, evidence preservation and
 refusal precedence. Each fixture runs behind an independent outer timeout that
 cleans up its process group and reaps the disposable supervisor process.
 
+**2026-09-17: the fixture adapter is staged and copied into place.** Section 3.5
+requires a fixture adapter that ships with the suite, and says nothing about how
+it reaches the disk. Writing it directly at the path the suite is about to exec
+opened a window: the suite's rows run as threads in one test binary, a sibling
+thread that forks while the script is open for writing hands its child a
+duplicate of that descriptor, and `execve` refuses a file any process holds open
+for writing until that child reaches its own `exec`. It presented as an
+intermittent Linux CI failure, `ExecutableFileBusy`, landing on a different row
+each time, and it cost a re-run on several unrelated pull requests.
+
+The helper now writes a staged file it never execs and has a **child process**
+copy that file into place, so this process never opens the executed path for
+writing and no fork of it can be holding a descriptor to it. Nothing about the
+supervisor is involved or changed: the fixture is still a real script, still
+exec'd through the same path, and every row of the suite asserts exactly what it
+did. A new Linux-only reproduction, `cargo test -p statecraft-adapter --test
+fixture_exec_race --locked`, forks children that outlive the fork while writer
+threads write and exec their own fixtures. Against the original writer on Debian
+bookworm with Rust 1.96.1 it refused 2 of 240 execs with `ExecutableFileBusy` on
+each of three consecutive runs; after the repair, three consecutive runs refused
+none. The same reproduction on darwin refused none either way, which is why it
+is bounded to the platform where the failure was observed.
+
 **2026-09-17: the inherited-input fixture saves stdin before backgrounding.**
 Linux dash replaces an asynchronous command's stdin with `/dev/null` before
 `<&0` can preserve it. The unchanged deadline suite reproduced PR #31's failure
