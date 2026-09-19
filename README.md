@@ -108,7 +108,7 @@ accepts `--json`. Run from a checkout, because nothing is installed:
 cargo run -p statecraft-cli -- project register <path>   # a verdict with reasons; nothing written inside
 cargo run -p statecraft-cli -- project arm      <path>   # consent to the target being driven
 cargo run -p statecraft-cli -- env plan         <path>   # what would be managed, and what is withheld
-cargo run -p statecraft-cli -- env apply        <path>   # managed bytes, recorded in a committed manifest
+cargo run -p statecraft-cli -- env apply        <path>   # managed bytes, plus the pins, in a committed manifest
 cargo run -p statecraft-cli -- work list        <path>   # the ready set, read from spec-spine's report
 cargo run -p statecraft-cli -- run              <path> <spec-id>  # isolated worktree, supervised session, counted refusals
 cargo run -p statecraft-cli -- accept           <path> <run-id>   # the suite at the trusted base; a receipt, or none
@@ -125,7 +125,7 @@ cargo run -p statecraft-cli -- run show         <path> <run-id>   # one account,
 | A **registered** target | every verb except `project register` and `project list` | Refused (2), naming the path. |
 | An **armed** target | `run`, and only `run` | Refused (2), naming `project arm <path>`. Discovery and inspection read an unarmed target, which is what registering one is for. |
 | A bare `spec-spine` resolvable on this process's `PATH`, and a corpus in the target that compiles | `work list`, `work show`, `run` | A finding (1) naming the target and what spec-spine said. Readiness is read from `registry plan` and `registry list`, never computed here and never read from `.derived/`. The binary invoked is whatever `spec-spine` resolves to, not this repository's pinned `.tooling/bin` copy. |
-| The provider adapter's three prerequisites: a resolvable `claude` executable, the credential path, and a **qualification record** for the pair (this adapter's build, that provider version) under `<product home>/qualifications.json` | `env plan`, `env apply`, `env upgrade`, `doctor` | The adapter **refuses to claim its paths and names which one is absent**, so `env apply` writes nothing and `doctor` reports the finding. A missing record does not stop `run`: an unqualified adapter still runs, and is labelled `unqualified` in the posture, the attempt record and the outcome. |
+| The provider adapter's three prerequisites: a resolvable `claude` executable, the credential path, and a **qualification record** for the pair (this adapter's build, that provider version) under `<product home>/qualifications.json` | `env plan`, `env apply`, `env upgrade`, `doctor` | The adapter **refuses to claim its paths and names which one is absent**, and `doctor` reports the finding. `env apply` still runs: it reports `applied: 0 path(s) written` and exits 0, writing **no managed byte** while still creating the manifest at `.statecraft/environment.json` with the pins and an empty `entries` list. The withheld managed paths and the recorded pins are two different writes, and only the first is withheld. A missing record does not stop `run` either: an unqualified adapter still runs, and is labelled `unqualified` in the posture, the attempt record and the outcome. |
 
 The product's own state lives outside every target, at `$STATECRAFT_HOME` or
 `~/.statecraft` by default. That is what makes `project register` write nothing

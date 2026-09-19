@@ -14,8 +14,11 @@ product is a local environment for governed agent work; the boundary is
 and what is proposed versus adopted is
 [docs/decisions/00-founding-decisions.md](docs/decisions/00-founding-decisions.md).
 
-All ten specs, `000` to `009`, are ratified and implemented, and `plan` reports
-nothing schedulable (measured 2026-09-19 with `make status`). The rule that made
+All ten specs, `000` to `009`, are `approved`, and `plan` reports nothing
+schedulable (measured 2026-09-19 with `make status`). `registry list` is the
+authority on the second half: `000` and `001` carry `implementation: n-a`,
+because they own prose and no code, and `002` to `009` carry
+`implementation: complete`. The rule that made
 `007` worth a warning here still holds for the next spec written: `draft` plus
 `pending` is schedulable, so `plan` offers a `draft` as ready and that is
 spec-spine's lifecycle answer, not the owner's. Check the `status` field, not

@@ -205,37 +205,35 @@ rejected without editing a spec.
 
 Dated entries for choices §3 was silent on. None changes what §3 requires.
 
-**2026-09-19: how a stale status description in this spec's territory is
-corrected.** Section 3.3 fixes the claim vocabulary and requires evidence beside
-any claim above *specified*; it does not say what to do when a claim that was
-true becomes false. The two documents this spec owns under `docs/` carried
-several: the design record said no manifest existed, and the decision record's
-`F-10` said `008` and `009` were drafts. Both were true on the day they were
-written.
+**2026-09-19: the status descriptions corrected in this spec's territory, and
+the evidence for each.** Section 3.3 requires evidence beside any claim above
+*specified*. Four present-tense claims in the two documents this spec owns had
+become false, and each is corrected with the measurement that falsified it. Each
+was true when written; this entry records what changed, not a rule for changing
+it.
 
-The choice recorded here: **a stale status description is corrected in place
-only where it is an undated, present-tense claim, and every dated statement is
-preserved and answered by a new dated entry beside it.** The original wording of
-any present-tense claim that is replaced is quoted in the replacement, so the
-record of what was believed survives the correction. A correction of this kind
-carries no authority: it never adopts a `D-` row, never lifts a deferral, and
-never revises a disposition, an acceptance requirement or a policy. Where a
-status description is the stated support for a deferral, the description is
-corrected and the deferral is left standing, because what a deferral waits for
-is a decision and not a field. Applied on this date to
-`docs/design/00-boundaries-and-reuse.md` and
-`docs/decisions/00-founding-decisions.md`.
+| Corrected claim | Where it stood | The measurement |
+|---|---|---|
+| "no dependency declared below exists in any manifest, because no manifest exists" | `docs/design/00-boundaries-and-reuse.md`, status line | A Cargo workspace with seven member crates exists, and `crates/statecraft-run/Cargo.toml` declares `attest-ledger-core` pinned to `a9c3595`, used by `src/record.rs`. |
+| `attest-ledger` listed as **proposed reuse** | same file, section 1 table | Same measurement: it is an actual dependency. The **reuse** disposition it was adopted under is unchanged. |
+| "specs `008` and `009` are drafts", supporting deferral `F-10` | `docs/decisions/00-founding-decisions.md`, section 4 | `spec-spine registry list` reports both `approved` with `implementation: complete`. `F-10` stays deferred: whether the single-repository loop works is the owner's judgment, not a status field. |
+| "one row of section 3 is adopted in part" | same file, adoption-status line | Section 5 of that file already records `D-03` adopted in full and `D-01` and `D-02` adopted for language and layout. The line is restated to match section 5, which stays the only place a row becomes binding. |
 
-**2026-09-19: this spec's own Verification preamble is stale, and is left to the
-owner.** The sentence introducing the block below reads "They assert nothing
+The original wording of each replaced claim is quoted in its replacement, and
+the dated 2026-09-16 statements in both documents are left as written. Nothing
+in this change adopts a `D-` row, lifts a deferral, or revises a disposition, an
+acceptance requirement or a policy.
+
+**2026-09-19: this spec's Verification preamble is stale, and the correction is
+deferred.** The sentence introducing the block below reads "They assert nothing
 about product behavior, because none is implemented." Measured on this date:
 `cargo test --workspace` passes 515 tests across seven crates, and
 `cargo run -p statecraft-cli -- --help` prints fifteen bound verbs, so the
-clause after the comma is false. The commands themselves are unaffected and are
-not touched: they assert the authored foundation, which is still what this spec
-owns, and `make verify SPEC=001` passes unchanged. Amending an approved spec's
-prose is the owner's act, so the measurement is recorded here rather than
-applied.
+clause after the comma is false. The commands themselves are untouched, they
+still assert the authored foundation this spec owns, and `make verify SPEC=001`
+passes unchanged. The owner has acknowledged the staleness and deferred the
+correction, so the measurement is recorded here and the preamble is left as it
+stands.
 
 ## Verification
 

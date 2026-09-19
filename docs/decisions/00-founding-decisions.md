@@ -522,10 +522,17 @@ deferral, or changes an acceptance requirement.
 
 **What was measured, and with what.** `make status` at spec-spine `0.20.0`
 reports ten specs, `000` to `009`, all `approved`, with `registry plan` offering
-nothing schedulable. `ls crates` and `cargo test --workspace` report seven
-member crates and 515 passing tests, none ignored. `cargo run -p statecraft-cli
--- --help` prints fifteen bound verbs. `crates/statecraft-run/Cargo.toml`
-carries `attest-ledger-core` pinned to `a9c3595`.
+nothing schedulable. `registry list` reports `000` and `001` as
+`implementation: n-a`, because they own prose and no code, and `002` to `009`
+as `implementation: complete`. `ls crates` and `cargo test --workspace` report
+seven member crates and 515 passing tests, none ignored.
+`cargo run -p statecraft-cli -- --help` prints fifteen bound verbs.
+`crates/statecraft-run/Cargo.toml` carries `attest-ledger-core` pinned to
+`a9c3595`. Against a disposable target with a scratch `STATECRAFT_HOME`, and
+with no provider session launched, `env apply` under a missing qualification
+record reports `applied: 0 path(s) written`, exits 0, writes no managed byte,
+and still creates `.statecraft/environment.json` carrying the pins with an
+empty `entries` list.
 
 **What this corrects.** The preamble above described 2026-09-16, when `006` was
 a proposal and `003` to `005` were unimplemented; it is left as the dated
@@ -534,9 +541,14 @@ than to add to it. `F-10`'s supporting clause named `008` and `009` as drafts,
 which they no longer are, and the correction is factual only: `F-10` stays
 deferred, and so do `F-01` through `F-09` and `F-11`.
 
+**Publication, scoped to this change.** The owner authorized publishing this
+change on 2026-09-19: the branch, its pull request and its merge through the
+normal protected process. That authorization covers this change and no other,
+and it carries no waiver, no policy change and no branch cleanup.
+
 **What is still not claimed.** Nothing is released. The workspace stays at
-version `0.0.0` with `publish = false`, and `F-02` holds: no push, pull request,
-merge, release or deploy is authorized by this entry or by anything it records.
+version `0.0.0` with `publish = false`, and `F-02` is not lifted: nothing here
+tags a release or pushes to a registry.
 The distribution half of `D-01`, including the binary's name (`D-08`), stays
 open. A spec being `approved` still grants no grade above *specified*, and every
 implemented-or-tested claim corrected in this change names the command that
