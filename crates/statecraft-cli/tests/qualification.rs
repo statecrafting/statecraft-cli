@@ -87,6 +87,10 @@ if [ "$1" = --version ]; then /bin/cat "$(dirname "$0")/version"; exit 0; fi
     let root = target.path().to_str().unwrap();
     let registered = run(&["project", "register", root]);
     assert!(registered.status.code().unwrap() <= 1, "{registered:?}");
+    // Arming is the consent to being driven (spec 002 section 3.1), and `run`
+    // refuses without it. A fixture that drives a target states it.
+    let armed = run(&["project", "arm", root]);
+    assert_eq!(armed.status.code(), Some(0), "{armed:?}");
     let output = run(&["run", root, "fixture", "--json"]);
     assert_eq!(output.status.code(), Some(0), "{output:?}");
     let answer: Value = serde_json::from_slice(&output.stdout).unwrap();

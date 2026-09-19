@@ -59,6 +59,6 @@
     "summary": "Specs 003, 004 and 005 each own a library crate and name operator verbs, and 006 section 3.1 admits a verb to the command tree only through an extends edge from the spec owning the behavior. No such edge exists, so work, run and accept are specified, implemented inside their own territories, and unreachable. This spec is that edge. It binds the three verbs, fixes discovery as a join of two spec-spine reports because one of them does not carry status, fixes inspection as a read-only fold of the run record and nothing else, places each verb in 006 section 3.3's closed exit-code vocabulary, and adds no behavior of its own: where a binding needs a library entry point that does not exist, the entry point is added in the crate that owns the behavior, never re-implemented here.\n",
     "title": "The integration slice: work, run and accept bound to a process, with discovery and inspection"
   },
-  "shardHash": "686e114b118931472836f998cd7b7b63f0fd2a0671fad680ab29a97c3279da9e",
+  "shardHash": "835a30e6b2a5de7ca1076e6982480594fd823b8dae9cbbe75aac8eacf93299e5",
   "specVersion": "1.3.0"
 }

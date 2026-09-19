@@ -122,8 +122,22 @@ fn run(args: &[String]) -> i32 {
                 return Exit::Usage.code();
             };
             let root = absolute(path);
-            if registry.get(&root).is_none() {
+            let Some(registration) = registry.get(&root) else {
                 return emit(&bind::unregistered_answer(&root), format);
+            };
+            // Registration makes a target visible; arming is what consents to
+            // it being driven (spec 002 section 3.1). `run` is the one verb
+            // here that drives, so it is the one verb this gates: discovery
+            // and inspection read, and reading an unarmed target was always
+            // the point of registering one.
+            //
+            // Placed here rather than inside `run_verb` because the consent is
+            // a property of the registration, which is read here and only
+            // here, and because refusing before the corpus report is what
+            // keeps the refusal ahead of every effect: no workspace, no
+            // appended attempt, no spawned provider.
+            if invocation.verb == Verb::Run && !registration.armed {
+                return emit(&bind::unarmed_answer(&root), format);
             }
             slice_verb(invocation.verb, &root, &home, &invocation.rest[1..], format)
         }

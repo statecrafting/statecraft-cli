@@ -275,6 +275,23 @@ acceptance library. This is the caller side the decision record assigns to this
 spec: the reader landed in #20 and `accept` is the verb that obtains a report.
 Base and candidate are named explicitly so the report is about this change.
 
+**2026-09-18: `run` refuses an unarmed target, and only `run`.** `002` §3.1
+already requires arming as the consent to being driven and
+`Registration::eligible` already reads it; §3.4 placed `run`'s other
+preconditions in `006` §3.3's vocabulary and was silent on this one, so the
+binding drove a registered target that had consented to nothing. It is a
+precondition, so a refusal (**2**) naming the path and the act that would
+consent, and it is evaluated where the registration is already read, which puts
+it ahead of the corpus report and therefore ahead of every effect: no workspace,
+no appended attempt, no spawned provider. Only `run` drives, so only `run` is
+gated: `work list`, `work show`, `run list`, `run show` and `accept` read, and
+a registered target staying readable while unarmed is what `002` §3.1 records a
+target for. The gate is on consent alone and not on `eligible`, which also folds
+in qualification: those are `002`'s two independent conditions and conflating
+them here would answer a question this change did not ask. Disarming withdraws
+consent for the next invocation; it does not cancel a live attempt, which §3
+does not provide and this entry does not add.
+
 **2026-09-17: the policy digest is computed over the base's bytes, read with
 `git show`.** `005` §3.3 requires every authority-set member to be read at the
 trusted base. A base that carries no declared authority-set path at all is a
@@ -301,6 +318,13 @@ coupling gate refuses a change to `crates/statecraft-cli/` that does not edit an
 owning spec, so a rule that leaked into a command has to be written down where
 it visibly does not belong. The other seven rows are tests.
 
+`crates/statecraft-cli/tests/arming_consent.rs` carries the §5 entry dated
+2026-09-18 instead, for the same filing reason: it is not one of §3.7's rows,
+and a row's file should hold rows. It asserts the refusal on one target whose
+only changing property is its consent, because a target that is unarmed and also
+has nothing ready refuses either way and would prove nothing about which
+precondition bit.
+
 The three `--help` commands are the only ones that check what this spec is
 *for*. Every verb it names is implemented already, inside a territory no command
 line reaches; the slice is the edge that makes them reachable. A verb that is
@@ -319,6 +343,7 @@ cargo clippy --workspace --all-targets --locked -- -D warnings
 cargo fmt --all --check
 spec-spine index coverage --fail-on-untraced
 cargo test -p statecraft-cli --test integration_slice
+cargo test -p statecraft-cli --test arming_consent
 test -f crates/statecraft-cli/tests/integration_slice.rs
 cargo run -q -p statecraft-cli -- work --help
 cargo run -q -p statecraft-cli -- run --help
