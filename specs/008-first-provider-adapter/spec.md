@@ -513,6 +513,30 @@ path, and registration is the precondition all five verbs share. The binding
 applies it to all five rather than to apply alone, which adds no rule: it applies
 one 002 already has to the four verbs whose row 006 did not spell out.
 
+**2026-09-18: the settings fixture consumes its prompt after the concurrency
+barrier, and each test names its own deadline.** Both are properties of the
+`## Verification` fixture, which §3 is silent on, and neither changes what
+§3.1's transport or §3.9's negative cases require. The fixture's `cat` of the
+prompt returns only at stdin EOF, and EOF needs every copy of the write end
+closed, including one a concurrently spawned child inherited. Read before the
+barrier, the two children of the concurrent test could each wait on the other:
+one blocked on an EOF it could not reach, so it never signalled arrival, and the
+peer spun in the barrier until both hit the deadline. The ordering requirement
+removes that mutual wait. It does not remove every wait a stray descriptor can
+cause, and the fixture's comment says so at the line it constrains.
+
+The deadline becomes a per-test argument, short only where the deadline is the
+subject and generous where it is incidental, matching the convention
+`statecraft-adapter`'s negative suite already uses. That is mitigation, not a
+fix: it widens the margin against a delayed EOF and leaves the behavior in
+place. The timeout test keeps its 5 second budget and its 10 second bound, so
+§3.9's bounded-cleanup row is asserted against the same numbers as before.
+Nothing is disabled, retried or suppressed, and the four substantive guarantees
+are unchanged. The residual is an EOF an inherited descriptor can still delay;
+no finite clean run establishes that it cannot recur. Whether `supervise_stream`
+gating completion on stdout EOF is itself a defect is a contract question for
+spec `004` and is untouched here.
+
 ## Verification
 
 Each line is one command. §3.9's eleven rows are integration tests named after
