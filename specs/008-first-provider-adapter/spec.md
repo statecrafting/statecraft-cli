@@ -513,6 +513,28 @@ path, and registration is the precondition all five verbs share. The binding
 applies it to all five rather than to apply alone, which adds no rule: it applies
 one 002 already has to the four verbs whose row 006 did not spell out.
 
+**2026-09-19: the transport read failure is covered where this adapter maps
+it.** Spec `004`'s entry of the same date adds `StreamError::ReadFailed` and
+makes such a failure `interrupted`. §3.1's transport and §3.9's negative cases
+are silent on which crate demonstrates that the new diagnostic survives this
+adapter's own mapping, and the mapping is this spec's. The coverage is a unit
+test beside the existing ones in this crate's execution module: a real child
+emits a valid init event and then a line that is not valid UTF-8, and the test
+asserts the observed outcome is `interrupted`, the stream error is the read
+failure, the absent provider claim is reported as absent, the evidence carries
+the diagnostic, and the settings file is still removed. No production behavior
+in this crate changes: `stream_error` already forces `interrupted` and already
+reaches the evidence as a string, and this records that both now hold for a
+diagnostic that did not previously exist. No §3.9 row is added or altered.
+
+The row names its own deadline, as the 2026-09-18 entry below requires of every
+fixture here. The deadline is not what this row measures: the fixture has to
+reach its unreadable line for a read failure to exist at all, and on a loaded
+machine the one second the other rows share expires first, which reports the
+absent init rather than the read failure. Measured: under six concurrent test
+processes the shared deadline produced the absent init in 29 of 30 runs, and a
+named 30-second deadline produced the read failure in 30 of 30.
+
 **2026-09-18: the settings fixture consumes its prompt after the concurrency
 barrier, and each test names its own deadline.** Both are properties of the
 `## Verification` fixture, which §3 is silent on, and neither changes what

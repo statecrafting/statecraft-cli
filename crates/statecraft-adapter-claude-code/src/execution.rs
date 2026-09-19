@@ -286,6 +286,75 @@ mod tests {
         assert_eq!(std::fs::read_dir(temporary_root.path()).unwrap().count(), 0);
     }
 
+    // A stdout read failure reaches the outcome, the stream error and the
+    // evidence through the provider's own mapping, without being reported as a
+    // stream that simply ended. The failure is produced by a line that is not
+    // valid UTF-8, so a real child raises it and no seam is needed here.
+    #[cfg(unix)]
+    #[test]
+    fn an_unreadable_stream_is_interrupted_and_says_why() {
+        use std::os::unix::fs::PermissionsExt;
+
+        let workspace = tempfile::tempdir().unwrap();
+        let temporary_root = tempfile::tempdir().unwrap();
+        let child = workspace.path().join("fixture.sh");
+        std::fs::write(
+            &child,
+            concat!(
+                "#!/bin/sh\n",
+                "/bin/cat > /dev/null\n",
+                r#"echo '{"type":"system","subtype":"init","claude_code_version":"fixture"}'"#,
+                "\n",
+                "printf 'x\\377\\376y\\n'\n",
+                "exit 0\n",
+            ),
+        )
+        .unwrap();
+        std::fs::set_permissions(&child, std::fs::Permissions::from_mode(0o700)).unwrap();
+
+        let invocation = Invocation::new(child.to_str().unwrap(), &[], None);
+        let environment = construct(&Blueprint::empty(), &CheckSuiteCommands::default());
+        // This row names its own deadline. The deadline is not what is under
+        // test here; the fixture has to reach its unreadable line for the read
+        // failure to exist at all, and on a loaded machine the shared one
+        // second expires first, which reports the absent init instead.
+        let mut request = request(workspace.path());
+        request.deadline_seconds = 30;
+        let execution = supervise_in(
+            &invocation,
+            &request,
+            &environment,
+            &[],
+            temporary_root.path(),
+        )
+        .unwrap();
+
+        match &execution.supervised.stream_error {
+            Some(StreamError::ReadFailed { detail, .. }) => {
+                assert!(
+                    detail.contains("while reading the event stream"),
+                    "{detail}"
+                );
+            }
+            other => panic!("expected a read failure, not a stream that ended: {other:?}"),
+        }
+        assert_eq!(execution.supervised.outcome, Outcome::Interrupted);
+        // The provider's claim is absent here and is reported as absent, not
+        // as a completion the supervisor could not read.
+        assert!(execution.result.is_none());
+        assert_eq!(execution.termination().observed, Outcome::Interrupted);
+        let evidence = execution.evidence();
+        assert!(
+            evidence["streamError"]
+                .as_str()
+                .unwrap()
+                .contains("could not read the event stream"),
+            "{evidence}"
+        );
+        // Cleanup still runs on the transport failure.
+        assert_eq!(std::fs::read_dir(temporary_root.path()).unwrap().count(), 0);
+    }
+
     #[test]
     fn temporary_storage_in_the_workspace_is_refused_before_writing() {
         let workspace = tempfile::tempdir().unwrap();

@@ -222,6 +222,46 @@ record.
 
 Dated entries for choices §3 was silent on. None changes what it requires.
 
+**2026-09-19: a stdout read failure is reported as one, and is never a
+completion.** The 2026-09-17 entry below separates terminal parsing from process
+completion; it did not say what happens when the read itself fails. The
+implementation answered by discarding the failure: the reader thread returned on
+an `Err` from `lines()` and ignored the result of the trailing drain, and the
+supervisor inferred the end of the stream from the channel disconnecting. That
+inference is wrong in both directions. A read failure before a terminal event
+was reported as `NoResult`, which claims the supervisor read the stream to its
+end and found no result, an observation nobody made. A read failure while
+draining after a valid terminal event was reported as nothing at all, and the
+attempt was `completed`.
+
+The reader now reports its own termination rather than letting the channel stand
+for it, so a clean end of file and a failed read are distinguishable. A read
+failure is a new `StreamError::ReadFailed` carrying the failure and the phase it
+occurred in, and the attempt is `interrupted`, never `completed`. It is
+`interrupted` rather than `failed` for the reason the 2026-09-16 entry below
+gives: a stream the supervisor could not read judged nothing, so calling it
+`failed` would claim an assessment of the work. The provider's terminal claim,
+the trusted event prefix and the retained refusals are unchanged and stay
+separate from this observation, which is what §3.1's division between the stream
+and the result already requires.
+
+Diagnostic precedence, where more than one is observed: **malformed**, then
+**read failure**, then **no result**. A malformed line is a judgement about
+bytes that did arrive and is the most specific. A read failure establishes that
+the stream was never read to its end. Only a stream read to its end, carrying no
+result, is `NoResult`.
+
+Deadline enforcement, child-exit observation, descendant handling and the
+no-blocking-join rule are untouched, and no field is added to the supervised
+record. Validation is deterministic and does not reproduce an operating-system
+race: a line that is not valid UTF-8 makes `lines()` fail in a real child, which
+covers the failure before a terminal event through the process boundary; a
+drain failure is injected through a private reader seam, since a trailing drain
+copies bytes and cannot be made to fail by their content. `cargo test -p
+statecraft-adapter --test deadline --locked` passes eleven tests, the ten it
+carried plus the unreadable-stdout row, and the deadline, inherited-pipe,
+malformed and draining rows are unchanged.
+
 **2026-09-17: terminal parsing and process completion are separate.** The
 deadline in §3.5.3 and the no-blocking-reader decision below cover the attempt
 through pipe draining and child exit. A terminal event ends the trusted event

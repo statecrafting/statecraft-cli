@@ -17,10 +17,11 @@ use crate::environment::{ChildEnvironment, EnvironmentState};
 use crate::manifest::Manifest;
 use crate::protocol::{Event, Request, StreamError, parse_event};
 use statecraft_run::attempt::Outcome;
-use std::io::{BufRead, BufReader};
+use std::io::{BufRead, BufReader, Read};
 use std::path::Path;
-use std::process::{Command, Stdio};
+use std::process::{Child, ChildStdout, Command, Stdio};
 use std::sync::mpsc;
+use std::thread::JoinHandle;
 use std::time::{Duration, Instant};
 
 /// Why nothing was spawned.
@@ -122,6 +123,36 @@ pub fn supervise_stream<E: Send + 'static>(
     decode: fn(&str, usize) -> Result<E, StreamError>,
     is_terminal: fn(&E) -> bool,
 ) -> std::io::Result<Supervised<E>> {
+    let spawned = spawn_supervised(program, args, request, environment)?;
+    read_supervised(
+        spawned.child,
+        spawned.stdout,
+        spawned.writer,
+        spawned.deadline,
+        decode,
+        is_terminal,
+    )
+}
+
+/// A spawned adapter, its pipes and the deadline it is already running against.
+///
+/// Split out from [`read_supervised`] so the reading half can be driven over
+/// any reader. Both halves are private: the seam exists so a stdout failure can
+/// be injected deterministically in a unit test, not as API.
+struct Spawned {
+    child: Child,
+    stdout: ChildStdout,
+    writer: JoinHandle<()>,
+    deadline: Instant,
+}
+
+/// Spawn the adapter, start prompt delivery, and begin the deadline.
+fn spawn_supervised(
+    program: &Path,
+    args: &[&str],
+    request: &Request,
+    environment: &ChildEnvironment,
+) -> std::io::Result<Spawned> {
     let workspace = workspace_to_enter(&request.workspace)?;
 
     let mut command = Command::new(program);
@@ -156,32 +187,90 @@ pub fn supervise_stream<E: Send + 'static>(
     });
 
     let stdout = child.stdout.take().expect("stdout was piped");
+    Ok(Spawned {
+        child,
+        stdout,
+        writer,
+        deadline,
+    })
+}
+
+/// What the reader thread hands back, in order, ending with exactly one `Ended`.
+///
+/// The reader reports its own termination rather than letting the channel's
+/// disconnection stand for it. Disconnection says the sender was dropped; it
+/// does not say the pipe reached end of file, and the two were previously
+/// indistinguishable to the caller.
+enum Item<E> {
+    Event(E),
+    Malformed(StreamError),
+    /// `None` is a clean end of file. `Some` is a read failure and its detail.
+    Ended(Option<String>),
+}
+
+/// Read a spawned adapter's stream under its deadline, then clean up.
+///
+/// Generic over the reader so a stdout failure can be injected without touching
+/// a live descriptor. Everything else, including child-exit observation,
+/// deadline enforcement and descendant handling, is the same in both uses.
+fn read_supervised<E: Send + 'static, R: Read + Send + 'static>(
+    mut child: Child,
+    stdout: R,
+    writer: JoinHandle<()>,
+    deadline: Instant,
+    decode: fn(&str, usize) -> Result<E, StreamError>,
+    is_terminal: fn(&E) -> bool,
+) -> std::io::Result<Supervised<E>> {
     let (tx, rx) = mpsc::sync_channel(16);
     let reader = std::thread::spawn(move || {
         let mut stdout = BufReader::new(stdout);
-        for (i, line) in (&mut stdout).lines().enumerate() {
-            let Ok(line) = line else { return };
-            if line.trim().is_empty() {
-                continue;
+        let mut failure = None;
+        'read: {
+            for (i, line) in (&mut stdout).lines().enumerate() {
+                let line = match line {
+                    Ok(line) => line,
+                    Err(e) => {
+                        // A read that failed is not a stream that ended. Say so
+                        // here rather than letting the absence of a result event
+                        // describe it later.
+                        failure = Some(format!("while reading the event stream: {e}"));
+                        break 'read;
+                    }
+                };
+                if line.trim().is_empty() {
+                    continue;
+                }
+                let event = decode(&line, i + 1);
+                let stop_parsing = event.as_ref().map_or(true, is_terminal);
+                let item = match event {
+                    Ok(event) => Item::Event(event),
+                    Err(e) => Item::Malformed(e),
+                };
+                if tx.send(item).is_err() {
+                    return;
+                }
+                if stop_parsing {
+                    break;
+                }
             }
-            let event = decode(&line, i + 1);
-            let stop_parsing = event.as_ref().map_or(true, is_terminal);
-            if tx.send(event).is_err() {
-                return;
-            }
-            if stop_parsing {
-                break;
+            // A terminal event or malformed line ends the trusted prefix. Drain
+            // raw bytes after it, keeping the channel open until the pipe
+            // closes. A failure here is still a failure to read the stream to
+            // its end, so it is reported rather than discarded.
+            if let Err(e) = std::io::copy(&mut stdout, &mut std::io::sink()) {
+                failure = Some(format!(
+                    "while draining output after the trusted prefix: {e}"
+                ));
             }
         }
-        // A terminal event or malformed line ends the trusted prefix. Drain
-        // raw bytes after it, keeping the channel open until the pipe closes.
-        let _ = std::io::copy(&mut stdout, &mut std::io::sink());
+        let _ = tx.send(Item::Ended(failure));
     });
 
     let mut events = Vec::new();
     let mut stream_error = None;
+    let mut read_failure: Option<String> = None;
     let mut timed_out = false;
-    let mut eof = false;
+    let mut ended = false;
 
     loop {
         let remaining = deadline.saturating_duration_since(Instant::now());
@@ -189,28 +278,45 @@ pub fn supervise_stream<E: Send + 'static>(
             timed_out = true;
             break;
         }
-        // Neither EOF nor a terminal event says the child has exited. Likewise,
-        // child exit does not close a pipe still held by a descendant. Keep all
-        // of these observations under the same deadline, without blocking on
-        // wait or join. The exit code is not a verdict on the work.
-        if eof && child.try_wait()?.is_some() && reader.is_finished() && writer.is_finished() {
+        // Neither the end of the stream nor a terminal event says the child has
+        // exited. Likewise, child exit does not close a pipe still held by a
+        // descendant. Keep all of these observations under the same deadline,
+        // without blocking on wait or join. The exit code is not a verdict on
+        // the work.
+        if ended && child.try_wait()?.is_some() && reader.is_finished() && writer.is_finished() {
             break;
         }
         let interval = remaining.min(Duration::from_millis(10));
-        if eof {
+        if ended {
             std::thread::sleep(interval);
             continue;
         }
         match rx.recv_timeout(interval) {
-            Ok(Ok(event)) => {
+            Ok(Item::Event(event)) => {
                 events.push(event);
             }
-            Ok(Err(e)) => {
+            Ok(Item::Malformed(e)) => {
                 // Keep the diagnostic and preceding evidence through cleanup.
-                stream_error = Some(e);
+                // First malformed line wins: parsing stops there, so a second
+                // would describe bytes the supervisor never trusted.
+                if stream_error.is_none() {
+                    stream_error = Some(e);
+                }
+            }
+            Ok(Item::Ended(failure)) => {
+                read_failure = failure;
+                ended = true;
             }
             Err(mpsc::RecvTimeoutError::Timeout) => {}
-            Err(mpsc::RecvTimeoutError::Disconnected) => eof = true,
+            Err(mpsc::RecvTimeoutError::Disconnected) => {
+                // The reader went away without reporting its own end. That is
+                // not evidence of a clean end of file, so it is not recorded as
+                // one.
+                read_failure = Some(
+                    "the stdout reader ended without reporting the end of the stream".to_string(),
+                );
+                ended = true;
+            }
         }
     }
 
@@ -237,11 +343,23 @@ pub fn supervise_stream<E: Send + 'static>(
         None
     };
 
+    // Diagnostic precedence, where more than one is observed: a malformed line
+    // is a judgement about bytes that arrived and is the most specific, so it
+    // is kept. A read failure is next: it establishes that the stream was never
+    // read to its end. Only a stream that was read to its end, and carried no
+    // result, is reported as having no result.
     let has_result = events.iter().any(is_terminal);
-    if stream_error.is_none() && !has_result && !timed_out {
-        stream_error = Some(StreamError::NoResult {
-            events: events.len(),
-        });
+    if stream_error.is_none() {
+        if let Some(detail) = read_failure {
+            stream_error = Some(StreamError::ReadFailed {
+                detail,
+                events: events.len(),
+            });
+        } else if !has_result && !timed_out {
+            stream_error = Some(StreamError::NoResult {
+                events: events.len(),
+            });
+        }
     }
 
     let outcome = if timed_out {
@@ -249,7 +367,9 @@ pub fn supervise_stream<E: Send + 'static>(
         Outcome::Interrupted
     } else if stream_error.is_some() {
         // A stream that cannot be read is never a completion. It is also not a
-        // judgement of the work, so it is interrupted rather than failed.
+        // judgement of the work, so it is interrupted rather than failed. A
+        // read failure lands here with the rest: the provider's terminal claim
+        // is retained in `events`, and stays separate from this observation.
         Outcome::Interrupted
     } else {
         Outcome::Completed
@@ -359,4 +479,112 @@ fn kill_tree(child: &mut std::process::Child) -> Option<String> {
         "descendants of {pid} are not killed on this platform; \
          a surviving process is possible and is reported rather than assumed away"
     ))
+}
+
+#[cfg(all(test, unix))]
+mod tests {
+    use super::*;
+    use crate::capability::Requested;
+    use crate::environment::{Blueprint, CheckSuiteCommands, construct};
+    use crate::protocol::{AttemptIdentity, Classification, read_stream};
+    use std::io::Write;
+
+    /// A reader that passes `budget` bytes through and then fails every read.
+    ///
+    /// Deterministic fault injection: no pipe race, no descriptor manipulation,
+    /// and the failure lands at a byte offset the test chooses. Sized to the
+    /// trusted prefix, it fails exactly once that prefix has been delivered,
+    /// which is the drain.
+    struct FailAfter<R> {
+        inner: R,
+        budget: usize,
+    }
+
+    impl<R: Read> Read for FailAfter<R> {
+        fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
+            if self.budget == 0 {
+                return Err(std::io::Error::other("injected stdout read failure"));
+            }
+            let cap = buf.len().min(self.budget);
+            let read = self.inner.read(&mut buf[..cap])?;
+            self.budget -= read;
+            Ok(read)
+        }
+    }
+
+    // A valid terminal event followed by a failure to drain the trailing bytes
+    // is interrupted, and the terminal claim and the refusal survive it.
+    #[test]
+    fn a_drain_failure_after_a_terminal_event_is_not_a_completion() {
+        let dir = tempfile::tempdir().unwrap();
+        let stream = concat!(
+            r#"{"event":"init","applied":[],"adapterVersion":"1.0","providerVersion":"fixture"}"#,
+            "\n",
+            r#"{"event":"refusal","guard":"fixture","detail":"blocked"}"#,
+            "\n",
+            r#"{"event":"result","classification":"completed","cost":{"amount":0.25,"unit":"fixture"}}"#,
+            "\n",
+        );
+        std::fs::write(dir.path().join("stream.jsonl"), stream).unwrap();
+        let script = dir.path().join("adapter.sh");
+        let mut file = std::fs::File::create(&script).unwrap();
+        file.write_all(b"cat > /dev/null\ncat stream.jsonl\n")
+            .unwrap();
+        drop(file);
+
+        let request = Request {
+            workspace: dir.path().to_path_buf(),
+            base_commit: "0".repeat(40),
+            prompt: b"fixture prompt".to_vec(),
+            capabilities: Requested::none(),
+            deadline_seconds: 30,
+            attempt: AttemptIdentity {
+                run_id: "drain-failure".into(),
+                number: 1,
+            },
+        };
+        let environment = construct(
+            &Blueprint::empty().allowing("PATH", "/usr/bin:/bin"),
+            &CheckSuiteCommands(vec![]),
+        );
+        let spawned = spawn_supervised(
+            Path::new("/bin/sh"),
+            &["adapter.sh"],
+            &request,
+            &environment,
+        )
+        .unwrap();
+        let stdout = FailAfter {
+            inner: spawned.stdout,
+            budget: stream.len(),
+        };
+        let run: Supervised = read_supervised(
+            spawned.child,
+            stdout,
+            spawned.writer,
+            spawned.deadline,
+            parse_event,
+            |event| matches!(event, Event::Result { .. }),
+        )
+        .unwrap();
+
+        match &run.stream_error {
+            Some(StreamError::ReadFailed { detail, events }) => {
+                assert!(
+                    detail.contains("while draining output after the trusted prefix"),
+                    "the phase belongs in the diagnostic, got {detail}"
+                );
+                assert_eq!(*events, 3);
+            }
+            other => panic!("expected a read failure, got {other:?}"),
+        }
+        assert_eq!(run.outcome, Outcome::Interrupted, "never read as success");
+        assert_eq!(run.events.len(), 3, "the trusted prefix is retained");
+        assert!(matches!(run.events.first(), Some(Event::Init { .. })));
+        assert_eq!(crate::protocol::refusals(&run.events).len(), 1);
+        // The provider's own claim survives the supervisor's observation.
+        let claimed = read_stream(&run.events, &[]).unwrap();
+        assert_eq!(claimed.classification, Classification::Completed);
+        assert_eq!(run.surviving_processes, None);
+    }
 }

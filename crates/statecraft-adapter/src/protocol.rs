@@ -196,6 +196,21 @@ pub enum StreamError {
     /// The stream had no init event, so nothing says what was applied.
     #[error("event stream carried no init event, so what the provider applied is unknown")]
     NoInit,
+    /// Reading the child's stdout failed, so the stream was never finished.
+    ///
+    /// Distinct from [`StreamError::NoResult`] on purpose. A stream that ended
+    /// is a stream the supervisor read to its end and found wanting; a stream
+    /// that could not be read established nothing about its own end, and
+    /// reporting the second as the first would claim an observation nobody
+    /// made. It is also distinct from [`StreamError::Malformed`], which is a
+    /// judgement about bytes that did arrive.
+    #[error("could not read the event stream after {events} event(s): {detail}")]
+    ReadFailed {
+        /// What failed, and during which phase of reading.
+        detail: String,
+        /// How many trusted events had already arrived.
+        events: usize,
+    },
 }
 
 /// Read a typed event stream into a result.
