@@ -19,7 +19,7 @@ struct Attempt {
 }
 
 impl Attempt {
-    fn new(workspace: &Path, rule: &str, mode: &str) -> Self {
+    fn new(workspace: &Path, rule: &str, mode: &str, deadline_seconds: u64) -> Self {
         std::fs::create_dir_all(workspace).unwrap();
         std::fs::create_dir(workspace.join(".claude")).unwrap();
         for name in ["settings.json", "settings.local.json"] {
@@ -39,16 +39,25 @@ settings=$8
 [ -f "$settings" ] && [ ! -L "$settings" ]
 /bin/ls -ln "$settings" > observed-mode
 [ "${USER+x}" != x ] && [ "${HOME+x}" != x ]
-/bin/cat > observed-prompt
 /bin/cat "$settings" > observed-settings
 /usr/bin/cmp expected-settings observed-settings
 printf '%s' "$settings" > observed-path
 printf '%s\n' "$@" > observed-args
 if [ -f concurrent ]; then
   : > ready
-  while [ ! -f ../a/ready ] || [ ! -f ../b/ready ]; do /bin/sleep 0.01; done
+  # One process per iteration, and this wait can now be long. Bound the rate.
+  while [ ! -f ../a/ready ] || [ ! -f ../b/ready ]; do /bin/sleep 0.1; done
   /usr/bin/cmp "$settings" expected-settings
 fi
+# Ordering requirement: the prompt is consumed here, after the barrier, and
+# must not move before it. `cat` returns only at stdin EOF, and EOF needs every
+# copy of the write end closed, including one a concurrently spawned child
+# inherited. Read before the barrier, each side of the concurrent test could
+# wait on the other: one blocked on an EOF it could not reach, so it never
+# signalled arrival, and the peer spun in the barrier until both hit the
+# deadline. Consuming the prompt after the barrier removes that dependency.
+# It does not remove every wait a stray descriptor can cause.
+/bin/cat > observed-prompt
 /bin/cat stream.jsonl
 if [ -f hang ]; then
   /bin/sleep 0.1
@@ -89,9 +98,19 @@ fi
                 base_commit: "fixture".into(),
                 prompt: b"private prompt: ' \" $(touch injected) `echo no` ;\n\\".to_vec(),
                 capabilities: Requested::none(),
-                // Allow fixture startup under a loaded test runner. The hung
-                // child still sleeps well beyond this supervised deadline.
-                deadline_seconds: 5,
+                // Named by each test. The deadline is the subject of exactly
+                // one of them; for the others it is an incidental bound, and a
+                // concurrently spawned child holding an inherited pipe
+                // descriptor can delay this child's EOF long enough to exhaust
+                // a short one.
+                //
+                // A generous bound here is **mitigation**: it widens the margin
+                // and leaves that behaviour in place. It is not a fix, and it
+                // cannot resolve a mutual wait, which is what the ordering
+                // requirement above is for. Short only where the deadline is
+                // the thing under test, matching the convention
+                // `statecraft-adapter`'s own negative suite uses.
+                deadline_seconds,
                 attempt: AttemptIdentity {
                     run_id: "settings-fixture".into(),
                     number: 1,
@@ -171,6 +190,7 @@ fn declared_denials_reach_the_child_and_survive_as_structured_evidence() {
         root.path(),
         "Bash(echo 'quote' \"double\" \\ $HOME $(touch injected) `id`;\n雪:*)",
         "",
+        30,
     );
     let execution = attempt.run();
     attempt.check(&execution);
@@ -182,8 +202,8 @@ fn declared_denials_reach_the_child_and_survive_as_structured_evidence() {
 #[test]
 fn concurrent_attempts_keep_independent_settings_until_both_children_read_them() {
     let root = tempfile::tempdir().unwrap();
-    let a = Attempt::new(&root.path().join("a"), "Bash(first:*)", "concurrent");
-    let b = Attempt::new(&root.path().join("b"), "Bash(second:*)", "concurrent");
+    let a = Attempt::new(&root.path().join("a"), "Bash(first:*)", "concurrent", 30);
+    let b = Attempt::new(&root.path().join("b"), "Bash(second:*)", "concurrent", 30);
     let (first, second) = std::thread::scope(|scope| {
         let first = scope.spawn(|| a.run());
         let second = scope.spawn(|| b.run());
@@ -197,7 +217,8 @@ fn concurrent_attempts_keep_independent_settings_until_both_children_read_them()
 #[test]
 fn timeout_after_terminal_denial_cleans_settings_and_retains_evidence() {
     let root = tempfile::tempdir().unwrap();
-    let attempt = Attempt::new(root.path(), "Bash(hang:*)", "hang");
+    // The one test whose subject is the deadline, so the one short budget.
+    let attempt = Attempt::new(root.path(), "Bash(hang:*)", "hang", 5);
     let started = std::time::Instant::now();
     let execution = attempt.run();
     assert!(started.elapsed() < std::time::Duration::from_secs(10));
@@ -209,7 +230,7 @@ fn timeout_after_terminal_denial_cleans_settings_and_retains_evidence() {
 #[test]
 fn a_settings_cleanup_failure_cannot_erase_the_terminal_denial() {
     let root = tempfile::tempdir().unwrap();
-    let attempt = Attempt::new(root.path(), "Bash(cleanup:*)", "obstruct-cleanup");
+    let attempt = Attempt::new(root.path(), "Bash(cleanup:*)", "obstruct-cleanup", 30);
     let execution = attempt.run();
     let path = std::fs::read_to_string(root.path().join("observed-path")).unwrap();
     // Remove only the empty directory the fixture put at its own settings path.
@@ -223,7 +244,7 @@ fn a_settings_cleanup_failure_cannot_erase_the_terminal_denial() {
 #[test]
 fn malformed_stream_cleanup_removes_the_settings_file() {
     let root = tempfile::tempdir().unwrap();
-    let attempt = Attempt::new(root.path(), "Bash(malformed:*)", "");
+    let attempt = Attempt::new(root.path(), "Bash(malformed:*)", "", 30);
     std::fs::write(root.path().join("stream.jsonl"), "not json\n").unwrap();
     let execution = attempt.run();
     assert_eq!(execution.supervised.outcome, Outcome::Interrupted);
