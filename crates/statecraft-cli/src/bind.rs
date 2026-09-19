@@ -464,6 +464,28 @@ pub fn unregistered_answer(path: &Path) -> Answer<String> {
     Answer::new(detail.clone(), Exit::Refused, detail)
 }
 
+/// The refusal an unarmed target gets from a verb that would drive it.
+///
+/// Spec 002 section 3.1: a repository is armed separately from being
+/// registered, and arming is what consents to being driven. Registration makes
+/// a target visible; it does not make it drivable. So a verb that would drive
+/// an unarmed target has an unmet precondition, which spec 006 section 3.3
+/// makes a refusal (2) and not a finding.
+///
+/// The mapping is the only judgement here, exactly as it is for
+/// [`unregistered_answer`]: that consent is required at all is spec 002's, and
+/// [`statecraft_environment::registry::Registration::armed`] is where it is
+/// recorded. This says nothing about qualification, which is the registration's
+/// other and independent condition.
+pub fn unarmed_answer(path: &Path) -> Answer<String> {
+    let detail = format!(
+        "{} is registered but not armed; `project arm {}` consents to it being driven",
+        path.display(),
+        path.display()
+    );
+    Answer::new(detail.clone(), Exit::Refused, detail)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
