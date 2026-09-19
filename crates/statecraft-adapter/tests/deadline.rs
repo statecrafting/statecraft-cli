@@ -100,6 +100,14 @@ fn terminal_then_exit_with_inherited_input_pipe() {
     bounded("inherited-input");
 }
 
+// A line that is not valid UTF-8 makes `lines()` fail. That is a read failure,
+// not a stream that ended, and it arrives through a real child rather than
+// through a seam.
+#[test]
+fn unreadable_stdout_before_a_terminal_event() {
+    bounded("unreadable");
+}
+
 #[test]
 fn normal_successful_child() {
     bounded("success");
@@ -141,6 +149,8 @@ fn deadline_worker() {
                 "{terminal}\nexec 3<&0\nsleep 300 <&3 3<&- >/dev/null &\necho $! > descendant\nexit 0"
             )
         }
+        // Raw bytes that are not valid UTF-8, so reading the line fails.
+        "unreadable" => "printf 'x\\377\\376y\\n'\nexit 0".into(),
         "success" => terminal.into(),
         "drain" => format!(
             "{terminal}\ni=0\nwhile [ $i -lt 10000 ]; do echo 'discard this trailing output'; i=$((i+1)); done"
@@ -225,6 +235,17 @@ fn deadline_worker() {
         assert_eq!(run.events.len(), 2);
     } else if case == "no-result" {
         assert_eq!(run.stream_error, Some(StreamError::NoResult { events: 2 }));
+    } else if case == "unreadable" {
+        match &run.stream_error {
+            Some(StreamError::ReadFailed { detail, events }) => {
+                assert!(
+                    detail.contains("while reading the event stream"),
+                    "the phase belongs in the diagnostic, got {detail}"
+                );
+                assert_eq!(*events, 2, "the preceding evidence is retained");
+            }
+            other => panic!("expected a read failure, not a stream that ended: {other:?}"),
+        }
     } else {
         assert_eq!(run.stream_error, None);
     }
