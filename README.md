@@ -6,37 +6,49 @@ result independently, and keep a reviewable account of what happened.
 
 It runs on one machine, on one repository, with no account and no hosted service.
 
-## Status: specified and implemented, not released
+## Status: specified, implemented and tested, not released
 
-`cargo run -p statecraft-cli -- project register <path>` records a repository and
-prints its verdict with reasons. The four `project` verbs work. The `env` verbs
-and `doctor` are bound and **refuse with exit 2**, because they need a configured
-adapter set and no spec ratifies a provider adapter yet. The `work`, `run` and
-`accept` verbs **do not exist**: spec `006` section 3.1 admits a verb only by the
-change that implements the behavior behind it, through an `extends` edge from the
-spec that owns it, so `003`, `004` and `005` are libraries with no command
-surface.
+Every verb the specs name is bound. There are fifteen, and
+`cargo run -p statecraft-cli -- --help` prints each one beside the spec it
+answers to:
 
-Nothing is installed or released: `F-02` defers publication, so the way to run
-it is from a checkout.
+```
+project register   project list   project arm   project disarm
+env plan   env apply   env upgrade   env remove   doctor
+work list   work show   run   run list   run show   accept
+```
 
-`000` to `007` are approved, and the constitution's product principles VI to
-XIII were ratified on 2026-09-16, three of them frozen as spec 000 anchors.
-`007-shared-evidence-envelope` was ratified on 2026-09-17. Every spec that
-claims code has built it: six crates, no forward claim outstanding, and
-`spec-spine registry plan` reports nothing schedulable.
+Measured on 2026-09-19: ten specs, `000` to `009`, all `approved`;
+`.tooling/bin/spec-spine registry plan` reports nothing schedulable; seven
+crates and one binary; `cargo test --workspace` passes **515 tests**, none
+ignored. Every spec that claims code has built it, and no forward claim is
+outstanding.
+
+`000` to `007` were ratified between 2026-09-16 and 2026-09-17, and the
+constitution's product principles VI to XIII were ratified on 2026-09-16, three
+of them frozen as spec `000` anchors. `008-first-provider-adapter` and
+`009-work-run-accept-integration` are `approved` and implemented: `008` names
+the first provider adapter and what its stream can and cannot witness, and `009`
+binds `work`, `run` and `accept` to a process.
+
+Nothing is installed or released: the workspace is at version `0.0.0` with
+`publish = false`, and `F-02` defers publication of any kind. The way to run it
+is from a checkout.
 
 The language and the layout are decided: Rust, one Cargo workspace, crates
-matching the spec boundaries. The packaging, the distribution and the first
-interaction mode are still **recommendations awaiting the owner's decision**,
-recorded with what has been adopted in
+matching the spec boundaries. The packaging, the distribution and the binary's
+name are still **recommendations awaiting the owner's decision**, recorded with
+what has been adopted in
 [docs/decisions/00-founding-decisions.md](docs/decisions/00-founding-decisions.md).
 
 This repository distinguishes four claims and makes them separately: *specified*,
-*implemented*, *tested*, *released*. Today `000` to `007` are specified, and
-`002` to `007` are additionally implemented and tested: six crates, 320 tests,
-and every row of every spec's observable-negative-cases table covered by one
-test named after the row. **Nothing is released**, and `F-02` defers publication.
+*implemented*, *tested*, *released*. Today `000` to `009` are specified, and
+`002` to `009` are additionally implemented and tested: seven crates and 515
+passing tests, from `cargo test --workspace` on 2026-09-19. The
+machine-checkable rows of each spec's observable-negative-cases table are
+carried by tests named after them; the rows those tables state as refused in
+review are review obligations, and no test is claimed for them. **Nothing is
+released**, and `F-02` defers publication.
 
 ## The idea
 
@@ -84,25 +96,51 @@ selection, publication of any kind, signing and key custody, any user interface,
 adaptive autonomy, cost and quota control, breadth across providers, and
 scheduling across repositories.
 
-## The first proposed workflow
+## The first workflow, as it is actually invoked
 
 One repository, one work item, one adapter, one workspace, one independent
-inspection, one reviewable outcome. Publication is not part of it.
+inspection, one reviewable outcome. Publication is not part of it (`F-02`).
 
-```
-statecraft project register <path>    # a qualification verdict, nothing written inside
-statecraft env apply                 # managed bytes, recorded in a committed manifest
-statecraft work list                 # the ready set, read from spec-spine's report
-statecraft run start --spec NNN       # isolated worktree, supervised session, counted refusals
-statecraft accept --run <id>          # the suite at the trusted base; a receipt, or none
-statecraft run show <id>              # one account, every value naming its record
+Every verb below takes the **target path** as its first argument, and every verb
+accepts `--json`. Run from a checkout, because nothing is installed:
+
+```sh
+cargo run -p statecraft-cli -- project register <path>   # a verdict with reasons; nothing written inside
+cargo run -p statecraft-cli -- project arm      <path>   # consent to the target being driven
+cargo run -p statecraft-cli -- env plan         <path>   # what would be managed, and what is withheld
+cargo run -p statecraft-cli -- env apply        <path>   # managed bytes, recorded in a committed manifest
+cargo run -p statecraft-cli -- work list        <path>   # the ready set, read from spec-spine's report
+cargo run -p statecraft-cli -- run              <path> <spec-id>  # isolated worktree, supervised session, counted refusals
+cargo run -p statecraft-cli -- accept           <path> <run-id>   # the suite at the trusted base; a receipt, or none
+cargo run -p statecraft-cli -- run show         <path> <run-id>   # one account, every value naming its record
 ```
 
-Two of these verbs are bound today: `project register` works, and `env apply`
-refuses with exit 2 until a provider adapter is ratified. The other four do not
-exist. They are the slice specs `002` to `005` describe and spec `006` binds,
-with its acceptance stated as refusals in
+`doctor`, `project list`, `project disarm`, `work show`, `run list`,
+`env upgrade` and `env remove` complete the surface.
+
+### What each step needs before it will do anything
+
+| Prerequisite | Which verbs | What happens without it |
+|---|---|---|
+| A **registered** target | every verb except `project register` and `project list` | Refused (2), naming the path. |
+| An **armed** target | `run`, and only `run` | Refused (2), naming `project arm <path>`. Discovery and inspection read an unarmed target, which is what registering one is for. |
+| A bare `spec-spine` resolvable on this process's `PATH`, and a corpus in the target that compiles | `work list`, `work show`, `run` | A finding (1) naming the target and what spec-spine said. Readiness is read from `registry plan` and `registry list`, never computed here and never read from `.derived/`. The binary invoked is whatever `spec-spine` resolves to, not this repository's pinned `.tooling/bin` copy. |
+| The provider adapter's three prerequisites: a resolvable `claude` executable, the credential path, and a **qualification record** for the pair (this adapter's build, that provider version) under `<product home>/qualifications.json` | `env plan`, `env apply`, `env upgrade`, `doctor` | The adapter **refuses to claim its paths and names which one is absent**, so `env apply` writes nothing and `doctor` reports the finding. A missing record does not stop `run`: an unqualified adapter still runs, and is labelled `unqualified` in the posture, the attempt record and the outcome. |
+
+The product's own state lives outside every target, at `$STATECRAFT_HOME` or
+`~/.statecraft` by default. That is what makes `project register` write nothing
+inside the repository it registers.
+
+What the slice must make observably true, stated as refusals rather than as
+assertions, is section 4 of
 [docs/design/00-boundaries-and-reuse.md](docs/design/00-boundaries-and-reuse.md#4-the-bounded-first-vertical-slice).
+
+### The exit codes a caller scripts against
+
+`0` did what was asked. `1` ran and reports a **finding**. `2` **refused**: a
+precondition was not met and nothing was done. `3` the arguments name no verb.
+`4` a **failure** nobody asked for. Spec `006` section 3.3 owns the vocabulary
+and a test keeps the set closed.
 
 ## Governance
 
@@ -121,7 +159,7 @@ replaced by another project's work. `make tools` reads the exact version from
 ```sh
 make tools       # install the pinned spec-spine into .tooling/bin
 make gate        # read-only: freshness, lint, coverage, the authored-content rules
-make code        # read-only: build, test, clippy, fmt across the six crates
+make code        # read-only: build, test, clippy, fmt across the seven crates
 make refresh     # writing: recompute the committed shard trees
 make verify SPEC=001
 ```

@@ -4,18 +4,28 @@
 
 Prepared 2026-09-16. Owned by spec `001-boundaries-and-authority`.
 
-**Status: design record. Nothing here is implemented, and no dependency declared
-below exists in any manifest**, because no manifest exists. The distinction the
-tables keep is between a dependency this product would take on a component that
-is implemented today, and an interface this product proposes and neither side has
-built.
+**Status: design record, written before any code existed.** As prepared, it read
+"nothing here is implemented, and no dependency declared below exists in any
+manifest, because no manifest exists". That sentence described 2026-09-16 and no
+longer describes the tree; it is replaced rather than deleted, because what the
+tables keep apart has not changed. The distinction is between a dependency this
+product would take on a component that is implemented today, and an interface
+this product proposes and neither side has built.
+
+**Corrected 2026-09-19.** A Cargo workspace exists with seven member crates, and
+one row below has moved from a proposal to a declared dependency:
+`attest-ledger-core` is in `crates/statecraft-run/Cargo.toml` as a git
+dependency pinned to `a9c3595`, used by `crates/statecraft-run/src/record.rs`.
+Every other row's state and disposition is unchanged, and no disposition in
+either table is revised here: a disposition is a decision, and moving one is the
+owner's act, not a consequence of a build.
 
 ## 1. Component owners, and what this product's relationship actually is
 
 | Component | State today | This product's relationship | Kind |
 |---|---|---|---|
 | spec-spine 0.20.0 | Implemented, released, installed locally at `.tooling/bin` | Invokes its supported commands, parses its structured reports | **actual dependency**, on a released binary |
-| `attest-ledger` 0.1.0 | Implemented, Apache-2.0 | Record envelope, chain hashing, verification | **proposed reuse** |
+| `attest-ledger` 0.1.0 | Implemented, Apache-2.0 | Record envelope, chain hashing, verification | **actual dependency** as of 2026-09-19: `attest-ledger-core`, pinned to `a9c3595` in `crates/statecraft-run`. The disposition it was adopted under is the **reuse** row below. |
 | `canonical-keysort-json` 0.1.0 | Implemented, Apache-2.0, Rust only | Canonical serialization at the hashing boundary | **proposed reuse** |
 | `action-gate` 0.1.0 | Implemented, Apache-2.0 | Check composition only, with required checks and the deny ceiling supplied here | **proposed adaptation at the boundary** |
 | Rahi | Implemented locally, not released | None. Not a local daemon, not a sandbox, not a UI framework | **no dependency**; a future hosted backend consumes contracts this product publishes |
@@ -115,6 +125,25 @@ independent inspection, one reviewable outcome. **Publication is not part of it*
 | 4 | `statecraft run start --spec NNN` | 003, 004 | An isolated worktree is prepared from a recorded base commit; the operator's checkout is untouched. One adapter session runs under a constructed environment. Refusals are counted by the supervisor from the event stream. The attempt ends in exactly one of the five outcomes. |
 | 5 | `statecraft accept --run <id>` | 005 | The suite runs from instructions read **at the base**, over the candidate sha. A receipt is minted only on a clean tree with an unmoved HEAD. A candidate touching the authority set is reported as an authority change and is not accepted on its own suite. |
 | 6 | `statecraft run show <id>` | 005 | One account folded from the records, every value naming its record, the claim beside the independent result, each evidence dimension separately, and absence named as `none`, `not-recorded` or `stale`. |
+
+**Verbs as bound, clarified 2026-09-19.** The column above is headed *proposed*
+and stays as written: it is what was proposed on 2026-09-16, and the steps and
+their observable requirements are unchanged. What the binary spells is not what
+the proposal spelled, so the two are reconciled here rather than by editing the
+table. Every verb takes the target path first and accepts `--json`.
+
+| Step | Proposed | Bound today |
+|---|---|---|
+| 1 | `statecraft project register <path>` | `project register <path>`, unchanged. A consent step joined it: `project arm <path>`, which step 4 now requires. |
+| 2 | `statecraft env plan` then `env apply` | `env plan <path>` then `env apply <path>` |
+| 3 | `statecraft work list` | `work list <path>` |
+| 4 | `statecraft run start --spec NNN` | `run <path> <spec-id>`. No `start` subverb and no `--spec` flag: the spec id is positional, and it is also the run id, because spec `003` section 3.4 makes a retry an appended attempt of the same run. `run` refuses (2) a registered target that is not armed. |
+| 5 | `statecraft accept --run <id>` | `accept <path> <run-id>` |
+| 6 | `statecraft run show <id>` | `run show <path> <run-id>` |
+
+Spec `006` owns the surface and spec `009` bound steps 3 to 6. Nothing in the
+right-hand column revises what the step must make observably true, and the
+acceptance below is untouched.
 
 ### The slice's acceptance, stated as refusals
 

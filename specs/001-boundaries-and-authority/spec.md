@@ -201,6 +201,42 @@ This spec also does not choose the language, runtime or packaging. That
 recommendation is `D-01` in the decision record, where it can be adopted or
 rejected without editing a spec.
 
+## 5. Decisions recorded during implementation
+
+Dated entries for choices §3 was silent on. None changes what §3 requires.
+
+**2026-09-19: how a stale status description in this spec's territory is
+corrected.** Section 3.3 fixes the claim vocabulary and requires evidence beside
+any claim above *specified*; it does not say what to do when a claim that was
+true becomes false. The two documents this spec owns under `docs/` carried
+several: the design record said no manifest existed, and the decision record's
+`F-10` said `008` and `009` were drafts. Both were true on the day they were
+written.
+
+The choice recorded here: **a stale status description is corrected in place
+only where it is an undated, present-tense claim, and every dated statement is
+preserved and answered by a new dated entry beside it.** The original wording of
+any present-tense claim that is replaced is quoted in the replacement, so the
+record of what was believed survives the correction. A correction of this kind
+carries no authority: it never adopts a `D-` row, never lifts a deferral, and
+never revises a disposition, an acceptance requirement or a policy. Where a
+status description is the stated support for a deferral, the description is
+corrected and the deferral is left standing, because what a deferral waits for
+is a decision and not a field. Applied on this date to
+`docs/design/00-boundaries-and-reuse.md` and
+`docs/decisions/00-founding-decisions.md`.
+
+**2026-09-19: this spec's own Verification preamble is stale, and is left to the
+owner.** The sentence introducing the block below reads "They assert nothing
+about product behavior, because none is implemented." Measured on this date:
+`cargo test --workspace` passes 515 tests across seven crates, and
+`cargo run -p statecraft-cli -- --help` prints fifteen bound verbs, so the
+clause after the comma is false. The commands themselves are unaffected and are
+not touched: they assert the authored foundation, which is still what this spec
+owns, and `make verify SPEC=001` passes unchanged. Amending an approved spec's
+prose is the owner's act, so the measurement is recorded here rather than
+applied.
+
 ## Verification
 
 Each line below is one command. These assert the authored foundation, which

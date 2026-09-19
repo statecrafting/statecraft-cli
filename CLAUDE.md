@@ -7,19 +7,20 @@ does not restate it.
 
 ## What this repository is right now
 
-A specified corpus with the code it claims. Six crates and one binary; the
+A specified corpus with the code it claims. Seven crates and one binary; the
 product is a local environment for governed agent work; the boundary is
 [README.md](README.md), the reasoning is
 [docs/design/00-boundaries-and-reuse.md](docs/design/00-boundaries-and-reuse.md),
 and what is proposed versus adopted is
 [docs/decisions/00-founding-decisions.md](docs/decisions/00-founding-decisions.md).
 
-`000` to `006` are ratified and implemented. `007-shared-evidence-envelope` is
-`draft` and implemented, which `plan` offers as ready and which is **not**
-permission to treat it as ratified: `draft` plus `pending` is schedulable, and
-that is spec-spine's lifecycle answer, not the owner's. Check the `status`
-field, not the plan output. Ratification is the owner's act; see AGENTS.md,
-"New sessions".
+All ten specs, `000` to `009`, are ratified and implemented, and `plan` reports
+nothing schedulable (measured 2026-09-19 with `make status`). The rule that made
+`007` worth a warning here still holds for the next spec written: `draft` plus
+`pending` is schedulable, so `plan` offers a `draft` as ready and that is
+spec-spine's lifecycle answer, not the owner's. Check the `status` field, not
+the plan output. Ratification is the owner's act; see AGENTS.md, "New
+sessions".
 
 ## Commands
 
@@ -32,9 +33,9 @@ make verify SPEC=001       # one spec's declared acceptance
 make status                # version, lifecycle counts, what is schedulable
 ```
 
-`make code` judges six crates. Both surfaces are required through the `ci-gate`
-status check. The guard that made the cargo verbs skip on an empty workspace is
-still there and still correct; it simply no longer fires.
+`make code` judges seven crates and 515 tests. Both surfaces are required
+through the `ci-gate` status check. The guard that made the cargo verbs skip on
+an empty workspace is still there and still correct; it simply no longer fires.
 
 `spec-spine index check --fail-on-unresolved` is now in the gate, so **a new
 spec that claims a crate before writing it will fail**. That is deliberate, and
@@ -50,7 +51,7 @@ AGENTS.md records what to do if a spec genuinely needs to claim ahead.
   `compile` and then `compile --check` in the same breath passes unconditionally
   and proves nothing.
 - **There are no forward claims left, and the gate now refuses one.** Specs `002`
-  to `005` once claimed crates that did not exist; all six crates are written, and
+  to `005` once claimed crates that did not exist; all seven crates are written, and
   `index check --fail-on-unresolved` is in the gate. Under the 0.20.0 pin an
   unresolved claim exits **1**, the validation code, not 2: it is a corpus that
   does not describe its tree, and `make refresh` cannot cure it. Do not "fix" one

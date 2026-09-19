@@ -4,8 +4,8 @@ The cross-agent authority for this repository, read by Claude Code, Codex CLI an
 any other agent through the `AGENTS.md` convention. Edit this file to evolve the
 protocol.
 
-This repository holds six crates and one binary, each crate claimed by the spec
-whose boundary it is. Do not add code, a crate or a test runner without a spec
+This repository holds seven crates and one binary, each crate claimed by the
+spec whose boundary it is. Do not add code, a crate or a test runner without a spec
 that claims it: `crates/**` is claimed by the spec whose boundary the crate is,
 and the coverage gate refuses an unclaimed source file.
 
@@ -70,10 +70,11 @@ section 3.1.1 joins it with `registry list --json` to read `status`. What `draft
 *ratification*, which is why an unratified spec's unresolved units warn instead
 of refusing.
 
-`000` to `007` are ratified, so what `plan` offers from that range is a real work
-order. Today it offers nothing: all eight are `approved` and `complete`, and
-`plan` reports 0 ready, 0 blocked. The next `draft` written here will be offered
-as ready anyway. Check the `status` field, not the plan output.
+All ten specs, `000` to `009`, are ratified, so what `plan` offers from that
+range is a real work order. Today it offers nothing: all ten are `approved`, and
+`plan` reports 0 ready, 0 blocked (measured 2026-09-19 with `make status`). The
+next `draft` written here will be offered as ready anyway. Check the `status`
+field, not the plan output.
 
 spec-spine does not enforce the difference, so this repository does. Until the
 owner ratifies a spec (see Approval semantics), `plan` naming it is a reading
@@ -82,9 +83,9 @@ suggestion, not a work order. Do not open an implementation branch for a `draft`
 ## The gate
 
 Two surfaces, not one. `make gate` judges the **corpus** and is meaningful with
-no code at all. `make code` judges the **workspace**, which is six crates today.
-CI runs them as separate jobs and requires both through `ci-gate`, the single
-status context branch protection names.
+no code at all. `make code` judges the **workspace**, which is seven crates
+today. CI runs them as separate jobs and requires both through `ci-gate`, the
+single status context branch protection names.
 
 ```sh
 make gate

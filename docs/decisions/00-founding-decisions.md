@@ -5,8 +5,11 @@
 Prepared 2026-09-16, at the founding of this repository. Owned by spec
 `001-boundaries-and-authority`.
 
-**Adoption status: one row of section 3 is adopted in part. Every other row is
-still a recommendation.** This record exists so the three kinds of statement
+**Adoption status as of 2026-09-19: `D-03` is adopted in full, and `D-01` and
+`D-02` are adopted for language and layout only. Every other row of section 3 is
+still a recommendation.** Section 5 carries each adoption with its date and is
+the only place a row becomes binding; the line you are reading is a summary of
+it and never a substitute. This record exists so the three kinds of statement
 below are never confused with each other. Section 1 is the repository owner's
 stated intent, recorded as given. Section 2 is inherited technical constraint:
 facts about tools, licenses and a predecessor, each verified in the session that
@@ -372,7 +375,7 @@ oversight, and reopened by a concrete consumer need rather than by availability.
 | F-07 | Breadth across providers. One adapter boundary and one adapter first. | A second provider, admitted by passing spec 004's suite. |
 | F-08 | aicortex integration. Spec 005 describes a narrow optional one-way interface and implements none of it. | An aicortex producer contract that exists. |
 | F-09 | Operating-system enforcement of spec 004's named residuals. | Its own spec, naming the mechanism and its own residuals. |
-| F-10 | Scheduling across repositories, parallelism, and any work queue. | Two conditions. The second, **a spec-spine release carrying spec 091's collision report**, was met by `v0.20.0` on 2026-09-17 (`C-16`). The first, **a single-repository loop that works**, is not met: specs `008` and `009` are drafts. Parallelism is reopened by consuming that report, never by inventing a local footprint format. |
+| F-10 | Scheduling across repositories, parallelism, and any work queue. | Two conditions. The second, **a spec-spine release carrying spec 091's collision report**, was met by `v0.20.0` on 2026-09-17 (`C-16`). The first, **a single-repository loop that works**, is **not recorded as met**. Its original supporting sentence, "specs `008` and `009` are drafts", was true when written and is stale: both are `approved` and implemented (see the 2026-09-19 entry in section 5). Whether the loop *works* is the owner's judgment and not a status field, so the deferral stands until section 5 records it met. Parallelism is reopened by consuming that report, never by inventing a local footprint format. |
 | F-11 | Adoption of `tenant-emit` and `tenant-tail`, and of the predecessor's export bundle and attestation formats. | A mapping from a real outcome of this product to their inputs (C-14). |
 
 ## 5. Adoption record
@@ -510,6 +513,34 @@ platform can pin its dependency to the commit this lands as. That authorization
 covers this change and no other. `F-02` is not lifted: nothing here tags a
 release or pushes to a registry, and `crates/statecraft-envelope/` stays
 `publish = false` at version `0.0.0`.
+
+### 2026-09-19: corpus status reconciled; no row adopted
+
+A documentation change measured this repository against what its own documents
+claimed and corrected the claims. Nothing here adopts a `D-` row, lifts a
+deferral, or changes an acceptance requirement.
+
+**What was measured, and with what.** `make status` at spec-spine `0.20.0`
+reports ten specs, `000` to `009`, all `approved`, with `registry plan` offering
+nothing schedulable. `ls crates` and `cargo test --workspace` report seven
+member crates and 515 passing tests, none ignored. `cargo run -p statecraft-cli
+-- --help` prints fifteen bound verbs. `crates/statecraft-run/Cargo.toml`
+carries `attest-ledger-core` pinned to `a9c3595`.
+
+**What this corrects.** The preamble above described 2026-09-16, when `006` was
+a proposal and `003` to `005` were unimplemented; it is left as the dated
+statement it is. The adoption-status line is restated to match section 5 rather
+than to add to it. `F-10`'s supporting clause named `008` and `009` as drafts,
+which they no longer are, and the correction is factual only: `F-10` stays
+deferred, and so do `F-01` through `F-09` and `F-11`.
+
+**What is still not claimed.** Nothing is released. The workspace stays at
+version `0.0.0` with `publish = false`, and `F-02` holds: no push, pull request,
+merge, release or deploy is authorized by this entry or by anything it records.
+The distribution half of `D-01`, including the binary's name (`D-08`), stays
+open. A spec being `approved` still grants no grade above *specified*, and every
+implemented-or-tested claim corrected in this change names the command that
+produced its evidence.
 
 To adopt a further row, the owner can state which `D-` rows are accepted and
 with what amendments. Adoption is then recorded here as plain text with its
