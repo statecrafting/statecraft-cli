@@ -314,9 +314,15 @@ mod tests {
 
         let invocation = Invocation::new(child.to_str().unwrap(), &[], None);
         let environment = construct(&Blueprint::empty(), &CheckSuiteCommands::default());
+        // This row names its own deadline. The deadline is not what is under
+        // test here; the fixture has to reach its unreadable line for the read
+        // failure to exist at all, and on a loaded machine the shared one
+        // second expires first, which reports the absent init instead.
+        let mut request = request(workspace.path());
+        request.deadline_seconds = 30;
         let execution = supervise_in(
             &invocation,
-            &request(workspace.path()),
+            &request,
             &environment,
             &[],
             temporary_root.path(),

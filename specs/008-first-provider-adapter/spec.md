@@ -527,6 +527,14 @@ in this crate changes: `stream_error` already forces `interrupted` and already
 reaches the evidence as a string, and this records that both now hold for a
 diagnostic that did not previously exist. No §3.9 row is added or altered.
 
+The row names its own deadline, as the 2026-09-18 entry below requires of every
+fixture here. The deadline is not what this row measures: the fixture has to
+reach its unreadable line for a read failure to exist at all, and on a loaded
+machine the one second the other rows share expires first, which reports the
+absent init rather than the read failure. Measured: under six concurrent test
+processes the shared deadline produced the absent init in 29 of 30 runs, and a
+named 30-second deadline produced the read failure in 30 of 30.
+
 **2026-09-18: the settings fixture consumes its prompt after the concurrency
 barrier, and each test names its own deadline.** Both are properties of the
 `## Verification` fixture, which §3 is silent on, and neither changes what
