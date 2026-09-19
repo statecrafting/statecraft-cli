@@ -73,6 +73,7 @@
       "3.6 Authored-content rules that hold repository-wide",
       "3.7 Observable negative cases",
       "4. Out of scope",
+      "5. Decisions recorded during implementation",
       "Verification"
     ],
     "specPath": "specs/001-boundaries-and-authority/spec.md",
@@ -80,6 +81,6 @@
     "summary": "What this product is, what it is not, and who owns each capability it depends on. Fixes the claim vocabulary (specified / implemented / tested / released), the two interaction modes and which one is built first, the rule that separates an authority change from an implementation change, and the reuse disposition for every shared component this repository would otherwise reimplement. Owns the product half of the constitution and the two founding records under docs/. It owns no code.\n",
     "title": "The product boundary, the component owners, and the separation of authority"
   },
-  "shardHash": "acadec8c004e822e99f5c9374c886115b999863b2791a9e3410f7d2eae0a7d8d",
+  "shardHash": "2966d28351abfc83b6ab7663e86599d5021ce895a57f96827adbbd24757781d7",
   "specVersion": "1.3.0"
 }

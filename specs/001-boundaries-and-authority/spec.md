@@ -201,6 +201,40 @@ This spec also does not choose the language, runtime or packaging. That
 recommendation is `D-01` in the decision record, where it can be adopted or
 rejected without editing a spec.
 
+## 5. Decisions recorded during implementation
+
+Dated entries for choices §3 was silent on. None changes what §3 requires.
+
+**2026-09-19: the status descriptions corrected in this spec's territory, and
+the evidence for each.** Section 3.3 requires evidence beside any claim above
+*specified*. Four present-tense claims in the two documents this spec owns had
+become false, and each is corrected with the measurement that falsified it. Each
+was true when written; this entry records what changed, not a rule for changing
+it.
+
+| Corrected claim | Where it stood | The measurement |
+|---|---|---|
+| "no dependency declared below exists in any manifest, because no manifest exists" | `docs/design/00-boundaries-and-reuse.md`, status line | A Cargo workspace with seven member crates exists, and `crates/statecraft-run/Cargo.toml` declares `attest-ledger-core` pinned to `a9c3595`, used by `src/record.rs`. |
+| `attest-ledger` listed as **proposed reuse** | same file, section 1 table | Same measurement: it is an actual dependency. The **reuse** disposition it was adopted under is unchanged. |
+| "specs `008` and `009` are drafts", supporting deferral `F-10` | `docs/decisions/00-founding-decisions.md`, section 4 | `spec-spine registry list` reports both `approved` with `implementation: complete`. `F-10` stays deferred: whether the single-repository loop works is the owner's judgment, not a status field. |
+| "one row of section 3 is adopted in part" | same file, adoption-status line | Section 5 of that file already records `D-03` adopted in full and `D-01` and `D-02` adopted for language and layout. The line is restated to match section 5, which stays the only place a row becomes binding. |
+
+The original wording of each replaced claim is quoted in its replacement, and
+the dated 2026-09-16 statements in both documents are left as written. Nothing
+in this change adopts a `D-` row, lifts a deferral, or revises a disposition, an
+acceptance requirement or a policy.
+
+**2026-09-19: this spec's Verification preamble is stale, and the correction is
+deferred.** The sentence introducing the block below reads "They assert nothing
+about product behavior, because none is implemented." Measured on this date:
+`cargo test --workspace` passes 515 tests across seven crates, and
+`cargo run -p statecraft-cli -- --help` prints fifteen bound verbs, so the
+clause after the comma is false. The commands themselves are untouched, they
+still assert the authored foundation this spec owns, and `make verify SPEC=001`
+passes unchanged. The owner has acknowledged the staleness and deferred the
+correction, so the measurement is recorded here and the preamble is left as it
+stands.
+
 ## Verification
 
 Each line below is one command. These assert the authored foundation, which
