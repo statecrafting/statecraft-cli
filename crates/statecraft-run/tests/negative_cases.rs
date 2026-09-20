@@ -7,7 +7,7 @@ use statecraft_run::attempt::{Outcome, Run};
 use statecraft_run::policy::{
     NoDeclarationFiled, Overrides, Policy, PolicySource, StaticDeclaration, resolve,
 };
-use statecraft_run::record::{Chain, Entry, Kind};
+use statecraft_run::record::{Chain, Entry, Identity, Kind};
 use statecraft_run::recovery::{
     CannotObserve, Observer, Unmatched, Verdict, blocked, reconcile, reconciliation_entry,
     unmatched_intents,
@@ -78,6 +78,9 @@ fn entry(kind: Kind, run: &str, attempt: u32, subject: &str, key: Option<&str>) 
         run_id: run.into(),
         attempt,
         subject: subject.into(),
+        // Mechanical (spec 003 section 3.3.1 clause 7): these rows are the
+        // legacy pairing's, and a record without the key folds exactly as it did.
+        effect_id: Identity::Absent,
         idempotency_key: key.map(str::to_string),
         detail: serde_json::Value::Null,
     }
