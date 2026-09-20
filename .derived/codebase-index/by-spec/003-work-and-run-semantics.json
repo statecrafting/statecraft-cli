@@ -7,6 +7,10 @@
     ],
     "implementingPaths": [
       {
+        "path": "crates/statecraft-acceptance/",
+        "source": "spec-edge"
+      },
+      {
         "path": "crates/statecraft-run/",
         "source": "spec-edge"
       }
@@ -24,11 +28,24 @@
           "kind": "directory",
           "path": "crates/statecraft-run/"
         }
+      },
+      {
+        "locations": [
+          {
+            "file": "crates/statecraft-acceptance/"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "directory",
+          "path": "crates/statecraft-acceptance/"
+        }
       }
     ],
     "specId": "003-work-and-run-semantics",
     "specStatus": "approved"
   },
   "schemaVersion": "1.1.0",
-  "shardHash": "9e63ec4190cf5c454bbe9a02504552600b46de4dbc41fe435a3b763b5d584da4"
+  "shardHash": "4ab5f411c0c48469e9b02007903118a502ab1a0708a4bb206a1e5b7e43cd91c0"
 }

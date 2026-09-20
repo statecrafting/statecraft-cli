@@ -16,6 +16,14 @@ summary: >
   retry, with no exactly-once promise.
 establishes:
   - { kind: directory, path: "crates/statecraft-run/" }
+extends:
+  # S1 adds one field to the record payload `003` owns. `Entry` has public
+  # fields, so every struct literal in the workspace must name the new field,
+  # and one of those literals is a test helper in `005`'s crate
+  # (`crates/statecraft-acceptance/src/suite.rs`). The edge is additive, the
+  # edit there is a single `effect_id: Identity::Absent`, and nothing `005`
+  # requires changes.
+  - { spec: "005-acceptance-and-evidence", unit: { kind: directory, path: "crates/statecraft-acceptance/" }, nature: additive }
 depends_on:
   - "000-bootstrap"
   - "001-boundaries-and-authority"
@@ -126,6 +134,89 @@ recovery can tell what was and was not done.
 State is recovered by **folding the record**. Memory is never the authority, and
 a recovered state is never reconstructed from the filesystem alone.
 
+### 3.3.1 Effect identity and one-to-one closing
+
+§3.3 brackets every effect between an intent and an outcome, and §3.6 folds the
+record to find every intent with no outcome. Neither says how an outcome names
+the intent it closes. Pairing them by `(run_id, attempt, subject)` uses a key
+the record does not make unique, and pairing on a non-unique key is not pairing:
+two effects bracketed in one attempt under one subject are read as one, and a
+single outcome closes both.
+
+An effect this section governs therefore carries its own identity.
+
+1. **The identity.** An intent for such an effect carries an `effectId`: a
+   non-empty string, unique within its `run_id`, chosen by the writer before the
+   intent is made durable. The outcome that closes the effect repeats it
+   unchanged, and every record that is evidence for that effect repeats it too.
+2. **The correlation.** For records carrying an identity, correlation is by
+   `(run_id, effectId)` and by nothing else. `subject` is never a correlation
+   key, `attempt` is never a correlation key, and neither is consulted as a
+   tie-breaker. Two runs may carry the same identity string; they are different
+   effects, and that is not a defect. Every answer the fold gives names both
+   halves of the key, so no result is attributable to the wrong run.
+3. **Absence, validity and the three states.** A record is in exactly one of
+   three states, and they are never conflated:
+   - **absent**: the record carries no `effectId` key. This and only this is a
+     record without an identity, folded by the pairing of clause 7.
+   - **valid**: the key is present and its value is a string that is not empty.
+   - **invalid**: the key is present with any other value, **including JSON
+     `null`**, an empty string, a number, a boolean, an array or an object.
+
+   An invalid identity is a defect the fold reports. It is never read as an
+   absent identity, the record carrying it is never folded by the pairing of
+   clause 7, and the value it carried is retained in the report as the record
+   carried it. Presence is therefore decided by the key, never by the value: a
+   decoding that maps a present `null` to the same state as a missing key does
+   not satisfy this clause. A record is never made undecodable by an invalid
+   identity, and is never dropped because of one.
+4. **Uniqueness within a run.** At most one intent in a run carries a given
+   identity. A second intent carrying an identity an earlier intent of the same
+   run already carried is a defect the fold reports, **whether or not the
+   earlier one was closed**: closure does not release an identity for reuse, and
+   the report says which of the two shapes it found. Neither intent is
+   discarded, neither is chosen over the other, and neither overwrites the
+   other. The identity is **ambiguous** from the second intent onward: it is not
+   reported as one open effect, and no outcome closes it.
+5. **One to one.** An intent is closed by at most one outcome. An identity
+   already closed is not closed again: a second outcome naming it is a defect
+   the fold reports, and it neither replaces the first nor is absorbed by it. An
+   outcome naming an identity the fold has no intent for is likewise a defect,
+   and so is an outcome naming an ambiguous identity. None of the three closes
+   anything.
+
+   Records are folded in chain order. An outcome whose `(run_id, effectId)` has
+   no preceding intent is an orphan outcome and closes nothing. A later intent
+   does not retroactively match that outcome: it remains open unless a
+   subsequent outcome validly closes it. The earlier orphan-outcome defect
+   remains reported even if a subsequent outcome closes the intent.
+6. **Defects are reported in full, and are the caller's to check.** An
+   identity-aware fold result **includes every defect the fold detected, with
+   none filtered away, collapsed or summarized out**, each naming the run, the
+   identity where there is one, and which condition was found. A defect does not
+   make an unrelated effect unmatched, does not make a matched effect
+   unresolved, and is carried beside the fold's other findings rather than in
+   place of them. **A caller that uses a fold result to authorize an action must
+   check its defects first**; the fold reports, and does not decide. What a
+   defect authorizes or forbids is an activation policy, is not fixed here, and
+   has no caller to bind yet.
+7. **Records with no identity key are unchanged.** Such a record keeps the
+   existing `(run_id, attempt, subject)` pairing exactly, including the intents
+   that pairing leaves permanently unmatched. That pairing considers only such
+   records. No existing writer is modified, no existing record is reinterpreted,
+   and no existing record is rewritten to carry an identity it was written
+   without. What the legacy pairing leaves unmatched is a separate finding, with
+   its own repair and its own decision, and is not decided here.
+8. **Wire form.** The identity is a top-level key of the record payload, spelled
+   `effectId`, and the key is **omitted entirely** from a record that has none.
+   A build that does not know the key ignores it and reads the record otherwise
+   unchanged.
+9. **What this section does not do.** It does not generate an identity, does not
+   name any subject that uses one, does not allocate an ordinal, does not make
+   any verb write one, does not carry an identity into a reconciliation record,
+   does not decide what a defect authorizes, and does not change what §3.6 does
+   with an unmatched intent once it is found.
+
 ### 3.4 The closed outcome set
 
 An attempt ends in exactly one of five outcomes. None is a synonym for another,
@@ -217,6 +308,13 @@ this product's specs are spec-spine's.
 | The adapter reports refusals and exits zero | Attempt outcome `refused`; the count comes from the event stream, not the exit code. |
 | The supervised process attempts to alter the refusal count | Impossible by placement, and the attempted write is itself recorded. |
 | A retry is requested for a `completed` attempt | A new attempt is appended; the earlier attempt's records are unchanged and still readable. |
+| Two effects in one attempt share a subject and each carries an `effectId` | Folded as two effects. Each is closed only by the outcome repeating its own identity; the other stays unmatched and keeps its identity. |
+| A second outcome names an `effectId` that is already closed | Reported as a defect naming the run and the identity. The first outcome stands; the second neither replaces it nor is absorbed. |
+| An outcome names an `effectId` no intent in the fold carries | Reported as a defect naming the run and the identity. It closes nothing and is never dropped silently. |
+| A record carries no `effectId` key | Folded by the legacy pairing of §3.3.1 clause 7, unchanged. |
+| A record carries an `effectId` that is empty, `null`, or any value that is not a non-empty string | Reported as a defect naming the record and retaining the value as carried. Never read as a record without an identity, never dropped, and never a decode failure. |
+| Two intents of one run carry the same `effectId` | Reported as a defect naming both, and saying whether the second followed the first's closure. Both are retained, neither is chosen, and the identity is ambiguous: no outcome closes it. |
+| Two different runs carry the same `effectId` string | Two independent effects, each reported under its own run. Not a defect: uniqueness is within a run. |
 
 ## 4. Out of scope
 
@@ -298,6 +396,39 @@ reimplemented. Vendoring a copy of a hash-linked ledger into the product that
 depends on it would defeat the reuse. The workspace is `publish = false` and
 `F-02` defers publication, so the usual objection does not apply yet;
 un-pinning it, or moving to a released version, is its own change.
+
+**2026-09-19: the identity is a top-level payload key, spelled in camelCase.**
+§3.3.1 puts an identity on the record payload, whose existing keys are `kind`,
+`run_id`, `attempt`, `subject`, `idempotency_key` and `detail`: Rust field names
+serialized as written. Every other JSON this product emits is camelCase,
+including the keys inside `detail` (`baseCommit`, `retryAllowed`, `outcome`) and
+every CLI view. Two spellings were available: follow the neighbouring payload
+keys, or follow the product's JSON contracts. `effectId` is chosen, because this
+record is read through the contracts rather than through the struct, and the
+serialization is therefore stated explicitly on the field rather than inherited
+from the field's Rust name. Placing the identity inside `detail` was rejected:
+`detail` is the untyped remainder, and a correlation key the fold depends on is
+not a remainder.
+
+**2026-09-19: presence is decided by the key, and an invalid value is a reported
+defect rather than a decode failure.** §3.3.1 clause 3 needs three states where
+an optional field offers two. An `Option` of the identity type does not give
+them: a self-describing format's `null` deserializes to the same `None` as a
+missing key, so an explicit `null` would be read as a record that never carried
+an identity, which clause 3 forbids. The field is therefore a three-state value
+of its own, defaulting to absent when the key is missing and decoding any
+present value: a non-empty string is the identity, and anything else is retained
+and reported as invalid. Decoding it as a plain string instead would fail
+deserialization, and the fold reads payloads through a decoder that today
+discards what it cannot decode, so the strictest-looking choice would have been
+the one that loses the defect. What this preserves is the **JSON value** an
+invalid identity carried, not necessarily the byte sequence that expressed it:
+number formatting, string escaping and object key order are the encoder's. That
+is sufficient, because a stored record is never rewritten by this product, so
+the historical bytes on disk are untouched regardless; and a record emitted with
+no identity omits the key and is byte-identical to what this product writes
+today. Making the decoder refuse rather than discard is a separate change, in a
+separate spec's territory, and is not made here.
 
 ## Verification
 

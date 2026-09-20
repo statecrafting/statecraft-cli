@@ -321,6 +321,7 @@ fn unrecorded_authority() -> AuthorityVerdict {
 mod tests {
     use super::*;
     use serde_json::json;
+    use statecraft_run::record::Identity;
 
     fn entry(
         kind: Kind,
@@ -334,6 +335,9 @@ mod tests {
             run_id: run_id.to_string(),
             attempt,
             subject: subject.to_string(),
+            // Mechanical: spec 003 section 3.3.1 added the field, and this
+            // helper's records carry no identity. Nothing 005 requires changes.
+            effect_id: Identity::Absent,
             idempotency_key: None,
             detail,
         }

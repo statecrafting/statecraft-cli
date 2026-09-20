@@ -49,8 +49,10 @@ pub mod workspace;
 
 pub use attempt::{Attempt, Outcome, Run};
 pub use policy::{Overrides, Policy, PolicySource};
-pub use record::{Chain, Entry, Kind};
-pub use recovery::{Verdict, reconcile};
+pub use record::{Chain, EffectId, Entry, Identity, Kind};
+pub use recovery::{
+    EffectFold, EffectKey, FoldDefect, UnmatchedEffect, Verdict, fold_effects, reconcile,
+};
 pub use report::{CorpusReport, ReportError};
 pub use session::{Concluded, Session, SessionError, begin, conclude, runs};
 pub use work::{WorkItem, WorkList, select};

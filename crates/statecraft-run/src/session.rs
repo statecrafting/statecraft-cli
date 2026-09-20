@@ -31,7 +31,7 @@
 //! attempt rather than trusting the process that is asking.
 
 use crate::attempt::{Attempt, Outcome, Run};
-use crate::record::{Chain, Entry, Kind};
+use crate::record::{Chain, Entry, Identity, Kind};
 use crate::refusal::{Accounting, decide};
 use crate::workspace::{self, Workspace, WorkspaceError};
 use serde::{Deserialize, Serialize};
@@ -182,6 +182,9 @@ pub fn begin(
             run_id: run_id.to_string(),
             attempt: number,
             subject: INTENT_SUBJECT.to_string(),
+            // Section 3.3.1 clause 9: this section writes no identity. The
+            // prepare-workspace intent is folded by the legacy pairing.
+            effect_id: Identity::Absent,
             // The workspace path is the idempotency key: preparing twice for
             // one run prepares once, which is what makes the key real rather
             // than declared.
@@ -302,6 +305,7 @@ pub fn conclude_observed(
             run_id: session.run_id.clone(),
             attempt: session.attempt,
             subject: ACCOUNTING_SUBJECT.to_string(),
+            effect_id: Identity::Absent,
             idempotency_key: None,
             detail: serde_json::to_value(accounting).unwrap_or(serde_json::Value::Null),
         },
@@ -325,6 +329,7 @@ pub fn conclude_observed(
             run_id: session.run_id.clone(),
             attempt: session.attempt,
             subject: OUTCOME_SUBJECT.to_string(),
+            effect_id: Identity::Absent,
             idempotency_key: None,
             detail: merge(
                 serde_json::json!({

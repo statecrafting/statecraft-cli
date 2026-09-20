@@ -37,6 +37,114 @@ pub enum Kind {
     Accounting,
 }
 
+/// A validated effect identity: a non-empty string.
+///
+/// Spec 003 section 3.3.1 clause 1. Uniqueness is **per run** and is the fold's
+/// business, not this type's: `EffectId` answers only whether a value is a
+/// well-formed identity at all.
+#[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
+pub struct EffectId(String);
+
+impl EffectId {
+    /// The identity, or `None` when the string is empty.
+    #[must_use]
+    pub fn new(s: &str) -> Option<Self> {
+        if s.is_empty() {
+            None
+        } else {
+            Some(Self(s.to_string()))
+        }
+    }
+
+    /// The identity as written.
+    #[must_use]
+    pub fn as_str(&self) -> &str {
+        &self.0
+    }
+}
+
+impl std::fmt::Display for EffectId {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(&self.0)
+    }
+}
+
+/// The identity field's three states (section 3.3.1 clause 3).
+///
+/// Presence is decided by the **key**, never by the value: `Absent` is
+/// reachable only from a missing key, which is why this is a three-state value
+/// of its own rather than an `Option`. A self-describing format deserializes an
+/// explicit `null` to the same `None` as a missing key, and clause 3 forbids
+/// reading the two as one state.
+///
+/// An invalid value is retained rather than refused. The fold reads payloads
+/// through a decoder that discards what it cannot decode
+/// ([`Chain::entries`]), so a stricter codec would lose the very defect
+/// clause 3 requires to be reported.
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+pub enum Identity {
+    /// The record carries no `effectId` key. The only state without an
+    /// identity, and the one folded by the legacy pairing of clause 7.
+    #[default]
+    Absent,
+    /// The key is present and its value is a non-empty string.
+    Valid(EffectId),
+    /// The key is present with any other value, JSON `null` included.
+    ///
+    /// A defect the fold reports, never read as [`Identity::Absent`], never a
+    /// decode failure, and never a reason to drop the record.
+    Invalid(Value),
+}
+
+impl Identity {
+    /// Whether the key was missing.
+    ///
+    /// The `skip_serializing_if` predicate: it is what keeps a record without
+    /// an identity byte-identical to what this product writes today.
+    #[must_use]
+    pub fn is_absent(&self) -> bool {
+        matches!(self, Identity::Absent)
+    }
+
+    /// The identity, when there is a valid one.
+    #[must_use]
+    pub fn valid(&self) -> Option<&EffectId> {
+        match self {
+            Identity::Valid(id) => Some(id),
+            _ => None,
+        }
+    }
+
+    /// Classify a **present** JSON value. A missing key never reaches here.
+    fn from_present(value: Value) -> Self {
+        match &value {
+            Value::String(s) if !s.is_empty() => Identity::Valid(EffectId(s.clone())),
+            _ => Identity::Invalid(value),
+        }
+    }
+}
+
+impl Serialize for Identity {
+    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        match self {
+            // Unreachable through `Entry`, which skips an absent identity. A
+            // direct `serialize` of one writes null rather than panicking.
+            Identity::Absent => serializer.serialize_none(),
+            Identity::Valid(id) => serializer.serialize_str(id.as_str()),
+            Identity::Invalid(value) => value.serialize(serializer),
+        }
+    }
+}
+
+impl<'de> Deserialize<'de> for Identity {
+    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        // Accepts ANY present value, so `null` reaches `Invalid(Value::Null)`.
+        // `Absent` comes from serde's `default`, which runs only when the key
+        // is missing.
+        Ok(Identity::from_present(Value::deserialize(deserializer)?))
+    }
+}
+
 /// The payload this product puts in an attest-ledger envelope.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Entry {
@@ -59,6 +167,20 @@ pub struct Entry {
     /// Anything else the caller wants recorded.
     #[serde(default)]
     pub detail: Value,
+    /// This effect's own identity, where it has one (section 3.3.1).
+    ///
+    /// `default` is what makes a missing key [`Identity::Absent`];
+    /// `skip_serializing_if` is what keeps a record without an identity
+    /// byte-identical to what this product wrote before the field existed.
+    /// The wire spelling is `effectId`, stated here rather than inherited from
+    /// the Rust field name, because this record is read through the product's
+    /// JSON contracts (section 5, 2026-09-19).
+    #[serde(
+        default,
+        rename = "effectId",
+        skip_serializing_if = "Identity::is_absent"
+    )]
+    pub effect_id: Identity,
 }
 
 /// Why a record operation failed.
