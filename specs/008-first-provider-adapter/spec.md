@@ -559,6 +559,109 @@ no finite clean run establishes that it cannot recur. Whether `supervise_stream`
 gating completion on stdout EOF is itself a defect is a contract question for
 spec `004` and is untouched here.
 
+**2026-09-20: the first recorded qualification of this pair, and the live run it
+admitted.** §3.8 makes a qualification an act an operator performs against a
+named pair and records, and the `## Verification` note below says the act is
+never re-derived by a check. It had never been performed. This entry records the
+first performance of it and the run it made possible. Nothing §3 requires
+changes; the measurements are §3.7's and §3.8's, taken rather than described.
+
+*What was measured, and against what.* Product source `94362ae` on `main`, a
+clean tree, the binary built from it at
+`sha256:726bb1208310786155abb1c3ee4b247c69bbbdcd35e7c1727071c7a8bc442578`.
+Adapter `claude-code` build `0.0.0`. Provider `/Users/bart/.local/bin/claude`,
+answering `2.1.267 (Claude Code)`, which is
+`capabilities::MEASURED_PROVIDER_VERSION` and the version the committed streams
+under `testdata/stream/` were captured from. Platform `darwin`, macOS 25.5.0.
+The suite: `004` §3.5's eight rows, `cargo test -p statecraft-adapter --test
+negative_suite --locked`, 18 passed with `suite_1` to `suite_8` all present;
+then this spec's ten declared commands,
+`PATH="$PWD/.tooling/bin:$PATH" make verify SPEC=008`, passed; and `004`'s
+seven, `make verify SPEC=004`, passed. `make code` passed over the same tree:
+537 tests, build, clippy with warnings denied, formatting.
+
+*The record, and that it is the record and not a label.* Written to
+`<product home>/qualifications.json` as `adapters.rs` reads one: adapter
+`claude-code`, binary version `0.0.0`, suite version `008.3.9`, date
+`2026-09-20T17:55:18Z`, provider version `2.1.267`. Its effect was measured on
+both sides of writing it. Before: `env plan` reported the adapter `refused`,
+`missing: ["qualification-record"]`, and planned zero writes. After: `claiming`,
+and two writes, `.claude/statecraft/instructions.md` and `CLAUDE.md`. `env
+apply` then wrote both and the manifest recorded both with their digests. That
+is §3.7's refusal and its release, observed rather than asserted, and it is also
+why an `env apply` exit code is not evidence that any path was installed.
+
+*The live run.* A disposable corpus outside this repository, registered, armed,
+and based at its own commit `30665d5`: one approved spec declaring one Python
+module and a fixed acceptance suite present at that base. `statecraft-cli run
+<corpus> 001-word-count-tool --json`, started `2026-09-20T17:56:15Z`, 57
+seconds, exit 0. Outcome `completed`, provider claim `completed`, zero refusals,
+base unmoved, capabilities `structured-refusals`, `turn-limit` and `cost-report`
+all applied with none degraded, and the posture recorded `qualification:
+"qualified"`. The provider implemented the module and committed it, leaving the
+prepared work tree clean at candidate `52b51dd`.
+
+*The acceptance.* `statecraft-cli accept <corpus> 001-word-count-tool --json`
+answered `accepted` and minted a receipt naming base `30665d5`, candidate
+`52b51dd`, one check (`spec-spine verify 001-word-count-tool --json`, exit 0),
+policy digest `22b8c544...`, product `0.0.0`, spec-spine `0.20.0`, adapter
+`0.0.0`, harness revision `not-recorded`, attempt `001-word-count-tool/1`, and
+no authority path touched. This is the first positive independent acceptance
+this corpus has produced. The historical run reported in PR 35 is not one: its
+trial spec declared no suite, so `accept` correctly answered `no-acceptance`,
+and that result stands as recorded.
+
+*What the posture makes durable, and what it does not.* A fresh `run show`
+after the accept reports the posture, including `qualification: "qualified"`,
+sourced to `attempt#001-word-count-tool/1`. It reports the acceptance as `none`
+with reason `suite-did-not-run` and the receipt freshness as `not-recorded`,
+because `accept` writes no record: the run record carries `intent`,
+`accounting` and `outcome` and nothing else. So the qualification posture of a
+run is durable evidence and the receipt is not. `005` §3.9 and `009` §3.3 are
+where an account's contents are decided, and neither is amended here.
+
+*Two bounded checks taken without the provider, because they bear on what a
+receipt means here.* A candidate committed into the same prepared workspace that
+rewrote its own `## Verification` block to a marker-writing command and appended
+a line to `.claude/` was refused: `acceptance: failed`, reason
+`authority-change`, members `acceptance-instructions` and `hooks`, no receipt,
+exit 1. The marker file existed afterwards, so that candidate's own acceptance
+instructions ran before the refusal. Whether the suite should be read from the
+base rather than from the prepared workspace, and whether the authority verdict
+should precede the suite, are `005` §3.2 and §3.3 questions and are untouched
+here. A second candidate carrying the base's unimplemented stub under the base's
+own acceptance was refused `suite-did-not-pass` with zero unrun checks and no
+receipt.
+
+*What this does not establish.* One qualified run is not repeatability. The PR
+35 run's qualification posture is not established from retained evidence: no
+`qualifications.json` exists at the default product home or in either retained
+trial home from that date, and the run records retained there are `interrupted`
+attempts carrying no posture field at all, so it is recorded here as unknown
+rather than as unqualified. The record written today binds a pair whose provider
+half is the version the committed streams were captured from; it is a recorded
+pass of the declared suite, not a fresh live re-capture, which is what the
+`## Verification` note below already says such a record is and is not.
+
+*The declared acceptance did not pass on every attempt, and that is retained.*
+The first `make verify SPEC=004` of the day failed at command 2, in
+`settings_transport::timeout_after_terminal_denial_cleans_settings_and_retains_evidence`,
+and so did the first `make verify SPEC=008` of the branch that carries this
+entry. Both passed on a later attempt against the same tree, and the same test
+also passed a full `make code`, ten consecutive isolated runs of the single
+test, and six consecutive runs of its whole test binary. Under a temporary local
+instrumentation of the fixture, not committed, every observed failure had the
+same shape: the spawned child produced no event, no terminal record and none of
+the files it writes as its first actions, including one written to an absolute
+path outside the workspace, and the attempt ran to its 5 second deadline. The
+2026-09-18 entry above records a residual for this fixture, a delayed end of
+file on an inherited descriptor. A child that never wrote anything is a
+different signature and is not claimed to be that residual recurring. No retry,
+timeout or assertion was changed to obtain any pass recorded above. The
+consequence for this spec is stated rather than softened: its declared
+acceptance is not yet reliably repeatable on this machine, and the cause is an
+open question in this fixture's own territory.
+
 ## Verification
 
 Each line is one command. §3.9's eleven rows are integration tests named after
