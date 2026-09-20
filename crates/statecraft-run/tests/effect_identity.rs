@@ -244,6 +244,69 @@ fn a_non_string_identity_is_invalid_and_keeps_its_value() {
     assert!(unmatched_intents(&chain).is_empty());
 }
 
+/// Every shape the section 3.8 row enumerates, classified by decoding the key
+/// rather than by constructing `Identity::Invalid` directly.
+///
+/// The sibling tests above build the variant themselves, so they assert what
+/// the fold does with an invalid identity but not that a raw value is *judged*
+/// invalid. This one goes through `Entry`'s deserializer for each of "empty
+/// string, `null`, a number, a boolean, an array or an object", so a
+/// classification arm that started accepting one of them would fail here.
+#[test]
+fn every_enumerated_non_string_value_decodes_as_invalid_and_is_retained() {
+    for raw in [
+        json!(""),
+        json!(null),
+        json!(7),
+        json!(false),
+        json!([1, 2]),
+        json!({"a": 1}),
+    ] {
+        let decoded: Entry = serde_json::from_value(json!({
+            "kind": "intent",
+            "run_id": "run-1",
+            "attempt": 1,
+            "subject": "publish",
+            "idempotency_key": null,
+            "detail": null,
+            "effectId": raw.clone(),
+        }))
+        .expect("an invalid identity is never a decode failure");
+        assert_eq!(
+            decoded.effect_id,
+            Identity::Invalid(raw.clone()),
+            "{raw} is invalid and keeps its value"
+        );
+        assert!(
+            !decoded.effect_id.is_absent(),
+            "{raw} is present, so it is never read as an absent identity"
+        );
+
+        let (home, target) = homes();
+        let chain = chain_of(&home, &target, &[decoded]);
+        let fold = fold_effects(&chain);
+        assert_eq!(fold.defects().len(), 1, "{raw} is reported, and once");
+        match &fold.defects()[0] {
+            FoldDefect::InvalidIdentity {
+                run_id,
+                record_index,
+                raw: carried,
+            } => {
+                assert_eq!(run_id, "run-1");
+                assert_eq!(*record_index, 0);
+                assert_eq!(*carried, raw, "the value is retained as carried");
+            }
+            other => panic!("expected an invalid identity for {raw}, got {other:?}"),
+        }
+        assert!(fold.open().is_empty());
+        assert!(fold.closed().is_empty());
+        assert!(
+            unmatched_intents(&chain).is_empty(),
+            "{raw} is present, so the legacy pairing of clause 7 does not claim it"
+        );
+    }
+}
+
 /// The test an `Option<EffectId>` fails: serde maps a present `null` and a
 /// missing key to the same `None`, and clause 3 forbids reading them as one.
 #[test]
@@ -383,17 +446,34 @@ fn an_outcome_for_an_ambiguous_identity_closes_nothing() {
     );
     let fold = fold_effects(&chain);
     assert_eq!(fold.defects().len(), 2, "the duplicate and the close");
-    assert!(
-        fold.defects().iter().any(|d| matches!(
-            d,
-            FoldDefect::AmbiguousClose {
-                record_index: 2,
-                ..
-            }
-        )),
-        "got {:?}",
-        fold.defects()
-    );
+    // Both defects are pinned positionally, in chain order: the duplicate is
+    // found at the second intent, the ambiguous close at the outcome that
+    // follows it. `any` would pass on a fold that reported them reversed.
+    match &fold.defects()[0] {
+        FoldDefect::DuplicateIntent {
+            key,
+            first,
+            second,
+            second_follows_closure,
+        } => {
+            assert_eq!(key.run_id, "run-1");
+            assert_eq!(key.effect_id.as_str(), "e1");
+            assert_eq!((*first, *second), (0, 1), "the two intents, in order");
+            assert!(
+                !*second_follows_closure,
+                "nothing had closed e1 when the duplicate arrived"
+            );
+        }
+        other => panic!("expected a duplicate intent, got {other:?}"),
+    }
+    match &fold.defects()[1] {
+        FoldDefect::AmbiguousClose { key, record_index } => {
+            assert_eq!(key.run_id, "run-1");
+            assert_eq!(key.effect_id.as_str(), "e1");
+            assert_eq!(*record_index, 2);
+        }
+        other => panic!("expected an ambiguous close, got {other:?}"),
+    }
     assert!(fold.closed().is_empty());
     assert_eq!(fold.ambiguous().len(), 1);
 }
