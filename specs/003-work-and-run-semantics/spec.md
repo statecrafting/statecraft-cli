@@ -194,12 +194,13 @@ An effect this section governs therefore carries its own identity.
    identity-aware fold result **includes every defect the fold detected, with
    none filtered away, collapsed or summarized out**, each naming the run, the
    identity where there is one, and which condition was found. A defect does not
-   make an unrelated effect unmatched, does not make a matched effect
-   unresolved, and is carried beside the fold's other findings rather than in
-   place of them. **A caller that uses a fold result to authorize an action must
-   check its defects first**; the fold reports, and does not decide. What a
-   defect authorizes or forbids is an activation policy, is not fixed here, and
-   has no caller to bind yet.
+   change the open or closed status of an unrelated effect. Duplicate intent
+   identities follow clause 4: the affected key becomes ambiguous even if an
+   earlier outcome closed it. Defects are carried beside the fold's other
+   findings rather than in place of them. **A caller that uses a fold result to
+   authorize an action must check its defects first**; the fold reports, and
+   does not decide. What a defect authorizes or forbids is an activation policy,
+   is not fixed here, and has no caller to bind yet.
 7. **Records with no identity key are unchanged.** Such a record keeps the
    existing `(run_id, attempt, subject)` pairing exactly, including the intents
    that pairing leaves permanently unmatched. That pairing considers only such
@@ -432,7 +433,7 @@ separate spec's territory, and is not made here.
 
 ## Verification
 
-Each line is one command. §3.8's fifteen rows are integration tests named after
+Each line is one command. §3.8's twenty-two rows are integration tests named after
 the rows they cover, including the ones that need a real git repository: the
 workspace rows build one in a temporary directory rather than mocking git,
 because "the operator's checkout is never edited" is not a claim a mock can
