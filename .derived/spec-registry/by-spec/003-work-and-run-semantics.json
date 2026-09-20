@@ -12,6 +12,16 @@
         "path": "crates/statecraft-run/"
       }
     ],
+    "extends": [
+      {
+        "nature": "additive",
+        "spec": "005-acceptance-and-evidence",
+        "unit": {
+          "kind": "directory",
+          "path": "crates/statecraft-acceptance/"
+        }
+      }
+    ],
     "id": "003-work-and-run-semantics",
     "implementation": "complete",
     "sectionHeadings": [
@@ -23,6 +33,7 @@
       "3.1.1 Ready is not ratified",
       "3.2 Workspace preparation",
       "3.3 The run record",
+      "3.3.1 Effect identity and one-to-one closing",
       "3.4 The closed outcome set",
       "3.5 Refusal accounting belongs to the supervisor",
       "3.6 Recovery and reconciliation",
@@ -37,6 +48,6 @@
     "summary": "The core loop's semantics. How a unit of work is identified by reading spec-spine's structured report rather than re-deriving it; how an isolated workspace is prepared so the operator's checkout is never edited; the append-only hash-linked run record with intent written before an effect and outcome after it; the closed outcome set (completed, failed, refused, interrupted, cancelled) and the rule that a retry appends an attempt rather than replacing history; supervisor-owned refusal accounting a supervised process cannot erase; and reconciliation of an ambiguous effect before any retry, with no exactly-once promise.\n",
     "title": "Work selection, workspace preparation, the run record, and recovery after interruption"
   },
-  "shardHash": "924228ea1bdbb7e46082305114262418918c610853153b5e29691a7ccc6ffd75",
+  "shardHash": "86a1f89a77aa9f1d2779ce805a81f3e56ee8f390d4bb18bb1ef259bdcf137775",
   "specVersion": "1.3.0"
 }
