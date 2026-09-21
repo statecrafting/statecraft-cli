@@ -763,8 +763,8 @@ existing behavior and names the number it found.
 
 **2026-09-20: two references to the old location are left for their owners.**
 `crates/statecraft-run/tests/negative_cases.rs` builds a `.derived/` directory as
-a temptation the product must not read, and `docs/design/00-boundaries-and-reuse.md`
-and `docs/decisions/00-founding-decisions.md` mention the old path in prose.
+a temptation the product must not read, and `docs/decisions/00-founding-decisions.md`
+mentions the old path in prose.
 Both are other specs' territory (`003` and `001`), the negative control still
 holds against any shard directory, and widening this change to reach them would
 be editing a spec's territory for a cosmetic improvement. They are recorded here

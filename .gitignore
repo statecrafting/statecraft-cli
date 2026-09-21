@@ -46,3 +46,6 @@ target
 # built it last, and a governed read then either refuses on the pin or, worse,
 # answers under a version this repository never adopted.
 .tooling/
+
+# JetBrains project files are per-developer, not per-repository.
+.idea/

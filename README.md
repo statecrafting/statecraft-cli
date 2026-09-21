@@ -22,46 +22,38 @@ init plan   init apply   migrate plan   migrate apply
 config show   approval grant   approval show
 ```
 
-Measured on 2026-09-20: eleven specs, `000` to `010`. `000` to `009` are
-`approved`; **`010` is a `draft`** and is implemented under an explicit
-authorization from the owner for that realignment and nothing else, so it
-carries no ratification and nothing here claims one. Eight crates and one
-binary; `cargo test --workspace` passes **683 tests**, none ignored;
-`spec-spine index coverage` reports 117 of 117 source files specifically
-claimed. Every spec that claims code has built it, and no forward claim is
-outstanding.
+Measured on 2026-09-21: seven specs, `000` to `006`, all `approved`. Eight
+crates and one binary; `cargo test --workspace` passes **683 tests**, none
+ignored; `spec-spine index coverage` reports 117 of 117 source files
+specifically claimed. Every spec that claims code has built it, and no forward
+claim is outstanding.
 
-`010-managed-environment-and-initialization` is the realignment that follows
-spec-spine withdrawing its kit and its public initializer: one Statecraft global
-environment under `~/.statecraft/`, one project area under `.statecraft/`, one
-initialization flow (`init plan` and `init apply`), a governance producer
-boundary that calls the spec-spine library, and four configuration layers with
-recorded provenance. It is a draft.
+Seven specs and eight crates, because **a spec may own more than one crate**.
+The corpus was eleven specs until 2026-09-21, when four pairs that each
+described one subject across two documents were consolidated: the work, run and
+accept bindings into `006`, the shared evidence envelope into `005`, the first
+provider adapter into `004`, and the managed environment into `002`. No crate
+was merged, renamed or deleted and no requirement changed; `D-02` is amended to
+match, and a crate still has exactly one owning spec.
 
-`000` to `007` were ratified between 2026-09-16 and 2026-09-17, and the
+`000` to `006` were ratified between 2026-09-16 and 2026-09-21, and the
 constitution's product principles VI to XIII were ratified on 2026-09-16, three
-of them frozen as spec `000` anchors. `008-first-provider-adapter` and
-`009-work-run-accept-integration` are `approved` and implemented: `008` names
-the first provider adapter and what its stream can and cannot witness, and `009`
-binds `work`, `run` and `accept` to a process.
+of them frozen as spec `000` anchors.
 
 Nothing is installed or released: the workspace is at version `0.0.0` with
 `publish = false`, and `F-02` defers publication of any kind. The way to run it
 is from a checkout.
 
-The language and the layout are decided: Rust, one Cargo workspace, crates
-matching the spec boundaries. The packaging, the distribution and the binary's
+The language and the layout are decided: Rust, one Cargo workspace, one owning
+spec per crate. The packaging, the distribution and the binary's
 name are still **recommendations awaiting the owner's decision**, recorded with
 what has been adopted in
 [docs/decisions/00-founding-decisions.md](docs/decisions/00-founding-decisions.md).
 
 This repository distinguishes four claims and makes them separately: *specified*,
-*implemented*, *tested*, *released*. Today `000` to `009` are specified and
-approved and `010` is specified as a draft; `002` to `010` are additionally
-implemented and tested: eight crates and 683 passing tests, from
-`cargo test --workspace` on 2026-09-20. `010` being implemented is not `010`
-being ratified, and the grade it claims is *implemented and tested*, never
-*approved*. The
+*implemented*, *tested*, *released*. Today `000` to `006` are specified and
+approved; `002` to `006` are additionally implemented and tested: eight crates
+and 683 passing tests, from `cargo test --workspace` on 2026-09-21. The
 machine-checkable rows of each spec's observable-negative-cases table are
 carried by tests named after them; the rows those tables state as refused in
 review are review obligations, and no test is claimed for them. **Nothing is
@@ -106,7 +98,7 @@ It does not own, and will not reimplement:
 
 The reasoning, the actual-versus-proposed dependency split and the reuse
 dispositions are in
-[docs/design/00-boundaries-and-reuse.md](docs/design/00-boundaries-and-reuse.md).
+[spec 001](specs/001-boundaries-and-authority/spec.md), sections 3.8 to 3.12.
 
 Deliberately deferred, by name rather than by omission: hosted platform
 selection, publication of any kind, signing and key custody, any user interface,
@@ -149,8 +141,8 @@ The product's own state lives outside every target, at `$STATECRAFT_HOME` or
 inside the repository it registers.
 
 What the slice must make observably true, stated as refusals rather than as
-assertions, is section 4 of
-[docs/design/00-boundaries-and-reuse.md](docs/design/00-boundaries-and-reuse.md#4-the-bounded-first-vertical-slice).
+assertions, is
+[spec 001](specs/001-boundaries-and-authority/spec.md) section 3.11.
 
 ### The exit codes a caller scripts against
 
@@ -192,7 +184,7 @@ implementation and history are preserved elsewhere and are **not** restored here
 this repository recovers specific measured failures, contracts and fixtures from
 it, and leaves its hosted client, its scheduler and its user interface behind.
 What was recovered and what was not is recorded in
-[docs/design/00-boundaries-and-reuse.md](docs/design/00-boundaries-and-reuse.md#2-what-the-archive-is-used-for-and-what-it-is-not).
+[spec 001](specs/001-boundaries-and-authority/spec.md) section 3.9.
 
 ## License
 

@@ -598,7 +598,7 @@ attestations; publication of any kind; the optional one-way interface that would
 later hand an outcome to aicortex, which is described here as a boundary and
 implemented by neither side. Legacy factory certificate formats
 (`tenant-emit`, `tenant-tail`) are assessed in
-`docs/design/00-boundaries-and-reuse.md` and adopted by nothing here.
+`001` section 3.8 and adopted by nothing here.
 
 **One inherited obligation this spec does not carry, deliberately.** Revision 4's
 shared-contract-acceptance paragraph required one fixture manifest tested by

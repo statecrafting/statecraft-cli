@@ -9,10 +9,6 @@
         "source": "spec-edge"
       },
       {
-        "path": "docs/design/00-boundaries-and-reuse.md",
-        "source": "spec-edge"
-      },
-      {
         "path": "scripts/check-authored-content.sh",
         "source": "spec-edge"
       },
@@ -33,19 +29,6 @@
         "unit": {
           "kind": "file",
           "path": "docs/decisions/00-founding-decisions.md"
-        }
-      },
-      {
-        "locations": [
-          {
-            "file": "docs/design/00-boundaries-and-reuse.md"
-          }
-        ],
-        "ownership": true,
-        "sourceField": "establishes",
-        "unit": {
-          "kind": "file",
-          "path": "docs/design/00-boundaries-and-reuse.md"
         }
       },
       {
@@ -210,5 +193,5 @@
     "specStatus": "approved"
   },
   "schemaVersion": "1.1.0",
-  "shardHash": "91cbca3d3fd5a66479c195422bcb8a4c5ceb36a64e0e2711023858d1dbe8531c"
+  "shardHash": "1edc7eecbcd999dc9540029faf204c562b3692513550b7c60c5116a5b9b96852"
 }
