@@ -1,7 +1,7 @@
 //! The four dimensions, admission, the refusal codes and the policy.
 //!
 //! statecraft-cli spec 005 section 3.5 fixed these value sets and this
-//! product's spec 007 moved them here without changing one of them: the four
+//! product's spec 005 moved them here without changing one of them: the four
 //! sets are still closed, `unsigned` still belongs only to `signature`, and
 //! `not-applicable` still belongs only to `subjectBinding`. What is added is
 //! refusal-code members and policy fields, each defaulted and skipped at its

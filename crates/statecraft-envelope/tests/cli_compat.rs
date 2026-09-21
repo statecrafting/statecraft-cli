@@ -1,6 +1,6 @@
 //! Compatibility with the bytes statecraft-cli already writes.
 //!
-//! Spec 007 section 3.4. Three properties, and they are not the same property:
+//! Spec 005 section 3.14. Three properties, and they are not the same property:
 //!
 //! 1. **Provenance.** Every fixture under `testdata/fixtures/cli/` is what the
 //!    CLI's own serializer emits. Asserted against the frozen transcription in
@@ -53,7 +53,7 @@ fn every_committed_fixture_is_what_the_cli_serializer_writes() {
         assert_eq!(
             fixture(name),
             expected,
-            "{name} is not what the pre-007 statecraft-cli encoder produces"
+            "{name} is not what the pre-transfer statecraft-cli encoder produces"
         );
     }
 }
@@ -277,7 +277,7 @@ fn the_bytes_the_old_cli_wrote_for_a_colliding_present_value_now_read_as_the_abs
     let text = fixture("recorded-collision-legacy.json");
     assert_eq!(text, "\"not-recorded\"");
 
-    // What the pre-007 CLI reader made of them: a present string. The
+    // What the pre-transfer CLI reader made of them: a present string. The
     // divergence is asserted rather than described, so it cannot quietly stop
     // being true.
     let legacy: legacy_cli::Recorded<String> = serde_json::from_str(&text).unwrap();
@@ -397,7 +397,7 @@ fn a_dimension_value_belonging_to_another_dimension_is_still_refused() {
 
 #[test]
 fn an_unknown_field_is_dropped_rather_than_preserved_and_that_is_recorded_here() {
-    // Known limitation, spec 007 section 5. Unknown *members* of an enum are
+    // Known limitation, spec 005 section 5. Unknown *members* of an enum are
     // preserved; an unknown *field* of a struct is not, because no type here
     // carries an extras map. A reader that re-serializes a record written by a
     // newer producer therefore loses the newer field. The test exists so the

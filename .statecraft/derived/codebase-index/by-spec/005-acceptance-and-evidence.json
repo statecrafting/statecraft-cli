@@ -10,6 +10,14 @@
       {
         "path": "crates/statecraft-acceptance/",
         "source": "spec-edge"
+      },
+      {
+        "path": "crates/statecraft-envelope",
+        "source": "manifest-metadata"
+      },
+      {
+        "path": "crates/statecraft-envelope/",
+        "source": "spec-edge"
       }
     ],
     "resolvedUnits": [
@@ -25,11 +33,24 @@
           "kind": "directory",
           "path": "crates/statecraft-acceptance/"
         }
+      },
+      {
+        "locations": [
+          {
+            "file": "crates/statecraft-envelope/"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "kind": "directory",
+          "path": "crates/statecraft-envelope/"
+        }
       }
     ],
     "specId": "005-acceptance-and-evidence",
     "specStatus": "approved"
   },
   "schemaVersion": "1.1.0",
-  "shardHash": "431a9baa00dc0d19f459b6753dd114e7228d49a1680ab4ba568a1723e119c259"
+  "shardHash": "6381565b55d3515945825dc0bee44b2698b57dd10a559f70f434dd1490abf366"
 }

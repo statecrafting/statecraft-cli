@@ -11,12 +11,16 @@
       {
         "kind": "directory",
         "path": "crates/statecraft-acceptance/"
+      },
+      {
+        "kind": "directory",
+        "path": "crates/statecraft-envelope/"
       }
     ],
     "id": "005-acceptance-and-evidence",
     "implementation": "complete",
     "sectionHeadings": [
-      "005: Independent acceptance, the receipt, and the evidence dimensions",
+      "005: Independent acceptance, the receipt, the evidence dimensions, and the envelope",
       "1. Purpose",
       "2. Territory",
       "3. Behavior",
@@ -35,15 +39,22 @@
       "3.8 The three names for absence",
       "3.9 The reviewable outcome",
       "3.10 Observable negative cases",
+      "3.11 One owner, and who re-exports",
+      "3.12 `Recorded<T>`: the three words are reserved",
+      "3.13 The reference",
+      "3.14 What a compatibility fixture must prove",
+      "3.15 Provenance and the licence",
+      "3.16 The native golden vectors stay provisional",
+      "3.17 The platform's dependency",
       "4. Out of scope",
       "5. Decisions recorded during implementation",
       "Verification"
     ],
     "specPath": "specs/005-acceptance-and-evidence/spec.md",
     "status": "approved",
-    "summary": "How a claim of completion becomes, or fails to become, an acceptance. Fixes the identification of candidate bytes and the trusted base, the authority-set rule that stops a candidate from being judged by rules it wrote, the receipt that binds repository, base, candidate, suite, exit codes and policy digest, the four evidence dimensions reported separately from admission with closed value sets, independently supplied trust roots, the preservation of original bytes and named hash constructions, and the three names for absence, none of which reads as success.\n",
-    "title": "Independent acceptance, the receipt, and the separately reported evidence dimensions"
+    "summary": "How a claim of completion becomes, or fails to become, an acceptance. Fixes the identification of candidate bytes and the trusted base, the authority-set rule that stops a candidate from being judged by rules it wrote, the receipt that binds repository, base, candidate, suite, exit codes and policy digest, the four evidence dimensions reported separately from admission with closed value sets, independently supplied trust roots, the preservation of original bytes and named hash constructions, and the three names for absence, none of which reads as success. It also owns the envelope crate the statecraft platform wrote against these serializations and transferred here, which makes one owner for the reference, the dimensions, admission and the absence words rather than two implementations of one wire format.\n",
+    "title": "Independent acceptance, the receipt, the separately reported evidence dimensions, and the envelope two products exchange"
   },
-  "shardHash": "279b1fd3e89e5cbdfc1c865266c6b0330445f81ab243dc3ddbc907b539186127",
+  "shardHash": "7f63cdfb5c238e763af45b47f76b5423d6abd712c503530d7ad595d131c3b64e",
   "specVersion": "1.3.0"
 }
