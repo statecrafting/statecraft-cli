@@ -1075,6 +1075,23 @@ mention, `.claude/agent-memory/`, whose disposition nobody has decided. The rest
 of §3.22 was checked and holds, including the global push gate at
 `~/.claude/hooks/push-gate.sh`, which is installed and registered.
 
+**2026-09-21: the fifth class belongs to a sibling product, and this one delivers
+no agent memory.** The correction above left `.claude/agent-memory/` undecided.
+The owner's disposition is that persistent agent memory is not harness content at
+all: it belongs to `aicortex`, a governed memory store for AI clients that serves
+one store over MCP and owns its own per-client configuration. So there is no
+sixth delivered class here, `harness::shipped()` never carries one, and §3.23's
+contracts have nothing to say about a store this product neither writes nor
+reads.
+
+Two consequences follow, and neither changes what §3 requires. §3.22's ordering
+is untouched: the counterparty's `.claude/agent-memory/reviewer/` holds notes
+about reviewing that repository rather than a global harness, so it moves under
+that repository's own decision and not with this delivery. And the interim is
+that nothing moves: aicortex is specified and under construction, so the notes
+that exist today stay where they are until that store can hold them, which is a
+sibling's schedule and not a condition on this product's delivery.
+
 ## Verification
 
 Each line is one command. They run the acceptance this spec's behavior declares:
