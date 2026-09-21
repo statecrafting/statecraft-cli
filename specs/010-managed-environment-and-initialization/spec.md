@@ -519,6 +519,21 @@ trimmed producer releases. No fixture substitutes for the boundary: where a
 conforming answer is needed, the suite derives one from the real library's own
 bytes and labels it a fixture.
 
+**2026-09-20: the trimmed producer was tested before it was released, under a
+temporary override that is not committed.** Section 3.5 permits a local source
+override for development verification and forbids committing one. Measured on
+this date against the sibling spec-spine working tree at
+`eb37615f34c5c5327d05e87189f08b4c4af38c0c`, branch
+`120-the-engine-ships-governance-not-an-environment`, three paths dirty,
+reached through a `[patch.crates-io]` entry added to this workspace's manifest
+and reverted immediately afterwards: `scaffold_init_json` returns only the
+contract set, the conformance reads `conforming`, and the end-to-end
+initialization reports **`complete`** where the released `0.21.0` reports
+`partial`. The three tests that assert today's non-conformance fail against
+that tree, which is exactly what they are for. **Nothing about a release is
+claimed**: the committed dependency stays `=0.21.0`, and adopting the trimmed
+producer is a pin bump plus those three inversions, as its own change.
+
 **2026-09-20: the governance files are written by this crate, and every rule
 about whether to write them is still 002's.** Section 3.5 reconciles through
 spec 002's ownership model. `statecraft_environment::plan::plan` computes what

@@ -71,6 +71,6 @@
     "summary": "spec-spine withdraws its kit and its public initializer, so the transition contract in 002 section 3.7 has no second installer to coexist with and this product becomes the sole user-facing initializer and environment manager. This spec is that realignment. It fixes one Statecraft-managed global environment under the product home and one per-project area under .statecraft/; it makes the reusable harness a single global source delivered by adapters rather than copied into every repository; it fixes the governance producer boundary as the spec-spine library's files-as-data result, with an explicit layout and a closed set of paths this product will place; it fixes the root instruction bridge as a tracked managed modification rather than ownership of a user's file; it fixes configuration authority as four layers with provenance rather than one last-writer-wins merge; it fixes the solo and team boundary so every capability has a local implementation and an unreachable platform is an honest unavailable state rather than a downgrade to solo; and it moves this repository's compiled artifacts to .statecraft/derived/ in one bounded step.\n",
     "title": "The Statecraft-managed environment: one global home, one project area, one initialization flow, and where authority comes from"
   },
-  "shardHash": "c03d5fb2791466b5dd95689dd6393d028b7fcb6a7bf758befce166a652dd2d0a",
+  "shardHash": "c145bd4cc533a0b8a8b979a5ba879488cc8946f36b882b149e160271e7e705df",
   "specVersion": "1.3.0"
 }
