@@ -17,7 +17,7 @@
 #
 # The floor was compared before the pin moved: `DEFAULT_BYPASS_PREFIXES` is
 # byte-identical between 0.18.0 and 0.20.0, and the one coupling change that
-# widens what the gate asks about (spec 097's governed scope) is inert while
+# widens what the gate asks about (spec 078's governed scope) is inert while
 # `[coverage] governed_scope` is unset here. `make tools` installs this exact
 # version into `.tooling/bin`, so a binary elsewhere on PATH cannot answer for
 # this repository.
@@ -44,7 +44,7 @@ specs_dir     = "specs"
 derived_dir   = ".statecraft/derived"
 standards_dir = "standards/spec"
 schemas_dir   = "standards/schemas"
-# An ungoverned root for a tool's own working files (spec 039): excluded
+# An ungoverned root for a tool's own working files (spec 036): excluded
 # from every content hash, and bypassed by the coupling gate. L-006 if a
 # spec claims a unit inside it. Empty means no such root is declared.
 # The CLI's own runtime state inside a governed repository (spec 002): run
@@ -67,7 +67,7 @@ npm_workspaces = ["package.json", "pnpm-workspace.yaml"]
 # files; you want `dir/**/*`, which is what the default below has.
 # The bare form is not an error and not empty: it parses, it prints
 # back through `config show`, and it matches nothing at all. It was
-# the shipped default until spec 069, and spec 057 found the same
+# the shipped default until spec 058, and spec 050 found the same
 # form in spec-spine's own config before that. If you narrow or
 # extend this list, keep the trailing `/*`:
 #

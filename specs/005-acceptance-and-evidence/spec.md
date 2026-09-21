@@ -169,7 +169,7 @@ So the split is:
 that, so three things are fixed rather than left to a caller:
 
 1. The report is `spec-spine delta --base <trusted base> --head <candidate>
-   --json`, whose envelope is spec-spine's own (its spec 037).
+   --json`, whose envelope is spec-spine's own (its spec 034).
 2. The **binary is resolved independently of the candidate**, from the pin the
    registered repository declares at the base. A candidate that chose the binary
    that classifies it would be classifying itself, which is what 088's own `D-1`

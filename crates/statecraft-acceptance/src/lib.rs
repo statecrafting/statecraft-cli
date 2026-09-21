@@ -11,7 +11,7 @@
 //!   structured report beats an exit code, and an unrun check is `unknown`.
 //! - [`authority`] applies the authority-set rule, and refuses to build the
 //!   change classifier that belongs to spec-spine.
-//! - [`delta`] reads spec-spine's change-classification report (its spec 088)
+//! - [`delta`] reads spec-spine's change-classification report (its spec 071)
 //!   and maps its structural classes onto the authority-set members `001`
 //!   section 3.5 enumerates.
 //! - [`receipt`] mints a receipt, or says precisely why it did not.
@@ -35,7 +35,7 @@
 //! absence of any verb that acts is how this crate keeps to it.
 //!
 //! It also builds no change classifier. Classifying a change under the base's
-//! rules is spec-spine's job; its spec 088 is released, the pin carries it, and
+//! rules is spec-spine's job; its spec 071 is released, the pin carries it, and
 //! this product now **reads** that report rather than answering the question
 //! itself. What it still does not do is obtain the report: `001` section 3.5
 //! requires every authority-set member to be read at the trusted base revision,

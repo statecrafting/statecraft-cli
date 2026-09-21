@@ -1,4 +1,4 @@
-//! spec-spine's change-classification report (its spec 088), read as a typed
+//! spec-spine's change-classification report (its spec 071), read as a typed
 //! value.
 //!
 //! Spec 005 section 3.3. Classifying a change under the base's rules is
@@ -43,7 +43,7 @@ use crate::authority::{CorpusAnswer, DeltaReport};
 
 /// The `DELTA_SCHEMA_VERSION` line this build reads.
 ///
-/// Spec 088 section 3.6 starts the report's schema at `0.1.0` on its own axis.
+/// Spec 071 section 3.6 starts the report's schema at `0.1.0` on its own axis.
 /// On a `0.x` line the MINOR is the breaking position, so this build reads
 /// `0.1.z` and refuses anything else rather than deserializing a contract it
 /// was not written against.
@@ -52,11 +52,11 @@ pub const READS_DELTA_SCHEMA: &str = "0.1";
 /// The verb whose envelope this is.
 pub const DELTA_VERB: &str = "delta";
 
-/// What spec-spine 088 section 3.2 requires the report to have classified
+/// What spec-spine 071 section 3.2 requires the report to have classified
 /// under, and the only value this reader accepts.
 pub const CLASSIFIED_UNDER_BASE: &str = "base";
 
-/// The eleven class tokens spec 088 section 3.3 fixes.
+/// The eleven class tokens spec 071 section 3.3 fixes.
 ///
 /// A token outside this list is not an error in the report; it is a contract
 /// this build has not read. [`reading_of`] returns [`ClassReading::Unplaceable`]
@@ -114,7 +114,7 @@ pub enum ClassReading {
 /// depend on the path. A token this returns `false` for makes the corpus-side
 /// answer an absence.
 pub fn class_is_placeable(class: &str) -> bool {
-    // spec-spine's own `unknown` is a path it could not place (088 `D-4`), and
+    // spec-spine's own `unknown` is a path it could not place (071 `D-4`), and
     // anything outside the eleven is a contract this build has not read.
     class != "unknown" && KNOWN_CLASSES.contains(&class)
 }
@@ -190,7 +190,7 @@ pub struct Change {
 pub struct PriorPolicy {
     /// Whether any structural class above `implementation` changed.
     ///
-    /// Spec 088 section 3.5 is explicit that `false` means only that: it does
+    /// Spec 071 section 3.5 is explicit that `false` means only that: it does
     /// not mean the change is safe, correct or approved.
     pub required: bool,
     /// Which classes, verbatim.
@@ -206,7 +206,7 @@ pub struct Report {
     pub schema_version: String,
     /// What produced it.
     pub tool: Tool,
-    /// Which side's rules classified. Spec 088 section 3.2: the base's.
+    /// Which side's rules classified. Spec 071 section 3.2: the base's.
     pub classified_under: String,
     /// The base ref's commit.
     pub base: String,
@@ -224,7 +224,7 @@ pub struct Report {
     pub prior_policy: PriorPolicy,
 }
 
-/// The `--json` envelope spec 037 wraps a verb's answer in.
+/// The `--json` envelope spec 034 wraps a verb's answer in.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Envelope {
@@ -402,7 +402,7 @@ impl DeltaReport for SpecSpineDeltaReport {
         if let Some(class) = self.unplaceable_class() {
             return CorpusAnswer::Unavailable {
                 reason: format!(
-                    "this product read spec-spine's change-classification report (its spec 088) \
+                    "this product read spec-spine's change-classification report (its spec 071) \
                      and will not place the class `{class}`, so the corpus-side answer is an \
                      absence rather than a guess"
                 ),
@@ -479,7 +479,7 @@ mod tests {
     }
 
     #[test]
-    fn every_class_spec_088_fixes_has_a_reading() {
+    fn every_class_spec_071_fixes_has_a_reading() {
         for class in KNOWN_CLASSES {
             let reading = reading_of(class, SPEC_SPINE_CONFIG);
             if class == "unknown" {
@@ -489,7 +489,7 @@ mod tests {
                 assert_ne!(
                     reading,
                     ClassReading::Unplaceable,
-                    "{class} is one of spec 088's eleven and must be placed"
+                    "{class} is one of spec 071's eleven and must be placed"
                 );
                 assert!(class_is_placeable(class));
             }

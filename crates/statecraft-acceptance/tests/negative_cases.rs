@@ -160,7 +160,7 @@ fn with_no_delta_report_the_verdict_is_not_recorded_and_acceptance_is_still_refu
     );
     assert!(v.note.contains("0.20.0"), "names the installed version");
     assert!(
-        v.note.contains("spec 088"),
+        v.note.contains("spec 071"),
         "names the report it does not read"
     );
     assert!(
@@ -317,7 +317,7 @@ fn a_report_naming_no_corpus_member_lets_acceptance_rest_on_the_candidates_own_s
     assert!(
         v.prior_policy_required == Recorded::Present(true),
         "spec-spine's `required` is recorded even where this product concludes no member \
-         was touched: the two answer different questions (spec 088 section 3.5)"
+         was touched: the two answer different questions (spec 071 section 3.5)"
     );
 }
 

@@ -197,7 +197,7 @@ jobs:
       - name: Show toolchain
         run: rustc --version && cargo --version
 
-      # The workspace suite asserts against the REAL governance tool: spec 010's
+      # The workspace suite asserts against the REAL governance tool: spec 002's
       # acceptance compiles, indexes and checks a scaffolded corpus at the new
       # derived path, and a stand-in would turn that row into a test of a
       # stand-in. So this job installs the same pinned binary the governance job
