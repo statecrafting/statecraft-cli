@@ -950,6 +950,42 @@ recorded, named precisely, and left for that decision. Contracts 1, 3, 4, 6 and 
 the shipped hook already meets, and its project gate is the test §3.14 rule 3
 requires, which is what makes it inert outside a Statecraft project.
 
+**2026-09-21: the two hook contracts are repaired, and the assertions now live
+here.** The entry above recorded `hooks/statecraft-gate.sh` failing §3.23
+contracts 2 and 5 and left the repair for its own decision, because a change to
+a hook is an authority change. The owner asked for it, so this is that change
+and nothing else rides along with it.
+
+The hook now resolves `$SPEC_SPINE_BIN`, then the target repository's own
+`target/release/spec-spine`, then `PATH` (contract 2); probes `check --help` and
+`lint --help` before reading any exit code, so a binary older than the verb is
+refused by name instead of reported as a stale tree (contract 5); reads each of
+`check`'s four answers as itself and exits with the code it was given, rather
+than letting `set -e` collapse them (contract 4); refuses when no binary can be
+executed inside a Statecraft project (contract 6); and takes the target
+repository as its argument rather than from the session's working directory
+(contract 3). It remains inert outside a Statecraft project, which is §3.14 rule
+3 and a different thing from contract 6.
+
+**§3.23's "whoever owns the files owns the assertions" is now discharged for the
+hook.** `crates/statecraft-home/tests/harness_hooks.rs` extracts the shipped body
+and runs it as a program against each contract, with a stub `spec-spine` that
+records which binary was chosen. Asserted by execution rather than by reading the
+source for a phrase, because a script that mentions a contract in a comment would
+pass the second and fail the first. Measured against the pre-repair body, eight of
+its ten tests fail; the two that pass are the properties that body already had.
+
+Two defects in the first draft of those tests are worth recording, because both
+produce a green suite that establishes nothing. Its fixture set `PATH` to the
+stub directory alone, which removed `git` along with everything else, so the hook
+found no repository and exited 0 having run nothing, and three assertions of the
+form "every line of the witness is X" passed on an empty witness. The fixture now
+puts a `git` shim in that directory and `assert_only_ran` refuses an empty
+witness first. Separately, a scan for writing verbs over the whole body tripped on
+the word "re-indexing" inside a message; the answer was not to reword the message
+but to assert over the binary in command position, since a scan that cannot tell
+an executed word from a printed one gets worked around rather than fixed.
+
 ## Verification
 
 Each line is one command. They run the acceptance this spec's behavior declares:
@@ -976,4 +1012,5 @@ test -f crates/statecraft-environment/tests/negative_cases.rs
 spec-spine index check --fail-on-unresolved
 test -f crates/statecraft-home/src/lib.rs
 cargo test -p statecraft-home --test negative_cases
+cargo test -p statecraft-home --test harness_hooks
 ```
