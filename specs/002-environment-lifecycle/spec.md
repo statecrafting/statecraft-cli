@@ -23,6 +23,9 @@ summary: >
   authority as four layers with provenance rather than one last-writer-wins
   merge, and a solo and team boundary in which every capability has a local
   implementation and an unreachable platform is an honest unavailable state.
+  Sections 3.22 and 3.23 record the counterparty's state at the moment it handed
+  its harness over, the order the last of that harness moves in, and what any
+  content delivered through the harness mechanism has to satisfy.
 establishes:
   - { kind: directory, path: "crates/statecraft-environment/" }
   - { kind: directory, path: "crates/statecraft-home/" }
@@ -621,6 +624,139 @@ There is no deprecation program, no dual installer, no compatibility shim and no
 generalized legacy-migration framework. The replaced model has no backward
 compatibility requirement.
 
+### 3.22 The counterparty's state, and the order the last of its harness moves in
+
+Prepared 2026-09-20 by a spec-spine session and handed to this product as input
+to section 3.14. It is **evidence from a counterparty, not an instruction to this
+corpus**: every disposition in it belongs to this product's owner, and nothing
+here binds beyond what sections 3.13 to 3.15 already required. It is recorded in
+the spec it informs rather than filed beside the corpus, because a design note
+that lives outside the spec is a second place for a requirement to be written
+down and the first place people stop reading.
+
+**What spec-spine no longer does.** It removed the initializer and the kit in
+one change:
+
+| Gone | Was |
+|---|---|
+| `spec-spine init` | the project initializer |
+| `--with-kit` | the harness installer |
+| `kit/`, `kit_embedded.rs` | the harness, vendored and embedded in the binary |
+| `.agents/`, `.codex/` | generated projections of that harness |
+| `website/` | the documentation site |
+
+No verb there writes an `AGENTS.md`, a `CLAUDE.md`, a `.claude/` directory, a
+skill, an agent brief, a hook, an MCP configuration, a CI workflow or a
+`Makefile`. What survived is section 3.15's producer seen from the other side:
+`scaffold_init_json` is a pure function of its argument, emits governance starter
+content only, as data, and its own tests assert that no emitted path begins with
+`.claude/`. So the ownership classes of section 3.2 have no second claimant left
+to negotiate with, and an adapter that manages `.claude/**` contends with
+nothing.
+
+**Where that repository's own `.claude/` stands**, measured 2026-09-20. It keeps
+one for itself, because removing it before a replacement exists would leave it
+with no development instruction and no hook enforcement, and it is being
+dismantled in the order that never leaves it unprotected:
+
+| Class | State |
+|---|---|
+| `.claude/rules/` (4 files) | **removed**, folded into that repository's `AGENTS.md` as a `## Rules` section. Never a candidate for a global home: they are its own governance and would bind every project a user opens. |
+| the push gate | **installed globally** at `~/.claude/hooks/push-gate.sh`. Repository-agnostic: `git` and `jq`, and no spec-spine. Copied rather than moved, because its tests cannot read `$HOME`. |
+| `.claude/skills/` (10), `.claude/agents/` (4) | waiting on this product. |
+| `.claude/settings.json` (a PR gate, two session hooks, permissions) | waiting on this product. |
+
+**The ordering is fixed, and it is the reason this section exists.** This product
+delivers a global harness with a Claude Code adapter; spec-spine confirms that a
+session there still has its loop and its hooks; **then** its `.claude/` goes,
+with its governing spec superseded in the same change. Doing it in the other
+order is the failure the removal of the kit was written to avoid, and no schedule
+pressure converts one order into the other.
+
+**The instruction bridge waits on this side by design.** spec-spine will not add
+`@.statecraft/AGENTS.md` to its root `AGENTS.md` until this product's initializer
+actually writes that file, because an import of a file that does not exist is a
+broken instruction rather than an early one. Section 3.13 is the rule and the
+initialization flow of section 3.17 writes the file, so the condition is
+satisfiable today; what remains is telling the counterparty, which is one line on
+its side and nothing on this one.
+
+### 3.23 What delivered harness content must satisfy
+
+Section 3.14 fixes the **mechanism**: one content-addressed source under the
+home, adapters that point at it, delivery evaluated rather than assumed. This
+section fixes what any **content** delivered through that mechanism has to
+satisfy, whether this product authors it or adopts it from the counterparty.
+Adopting the inventory below is the owner's act; what adoption costs is stated
+here so the decision is not made by discovering the cost afterwards.
+
+**The inventory offered.** Ten skills (`prime`, `next`, `build`, `verify`,
+`ship`, `shepherd`, `spec`, `commit`, `code-review`, `setup`) and four agents
+(`architect`, `explorer`, `implementer`, `reviewer`). They are already
+**repository-invariant**: every project-specific fact lives in that project's
+`AGENTS.md`, which each skill ends by pointing at. That property was built for a
+distribution that was then cancelled, and it is what makes section 3.14's
+"maintained once, copied into no repository" viable for them unchanged.
+
+**Three assertions hold for a delivered skill**, wherever the file lands:
+
+1. No skill names a gate flag its project's `AGENTS.md` omits.
+2. A read-only skill never invokes a writing verb.
+3. Each skill wraps the tool verbs it exists for, rather than restating them.
+
+**Seven contracts hold for a delivered hook.** Each was written after a measured
+failure, and the contract is worth more than the shell that carries it:
+
+1. **Read, never repair.** No hook may invoke a writing subcommand. A hook fires
+   where it cannot commit what it regenerated, so a writing hook leaves the
+   derived tree dirty; an orchestrator that refuses to start on a dirty tree then
+   never starts, and one adopter's pipeline stalled eleven hours on dirt it had
+   produced itself. The single sanctioned exception is a `compile` after an edit
+   to a `spec.md`, where the session is live and can commit the result.
+2. **Resolve the binary in order**: `$SPEC_SPINE_BIN`, then the target
+   repository's own `target/release/spec-spine`, then `PATH`. A repository that
+   builds its own binary must be governed by the one it builds; the `PATH`
+   fallback keeps an adopter on the published CLI working. A bare name resolved
+   from `PATH` alone is whichever copy the last unrelated project installed.
+3. **Resolve the target repository from the command, not from the session.** A
+   multi-repository session pushes and edits in whichever tree the command names.
+4. **Read the verdict; never guess it.** `check` has four answers and they are
+   not interchangeable: `0` fresh, `1` a corpus that does not validate, `2` stale
+   or an unresolved claim, `3` a read that was not performed. Only one of the
+   four is repaired by regenerating.
+5. **Establish the verb before reading its exit code.** `clap` also spends `2` on
+   an unknown subcommand, so a hook confirms the binary carries the verb
+   (`check --help`) first. Without that, a binary older than the verb reports a
+   fresh tree as stale and sends the session to regenerate shards that were
+   already correct.
+6. **A gate whose check did not run is not green.** Every non-zero code refuses.
+7. **A branch gate resolves the protected branch rather than assuming `main`**:
+   `$SPEC_SPINE_DEFAULT_BRANCH`, then the remote's own `HEAD`, then `main` as a
+   floor. It refuses only a push that would actually update that branch, so a tag
+   push from the default branch is allowed, and it is anchored on the command
+   that invokes the verb, so a `grep` or a heredoc merely containing the text
+   still runs. A pull-request gate runs the coupling gate before the create verb
+   and refuses without a human-written waiver line in the body.
+
+**A deny list is a safety floor, not an adapter's optional extra.** Where a
+delivery carries permissions at all, the refusals travel with it: no publish
+verb, no release verb, no force push, no recursive removal of a corpus or a
+derived tree.
+
+**Whoever owns the files owns the assertions.** In spec-spine the three skill
+assertions and the seven hook contracts are enforced by
+`crates/spec-spine-core/tests/harness_hooks.rs` (1124 lines, which extracts each
+hook body and runs it as a program over a matrix of command spellings and branch
+names) and `harness_skills.rs` (about 800). A hermetic test cannot read `$HOME`,
+so neither file survives the move on its own: they are reimplemented where the
+files land, or the requirements become unenforced. That cost is small and it is
+not optional, and it is the second reason section 3.22's ordering is not
+negotiable.
+
+The harness this build ships under section 3.14 is deliberately small, and
+adopting the inventory above would not change that judgment by itself: the point
+of a global harness is that it is one source, not that it is a large one.
+
 ## 4. Out of scope
 
 Installing the product itself; provider authentication; hosted registration;
@@ -788,6 +924,31 @@ edges that carry the real relationship stay and say more than the dropped line
 did: the `extends` edge names the exact crate the verbs are bound in, and the
 `amends` edge names what §3.16 reads differently in `006` §3.6. The same
 resolution was taken in `004` on the same date and for the same reason.
+
+**2026-09-21: the spec-spine harness handoff is folded in here, and two contracts
+the shipped hook does not yet meet.** The handoff arrived as
+`docs/design/01-spec-spine-harness-handoff-2026-09.md` and is now §3.22 and
+§3.23. It was filed rather than folded by mistake: a design note beside the
+corpus is a second place for a requirement to live, and AGENTS.md's source
+ownership table has recorded since the founding record moved that this repository
+keeps no design directory. Nothing was dropped in the move; the half reporting
+that §3.7 still named a live counterparty was already discharged by §3.7 and
+§3.21 before the note landed, and the half about spec-spine's renumbered ordinals
+is AGENTS.md's "Citing another corpus", written in this same change.
+
+Folding it in made two gaps measurable that a loose file had left unmeasured.
+The harness `hooks/statecraft-gate.sh` that `harness::shipped()` carries predates
+§3.23 and does not satisfy contract 2 or contract 5: it invokes a bare
+`spec-spine` resolved from `PATH` with no `$SPEC_SPINE_BIN` and no repository-local
+`target/release/spec-spine` ahead of it, and under `set -eu` it reads the exit
+code without first establishing that the binary carries the verb, so `clap`
+spending `2` on an unknown subcommand is indistinguishable from a stale tree.
+Both are real against the contracts and neither is repaired here: a change to a
+hook is an authority change under AGENTS.md "Approval semantics", decided on its
+own and never bundled with the change that would authorize it. The gap is
+recorded, named precisely, and left for that decision. Contracts 1, 3, 4, 6 and 7
+the shipped hook already meets, and its project gate is the test §3.14 rule 3
+requires, which is what makes it inert outside a Statecraft project.
 
 ## Verification
 
