@@ -20,6 +20,7 @@ use statecraft_home::flow::SpecSpineCommand;
 use statecraft_home::home::Layout;
 use statecraft_home::producer::Library;
 use statecraft_home::service::{self, Operation, Severity};
+use statecraft_home::settings::Intent;
 use statecraft_home::team::Unreachable;
 use std::path::Path;
 
@@ -98,6 +99,53 @@ pub fn wrap(answer: service::Answer) -> Answer<service::Answer> {
     Answer::new(answer, exit, summary)
 }
 
+/// The settings intent an invocation of `home apply` carries.
+///
+/// Spec 002 section 3.24: the modification is **refused by default**, so the
+/// absence of a flag is [`Intent::Withheld`] and not a shorthand for consent.
+/// The token is the one the plan printed, repeated back, which is what makes
+/// consent specific to the content the operator actually read: content whose
+/// lines have changed has a different token and is presented again.
+///
+/// `None` means the flags do not name an operation, which the caller renders as
+/// a usage error rather than guessing at.
+pub fn settings_intent(args: &[String]) -> Option<Intent> {
+    let mut intent = Intent::Withheld;
+    let mut seen = 0usize;
+    let mut i = 0usize;
+    while i < args.len() {
+        let arg = args[i].as_str();
+        if arg == "--remove-settings" {
+            intent = Intent::Remove;
+            seen += 1;
+        } else if let Some(token) = arg.strip_prefix("--consent-settings=") {
+            intent = Intent::Consented {
+                token: token.to_string(),
+            };
+            seen += 1;
+        } else if arg == "--consent-settings" {
+            let token = args.get(i + 1)?;
+            if token.starts_with("--") {
+                return None;
+            }
+            intent = Intent::Consented {
+                token: token.clone(),
+            };
+            seen += 1;
+            i += 1;
+        } else if arg.starts_with("--") {
+            // An unrecognised flag on a verb that writes is a usage error, not
+            // something to ignore: ignoring it is how a mistyped consent flag
+            // reads as a silent refusal.
+            return None;
+        }
+        i += 1;
+    }
+    // Two intents in one invocation name no single operation. Refusing is the
+    // answer; picking the last one would be this binding deciding a policy.
+    if seen > 1 { None } else { Some(intent) }
+}
+
 /// Which operation a verb names, given what followed it.
 pub fn operation(
     verb: crate::commands::Verb,
@@ -109,7 +157,9 @@ pub fn operation(
     Some(match verb {
         Verb::HomeShow => Operation::HomeShow,
         Verb::HomePlan => Operation::HomePlan,
-        Verb::HomeApply => Operation::HomeApply,
+        Verb::HomeApply => Operation::HomeApply {
+            settings: settings_intent(rest)?,
+        },
         Verb::InitPlan => Operation::InitPlan { root: root()? },
         Verb::InitApply => Operation::InitApply { root: root()? },
         Verb::MigratePlan => Operation::MigratePlan { root: root()? },
@@ -145,7 +195,8 @@ pub fn operation(
 pub fn usage(verb: crate::commands::Verb) -> &'static str {
     use crate::commands::Verb;
     match verb {
-        Verb::HomeShow | Verb::HomePlan | Verb::HomeApply => "",
+        Verb::HomeShow | Verb::HomePlan => "",
+        Verb::HomeApply => " [--consent-settings <token> | --remove-settings]",
         Verb::ProjectEnroll => " <path> <team>",
         Verb::ConfigShow => " <path> [key=value ...]",
         Verb::ApprovalGrant => " <path> <subject> <operator> <reason...>",
@@ -214,6 +265,49 @@ mod tests {
         assert!(operation(Verb::ApprovalShow, &[], Some(Path::new("/p"))).is_none());
         assert!(operation(Verb::InitApply, &[], None).is_none());
         assert!(operation(Verb::HomeShow, &[], None).is_some());
+    }
+
+    #[test]
+    fn home_apply_withholds_the_settings_modification_unless_it_is_consented_to() {
+        let argv = |s: &str| -> Vec<String> { s.split_whitespace().map(str::to_string).collect() };
+        // No flag is a refusal, not a shorthand for consent.
+        assert_eq!(settings_intent(&[]), Some(Intent::Withheld));
+        assert_eq!(
+            settings_intent(&argv("--consent-settings abc123")),
+            Some(Intent::Consented {
+                token: "abc123".into()
+            })
+        );
+        assert_eq!(
+            settings_intent(&argv("--consent-settings=abc123")),
+            Some(Intent::Consented {
+                token: "abc123".into()
+            })
+        );
+        assert_eq!(
+            settings_intent(&argv("--remove-settings")),
+            Some(Intent::Remove)
+        );
+        // A consent flag with no token, a mistyped flag, and two intents at
+        // once each name no operation, so each is a usage error rather than a
+        // silent withholding.
+        assert_eq!(settings_intent(&argv("--consent-settings")), None);
+        assert_eq!(
+            settings_intent(&argv("--consent-settings --remove-settings")),
+            None
+        );
+        assert_eq!(settings_intent(&argv("--consent-setting abc")), None);
+        assert_eq!(
+            settings_intent(&argv("--remove-settings --consent-settings=x")),
+            None
+        );
+    }
+
+    #[test]
+    fn a_mistyped_consent_flag_names_no_operation_at_all() {
+        let rest = vec!["--consent-settings".to_string()];
+        assert!(operation(Verb::HomeApply, &rest, None).is_none());
+        assert!(operation(Verb::HomeApply, &[], None).is_some());
     }
 
     #[test]

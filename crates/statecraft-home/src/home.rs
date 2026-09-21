@@ -82,6 +82,16 @@ impl Layout {
         self.root.join("delivery.json")
     }
 
+    /// Modifications of files this product does not own.
+    ///
+    /// Spec 002 sections 3.13 and 3.24: a modification records the path, the
+    /// exact content and the digest either side. It is never a managed entry
+    /// and never ownership of the file, which is why it lives in the product's
+    /// own home rather than in the file it describes.
+    pub fn modifications_file(&self) -> PathBuf {
+        self.root.join("modifications.json")
+    }
+
     /// The canonical harness source.
     pub fn harness_dir(&self) -> PathBuf {
         self.root.join("harness")
@@ -121,6 +131,7 @@ impl Layout {
             self.personal_file(),
             self.tools_file(),
             self.delivery_file(),
+            self.modifications_file(),
         ]
     }
 }
@@ -480,6 +491,7 @@ mod tests {
         Personal::default().write(&layout).unwrap();
         Tools::default().write(&layout).unwrap();
         std::fs::write(layout.delivery_file(), "[]\n").unwrap();
+        std::fs::write(layout.modifications_file(), "[]\n").unwrap();
         assert!(presence(&layout).complete());
     }
 }

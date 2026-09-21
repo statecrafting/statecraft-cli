@@ -347,6 +347,9 @@ pub fn help_text(topic: &[String]) -> String {
         "\nMost verbs take a target path, and every verb accepts --json.\n\
          The `home` verbs read and write the product's own home and take no path.\n\
          `init plan` and `home plan` write nothing; the matching `apply` performs it.\n\
+         `home apply` shows the settings modification and refuses it by default; it is\n\
+         performed only by `--consent-settings <token>` naming the token the plan printed,\n\
+         and taken back out by `--remove-settings`.\n\
          Initialization stops after registering and qualifying: arming and running\n\
          are separate explicit acts.\n",
     );

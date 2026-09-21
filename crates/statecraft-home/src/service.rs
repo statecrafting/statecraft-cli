@@ -21,6 +21,7 @@ use crate::flow::{self, Corpus};
 use crate::harness;
 use crate::home::{Layout, Personal, Tools};
 use crate::project;
+use crate::settings::{self, SettingsOutcome};
 use crate::team::{self, CoordinationAuthority, Eligibility, LocalApproval, LocalApprovals};
 use serde::Serialize;
 use statecraft_environment::manifest::{Enrollment, Manifest, Project};
@@ -36,7 +37,15 @@ pub enum Operation {
     /// What `home apply` would write, inside the home and outside it.
     HomePlan,
     /// Create or repair the home, and perform native delivery.
-    HomeApply,
+    ///
+    /// The settings modification of spec 002 section 3.24 is carried as an
+    /// intent rather than performed by default: [`crate::settings::Intent`]'s
+    /// default is `Withheld`, so this verb shows the modification and writes
+    /// nothing unless the operator consented to that exact content.
+    HomeApply {
+        /// What the operator asked for, about the settings modification.
+        settings: crate::settings::Intent,
+    },
     /// Every project change initialization would make.
     InitPlan {
         /// The project.
@@ -160,6 +169,11 @@ pub struct HomeChange {
     pub linked: Vec<String>,
     /// Paths deliberately left alone, each with its reason.
     pub preserved: Vec<String>,
+    /// The consented settings modification, per native home.
+    ///
+    /// Section 3.24. Present in a plan as well as in an apply, because the
+    /// modification has to be named in the plan before anything is written.
+    pub settings: Vec<SettingsOutcome>,
 }
 
 /// What an enrollment change did.
@@ -236,7 +250,26 @@ impl Answer {
                     Severity::Finding
                 }
             }
-            Answer::HomeChange(_) => Severity::Ok,
+            Answer::HomeChange(change) => {
+                // Spec 006 section 3.3: a withheld write is a finding, a
+                // precondition that stopped something is a refusal, and
+                // something nobody asked for is a failure. The settings
+                // modification is the one part of this verb that can be any of
+                // the three, and saying so is what makes it scriptable.
+                if change.settings.iter().any(SettingsOutcome::is_failure) {
+                    Severity::Failed
+                } else if change.settings.iter().any(SettingsOutcome::is_refusal) {
+                    Severity::Refused
+                } else if change
+                    .settings
+                    .iter()
+                    .any(SettingsOutcome::is_withheld_write)
+                {
+                    Severity::Finding
+                } else {
+                    Severity::Ok
+                }
+            }
             Answer::Init(report) => match report.outcome {
                 flow::Outcome::Complete => Severity::Ok,
                 flow::Outcome::Partial => Severity::Finding,
@@ -300,6 +333,9 @@ impl Answer {
                 for note in &c.preserved {
                     out.push_str(&format!("preserve {note}\n"));
                 }
+                for outcome in &c.settings {
+                    out.push_str(&outcome.render());
+                }
                 out
             }
             Answer::Init(r) => r.render(),
@@ -362,8 +398,8 @@ pub struct Ports<'a> {
 pub fn execute(ports: &Ports<'_>, operation: Operation) -> Answer {
     match operation {
         Operation::HomeShow => home_show(ports),
-        Operation::HomePlan => home_change(ports, flow::Mode::Plan),
-        Operation::HomeApply => home_change(ports, flow::Mode::Apply),
+        Operation::HomePlan => home_change(ports, flow::Mode::Plan, settings::Intent::Withheld),
+        Operation::HomeApply { settings } => home_change(ports, flow::Mode::Apply, settings),
         Operation::InitPlan { root } => init(ports, &root, flow::Mode::Plan),
         Operation::InitApply { root } => init(ports, &root, flow::Mode::Apply),
         Operation::MigratePlan { root } => match derived::plan(&root) {
@@ -441,7 +477,7 @@ fn home_show(ports: &Ports<'_>) -> Answer {
     }))
 }
 
-fn home_change(ports: &Ports<'_>, mode: flow::Mode) -> Answer {
+fn home_change(ports: &Ports<'_>, mode: flow::Mode, intent: settings::Intent) -> Answer {
     let writing = mode == flow::Mode::Apply;
     let shipped = harness::shipped();
     let revision = harness::revision_of(&shipped);
@@ -492,11 +528,13 @@ fn home_change(ports: &Ports<'_>, mode: flow::Mode) -> Answer {
                 };
             }
         }
-        if !ports.home.delivery_file().exists() {
-            if let Err(e) = std::fs::write(ports.home.delivery_file(), "[]\n") {
-                return Answer::Failed {
-                    reason: e.to_string(),
-                };
+        for file in [ports.home.delivery_file(), ports.home.modifications_file()] {
+            if !file.exists() {
+                if let Err(e) = std::fs::write(&file, "[]\n") {
+                    return Answer::Failed {
+                        reason: e.to_string(),
+                    };
+                }
             }
         }
     }
@@ -535,6 +573,28 @@ fn home_change(ports: &Ports<'_>, mode: flow::Mode) -> Answer {
         plans.push(plan);
     }
 
+    // Section 3.24, and section 3.14 rule 4: the one write into a harness's own
+    // settings file happens under this verb and nowhere else, and only when the
+    // operator consented to that exact content. A plan computes it and writes
+    // nothing, which is what "named in the plan before anything is written"
+    // requires.
+    let settings_outcomes: Vec<SettingsOutcome> = delivery::native_homes_under(&ports.native_root)
+        .iter()
+        .map(|home| {
+            let intent = if writing {
+                intent.clone()
+            } else {
+                settings::Intent::Withheld
+            };
+            settings::perform(
+                ports.home,
+                home,
+                &intent,
+                &rfc3339_utc(ports.clock.now_unix()),
+            )
+        })
+        .collect();
+
     if writing {
         let record = delivery::Record {
             harness: plans
@@ -568,6 +628,7 @@ fn home_change(ports: &Ports<'_>, mode: flow::Mode) -> Answer {
         delivery: plans,
         linked,
         preserved,
+        settings: settings_outcomes,
     }))
 }
 

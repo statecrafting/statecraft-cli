@@ -1092,6 +1092,94 @@ that nothing moves: aicortex is specified and under construction, so the notes
 that exist today stay where they are until that store can hold them, which is a
 sibling's schedule and not a condition on this product's delivery.
 
+**2026-09-21: §3.24 is implemented, and the one requirement a JSON document
+cannot carry is measured rather than reinterpreted.** The authority change of
+the entry above left §3.24 specified and not implemented. This is the
+implementation: `crates/statecraft-home/src/settings.rs`, threaded through the
+typed operation boundary as an intent on `home apply`, with
+`crates/statecraft-home/tests/settings_modification.rs` as its acceptance.
+
+§3.24 says "every managed line lives inside a single marked region in the file".
+§3.13's bridge and the ignore merge both mark a region with comment lines,
+which Markdown and `.gitignore` have. **A settings file is JSON, which has no
+comment syntax, and the modification has two insertion points that are not
+adjacent in any document**: a hook registration belongs in `hooks.<Event>` and a
+deny entry in `permissions.deny`. Textual contiguity is therefore achievable
+only in the trivial case of a file that carries neither key already, and
+"pre-existing hooks" is one of the cases §3.24 names. Two ways of forcing it
+were rejected: reformatting the whole file so the region could be contiguous
+breaks "nothing outside is rewritten", and a sentinel deny entry such as
+`Bash(statecraft-region-begin)` inserts a fake refusal into a user's own list.
+
+What is implemented instead is **marked content in one recorded modification**,
+which keeps every guarantee §3.24 states around the region:
+
+- a managed hook registration is marked **inside itself**: the command string's
+  first line is `# statecraft-managed <revision>`, a shell comment to the
+  interpreter and a marker to this product, so a managed hook is recognizable
+  from the file alone with no record to consult;
+- managed deny entries are appended as one contiguous run at the end of the
+  array and identified on removal by exact match, in order, against the record;
+- both are one `modification` entry in the home, with the path, the exact
+  content and the digest either side.
+
+`implementation` therefore stays `in-progress`. The sentence quoted above is not
+satisfied literally and this build does not pretend otherwise; the smallest
+amendment that would make it satisfiable is put to the owner separately, and
+until it is decided this section's remaining obligation is the wording, not the
+behavior.
+
+**2026-09-21: consent is to a token over the content, not to a verb.** "Consent
+to one revision is not consent to the next" needs consent to be about content
+rather than about having typed a flag. `home plan` and an unconsented
+`home apply` print the exact lines and a `consent token`, a digest over exactly
+those lines; `home apply --consent-settings <token>` performs the modification
+only when the token still matches. Content whose lines changed has a different
+token, so the operator is shown the new content and refused, which is the
+requirement expressed as a mechanism rather than as a habit. A stale token is a
+finding, never a silent no-op.
+
+The flags hang off `home apply` rather than becoming their own verb, because
+§3.14 rule 4 is what they have to satisfy: writing into a native location is an
+explicit operator action **under `home apply`**. `--remove-settings` is on the
+same verb for the same reason.
+
+**2026-09-21: a withheld write is exit 1, and the settings modification is the
+one part of `home apply` that can answer with any of the four codes.** Spec 006
+§3.3 spends 1 on "a diagnostic state, a withheld write". An unconsented
+`home apply` inside an operator's own agent home names a modification and does
+not perform it, which is exactly that, so it is a finding rather than a success.
+A malformed settings file is a refusal (2), an unreadable or unwritable one is a
+failure (4), and a home with no native agent directory is not applicable and
+stays 0. The severity is decided at the operation boundary, so the binding
+carries none of it.
+
+**2026-09-21: a refusal this product cannot prove it placed is never recorded as
+placed.** Two situations leave a floor entry in the file that no record
+attributes here: the user already refused it themselves, and an apply
+interrupted between the write and the record. Attributing it would mean a later
+`--remove-settings` takes out a refusal that was the user's, which is the one
+direction §3.24 never allows. So the record claims only what it can prove, the
+outcome says which entries it declines to claim and why, and a lost record costs
+a refusal nothing. The hook half needs no such rule, because it carries its own
+marker.
+
+The write itself is a write to a neighbouring name followed by a rename, so an
+interruption leaves either the old bytes or the new ones. Running the operation
+again after an interrupted one repairs the record and writes the region no
+second time, which is asserted by removing the record from the home and applying
+again.
+
+**2026-09-21: the one shipped registration is on `SessionStart`, and that
+settles nothing about the other three events.** §3.24 fixes what a modification
+may carry and not what this build places. The harness ships one hook, and
+whether a harness's end-of-turn event should advise or refuse is an open
+adoption question that belongs to §3.23's inventory decision and not to this
+implementation. `SessionStart` is the event where the answer is the same under
+either reading, so the mechanism ships without deciding the policy. Registering
+the other three, and the ten skills and four agents §3.23 lists, remains the
+owner's adoption act.
+
 ## Verification
 
 Each line is one command. They run the acceptance this spec's behavior declares:
@@ -1119,4 +1207,6 @@ spec-spine index check --fail-on-unresolved
 test -f crates/statecraft-home/src/lib.rs
 cargo test -p statecraft-home --test negative_cases
 cargo test -p statecraft-home --test harness_hooks
+test -f crates/statecraft-home/src/settings.rs
+cargo test -p statecraft-home --test settings_modification
 ```
