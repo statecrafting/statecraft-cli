@@ -1,0 +1,56 @@
+{
+  "mapping": {
+    "amends": [
+      "002-environment-lifecycle",
+      "006-command-surface"
+    ],
+    "dependsOn": [
+      "000-bootstrap",
+      "001-boundaries-and-authority",
+      "002-environment-lifecycle",
+      "006-command-surface"
+    ],
+    "implementingPaths": [
+      {
+        "path": "crates/statecraft-cli/",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/statecraft-environment/",
+        "source": "spec-edge"
+      }
+    ],
+    "resolvedUnits": [
+      {
+        "locations": [
+          {
+            "file": "crates/statecraft-cli/"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "directory",
+          "path": "crates/statecraft-cli/"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "crates/statecraft-environment/"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "directory",
+          "path": "crates/statecraft-environment/"
+        }
+      }
+    ],
+    "specId": "010-managed-environment-and-initialization",
+    "specStatus": "draft"
+  },
+  "schemaVersion": "1.1.0",
+  "shardHash": "67f5c437bc3d39e728b0af60895449bf217b333fa16adbe948a7be5797892b88"
+}
