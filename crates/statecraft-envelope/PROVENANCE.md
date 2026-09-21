@@ -14,7 +14,7 @@ re-derive.
 | Origin spec | statecraft spec `003-evidence-intake-and-storage`, sections 3.1 to 3.5 |
 | Status there | **staged**, explicitly pending transfer to this workspace (the platform's P-03 condition, and resolution R-7 of its `docs/design/03-shared-contract-resolution.md`) |
 | Licence there | `license = "Apache-2.0"` at crate level, deliberately unlike that repository's own LICENSE |
-| Received under | statecraft-cli spec `007-shared-evidence-envelope` |
+| Received under | statecraft-cli spec `005-acceptance-and-evidence`, sections 3.11 to 3.17 |
 
 The crate was staged in the platform repository and never consumed there as a
 finished thing: the platform's own design record says the CLI does not consume
@@ -53,7 +53,7 @@ Nothing that changes a byte on the wire. In full:
 1. **`Cargo.toml`** rewritten for this workspace: explicit dependency versions
    in this repository's style instead of `workspace = true` inheritance, the
    `[package.metadata.spec-spine]` pointer moved from the platform's spec 003 to
-   this repository's spec 007, the lint tables stated per crate, and the
+   this repository's spec 005, the lint tables stated per crate, and the
    provenance and licence notes above.
 2. **`src/lib.rs`**: `#![forbid(unsafe_code)]` stated in the crate (the platform
    carried it as a workspace lint), and the module header updated to say where
@@ -61,7 +61,7 @@ Nothing that changes a byte on the wire. In full:
 3. **`src/absence.rs`**: rewritten to resolve the `Recorded<T>` wire ambiguity
    the platform's resolution R-8 recorded as a finding for this repository's
    owner. Variant order was the staged crate's answer and is not a complete one;
-   see spec 007 section 3.2 and the module's own documentation. The encoding is
+   see spec 005 section 3.12 and the module's own documentation. The encoding is
    unchanged; what is new is that the ambiguous encoding is refused.
 4. **`src/dimensions.rs`**: `Dimensions::unsigned_today` (this product's spec 005
    section 3.5 constructor, which had stayed behind) and `Admission::reasons`
@@ -81,6 +81,6 @@ unmodified.
 
 `testdata/vectors/` holds five **provisional** golden vectors for the native
 shapes (entry, fact, tombstone, attestation). The transfer does not freeze them,
-and neither does spec 007. They freeze at the platform's first signed entry,
+and neither does spec 005. They freeze at the platform's first signed entry,
 under the platform's own constitution VIII; that entry does not exist. Until it
 does, a vector change is an ordinary change. See `tests/vectors.rs`.

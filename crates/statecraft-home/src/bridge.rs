@@ -1,6 +1,6 @@
 //! The root instruction bridge: one line of a file this product does not own.
 //!
-//! Spec 010 section 3.3. The root `AGENTS.md` stays the user's. This product
+//! Spec 002 section 3.13. The root `AGENTS.md` stays the user's. This product
 //! takes exactly one **managed modification** of it:
 //!
 //! > the first line is exactly `@.statecraft/AGENTS.md`

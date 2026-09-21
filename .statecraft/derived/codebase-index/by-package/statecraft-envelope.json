@@ -3,8 +3,8 @@
     "kind": "rust-lib",
     "name": "statecraft-envelope",
     "path": "crates/statecraft-envelope",
-    "specRef": "007-shared-evidence-envelope"
+    "specRef": "005-acceptance-and-evidence"
   },
   "schemaVersion": "1.1.0",
-  "shardHash": "cff33e2256e10e85c118aa1a0b5fe94d33ad0f2cc70db50796ec40ed1360364e"
+  "shardHash": "d1d71ad0f4b871009561652f7e2d4e54bc621fe99866f42d30e21cb378cf2a91"
 }

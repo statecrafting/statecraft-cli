@@ -12,7 +12,7 @@
 //! # Where these types live now
 //!
 //! [`Reference`], [`Construction`] and [`Embedded`] are defined in
-//! `statecraft-envelope` and re-exported here (spec 007). A reference is the
+//! `statecraft-envelope` and re-exported here (spec 005). A reference is the
 //! most widely exchanged value in the pair of products, and it now has one
 //! definition. The field names, their order and the construction spellings are
 //! the ones this crate established; the envelope adds three optional fields

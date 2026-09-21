@@ -1,7 +1,7 @@
 //! Running the suite, and folding one run's account out of the record.
 //!
-//! Added by spec `009`'s additive `extends` edge on this crate. Spec 009 section
-//! 3.5: a binding that needs a library entry point gets it in the library that
+//! Added by spec `006`'s additive `extends` edge on this crate. Spec 006 section
+//! 3.11: a binding that needs a library entry point gets it in the library that
 //! owns the behavior, and both entry points here are behavior spec `005` owns.
 //!
 //! # Where the suite comes from
@@ -17,7 +17,7 @@
 //! # The fold
 //!
 //! [`fold`] reads spec 005 section 3.9's reviewable account out of the run
-//! record and **nothing else** (spec 009 section 3.3). Every value carries the
+//! record and **nothing else** (spec 006 section 3.9). Every value carries the
 //! record it came from, and a value the record does not carry is one of the
 //! three names for absence rather than a default.
 
@@ -169,7 +169,7 @@ pub fn fold(run_id: &str, entries: &[Entry]) -> ReviewableOutcome {
     };
     let outcome_record = record_name(outcome_entry);
 
-    // Spec 009 section 3.3: an inspection of a run whose intent has no outcome
+    // Spec 006 section 3.9: an inspection of a run whose intent has no outcome
     // reports the reconciliation state of spec 003 section 3.6, and `unknown`
     // is shown as `unknown`. It is never an inferred outcome.
     let independent = match (outcome_entry, reconciliation) {

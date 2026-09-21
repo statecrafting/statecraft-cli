@@ -1,7 +1,7 @@
 # CLI fixtures, emitted by the CLI
 
 Each file is JSON **emitted by `statecraft-acceptance`'s own serializers** at
-`8f6591f`, the commit before spec 007 moved the shared types into this crate.
+`8f6591f`, the commit before the shared types moved into this crate.
 They are not hand-derived. The case list that produced them is
 `tests/legacy_cli/mod.rs`, and `tests/cli_compat.rs` asserts that the frozen
 transcription of that serializer still writes each of these files byte for
@@ -19,7 +19,7 @@ Three properties are checked, and they are different properties:
    re-serializes to identical bytes, member order included.
 3. **Semantic interpretation**: the value means what the CLI meant it to mean.
    A fixture that round-trips can still have been read wrong, which is exactly
-   what happened to `harness_revision` before spec 007, so every fixture is
+   what happened to `harness_revision` before the transfer, so every fixture is
    also read for its meaning.
 
 | File | What it pins |
@@ -35,7 +35,7 @@ Three properties are checked, and they are different properties:
 | `policy-strict.json` | the three CLI booleans, every added field absent |
 | `policy-permissive.json` | the same three, all false: absent is not the same as false |
 | `recorded-forms.json` | a present value and all three absences |
-| `recorded-collision-legacy.json` | the ambiguous bytes a pre-007 build could write |
+| `recorded-collision-legacy.json` | the ambiguous bytes a pre-transfer build could write |
 | `receipt-not-recorded.json` | a receipt whose `harness_revision` is an absence |
 | `receipt-harness-present.json` | a receipt whose `harness_revision` is a value |
 | `receipt-legacy-no-authority-paths.json` | a receipt written before a field existed |

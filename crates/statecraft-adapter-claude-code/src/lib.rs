@@ -1,7 +1,7 @@
 //! The first provider adapter: Claude Code.
 //!
 //! This crate is the implementation of
-//! [spec 008](../../../specs/008-first-provider-adapter/spec.md). It is the one
+//! [spec 004](../../../specs/004-execution-adapter/spec.md). It is the one
 //! crate in this workspace permitted to name a provider. Spec 004 section 3.8
 //! makes a provider name inside the seam a defect, and
 //! `statecraft-adapter/tests/no_provider_names.rs` enforces that mechanically;
@@ -9,7 +9,7 @@
 //!
 //! # Everything here is a measurement, and it binds to one version pair
 //!
-//! Every fact in spec 008 sections 3.1 to 3.6 was measured against
+//! Every fact in spec 004 sections 3.9 to 3.14 was measured against
 //! **Claude Code 2.1.267 on darwin, on 2026-09-17**, with
 //! `claude --print --output-format stream-json --verbose`. Section 3.8 binds the
 //! qualification to the pair of this adapter's build and that provider version:

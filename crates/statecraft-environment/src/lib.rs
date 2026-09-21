@@ -11,7 +11,7 @@
 //!   Registering writes nothing inside the target, and arming is a separate act.
 //! - [`manifest`] is the committed record of every byte this product owns in a
 //!   target, plus the project declaration and the lines this product owns inside
-//!   files it does not (spec 010). A path it does not mention is `user` class,
+//!   files it does not (spec 002). A path it does not mention is `user` class,
 //!   which is what makes the three ownership classes exhaustive by construction.
 //! - [`adapter`] is what an agent-harness adapter declares, and when it refuses.
 //! - [`plan`] computes what an apply would do; [`apply`] performs it and can

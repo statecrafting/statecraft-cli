@@ -12,13 +12,13 @@
 //!
 //! # Where the qualification records come from
 //!
-//! Spec 008 section 3.8 makes a qualification an act performed by an operator
+//! Spec 004 section 3.16 makes a qualification an act performed by an operator
 //! against a named provider version and **recorded**. A record is therefore read
 //! rather than derived: `<product home>/qualifications.json`, which spec 006
 //! section 3.6 permits because the product home is one of the three things the
 //! binary reads. An absent or unreadable file is no records, which makes the
 //! adapter `unqualified`: spec 004 section 3.4 says such an adapter still runs,
-//! and spec 008 section 3.7 says it does not claim a target's paths.
+//! and spec 004 section 3.15 says it does not claim a target's paths.
 
 use statecraft_adapter::environment::{Blueprint, CheckSuiteCommands, ChildEnvironment, construct};
 use statecraft_adapter_claude_code as provider;
@@ -45,11 +45,11 @@ pub fn declarations() -> Vec<Declaration> {
 /// dropped, including the credential paths spec 004 section 3.6 refuses to place
 /// in a child at all, and including `HOME`.
 ///
-/// Two names are allowed, and each is a prerequisite spec 008 section 3.7 names:
+/// Two names are allowed, and each is a prerequisite spec 004 section 3.15 names:
 ///
 /// - `PATH`, because an adapter that cannot resolve its own executable has
 ///   nothing to probe.
-/// - `USER`, because spec 008 section 3.6's credential path runs through the
+/// - `USER`, because spec 004 section 3.14's credential path runs through the
 ///   operating-system keychain and the lookup is keyed by the account name.
 ///   Measured: `PATH` alone terminates the provider with section 3.5's
 ///   `api_error` shape, reading `Not logged in`. This is not a credential and
@@ -176,14 +176,14 @@ mod tests {
         for name in environment.variables.keys() {
             assert!(name == "PATH" || name == "USER", "unexpected name {name}");
         }
-        // Spec 008 section 3.6: the home directory is not among them, so the
+        // Spec 004 section 3.14: the home directory is not among them, so the
         // keychain is reached by the account name and not by a home path.
         assert!(!environment.variables.contains_key("HOME"));
     }
 
     #[test]
     fn the_account_name_is_carried_with_the_operators_own_value() {
-        // Spec 008 section 3.6 measured that the keychain lookup is keyed by the
+        // Spec 004 section 3.14 measured that the keychain lookup is keyed by the
         // account name, so a placeholder or an empty value is not a substitute.
         let Ok(user) = std::env::var("USER") else {
             return;

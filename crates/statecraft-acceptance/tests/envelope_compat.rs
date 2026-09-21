@@ -1,7 +1,7 @@
 //! The other side of the shared contract: this product still writes the bytes
 //! the fixtures record, now that it writes them through `statecraft-envelope`.
 //!
-//! Spec 007 section 3.4. `crates/statecraft-envelope/tests/cli_compat.rs`
+//! Spec 005 section 3.14. `crates/statecraft-envelope/tests/cli_compat.rs`
 //! checks the shared types against fixtures emitted by this crate's serializer
 //! before the transfer. This file checks the direction that matters to an
 //! operator: that the functions this product actually calls to mint a receipt,
@@ -176,7 +176,7 @@ fn a_receipt_read_back_through_this_products_types_means_what_it_said() {
 fn the_legacy_collision_reads_as_an_absence_through_this_products_types() {
     // The same reinterpretation the envelope documents, asserted at the API
     // this product's callers use. A receipt whose `harness_revision` was
-    // written as a present `"not-recorded"` by a pre-007 build reads as the
+    // written as a present `"not-recorded"` by a pre-transfer build reads as the
     // absence it was always meant to be.
     let text = fixture("recorded-collision-legacy.json");
     let value: Recorded<String> = serde_json::from_str(&text).unwrap();

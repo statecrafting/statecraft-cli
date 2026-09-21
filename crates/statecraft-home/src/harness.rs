@@ -1,7 +1,7 @@
 //! The one canonical harness source, maintained globally and copied into no
 //! repository.
 //!
-//! Spec 010 section 3.4. Skills, agent definitions, rules, hooks and adapter
+//! Spec 002 section 3.14. Skills, agent definitions, rules, hooks and adapter
 //! templates live once, under `harness/<revision>/` in the product home. A
 //! revision is **content addressed**: its identity is a digest over its own
 //! files, so two homes holding the same bytes hold the same revision, a changed
@@ -275,7 +275,7 @@ const HOOK_GATE: &str = r#"#!/bin/sh
 # which is what makes it safe to place on a path shared with other work.
 #
 # This product does NOT wire this hook into an agent's settings. Doing so would
-# mean rewriting a user's own configuration file, and spec 010 section 3.4
+# mean rewriting a user's own configuration file, and spec 002 section 3.14
 # refuses that. Install it yourself if you want it.
 set -eu
 

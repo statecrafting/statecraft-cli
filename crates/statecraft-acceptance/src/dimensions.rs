@@ -10,7 +10,7 @@
 //!
 //! The four enums, [`Dimensions`], [`Admission`], [`RefusalCode`] and
 //! [`AdmissionPolicy`] are defined in `statecraft-envelope` and re-exported
-//! here (spec 007). They are the bytes two products exchange, and one owner is
+//! here (spec 005). They are the bytes two products exchange, and one owner is
 //! the only way the two agree by construction rather than by inspection. The
 //! serialized forms are unchanged: the four value sets are still closed and
 //! still refuse a fifth member, and the envelope's additions are members and

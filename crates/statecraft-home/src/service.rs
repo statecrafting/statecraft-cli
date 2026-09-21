@@ -1,6 +1,6 @@
 //! The typed operation boundary.
 //!
-//! Spec 010 section 3.10. Every operation is a typed request and a typed
+//! Spec 002 section 3.20. Every operation is a typed request and a typed
 //! outcome here. The command surface is **one caller** of it; a local dashboard
 //! is a second caller of the same operations, and implements no second settings
 //! engine, no second scheduler and no second policy model.

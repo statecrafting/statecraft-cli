@@ -3,15 +3,53 @@
     "dependsOn": [
       "000-bootstrap",
       "001-boundaries-and-authority",
+      "002-environment-lifecycle",
       "003-work-and-run-semantics"
     ],
     "implementingPaths": [
       {
+        "path": "crates/statecraft-acceptance/",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/statecraft-adapter-claude-code",
+        "source": "manifest-metadata"
+      },
+      {
+        "path": "crates/statecraft-adapter-claude-code/",
+        "source": "spec-edge"
+      },
+      {
         "path": "crates/statecraft-adapter/",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/statecraft-cli/",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/statecraft-environment/",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/statecraft-run/",
         "source": "spec-edge"
       }
     ],
     "resolvedUnits": [
+      {
+        "locations": [
+          {
+            "file": "crates/statecraft-adapter-claude-code/"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "kind": "directory",
+          "path": "crates/statecraft-adapter-claude-code/"
+        }
+      },
       {
         "locations": [
           {
@@ -24,11 +62,63 @@
           "kind": "directory",
           "path": "crates/statecraft-adapter/"
         }
+      },
+      {
+        "locations": [
+          {
+            "file": "crates/statecraft-acceptance/"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "directory",
+          "path": "crates/statecraft-acceptance/"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "crates/statecraft-cli/"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "directory",
+          "path": "crates/statecraft-cli/"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "crates/statecraft-environment/"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "directory",
+          "path": "crates/statecraft-environment/"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "crates/statecraft-run/"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "directory",
+          "path": "crates/statecraft-run/"
+        }
       }
     ],
     "specId": "004-execution-adapter",
     "specStatus": "approved"
   },
   "schemaVersion": "1.1.0",
-  "shardHash": "1025df2a7d9d3cbf1d50adeeb3356367881c70798ce7ff24fc8329bed2c9c3f8"
+  "shardHash": "957c7d11fbc1e5e67a68fd856fb7121d941c9272b1613dd1ca7a679183e56176"
 }

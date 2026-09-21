@@ -1,6 +1,6 @@
 //! `accept`: the sequence, and nothing but the sequence.
 //!
-//! Added by spec `009`'s additive `extends` edge. Every judgement here comes
+//! Added by spec `006`'s additive `extends` edge. Every judgement here comes
 //! from `statecraft_acceptance`; what this module contributes is the order, the
 //! three observations only the caller can make (what the candidate is, what
 //! changed, and what the base's authority-set bytes are), and the invocation
@@ -16,7 +16,7 @@
 //! run here, in the **target** rather than in the prepared workspace, with the
 //! base and the candidate named explicitly.
 //!
-//! This is the caller side the decision record calls out as 009's: the reader
+//! This is the caller side the decision record assigns to the `accept` binding: the reader
 //! landed in #20, and the verb that obtains a report is this one.
 
 use statecraft_acceptance::absence::{Absence, Recorded};
@@ -91,7 +91,7 @@ pub fn identify_candidate(workspace: &Path, head_stable: bool) -> Result<Candida
 /// candidate's. A member the base does not carry contributes nothing rather
 /// than an error: a repository that has not yet written a hooks directory has
 /// no hooks to digest. What cannot be computed at all is a **refusal** (spec
-/// 009 section 3.4), because a digest nobody can compute identifies no policy.
+/// 006 section 3.10), because a digest nobody can compute identifies no policy.
 pub fn policy_digest(
     target: &Path,
     base: &str,

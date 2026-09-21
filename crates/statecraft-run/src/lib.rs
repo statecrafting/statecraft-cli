@@ -24,7 +24,7 @@
 //! - [`recovery`] folds the record, reconciles every intent with no outcome, and
 //!   blocks a retry it cannot resolve.
 //! - [`session`] is one run from intent to outcome, and the fold that reads runs
-//!   back out of the record. Added by spec 009's additive edge, because a
+//!   back out of the record. Added by spec 006's additive edge, because a
 //!   command may not be a second implementation and a binding needs an entry
 //!   point.
 //!

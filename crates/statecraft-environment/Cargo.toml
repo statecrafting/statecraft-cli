@@ -28,9 +28,9 @@ thiserror = "2.0.20"
 tempfile = "3.27.0"
 # A DEV-dependency cycle, on purpose, and Cargo permits exactly this shape.
 #
-# Spec 008 section 3.7's two negative-case rows (an absent prerequisite, and a
+# Spec 004 section 3.15's two negative-case rows (an absent prerequisite, and a
 # colliding declared path) are behaviors of THIS crate's adapter model, so spec
-# 008's verification runs them here. Testing them against a declaration restated
+# 004's verification runs them here. Testing them against a declaration restated
 # in the test file would test a copy, and the copy is what drifts. The real
 # declaration lives in the adapter crate, which depends on this one, so the only
 # way to reach it from a test here is a dev-dependency: it is absent from the

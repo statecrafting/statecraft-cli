@@ -1,6 +1,6 @@
 //! A resolved run is frozen.
 //!
-//! Spec 010 section 3.6, last rule. A run resolves its harness revision and its
+//! Spec 002 section 3.16, last rule. A run resolves its harness revision and its
 //! tools **once**, and records the requested identity alongside the identity
 //! that actually resolved. A later global upgrade changes the home and changes
 //! nothing about a run already resolved, which is only true because the

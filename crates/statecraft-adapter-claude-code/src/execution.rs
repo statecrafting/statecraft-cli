@@ -1,5 +1,5 @@
 //! Connect the native stream to the existing mapping without teaching the
-//! generic protocol a provider's spelling. Spec 008 sections 3.1 to 3.5.
+//! generic protocol a provider's spelling. Spec 004 sections 3.9 to 3.13.
 
 use crate::Invocation;
 use crate::outcome::TerminalReading;
@@ -191,7 +191,7 @@ fn supervise_in(
         }
         Err(error) => {
             // Missing initialization cannot erase independently readable
-            // terminal denials (008 section 3.3). Preserve their events for
+            // terminal denials (004 section 3.11). Preserve their events for
             // the run supervisor's accounting without inventing an init or
             // treating this stream as a completed execution.
             if let Some(result) = &result {

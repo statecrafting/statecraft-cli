@@ -32,15 +32,15 @@ path = "src/main.rs"
 serde = { version = "1.0.229", features = ["derive"] }
 serde_json = "1.0.151"
 statecraft-acceptance = { path = "../statecraft-acceptance" }
-# Spec 008's `extends` edge. The environment verbs need a configured adapter
-# set, and until 008 ratified one they refused for want of it. The seam
+# Spec 004's `extends` edge. The environment verbs need a configured adapter
+# set, and until 004 named one they refused for want of it. The seam
 # (`statecraft-adapter`) is here for the constructed child environment the
 # adapter's prerequisites are probed against; no provider name reaches it.
 statecraft-adapter = { path = "../statecraft-adapter" }
 statecraft-adapter-claude-code = { path = "../statecraft-adapter-claude-code" }
 statecraft-envelope = { path = "../statecraft-envelope" }
 statecraft-environment = { path = "../statecraft-environment" }
-# Spec 010's `extends` edge. The managed environment, the initialization flow
+# Spec 002's `extends` edge. The managed environment, the initialization flow
 # and the typed operation boundary live there; every verb this crate adds for
 # it is a binding onto `statecraft_home::service::execute`.
 statecraft-home = { path = "../statecraft-home" }
@@ -48,7 +48,7 @@ statecraft-run = { path = "../statecraft-run" }
 
 [dev-dependencies]
 tempfile = "3.27.0"
-# Spec 009 section 3.7's rows are about the record a run leaves, so the suite
+# Spec 006 section 3.7's rows are about the record a run leaves, so the suite
 # writes one through the entry points the owning crates expose rather than
 # through a provider it cannot spawn on a check runner.
 serde_json = "1.0.151"

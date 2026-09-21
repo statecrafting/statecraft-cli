@@ -2,7 +2,7 @@
 //! `Recorded<T>` unambiguous.
 //!
 //! The vocabulary is statecraft-cli spec 005 section 3.8: absence is one of
-//! three named things, and **none of them reads as success**. Spec 007 adds
+//! three named things, and **none of them reads as success**. Spec 005 adds
 //! what 005 left open, because two products now read the same bytes.
 //!
 //! # The ambiguity, stated

@@ -106,7 +106,7 @@ pub enum Finding {
     },
     /// A tracked modification is no longer in the file it was made to.
     ///
-    /// Spec 010 section 3.3: the modification is one line inside a file this
+    /// Spec 002 section 3.13: the modification is one line inside a file this
     /// product does not own, so its absence is a finding and never a repair.
     /// The user removed the line, which is their right; the record says so.
     ModificationLost {
@@ -117,7 +117,7 @@ pub enum Finding {
     },
     /// A committed declared value names one machine rather than a requirement.
     ///
-    /// Spec 010 section 3.2. Refused at write time, and reported here for a
+    /// Spec 002 section 3.12. Refused at write time, and reported here for a
     /// declaration that arrived some other way, such as a hand edit.
     NonPortableDeclaration {
         /// Which map: `requirements` or `overrides`.
@@ -285,7 +285,7 @@ pub fn doctor(
         }
     }
 
-    // Spec 010 section 3.3: a tracked line that is gone is reported, never
+    // Spec 002 section 3.13: a tracked line that is gone is reported, never
     // reinserted. Reading the file rather than its digest, because the user is
     // free to edit everything else in it and only the line is ours.
     for modification in &manifest.modifications {

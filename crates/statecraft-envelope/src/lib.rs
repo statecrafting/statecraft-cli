@@ -1,7 +1,7 @@
 //! The shared evidence envelope: the wire types two products exchange.
 //!
 //! This crate is the implementation of
-//! [spec 007](../../../specs/007-shared-evidence-envelope/spec.md), and it is
+//! [spec 005](../../../specs/005-acceptance-and-evidence/spec.md), and it is
 //! the **one owner** of the reference, the four evidence dimensions, admission
 //! and the three names for absence. `statecraft-acceptance` re-exports them
 //! rather than declaring them a second time, and the statecraft platform

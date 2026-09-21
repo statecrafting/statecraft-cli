@@ -1,7 +1,7 @@
 //! Solo and team: local approvals, the coordination-authority seam, and
 //! eligibility.
 //!
-//! Spec 010 section 3.8. The complete local capability set requires no
+//! Spec 002 section 3.18. The complete local capability set requires no
 //! platform: no account, no login, no hosted connection, no paid plan and no
 //! platform-issued token. That is constitution XIII made operational, and it is
 //! why every type here has a local answer.

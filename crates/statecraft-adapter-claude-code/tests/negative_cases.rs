@@ -1,10 +1,10 @@
-//! Spec 008 section 3.9's observable negative cases, nine of eleven.
+//! Spec 004 section 3.8's observable negative cases, nine of eleven.
 //!
 //! Each test is named after the row it covers. Two rows are the environment half
 //! (section 3.7) and live in the crate spec 002 owns, under the `extends` edge
-//! spec 008's frontmatter declares: `crates/statecraft-environment/tests/
+//! spec 004's frontmatter declares: `crates/statecraft-environment/tests/
 //! negative_cases.rs` holds the absent prerequisite and the colliding declared
-//! path. Spec 008's `## Verification` block runs both suites for that reason.
+//! path. Spec 004's `## Verification` block runs both suites for that reason.
 //!
 //! Every row here is checked against the **recorded** streams under
 //! `testdata/stream/`, captured from Claude Code 2.1.267. See that directory's
@@ -203,7 +203,7 @@ fn native_unknown_terminal_is_reported_with_its_claim_and_physical_line() {
         execution.evidence()["streamError"]
             .as_str()
             .unwrap()
-            .contains("not in spec 008")
+            .contains("not in spec 004")
     );
     assert_eq!(
         execution.evidence()["providerTerminal"]["subtype"],
@@ -494,7 +494,7 @@ fn a_provider_version_the_record_does_not_name_is_unqualified_and_still_runs() {
     assert!(posture.render().contains("unqualified"));
 }
 
-// A malformed stream, which spec 004 section 3.5 case 4 and spec 008 section 3.5
+// A malformed stream, which spec 004 section 3.5 case 4 and spec 004 section 3.13
 // both route to "reported as malformed" rather than to an outcome.
 #[test]
 fn a_malformed_stream_is_reported_as_malformed_and_never_a_clean_completion() {

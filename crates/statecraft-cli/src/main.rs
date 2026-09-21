@@ -104,7 +104,7 @@ fn run(args: &[String]) -> i32 {
             }
             environment_verb(invocation.verb, &root, &home, format)
         }
-        // Spec 009's edge: the verbs 003, 004 and 005 name, bound here for the
+        // Spec 006's edges: the verbs 003, 004 and 005 name, bound here for the
         // first time. Same precondition as the environment verbs, for the same
         // reason: this product works in registered targets.
         Verb::WorkList
@@ -150,7 +150,7 @@ fn run(args: &[String]) -> i32 {
         }
         // The rest take a path, and deliberately NOT a registered one:
         // `init apply` is what makes a project registrable, so a registration
-        // precondition here would be the bootstrap cycle spec 010 section 3.7
+        // precondition here would be the bootstrap cycle spec 002 section 3.17
         // avoids by ordering.
         Verb::InitPlan
         | Verb::InitApply
@@ -210,7 +210,7 @@ fn manage_verb(
     emit(&statecraft_cli::manage::execute(home, operation), format)
 }
 
-/// What each 009 verb needs after the target path.
+/// What each work, run and accept verb needs after the target path.
 fn argument_hint(verb: Verb) -> &'static str {
     match verb {
         Verb::WorkShow => " <spec-id>",
@@ -223,7 +223,7 @@ fn argument_hint(verb: Verb) -> &'static str {
 /// One `work`, `run` or `accept` verb against one registered target.
 ///
 /// Each arm calls entry points the owning crates expose and maps what they
-/// return. Spec 009 section 3.5: nothing here derives an answer an owning crate
+/// return. Spec 006 section 3.11: nothing here derives an answer an owning crate
 /// could have returned.
 fn slice_verb(
     verb: Verb,
@@ -316,7 +316,7 @@ fn slice_verb(
 
 /// `run <path> <spec-id>`
 ///
-/// The three calls spec 009 section 3.5 leaves to the caller, in order: begin,
+/// The three calls spec 006 section 3.11 leaves to the caller, in order: begin,
 /// supervise, conclude. The supervision is the adapter's; the other two are
 /// `statecraft_run::session`'s.
 fn run_verb(
@@ -338,7 +338,7 @@ fn run_verb(
         Err(e) => return fail(&e.to_string(), format),
     };
 
-    // The run id is the spec id: spec 009 section 3.1 says the operator names a
+    // The run id is the spec id: spec 006 section 3.1 says the operator names a
     // unit of work, and spec 003 section 3.4 makes a retry an appended attempt
     // of the same run, so a fresh id per invocation would turn every retry into
     // a new run.

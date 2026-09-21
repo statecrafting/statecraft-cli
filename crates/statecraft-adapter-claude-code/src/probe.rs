@@ -1,6 +1,6 @@
 //! Detecting this adapter's three prerequisites, for real.
 //!
-//! Spec 008 section 3.7's refusal is only as honest as the detection behind it,
+//! Spec 004 section 3.15's refusal is only as honest as the detection behind it,
 //! so this is a real [`HarnessProbe`] rather than a table. Each answer says what
 //! it observed and, where it cannot observe the thing itself, what it observed
 //! instead.
@@ -17,7 +17,7 @@
 //! Satisfied when a record on hand names this adapter build **and** the observed
 //! provider version. Note what this prerequisite does not do: an unqualified
 //! adapter still runs (spec 004 section 3.4). It is declared here because spec
-//! 008 section 3.7 lists it, and what it gates is the adapter claiming the
+//! 004 section 3.15 lists it, and what it gates is the adapter claiming the
 //! target's *paths*, not the adapter running.
 //!
 //! # `credential-path`
@@ -39,7 +39,7 @@ use statecraft_environment::adapter::HarnessProbe;
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 
-/// The platform spec 008's measurements were taken on.
+/// The platform the provider measurements were taken on.
 pub const MEASURED_PLATFORM: &str = "macos";
 
 /// A probe that answers from the constructed environment and the records on hand.
@@ -67,7 +67,7 @@ impl ConstructedEnvironmentProbe {
 
     /// The provider version observed in front of us, however the caller got it.
     ///
-    /// A parameter and not a `claude --version` call: spec 008 section 3.8 makes
+    /// A parameter and not a `claude --version` call: spec 004 section 3.16 makes
     /// the qualification an act performed against a named binary version and
     /// recorded, and a probe that discovered the version itself would let the
     /// candidate under test choose what it is compared against.
@@ -157,7 +157,7 @@ impl HarnessProbe for ConstructedEnvironmentProbe {
 
 /// Ask the resolved executable which version it is.
 ///
-/// Observation only. Spec 008 section 3.8 makes the qualification an act
+/// Observation only. Spec 004 section 3.16 makes the qualification an act
 /// performed by an operator against a **named** binary version and recorded;
 /// this exists so a record can be compared with the binary in front of us, and
 /// it is deliberately not wired into [`ConstructedEnvironmentProbe`]: a probe

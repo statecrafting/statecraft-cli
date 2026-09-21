@@ -1,6 +1,6 @@
 //! The governance producer boundary.
 //!
-//! Spec 010 section 3.5. Governance starter files come from the spec-spine
+//! Spec 002 section 3.15. Governance starter files come from the spec-spine
 //! **library** and from nowhere else:
 //!
 //! `spec_spine_core::scaffold_init_json(config_json) -> Result<String, Error>`
@@ -42,7 +42,7 @@ pub const PRODUCER_VERSION: &str = "0.21.0";
 pub const SPECS_DIR: &str = "specs";
 /// The standards directory this product declares.
 pub const STANDARDS_DIR: &str = "standards/spec";
-/// The derived directory this product declares (spec 010 section 3.2).
+/// The derived directory this product declares (spec 002 section 3.12).
 pub const DERIVED_DIR: &str = ".statecraft/derived";
 /// The state directory this product declares.
 pub const STATE_DIR: &str = ".statecraft/state";

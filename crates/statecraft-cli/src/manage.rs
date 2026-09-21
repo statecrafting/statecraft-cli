@@ -1,14 +1,14 @@
-//! The bindings for spec 010's verbs.
+//! The bindings for the managed-environment verbs.
 //!
 //! Spec 006 section 3.2, unchanged: a command parses what it was given, calls
 //! **exactly one** library operation, and maps the value it returns onto an
 //! exit code. Every one of these calls `statecraft_home::service::execute`,
-//! which is spec 010 section 3.10's typed operation boundary, and none of them
-//! contains a rule spec 010 did not state.
+//! which is spec 002 section 3.20's typed operation boundary, and none of them
+//! contains a rule spec 002 did not state.
 //!
 //! The severity of an outcome is decided by that boundary and mapped here. A
 //! binding that decided for itself whether a partial initialization is a
-//! finding or a failure would be carrying one of spec 010's rules where nobody
+//! finding or a failure would be carrying one of spec 002's rules where nobody
 //! looks for it.
 
 use crate::exit::Exit;
@@ -25,7 +25,7 @@ use std::path::Path;
 
 /// The default revision the trusted declaration is read at.
 ///
-/// `HEAD` rather than the working tree, because spec 010 section 3.6 reads the
+/// `HEAD` rather than the working tree, because spec 002 section 3.16 reads the
 /// trusted configuration at the base revision and the candidate does not get
 /// to choose the policy that judges it.
 pub const DEFAULT_BASE_REVISION: &str = "HEAD";
@@ -141,7 +141,7 @@ pub fn operation(
     })
 }
 
-/// What each spec 010 verb needs after its verb.
+/// What each managed-environment verb needs after its verb.
 pub fn usage(verb: crate::commands::Verb) -> &'static str {
     use crate::commands::Verb;
     match verb {

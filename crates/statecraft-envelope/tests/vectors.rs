@@ -3,7 +3,7 @@
 //!
 //! **Provisional, and the transfer into this repository did not change that.**
 //! They freeze at the platform's first signed entry, under the platform's own
-//! constitution VIII; no such entry exists. Spec 007 section 3.6 says what that
+//! constitution VIII; no such entry exists. Spec 005 section 3.16 says what that
 //! means here: until the freeze, a vector change is an ordinary change, and
 //! nothing in this repository may cite these as a frozen interoperability
 //! contract.

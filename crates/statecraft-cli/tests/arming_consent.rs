@@ -6,7 +6,7 @@
 //! regression for the two together.
 //!
 //! A separate file from `integration_slice.rs` and `negative_cases.rs`, which
-//! carry spec 009's and spec 006's own negative-case rows: a row deleted from
+//! carry spec 006's negative-case rows: a row deleted from
 //! one of those files should read as a deleted row, not as a refactor.
 //!
 //! The whole difficulty of testing a refusal is proving it refused for the
@@ -112,7 +112,7 @@ if [ "$1" = --version ]; then echo '2.1.267'; exit 0; fi
                 "PATH",
                 format!("{}:/usr/bin:/bin", self.bin.path().display()),
             )
-            // Spec 008 section 3.6: the account name is carried to the child
+            // Spec 004 section 3.14: the account name is carried to the child
             // with this process's own value, and `HOME` still is not.
             .env("USER", "fixture-operator")
             .output()
@@ -190,7 +190,7 @@ fn run_is_refused_until_the_target_is_armed_and_again_once_it_is_disarmed() {
 
     // And the unit of work is schedulable while the target is unarmed, so a
     // refusal from `run` cannot be the policy declining this spec. `work show`
-    // exits 0 only for a schedulable unit (spec 009 section 3.4).
+    // exits 0 only for a schedulable unit (spec 006 section 3.10).
     let shown = f.run(&["work", "show", root, "fixture"]);
     assert_eq!(code(&shown), 0, "the fixture spec is eligible: {shown:?}");
 

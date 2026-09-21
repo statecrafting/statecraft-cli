@@ -594,16 +594,16 @@ fn doctor_reports_every_state_exits_non_zero_and_repairs_nothing() {
     assert!(!target.path().join("gone.md").exists());
 }
 
-// The two rows of spec 008 section 3.9 that are this crate's behavior.
+// The two rows of spec 004 section 3.8 that are this crate's behavior.
 //
-// Spec 008's `extends` edge names `crates/statecraft-environment/` as an
+// Spec 004's `extends` edge names `crates/statecraft-environment/` as an
 // additive unit, and its `## Verification` block runs this suite for these two
 // rows: an absent prerequisite and a colliding declared path are things the
 // ADAPTER MODEL does, not things a provider's stream does. The declaration under
 // test is the real one, reached through a dev-dependency (see `Cargo.toml`), so
 // these rows cannot pass against a copy that has drifted from it.
 
-// Spec 008 section 3.9: `claude` is absent from the constructed environment.
+// Spec 004 section 3.8: `claude` is absent from the constructed environment.
 #[test]
 fn spec_008_an_absent_provider_executable_refuses_to_claim_and_names_the_prerequisite() {
     use statecraft_adapter_claude_code::environment as provider_env;
@@ -655,7 +655,7 @@ fn spec_008_an_absent_provider_executable_refuses_to_claim_and_names_the_prerequ
     assert!(manifest.entries.is_empty());
 }
 
-// Spec 008 section 3.9: a second provider adapter declaring a path this one
+// Spec 004 section 3.8: a second provider adapter declaring a path this one
 // declares. Refused at PLAN time, naming both adapters and the path.
 #[test]
 fn spec_008_a_second_adapter_declaring_this_ones_path_is_refused_at_plan_time() {

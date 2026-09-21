@@ -102,7 +102,7 @@ esac
             .env_clear()
             .env("STATECRAFT_HOME", home.path())
             .env("PATH", &path)
-            // Spec 008 section 3.6: the account name is carried to the child
+            // Spec 004 section 3.14: the account name is carried to the child
             // with this process's own value, and `HOME` still is not.
             .env("USER", "fixture-operator")
             .output()
@@ -183,7 +183,7 @@ esac
             evidence["streamError"]
                 .as_str()
                 .unwrap()
-                .contains("not in spec 008")
+                .contains("not in spec 004")
         );
     } else {
         assert!(evidence["streamError"].is_null());
