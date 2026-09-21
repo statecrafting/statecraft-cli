@@ -1,0 +1,10 @@
+{
+  "package": {
+    "kind": "rust-lib",
+    "name": "statecraft-adapter-claude-code",
+    "path": "crates/statecraft-adapter-claude-code",
+    "specRef": "008-first-provider-adapter"
+  },
+  "schemaVersion": "1.1.0",
+  "shardHash": "f99aa32dd12ee0e6b5a1ef3d6a3e0453087ccfbf81c1903647b522ac17ec874b"
+}

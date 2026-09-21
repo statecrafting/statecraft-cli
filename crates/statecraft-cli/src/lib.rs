@@ -32,6 +32,14 @@
 //! rule as [`bind`], and spec 009 section 3.5 sharpens it: where a verb needed
 //! something an owning library did not expose, the entry point was added there.
 //!
+//! # The managed environment
+//!
+//! [`manage`] holds the bindings spec 010 added: the global home, the one
+//! initialization flow, the one-time relocation, enrollment, the resolved
+//! configuration and local approvals. Each calls
+//! `statecraft_home::service::execute` and maps what it returns, which is the
+//! same rule as [`bind`] against a different owning spec.
+//!
 //! # Nothing here publishes
 //!
 //! There is no verb that publishes, releases or tags, and a test asserts the
@@ -44,6 +52,7 @@ pub mod adapters;
 pub mod bind;
 pub mod commands;
 pub mod exit;
+pub mod manage;
 pub mod render;
 pub mod slice;
 
@@ -57,10 +66,10 @@ pub use render::{Answer, Format};
 /// is what makes registration write nothing inside a target. Overridable by
 /// `STATECRAFT_HOME` so a test, or an operator with two setups, is not forced to
 /// share one.
+/// Spec 010 section 3.1 gives the home a declared shape, so the resolution
+/// moves to the crate that owns that shape and this stays the one name the
+/// binary calls. Two functions answering "where is the home" is how a test
+/// home and a real one end up being different places.
 pub fn product_home() -> std::path::PathBuf {
-    if let Ok(explicit) = std::env::var("STATECRAFT_HOME") {
-        return std::path::PathBuf::from(explicit);
-    }
-    let base = std::env::var("HOME").unwrap_or_else(|_| ".".to_string());
-    std::path::Path::new(&base).join(".statecraft")
+    statecraft_home::home::resolve()
 }

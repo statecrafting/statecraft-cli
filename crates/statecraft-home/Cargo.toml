@@ -1,0 +1,47 @@
+# Spec: specs/010-managed-environment-and-initialization/spec.md
+#
+# The Statecraft-managed environment: the global home, the per-project area, the
+# governance producer boundary, the root instruction bridge, configuration
+# authority with provenance, the solo and team boundary, and the one
+# initialization flow that reconciles them.
+#
+# A library, not a binary. Spec 006 owns the command surface, and spec 010's
+# verbs are bindings inside that crate, declared as an `extends` edge rather
+# than a second binary here.
+[package]
+name = "statecraft-home"
+description = "The Statecraft-managed global environment, project area and initialization"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+publish.workspace = true
+
+[dependencies]
+serde = { version = "1.0.229", features = ["derive"] }
+serde_json = "1.0.151"
+sha2 = "0.11.0"
+thiserror = "2.0.20"
+statecraft-environment = { path = "../statecraft-environment" }
+
+# The governance producer (spec 010 section 3.5), as an exact, reproducible
+# crates.io dependency rather than a path to a sibling checkout. `=` is
+# deliberate: the contract this product consumes is the shape one release
+# emits, and a caret range on a 0.x line would admit a different one.
+#
+# `default-features = false` drops spec-spine's `symbol-resolution` feature and
+# its pinned tree-sitter grammars with it. The scaffolder is a pure function of
+# the configuration and needs none of them, and a `links = "tree-sitter"` clash
+# with some future dependency of this workspace is a cost with no benefit here.
+spec-spine-core = { version = "=0.21.0", default-features = false }
+
+[dev-dependencies]
+tempfile = "3.27.0"
+
+[lints.rust]
+missing_docs = "warn"
+
+[lints.clippy]
+all = { level = "warn", priority = -1 }

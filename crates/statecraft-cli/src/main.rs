@@ -141,6 +141,43 @@ fn run(args: &[String]) -> i32 {
             }
             slice_verb(invocation.verb, &root, &home, &invocation.rest[1..], format)
         }
+        // Spec 010's verbs. Three of them take no path at all: the `home`
+        // verbs are about the product's own home and not about a target, and
+        // requiring one would be requiring a project in order to look at the
+        // environment that exists before any project does.
+        Verb::HomeShow | Verb::HomePlan | Verb::HomeApply => {
+            manage_verb(invocation.verb, &invocation.rest, None, &home, format)
+        }
+        // The rest take a path, and deliberately NOT a registered one:
+        // `init apply` is what makes a project registrable, so a registration
+        // precondition here would be the bootstrap cycle spec 010 section 3.7
+        // avoids by ordering.
+        Verb::InitPlan
+        | Verb::InitApply
+        | Verb::MigratePlan
+        | Verb::MigrateApply
+        | Verb::ProjectEnroll
+        | Verb::ProjectUnenroll
+        | Verb::ConfigShow
+        | Verb::ApprovalGrant
+        | Verb::ApprovalShow => {
+            let Some(path) = invocation.rest.first() else {
+                eprintln!(
+                    "usage: {}{}",
+                    invocation.verb.spelling(),
+                    statecraft_cli::manage::usage(invocation.verb)
+                );
+                return Exit::Usage.code();
+            };
+            let root = absolute(path);
+            manage_verb(
+                invocation.verb,
+                &invocation.rest[1..],
+                Some(&root),
+                &home,
+                format,
+            )
+        }
         // A help request is not an operation, so it consults nothing and
         // changes nothing. Exit 0: the question was asked and answered.
         Verb::Help => {
@@ -148,6 +185,29 @@ fn run(args: &[String]) -> i32 {
             Exit::Ok.code()
         }
     }
+}
+
+/// One spec 010 verb, against one product home.
+///
+/// The whole binding: name the operation, call the one boundary, render what
+/// it returned. The operation's severity is decided there (spec 010 section
+/// 3.10), so nothing here decides what a partial initialization means.
+fn manage_verb(
+    verb: Verb,
+    rest: &[String],
+    root: Option<&std::path::Path>,
+    home: &std::path::Path,
+    format: Format,
+) -> i32 {
+    let Some(operation) = statecraft_cli::manage::operation(verb, rest, root) else {
+        eprintln!(
+            "usage: {}{}",
+            verb.spelling(),
+            statecraft_cli::manage::usage(verb)
+        );
+        return Exit::Usage.code();
+    };
+    emit(&statecraft_cli::manage::execute(home, operation), format)
 }
 
 /// What each 009 verb needs after the target path.

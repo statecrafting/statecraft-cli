@@ -7,23 +7,27 @@ does not restate it.
 
 ## What this repository is right now
 
-A specified corpus with the code it claims. Seven crates and one binary; the
+A specified corpus with the code it claims. Eight crates and one binary; the
 product is a local environment for governed agent work; the boundary is
 [README.md](README.md), the reasoning is
 [docs/design/00-boundaries-and-reuse.md](docs/design/00-boundaries-and-reuse.md),
 and what is proposed versus adopted is
 [docs/decisions/00-founding-decisions.md](docs/decisions/00-founding-decisions.md).
 
-All ten specs, `000` to `009`, are `approved`, and `plan` reports nothing
-schedulable (measured 2026-09-19 with `make status`). `registry list` is the
+Ten of the eleven specs, `000` to `009`, are `approved`. `registry list` is the
 authority on the second half: `000` and `001` carry `implementation: n-a`,
 because they own prose and no code, and `002` to `009` carry
-`implementation: complete`. The rule that made
-`007` worth a warning here still holds for the next spec written: `draft` plus
-`pending` is schedulable, so `plan` offers a `draft` as ready and that is
-spec-spine's lifecycle answer, not the owner's. Check the `status` field, not
-the plan output. Ratification is the owner's act; see AGENTS.md, "New
-sessions".
+`implementation: complete`.
+
+**`010-managed-environment-and-initialization` is a `draft` with code behind
+it, and that is the one exception in this corpus.** The owner authorized
+building the managed-environment realignment as a draft, for that realignment
+and nothing else. It is not ratified, no agent may ratify it, and no document
+here may call it approved. The general rule is unchanged and matters more than
+ever now that `plan` will offer it: `draft` plus `pending` is schedulable, so
+`plan` names it exactly as it names a ratified spec. **Check the `status`
+field, not the plan output.** Ratification is the owner's act; see AGENTS.md,
+"New sessions".
 
 ## Commands
 
@@ -36,7 +40,7 @@ make verify SPEC=001       # one spec's declared acceptance
 make status                # version, lifecycle counts, what is schedulable
 ```
 
-`make code` judges seven crates and 515 tests. Both surfaces are required
+`make code` judges eight crates and 683 tests. Both surfaces are required
 through the `ci-gate` status check. The guard that made the cargo verbs skip on
 an empty workspace is still there and still correct; it simply no longer fires.
 
@@ -46,9 +50,11 @@ AGENTS.md records what to do if a spec genuinely needs to claim ahead.
 
 ## Conventions that bite
 
-- **`.derived/` is compiler output.** Read it through `spec-spine` subcommands
-  only. Never `jq` it, never hand-edit it, and never run a writing `compile` to
-  make a freshness check pass.
+- **`.statecraft/derived/` is compiler output.** Read it through `spec-spine`
+  subcommands only. Never `jq` it, never hand-edit it, and never run a writing
+  `compile` to make a freshness check pass. It moved there from `.derived/` with
+  spec `010`; `.statecraft/` as a whole is committed, and only
+  `.statecraft/state/` is ignored.
 - **Refresh with the change, not before the check.** After editing any
   `spec.md`, run `make refresh` and commit the shards alongside the edit. Running
   `compile` and then `compile --check` in the same breath passes unconditionally

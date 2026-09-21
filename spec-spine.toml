@@ -41,7 +41,7 @@ allowed = []
 specs_dir     = "specs"
 # Where the compiler and indexer write. See .gitignore for whether the
 # shard trees belong in version control.
-derived_dir   = ".derived"
+derived_dir   = ".statecraft/derived"
 standards_dir = "standards/spec"
 schemas_dir   = "standards/schemas"
 # An ungoverned root for a tool's own working files (spec 039): excluded
@@ -85,7 +85,7 @@ extra_hashed_inputs = [
   ".gitignore",
 ]
 # Directories the symbol resolver and the coverage walk skip.
-resolver_exclusions = ["target", "node_modules", ".derived", "dist", "build", ".next", ".tooling"]
+resolver_exclusions = ["target", "node_modules", ".statecraft/derived", "dist", "build", ".next", ".tooling"]
 # Named path sets `index check --slice <name>` can gate on their own.
 # [index.slices]
 # api = ["crates/*/src/lib.rs"]

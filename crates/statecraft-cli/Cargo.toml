@@ -40,6 +40,10 @@ statecraft-adapter = { path = "../statecraft-adapter" }
 statecraft-adapter-claude-code = { path = "../statecraft-adapter-claude-code" }
 statecraft-envelope = { path = "../statecraft-envelope" }
 statecraft-environment = { path = "../statecraft-environment" }
+# Spec 010's `extends` edge. The managed environment, the initialization flow
+# and the typed operation boundary live there; every verb this crate adds for
+# it is a binding onto `statecraft_home::service::execute`.
+statecraft-home = { path = "../statecraft-home" }
 statecraft-run = { path = "../statecraft-run" }
 
 [dev-dependencies]

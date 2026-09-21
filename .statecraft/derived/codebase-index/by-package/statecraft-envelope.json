@@ -1,0 +1,10 @@
+{
+  "package": {
+    "kind": "rust-lib",
+    "name": "statecraft-envelope",
+    "path": "crates/statecraft-envelope",
+    "specRef": "007-shared-evidence-envelope"
+  },
+  "schemaVersion": "1.1.0",
+  "shardHash": "93ecc9a77621a9a90f8bbe51270100827541377d18f3eb42bee0cf6682dbfbe4"
+}

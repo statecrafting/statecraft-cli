@@ -20,6 +20,12 @@ summary: >
   has a local implementation and an unreachable platform is an honest unavailable
   state rather than a downgrade to solo; and it moves this repository's compiled
   artifacts to .statecraft/derived/ in one bounded step.
+establishes:
+  # Claimed by the change that writes it, which is this one. Section 2 says why
+  # the claim could not be in the draft: the gate carries
+  # `index check --fail-on-unresolved`, so a spec claiming a crate it has not
+  # written yet fails. `008` set the precedent.
+  - { kind: directory, path: "crates/statecraft-home/" }
 amends:
   # Section 3.7's transition contract is withdrawn and the committed declaration
   # gains a project block; section 3.11 below states exactly what changes and
@@ -38,6 +44,10 @@ extends:
   # Every verb this spec names is a binding inside the crate 006 owns as one
   # directory unit, which is how 006 section 3.1 admits a verb to the tree.
   - { spec: "006-command-surface", unit: { kind: directory, path: "crates/statecraft-cli/" }, nature: additive }
+  # The authored-content check skips the compiled artifacts by path, and section
+  # 3.9 moves them. The script is 001's unit, so the edge is declared rather
+  # than discovered by the coupling gate.
+  - { spec: "001-boundaries-and-authority", unit: "scripts/check-authored-content.sh", nature: corrective }
 depends_on:
   - "000-bootstrap"
   - "001-boundaries-and-authority"
@@ -91,10 +101,10 @@ acceptance (`005`), the provider adapter (`008`), the integration slice (`009`).
 This spec adds no run, no scheduler and no second ledger. Where it needs a work,
 run or acceptance semantic, it reuses the one that exists.
 
-The claim on `crates/statecraft-home/` is deliberately absent from this draft.
-The gate carries `index check --fail-on-unresolved`, so a spec claiming a crate
-it has not written yet fails, and `008` set the precedent: the claim is added by
-the change that writes the crate.
+The claim on `crates/statecraft-home/` was deliberately absent from the draft
+that proposed this spec: the gate carries `index check --fail-on-unresolved`, so
+a spec claiming a crate it has not written yet fails. `008` set the precedent,
+and the claim arrived with the change that wrote the crate.
 
 ## 3. Behavior
 
@@ -492,6 +502,87 @@ avoid.
 ## 5. Decisions recorded during implementation
 
 Dated entries for choices section 3 was silent on. None changes what it requires.
+
+**2026-09-20: the producer dependency is an exact crates.io pin, and the
+boundary it names is not yet satisfied.** Section 3.5 requires an exact,
+reproducible dependency and forbids a filesystem path to a sibling checkout.
+This build depends on `spec-spine-core = "=0.21.0"` with `default-features =
+false`, which drops the `symbol-resolution` feature and its pinned tree-sitter
+grammars; the scaffolder needs none of them. That release **still returns
+`AGENTS.md` and three `.claude/rules/` files** alongside the contract set,
+because trimming the producer is another repository's change and has not
+shipped. This product places neither and reports the producer `non-conforming`,
+which makes an initialization against the real library `partial`.
+`crates/statecraft-home/tests/producer_integration.rs` asserts exactly that, and
+`the_producer_is_not_yet_conforming` is the single test that changes when the
+trimmed producer releases. No fixture substitutes for the boundary: where a
+conforming answer is needed, the suite derives one from the real library's own
+bytes and labels it a fixture.
+
+**2026-09-20: the governance files are written by this crate, and every rule
+about whether to write them is still 002's.** Section 3.5 reconciles through
+spec 002's ownership model. `statecraft_environment::plan::plan` computes what
+is written and what is withheld, exactly as it does for an adapter, against a
+declaration this crate synthesizes for the pseudo-harness
+`statecraft-governance`. The write loop is here rather than
+`apply::perform`, because a governance starter file's source is a **template**
+and not an adapter, and adding a source-kind field to `Declaration` would have
+broken every construction site in spec 008's crate for a field spec 008 does not
+need. The decisions stay in one place; only the write does not.
+
+**2026-09-20: a contract path already on disk is adopted, and adoption happens
+before planning.** Section 3.5 says an existing path is depended on and never
+rewritten. Spec 002's plan reaches that outcome for a path the manifest records
+as `adopted`, so the reconcile step records the adoption first and the
+governance step then withholds the write with 002's own reason. Nothing new
+decides it.
+
+**2026-09-20: the native root is a parameter, never a read of the process
+environment.** `STATECRAFT_NATIVE_ROOT` exists and is read at the command
+surface only. Every operation takes the parent directory explicitly, so an
+operation always states where it would write, and a test stays out of the
+operator's real home without mutating a process-wide variable that its
+neighbours in the same test binary would also see.
+
+**2026-09-20: hooks ship in the harness and are delivered by nobody.** Section
+3.4 refuses to rewrite a user's own settings file, and every mechanism for
+wiring a hook into the harnesses this product knows about goes through one. So
+`hooks/statecraft-gate.sh` is part of the canonical harness, is content
+addressed with the rest of it, and is installed by the operator if they want it.
+Native delivery links skills and agent definitions and names no hook, and a test
+holds that.
+
+**2026-09-20: the delivery verdict is evaluated from the file tree, and no
+verdict comes from a provider run.** Section 3.4 requires delivery to be
+evaluated rather than assumed, and a provider run costs credit and proves one
+session rather than a rule. So a harness's documented load rule is followed from
+its entry file through `@path` imports against the real tree. `claude-code`
+reports `reached` with the chain; `codex-cli` reports `unverified`, because its
+documentation does not establish the expansion. Neither verdict claims anything
+about a live session, and the suite spends nothing.
+
+**2026-09-20: what the relocation rewrites, and what it leaves.** Section 3.9
+moves the artifacts and the configuration together. The operation rewrites a
+**quoted string literal** in `spec-spine.toml` and an ignore pattern that starts
+with the old directory, and nothing else. Prose in a comment that mentions the
+old location is left alone: an operation that edited English would be guessing
+at meaning. The documents are updated by the change that performs the move,
+which is this one.
+
+**2026-09-20: the manifest goes to version 2 with no migration.** Section 3.2
+adds the project block and the tracked modifications. Nothing is released and no
+version-1 file exists outside a test, so a migration would be machinery
+maintained for nobody. A version-1 file is refused by version, which is the
+existing behavior and names the number it found.
+
+**2026-09-20: two references to the old location are left for their owners.**
+`crates/statecraft-run/tests/negative_cases.rs` builds a `.derived/` directory as
+a temptation the product must not read, and `docs/design/00-boundaries-and-reuse.md`
+and `docs/decisions/00-founding-decisions.md` mention the old path in prose.
+Both are other specs' territory (`003` and `001`), the negative control still
+holds against any shard directory, and widening this change to reach them would
+be editing a spec's territory for a cosmetic improvement. They are recorded here
+as a follow-up rather than swept.
 
 ## Verification
 

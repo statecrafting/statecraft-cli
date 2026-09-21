@@ -1,0 +1,33 @@
+{
+  "mapping": {
+    "dependsOn": [
+      "000-bootstrap",
+      "001-boundaries-and-authority"
+    ],
+    "implementingPaths": [
+      {
+        "path": "crates/statecraft-environment/",
+        "source": "spec-edge"
+      }
+    ],
+    "resolvedUnits": [
+      {
+        "locations": [
+          {
+            "file": "crates/statecraft-environment/"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "kind": "directory",
+          "path": "crates/statecraft-environment/"
+        }
+      }
+    ],
+    "specId": "002-environment-lifecycle",
+    "specStatus": "approved"
+  },
+  "schemaVersion": "1.1.0",
+  "shardHash": "30b7d5b4b442ed3b3b015a88a7e64e06b7b20bd926964ec8d16151170f636bf2"
+}
