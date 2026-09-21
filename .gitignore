@@ -30,8 +30,8 @@ target
 # them is what makes `spec-spine check` a freshness gate on a pull request: CI
 # compares the corpus against what the branch committed.
 #
-# The whole of .statecraft/ is deliberately NOT ignored either (spec 010 section
-# 3.2). Ignoring it would take the declaration, the managed instructions and the
+# The whole of .statecraft/ is deliberately NOT ignored either (spec 002 section
+# 3.12). Ignoring it would take the declaration, the managed instructions and the
 # compiled artifacts out of version control in one line; only the runtime state
 # below is excluded.
 

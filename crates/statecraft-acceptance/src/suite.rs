@@ -58,7 +58,7 @@ impl Default for SpecSpineVerify {
     }
 }
 
-/// The verdict envelope `verify --json` emits (spec-spine's spec 037).
+/// The verdict envelope `verify --json` emits (spec-spine's spec 034).
 #[derive(Debug, Clone, Deserialize)]
 struct VerifyEnvelope {
     #[serde(rename = "exitCode")]

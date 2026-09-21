@@ -8,7 +8,7 @@
 //! # The split that matters
 //!
 //! Classifying a change under the base's rules is spec-spine's job (its spec
-//! 088), and this product **reads** its report rather than answering the
+//! 071), and this product **reads** its report rather than answering the
 //! question itself: [`crate::delta`] is the reader. Declaring which paths are
 //! members **here** is this product's job, and is done by path.
 //!
@@ -114,7 +114,7 @@ pub trait DeltaReport {
 /// No report was supplied for this candidate.
 ///
 /// Correct whenever the caller has none, and deliberately empty-handed. The
-/// absence is attributed to this product: spec-spine 088 is released and the
+/// absence is attributed to this product: spec-spine 071 is released and the
 /// `=0.20.0` pin carries it, so the report exists and this instance is the case
 /// where nothing asked for it.
 #[derive(Debug, Clone)]
@@ -127,7 +127,7 @@ impl DeltaReport for NoDeltaReport {
     fn corpus_answer(&self, _changed_paths: &[String]) -> CorpusAnswer {
         CorpusAnswer::Unavailable {
             reason: "this product does not read spec-spine's change-classification report \
-                     (its spec 088) for this candidate, because none was supplied"
+                     (its spec 071) for this candidate, because none was supplied"
                 .to_string(),
         }
     }
@@ -172,7 +172,7 @@ pub struct Verdict {
     pub corpus_classes: Vec<String>,
     /// spec-spine's own `priorPolicy.required`, recorded as it answered it.
     ///
-    /// Spec 088 section 3.5: `false` means only that no structural class above
+    /// Spec 071 section 3.5: `false` means only that no structural class above
     /// `implementation` changed. It does not mean the change is safe, correct
     /// or approved, and nothing here reads it as an acceptance.
     pub prior_policy_required: Recorded<bool>,
@@ -313,7 +313,7 @@ mod tests {
             CorpusVerdict::Absent(Absence::NotRecorded)
         );
         assert!(v.note.contains("0.18.0"));
-        assert!(v.note.contains("spec 088"));
+        assert!(v.note.contains("spec 071"));
         assert_eq!(
             v.prior_policy_required,
             Recorded::Absent(Absence::NotRecorded)

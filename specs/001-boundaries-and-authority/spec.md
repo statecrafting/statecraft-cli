@@ -421,6 +421,24 @@ passes unchanged. The owner has acknowledged the staleness and deferred the
 correction, so the measurement is recorded here and the preamble is left as it
 stands.
 
+**2026-09-21: a borrowed ordinal is corrected in this spec's territory, and the
+rule for reading one is recorded.** Section 3.8's tables and the decision record
+this spec owns cite other corpora by ordinal. spec-spine collapsed its corpus and
+renumbered contiguously on 2026-09-20, which makes an old ordinal worse than a
+dangling one: it resolves, to a different document. Three citations in
+`docs/decisions/00-founding-decisions.md` were corrected against
+`docs/corpus-map.md` in that repository (097 to 078, 091 to 072, and `C-18`'s 102
+to 081), and seven more elsewhere in the corpus.
+
+What is **not** corrected is the point of this entry. `D-01`'s reasons cite the
+archived predecessor's own spec 102, section 3.9 cites its 032, 040, 042 and 043,
+and `crates/statecraft-envelope/PROVENANCE.md` cites hqgit's. Those belong to
+other corpora, spec-spine did not renumber them, and remapping one would be the
+same defect pointing the other way. The rule this spec now holds: an ordinal is
+read together with the sentence that says whose it is, and a spec-spine ordinal
+is trusted only from `registry list` or the corpus map. AGENTS.md carries the
+operational form.
+
 ## Verification
 
 Each line below is one command. These assert the authored foundation, which

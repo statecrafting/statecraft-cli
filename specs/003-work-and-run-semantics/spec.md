@@ -277,7 +277,7 @@ budget are out of scope.
 
 **When parallelism reopens, it consumes an upstream report rather than inventing
 a format.** Two ready specs can claim overlapping territory, and spec-spine's
-spec 091 (`two ready specs can collide`) is the collision report for exactly that
+spec 072 (`two ready specs can collide`) is the collision report for exactly that
 question. It landed in spec-spine `v0.20.0` and the pin carries it (`C-16`,
 corrected 2026-09-17).
 
