@@ -256,14 +256,20 @@ impl Answer {
                 // something nobody asked for is a failure. The settings
                 // modification is the one part of this verb that can be any of
                 // the three, and saying so is what makes it scriptable.
+                //
+                // A **plan** withholds nothing: writing nothing is what it was
+                // asked to do, so naming the modification is success and not a
+                // finding. Only an apply that named a modification and did not
+                // perform it has withheld a write.
                 if change.settings.iter().any(SettingsOutcome::is_failure) {
                     Severity::Failed
                 } else if change.settings.iter().any(SettingsOutcome::is_refusal) {
                     Severity::Refused
-                } else if change
-                    .settings
-                    .iter()
-                    .any(SettingsOutcome::is_withheld_write)
+                } else if change.mode == flow::Mode::Apply
+                    && change
+                        .settings
+                        .iter()
+                        .any(SettingsOutcome::is_withheld_write)
                 {
                     Severity::Finding
                 } else {

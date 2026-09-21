@@ -158,8 +158,12 @@ fn the_plan_shows_the_exact_lines_and_writes_nothing() {
         assert!(plan.render().contains(line), "{line} is not in the plan");
     }
 
-    // And nothing was written: `home plan` does not create the file.
+    // And nothing was written: `home plan` does not create the file. A plan
+    // withholds nothing, so naming the modification is exit 0 and not a
+    // finding; only an apply that named one and did not perform it has
+    // withheld a write.
     assert!(!settings_path(&sandbox).exists());
+    assert_eq!(answer.severity(), Severity::Ok, "{}", answer.render());
 }
 
 #[test]
