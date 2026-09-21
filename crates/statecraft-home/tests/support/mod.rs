@@ -1,4 +1,4 @@
-//! Shared scaffolding for spec 010's acceptance suite.
+//! Shared scaffolding for the managed-environment acceptance suite.
 //!
 //! Two rules this module exists to keep:
 //!

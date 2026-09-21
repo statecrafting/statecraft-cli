@@ -1,11 +1,12 @@
-# Spec: specs/010-managed-environment-and-initialization/spec.md
+# Spec: specs/002-environment-lifecycle/spec.md
 #
 # The Statecraft-managed environment: the global home, the per-project area, the
 # governance producer boundary, the root instruction bridge, configuration
 # authority with provenance, the solo and team boundary, and the one
 # initialization flow that reconciles them.
 #
-# A library, not a binary. Spec 006 owns the command surface, and spec 010's
+# A library, not a binary. Spec 006 owns the command surface, and this half of
+# spec 002's
 # verbs are bindings inside that crate, declared as an `extends` edge rather
 # than a second binary here.
 [package]
@@ -26,7 +27,7 @@ sha2 = "0.11.0"
 thiserror = "2.0.20"
 statecraft-environment = { path = "../statecraft-environment" }
 
-# The governance producer (spec 010 section 3.5), as an exact, reproducible
+# The governance producer (spec 002 section 3.15), as an exact, reproducible
 # crates.io dependency rather than a path to a sibling checkout. `=` is
 # deliberate: the contract this product consumes is the shape one release
 # emits, and a caret range on a 0.x line would admit a different one.

@@ -15,7 +15,7 @@ pub const MANIFEST_PATH: &str = ".statecraft/environment.json";
 
 /// The manifest schema version. Bumping it is a change to this spec.
 ///
-/// Version 2 (spec 010) adds the project declaration and the tracked
+/// Version 2 (spec 002 section 3.12) adds the project declaration and the tracked
 /// modifications. There is no migration from version 1: nothing is released,
 /// so no version-1 file exists outside a test, and a migration framework for a
 /// schema with no adopters would be machinery maintained for nobody. A
@@ -110,7 +110,7 @@ pub struct Pins {
 
 /// Whether a project coordinates with a team, and which one.
 ///
-/// Spec 010 section 3.8: enrollment is explicit and project-scoped, it lives in
+/// Spec 002 section 3.18: enrollment is explicit and project-scoped, it lives in
 /// this committed declaration and nowhere else, and the default is solo. A
 /// platform this product cannot reach does not change what this field says.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
@@ -139,7 +139,7 @@ impl Enrollment {
 
 /// The committed project declaration.
 ///
-/// Spec 010 section 3.2. It carries what a remote worker needs in order to
+/// Spec 002 section 3.12. It carries what a remote worker needs in order to
 /// resolve the same requirements independently, and therefore carries no
 /// secret, no machine-specific absolute path and no personal preference.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
@@ -232,7 +232,7 @@ pub enum ModificationKind {
 
 /// A tracked modification of a file this product does NOT own.
 ///
-/// Spec 010 section 3.3. The distinction from an [`Entry`] is the whole point:
+/// Spec 002 section 3.13. The distinction from an [`Entry`] is the whole point:
 /// an entry says "these bytes are ours"; a modification says "one line of
 /// somebody else's file is ours, and here is what the file looked like before
 /// and after". Removal takes back the line and nothing else.
@@ -264,10 +264,10 @@ pub struct Manifest {
     /// Every managed and adopted path.
     #[serde(default)]
     pub entries: Vec<Entry>,
-    /// Lines this product owns inside files it does not (spec 010 section 3.3).
+    /// Lines this product owns inside files it does not (spec 002 section 3.13).
     #[serde(default)]
     pub modifications: Vec<Modification>,
-    /// The project declaration (spec 010 section 3.2).
+    /// The project declaration (spec 002 section 3.12).
     #[serde(default)]
     pub project: Project,
 }
@@ -432,7 +432,7 @@ impl Manifest {
     /// Pretty-printed with a trailing newline, because it is committed and a
     /// human reads its diff.
     pub fn write(&self, root: &std::path::Path) -> Result<(), ManifestError> {
-        // Spec 010 section 3.2: a value naming one machine's filesystem is
+        // Spec 002 section 3.12: a value naming one machine's filesystem is
         // refused here rather than reported later, because the committed file
         // is exactly what a remote worker has to resolve from.
         let violations = self.project.portability_violations();

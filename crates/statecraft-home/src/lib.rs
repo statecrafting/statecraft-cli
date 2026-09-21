@@ -1,7 +1,7 @@
 //! The Statecraft-managed environment.
 //!
 //! This crate is the implementation of
-//! [spec 010](../../../specs/010-managed-environment-and-initialization/spec.md):
+//! [spec 002](../../../specs/002-environment-lifecycle/spec.md), sections 3.11 to 3.21:
 //! one global environment, one per-project area, one initialization flow, and
 //! where a configuration value's authority comes from.
 //!
@@ -41,7 +41,7 @@
 //! # What it does not do
 //!
 //! There is no binary here, and no hosted platform. Spec 006 owns the command
-//! surface and spec 010's verbs are bindings inside that crate. The platform is
+//! surface and these verbs are bindings inside that crate. The platform is
 //! a trait with one shipped implementation that reaches nothing and reports
 //! `unavailable`: this repository implements the local boundary and the honest
 //! unavailable states, and nothing here presents a fixture as a live

@@ -1,6 +1,6 @@
 //! The one Statecraft-managed global environment.
 //!
-//! Spec 010 section 3.1. `~/.statecraft/`, overridden by `STATECRAFT_HOME`.
+//! Spec 002 section 3.11. `~/.statecraft/`, overridden by `STATECRAFT_HOME`.
 //! The override is not new: spec 006 section 5 recorded it, and the resolution
 //! moves here so one function answers "where is the home" for the binary, the
 //! library and every test.
@@ -156,7 +156,7 @@ impl Default for Personal {
 
 /// What a tool's identity was asked to be, and what it turned out to be.
 ///
-/// Spec 010 section 3.6: a run records the requested identity **and** the
+/// Spec 002 section 3.16: a run records the requested identity **and** the
 /// identity that actually resolved. Recording only the request is how a report
 /// says `=0.20.0` about a machine running something else.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]

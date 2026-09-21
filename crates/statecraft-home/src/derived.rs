@@ -1,6 +1,6 @@
 //! The one-time relocation of the compiled artifacts.
 //!
-//! Spec 010 section 3.9. `.derived/` moves to `.statecraft/derived/`, and the
+//! Spec 002 section 3.19. `.derived/` moves to `.statecraft/derived/`, and the
 //! declared configuration and the ignore rules move with it in the same
 //! operation. It touches exactly one repository root: it sweeps no sibling
 //! repository and no home directory, and there is nothing in this module that

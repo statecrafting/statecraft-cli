@@ -34,7 +34,7 @@
 //!
 //! # The managed environment
 //!
-//! [`manage`] holds the bindings spec 010 added: the global home, the one
+//! [`manage`] holds the managed-environment bindings: the global home, the one
 //! initialization flow, the one-time relocation, enrollment, the resolved
 //! configuration and local approvals. Each calls
 //! `statecraft_home::service::execute` and maps what it returns, which is the
@@ -66,7 +66,7 @@ pub use render::{Answer, Format};
 /// is what makes registration write nothing inside a target. Overridable by
 /// `STATECRAFT_HOME` so a test, or an operator with two setups, is not forced to
 /// share one.
-/// Spec 010 section 3.1 gives the home a declared shape, so the resolution
+/// Spec 002 section 3.11 gives the home a declared shape, so the resolution
 /// moves to the crate that owns that shape and this stays the one name the
 /// binary calls. Two functions answering "where is the home" is how a test
 /// home and a real one end up being different places.

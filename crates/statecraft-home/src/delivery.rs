@@ -1,6 +1,6 @@
 //! Delivery: what actually reaches a session, evaluated rather than assumed.
 //!
-//! Spec 010 section 3.4. Two different deliveries live here, and conflating
+//! Spec 002 section 3.14. Two different deliveries live here, and conflating
 //! them is the mistake this module exists to prevent:
 //!
 //! - **Native delivery** puts small links into an agent's own home so its

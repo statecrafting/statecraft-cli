@@ -1,4 +1,4 @@
-//! Spec 010's verbs, through the built binary.
+//! The managed-environment verbs, through the built binary.
 //!
 //! Spec 006 section 3.3's exit-code vocabulary is a property of a process, so
 //! these spawn the executable rather than calling a function and inspecting an
@@ -216,7 +216,7 @@ fn the_help_lists_every_new_group() {
     ] {
         assert!(text.contains(verb), "the help omits `{verb}`");
     }
-    assert!(text.contains("010-managed-environment-and-initialization"));
+    assert!(text.contains("002-environment-lifecycle"));
 }
 
 #[test]

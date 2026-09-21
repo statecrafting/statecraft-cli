@@ -1,6 +1,6 @@
 //! The one initialization flow.
 //!
-//! Spec 010 section 3.7. Seven steps, in order, each reported separately, and
+//! Spec 002 section 3.17. Seven steps, in order, each reported separately, and
 //! then it stops: arming and execution are separate explicit acts and are not
 //! steps of initialization.
 //!

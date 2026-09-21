@@ -1,6 +1,6 @@
 //! The per-project Statecraft area, and the managed instructions inside it.
 //!
-//! Spec 010 section 3.2. Exactly four paths, and no others. The existing
+//! Spec 002 section 3.12. Exactly four paths, and no others. The existing
 //! locations are preserved and not moved: `spec-spine.toml` at the root,
 //! `specs/` at the root, `standards/spec/` where it is, and every ordinary
 //! project document where it is.

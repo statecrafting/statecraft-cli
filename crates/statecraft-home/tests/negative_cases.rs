@@ -1,4 +1,5 @@
-//! Spec 010's declared acceptance: one test per row of section 3.12.
+//! Spec 002's declared acceptance for the managed environment: one test per
+//! row of section 3.10 that belongs to the global home and initialization.
 //!
 //! Each test is named after the row it covers, so a row that stops being
 //! covered shows up as a deleted test rather than as a quietly weakened

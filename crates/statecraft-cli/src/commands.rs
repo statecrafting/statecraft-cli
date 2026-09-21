@@ -135,7 +135,8 @@ impl Verb {
             // the owner; the adapter is how the attempt happens.
             Verb::Run => "003-work-and-run-semantics",
             Verb::RunShow | Verb::Accept => "005-acceptance-and-evidence",
-            // Spec 010's verbs. The behavior behind each is in that spec's
+            // The managed-environment verbs. The behavior behind each is in
+            // that spec's
             // crate, and the binding reaches it through one `extends` edge on
             // the crate 006 owns, which is how 006 section 3.1 admits a verb.
             Verb::HomeShow
@@ -149,7 +150,7 @@ impl Verb {
             | Verb::ProjectUnenroll
             | Verb::ConfigShow
             | Verb::ApprovalGrant
-            | Verb::ApprovalShow => "010-managed-environment-and-initialization",
+            | Verb::ApprovalShow => "002-environment-lifecycle",
             Verb::Help => "006-command-surface",
         }
     }

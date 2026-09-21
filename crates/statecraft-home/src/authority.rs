@@ -1,6 +1,6 @@
 //! Configuration authority: four layers, with provenance, and no merge.
 //!
-//! Spec 010 section 3.6. There is one policy and approval model, and it is not
+//! Spec 002 section 3.16. There is one policy and approval model, and it is not
 //! a last-writer-wins merge. Each key is answered with the value, the layer
 //! that supplied it, and every layer that constrained it. Three rules make the
 //! answer honest:

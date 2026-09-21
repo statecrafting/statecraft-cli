@@ -1,6 +1,6 @@
 //! The real producer boundary, asserted against the real library.
 //!
-//! Spec 010 section 3.5. Everything here calls
+//! Spec 002 section 3.15. Everything here calls
 //! `spec_spine_core::scaffold_init_json` in process, through
 //! [`statecraft_home::producer::Library`], and asserts what it actually
 //! returns. No fixture appears in this file, and nothing in it is satisfied by

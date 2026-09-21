@@ -1,6 +1,6 @@
 //! Merging the producer's `.gitignore` fragment into a repository's own.
 //!
-//! Spec 010 section 3.5: the fragment is **merged**, never installed as a file.
+//! Spec 002 section 3.15: the fragment is **merged**, never installed as a file.
 //! The lines it contributes that are not already present are collected inside
 //! one marked block, and no unrelated entry is replaced, reordered or removed.
 //! Merging is idempotent.

@@ -150,7 +150,7 @@ fn run(args: &[String]) -> i32 {
         }
         // The rest take a path, and deliberately NOT a registered one:
         // `init apply` is what makes a project registrable, so a registration
-        // precondition here would be the bootstrap cycle spec 010 section 3.7
+        // precondition here would be the bootstrap cycle spec 002 section 3.17
         // avoids by ordering.
         Verb::InitPlan
         | Verb::InitApply
