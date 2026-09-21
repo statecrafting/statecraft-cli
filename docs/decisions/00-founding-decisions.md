@@ -133,6 +133,24 @@ an authority-set verdict from a live report.
 Each row is a recommendation with its reason. Each can be adopted, amended or
 rejected without editing a spec, which is why they live here and not in one.
 
+**Where each row stands, as a reading aid and never as the record.** Section 5 is
+the record; this table is a summary of it and is not a substitute. A row that is
+merely *unadopted* is still live: it is a recommendation nobody has decided, not
+one that has lapsed.
+
+| Row | Standing | Where it was settled, if it was |
+|---|---|---|
+| `D-01` | Adopted for language and layout; the distribution and naming half is **open** | Section 5, 2026-09-16 |
+| `D-02` | Adopted, then **amended** 2026-09-21: a crate has exactly one owning spec, and a spec may own more than one crate | Section 5, 2026-09-16 and 2026-09-21 |
+| `D-03` | **Superseded.** Every spec in the corpus is now `approved` | Section 5, and `registry list` |
+| `D-04` | **Superseded.** The kit transition contract is withdrawn with the installer that motivated it | Spec `002` sections 3.7 and 3.21 |
+| `D-05` | Mode B is built; exposing Mode A over the same verbs is **open** (`F-04`) | Spec `001` section 3.4 |
+| `D-06` | **Open as standing policy.** The pin is exact and the binary is repository-local | `spec-spine.toml`, and `AGENTS.md` |
+| `D-07` | Carried into spec `005` as written, recorded as inherited and not re-decided | Spec `005` section 2 |
+| `D-08` | **Open.** The executable is `statecraft-cli` until this is decided | Spec `006` section 3.5 |
+| `D-09` | Adopted in practice by the pointer model | Spec `002` sections 3.8 and 3.13 |
+| `D-10` | Recorded as dropped for now, reopened only against a named consumer | This row |
+
 ### D-01: Language, runtime and packaging
 
 **Recommendation.** Rust, one workspace, one binary named `statecraft`,
@@ -172,52 +190,37 @@ their own specs.
 something real to hold, and spec 004's rule that no provider name appears in the
 adapter seam becomes a compile-unit fact rather than a review convention.
 
+**Amended 2026-09-21**, in section 5: a crate has exactly one owning spec, and a
+spec may own more than one crate. Read that entry before this row.
+
 ### D-03: The corpus itself
 
-**Status: adopted in part, 2026-09-16.** The owner ratified `001` and `002`,
-and the three anchors this row carries were added to spec 000 in the same
-change. `003` to `005` were deliberately left `draft`, so each meets one more
-reading before code is written against it. The remainder of this row stays open.
-
-**Recommendation.** Ratify specs `001` to `005` as a set, or amend them first.
-Until then this repository is specified only, and partially.
-
-**Reason.** A corpus its owner has not read should not be dispatched from.
-Flipping a spec to `approved` is the act that records agreement; per C-03 it
-should carry `pending` at the same time so it becomes a work order rather than a
-settled claim.
-
-**This row also carries the three `unamendable` anchors.** Spec 000 section 5
-deliberately holds **no** product anchor: freezing constitution VI, VII and IX
-while their text is owned by a `draft` spec would be the corpus granting itself
-authority, which is what constitution VII forbids. Ratifying `001` is what makes
-`independent-acceptance`, `no-self-granted-authority` and
-`evidence-outside-the-child` addable to spec 000's list, and adding them is part
-of this row rather than a separate act.
-
-**Note the gap this row closes, per C-15.** spec-spine already offers a `draft`
-plus `pending` spec as ready, so the tool does not withhold unratified work. The
-guard is a project rule, stated in AGENTS.md, and later a per-project lifecycle
-policy this product would carry for the repositories it drives. Until then,
-`registry plan` naming a spec is not permission to build it.
+**Superseded 2026-09-21.** This row recommended ratifying specs `001` to `005`
+as a set, or amending them first, and recorded that until then the repository was
+specified only and partially. Every spec in the corpus is now `approved`, and
+`registry list` is the authority on that rather than this file. The reason the
+row gave still holds and is now a standing rule rather than a recommendation: a
+corpus its owner has not read should not be dispatched from, which is why
+AGENTS.md says an agent never ratifies. The 2026-09-16 entry in section 5 records
+the adoption in part; the ratifications since are each recorded in their own
+spec.
 
 ### D-04: Who installs the working environment
 
-**Recommendation.** Adopt the transition contract in spec 002 section 3.7: this
-product never writes a path spec-spine's kit owns without a recorded, per-path,
-operator-initiated and reversible ownership transfer. Standalone spec-spine use
-stays viable. Do not edit, vendor or deprecate spec-spine's kit from this
-repository.
+**Superseded 2026-09-21.** This row recommended adopting the transition contract
+in spec `002` section 3.7, under which this product never wrote a path
+spec-spine's kit owned without a recorded, per-path, operator-initiated and
+reversible ownership transfer. spec-spine then withdrew the kit and its public
+initializer, so there is no second installer to coexist with and the contract has
+nothing to hold. Spec `002` section 3.7 is the withdrawal and section 3.21 states
+what replaces it, including the three parts retained because each is general
+rather than kit-specific: a `foreign` finding names an owner, `shadowed` stays,
+and ownership transfer stays per path, explicit, operator-initiated, reversible
+and recorded.
 
-**Reason.** I-06 wants this product to own the working environment, and two
-installers silently claiming the same harness files is the failure that makes
-both untrustworthy. The contract lets ownership move one path at a time, with a
-digest recorded at the moment it moves, so `doctor` can tell a transferred file
-from a drifted one from a foreign one.
-
-**Open inside this row.** Whether this product should eventually install a
-harness at all, or only ever adapt around one spec-spine installs. The contract
-above is correct either way, which is why the question does not block it.
+The question the row answered, I-06's "this product owns the working
+environment", is now answered by the whole of spec `002`: it owns it, and it is
+the only installer.
 
 ### D-05: The first usable workflow, and the interaction mode
 
@@ -558,6 +561,53 @@ To adopt a further row, the owner can state which `D-` rows are accepted and
 with what amendments. Adoption is then recorded here as plain text with its
 date, and each ratified spec's frontmatter is flipped in the change that
 dispatches it.
+
+### 2026-09-21: D-02 amended; the corpus consolidated to seven specs
+
+The owner directed a consolidation of the spec corpus and decided the layout
+question it raises. Recorded here because it changes an adopted row.
+
+**What changed.** Eleven specs become seven. Four pairs, each of which described
+one subject across two documents, are merged into the spec that held the subject
+first: `009`'s work, run and accept bindings into `006`; `007`'s shared envelope
+into `005`; `008`'s first provider into `004`; and `010`'s managed environment
+into `002`. No crate is merged, renamed or deleted, and no requirement is
+weakened: each absorbed spec's section 3 moves whole, keeping its wording, and
+every citation in the tree moves with it from an explicit map.
+
+**What this amends in `D-02`.** The row as adopted on 2026-09-16 reads "crates
+matching the spec boundaries", and its stated reason is that the spec corpus is
+the module boundary, so the coupling gate has something real to hold. Three of
+the seven specs now own two crates each: `002` owns `statecraft-environment` and
+`statecraft-home`, `004` owns `statecraft-adapter` and
+`statecraft-adapter-claude-code`, and `005` owns `statecraft-acceptance` and
+`statecraft-envelope`. **The amended row is: a crate has exactly one owning
+spec, and a spec may own more than one crate.** One direction of the
+correspondence is kept, and it is the direction the coupling gate uses: every
+compile unit still resolves to exactly one spec, so the gate still holds a real
+unit per claim, and `index coverage` still reports every source file
+specifically claimed.
+
+**What the amendment costs, stated rather than smoothed.** `D-02`'s reason named
+one case specifically: spec `004`'s rule that no provider name appears in the
+adapter seam becomes a compile-unit fact rather than a review convention. That
+rule survives the merge unchanged, and it survives as a compile-unit fact,
+because the two crates are untouched and `cargo test -p statecraft-adapter
+--test no_provider_names` is the mechanism it was always enforced by. What is
+lost is the second, weaker guard: two specs can no longer disagree about it,
+because there is one spec. Each merged spec's section 2 now states the
+separation its two crates hold and why, which is where a reader will look.
+
+A second cost was found by the compiler rather than by reading. Merging a spec
+that depended on `005` and `006` into one they depend on makes a cycle
+`compile` refuses (`V-014`), in `004` and again in `002`. It is resolved in both
+by carrying the relationship on the `extends` and `amends` edges alone, which
+name the exact unit reached and its nature, and never by dropping a claim. Each
+is recorded in its own spec's section 5.
+
+**What is not adopted here.** No other `D-` row moves, no deferral is lifted,
+and nothing is released. `D-01`'s distribution half and `D-08` stay open, and
+`F-02` holds.
 
 Publication, merges, releases and deployments are not covered by adopting any row
 here. F-02 holds until it is separately lifted.

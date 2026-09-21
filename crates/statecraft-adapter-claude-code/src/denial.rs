@@ -1,6 +1,6 @@
 //! Two denial mechanisms with opposite evidence properties.
 //!
-//! Spec 008 section 3.4, measured on Claude Code 2.1.267 with the same prompt:
+//! Spec 004 section 3.12, measured on Claude Code 2.1.267 with the same prompt:
 //!
 //! | Mechanism | Reflected in the init event | Produces a refusal record |
 //! |---|---|---|
@@ -75,7 +75,7 @@ impl DenialMechanism {
 
 /// A restriction expressed the wrong way for what it has to prove.
 ///
-/// Spec 008 section 3.9: a tool restriction expressed as tool-set removal where
+/// Spec 004 section 3.8: a tool restriction expressed as tool-set removal where
 /// a refusal record is required **fails qualification**, because the manifest
 /// declared `structured-refusals` and that path produces none.
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
@@ -83,7 +83,7 @@ impl DenialMechanism {
     "restriction on {tools:?} was expressed as {mechanism} and must survive as evidence; \
      this adapter declares `structured-refusals` and that mechanism produces none, \
      so the declaration and the invocation disagree and the binary fails qualification \
-     (spec 008 section 3.4)"
+     (spec 004 section 3.12)"
 )]
 pub struct NotRefusalBearing {
     /// The tools the restriction covers.

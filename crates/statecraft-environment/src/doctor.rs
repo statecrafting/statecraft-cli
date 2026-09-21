@@ -104,6 +104,29 @@ pub enum Finding {
         /// The adapter whose declaration covers it.
         adapter: String,
     },
+    /// A tracked modification is no longer in the file it was made to.
+    ///
+    /// Spec 002 section 3.13: the modification is one line inside a file this
+    /// product does not own, so its absence is a finding and never a repair.
+    /// The user removed the line, which is their right; the record says so.
+    ModificationLost {
+        /// The file.
+        path: String,
+        /// The line that is gone.
+        line: String,
+    },
+    /// A committed declared value names one machine rather than a requirement.
+    ///
+    /// Spec 002 section 3.12. Refused at write time, and reported here for a
+    /// declaration that arrived some other way, such as a hand edit.
+    NonPortableDeclaration {
+        /// Which map: `requirements` or `overrides`.
+        field: String,
+        /// The key.
+        key: String,
+        /// Why it is not portable.
+        reason: String,
+    },
 }
 
 impl Finding {
@@ -123,6 +146,12 @@ impl Finding {
             }
             Finding::UnmanagedWrite { path, adapter } => {
                 format!("unmanaged-write {path}, declared by adapter {adapter}")
+            }
+            Finding::ModificationLost { path, line } => {
+                format!("modification-lost {path}: `{line}` is no longer in the file")
+            }
+            Finding::NonPortableDeclaration { field, key, reason } => {
+                format!("non-portable-declaration {field}.{key}: {reason}")
             }
         }
     }
@@ -254,6 +283,31 @@ pub fn doctor(
                 });
             }
         }
+    }
+
+    // Spec 002 section 3.13: a tracked line that is gone is reported, never
+    // reinserted. Reading the file rather than its digest, because the user is
+    // free to edit everything else in it and only the line is ours.
+    for modification in &manifest.modifications {
+        let text = match std::fs::read_to_string(resolve(root, &modification.path)) {
+            Ok(t) => t,
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => String::new(),
+            Err(e) => return Err(e),
+        };
+        if !text.lines().any(|l| l.trim_end() == modification.line) {
+            report.findings.push(Finding::ModificationLost {
+                path: modification.path.clone(),
+                line: modification.line.clone(),
+            });
+        }
+    }
+
+    for violation in manifest.project.portability_violations() {
+        report.findings.push(Finding::NonPortableDeclaration {
+            field: violation.field,
+            key: violation.key,
+            reason: violation.reason,
+        });
     }
 
     if let Some(found) = &observed.product {

@@ -46,6 +46,30 @@ pub enum Verb {
     RunShow,
     /// `accept <path> <run>`
     Accept,
+    /// `home show`
+    HomeShow,
+    /// `home plan`
+    HomePlan,
+    /// `home apply`
+    HomeApply,
+    /// `init plan <path>`
+    InitPlan,
+    /// `init apply <path>`
+    InitApply,
+    /// `migrate plan <path>`
+    MigratePlan,
+    /// `migrate apply <path>`
+    MigrateApply,
+    /// `project enroll <path> <team>`
+    ProjectEnroll,
+    /// `project unenroll <path>`
+    ProjectUnenroll,
+    /// `config show <path>`
+    ConfigShow,
+    /// `approval grant <path> <subject> <operator> <reason...>`
+    ApprovalGrant,
+    /// `approval show <path> <subject>`
+    ApprovalShow,
     /// `--help`, optionally with a group or a verb as its topic.
     ///
     /// Not part of the command tree: [`Verb::all`] lists the operations, and a
@@ -73,13 +97,25 @@ impl Verb {
             Verb::RunList => "run list",
             Verb::RunShow => "run show",
             Verb::Accept => "accept",
+            Verb::HomeShow => "home show",
+            Verb::HomePlan => "home plan",
+            Verb::HomeApply => "home apply",
+            Verb::InitPlan => "init plan",
+            Verb::InitApply => "init apply",
+            Verb::MigratePlan => "migrate plan",
+            Verb::MigrateApply => "migrate apply",
+            Verb::ProjectEnroll => "project enroll",
+            Verb::ProjectUnenroll => "project unenroll",
+            Verb::ConfigShow => "config show",
+            Verb::ApprovalGrant => "approval grant",
+            Verb::ApprovalShow => "approval show",
             Verb::Help => "--help",
         }
     }
 
     /// Which spec owns the behavior behind it.
     ///
-    /// Spec 009's edge added the verbs 003, 004 and 005 name, so this is no
+    /// Spec 006's edges added the verbs 003, 004 and 005 name, so this is no
     /// longer one answer. Spec 006 section 3.1's table is where the mapping
     /// lives; this is that table, in code.
     pub fn owning_spec(self) -> &'static str {
@@ -94,11 +130,27 @@ impl Verb {
             | Verb::EnvRemove
             | Verb::Doctor => "002-environment-lifecycle",
             Verb::WorkList | Verb::WorkShow | Verb::RunList => "003-work-and-run-semantics",
-            // `run` is 003's semantics through 004's adapter, and 009 section
+            // `run` is 003's semantics through 004's adapter, and 006 section
             // 3.1 names both. The record and the outcome are 003's, so that is
             // the owner; the adapter is how the attempt happens.
             Verb::Run => "003-work-and-run-semantics",
             Verb::RunShow | Verb::Accept => "005-acceptance-and-evidence",
+            // The managed-environment verbs. The behavior behind each is in
+            // that spec's
+            // crate, and the binding reaches it through one `extends` edge on
+            // the crate 006 owns, which is how 006 section 3.1 admits a verb.
+            Verb::HomeShow
+            | Verb::HomePlan
+            | Verb::HomeApply
+            | Verb::InitPlan
+            | Verb::InitApply
+            | Verb::MigratePlan
+            | Verb::MigrateApply
+            | Verb::ProjectEnroll
+            | Verb::ProjectUnenroll
+            | Verb::ConfigShow
+            | Verb::ApprovalGrant
+            | Verb::ApprovalShow => "002-environment-lifecycle",
             Verb::Help => "006-command-surface",
         }
     }
@@ -107,7 +159,7 @@ impl Verb {
     ///
     /// [`Verb::Help`] is deliberately absent: it is not an operation, and a
     /// usage error listing it would offer help as a thing to do.
-    pub fn all() -> [Verb; 15] {
+    pub fn all() -> [Verb; 27] {
         [
             Verb::ProjectRegister,
             Verb::ProjectList,
@@ -124,11 +176,25 @@ impl Verb {
             Verb::RunList,
             Verb::RunShow,
             Verb::Accept,
+            Verb::HomeShow,
+            Verb::HomePlan,
+            Verb::HomeApply,
+            Verb::InitPlan,
+            Verb::InitApply,
+            Verb::MigratePlan,
+            Verb::MigrateApply,
+            Verb::ProjectEnroll,
+            Verb::ProjectUnenroll,
+            Verb::ConfigShow,
+            Verb::ApprovalGrant,
+            Verb::ApprovalShow,
         ]
     }
 
     /// The groups a help topic may name.
-    pub const GROUPS: [&'static str; 5] = ["project", "env", "work", "run", "accept"];
+    pub const GROUPS: [&'static str; 9] = [
+        "project", "env", "work", "run", "accept", "home", "init", "migrate", "config",
+    ];
 
     /// Parse a verb from the leading arguments, returning how many it consumed.
     pub fn parse(args: &[String]) -> Option<(Verb, usize)> {
@@ -138,6 +204,8 @@ impl Verb {
             ("project", Some("register")) => Some((Verb::ProjectRegister, 2)),
             ("project", Some("list")) => Some((Verb::ProjectList, 2)),
             ("project", Some("arm")) => Some((Verb::ProjectArm, 2)),
+            ("project", Some("enroll")) => Some((Verb::ProjectEnroll, 2)),
+            ("project", Some("unenroll")) => Some((Verb::ProjectUnenroll, 2)),
             ("project", Some("disarm")) => Some((Verb::ProjectDisarm, 2)),
             ("env", Some("plan")) => Some((Verb::EnvPlan, 2)),
             ("env", Some("apply")) => Some((Verb::EnvApply, 2)),
@@ -153,6 +221,16 @@ impl Verb {
             ("run", Some("show")) => Some((Verb::RunShow, 2)),
             ("run", _) => Some((Verb::Run, 1)),
             ("accept", _) => Some((Verb::Accept, 1)),
+            ("home", Some("show")) => Some((Verb::HomeShow, 2)),
+            ("home", Some("plan")) => Some((Verb::HomePlan, 2)),
+            ("home", Some("apply")) => Some((Verb::HomeApply, 2)),
+            ("init", Some("plan")) => Some((Verb::InitPlan, 2)),
+            ("init", Some("apply")) => Some((Verb::InitApply, 2)),
+            ("migrate", Some("plan")) => Some((Verb::MigratePlan, 2)),
+            ("migrate", Some("apply")) => Some((Verb::MigrateApply, 2)),
+            ("config", Some("show")) => Some((Verb::ConfigShow, 2)),
+            ("approval", Some("grant")) => Some((Verb::ApprovalGrant, 2)),
+            ("approval", Some("show")) => Some((Verb::ApprovalShow, 2)),
             _ => None,
         }
     }
@@ -265,7 +343,13 @@ pub fn help_text(topic: &[String]) -> String {
     for v in matching {
         out.push_str(&format!("  {:<18} {}\n", v.spelling(), v.owning_spec()));
     }
-    out.push_str("\nEvery verb takes a registered target path, and every verb accepts --json.\n");
+    out.push_str(
+        "\nMost verbs take a target path, and every verb accepts --json.\n\
+         The `home` verbs read and write the product's own home and take no path.\n\
+         `init plan` and `home plan` write nothing; the matching `apply` performs it.\n\
+         Initialization stops after registering and qualifying: arming and running\n\
+         are separate explicit acts.\n",
+    );
     out
 }
 
@@ -311,6 +395,38 @@ mod tests {
     #[test]
     fn without_json_the_default_is_the_human_rendering() {
         assert!(!parse(&argv("doctor")).unwrap().json);
+    }
+
+    #[test]
+    fn the_new_groups_have_a_preview_and_a_performance_spelled_the_same_way() {
+        // `env plan` / `env apply` is the vocabulary this binary already has,
+        // so `home` and `init` and `migrate` use it rather than inventing a
+        // second spelling for the same distinction.
+        for group in ["home", "init", "migrate"] {
+            let plan = parse(&argv(&format!("{group} plan"))).unwrap();
+            let apply = parse(&argv(&format!("{group} apply"))).unwrap();
+            assert_ne!(plan.verb, apply.verb);
+            assert!(plan.verb.spelling().ends_with("plan"));
+            assert!(apply.verb.spelling().ends_with("apply"));
+        }
+    }
+
+    #[test]
+    fn every_group_names_at_least_one_verb_in_the_help() {
+        for group in Verb::GROUPS {
+            let text = help_text(&[group.to_string()]);
+            assert!(
+                !text.starts_with("no verbs match"),
+                "the help has nothing for the group `{group}`"
+            );
+        }
+    }
+
+    #[test]
+    fn a_reason_with_spaces_survives_parsing() {
+        let i = parse(&argv("approval grant /p 003-x bart reviewed the diff")).unwrap();
+        assert_eq!(i.verb, Verb::ApprovalGrant);
+        assert_eq!(i.rest, ["/p", "003-x", "bart", "reviewed", "the", "diff"]);
     }
 
     #[test]

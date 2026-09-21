@@ -54,7 +54,7 @@ SKIP_NOTE := no crate exists yet, so the workspace has no members and cargo has 
 ## `index coverage --fail-on-untraced` joined this list with the first source
 ## file, which is the condition AGENTS.md recorded for it. On a code-free tree it
 ## refused an empty universe rather than passing vacuously; now it defends
-## 13/13 specifically claimed instead of reporting the number.
+## 117/117 specifically claimed instead of reporting the number.
 ##
 ## `index check --fail-on-unresolved` joined this list when 006 built the last
 ## forward claim. Both flags the generic spec-spine kit carries are now present,

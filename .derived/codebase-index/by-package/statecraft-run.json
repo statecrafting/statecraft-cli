@@ -1,9 +1,0 @@
-{
-  "package": {
-    "kind": "rust-lib",
-    "name": "statecraft-run",
-    "path": "crates/statecraft-run"
-  },
-  "schemaVersion": "1.1.0",
-  "shardHash": "0accb6af1b881a66654fc4878a8794831606fa4f1a2571232e870608d9d8398a"
-}

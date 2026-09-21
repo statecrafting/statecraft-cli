@@ -1,0 +1,9 @@
+{
+  "package": {
+    "kind": "rust-lib",
+    "name": "statecraft-adapter",
+    "path": "crates/statecraft-adapter"
+  },
+  "schemaVersion": "1.1.0",
+  "shardHash": "f7b55c2d2a7acf4bb56c4aeee3a0c20aceed8b08eb7a398da2092a5494c7fbdf"
+}

@@ -86,7 +86,7 @@ jobs:
       # Enforced from 2026-09-16, with the first source file. On a code-free
       # tree this flag refused an empty universe rather than passing vacuously,
       # which is why it was withheld and why AGENTS.md named the condition that
-      # would bring it in. Coverage is 13/13 specifically claimed; the flag
+      # would bring it in. Coverage is 117/117 specifically claimed; the flag
       # defends that instead of reporting it.
       - name: Ownership coverage (enforced)
         run: $SS index coverage --fail-on-untraced
@@ -196,6 +196,30 @@ jobs:
         shell: bash
       - name: Show toolchain
         run: rustc --version && cargo --version
+
+      # The workspace suite asserts against the REAL governance tool: spec 010's
+      # acceptance compiles, indexes and checks a scaffolded corpus at the new
+      # derived path, and a stand-in would turn that row into a test of a
+      # stand-in. So this job installs the same pinned binary the governance job
+      # does, from the same single authored version, and caches it on the same
+      # key. `crates/statecraft-home/tests/support` prefers `.tooling/bin` and
+      # fails loudly rather than skipping when neither copy is there.
+      - name: Resolve the pinned spec-spine version
+        run: |
+          set -euo pipefail
+          v=$(sed -n 's/^required_version = "=\(.*\)"/\1/p' spec-spine.toml)
+          test -n "$v" || { echo "no required_version in spec-spine.toml"; exit 3; }
+          echo "SPEC_SPINE_VERSION=$v" >> "$GITHUB_ENV"
+      - name: Cache spec-spine
+        id: cache-spec-spine-code
+        uses: actions/cache@v4
+        with:
+          path: .tooling/bin/spec-spine
+          key: spec-spine-cli-${{ env.SPEC_SPINE_VERSION }}-${{ runner.os }}-${{ runner.arch }}
+      - name: Install the pinned spec-spine
+        if: steps.cache-spec-spine-code.outputs.cache-hit != 'true'
+        run: make tools
+
       - name: Build, test, clippy, fmt
         run: make code
 

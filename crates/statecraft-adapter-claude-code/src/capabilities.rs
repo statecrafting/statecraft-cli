@@ -1,6 +1,6 @@
 //! The five declared tokens, each against a measurement.
 //!
-//! Spec 008 section 3.2. Spec 004 section 3.2 closed the vocabulary at six
+//! Spec 004 section 3.10. Spec 004 section 3.2 closed the vocabulary at six
 //! tokens and section 3.5 case 6 makes a manifest declaring a token the adapter
 //! does not honor a qualification failure, so each declaration below names what
 //! was measured and what the measurement did not establish.
@@ -15,7 +15,7 @@
 //! | `workspace-write` | **not declared** | Not measured. Spec 004 section 3.3 makes an undeclared token a refusal when required and a recorded degradation when preferred, which is the right answer for a claim nobody checked. |
 //!
 //! Declaring `workspace-write` later is an amendment with its own measurement,
-//! and spec 008 section 4 puts it out of scope deliberately.
+//! and spec 004 section 4 puts it out of scope deliberately.
 
 use crate::stream::SystemEvent;
 use statecraft_adapter::capability::Capability;
@@ -24,7 +24,7 @@ use statecraft_adapter::manifest::Manifest;
 /// This adapter's name. Not a harness name and not a binary name.
 pub const ADAPTER_NAME: &str = "claude-code";
 
-/// The provider version every measurement in spec 008 was taken against.
+/// The provider version every provider measurement was taken against.
 ///
 /// Section 3.8: the qualification binds to the **pair** of this adapter's build
 /// and this provider version. A provider upgrade invalidates it even when this
@@ -67,7 +67,7 @@ pub fn manifest() -> Manifest {
 ///
 /// Spec 004 section 3.3 wants the init event to carry what was actually applied
 /// beside what was requested, and section 3.5.6 makes a declared-but-unapplied
-/// token a qualification failure. Section 008.3.4 measured that for this
+/// token a qualification failure. Section 3.12 measured that for this
 /// provider the init event witnesses **one** of the five directly: the tool set,
 /// and only when the restriction was expressed as removal.
 ///

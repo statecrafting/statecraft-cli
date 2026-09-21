@@ -1,8 +1,8 @@
 //! One run, from intent to outcome, and the fold that reads runs back.
 //!
-//! Added by spec `009`'s additive `extends` edge on this crate. Spec 006
+//! Added by spec `006`'s additive `extends` edge on this crate. Spec 006
 //! section 3.2 forbids a command from being a second implementation, and spec
-//! 009 section 3.5 gives that its practical form: when a verb needs something
+//! 006 section 3.11 gives that its practical form: when a verb needs something
 //! the owning library does not expose, the entry point is added **here** and the
 //! binding calls it.
 //!
@@ -40,7 +40,7 @@ use std::path::Path;
 
 /// Fold the record into every run it describes, oldest first.
 ///
-/// Spec 009 section 3.3: inspection reads **nothing else**. Not the filesystem,
+/// Spec 006 section 3.9: inspection reads **nothing else**. Not the filesystem,
 /// not the prepared worktree, not the adapter's transcript, and not memory
 /// carried from an earlier command in the same process. The parameter is a
 /// chain and there is no other one, which is how that is structural here rather
@@ -127,7 +127,7 @@ pub enum SessionError {
     Workspace(#[from] WorkspaceError),
     /// The record could not be written.
     ///
-    /// Spec 009 section 3.4: a supervisor that could not write the record is a
+    /// Spec 006 section 3.10: a supervisor that could not write the record is a
     /// **failure**, not a refusal. Neither the operator nor the target asked
     /// for it.
     #[error(transparent)]

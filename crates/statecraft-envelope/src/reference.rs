@@ -1,5 +1,5 @@
 //! The reference: preserved bytes, their digest, and the construction that
-//! produced it. Spec 007 section 3.3; statecraft-cli spec 005 section 3.7 is
+//! produced it. Spec 005 section 3.13; statecraft-cli spec 005 section 3.7 is
 //! what it must keep saying.
 //!
 //! Field names, their order and the `Construction` spellings are the ones

@@ -1,13 +1,13 @@
 //! Qualification binds to a **pair** of versions.
 //!
-//! Spec 008 section 3.8. Spec 004 section 3.4 already says an adapter binary
+//! Spec 004 section 3.16. Spec 004 section 3.4 already says an adapter binary
 //! version is qualified only by a recorded pass of the negative suite, and that
 //! an adapter with no record **runs** and is labelled `unqualified` everywhere
 //! it appears.
 //!
 //! For this adapter the record names two versions, not one: this crate's own
 //! build and the **provider** binary it was measured against. Every finding in
-//! spec 008 sections 3.1 to 3.6 is a fact about Claude Code
+//! spec 004 sections 3.9 to 3.14 is a fact about Claude Code
 //! [`crate::capabilities::MEASURED_PROVIDER_VERSION`]. A provider upgrade
 //! invalidates the qualification even when this crate is byte-identical, because
 //! what was qualified was the pair.
@@ -31,7 +31,7 @@ pub struct ProviderPair {
 }
 
 impl ProviderPair {
-    /// The pair spec 008's measurements were taken against.
+    /// The pair the provider measurements were taken against.
     pub fn measured() -> Self {
         Self {
             adapter_version: env!("CARGO_PKG_VERSION").to_string(),
@@ -75,7 +75,7 @@ pub fn record(provider_version: &str, suite_version: &str, date: &str) -> Paired
 ///
 /// Both halves must match. A record for this adapter build earned against a
 /// different provider version does **not** transfer, which is the whole content
-/// of section 3.8, and the adapter still runs: spec 008 section 3.9's last row
+/// of section 3.8, and the adapter still runs: spec 004 section 3.8's last row
 /// but one says it is labelled `unqualified` in the posture, the attempt record
 /// and the outcome, and that it still runs.
 pub fn qualification_for_pair(

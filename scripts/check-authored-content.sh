@@ -40,7 +40,7 @@ fi
 files=()
 while IFS= read -r -d '' f; do
   case "$f" in
-    .derived/*|*.png|*.jpg|*.jpeg|*.gif|*.ico|*.pdf|*.node) continue ;;
+    .statecraft/derived/*|*.png|*.jpg|*.jpeg|*.gif|*.ico|*.pdf|*.node) continue ;;
   esac
   [ -f "$f" ] || continue
   files+=("$f")

@@ -23,12 +23,17 @@ target
 # spec-spine writes wall-clock metadata here. It is the one non-deterministic
 # artifact, excluded from every determinism and golden check, so it must never
 # be committed.
-.derived/**/build-meta.json
+.statecraft/derived/**/build-meta.json
 
-# NOT ignored, deliberately: .derived/spec-registry/ and .derived/codebase-index/
-# are the committed shard trees. Committing them is what makes `spec-spine check`
-# a freshness gate on a pull request: CI compares the corpus against what the
-# branch committed.
+# NOT ignored, deliberately: .statecraft/derived/spec-registry/ and
+# .statecraft/derived/codebase-index/ are the committed shard trees. Committing
+# them is what makes `spec-spine check` a freshness gate on a pull request: CI
+# compares the corpus against what the branch committed.
+#
+# The whole of .statecraft/ is deliberately NOT ignored either (spec 010 section
+# 3.2). Ignoring it would take the declaration, the managed instructions and the
+# compiled artifacts out of version control in one line; only the runtime state
+# below is excluded.
 
 # The CLI's own runtime state inside a governed repository (spec 002). Managed
 # bytes are declared in .statecraft/environment.json, which IS committed; the
@@ -41,3 +46,6 @@ target
 # built it last, and a governed read then either refuses on the pin or, worse,
 # answers under a version this repository never adopted.
 .tooling/
+
+# JetBrains project files are per-developer, not per-repository.
+.idea/

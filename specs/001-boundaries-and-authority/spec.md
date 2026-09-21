@@ -24,7 +24,6 @@ establishes:
   - { kind: section, file: "standards/spec/constitution.md", anchor: "xii-public-claims-are-graded" }
   - { kind: section, file: "standards/spec/constitution.md", anchor: "xiii-the-local-product-owes-nothing-to-a-hosted-one" }
   - "docs/decisions/00-founding-decisions.md"
-  - "docs/design/00-boundaries-and-reuse.md"
   - "scripts/check-authored-content.sh"
 depends_on:
   - "000-bootstrap"
@@ -52,7 +51,7 @@ founding records under `docs/`.
 ## 2. Territory
 
 Constitution principles VI to XIII; `docs/decisions/00-founding-decisions.md`;
-`docs/design/00-boundaries-and-reuse.md`;
+sections 3.8 to 3.12;
 `scripts/check-authored-content.sh`.
 
 Not this spec's territory: the corpus contract (`000`), the environment
@@ -73,7 +72,7 @@ outcome. It works on one machine, on one repository, with no account.
 | Capability | Owner | This product's relationship |
 |---|---|---|
 | Specification semantics, compilation, ownership analysis, freshness, verification contracts | spec-spine | Consumer of its supported commands and **its structured reports**. Never a second compiler, and never an ad-hoc read of `.derived/`. |
-| Application knowledge, recall, coordination semantics | aicortex | No dependency in the first slice. `005` places the interface out of scope; the narrow, optional, one-way boundary it would be is described in `docs/design/00-boundaries-and-reuse.md` section 5, and implemented by neither side. |
+| Application knowledge, recall, coordination semantics | aicortex | No dependency in the first slice. `005` places the interface out of scope; the narrow, optional, one-way boundary it would be is described in section 3.12, and implemented by neither side. |
 | Service chassis, identity, persistent cell enforcement | Rahi | Not a required local daemon, not a process sandbox, not a desktop framework. A future hosted backend consumes explicit contracts from this product. |
 | Ordered pure checks and decision composition | action-gate | Adapted at the boundary: this product supplies the required checks and the deny-by-default ceiling, because the library's own fallthrough is allow. |
 | Hash-linked records, signing, verification | attest-ledger | Reused for the record envelope. Durability, crash recovery, and independently supplied issuer trust stay here. |
@@ -84,7 +83,7 @@ outcome. It works on one machine, on one repository, with no account.
 
 A shared name is not a shared semantic. Before any new shared mechanism is
 designed here, its disposition is recorded in
-`docs/design/00-boundaries-and-reuse.md` as one of: **reuse**, **extend the
+section 3.8 as one of: **reuse**, **extend the
 owner**, **adapt at the boundary**, **recover from archive**, or **new, with a
 stated mismatch**.
 
@@ -110,6 +109,7 @@ age:
 | 2026-09-16 | `000` to `005` specified. `002` additionally **implemented and tested within its own territory**, the evidence being `crates/statecraft-environment/`, 59 tests, and one integration test per row of `002` section 3.10 named after the row it covers. Nothing released; `F-02` defers publication. |
 | 2026-09-16 | `000` to `006` specified. `002` to `005` additionally **implemented and tested within their own territories**: four crates, 221 tests, and one integration test per row of each spec's observable-negative-cases table, named after the row it covers. `006` is ratified and not yet implemented, so the product is still not runnable. Nothing released. |
 | 2026-09-17 | `000` to `007` specified and approved. `002` to `007` additionally **implemented and tested within their own territories**: six crates, 320 tests, and 73 of 73 source files specifically claimed. For `002` to `006` the evidence is one integration test per row of each spec's observable-negative-cases table, named after the row it covers; `007` has no such table, and its acceptance is the compatibility suite of its section 3.4, which runs from two crates of this workspace, `statecraft-envelope` and `statecraft-acceptance`, and fails on each independently. That is a check within one implementation and not parity between two, so it claims nothing about a second reader. `006` is now implemented, so the product **is runnable as `statecraft-cli`**; what its verbs do is still bounded by the territories above. Nothing released; `F-02` defers publication and `crates/statecraft-envelope/` stays `publish = false`. |
+| 2026-09-21 | Seven specs, `000` to `006`, all specified and approved, after four pairs were consolidated into the spec that held each subject first. `002` to `006` additionally **implemented and tested**: eight crates, 683 tests, 117 of 117 source files specifically claimed, and 27 verbs bound in the binary. Measured with `make status`, `cargo test --workspace`, `spec-spine index coverage` and `statecraft-cli --help` on 2026-09-21. The consolidation changed no requirement and merged no crate, so no grade moves because of it. Nothing released; `F-02` defers publication and `crates/statecraft-envelope/` stays `publish = false`. |
 
 Each row is narrower than "the spec is implemented". The commands `002` to `005`
 name are not bound to a process by those crates, so the grade they claim is
@@ -173,7 +173,7 @@ These are mechanical and checked by `scripts/check-authored-content.sh`:
    review or release note, contains an agent-session URL or a session-tracking
    trailer, and none substitutes another tracking link.
 3. `LICENSE` and any `NOTICE` are preserved. Recovering behavior from an
-   archived component does not relicense it: `docs/design/00-boundaries-and-reuse.md`
+   archived component does not relicense it: section 3.9
    records each source's license, and an AGPL source's *behavior and fixtures*
    may be reimplemented from a written description, while its code may not be
    copied into this Apache-2.0 tree.
@@ -188,6 +188,192 @@ These are mechanical and checked by `scripts/check-authored-content.sh`:
 | A design proposes a new shared mechanism with no disposition row | Refused: 3.2 requires the row, including the mismatch that justifies `new`. |
 | A candidate's diff touches the authority set and the run accepts it on its own suite | Violates 3.5.2; `005` is where the mechanism lives. |
 | A verb is added in Mode A that has no Mode B equivalent | Refused: 3.4 makes Mode B the supervisor, and a Mode-A-only verb has no supervisor to record its outcome. |
+
+### 3.8 The reuse dispositions, the archive, the slice, and the later interfaces
+
+Sections 3.8 to 3.12 are the design record section 3.2 requires, folded in from
+`docs/design/00-boundaries-and-reuse.md`, which was prepared 2026-09-16 and is
+deleted by the change that folds it. Nothing in it is revised on the way in: a
+disposition is a decision and moving one is the owner's act, not a consequence
+of a build or of a file moving.
+
+Two of its dated notes are kept as the dated statements they are. As prepared it
+read "nothing here is implemented, and no dependency declared below exists in
+any manifest, because no manifest exists", which described 2026-09-16 and stopped
+being true. Corrected 2026-09-19: a Cargo workspace exists, and one row below has
+moved from a proposal to a declared dependency, `attest-ledger-core`, pinned to
+`a9c3595` in `crates/statecraft-run/Cargo.toml` and used by `src/record.rs`. The
+distinction the tables keep apart is unchanged: a dependency this product would
+take on a component that is implemented today, against an interface this product
+proposes and neither side has built.
+
+#### Component owners, and what this product's relationship actually is
+
+| Component | State today | This product's relationship | Kind |
+|---|---|---|---|
+| spec-spine 0.20.0 | Implemented, released, installed locally at `.tooling/bin` | Invokes its supported commands, parses its structured reports | **actual dependency**, on a released binary |
+| `attest-ledger` 0.1.0 | Implemented, Apache-2.0 | Record envelope, chain hashing, verification | **actual dependency** as of 2026-09-19: `attest-ledger-core`, pinned to `a9c3595` in `crates/statecraft-run`. The disposition it was adopted under is the **reuse** row below. |
+| `canonical-keysort-json` 0.1.0 | Implemented, Apache-2.0, Rust only | Canonical serialization at the hashing boundary | **proposed reuse** |
+| `action-gate` 0.1.0 | Implemented, Apache-2.0 | Check composition only, with required checks and the deny ceiling supplied here | **proposed adaptation at the boundary** |
+| Rahi | Implemented locally, not released | None. Not a local daemon, not a sandbox, not a UI framework | **no dependency**; a future hosted backend consumes contracts this product publishes |
+| aicortex | Design plus a local bootstrap; no coordination runtime | None in the first slice | **proposed interface**, built by neither side |
+| `trust-window` 0.1.0 | Implemented, Apache-2.0 | None | **deferred**, no consumer (F-05) |
+| `fact-fold` | Implemented, TypeScript, private | None | **not this product's concern** |
+| `tenant-emit`, `tenant-tail` | Implemented, released, tied to the retired factory model | None | **assessed, not adopted** (F-11) |
+| Chancery `kernel-addon` | Implemented Rust kernel, Apache-2.0, product parked | None | **donor of lessons only** |
+| `governance-native` `portable.rs` | Implemented, **AGPL-3.0** | Behavior and fixtures may be reimplemented from description; code may not be copied here | **recover behavior from archive**, not code |
+| Archived predecessor CLI | 76 specs, partly implemented, history preserved | Source of measured failures, contracts and fixtures | **recover from archive**, selectively |
+
+#### The dispositions, stated as section 3.2 requires
+
+Each row below is the record that mechanism needs before anything is designed
+here. A shared name is not evidence of a shared semantic, and a mismatch is
+stated rather than implied.
+
+| Mechanism | Disposition | Reason, and the concrete mismatch where one exists |
+|---|---|---|
+| Hash-linked record envelope | **reuse** `attest-ledger` | It owns the construction. Durability (fsync before acknowledge), an O(1) append, crash-torn-tail recovery and independently supplied issuer trust are **not** in it and stay here. Its anchor verifier trusts the key the anchor carries (C-08), which cannot satisfy spec 005 section 3.6, so trust roots are supplied by this product. |
+| Canonical JSON bytes | **reuse** `canonical-keysort-json` | It exists to stop `serde_json`'s `preserve_order` from silently changing the bytes a hash is computed over. |
+| Strict portable-input validation | **recover behavior from archive**, new code | `canonical-keysort-json` sorts keys; it does not reject duplicate keys, non-integer numeric tokens, out-of-range integers or invalid encoding. `governance-native`'s `portable.rs` does, including rejecting `-0`, and is AGPL-3.0 (C-09). Recover the described behavior and the golden cases; write the code here. |
+| Ordered check composition | **adapt at the boundary** `action-gate` | Its evaluator returns the first decision and otherwise **allows**, including over an empty registry (C-07). A deny-by-default acceptance cannot be built by trusting that fallthrough, so this product supplies the required-check set and the permission ceiling, and enforcement stays outside the library. |
+| Run state, supervision, outcomes, recovery | **new** | No owner exists. `action-gate` composes pure checks and enforces no effect; Rahi enforces cells, not local child processes. |
+| Execution adapter protocol and capability tokens | **new**, shaped by the archive | The predecessor's specs 043, 114, 116, 120 and 124 reached this shape; the code is TypeScript and Rust in a retired tree. Recover the protocol shape and the negative table; write the code here. |
+| Acceptance receipt | **new**, semantics inherited | The four dimensions and the byte-reference rule are inherited (C-13, D-07). The receipt binding repository, base, candidate, suite, exit codes and policy digest is this product's. |
+| Legacy certificate emission and verification | **assessed, not adopted** | `tenant-emit` and `tenant-tail` are real and independently usable, and their inputs are the retired factory's run-directory and stage layout (C-14). Forcing this product's outcome into that layout to reuse a package would shape the product around a retired factory. Reopened by a mapping from a real outcome, not by their availability. |
+| Knowledge, recall, temporal facts | **not ours** | aicortex owns application knowledge; `fact-fold` is a candidate for its graph storage. Building either here would be the second generic memory store I-08 refuses. |
+| Autonomy scoring | **deferred** | `trust-window` is available and has no consumer here. Introducing adaptive autonomy in a first slice to justify a dependency is the wrong order. |
+
+### 3.9 What the archive is used for, and what it is not
+
+The predecessor is evidence, not a template. Three specific things are worth
+recovering, and were read for this design:
+
+1. **Measured failures** (C-11). A foreign-origin browser POST reached a
+   loopback API with no `Origin` or `Host` check and disarmed a fixture project.
+   A fabricated token in the supervisor's environment reached the gate suite,
+   repository hooks and the publishing path. A driven session could publish
+   around the supervisor through a keyring-authenticated `gh` or plain SSH.
+   These are why constitution VIII and IX are worded as enforcement rather than
+   intent, and why spec 004 constructs the child environment instead of filtering
+   it.
+2. **Contracts that were paid for.** The adapter seam's three parts, the closed
+   capability vocabulary, the negative conformance table, the five outcome names,
+   the intent/outcome bracket, and the three names for absence. Each cost a spec
+   and a correction in the predecessor.
+3. **Ordering lessons.** The predecessor packaged members before the seam existed
+   and performed the surgery afterwards (its spec 043 on its spec 042). It drove
+   every session with permissions bypassed at one hardcoded call site until its
+   spec 032 made posture explicit registry state. It journaled a null model for
+   44 sessions before its spec 040 made the model a chosen, recorded fact. This
+   corpus puts the seam, the posture and the record first.
+
+What is **not** recovered: the hosted control-plane client and its verbs, the MCP
+face, the multi-project scheduler and standby daemon, the web UI, corpus
+synthesis and holdback validation, quota and cost machinery, and the export and
+attestation bundle formats. Each is either deferred by name in the decision
+record or belongs to a hosted decision that has not been made.
+
+Licenses are preserved as found. An AGPL-3.0 source contributes a written
+description of behavior and its golden cases to this Apache-2.0 tree, never its
+code.
+
+### 3.10 The two interaction modes, drawn out
+
+```
+Mode A: the agent invokes this product
+  agent session ──calls──> statecraft verbs ──> reads spec-spine, prepares, reports
+  The agent is the supervisor of itself. A refusal it does not report is invisible.
+  Constitution IX cannot be satisfied: there is no second party holding the record.
+
+Mode B: this product supervises the agent          <-- built first (D-05)
+  operator ──> statecraft ──spawns──> adapter ──spawns──> agent process
+                    │                    │
+                    │<───event stream────┘   refusals counted HERE
+                    └── run record, outcome, independent acceptance
+  The supervisor owns the environment, the deadline, the event stream and the verdict.
+```
+
+Mode A is served afterwards by the same verbs: every verb specs 002 to 005
+define emits machine-readable output, so an agent calling them is a consumer of
+the Mode B surface rather than a second product. What Mode A can never supply is
+a supervisor, which is why it is second and not first.
+
+### 3.11 The bounded first vertical slice
+
+One repository, one work item, one adapter, one isolated workspace, one
+independent inspection, one reviewable outcome. **Publication is not part of it**
+(F-02).
+
+| Step | Verb (proposed) | Spec | What must be observably true |
+|---|---|---|---|
+| 1 | `statecraft project register <path>` | 002 | A qualification verdict with reasons is recorded. Nothing is written inside the target. A non-git path is `unqualified`; a corpus-less repository is `ungoverned`. |
+| 2 | `statecraft env plan` then `env apply` | 002 | Managed bytes are written and recorded in a committed manifest with source and digest. A pre-existing user instruction file is left untouched and reported `foreign`. A second run is a no-op. |
+| 3 | `statecraft work list` | 003 | The ready set comes from spec-spine's structured report, with the field each row came from named. A target whose corpus does not compile refuses, rather than reading `.derived/` directly. |
+| 4 | `statecraft run start --spec NNN` | 003, 004 | An isolated worktree is prepared from a recorded base commit; the operator's checkout is untouched. One adapter session runs under a constructed environment. Refusals are counted by the supervisor from the event stream. The attempt ends in exactly one of the five outcomes. |
+| 5 | `statecraft accept --run <id>` | 005 | The suite runs from instructions read **at the base**, over the candidate sha. A receipt is minted only on a clean tree with an unmoved HEAD. A candidate touching the authority set is reported as an authority change and is not accepted on its own suite. |
+| 6 | `statecraft run show <id>` | 005 | One account folded from the records, every value naming its record, the claim beside the independent result, each evidence dimension separately, and absence named as `none`, `not-recorded` or `stale`. |
+
+**Verbs as bound, clarified 2026-09-19.** The column above is headed *proposed*
+and stays as written: it is what was proposed on 2026-09-16, and the steps and
+their observable requirements are unchanged. What the binary spells is not what
+the proposal spelled, so the two are reconciled here rather than by editing the
+table. Every verb takes the target path first and accepts `--json`.
+
+| Step | Proposed | Bound today |
+|---|---|---|
+| 1 | `statecraft project register <path>` | `project register <path>`, unchanged. A consent step joined it: `project arm <path>`, which step 4 now requires. |
+| 2 | `statecraft env plan` then `env apply` | `env plan <path>` then `env apply <path>` |
+| 3 | `statecraft work list` | `work list <path>` |
+| 4 | `statecraft run start --spec NNN` | `run <path> <spec-id>`. No `start` subverb and no `--spec` flag: the spec id is positional, and it is also the run id, because spec `003` section 3.4 makes a retry an appended attempt of the same run. `run` refuses (2) a registered target that is not armed. |
+| 5 | `statecraft accept --run <id>` | `accept <path> <run-id>` |
+| 6 | `statecraft run show <id>` | `run show <path> <run-id>` |
+
+Spec `006` owns the surface and spec `009` bound steps 3 to 6. Nothing in the
+right-hand column revises what the step must make observably true, and the
+acceptance below is untouched.
+
+#### The slice's acceptance, stated as refusals
+
+The slice is done when these hold, each demonstrable rather than asserted:
+
+1. An adapter that reports success while the suite fails produces **no receipt**,
+   and the report is retained in a field named for a claim.
+2. An adapter that emits refusal events and exits **zero** produces an attempt
+   whose outcome is `refused`.
+3. A required capability the adapter's manifest lacks refuses **before any
+   process is spawned**.
+4. A candidate whose diff touches the authority set is reported as an authority
+   change even when its own suite passes.
+5. Killing the supervisor mid-attempt leaves an intent with no outcome; the next
+   start reconciles it and reports `unknown` where it cannot tell, and does not
+   retry that effect.
+6. `env remove` removes every matching managed byte, leaves a drifted one with a
+   report, and leaves no other byte changed.
+7. Every signature reads `unsigned` and every issuer `unknown`, because nothing is
+   signed, and the outcome says so rather than omitting the fields.
+
+#### What the slice deliberately does not prove
+
+That the environment is safe against hostile code. Spec 004 section 3.6 names
+three residuals it does not close, and closing them needs an operating-system
+mechanism deferred as F-09. The slice proves the record is **complete** through
+the supervisor's path, which is a different and smaller claim.
+
+### 3.12 Interfaces this product would publish later
+
+Named so a future consumer has something to consume, and implemented by nothing.
+
+- **To a hosted backend.** The run record's envelope, the receipt, and the four
+  evidence dimensions with admission kept apart. A hosted service would admit or
+  refuse a receipt under its own policy, supplying its own trust roots. It never
+  becomes a precondition for the local product (constitution XIII).
+- **To aicortex.** One-way, least-privilege, journal-derived: an outcome summary
+  a publisher could hand over after a run closed. It carries no credential, no
+  grant and no live claim, and repository files stay readable without it.
+- **To an independent verifier.** The preserved evidence bytes, their typed
+  digests with named constructions, and a report that separates integrity,
+  signature, issuer trust and subject binding. A verifier never executes what the
+  evidence carries and never takes the evidence's own anchor as a trust root.
 
 ## 4. Out of scope
 
@@ -214,7 +400,7 @@ it.
 
 | Corrected claim | Where it stood | The measurement |
 |---|---|---|
-| "no dependency declared below exists in any manifest, because no manifest exists" | `docs/design/00-boundaries-and-reuse.md`, status line | A Cargo workspace with seven member crates exists, and `crates/statecraft-run/Cargo.toml` declares `attest-ledger-core` pinned to `a9c3595`, used by `src/record.rs`. |
+| "no dependency declared below exists in any manifest, because no manifest exists" | the design record now folded in as section 3.8, status line | A Cargo workspace with seven member crates exists, and `crates/statecraft-run/Cargo.toml` declares `attest-ledger-core` pinned to `a9c3595`, used by `src/record.rs`. |
 | `attest-ledger` listed as **proposed reuse** | same file, section 1 table | Same measurement: it is an actual dependency. The **reuse** disposition it was adopted under is unchanged. |
 | "specs `008` and `009` are drafts", supporting deferral `F-10` | `docs/decisions/00-founding-decisions.md`, section 4 | `spec-spine registry list` reports both `approved` with `implementation: complete`. `F-10` stays deferred: whether the single-repository loop works is the owner's judgment, not a status field. |
 | "one row of section 3 is adopted in part" | same file, adoption-status line | Section 5 of that file already records `D-03` adopted in full and `D-01` and `D-02` adopted for language and layout. The line is restated to match section 5, which stays the only place a row becomes binding. |
@@ -243,7 +429,6 @@ implemented.
 
 ```verify:cli
 test -f docs/decisions/00-founding-decisions.md
-test -f docs/design/00-boundaries-and-reuse.md
 test -x scripts/check-authored-content.sh
 scripts/check-authored-content.sh
 grep -qF 'XII. Public claims are graded' standards/spec/constitution.md

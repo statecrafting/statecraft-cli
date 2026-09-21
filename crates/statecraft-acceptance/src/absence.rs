@@ -9,7 +9,7 @@
 //!
 //! [`Absence`] and [`Recorded`] are defined in `statecraft-envelope` and
 //! re-exported here, so the name a reader of this crate uses is unchanged.
-//! Spec 007 moved them because the platform reads and writes the same bytes: a
+//! Spec 005 moved them because the platform reads and writes the same bytes: a
 //! second definition of a wire type is a second answer to the same question,
 //! and the two answers had already diverged on how `"not-recorded"` reads.
 //!
@@ -123,7 +123,7 @@ mod tests {
 
     #[test]
     fn a_harness_revision_named_after_an_absence_is_refused_rather_than_written() {
-        // The collision spec 007 closes, at the field that motivated the type.
+        // The collision spec 005 closes, at the field that motivated the type.
         assert!(Recorded::<String>::present("not-recorded".into()).is_err());
         assert!(Recorded::<String>::present("harness-2026.09".into()).is_ok());
     }

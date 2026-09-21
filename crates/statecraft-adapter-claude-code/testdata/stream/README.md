@@ -2,11 +2,11 @@
 
 Captured from **Claude Code 2.1.267 on darwin, on 2026-09-17**, in a scratch git
 work tree, with `claude --print --output-format stream-json --verbose`. These are
-the measurement behind spec 008 sections 3.1 to 3.5, committed.
+the measurement behind spec 004 sections 3.9 to 3.13, committed.
 
 **A fixture is evidence of what the provider emitted on a named version. It is
 not evidence that the provider still emits it**, and nothing in this crate claims
-otherwise. Spec 008's `## Verification` block says why the acceptance checks the
+otherwise. Spec 004's `## Verification` block says why the acceptance checks the
 mapping against these bytes rather than spawning the provider: section 3.6
 measured that this provider resolves credentials through the operating-system
 keychain, which no check runner has, and spec 005 section 3.2 rule 3 makes a
@@ -26,7 +26,7 @@ with `Bash` absent under removal. The count going up when a tool is removed is
 what the provider did; it is recorded rather than tidied.
 
 `api-error.jsonl` was captured on the same date and the same provider version,
-under the environment spec 008 section 3.6 describes: a child given `PATH` alone
+under the environment spec 004 section 3.14 describes: a child given `PATH` alone
 cannot reach the operating-system keychain, so the provider terminated
 unauthenticated. The authentication is the *cause* and not the finding. What the
 fixture records is the **shape** every API-side error of this provider arrives
@@ -56,7 +56,7 @@ public repository and the operator's machine is not part of the measurement:
   **preserve the counts**, except the tool names the measurements rest on
   (`Bash`, `Read`, `Edit`, `Write`, `Glob`, `Grep`, `Task`), which are verbatim.
 
-Everything else is verbatim, including every field spec 008 sections 3.1 to 3.5
+Everything else is verbatim, including every field spec 004 sections 3.9 to 3.13
 rest on: `claude_code_version`, `model`, `permissionMode`, `apiKeySource`,
 `subtype`, `is_error`, `terminal_reason`, `stop_reason`, `num_turns`,
 `total_cost_usd`, `usage`, `modelUsage` and `permission_denials`.

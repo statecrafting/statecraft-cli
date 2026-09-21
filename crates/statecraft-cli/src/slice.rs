@@ -1,8 +1,8 @@
-//! The bindings spec `009` adds: `work`, `run`, `accept`.
+//! The `work`, `run` and `accept` bindings.
 //!
-//! Added by spec 009's additive `extends` edge on this crate. Same rule as
+//! Added by spec 006's additive `extends` edge on this crate. Same rule as
 //! [`crate::bind`]: arguments in, **one** library operation, a value out, an exit
-//! code. Spec 009 section 3.5 sharpens it for this slice: where a verb needed
+//! code. Spec 006 section 3.11 sharpens it for this slice: where a verb needed
 //! something the owning library did not expose, the entry point was added
 //! **there** (`statecraft_run::session`, `statecraft_run::work::Eligibility`,
 //! `statecraft_acceptance::suite`) and these functions call it.
@@ -53,7 +53,7 @@ pub struct WorkRowView {
     pub status: String,
     /// **Which report field this row came from.**
     ///
-    /// Spec 009 section 3.2 rule 1: a reader must never have to guess whether
+    /// Spec 006 section 3.8 rule 1: a reader must never have to guess whether
     /// `ready` and `status` came from one answer. They did not, so every row
     /// says where each half came from.
     pub from_field: String,
@@ -114,7 +114,7 @@ impl WorkListView {
 
 /// `work list <path>`
 ///
-/// Spec 009 section 3.4: an empty ready set is **0**. It is an answer to a
+/// Spec 006 section 3.10: an empty ready set is **0**. It is an answer to a
 /// question that was asked and answered, not a finding.
 pub fn work_list_answer(list: WorkList) -> Answer<WorkListView> {
     let view = WorkListView::of(&list);
@@ -154,7 +154,7 @@ pub fn work_list_answer(list: WorkList) -> Answer<WorkListView> {
 
 /// `work show <path> <id>`
 ///
-/// Spec 009 section 3.4: a spec excluded by spec 003 section 3.1.1 is **1**. The
+/// Spec 006 section 3.10: a spec excluded by spec 003 section 3.1.1 is **1**. The
 /// reason is the answer, and it is not a failure.
 pub fn work_show_answer(eligibility: Eligibility) -> Answer<Eligibility> {
     let exit = if eligibility.schedulable() {
@@ -168,7 +168,7 @@ pub fn work_show_answer(eligibility: Eligibility) -> Answer<Eligibility> {
 
 /// A report gap, mapped.
 ///
-/// Spec 009 section 3.4 and spec 003 section 3.8: a report lacking a field a
+/// Spec 006 section 3.10 and spec 003 section 3.8: a report lacking a field a
 /// verb needs is **2**, naming the field and the spec-spine version. Never a
 /// locally derived substitute, and nothing was done.
 pub fn report_error_answer(e: &ReportError) -> Answer<String> {
@@ -228,7 +228,7 @@ impl ConcludedView {
 
 /// `run <path> <id>`
 ///
-/// Spec 009 section 3.4, stated twice there and once more here: **0 means the
+/// Spec 006 section 3.10, stated twice there and once more here: **0 means the
 /// attempt reached its own end, and carries no acceptance claim whatever.** A
 /// caller that wants an acceptance runs `accept` and reads its code.
 pub fn run_answer(concluded: Concluded) -> Answer<ConcludedView> {
@@ -324,7 +324,7 @@ pub struct AttemptRowView {
 
 /// `run list <path>`
 ///
-/// A fold of the record and nothing else (spec 009 section 3.3). An empty
+/// A fold of the record and nothing else (spec 006 section 3.9). An empty
 /// register of runs is 0, for the same reason an empty ready set is.
 pub fn run_list_answer(runs: Vec<Run>) -> Answer<RunListView> {
     let view = RunListView {
@@ -384,7 +384,7 @@ pub fn no_such_run_answer(run_id: &str) -> Answer<String> {
 
 /// `accept <path> <run>`
 ///
-/// Spec 009 section 3.4, four rows at once. **Every unsuccessful answer is a
+/// Spec 006 section 3.10, four rows at once. **Every unsuccessful answer is a
 /// finding, not a failure and not a silent zero**, except the one precondition
 /// that stopped the operation before it judged anything:
 ///

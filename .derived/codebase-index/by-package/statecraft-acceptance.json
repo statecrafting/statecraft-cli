@@ -1,9 +1,0 @@
-{
-  "package": {
-    "kind": "rust-lib",
-    "name": "statecraft-acceptance",
-    "path": "crates/statecraft-acceptance"
-  },
-  "schemaVersion": "1.1.0",
-  "shardHash": "ff922794232521675cd2e0d06f4de14308f32d4aaea8f8de19c5018a55ffad1c"
-}

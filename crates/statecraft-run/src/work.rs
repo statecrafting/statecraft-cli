@@ -68,7 +68,7 @@ impl WorkList {
 
 /// What `work show` found for one spec id.
 ///
-/// Added by spec 009's additive edge. Spec 009 section 3.5 forbids the CLI crate
+/// Added by spec 006's additive edge. Spec 006 section 3.11 forbids the CLI crate
 /// from deriving an answer an owning crate could have returned, and "is this
 /// spec eligible, and if not why" is exactly such an answer: [`WorkList`]
 /// already holds both halves, so the lookup belongs beside them.

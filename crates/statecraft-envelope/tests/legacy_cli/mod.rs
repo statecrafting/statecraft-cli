@@ -4,7 +4,7 @@
 //! # Why a second copy of types this repository just finished de-duplicating
 //!
 //! The fixtures under `testdata/fixtures/cli/` were emitted by
-//! `statecraft-acceptance` at `8f6591f`, the commit before spec 007. That crate
+//! `statecraft-acceptance` at `8f6591f`, the commit before the transfer. That crate
 //! now re-exports this one, so asking it to re-emit them would be asking the
 //! shared types whether they agree with themselves: a test that cannot fail and
 //! therefore cannot be evidence.
@@ -20,7 +20,7 @@
 //! **They are never edited to make a test pass.** They are what the CLI wrote.
 //! A disagreement between this encoder and the shared types is a compatibility
 //! break to be decided, not a transcription to be corrected. The one exception
-//! is the ambiguity spec 007 closed, which is recorded in `legacy_collision`
+//! is the ambiguity spec 005 closed, which is recorded in `legacy_collision`
 //! below and asserted as a known, named difference.
 
 #![allow(dead_code)]
@@ -37,9 +37,9 @@ pub enum Absence {
     Stale,
 }
 
-/// The pre-007 `Recorded<T>`: untagged, `Present` declared **first**. For
+/// The pre-transfer `Recorded<T>`: untagged, `Present` declared **first**. For
 /// `T = String` this is the reader that takes `"not-recorded"` as a present
-/// string, which is the divergence spec 007 resolved.
+/// string, which is the divergence spec 005 resolved.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case", untagged)]
 pub enum Recorded<T> {
@@ -194,7 +194,7 @@ fn receipt(harness_revision: Recorded<String>) -> Receipt {
     }
 }
 
-/// Every fixture, by file name, as the pre-007 CLI serializer writes it.
+/// Every fixture, by file name, as the pre-transfer CLI serializer writes it.
 ///
 /// The case list is the one that produced the committed files, run against the
 /// live `statecraft-acceptance` at `8f6591f`.
@@ -309,7 +309,7 @@ pub fn fixtures() -> Vec<(&'static str, String)> {
 }
 
 /// The one value this encoder can write that the shared types refuse: a
-/// **present** string equal to a reserved absence word. The pre-007 CLI had
+/// **present** string equal to a reserved absence word. The pre-transfer CLI had
 /// nothing to stop it, and the bytes it produces are indistinguishable from
 /// the absence's.
 pub fn legacy_collision() -> Recorded<String> {

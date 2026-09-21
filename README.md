@@ -8,43 +8,52 @@ It runs on one machine, on one repository, with no account and no hosted service
 
 ## Status: specified, implemented and tested, not released
 
-Every verb the specs name is bound. There are fifteen, and
+Every verb the specs name is bound. There are twenty-seven, and
 `cargo run -p statecraft-cli -- --help` prints each one beside the spec it
 answers to:
 
 ```
 project register   project list   project arm   project disarm
+project enroll   project unenroll
 env plan   env apply   env upgrade   env remove   doctor
 work list   work show   run   run list   run show   accept
+home show   home plan   home apply
+init plan   init apply   migrate plan   migrate apply
+config show   approval grant   approval show
 ```
 
-Measured on 2026-09-19: ten specs, `000` to `009`, all `approved`;
-`.tooling/bin/spec-spine registry plan` reports nothing schedulable; seven
-crates and one binary; `cargo test --workspace` passes **515 tests**, none
-ignored. Every spec that claims code has built it, and no forward claim is
-outstanding.
+Measured on 2026-09-21: seven specs, `000` to `006`, all `approved`. Eight
+crates and one binary; `cargo test --workspace` passes **683 tests**, none
+ignored; `spec-spine index coverage` reports 117 of 117 source files
+specifically claimed. Every spec that claims code has built it, and no forward
+claim is outstanding.
 
-`000` to `007` were ratified between 2026-09-16 and 2026-09-17, and the
+Seven specs and eight crates, because **a spec may own more than one crate**.
+The corpus was eleven specs until 2026-09-21, when four pairs that each
+described one subject across two documents were consolidated: the work, run and
+accept bindings into `006`, the shared evidence envelope into `005`, the first
+provider adapter into `004`, and the managed environment into `002`. No crate
+was merged, renamed or deleted and no requirement changed; `D-02` is amended to
+match, and a crate still has exactly one owning spec.
+
+`000` to `006` were ratified between 2026-09-16 and 2026-09-21, and the
 constitution's product principles VI to XIII were ratified on 2026-09-16, three
-of them frozen as spec `000` anchors. `008-first-provider-adapter` and
-`009-work-run-accept-integration` are `approved` and implemented: `008` names
-the first provider adapter and what its stream can and cannot witness, and `009`
-binds `work`, `run` and `accept` to a process.
+of them frozen as spec `000` anchors.
 
 Nothing is installed or released: the workspace is at version `0.0.0` with
 `publish = false`, and `F-02` defers publication of any kind. The way to run it
 is from a checkout.
 
-The language and the layout are decided: Rust, one Cargo workspace, crates
-matching the spec boundaries. The packaging, the distribution and the binary's
+The language and the layout are decided: Rust, one Cargo workspace, one owning
+spec per crate. The packaging, the distribution and the binary's
 name are still **recommendations awaiting the owner's decision**, recorded with
 what has been adopted in
 [docs/decisions/00-founding-decisions.md](docs/decisions/00-founding-decisions.md).
 
 This repository distinguishes four claims and makes them separately: *specified*,
-*implemented*, *tested*, *released*. Today `000` to `009` are specified, and
-`002` to `009` are additionally implemented and tested: seven crates and 515
-passing tests, from `cargo test --workspace` on 2026-09-19. The
+*implemented*, *tested*, *released*. Today `000` to `006` are specified and
+approved; `002` to `006` are additionally implemented and tested: eight crates
+and 683 passing tests, from `cargo test --workspace` on 2026-09-21. The
 machine-checkable rows of each spec's observable-negative-cases table are
 carried by tests named after them; the rows those tables state as refused in
 review are review obligations, and no test is claimed for them. **Nothing is
@@ -89,7 +98,7 @@ It does not own, and will not reimplement:
 
 The reasoning, the actual-versus-proposed dependency split and the reuse
 dispositions are in
-[docs/design/00-boundaries-and-reuse.md](docs/design/00-boundaries-and-reuse.md).
+[spec 001](specs/001-boundaries-and-authority/spec.md), sections 3.8 to 3.12.
 
 Deliberately deferred, by name rather than by omission: hosted platform
 selection, publication of any kind, signing and key custody, any user interface,
@@ -124,7 +133,7 @@ cargo run -p statecraft-cli -- run show         <path> <run-id>   # one account,
 |---|---|---|
 | A **registered** target | every verb except `project register` and `project list` | Refused (2), naming the path. |
 | An **armed** target | `run`, and only `run` | Refused (2), naming `project arm <path>`. Discovery and inspection read an unarmed target, which is what registering one is for. |
-| A bare `spec-spine` resolvable on this process's `PATH`, and a corpus in the target that compiles | `work list`, `work show`, `run` | A finding (1) naming the target and what spec-spine said. Readiness is read from `registry plan` and `registry list`, never computed here and never read from `.derived/`. The binary invoked is whatever `spec-spine` resolves to, not this repository's pinned `.tooling/bin` copy. |
+| A bare `spec-spine` resolvable on this process's `PATH`, and a corpus in the target that compiles | `work list`, `work show`, `run` | A finding (1) naming the target and what spec-spine said. Readiness is read from `registry plan` and `registry list`, never computed here and never read from `.statecraft/derived/`. The binary invoked is whatever `spec-spine` resolves to, not this repository's pinned `.tooling/bin` copy. |
 | The provider adapter's three prerequisites: a resolvable `claude` executable, the credential path, and a **qualification record** for the pair (this adapter's build, that provider version) under `<product home>/qualifications.json` | `env plan`, `env apply`, `env upgrade`, `doctor` | The adapter **refuses to claim its paths and names which one is absent**, and `doctor` reports the finding. `env apply` still runs: it reports `applied: 0 path(s) written` and exits 0, writing **no managed byte** while still creating the manifest at `.statecraft/environment.json` with the pins and an empty `entries` list. The withheld managed paths and the recorded pins are two different writes, and only the first is withheld. A missing record does not stop `run` either: an unqualified adapter still runs, and is labelled `unqualified` in the posture, the attempt record and the outcome. |
 
 The product's own state lives outside every target, at `$STATECRAFT_HOME` or
@@ -132,8 +141,8 @@ The product's own state lives outside every target, at `$STATECRAFT_HOME` or
 inside the repository it registers.
 
 What the slice must make observably true, stated as refusals rather than as
-assertions, is section 4 of
-[docs/design/00-boundaries-and-reuse.md](docs/design/00-boundaries-and-reuse.md#4-the-bounded-first-vertical-slice).
+assertions, is
+[spec 001](specs/001-boundaries-and-authority/spec.md) section 3.11.
 
 ### The exit codes a caller scripts against
 
@@ -146,7 +155,7 @@ and a test keeps the set closed.
 
 Governed by [spec-spine](https://github.com/statecrafting/spec-spine), pinned to
 **0.20.0** exactly in `spec-spine.toml`. Specs are the source of truth; the
-derived shards under `.derived/` are compiler output, committed, and read only
+derived shards under `.statecraft/derived/` are compiler output, committed, and read only
 through `spec-spine` subcommands.
 
 The binary is installed **into this repository**, at the gitignored
@@ -159,7 +168,7 @@ replaced by another project's work. `make tools` reads the exact version from
 ```sh
 make tools       # install the pinned spec-spine into .tooling/bin
 make gate        # read-only: freshness, lint, coverage, the authored-content rules
-make code        # read-only: build, test, clippy, fmt across the seven crates
+make code        # read-only: build, test, clippy, fmt across the eight crates
 make refresh     # writing: recompute the committed shard trees
 make verify SPEC=001
 ```
@@ -175,7 +184,7 @@ implementation and history are preserved elsewhere and are **not** restored here
 this repository recovers specific measured failures, contracts and fixtures from
 it, and leaves its hosted client, its scheduler and its user interface behind.
 What was recovered and what was not is recorded in
-[docs/design/00-boundaries-and-reuse.md](docs/design/00-boundaries-and-reuse.md#2-what-the-archive-is-used-for-and-what-it-is-not).
+[spec 001](specs/001-boundaries-and-authority/spec.md) section 3.9.
 
 ## License
 
