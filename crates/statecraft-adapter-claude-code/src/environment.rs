@@ -1,6 +1,6 @@
 //! The environment half: what this adapter declares, and when it refuses.
 //!
-//! Spec 008 section 3.7, under spec 002 section 3.9. An adapter declares the
+//! Spec 004 section 3.15, under spec 002 section 3.9. An adapter declares the
 //! harness it targets, the exact set of paths it would manage, the facts it
 //! cannot express in that harness, and the prerequisites it needs present.
 //!
@@ -36,7 +36,7 @@ pub const PROVIDER_EXECUTABLE: &str = "provider-executable";
 /// A provider version this adapter has a qualification record for.
 pub const QUALIFICATION_RECORD: &str = "qualification-record";
 
-/// The credential path of spec 008 section 3.6.
+/// The credential path of spec 004 section 3.14.
 pub const CREDENTIAL_PATH: &str = "credential-path";
 
 /// The adapter's own file, which it owns outright.
@@ -48,7 +48,7 @@ pub const POINTER: &str = "CLAUDE.md";
 /// Facts this adapter cannot express in this harness.
 ///
 /// Spec 002 section 3.9 requires them stated rather than dropped, and each of
-/// these is a measurement from spec 008 rather than a caution.
+/// these is a measurement from spec 004 rather than a caution.
 pub const UNEXPRESSIBLE: [&str; 3] = [
     "the applied tool allowlist: the init event does not reflect an allowlist, so what was \
      applied is recorded `not-recorded` and never the request restated (section 3.4)",

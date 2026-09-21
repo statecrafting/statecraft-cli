@@ -9,7 +9,7 @@
 //!
 //! 1. **Extend, never replace.** This module reads and writes only the files it
 //!    owns. `projects.json` and `qualifications.json` belong to specs 002 and
-//!    008 and are never rewritten here, so adopting this shape loses no record.
+//!    004 and are never rewritten here, so adopting this shape loses no record.
 //! 2. **An absent home is an empty home.** Every read answers without one.
 //! 3. **No credential lives here.** Nothing in this module reads, writes or
 //!    relocates a provider credential or a platform token.
@@ -102,7 +102,7 @@ impl Layout {
         self.root.join("projects.json")
     }
 
-    /// Provider qualification records. Spec 008's file, same rule.
+    /// Provider qualification records. Spec 004's file, same rule.
     pub fn qualifications_file(&self) -> PathBuf {
         self.root.join("qualifications.json")
     }

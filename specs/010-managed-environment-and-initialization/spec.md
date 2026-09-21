@@ -135,7 +135,7 @@ Three rules the shape has to keep:
    before anything is installed.
 3. **No credential lives here.** The home holds no provider credential and no
    platform token. Provider credentials stay where the provider keeps them
-   (`008` section 3.6), and this product does not relocate them.
+   (`004` section 3.14), and this product does not relocate them.
 
 ### 3.2 One per-project area
 

@@ -1,4 +1,4 @@
-//! Spec 008 section 3.5's fixed outcome mapping.
+//! Spec 004 section 3.13's fixed outcome mapping.
 //!
 //! | Provider terminal state | `003` section 3.4 outcome | Why |
 //! |---|---|---|
@@ -29,7 +29,7 @@ use statecraft_run::attempt::Outcome;
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
 #[error(
     "provider terminal state (subtype `{subtype}`, terminal_reason {terminal_reason:?}) is not \
-     in spec 008 section 3.5's mapping; reported rather than mapped, because an outcome this \
+     in spec 004 section 3.13's mapping; reported rather than mapped, because an outcome this \
      adapter invented would be an outcome nobody measured"
 )]
 pub struct UnmappedTerminalState {

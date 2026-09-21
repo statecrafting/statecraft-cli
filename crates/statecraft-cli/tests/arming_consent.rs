@@ -112,7 +112,7 @@ if [ "$1" = --version ]; then echo '2.1.267'; exit 0; fi
                 "PATH",
                 format!("{}:/usr/bin:/bin", self.bin.path().display()),
             )
-            // Spec 008 section 3.6: the account name is carried to the child
+            // Spec 004 section 3.14: the account name is carried to the child
             // with this process's own value, and `HOME` still is not.
             .env("USER", "fixture-operator")
             .output()

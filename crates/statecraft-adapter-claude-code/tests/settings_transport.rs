@@ -1,4 +1,4 @@
-//! Spec 008 sections 3.1, 3.3 and 3.4 through a disposable settings-reading child.
+//! Spec 004 sections 3.9, 3.3 and 3.4 through a disposable settings-reading child.
 //! These synthetic denials test transport and evidence, not live qualification.
 
 #![cfg(unix)]

@@ -346,7 +346,7 @@ command crate. The configured adapter set is `declarations` in
 it in `environment_verb` in `crates/statecraft-cli/src/main.rs`. So the
 unconditional refusal for want of a ratified adapter no longer applies. A
 prerequisite that is genuinely absent still refuses, under `002` section 3.9 and
-`008` section 3.6, and that is the same correct answer to an unmet precondition
+`004` section 3.14, and that is the same correct answer to an unmet precondition
 the entry above describes.
 
 **2026-09-16: the product home is overridable by `STATECRAFT_HOME`.** §3.6 says

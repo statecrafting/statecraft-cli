@@ -1,6 +1,6 @@
 //! What a spawn of this provider consists of, as a value.
 //!
-//! Spec 008 section 3.1: the adapter spawns
+//! Spec 004 section 3.9: the adapter spawns
 //! `claude --print --output-format stream-json --verbose`, and **the prompt is
 //! delivered on a stream and never interpolated into a command line** (spec 004
 //! section 3.1).
@@ -20,7 +20,7 @@ use serde::{Deserialize, Serialize};
 /// restriction whose refusal must survive as evidence.
 pub const SETTINGS_DENY_KEY: &str = "permissions.deny";
 
-/// The flags spec 008 section 3.1 fixes for every spawn.
+/// The flags spec 004 section 3.9 fixes for every spawn.
 pub const BASE_ARGS: [&str; 4] = ["--print", "--output-format", "stream-json", "--verbose"];
 
 /// One spawn, as a value.

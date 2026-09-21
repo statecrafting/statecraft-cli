@@ -32,8 +32,8 @@ path = "src/main.rs"
 serde = { version = "1.0.229", features = ["derive"] }
 serde_json = "1.0.151"
 statecraft-acceptance = { path = "../statecraft-acceptance" }
-# Spec 008's `extends` edge. The environment verbs need a configured adapter
-# set, and until 008 ratified one they refused for want of it. The seam
+# Spec 004's `extends` edge. The environment verbs need a configured adapter
+# set, and until 004 named one they refused for want of it. The seam
 # (`statecraft-adapter`) is here for the constructed child environment the
 # adapter's prerequisites are probed against; no provider name reaches it.
 statecraft-adapter = { path = "../statecraft-adapter" }

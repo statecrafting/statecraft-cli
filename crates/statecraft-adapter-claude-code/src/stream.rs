@@ -1,6 +1,6 @@
 //! The provider's event stream, and the mapping onto spec 004 section 3.1.
 //!
-//! Spec 008 section 3.1 fixes which provider event is which part of the seam:
+//! Spec 004 section 3.9 fixes which provider event is which part of the seam:
 //!
 //! | `004` section 3.1 part | Provider event |
 //! |---|---|
