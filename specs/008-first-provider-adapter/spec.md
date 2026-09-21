@@ -559,6 +559,218 @@ no finite clean run establishes that it cannot recur. Whether `supervise_stream`
 gating completion on stdout EOF is itself a defect is a contract question for
 spec `004` and is untouched here.
 
+**2026-09-20: the first recorded qualification of this pair, and the live run it
+admitted.** §3.8 makes a qualification an act an operator performs against a
+named pair and records, and the `## Verification` note below says the act is
+never re-derived by a check. No such record was found in the scope searched: this
+repository's history, the default product home, and the two trial homes retained
+from the 2026-09-17 measurements. Within that scope this is the first
+performance of it. Broader provenance was not searched and is not claimed.
+Nothing §3 requires changes; the measurements are §3.7's and §3.8's, taken
+rather than described.
+
+*What was measured, and against what.* Product source `94362ae` on `main`, a
+clean tree, the binary built from it at
+`sha256:726bb1208310786155abb1c3ee4b247c69bbbdcd35e7c1727071c7a8bc442578`.
+Adapter `claude-code` build `0.0.0`. Provider `/Users/bart/.local/bin/claude`,
+answering `2.1.267 (Claude Code)`, which is
+`capabilities::MEASURED_PROVIDER_VERSION` and the version the committed streams
+under `testdata/stream/` were captured from. Platform `darwin`, macOS 25.5.0.
+The commands: `cargo test -p statecraft-adapter --test negative_suite --locked`,
+18 passed with `suite_1` to `suite_8` all present; this spec's ten declared
+commands, `PATH="$PWD/.tooling/bin:$PATH" make verify SPEC=008`, passed;
+`004`'s seven, `make verify SPEC=004`, passed; and `make code` over the same
+tree, 537 tests, build, clippy with warnings denied, formatting.
+
+*Which adapter each §3.5 row was actually established against.* `004` §3.5's
+own table runs against the **fixture adapter**, which is what lets it run with
+no real provider installed, and `004` §3.4 says a suite pass by a sibling
+adapter does not transfer. So `suite_1` to `suite_8` passing establishes the
+seam, not this adapter. The evidence that does bear on this pair is the
+provider-specific replay of the streams committed under `testdata/stream/`,
+captured from 2.1.267 and driven through a real child and this crate's own
+`execution::supervise`. Row by row:
+
+| `004` §3.5 row | Evidence bearing on **this** adapter | What the child was | Established |
+|---|---|---|---|
+| 1, a refusal retained beside a completed result | `negative_cases::native_denied_success_keeps_progress_claim_turns_and_exactly_one_refusal`; `a_denied_session_that_calls_itself_a_success_is_refused_and_never_completed` | recorded 2.1.267 stream replayed through a real child | yes |
+| 2, a required capability the manifest lacks refused before spawn | `a_required_token_this_manifest_does_not_declare_refuses_before_any_spawn`, against this adapter's own manifest | none spawned, which is the assertion | yes |
+| 3, a hung child killed at the deadline **with its descendants** | `settings_transport::timeout_after_terminal_denial_cleans_settings_and_retains_evidence` reaches the deadline and `interrupted` through this crate's execution path | a fixture shell child, not the provider | deadline and `interrupted` yes; **descendants no**: the descendant assertion exists only in `suite_3`, against the fixture adapter, and no hung real provider was ever measured |
+| 4, a malformed stream reported as malformed | `a_malformed_stream_is_reported_as_malformed_and_never_a_clean_completion`; `native_malformed_and_truncated_streams_retain_progress_and_report_the_error` | recorded streams, mutated and truncated | yes |
+| 5, an absent cost `unknown` and never zero | `a_reported_cost_is_carried_and_an_absent_one_is_unknown_and_never_zero` | recorded streams | yes |
+| 6, a declared token the adapter does not honor fails qualification | `a_refusal_that_must_be_evidence_may_not_be_expressed_as_tool_set_removal` asserts `fails qualification` against this adapter's own denial mechanism and `tool-removed.jsonl` | recorded stream | this adapter's mechanism yes; the **runtime declared-not-applied discrepancy** path is asserted only in `suite_6`, against the fixture adapter |
+| 7, records identical whichever implementation produced them | `native_recorded_success_crosses_the_process_seam` shows this adapter's records equal its own mapping and read through the generic seam | recorded stream replayed through a real child | **no**: `suite_7` compares two **fixture** implementations, and no comparison involving this adapter and a second implementation exists |
+| 8, the posture declares every command the run will need | mechanism asserted in `statecraft-adapter`'s `a_posture_omitting_a_check_suite_command_is_refused_naming_the_command` | none | **no, and the product binding makes it vacuous**: `adapters::child_environment` supplies `manifest.requires_commands` as both the declared command set and the check-suite command set, so the two are equal by construction and the guard cannot fire |
+
+Row 8's gap is not a reading of the code alone. The trial below declared
+`python3 tests/check_wordcount.py` as its acceptance, `REQUIRES_COMMANDS` is
+`["claude", "git"]`, and nothing refused at plan time: the environment reported
+`applied` and the command resolved only because the blueprint copies the
+operator's whole `PATH`. That is the case §3.5 row 8 exists to refuse, reaching
+an attempt undetected.
+
+*The record, and that it is the record and not a label.* Written to
+`<product home>/qualifications.json` as `adapters.rs` reads one: adapter
+`claude-code`, binary version `0.0.0`, suite version `008.3.9`, date
+`2026-09-20T17:55:18Z`, provider version `2.1.267`. Its effect was measured on
+both sides of writing it. Before: `env plan` reported the adapter `refused`,
+`missing: ["qualification-record"]`, and planned zero writes. After: `claiming`,
+and two writes, `.claude/statecraft/instructions.md` and `CLAUDE.md`. `env
+apply` then wrote both and the manifest recorded both with their digests. That
+is §3.7's refusal and its release, observed rather than asserted, and it is also
+why an `env apply` exit code is not evidence that any path was installed.
+
+Four facts, which this entry keeps apart because collapsing them is how a label
+comes to stand for evidence it does not have. **A record was written**, naming
+the pair. **The product honored it**, measured on both sides of writing it.
+**The live run persisted the label**, readable from a fresh process. **Whether
+the record rests on sufficient qualification evidence is not established**: the
+table above leaves row 7 unestablished for this adapter, row 3's descendant
+clause unestablished for this adapter, row 6 partial, and row 8 both
+unestablished and vacuous in the product binding. A reader of the `qualified`
+label should read it as "a record naming this pair exists and the product found
+it", which is what the code computes, and not as "every §3.5 row has been
+established against this adapter", which it is not.
+
+*The live run.* A disposable corpus outside this repository, registered, armed,
+and based at its own commit `30665d5`: one approved spec declaring one Python
+module and a fixed acceptance suite present at that base. `statecraft-cli run
+<corpus> 001-word-count-tool --json`, started `2026-09-20T17:56:15Z`, 57
+seconds, exit 0. Outcome `completed`, provider claim `completed`, zero refusals,
+base unmoved, capabilities `structured-refusals`, `turn-limit` and `cost-report`
+all applied with none degraded, and the posture recorded `qualification:
+"qualified"`. The provider implemented the module and committed it, leaving the
+prepared work tree clean at candidate `52b51dd`.
+
+*The acceptance.* `statecraft-cli accept <corpus> 001-word-count-tool --json`
+answered `accepted` and minted a receipt naming base `30665d5`, candidate
+`52b51dd`, one check (`spec-spine verify 001-word-count-tool --json`, exit 0),
+policy digest `22b8c544...`, product `0.0.0`, spec-spine `0.20.0`, adapter
+`0.0.0`, harness revision `not-recorded`, attempt `001-word-count-tool/1`, and
+no authority path touched. No earlier `accepted` answer was found in the scope
+searched. The historical run reported in PR 35 is not one: its trial spec
+declared no suite, so `accept` correctly answered `no-acceptance`, and that
+result stands as recorded.
+
+*The receipt does not bind the suite §3.4 says it binds.* The plan declared at
+the trusted base is one command, `python3 tests/check_wordcount.py`, which
+`spec-spine verify 001-word-count-tool --plan` prints at `30665d5`. The receipt
+carries one entry, and it is `spec-spine verify 001-word-count-tool --json` with
+exit 0. §3.4 requires the ordered suite with **each command and each exit
+code**; what is bound is the verifier invocation and the verifier's exit code,
+so neither the declared command nor its exit code appears anywhere in the
+receipt. At one declared command the difference is already total, and it grows
+with the plan: an aggregate verdict cannot say which command failed, which never
+ran, or in what order they went. `005` §3.4 is where that requirement lives and
+this spec does not amend it; the measurement is recorded here because it is what
+this trial produced.
+
+*What the posture makes durable, and what an unmet obligation leaves undone.* A
+fresh `run show` after the accept reports the posture, including
+`qualification: "qualified"`, sourced to `attempt#001-word-count-tool/1`. It
+reports the acceptance as `none` with reason `suite-did-not-run`, the receipt
+freshness as `not-recorded`, and an authority note reading "no acceptance has
+been run for this run". The run record carries `intent`, `accounting` and
+`outcome` and nothing else: `accept` wrote nothing. So the run's qualification
+posture is durable and the acceptance is not.
+
+That is an **unmet obligation, not a design choice**, and this entry corrects an
+earlier reading of it. `009` §3.1 gives `accept` as the verb that "judges the
+candidate independently and **records the acceptance or its absence**". `005`
+§3.1 requires candidate, base and policy to be "all named in the record", and
+makes an unidentifiable one "**no acceptance**, recorded as such". §3.1.1
+requires `not-attempted` to be "**recorded** rather than left blank", and says a
+reader "must never have to infer from a missing receipt whether the suite ran
+and failed, or never ran at all". The account produced here is exactly that
+inference, and it resolves it wrongly: it asserts that no acceptance has been
+run for a run that had just been accepted.
+
+`005`'s 2026-09-16 entry, "nothing in this crate acts", is not an exemption from
+this. It scopes to the acceptance **library**: `mint` returns a value and the
+crate performs no external effect, which is how "a receipt is not a permission"
+is implemented. The recording obligation falls on the verb's binding, which
+`009` owns in the crate `006` owns. Repairing it belongs to `003`, `005` and
+`009` together and not to this spec, which is why nothing here is amended; what
+is recorded here is that the obligation is unmet and how it presents.
+
+*Two bounded checks taken without the provider, because they bear on what a
+receipt means here.* A candidate committed into the same prepared workspace that
+rewrote its own `## Verification` block to a marker-writing command and appended
+a line to `.claude/` was refused: `acceptance: failed`, reason
+`authority-change`, members `acceptance-instructions` and `hooks`, no receipt,
+exit 1. The marker file existed afterwards, so that candidate's own acceptance
+instructions ran before the refusal. Two distinct things follow, and they are
+not the same kind of thing. That the instructions came from the candidate is an
+**unmet obligation**: `005` §3.2 already says the suite is run "from the
+instructions read **at the base**", and `SpecSpineVerify::run_suite` runs
+`spec-spine verify` with the prepared workspace as its working directory, whose
+HEAD is the candidate. That the plan executed **before** the authority verdict
+was computed is a **sequencing question §3 does not settle** either way, and
+turning it into a stated rule needs its own amendment. Both live in `005` and
+neither is amended here. A second candidate carrying the base's unimplemented stub under the base's
+own acceptance was refused `suite-did-not-pass` with zero unrun checks and no
+receipt.
+
+*What this does not establish.* One run is not repeatability. The PR 35 run's
+qualification posture is not established from retained evidence: no
+`qualifications.json` exists at the default product home or in either retained
+trial home from that date, and the run records retained there are `interrupted`
+attempts carrying no posture field at all, so it is recorded here as unknown
+rather than as unqualified, and its `no-acceptance` result is left exactly as it
+was reported. Nor does this establish a conforming independent acceptance path:
+trusted-base instruction loading, command-level receipt evidence and durable
+recording are each unmet above, and a receipt produced while all three are
+outstanding evidences that a verifier exited zero over named bytes, which is
+less than §3.4 asks a receipt to bind.
+
+*An ambiguity in the contract, named rather than resolved.* `004` §3.4 defines
+the act: "An adapter binary version is qualified only by a recorded pass of the
+negative suite in §3.5", and §3.5 makes that table runnable with no real
+provider installed. The `## Verification` note below says instead that "the live
+measurement stays where §3.8 puts it: a qualification act performed by an
+operator against a named binary version and recorded", and that "what the suite
+checks is the consequence rather than the act". These do not name the same act.
+Under the first, what was done today is the act, completely. Under the second,
+the act is a live measurement that no spec defines: nothing states what it must
+cover, what would fail it, or how its result enters the record, and
+`qualification::record` takes a provider version, a suite version and a date
+with no live-measurement input at all. This entry does not choose between the
+two readings. It records that the first is satisfied to the extent the row table
+above allows, that the second has no definition to satisfy, and that resolving
+which one §3.8 means is the owner's.
+
+*Where this evidence lives.* Under
+`~/DevWork/statecraft-cli-evidence/2026-09-20-live-qualification/`, outside this
+repository and outside any temporary directory: 46 files with an `INVENTORY.md`,
+a `SHA256SUMS` verified after copying, the command logs, the isolated product
+home's register, qualification record and run-record chain, the environment
+manifest, the binary under test, and a git bundle carrying the trial corpus's
+complete history including the accepted candidate `52b51dd`, the hostile
+candidate `1eecdf8` and the failing-suite candidate `44451e1` under
+`refs/evidence/`. The originals under `/private/tmp/statecraft-trial-2026-09-20/`
+are preserved unchanged. That archive is an evidence archive and is **not**
+receipt persistence: the product still records no acceptance, which is the
+defect the archive documents.
+
+*The declared acceptance did not pass on every attempt, and that is retained.*
+The first `make verify SPEC=004` of the day failed at command 2, in
+`settings_transport::timeout_after_terminal_denial_cleans_settings_and_retains_evidence`,
+and so did the first `make verify SPEC=008` of the branch that carries this
+entry. Both passed on a later attempt against the same tree, and the same test
+also passed a full `make code`, ten consecutive isolated runs of the single
+test, and six consecutive runs of its whole test binary. Under a temporary local
+instrumentation of the fixture, not committed, every observed failure had the
+same shape: the spawned child produced no event, no terminal record and none of
+the files it writes as its first actions, including one written to an absolute
+path outside the workspace, and the attempt ran to its 5 second deadline. The
+2026-09-18 entry above records a residual for this fixture, a delayed end of
+file on an inherited descriptor. A child that never wrote anything is a
+different signature and is not claimed to be that residual recurring. No retry,
+timeout or assertion was changed to obtain any pass recorded above. The
+consequence for this spec is stated rather than softened: its declared
+acceptance is not yet reliably repeatable on this machine, and the cause is an
+open question in this fixture's own territory.
+
 ## Verification
 
 Each line is one command. §3.9's eleven rows are integration tests named after
