@@ -277,15 +277,97 @@ const HOOK_GATE: &str = r#"#!/bin/sh
 # This product does NOT wire this hook into an agent's settings. Doing so would
 # mean rewriting a user's own configuration file, and spec 002 section 3.14
 # refuses that. Install it yourself if you want it.
+#
+# Spec 002 section 3.23 states the seven contracts this script is held to, and
+# crates/statecraft-home/tests/harness_hooks.rs extracts this body and runs it
+# as a program against each one. The numbered comments below name the contract
+# the lines under them exist for.
+#
+# Usage: statecraft-gate.sh [target-directory]
 set -eu
 
-root=$(git rev-parse --show-toplevel 2>/dev/null || true)
+# Contract 3: resolve the target repository from the command, not the session.
+# A caller that knows which tree it is acting on names it, and only a caller
+# with nothing to name falls back to the working directory. A multi-repository
+# session governs whichever tree the command named.
+target=${1:-.}
+root=$(git -C "$target" rev-parse --show-toplevel 2>/dev/null || true)
+
+# Not a repository, or not a Statecraft project. This is not a gate here at all,
+# so it is inert rather than refusing: section 3.14 rule 3. That is a different
+# thing from contract 6 below, which is about a gate that exists and did not run.
 [ -n "$root" ] || exit 0
 [ -f "$root/.statecraft/environment.json" ] || exit 0
 
+# Contract 2: $SPEC_SPINE_BIN, then the target repository's own build, then
+# PATH. A repository that builds its own binary must be governed by the one it
+# builds; the PATH fallback keeps an adopter on the published CLI working. A
+# bare name resolved from PATH alone is whichever copy the last unrelated
+# project on the machine installed.
+if [ -n "${SPEC_SPINE_BIN:-}" ]; then
+  bin=$SPEC_SPINE_BIN
+elif [ -x "$root/target/release/spec-spine" ]; then
+  bin=$root/target/release/spec-spine
+else
+  bin=$(command -v spec-spine 2>/dev/null || true)
+fi
+
+# Contract 6: a gate whose check did not run is not green. Inside a Statecraft
+# project, a binary this script cannot execute refuses. It does not pass.
+if [ -z "$bin" ] || [ ! -x "$bin" ]; then
+  echo "statecraft-gate: no spec-spine binary (SPEC_SPINE_BIN, target/release, PATH)" >&2
+  exit 1
+fi
+
+# Contract 5: establish the verb before reading its exit code. clap also spends
+# 2 on an unknown subcommand, so without this a binary older than the verb
+# reports a fresh tree as stale and sends the session to regenerate shards that
+# were already correct. The answer to a missing verb is a refusal naming the
+# binary, never a verdict about the tree.
+for verb in check lint; do
+  if ! "$bin" "$verb" --help >/dev/null 2>&1; then
+    echo "statecraft-gate: $bin does not carry the verb '$verb'; that is not a verdict about the tree" >&2
+    exit 1
+  fi
+done
+
 cd "$root"
-spec-spine check --fail-on-warn
-spec-spine lint --fail-on-warn
+
+# Contract 1: read, never repair. Both verbs below are reads, and no writing
+# subcommand appears anywhere in this script. A hook fires where it cannot
+# commit what it regenerated, so a writing hook leaves the derived tree dirty;
+# an orchestrator that refuses to start on a dirty tree then never starts.
+#
+# Contract 4: read the verdict, never guess it. The four answers are not
+# interchangeable, and only one of them is repaired by regenerating.
+code=0
+"$bin" check --fail-on-warn || code=$?
+case $code in
+  0) ;;
+  1)
+    echo "statecraft-gate: the corpus does not validate; re-indexing cannot cure it" >&2
+    exit 1
+    ;;
+  2)
+    echo "statecraft-gate: stale; refresh and commit the shards with the change that staled them" >&2
+    exit 2
+    ;;
+  3)
+    echo "statecraft-gate: the read was not performed; that is not a verdict" >&2
+    exit 3
+    ;;
+  *)
+    echo "statecraft-gate: check answered $code, which this gate does not know how to read" >&2
+    exit "$code"
+    ;;
+esac
+
+code=0
+"$bin" lint --fail-on-warn || code=$?
+if [ "$code" -ne 0 ]; then
+  echo "statecraft-gate: lint refused with $code" >&2
+  exit "$code"
+fi
 "#;
 
 const ADAPTER_CLAUDE_CODE: &str = r#"# Adapter template: claude-code

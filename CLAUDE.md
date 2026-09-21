@@ -72,7 +72,12 @@ AGENTS.md records what to do if a spec genuinely needs to claim ahead.
   contract is superseded and spec `002` section 3.7 is its withdrawal. Section
   3.21 states what replaced it and what three parts of it are retained. The
   harness is one global source delivered by adapters (section 3.14), copied into
-  no repository.
+  no repository. Sections 3.22 and 3.23 carry the handoff from that withdrawal:
+  what the counterparty still holds, the order the last of it moves in, and
+  **seven contracts any delivered hook must satisfy**. If you touch
+  `harness::shipped()`, read 3.23 first and run
+  `cargo test -p statecraft-home --test harness_hooks`, which extracts the
+  shipped body and runs it as a program against each contract.
 - **The pin is exact, and the binary is local.** `required_version = "=0.20.0"`,
   installed at the gitignored `.tooling/bin` by `make tools`, which reads the
   version from the pin. Run spec-spine through `make` or as
