@@ -1,11 +1,12 @@
-//! Spec 009 section 3.7, the observable negative cases, seven of ten.
+//! Spec 006 section 3.7, the observable negative cases, seven of ten.
 //!
-//! A separate file from this crate's `negative_cases.rs`, which covers spec
-//! 006's own rows: two specs' rows in one file would make a deleted row look
-//! like a refactor.
+//! A separate file from this crate's `negative_cases.rs`, which covers the
+//! environment and usage rows. The two sets were filed apart when the bindings
+//! were two specs, and they stay apart: merging the files would make a deleted
+//! row look like a refactor.
 //!
 //! **Three of the ten rows are review obligations and not tests**, and spec
-//! 009's `## Verification` block says so. Rows 6, 9 and 10 require that an
+//! 006's `## Verification` block says so. Rows 6, 9 and 10 require that an
 //! inspection verb which repaired the record, a verb that answered a
 //! specification question itself, and a CLI-crate answer an owning crate could
 //! have returned are each "refused as a defect". A defect refused in review is
@@ -71,9 +72,9 @@ fn registered() -> (tempfile::TempDir, tempfile::TempDir, String) {
     (home, target, path)
 }
 
-// The three commands spec 009's verification block calls the only ones that
-// check what this spec is FOR: every verb it names was implemented already,
-// inside a territory no command line reached.
+// The three commands spec 006's verification block calls the only ones that
+// check what the work, run and accept bindings are FOR: every verb they name
+// was implemented already, inside a territory no command line reached.
 #[test]
 fn every_verb_this_slice_adds_is_reachable_from_a_command_line() {
     let home = tempfile::tempdir().unwrap();
@@ -86,7 +87,7 @@ fn every_verb_this_slice_adds_is_reachable_from_a_command_line() {
     }
 
     // And reachability says nothing about whether an attempt would succeed,
-    // which is spec 009 section 3.4's own warning about `run` exiting 0.
+    // which is spec 006 section 3.10's own warning about `run` exiting 0.
     let help = stdout(&run_in(home.path(), &["run", "--help"]));
     assert!(help.contains("run list"));
     assert!(help.contains("run show"));
@@ -283,7 +284,7 @@ fn accept_on_a_refused_attempt_is_not_attempted_with_the_count_and_no_receipt() 
     );
     let parsed: serde_json::Value = serde_json::from_str(&stdout(&out)).expect("valid json");
     // The wire shape here is spec 005's own `Acceptance`, which that crate
-    // derives and that spec fixed; see spec 009 section 5.
+    // derives and that spec fixed; see spec 006 section 5.
     assert_eq!(parsed["value"]["acceptance"], "not-attempted");
     assert_eq!(parsed["value"]["reason"], "attempt-refused");
     assert_eq!(parsed["value"]["refusal_count"], 1);
@@ -388,7 +389,7 @@ fn the_grown_command_tree_still_has_no_verb_that_publishes() {
         }
     }
     // The count is spelled out rather than derived, so a verb joining the tree
-    // is a deliberate edit here. Fifteen when spec 009 bound the slice; twelve
-    // more when spec 010 bound the managed environment.
+    // is a deliberate edit here. Fifteen when the work, run and accept
+    // bindings landed; twelve more with the managed environment.
     assert_eq!(statecraft_cli::commands::Verb::all().len(), 27);
 }

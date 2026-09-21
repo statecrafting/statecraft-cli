@@ -115,7 +115,7 @@ impl Verb {
 
     /// Which spec owns the behavior behind it.
     ///
-    /// Spec 009's edge added the verbs 003, 004 and 005 name, so this is no
+    /// Spec 006's edges added the verbs 003, 004 and 005 name, so this is no
     /// longer one answer. Spec 006 section 3.1's table is where the mapping
     /// lives; this is that table, in code.
     pub fn owning_spec(self) -> &'static str {
@@ -130,7 +130,7 @@ impl Verb {
             | Verb::EnvRemove
             | Verb::Doctor => "002-environment-lifecycle",
             Verb::WorkList | Verb::WorkShow | Verb::RunList => "003-work-and-run-semantics",
-            // `run` is 003's semantics through 004's adapter, and 009 section
+            // `run` is 003's semantics through 004's adapter, and 006 section
             // 3.1 names both. The record and the outcome are 003's, so that is
             // the owner; the adapter is how the attempt happens.
             Verb::Run => "003-work-and-run-semantics",

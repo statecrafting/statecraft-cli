@@ -675,7 +675,7 @@ been run for this run". The run record carries `intent`, `accounting` and
 posture is durable and the acceptance is not.
 
 That is an **unmet obligation, not a design choice**, and this entry corrects an
-earlier reading of it. `009` §3.1 gives `accept` as the verb that "judges the
+earlier reading of it. `006` §3.1 gives `accept` as the verb that "judges the
 candidate independently and **records the acceptance or its absence**". `005`
 §3.1 requires candidate, base and policy to be "all named in the record", and
 makes an unidentifiable one "**no acceptance**, recorded as such". §3.1.1

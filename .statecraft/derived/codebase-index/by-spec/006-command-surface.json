@@ -3,11 +3,22 @@
     "dependsOn": [
       "000-bootstrap",
       "001-boundaries-and-authority",
-      "002-environment-lifecycle"
+      "002-environment-lifecycle",
+      "003-work-and-run-semantics",
+      "004-execution-adapter",
+      "005-acceptance-and-evidence"
     ],
     "implementingPaths": [
       {
+        "path": "crates/statecraft-acceptance/",
+        "source": "spec-edge"
+      },
+      {
         "path": "crates/statecraft-cli/",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/statecraft-run/",
         "source": "spec-edge"
       }
     ],
@@ -24,11 +35,37 @@
           "kind": "directory",
           "path": "crates/statecraft-cli/"
         }
+      },
+      {
+        "locations": [
+          {
+            "file": "crates/statecraft-acceptance/"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "directory",
+          "path": "crates/statecraft-acceptance/"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "crates/statecraft-run/"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "directory",
+          "path": "crates/statecraft-run/"
+        }
       }
     ],
     "specId": "006-command-surface",
     "specStatus": "approved"
   },
   "schemaVersion": "1.1.0",
-  "shardHash": "85611dc82318dfa55df9ea953e2621afbff51096f126ae277e31b6e3f81acec8"
+  "shardHash": "ac4038fb1a34e5724ba58d945df94e8840fa7aec5d93083c732c42648b4a6d10"
 }

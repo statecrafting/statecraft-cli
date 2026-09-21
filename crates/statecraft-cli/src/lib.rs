@@ -28,8 +28,8 @@
 //!
 //! # The integration slice
 //!
-//! [`slice`] holds the `work`, `run` and `accept` bindings spec 009 added. Same
-//! rule as [`bind`], and spec 009 section 3.5 sharpens it: where a verb needed
+//! [`slice`] holds the `work`, `run` and `accept` bindings. Same
+//! rule as [`bind`], and spec 006 section 3.11 sharpens it: where a verb needed
 //! something an owning library did not expose, the entry point was added there.
 //!
 //! # The managed environment
