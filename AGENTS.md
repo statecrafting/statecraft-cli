@@ -72,18 +72,13 @@ section 3.1.1 joins it with `registry list --json` to read `status`. What `draft
 *ratification*, which is why an unratified spec's unresolved units warn instead
 of refusing.
 
-Ten specs, `000` to `009`, are ratified, so what `plan` offers from that range
-is a real work order. **`010-managed-environment-and-initialization` is a
-`draft` and `plan` now offers it**, which is exactly the case this section
-warns about: it is `draft` plus `pending`, so the lifecycle table makes it
-schedulable and `plan` names it as ready. It is not a work order and it is not
-ratified.
+All eleven specs, `000` to `010`, are ratified, so what `plan` offers is a real
+work order. Today it offers nothing. The next `draft` written here will be
+offered as ready anyway; check the `status` field, not the plan output.
 
-`010` is also the one spec in this corpus that is a `draft` **with code behind
-it**. The owner authorized building that realignment as a draft, for that
-realignment and nothing else. The authorization is not a precedent, it is not a
-ratification, and it does not travel to the next draft: the rule below still
-holds for every other spec.
+`010` was built as a `draft`, on an authorization the owner gave for that
+realignment and nothing else, and was ratified on 2026-09-20. That is not a
+precedent and it does not travel to the next draft.
 
 spec-spine does not enforce the difference, so this repository does. Until the
 owner ratifies a spec (see Approval semantics), `plan` naming it is a reading

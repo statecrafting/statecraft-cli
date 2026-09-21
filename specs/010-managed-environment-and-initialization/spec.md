@@ -1,8 +1,8 @@
 ---
 id: "010-managed-environment-and-initialization"
 title: "The Statecraft-managed environment: one global home, one project area, one initialization flow, and where authority comes from"
-status: draft
-implementation: pending
+status: approved
+implementation: complete
 created: "2026-09-20"
 summary: >
   spec-spine withdraws its kit and its public initializer, so the transition
@@ -598,6 +598,15 @@ Both are other specs' territory (`003` and `001`), the negative control still
 holds against any shard directory, and widening this change to reach them would
 be editing a spec's territory for a cosmetic improvement. They are recorded here
 as a follow-up rather than swept.
+
+**2026-09-20: ratified, and the draft exception it needed is retired.** This
+spec was written and built as a `draft`, which AGENTS.md records as the one
+exception this corpus has granted. The owner ratified it on the date above, so
+`status` is `approved` and `implementation` is `complete` against the evidence
+this file's Verification block declares. The exception was for this realignment
+and nothing else: the passages in AGENTS.md and CLAUDE.md that carried it are
+removed by this change, and the general rule they qualified is unchanged. No
+agent ratified anything.
 
 ## Verification
 

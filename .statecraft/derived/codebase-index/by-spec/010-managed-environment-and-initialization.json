@@ -83,8 +83,8 @@
       }
     ],
     "specId": "010-managed-environment-and-initialization",
-    "specStatus": "draft"
+    "specStatus": "approved"
   },
   "schemaVersion": "1.1.0",
-  "shardHash": "fc3a06706929b33aef4c8b6fccf9b2699f77f8d3e0525e9e4c644434e08019c5"
+  "shardHash": "aea3f2ff306cf645499b26feb7e7a40b75a86553f288da4cfaeab1dfc96e92f7"
 }

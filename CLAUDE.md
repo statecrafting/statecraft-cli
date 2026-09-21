@@ -14,20 +14,16 @@ product is a local environment for governed agent work; the boundary is
 and what is proposed versus adopted is
 [docs/decisions/00-founding-decisions.md](docs/decisions/00-founding-decisions.md).
 
-Ten of the eleven specs, `000` to `009`, are `approved`. `registry list` is the
+All eleven specs, `000` to `010`, are `approved`. `registry list` is the
 authority on the second half: `000` and `001` carry `implementation: n-a`,
-because they own prose and no code, and `002` to `009` carry
+because they own prose and no code, and `002` to `010` carry
 `implementation: complete`.
 
-**`010-managed-environment-and-initialization` is a `draft` with code behind
-it, and that is the one exception in this corpus.** The owner authorized
-building the managed-environment realignment as a draft, for that realignment
-and nothing else. It is not ratified, no agent may ratify it, and no document
-here may call it approved. The general rule is unchanged and matters more than
-ever now that `plan` will offer it: `draft` plus `pending` is schedulable, so
-`plan` names it exactly as it names a ratified spec. **Check the `status`
-field, not the plan output.** Ratification is the owner's act; see AGENTS.md,
-"New sessions".
+The rule that made `010` worth a warning here still holds for the next spec
+written: `draft` plus `pending` is schedulable, so `plan` offers a `draft` as
+ready and that is spec-spine's lifecycle answer, not the owner's. **Check the
+`status` field, not the plan output.** Ratification is the owner's act; see
+AGENTS.md, "New sessions".
 
 ## Commands
 
