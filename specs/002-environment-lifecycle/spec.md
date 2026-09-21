@@ -2,7 +2,7 @@
 id: "002-environment-lifecycle"
 title: "Project registration and the Statecraft-managed environment: one global home, one project area, one initialization flow, and where authority comes from"
 status: approved
-implementation: complete
+implementation: in-progress
 created: "2026-09-16"
 summary: >
   How a repository becomes a target this product may work in, and how the
@@ -25,7 +25,10 @@ summary: >
   implementation and an unreachable platform is an honest unavailable state.
   Sections 3.22 and 3.23 record the counterparty's state at the moment it handed
   its harness over, the order the last of that harness moves in, and what any
-  content delivered through the harness mechanism has to satisfy.
+  content delivered through the harness mechanism has to satisfy. Section 3.24
+  is the one write into a harness's own settings file that section 3.14 rule 1
+  admits: narrow, marked, reversible, refused by default, and able to add a
+  refusal but never a permission.
 establishes:
   - { kind: directory, path: "crates/statecraft-environment/" }
   - { kind: directory, path: "crates/statecraft-home/" }
@@ -375,10 +378,12 @@ Native agent discovery may still need something in a native location such as
 files, plugins or launch configuration that point at the one canonical source.
 Four rules bound them:
 
-1. An adapter never repoints an agent home, never moves an authentication store,
-   and never changes personal permissions. Unrelated native user configuration
-   is preserved, and a delivery that would have to rewrite a user's settings
-   file is not performed.
+1. An adapter never repoints an agent home and never moves, reads or rewrites an
+   authentication store. Unrelated native user configuration is preserved. A
+   user's settings file is touched only under the **consented settings
+   modification** of section 3.24, which is narrow, marked, reversible and
+   refused by default; outside that, a delivery that would have to rewrite it is
+   not performed.
 2. Every delivered name is Statecraft-namespaced, so it cannot collide with a
    generic user skill of the same purpose.
 3. Every delivered behavior is **gated to Statecraft projects**: it applies only
@@ -757,6 +762,55 @@ The harness this build ships under section 3.14 is deliberately small, and
 adopting the inventory above would not change that judgment by itself: the point
 of a global harness is that it is one source, not that it is a large one.
 
+### 3.24 The consented settings modification
+
+Section 3.14 rule 1 admits exactly one write into a harness's own settings file.
+It is the narrowest thing that lets a hook the harness ships actually fire, and
+everything about it is shaped so that a user who never consents is in the same
+position as before this section existed.
+
+**What it may carry, and nothing else.** Two kinds of line:
+
+1. A **hook registration** whose command resolves inside the canonical harness
+   under the product home. Never a command assembled from anything else.
+2. A **deny entry**, which is a refusal.
+
+A merge may add a refusal. It may never add or widen a permission: no allow
+entry, no `ask` downgraded, no existing deny removed, weakened or reordered. The
+deny list travels as a floor (section 3.23), and a floor that a delivery can
+lower is not one. `settings.local.json` is the user's own override layer and is
+never written at all.
+
+**Consent is a separate act from installation.** The modification is named in the
+`home apply` plan before anything is written, in the exact lines it would add,
+and is **refused by default**: installing skills and agents does not perform it,
+and neither does any read, test or project operation. It is performed only when
+the operator consents to that modification specifically. Consent to one revision
+is not consent to the next: a modification whose lines have changed is presented
+again.
+
+**One marked region, recorded as a modification.** Every managed line lives
+inside a single marked region in the file. Outside that region nothing is
+rewritten, reordered or reformatted, and the file's own shape is preserved. The
+region is recorded in the home the way section 3.13 records the root instruction
+bridge: as a **modification** (path, the exact lines, the digest before and the
+digest after), never as a managed entry and never as ownership of the file.
+
+**Reversible, and only while it is intact.** Removal removes exactly the marked
+region and nothing else, and only while the region is present and byte-identical
+to what was recorded. A region a user has edited is **reported and left**: an
+edited region is a user's file again, and this product does not take it back.
+Applying the modification twice changes nothing.
+
+**A conflict is named, not resolved.** Where the user already registers a hook on
+the same event with a different command, both remain and the situation is
+reported. This product does not decide which of two hooks a user wants.
+
+**What this does not become.** It is not a general settings manager, not a
+migration, and not a path to any other key. A settings key this section does not
+name is not writable by any code path, and adding one is an amendment to this
+section rather than a use of it.
+
 ## 4. Out of scope
 
 Installing the product itself; provider authentication; hosted registration;
@@ -985,6 +1039,41 @@ witness first. Separately, a scan for writing verbs over the whole body tripped 
 the word "re-indexing" inside a message; the answer was not to reword the message
 but to assert over the binary in command position, since a scan that cannot tell
 an executed word from a printed one gets worked around rather than fixed.
+
+**2026-09-21: the owner amended §3.14 rule 1, and this spec is no longer
+`complete`.** §3.22 records that spec-spine's `.claude/settings.json` waits on
+this product. Measuring the two sides against each other made the contradiction
+plain: rule 1 as written refused every write to a user's settings file, and
+`delivery::NEVER_TOUCHED` enforced that in code, so the four hook events and the
+deny list had no route here and the leanout could not finish. Three ways out were
+put to the owner: spec-spine keeps that file as its own governance, rule 1 is
+amended, or the operator pastes a wiring snippet. **The owner chose the
+amendment**, and §3.24 is it.
+
+What §3.24 deliberately is not: a settings manager. It carries two kinds of line
+and no others, it may add a refusal and never a permission, and a key it does not
+name is not writable by any code path. It is modelled on §3.13's root instruction
+bridge, which is this corpus's existing answer to touching a file it does not own:
+a marked region, recorded as a modification with the digest either side, removed
+only while intact, and reported rather than reclaimed once a user has edited it.
+
+**This change is the authority change and nothing else.** AGENTS.md separates one
+from the implementation it would authorize, so no code moves here.
+`delivery::NEVER_TOUCHED` still lists `settings.json`, `native_destination` still
+links only `skills/` and `agents/`, and no consent flow exists. §3.24 is therefore
+**specified and not implemented**, and `implementation` moves from `complete` to
+`in-progress` rather than staying a claim this tree does not support. That also
+makes the remaining work schedulable, which is where the next session should find
+it.
+
+**Two corrections to §3.22's inventory, measured 2026-09-21 rather than taken from
+the note.** A history is corrected by appending, so §3.22 stands and this is the
+correction. That `settings.json` carries **four** hook events, not three:
+`SessionStart`, `PostToolUse`, `PreToolUse` (which holds the push gate and the
+PR gate together) and `Stop`. And there is a fifth class the note did not
+mention, `.claude/agent-memory/`, whose disposition nobody has decided. The rest
+of §3.22 was checked and holds, including the global push gate at
+`~/.claude/hooks/push-gate.sh`, which is installed and registered.
 
 ## Verification
 
