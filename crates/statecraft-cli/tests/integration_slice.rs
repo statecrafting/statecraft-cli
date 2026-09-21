@@ -387,5 +387,8 @@ fn the_grown_command_tree_still_has_no_verb_that_publishes() {
             );
         }
     }
-    assert_eq!(statecraft_cli::commands::Verb::all().len(), 15);
+    // The count is spelled out rather than derived, so a verb joining the tree
+    // is a deliberate edit here. Fifteen when spec 009 bound the slice; twelve
+    // more when spec 010 bound the managed environment.
+    assert_eq!(statecraft_cli::commands::Verb::all().len(), 27);
 }

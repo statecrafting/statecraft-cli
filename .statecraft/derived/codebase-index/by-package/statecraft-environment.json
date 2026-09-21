@@ -1,0 +1,9 @@
+{
+  "package": {
+    "kind": "rust-lib",
+    "name": "statecraft-environment",
+    "path": "crates/statecraft-environment"
+  },
+  "schemaVersion": "1.1.0",
+  "shardHash": "239ff6175aa63ef7b0b83770069820d30f4eba37f7fc850ce36e5576871354fc"
+}

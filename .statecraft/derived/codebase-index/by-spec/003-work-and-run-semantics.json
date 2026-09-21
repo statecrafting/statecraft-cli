@@ -1,0 +1,51 @@
+{
+  "mapping": {
+    "dependsOn": [
+      "000-bootstrap",
+      "001-boundaries-and-authority",
+      "002-environment-lifecycle"
+    ],
+    "implementingPaths": [
+      {
+        "path": "crates/statecraft-acceptance/",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/statecraft-run/",
+        "source": "spec-edge"
+      }
+    ],
+    "resolvedUnits": [
+      {
+        "locations": [
+          {
+            "file": "crates/statecraft-run/"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "kind": "directory",
+          "path": "crates/statecraft-run/"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "crates/statecraft-acceptance/"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "directory",
+          "path": "crates/statecraft-acceptance/"
+        }
+      }
+    ],
+    "specId": "003-work-and-run-semantics",
+    "specStatus": "approved"
+  },
+  "schemaVersion": "1.1.0",
+  "shardHash": "1794a849a44e32a8786bbeefd1d09ad56fe0b43eff93eec74522a2d69f0d4c7e"
+}

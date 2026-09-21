@@ -1,0 +1,90 @@
+{
+  "mapping": {
+    "amends": [
+      "002-environment-lifecycle",
+      "006-command-surface"
+    ],
+    "dependsOn": [
+      "000-bootstrap",
+      "001-boundaries-and-authority",
+      "002-environment-lifecycle",
+      "006-command-surface"
+    ],
+    "implementingPaths": [
+      {
+        "path": "crates/statecraft-cli/",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/statecraft-environment/",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/statecraft-home/",
+        "source": "spec-edge"
+      },
+      {
+        "path": "scripts/check-authored-content.sh",
+        "source": "spec-edge"
+      }
+    ],
+    "resolvedUnits": [
+      {
+        "locations": [
+          {
+            "file": "crates/statecraft-home/"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "kind": "directory",
+          "path": "crates/statecraft-home/"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "crates/statecraft-cli/"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "directory",
+          "path": "crates/statecraft-cli/"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "crates/statecraft-environment/"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "directory",
+          "path": "crates/statecraft-environment/"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "scripts/check-authored-content.sh"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "scripts/check-authored-content.sh"
+        }
+      }
+    ],
+    "specId": "010-managed-environment-and-initialization",
+    "specStatus": "approved"
+  },
+  "schemaVersion": "1.1.0",
+  "shardHash": "aea3f2ff306cf645499b26feb7e7a40b75a86553f288da4cfaeab1dfc96e92f7"
+}

@@ -70,6 +70,15 @@ impl Verdict {
     pub fn schedulable(self) -> bool {
         matches!(self, Verdict::Qualified)
     }
+
+    /// A one-word rendering, the vocabulary of section 3.1's table.
+    pub fn word(self) -> &'static str {
+        match self {
+            Verdict::Qualified => "qualified",
+            Verdict::Ungoverned => "ungoverned",
+            Verdict::Unqualified => "unqualified",
+        }
+    }
 }
 
 /// A verdict and the reasons behind it.
@@ -79,6 +88,21 @@ pub struct Qualification {
     pub verdict: Verdict,
     /// Every observation that produced it, in the order they were made.
     pub reasons: Vec<Reason>,
+}
+
+impl Qualification {
+    /// A one-line rendering: the verdict and every reason behind it.
+    pub fn describe(&self) -> String {
+        format!(
+            "{}: {}",
+            self.verdict.word(),
+            self.reasons
+                .iter()
+                .map(Reason::describe)
+                .collect::<Vec<_>>()
+                .join("; ")
+        )
+    }
 }
 
 /// What can be observed about a candidate target.
@@ -228,6 +252,16 @@ mod tests {
         let q = run(true, false, CorpusState::Compiles);
         assert_eq!(q.verdict, Verdict::Unqualified);
         assert!(q.reasons.contains(&Reason::NoBaseRevision));
+    }
+
+    #[test]
+    fn each_verdict_has_its_own_word_and_a_describable_qualification() {
+        assert_eq!(Verdict::Qualified.word(), "qualified");
+        assert_eq!(Verdict::Ungoverned.word(), "ungoverned");
+        assert_eq!(Verdict::Unqualified.word(), "unqualified");
+        let q = run(true, true, CorpusState::Absent);
+        assert!(q.describe().starts_with("ungoverned: "));
+        assert!(q.describe().contains("no spec-spine corpus"));
     }
 
     #[test]

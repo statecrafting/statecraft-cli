@@ -1,0 +1,214 @@
+{
+  "mapping": {
+    "dependsOn": [
+      "000-bootstrap"
+    ],
+    "implementingPaths": [
+      {
+        "path": "docs/decisions/00-founding-decisions.md",
+        "source": "spec-edge"
+      },
+      {
+        "path": "docs/design/00-boundaries-and-reuse.md",
+        "source": "spec-edge"
+      },
+      {
+        "path": "scripts/check-authored-content.sh",
+        "source": "spec-edge"
+      },
+      {
+        "path": "standards/spec/constitution.md",
+        "source": "spec-edge"
+      }
+    ],
+    "resolvedUnits": [
+      {
+        "locations": [
+          {
+            "file": "docs/decisions/00-founding-decisions.md"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "kind": "file",
+          "path": "docs/decisions/00-founding-decisions.md"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "docs/design/00-boundaries-and-reuse.md"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "kind": "file",
+          "path": "docs/design/00-boundaries-and-reuse.md"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "scripts/check-authored-content.sh"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "kind": "file",
+          "path": "scripts/check-authored-content.sh"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "standards/spec/constitution.md",
+            "span": {
+              "endLine": 130,
+              "startLine": 114
+            }
+          }
+        ],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "anchor": "ix-outcomes-are-recorded-outside-the-child-and-recovery-reconciles-before-it-repeats",
+          "file": "standards/spec/constitution.md",
+          "kind": "section"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "standards/spec/constitution.md",
+            "span": {
+              "endLine": 85,
+              "startLine": 71
+            }
+          }
+        ],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "anchor": "vi-a-declaration-of-completion-is-not-an-acceptance",
+          "file": "standards/spec/constitution.md",
+          "kind": "section"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "standards/spec/constitution.md",
+            "span": {
+              "endLine": 101,
+              "startLine": 86
+            }
+          }
+        ],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "anchor": "vii-a-candidate-cannot-enlarge-its-own-authority",
+          "file": "standards/spec/constitution.md",
+          "kind": "section"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "standards/spec/constitution.md",
+            "span": {
+              "endLine": 113,
+              "startLine": 102
+            }
+          }
+        ],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "anchor": "viii-name-the-enforcement-or-do-not-claim-the-protection",
+          "file": "standards/spec/constitution.md",
+          "kind": "section"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "standards/spec/constitution.md",
+            "span": {
+              "endLine": 143,
+              "startLine": 131
+            }
+          }
+        ],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "anchor": "x-intent-execution-verification-and-acceptance-are-separate-records",
+          "file": "standards/spec/constitution.md",
+          "kind": "section"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "standards/spec/constitution.md",
+            "span": {
+              "endLine": 154,
+              "startLine": 144
+            }
+          }
+        ],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "anchor": "xi-a-capability-is-declared-and-qualified-never-assumed",
+          "file": "standards/spec/constitution.md",
+          "kind": "section"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "standards/spec/constitution.md",
+            "span": {
+              "endLine": 161,
+              "startLine": 155
+            }
+          }
+        ],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "anchor": "xii-public-claims-are-graded",
+          "file": "standards/spec/constitution.md",
+          "kind": "section"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "standards/spec/constitution.md",
+            "span": {
+              "endLine": 170,
+              "startLine": 162
+            }
+          }
+        ],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "anchor": "xiii-the-local-product-owes-nothing-to-a-hosted-one",
+          "file": "standards/spec/constitution.md",
+          "kind": "section"
+        }
+      }
+    ],
+    "specId": "001-boundaries-and-authority",
+    "specStatus": "approved"
+  },
+  "schemaVersion": "1.1.0",
+  "shardHash": "91cbca3d3fd5a66479c195422bcb8a4c5ceb36a64e0e2711023858d1dbe8531c"
+}

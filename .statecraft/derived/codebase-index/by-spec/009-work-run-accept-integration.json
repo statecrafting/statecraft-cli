@@ -1,0 +1,72 @@
+{
+  "mapping": {
+    "dependsOn": [
+      "000-bootstrap",
+      "001-boundaries-and-authority",
+      "003-work-and-run-semantics",
+      "004-execution-adapter",
+      "005-acceptance-and-evidence",
+      "006-command-surface",
+      "008-first-provider-adapter"
+    ],
+    "implementingPaths": [
+      {
+        "path": "crates/statecraft-acceptance/",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/statecraft-cli/",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/statecraft-run/",
+        "source": "spec-edge"
+      }
+    ],
+    "resolvedUnits": [
+      {
+        "locations": [
+          {
+            "file": "crates/statecraft-acceptance/"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "directory",
+          "path": "crates/statecraft-acceptance/"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "crates/statecraft-cli/"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "directory",
+          "path": "crates/statecraft-cli/"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "crates/statecraft-run/"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "directory",
+          "path": "crates/statecraft-run/"
+        }
+      }
+    ],
+    "specId": "009-work-run-accept-integration",
+    "specStatus": "approved"
+  },
+  "schemaVersion": "1.1.0",
+  "shardHash": "3378df48e96d8341e9f084c8ae380d7d929fc62a0dde489106eae856f6edea76"
+}
