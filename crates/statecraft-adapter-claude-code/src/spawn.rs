@@ -34,6 +34,11 @@ pub struct Invocation {
     pub settings: serde_json::Value,
     /// What was asked of the tool set, and what is known to have been applied.
     pub tool_restriction: Option<ToolRestriction>,
+    /// The exact bytes the settings file receives, when a caller has bytes an
+    /// observation is bound to. `None` writes [`Invocation::settings`] in
+    /// serde's compact form, which is the behavior every existing caller has.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub settings_document: Option<String>,
 }
 
 impl Invocation {
@@ -58,7 +63,44 @@ impl Invocation {
                 deny.to_vec(),
                 Vec::new(),
             )),
+            settings_document: None,
         }
+    }
+
+    /// Register hooks in this invocation's settings, beside its deny rules.
+    ///
+    /// `hooks` is the provider's own `hooks` settings value, event name to
+    /// matcher groups. Spec 004 section 5, 2026-09-22: spec 002 section 3.32
+    /// rule 25 supplies a managed run's startup hook and admission gate this
+    /// way, per invocation, rather than relying on a registration in the
+    /// operator's home. It replaces any hooks set before, and must be called
+    /// before [`Invocation::with_settings_document`], whose bytes must parse to
+    /// the settings including these.
+    pub fn with_hooks(mut self, hooks: serde_json::Value) -> Self {
+        self.settings["hooks"] = hooks;
+        self
+    }
+
+    /// Deliver these exact settings bytes rather than a serialization of
+    /// [`Invocation::settings`].
+    ///
+    /// Spec 002 section 3.29 rule 4 binds an observation to the settings
+    /// payload **by digest**, so a session that is to be covered by an
+    /// observation has to receive the bytes the observation was made with, not
+    /// an equivalent document formatted differently. The document must parse
+    /// to the settings this invocation already carries, so the value its deny
+    /// rules are read from and the bytes the child reads cannot disagree.
+    pub fn with_settings_document(mut self, document: String) -> Result<Self, String> {
+        let parsed: serde_json::Value = serde_json::from_str(&document)
+            .map_err(|e| format!("the settings document is not JSON: {e}"))?;
+        if parsed != self.settings {
+            return Err(format!(
+                "the settings document {parsed} is not the settings {} this invocation carries",
+                self.settings
+            ));
+        }
+        self.settings_document = Some(document);
+        Ok(self)
     }
 
     /// The arguments, borrowed for a supervisor call.
@@ -121,6 +163,38 @@ mod tests {
         let joined = i.args.join(" ");
         assert!(!joined.contains("prompt"));
         assert_eq!(i.args.len(), 6);
+    }
+
+    #[test]
+    fn hooks_join_the_deny_rules_and_the_document_must_carry_both() {
+        let hooks = serde_json::json!({"SessionStart": [{"matcher": "startup",
+            "hooks": [{"type": "command", "command": "/x/hook.sh"}]}]});
+        let invocation =
+            Invocation::new("claude", &["Bash(x*)".to_string()], None).with_hooks(hooks.clone());
+        assert_eq!(invocation.settings["hooks"], hooks);
+        assert_eq!(invocation.deny_rules(), ["Bash(x*)"]);
+        // The floor alone is no longer this invocation's settings.
+        let floor_only = r#"{"permissions":{"deny":["Bash(x*)"]}}"#.to_string();
+        assert!(
+            invocation
+                .clone()
+                .with_settings_document(floor_only)
+                .is_err()
+        );
+        let both = serde_json::to_string(&invocation.settings).unwrap();
+        assert!(invocation.with_settings_document(both).is_ok());
+    }
+
+    #[test]
+    fn a_settings_document_must_be_the_settings_the_invocation_carries() {
+        let rules = ["Bash(echo:*)".to_string()];
+        let i = Invocation::new("claude", &rules, None);
+        let pretty = format!("{}\n", serde_json::to_string_pretty(&i.settings).unwrap());
+        let with = i.clone().with_settings_document(pretty.clone()).unwrap();
+        assert_eq!(with.settings_document.as_deref(), Some(pretty.as_str()));
+        assert_eq!(with.deny_rules(), rules);
+        assert!(i.clone().with_settings_document("{}".into()).is_err());
+        assert!(i.with_settings_document("not json".into()).is_err());
     }
 
     #[test]

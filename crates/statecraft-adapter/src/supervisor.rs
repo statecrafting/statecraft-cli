@@ -62,6 +62,47 @@ pub struct Supervised<E = Event> {
     pub stream_error: Option<StreamError>,
     /// Set when a process outlived the kill.
     pub surviving_processes: Option<String>,
+    /// Set when the caller's [`Watch`] refused the spawn or asked for the
+    /// process to be stopped, with the reason it gave. A stopped supervision is
+    /// `interrupted`: the process did not end by itself.
+    pub stopped: Option<String>,
+}
+
+/// What a [`Watch`] asks of the supervisor after it has seen an event.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum Control {
+    /// Keep reading.
+    Continue,
+    /// Kill the process group now, as at the deadline, keeping every event
+    /// read so far, and report this reason.
+    Stop(String),
+}
+
+/// A caller's view of one supervised launch (spec 004 section 5, 2026-09-22).
+///
+/// Both methods run on the supervising thread, so a watch may write files and
+/// hold state without synchronizing. Neither is given the prompt.
+pub trait Watch<E> {
+    /// The spawn call returned a process with this id. Called before the
+    /// prompt writer starts: an `Err` kills the process group, no prompt is
+    /// written, and the supervision reports the reason as `stopped`.
+    fn spawned(&mut self, pid: u32) -> Result<(), String>;
+
+    /// One decoded event, in stream order, before the next is read.
+    fn event(&mut self, event: &E) -> Control;
+}
+
+/// The watch a caller that supplies none gets: it confirms every spawn and
+/// never stops anything, so supervision is exactly what it was without one.
+pub struct Unwatched;
+
+impl<E> Watch<E> for Unwatched {
+    fn spawned(&mut self, _pid: u32) -> Result<(), String> {
+        Ok(())
+    }
+    fn event(&mut self, _event: &E) -> Control {
+        Control::Continue
+    }
 }
 
 /// Check a request against a manifest and an environment, before spawning.
@@ -123,14 +164,58 @@ pub fn supervise_stream<E: Send + 'static>(
     decode: fn(&str, usize) -> Result<E, StreamError>,
     is_terminal: fn(&E) -> bool,
 ) -> std::io::Result<Supervised<E>> {
-    let spawned = spawn_supervised(program, args, request, environment)?;
+    supervise_watched(
+        program,
+        args,
+        request,
+        environment,
+        decode,
+        is_terminal,
+        &mut Unwatched,
+    )
+}
+
+/// [`supervise_stream`], with a caller's [`Watch`] told of the spawn before the
+/// prompt is delivered and shown each event as it is read.
+///
+/// Spec 004 section 5, 2026-09-22, for spec 002 section 3.32: a launch whose
+/// spawn confirmation must be persisted before the process is given work, and
+/// whose startup decision may stop the process at an event.
+pub fn supervise_watched<E: Send + 'static>(
+    program: &Path,
+    args: &[&str],
+    request: &Request,
+    environment: &ChildEnvironment,
+    decode: fn(&str, usize) -> Result<E, StreamError>,
+    is_terminal: fn(&E) -> bool,
+    watch: &mut dyn Watch<E>,
+) -> std::io::Result<Supervised<E>> {
+    let spawned = match spawn_supervised(program, args, request, environment, &mut |pid| {
+        watch.spawned(pid)
+    })? {
+        Launched::Running(spawned) => spawned,
+        Launched::Refused {
+            reason,
+            surviving_processes,
+        } => {
+            return Ok(Supervised {
+                events: Vec::new(),
+                outcome: Outcome::Interrupted,
+                stream_error: None,
+                surviving_processes,
+                stopped: Some(reason),
+            });
+        }
+    };
     read_supervised(
         spawned.child,
         spawned.stdout,
         spawned.writer,
         spawned.deadline,
+        Instant::now,
         decode,
         is_terminal,
+        watch,
     )
 }
 
@@ -146,13 +231,24 @@ struct Spawned {
     deadline: Instant,
 }
 
+/// A spawn the caller confirmed, or one it refused and that was killed before
+/// it was given its prompt.
+enum Launched {
+    Running(Spawned),
+    Refused {
+        reason: String,
+        surviving_processes: Option<String>,
+    },
+}
+
 /// Spawn the adapter, start prompt delivery, and begin the deadline.
 fn spawn_supervised(
     program: &Path,
     args: &[&str],
     request: &Request,
     environment: &ChildEnvironment,
-) -> std::io::Result<Spawned> {
+    confirm: &mut dyn FnMut(u32) -> Result<(), String>,
+) -> std::io::Result<Launched> {
     let workspace = workspace_to_enter(&request.workspace)?;
 
     let mut command = Command::new(program);
@@ -175,6 +271,17 @@ fn spawn_supervised(
     let mut child = command.spawn()?;
     let deadline = Instant::now() + Duration::from_secs(request.deadline_seconds);
 
+    // The caller confirms the spawn before the process is given any work. A
+    // refusal kills the group with the prompt unwritten; dropping the piped
+    // stdin with the child closes it.
+    if let Err(reason) = confirm(child.id()) {
+        let surviving_processes = kill_tree(&mut child);
+        return Ok(Launched::Refused {
+            reason,
+            surviving_processes,
+        });
+    }
+
     // The prompt goes on a stream. It is never interpolated into a command line,
     // which is why `args` above carries no prompt and cannot. A child that does
     // not read it must not hold the supervisor outside its deadline loop.
@@ -187,12 +294,12 @@ fn spawn_supervised(
     });
 
     let stdout = child.stdout.take().expect("stdout was piped");
-    Ok(Spawned {
+    Ok(Launched::Running(Spawned {
         child,
         stdout,
         writer,
         deadline,
-    })
+    }))
 }
 
 /// What the reader thread hands back, in order, ending with exactly one `Ended`.
@@ -211,15 +318,22 @@ enum Item<E> {
 /// Read a spawned adapter's stream under its deadline, then clean up.
 ///
 /// Generic over the reader so a stdout failure can be injected without touching
-/// a live descriptor. Everything else, including child-exit observation,
-/// deadline enforcement and descendant handling, is the same in both uses.
+/// a live descriptor, and over the clock the deadline is compared against so an
+/// event-order claim can be tested without racing it (spec 004 section 5,
+/// 2026-09-22). Production passes [`Instant::now`] and the deadline computed at
+/// the spawn, so the deadline's start point is the spawn. Everything else,
+/// including child-exit observation, deadline enforcement and descendant
+/// handling, is the same in every use.
+#[allow(clippy::too_many_arguments)]
 fn read_supervised<E: Send + 'static, R: Read + Send + 'static>(
     mut child: Child,
     stdout: R,
     writer: JoinHandle<()>,
     deadline: Instant,
+    now: impl Fn() -> Instant,
     decode: fn(&str, usize) -> Result<E, StreamError>,
     is_terminal: fn(&E) -> bool,
+    watch: &mut dyn Watch<E>,
 ) -> std::io::Result<Supervised<E>> {
     let (tx, rx) = mpsc::sync_channel(16);
     let reader = std::thread::spawn(move || {
@@ -271,11 +385,19 @@ fn read_supervised<E: Send + 'static, R: Read + Send + 'static>(
     let mut read_failure: Option<String> = None;
     let mut timed_out = false;
     let mut ended = false;
+    let mut stopped: Option<String> = None;
 
     loop {
-        let remaining = deadline.saturating_duration_since(Instant::now());
+        let remaining = deadline.saturating_duration_since(now());
         if remaining.is_zero() {
             timed_out = true;
+            // What the reader had already delivered when the deadline fired
+            // was read before the deadline, and dropping it with the channel
+            // would lose exactly the evidence an interruption must keep: a
+            // terminal denial that arrived in the last polling interval.
+            if !ended {
+                drain_delivered(&rx, &mut events, &mut stream_error);
+            }
             break;
         }
         // Neither the end of the stream nor a terminal event says the child has
@@ -293,7 +415,14 @@ fn read_supervised<E: Send + 'static, R: Read + Send + 'static>(
         }
         match rx.recv_timeout(interval) {
             Ok(Item::Event(event)) => {
+                let control = watch.event(&event);
                 events.push(event);
+                if let Control::Stop(reason) = control {
+                    // The caller decided at this event. What follows it in
+                    // the pipe was not read, and is not waited for.
+                    stopped = Some(reason);
+                    break;
+                }
             }
             Ok(Item::Malformed(e)) => {
                 // Keep the diagnostic and preceding evidence through cleanup.
@@ -320,7 +449,7 @@ fn read_supervised<E: Send + 'static, R: Read + Send + 'static>(
         }
     }
 
-    let surviving = if timed_out {
+    let surviving = if timed_out || stopped.is_some() {
         let residual = kill_tree(&mut child);
         // The reader is NOT joined here, deliberately. It is blocked on a pipe
         // whose writers include anything the child left behind, so joining it
@@ -355,15 +484,16 @@ fn read_supervised<E: Send + 'static, R: Read + Send + 'static>(
                 detail,
                 events: events.len(),
             });
-        } else if !has_result && !timed_out {
+        } else if !has_result && !timed_out && stopped.is_none() {
             stream_error = Some(StreamError::NoResult {
                 events: events.len(),
             });
         }
     }
 
-    let outcome = if timed_out {
-        // Nothing was judged, so this is interrupted and not failed.
+    let outcome = if timed_out || stopped.is_some() {
+        // Nothing was judged, so this is interrupted and not failed. A process
+        // the caller stopped did not end by itself either.
         Outcome::Interrupted
     } else if stream_error.is_some() {
         // A stream that cannot be read is never a completion. It is also not a
@@ -380,7 +510,209 @@ fn read_supervised<E: Send + 'static, R: Read + Send + 'static>(
         outcome,
         stream_error,
         surviving_processes: surviving,
+        stopped,
     })
+}
+
+/// Absorb every item the reader had already delivered, without waiting.
+///
+/// Called only when the deadline has fired. It takes what is in the channel
+/// and nothing more: an item still being read is not an item that was read
+/// before the deadline, and waiting for it would be the supervisor being held
+/// past its own deadline by the child.
+fn drain_delivered<E>(
+    rx: &mpsc::Receiver<Item<E>>,
+    events: &mut Vec<E>,
+    stream_error: &mut Option<StreamError>,
+) {
+    while let Ok(item) = rx.try_recv() {
+        match item {
+            Item::Event(event) => events.push(event),
+            Item::Malformed(e) => {
+                if stream_error.is_none() {
+                    *stream_error = Some(e);
+                }
+            }
+            Item::Ended(_) => break,
+        }
+    }
+}
+
+/// What a raw capture read, and how the process ended.
+///
+/// The bytes are kept exactly as they arrived, standard output and standard
+/// error apart. Nothing is decoded here: a capture that is later judged has to
+/// be judged from what the process wrote, not from a reading of it.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Captured {
+    /// Standard output, verbatim.
+    pub stdout: Vec<u8>,
+    /// Standard error, verbatim.
+    pub stderr: Vec<u8>,
+    /// The exit code, when the process exited by itself.
+    pub code: Option<i32>,
+    /// The signal that ended it, when one did.
+    pub signal: Option<i32>,
+    /// Whether the deadline ended it.
+    pub timed_out: bool,
+    /// Set when something in its process group outlived it.
+    pub surviving_processes: Option<String>,
+}
+
+/// Spawn a program in its own process group, feed it `stdin`, and keep both
+/// output streams verbatim, under a deadline.
+///
+/// The same process-group supervision [`supervise`] uses, for a caller that has
+/// to keep the raw bytes rather than a decoded event stream. The deadline runs
+/// from the spawn. At the deadline the whole group is killed. A child that
+/// exits while a descendant is still in its group has the group killed too, and
+/// the survivor is reported, because a descendant left running is not a
+/// process that ended.
+///
+/// Readers are joined only once the child has exited and both pipes have
+/// closed, or not at all: a reader blocked on a pipe a survivor holds would
+/// otherwise hold the supervisor past its deadline.
+pub fn capture(
+    program: &Path,
+    args: &[&str],
+    workspace: &Path,
+    environment: &std::collections::BTreeMap<String, String>,
+    stdin: &[u8],
+    deadline: Duration,
+) -> std::io::Result<Captured> {
+    let workspace = workspace_to_enter(workspace)?;
+    let mut command = Command::new(program);
+    command
+        .args(args)
+        .current_dir(workspace)
+        .env_clear()
+        .envs(environment)
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped());
+    #[cfg(unix)]
+    {
+        use std::os::unix::process::CommandExt;
+        command.process_group(0);
+    }
+    let mut child = command.spawn()?;
+    let deadline = Instant::now() + deadline;
+
+    let mut input = child.stdin.take().expect("stdin was piped");
+    let bytes = stdin.to_vec();
+    let writer = std::thread::spawn(move || {
+        use std::io::Write;
+        let _ = input.write_all(&bytes);
+    });
+    let pipe = |mut from: Box<dyn Read + Send>| {
+        std::thread::spawn(move || {
+            let mut out = Vec::new();
+            let _ = from.read_to_end(&mut out);
+            out
+        })
+    };
+    let out = pipe(Box::new(child.stdout.take().expect("stdout was piped")));
+    let err = pipe(Box::new(child.stderr.take().expect("stderr was piped")));
+
+    let mut status = None;
+    let mut timed_out = false;
+    loop {
+        if status.is_none() {
+            status = child.try_wait()?;
+        }
+        if status.is_some() && out.is_finished() && err.is_finished() {
+            break;
+        }
+        if Instant::now() >= deadline {
+            timed_out = true;
+            break;
+        }
+        std::thread::sleep(Duration::from_millis(10));
+    }
+
+    let surviving = if timed_out {
+        let residual = kill_tree(&mut child);
+        if status.is_none() {
+            status = child.try_wait()?;
+        }
+        // The group is dead, so its pipes close and the readers finish with
+        // what was written before the deadline, which is the evidence a
+        // timeout keeps. Bounded: a writer that escaped the group is a
+        // survivor, and it does not get to hold this function either.
+        let settle = Instant::now() + Duration::from_secs(2);
+        while !(out.is_finished() && err.is_finished()) && Instant::now() < settle {
+            std::thread::sleep(Duration::from_millis(10));
+        }
+        residual
+    } else {
+        // The child is gone. Anything still answering in its group is a
+        // descendant it left behind, which is killed and reported.
+        group_survivor(&mut child)
+    };
+
+    let (stdout, stderr) = if out.is_finished() && err.is_finished() {
+        let _ = writer.join();
+        (
+            out.join().unwrap_or_default(),
+            err.join().unwrap_or_default(),
+        )
+    } else {
+        // A survivor may hold a pipe. The readers are dropped rather than
+        // joined, and what they had read is lost with them; the timeout and
+        // the survivor say why.
+        drop(writer);
+        (Vec::new(), Vec::new())
+    };
+
+    let (code, signal) = match status {
+        Some(s) => (s.code(), exit_signal(&s)),
+        None => (None, None),
+    };
+    Ok(Captured {
+        stdout,
+        stderr,
+        code,
+        signal,
+        timed_out,
+        surviving_processes: surviving,
+    })
+}
+
+#[cfg(unix)]
+fn exit_signal(status: &std::process::ExitStatus) -> Option<i32> {
+    use std::os::unix::process::ExitStatusExt;
+    status.signal()
+}
+
+#[cfg(not(unix))]
+fn exit_signal(_: &std::process::ExitStatus) -> Option<i32> {
+    None
+}
+
+/// After a child exited by itself, kill and report anything left in its group.
+#[cfg(unix)]
+fn group_survivor(child: &mut std::process::Child) -> Option<String> {
+    let pid = child.id();
+    let answers = Command::new("kill")
+        .args(["-s", "0", "--", &format!("-{pid}")])
+        .output()
+        .map(|o| o.status.success())
+        .unwrap_or(false);
+    if !answers {
+        return None;
+    }
+    let residual = kill_tree(child);
+    Some(residual.unwrap_or_else(|| {
+        format!(
+            "process group {pid} still had members after its leader exited; they were \
+             killed, and a process that left descendants running did not end cleanly"
+        )
+    }))
+}
+
+#[cfg(not(unix))]
+fn group_survivor(_: &mut std::process::Child) -> Option<String> {
+    None
 }
 
 /// The directory the child is spawned in, or why it is not one.
@@ -484,6 +816,124 @@ fn kill_tree(child: &mut std::process::Child) -> Option<String> {
 #[cfg(all(test, unix))]
 mod tests {
     use super::*;
+
+    /// An event the reader delivered before the deadline fired is kept.
+    ///
+    /// Deterministic: the channel is filled before the drain runs, which is
+    /// the state the deadline branch finds when the reader delivered in the
+    /// last polling interval. Before the drain existed, those items were
+    /// dropped with the channel.
+    #[test]
+    fn events_delivered_before_the_deadline_survive_it() {
+        let (tx, rx) = mpsc::sync_channel(16);
+        tx.send(Item::Event(1)).unwrap();
+        tx.send(Item::Event(2)).unwrap();
+        tx.send(Item::Malformed(StreamError::Malformed {
+            line: 3,
+            detail: "x".into(),
+        }))
+        .unwrap();
+        tx.send(Item::Event(4)).unwrap();
+        let mut events = Vec::new();
+        let mut error = None;
+        drain_delivered(&rx, &mut events, &mut error);
+        assert_eq!(events, [1, 2, 4]);
+        assert!(matches!(
+            error,
+            Some(StreamError::Malformed { line: 3, .. })
+        ));
+        // Nothing more was delivered, and the drain did not wait for more.
+        drop(tx);
+        drain_delivered(&rx, &mut events, &mut error);
+        assert_eq!(events.len(), 3);
+    }
+
+    fn sh(script: &str, stdin: &[u8], deadline: Duration) -> (Captured, tempfile::TempDir) {
+        let dir = tempfile::tempdir().unwrap();
+        let env: std::collections::BTreeMap<String, String> =
+            [("PATH".to_string(), "/usr/bin:/bin".to_string())].into();
+        let captured = capture(
+            Path::new("/bin/sh"),
+            &["-c", script],
+            dir.path(),
+            &env,
+            stdin,
+            deadline,
+        )
+        .unwrap();
+        (captured, dir)
+    }
+
+    #[test]
+    fn a_capture_keeps_both_streams_apart_and_verbatim() {
+        let (c, _dir) = sh(
+            "cat; printf 'to stderr\\377\\n' >&2; printf 'no newline'; exit 3",
+            b"in\n",
+            Duration::from_secs(30),
+        );
+        assert_eq!(c.stdout, b"in\nno newline");
+        assert_eq!(c.stderr, b"to stderr\xff\n");
+        assert_eq!((c.code, c.signal, c.timed_out), (Some(3), None, false));
+        assert!(c.surviving_processes.is_none());
+    }
+
+    #[test]
+    fn a_capture_says_which_signal_ended_the_process() {
+        let (c, _dir) = sh("kill -s TERM $$", b"", Duration::from_secs(30));
+        assert_eq!((c.code, c.signal, c.timed_out), (None, Some(15), false));
+    }
+
+    #[test]
+    fn a_capture_kills_the_whole_group_at_the_deadline_and_keeps_what_was_written() {
+        let started = Instant::now();
+        let (c, dir) = sh(
+            "sleep 300 & echo $! > descendant; echo before; exec sleep 300",
+            b"",
+            Duration::from_secs(1),
+        );
+        let elapsed = started.elapsed();
+        assert!(c.timed_out);
+        assert!(elapsed >= Duration::from_secs(1), "{elapsed:?}");
+        // Held by its own child it would take 300 seconds; this separates that
+        // defect from the latency of the `kill` it spawns.
+        assert!(elapsed < Duration::from_secs(60), "{elapsed:?}");
+        assert_eq!(c.stdout, b"before\n");
+        assert!(
+            c.surviving_processes.is_none(),
+            "{:?}",
+            c.surviving_processes
+        );
+        let pid = std::fs::read_to_string(dir.path().join("descendant")).unwrap();
+        let alive = Command::new("kill")
+            .args(["-s", "0", pid.trim()])
+            .output()
+            .unwrap()
+            .status
+            .success();
+        assert!(!alive, "descendant {pid} outlived the deadline");
+    }
+
+    #[test]
+    fn a_descendant_left_running_after_the_child_exits_is_killed_and_reported() {
+        // The descendant closes the pipes, so nothing holds the capture open:
+        // only the group check can see it.
+        let (c, dir) = sh(
+            "sleep 300 </dev/null >/dev/null 2>&1 & echo $! > descendant; exit 0",
+            b"",
+            Duration::from_secs(30),
+        );
+        assert!(!c.timed_out);
+        assert_eq!(c.code, Some(0));
+        assert!(c.surviving_processes.is_some());
+        let pid = std::fs::read_to_string(dir.path().join("descendant")).unwrap();
+        let alive = Command::new("kill")
+            .args(["-s", "0", pid.trim()])
+            .output()
+            .unwrap()
+            .status
+            .success();
+        assert!(!alive, "descendant {pid} was reported and left running");
+    }
     use crate::capability::Requested;
     use crate::environment::{Blueprint, CheckSuiteCommands, construct};
     use crate::protocol::{AttemptIdentity, Classification, read_stream};
@@ -547,13 +997,16 @@ mod tests {
             &Blueprint::empty().allowing("PATH", "/usr/bin:/bin"),
             &CheckSuiteCommands(vec![]),
         );
-        let spawned = spawn_supervised(
+        let Launched::Running(spawned) = spawn_supervised(
             Path::new("/bin/sh"),
             &["adapter.sh"],
             &request,
             &environment,
+            &mut |_| Ok(()),
         )
-        .unwrap();
+        .unwrap() else {
+            panic!("an unrefused spawn runs");
+        };
         let stdout = FailAfter {
             inner: spawned.stdout,
             budget: stream.len(),
@@ -563,8 +1016,10 @@ mod tests {
             stdout,
             spawned.writer,
             spawned.deadline,
+            Instant::now,
             parse_event,
             |event| matches!(event, Event::Result { .. }),
+            &mut Unwatched,
         )
         .unwrap();
 
@@ -586,5 +1041,458 @@ mod tests {
         let claimed = read_stream(&run.events, &[]).unwrap();
         assert_eq!(claimed.classification, Classification::Completed);
         assert_eq!(run.surviving_processes, None);
+    }
+
+    // ---- Event order and retention at the deadline, deterministically ----
+    //
+    // Spec 004 section 5, 2026-09-22. The real-process suite in
+    // `tests/deadline.rs` can only assert what holds whether or not a child
+    // ran. What the supervisor retains, and in which order, is decided here,
+    // through the reading seam with a clock the test controls: the scripted
+    // stream is delivered, and the deadline passes only once the reader has
+    // asked for bytes beyond it, so every scripted line is already in the
+    // channel when the deadline branch runs. The child is a real process in its
+    // own group, so the kill is real and its death is checked by process id.
+
+    use std::sync::Arc;
+    use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
+
+    const INIT: &str =
+        r#"{"event":"init","applied":[],"adapterVersion":"1.0","providerVersion":"fixture"}"#;
+    const REFUSAL: &str = r#"{"event":"refusal","guard":"fixture","detail":"blocked"}"#;
+    const RESULT: &str = r#"{"event":"result","classification":"completed","cost":{"amount":0.25,"unit":"fixture"}}"#;
+
+    /// What the scripted reader does once its bytes are delivered.
+    enum Then {
+        /// Blocks, as a pipe held open by a live writer does, until the test
+        /// drops the sender.
+        Hang(mpsc::Receiver<()>),
+        /// End of file.
+        Eof,
+    }
+
+    /// A stdout that delivers `bytes`, raises `beyond` the first time it is
+    /// asked for more, and then hangs or ends.
+    struct Scripted {
+        bytes: Vec<u8>,
+        offset: usize,
+        then: Then,
+        beyond: Arc<AtomicBool>,
+    }
+
+    impl Read for Scripted {
+        fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
+            let rest = &self.bytes[self.offset..];
+            let n = rest.len().min(buf.len());
+            if n > 0 {
+                buf[..n].copy_from_slice(&rest[..n]);
+                self.offset += n;
+                return Ok(n);
+            }
+            // Every complete line before this call has been decoded and sent:
+            // the reader asks for more bytes only once its buffer is spent.
+            self.beyond.store(true, Ordering::SeqCst);
+            // Bounded, so a supervisor that wrongly joined this reader fails
+            // its test by outcome rather than holding it forever.
+            if let Then::Hang(rx) = &self.then {
+                let _ = rx.recv_timeout(Duration::from_secs(60));
+            }
+            Ok(0)
+        }
+    }
+
+    /// A clock frozen before the deadline until `beyond` is raised, and past it
+    /// `polls` readings after that. `None` never passes it.
+    fn clock(deadline: Instant, beyond: Option<(Arc<AtomicBool>, usize)>) -> impl Fn() -> Instant {
+        let base = Instant::now();
+        let seen = AtomicUsize::new(0);
+        move || match &beyond {
+            Some((flag, polls)) if flag.load(Ordering::SeqCst) => {
+                if seen.fetch_add(1, Ordering::SeqCst) >= *polls {
+                    deadline + Duration::from_millis(1)
+                } else {
+                    base
+                }
+            }
+            _ => base,
+        }
+    }
+
+    /// A real child in its own process group, and its descendant, both
+    /// running before supervision starts. The marker is the synchronization
+    /// that establishes the prerequisite; the wait for it is bounded.
+    fn group(script: &str) -> (Child, tempfile::TempDir) {
+        use std::os::unix::process::CommandExt;
+        let dir = tempfile::tempdir().unwrap();
+        let child = Command::new("/bin/sh")
+            .args(["-c", script])
+            .current_dir(dir.path())
+            .process_group(0)
+            .stdin(Stdio::null())
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
+            .spawn()
+            .unwrap();
+        let started = Instant::now();
+        while !dir.path().join("ready").exists() {
+            assert!(
+                started.elapsed() < Duration::from_secs(60),
+                "the fixture child never started"
+            );
+            std::thread::sleep(Duration::from_millis(5));
+        }
+        (child, dir)
+    }
+
+    fn dead(pid: &str) -> bool {
+        !Command::new("kill")
+            .args(["-s", "0", pid.trim()])
+            .output()
+            .unwrap()
+            .status
+            .success()
+    }
+
+    struct Seam {
+        run: Supervised,
+        child_pid: u32,
+        dir: tempfile::TempDir,
+    }
+
+    /// Supervise `lines` through the seam, with `child_script` as the real
+    /// child and the writer either finished or blocked.
+    fn seam(
+        lines: &[&str],
+        then_hang: bool,
+        child_script: &str,
+        writer_blocked: bool,
+        advance: Option<usize>,
+    ) -> Seam {
+        let (child, dir) = group(child_script);
+        let child_pid = child.id();
+        let beyond = Arc::new(AtomicBool::new(false));
+        let mut bytes = lines.join("\n").into_bytes();
+        bytes.push(b'\n');
+        let (hold, held) = mpsc::channel::<()>();
+        let stdout = Scripted {
+            bytes,
+            offset: 0,
+            then: if then_hang {
+                Then::Hang(held)
+            } else {
+                Then::Eof
+            },
+            beyond: beyond.clone(),
+        };
+        let (block, blocked) = mpsc::channel::<()>();
+        let writer = std::thread::spawn(move || {
+            // Bounded for the same reason as the scripted reader's hang.
+            if writer_blocked {
+                let _ = blocked.recv_timeout(Duration::from_secs(60));
+            }
+        });
+        let deadline = Instant::now() + Duration::from_secs(1);
+        let run = read_supervised(
+            child,
+            stdout,
+            writer,
+            deadline,
+            clock(deadline, advance.map(|polls| (beyond, polls))),
+            parse_event,
+            |event| matches!(event, Event::Result { .. }),
+            &mut Unwatched,
+        )
+        .unwrap();
+        drop(hold);
+        drop(block);
+        Seam {
+            run,
+            child_pid,
+            dir,
+        }
+    }
+
+    const HANGS: &str = "sleep 300 & echo $! > descendant; : > ready; exec sleep 300";
+    const EXITS: &str = ": > ready; exit 0";
+
+    #[test]
+    fn a_terminal_event_then_a_hang_is_retained_whole_and_interrupted() {
+        let s = seam(&[INIT, REFUSAL, RESULT], true, HANGS, false, Some(0));
+        assert_eq!(s.run.outcome, Outcome::Interrupted);
+        assert_eq!(s.run.events.len(), 3, "{:?}", s.run.events);
+        assert!(matches!(s.run.events[0], Event::Init { .. }));
+        assert_eq!(crate::protocol::refusals(&s.run.events).len(), 1);
+        // The provider's claim is kept beside the supervisor's observation.
+        let claimed = read_stream(&s.run.events, &[]).unwrap();
+        assert_eq!(claimed.classification, Classification::Completed);
+        assert_eq!(s.run.stream_error, None);
+        assert_eq!(s.run.surviving_processes, None);
+        assert!(
+            dead(&s.child_pid.to_string()),
+            "the child outlived the kill"
+        );
+        let descendant = std::fs::read_to_string(s.dir.path().join("descendant")).unwrap();
+        assert!(
+            dead(&descendant),
+            "descendant {descendant} outlived the kill"
+        );
+    }
+
+    #[test]
+    fn a_malformed_line_keeps_the_events_before_it_and_its_diagnostic() {
+        let s = seam(
+            &[INIT, REFUSAL, "malformed", RESULT],
+            true,
+            HANGS,
+            false,
+            Some(0),
+        );
+        assert_eq!(s.run.outcome, Outcome::Interrupted);
+        assert_eq!(s.run.events.len(), 2, "{:?}", s.run.events);
+        assert!(matches!(
+            s.run.stream_error,
+            Some(StreamError::Malformed { line: 3, .. })
+        ));
+        assert_eq!(crate::protocol::refusals(&s.run.events).len(), 1);
+        assert_eq!(s.run.surviving_processes, None);
+    }
+
+    #[test]
+    fn end_of_file_with_a_live_child_holds_until_the_deadline_and_no_longer() {
+        // The clock passes the deadline only several polls after end of file,
+        // so a supervisor released by end of file alone would have returned
+        // un-timed-out before then, and would not read as interrupted.
+        let s = seam(&[INIT, REFUSAL], false, HANGS, false, Some(5));
+        assert_eq!(s.run.outcome, Outcome::Interrupted);
+        assert_eq!(s.run.events.len(), 2);
+        assert_eq!(
+            s.run.stream_error, None,
+            "a timeout is not a missing result"
+        );
+        assert!(dead(&s.child_pid.to_string()));
+    }
+
+    #[test]
+    fn a_blocked_prompt_writer_holds_until_the_deadline_and_no_longer() {
+        // The child has exited and the stream has ended; only the writer is
+        // still blocked. It must not release the supervisor early, and it must
+        // not hold it past the deadline either: it is dropped, not joined.
+        let s = seam(&[INIT, REFUSAL, RESULT], false, EXITS, true, Some(5));
+        assert_eq!(s.run.outcome, Outcome::Interrupted);
+        assert_eq!(s.run.events.len(), 3);
+        assert_eq!(s.run.surviving_processes, None);
+    }
+
+    #[test]
+    fn an_inherited_output_pipe_after_exit_is_interrupted_with_its_evidence() {
+        // The child exited; its pipe is still held, so the stream never ends.
+        let s = seam(&[INIT, REFUSAL, RESULT], true, EXITS, false, Some(0));
+        assert_eq!(s.run.outcome, Outcome::Interrupted);
+        assert_eq!(s.run.events.len(), 3);
+        let claimed = read_stream(&s.run.events, &[]).unwrap();
+        assert_eq!(claimed.classification, Classification::Completed);
+    }
+
+    #[test]
+    fn a_normal_completion_is_completed_with_its_whole_stream() {
+        // The clock never passes the deadline, so this cannot be a timeout.
+        let s = seam(&[INIT, REFUSAL, RESULT], false, EXITS, false, None);
+        assert_eq!(s.run.outcome, Outcome::Completed);
+        assert_eq!(s.run.events.len(), 3);
+        assert_eq!(s.run.stream_error, None);
+    }
+
+    #[test]
+    fn output_after_the_terminal_event_is_drained_and_not_read() {
+        let trailing = ["discard this trailing output"; 64];
+        let mut lines = vec![INIT, RESULT];
+        lines.extend(trailing);
+        let s = seam(&lines, false, EXITS, false, None);
+        assert_eq!(s.run.outcome, Outcome::Completed);
+        assert_eq!(s.run.events.len(), 2, "the trusted prefix only");
+    }
+
+    #[test]
+    fn an_exit_without_a_terminal_event_is_interrupted_with_no_result() {
+        let s = seam(&[INIT, REFUSAL], false, EXITS, false, None);
+        assert_eq!(s.run.outcome, Outcome::Interrupted);
+        assert_eq!(
+            s.run.stream_error,
+            Some(StreamError::NoResult { events: 2 })
+        );
+    }
+
+    // ---- The watch (spec 004 section 5, 2026-09-22) ----
+
+    /// Records what the supervisor told it, and answers as configured.
+    struct Recording {
+        refuse_spawn: Option<String>,
+        stop_at: Option<usize>,
+        spawned: Vec<u32>,
+        seen: usize,
+        at_spawn: Option<Box<dyn FnMut()>>,
+    }
+
+    impl Watch<Event> for Recording {
+        fn spawned(&mut self, pid: u32) -> Result<(), String> {
+            self.spawned.push(pid);
+            if let Some(check) = self.at_spawn.as_mut() {
+                check();
+            }
+            match &self.refuse_spawn {
+                Some(reason) => Err(reason.clone()),
+                None => Ok(()),
+            }
+        }
+        fn event(&mut self, _event: &Event) -> Control {
+            self.seen += 1;
+            match self.stop_at {
+                Some(n) if n == self.seen => Control::Stop(format!("stopped at event {n}")),
+                _ => Control::Continue,
+            }
+        }
+    }
+
+    fn watched(script: &str, watch: &mut Recording) -> (Supervised, tempfile::TempDir) {
+        let dir = tempfile::tempdir().unwrap();
+        let run = watched_in(dir.path(), script, watch);
+        (run, dir)
+    }
+
+    fn watched_in(dir: &Path, script: &str, watch: &mut Recording) -> Supervised {
+        std::fs::write(dir.join("child.sh"), script).unwrap();
+        let request = Request {
+            workspace: dir.to_path_buf(),
+            base_commit: "0".repeat(40),
+            prompt: b"fixture prompt".to_vec(),
+            capabilities: Requested::none(),
+            deadline_seconds: 30,
+            attempt: AttemptIdentity {
+                run_id: "watched".into(),
+                number: 1,
+            },
+        };
+        let environment = construct(
+            &Blueprint::empty().allowing("PATH", "/usr/bin:/bin"),
+            &CheckSuiteCommands(vec![]),
+        );
+        supervise_watched(
+            Path::new("/bin/sh"),
+            &["child.sh"],
+            &request,
+            &environment,
+            parse_event,
+            |event| matches!(event, Event::Result { .. }),
+            watch,
+        )
+        .unwrap()
+    }
+
+    fn recording() -> Recording {
+        Recording {
+            refuse_spawn: None,
+            stop_at: None,
+            spawned: Vec::new(),
+            seen: 0,
+            at_spawn: None,
+        }
+    }
+
+    /// The prompt writer starts after the watch confirmed the spawn, not
+    /// before: while the confirmation is held, the child has been given
+    /// nothing, and once it is released the child gets the whole prompt.
+    #[test]
+    fn the_prompt_is_delivered_only_after_the_spawn_is_confirmed() {
+        let dir = tempfile::tempdir().unwrap();
+        let script = format!("cat > got-prompt\nprintf '%s\\n' '{INIT}' '{RESULT}'\n");
+        let at_confirmation = Arc::new(std::sync::Mutex::new(None::<Vec<u8>>));
+        let slot = at_confirmation.clone();
+        let input = dir.path().join("got-prompt");
+        let mut watch = recording();
+        watch.at_spawn = Some(Box::new(move || {
+            // Hold the confirmation long enough for a writer, had one
+            // started, to have delivered the prompt. The redirection creates
+            // the file before `cat` reads, so absent and empty both mean
+            // nothing was delivered.
+            std::thread::sleep(Duration::from_millis(300));
+            *slot.lock().unwrap() = Some(std::fs::read(&input).unwrap_or_default());
+        }));
+        let run = watched_in(dir.path(), &script, &mut watch);
+        assert_eq!(
+            at_confirmation.lock().unwrap().as_deref(),
+            Some(&b""[..]),
+            "the child read its prompt before the spawn was confirmed"
+        );
+        assert_eq!(watch.spawned.len(), 1);
+        assert_eq!(run.outcome, Outcome::Completed, "{run:?}");
+        assert_eq!(run.stopped, None);
+        assert_eq!(
+            std::fs::read(dir.path().join("got-prompt")).unwrap(),
+            b"fixture prompt"
+        );
+    }
+
+    /// A refused confirmation kills the process with its prompt unwritten, and
+    /// nothing after the refusal runs.
+    #[test]
+    fn a_refused_confirmation_kills_the_process_and_delivers_no_prompt() {
+        let script = "echo $$ > pid\ncat > got-prompt\ntouch finished\n";
+        let mut watch = recording();
+        watch.refuse_spawn = Some("the confirmation could not be persisted".into());
+        let (run, dir) = watched(script, &mut watch);
+        assert_eq!(run.outcome, Outcome::Interrupted);
+        assert_eq!(
+            run.stopped.as_deref(),
+            Some("the confirmation could not be persisted")
+        );
+        assert!(run.events.is_empty());
+        assert_eq!(run.stream_error, None);
+        let got = std::fs::read(dir.path().join("got-prompt")).unwrap_or_default();
+        assert!(got.is_empty(), "a prompt reached a refused spawn: {got:?}");
+        assert!(!dir.path().join("finished").exists());
+        if let Ok(pid) = std::fs::read_to_string(dir.path().join("pid")) {
+            assert!(dead(&pid), "the refused process is still running");
+        }
+    }
+
+    /// A stop at an event kills the group before the child's next effect, keeps
+    /// the events read up to and including that one, and reads no more.
+    #[test]
+    fn a_watch_that_stops_at_an_event_kills_the_group_before_the_next_effect() {
+        let script = format!(
+            "cat > /dev/null\necho $$ > pid\nprintf '%s\\n' '{INIT}'\n\
+             while [ ! -f go ]; do sleep 0.05; done\ntouch effect\nprintf '%s\\n' '{RESULT}'\n"
+        );
+        let mut watch = recording();
+        watch.stop_at = Some(1);
+        let (run, dir) = watched(&script, &mut watch);
+        assert_eq!(run.outcome, Outcome::Interrupted);
+        assert_eq!(run.stopped.as_deref(), Some("stopped at event 1"));
+        assert_eq!(run.events.len(), 1);
+        assert!(matches!(run.events[0], Event::Init { .. }));
+        assert_eq!(run.stream_error, None, "a stop is not a transport failure");
+        // Release the child's next effect. A child still running would take
+        // it within one poll.
+        std::fs::write(dir.path().join("go"), "").unwrap();
+        std::thread::sleep(Duration::from_millis(500));
+        assert!(
+            !dir.path().join("effect").exists(),
+            "the effect ran after the stop"
+        );
+        let pid = std::fs::read_to_string(dir.path().join("pid")).unwrap();
+        assert!(dead(&pid));
+    }
+
+    /// Without a watch, supervision is unchanged: the watch that is supplied
+    /// by default confirms and never stops.
+    #[test]
+    fn an_unwatched_supervision_is_what_it_was() {
+        let mut watch = recording();
+        let script = format!("cat > /dev/null\nprintf '%s\\n' '{INIT}' '{REFUSAL}' '{RESULT}'\n");
+        let (run, _dir) = watched(&script, &mut watch);
+        assert_eq!(run.outcome, Outcome::Completed);
+        assert_eq!(run.events.len(), 3);
+        assert_eq!(watch.seen, 3);
+        assert_eq!(run.stopped, None);
     }
 }

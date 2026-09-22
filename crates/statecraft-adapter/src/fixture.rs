@@ -154,6 +154,37 @@ echo '{{"event":"result","classification":"completed","cost":null}}'
     Ok(path)
 }
 
+/// Install an executable script at `path` without this process ever holding
+/// `path` open for writing.
+///
+/// The race [`write`]'s note describes is not particular to the fixture
+/// adapter: any test that writes a script and then execs it, while sibling
+/// test threads fork, can hit `ETXTBSY`. This is the same staging and child
+/// copy, for any script a test needs. The staged file sits beside `path` and
+/// is removed once the copy is in place.
+pub fn install_script(path: &Path, contents: impl AsRef<[u8]>, mode: u32) -> std::io::Result<()> {
+    let mut staged_name = path
+        .file_name()
+        .ok_or_else(|| std::io::Error::other("a script path needs a file name"))?
+        .to_os_string();
+    staged_name.push(".staged");
+    let staged = path.with_file_name(staged_name);
+    let mut file = std::fs::File::create(&staged)?;
+    file.write_all(contents.as_ref())?;
+    file.sync_all()?;
+    drop(file);
+    copy_through_a_child(&staged, path)?;
+    std::fs::remove_file(&staged)?;
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        std::fs::set_permissions(path, std::fs::Permissions::from_mode(mode))?;
+    }
+    #[cfg(not(unix))]
+    let _ = mode;
+    Ok(())
+}
+
 /// Copy `from` to `to` in a child process, so this process never holds a
 /// descriptor open for writing on `to`.
 ///

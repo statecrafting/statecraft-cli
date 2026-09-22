@@ -2,7 +2,7 @@
 id: "004-execution-adapter"
 title: "The execution adapter boundary and the first provider: one protocol, declared capabilities, a qualification suite, a constructed child environment, and what a real stream can witness"
 status: approved
-implementation: in-progress
+implementation: complete
 created: "2026-09-16"
 summary: >
   The single seam through which this product runs an agent, and the first
@@ -1248,6 +1248,22 @@ watchdog that kills and reaps a worker the supervisor failed to release, it runs
 its cleanup before any assertion, and it is not evidence of anything the product
 promises. Nothing is retried, serialized or repeated to obtain a pass.
 
+**2026-09-22: the deadline suite, measured before and after.** Before: with the
+fixture's first line delayed two seconds, a stand-in for the `execve`
+starvation measured on 2026-09-21, `terminal_then_hang` failed on
+`matches!(run.events.first(), Some(Event::Init { .. }))` while the supervisor
+behaved correctly, returning `interrupted` at 1.03 seconds against its
+one-second deadline. That is the defect the entry above names: a test that
+fails with the product right. After: the suite carries that shape as an
+eleventh real-process row, `a_child_that_has_not_started_by_the_deadline`, and
+passes all twelve tests, the worker included. The supervisor's eight new seam
+tests pass, and two deliberate mutations, applied and reverted, show what they
+catch: removing the post-deadline drain fails the terminal-then-hang test, and
+letting end of file release the supervisor fails the end-of-file and
+blocked-writer tests. The seam's fixtures bound their own blocking at sixty
+seconds, so a supervisor that wrongly waits on them fails by outcome rather than
+holding the test run.
+
 **2026-09-22, authority: a caller may watch a supervised launch, confirm the
 spawn before the prompt is delivered, and stop the process at an event.** Spec
 `002` section 3.32 needs two things only this supervisor can give it. First, a
@@ -1274,6 +1290,18 @@ invocation, so an invocation may carry a `hooks` value in its settings beside
 the deny rules; the exact-bytes rule of the settings document is unchanged and
 now covers both, and an invocation that registers no hooks writes what it
 wrote before.
+
+**2026-09-22: a test that writes a script and execs it is the `ETXTBSY` race,
+wherever it is.** CI on this change's pull request failed one row of the
+negative suite, `the_prompt_reaches_the_child_on_a_stream_and_no_argument_carries_it`,
+with `ExecutableFileBusy`. The test wrote its own script in place and exec'd it,
+so a sibling thread's fork could hold that file open for writing at the moment
+of the exec: the race `fixture::write` already documents and avoids, at a site
+that bypassed it. The product was not involved. The staging is now a public
+helper, `fixture::install_script`, and every test in this spec's two crates that
+execs a script it wrote goes through it: the failing row, four execution tests,
+the settings-transport fixture, and three probe tests, the last being the
+second site the 2026-09-19 repair left.
 
 ## Verification
 
