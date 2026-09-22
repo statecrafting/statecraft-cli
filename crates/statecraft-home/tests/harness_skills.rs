@@ -7,22 +7,51 @@
 //! assertions live here.
 //!
 //! **What these tests are careful not to be.** The owner named the failure
-//! mode directly: a check that merely finds a phrase in a file. So every
-//! assertion below is over **parsed structure** (front matter, fenced command
-//! blocks, declared tools) rather than over prose, and the two that cannot be
-//! are written to fail on the thing that would actually be wrong rather than
-//! on a wording. A skill is prose and some of it can only be judged by
-//! reading; what can be judged mechanically is judged mechanically, and the
-//! rest is out of scope rather than faked.
+//! mode directly: a check that merely finds a phrase in a file. Most of what
+//! follows is therefore over **parsed structure** (front matter, fenced command
+//! blocks, declared tools) rather than over prose. Two are not, and the table
+//! below says which, because a phrase check labelled as one is honest and a
+//! phrase check counted as structure is the failure itself.
 //!
-//! | Assertion | Test |
-//! |---|---|
-//! | 3.23.1 no skill names a gate flag its project's AGENTS.md omits | `no_skill_names_a_gate_flag_of_its_own` |
-//! | 3.23.2 a read-only skill never invokes a writing verb | `a_read_only_skill_invokes_no_writing_verb` |
-//! | 3.23.3 each skill wraps the tool verbs it exists for | `every_skill_wraps_verbs_rather_than_restating_them` |
-//! | 3.14 rule 2, namespaced | `every_adopted_name_is_namespaced` |
-//! | 3.14 rule 3, project-gated | `every_adopted_file_states_the_project_gate` |
-//! | adoption defect: a project's own layout | `no_adopted_file_hardcodes_another_projects_layout` |
+//! **Every test in this file is a static content assertion.** None of them
+//! runs a skill, because a skill is not a program: it is instructions a model
+//! reads, and running it means running a session. That is the difference
+//! between this file and `harness_hooks.rs`, where every test writes a shipped
+//! body out and executes it. An earlier handoff described both files as
+//! "running the files rather than reading them"; that is true of the hooks and
+//! false of these, and the distinction is exactly section 3.26's first and
+//! third evidence classes, so it is corrected here rather than carried.
+//!
+//! | Assertion | Test | What it establishes |
+//! |---|---|---|
+//! | 3.23.1 no skill names a gate flag its project's AGENTS.md omits | `no_skill_names_a_gate_flag_of_its_own` | structural: over parsed fenced commands |
+//! | 3.23.2 a read-only skill never invokes a writing verb | `a_read_only_skill_invokes_no_writing_verb` | structural: declared read-only from front matter, commands from fences |
+//! | 3.23.3 each skill wraps the tool verbs it exists for | `every_skill_invokes_the_authority_it_wraps` | structural: each skill invokes the verb it exists for |
+//! | 3.23.3, the other half | `no_adopted_file_reads_a_governed_artifact_outside_the_tool` | structural: no ad-hoc parse of the derived tree |
+//! | 3.23.3, the weakest half | `every_skill_names_an_authority_to_defer_to` | **phrase check**, and labelled as one |
+//! | 3.14 rule 2, namespaced | `every_adopted_name_is_namespaced` | structural: over the dispatched `name` |
+//! | 3.14 rule 3, project-gated | `every_adopted_file_states_the_project_gate` | substring, over two required locations |
+//! | adoption defect: a project's own layout | `no_adopted_file_hardcodes_another_projects_layout` | substring, over a closed list |
+//!
+//! # Where a static check is insufficient, stated rather than papered over
+//!
+//! Three claims about a skill cannot be established by reading it, and no test
+//! here should be read as establishing them.
+//!
+//! 1. **That a session actually runs the commands the file names.** A skill is
+//!    advice; a model chooses. Only a live session establishes what one did.
+//! 2. **That the skill's judgment is sound.** Whether the ordering it advises
+//!    is the right ordering is a question about the prose, settled by review.
+//! 3. **That "wraps rather than restates" holds in full.** The two structural
+//!    halves below are real and they are not the whole property: a file could
+//!    invoke the authority verb and still paraphrase, beside it, an algorithm
+//!    that lives in the tool. Catching that is reading, and it was done on
+//!    adoption; what is mechanised is the part that regresses silently.
+//!
+//! The binary's own verb list is deliberately not probed here. It would turn
+//! a deterministic assertion into one that depends on which `spec-spine` a
+//! machine has installed, and a test that passes because a binary was absent
+//! is worse than no test.
 
 use statecraft_home::harness::{self, ADOPTED_AGENTS, ADOPTED_SKILLS};
 
@@ -241,15 +270,133 @@ fn a_skill_that_cannot_reach_a_shell_runs_no_commands() {
     }
 }
 
-/// Assertion 3: each skill wraps the tool verbs it exists for, rather than
-/// restating them.
+/// Assertion 3, first half: each skill actually invokes the verb it exists
+/// for.
 ///
-/// Restating means carrying a copy of a protocol that lives somewhere else,
-/// which is the thing that goes stale. The mechanical form of "wraps" is that
-/// the skill **points at the authority** rather than reproducing it, so every
-/// skill has to name `AGENTS.md`.
+/// "Wraps rather than restates" means the answer is **obtained from the tool**
+/// rather than reproduced from a reading of what the tool would have said. The
+/// mechanical form of that is that the skill runs the verb: a skill named for
+/// selecting work that never runs the selection verb is describing the
+/// selection, and a description of an algorithm is the thing that goes stale.
+///
+/// The table is exhaustive over the adopted inventory and the exemption list
+/// is closed, so a skill added without an entry fails rather than being
+/// covered by a default.
 #[test]
-fn every_skill_wraps_verbs_rather_than_restating_them() {
+fn every_skill_invokes_the_authority_it_wraps() {
+    // The verb each skill exists to wrap. Any one of the alternatives
+    // satisfies it: several skills wrap a small group rather than a single
+    // verb, and requiring all of them would assert an ordering rather than a
+    // delegation.
+    const WRAPS: [(&str, &[&str]); 9] = [
+        ("next", &["spec-spine registry plan"]),
+        ("build", &["spec-spine compile"]),
+        ("verify", &["spec-spine verify"]),
+        ("spec", &["spec-spine registry list", "spec-spine lint"]),
+        (
+            "setup",
+            &[
+                "spec-spine registry status-report",
+                "spec-spine index coverage",
+            ],
+        ),
+        (
+            "code-review",
+            &[
+                "spec-spine registry show",
+                "spec-spine registry relationships",
+            ],
+        ),
+        ("commit", &["git commit"]),
+        ("ship", &["gh pr create"]),
+        ("shepherd", &["gh pr view", "gh pr merge"]),
+    ];
+
+    // The one skill that wraps no verb, and why. Orientation: it tells a
+    // session what to read and in what order, and reading is not a verb this
+    // product owns. Listed rather than silently skipped, and the list is
+    // asserted closed below.
+    const WRAPS_NOTHING: [&str; 1] = ["prime"];
+
+    for (name, text) in ADOPTED_SKILLS {
+        if WRAPS_NOTHING.contains(&name) {
+            assert!(
+                commands(text).is_empty(),
+                "the skill {name} is listed as wrapping no verb and runs commands; \
+                 either it wraps one, and the table says which, or it does not"
+            );
+            continue;
+        }
+        let expected = WRAPS
+            .iter()
+            .find(|(n, _)| *n == name)
+            .unwrap_or_else(|| {
+                panic!(
+                    "the skill {name} is in neither table; a skill added without an \
+                     entry is a skill whose delegation nothing checks"
+                )
+            })
+            .1;
+        let ran = commands(text);
+        assert!(
+            ran.iter()
+                .any(|c| expected.iter().any(|verb| c.starts_with(verb))),
+            "the skill {name} never invokes any of {expected:?}, so whatever it says \
+             about them is a restatement rather than a wrapper; it runs {ran:?}"
+        );
+    }
+
+    assert_eq!(
+        WRAPS.len() + WRAPS_NOTHING.len(),
+        ADOPTED_SKILLS.len(),
+        "the two tables no longer cover the adopted inventory"
+    );
+}
+
+/// Assertion 3, second half: the governed artifacts are read through the tool.
+///
+/// The sharpest form of "restating the algorithm rather than wrapping the
+/// verb": the compiled artifacts are a typed answer, and a skill that reaches
+/// past the CLI into the JSON has reimplemented the tool's read in a shell
+/// pipeline that will encode a stale assumption the day the schema moves.
+///
+/// Narrow on purpose. `jq` over a `gh` response is a skill parsing an API's
+/// answer, which is nobody's governed artifact; only the derived tree is.
+#[test]
+fn no_adopted_file_reads_a_governed_artifact_outside_the_tool() {
+    const DERIVED: [&str; 2] = [".statecraft/derived", ".derived/"];
+    const AD_HOC: [&str; 6] = ["jq", "grep", "awk", "sed", "python", "cat"];
+    for (kind, name, text) in adopted() {
+        for command in commands(text) {
+            if !DERIVED.iter().any(|d| command.contains(d)) {
+                continue;
+            }
+            for parser in AD_HOC {
+                let parses = command
+                    .split_whitespace()
+                    .any(|w| w == parser || w.ends_with(&format!("/{parser}")));
+                assert!(
+                    !parses,
+                    "{kind} {name} runs `{command}`, which parses the derived tree with \
+                     {parser} instead of asking the tool; a typed read fails at the \
+                     deserializer and an ad-hoc one silently encodes a stale assumption"
+                );
+            }
+        }
+    }
+}
+
+/// Assertion 3, weakest half: every skill names an authority to defer to.
+///
+/// **A phrase check, and it is labelled one.** It establishes that the string
+/// `AGENTS.md` appears, which means a reader is pointed somewhere; it does
+/// **not** establish that the skill wraps a tool rather than duplicating its
+/// algorithm. The two tests above are the structural halves of that property.
+/// This one is kept because it catches the specific regression of a file
+/// losing its pointer to the project layer, and it is described accurately so
+/// nothing downstream reads it as more than that.
+#[test]
+fn every_skill_names_an_authority_to_defer_to() {
     for (name, text) in ADOPTED_SKILLS {
         assert!(
             text.contains("AGENTS.md"),
