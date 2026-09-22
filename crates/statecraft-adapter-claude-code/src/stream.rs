@@ -69,6 +69,9 @@ pub enum ProviderEvent {
 pub struct SystemEvent {
     /// Which system event this is.
     pub subtype: String,
+    /// The session this event belongs to. Every recorded event carries one.
+    #[serde(default)]
+    pub session_id: Option<String>,
     /// The provider's own version, from the init event.
     #[serde(default)]
     pub claude_code_version: Option<String>,
@@ -102,6 +105,10 @@ pub struct SystemEvent {
     /// And the tool-use id, which ties it to the result's denial entry.
     #[serde(default)]
     pub tool_use_id: Option<String>,
+    /// A `permission_denied` event's own classification of why. Recorded as
+    /// `subcommandResults` on 2.1.267. Carried for a record, never decisive.
+    #[serde(default)]
+    pub decision_reason_type: Option<String>,
     /// Prose. Never parsed for a decision: spec 004 section 3.1 requires a
     /// refusal to be a structured event rather than text pulled out of a
     /// transcript, and this field is carried, not read.
@@ -127,12 +134,128 @@ impl SystemEvent {
     }
 }
 
-/// An `assistant` or `user` event. The body is carried, never interpreted.
+/// An `assistant` or `user` event.
+///
+/// The body is carried, and interpreted only as far as the two structured
+/// blocks a tool call leaves: an assistant's `tool_use` and the `tool_result`
+/// fed back in the next user event. Spec 002 section 3.30 rule 7 needs them
+/// correlated, and typing them here keeps that reading in the adapter that owns
+/// these bytes rather than in a second parser elsewhere. Text blocks are never
+/// read for a decision.
 #[derive(Debug, Clone, Deserialize)]
 pub struct MessageEvent {
-    /// The provider's message object, opaque here.
+    /// The provider's message object.
     #[serde(default)]
     pub message: serde_json::Value,
+    /// The session this event belongs to.
+    #[serde(default)]
+    pub session_id: Option<String>,
+    /// The harness's own notes on the tool results this event carries.
+    ///
+    /// Recorded on 2.1.267 beside a denied tool result as
+    /// `{"id": <tool-use id>, "non_execution_kind": "permission-rule"}`, and
+    /// absent beside a tool that ran. It is the harness saying a result is not
+    /// an execution, which a result's error flag does not say: a command that
+    /// ran and failed carries the same flag.
+    #[serde(default)]
+    pub tool_result_meta: Vec<ToolResultMeta>,
+}
+
+/// One entry of a user event's `tool_result_meta`.
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+pub struct ToolResultMeta {
+    /// The tool-use id the note is about.
+    pub id: String,
+    /// Why the tool did not execute, when it did not.
+    #[serde(default)]
+    pub non_execution_kind: Option<String>,
+}
+
+/// An assistant's request to run a tool. A request, not an execution.
+#[derive(Debug, Clone, PartialEq, Deserialize)]
+pub struct ToolUse {
+    /// The tool-use id every later event about this call names.
+    pub id: String,
+    /// Which tool.
+    pub name: String,
+    /// The input, verbatim.
+    #[serde(default)]
+    pub input: serde_json::Value,
+}
+
+impl ToolUse {
+    /// The `command` the input names, when it names one.
+    pub fn command(&self) -> Option<&str> {
+        self.input.get("command").and_then(serde_json::Value::as_str)
+    }
+}
+
+/// What the harness fed back for one tool use.
+#[derive(Debug, Clone, PartialEq, Deserialize)]
+pub struct ToolResult {
+    /// The tool use this answers.
+    pub tool_use_id: String,
+    /// The harness's error flag. Set for a refusal **and** for a command that
+    /// ran and failed, so it does not say which.
+    #[serde(default)]
+    pub is_error: bool,
+    /// The content, a string or a list of text blocks.
+    #[serde(default)]
+    pub content: serde_json::Value,
+}
+
+impl ToolResult {
+    /// The content as text: the string itself, or the text blocks joined.
+    ///
+    /// `None` when the content is neither, which is a shape this build has not
+    /// seen and does not guess at.
+    pub fn text(&self) -> Option<String> {
+        match &self.content {
+            serde_json::Value::String(s) => Some(s.clone()),
+            serde_json::Value::Array(blocks) => blocks
+                .iter()
+                .map(|b| match b.get("type").and_then(serde_json::Value::as_str) {
+                    Some("text") => b.get("text").and_then(serde_json::Value::as_str),
+                    _ => None,
+                })
+                .collect::<Option<Vec<_>>>()
+                .map(|parts| parts.concat()),
+            _ => None,
+        }
+    }
+}
+
+impl MessageEvent {
+    /// The message's content blocks of one type, typed.
+    ///
+    /// A block of that type that does not deserialize is an error rather than
+    /// skipped: a tool use without an id cannot be correlated with anything,
+    /// and silently dropping it would make a capture look like it held fewer
+    /// calls than it did.
+    fn blocks<T: serde::de::DeserializeOwned>(&self, kind: &str) -> Result<Vec<T>, String> {
+        let Some(content) = self
+            .message
+            .get("content")
+            .and_then(serde_json::Value::as_array)
+        else {
+            return Ok(Vec::new());
+        };
+        content
+            .iter()
+            .filter(|b| b.get("type").and_then(serde_json::Value::as_str) == Some(kind))
+            .map(|b| serde_json::from_value(b.clone()).map_err(|e| format!("a {kind} block: {e}")))
+            .collect()
+    }
+
+    /// Every tool use this message requests.
+    pub fn tool_uses(&self) -> Result<Vec<ToolUse>, String> {
+        self.blocks("tool_use")
+    }
+
+    /// Every tool result this message carries.
+    pub fn tool_results(&self) -> Result<Vec<ToolResult>, String> {
+        self.blocks("tool_result")
+    }
 }
 
 /// One entry of the result event's refusal record.
@@ -158,6 +281,9 @@ pub struct ResultEvent {
     /// The provider's own terminal subtype: measured `"success"` and
     /// `"error_max_turns"`.
     pub subtype: String,
+    /// The session this event ends.
+    #[serde(default)]
+    pub session_id: Option<String>,
     /// The provider's own error flag. **A claim, never an outcome.**
     #[serde(default)]
     pub is_error: bool,
@@ -363,6 +489,108 @@ mod tests {
     fn an_event_type_this_build_does_not_map_is_progress_and_not_an_error() {
         let events = read_jsonl("{\"type\":\"rate_limit_event\",\"x\":1}\n").unwrap();
         assert!(matches!(events[0], ProviderEvent::Unknown));
+    }
+
+    /// The recorded denied stream: the request, the refusal and the result are
+    /// three events about one tool-use id, and the result is marked as not
+    /// executed by the harness itself.
+    #[test]
+    fn a_recorded_denial_correlates_request_result_and_refusal_by_one_id() {
+        let events = read_jsonl(include_str!("../testdata/stream/denied.jsonl")).unwrap();
+        let mut uses = Vec::new();
+        let mut results = Vec::new();
+        let mut meta = Vec::new();
+        let mut sessions = std::collections::BTreeSet::new();
+        let mut mid_stream = Vec::new();
+        let mut denials = Vec::new();
+        for event in &events {
+            match event {
+                ProviderEvent::System(s) => {
+                    sessions.insert(s.session_id.clone());
+                    if s.is_permission_denied() {
+                        mid_stream.push((s.tool_use_id.clone(), s.decision_reason_type.clone()));
+                    }
+                }
+                ProviderEvent::Assistant(m) => {
+                    sessions.insert(m.session_id.clone());
+                    uses.extend(m.tool_uses().unwrap());
+                }
+                ProviderEvent::User(m) => {
+                    sessions.insert(m.session_id.clone());
+                    results.extend(m.tool_results().unwrap());
+                    meta.extend(m.tool_result_meta.clone());
+                }
+                ProviderEvent::Result(r) => {
+                    sessions.insert(r.session_id.clone());
+                    denials.extend(r.permission_denials.clone());
+                }
+                ProviderEvent::Unknown => {}
+            }
+        }
+        assert_eq!(sessions.len(), 1, "one session: {sessions:?}");
+        assert!(sessions.iter().all(Option::is_some));
+        assert_eq!(uses.len(), 1);
+        let id = &uses[0].id;
+        assert_eq!(uses[0].name, "Bash");
+        assert_eq!(uses[0].command(), Some("echo hello"));
+        assert_eq!(results.len(), 1);
+        assert_eq!(&results[0].tool_use_id, id);
+        assert!(results[0].is_error);
+        assert_eq!(
+            meta,
+            [ToolResultMeta {
+                id: id.clone(),
+                non_execution_kind: Some("permission-rule".into())
+            }]
+        );
+        assert_eq!(mid_stream, [(Some(id.clone()), Some("subcommandResults".into()))]);
+        assert_eq!(denials.len(), 1);
+        assert_eq!(&denials[0].tool_use_id, id);
+        assert_eq!(denials[0].tool_input, uses[0].input);
+    }
+
+    /// The recorded turn-capped stream: a tool that ran has a result and no
+    /// non-execution note, and its result precedes the capped terminal event.
+    #[test]
+    fn a_recorded_execution_has_a_result_and_no_non_execution_note() {
+        let events = read_jsonl(include_str!("../testdata/stream/max-turns.jsonl")).unwrap();
+        let mut order = Vec::new();
+        for event in &events {
+            match event {
+                ProviderEvent::Assistant(m) => {
+                    for u in m.tool_uses().unwrap() {
+                        order.push(format!("use {}", u.id));
+                    }
+                }
+                ProviderEvent::User(m) => {
+                    assert!(m.tool_result_meta.is_empty());
+                    for r in m.tool_results().unwrap() {
+                        assert!(!r.is_error);
+                        assert!(r.text().is_some());
+                        order.push(format!("result {}", r.tool_use_id));
+                    }
+                }
+                ProviderEvent::Result(r) => {
+                    assert_eq!(r.terminal_reason.as_deref(), Some("max_turns"));
+                    order.push("terminal".into());
+                }
+                _ => {}
+            }
+        }
+        assert_eq!(order.len(), 3, "{order:?}");
+        assert!(order[0].starts_with("use "));
+        assert_eq!(order[1].replacen("result", "use", 1), order[0]);
+        assert_eq!(order[2], "terminal");
+    }
+
+    #[test]
+    fn a_tool_use_block_without_an_id_is_an_error_and_not_skipped() {
+        let line = r#"{"type":"assistant","message":{"content":[{"type":"tool_use","name":"Bash","input":{"command":"x"}}]}}"#;
+        let events = read_jsonl(line).unwrap();
+        let ProviderEvent::Assistant(m) = &events[0] else {
+            panic!("an assistant event")
+        };
+        assert!(m.tool_uses().is_err());
     }
 
     #[test]

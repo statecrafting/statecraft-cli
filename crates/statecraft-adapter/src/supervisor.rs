@@ -383,6 +383,180 @@ fn read_supervised<E: Send + 'static, R: Read + Send + 'static>(
     })
 }
 
+/// What a raw capture read, and how the process ended.
+///
+/// The bytes are kept exactly as they arrived, standard output and standard
+/// error apart. Nothing is decoded here: a capture that is later judged has to
+/// be judged from what the process wrote, not from a reading of it.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Captured {
+    /// Standard output, verbatim.
+    pub stdout: Vec<u8>,
+    /// Standard error, verbatim.
+    pub stderr: Vec<u8>,
+    /// The exit code, when the process exited by itself.
+    pub code: Option<i32>,
+    /// The signal that ended it, when one did.
+    pub signal: Option<i32>,
+    /// Whether the deadline ended it.
+    pub timed_out: bool,
+    /// Set when something in its process group outlived it.
+    pub surviving_processes: Option<String>,
+}
+
+/// Spawn a program in its own process group, feed it `stdin`, and keep both
+/// output streams verbatim, under a deadline.
+///
+/// The same process-group supervision [`supervise`] uses, for a caller that has
+/// to keep the raw bytes rather than a decoded event stream. The deadline runs
+/// from the spawn. At the deadline the whole group is killed. A child that
+/// exits while a descendant is still in its group has the group killed too, and
+/// the survivor is reported, because a descendant left running is not a
+/// process that ended.
+///
+/// Readers are joined only once the child has exited and both pipes have
+/// closed, or not at all: a reader blocked on a pipe a survivor holds would
+/// otherwise hold the supervisor past its deadline.
+pub fn capture(
+    program: &Path,
+    args: &[&str],
+    workspace: &Path,
+    environment: &std::collections::BTreeMap<String, String>,
+    stdin: &[u8],
+    deadline: Duration,
+) -> std::io::Result<Captured> {
+    let workspace = workspace_to_enter(workspace)?;
+    let mut command = Command::new(program);
+    command
+        .args(args)
+        .current_dir(workspace)
+        .env_clear()
+        .envs(environment)
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped());
+    #[cfg(unix)]
+    {
+        use std::os::unix::process::CommandExt;
+        command.process_group(0);
+    }
+    let mut child = command.spawn()?;
+    let deadline = Instant::now() + deadline;
+
+    let mut input = child.stdin.take().expect("stdin was piped");
+    let bytes = stdin.to_vec();
+    let writer = std::thread::spawn(move || {
+        use std::io::Write;
+        let _ = input.write_all(&bytes);
+    });
+    let pipe = |mut from: Box<dyn Read + Send>| {
+        std::thread::spawn(move || {
+            let mut out = Vec::new();
+            let _ = from.read_to_end(&mut out);
+            out
+        })
+    };
+    let out = pipe(Box::new(child.stdout.take().expect("stdout was piped")));
+    let err = pipe(Box::new(child.stderr.take().expect("stderr was piped")));
+
+    let mut status = None;
+    let mut timed_out = false;
+    loop {
+        if status.is_none() {
+            status = child.try_wait()?;
+        }
+        if status.is_some() && out.is_finished() && err.is_finished() {
+            break;
+        }
+        if Instant::now() >= deadline {
+            timed_out = true;
+            break;
+        }
+        std::thread::sleep(Duration::from_millis(10));
+    }
+
+    let surviving = if timed_out {
+        let residual = kill_tree(&mut child);
+        if status.is_none() {
+            status = child.try_wait()?;
+        }
+        // The group is dead, so its pipes close and the readers finish with
+        // what was written before the deadline, which is the evidence a
+        // timeout keeps. Bounded: a writer that escaped the group is a
+        // survivor, and it does not get to hold this function either.
+        let settle = Instant::now() + Duration::from_secs(2);
+        while !(out.is_finished() && err.is_finished()) && Instant::now() < settle {
+            std::thread::sleep(Duration::from_millis(10));
+        }
+        residual
+    } else {
+        // The child is gone. Anything still answering in its group is a
+        // descendant it left behind, which is killed and reported.
+        group_survivor(&mut child)
+    };
+
+    let (stdout, stderr) = if out.is_finished() && err.is_finished() {
+        let _ = writer.join();
+        (out.join().unwrap_or_default(), err.join().unwrap_or_default())
+    } else {
+        // A survivor may hold a pipe. The readers are dropped rather than
+        // joined, and what they had read is lost with them; the timeout and
+        // the survivor say why.
+        drop(writer);
+        (Vec::new(), Vec::new())
+    };
+
+    let (code, signal) = match status {
+        Some(s) => (s.code(), exit_signal(&s)),
+        None => (None, None),
+    };
+    Ok(Captured {
+        stdout,
+        stderr,
+        code,
+        signal,
+        timed_out,
+        surviving_processes: surviving,
+    })
+}
+
+#[cfg(unix)]
+fn exit_signal(status: &std::process::ExitStatus) -> Option<i32> {
+    use std::os::unix::process::ExitStatusExt;
+    status.signal()
+}
+
+#[cfg(not(unix))]
+fn exit_signal(_: &std::process::ExitStatus) -> Option<i32> {
+    None
+}
+
+/// After a child exited by itself, kill and report anything left in its group.
+#[cfg(unix)]
+fn group_survivor(child: &mut std::process::Child) -> Option<String> {
+    let pid = child.id();
+    let answers = Command::new("kill")
+        .args(["-s", "0", "--", &format!("-{pid}")])
+        .output()
+        .map(|o| o.status.success())
+        .unwrap_or(false);
+    if !answers {
+        return None;
+    }
+    let residual = kill_tree(child);
+    Some(residual.unwrap_or_else(|| {
+        format!(
+            "process group {pid} still had members after its leader exited; they were \
+             killed, and a process that left descendants running did not end cleanly"
+        )
+    }))
+}
+
+#[cfg(not(unix))]
+fn group_survivor(_: &mut std::process::Child) -> Option<String> {
+    None
+}
+
 /// The directory the child is spawned in, or why it is not one.
 ///
 /// Spec 003 section 3.2 prepares an isolated worktree and says the operator's
@@ -484,6 +658,89 @@ fn kill_tree(child: &mut std::process::Child) -> Option<String> {
 #[cfg(all(test, unix))]
 mod tests {
     use super::*;
+
+    fn sh(script: &str, stdin: &[u8], deadline: Duration) -> (Captured, tempfile::TempDir) {
+        let dir = tempfile::tempdir().unwrap();
+        let env: std::collections::BTreeMap<String, String> =
+            [("PATH".to_string(), "/usr/bin:/bin".to_string())].into();
+        let captured = capture(
+            Path::new("/bin/sh"),
+            &["-c", script],
+            dir.path(),
+            &env,
+            stdin,
+            deadline,
+        )
+        .unwrap();
+        (captured, dir)
+    }
+
+    #[test]
+    fn a_capture_keeps_both_streams_apart_and_verbatim() {
+        let (c, _dir) = sh(
+            "cat; printf 'to stderr\\377\\n' >&2; printf 'no newline'; exit 3",
+            b"in\n",
+            Duration::from_secs(30),
+        );
+        assert_eq!(c.stdout, b"in\nno newline");
+        assert_eq!(c.stderr, b"to stderr\xff\n");
+        assert_eq!((c.code, c.signal, c.timed_out), (Some(3), None, false));
+        assert!(c.surviving_processes.is_none());
+    }
+
+    #[test]
+    fn a_capture_says_which_signal_ended_the_process() {
+        let (c, _dir) = sh("kill -s TERM $$", b"", Duration::from_secs(30));
+        assert_eq!((c.code, c.signal, c.timed_out), (None, Some(15), false));
+    }
+
+    #[test]
+    fn a_capture_kills_the_whole_group_at_the_deadline_and_keeps_what_was_written() {
+        let started = Instant::now();
+        let (c, dir) = sh(
+            "sleep 300 & echo $! > descendant; echo before; exec sleep 300",
+            b"",
+            Duration::from_secs(1),
+        );
+        let elapsed = started.elapsed();
+        assert!(c.timed_out);
+        assert!(elapsed >= Duration::from_secs(1), "{elapsed:?}");
+        // Held by its own child it would take 300 seconds; this separates that
+        // defect from the latency of the `kill` it spawns.
+        assert!(elapsed < Duration::from_secs(60), "{elapsed:?}");
+        assert_eq!(c.stdout, b"before\n");
+        assert!(c.surviving_processes.is_none(), "{:?}", c.surviving_processes);
+        let pid = std::fs::read_to_string(dir.path().join("descendant")).unwrap();
+        let alive = Command::new("kill")
+            .args(["-s", "0", pid.trim()])
+            .output()
+            .unwrap()
+            .status
+            .success();
+        assert!(!alive, "descendant {pid} outlived the deadline");
+    }
+
+    #[test]
+    fn a_descendant_left_running_after_the_child_exits_is_killed_and_reported() {
+        // The descendant closes the pipes, so nothing holds the capture open:
+        // only the group check can see it.
+        let (c, dir) = sh(
+            "sleep 300 </dev/null >/dev/null 2>&1 & echo $! > descendant; exit 0",
+            b"",
+            Duration::from_secs(30),
+        );
+        assert!(!c.timed_out);
+        assert_eq!(c.code, Some(0));
+        assert!(c.surviving_processes.is_some());
+        let pid = std::fs::read_to_string(dir.path().join("descendant")).unwrap();
+        let alive = Command::new("kill")
+            .args(["-s", "0", pid.trim()])
+            .output()
+            .unwrap()
+            .status
+            .success();
+        assert!(!alive, "descendant {pid} was reported and left running");
+    }
     use crate::capability::Requested;
     use crate::environment::{Blueprint, CheckSuiteCommands, construct};
     use crate::protocol::{AttemptIdentity, Classification, read_stream};
