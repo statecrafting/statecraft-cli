@@ -78,7 +78,9 @@ pub enum Verb {
     SessionPayload,
     /// `startup record <path> <session-id>`
     StartupRecord,
-    /// `startup qualify <path> <session-id> <submission>`
+    /// `startup capture <path> <control> <capture-dir>`
+    StartupCapture,
+    /// `startup qualify <path> <session-id> <capture-dir>`
     StartupQualify,
     /// `--help`, optionally with a group or a verb as its topic.
     ///
@@ -123,6 +125,7 @@ impl Verb {
             Verb::HarnessUpgrade => "harness upgrade",
             Verb::SessionPayload => "session payload",
             Verb::StartupRecord => "startup record",
+            Verb::StartupCapture => "startup capture",
             Verb::StartupQualify => "startup qualify",
             Verb::Help => "--help",
         }
@@ -172,6 +175,9 @@ impl Verb {
             | Verb::HarnessUpgrade
             | Verb::SessionPayload
             | Verb::StartupRecord
+            // Spec 006 section 3.11.2: the launch that binds a control to its
+            // settings.
+            | Verb::StartupCapture
             | Verb::StartupQualify => "002-environment-lifecycle",
             Verb::Help => "006-command-surface",
         }
@@ -181,7 +187,7 @@ impl Verb {
     ///
     /// [`Verb::Help`] is deliberately absent: it is not an operation, and a
     /// usage error listing it would offer help as a thing to do.
-    pub fn all() -> [Verb; 32] {
+    pub fn all() -> [Verb; 33] {
         [
             Verb::ProjectRegister,
             Verb::ProjectList,
@@ -214,6 +220,7 @@ impl Verb {
             Verb::HarnessUpgrade,
             Verb::SessionPayload,
             Verb::StartupRecord,
+            Verb::StartupCapture,
             Verb::StartupQualify,
         ]
     }
@@ -263,6 +270,7 @@ impl Verb {
             ("harness", Some("upgrade")) => Some((Verb::HarnessUpgrade, 2)),
             ("session", Some("payload")) => Some((Verb::SessionPayload, 2)),
             ("startup", Some("record")) => Some((Verb::StartupRecord, 2)),
+            ("startup", Some("capture")) => Some((Verb::StartupCapture, 2)),
             ("startup", Some("qualify")) => Some((Verb::StartupQualify, 2)),
             _ => None,
         }

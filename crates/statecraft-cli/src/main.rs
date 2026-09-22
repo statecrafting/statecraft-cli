@@ -168,6 +168,7 @@ fn run(args: &[String]) -> i32 {
         | Verb::HarnessShow
         | Verb::HarnessUpgrade
         | Verb::StartupRecord
+        | Verb::StartupCapture
         | Verb::StartupQualify => {
             let Some(path) = invocation.rest.first() else {
                 eprintln!(

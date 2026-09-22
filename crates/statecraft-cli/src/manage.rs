@@ -201,12 +201,54 @@ pub fn operation(
             root: root()?,
             session_id: rest.first()?.clone(),
         },
+        Verb::StartupCapture => startup_capture(root()?, rest)?,
         Verb::StartupQualify => Operation::StartupQualify {
             root: root()?,
             session_id: rest.first()?.clone(),
             submission: std::path::PathBuf::from(rest.get(1)?),
         },
         _ => return None,
+    })
+}
+
+/// `startup capture`'s arguments, and nothing it could use to describe an
+/// invocation: the arguments, prompt, commands and settings are constructed by
+/// the operation (spec 006 section 3.11.2). The environment is this process's
+/// own, passed through exactly, because the provider is the operator's.
+fn startup_capture(root: std::path::PathBuf, rest: &[String]) -> Option<Operation> {
+    let control = statecraft_home::admission::Control::from_word(rest.first()?)?;
+    let directory = std::path::PathBuf::from(rest.get(1)?);
+    let mut program = "claude".to_string();
+    let mut deadline_seconds = statecraft_home::capture::DEFAULT_DEADLINE_SECONDS;
+    let mut synthetic = false;
+    let mut i = 2;
+    while i < rest.len() {
+        match rest[i].as_str() {
+            "--program" => {
+                program = rest.get(i + 1)?.clone();
+                i += 1;
+            }
+            "--deadline" => {
+                deadline_seconds = rest.get(i + 1)?.parse().ok().filter(|s| *s > 0)?;
+                i += 1;
+            }
+            "--synthetic" => synthetic = true,
+            _ => return None,
+        }
+        i += 1;
+    }
+    Some(Operation::StartupCapture {
+        root,
+        control,
+        directory,
+        program,
+        deadline_seconds,
+        synthetic,
+        // A variable that is not UTF-8 cannot be carried in the map the
+        // supervisor takes, and is left out rather than panicking.
+        environment: std::env::vars_os()
+            .filter_map(|(k, v)| Some((k.into_string().ok()?, v.into_string().ok()?)))
+            .collect(),
     })
 }
 
@@ -222,7 +264,11 @@ pub fn usage(verb: crate::commands::Verb) -> &'static str {
         Verb::ApprovalShow => " <path> <subject>",
         Verb::SessionPayload => "",
         Verb::StartupRecord => " <path> <session-id>",
-        Verb::StartupQualify => " <path> <session-id> <submission.json>",
+        Verb::StartupCapture => {
+            " <path> <refusal|allowed-command|without-payload> <capture-dir> \
+             [--program <executable>] [--deadline <seconds>] [--synthetic]"
+        }
+        Verb::StartupQualify => " <path> <session-id> <capture-dir>",
         _ => " <path>",
     }
 }
