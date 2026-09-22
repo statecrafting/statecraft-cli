@@ -1248,6 +1248,22 @@ watchdog that kills and reaps a worker the supervisor failed to release, it runs
 its cleanup before any assertion, and it is not evidence of anything the product
 promises. Nothing is retried, serialized or repeated to obtain a pass.
 
+**2026-09-22: the deadline suite, measured before and after.** Before: with the
+fixture's first line delayed two seconds, a stand-in for the `execve`
+starvation measured on 2026-09-21, `terminal_then_hang` failed on
+`matches!(run.events.first(), Some(Event::Init { .. }))` while the supervisor
+behaved correctly, returning `interrupted` at 1.03 seconds against its
+one-second deadline. That is the defect the entry above names: a test that
+fails with the product right. After: the suite carries that shape as an
+eleventh real-process row, `a_child_that_has_not_started_by_the_deadline`, and
+passes all twelve tests, the worker included. The supervisor's eight new seam
+tests pass, and two deliberate mutations, applied and reverted, show what they
+catch: removing the post-deadline drain fails the terminal-then-hang test, and
+letting end of file release the supervisor fails the end-of-file and
+blocked-writer tests. The seam's fixtures bound their own blocking at sixty
+seconds, so a supervisor that wrongly waits on them fails by outcome rather than
+holding the test run.
+
 ## Verification
 
 Each line is one command. §3.5's suite is eight tests named `suite_1` to
