@@ -743,6 +743,59 @@ failure, and the contract is worth more than the shell that carries it:
    still runs. A pull-request gate runs the coupling gate before the create verb
    and refuses without a human-written waiver line in the body.
 
+**An end-of-turn hook advises; an operation gate enforces.** Contract 6 above
+is a rule about **gates**, and a harness's end-of-turn event is not one. The
+owner settled the policy on 2026-09-21 and it has three parts:
+
+1. **Stop is advisory, and reports the result accurately.** It says what the
+   check answered, including that the check could not be performed. It does not
+   convert that answer into a block.
+2. **An enforcing operation gate refuses a failed or unavailable check.** A push
+   gate, a pull-request gate and any other gate standing in front of an
+   operation refuse on every non-zero code and on a check that did not run,
+   which is contract 6 unchanged.
+3. **Stop never prevents a useful failure handback.** A session that has
+   something to report, including a failure, hands it back. A stale derived tree
+   or a read that was not performed is a fact the handback carries, never a
+   reason to withhold it. The asymmetry is the point: a gate that wrongly
+   refuses costs an operation that can be retried, and an end-of-turn block that
+   wrongly fires costs the report of why the work failed, which is the thing
+   nobody can reconstruct afterwards.
+
+This changes no hook's repair behavior. Contract 1 stands exactly as written:
+read, never repair, with the single sanctioned exception of a `compile` after an
+edit to a `spec.md`, where the session is live and can commit the result. No
+part of the Stop policy authorizes a hook to write.
+
+**Two exit vocabularies, and no numeric passthrough between them.** Contract 4
+reads spec-spine's codes. Spec `006` §3.3 fixes this product's own. They are
+different closed vocabularies that share the integers, and three of the four
+overlapping values disagree:
+
+| Code | spec-spine `check` | Statecraft command (`006` §3.3) |
+|---|---|---|
+| 0 | fresh | did what was asked, found nothing wrong |
+| 1 | the corpus does not validate | a finding: a diagnostic state, a withheld write |
+| 2 | stale, or an unresolved claim | refused: a precondition was not met |
+| 3 | the read was not performed | usage error: no such operation |
+| 4 | not used | failed |
+
+Propagating a spec-spine code as a Statecraft code would report a stale tree as
+a refusal and an unperformed read as a usage error. Where this product runs a
+governance verb and answers in its own vocabulary, it **translates**:
+
+| spec-spine `check` answered | this product reports |
+|---|---|
+| 0 fresh | 0 |
+| 1 the corpus does not validate | 1, a finding: the check ran and the corpus is what it found |
+| 2 stale, or an unresolved claim | 1, a finding, and the two readings are distinguished in the text, not in the code |
+| 3 the read was not performed | 4, a failure: nothing about the corpus was established |
+| the binary is absent, or lacks the verb | 2, a refusal: a precondition was not met and nothing was done |
+
+An enforcing gate collapses the same answers to green and not-green, where only
+`0` is green. That is contract 6, and it is not a different translation: it is
+this one, read by something that has only two outcomes to spend.
+
 **A deny list is a safety floor, not an adapter's optional extra.** Where a
 delivery carries permissions at all, the refusals travel with it: no publish
 verb, no release verb, no force push, no recursive removal of a corpus or a
@@ -1244,6 +1297,35 @@ establishes none of those. §3.24's implementation is therefore reconciled
 against the revised contract as its own work, and `implementation` stays
 `in-progress` until that reconciliation is done rather than because the
 sentence is unsettled.
+
+**2026-09-21, authority: an end-of-turn hook advises, and the two exit
+vocabularies are translated rather than passed through.** §3.23's seven hook
+contracts were written from measured failures in gates, and contract 6 ("a gate
+whose check did not run is not green") was read here as though every hook were
+a gate. The owner's decision separates them, and the §3.23 text now carries
+both halves.
+
+The reason the separation matters is asymmetric cost, and it is worth stating
+once rather than rediscovering. A gate that wrongly refuses costs an operation
+the operator can retry with the same evidence in hand. An end-of-turn block
+that wrongly fires costs the handback itself, which is the only account of why
+the work failed and the one thing that cannot be reconstructed later. So the
+two answer differently to the same non-zero code: the gate refuses and the
+end-of-turn event reports.
+
+The exit-code table is the second half and was an unforced hazard. This
+product spends `3` on a usage error and spec-spine spends it on a read that was
+not performed; this product spends `2` on a refusal and spec-spine on a stale
+tree. Three of the four shared integers disagree, so a code propagated from one
+vocabulary into the other is not merely imprecise, it names a different
+condition. §3.23 now carries the translation and the collapse an enforcing gate
+performs on it.
+
+Two boundaries the owner drew explicitly, recorded so a later reading does not
+widen them. No new hook repair behavior is authorized: contract 1 stands, and
+the post-edit `compile` remains the single sanctioned exception. And nothing
+here decides which events this build registers; that is §3.23's inventory
+question, settled separately.
 
 ## Verification
 
