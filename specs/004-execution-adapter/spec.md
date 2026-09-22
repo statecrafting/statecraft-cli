@@ -1291,6 +1291,18 @@ the deny rules; the exact-bytes rule of the settings document is unchanged and
 now covers both, and an invocation that registers no hooks writes what it
 wrote before.
 
+**2026-09-22: a test that writes a script and execs it is the `ETXTBSY` race,
+wherever it is.** CI on this change's pull request failed one row of the
+negative suite, `the_prompt_reaches_the_child_on_a_stream_and_no_argument_carries_it`,
+with `ExecutableFileBusy`. The test wrote its own script in place and exec'd it,
+so a sibling thread's fork could hold that file open for writing at the moment
+of the exec: the race `fixture::write` already documents and avoids, at a site
+that bypassed it. The product was not involved. The staging is now a public
+helper, `fixture::install_script`, and every test in this spec's two crates that
+execs a script it wrote goes through it: the failing row, four execution tests,
+the settings-transport fixture, and three probe tests, the last being the
+second site the 2026-09-19 repair left.
+
 ## Verification
 
 Each line is one command. §3.5's suite is eight tests named `suite_1` to

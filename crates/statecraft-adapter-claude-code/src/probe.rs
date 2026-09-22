@@ -198,12 +198,7 @@ mod tests {
 
     fn child_with_claude(dir: &Path) -> BTreeMap<String, String> {
         let exe = dir.join("claude");
-        std::fs::write(&exe, "#!/bin/sh\nexit 0\n").unwrap();
-        #[cfg(unix)]
-        {
-            use std::os::unix::fs::PermissionsExt;
-            std::fs::set_permissions(&exe, std::fs::Permissions::from_mode(0o755)).unwrap();
-        }
+        statecraft_adapter::fixture::install_script(&exe, "#!/bin/sh\nexit 0\n", 0o755).unwrap();
         let mut vars = BTreeMap::new();
         vars.insert("PATH".to_string(), dir.display().to_string());
         vars
@@ -265,12 +260,12 @@ mod tests {
     fn an_executable_that_does_not_answer_with_a_version_reads_none() {
         let dir = tempfile::tempdir().unwrap();
         let exe = dir.path().join("claude");
-        std::fs::write(&exe, "#!/bin/sh\necho 'not a version'\n").unwrap();
-        #[cfg(unix)]
-        {
-            use std::os::unix::fs::PermissionsExt;
-            std::fs::set_permissions(&exe, std::fs::Permissions::from_mode(0o755)).unwrap();
-        }
+        statecraft_adapter::fixture::install_script(
+            &exe,
+            "#!/bin/sh\necho 'not a version'\n",
+            0o755,
+        )
+        .unwrap();
         assert_eq!(observe_provider_version(&exe), None);
     }
 
@@ -278,12 +273,12 @@ mod tests {
     fn a_version_shaped_answer_is_read_as_the_version() {
         let dir = tempfile::tempdir().unwrap();
         let exe = dir.path().join("claude");
-        std::fs::write(&exe, "#!/bin/sh\necho '2.1.267 (Claude Code)'\n").unwrap();
-        #[cfg(unix)]
-        {
-            use std::os::unix::fs::PermissionsExt;
-            std::fs::set_permissions(&exe, std::fs::Permissions::from_mode(0o755)).unwrap();
-        }
+        statecraft_adapter::fixture::install_script(
+            &exe,
+            "#!/bin/sh\necho '2.1.267 (Claude Code)'\n",
+            0o755,
+        )
+        .unwrap();
         assert_eq!(observe_provider_version(&exe).as_deref(), Some("2.1.267"));
     }
 

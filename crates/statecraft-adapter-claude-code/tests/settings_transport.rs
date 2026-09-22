@@ -9,7 +9,6 @@ use statecraft_adapter::environment::{Blueprint, CheckSuiteCommands, construct};
 use statecraft_adapter::protocol::{AttemptIdentity, Request, refusals};
 use statecraft_adapter_claude_code::{Invocation, execution};
 use statecraft_run::attempt::Outcome;
-use std::os::unix::fs::PermissionsExt;
 use std::path::{Path, PathBuf};
 
 struct Attempt {
@@ -26,7 +25,7 @@ impl Attempt {
             std::fs::write(workspace.join(".claude").join(name), EXISTING_SETTINGS).unwrap();
         }
         let child = workspace.join("fixture child ' $ ;.sh");
-        std::fs::write(
+        statecraft_adapter::fixture::install_script(
             &child,
             r#"#!/bin/sh
 set -eu
@@ -76,9 +75,9 @@ if [ -f obstruct-cleanup ]; then
   /bin/mkdir "$settings"
 fi
 "#,
+            0o700,
         )
         .unwrap();
-        std::fs::set_permissions(&child, std::fs::Permissions::from_mode(0o700)).unwrap();
         let invocation = Invocation::new(child.to_str().unwrap(), &[rule.into()], Some(2));
         std::fs::write(
             workspace.join("expected-settings"),

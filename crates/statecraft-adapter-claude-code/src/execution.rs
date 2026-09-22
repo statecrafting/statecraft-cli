@@ -487,12 +487,10 @@ mod tests {
     #[cfg(unix)]
     #[test]
     fn an_unreadable_stream_is_interrupted_and_says_why() {
-        use std::os::unix::fs::PermissionsExt;
-
         let workspace = tempfile::tempdir().unwrap();
         let temporary_root = tempfile::tempdir().unwrap();
         let child = workspace.path().join("fixture.sh");
-        std::fs::write(
+        statecraft_adapter::fixture::install_script(
             &child,
             concat!(
                 "#!/bin/sh\n",
@@ -502,9 +500,9 @@ mod tests {
                 "printf 'x\\377\\376y\\n'\n",
                 "exit 0\n",
             ),
+            0o700,
         )
         .unwrap();
-        std::fs::set_permissions(&child, std::fs::Permissions::from_mode(0o700)).unwrap();
 
         let invocation = Invocation::new(child.to_str().unwrap(), &[], None);
         let environment = construct(&Blueprint::empty(), &CheckSuiteCommands::default());
@@ -557,13 +555,15 @@ mod tests {
     #[cfg(unix)]
     #[test]
     fn settings_are_removed_when_supervision_times_out() {
-        use std::os::unix::fs::PermissionsExt;
-
         let workspace = tempfile::tempdir().unwrap();
         let temporary_root = tempfile::tempdir().unwrap();
         let child = workspace.path().join("hang.sh");
-        std::fs::write(&child, "#!/bin/sh\nexec /bin/sleep 300\n").unwrap();
-        std::fs::set_permissions(&child, std::fs::Permissions::from_mode(0o700)).unwrap();
+        statecraft_adapter::fixture::install_script(
+            &child,
+            "#!/bin/sh\nexec /bin/sleep 300\n",
+            0o700,
+        )
+        .unwrap();
         let invocation = Invocation::new(child.to_str().unwrap(), &["Bash(x:*)".into()], None);
         let environment = construct(&Blueprint::empty(), &CheckSuiteCommands::default());
         let execution = supervise_in(
@@ -635,12 +635,10 @@ mod tests {
     /// written, byte for byte, including formatting a parse would lose.
     #[test]
     fn the_settings_bytes_written_are_read_back_and_handed_over() {
-        use std::os::unix::fs::PermissionsExt;
-
         let workspace = tempfile::tempdir().unwrap();
         let temporary_root = tempfile::tempdir().unwrap();
         let child = workspace.path().join("fixture.sh");
-        std::fs::write(
+        statecraft_adapter::fixture::install_script(
             &child,
             concat!(
                 "#!/bin/sh\n",
@@ -650,9 +648,9 @@ mod tests {
                 r#"echo '{"type":"result","subtype":"success","is_error":false,"num_turns":1,"permission_denials":[],"session_id":"s"}'"#,
                 "\n",
             ),
+            0o700,
         )
         .unwrap();
-        std::fs::set_permissions(&child, std::fs::Permissions::from_mode(0o700)).unwrap();
         let rules = ["Bash(cargo publish*)".to_string()];
         let invocation = Invocation::new(child.to_str().unwrap(), &rules, None);
         let document = format!(
@@ -682,8 +680,6 @@ mod tests {
     #[test]
     fn a_watch_stops_at_init_and_the_startup_evidence_before_it_survives() {
         use statecraft_adapter::supervisor::Control;
-        use std::os::unix::fs::PermissionsExt;
-
         struct AtInit(Vec<bool>);
         impl Watch<(usize, ProviderEvent)> for AtInit {
             fn spawned(&mut self, _pid: u32) -> Result<(), String> {
@@ -702,7 +698,7 @@ mod tests {
         let workspace = tempfile::tempdir().unwrap();
         let temporary_root = tempfile::tempdir().unwrap();
         let child = workspace.path().join("fixture.sh");
-        std::fs::write(
+        statecraft_adapter::fixture::install_script(
             &child,
             concat!(
                 "#!/bin/sh\n",
@@ -715,9 +711,9 @@ mod tests {
                 r#"echo '{"type":"result","subtype":"success","is_error":false,"num_turns":1,"permission_denials":[],"session_id":"s"}'"#,
                 "\n",
             ),
+            0o700,
         )
         .unwrap();
-        std::fs::set_permissions(&child, std::fs::Permissions::from_mode(0o700)).unwrap();
         let invocation = Invocation::new(child.to_str().unwrap(), &[], None);
         let environment = construct(&Blueprint::empty(), &CheckSuiteCommands::default());
         let mut request = request(workspace.path());

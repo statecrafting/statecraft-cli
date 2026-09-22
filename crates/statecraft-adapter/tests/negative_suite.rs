@@ -430,7 +430,10 @@ fn the_prompt_reaches_the_child_on_a_stream_and_no_argument_carries_it() {
     // stream" is observed rather than assumed.
     let adapter = dir.path().join("echoing-adapter.sh");
     let seen = dir.path().join("stdin-seen.txt");
-    std::fs::write(
+    // Installed through the fixture's staging, never written in place: a
+    // script this process wrote and then exec'd is the `ETXTBSY` race
+    // `fixture::write` documents, measured here on Linux CI on 2026-09-22.
+    fixture::install_script(
         &adapter,
         format!(
             "#!/bin/sh\ncat > {}\n\
@@ -438,13 +441,9 @@ fn the_prompt_reaches_the_child_on_a_stream_and_no_argument_carries_it() {
              echo '{{\"event\":\"result\",\"classification\":\"completed\",\"cost\":null}}'\n",
             seen.display()
         ),
+        0o755,
     )
     .unwrap();
-    #[cfg(unix)]
-    {
-        use std::os::unix::fs::PermissionsExt;
-        std::fs::set_permissions(&adapter, std::fs::Permissions::from_mode(0o755)).unwrap();
-    }
 
     let env = env_for(&["sh"]);
     let mut req = request(dir.path(), 30, Requested::none());
