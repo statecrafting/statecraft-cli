@@ -2525,6 +2525,26 @@ The lock is removed with the precondition it mitigated. The deadline stays five
 seconds, no assertion about the product is weakened, nothing is retried, and
 the earlier failure evidence in the entries above is kept as written.
 
+**2026-09-22: §3.30 is implemented, and the probes were run before the
+repair.** Nine one-mutation probes were run against the admission as it stood at
+`88bc616` (unchanged since `62bde9a`), each on the section 3.29 fixture with every
+other prerequisite satisfied. All nine were **admitted**: an allowed-command
+request with no result; a denial under another tool's name; a denial naming
+another tool-use id; two init events from two sessions; two terminal events that
+disagree; a refused command both denied and executed; a `--settings` naming a
+different file than the recorded bytes; a `--settings=` spelling in the
+absent-payload control; and a second `--settings`. The probe was not committed.
+Each defect is now a test in `crates/statecraft-home/tests/qualification_admission.rs`
+that changes exactly that one thing on the admitted fixture and asserts the
+refusal it causes, 38 tests in all, beside the unchanged prose control.
+
+What the fixture is matters as much as what it proves. Its event shapes are the
+ones the committed 2.1.267 recordings carry, including `tool_result_meta` and its
+`non_execution_kind`, which is the field that tells a refused result from a
+command that ran and failed; the adapter's own tests read that field out of
+`denied.jsonl` and its absence out of `max-turns.jsonl`. Nothing the provider
+does not emit is required, and no field was invented to make a control pass.
+
 **2026-09-22: `run` delivers the floor and refuses a requirement it cannot
 establish.** Found while looking for the next gap on the qualification path,
 with the source as the evidence: `run` launched the provider with
