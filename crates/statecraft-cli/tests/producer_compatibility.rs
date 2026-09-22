@@ -38,7 +38,10 @@ fn a_ready_entry_carrying_status_is_accepted_and_the_join_still_decides() {
     let bin = tempfile::tempdir().unwrap();
     git(target.path(), &["init", "--quiet"]);
     git(target.path(), &["config", "user.name", "fixture"]);
-    git(target.path(), &["config", "user.email", "fixture@example.com"]);
+    git(
+        target.path(),
+        &["config", "user.email", "fixture@example.com"],
+    );
     std::fs::write(target.path().join("x"), "x").unwrap();
     git(target.path(), &["add", "x"]);
     git(target.path(), &["commit", "--quiet", "-m", "base"]);
