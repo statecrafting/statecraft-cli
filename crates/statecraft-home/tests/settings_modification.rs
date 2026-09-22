@@ -27,6 +27,23 @@
 //! | a malformed file is refused | `a_malformed_settings_file_is_refused_and_left_exactly_as_it_was` |
 //! | an interrupted apply is recoverable | `an_apply_interrupted_before_the_record_is_repaired_by_running_it_again` |
 //! | a superseded revision comes out before the new one goes in | `a_changed_revision_replaces_the_region_rather_than_accumulating` |
+//!
+//! Section 3.24 as the owner revised it on 2026-09-21 identifies an insertion
+//! by exact content, structural location **and** recorded provenance, which is
+//! established by constructing disagreements between the file and the record:
+//!
+//! | Requirement | Test |
+//! |---|---|
+//! | a duplicate key is ambiguous structure | `a_duplicate_json_key_is_ambiguous_structure_and_is_refused` |
+//! | ambiguity anywhere, not only on the touched paths | `a_duplicate_key_nested_below_the_touched_paths_is_also_refused` |
+//! | the target is a precondition, not only the content | `a_file_changed_between_the_plan_and_the_write_is_not_overwritten` |
+//! | a marker is content, and content can be copied | `a_forged_marker_with_no_record_behind_it_is_never_adopted` |
+//! | a user's own refusal is never claimed | `a_pre_existing_user_deny_is_never_claimed_and_survives_removal` |
+//! | a duplicated value leaves the user's copy | `a_duplicate_deny_value_leaves_the_users_copy_behind` |
+//! | multiple valid locations, one recorded modification | `the_insertions_are_not_adjacent_and_neither_is_claimed_by_the_other` |
+//! | a record that cannot be read establishes nothing | `a_corrupt_record_is_a_failure_and_the_settings_file_is_untouched` |
+//! | removal after a user edit leaves every byte | `removal_after_a_user_edit_reports_and_leaves_every_byte` |
+//! | unrelated keys survive reapplication and removal | `reapplying_after_a_user_adds_an_unrelated_key_preserves_it` |
 
 mod support;
 
@@ -670,23 +687,34 @@ fn an_apply_interrupted_before_the_record_is_repaired_by_running_it_again() {
     );
     assert_eq!(answer.severity(), Severity::Ok, "{}", answer.render());
 
-    // The repaired record claims the hook, which is marked in the file and so
-    // provably this product's, and deliberately does **not** claim the
-    // refusals, which are not. Removal therefore takes the hook and leaves
-    // every deny entry: a lost record costs a refusal nothing.
+    // The repaired record claims neither half, and the hook is the half worth
+    // asserting. Under section 3.24 as revised on 2026-09-21 an insertion is
+    // identified by exact content, structural location **and** recorded
+    // provenance, conjunctively. The marker is the first of the three. It is
+    // also copyable, so a marked registration with no record behind it is
+    // content this product cannot prove it placed, and it is reported rather
+    // than adopted.
     assert!(
         answer.render().contains("will leave it"),
         "the repair did not report what it declines to claim:\n{}",
         answer.render()
     );
+    assert!(
+        answer
+            .render()
+            .contains("a marker is content and content can be copied"),
+        "the repair claimed a marked hook it cannot prove it placed:\n{}",
+        answer.render()
+    );
+
     suite.harness(&sandbox).execute(Operation::HomeApply {
         settings: Intent::Remove,
     });
     let left: serde_json::Value =
         serde_json::from_str(&std::fs::read_to_string(settings_path(&sandbox)).unwrap()).unwrap();
     assert!(
-        left.get("hooks").is_none(),
-        "the marked hook survived removal"
+        left.get("hooks").is_some(),
+        "a marked hook with no recorded provenance was removed on the marker alone"
     );
     assert_eq!(
         left.pointer("/permissions/deny")
@@ -696,6 +724,16 @@ fn an_apply_interrupted_before_the_record_is_repaired_by_running_it_again() {
             .len(),
         settings::DENY_FLOOR.len(),
         "a refusal this product could not prove it placed was removed"
+    );
+
+    // Nothing was written by the repair, so the file is still the bytes the
+    // first apply left. The cost of the lost record is that this product will
+    // not take its own content back out, which is the conservative direction
+    // and is the one section 3.24 names.
+    assert_eq!(
+        std::fs::read(settings_path(&sandbox)).unwrap(),
+        written,
+        "the removal that could claim nothing still changed the file"
     );
 }
 
@@ -777,4 +815,468 @@ fn a_native_home_that_does_not_exist_is_not_created_to_hold_a_settings_file() {
         outcomes(&answer)
     );
     assert_eq!(answer.severity(), Severity::Ok, "{}", answer.render());
+}
+
+// ---------------------------------------------------------------------------
+// Section 3.24 as the owner revised it on 2026-09-21.
+//
+// The contract above is satisfied by a property of the file's layout, which a
+// reader can see. The revised contract is satisfied by three properties of
+// each insertion, of which only the first is visible in the file: exact
+// content, structural location, and recorded provenance. A claim of that shape
+// is established by exercising the cases where the record and the file
+// disagree, so every test below constructs a disagreement and asserts which
+// way it is resolved.
+// ---------------------------------------------------------------------------
+
+/// The settings file after a consented apply, as bytes.
+fn apply_consented(sandbox: &Sandbox, suite: &Suite<'_>) -> Vec<u8> {
+    let answer = install_home(sandbox, suite);
+    let token = token_from_plan(&answer);
+    let answer = suite.harness(sandbox).execute(Operation::HomeApply {
+        settings: Intent::Consented { token },
+    });
+    assert_eq!(
+        answer.severity(),
+        Severity::Ok,
+        "the consented apply did not succeed:\n{}",
+        answer.render()
+    );
+    std::fs::read(settings_path(sandbox)).unwrap()
+}
+
+#[test]
+fn a_duplicate_json_key_is_ambiguous_structure_and_is_refused() {
+    let sandbox = sandbox_with_native_home();
+    let suite = suite();
+
+    // Valid JSON, and two structural locations with one name. `serde_json`
+    // keeps the last occurrence and is what every judgement here is made
+    // against; the text walker takes the first and is what every edit is
+    // applied to. A build that guessed would judge one value and edit another.
+    let ambiguous = br#"{
+  "permissions": { "deny": ["Bash(sudo *)"] },
+  "permissions": { "deny": ["Bash(curl *)"] }
+}
+"#;
+    std::fs::write(settings_path(&sandbox), ambiguous).unwrap();
+
+    let answer = install_home(&sandbox, &suite);
+    assert!(
+        matches!(outcome(&answer), SettingsOutcome::Refused { .. }),
+        "a duplicate key was not refused: {:?}",
+        outcome(&answer)
+    );
+    assert!(
+        answer.render().contains("more than once"),
+        "the refusal did not name the ambiguity:\n{}",
+        answer.render()
+    );
+    assert_eq!(answer.severity(), Severity::Refused, "{}", answer.render());
+    assert_eq!(
+        std::fs::read(settings_path(&sandbox)).unwrap(),
+        ambiguous,
+        "an ambiguous file was written to"
+    );
+
+    // And consent does not force it through: the refusal is about the
+    // document's structure, not about the operator's intent.
+    let answer = suite.harness(&sandbox).execute(Operation::HomeApply {
+        settings: Intent::Consented {
+            token: "anything".into(),
+        },
+    });
+    assert_eq!(answer.severity(), Severity::Refused, "{}", answer.render());
+    assert_eq!(std::fs::read(settings_path(&sandbox)).unwrap(), ambiguous);
+}
+
+#[test]
+fn a_duplicate_key_nested_below_the_touched_paths_is_also_refused() {
+    let sandbox = sandbox_with_native_home();
+    let suite = suite();
+
+    // The never-widen checks compare the two parsed documents whole, so an
+    // ambiguity anywhere is an ambiguity in the comparison, not only one in
+    // the path being spliced.
+    let ambiguous = br#"{
+  "env": { "A": "1", "A": "2" },
+  "permissions": { "deny": [] }
+}
+"#;
+    std::fs::write(settings_path(&sandbox), ambiguous).unwrap();
+
+    let answer = install_home(&sandbox, &suite);
+    assert!(
+        matches!(outcome(&answer), SettingsOutcome::Refused { .. }),
+        "a nested duplicate key was not refused: {:?}",
+        outcome(&answer)
+    );
+    assert!(
+        answer.render().contains("env"),
+        "the refusal did not name where the ambiguity is:\n{}",
+        answer.render()
+    );
+    assert_eq!(std::fs::read(settings_path(&sandbox)).unwrap(), ambiguous);
+}
+
+#[test]
+fn a_file_changed_between_the_plan_and_the_write_is_not_overwritten() {
+    let sandbox = sandbox_with_native_home();
+    let suite = suite();
+    std::fs::write(
+        settings_path(&sandbox),
+        b"{\n  \"permissions\": {\n    \"deny\": [\n      \"Bash(sudo *)\"\n    ]\n  }\n}\n",
+    )
+    .unwrap();
+
+    let answer = install_home(&sandbox, &suite);
+    let token = token_from_plan(&answer);
+
+    // The operator reads the plan, and edits their own settings before
+    // repeating the token back. Consent names the content to place; it says
+    // nothing about the file it is placed into, so the target is a
+    // precondition in its own right and is validated before the write.
+    let edited = b"{\n  \"permissions\": {\n    \"deny\": [\n      \"Bash(sudo *)\",\n      \"Bash(nc *)\"\n    ]\n  }\n}\n";
+    std::fs::write(settings_path(&sandbox), edited).unwrap();
+    let before_write = std::fs::read(settings_path(&sandbox)).unwrap();
+
+    let answer = suite.harness(&sandbox).execute(Operation::HomeApply {
+        settings: Intent::Consented { token },
+    });
+
+    assert!(
+        matches!(outcome(&answer), SettingsOutcome::ConsentStale { .. }),
+        "a consent given against other bytes was honoured: {:?}",
+        outcome(&answer)
+    );
+    assert!(
+        answer.render().contains("the file it goes into"),
+        "the staleness did not say what the token covers:\n{}",
+        answer.render()
+    );
+    assert_eq!(answer.severity(), Severity::Finding, "{}", answer.render());
+    assert_eq!(
+        std::fs::read(settings_path(&sandbox)).unwrap(),
+        before_write,
+        "a file edited after it was inspected was overwritten:\n{}",
+        answer.render()
+    );
+
+    // The next apply against the file as it now is succeeds and keeps the
+    // user's new entry, so the refusal costs an operator one retry and never
+    // costs them a line they wrote.
+
+    let answer = install_home(&sandbox, &suite);
+    let token = token_from_plan(&answer);
+    let answer = suite.harness(&sandbox).execute(Operation::HomeApply {
+        settings: Intent::Consented { token },
+    });
+    assert_eq!(answer.severity(), Severity::Ok, "{}", answer.render());
+    let after: serde_json::Value =
+        serde_json::from_str(&std::fs::read_to_string(settings_path(&sandbox)).unwrap()).unwrap();
+    let deny = after
+        .pointer("/permissions/deny")
+        .unwrap()
+        .as_array()
+        .unwrap();
+    assert!(
+        deny.iter().any(|v| v == "Bash(nc *)"),
+        "the entry the user added between the plan and the write was lost"
+    );
+    assert!(
+        deny.iter().any(|v| v == "Bash(sudo *)"),
+        "an entry the user already had was lost"
+    );
+}
+
+#[test]
+fn a_forged_marker_with_no_record_behind_it_is_never_adopted() {
+    let sandbox = sandbox_with_native_home();
+    let suite = suite();
+
+    // A user copies a marked registration out of somebody's shipped harness,
+    // byte for byte, and writes it into their own settings. The content
+    // property of section 3.24's three is satisfied; the recorded provenance
+    // is not, and the three are conjunctive.
+    let revision = harness::revision_of(&harness::shipped());
+    let script = sandbox
+        .layout()
+        .harness_revision_dir(&revision.id)
+        .join("hooks/statecraft-gate.sh");
+    let forged = format!(
+        "{}\n{{\n  \"hooks\": {{\n    \"{}\": [\n      {{\n        \"matcher\": \"{}\",\n        \"hooks\": [\n          {{\n            \"type\": \"command\",\n            \"command\": {}\n          }}\n        ]\n      }}\n    ]\n  }}\n}}\n",
+        "",
+        settings::SHIPPED_EVENT,
+        settings::SHIPPED_MATCHER,
+        serde_json::Value::String(format!(
+            "{} {}\n\"{}\" \"${{CLAUDE_PROJECT_DIR:-.}}\"",
+            settings::MARKER,
+            revision.id,
+            script.display()
+        ))
+    );
+    let forged = forged.trim_start().to_string();
+    std::fs::write(settings_path(&sandbox), &forged).unwrap();
+
+    let answer = install_home(&sandbox, &suite);
+    let token = token_from_plan(&answer);
+    let answer = suite.harness(&sandbox).execute(Operation::HomeApply {
+        settings: Intent::Consented { token },
+    });
+    assert!(
+        answer
+            .render()
+            .contains("a marker is content and content can be copied"),
+        "a registration carrying the marker was adopted on the marker alone:\n{}",
+        answer.render()
+    );
+
+    let recorded = modifications(&sandbox);
+    assert_eq!(recorded.len(), 1);
+    assert!(
+        recorded[0].hooks.is_empty(),
+        "the record claims a registration this product did not place: {:?}",
+        recorded[0].hooks
+    );
+
+    // So removal leaves it. The user wrote those bytes and they are the
+    // user's, however much they look like this product's.
+    suite.harness(&sandbox).execute(Operation::HomeApply {
+        settings: Intent::Remove,
+    });
+    let left: serde_json::Value =
+        serde_json::from_str(&std::fs::read_to_string(settings_path(&sandbox)).unwrap()).unwrap();
+    assert!(
+        left.pointer(&format!("/hooks/{}", settings::SHIPPED_EVENT))
+            .is_some(),
+        "a registration this product never placed was removed"
+    );
+}
+
+#[test]
+fn a_pre_existing_user_deny_is_never_claimed_and_survives_removal() {
+    let sandbox = sandbox_with_native_home();
+    let suite = suite();
+
+    // The user already refuses two of the floor entries, for their own
+    // reasons. Both are indistinguishable from the managed copy, which is
+    // exactly why neither may be claimed.
+    let theirs = [settings::DENY_FLOOR[0], settings::DENY_FLOOR[3]];
+    let existing = format!(
+        "{{\n  \"permissions\": {{\n    \"deny\": [\n      {},\n      {}\n    ]\n  }}\n}}\n",
+        serde_json::Value::String(theirs[0].into()),
+        serde_json::Value::String(theirs[1].into())
+    );
+    std::fs::write(settings_path(&sandbox), &existing).unwrap();
+
+    apply_consented(&sandbox, &suite);
+
+    let recorded = modifications(&sandbox);
+    for entry in theirs {
+        assert!(
+            !recorded[0].deny.contains(&entry.to_string()),
+            "{entry} was the user's and was claimed as a managed insertion"
+        );
+    }
+
+    suite.harness(&sandbox).execute(Operation::HomeApply {
+        settings: Intent::Remove,
+    });
+    let left: serde_json::Value =
+        serde_json::from_str(&std::fs::read_to_string(settings_path(&sandbox)).unwrap()).unwrap();
+    let deny = left
+        .pointer("/permissions/deny")
+        .unwrap()
+        .as_array()
+        .unwrap();
+    for entry in theirs {
+        assert!(
+            deny.iter().any(|v| v == entry),
+            "{entry} was the user's refusal and removal took it out"
+        );
+    }
+    assert_eq!(
+        deny.len(),
+        theirs.len(),
+        "removal left more than the user's own refusals: {deny:?}"
+    );
+}
+
+#[test]
+fn a_duplicate_deny_value_leaves_the_users_copy_behind() {
+    let sandbox = sandbox_with_native_home();
+    let suite = suite();
+    apply_consented(&sandbox, &suite);
+
+    // After the floor is placed, the user adds their own copy of one of its
+    // entries. Two identical strings now sit in the array and only one of
+    // them is this product's. Removal must take exactly one.
+    let duplicated = settings::DENY_FLOOR[0];
+    let text = std::fs::read_to_string(settings_path(&sandbox)).unwrap();
+    let mut value: serde_json::Value = serde_json::from_str(&text).unwrap();
+    value
+        .pointer_mut("/permissions/deny")
+        .unwrap()
+        .as_array_mut()
+        .unwrap()
+        .push(serde_json::Value::String(duplicated.into()));
+    std::fs::write(
+        settings_path(&sandbox),
+        format!("{}\n", serde_json::to_string_pretty(&value).unwrap()),
+    )
+    .unwrap();
+
+    suite.harness(&sandbox).execute(Operation::HomeApply {
+        settings: Intent::Remove,
+    });
+    let left: serde_json::Value =
+        serde_json::from_str(&std::fs::read_to_string(settings_path(&sandbox)).unwrap()).unwrap();
+    let deny: Vec<&str> = left
+        .pointer("/permissions/deny")
+        .map(|d| {
+            d.as_array()
+                .unwrap()
+                .iter()
+                .map(|v| v.as_str().unwrap())
+                .collect()
+        })
+        .unwrap_or_default();
+    assert_eq!(
+        deny.iter().filter(|e| **e == duplicated).count(),
+        1,
+        "removal did not leave the user's copy of a duplicated refusal: {deny:?}"
+    );
+}
+
+#[test]
+fn the_insertions_are_not_adjacent_and_neither_is_claimed_by_the_other() {
+    let sandbox = sandbox_with_native_home();
+    let suite = suite();
+    apply_consented(&sandbox, &suite);
+
+    // Section 3.24 as revised admits multiple syntactically valid locations,
+    // which is the whole reason it was revised. This asserts the shape rather
+    // than assuming it: the two insertions land under two different top-level
+    // keys, and each is found at its own structural location.
+    let after: serde_json::Value =
+        serde_json::from_str(&std::fs::read_to_string(settings_path(&sandbox)).unwrap()).unwrap();
+    assert!(
+        after.pointer("/permissions/deny").is_some(),
+        "the deny insertion is not at permissions.deny"
+    );
+    assert!(
+        after
+            .pointer(&format!("/hooks/{}", settings::SHIPPED_EVENT))
+            .is_some(),
+        "the hook insertion is not at hooks.{}",
+        settings::SHIPPED_EVENT
+    );
+
+    let recorded = modifications(&sandbox);
+    assert_eq!(
+        recorded.len(),
+        1,
+        "two locations were tracked by more than one recorded modification"
+    );
+    assert!(!recorded[0].hooks.is_empty() && !recorded[0].deny.is_empty());
+}
+
+#[test]
+fn a_corrupt_record_is_a_failure_and_the_settings_file_is_untouched() {
+    let sandbox = sandbox_with_native_home();
+    let suite = suite();
+    let written = apply_consented(&sandbox, &suite);
+
+    // The record is the third identifying property. A record this product
+    // cannot read establishes nothing about what it owns, and guessing from
+    // the file alone is the failure section 3.24 refuses.
+    std::fs::write(sandbox.layout().modifications_file(), "{ not json").unwrap();
+
+    let answer = suite.harness(&sandbox).execute(Operation::HomeApply {
+        settings: Intent::Remove,
+    });
+    assert_eq!(answer.severity(), Severity::Failed, "{}", answer.render());
+    assert_eq!(
+        std::fs::read(settings_path(&sandbox)).unwrap(),
+        written,
+        "an unreadable record led to a write"
+    );
+}
+
+#[test]
+fn removal_after_a_user_edit_reports_and_leaves_every_byte() {
+    let sandbox = sandbox_with_native_home();
+    let suite = suite();
+    apply_consented(&sandbox, &suite);
+
+    // The user edits the managed command. Exact content no longer matches, so
+    // ownership cannot be established and nothing comes out, including the
+    // deny entries whose own content is still intact: the record describes one
+    // modification and it is not intact.
+    let text = std::fs::read_to_string(settings_path(&sandbox)).unwrap();
+    let edited = text.replace("CLAUDE_PROJECT_DIR:-.", "CLAUDE_PROJECT_DIR:-/tmp");
+    assert_ne!(
+        edited, text,
+        "the fixture did not actually edit the command"
+    );
+    std::fs::write(settings_path(&sandbox), &edited).unwrap();
+
+    let answer = suite.harness(&sandbox).execute(Operation::HomeApply {
+        settings: Intent::Remove,
+    });
+    assert_eq!(
+        std::fs::read_to_string(settings_path(&sandbox)).unwrap(),
+        edited,
+        "an edited modification was partly removed"
+    );
+    assert!(
+        answer.render().contains("edited"),
+        "the edit was not reported:\n{}",
+        answer.render()
+    );
+    assert_eq!(
+        modifications(&sandbox).len(),
+        1,
+        "the record was dropped, which is the only thing that still says what was placed"
+    );
+}
+
+#[test]
+fn reapplying_after_a_user_adds_an_unrelated_key_preserves_it() {
+    let sandbox = sandbox_with_native_home();
+    let suite = suite();
+    apply_consented(&sandbox, &suite);
+
+    // An unrelated key, with a shape this module never reads, added after the
+    // insertions are in place. Reapplication is idempotent and preservation is
+    // about bytes, not about keys this module happens to know.
+    let text = std::fs::read_to_string(settings_path(&sandbox)).unwrap();
+    let with_extra = text.replacen(
+        '{',
+        "{\n  \"model\": \"opus\",\n  \"env\": { \"K\": \"v\" },",
+        1,
+    );
+    std::fs::write(settings_path(&sandbox), &with_extra).unwrap();
+
+    let answer = install_home(&sandbox, &suite);
+    let token = token_from_plan(&answer);
+    let answer = suite.harness(&sandbox).execute(Operation::HomeApply {
+        settings: Intent::Consented { token },
+    });
+    assert_eq!(answer.severity(), Severity::Ok, "{}", answer.render());
+    assert_eq!(
+        std::fs::read_to_string(settings_path(&sandbox)).unwrap(),
+        with_extra,
+        "an idempotent reapplication rewrote the file"
+    );
+
+    // And removal takes the insertions and leaves the user's keys exactly.
+    suite.harness(&sandbox).execute(Operation::HomeApply {
+        settings: Intent::Remove,
+    });
+    let left: serde_json::Value =
+        serde_json::from_str(&std::fs::read_to_string(settings_path(&sandbox)).unwrap()).unwrap();
+    assert_eq!(left.pointer("/model").unwrap(), "opus");
+    assert_eq!(left.pointer("/env/K").unwrap(), "v");
+    assert!(left.get("hooks").is_none(), "the hook insertion survived");
 }

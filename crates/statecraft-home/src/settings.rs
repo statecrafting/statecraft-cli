@@ -19,28 +19,56 @@
 //! edits by splicing bytes into located spans. What a caller did not consent to
 //! is not merely logically unchanged; it is the same bytes.
 //!
-//! # The marked region, in a syntax that has no comments
+//! # Three properties identify an insertion, and one of them is not enough
 //!
-//! Section 3.13's bridge and [`crate::ignore`]'s merged block both mark their
-//! region with comment lines, which a Markdown file and a `.gitignore` have and
-//! JSON does not. Two consequences are measured rather than assumed, and both
-//! are recorded as a dated decision in spec 002 section 5:
+//! Section 3.24, as the owner revised it on 2026-09-21: all managed insertions
+//! are tracked by **one recorded modification**, they may occupy **multiple
+//! syntactically valid locations**, and each is identified by its **exact
+//! content**, its **structural location** and its **recorded provenance**.
+//! Unrelated bytes are preserved, and removal happens only where this product
+//! can establish that the content is an intact insertion it owns.
 //!
-//! 1. A managed **hook registration** carries its marker inside itself. The
-//!    command string's first line is [`MARKER`] followed by the harness
-//!    revision, which is a shell comment to the interpreter that runs it and a
-//!    marker to this module that reads it. So a managed hook is recognizable
-//!    from the file alone, with no record to consult.
-//! 2. A managed **deny entry** is a bare string in an array and has nowhere to
-//!    carry a marker. Managed entries are therefore appended as one contiguous
-//!    run at the end of the deny array and identified on removal by exact
-//!    match, in order, against the recorded modification.
+//! The revision replaced a requirement that every managed line occupy one
+//! physically contiguous marked region. That was unsatisfiable here and the
+//! reason is structural rather than awkward: a settings file is strict JSON,
+//! which has no comment syntax, and the two insertion points are not adjacent
+//! in any document, because a hook registration belongs in `hooks.<Event>` and
+//! a deny entry in `permissions.deny`. What the region was carrying was
+//! attributability, and the three properties carry it directly.
 //!
-//! That is two marked runs in two arrays, not one marked region in one file,
-//! and no JSON document can hold the second. Every guarantee section 3.24 names
-//! **around** the region is met exactly: marked, recorded with the digest
-//! either side, nothing outside it touched, removed only while byte-identical,
-//! reported and left once edited, idempotent on reapplication.
+//! This module holds all three, and holds them **conjunctively**:
+//!
+//! 1. **Exact content.** A hook registration matches byte for byte, command
+//!    and all. A deny entry matches as a string, in order, as a contiguous run
+//!    inside the array.
+//! 2. **Structural location.** Each recorded kind names where it lives: a
+//!    [`Modification::hooks`] entry lives at `hooks.<event>` and a
+//!    [`Modification::deny`] entry in `permissions.deny`. A document whose
+//!    structure is ambiguous, meaning any object naming a key twice, is
+//!    refused by [`unambiguous`] rather than guessed at.
+//! 3. **Recorded provenance.** The home's record says this product placed it.
+//!    Content this product cannot prove it placed is reported as unclaimed and
+//!    is never removed.
+//!
+//! [`MARKER`] is **content**, which makes it the first property and not the
+//! third. It is genuinely useful: a managed hook is recognizable from the file
+//! alone, so a user reading their own settings can see what is there. It is
+//! also copyable, so a registration carrying it is not thereby this product's,
+//! and the unclaimed list in [`SettingsOutcome::Applied`] exists for exactly
+//! that case. The error is always in the direction of leaving content alone.
+//!
+//! Strict JSON is the floor the owner fixed alongside the contract: no JSON5,
+//! no comment outside a string value, no deny entry that refuses nothing and
+//! exists only to mark a boundary, and no metadata key the harness does not
+//! support. A marker travels inside content the harness already reads as
+//! content, or it does not travel. [`MARKER`] rides inside a command string,
+//! where it is a shell comment to the interpreter that runs it.
+//!
+//! Every guarantee section 3.24 states around the contract is met unchanged:
+//! an exact reviewable plan, consent specific to the content, no widened
+//! permission, `settings.local.json` never written, the digest either side,
+//! idempotent application, conservative removal, and user edits and conflicts
+//! preserved rather than resolved.
 
 use crate::harness;
 use crate::home::HomeError;
@@ -63,6 +91,12 @@ pub const LOCAL_SETTINGS: &str = "settings.local.json";
 /// A shell comment to the interpreter and a marker to this module. Followed by
 /// one space and the harness revision, so the file itself says which revision
 /// the registration belongs to.
+///
+/// It is the **content** property of section 3.24's three, and no more than
+/// that. Anyone can type it, so a registration carrying it is not this
+/// product's until the record says so as well. Section 3.28 states the
+/// general rule: an unmarked registration is the user's, and resemblance is
+/// never ownership.
 pub const MARKER: &str = "# statecraft-managed";
 
 /// The refusals that travel with any delivery that carries permissions at all.
@@ -139,12 +173,15 @@ pub struct Managed {
 }
 
 impl Managed {
-    /// The consent token: a digest over the exact content and nothing else.
+    /// The content identity: a digest over the exact content and nothing else.
     ///
     /// Section 3.24's "consent to one revision is not consent to the next" is
-    /// this. An operator consents to a token; content whose lines have changed
-    /// has a different token, so the modification is presented again rather
-    /// than performed on a consent given to something else.
+    /// this. Content whose lines have changed has a different identity, so the
+    /// modification is presented again rather than performed on a consent
+    /// given to something else.
+    ///
+    /// This is half of what an operator consents to. The other half is the
+    /// file the content would go into: see [`consent_token`].
     pub fn token(&self) -> String {
         let mut material = String::new();
         for hook in &self.hooks {
@@ -185,6 +222,25 @@ impl Managed {
     pub fn is_empty(&self) -> bool {
         self.hooks.is_empty() && self.deny.is_empty()
     }
+}
+
+/// The token an operator consents to: the content, and the file it goes into.
+///
+/// Section 3.24 requires consent to identify **the exact planned
+/// modification**, and a modification is not only what would be inserted. The
+/// same content spliced into a different file is a different plan: different
+/// insertion points, a different set of entries already refused, a different
+/// set of conflicts, and different resulting bytes. An operator who reviewed
+/// one of those did not review the other.
+///
+/// So the token covers the content identity and the digest of the target as it
+/// was when the plan was computed. A settings file that changed after the plan
+/// was shown produces a different token, the consent does not match, and the
+/// current plan is presented instead of a plan nobody read. That is the
+/// mechanism behind "do not overwrite a file changed since it was inspected":
+/// an operator loses a retry and never loses a line they wrote.
+pub fn consent_token(content: &str, target: &str) -> String {
+    digest_bytes(format!("{content}\u{0}{target}").as_bytes())
 }
 
 /// The content this build would place, for one installed harness revision.
@@ -249,6 +305,31 @@ pub enum Refusal {
         /// What moved.
         detail: String,
     },
+    /// An object in the document names the same key twice.
+    ///
+    /// Section 3.24 identifies an insertion partly by its **structural
+    /// location**, and a duplicate key means the document has two locations
+    /// with one name. This module would not merely be imprecise about which it
+    /// meant: `serde_json`, which judges, keeps the last occurrence, and
+    /// [`locate`], which edits, finds the first. So a judgement made about one
+    /// value would be applied to another. Refused rather than guessed.
+    AmbiguousStructure {
+        /// The dotted path of the object holding the duplicate.
+        at: String,
+        /// The key named more than once.
+        key: String,
+    },
+    /// The file changed between being inspected and being written.
+    ///
+    /// The plan is computed from bytes that were read. Writing bytes derived
+    /// from a stale read would discard whatever the user did in between, which
+    /// is the one thing "unrelated bytes are preserved" cannot survive.
+    ChangedSinceInspected {
+        /// The digest the plan was computed against.
+        inspected: String,
+        /// The digest the file has now.
+        found: String,
+    },
 }
 
 impl Refusal {
@@ -267,6 +348,14 @@ impl Refusal {
             Refusal::WouldChangeMoreThanTheRegion { detail } => format!(
                 "refusing to write: the result would change something outside the managed \
                  region ({detail})"
+            ),
+            Refusal::AmbiguousStructure { at, key } => format!(
+                "{at} names `{key}` more than once, so there is no one structural location to \
+                 identify an insertion by; nothing is written"
+            ),
+            Refusal::ChangedSinceInspected { inspected, found } => format!(
+                "{SETTINGS} changed since it was inspected ({inspected} -> {found}), so the \
+                 planned write is against bytes that are no longer there; nothing is written"
             ),
         }
     }
@@ -343,7 +432,10 @@ pub struct Plan {
     pub action: Action,
     /// The exact content, and nothing else.
     pub managed: Managed,
-    /// The token an operator consents to.
+    /// The identity of the content alone.
+    pub content_token: String,
+    /// The token an operator consents to: the content, and the target as it
+    /// was when this plan was computed. See [`consent_token`].
     pub consent_token: String,
     /// The hook registrations this would actually add, which is empty when the
     /// region is already current.
@@ -398,7 +490,9 @@ impl Plan {
         }
         out.push_str("  no allow entry, no ask setting and no existing deny entry is touched\n");
         out.push_str(&format!(
-            "  consent token {}\n  refused by default: re-run `home apply --consent-settings {}`\n",
+            "  consent token {}\n  it covers the content above and this file as it stands; edit \
+             either and the plan is shown again\n  refused by default: re-run \
+             `home apply --consent-settings {}`\n",
             self.consent_token, self.consent_token
         ));
         out
@@ -604,12 +698,21 @@ pub enum SettingsOutcome {
         /// The plan, in the exact lines it would add.
         plan: Box<Plan>,
     },
-    /// The consent given names content this build no longer places.
+    /// The consent given does not name the modification this apply would make.
+    ///
+    /// Either the content changed, or the file it would go into did. Both are
+    /// "a modification the operator has not reviewed", and the answer to both
+    /// is to present the current one.
     ConsentStale {
-        /// The token the current content has.
+        /// The token the current content, against the current file, has.
         expected: String,
         /// The token the operator gave.
         given: String,
+        /// The identity of the content alone, so an operator can see which
+        /// half of the pair moved.
+        content_token: String,
+        /// The digest of the target the plan below was computed against.
+        target_digest: String,
         /// The plan for the current content.
         plan: Box<Plan>,
     },
@@ -682,14 +785,20 @@ impl SettingsOutcome {
             SettingsOutcome::ConsentStale {
                 expected,
                 given,
+                content_token,
+                target_digest,
                 plan,
             } => {
                 format!(
-                    "settings {}: the consent given ({given}) names content this build no longer \
-                 places; nothing was written\n{}",
+                    "settings {}: the consent given ({given}) does not name the modification this \
+                 would make; nothing was written\n{}",
                     plan.path,
                     plan.render()
-                ) + &format!("  consent to the content above with {expected}\n")
+                ) + &format!(
+                    "  the token covers the content ({content_token}) and the file it goes into \
+                     ({target_digest}); one of the two has changed since you were shown a plan\n  \
+                     consent to the modification above with {expected}\n"
+                )
             }
             SettingsOutcome::Applied {
                 plan,
@@ -756,7 +865,8 @@ pub fn plan(path: &str, existing: Option<&str>, managed: &Managed) -> Result<Pla
             revision: managed.revision.clone(),
             action: Action::Create,
             managed: managed.clone(),
-            consent_token: managed.token(),
+            content_token: managed.token(),
+            consent_token: consent_token(&managed.token(), &digest_of(None)),
             adding_hooks: managed.hooks.clone(),
             adding_deny: managed.deny.clone(),
             already_denied: Vec::new(),
@@ -776,6 +886,7 @@ pub fn plan(path: &str, existing: Option<&str>, managed: &Managed) -> Result<Pla
             found: kind_of(&before).to_string(),
         });
     };
+    unambiguous(text)?;
 
     // What is already there, by its own marker.
     let present = marked_registrations(&before);
@@ -861,7 +972,8 @@ pub fn plan(path: &str, existing: Option<&str>, managed: &Managed) -> Result<Pla
         revision: managed.revision.clone(),
         action,
         managed: managed.clone(),
-        consent_token: managed.token(),
+        content_token: managed.token(),
+        consent_token: consent_token(&managed.token(), &digest_of(Some(text))),
         adding_hooks,
         adding_deny,
         already_denied,
@@ -995,6 +1107,71 @@ fn deny_entries(root: &serde_json::Map<String, Value>) -> Result<Vec<String>, Re
         .iter()
         .map(|v| v.as_str().unwrap_or("").to_string())
         .collect())
+}
+
+/// Refuse a document in which any object names a key twice.
+///
+/// Section 3.24 identifies an insertion by exact content, **structural
+/// location** and recorded provenance. A duplicate key breaks the second: the
+/// document holds two locations with one name, and this module's two views of
+/// it disagree about which one is meant. `serde_json` keeps the last
+/// occurrence of a duplicate and is what every judgement here is made against;
+/// [`locate`] walks the text and takes the first, and is what every edit is
+/// applied to. On a document with no duplicate key the two always agree, which
+/// is why the rest of this module may treat them as one view.
+///
+/// Scanned over the whole document rather than only the paths this
+/// modification writes into, because the never-widen checks compare the parsed
+/// documents whole.
+fn unambiguous(text: &str) -> Result<(), Refusal> {
+    fn walk(text: &str, object: Span, path: &str) -> Result<(), Refusal> {
+        let members = object_members(text, object);
+        let mut seen: Vec<&str> = Vec::with_capacity(members.len());
+        for member in &members {
+            if seen.contains(&member.key.as_str()) {
+                return Err(Refusal::AmbiguousStructure {
+                    at: path.to_string(),
+                    key: member.key.clone(),
+                });
+            }
+            seen.push(&member.key);
+        }
+        for member in &members {
+            let child = if path == "(root)" {
+                member.key.clone()
+            } else {
+                format!("{path}.{}", member.key)
+            };
+            descend(text, member.value, &child)?;
+        }
+        Ok(())
+    }
+
+    fn descend(text: &str, value: Span, path: &str) -> Result<(), Refusal> {
+        match text.as_bytes().get(value.start) {
+            Some(b'{') => walk(text, value, path),
+            Some(b'[') => {
+                for (i, element) in array_elements(text, value).into_iter().enumerate() {
+                    descend(text, element, &format!("{path}[{i}]"))?;
+                }
+                Ok(())
+            }
+            _ => Ok(()),
+        }
+    }
+
+    descend(text, root_span(text)?, "(root)")
+}
+
+/// The digest of a file's text, or the reserved word for a file that is absent.
+///
+/// An absent file and an empty one are different preconditions, and a digest
+/// over zero bytes would make them the same.
+fn digest_of(text: Option<&str>) -> String {
+    match text {
+        Some(text) => digest_bytes(text.as_bytes()),
+        None => "(absent)".to_string(),
+    }
 }
 
 /// What a value is, in one word, for a report.
@@ -1135,6 +1312,7 @@ pub fn removal(existing: Option<&str>, record: &Modification) -> Result<Removal,
             found: kind_of(&before).into(),
         });
     };
+    unambiguous(text)?;
 
     let present = marked_registrations(&before);
     let mut detail = Vec::new();
@@ -1339,6 +1517,34 @@ pub fn perform(
         }
     };
 
+    // The digest of what was inspected. Every write below is checked against
+    // it immediately before it happens: consent names the exact content to
+    // place, and the file it is placed into must still be the file the plan
+    // was computed from. A user who edits their settings while an apply is in
+    // flight gets a refusal, not a silent overwrite of what they wrote.
+    let inspected = digest_of(existing.as_deref());
+    let unchanged = || -> Result<(), Box<SettingsOutcome>> {
+        let now = match read() {
+            Ok(text) => digest_of(text.as_deref()),
+            Err(e) => {
+                return Err(Box::new(SettingsOutcome::Failed {
+                    path: display.clone(),
+                    reason: e.to_string(),
+                }));
+            }
+        };
+        if now == inspected {
+            return Ok(());
+        }
+        Err(Box::new(SettingsOutcome::Refused {
+            path: display.clone(),
+            refusal: Refusal::ChangedSinceInspected {
+                inspected: inspected.clone(),
+                found: now,
+            },
+        }))
+    };
+
     let mut modifications = match read_modifications(layout) {
         Ok(m) => m,
         Err(e) => {
@@ -1368,6 +1574,9 @@ pub fn perform(
             }
         };
         if let Some(contents) = outcome.contents_after() {
+            if let Err(refused) = unchanged() {
+                return *refused;
+            }
             if let Err(e) = write_atomically(&path, contents) {
                 return SettingsOutcome::Failed {
                     path: display,
@@ -1397,7 +1606,12 @@ pub fn perform(
     }
 
     let content = managed_for(layout);
-    let token = content.token();
+    // What a consent for this content, against this file as it stands, must
+    // be. Computed from the on-disk digest rather than from the plan's,
+    // because a plan that first takes a superseded region out is computed
+    // against text that was never on disk, and an operator consents to the
+    // file they inspected.
+    let token = consent_token(&content.token(), &inspected);
 
     // A recorded region from a different revision comes out before the new one
     // goes in, and only while it is intact. That is what keeps a revision
@@ -1405,25 +1619,6 @@ pub fn perform(
     let superseded_record = recorded_for(&modifications, &display)
         .filter(|m| m.revision != content.revision)
         .cloned();
-
-    if let Intent::Consented { token: given } = intent {
-        if given != &token {
-            let plan = match plan(&display, existing.as_deref(), &content) {
-                Ok(plan) => plan,
-                Err(refusal) => {
-                    return SettingsOutcome::Refused {
-                        path: display,
-                        refusal,
-                    };
-                }
-            };
-            return SettingsOutcome::ConsentStale {
-                expected: token,
-                given: given.clone(),
-                plan: Box::new(plan),
-            };
-        }
-    }
 
     let (base, superseded) = match (&superseded_record, intent) {
         (Some(record), Intent::Consented { .. }) => match removal(existing.as_deref(), record) {
@@ -1454,13 +1649,43 @@ pub fn perform(
         }
     };
 
-    let Intent::Consented { .. } = intent else {
+    let Intent::Consented { token: given } = intent else {
         return SettingsOutcome::Withheld {
             plan: Box::new(plan),
         };
     };
 
-    if plan.action.changes_the_file() || superseded.is_some() {
+    let would_write = plan.action.changes_the_file() || superseded.is_some();
+
+    // Consent is checked here, at the write boundary, and only when there is a
+    // write to consent to. A modification already in place is section 3.24's
+    // "applying the modification twice changes nothing", and asking an
+    // operator to re-consent to a no-op would turn idempotence into a
+    // conversation. Where there **is** a write, the token must name this exact
+    // planned modification: this content, into this file as it stands.
+    if would_write && given != &token {
+        let current = match self::plan(&display, existing.as_deref(), &content) {
+            Ok(current) => current,
+            Err(refusal) => {
+                return SettingsOutcome::Refused {
+                    path: display,
+                    refusal,
+                };
+            }
+        };
+        return SettingsOutcome::ConsentStale {
+            expected: token,
+            given: given.clone(),
+            content_token: content.token(),
+            target_digest: inspected.clone(),
+            plan: Box::new(current),
+        };
+    }
+
+    if would_write {
+        if let Err(refused) = unchanged() {
+            return *refused;
+        }
         if let Err(e) = write_atomically(&path, &plan.contents_after) {
             return SettingsOutcome::Failed {
                 path: display,
@@ -1472,24 +1697,32 @@ pub fn perform(
     // What the record says this product placed. A re-apply that adds nothing
     // keeps what the previous record for this revision already said, so a
     // second run does not shrink the region it can later take back out.
-    let mut placed_deny: Vec<String> = recorded_for(&modifications, &display)
-        .filter(|m| m.revision == content.revision)
-        .map(|m| m.deny.clone())
-        .unwrap_or_default();
+    let previous =
+        recorded_for(&modifications, &display).filter(|m| m.revision == content.revision);
+    let mut placed_deny: Vec<String> = previous.map(|m| m.deny.clone()).unwrap_or_default();
     for entry in &plan.adding_deny {
         if !placed_deny.contains(entry) {
             placed_deny.push(entry.clone());
         }
     }
+    let mut placed_hooks: Vec<HookRegistration> =
+        previous.map(|m| m.hooks.clone()).unwrap_or_default();
+    for hook in &plan.adding_hooks {
+        if !placed_hooks.contains(hook) {
+            placed_hooks.push(hook.clone());
+        }
+    }
 
-    // A refusal that is in the file but that no record attributes to this
-    // product is left unclaimed. Two situations produce one, and the safe
-    // answer is the same for both: the user already refused it themselves, or
-    // an apply was interrupted before its record was written and the
-    // attribution is gone. Claiming it would mean a later removal takes out a
-    // refusal this product cannot prove it placed, which is the one direction
-    // section 3.24 never allows.
-    let unclaimed: Vec<String> = content
+    // Content that is in the file but that no record attributes to this
+    // product is left unclaimed. Three situations produce one, and the safe
+    // answer is the same for all three: the user wrote it themselves, an apply
+    // was interrupted before its record was written and the attribution is
+    // gone, or someone copied a marked registration out of a shipped harness.
+    // Claiming it would mean a later removal takes out content this product
+    // cannot prove it placed, which is the one direction section 3.24 never
+    // allows. A marker resembling this product's satisfies one of the three
+    // identifying properties and is not, on its own, proof of ownership.
+    let mut unclaimed: Vec<String> = content
         .deny
         .iter()
         .filter(|entry| !placed_deny.contains(entry))
@@ -1500,6 +1733,20 @@ pub fn perform(
             )
         })
         .collect();
+    unclaimed.extend(
+        content
+            .hooks
+            .iter()
+            .filter(|hook| !placed_hooks.contains(hook))
+            .map(|hook| {
+                format!(
+                    "hook {} `{}` is registered already, with the bytes this build places, and is \
+                     not recorded as placed here; a marker is content and content can be copied, \
+                     so removal will leave it",
+                    hook.event, hook.matcher
+                )
+            }),
+    );
 
     // Recorded after the write, and unconditionally: an apply interrupted
     // between the two leaves a region on disk with no record, and running it
@@ -1511,7 +1758,7 @@ pub fn perform(
             kind: KIND.to_string(),
             harness: native.harness.clone(),
             revision: content.revision.clone(),
-            hooks: content.hooks.clone(),
+            hooks: placed_hooks,
             deny: placed_deny,
             digest_before: plan.digest_before.clone(),
             digest_after: plan.digest_after.clone(),

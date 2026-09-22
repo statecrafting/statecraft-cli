@@ -1687,6 +1687,62 @@ this session, for this command, and only an inspection of effective behavior
 establishes it. Reading the file and reporting the session qualified would be
 this section's failure committed by the tooling that was written to detect it.
 
+**2026-09-21: §3.24's implementation is reconciled with the revised contract,
+and four gaps were found by writing the disagreements down.** The entry above
+said the code written against the old wording is a candidate for the new one
+and that the difference is established by exercising the cases where the record
+and the file disagree. Doing that found four, three of them defects and one a
+design that had to be sharpened.
+
+**A duplicate JSON key made the two views of the document disagree.** This
+module deliberately keeps two: `serde_json` parses, and judges, and a text
+walker locates spans, and edits. On a document with no duplicate key the two
+always agree, which is why the rest of the module may treat them as one view.
+`serde_json` keeps the **last** occurrence of a duplicate and `locate` takes
+the **first**, so on `{"permissions": {...}, "permissions": {...}}` a
+judgement made about one value would have been applied to the other. It is
+also exactly the structural-location property failing: two locations with one
+name. Refused, as `AmbiguousStructure`, scanned over the whole document rather
+than only the paths written into, because the never-widen checks compare the
+parsed documents whole.
+
+**Consent named the content and not the target.** §3.24's token was a digest
+over the exact lines, which satisfies "consent to one revision is not consent
+to the next" and leaves a second hole: the same content spliced into a
+different file is a different modification, with different insertion points,
+different entries already refused, different conflicts and different resulting
+bytes. An operator who read one plan could consent to another. The token now
+covers the content **and** the digest of the target as the plan saw it, which
+is the owner's "do not overwrite a file changed since it was inspected"
+expressed as a mechanism. The check moved to the write boundary and fires only
+where there is a write, because a modification already in place is
+idempotence, and asking an operator to re-consent to a no-op would turn that
+into a conversation. A re-read immediately before the write catches a
+concurrent writer in the same window.
+
+**A marker was treated as proof of ownership for hooks.** The deny half
+already declined to claim what it could not prove it placed. The hook half did
+not, on the reasoning that a registration carries its own marker. The revised
+contract makes the three properties conjunctive, and the owner stated the
+consequence directly: a marker resembling this product's is not by itself
+proof. A marker is content, and content can be copied out of a shipped harness
+by anyone. So the hook half now records only what this product actually added
+or had already recorded, and a marked registration with no record behind it is
+reported as unclaimed and left. The cost is real and is the right direction:
+after a lost record this product will not take its own registration back out,
+and the operator removes those bytes themselves.
+
+**Test coverage was of the old contract.** Ten cases were added, each
+constructing a disagreement rather than asserting a phrase: a duplicate key at
+the touched path and below it, a file edited between the plan and the write, a
+forged marker, a pre-existing user refusal, a duplicated deny value whose
+ownership is ambiguous, the two insertions at their two locations under one
+record, a record that cannot be read, removal after a user edit, and an
+unrelated key surviving both reapplication and removal. One existing test
+changed its expectation rather than its assertion, which is the visible trace
+of the third gap: it asserted that a repair after a lost record adopts the
+marked hook, and it now asserts that it does not.
+
 ## Verification
 
 Each line is one command. They run the acceptance this spec's behavior declares:

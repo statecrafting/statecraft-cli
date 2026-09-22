@@ -104,8 +104,11 @@ pub fn wrap(answer: service::Answer) -> Answer<service::Answer> {
 /// Spec 002 section 3.24: the modification is **refused by default**, so the
 /// absence of a flag is [`Intent::Withheld`] and not a shorthand for consent.
 /// The token is the one the plan printed, repeated back, which is what makes
-/// consent specific to the content the operator actually read: content whose
-/// lines have changed has a different token and is presented again.
+/// consent specific to the modification the operator actually read. It covers
+/// both halves of that modification: the exact content, and the file it would
+/// go into as it stood when the plan was computed. Either one changing
+/// produces a different token, so a plan nobody reviewed is presented rather
+/// than performed.
 ///
 /// `None` means the flags do not name an operation, which the caller renders as
 /// a usage error rather than guessing at.
