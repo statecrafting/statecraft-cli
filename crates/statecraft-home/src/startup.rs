@@ -552,6 +552,129 @@ pub fn assemble(
     })
 }
 
+/// A claim that a live session was observed enforcing the floor.
+///
+/// Section 3.26's third evidence class is the only one a session can produce,
+/// and it is therefore the only one nothing in this crate can produce for
+/// itself. That makes it the field most easily filled in by assertion, so it
+/// is not fillable by assertion: [`admit`] is the only route to
+/// [`Observation::Observed`] outside a deserialization, and every field below
+/// is checked against something this build can compute or enumerate.
+#[derive(Debug, Clone)]
+pub struct Claim<'a> {
+    /// The harness version, exactly as the binary reported it.
+    pub version: &'a str,
+    /// The digest of the settings file the session was actually started with.
+    pub payload_digest: &'a str,
+    /// The command the floor should have refused.
+    pub refused_command: &'a str,
+    /// What the session printed, captured verbatim.
+    pub transcript: &'a str,
+}
+
+/// Why a claimed observation is not admitted as one.
+#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
+pub enum NotAdmitted {
+    /// The session ran with settings this build did not produce.
+    #[error(
+        "the session was started with settings digesting to {found}; this build's payload digests to {expected}, so the observation is of some other bytes"
+    )]
+    PayloadMismatch {
+        /// What this build produces.
+        expected: String,
+        /// What the session was given.
+        found: String,
+    },
+    /// The command is not one the floor claims, so refusing it proves nothing.
+    #[error(
+        "`{command}` matches no entry in the deny floor, so its refusal is not evidence that the floor was enforced"
+    )]
+    NotOnTheFloor {
+        /// The command claimed.
+        command: String,
+    },
+    /// Nothing was captured.
+    #[error("the transcript is empty; a step whose output was not captured did not happen")]
+    EmptyTranscript,
+    /// The transcript does not show the refusal being claimed.
+    #[error("the transcript does not show `{command}` being refused")]
+    RefusalNotShown {
+        /// The command claimed.
+        command: String,
+    },
+    /// No version was read.
+    #[error("no harness version was recorded; the observation is version specific")]
+    NoVersion,
+}
+
+/// Whether a deny-floor entry claims a command.
+///
+/// The entries are `Bash(<prefix>*)` or `Bash(<exact>)`. Matching them here
+/// rather than trusting a caller's word is what makes [`NotAdmitted::NotOnTheFloor`]
+/// decidable: an observation of some unrelated command being refused says
+/// nothing about this floor.
+fn floor_claims(command: &str) -> bool {
+    crate::settings::DENY_FLOOR.iter().any(|entry| {
+        let Some(body) = entry
+            .strip_prefix("Bash(")
+            .and_then(|b| b.strip_suffix(')'))
+        else {
+            return false;
+        };
+        match body.strip_suffix('*') {
+            Some(prefix) => command.starts_with(prefix),
+            None => command == body,
+        }
+    })
+}
+
+/// Admit a live-session observation, or say why it is not one.
+///
+/// **The weakest link is named rather than hidden.** Three of the four checks
+/// are against something computable: the payload digest is this build's own,
+/// the command is enumerated in the floor, and the version is present. The
+/// fourth reads the provider's own output for the refusal, and that is a
+/// judgement about text a provider emitted. It cannot be made stronger from
+/// here, which is exactly why the acceptance keeps the captured output: the
+/// admission is reviewable because the bytes it was made from are kept, not
+/// because the check is clever.
+pub fn admit(claim: &Claim<'_>) -> Result<Observation, NotAdmitted> {
+    if claim.version.trim().is_empty() {
+        return Err(NotAdmitted::NoVersion);
+    }
+    let expected = payload_identity();
+    if claim.payload_digest != expected {
+        return Err(NotAdmitted::PayloadMismatch {
+            expected,
+            found: claim.payload_digest.to_string(),
+        });
+    }
+    if !floor_claims(claim.refused_command) {
+        return Err(NotAdmitted::NotOnTheFloor {
+            command: claim.refused_command.to_string(),
+        });
+    }
+    if claim.transcript.trim().is_empty() {
+        return Err(NotAdmitted::EmptyTranscript);
+    }
+    let shows_refusal = claim.transcript.contains(claim.refused_command)
+        && ["denied", "refus", "not allowed", "blocked", "permission"]
+            .iter()
+            .any(|marker| claim.transcript.to_lowercase().contains(marker));
+    if !shows_refusal {
+        return Err(NotAdmitted::RefusalNotShown {
+            command: claim.refused_command.to_string(),
+        });
+    }
+    Ok(Observation::Observed {
+        version: claim.version.to_string(),
+        observed: format!(
+            "`{}` was refused by the installed harness, started with the payload digesting              to {expected}",
+            claim.refused_command
+        ),
+    })
+}
+
 /// The identity of the settings payload a session was started with.
 ///
 /// Recorded beside the rest because section 3.27's mechanism is the thing a
@@ -1033,6 +1156,91 @@ mod tests {
                 !json.contains(overclaim),
                 "the record uses the word `{overclaim}`, which no digest establishes"
             );
+        }
+    }
+
+    fn good_claim<'a>(digest: &'a str, transcript: &'a str) -> Claim<'a> {
+        Claim {
+            version: "2.1.267",
+            payload_digest: digest,
+            refused_command: "cargo publish --dry-run",
+            transcript,
+        }
+    }
+
+    #[test]
+    fn an_admitted_observation_needs_this_builds_payload_a_floor_command_and_a_transcript() {
+        let digest = payload_identity();
+        let transcript = "> cargo publish --dry-run\nPermission denied by settings.\n";
+        let observation = admit(&good_claim(&digest, transcript)).unwrap();
+        assert!(observation.observed());
+        let Observation::Observed { version, observed } = &observation else {
+            unreachable!()
+        };
+        assert_eq!(version, "2.1.267");
+        assert!(observed.contains(&digest));
+    }
+
+    #[test]
+    fn an_arbitrary_or_incomplete_observation_is_not_admitted() {
+        let digest = payload_identity();
+        let transcript = "> cargo publish --dry-run\nPermission denied by settings.\n";
+
+        // Other bytes: the session ran with settings this build did not make.
+        let mut other = good_claim(&digest, transcript);
+        let elsewhere = "f".repeat(64);
+        other.payload_digest = &elsewhere;
+        assert!(matches!(
+            admit(&other),
+            Err(NotAdmitted::PayloadMismatch { .. })
+        ));
+
+        // A command the floor never claimed: refusing it proves nothing.
+        let mut unrelated = good_claim(&digest, "> ls\nPermission denied.\n");
+        unrelated.refused_command = "ls";
+        assert!(matches!(
+            admit(&unrelated),
+            Err(NotAdmitted::NotOnTheFloor { .. })
+        ));
+
+        // Nothing captured.
+        assert!(matches!(
+            admit(&good_claim(&digest, "   \n")),
+            Err(NotAdmitted::EmptyTranscript)
+        ));
+
+        // Captured, and it does not show the refusal. A transcript in which
+        // the command RAN is the negative result, not a weaker positive.
+        assert!(matches!(
+            admit(&good_claim(
+                &digest,
+                "> cargo publish --dry-run\n   Packaging spec-fixture v0.1.0\n"
+            )),
+            Err(NotAdmitted::RefusalNotShown { .. })
+        ));
+
+        // No version: the observation is version specific.
+        let mut unversioned = good_claim(&digest, transcript);
+        unversioned.version = "  ";
+        assert!(matches!(admit(&unversioned), Err(NotAdmitted::NoVersion)));
+    }
+
+    #[test]
+    fn every_floor_entry_is_matchable_and_nothing_else_is() {
+        for entry in crate::settings::DENY_FLOOR {
+            let body = entry
+                .strip_prefix("Bash(")
+                .unwrap()
+                .strip_suffix(')')
+                .unwrap();
+            let command = body.trim_end_matches('*').to_string();
+            assert!(
+                floor_claims(&command),
+                "the floor entry {entry} claims nothing"
+            );
+        }
+        for command in ["ls", "git status", "cargo build", "git push origin topic"] {
+            assert!(!floor_claims(command), "the floor claimed `{command}`");
         }
     }
 

@@ -1,0 +1,124 @@
+//! Write a managed session's startup record from evidence that was captured.
+//!
+//! Spec 002 section 3.26. The record's seven fields are read from the project,
+//! the home and the manifest; the three evidence classes are supplied
+//! separately, because they are three different measurements and only one of
+//! them can be made by reading anything.
+//!
+//! ```sh
+//! cargo run -q -p statecraft-home --example record-startup -- \
+//!   <project> <home> <session-id> <version> <refused-command> <transcript-file>
+//! ```
+//!
+//! The last three are the live-session observation, and they are **admitted
+//! rather than believed**: `startup::admit` refuses a claim whose payload
+//! digest is not this build's, whose command no deny-floor entry claims, whose
+//! transcript is empty, or whose transcript does not show the refusal. There is
+//! no argument that asserts qualification, and passing one is not possible
+//! rather than discouraged.
+//!
+//! Omit the last three and the record is written with the observation absent
+//! and says so. That is the ordinary case and it is not a failure: a session
+//! that was not observed is recorded as one that was not observed.
+
+use statecraft_environment::manifest::Manifest;
+use statecraft_home::startup::{self, AdapterIdentity, Claim, Observation, StartupRecord, Supply};
+use statecraft_home::{delivery, home::Layout, required};
+
+fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let args: Vec<String> = std::env::args().skip(1).collect();
+    if args.len() != 3 && args.len() != 6 {
+        eprintln!(
+            "usage: record-startup <project> <home> <session-id> \
+             [<version> <refused-command> <transcript-file>]"
+        );
+        std::process::exit(3);
+    }
+    let root = std::path::PathBuf::from(&args[0]);
+    let layout = Layout::new(&args[1]);
+    let session_id = &args[2];
+
+    let manifest = Manifest::read(&root)?.ok_or("the project holds no manifest")?;
+
+    // Evidence class 1: the documented load rule, evaluated against the tree.
+    let rule = delivery::load_rules()
+        .into_iter()
+        .find(|r| r.harness == delivery::native_homes()[0].harness)
+        .ok_or("no load rule for this harness")?;
+    let verdict = delivery::evaluate(&root, &rule);
+
+    // Section 3.25: what is required, and what answered. The resolved identity
+    // is the revision installed under the required identity, which is the only
+    // one this product would have used; when that is missing or corrupt the
+    // standing says so and the record carries the refusal.
+    let required_digest = required::required_of(&manifest).map(str::to_string);
+    let standing = required::evaluate(&layout, &manifest, required_digest.as_deref());
+    let resolved = standing
+        .permits_managed_execution()
+        .then(|| required_digest.clone())
+        .flatten();
+
+    // Evidence class 2: whether the bytes were read and handed over. This
+    // example delivers nothing, and records that rather than implying it.
+    let supply = Supply::NotAttempted {
+        reason: "this recorder reads and records; it performs no delivery, so nothing \
+                 about one is established here"
+            .to_string(),
+    };
+
+    // Evidence class 3: a live session, admitted or absent.
+    let transcript;
+    let observation = if args.len() == 6 {
+        transcript = std::fs::read_to_string(&args[5])?;
+        let claim = Claim {
+            version: &args[3],
+            payload_digest: &startup::payload_identity(),
+            refused_command: &args[4],
+            transcript: &transcript,
+        };
+        match startup::admit(&claim) {
+            Ok(observed) => observed,
+            Err(why) => {
+                // Not admitted is not "recorded more weakly". Nothing is
+                // written, because a record carrying a rejected claim as an
+                // absence would lose the fact that a claim was made and
+                // refused.
+                eprintln!("the claimed observation is not admitted: {why}");
+                std::process::exit(1);
+            }
+        }
+    } else {
+        Observation::NotObserved {
+            reason: "no live session was observed for this start".to_string(),
+        }
+    };
+
+    let record = startup::assemble(
+        &root,
+        session_id,
+        &statecraft_environment::time::rfc3339_utc(
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)?
+                .as_secs() as i64,
+        ),
+        &manifest,
+        AdapterIdentity {
+            name: "claude-code".into(),
+            harness: "claude-code".into(),
+            version: env!("CARGO_PKG_VERSION").into(),
+        },
+        verdict,
+        standing,
+        resolved,
+        supply,
+        observation,
+    )?;
+
+    record.write(&root)?;
+    println!("{}", record.describe());
+    println!(
+        "written   {}",
+        StartupRecord::path(&root, session_id).display()
+    );
+    Ok(())
+}
