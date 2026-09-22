@@ -2228,6 +2228,36 @@ and the acceptance script found it by digesting what it had written. §3.4 of
 the change; the digest and the argument moved to the `--json` rendering, where
 a caller reads them.
 
+**2026-09-21: the deadline attempt's synchronisation is contention
+mitigation, and the investigation closes there.** The earlier entries on this
+attempt recorded a `RwLock` that serialises the one attempt whose subject is a
+deadline against the four whose subject is not, measured at 1 failure in 5 runs
+before and 0 in 40 after. Re-read against what the test requires, that
+description overstated it, and this entry corrects it by appending rather than
+by editing the earlier ones.
+
+What the lock establishes is that **no other attempt in that test binary runs
+during the measurement**. What the test requires is that the child is
+`execve`d, runs its body, emits its terminal event and is read by the
+supervisor inside five seconds of wall clock. That is a real-time bound, and
+mutual exclusion does not establish a real-time bound: it removes one
+contributor to the window and leaves the rest of the workspace, the machine and
+the kernel's scheduling of `fork`/`execve` in place. A reduced failure rate
+under one load profile is a reduced failure rate, and calling it the absence of
+the race would be a claim the measurement does not carry.
+
+The remaining failure is **not** dismissed as irrelevant, because it is not.
+When the whole budget goes on `execve`, no init event arrives, supervision
+interrupts with `NoInit`, and the attempt's subject, whether a terminal denial
+that did arrive survives an interruption, is not measured at all. That is this
+measurement's precondition failing and it leaves the test unable to say
+anything. So the attempt now reads the child's own `entered` marker **before**
+it judges the denial, and fails on the precondition with its own message. It
+still fails: passing in that state would be suppression, and reporting it as a
+lost denial would send the next reader after the wrong defect. No loop was run
+to accumulate a clean count, and no assertion was weakened; the deadline is
+unchanged at five seconds.
+
 ## Verification
 
 Each line is one command. They run the acceptance this spec's behavior declares:

@@ -12,31 +12,41 @@ use statecraft_run::attempt::Outcome;
 use std::os::unix::fs::PermissionsExt;
 use std::path::{Path, PathBuf};
 
-/// Serialises the one attempt whose subject is a deadline against the four
-/// whose subject is not.
+/// **Contention mitigation, not a proof that the race is eliminated.**
 ///
 /// The other attempts in this file spawn children of their own, and the
 /// concurrent one spawns two that fork a `/bin/sleep` ten times a second while
 /// they wait at their barrier. Running the deadline measurement beside them
 /// puts this fixture's own process pressure inside the window the deadline is
-/// measuring: the budget is five seconds because five seconds is the subject,
-/// and it should not also have to absorb contention the suite creates for
-/// itself.
+/// measuring. So the deadline attempt takes the write side and every other
+/// attempt takes the read side: the four still run in parallel with each other,
+/// and none of them runs while the deadline is being measured.
 ///
-/// So the deadline attempt takes the write side and every other attempt takes
-/// the read side: the four still run in parallel with each other, and none of
-/// them runs while the deadline is being measured. This is synchronisation
-/// rather than a larger budget, the deadline is unchanged at five seconds, and
-/// no assertion is weakened.
+/// What that establishes is exactly one thing: **no other attempt in this test
+/// binary is running during the measurement.** It is worth having, and it is
+/// not the ordering the test requires.
+///
+/// The test requires that the child is `execve`d, runs its body, emits its
+/// terminal event, and that the supervisor reads it, all inside five seconds of
+/// wall clock. That is a real-time bound, and mutual exclusion cannot establish
+/// a real-time bound. It removes one contributor to the window and leaves every
+/// other one in place: the rest of the workspace's test binaries, whatever else
+/// the machine is doing, and the kernel's own scheduling of a `fork`/`execve`
+/// pair. The measured improvement was 1 failure in 5 runs before and 0 in 40
+/// after, under one load profile. That is a reduced failure rate. It is not the
+/// absence of the failure, and describing it as one would be a claim the
+/// measurement does not carry.
+///
+/// What holds unconditionally is elsewhere, and deliberately so: the ordering
+/// *within* the child is established by the fixture, whose
+/// `settings-after-terminal` marker sits on the line after the terminal emit,
+/// and the deadline attempt below reads the trace before it judges, so a run
+/// whose precondition was not met fails saying that rather than looking like a
+/// lost denial.
 ///
 /// Poisoning is ignored on both sides. A panic in one attempt must fail that
 /// attempt and no other: a poisoned lock would turn one real failure into five
 /// `PoisonError`s and bury the one that says what went wrong.
-///
-/// It does not make the measurement immune to load the suite does not control.
-/// A machine that cannot `execve` a shell script inside five seconds will still
-/// fail this attempt, and it will fail it with the trace below saying so rather
-/// than silently.
 static QUIET: std::sync::RwLock<()> = std::sync::RwLock::new(());
 
 struct Attempt {
@@ -291,6 +301,22 @@ fn concurrent_attempts_keep_independent_settings_until_both_children_read_them()
 /// hoped for here: the marker it writes sits on the line after the terminal
 /// emit, so `settings-after-terminal` existing means the child outlived its own
 /// terminal event.
+/// The workspace's entries, sorted, for a failure message.
+///
+/// A failing deadline attempt is judged from what the child left behind, so the
+/// two messages below read the same tree rather than each building their own.
+fn workspace_entries(root: &Path) -> Vec<String> {
+    let mut names: Vec<String> = std::fs::read_dir(root)
+        .map(|d| {
+            d.filter_map(Result::ok)
+                .map(|e| e.file_name().to_string_lossy().to_string())
+                .collect()
+        })
+        .unwrap_or_default();
+    names.sort();
+    names
+}
+
 #[test]
 fn timeout_after_terminal_denial_cleans_settings_and_retains_evidence() {
     use std::time::{Duration, Instant};
@@ -320,6 +346,28 @@ fn timeout_after_terminal_denial_cleans_settings_and_retains_evidence() {
     );
 
     // 1. The terminal denial reached the supervisor before the deadline.
+    //
+    // The precondition is judged first, and separately. The child records
+    // `entered` on the first line of its body, so an empty trace means the
+    // whole budget went on `fork`/`execve` and the child never ran. That is not
+    // a lost denial and it is not irrelevant either: it is this measurement's
+    // precondition failing, which leaves the subject unmeasured. It fails, and
+    // it fails saying which of the two happened, because passing in that state
+    // would be suppression and reporting it as a lost denial would send the
+    // next reader after the wrong defect.
+    let trace = std::fs::read_to_string(root.path().join("trace")).unwrap_or_default();
+    assert!(
+        trace.contains("entered"),
+        "the child never ran its body inside the five-second budget: the trace is {trace:?} and \
+         the workspace holds {:?}. Supervision reported {:?} after {elapsed:?} with stream error \
+         {:?}, which is the supervisor behaving correctly on a child that never started. \
+         The subject of this test, whether a terminal denial that DID arrive survives an \
+         interruption, was not measured. The synchronisation above reduces the contention this \
+         suite creates for itself and does not bound `execve`; nothing in this crate can.",
+        workspace_entries(root.path()),
+        execution.supervised.outcome,
+        execution.supervised.stream_error,
+    );
     let seen = refusals(&execution.supervised.events);
     assert_eq!(
         seen.len(),
@@ -330,18 +378,8 @@ fn timeout_after_terminal_denial_cleans_settings_and_retains_evidence() {
          given are not the ones written, and `emitted` present means the stream \
          was written and the supervisor did not read it inside the deadline. \
          Supervision reported {:?} after {elapsed:?}, stream error {:?}",
-        std::fs::read_to_string(root.path().join("trace")).unwrap_or_default(),
-        {
-            let mut names: Vec<String> = std::fs::read_dir(root.path())
-                .map(|d| {
-                    d.filter_map(Result::ok)
-                        .map(|e| e.file_name().to_string_lossy().to_string())
-                        .collect()
-                })
-                .unwrap_or_default();
-            names.sort();
-            names
-        },
+        trace,
+        workspace_entries(root.path()),
         execution.supervised.outcome,
         execution.supervised.stream_error,
     );
