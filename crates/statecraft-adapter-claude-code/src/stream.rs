@@ -99,6 +99,16 @@ pub struct SystemEvent {
     /// And which event fired it.
     #[serde(default)]
     pub hook_event: Option<String>,
+    /// A `hook_response` event's standard output, verbatim. Spec 002 section
+    /// 3.31 reads a startup acknowledgment from it; nothing here interprets it.
+    #[serde(default)]
+    pub stdout: Option<String>,
+    /// A `hook_response` event's exit code.
+    #[serde(default)]
+    pub exit_code: Option<i64>,
+    /// A `hook_response` event's own outcome word, `success` on 2.1.267.
+    #[serde(default)]
+    pub outcome: Option<String>,
     /// A `permission_denied` event names the tool.
     #[serde(default)]
     pub tool_name: Option<String>,
@@ -125,6 +135,11 @@ impl SystemEvent {
     /// Whether this is one of the hook events `hook-enforcement` rests on.
     pub fn is_hook(&self) -> bool {
         self.subtype == "hook_started" || self.subtype == "hook_response"
+    }
+
+    /// Whether this is a hook's reported response, which carries its output.
+    pub fn is_hook_response(&self) -> bool {
+        self.subtype == "hook_response"
     }
 
     /// Whether this is the mid-stream denial notification section 3.1 lists as
