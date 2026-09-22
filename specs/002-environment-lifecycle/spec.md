@@ -1877,6 +1877,32 @@ read of a settings file substitutes for one. Until a live session produces one,
 this product reports a session as **not qualified** for the managed-execution
 claim, which is §3.27's answer and not a workaround for it.
 
+**2026-09-21: the producer version this build reports is a literal, not the
+dependency's.** Found by running the producer acceptance against the packaged
+`0.22.0` candidate in an isolated worktree. `producer::PRODUCER_VERSION` is the
+string `"0.21.0"`, and `bridge.rs` carries the same number in a step label, so
+an initialization run against a different producer still reported
+`spec-spine-core@0.21.0`. Cargo does not hand a dependent crate a dependency's
+version at compile time, so the literal is not an oversight with an obvious
+cure; it is a coupling between the manifest and two source files that nothing
+enforces. Recorded rather than changed: the committed dependency is unmoved,
+and a repair belongs with the change that moves it, where the two can be
+verified together.
+
+**2026-09-21: a packaged `.crate` digest identifies a commit and the sources
+identify the library.** The counterparty's release record carries digests for
+the two `0.22.0` producer archives cut at `da1cd99b`. The archives actually on
+that machine are cut at `5b8c201a`, two documentation commits later, so their
+digests are different and the record's are stale by exactly the mechanism the
+record itself documents: `cargo package` stamps `.cargo_vcs_info.json` with the
+git sha, so the digest moves on every commit including one that touches no
+crate source. This product therefore records **both** for an isolated
+measurement: the archive digest, which says which commit the artifact was cut
+from, and a digest over the archive's contents **excluding** that stamp, which
+says whether the library changed. Only the second is comparable across
+commits, and confusing them is how "the candidate moved" and "the candidate's
+code moved" become one question with one wrong answer.
+
 **2026-09-21: the adapter's deadline attempt raced its own subject, and the
 repair is structural rather than a larger budget.**
 `crates/statecraft-adapter-claude-code/tests/settings_transport.rs`, the
