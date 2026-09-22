@@ -109,7 +109,12 @@ pub fn operation(
     Some(match verb {
         Verb::HomeShow => Operation::HomeShow,
         Verb::HomePlan => Operation::HomePlan,
-        Verb::HomeApply => Operation::HomeApply,
+        // Spec 002 section 3.24's settings intent. Until spec 006 binds the
+        // flags that choose it, `home apply` asks for what it always did: the
+        // plan for the modification, and no write.
+        Verb::HomeApply => Operation::HomeApply {
+            settings: statecraft_home::settings::Intent::Withheld,
+        },
         Verb::InitPlan => Operation::InitPlan { root: root()? },
         Verb::InitApply => Operation::InitApply { root: root()? },
         Verb::MigratePlan => Operation::MigratePlan { root: root()? },

@@ -127,6 +127,23 @@ pub enum Finding {
         /// Why it is not portable.
         reason: String,
     },
+    /// The committed harness requirement and the home disagree.
+    ///
+    /// Spec 002 section 3.25 names `doctor` as one of the four things that stay
+    /// possible while managed execution is refused, and this is that: the
+    /// disagreement, reported. The comparison is made by the crate that owns
+    /// the harness, because this crate cannot see a home; the caller supplies
+    /// the answer and `doctor` reports it beside everything else, so an
+    /// operator diagnosing a refusal reads one report rather than two.
+    ///
+    /// Reporting only. Nothing here installs, selects or commits a
+    /// requirement, which is the same rule as every other finding.
+    HarnessRequirement {
+        /// The standing's one-word name.
+        standing: String,
+        /// Why managed execution is refused.
+        reason: String,
+    },
 }
 
 impl Finding {
@@ -152,6 +169,9 @@ impl Finding {
             }
             Finding::NonPortableDeclaration { field, key, reason } => {
                 format!("non-portable-declaration {field}.{key}: {reason}")
+            }
+            Finding::HarnessRequirement { standing, reason } => {
+                format!("harness-requirement {standing}: {reason}")
             }
         }
     }

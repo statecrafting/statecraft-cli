@@ -1,0 +1,18 @@
+{
+  "SessionStart": {
+    "file": "statecraft-session-start.sh",
+    "matcher": "startup|resume|clear|compact"
+  },
+  "PostToolUse": {
+    "file": "statecraft-post-edit.sh",
+    "matcher": "Edit|Write"
+  },
+  "PreToolUse": {
+    "file": "statecraft-pre-bash.sh",
+    "matcher": "Bash"
+  },
+  "Stop": {
+    "file": "statecraft-stop.sh",
+    "matcher": "*"
+  }
+}

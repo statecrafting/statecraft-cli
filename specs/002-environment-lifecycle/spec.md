@@ -57,6 +57,26 @@ summary: >
 establishes:
   - { kind: directory, path: "crates/statecraft-environment/" }
   - { kind: directory, path: "crates/statecraft-home/" }
+  # Evidence for the 2026-09-21 round, in this spec's own directory. Claimed
+  # as a SECTION rather than as a whole file: a whole-file claim raises L-008,
+  # because nothing hashes the file, and the two cures the lint offers are a
+  # covering glob in [index] extra_hashed_inputs, which would restamp every
+  # shard in the corpus whenever a handoff paragraph changes, and a section
+  # unit, which is hashed through its own span and stales only this spec's
+  # shard. The second is right: this is evidence, and evidence changing is a
+  # fact about this spec and about nothing else.
+  #
+  # Not a second place for a requirement. Every requirement is in this file
+  # and every decision is a dated entry in section 5. The handoff carries what
+  # a spec should not: measurement that ages, which is commits, digests, test
+  # counts, a producer matrix, a rollback plan, and the live-session script
+  # still to be approved.
+  - { kind: section, file: "specs/002-environment-lifecycle/handoff-2026-09-21.md", anchor: "7-truthful-implementation-state-of-spec-002" }
+  # The acceptance, as a program rather than as prose. Claimed as a whole file:
+  # `scripts/**/*` is in [index] extra_hashed_inputs, so it is witnessed and
+  # raises no L-008, and a change to it restamping every shard is correct for a
+  # file that decides what this corpus may claim about enforcement.
+  - "scripts/acceptance/managed-session.sh"
 amends:
   # Section 3.6's "no configuration file may change a rule" gets its precise
   # reading in section 3.16: a layer supplies a value, never a rule, and every
@@ -2047,6 +2067,94 @@ that nothing moves: aicortex is specified and under construction, so the notes
 that exist today stay where they are until that store can hold them, which is a
 sibling's schedule and not a condition on this product's delivery.
 
+**2026-09-21: §3.24 is implemented, and the one requirement a JSON document
+cannot carry is measured rather than reinterpreted.** The authority change of
+the entry above left §3.24 specified and not implemented. This is the
+implementation: `crates/statecraft-home/src/settings.rs`, threaded through the
+typed operation boundary as an intent on `home apply`, with
+`crates/statecraft-home/tests/settings_modification.rs` as its acceptance.
+
+§3.24 says "every managed line lives inside a single marked region in the file".
+§3.13's bridge and the ignore merge both mark a region with comment lines,
+which Markdown and `.gitignore` have. **A settings file is JSON, which has no
+comment syntax, and the modification has two insertion points that are not
+adjacent in any document**: a hook registration belongs in `hooks.<Event>` and a
+deny entry in `permissions.deny`. Textual contiguity is therefore achievable
+only in the trivial case of a file that carries neither key already, and
+"pre-existing hooks" is one of the cases §3.24 names. Two ways of forcing it
+were rejected: reformatting the whole file so the region could be contiguous
+breaks "nothing outside is rewritten", and a sentinel deny entry such as
+`Bash(statecraft-region-begin)` inserts a fake refusal into a user's own list.
+
+What is implemented instead is **marked content in one recorded modification**,
+which keeps every guarantee §3.24 states around the region:
+
+- a managed hook registration is marked **inside itself**: the command string's
+  first line is `# statecraft-managed <revision>`, a shell comment to the
+  interpreter and a marker to this product, so a managed hook is recognizable
+  from the file alone with no record to consult;
+- managed deny entries are appended as one contiguous run at the end of the
+  array and identified on removal by exact match, in order, against the record;
+- both are one `modification` entry in the home, with the path, the exact
+  content and the digest either side.
+
+`implementation` therefore stays `in-progress`. The sentence quoted above is not
+satisfied literally and this build does not pretend otherwise; the smallest
+amendment that would make it satisfiable is put to the owner separately, and
+until it is decided this section's remaining obligation is the wording, not the
+behavior.
+
+**2026-09-21: consent is to a token over the content, not to a verb.** "Consent
+to one revision is not consent to the next" needs consent to be about content
+rather than about having typed a flag. `home plan` and an unconsented
+`home apply` print the exact lines and a `consent token`, a digest over exactly
+those lines; `home apply --consent-settings <token>` performs the modification
+only when the token still matches. Content whose lines changed has a different
+token, so the operator is shown the new content and refused, which is the
+requirement expressed as a mechanism rather than as a habit. A stale token is a
+finding, never a silent no-op.
+
+The flags hang off `home apply` rather than becoming their own verb, because
+§3.14 rule 4 is what they have to satisfy: writing into a native location is an
+explicit operator action **under `home apply`**. `--remove-settings` is on the
+same verb for the same reason.
+
+**2026-09-21: a withheld write is exit 1, and the settings modification is the
+one part of `home apply` that can answer with any of the four codes.** Spec 006
+§3.3 spends 1 on "a diagnostic state, a withheld write". An unconsented
+`home apply` inside an operator's own agent home names a modification and does
+not perform it, which is exactly that, so it is a finding rather than a success.
+A malformed settings file is a refusal (2), an unreadable or unwritable one is a
+failure (4), and a home with no native agent directory is not applicable and
+stays 0. The severity is decided at the operation boundary, so the binding
+carries none of it.
+
+**2026-09-21: a refusal this product cannot prove it placed is never recorded as
+placed.** Two situations leave a floor entry in the file that no record
+attributes here: the user already refused it themselves, and an apply
+interrupted between the write and the record. Attributing it would mean a later
+`--remove-settings` takes out a refusal that was the user's, which is the one
+direction §3.24 never allows. So the record claims only what it can prove, the
+outcome says which entries it declines to claim and why, and a lost record costs
+a refusal nothing. The hook half needs no such rule, because it carries its own
+marker.
+
+The write itself is a write to a neighbouring name followed by a rename, so an
+interruption leaves either the old bytes or the new ones. Running the operation
+again after an interrupted one repairs the record and writes the region no
+second time, which is asserted by removing the record from the home and applying
+again.
+
+**2026-09-21: the one shipped registration is on `SessionStart`, and that
+settles nothing about the other three events.** §3.24 fixes what a modification
+may carry and not what this build places. The harness ships one hook, and
+whether a harness's end-of-turn event should advise or refuse is an open
+adoption question that belongs to §3.23's inventory decision and not to this
+implementation. `SessionStart` is the event where the answer is the same under
+either reading, so the mechanism ships without deciding the policy. Registering
+the other three, and the ten skills and four agents §3.23 lists, remains the
+owner's adoption act.
+
 **2026-09-21, authority: the owner replaced §3.24's physical single-region
 requirement, and the code that already existed is a candidate for the new
 wording rather than a retroactive fit for the old one.** The entries above put
@@ -2242,6 +2350,467 @@ this session, for this command, and only an inspection of effective behavior
 establishes it. Reading the file and reporting the session qualified would be
 this section's failure committed by the tooling that was written to detect it.
 
+**2026-09-21: §3.24's implementation is reconciled with the revised contract,
+and four gaps were found by writing the disagreements down.** The entry above
+said the code written against the old wording is a candidate for the new one
+and that the difference is established by exercising the cases where the record
+and the file disagree. Doing that found four, three of them defects and one a
+design that had to be sharpened.
+
+**A duplicate JSON key made the two views of the document disagree.** This
+module deliberately keeps two: `serde_json` parses, and judges, and a text
+walker locates spans, and edits. On a document with no duplicate key the two
+always agree, which is why the rest of the module may treat them as one view.
+`serde_json` keeps the **last** occurrence of a duplicate and `locate` takes
+the **first**, so on `{"permissions": {...}, "permissions": {...}}` a
+judgement made about one value would have been applied to the other. It is
+also exactly the structural-location property failing: two locations with one
+name. Refused, as `AmbiguousStructure`, scanned over the whole document rather
+than only the paths written into, because the never-widen checks compare the
+parsed documents whole.
+
+**Consent named the content and not the target.** §3.24's token was a digest
+over the exact lines, which satisfies "consent to one revision is not consent
+to the next" and leaves a second hole: the same content spliced into a
+different file is a different modification, with different insertion points,
+different entries already refused, different conflicts and different resulting
+bytes. An operator who read one plan could consent to another. The token now
+covers the content **and** the digest of the target as the plan saw it, which
+is the owner's "do not overwrite a file changed since it was inspected"
+expressed as a mechanism. The check moved to the write boundary and fires only
+where there is a write, because a modification already in place is
+idempotence, and asking an operator to re-consent to a no-op would turn that
+into a conversation. A re-read immediately before the write catches a
+concurrent writer in the same window.
+
+**A marker was treated as proof of ownership for hooks.** The deny half
+already declined to claim what it could not prove it placed. The hook half did
+not, on the reasoning that a registration carries its own marker. The revised
+contract makes the three properties conjunctive, and the owner stated the
+consequence directly: a marker resembling this product's is not by itself
+proof. A marker is content, and content can be copied out of a shipped harness
+by anyone. So the hook half now records only what this product actually added
+or had already recorded, and a marked registration with no record behind it is
+reported as unclaimed and left. The cost is real and is the right direction:
+after a lost record this product will not take its own registration back out,
+and the operator removes those bytes themselves.
+
+**Test coverage was of the old contract.** Ten cases were added, each
+constructing a disagreement rather than asserting a phrase: a duplicate key at
+the touched path and below it, a file edited between the plan and the write, a
+forged marker, a pre-existing user refusal, a duplicated deny value whose
+ownership is ambiguous, the two insertions at their two locations under one
+record, a record that cannot be read, removal after a user edit, and an
+unrelated key surviving both reapplication and removal. One existing test
+changed its expectation rather than its assertion, which is the visible trace
+of the third gap: it asserted that a repair after a lost record adopts the
+marked hook, and it now asserts that it does not.
+
+**2026-09-21: the published `0.21.0` and the source that calls itself `0.21.0`
+are two implementations, and the second one conforms.** §3.15's boundary
+reports the producer as non-conforming, and
+`the_producer_is_not_yet_conforming` holds that finding. Measuring what is
+actually depended on, and what actually exists, separates two things the
+version number hides.
+
+**What this build depends on.** `crates/statecraft-home/Cargo.toml` pins
+`spec-spine-core = { version = "=0.21.0", default-features = false }`, and
+`Cargo.lock` resolves it to `0.21.0` from crates.io with checksum
+`cf8d0b123bbf6ae494700924c727ba8a5d115a821f0ea18e6dce9f140276c308`. Called
+with this product's own `config_json()` it returns four out-of-contract paths:
+`AGENTS.md` and the three `.claude/rules/*` files. That is the
+non-conformance, unchanged, and the refusal that withholds those four stays
+exactly where it is.
+
+**Why the counterparty's tree says otherwise.** The published crate was cut at
+tag `v0.21.0`, commit `694dd294`, where the module is still the old `init`
+scaffolder. The narrowing landed **after** that tag, in `373ab506`, and the
+module's own documentation now says it emits no `AGENTS.md`, no `CLAUDE.md`
+and no `.claude/`. The workspace version was not raised with it, so the tree
+and the registry both say `0.21.0` and mean different code. A consumer cannot
+tell them apart by version, which is why this entry records a commit.
+
+**The candidate, measured.** Commit `df6fb4f7`, source digest
+`ac89a5423e053f04faa68ae69d124c28fef7393da8e7dfa73d4c811fd65bf859` over the
+two producer crates' sources. Built in a scratch worktree with a
+`[patch.crates-io]` that was never committed, it returns seven paths, all of
+them in contract: six governance files and the `.gitignore` fragment. Three
+tests invert, which is what the suite was built to show: the producer is
+conforming, no out-of-contract path is carried, and the end-to-end
+initialization is **complete** rather than partial, with 7 writes, 0 withheld,
+2 ignore patterns merged, and the project registered and qualified.
+
+So the boundary is correct and the blockage is entirely a publication. Nothing
+here changes the dependency: a candidate measured in a scratch worktree is
+evidence about a candidate, and the permanent exact dependency waits for a
+published version verified directly. The pinned governance CLI (`=0.20.0` in
+`spec-spine.toml`) and the scaffold library dependency are different surfaces
+and do not move together.
+
+**2026-09-21: the adopted inventory is delivered, and running the hooks as
+programs found three defects the files' own prose denied.** Ten skills, four
+agents and four event behaviors, adopted under the authority change above and
+now in `crates/statecraft-home/harness/`, reached through `include_str!` from
+`harness::ADOPTED_SKILLS`, `ADOPTED_AGENTS` and `ADOPTED_HOOKS`. They are held
+as files rather than as string literals because they are 1900 lines of
+authored prose: they are reviewed as prose, and a diff against the source they
+came from is only legible while they are files.
+
+**§3.23 said the inventory was already repository-invariant. The agents were
+not.** All four carried a table of the counterparty's own crate layout,
+`crates/{spec-spine-core,spec-spine-types}/` and `crates/spec-spine-cli/`, as
+"the surfaces this project has". That is the adoption defect the owner named,
+and it is invisible to a check that greps for a word, because the word
+`spec-spine` legitimately appears throughout as the name of the governance
+CLI. The tables are replaced by a pointer to the project's own `AGENTS.md`,
+with two facts an agent may rely on everywhere: the corpus is the source of
+truth, and the derived tree is read through the CLI. Four skills carried the
+same defect in a different shape: a fenced block listing a gate with exact
+flags, immediately after telling the session to run the gate exactly as
+`AGENTS.md` lists it.
+
+**Three defects were found by running the hooks, not by reading them.**
+
+1. **The push gate fired outside a Statecraft project.** The manifest test was
+   placed in the pull-request half, after the push half, so
+   `git push origin main` was refused in an unrelated repository that merely
+   happened to be open. That is §3.14 rule 3 broken in its most damaging form,
+   because the collision stops an operation rather than printing a line. The
+   gate now guards the whole hook, on the repository the **command** acts on.
+2. **`SessionStart` sent a session to a writing verb for a validation
+   failure**, advising `run spec-spine compile for the violations` on exit 1.
+   Contract 4 turns on exactly one of the four answers being the one
+   regenerating repairs, and `1` is not it.
+3. **The build's own `statecraft-gate.sh` duplicated the adopted
+   `SessionStart` behavior.** Registering both would run two freshness reports
+   per session and make "one canonical source" false in the only place a user
+   would see it. The hand-rolled gate is superseded and removed rather than
+   registered beside its replacement.
+
+**The assertions moved with the files, which is what §3.23 priced.**
+`harness_hooks.rs` is rewritten against the four adopted hooks: 22 tests, each
+writing a body out and running it with the input its event actually delivers,
+against a stub binary that records which copy was chosen. `harness_skills.rs`
+is new: nine tests over parsed front matter and fenced command blocks rather
+than over prose, because the owner named "finds a phrase in a file" as the
+failure to avoid. Two of them earned their keep immediately: the read-only
+assertion cannot be derived from `allowed-tools`, because `commit` declares
+`Bash` alone and looks read-only by that test while its whole purpose is to
+write, and a first draft of the fence parser read the closing ``` of a
+`markdown` block as the opening of a shell block.
+
+**§3.27 is implemented and the floor moved rather than shrank.** The consented
+global modification now carries hook registrations only. `crate::session`
+carries the deny floor as a managed-session payload, and carries nothing else:
+no allow entry, no `ask`, no `defaultMode`, no model, which is §3.28's list.
+Six existing tests asserted the floor landing in the global file and were
+rewritten to assert that it does not, each one paired with an assertion that
+the floor is still carried whole somewhere, so "not here" cannot be satisfied
+by lowering it.
+
+**The mechanism is verified as far as a read can verify it, and no further.**
+Claude Code 2.1.267 documents and carries `--settings <file-or-json>`, which
+`session::probe_version` establishes by running the installed binary.
+`qualification_from` cannot return `Qualified` from that, by construction and
+by test: whether a refusal passed through the argument is actually **enforced**
+is §3.26's third evidence class, an observation of a running session, and no
+read of a settings file substitutes for one. Until a live session produces one,
+this product reports a session as **not qualified** for the managed-execution
+claim, which is §3.27's answer and not a workaround for it.
+
+**2026-09-21: the producer version this build reports is a literal, not the
+dependency's.** Found by running the producer acceptance against the packaged
+`0.22.0` candidate in an isolated worktree. `producer::PRODUCER_VERSION` is the
+string `"0.21.0"`, and `bridge.rs` carries the same number in a step label, so
+an initialization run against a different producer still reported
+`spec-spine-core@0.21.0`. Cargo does not hand a dependent crate a dependency's
+version at compile time, so the literal is not an oversight with an obvious
+cure; it is a coupling between the manifest and two source files that nothing
+enforces. Recorded rather than changed: the committed dependency is unmoved,
+and a repair belongs with the change that moves it, where the two can be
+verified together.
+
+**2026-09-21: a packaged `.crate` digest identifies a commit and the sources
+identify the library.** The counterparty's release record carries digests for
+the two `0.22.0` producer archives cut at `da1cd99b`. The archives actually on
+that machine are cut at `5b8c201a`, two documentation commits later, so their
+digests are different and the record's are stale by exactly the mechanism the
+record itself documents: `cargo package` stamps `.cargo_vcs_info.json` with the
+git sha, so the digest moves on every commit including one that touches no
+crate source. This product therefore records **both** for an isolated
+measurement: the archive digest, which says which commit the artifact was cut
+from, and a digest over the archive's contents **excluding** that stamp, which
+says whether the library changed. Only the second is comparable across
+commits, and confusing them is how "the candidate moved" and "the candidate's
+code moved" become one question with one wrong answer.
+
+**2026-09-21: the adapter's deadline attempt raced its own subject, and the
+repair is structural rather than a larger budget.**
+`crates/statecraft-adapter-claude-code/tests/settings_transport.rs`, the
+attempt named `timeout_after_terminal_denial_cleans_settings_and_retains_evidence`,
+has been failing intermittently on loaded machines for several rounds. It is
+spec `004`'s file, and this spec declares a corrective `extends` edge for the
+repair; `004`'s required behavior is untouched and nothing here weakens it.
+
+**The event ordering the attempt needs**, which is four things and was written
+as one: the terminal denial reaches the supervisor; the child is still alive
+after emitting it; the **deadline** is what ends supervision; and the denial is
+still in the structured evidence afterwards, with the supplied settings file
+removed and the workspace's own two untouched.
+
+**The defect.** The deadline is five seconds because the deadline is the
+subject. But the attempt reused the shared fixture path, so those five seconds
+also had to cover five process spawns, a blocking read of stdin that waits on
+the supervisor's writer thread, and a deliberate 100-millisecond sleep, before
+the point the assertion measures. None of that is the subject: every one of
+those properties is asserted by the attempts that name a thirty-second
+deadline. A budget that has to cover work it was not sized for is a race, and a
+loaded machine loses it.
+
+**The repair.** The fixture child takes the shortest path when the deadline is
+the subject: settings intact, terminal denial emitted, marker written on the
+line after the emit, then a hang far longer than the deadline. Nothing
+schedulable sits between the terminal event and the marker, so
+`settings-after-terminal` existing means the child outlived its own terminal
+event rather than meaning it won a race. The assertions are the four above,
+spelled separately, and the elapsed time is now bounded **below** by the
+deadline as well as above, so a child that exited early fails instead of
+passing as an interruption. The deadline stays five seconds, the negative
+behavior is unchanged, and nothing is retried or ignored.
+
+**It then reproduced, and the reproduction changed the diagnosis.** The first
+repair was written from reading the fixture, because two full
+`cargo test --workspace` runs and six runs under CPU spin loops were all green.
+A later `make code` run failed, and so did a loop under **process-spawn**
+pressure rather than CPU pressure. The attempt now carries a trace, so the
+failure described itself instead of being a mystery: the child's trace was
+**empty**, the workspace held none of the files the child writes on its first
+two lines, supervision reported `Interrupted` after 5.03 seconds, and the
+stream error was `NoInit`. The child was spawned and never ran its body. The
+five seconds were consumed by process startup alone.
+
+That is a larger finding than the first one and it does not replace it: work
+inside the measured window was a real race and removing it was right. What it
+adds is that the residual cost is `execve` itself, which the fixture cannot
+shorten.
+
+**Two further repairs, and one thing that is not a defect.** The suite's own
+contention is serialised away: the deadline attempt takes an exclusive lock and
+the other four take a shared one, so the measurement never runs beside the
+concurrent attempt's two children and their ten-per-second `sleep` forks. The
+budget is unchanged at five seconds and no assertion is weakened, which is why
+this is synchronisation rather than a larger deadline. And the trace stays, so
+any residual failure names its cause.
+
+What remains is not a defect in this product. A machine that cannot start a
+shell script inside five seconds will still fail this attempt, and the
+supervisor's behavior in that case, interrupting at the deadline with `NoInit`
+and cleaning up, is exactly correct. The attempt fails there because the
+**precondition of its measurement** was not met, not because the behavior it
+measures is wrong, and it now says which of the two happened. Passing it in
+that state would be suppression.
+
+**2026-09-21: the adopted `PreToolUse` gate skipped a check it was required to
+refuse on, and the inherited wording is the reason.** A fourth adoption defect,
+beside the three already recorded. The shipped `statecraft-pre-bash.sh` reads
+the derived directory from `spec-spine config show --json`; where that read
+answered nothing, it printed `derived-tree check skipped` and **continued**,
+citing the counterparty's spec `093` section 3.4, which says a configuration
+that could not be read is not evidence of a dirty tree. That sentence is true
+and it is not the rule this corpus adopted. §3.23 contract 6 says a gate whose
+check did not run is not green, and the Stop policy's second part says an
+enforcing operation gate refuses a failed **or unavailable** check. This gate
+stands in front of `gh pr create` and is the one hook §3.23 marks enforcing, so
+the conflict is resolved in favour of the adopted rule: an unanswered
+configuration read now refuses with exit 2, and the message says the check was
+not performed rather than that the tree is dirty, because the two remedies
+differ and regenerating shards repairs neither.
+
+The same reading applies to the three git reads beside it. `git diff
+--name-only` prints nothing both when a tree is clean and when the command
+failed, and the inherited script discarded every exit status, so a failed read
+was indistinguishable from a clean tree. Each read's status is now read, and a
+read that did not run refuses on the same contract.
+
+Recorded rather than performed silently, because the weaker behavior is not
+preserved merely because it was copied, and because the counterparty's own
+copy still carries it: this is a defect to fix there independently, not a
+regression to revert here.
+
+**2026-09-21: the earlier coverage gap over the derived tree's three states was
+wrongly reasoned, and is closed.** The 2026-09-21 handoff recorded staged,
+unstaged and untracked derived output as not separately exercised, on the
+grounds that the shipped hooks never inspect the index, so the three states
+would be indistinguishable to them and a test would assert a property of `git`.
+The shipped hook reads `git diff`, `git diff --cached` and `git ls-files
+--others` on three separate lines. Seven behavioral cases now assert what the
+hook does with those answers rather than what git computes: each of the three
+states refuses and is named as itself in the message; a staged edit whose
+working-tree contents cancel it against HEAD is still refused and both states
+are named, which is the case one HEAD-relative comparison cannot see; a
+committed derived tree is the positive control, without which the six refusals
+prove nothing; a failed read refuses; and an unanswered configuration refuses.
+
+**2026-09-21: the bounded integration is demonstrated, and three obligations
+are named as outstanding rather than counted as met.**
+`crates/statecraft-home/tests/bounded_integration.rs` walks the whole flow
+once in one isolated home against one fixture repository, and asserts the
+properties that only exist **between** the mechanisms every other test file
+judges one at a time. Eleven tests: the full harness installs once under the
+home and the project receives no copy; the bytes written are the bytes the
+plan's digest predicted; the floor is delivered per session and reaches no
+global file; an unrelated repository is byte-identical afterwards; the managed
+instructions exist before the bridge names them; a pre-existing root
+`AGENTS.md`, `model`, `permissions.allow` and an unmarked user hook all
+survive; all four events resolve to installed, executable files inside the
+canonical revision; the modification reverses to the operator's own bytes and
+can be rebuilt afterwards; and nothing arms a target.
+
+Two of them are about the premise rather than the behavior. The authority
+port is `Unreachable` throughout, so **every assertion here holds with no
+platform login**, and that is asserted rather than left implicit. And a
+shipped hook is run with `env_clear()`, a bare `PATH` and no `$HOME` at all:
+it still reaches a verdict and still says nothing outside a Statecraft
+project, which is the converse of sandboxing and the half that matters on an
+operator's own machine.
+
+**§3.25 and §3.26 are implemented, and one obligation is not.** The paragraph
+this replaces named three; two of them are done.
+
+**§3.25's required identity** is a committed project requirement in
+`required.rs`, carried as one key in the manifest's `project.requirements`,
+which is the governed contract for a committed requirement and already binds
+every configuration layer. The full digest is what is committed and what every
+comparison is against; `Revision` now keeps it, and the twelve-character form
+is derived from it by one function and is display only. Seven standings, one of
+which permits managed execution. A manifest with no requirement is
+`unrequired`, is **not** qualified, and is not repaired by a read; nothing
+selects the latest installed revision; and inspection, diagnosis through a new
+`doctor` finding, planning and an explicit upgrade all stay available under
+every refusal.
+
+**§3.26's startup record** is in `startup.rs`: seven fields, the §3.14 verdict
+unchanged beside them, and the three evidence classes as three types that no
+code path substitutes for one another. `Observation::Observed` is constructible
+only from a session qualification, so a probe cannot reach it. An incomplete
+record is refused rather than written, the write is a rename so no reader sees
+half of one, and a truncated record reads back as an error rather than as no
+record.
+
+**The live-session observation** is the one that remains, and it is the one
+this spec cannot produce for itself. `session::qualification_from` cannot
+return `Qualified`, by construction and by test, and no session has been run
+under this prompt. So no session has been shown to enforce the floor, and every
+fixture result in this file is fixture evidence. A bounded acceptance script is
+prepared and awaits approval as its own act.
+
+**One thing §3.25 requires has a library and no verb.** Committing a
+requirement is an explicit reviewed act, and the command tree carries no
+spelling for it: the verb table is `006`'s requirement and an entry in it is
+`006`'s change to make. Until that change is proposed, the act is performed
+through `crates/statecraft-home/examples/require-harness.rs`, which is also
+what builds the acceptance fixture. Named here rather than left for a reader to
+discover, because "implemented" and "reachable by an operator" are different
+claims and this is the second one missing.
+
+**2026-09-21: the admission reads a structured refusal record, and the
+adapter that produces one is a dependency.** §3.29 rule 1 requires the
+admission to read structured evidence the harness emits rather than prose. That
+record is spec `004` section 3.3's `permission_denials`, and its shape is
+already owned, parsed and tested in `crates/statecraft-adapter-claude-code/`.
+`crates/statecraft-home/` therefore takes that crate as a dependency and reads
+the provider capture through its types, rather than growing a second parser for
+the same bytes. The alternative considered and refused was a private copy of
+the event shapes in this spec's crate, which would have been two places to
+correct when the provider adds a field, and the one place nobody would look.
+The dependency is acyclic: nothing in `004`'s crate reaches back here. No unit
+of `004` is edited by this, so no new edge is declared; the `extends` edge
+already in this file's frontmatter covers the one test of `004`'s that this
+round repaired.
+
+**2026-09-21: the negative control was written before the repair, and it
+failed.** §3.29 names the exact transcript that defeated the first admission.
+It is a test in `crates/statecraft-home/tests/qualification_admission.rs`
+rather than a sentence in this section, and it was run against the unrepaired
+implementation first, where it failed with the admission returning
+`Ok(Observed { .. })` for a transcript stating the command had succeeded. Two
+further probes against the same build showed the deserialization route and the
+`from_qualification` route reaching `Observed` with no evidence at all, which
+is why §3.29 rule 5 covers every route rather than the one that was reported.
+
+**2026-09-21: the evidence bytes are kept in the record, not beside it.** §3.29
+rule 5 re-checks a deserialized record, and rule 3 refuses substituted
+evidence. Neither is decidable from a digest alone once the original file is
+gone, so the record carries each control's captured bytes verbatim along with
+the path they were read from. The cost is a record of a few kilobytes where it
+was a few hundred bytes, which is the price of a record that can be re-judged
+rather than believed. The captures are bounded by the acceptance's own
+`--max-turns 1`.
+
+**2026-09-21: the acceptance is a program, and its three stages are three
+approvals.** §6 of the handoff was an outline with steps reading "same, with"
+and "open a session", which is a procedure a reader performs and a procedure
+nobody can rerun identically. It is replaced by
+`scripts/acceptance/managed-session.sh`, which carries the commands, the
+branching, the capture locations, the preserved exit statuses, a per-step
+deadline enforced by a watchdog rather than by `timeout`, and its own cleanup.
+
+The stages are separated by what each one costs and what it touches.
+`preflight` is local, spawns no provider and needs no approval;
+`permission-experiment` spawns the provider and refuses without
+`APPROVED_PROVIDER_SESSION=yes`; `coexistence` observes the real home and
+refuses without `APPROVED_REAL_HOME_COEXISTENCE=yes`. **The second gate is not
+satisfied by the first**, and that is enforced by the script rather than
+described in it, because §3.24's consent is its own act and an experiment that
+inherited it would be performing a write nobody approved. No stage activates
+anything in the real home: the permission experiment carries its settings on
+each invocation's own command line, and the coexistence stage runs a plan and
+reads digests.
+
+The preflight ends by submitting a **fabricated** claim, whose refusal capture
+is the sentence §3.29 names, and refusing to continue unless the admission
+refuses it for being prose. A run whose admission would admit that sentence
+would produce a worthless result at provider cost, so it is checked before the
+first invocation is paid for rather than after.
+
+**2026-09-21: `session payload`'s human rendering is the bytes and nothing
+else.** The first rendering appended the digest and the argument, which made
+`session payload > floor.json` write a settings file that was not the payload,
+and the acceptance script found it by digesting what it had written. §3.4 of
+`006` makes human output a view rather than a contract, which is what allows
+the change; the digest and the argument moved to the `--json` rendering, where
+a caller reads them.
+
+**2026-09-21: the deadline attempt's synchronisation is contention
+mitigation, and the investigation closes there.** The earlier entries on this
+attempt recorded a `RwLock` that serialises the one attempt whose subject is a
+deadline against the four whose subject is not, measured at 1 failure in 5 runs
+before and 0 in 40 after. Re-read against what the test requires, that
+description overstated it, and this entry corrects it by appending rather than
+by editing the earlier ones.
+
+What the lock establishes is that **no other attempt in that test binary runs
+during the measurement**. What the test requires is that the child is
+`execve`d, runs its body, emits its terminal event and is read by the
+supervisor inside five seconds of wall clock. That is a real-time bound, and
+mutual exclusion does not establish a real-time bound: it removes one
+contributor to the window and leaves the rest of the workspace, the machine and
+the kernel's scheduling of `fork`/`execve` in place. A reduced failure rate
+under one load profile is a reduced failure rate, and calling it the absence of
+the race would be a claim the measurement does not carry.
+
+The remaining failure is **not** dismissed as irrelevant, because it is not.
+When the whole budget goes on `execve`, no init event arrives, supervision
+interrupts with `NoInit`, and the attempt's subject, whether a terminal denial
+that did arrive survives an interruption, is not measured at all. That is this
+measurement's precondition failing and it leaves the test unable to say
+anything. So the attempt now reads the child's own `entered` marker **before**
+it judges the denial, and fails on the precondition with its own message. It
+still fails: passing in that state would be suppression, and reporting it as a
+lost denial would send the next reader after the wrong defect. No loop was run
+to accumulate a clean count, and no assertion was weakened; the deadline is
+unchanged at five seconds.
+
 **2026-09-22, authority: §3.30, recorded before the repair it authorizes.**
 Re-reading the §3.29 implementation at `62bde9a` against what each control has
 to prove found five defects the section's own negative controls did not reach,
@@ -2316,6 +2885,175 @@ The lock is removed with the precondition it mitigated. The deadline stays five
 seconds, no assertion about the product is weakened, nothing is retried, and
 the earlier failure evidence in the entries above is kept as written.
 
+**2026-09-22: §3.30 is implemented, and the probes were run before the
+repair.** Nine one-mutation probes were run against the admission as it stood at
+`88bc616` (unchanged since `62bde9a`), each on the section 3.29 fixture with every
+other prerequisite satisfied. All nine were **admitted**: an allowed-command
+request with no result; a denial under another tool's name; a denial naming
+another tool-use id; two init events from two sessions; two terminal events that
+disagree; a refused command both denied and executed; a `--settings` naming a
+different file than the recorded bytes; a `--settings=` spelling in the
+absent-payload control; and a second `--settings`. The probe was not committed.
+Each defect is now a test in `crates/statecraft-home/tests/qualification_admission.rs`
+that changes exactly that one thing on the admitted fixture and asserts the
+refusal it causes, 38 tests in all, beside the unchanged prose control.
+
+What the fixture is matters as much as what it proves. Its event shapes are the
+ones the committed 2.1.267 recordings carry, including `tool_result_meta` and its
+`non_execution_kind`, which is the field that tells a refused result from a
+command that ran and failed; the adapter's own tests read that field out of
+`denied.jsonl` and its absence out of `max-turns.jsonl`. Nothing the provider
+does not emit is required, and no field was invented to make a control pass.
+
+**2026-09-22: `run` delivers the floor and refuses a requirement it cannot
+establish.** Found while looking for the next gap on the qualification path,
+with the source as the evidence: `run` launched the provider with
+`Invocation::new(program, &[], None)`, an empty deny list, and consulted no
+required identity, and `crates/statecraft-cli/tests/native_stream.rs` asserted
+the empty list. That assertion predates §3.27 (2026-09-21), which requires the
+floor to reach a managed session through the per-session settings mechanism,
+and §3.25, which requires managed execution to refuse missing, corrupt or
+mismatched required content. No entry deferred either, so this is an open
+defect and not a decision.
+
+Three choices the sections were silent on. **The bytes:** a run receives
+`session::payload_json()` exactly, through a settings document the adapter
+writes verbatim, because §3.29 rule 4 binds an observation to the payload by
+digest and a differently formatted equivalent would be other bytes. **Which
+standings stop a run:** the three §3.25 names, plus a requirement this build
+cannot read as a digest and an installed tree that cannot be read, since both
+are required content that cannot be established. A project that commits no
+requirement is not managed *under* one, so it runs and is recorded `unrequired`;
+it is still not qualified. **Mismatch:** nothing measures which revision
+actually answers inside a run yet, and passing the requirement as the resolved
+identity would record a resolution nobody observed, so a mismatch is not
+detectable at run start and the standing is recorded as evaluated with nothing
+resolved. The attempt record carries the payload digest and the standing.
+
+Delivering the floor claims nothing about enforcement: the posture still says
+unqualified, and only an admitted live observation changes that. Before the
+repair the eight `native_stream` tests failed against the previous binding (the
+seven existing ones once the fixture child required the payload bytes, and the
+new refusal test); after it, all eight pass.
+
+**2026-09-22: `run` writes its startup records, and four choices §3.31 left
+open.** Implemented under §3.31, recorded after it. **A repository with no
+manifest** is registered and armed and still not a managed session: §3.14 rule 3
+gates every delivered behavior on the manifest, and no project identity exists
+to record. Such a run launches as before, writes no startup record, and its
+answer says `managed: false` rather than implying a record. **`startup show`
+does not require registration**, like the other `startup` verbs; it requires a
+manifest, and it reads the attempt list from the run record exactly as `run
+show` does. **The adapter identity** recorded is the adapter manifest's name and
+version with `claude-code` as the harness, the same three facts the posture
+already records. **The provider version** in the launch evidence is the one the
+stream's init event reported through the generic seam, and the reserved absence
+word when there was none.
+
+Measured. Before, the new `crates/statecraft-cli/tests/run_startup.rs` run
+against the tree at `2ee9704` failed all seven tests: `run` completed with no
+`startup` field and wrote no record, an unwritable startup directory did not
+stop the launch, a record that could not be stored did not change the exit
+code, and `startup show` was an unknown verb. The `startup record` test in
+`qualification_workflow.rs` failed on the resolved identity, `Some` of the
+required digest where nothing was measured. After, all seven pass, the thirteen
+`launch` unit tests pass, the three acknowledgment tests in `harness_hooks.rs`
+pass, and `cargo test --workspace --locked` passes 936 tests. The fake provider
+those tests use runs the shipped hook from the "registered" revision and
+streams its output as `hook_response`; that is locally exercised, and whether
+the live provider does it in a managed run is still unobserved (§3.31 rule 20).
+
+**2026-09-22: the two provider premises, graded, and the acceptance script's run
+step.** The previous hand-back left two premises of the permission experiment
+unobserved. Neither is observed now either, and no provider session was
+started to change that; what changed is that each has a stated grade.
+
+*One `--allowedTools` followed by two rules containing spaces.* Documented: the
+installed `claude --help` for 2.1.267 describes the option as `<tools...>`,
+"Comma or space-separated", with `"Bash(git *) Edit"` as its example. Read
+statically from the installed binary: the splitter applied to the option's
+values (`sd`, called from the permission-context setup with the
+`--allowedTools` array) splits on commas and spaces only outside parentheses,
+so each argument this build passes stays one rule. Locally exercised:
+`admission::tests::each_rule_in_the_grant_survives_the_installed_splitter_whole`
+runs the constructed arguments through a transcription of that splitter for all
+three controls, and asserts neither command contains a parenthesis. The
+construction needed no correction.
+
+*The floor's deny beating that grant.* Documented, in the provider's permissions
+reference: rules are evaluated "deny, then ask, then allow", an allow rule
+"can't carve an exception out of a deny rule", and a deny at any level cannot
+be overridden by `--allowedTools`. Read statically: the Bash permission check
+returns early on an exact-stage deny or ask only, then checks prefix and
+wildcard deny rules, which is where `Bash(cargo publish*)` matches, before an
+exact allow is honored. Observed: not yet. A fake provider cannot observe
+either premise, and the refusal control is still what tests the second.
+
+*Harmlessness, including ancestors.* `--manifest-path` names the manifest, so
+cargo searches no ancestor for one, and `--dry-run` uploads nothing. What an
+ancestor could still change is which toolchain a rustup proxy selects, and an
+uninstalled one may be downloaded first. The preflight now refuses when an
+ancestor of the fixture project holds `rust-toolchain` or
+`rust-toolchain.toml`, lists any ancestor cargo configuration for review, and
+the permission stage exports `RUSTUP_AUTO_INSTALL=0`.
+
+*The run path in the script.* The preflight gains a synthetic step 10: `run`
+against a local fake that checks the payload bytes, runs the required
+revision's shipped `SessionStart` hook as the operator's registration would,
+and streams its output as `hook_response`; then `startup show` must read back
+an acknowledged observation equal to the requirement, a supplied supply and
+the named missing class. The permission stage starts no run, because a run
+session would be a fourth session. `acceptance_script.rs` asserts the step's
+persisted records and the ancestor refusal.
+
+**2026-09-22: section 3.32 implemented, and six choices it left open.**
+
+1. *The exclusive write.* Each record is written to a private temporary name in
+   the attempt's directory and hard-linked to its final name. The link fails
+   if the name exists, so the write is exclusive and a reader never sees half
+   a file. The previous build checked for the file and then renamed over it,
+   and a rename replaces; between the check and the rename a second writer
+   could have been replaced. Every record, the gate included, now goes
+   through the one function.
+2. *The gate's wait.* Thirty seconds, passed to the gate as its first argument
+   in the registered command, so the intent records the exact bound and a test
+   can run the same script with a shorter one. The hook is registered with a
+   sixty-second timeout, longer than the wait, so what a provider reports is
+   the gate's refusal rather than its own timeout.
+3. *The decision file.* `admission.json` is one line of compact JSON, so the
+   gate reads it with `grep` for the exact member `"decision":"admitted"`. A
+   reason cannot forge that member: a quotation mark inside a string value is
+   escaped. The gate never parses anything else, and a decision it cannot read
+   is a decision that has not been written.
+4. *Where the decision point is.* The first event that is not a `SessionStart`
+   `hook_started` or `hook_response`. The recorded `2.1.267` streams put every
+   such response before `init`, so in them this is the init event. A provider
+   that reports a startup hook after `init` would be judged on what arrived
+   before it, which is refused as not established rather than waited for.
+5. *An unpersisted decision.* When `admission.json` cannot be written, a gated
+   attempt is stopped and refused under `startup-admission`: the gate cannot
+   read a decision that is not on disk, so it would hold every tool call until
+   its wait ran out, and stopping the process says that plainly instead.
+6. *What `run` refuses and what it reads.* A live attempt's refusal inspects
+   that attempt's records with its outcome absent, and says what they
+   establish; nothing in the refusal writes, reconciles or infers.
+
+Measured through the built binary: a run whose fake honors the registration is
+admitted at its init event and its tool call runs after it; a tool call begun
+before the decision waits at the gate and runs only after admission; a
+substituted startup hook naming another revision is refused, and neither the
+waiting tool call nor a later one produces its effect; a fake that ignores the
+registration produces an effect before the decision and the refusal says it
+is retrospective; and a launcher killed while its session runs leaves
+`outcome-unknown`, after which `run` refuses rather than replaying and the
+fake was launched once. Library tests inject each failure section 3.32 names:
+the intent, a spawn failure, a process created before its confirmation, a
+confirmation that cannot be persisted (the real supervisor, the prompt never
+delivered), a decision that cannot be persisted, and a record that cannot be
+persisted. Every test in this spec's crates that execs a script it wrote
+installs it through `statecraft_adapter::fixture::install_script`, the staging
+spec `004`'s 2026-09-22 `ETXTBSY` entry records, so none can hit that race.
+
 ## Verification
 
 Each line is one command. They run the acceptance this spec's behavior declares:
@@ -2343,4 +3081,21 @@ spec-spine index check --fail-on-unresolved
 test -f crates/statecraft-home/src/lib.rs
 cargo test -p statecraft-home --test negative_cases
 cargo test -p statecraft-home --test harness_hooks
+test -f crates/statecraft-home/src/settings.rs
+cargo test -p statecraft-home --test settings_modification
+test -f crates/statecraft-home/src/session.rs
+cargo test -p statecraft-home --test harness_skills
+cargo test -p statecraft-home --test bounded_integration
+test -f crates/statecraft-home/src/required.rs
+test -f crates/statecraft-home/src/startup.rs
+cargo test -p statecraft-home --lib required
+cargo test -p statecraft-home --lib startup
+cargo test -p statecraft-home --lib admission
+cargo test -p statecraft-home --test qualification_admission
+cargo build -p statecraft-home --example require-harness
+cargo test -p statecraft-adapter-claude-code --test settings_transport
+cargo test -p statecraft-adapter --lib supervisor
+cargo test -p statecraft-home --lib capture
+cargo test -p statecraft-home --lib launch
+sh -n scripts/acceptance/managed-session.sh
 ```

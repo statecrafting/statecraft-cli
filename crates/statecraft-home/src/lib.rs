@@ -53,18 +53,25 @@
 
 #![forbid(unsafe_code)]
 
+pub mod admission;
 pub mod authority;
 pub mod bridge;
+pub mod capture;
 pub mod delivery;
 pub mod derived;
 pub mod flow;
 pub mod harness;
 pub mod home;
 pub mod ignore;
+pub mod launch;
 pub mod producer;
 pub mod project;
+pub mod required;
 pub mod resolved;
 pub mod service;
+pub mod session;
+pub mod settings;
+pub mod startup;
 pub mod team;
 
 pub use flow::{Mode, Outcome, Report, Step};

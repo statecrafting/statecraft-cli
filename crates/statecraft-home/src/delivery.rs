@@ -321,7 +321,7 @@ pub fn load_rules() -> Vec<LoadRule> {
 }
 
 /// Whether a session would actually resolve the managed instructions.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case", tag = "verdict")]
 pub enum Delivery {
     /// The documented rule arrives at the managed file. The chain is named.
