@@ -956,6 +956,57 @@ reusing a consent given for other bytes. Where the modification content is
 byte-identical across the upgrade, there is nothing new to consent to and
 nothing is asked.
 
+### 3.26 Startup delivery evidence
+
+Section 3.14 fixed a three-valued verdict over a harness's documented load
+rule. This section fixes what a managed session **records** about delivery, and
+what that record is and is not allowed to claim. The owner settled it on
+2026-09-21.
+
+**What is recorded.** Seven things, at the start of a managed session:
+
+| Recorded | What it is |
+|---|---|
+| project identity | which repository, and the manifest that makes it a target |
+| instruction-file identities | each instruction file reached, by path and digest |
+| required harness identity | the committed requirement of section 3.25, full digest |
+| resolved harness identity | what actually answered, full digest |
+| adapter identity | which adapter performed the delivery, and its own identity |
+| load chain | the files traversed, entry first, managed file last |
+| delivery status | the section 3.14 verdict |
+
+**Three statements, kept distinct and never substituted for one another.**
+
+1. **The documented load chain reaches a file.** A rule was evaluated against
+   the tree and arrives. This is a statement about the tree and the rule.
+2. **Its bytes were resolved and supplied.** The file was read, it digests to
+   what is recorded, and its content was handed to the session. This is a
+   statement about what this product did.
+3. **A live session demonstrated the expected behavior.** A real session was
+   observed behaving as the instructions require. This is a statement about a
+   session, and only a session can produce it.
+
+Each is strictly weaker evidence for the next, and none of them implies the
+one after it. A record that states the first must not be read as the second,
+and a record that states the second must not be read as the third.
+
+**What a digest never proves.** A digest establishes that bytes are the bytes.
+An acknowledgement establishes that something emitted an acknowledgement.
+Neither establishes that a model **read**, **understood** or **complied with**
+the instructions, and no field in this record makes that claim. The three
+words are listed because each is a distinct overclaim and all three are easy to
+write by accident.
+
+**The three verdicts keep their meanings.** `reached`, `not-reached` and
+`unverified` mean exactly what section 3.14's table says. The new evidence is
+carried in **added fields**, narrowly defined, alongside the verdict. In
+particular `reached` is not quietly widened to mean supplied, and is not
+narrowed to require a live observation: a rule that arrives is a rule that
+arrives, and the fact that this is weaker than what an operator often wants is
+the reason it is reported separately rather than merged into a single richer
+word. Redefining an existing verdict changes the meaning of every record
+already written under it, which is a migration and not an improvement.
+
 ## 4. Out of scope
 
 Installing the product itself; provider authentication; hosted registration;
@@ -1421,6 +1472,30 @@ Selecting the latest installed revision makes a mismatch disappear at the exact
 moment it should be reported. Rewriting the requirement during a read makes a
 `doctor` run into the repair that hides what `doctor` was asked to find, which
 is the same defect AGENTS.md refuses in a `compile` substituted for a `check`.
+
+**2026-09-21, authority: §3.26, and why the evidence is added beside the
+verdict rather than folded into it.** §3.14's three verdicts are already
+implemented, in `crates/statecraft-home/src/delivery.rs`, as `Reached { via }`,
+`NotReached { reason }` and `Unverified { reason }`. The owner's decision adds
+what a managed session records at startup and fixes the claims that record may
+carry; it does not touch the three words.
+
+That restraint is the substance of the entry. The tempting move is to make
+`reached` mean more, because `reached` is what an operator reads and what an
+operator wants to know is whether the instructions are actually in effect. But
+`reached` is written into records, and a verdict whose meaning changes rewrites
+the meaning of every record already carrying it, retroactively and silently.
+So the three evidence statements are separate fields: the chain arrives, the
+bytes were resolved and supplied, and a live session demonstrated the behavior.
+They are ordered by strength and each is strictly weaker evidence for the next.
+
+The prohibition is narrow and worth naming precisely. A digest proves bytes are
+bytes. An acknowledgement proves something emitted an acknowledgement. Neither
+proves that a model read, understood or complied with anything, and this
+product's records claim none of the three. The distance between "supplied" and
+"complied" is exactly the distance a live-session acceptance has to cross,
+which is why §3.26 admits the third statement as a category and leaves
+producing one to a session rather than to this record.
 
 ## Verification
 
