@@ -12,43 +12,6 @@ use statecraft_run::attempt::Outcome;
 use std::os::unix::fs::PermissionsExt;
 use std::path::{Path, PathBuf};
 
-/// **Contention mitigation, not a proof that the race is eliminated.**
-///
-/// The other attempts in this file spawn children of their own, and the
-/// concurrent one spawns two that fork a `/bin/sleep` ten times a second while
-/// they wait at their barrier. Running the deadline measurement beside them
-/// puts this fixture's own process pressure inside the window the deadline is
-/// measuring. So the deadline attempt takes the write side and every other
-/// attempt takes the read side: the four still run in parallel with each other,
-/// and none of them runs while the deadline is being measured.
-///
-/// What that establishes is exactly one thing: **no other attempt in this test
-/// binary is running during the measurement.** It is worth having, and it is
-/// not the ordering the test requires.
-///
-/// The test requires that the child is `execve`d, runs its body, emits its
-/// terminal event, and that the supervisor reads it, all inside five seconds of
-/// wall clock. That is a real-time bound, and mutual exclusion cannot establish
-/// a real-time bound. It removes one contributor to the window and leaves every
-/// other one in place: the rest of the workspace's test binaries, whatever else
-/// the machine is doing, and the kernel's own scheduling of a `fork`/`execve`
-/// pair. The measured improvement was 1 failure in 5 runs before and 0 in 40
-/// after, under one load profile. That is a reduced failure rate. It is not the
-/// absence of the failure, and describing it as one would be a claim the
-/// measurement does not carry.
-///
-/// What holds unconditionally is elsewhere, and deliberately so: the ordering
-/// *within* the child is established by the fixture, whose
-/// `settings-after-terminal` marker sits on the line after the terminal emit,
-/// and the deadline attempt below reads the trace before it judges, so a run
-/// whose precondition was not met fails saying that rather than looking like a
-/// lost denial.
-///
-/// Poisoning is ignored on both sides. A panic in one attempt must fail that
-/// attempt and no other: a poisoned lock would turn one real failure into five
-/// `PoisonError`s and bury the one that says what went wrong.
-static QUIET: std::sync::RwLock<()> = std::sync::RwLock::new(());
-
 struct Attempt {
     invocation: Invocation,
     request: Request,
@@ -76,36 +39,17 @@ settings=$8
 [ -f "$settings" ] && [ ! -L "$settings" ]
 [ "${USER+x}" != x ] && [ "${HOME+x}" != x ]
 printf '%s' "$settings" > observed-path
-# The deadline path, and it is deliberately the SHORTEST path through this
-# fixture. Everything the full path does below is asserted by the attempts that
-# name a generous deadline; repeating it here put five process spawns, a 100ms
-# sleep and a blocking read of stdin between this child starting and the point
-# the deadline test actually measures, and all of that had to finish inside the
-# five seconds that ARE the subject. That is not a bound, it is a race, and a
-# loaded machine lost it.
-#
-# What is left is the ordering the test needs and nothing else: the settings
-# arrived intact, the terminal denial is emitted, the child is STILL ALIVE
-# after emitting it, and only then does it hang past the deadline. The marker
-# is a shell redirect on the line after the emit, so nothing schedulable sits
-# between the two.
-#
-# The hang is far longer than the deadline on purpose: a child that could
-# finish sleeping would end supervision by exiting, and the test would be
-# measuring an exit rather than a timeout.
+# The deadline path. The child hangs from here on and backgrounds a
+# descendant that holds its output pipe, so the group kill is what ends both.
+# Nothing the deadline test asserts depends on this branch being reached by any
+# particular time: the product promises a deadline measured from spawn, not
+# that a child is scheduled inside it. The trace says whether it was reached,
+# for a failure message, and is never a precondition.
 if [ -f hang ]; then
-  # Every step leaves a mark. An intermittent failure that destroys its own
-  # evidence is the thing to fix before the failure itself: the deadline is
-  # five seconds, stderr is /dev/null, and without this a child that exited
-  # early and one that was still working are the same observation.
   echo entered >> trace
-  /usr/bin/cmp "$settings" expected-settings
-  echo settings-match >> trace
-  /bin/cat stream.jsonl
-  echo emitted >> trace
-  : > settings-after-terminal
-  /bin/sleep 60
-  exit 0
+  /bin/sleep 300 &
+  echo $! > descendant
+  exec /bin/sleep 300
 fi
 /bin/ls -ln "$settings" > observed-mode
 /bin/cat "$settings" > observed-settings
@@ -247,7 +191,6 @@ const EXISTING_SETTINGS: &str = r#"{"permissions":{"deny":["Read(existing-secret
 
 #[test]
 fn declared_denials_reach_the_child_and_survive_as_structured_evidence() {
-    let _quiet = QUIET.read().unwrap_or_else(|e| e.into_inner());
     let root = tempfile::tempdir().unwrap();
     let attempt = Attempt::new(
         root.path(),
@@ -264,7 +207,6 @@ fn declared_denials_reach_the_child_and_survive_as_structured_evidence() {
 
 #[test]
 fn concurrent_attempts_keep_independent_settings_until_both_children_read_them() {
-    let _quiet = QUIET.read().unwrap_or_else(|e| e.into_inner());
     let root = tempfile::tempdir().unwrap();
     let a = Attempt::new(&root.path().join("a"), "Bash(first:*)", "concurrent", 30);
     let b = Attempt::new(&root.path().join("b"), "Bash(second:*)", "concurrent", 30);
@@ -278,150 +220,89 @@ fn concurrent_attempts_keep_independent_settings_until_both_children_read_them()
     assert_eq!(second.supervised.outcome, Outcome::Refused);
 }
 
-/// The deadline fires after a terminal denial: the denial survives as evidence
-/// and the settings file is still cleaned up.
+/// The deadline, the kill and the cleanup, through this crate's execution path.
 ///
-/// Four distinct things, asserted as four rather than through the shared
-/// `check`, because only these four are this test's subject and everything
-/// else `check` asserts is covered by the attempts that name a generous
-/// deadline. Running all of it here is what made a five-second budget carry
-/// work it was never sized for.
+/// Spec 004 section 3.5 case 3, with the contract spec 002's 2026-09-22 entry
+/// records. The deadline is five seconds and runs from `spawn`, as the product's
+/// does. What is asserted holds whether or not the child was ever scheduled
+/// inside those five seconds, because the product does not promise that it
+/// would be:
 ///
-/// 1. **The terminal denial** reached the supervisor and is in the events.
-/// 2. **The timeout**, and it is what ended supervision: the elapsed time is
-///    bounded below by the deadline as well as above, so a child that exited
-///    early would fail rather than pass as an interruption.
-/// 3. **The cleanup** removed the supplied settings file, and left the
-///    workspace's own two untouched.
-/// 4. **The durable evidence**: the denial is still in the structured evidence
-///    after the interruption, which is the thing an interruption could
-///    plausibly have cost.
+/// 1. supervision ended **no earlier** than the deadline, so a child that
+///    exited early fails rather than passing as a timeout;
+/// 2. it ended well before the child's own 300-second hang, so it was not held
+///    by the process it supervises. The 60-second bound separates that defect
+///    from the latency of the `kill` the supervisor spawns;
+/// 3. the attempt is `interrupted`, nothing in the group survived, and a
+///    descendant the child did start is dead by its process id;
+/// 4. the workspace's own settings are untouched, and the supplied settings
+///    file, when the child lived to name it, is gone. The unconditional form of
+///    that last check is `execution`'s own
+///    `settings_are_removed_when_supervision_times_out`, where the temporary
+///    root is the test's.
 ///
-/// The ordering the test needs is established in the fixture child rather than
-/// hoped for here: the marker it writes sits on the line after the terminal
-/// emit, so `settings-after-terminal` existing means the child outlived its own
-/// terminal event.
-/// The workspace's entries, sorted, for a failure message.
-///
-/// A failing deadline attempt is judged from what the child left behind, so the
-/// two messages below read the same tree rather than each building their own.
-fn workspace_entries(root: &Path) -> Vec<String> {
-    let mut names: Vec<String> = std::fs::read_dir(root)
-        .map(|d| {
-            d.filter_map(Result::ok)
-                .map(|e| e.file_name().to_string_lossy().to_string())
-                .collect()
-        })
-        .unwrap_or_default();
-    names.sort();
-    names
-}
-
+/// Retention of a terminal denial across the interruption is measured where it
+/// is decided, without a race: `execution`'s
+/// `an_interruption_keeps_the_terminal_denial_the_supervisor_read` and the
+/// supervisor's `events_delivered_before_the_deadline_survive_it`.
 #[test]
-fn timeout_after_terminal_denial_cleans_settings_and_retains_evidence() {
+fn a_hung_child_is_interrupted_at_the_deadline_with_its_group_and_settings_cleaned() {
     use std::time::{Duration, Instant};
 
-    // The write side: no other attempt in this file runs while this one is
-    // measuring a five-second budget.
-    let _quiet = QUIET.write().unwrap_or_else(|e| e.into_inner());
-
     let root = tempfile::tempdir().unwrap();
-    // The one test whose subject is the deadline, so the one short budget.
     let attempt = Attempt::new(root.path(), "Bash(hang:*)", "hang", 5);
     let started = Instant::now();
     let execution = attempt.run();
     let elapsed = started.elapsed();
+    let trace = std::fs::read_to_string(root.path().join("trace")).unwrap_or_default();
+    let context = format!(
+        "after {elapsed:?}: outcome {:?}, stream error {:?}, survivors {:?}; the child's trace \
+         is {trace:?} (empty means it was never scheduled, which the product does not \
+         promise and nothing here requires)",
+        execution.supervised.outcome,
+        execution.supervised.stream_error,
+        execution.supervised.surviving_processes,
+    );
 
-    // 2. The timeout, and that it is what ended supervision.
-    assert_eq!(execution.supervised.outcome, Outcome::Interrupted);
     assert!(
         elapsed >= Duration::from_secs(5),
-        "supervision ended in {elapsed:?}, before the deadline it was given; an \
-         interruption that arrived early is not the timeout this test is about"
+        "supervision ended before its deadline, so this is not a timeout: {context}"
     );
     assert!(
-        elapsed < Duration::from_secs(10),
-        "supervision took {elapsed:?}, so it was held past its own deadline by \
-         the child it was supervising"
+        elapsed < Duration::from_secs(60),
+        "supervision was held far past its deadline by the child it supervises: {context}"
     );
-
-    // 1. The terminal denial reached the supervisor before the deadline.
-    //
-    // The precondition is judged first, and separately. The child records
-    // `entered` on the first line of its body, so an empty trace means the
-    // whole budget went on `fork`/`execve` and the child never ran. That is not
-    // a lost denial and it is not irrelevant either: it is this measurement's
-    // precondition failing, which leaves the subject unmeasured. It fails, and
-    // it fails saying which of the two happened, because passing in that state
-    // would be suppression and reporting it as a lost denial would send the
-    // next reader after the wrong defect.
-    let trace = std::fs::read_to_string(root.path().join("trace")).unwrap_or_default();
+    assert_eq!(execution.supervised.outcome, Outcome::Interrupted, "{context}");
     assert!(
-        trace.contains("entered"),
-        "the child never ran its body inside the five-second budget: the trace is {trace:?} and \
-         the workspace holds {:?}. Supervision reported {:?} after {elapsed:?} with stream error \
-         {:?}, which is the supervisor behaving correctly on a child that never started. \
-         The subject of this test, whether a terminal denial that DID arrive survives an \
-         interruption, was not measured. The synchronisation above reduces the contention this \
-         suite creates for itself and does not bound `execve`; nothing in this crate can.",
-        workspace_entries(root.path()),
-        execution.supervised.outcome,
-        execution.supervised.stream_error,
+        execution.supervised.surviving_processes.is_none(),
+        "the group outlived the kill: {context}"
     );
-    let seen = refusals(&execution.supervised.events);
-    assert_eq!(
-        seen.len(),
-        1,
-        "the terminal denial did not arrive. The child's trace is {:?} and the \
-         workspace holds {:?}; `entered` absent means it never started or exited \
-         on an argument check, `settings-match` absent means the settings it was \
-         given are not the ones written, and `emitted` present means the stream \
-         was written and the supervisor did not read it inside the deadline. \
-         Supervision reported {:?} after {elapsed:?}, stream error {:?}",
-        trace,
-        workspace_entries(root.path()),
-        execution.supervised.outcome,
-        execution.supervised.stream_error,
-    );
-    assert_eq!(
-        serde_json::from_str::<Value>(&seen[0].detail).unwrap(),
-        attempt.denial
-    );
-
-    // And the child outlived it, which is what makes this a timeout AFTER a
-    // terminal denial rather than one instead of it.
-    assert!(
-        root.path().join("settings-after-terminal").exists(),
-        "the child did not reach the point past its own terminal event"
-    );
-
-    // 4. The evidence is durable across the interruption.
-    assert_eq!(
-        execution.evidence()["providerTerminal"]["permission_denials"],
-        json!([attempt.denial])
-    );
-    assert_eq!(execution.termination().adapter_claimed, Outcome::Completed);
-
-    // 3. The cleanup happened, and touched nothing of the workspace's own.
-    let supplied =
-        PathBuf::from(std::fs::read_to_string(root.path().join("observed-path")).unwrap());
-    assert!(supplied.is_absolute());
-    assert!(!supplied.starts_with(root.path().canonicalize().unwrap()));
-    assert!(
-        !supplied.exists(),
-        "the settings file survived an interrupted supervision"
-    );
+    if let Ok(pid) = std::fs::read_to_string(root.path().join("descendant")) {
+        let alive = std::process::Command::new("kill")
+            .args(["-s", "0", pid.trim()])
+            .output()
+            .unwrap()
+            .status
+            .success();
+        assert!(!alive, "descendant {} escaped supervision: {context}", pid.trim());
+    }
+    if let Ok(path) = std::fs::read_to_string(root.path().join("observed-path")) {
+        assert!(
+            !Path::new(&path).exists(),
+            "the settings file survived an interrupted supervision: {context}"
+        );
+    }
     for name in ["settings.json", "settings.local.json"] {
         assert_eq!(
             std::fs::read_to_string(root.path().join(".claude").join(name)).unwrap(),
             EXISTING_SETTINGS
         );
     }
+    assert!(execution.settings_cleanup_error.is_none(), "{context}");
 }
 
 #[test]
 fn a_settings_cleanup_failure_cannot_erase_the_terminal_denial() {
-    let _quiet = QUIET.read().unwrap_or_else(|e| e.into_inner());
     let root = tempfile::tempdir().unwrap();
     let attempt = Attempt::new(root.path(), "Bash(cleanup:*)", "obstruct-cleanup", 30);
     let execution = attempt.run();
@@ -436,7 +317,6 @@ fn a_settings_cleanup_failure_cannot_erase_the_terminal_denial() {
 
 #[test]
 fn malformed_stream_cleanup_removes_the_settings_file() {
-    let _quiet = QUIET.read().unwrap_or_else(|e| e.into_inner());
     let root = tempfile::tempdir().unwrap();
     let attempt = Attempt::new(root.path(), "Bash(malformed:*)", "", 30);
     std::fs::write(root.path().join("stream.jsonl"), "not json\n").unwrap();

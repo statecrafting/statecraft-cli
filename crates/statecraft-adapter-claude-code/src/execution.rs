@@ -155,6 +155,20 @@ fn supervise_in(
         .err()
         .filter(|error| error.kind() != std::io::ErrorKind::NotFound)
         .map(|error| error.to_string());
+    Ok(map_native(native, granted, settings_cleanup_error))
+}
+
+/// Map what the supervisor read onto an execution.
+///
+/// A function of the supervised events and outcome and nothing else, so what
+/// an interruption keeps is decided here and is testable without racing a
+/// deadline: whatever the supervisor had read when it stopped is mapped, and an
+/// interrupted supervision stays interrupted whatever the provider claimed.
+fn map_native(
+    native: Supervised<(usize, ProviderEvent)>,
+    granted: &[Capability],
+    settings_cleanup_error: Option<String>,
+) -> Execution {
     let mut supervised = Supervised {
         events: Vec::new(),
         outcome: native.outcome,
@@ -209,12 +223,12 @@ fn supervise_in(
     if supervised.stream_error.is_some() {
         supervised.outcome = Outcome::Interrupted;
     }
-    Ok(Execution {
+    Execution {
         supervised,
         terminal,
         result,
         settings_cleanup_error,
-    })
+    }
 }
 
 #[cfg(test)]
@@ -236,6 +250,49 @@ mod tests {
                 number: 1,
             },
         }
+    }
+
+    /// A terminal denial the supervisor read before its deadline survives the
+    /// interruption as structured evidence, and the interruption is not
+    /// overwritten by the provider's claim of completion.
+    ///
+    /// This is the retention half of spec 004 section 3.5 case 3, measured
+    /// where it is decided. The supervision is constructed rather than timed,
+    /// so the test does not depend on a child being scheduled inside a
+    /// deadline, which the product does not promise.
+    #[test]
+    fn an_interruption_keeps_the_terminal_denial_the_supervisor_read() {
+        let denial = serde_json::json!({"tool_name": "Bash", "tool_use_id": "t1",
+            "tool_input": {"command": "hang"}});
+        let lines = [
+            serde_json::json!({"type":"system","subtype":"init","claude_code_version":"fixture"}),
+            serde_json::json!({"type":"result","subtype":"success","num_turns":2,
+                "permission_denials":[denial]}),
+        ];
+        let native = Supervised {
+            events: lines
+                .iter()
+                .enumerate()
+                .map(|(i, l)| (i + 1, serde_json::from_value(l.clone()).unwrap()))
+                .collect(),
+            outcome: Outcome::Interrupted,
+            stream_error: None,
+            surviving_processes: None,
+        };
+        let execution = map_native(native, &[], None);
+        assert_eq!(execution.supervised.outcome, Outcome::Interrupted);
+        let refusals = statecraft_adapter::protocol::refusals(&execution.supervised.events);
+        assert_eq!(refusals.len(), 1);
+        assert_eq!(
+            serde_json::from_str::<serde_json::Value>(&refusals[0].detail).unwrap(),
+            denial
+        );
+        assert_eq!(
+            execution.evidence()["providerTerminal"]["permission_denials"],
+            serde_json::json!([denial])
+        );
+        assert_eq!(execution.termination().adapter_claimed, Outcome::Completed);
+        assert_eq!(execution.termination().observed, Outcome::Interrupted);
     }
 
     #[test]
@@ -352,6 +409,36 @@ mod tests {
             "{evidence}"
         );
         // Cleanup still runs on the transport failure.
+        assert_eq!(std::fs::read_dir(temporary_root.path()).unwrap().count(), 0);
+    }
+
+    /// The settings file is removed when supervision ends at its deadline.
+    ///
+    /// The temporary root is the test's own, so the check needs nothing from
+    /// the child: whether or not it was scheduled before the deadline, the file
+    /// this crate wrote is gone afterwards.
+    #[cfg(unix)]
+    #[test]
+    fn settings_are_removed_when_supervision_times_out() {
+        use std::os::unix::fs::PermissionsExt;
+
+        let workspace = tempfile::tempdir().unwrap();
+        let temporary_root = tempfile::tempdir().unwrap();
+        let child = workspace.path().join("hang.sh");
+        std::fs::write(&child, "#!/bin/sh\nexec /bin/sleep 300\n").unwrap();
+        std::fs::set_permissions(&child, std::fs::Permissions::from_mode(0o700)).unwrap();
+        let invocation = Invocation::new(child.to_str().unwrap(), &["Bash(x:*)".into()], None);
+        let environment = construct(&Blueprint::empty(), &CheckSuiteCommands::default());
+        let execution = supervise_in(
+            &invocation,
+            &request(workspace.path()),
+            &environment,
+            &[],
+            temporary_root.path(),
+        )
+        .unwrap();
+        assert_eq!(execution.supervised.outcome, Outcome::Interrupted);
+        assert!(execution.settings_cleanup_error.is_none());
         assert_eq!(std::fs::read_dir(temporary_root.path()).unwrap().count(), 0);
     }
 

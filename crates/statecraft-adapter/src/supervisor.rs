@@ -276,6 +276,13 @@ fn read_supervised<E: Send + 'static, R: Read + Send + 'static>(
         let remaining = deadline.saturating_duration_since(Instant::now());
         if remaining.is_zero() {
             timed_out = true;
+            // What the reader had already delivered when the deadline fired
+            // was read before the deadline, and dropping it with the channel
+            // would lose exactly the evidence an interruption must keep: a
+            // terminal denial that arrived in the last polling interval.
+            if !ended {
+                drain_delivered(&rx, &mut events, &mut stream_error);
+            }
             break;
         }
         // Neither the end of the stream nor a terminal event says the child has
@@ -381,6 +388,30 @@ fn read_supervised<E: Send + 'static, R: Read + Send + 'static>(
         stream_error,
         surviving_processes: surviving,
     })
+}
+
+/// Absorb every item the reader had already delivered, without waiting.
+///
+/// Called only when the deadline has fired. It takes what is in the channel
+/// and nothing more: an item still being read is not an item that was read
+/// before the deadline, and waiting for it would be the supervisor being held
+/// past its own deadline by the child.
+fn drain_delivered<E>(
+    rx: &mpsc::Receiver<Item<E>>,
+    events: &mut Vec<E>,
+    stream_error: &mut Option<StreamError>,
+) {
+    while let Ok(item) = rx.try_recv() {
+        match item {
+            Item::Event(event) => events.push(event),
+            Item::Malformed(e) => {
+                if stream_error.is_none() {
+                    *stream_error = Some(e);
+                }
+            }
+            Item::Ended(_) => break,
+        }
+    }
 }
 
 /// What a raw capture read, and how the process ended.
@@ -658,6 +689,34 @@ fn kill_tree(child: &mut std::process::Child) -> Option<String> {
 #[cfg(all(test, unix))]
 mod tests {
     use super::*;
+
+    /// An event the reader delivered before the deadline fired is kept.
+    ///
+    /// Deterministic: the channel is filled before the drain runs, which is
+    /// the state the deadline branch finds when the reader delivered in the
+    /// last polling interval. Before the drain existed, those items were
+    /// dropped with the channel.
+    #[test]
+    fn events_delivered_before_the_deadline_survive_it() {
+        let (tx, rx) = mpsc::sync_channel(16);
+        tx.send(Item::Event(1)).unwrap();
+        tx.send(Item::Event(2)).unwrap();
+        tx.send(Item::Malformed(StreamError::Malformed {
+            line: 3,
+            detail: "x".into(),
+        }))
+        .unwrap();
+        tx.send(Item::Event(4)).unwrap();
+        let mut events = Vec::new();
+        let mut error = None;
+        drain_delivered(&rx, &mut events, &mut error);
+        assert_eq!(events, [1, 2, 4]);
+        assert!(matches!(error, Some(StreamError::Malformed { line: 3, .. })));
+        // Nothing more was delivered, and the drain did not wait for more.
+        drop(tx);
+        drain_delivered(&rx, &mut events, &mut error);
+        assert_eq!(events.len(), 3);
+    }
 
     fn sh(script: &str, stdin: &[u8], deadline: Duration) -> (Captured, tempfile::TempDir) {
         let dir = tempfile::tempdir().unwrap();
