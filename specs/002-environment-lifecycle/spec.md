@@ -852,7 +852,10 @@ position as before this section existed.
 
 1. A **hook registration** whose command resolves inside the canonical harness
    under the product home. Never a command assembled from anything else.
-2. A **deny entry**, which is a refusal.
+2. A **deny entry**, which is a refusal. Where such an entry lands is fixed by
+   section 3.27: not in the user's global deny list by default, because a deny
+   entry carries no project gate and acquires none from the scripts registered
+   beside it.
 
 A merge may add a refusal. It may never add or widen a permission: no allow
 entry, no `ask` downgraded, no existing deny removed, weakened or reordered. The
@@ -1032,6 +1035,51 @@ arrives, and the fact that this is weaker than what an operator often wants is
 the reason it is reported separately rather than merged into a single richer
 word. Redefining an existing verdict changes the meaning of every record
 already written under it, which is a migration and not an improvement.
+
+### 3.27 Global adapter registration is not managed-session permission delivery
+
+A narrow amendment, settled by the owner on 2026-09-21 and recorded before the
+implementation it authorizes. It separates two things this build had joined:
+registering an adapter **globally**, and delivering the deny floor to a
+**managed session**.
+
+**Section 3.14 rule 3 is unchanged and is the reason.** Every delivered
+behavior applies only inside a repository holding
+`.statecraft/environment.json`, and is inert everywhere else. An unrelated
+project is unaffected by global integration.
+
+**The floor does not go into the user's global deny list by default.** A
+refusal written into the user-global `permissions.deny` applies to every
+session that user runs, in every repository, managed or not. Hook *scripts* can
+be project-gated because a script can test for the manifest and exit; a deny
+entry is evaluated by the harness before anything of this product's runs, so it
+carries no gate and acquires none from the scripts shipped beside it. Those
+entries are therefore **not project-gated merely because the hook scripts
+are**, and this product does not install them there by default.
+
+**The floor is delivered through a supported managed-session settings
+mechanism**, carrying the canonical Statecraft content. Claude Code documents a
+`--settings` argument for exactly this shape of need. Documentation is not
+evidence: the **installed version** and the **effective behavior** are verified
+before this product relies on the mechanism, and an unverified mechanism is an
+unavailable one.
+
+**Three conditions on whatever global registration remains.** A global hook
+registration, if used at all, is **inert outside a Statecraft project**.
+Delivered skills and agents stay **namespaced and project-gated**, which is
+section 3.14 rules 2 and 3. And consent asked for a write into a global native
+settings file **describes the actual scope of that write**: a modification that
+takes effect in every repository is presented as one, whatever the scripts it
+registers do afterwards.
+
+**The floor is never weakened to solve a delivery problem.** Section 3.23's
+refusals are a floor, and a floor a delivery can lower is not one. Where an
+ordinary unmanaged session cannot receive the scoped floor, the answer is to
+**report that session as not qualified** for the managed-execution claim.
+Two repairs are specifically refused: lowering the floor so that delivery
+succeeds, and writing a repository-local generic harness copy so the
+limitation stops being visible. The second would also reintroduce exactly what
+section 3.14 removes.
 
 ## 4. Out of scope
 
@@ -1546,6 +1594,33 @@ The inventory was written inside spec-spine's own repository; a file that
 arrives carrying that project's crate layout, gate commands or workflow is an
 adoption defect, and the check for it is not "does the word appear somewhere in
 the file".
+
+**2026-09-21, authority: §3.27, and the gate a deny entry does not have.** This
+build writes the deny floor into `permissions.deny` in a native settings file
+and registers hook scripts beside it, and the two were reasoned about as one
+delivery. They are not one. A hook script can be project-gated because a script
+runs and can test for `.statecraft/environment.json` and exit, which is what
+`harness::GATE` states and what the shipped scripts do. A deny entry is
+evaluated by the harness itself, before anything of this product's runs, so it
+has no place to perform that test. Writing the floor into a user's global deny
+list therefore applies it to every repository that user opens, and the
+project-gated scripts sitting next to it do not narrow it by association.
+
+So the two are separated: global registration is one act with one scope, and
+delivering the floor to a managed session is another, through a mechanism that
+can carry a scope. Claude Code documents `--settings` for that shape of need.
+The amendment deliberately does not treat the documentation as the evidence:
+the installed version and the effective behavior are measured before this
+product relies on the mechanism, and an unverified mechanism is unavailable
+rather than assumed.
+
+The last paragraph of §3.27 is the one that will be under pressure, so it is
+written as two named refusals rather than as a principle. If the floor cannot
+be delivered to an ordinary unmanaged session, the answer is to report that
+session as not qualified for the managed-execution claim. It is not to lower
+the floor until delivery succeeds, and it is not to write a repository-local
+generic harness copy so that the limitation stops being visible, which would
+also reintroduce the exact thing §3.14 removes.
 
 ## Verification
 
