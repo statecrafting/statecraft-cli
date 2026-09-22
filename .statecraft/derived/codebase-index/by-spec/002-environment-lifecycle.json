@@ -23,6 +23,10 @@
       {
         "path": "scripts/check-authored-content.sh",
         "source": "spec-edge"
+      },
+      {
+        "path": "specs/002-environment-lifecycle/handoff-2026-09-21.md",
+        "source": "spec-edge"
       }
     ],
     "resolvedUnits": [
@@ -50,6 +54,24 @@
         "unit": {
           "kind": "directory",
           "path": "crates/statecraft-home/"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "specs/002-environment-lifecycle/handoff-2026-09-21.md",
+            "span": {
+              "endLine": 381,
+              "startLine": 360
+            }
+          }
+        ],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "anchor": "7-truthful-implementation-state-of-spec-002",
+          "file": "specs/002-environment-lifecycle/handoff-2026-09-21.md",
+          "kind": "section"
         }
       },
       {
@@ -83,5 +105,5 @@
     "specStatus": "approved"
   },
   "schemaVersion": "1.1.0",
-  "shardHash": "28ad263980f45c642b7f6da7079e74489e797a5fe40d325f66cb31246301784a"
+  "shardHash": "95e698cfb2452d31e8f417053672ad0789e1d9aa91f65fe958e90de70b583181"
 }

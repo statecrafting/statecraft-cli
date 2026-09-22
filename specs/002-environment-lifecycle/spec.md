@@ -37,6 +37,21 @@ summary: >
 establishes:
   - { kind: directory, path: "crates/statecraft-environment/" }
   - { kind: directory, path: "crates/statecraft-home/" }
+  # Evidence for the 2026-09-21 round, in this spec's own directory. Claimed
+  # as a SECTION rather than as a whole file: a whole-file claim raises L-008,
+  # because nothing hashes the file, and the two cures the lint offers are a
+  # covering glob in [index] extra_hashed_inputs, which would restamp every
+  # shard in the corpus whenever a handoff paragraph changes, and a section
+  # unit, which is hashed through its own span and stales only this spec's
+  # shard. The second is right: this is evidence, and evidence changing is a
+  # fact about this spec and about nothing else.
+  #
+  # Not a second place for a requirement. Every requirement is in this file
+  # and every decision is a dated entry in section 5. The handoff carries what
+  # a spec should not: measurement that ages, which is commits, digests, test
+  # counts, a producer matrix, a rollback plan, and the live-session script
+  # still to be approved.
+  - { kind: section, file: "specs/002-environment-lifecycle/handoff-2026-09-21.md", anchor: "7-truthful-implementation-state-of-spec-002" }
 amends:
   # Section 3.6's "no configuration file may change a rule" gets its precise
   # reading in section 3.16: a layer supplies a value, never a rule, and every

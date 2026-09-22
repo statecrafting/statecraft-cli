@@ -525,3 +525,18 @@ mod tests {
         }
     }
 }
+
+#[cfg(test)]
+mod revision_report {
+    /// Print the shipped revision identity. Not an assertion: a way to read
+    /// the identity a handoff has to record, without a second binary.
+    #[test]
+    #[ignore = "reporting, not an assertion: run with --ignored to print"]
+    fn print_shipped_revision() {
+        let r = super::revision_of(&super::shipped());
+        println!("revision {} over {} files", r.id, r.files.len());
+        for f in &r.files {
+            println!("  {}  {}  {} bytes", &f.digest[..16], f.rel_path, f.bytes);
+        }
+    }
+}
