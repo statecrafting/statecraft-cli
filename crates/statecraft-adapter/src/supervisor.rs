@@ -953,15 +953,19 @@ mod tests {
     /// A stdout that delivers `bytes`, raises `beyond` the first time it is
     /// asked for more, and then hangs or ends.
     struct Scripted {
-        bytes: std::io::Cursor<Vec<u8>>,
+        bytes: Vec<u8>,
+        offset: usize,
         then: Then,
         beyond: Arc<AtomicBool>,
     }
 
     impl Read for Scripted {
         fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
-            let n = self.bytes.read(buf)?;
+            let rest = &self.bytes[self.offset..];
+            let n = rest.len().min(buf.len());
             if n > 0 {
+                buf[..n].copy_from_slice(&rest[..n]);
+                self.offset += n;
                 return Ok(n);
             }
             // Every complete line before this call has been decoded and sent:
@@ -1050,7 +1054,8 @@ mod tests {
         bytes.push(b'\n');
         let (hold, held) = mpsc::channel::<()>();
         let stdout = Scripted {
-            bytes: std::io::Cursor::new(bytes),
+            bytes,
+            offset: 0,
             then: if then_hang {
                 Then::Hang(held)
             } else {
