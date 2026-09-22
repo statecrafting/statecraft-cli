@@ -307,3 +307,48 @@ fn the_stage_refuses_without_a_preflight_and_clean_removes_only_its_own() {
 
     assert_eq!(code(&run.script("bogus", &[])), 3);
 }
+
+/// Spec 002 section 3.31, through the operator's script: the preflight drives
+/// `run` and `startup show` against a local fake, and what they wrote is the
+/// persisted startup evidence, read back. Synthetic, and the step says so.
+#[test]
+fn the_preflight_runs_the_run_path_and_reads_its_startup_evidence_back() {
+    let run = Run::new();
+    run.preflight();
+    let steps = run.acc().join("steps");
+    let read = |name: &str| std::fs::read_to_string(steps.join(name)).unwrap();
+    assert_eq!(read("09-run.status"), "exit 0\n");
+    assert_eq!(read("09-startup-show.status"), "exit 1\n");
+    let shown: serde_json::Value = serde_json::from_str(&read("09-startup-show.out")).unwrap();
+    let v = &shown["value"]["value"];
+    assert_eq!(v["verdict"], "unverified");
+    let required = v["intent"]["requiredHarness"].as_str().unwrap();
+    assert_eq!(v["intent"]["selected"]["digest"], required);
+    assert_eq!(v["record"]["resolvedHarness"], required);
+    assert_eq!(v["record"]["launch"]["harness"]["grade"], "acknowledged");
+    assert_eq!(
+        v["record"]["launch"]["settingsWritten"]["digest"],
+        v["intent"]["payload"]["digest"]
+    );
+    let dir = run
+        .acc()
+        .join("project/.statecraft/state/startup/runs/acc-run/1");
+    assert!(dir.join("intent.json").is_file());
+    assert!(dir.join("record.json").is_file());
+}
+
+/// Section 7 of the preflight: a toolchain file in an ancestor of the fixture
+/// would choose what the refused command runs under, and possibly download it,
+/// so the preflight refuses rather than continue.
+#[test]
+fn an_ancestor_toolchain_file_refuses_the_preflight() {
+    let run = Run::new();
+    std::fs::write(
+        run.dir.path().join("rust-toolchain.toml"),
+        "[toolchain]\nchannel = \"0.0.0\"\n",
+    )
+    .unwrap();
+    let out = run.script("preflight", &[]);
+    assert_eq!(code(&out), 2, "{}", both(&out));
+    assert!(both(&out).contains("rust-toolchain.toml"), "{}", both(&out));
+}

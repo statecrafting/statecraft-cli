@@ -1752,6 +1752,69 @@ mod tests {
         assert_eq!(without[grant + 1..], ["Bash(a)", "Bash(b)"]);
     }
 
+    /// Spec 002 section 5, 2026-09-22: the grant's two rules each contain
+    /// spaces, and the installed 2.1.267 build splits `--allowedTools` values
+    /// on commas and spaces **outside parentheses only** (its `sd` function,
+    /// read statically from the shipped binary; the help text documents
+    /// "Comma or space-separated", with `"Bash(git *) Edit"` as the example).
+    /// This is a transcription of that splitter, so the test establishes that
+    /// the argument construction survives it. It is not the provider parsing
+    /// anything, and nothing here observes enforcement.
+    #[test]
+    fn each_rule_in_the_grant_survives_the_installed_splitter_whole() {
+        fn split_like_2_1_267(values: &[String]) -> Vec<String> {
+            let mut out = Vec::new();
+            for value in values {
+                let (mut current, mut inside) = (String::new(), false);
+                for c in value.chars() {
+                    match c {
+                        '(' => {
+                            inside = true;
+                            current.push(c);
+                        }
+                        ')' => {
+                            inside = false;
+                            current.push(c);
+                        }
+                        ',' | ' ' if !inside => {
+                            if !current.trim().is_empty() {
+                                out.push(current.trim().to_string());
+                            }
+                            current.clear();
+                        }
+                        _ => current.push(c),
+                    }
+                }
+                if !current.trim().is_empty() {
+                    out.push(current.trim().to_string());
+                }
+            }
+            out
+        }
+        for control in [Control::Refusal, Control::Allowed, Control::WithoutPayload] {
+            let args = arguments(control, REFUSED_COMMAND, ALLOWED_COMMAND, Some("/s.json"));
+            let grant = args.iter().position(|a| a == "--allowedTools").unwrap();
+            // The option is variadic: it takes values up to the next option.
+            let values: Vec<String> = args[grant + 1..]
+                .iter()
+                .take_while(|a| !a.starts_with("--"))
+                .cloned()
+                .collect();
+            assert_eq!(
+                split_like_2_1_267(&values),
+                [
+                    format!("{GOVERNED_TOOL}({REFUSED_COMMAND})"),
+                    format!("{GOVERNED_TOOL}({ALLOWED_COMMAND})"),
+                ]
+            );
+        }
+        // Neither command may contain a parenthesis, which would end the
+        // protected span early and split the rule.
+        for command in [REFUSED_COMMAND, ALLOWED_COMMAND] {
+            assert!(!command.contains(['(', ')']), "{command}");
+        }
+    }
+
     #[test]
     fn no_argument_carries_the_prompt() {
         let args = arguments(

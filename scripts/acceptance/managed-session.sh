@@ -14,10 +14,13 @@
 # THE STAGES ARE SEPARATE APPROVALS.
 #
 #   preflight              Local only. Builds the fixture, runs the product's
-#                          own verbs against it, and checks, through the same
+#                          own verbs against it, checks, through the same
 #                          launch and admission path stage 2 uses, that the
-#                          admission refuses a prose claim. Spawns no provider,
-#                          writes nothing outside $ACC, needs no approval.
+#                          admission refuses a prose claim, and drives `run`
+#                          and `startup show` end to end against a local fake
+#                          (spec 002 section 3.31), which is SYNTHETIC. Spawns
+#                          no provider, writes nothing outside $ACC, needs no
+#                          approval.
 #
 #   permission-experiment  Spawns the provider: at most THREE sessions, one per
 #                          control, in order, each bounded by $STEP_TIMEOUT
@@ -229,6 +232,23 @@ preflight() {
   # The product refuses to launch when this path exists; checked here too so
   # the preflight says so before anything else.
   [ ! -e "$PROJECT/statecraft-absent" ] || refuse "$PROJECT/statecraft-absent exists"
+  # `--manifest-path` names the manifest, so cargo searches no ancestor for
+  # one. What an ancestor CAN still change is which toolchain a rustup proxy
+  # selects, and an uninstalled one may be downloaded before cargo runs. So no
+  # ancestor of the project may carry a toolchain file, and stage 2 exports
+  # RUSTUP_AUTO_INSTALL=0 besides. Cargo configuration in an ancestor is
+  # listed for review; `--dry-run` uploads nothing whatever it says.
+  dir="$PROJECT"
+  while :; do
+    for f in rust-toolchain rust-toolchain.toml; do
+      [ ! -e "$dir/$f" ] || refuse "$dir/$f would select the toolchain the refused command runs under; choose an ACC outside it"
+    done
+    for f in .cargo/config .cargo/config.toml; do
+      [ ! -e "$dir/$f" ] || say "  note: $dir/$f is cargo configuration an unenforced refusal would read"
+    done
+    [ "$dir" = / ] && break
+    dir="$(dirname -- "$dir")"
+  done
 
   step "8. The unobserved record"
   bounded 06-record "$LOCAL_TIMEOUT" product startup record "$PROJECT" acc-unobserved
@@ -260,6 +280,77 @@ PROSE
     || fail "the prose claim was refused for another reason; see $CAPTURE/08-prose-qualify.out"
   [ ! -e "$PROJECT/.statecraft/state/startup/acc-prose.json" ] || fail "a refused claim wrote a record"
 
+  step "10. The run path, against a local fake (SYNTHETIC)"
+  # Spec 002 section 3.31, end to end through the product: `run` writes its
+  # startup intent and record, the shipped SessionStart hook from the required
+  # revision acknowledges the attempt, and `startup show` reads the judgement
+  # back. The fake stands in for the provider and for the operator's global
+  # hook registration; it runs nothing else, and nothing here is live.
+  runbin="$ACC/runbin"
+  mkdir -p "$runbin"
+  bounded 09-payload-bytes "$LOCAL_TIMEOUT" product session payload
+  [ "$RAN" = 0 ] || fail "the payload bytes could not be obtained"
+  cp "$CAPTURE/09-payload-bytes.out" "$runbin/payload"
+  cp "$REPO/crates/statecraft-adapter-claude-code/testdata/stream/success.jsonl" "$runbin/session.jsonl"
+  required="$(sed -n 's/^ *"required": "\([0-9a-f]\{64\}\)",*$/\1/p' "$CAPTURE/04-harness-show.out" | head -n 1)"
+  display="$(sed -n 's/^ *"requiredDisplay": "\(h-[0-9a-f]*\)",*$/\1/p' "$CAPTURE/04-harness-show.out" | head -n 1)"
+  [ -n "$required" ] && [ -n "$display" ] || fail "no required revision in $CAPTURE/04-harness-show.out"
+  printf '%s' "$HOME_DIR/harness/$display/hooks/statecraft-session-start.sh" >"$runbin/registered-hook"
+  cat >"$runbin/spec-spine" <<'SPINE'
+#!/bin/sh
+# A synthetic scheduler input for the fixture: one ready unit of work.
+case "$*" in
+  --version) echo 'spec-spine 0.20.0' ;;
+  check) exit 0 ;;
+  'registry plan --json') echo '{"ready":[{"id":"acc-run","title":"synthetic run"}]}' ;;
+  'registry list --json') echo '{"items":[{"id":"acc-run","status":"approved","implementation":"pending"}]}' ;;
+  *) exit 3 ;;
+esac
+SPINE
+  cat >"$runbin/claude" <<'FAKE'
+#!/bin/sh
+# A LOCAL FAKE PROVIDER for the run path. Never a provider, never live evidence.
+if [ "${1:-}" = --version ]; then printf '2.1.267 (Claude Code)\n'; exit 0; fi
+here="$(dirname -- "$0")"
+settings=""
+while [ "$#" -gt 0 ]; do
+  case "$1" in --settings) settings="$2"; shift ;; esac
+  shift
+done
+cmp -s "$settings" "$here/payload" || { echo "the settings are not the payload" >&2; exit 3; }
+cat >/dev/null
+session=11111111-1111-1111-1111-111111111111
+out="$(CLAUDE_PROJECT_DIR="$PWD" "$(cat "$here/registered-hook")" "$PWD" 2>/dev/null)"
+code=$?
+esc="$(printf '%s' "$out" | awk 'BEGIN { ORS = "" } { gsub(/\\/, "\\\\"); gsub(/"/, "\\\""); gsub(/\t/, "\\t"); if (NR > 1) printf "\\n"; print }')"
+printf '{"type":"system","subtype":"hook_started","hook_name":"SessionStart:startup","hook_event":"SessionStart","session_id":"%s"}\n' "$session"
+printf '{"type":"system","subtype":"hook_response","hook_name":"SessionStart:startup","hook_event":"SessionStart","stdout":"%s","stderr":"","exit_code":%s,"outcome":"success","session_id":"%s"}\n' "$esc" "$code" "$session"
+cat "$here/session.jsonl"
+FAKE
+  chmod 700 "$runbin/spec-spine" "$runbin/claude"
+  runpath="$runbin:/usr/bin:/bin"
+  for verb in register arm; do
+    bounded "09-$verb" "$LOCAL_TIMEOUT" env PATH="$runpath" STATECRAFT_HOME="$HOME_DIR" \
+      STATECRAFT_NATIVE_ROOT="$NATIVE_DIR" "$CLI" project "$verb" "$PROJECT"
+    case "$RAN" in 0|1) ;; *) fail "project $verb: $(cat "$CAPTURE/09-$verb.status")" ;; esac
+  done
+  bounded 09-run "$LOCAL_TIMEOUT" env PATH="$runpath" STATECRAFT_HOME="$HOME_DIR" \
+    STATECRAFT_NATIVE_ROOT="$NATIVE_DIR" "$CLI" run "$PROJECT" acc-run --json
+  [ "$RAN" = 0 ] || fail "the synthetic run did not complete: $(cat "$CAPTURE/09-run.status"); see $CAPTURE/09-run.out"
+  holds 09-run '"verdict": "unverified"' || fail "the run's startup verdict is not unverified; see $CAPTURE/09-run.out"
+  bounded 09-startup-show "$LOCAL_TIMEOUT" env PATH="$runpath" STATECRAFT_HOME="$HOME_DIR" \
+    STATECRAFT_NATIVE_ROOT="$NATIVE_DIR" "$CLI" startup show "$PROJECT" acc-run --json
+  # 1: unverified is a finding. A run never reaches qualified.
+  [ "$RAN" = 1 ] || fail "startup show: $(cat "$CAPTURE/09-startup-show.status"); see $CAPTURE/09-startup-show.out"
+  holds 09-startup-show '"grade": "acknowledged"' \
+    || fail "the required revision's hook did not acknowledge the attempt; see $CAPTURE/09-startup-show.out"
+  holds 09-startup-show "\"resolvedHarness\": \"$required\"" \
+    || fail "the observed revision is not the required one; see $CAPTURE/09-startup-show.out"
+  holds 09-startup-show '"supply": "supplied"' || fail "the run did not record its supply"
+  holds 09-startup-show 'no live observation' || fail "the run's verdict does not name the missing class"
+  say "  SYNTHETIC: run and startup show agree; the observed revision is the required one,"
+  say "  measured by the hook's acknowledgment in a fake stream. Nothing here is live."
+
   printf 'cli %s\n' "$CLI" >"$ACC/preflight.ok"
   say ""
   say "preflight: every precondition holds. Steps are recorded in $CAPTURE."
@@ -268,6 +359,21 @@ PROSE
 }
 
 # --------------------------------------------------- the permission experiment
+#
+# TWO PREMISES, AND WHAT GRADE EACH HAS. One `--allowedTools` followed by two
+# rules that contain spaces: DOCUMENTED ("Comma or space-separated", example
+# "Bash(git *) Edit") and READ STATICALLY from the installed 2.1.267 build,
+# whose splitter keeps spaces inside parentheses; the argument construction is
+# LOCALLY EXERCISED against a transcription of it. The floor's deny beating
+# that grant: DOCUMENTED ("deny, then ask, then allow"; "can't be overridden
+# by --allowedTools") and READ STATICALLY (a wildcard deny is checked before
+# an exact allow is honored). Neither is OBSERVED until this stage runs live,
+# and a fake cannot observe either. If either fails, the refusal control
+# records an execution and the result is UNVERIFIED, never admitted.
+#
+# This stage starts no `run`: a run session would be a fourth session, and
+# section 3.30 allows three. The run path is exercised by the preflight only,
+# against a local fake.
 #
 # WHY EVERY CONTROL IS HARMLESS IF ENFORCEMENT FAILS. The product fixes the
 # commands (spec 002 section 3.30): `cargo publish --dry-run --manifest-path
@@ -296,6 +402,9 @@ permission_experiment() {
   [ ! -e "$captures" ] \
     || refuse "$captures exists: a launch happens once. Run the preflight again for a fresh fixture"
 
+  # Section 7 of the preflight: an unenforced refusal must not be able to make
+  # a rustup proxy download a toolchain before cargo fails.
+  export RUSTUP_AUTO_INSTALL=0
   launched=0
   for control in refusal allowed-command without-payload; do
     step "Launch: $control (session $((launched + 1)) of at most 3)"

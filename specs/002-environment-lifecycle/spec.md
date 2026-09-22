@@ -2784,6 +2784,49 @@ those tests use runs the shipped hook from the "registered" revision and
 streams its output as `hook_response`; that is locally exercised, and whether
 the live provider does it in a managed run is still unobserved (§3.31 rule 20).
 
+**2026-09-22: the two provider premises, graded, and the acceptance script's run
+step.** The previous hand-back left two premises of the permission experiment
+unobserved. Neither is observed now either, and no provider session was
+started to change that; what changed is that each has a stated grade.
+
+*One `--allowedTools` followed by two rules containing spaces.* Documented: the
+installed `claude --help` for 2.1.267 describes the option as `<tools...>`,
+"Comma or space-separated", with `"Bash(git *) Edit"` as its example. Read
+statically from the installed binary: the splitter applied to the option's
+values (`sd`, called from the permission-context setup with the
+`--allowedTools` array) splits on commas and spaces only outside parentheses,
+so each argument this build passes stays one rule. Locally exercised:
+`admission::tests::each_rule_in_the_grant_survives_the_installed_splitter_whole`
+runs the constructed arguments through a transcription of that splitter for all
+three controls, and asserts neither command contains a parenthesis. The
+construction needed no correction.
+
+*The floor's deny beating that grant.* Documented, in the provider's permissions
+reference: rules are evaluated "deny, then ask, then allow", an allow rule
+"can't carve an exception out of a deny rule", and a deny at any level cannot
+be overridden by `--allowedTools`. Read statically: the Bash permission check
+returns early on an exact-stage deny or ask only, then checks prefix and
+wildcard deny rules, which is where `Bash(cargo publish*)` matches, before an
+exact allow is honored. Observed: not yet. A fake provider cannot observe
+either premise, and the refusal control is still what tests the second.
+
+*Harmlessness, including ancestors.* `--manifest-path` names the manifest, so
+cargo searches no ancestor for one, and `--dry-run` uploads nothing. What an
+ancestor could still change is which toolchain a rustup proxy selects, and an
+uninstalled one may be downloaded first. The preflight now refuses when an
+ancestor of the fixture project holds `rust-toolchain` or
+`rust-toolchain.toml`, lists any ancestor cargo configuration for review, and
+the permission stage exports `RUSTUP_AUTO_INSTALL=0`.
+
+*The run path in the script.* The preflight gains a synthetic step 10: `run`
+against a local fake that checks the payload bytes, runs the required
+revision's shipped `SessionStart` hook as the operator's registration would,
+and streams its output as `hook_response`; then `startup show` must read back
+an acknowledged observation equal to the requirement, a supplied supply and
+the named missing class. The permission stage starts no run, because a run
+session would be a fourth session. `acceptance_script.rs` asserts the step's
+persisted records and the ancestor refusal.
+
 ## Verification
 
 Each line is one command. They run the acceptance this spec's behavior declares:
