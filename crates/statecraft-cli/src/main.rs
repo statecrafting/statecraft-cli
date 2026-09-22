@@ -342,6 +342,26 @@ fn run_verb(
         return emit(&slice::work_show_answer(eligibility), format);
     }
 
+    // Spec 002 section 3.25: managed execution refuses when the committed
+    // requirement's content cannot be established. Judged by the library and
+    // before the attempt is appended, so a refusal leaves no attempt behind.
+    let standing = match statecraft_environment::manifest::Manifest::read(root) {
+        // Nothing has resolved for this session yet, and nothing is claimed
+        // to have: passing the requirement as the resolved identity would
+        // record a resolution nobody measured. So a mismatch is not detectable
+        // here, and that is stated rather than papered over.
+        Ok(Some(manifest)) => statecraft_home::required::evaluate(
+            &statecraft_home::home::Layout::new(home),
+            &manifest,
+            None,
+        ),
+        Ok(None) => statecraft_home::required::Standing::Unrequired,
+        Err(e) => return fail(&e.to_string(), format),
+    };
+    if let Some(reason) = standing.refuses_a_run() {
+        return emit(&bind::harness_refused_answer(root, &reason), format);
+    }
+
     let (mut chain, _) = match Chain::open(home, root) {
         Ok(c) => c,
         Err(e) => return fail(&e.to_string(), format),
@@ -422,8 +442,24 @@ fn run_verb(
         );
     };
 
-    let invocation =
-        statecraft_adapter_claude_code::Invocation::new(&program.display().to_string(), &[], None);
+    // Spec 002 section 3.27: the floor reaches a managed session through the
+    // per-session settings argument, as the exact payload bytes an observation
+    // is bound to (section 3.29 rule 4). Delivering it claims nothing about
+    // enforcement; the posture below still says unqualified.
+    let floor: Vec<String> = statecraft_home::settings::DENY_FLOOR
+        .iter()
+        .map(|r| (*r).to_string())
+        .collect();
+    let invocation = match statecraft_adapter_claude_code::Invocation::new(
+        &program.display().to_string(),
+        &floor,
+        None,
+    )
+    .with_settings_document(statecraft_home::session::payload_json())
+    {
+        Ok(invocation) => invocation,
+        Err(e) => return fail(&e, format),
+    };
     let request = statecraft_adapter::protocol::Request {
         workspace: session.workspace.path.clone(),
         base_commit: session.workspace.base_commit.clone(),
@@ -485,6 +521,11 @@ fn run_verb(
             "degraded": negotiation.degraded.iter().map(|c| c.token()).collect::<Vec<_>>(),
             "specId": spec_id,
             "execution": execution.evidence(),
+            "payload": {
+                "digest": statecraft_home::startup::payload_identity(),
+                "argument": statecraft_home::session::SETTINGS_ARGUMENT,
+            },
+            "harnessStanding": standing.word(),
         }),
         format,
     )

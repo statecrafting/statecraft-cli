@@ -2525,6 +2525,37 @@ The lock is removed with the precondition it mitigated. The deadline stays five
 seconds, no assertion about the product is weakened, nothing is retried, and
 the earlier failure evidence in the entries above is kept as written.
 
+**2026-09-22: `run` delivers the floor and refuses a requirement it cannot
+establish.** Found while looking for the next gap on the qualification path,
+with the source as the evidence: `run` launched the provider with
+`Invocation::new(program, &[], None)`, an empty deny list, and consulted no
+required identity, and `crates/statecraft-cli/tests/native_stream.rs` asserted
+the empty list. That assertion predates §3.27 (2026-09-21), which requires the
+floor to reach a managed session through the per-session settings mechanism,
+and §3.25, which requires managed execution to refuse missing, corrupt or
+mismatched required content. No entry deferred either, so this is an open
+defect and not a decision.
+
+Three choices the sections were silent on. **The bytes:** a run receives
+`session::payload_json()` exactly, through a settings document the adapter
+writes verbatim, because §3.29 rule 4 binds an observation to the payload by
+digest and a differently formatted equivalent would be other bytes. **Which
+standings stop a run:** the three §3.25 names, plus a requirement this build
+cannot read as a digest and an installed tree that cannot be read, since both
+are required content that cannot be established. A project that commits no
+requirement is not managed *under* one, so it runs and is recorded `unrequired`;
+it is still not qualified. **Mismatch:** nothing measures which revision
+actually answers inside a run yet, and passing the requirement as the resolved
+identity would record a resolution nobody observed, so a mismatch is not
+detectable at run start and the standing is recorded as evaluated with nothing
+resolved. The attempt record carries the payload digest and the standing.
+
+Delivering the floor claims nothing about enforcement: the posture still says
+unqualified, and only an admitted live observation changes that. Before the
+repair the eight `native_stream` tests failed against the previous binding (the
+seven existing ones once the fixture child required the payload bytes, and the
+new refusal test); after it, all eight pass.
+
 ## Verification
 
 Each line is one command. They run the acceptance this spec's behavior declares:
@@ -2569,5 +2600,6 @@ cargo test -p statecraft-adapter --lib supervisor
 cargo test -p statecraft-home --lib capture
 cargo test -p statecraft-cli --test qualification_workflow
 cargo test -p statecraft-cli --test acceptance_script
+cargo test -p statecraft-cli --test native_stream
 sh -n scripts/acceptance/managed-session.sh
 ```

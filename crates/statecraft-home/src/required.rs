@@ -255,6 +255,29 @@ impl Standing {
         }
     }
 
+    /// Why a managed run may not start, or `None` when it may.
+    ///
+    /// Section 3.25: a session that would be managed under a required identity
+    /// refuses when the required content is missing, corrupt or mismatched. A
+    /// requirement this build cannot read as a digest, and an installed tree
+    /// that cannot be read, are the same condition one step earlier: the
+    /// required content cannot be established, and they refuse for that
+    /// reason.
+    ///
+    /// Two states do not refuse a run, and neither is qualified. `Unrequired`
+    /// is a project that commits no identity, so no session of it is managed
+    /// **under** one; it runs and is recorded as unrequired. `Exact` with
+    /// nothing resolved is the state before a session has resolved, and a run
+    /// is how one does. [`Standing::refusal`] answers the stricter question of
+    /// whether the managed-execution **claim** holds, which neither state
+    /// meets.
+    pub fn refuses_a_run(&self) -> Option<String> {
+        match self {
+            Standing::Unrequired | Standing::Exact { .. } => None,
+            other => other.refusal(),
+        }
+    }
+
     /// Why the required identity and the home or the session **disagree**, or
     /// `None` when nothing does.
     ///

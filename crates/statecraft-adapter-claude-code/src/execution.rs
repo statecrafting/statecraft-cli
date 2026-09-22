@@ -123,7 +123,13 @@ fn supervise_in(
         .prefix("statecraft-settings-")
         .suffix(".json")
         .tempfile_in(temporary_root)?;
-    serde_json::to_writer(settings.as_file_mut(), &invocation.settings)?;
+    match &invocation.settings_document {
+        Some(document) => {
+            use std::io::Write;
+            settings.as_file_mut().write_all(document.as_bytes())?;
+        }
+        None => serde_json::to_writer(settings.as_file_mut(), &invocation.settings)?,
+    }
     let settings_path = settings.path().to_str().ok_or_else(|| {
         std::io::Error::new(
             std::io::ErrorKind::InvalidInput,
