@@ -145,33 +145,56 @@ esac
 # found, which the message has to name because the remedies differ.
 #
 # The derived directory is the tool's own typed answer, never a hardcoded path
-# (spec 094 3.2). A configuration that could not be read is not evidence of a
-# dirty tree, so an unanswered read announces the skip instead of refusing
-# (spec 093 3.4).
+# (spec 094 3.2).
+#
+# STATECRAFT AMENDMENT, spec 002 section 3.23 contract 6 and the Stop policy's
+# second part. The inherited script announced the skip and continued here,
+# citing the counterparty's spec 093 3.4. That wording conflicts with the rule
+# the owner adopted on 2026-09-21: an enforcing operation gate refuses a failed
+# or unavailable check, and "a gate whose check did not run is not green" admits
+# no exception for a check whose configuration could not be read. This gate
+# stands in front of `gh pr create`; a derived-tree state it never established
+# is not a derived-tree state it may report as clean. The weaker behavior is not
+# preserved merely because it was copied, and the message distinguishes the two
+# remedies: an unperformed read is not a dirty tree and regenerating repairs
+# nothing.
 derived=$("$sc" --repo "$root" config show --json 2>/dev/null | jq -r '.layout.derived_dir // empty' 2>/dev/null) || derived=''
 if [ -z "$derived" ]; then
-  echo '[pr-gate] derived_dir not reported, derived-tree check skipped'
-else
-  dt_unstaged=$(git -C "$root" diff --name-only -- "$derived" 2>/dev/null)
-  dt_staged=$(git -C "$root" diff --cached --name-only -- "$derived" 2>/dev/null)
-  dt_untracked=$(git -C "$root" ls-files --others --exclude-standard -- "$derived" 2>/dev/null)
-  if [ -n "$dt_unstaged" ] || [ -n "$dt_staged" ] || [ -n "$dt_untracked" ]; then
-    { echo "[pr-gate] BLOCKED: the derived tree under $derived is not committed in $root."
-      if [ -n "$dt_unstaged" ]; then
-        echo '[pr-gate] unstaged changes (git add, then commit):'
-        printf '%s\n' "$dt_unstaged" | sed 's/^/  /'
-      fi
-      if [ -n "$dt_staged" ]; then
-        echo '[pr-gate] staged changes (git commit):'
-        printf '%s\n' "$dt_staged" | sed 's/^/  /'
-      fi
-      if [ -n "$dt_untracked" ]; then
-        echo '[pr-gate] untracked files (git add, then commit):'
-        printf '%s\n' "$dt_untracked" | sed 's/^/  /'
-      fi
-      echo '[pr-gate] Commit the regenerated shards with the change that made them stale, push, and retry.'; } >&2
-    exit 2
-  fi
+  { echo "[pr-gate] BLOCKED: the derived-tree check was NOT PERFORMED in $root (spec-spine config show did not report layout.derived_dir)."
+    echo "[pr-gate] The binary is $sc. The derived tree has not been judged and is not known to be clean; a gate whose check did not run is not green. Repair the configuration read (spec-spine config show --json must report layout.derived_dir) and retry. Regenerating shards repairs nothing here."; } >&2
+  exit 2
+fi
+
+# Spec 093 3.13: the derived tree is asked about in all three states git
+# distinguishes, and each is read on its own. Each read's exit status is read
+# too: `git diff` answers with an empty line list both when the tree is clean
+# and when the command failed, and treating the second as the first is the same
+# defect as skipping the check. A read that did not run refuses, on the same
+# contract 6.
+dt_unstaged=$(git -C "$root" diff --name-only -- "$derived" 2>/dev/null); rc_unstaged=$?
+dt_staged=$(git -C "$root" diff --cached --name-only -- "$derived" 2>/dev/null); rc_staged=$?
+dt_untracked=$(git -C "$root" ls-files --others --exclude-standard -- "$derived" 2>/dev/null); rc_untracked=$?
+if [ "$rc_unstaged" -ne 0 ] || [ "$rc_staged" -ne 0 ] || [ "$rc_untracked" -ne 0 ]; then
+  { echo "[pr-gate] BLOCKED: a derived-tree read was NOT PERFORMED in $root (git diff exited $rc_unstaged, git diff --cached exited $rc_staged, git ls-files exited $rc_untracked)."
+    echo "[pr-gate] An empty answer from a command that failed is not a clean tree. The derived tree under $derived has not been judged; fix the repository read and retry."; } >&2
+  exit 2
+fi
+if [ -n "$dt_unstaged" ] || [ -n "$dt_staged" ] || [ -n "$dt_untracked" ]; then
+  { echo "[pr-gate] BLOCKED: the derived tree under $derived is not committed in $root."
+    if [ -n "$dt_unstaged" ]; then
+      echo '[pr-gate] unstaged changes (git add, then commit):'
+      printf '%s\n' "$dt_unstaged" | sed 's/^/  /'
+    fi
+    if [ -n "$dt_staged" ]; then
+      echo '[pr-gate] staged changes (git commit):'
+      printf '%s\n' "$dt_staged" | sed 's/^/  /'
+    fi
+    if [ -n "$dt_untracked" ]; then
+      echo '[pr-gate] untracked files (git add, then commit):'
+      printf '%s\n' "$dt_untracked" | sed 's/^/  /'
+    fi
+    echo '[pr-gate] Commit the regenerated shards with the change that made them stale, push, and retry.'; } >&2
+  exit 2
 fi
 
 out=$("$sc" --repo "$root" couple --base "origin/$(default_branch "$root")" --head HEAD 2>&1); ec=$?

@@ -26,10 +26,18 @@
 //! | 3 target from the command | post-edit, pre-bash | `contract_3_*` |
 //! | 4 read the verdict, never guess it | session-start, stop | `contract_4_*` |
 //! | 5 establish the verb first | session-start, stop | `contract_5_*` |
-//! | 6 a gate whose check did not run is not green | pre-bash | `contract_6_*` |
+//! | 6 a gate whose check did not run is not green | pre-bash | `contract_6_*`, and the seven derived-tree cases below |
 //! | 7 a branch gate resolves the protected branch | pre-bash | `contract_7_*` |
 //! | the Stop policy: advisory, and accurate | stop | `stop_policy_*` |
 //! | section 3.14 rule 3, the project gate | all four | `outside_a_statecraft_project_*` |
+//!
+//! Each run is isolated from the operator's own configuration as well as from
+//! their `spec-spine`: `HOME` is the fixture's, and git is told to read neither
+//! the global nor the system configuration, so an operator's `core.hooksPath`,
+//! their `includeIf` blocks and their own global hooks cannot reach into a
+//! measurement of this product's. Where running the hook is part of the claim,
+//! the stub's witness is asserted nonempty: "every line is X" is satisfied
+//! vacuously by a hook that ran nothing.
 
 use std::path::{Path, PathBuf};
 use std::process::{Command, Output, Stdio};
@@ -42,6 +50,12 @@ fn hook_body(file: &str) -> String {
         .unwrap_or_else(|| panic!("the harness ships hooks/{file}"))
         .contents
 }
+
+/// The derived directory the fixture's stub reports and the fixture commits.
+///
+/// The real path this repository uses, so the test exercises the shape the
+/// hook meets rather than a convenient one.
+const DERIVED_DIR: &str = ".statecraft/derived";
 
 const SESSION_START: &str = "statecraft-session-start.sh";
 const POST_EDIT: &str = "statecraft-post-edit.sh";
@@ -73,6 +87,21 @@ fn fixture_path(path_dir: &Path) -> String {
     format!("{}:{}", path_dir.display(), system_path())
 }
 
+/// The real `git`, by absolute path.
+///
+/// A stub that intercepts one subcommand has to hand every other one to the
+/// real binary, and it may not do that through `PATH`, because it is itself
+/// first on `PATH`.
+fn real_git() -> PathBuf {
+    for dir in ["/usr/bin", "/bin"] {
+        let candidate = Path::new(dir).join("git");
+        if candidate.is_file() {
+            return candidate;
+        }
+    }
+    panic!("no git on the system path, which these fixtures need");
+}
+
 fn executable(path: &Path, body: &str) {
     if let Some(parent) = path.parent() {
         std::fs::create_dir_all(parent).unwrap();
@@ -85,12 +114,44 @@ fn executable(path: &Path, body: &str) {
     }
 }
 
+/// What a stub `spec-spine` answers when asked for the configuration.
+///
+/// The derived-tree check reads `config show --json` and takes
+/// `layout.derived_dir` from it, so what that call answers is the
+/// difference between a check that ran and one that did not.
+#[derive(Clone, Copy)]
+enum ConfigAnswer {
+    /// A well-formed answer naming the derived directory.
+    Reports(&'static str),
+    /// A well-formed answer that does not carry the key.
+    WithoutTheKey,
+    /// Output the reader cannot parse.
+    NotJson,
+    /// The verb fails.
+    Fails,
+}
+
+impl ConfigAnswer {
+    /// The shell that answers a `config` invocation.
+    fn shell(self) -> String {
+        match self {
+            ConfigAnswer::Reports(dir) => {
+                format!("printf '%s\\n' '{{\"layout\":{{\"derived_dir\":\"{dir}\"}}}}'; exit 0")
+            }
+            ConfigAnswer::WithoutTheKey => "printf '%s\\n' '{\"layout\":{}}'; exit 0".to_string(),
+            ConfigAnswer::NotJson => "printf '%s\\n' 'not json at all'; exit 0".to_string(),
+            ConfigAnswer::Fails => "exit 4".to_string(),
+        }
+    }
+}
+
 /// A git repository that is a Statecraft project, plus a hook written out.
 struct Fixture {
     _dir: tempfile::TempDir,
     root: PathBuf,
     dir: PathBuf,
     path_dir: PathBuf,
+    home: PathBuf,
 }
 
 impl Fixture {
@@ -130,11 +191,14 @@ impl Fixture {
         std::fs::create_dir_all(&path_dir).unwrap();
 
         let scripts = dir.path().join("scripts");
+        let home = dir.path().join("home");
+        std::fs::create_dir_all(&home).unwrap();
         Self {
             _dir: dir,
             root,
             dir: scripts,
             path_dir,
+            home,
         }
     }
 
@@ -164,15 +228,38 @@ impl Fixture {
         carries_verbs: bool,
         says: &str,
     ) {
+        self.stub_answering(
+            at,
+            label,
+            check_code,
+            carries_verbs,
+            says,
+            ConfigAnswer::Reports(DERIVED_DIR),
+        );
+    }
+
+    /// A stub that also decides what `config show --json` answers, which is
+    /// what the derived-tree check reads the derived directory from.
+    fn stub_answering(
+        &self,
+        at: &Path,
+        label: &str,
+        check_code: i32,
+        carries_verbs: bool,
+        says: &str,
+        config: ConfigAnswer,
+    ) {
         let witness = self.root.join("witness");
         let body = if carries_verbs {
             format!(
                 "#!/bin/sh\nprintf '{label}\\n' >> '{}'\n\
                  case \"$1\" in --version) echo 'spec-spine 9.9.9'; exit 0 ;; esac\n\
                  case \"$1 $2\" in\n  'check --help'|'lint --help'|'couple --help') exit 0 ;;\nesac\n\
+                 for a in \"$@\"; do\n  if [ \"$a\" = config ]; then {}; fi\ndone\n\
                  for a in \"$@\"; do\n  if [ \"$a\" = check ]; then printf '%s\\n' '{says}'; exit {check_code}; fi\ndone\n\
                  exit 0\n",
-                witness.display()
+                witness.display(),
+                config.shell()
             )
         } else {
             format!(
@@ -182,6 +269,75 @@ impl Fixture {
             )
         };
         executable(at, &body);
+    }
+
+    /// The environment that keeps a fixture run out of the operator's own
+    /// configuration.
+    ///
+    /// `HOME` is the fixture's own directory, so the hook's `~` expansion and
+    /// anything that reads a home find the fixture's. Git is told to read
+    /// neither the global nor the system configuration, so the operator's
+    /// `core.hooksPath`, their `includeIf` blocks and their own global hooks
+    /// cannot reach into a measurement of this product's.
+    fn isolated(&self) -> Vec<(String, String)> {
+        vec![
+            ("HOME".to_string(), self.home.display().to_string()),
+            ("GIT_CONFIG_GLOBAL".to_string(), "/dev/null".to_string()),
+            ("GIT_CONFIG_SYSTEM".to_string(), "/dev/null".to_string()),
+            ("GIT_CONFIG_NOSYSTEM".to_string(), "1".to_string()),
+        ]
+    }
+
+    /// Run git inside the fixture repository, isolated from the operator's own
+    /// configuration, and assert it succeeded.
+    fn git(&self, args: &[&str]) -> String {
+        let out = Command::new(real_git())
+            .args(["-C", &self.root.display().to_string()])
+            .args(args)
+            .env("PATH", system_path())
+            .envs(self.isolated())
+            .env("GIT_AUTHOR_NAME", "fixture")
+            .env("GIT_AUTHOR_EMAIL", "fixture@example.invalid")
+            .env("GIT_COMMITTER_NAME", "fixture")
+            .env("GIT_COMMITTER_EMAIL", "fixture@example.invalid")
+            .output()
+            .unwrap();
+        assert!(
+            out.status.success(),
+            "git {args:?} failed: {}",
+            String::from_utf8_lossy(&out.stderr)
+        );
+        String::from_utf8_lossy(&out.stdout).to_string()
+    }
+
+    /// Write one file under the derived directory.
+    fn write_derived(&self, name: &str, contents: &str) -> PathBuf {
+        let path = self.root.join(DERIVED_DIR).join(name);
+        std::fs::create_dir_all(path.parent().unwrap()).unwrap();
+        std::fs::write(&path, contents).unwrap();
+        path
+    }
+
+    /// Commit everything currently in the tree, so the repository has a HEAD
+    /// and a committed derived tree to diverge from.
+    fn commit_everything(&self, message: &str) {
+        self.git(&["add", "-A"]);
+        self.git(&["commit", "--quiet", "--allow-empty", "-m", message]);
+    }
+
+    /// Put a `git` on the fixture's PATH that refuses the derived-tree reads.
+    ///
+    /// Everything else is handed to the real binary, so the hook still
+    /// resolves the repository and the branch; only the three reads the
+    /// derived-tree check performs fail, which is the state being measured.
+    fn break_the_derived_reads(&self) {
+        executable(
+            &self.path_dir.join("git"),
+            &format!(
+                "#!/bin/sh\nfor a in \"$@\"; do\n  case \"$a\" in diff|ls-files) exit 9 ;; esac\ndone\nexec '{}' \"$@\"\n",
+                real_git().display()
+            ),
+        );
     }
 
     fn witness(&self) -> String {
@@ -215,7 +371,8 @@ impl Fixture {
         cmd.current_dir(std::env::temp_dir())
             .env("PATH", fixture_path(&self.path_dir))
             .env("CLAUDE_PROJECT_DIR", &self.root)
-            .env_remove("SPEC_SPINE_BIN");
+            .env_remove("SPEC_SPINE_BIN")
+            .envs(self.isolated());
         for (k, v) in env {
             cmd.env(k, v);
         }
@@ -233,6 +390,7 @@ impl Fixture {
             .env("PATH", fixture_path(&self.path_dir))
             .env("CLAUDE_PROJECT_DIR", &self.root)
             .env_remove("SPEC_SPINE_BIN")
+            .envs(self.isolated())
             .envs(env.iter().copied())
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
@@ -683,6 +841,212 @@ fn contract_6_only_the_enforcing_event_is_declared_enforcing() {
         "the set of enforcing events changed; section 3.23's Stop policy says \
          an operation gate enforces and an end-of-turn event advises"
     );
+}
+
+// ---------------------------------------------------------------------------
+// Contract 6, on the derived-tree check the pull-request gate performs.
+// ---------------------------------------------------------------------------
+//
+// The earlier round recorded this as a coverage gap and gave a reason that is
+// wrong: it said the shipped hooks never inspect the index, so the three states
+// would be indistinguishable and a test would be asserting a property of `git`.
+// The shipped `statecraft-pre-bash.sh` reads `git diff` for the unstaged state,
+// `git diff --cached` for the staged one and `git ls-files --others` for the
+// untracked one, on three separate lines. What follows is not a test of `git`:
+// it is a test of what THIS hook does with the three answers, which of them it
+// names in the message, and whether it refuses the operation it stands in front
+// of.
+
+/// A fixture with a committed derived tree and a stub that reports where it is.
+///
+/// The positive control below is what makes the six refusals meaningful: a
+/// suite in which the gate refused unconditionally would pass every one of
+/// them.
+fn derived_fixture() -> (Fixture, PathBuf) {
+    let fixture = Fixture::new();
+    fixture.stub(
+        &fixture.root.join("target/release/spec-spine"),
+        "repo",
+        0,
+        true,
+    );
+    let shard = fixture.write_derived("spec-registry.json", "{\"committed\":true}\n");
+    fixture.commit_everything("the committed derived tree");
+    (fixture, shard)
+}
+
+/// Open a pull request from the fixture, which is the operation this gate
+/// stands in front of.
+fn pr_create(fixture: &Fixture) -> Output {
+    let payload = bash_payload("gh pr create --title x --body y", &fixture.root);
+    fixture.run_payload(PRE_BASH, &payload, &[("SPEC_SPINE_DEFAULT_BRANCH", "main")])
+}
+
+/// The positive control: a committed derived tree does not refuse.
+#[test]
+fn the_derived_tree_check_passes_a_tree_whose_shards_are_committed() {
+    let (fixture, _shard) = derived_fixture();
+    let out = pr_create(&fixture);
+    assert!(
+        out.status.success(),
+        "the gate refused a clean tree, so every refusal below proves nothing: {}",
+        text(&out)
+    );
+    // The check ran: the stub was asked, rather than the hook exiting early.
+    fixture.assert_only_ran("repo");
+}
+
+/// An unstaged derived change is refused, and named as unstaged.
+#[test]
+fn an_unstaged_derived_change_refuses_the_pull_request() {
+    let (fixture, shard) = derived_fixture();
+    std::fs::write(&shard, "{\"committed\":false}\n").unwrap();
+
+    let out = pr_create(&fixture);
+    let seen = text(&out);
+    assert!(!out.status.success(), "the gate allowed it: {seen}");
+    assert!(seen.contains("unstaged changes"), "{seen}");
+    assert!(seen.contains("spec-registry.json"), "{seen}");
+    assert!(!fixture.witness().trim().is_empty(), "no stub ran at all");
+}
+
+/// A staged derived change is refused, and named as staged.
+///
+/// The state `git add` leaves behind, and the one a bare `git diff` misses:
+/// the index and the working tree agree, so the unstaged read is empty and only
+/// the cached read answers.
+#[test]
+fn a_staged_derived_change_refuses_the_pull_request() {
+    let (fixture, shard) = derived_fixture();
+    std::fs::write(&shard, "{\"committed\":false}\n").unwrap();
+    fixture.git(&["add", DERIVED_DIR]);
+
+    let out = pr_create(&fixture);
+    let seen = text(&out);
+    assert!(!out.status.success(), "the gate allowed it: {seen}");
+    assert!(seen.contains("staged changes"), "{seen}");
+    assert!(
+        !seen.contains("unstaged changes"),
+        "a staged-only change was reported as unstaged, and the two remedies \
+         differ: {seen}"
+    );
+}
+
+/// An untracked derived file is refused, and named as untracked.
+///
+/// The state a new spec's shards leave behind, and the other one a bare
+/// `git diff` misses: git knows nothing about the file, so neither diff
+/// mentions it.
+#[test]
+fn an_untracked_derived_file_refuses_the_pull_request() {
+    let (fixture, _shard) = derived_fixture();
+    fixture.write_derived("codebase-index.json", "{\"new\":true}\n");
+
+    let out = pr_create(&fixture);
+    let seen = text(&out);
+    assert!(!out.status.success(), "the gate allowed it: {seen}");
+    assert!(seen.contains("untracked files"), "{seen}");
+    assert!(seen.contains("codebase-index.json"), "{seen}");
+}
+
+/// A staged change whose working-tree contents cancel it is still refused, and
+/// both states are named.
+///
+/// HEAD and the working tree agree, so one HEAD-relative comparison finds
+/// nothing at all; the index holds an edit that a commit would land. The two
+/// per-state reads both answer, and the message names both because the
+/// remedies differ: one is `git add`, the other is `git commit`.
+#[test]
+fn a_staged_change_cancelled_by_the_working_tree_is_still_refused() {
+    let (fixture, shard) = derived_fixture();
+    let committed = std::fs::read_to_string(&shard).unwrap();
+    std::fs::write(&shard, "{\"staged\":true}\n").unwrap();
+    fixture.git(&["add", DERIVED_DIR]);
+    std::fs::write(&shard, &committed).unwrap();
+
+    // The premise: against HEAD alone this tree looks clean.
+    assert!(
+        fixture
+            .git(&["diff", "--name-only", "HEAD", "--", DERIVED_DIR])
+            .trim()
+            .is_empty(),
+        "the fixture does not set up the state it is named for"
+    );
+
+    let out = pr_create(&fixture);
+    let seen = text(&out);
+    assert!(
+        !out.status.success(),
+        "a staged edit that a commit would land was allowed because the working \
+         tree cancelled it against HEAD: {seen}"
+    );
+    assert!(seen.contains("staged changes"), "{seen}");
+    assert!(seen.contains("unstaged changes"), "{seen}");
+}
+
+/// A derived-tree read that failed is refused, and is not reported as clean.
+///
+/// `git diff --name-only` prints nothing both when a tree is clean and when the
+/// command failed. The hook reads each exit status, so the second is a check
+/// that did not run rather than a clean answer.
+#[test]
+fn a_failed_derived_read_refuses_rather_than_reading_as_clean() {
+    let (fixture, _shard) = derived_fixture();
+    fixture.break_the_derived_reads();
+
+    let out = pr_create(&fixture);
+    let seen = text(&out);
+    assert!(
+        !out.status.success(),
+        "a failed read was reported as a clean derived tree: {seen}"
+    );
+    assert!(seen.contains("NOT PERFORMED"), "{seen}");
+    assert!(
+        seen.contains("not a clean tree"),
+        "the message does not distinguish an unperformed read from a clean one: {seen}"
+    );
+}
+
+/// A derived directory the configuration does not report refuses.
+///
+/// Section 3.23 contract 6 and the Stop policy's second part: an enforcing
+/// operation gate refuses a failed or unavailable check. The inherited script
+/// announced `derived-tree check skipped` and continued, citing the
+/// counterparty's own weaker wording. A gate in front of `gh pr create` that
+/// never established the derived-tree state may not report it as clean, and the
+/// weaker behavior is not preserved merely because it was copied.
+#[test]
+fn an_unanswered_derived_directory_refuses_rather_than_skipping() {
+    for answer in [
+        ConfigAnswer::WithoutTheKey,
+        ConfigAnswer::NotJson,
+        ConfigAnswer::Fails,
+    ] {
+        let fixture = Fixture::new();
+        fixture.stub_answering(
+            &fixture.root.join("target/release/spec-spine"),
+            "repo",
+            0,
+            true,
+            "",
+            answer,
+        );
+        fixture.write_derived("spec-registry.json", "{}\n");
+        fixture.commit_everything("the committed derived tree");
+
+        let out = pr_create(&fixture);
+        let seen = text(&out);
+        assert!(
+            !out.status.success(),
+            "the gate continued past a derived-tree check it never performed: {seen}"
+        );
+        assert!(seen.contains("NOT PERFORMED"), "{seen}");
+        assert!(
+            !seen.contains("check skipped"),
+            "the gate still announces a skip: {seen}"
+        );
+        assert!(!fixture.witness().trim().is_empty(), "no stub ran at all");
+    }
 }
 
 // ---------------------------------------------------------------------------

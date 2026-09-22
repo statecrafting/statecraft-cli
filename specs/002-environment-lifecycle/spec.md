@@ -1870,6 +1870,47 @@ read of a settings file substitutes for one. Until a live session produces one,
 this product reports a session as **not qualified** for the managed-execution
 claim, which is §3.27's answer and not a workaround for it.
 
+**2026-09-21: the adopted `PreToolUse` gate skipped a check it was required to
+refuse on, and the inherited wording is the reason.** A fourth adoption defect,
+beside the three already recorded. The shipped `statecraft-pre-bash.sh` reads
+the derived directory from `spec-spine config show --json`; where that read
+answered nothing, it printed `derived-tree check skipped` and **continued**,
+citing the counterparty's spec `093` section 3.4, which says a configuration
+that could not be read is not evidence of a dirty tree. That sentence is true
+and it is not the rule this corpus adopted. §3.23 contract 6 says a gate whose
+check did not run is not green, and the Stop policy's second part says an
+enforcing operation gate refuses a failed **or unavailable** check. This gate
+stands in front of `gh pr create` and is the one hook §3.23 marks enforcing, so
+the conflict is resolved in favour of the adopted rule: an unanswered
+configuration read now refuses with exit 2, and the message says the check was
+not performed rather than that the tree is dirty, because the two remedies
+differ and regenerating shards repairs neither.
+
+The same reading applies to the three git reads beside it. `git diff
+--name-only` prints nothing both when a tree is clean and when the command
+failed, and the inherited script discarded every exit status, so a failed read
+was indistinguishable from a clean tree. Each read's status is now read, and a
+read that did not run refuses on the same contract.
+
+Recorded rather than performed silently, because the weaker behavior is not
+preserved merely because it was copied, and because the counterparty's own
+copy still carries it: this is a defect to fix there independently, not a
+regression to revert here.
+
+**2026-09-21: the earlier coverage gap over the derived tree's three states was
+wrongly reasoned, and is closed.** The 2026-09-21 handoff recorded staged,
+unstaged and untracked derived output as not separately exercised, on the
+grounds that the shipped hooks never inspect the index, so the three states
+would be indistinguishable to them and a test would assert a property of `git`.
+The shipped hook reads `git diff`, `git diff --cached` and `git ls-files
+--others` on three separate lines. Seven behavioral cases now assert what the
+hook does with those answers rather than what git computes: each of the three
+states refuses and is named as itself in the message; a staged edit whose
+working-tree contents cancel it against HEAD is still refused and both states
+are named, which is the case one HEAD-relative comparison cannot see; a
+committed derived tree is the positive control, without which the six refusals
+prove nothing; a failed read refuses; and an unanswered configuration refuses.
+
 **2026-09-21: the bounded integration is demonstrated, and three obligations
 are named as outstanding rather than counted as met.**
 `crates/statecraft-home/tests/bounded_integration.rs` walks the whole flow
