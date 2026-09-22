@@ -3054,6 +3054,17 @@ persisted. Every test in this spec's crates that execs a script it wrote
 installs it through `statecraft_adapter::fixture::install_script`, the staging
 spec `004`'s 2026-09-22 `ETXTBSY` entry records, so none can hit that race.
 
+**2026-09-22: the sandbox repositories run no automatic git maintenance.** CI
+on the command-surface pull request failed
+`an_unrelated_repository_is_untouched_and_ungoverned` in the bounded
+integration: the unrelated repository's snapshot before initialization held
+`.git/objects/maintenance.lock` and the one after did not. The fixture's own
+`git commit` had started git's detached automatic maintenance, and its lock
+came and went while the test ran. This product wrote nothing there. The test's
+git helper now passes `maintenance.auto=false` and `gc.auto=0` to every
+invocation, so the repositories a test snapshots change only when something
+under test changes them; the snapshot itself still covers `.git`.
+
 ## Verification
 
 Each line is one command. They run the acceptance this spec's behavior declares:
