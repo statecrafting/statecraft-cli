@@ -51,6 +51,14 @@
           "kind": "directory",
           "path": "crates/statecraft-adapter-claude-code/"
         }
+      },
+      {
+        "nature": "additive",
+        "spec": "004-execution-adapter",
+        "unit": {
+          "kind": "directory",
+          "path": "crates/statecraft-adapter/"
+        }
       }
     ],
     "id": "002-environment-lifecycle",
@@ -89,15 +97,16 @@
       "3.27 Global adapter registration is not managed-session permission delivery",
       "3.28 An unmarked registration is the user's, and resemblance is not ownership",
       "3.29 What admits a live observation",
+      "3.30 What each control must demonstrate, and what binds a capture to its launch",
       "4. Out of scope",
       "5. Decisions recorded during implementation",
       "Verification"
     ],
     "specPath": "specs/002-environment-lifecycle/spec.md",
     "status": "approved",
-    "summary": "How a repository becomes a target this product may work in, and how the product installs and maintains the working environment inside it. Fixes the three ownership classes (managed, adopted, user), the committed manifest that records every managed byte with its source and digest, the pins the environment records, what an upgrade does when a managed file has drifted, what removal leaves behind, and how an agent-harness adapter declares what it owns. Preserving a pre-existing user instruction file is a refusal, not a merge. Sections 3.11 to 3.21 carry the realignment that followed spec-spine withdrawing its kit and its public initializer, which left this product the sole user-facing initializer: one Statecraft-managed global environment under the product home and one per-project area under .statecraft/, the reusable harness as a single global source delivered by adapters rather than copied into every repository, the governance producer boundary as the spec-spine library's files-as-data result, the root instruction bridge as a tracked managed modification rather than ownership of a user's file, configuration authority as four layers with provenance rather than one last-writer-wins merge, and a solo and team boundary in which every capability has a local implementation and an unreachable platform is an honest unavailable state. Sections 3.22 and 3.23 record the counterparty's state at the moment it handed its harness over, the order the last of that harness moves in, and what any content delivered through the harness mechanism has to satisfy. Section 3.24 is the one write into a harness's own settings file that section 3.14 rule 1 admits: narrow, marked, reversible, refused by default, and able to add a refusal but never a permission. Sections 3.25 to 3.28 carry the owner's resolutions of 2026-09-21: the committed required harness identity beside the per-session resolved one, what a managed session records about delivery and what that record may not claim, the separation of global adapter registration from managed-session permission delivery, and the rule that an unmarked registration is the user's however much it resembles shipped content. Section 3.29 is the same day's narrow authority amendment over the admission itself: what a claimed live observation has to carry, which controls the qualification boundary enforces rather than describes, and that unverified is the answer when the evidence cannot decide.\n",
+    "summary": "How a repository becomes a target this product may work in, and how the product installs and maintains the working environment inside it. Fixes the three ownership classes (managed, adopted, user), the committed manifest that records every managed byte with its source and digest, the pins the environment records, what an upgrade does when a managed file has drifted, what removal leaves behind, and how an agent-harness adapter declares what it owns. Preserving a pre-existing user instruction file is a refusal, not a merge. Sections 3.11 to 3.21 carry the realignment that followed spec-spine withdrawing its kit and its public initializer, which left this product the sole user-facing initializer: one Statecraft-managed global environment under the product home and one per-project area under .statecraft/, the reusable harness as a single global source delivered by adapters rather than copied into every repository, the governance producer boundary as the spec-spine library's files-as-data result, the root instruction bridge as a tracked managed modification rather than ownership of a user's file, configuration authority as four layers with provenance rather than one last-writer-wins merge, and a solo and team boundary in which every capability has a local implementation and an unreachable platform is an honest unavailable state. Sections 3.22 and 3.23 record the counterparty's state at the moment it handed its harness over, the order the last of that harness moves in, and what any content delivered through the harness mechanism has to satisfy. Section 3.24 is the one write into a harness's own settings file that section 3.14 rule 1 admits: narrow, marked, reversible, refused by default, and able to add a refusal but never a permission. Sections 3.25 to 3.28 carry the owner's resolutions of 2026-09-21: the committed required harness identity beside the per-session resolved one, what a managed session records about delivery and what that record may not claim, the separation of global adapter registration from managed-session permission delivery, and the rule that an unmarked registration is the user's however much it resembles shipped content. Section 3.29 is the same day's narrow authority amendment over the admission itself: what a claimed live observation has to carry, which controls the qualification boundary enforces rather than describes, and that unverified is the answer when the evidence cannot decide. Section 3.30 is the 2026-09-22 amendment that sharpens it: each control is judged from correlated structured events as refused or executed, a capture is one session read whole, and an invocation is bound to its settings by the launch that performed it rather than by a description written afterwards.\n",
     "title": "Project registration and the Statecraft-managed environment: one global home, one project area, one initialization flow, and where authority comes from"
   },
-  "shardHash": "323797db5c2717805946b6a9b769155693bbbe2cba7b5717222a9aa19a964d55",
+  "shardHash": "367994b9b13f1373b1e4e11081214e25e3d0070c7f2b6bdac63295e579718db5",
   "specVersion": "1.3.0"
 }

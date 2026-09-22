@@ -37,7 +37,11 @@ summary: >
   3.29 is the same day's narrow authority amendment over the admission itself:
   what a claimed live observation has to carry, which controls the qualification
   boundary enforces rather than describes, and that unverified is the answer
-  when the evidence cannot decide.
+  when the evidence cannot decide. Section 3.30 is the 2026-09-22 amendment
+  that sharpens it: each control is judged from correlated structured events
+  as refused or executed, a capture is one session read whole, and an
+  invocation is bound to its settings by the launch that performed it rather
+  than by a description written afterwards.
 establishes:
   - { kind: directory, path: "crates/statecraft-environment/" }
   - { kind: directory, path: "crates/statecraft-home/" }
@@ -81,6 +85,13 @@ extends:
   # corrective. The edge is declared rather than left for the coupling gate to
   # discover, and the diagnosis is a dated entry in section 5.
   - { spec: "004-execution-adapter", unit: { kind: directory, path: "crates/statecraft-adapter-claude-code/" }, nature: corrective }
+  # Section 3.30 rule 12's launch is supervised by the process-group supervisor
+  # 004 already owns, so the raw capture it needs is added there rather than
+  # written a second time here. Additive: no existing behavior of the
+  # supervisor changes. The same section's rule 7 types three stream fields in
+  # the claude-code crate above, which is also additive; that edge keeps the
+  # nature of the repair it was first declared for.
+  - { spec: "004-execution-adapter", unit: { kind: directory, path: "crates/statecraft-adapter/" }, nature: additive }
 depends_on:
   - "000-bootstrap"
   - "001-boundaries-and-authority"
@@ -1233,6 +1244,188 @@ kept with the record, not summarized into it. The admission is reviewable
 because what it was made from is kept and can be re-read, which is the property
 section 3.26 already relies on and which rules 3 and 5 now depend on.
 
+### 3.30 What each control must demonstrate, and what binds a capture to its launch
+
+A narrowly scoped authority amendment, settled by the owner on 2026-09-22 and
+recorded before the implementation it authorizes. It sharpens section 3.29
+rules 2 to 4. Rules 1, 5 and 6 are unchanged and govern everything below.
+
+**The defects this closes, exactly.** The admission written under section 3.29
+read each capture's assistant turns for tool-use **requests** and treated a
+request with no matching denial entry as a control that ran. A request is not
+an execution, and the absence of a denial entry is not the presence of a
+result. It matched a denial to a command by the command text alone, so a
+denial on another tool, or on another tool use, carrying the same text
+satisfied it. It kept only the last init event and the last terminal event, so
+a capture holding two sessions, or two disagreeing terminal events, was read as
+one. And it bound an invocation to its settings by checking that a
+`--settings` token appeared somewhere in a caller-authored argument list and,
+separately, that caller-supplied bytes digested to the payload. Neither check
+relates the argument to the bytes, and the argument list was written by the
+same caller after the fact.
+
+**Rule 7: a control is judged from correlated structured events.** Everything
+below is read through the supported adapter's own types (spec `004` section
+3.9), extended there where a field it carries was not yet typed, and never
+through a second parser in this spec's crate. The fields read are the ones the
+recorded Claude Code `2.1.267` streams under
+`crates/statecraft-adapter-claude-code/testdata/stream/` carry: the session id
+on every event; the init event's version and working directory; each assistant
+`tool_use` block's id, tool name and input; each `tool_result` block's
+tool-use id, error flag and content, with the carrying event's
+`tool_result_meta` and its `non_execution_kind`; the mid-stream
+`permission_denied` event's tool-use id, tool name and decision reason; and the
+terminal event's `permission_denials`. A field the provider does not emit is
+not required, and no fixture invents one.
+
+**Rule 8: a capture is one session, read whole.** A capture is admissible only
+when it holds exactly one init event and exactly one terminal event, the
+terminal event is its last event, no turn precedes the init event, every
+system, assistant, user and terminal event names the same session, tool-use ids
+are unique, every tool result names a tool use earlier in the same capture and
+no tool use has two results, every denial entry and every mid-stream denial
+names a tool use in the same capture whose tool name agrees, every denial
+entry's input is that tool use's input verbatim, and the init event's working
+directory is the directory the launch recorded. Anything else is conflicting,
+duplicated, mixed-session or incomplete evidence and refuses the claim.
+
+**Rule 9: each tool use is classified, not inferred.** The governed tool is the
+one the floor's entries name, `Bash`, and a command is its input's `command`
+string compared exactly. For one tool use:
+
+| Classification | What must be present |
+|---|---|
+| refused | a terminal denial entry for its id, and its tool result marked as not executed by `non_execution_kind` |
+| executed | a tool result for its id, no `non_execution_kind` on it, no denial entry and no mid-stream denial for its id |
+| unresolved | anything else: a request with no result, a result marked not executed with no denial behind it, or a denial whose result is not marked |
+
+An unresolved use refuses the claim. A request with the expected command text
+under another tool's name is not a use of the governed tool, and a denial on it
+proves nothing about the floor.
+
+**Rule 10: what each control proves.** Section 3.29 rule 2's table, stated as
+outcomes:
+
+| Control | Required outcome | Not required |
+|---|---|---|
+| the refusal | at least one governed use of the claimed command, and every such use **refused** | anything about the command's own exit |
+| the allowed command | at least one governed use of the allowed command, every such use **executed**, and at least one whose result is not an error and whose content, trailing line breaks removed, is exactly the expected output | |
+| the absent payload | at least one governed use of the claimed command, and every such use **executed** | the command succeeding |
+
+A control whose capture carries any other tool use refuses the claim, because
+evidence about a session that did something else is not evidence about this
+one. **Permission success and command success are different facts.** The
+absent-payload control proves that the claimed command reached execution with
+no permission refusal, under the same grant and without the payload. The
+command is chosen so that it fails harmlessly once it runs, and it is expected
+to: `cargo publish --dry-run --manifest-path statecraft-absent/Cargo.toml` names
+a manifest path that does not exist, so cargo stops before resolving anything,
+searches no ancestor directory, and contacts no registry. A result flagged as an
+error there is the command failing, which is what it was chosen to do, and it
+is not a refusal unless the harness marks it as one.
+
+A denied command that also shows evidence of executing is not a refusal. Two
+uses of the claimed command in the refusal control, one refused and one
+executed, refuse the claim.
+
+**Rule 11: terminal and process conditions are judged per observation, and
+kept.** A control is measurable only when the process ended by itself inside
+its deadline, no signal ended it, nothing in its process group outlived it,
+its exit code is `0` or `1`, and that code agrees with the terminal event's
+error flag the way every recorded stream agrees (`0` with `is_error: false`,
+`1` with `is_error: true`). Its terminal reason is `completed` or `max_turns`.
+The turn cap is admitted because the measurement shows the tool result arriving
+before the capped terminal event (`max-turns.jsonl`, `--max-turns 1`), so the
+cap ends a session whose control has already produced its evidence. An
+`api_error`, a terminal state spec `004` section 3.13 does not map, a timeout, a
+signal or a survivor leaves the control unmeasured and refuses the claim. The
+terminal state and the process end are preserved in the record either way.
+
+**Rule 12: the launch is the evidence of the invocation.** Section 3.29 rule 4's
+binding is made by the operation that launches the process, not by a
+description written afterwards. This product's own launch (spec `006` section
+3.11.2) constructs the argument vector, writes the payload to a settings file,
+resolves and digests the executable, reads its version, supervises the process
+in its own process group under a deadline, and records together: the executable
+as requested and as resolved, with its digest; the version it reported; the
+argument vector and working directory; the prompt, which travels on standard
+input and never in an argument; the settings path, the exact settings bytes, and
+their digest before the launch and after the process ended; standard output and
+standard error, separately and verbatim; the exit code, signal, timeout and
+survivors; a capture identity; and the control it is.
+
+The admission recomputes the argument vector this build constructs for the
+recorded control, commands and settings path, and requires it **exactly**. So
+a payload control carries one `--settings` argument naming the recorded file,
+and the absent-payload control carries none in either spelling, `--settings
+<path>` or `--settings=<path>`; a second settings argument, a substituted path,
+a reordered or additional argument, or bytes that changed while the process ran
+refuse the claim. Because the prompt is not an argument, no text in it can be
+read as an option. Three controls are three launches: their capture
+identities, their sessions and their tool-use ids are pairwise distinct, and
+two controls naming one session are substituted evidence however differently
+their bytes are formatted.
+
+**The trust boundary.** A launch record is **launcher-attested**. It
+establishes that this product started this executable with these arguments,
+this working directory and these settings bytes, and received these bytes back.
+It does not establish that the provider **loaded** the settings: that is
+inferred from behavior, which is what the three controls are for. It does not
+authenticate its own origin either. A record edited by hand after the fact and
+still consistent is admitted, because nothing here signs it, and no field and
+no rendering claims cryptographic provenance. What makes it reviewable is that
+the bytes are kept, which is section 3.29's closing paragraph.
+
+**Synthetic captures stay synthetic.** A capture launched against a fake
+provider is marked `synthetic` by the launching operation, at the operator's
+explicit request. Synthetic evidence runs the whole admission, so the path is
+testable end to end, and an observation admitted from any synthetic control is
+**never** a live observation: the record does not qualify and every rendering
+says synthetic. The mark prevents this product's own fixtures from being
+presented as earned; it does not detect a forgery, which the paragraph above
+already disclaims.
+
+**Records written before this section.** They carry no launch record. They
+still deserialize, their bytes and provenance stay in the file untouched, and
+the admission refuses them for the missing launch, so they read as not
+qualified. No record is rewritten, migrated or deleted.
+
+**The experiment these rules judge.** The acceptance script is the operator's
+route, and its contract is part of this amendment:
+
+- **Commands.** Refused: `cargo publish --dry-run --manifest-path
+  statecraft-absent/Cargo.toml`, which the floor's `Bash(cargo publish*)`
+  claims. Allowed: `echo statecraft-allowed-control`, whose expected output is
+  `statecraft-allowed-control` and which no floor entry claims.
+- **One grant, identical in all three.** Every launch carries
+  `--allowedTools` naming exactly those two commands. Without a grant a
+  non-interactive session refuses an unapproved command whatever the payload
+  says, so the absent-payload control could never show execution and the
+  refusal could not be attributed to the payload. With the grant identical,
+  the payload is the only difference between the refusal and the absent-payload
+  launches. That the provider's deny entry prevails over the grant is a premise
+  the refusal control **tests**: if it does not, the refusal control records an
+  execution and the claim is refused. The payload itself still carries no allow
+  entry, which is section 3.24's and section 3.28's rule and is untouched.
+- **Turns.** `--max-turns 1`, for rule 11's measured reason.
+- **Sessions.** At most **three** provider sessions: the refusal, the allowed
+  command and the absent payload, in that order. The first control whose launch
+  does not complete ends the experiment, and no later session is started. There
+  is no retry, no replay after an uncertain outcome, and no conditional extra
+  session. Each launch also runs the provider's `--version` once, which is a
+  version probe and not a session.
+- **Bounds.** Each session has its own deadline (default 300 seconds), each
+  version probe 30 seconds, so the whole stage is bounded by three sessions and
+  three probes.
+- **Approvals.** The provider stage refuses unless
+  `APPROVED_PROVIDER_SESSION=yes`; the real-home coexistence stage refuses unless
+  `APPROVED_REAL_HOME_COEXISTENCE=yes`. Neither implies the other.
+- **The local test route.** `SC_ACCEPTANCE_FAKE_PROVIDER=<path>` runs the
+  provider stage's whole control flow against a local executable instead of the
+  provider. It never reads the provider approval, refuses to run when that
+  approval is also set, marks every capture synthetic, and reports its result as
+  synthetic.
+
 ## 4. Out of scope
 
 Installing the product itself; provider authentication; hosted registration;
@@ -2257,6 +2450,24 @@ still fails: passing in that state would be suppression, and reporting it as a
 lost denial would send the next reader after the wrong defect. No loop was run
 to accumulate a clean count, and no assertion was weakened; the deadline is
 unchanged at five seconds.
+
+**2026-09-22, authority: §3.30, recorded before the repair it authorizes.**
+Re-reading the §3.29 implementation at `62bde9a` against what each control has
+to prove found five defects the section's own negative controls did not reach,
+and §3.30 names them. None was a gap in a word list and none is closed by
+reading more prose: each is a place where a request stood in for a result, a
+text match stood in for an identity, or a description written after the launch
+stood in for the launch. The owner authorized the repair on 2026-09-22 with the
+instruction that the authority be recorded first and separately, which is this
+entry and the section it points at. §3.29's rules 1, 5 and 6 stand as written;
+§3.30 adds rules 7 to 12, which sharpen rules 2 to 4.
+
+Two design facts are recorded because they are premises rather than
+measurements. The experiment grants both commands to all three launches,
+because a non-interactive session refuses an ungranted command regardless of
+the payload and the controls would otherwise measure the missing grant; and
+that a deny entry prevails over such a grant is what the refusal control
+tests, not what it assumes. Neither has been observed on a live provider here.
 
 ## Verification
 

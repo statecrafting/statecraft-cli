@@ -13,6 +13,10 @@
         "source": "spec-edge"
       },
       {
+        "path": "crates/statecraft-adapter/",
+        "source": "spec-edge"
+      },
+      {
         "path": "crates/statecraft-cli/",
         "source": "spec-edge"
       },
@@ -111,6 +115,19 @@
       {
         "locations": [
           {
+            "file": "crates/statecraft-adapter/"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "directory",
+          "path": "crates/statecraft-adapter/"
+        }
+      },
+      {
+        "locations": [
+          {
             "file": "crates/statecraft-cli/"
           }
         ],
@@ -139,5 +156,5 @@
     "specStatus": "approved"
   },
   "schemaVersion": "1.1.0",
-  "shardHash": "76921a0ee23ceaa9d7bfeb2f8cb143751b9a00560e231f1d892a74f603eee98f"
+  "shardHash": "03d377467fc843123320db4708437381f4fe0a259daf213cb9ed8d75eb899499"
 }
