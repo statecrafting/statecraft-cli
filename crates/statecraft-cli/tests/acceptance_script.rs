@@ -103,7 +103,10 @@ fn the_local_route_runs_the_whole_stage_and_says_synthetic() {
     // The preflight's own check: a prose claim, launched and submitted through
     // the product, was refused as prose.
     let prose = std::fs::read_to_string(run.acc().join("steps/08-prose-qualify.out")).unwrap();
-    assert!(prose.contains("not the harness's structured output"), "{prose}");
+    assert!(
+        prose.contains("not the harness's structured output"),
+        "{prose}"
+    );
 
     let out = run.fake_run("faithful", &[]);
     let text = both(&out);
@@ -115,8 +118,11 @@ fn the_local_route_runs_the_whole_stage_and_says_synthetic() {
         "synthetic-admitted\n"
     );
     let record: serde_json::Value = serde_json::from_slice(
-        &std::fs::read(run.acc().join("project/.statecraft/state/startup/acc-synthetic.json"))
-            .expect("the record"),
+        &std::fs::read(
+            run.acc()
+                .join("project/.statecraft/state/startup/acc-synthetic.json"),
+        )
+        .expect("the record"),
     )
     .unwrap();
     assert_eq!(
@@ -124,9 +130,10 @@ fn the_local_route_runs_the_whole_stage_and_says_synthetic() {
         serde_json::json!("synthetic")
     );
     // The record the product wrote reads back as synthetic and not qualified.
-    let read = statecraft_home::startup::StartupRecord::read(&run.acc().join("project"), "acc-synthetic")
-        .unwrap()
-        .unwrap();
+    let read =
+        statecraft_home::startup::StartupRecord::read(&run.acc().join("project"), "acc-synthetic")
+            .unwrap()
+            .unwrap();
     assert!(read.observation.synthetic());
     assert!(!read.qualifies());
     // The paths with quotes, a backslash and a dollar sign reached the product
@@ -185,18 +192,33 @@ fn an_incomplete_launch_stops_the_stage_before_another_session() {
         let out = run.fake_run(mode, &[]);
         let text = both(&out);
         assert_eq!(code(&out), 1, "{mode}: {text}");
-        assert!(text.contains("no further session was started (1 of 3 launched)"), "{mode}: {text}");
+        assert!(
+            text.contains("no further session was started (1 of 3 launched)"),
+            "{mode}: {text}"
+        );
         assert!(text.contains(says), "{mode}: {text}");
         assert!(run.captures().join("refusal.json").is_file(), "{mode}");
-        assert!(!run.captures().join("allowed-command.json").exists(), "{mode}: a second session ran");
-        assert!(!run.acc().join("steps/11-qualify.out").exists(), "{mode}: it went on to qualify");
+        assert!(
+            !run.captures().join("allowed-command.json").exists(),
+            "{mode}: a second session ran"
+        );
+        assert!(
+            !run.acc().join("steps/11-qualify.out").exists(),
+            "{mode}: it went on to qualify"
+        );
         if mode == "hang" {
             let record: serde_json::Value = serde_json::from_slice(
                 &std::fs::read(run.captures().join("refusal.json")).unwrap(),
             )
             .unwrap();
-            assert_eq!(record["launch"]["process"]["timedOut"], serde_json::json!(true));
-            assert!(record["launch"]["process"]["survivingProcesses"].is_null(), "{record}");
+            assert_eq!(
+                record["launch"]["process"]["timedOut"],
+                serde_json::json!(true)
+            );
+            assert!(
+                record["launch"]["process"]["survivingProcesses"].is_null(),
+                "{record}"
+            );
         }
     }
 }
@@ -233,7 +255,10 @@ fn both_approvals_refuse_when_unset_and_the_routes_do_not_mix() {
     assert_eq!(code(&out), 2, "{}", both(&out));
     assert!(both(&out).contains("APPROVED_PROVIDER_SESSION=yes"));
     assert!(!run.acc().join("launched").exists());
-    assert!(!run.acc().join("steps/10-refusal.cmd").exists(), "a launch was attempted");
+    assert!(
+        !run.acc().join("steps/10-refusal.cmd").exists(),
+        "a launch was attempted"
+    );
 
     let out = run.script("coexistence", &[]);
     assert_eq!(code(&out), 2, "{}", both(&out));
@@ -248,11 +273,17 @@ fn both_approvals_refuse_when_unset_and_the_routes_do_not_mix() {
     let fake = fake().display().to_string();
     let out = run.script(
         "permission-experiment",
-        &[("SC_ACCEPTANCE_FAKE_PROVIDER", &fake), ("APPROVED_PROVIDER_SESSION", "yes")],
+        &[
+            ("SC_ACCEPTANCE_FAKE_PROVIDER", &fake),
+            ("APPROVED_PROVIDER_SESSION", "yes"),
+        ],
     );
     assert_eq!(code(&out), 2, "{}", both(&out));
     assert!(both(&out).contains("both set"));
-    assert!(!run.acc().join("steps/10-refusal.cmd").exists(), "a launch was attempted");
+    assert!(
+        !run.acc().join("steps/10-refusal.cmd").exists(),
+        "a launch was attempted"
+    );
 }
 
 #[test]

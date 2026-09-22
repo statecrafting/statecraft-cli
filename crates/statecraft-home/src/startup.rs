@@ -1097,6 +1097,51 @@ mod tests {
         assert_eq!(StartupRecord::read(&root, "s-1").unwrap().unwrap(), record);
     }
 
+    /// Spec 002 sections 3.29 rule 5 and 3.30: a record read back from disk is
+    /// judged again, so its qualification is what its evidence supports now,
+    /// not what the file says. Each hand edit below changes one thing and the
+    /// reload's judgement follows it.
+    #[test]
+    fn a_record_read_back_is_judged_again() {
+        let (_h, _d, record) = qualifying();
+        assert!(record.qualifies());
+        let root = PathBuf::from(&record.project.root);
+        record.write(&root).unwrap();
+        let path = StartupRecord::path(&root, "s-1");
+        let reload = || StartupRecord::read(&root, "s-1").unwrap().unwrap();
+        assert!(
+            reload().qualifies(),
+            "the same bytes, read back, qualify the same way"
+        );
+
+        let original: serde_json::Value =
+            serde_json::from_slice(&std::fs::read(&path).unwrap()).unwrap();
+        let edits: [(&str, fn(&mut serde_json::Value)); 3] = [
+            ("the launch stripped, as a pre-3.30 record", |v| {
+                v["observation"]["evidence"]["refusal"]
+                    .as_object_mut()
+                    .unwrap()
+                    .remove("launch");
+            }),
+            ("the origin flipped to synthetic", |v| {
+                v["observation"]["evidence"]["allowed"]["launch"]["origin"] =
+                    serde_json::json!("synthetic");
+            }),
+            ("the process said to have timed out", |v| {
+                v["observation"]["evidence"]["withoutPayload"]["launch"]["process"]["timedOut"] =
+                    serde_json::json!(true);
+            }),
+        ];
+        for (name, edit) in edits {
+            let mut v = original.clone();
+            edit(&mut v);
+            std::fs::write(&path, serde_json::to_vec_pretty(&v).unwrap()).unwrap();
+            let read = reload();
+            assert!(read.observation.observed(), "{name}: the shape survives");
+            assert!(!read.qualifies(), "{name}: the reload still qualified");
+        }
+    }
+
     #[test]
     fn an_unreadable_record_is_an_error_rather_than_an_absence() {
         let (_h, _d, record) = qualifying();
