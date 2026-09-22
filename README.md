@@ -8,9 +8,8 @@ It runs on one machine, on one repository, with no account and no hosted service
 
 ## Status: specified, implemented and tested, not released
 
-Every verb the specs name is bound. There are twenty-seven, and
-`cargo run -p statecraft-cli -- --help` prints each one beside the spec it
-answers to:
+Every verb the specs name is bound, and `cargo run -p statecraft-cli -- --help`
+prints each one beside the spec it answers to:
 
 ```
 project register   project list   project arm   project disarm
@@ -20,13 +19,15 @@ work list   work show   run   run list   run show   accept
 home show   home plan   home apply
 init plan   init apply   migrate plan   migrate apply
 config show   approval grant   approval show
+harness show   harness upgrade   session payload
+startup record   startup capture   startup qualify   startup show
 ```
 
-Measured on 2026-09-21: seven specs, `000` to `006`, all `approved`. Eight
-crates and one binary; `cargo test --workspace` passes **683 tests**, none
-ignored; `spec-spine index coverage` reports 117 of 117 source files
-specifically claimed. Every spec that claims code has built it, and no forward
-claim is outstanding.
+Seven specs, `000` to `006`, all `approved`; eight crates and one binary.
+`make code` runs the whole workspace suite and `make gate` requires every
+source file to be specifically claimed by a spec, so neither a test count nor a
+coverage figure is restated here: run them. Every spec that claims code has
+built it, and no forward claim is outstanding.
 
 Seven specs and eight crates, because **a spec may own more than one crate**.
 The corpus was eleven specs until 2026-09-21, when four pairs that each
@@ -52,12 +53,14 @@ what has been adopted in
 
 This repository distinguishes four claims and makes them separately: *specified*,
 *implemented*, *tested*, *released*. Today `000` to `006` are specified and
-approved; `002` to `006` are additionally implemented and tested: eight crates
-and 683 passing tests, from `cargo test --workspace` on 2026-09-21. The
-machine-checkable rows of each spec's observable-negative-cases table are
-carried by tests named after them; the rows those tables state as refused in
-review are review obligations, and no test is claimed for them. **Nothing is
-released**, and `F-02` defers publication.
+approved; `002` to `006` are additionally implemented and tested by
+`cargo test --workspace`, and `registry list` is the authority on each spec's
+implementation state. The machine-checkable rows of each spec's
+observable-negative-cases table are carried by tests named after them; the rows
+those tables state as refused in review are review obligations, and no test is
+claimed for them. **No managed session has been live-qualified**: every
+qualification path is exercised against local fakes, which the records mark
+synthetic. **Nothing is released**, and `F-02` defers publication.
 
 ## The idea
 
@@ -143,6 +146,45 @@ inside the repository it registers.
 What the slice must make observably true, stated as refusals rather than as
 assertions, is
 [spec 001](specs/001-boundaries-and-authority/spec.md) section 3.11.
+
+### What a managed run records at its start
+
+A **managed** run is one in a project holding `.statecraft/environment.json`.
+The route to one, from a checkout:
+
+```sh
+cargo run -p statecraft-cli -- home apply                 # the product home and its harness revision
+cargo run -p statecraft-cli -- init apply      <path>     # the project area and its manifest
+cargo run -p statecraft-cli -- harness upgrade <path>     # commit the required harness revision, explicitly
+cargo run -p statecraft-cli -- run             <path> <spec-id>
+cargo run -p statecraft-cli -- startup show    <path> <run-id> [--attempt <n>]
+```
+
+`run` refuses before any attempt when the required revision is missing,
+corrupt or unreadable (spec `002` section 3.25). Otherwise it writes two
+records per attempt under `.statecraft/state/startup/runs/<run>/<attempt>/`
+(spec `002` section 3.31): `intent.json` before the process exists, and
+`record.json` after it ends. `startup show` reads them back and answers, from
+their bytes:
+
+| Question | Where the answer comes from |
+|---|---|
+| which revision was **required** | the committed manifest, full digest |
+| which was **selected** | the run's own choice, the required revision once it is verified intact, carried to the session in its environment |
+| which was **observed** | the shipped `SessionStart` hook's acknowledgment of this attempt, in this attempt's own stream; anything else is `unverified`, by kind, and never a match |
+| what payload was **delivered** | the settings bytes the adapter wrote, by digest, against this build's payload |
+| whether it **launched** | whether `intent.json` exists |
+| why it is **not qualified** | the verdict (`not-launched`, `interrupted`, `mismatched`, `unverified`) and its reasons |
+
+Four statements stay apart: an **admitted synthetic observation** (a local fake,
+never qualifying), **payload delivered** (bytes on the command line),
+**harness observed** (a hook in the named revision ran in this session), and
+**live qualified**, which a run cannot reach: a run session is not one of the
+three qualification controls. A mismatch observed after launch refuses the
+attempt. What is still unobserved is whether the live provider runs a
+globally registered `SessionStart` hook in a managed run and reports it; until
+a live run shows it, a live run's observation is expected to read
+`unverified: absent`.
 
 ### The exit codes a caller scripts against
 
