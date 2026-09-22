@@ -2,7 +2,7 @@
 id: "006-command-surface"
 title: "The command surface: one binary, every verb the other specs name, and what an exit code means"
 status: approved
-implementation: in-progress
+implementation: complete
 created: "2026-09-16"
 summary: >
   The binary, and every verb reachable through it. Specs 002 to 005 each
@@ -605,6 +605,19 @@ trusted base. A base that carries no declared authority-set path at all is a
 paths are members is `005` §3.3 case 2's declaration, by path, and the five this
 repository declares are listed in the binding.
 
+**2026-09-21: five verbs for `002`, and the spellings were chosen to match the
+tree rather than the library.** `harness` and `startup` are new groups;
+`session` is a third. Each groups a noun the way `project`, `env`, `home` and
+`config` already do, and each verb after it is the act. The alternatives
+considered were folding all five under `env`, which would have put a read of the
+harness requirement beside `env apply` and invited the reading that one implies
+the other, and folding the two `startup` verbs into one with a flag, which would
+have made submitting evidence look like an option on recording rather than the
+separate act §3.29 requires. `session payload` takes no path for the reason §3.11.1
+states; the other four take one and none of them requires it to be registered,
+because reading a requirement and recording a start are both things a target
+does before it is driven.
+
 **2026-09-22, authority: §3.11.2, recorded before the binding.** The launch
 verb and the split of `startup qualify`'s exit 2. The alternative considered for
 the launch was leaving it in the acceptance script and having the script write
@@ -614,6 +627,75 @@ variables can be written twice differently and nothing checks that they were
 not. The table row for `session payload` is corrected in the same change: it
 named a `--digest` option that never existed, since the identity moved to the
 `--json` rendering on 2026-09-21.
+
+**2026-09-22: two producer capabilities this surface can use, recorded as
+bounded opportunities and not as requirements.** spec-spine builds features
+when an opportunity exists rather than waiting for a consumer's request, so the
+two below are written down before they ship. Neither changes the pin
+(`=0.20.0`), neither copies a producer internal, and adopting either is its own
+change with its own re-index and bypass-floor review (`D-06`). Measured against
+spec-spine's tree on 2026-09-22: its `v0.22.0` candidate is integrated, untagged
+and unpublished, and carries neither capability.
+
+*Readiness status on the ready set.* Producer contract: spec-spine spec 102
+(`status: draft`, `implementation: pending`), which adds `status` to each
+`registry plan --json` ready entry as a read-schema MINOR and changes no
+partition, ordering or exit code; spec 101, which is in the `v0.22.0` candidate,
+only documents that `ready` is a scheduling answer. Where it meets this
+surface: section 3.8's join, which exists because the plan carries no status,
+and spec `003` section 3.1.1's rule that ready is not ratified. **Version
+prerequisite:** a published spec-spine whose `registry plan` read schema has
+taken spec 102's MINOR, pinned here. **What it may and may not change:** it may
+let the join cross-check two sources for `status` and refuse when they
+disagree; it may not let the plan's field replace the lifecycle report as the
+source of `status`, because approval stays this product's rule. **Prepared
+now:** `crates/statecraft-cli/tests/producer_compatibility.rs` drives `work
+list` against a stub emitting spec 102's shape with a `status` that
+**contradicts** `registry list`, and asserts that the additive field is accepted
+and that eligibility is still decided by `registry list`. It is a compatibility
+fixture: it says what this consumer does with the shape, and nothing about
+whether any release emits it.
+
+*Portable verifier fixtures.* Producer contract: spec-spine spec 103
+(`status: draft`, `implementation: pending`, its build on a sibling branch):
+case directories of stored `payload.json` bytes and a `case.json` naming the
+payload type, its schema version, a digest subject and the expected `match`,
+`mismatch` or `refused` outcome with a reason from a closed set. Where it meets
+this product: the envelope crate spec `005` owns, and the startup intent of
+`002` section 3.31, which today identifies the project by its manifest digest
+and not by the corpus attestation the work was scheduled from. **Version
+prerequisite:** a published spec-spine release carrying spec 103's fixture set
+as an artifact, with its index version. **Nothing is prepared**, because no
+supported local mechanism supplies the fixtures without copying them out of an
+unreleased branch. **The consumer-verification plan, exactly:** pin the release
+that publishes the set; add a test that walks its index, feeds each case's
+`payload.json` bytes, unmodified, to this product's attestation verification,
+and asserts the case's expected outcome and reason, failing on any case it
+cannot classify rather than skipping it; then, as a separate authority
+amendment to `002` section 3.31, decide whether the startup intent records the
+corpus `attestationHash` beside the manifest digest.
+
+**2026-09-22, later: the producer state re-measured, and four integration
+opportunities with their exact consumer checks.** The entry above measured a
+producer that has since moved, so this one supersedes its producer facts and
+leaves its reasoning standing. Measured from the remote on 2026-09-22: the
+latest spec-spine **release** is `v0.21.0` (2026-09-20) on GitHub and on
+crates.io for both `spec-spine-cli` and `spec-spine-core`. On its `main`, spec
+102 (`#307`), spec 103 (`#301`) and spec 106 (`#308`) are merged with
+`implementation: complete`, and spec 107 merged as `#309` (`6e123d2`) while this
+entry was being written. All four are `status: draft` in that corpus and none
+is in any release. The pin here stays `=0.20.0`, and nothing below repins it.
+
+| Opportunity | Producer contract | Where it meets this product | Consumer check when a release carries it |
+|---|---|---|---|
+| readiness status on the ready set | 102: each `registry plan --json` ready entry gains `status`; measured by building `45becbb` from a clean export, the plan answers `schemaVersion` `0.3.0` with entries of `id`, `status`, `title`, where the pinned `0.20.0` answers `0.1.0` with `id` and `title` | section 3.8's join | `producer_compatibility.rs` now emits that measured shape key for key and still asserts the join decides; on adoption, add a cross-check that refuses when the two sources disagree, and keep `registry list` the source |
+| portable verifier fixtures | 103: stored `payload.json` cases with an expected outcome and a closed reason set, as a published artifact | the envelope spec `005` owns | walk the released index, feed each case's bytes unmodified to this product's verification, assert the expected outcome and reason, and fail on any case it cannot classify |
+| obligation references in operator evidence | 106: `registry obligation <spec>#<id> --json` resolves one obligation with its `sectionDigest` | spec `002` section 3.32's records name sections in prose | a startup record could cite the obligations it answers to (for example `002#3.32`) with their section digests, so a later reader can tell whether the rule it was judged under changed; that is an authority amendment to `002`, not a binding change here |
+| context-closure identity in run records | 107: `registry closure --request <file or -> --json` resolves a request of specs, sections and obligations to members with identities and one order-independent `digest` | spec `003`'s run record and `002` section 3.31's intent | the intent could carry the closure digest of the work order the session was given, beside the manifest digest; consumer check: resolve a fixed request twice over an unchanged ledger and get one digest, change one member and get another |
+
+None of the four is implemented here, because none has a released producer
+contract, and a compatibility fixture is the only mechanism this repository
+supports for an unreleased one.
 
 ## Verification
 
@@ -648,7 +730,17 @@ precondition bit.
 
 `crates/statecraft-cli/tests/managed_environment.rs` carries `002`'s
 managed-environment rows, which reach this crate through that spec's own
-bindings.
+bindings. `crates/statecraft-cli/tests/qualification_workflow.rs` carries
+§3.11.1's five verbs the same way, and asserts three things a library test
+cannot: that inspection leaves the manifest and the installed revisions
+byte-identical, that a refused submission exits 2 and writes no record, and
+that an unreadable submission is reported differently from a refused one. Its
+captures are synthetic and the file says so at the top; **no test in this
+repository spawns a provider or claims a live qualification.**
+`crates/statecraft-cli/tests/run_startup.rs` carries §3.11.3: `run` and
+`startup show` through the built binary against a fake provider that runs the
+registered hook, including the exit 4 when a record cannot be stored and the
+refusal when the intent cannot be written.
 
 The three `--help` commands check reachability and nothing else. A verb that is
 absent from the tree exits `3` under §3.3, so they fail loudly on exactly the
@@ -667,6 +759,11 @@ spec-spine index check --fail-on-unresolved
 cargo test -p statecraft-cli --test negative_cases
 cargo test -p statecraft-cli --test integration_slice
 cargo test -p statecraft-cli --test arming_consent
+cargo test -p statecraft-cli --test qualification_workflow
+cargo test -p statecraft-cli --test run_startup
+cargo test -p statecraft-cli --test producer_compatibility
+cargo run -q -p statecraft-cli -- harness --help
+cargo run -q -p statecraft-cli -- startup --help
 test -f crates/statecraft-cli/tests/integration_slice.rs
 cargo run -q -p statecraft-cli -- work --help
 cargo run -q -p statecraft-cli -- run --help

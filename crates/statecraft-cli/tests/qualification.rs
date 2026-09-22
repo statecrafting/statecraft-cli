@@ -6,13 +6,13 @@
 
 use serde_json::Value;
 use statecraft_adapter_claude_code::qualification::{PairedRecord, record};
-use std::os::unix::fs::PermissionsExt;
 use std::path::Path;
 use std::process::Command;
 
 fn executable(path: &Path, script: &str) {
-    std::fs::write(path, script).unwrap();
-    std::fs::set_permissions(path, std::fs::Permissions::from_mode(0o755)).unwrap();
+    // Staged and copied, never written in place: a script this process wrote
+    // and then exec'd is the `ETXTBSY` race spec 004 records.
+    statecraft_adapter::fixture::install_script(path, script, 0o755).unwrap();
 }
 
 fn check(records: Option<Vec<PairedRecord>>, version: &str, expected: &str) {
@@ -53,6 +53,13 @@ esac
     )
     .unwrap();
     std::fs::write(bin.path().join("version"), version).unwrap();
+    // Spec 002 section 3.27: the run delivers the managed-session payload, byte
+    // for byte, which the child checks before it answers.
+    std::fs::write(
+        bin.path().join("expected-settings"),
+        statecraft_home::session::payload_json(),
+    )
+    .unwrap();
     executable(
         &bin.path().join("claude"),
         r#"#!/bin/sh
@@ -60,7 +67,7 @@ if [ "$1" = --version ]; then /bin/cat "$(dirname "$0")/version"; exit 0; fi
 [ "$#" = 6 ] || exit 3
 [ "$1 $2 $3 $4" = '--print --output-format stream-json --verbose' ] || exit 3
 [ "$5" = --settings ] || exit 3
-[ "$(/bin/cat "$6")" = '{"permissions":{"deny":[]}}' ] || exit 3
+/usr/bin/cmp -s "$6" "$(dirname "$0")/expected-settings" || exit 3
 [ "$USER" = fixture-operator ] || exit 3
 [ "${HOME+x}" != x ] || exit 3
 /bin/cat > child-prompt

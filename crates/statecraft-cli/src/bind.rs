@@ -486,6 +486,18 @@ pub fn unarmed_answer(path: &Path) -> Answer<String> {
     Answer::new(detail.clone(), Exit::Refused, detail)
 }
 
+/// A managed run refused under spec 002 section 3.25, before any attempt.
+pub fn harness_refused_answer(path: &Path, reason: &str) -> Answer<String> {
+    let detail = format!(
+        "{} is not driven: {reason}. `harness show {}` inspects it and `harness upgrade {}` is \
+         the explicit act that changes the requirement",
+        path.display(),
+        path.display(),
+        path.display()
+    );
+    Answer::new(detail.clone(), Exit::Refused, detail)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
