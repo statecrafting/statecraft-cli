@@ -528,7 +528,10 @@ pub fn capture(
 
     let (stdout, stderr) = if out.is_finished() && err.is_finished() {
         let _ = writer.join();
-        (out.join().unwrap_or_default(), err.join().unwrap_or_default())
+        (
+            out.join().unwrap_or_default(),
+            err.join().unwrap_or_default(),
+        )
     } else {
         // A survivor may hold a pipe. The readers are dropped rather than
         // joined, and what they had read is lost with them; the timeout and
@@ -711,7 +714,10 @@ mod tests {
         let mut error = None;
         drain_delivered(&rx, &mut events, &mut error);
         assert_eq!(events, [1, 2, 4]);
-        assert!(matches!(error, Some(StreamError::Malformed { line: 3, .. })));
+        assert!(matches!(
+            error,
+            Some(StreamError::Malformed { line: 3, .. })
+        ));
         // Nothing more was delivered, and the drain did not wait for more.
         drop(tx);
         drain_delivered(&rx, &mut events, &mut error);
@@ -768,7 +774,11 @@ mod tests {
         // defect from the latency of the `kill` it spawns.
         assert!(elapsed < Duration::from_secs(60), "{elapsed:?}");
         assert_eq!(c.stdout, b"before\n");
-        assert!(c.surviving_processes.is_none(), "{:?}", c.surviving_processes);
+        assert!(
+            c.surviving_processes.is_none(),
+            "{:?}",
+            c.surviving_processes
+        );
         let pid = std::fs::read_to_string(dir.path().join("descendant")).unwrap();
         let alive = Command::new("kill")
             .args(["-s", "0", pid.trim()])

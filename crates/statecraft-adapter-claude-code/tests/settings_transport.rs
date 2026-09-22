@@ -272,7 +272,11 @@ fn a_hung_child_is_interrupted_at_the_deadline_with_its_group_and_settings_clean
         elapsed < Duration::from_secs(60),
         "supervision was held far past its deadline by the child it supervises: {context}"
     );
-    assert_eq!(execution.supervised.outcome, Outcome::Interrupted, "{context}");
+    assert_eq!(
+        execution.supervised.outcome,
+        Outcome::Interrupted,
+        "{context}"
+    );
     assert!(
         execution.supervised.surviving_processes.is_none(),
         "the group outlived the kill: {context}"
@@ -284,7 +288,11 @@ fn a_hung_child_is_interrupted_at_the_deadline_with_its_group_and_settings_clean
             .unwrap()
             .status
             .success();
-        assert!(!alive, "descendant {} escaped supervision: {context}", pid.trim());
+        assert!(
+            !alive,
+            "descendant {} escaped supervision: {context}",
+            pid.trim()
+        );
     }
     if let Ok(path) = std::fs::read_to_string(root.path().join("observed-path")) {
         assert!(

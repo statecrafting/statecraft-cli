@@ -186,7 +186,9 @@ pub struct ToolUse {
 impl ToolUse {
     /// The `command` the input names, when it names one.
     pub fn command(&self) -> Option<&str> {
-        self.input.get("command").and_then(serde_json::Value::as_str)
+        self.input
+            .get("command")
+            .and_then(serde_json::Value::as_str)
     }
 }
 
@@ -214,10 +216,12 @@ impl ToolResult {
             serde_json::Value::String(s) => Some(s.clone()),
             serde_json::Value::Array(blocks) => blocks
                 .iter()
-                .map(|b| match b.get("type").and_then(serde_json::Value::as_str) {
-                    Some("text") => b.get("text").and_then(serde_json::Value::as_str),
-                    _ => None,
-                })
+                .map(
+                    |b| match b.get("type").and_then(serde_json::Value::as_str) {
+                        Some("text") => b.get("text").and_then(serde_json::Value::as_str),
+                        _ => None,
+                    },
+                )
                 .collect::<Option<Vec<_>>>()
                 .map(|parts| parts.concat()),
             _ => None,
@@ -543,7 +547,10 @@ mod tests {
                 non_execution_kind: Some("permission-rule".into())
             }]
         );
-        assert_eq!(mid_stream, [(Some(id.clone()), Some("subcommandResults".into()))]);
+        assert_eq!(
+            mid_stream,
+            [(Some(id.clone()), Some("subcommandResults".into()))]
+        );
         assert_eq!(denials.len(), 1);
         assert_eq!(&denials[0].tool_use_id, id);
         assert_eq!(denials[0].tool_input, uses[0].input);
