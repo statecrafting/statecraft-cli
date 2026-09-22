@@ -25,6 +25,10 @@
         "source": "spec-edge"
       },
       {
+        "path": "scripts/acceptance/managed-session.sh",
+        "source": "spec-edge"
+      },
+      {
         "path": "scripts/check-authored-content.sh",
         "source": "spec-edge"
       },
@@ -63,10 +67,23 @@
       {
         "locations": [
           {
+            "file": "scripts/acceptance/managed-session.sh"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "kind": "file",
+          "path": "scripts/acceptance/managed-session.sh"
+        }
+      },
+      {
+        "locations": [
+          {
             "file": "specs/002-environment-lifecycle/handoff-2026-09-21.md",
             "span": {
-              "endLine": 648,
-              "startLine": 624
+              "endLine": 582,
+              "startLine": 548
             }
           }
         ],
@@ -122,5 +139,5 @@
     "specStatus": "approved"
   },
   "schemaVersion": "1.1.0",
-  "shardHash": "1976d4d6513fc91e568729e89d5005b15d863a3a295b2abfe4c826cb735c8bf6"
+  "shardHash": "89defac3adf7f583bd76d774cb783ac018c58362f0cff574a96d963a60258f40"
 }

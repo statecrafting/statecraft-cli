@@ -188,6 +188,19 @@ fn session_payload_prints_the_bytes_and_their_identity() {
         value["value"]["value"]["delivered"],
         serde_json::json!(false)
     );
+
+    // The human rendering is the bytes and nothing else, because this verb
+    // exists so an operator can redirect it into the file the settings
+    // argument will read. A rendering that appended a digest line would
+    // produce a settings file that is not the payload, and the acceptance
+    // script found exactly that.
+    let human = sandbox.run(&["session", "payload"]);
+    assert_eq!(code(&human), 0);
+    assert_eq!(stdout(&human), statecraft_home::session::payload_json());
+    let reparsed: serde_json::Value = serde_json::from_str(&stdout(&human))
+        .expect("the human rendering is the settings document itself");
+    assert!(reparsed["permissions"]["deny"].is_array());
+
     // It needs no target, which is the point of it taking no path.
     assert!(!sandbox.home().exists() || sandbox.home().is_dir());
 }

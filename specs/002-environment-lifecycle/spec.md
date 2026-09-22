@@ -56,6 +56,11 @@ establishes:
   # counts, a producer matrix, a rollback plan, and the live-session script
   # still to be approved.
   - { kind: section, file: "specs/002-environment-lifecycle/handoff-2026-09-21.md", anchor: "7-truthful-implementation-state-of-spec-002" }
+  # The acceptance, as a program rather than as prose. Claimed as a whole file:
+  # `scripts/**/*` is in [index] extra_hashed_inputs, so it is witnessed and
+  # raises no L-008, and a change to it restamping every shard is correct for a
+  # file that decides what this corpus may claim about enforcement.
+  - "scripts/acceptance/managed-session.sh"
 amends:
   # Section 3.6's "no configuration file may change a rule" gets its precise
   # reading in section 3.16: a layer supplies a value, never a rule, and every
@@ -2188,6 +2193,40 @@ the path they were read from. The cost is a record of a few kilobytes where it
 was a few hundred bytes, which is the price of a record that can be re-judged
 rather than believed. The captures are bounded by the acceptance's own
 `--max-turns 1`.
+
+**2026-09-21: the acceptance is a program, and its three stages are three
+approvals.** §6 of the handoff was an outline with steps reading "same, with"
+and "open a session", which is a procedure a reader performs and a procedure
+nobody can rerun identically. It is replaced by
+`scripts/acceptance/managed-session.sh`, which carries the commands, the
+branching, the capture locations, the preserved exit statuses, a per-step
+deadline enforced by a watchdog rather than by `timeout`, and its own cleanup.
+
+The stages are separated by what each one costs and what it touches.
+`preflight` is local, spawns no provider and needs no approval;
+`permission-experiment` spawns the provider and refuses without
+`APPROVED_PROVIDER_SESSION=yes`; `coexistence` observes the real home and
+refuses without `APPROVED_REAL_HOME_COEXISTENCE=yes`. **The second gate is not
+satisfied by the first**, and that is enforced by the script rather than
+described in it, because §3.24's consent is its own act and an experiment that
+inherited it would be performing a write nobody approved. No stage activates
+anything in the real home: the permission experiment carries its settings on
+each invocation's own command line, and the coexistence stage runs a plan and
+reads digests.
+
+The preflight ends by submitting a **fabricated** claim, whose refusal capture
+is the sentence §3.29 names, and refusing to continue unless the admission
+refuses it for being prose. A run whose admission would admit that sentence
+would produce a worthless result at provider cost, so it is checked before the
+first invocation is paid for rather than after.
+
+**2026-09-21: `session payload`'s human rendering is the bytes and nothing
+else.** The first rendering appended the digest and the argument, which made
+`session payload > floor.json` write a settings file that was not the payload,
+and the acceptance script found it by digesting what it had written. §3.4 of
+`006` makes human output a view rather than a contract, which is what allows
+the change; the digest and the argument moved to the `--json` rendering, where
+a caller reads them.
 
 ## Verification
 

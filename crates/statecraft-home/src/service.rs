@@ -613,12 +613,13 @@ impl Answer {
                 out.push_str(&format!("standing  {}\n", u.standing.describe()));
                 out
             }
-            Answer::SessionPayload(p) => format!(
-                "{}\ndigest    {}\nargument  {} <these bytes>\nnothing was delivered by this read\n",
-                p.payload.trim_end(),
-                p.digest,
-                p.argument
-            ),
+            // The bytes, and nothing else. This verb exists so an operator can
+            // put the payload where the settings argument will read it, and a
+            // rendering that appended a digest line would produce a settings
+            // file that is not the payload. The digest and the argument are in
+            // the `--json` rendering, which is where a caller reads them
+            // (spec 006 section 3.4).
+            Answer::SessionPayload(p) => p.payload.clone(),
             Answer::Startup(s) => {
                 let mut out = format!("session   {}\n", s.session_id);
                 out.push_str(&s.record.describe());
