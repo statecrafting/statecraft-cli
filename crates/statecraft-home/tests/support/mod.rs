@@ -281,7 +281,14 @@ impl Sandbox {
 
 /// Run a git command in a directory, failing loudly.
 pub fn git(at: &Path, args: &[&str]) {
+    // No automatic maintenance. A commit can start `git maintenance run
+    // --auto` detached, and its lock file then appears in, and vanishes from,
+    // a repository a test is snapshotting: measured on Linux CI on
+    // 2026-09-22 as `.git/objects/maintenance.lock` in one snapshot of the
+    // unrelated repository and not the next. That is git changing its own
+    // directory, not this product changing the repository.
     let out = std::process::Command::new("git")
+        .args(["-c", "maintenance.auto=false", "-c", "gc.auto=0"])
         .args(args)
         .current_dir(at)
         .output()
