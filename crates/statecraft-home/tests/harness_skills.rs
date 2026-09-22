@@ -45,7 +45,7 @@ fn front_matter(text: &str) -> Vec<(String, String)> {
     out
 }
 
-fn field<'a>(text: &'a str, key: &str) -> Option<String> {
+fn field(text: &str, key: &str) -> Option<String> {
     front_matter(text)
         .into_iter()
         .find(|(k, _)| k == key)

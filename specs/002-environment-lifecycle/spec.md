@@ -1943,4 +1943,7 @@ cargo test -p statecraft-home --test negative_cases
 cargo test -p statecraft-home --test harness_hooks
 test -f crates/statecraft-home/src/settings.rs
 cargo test -p statecraft-home --test settings_modification
+test -f crates/statecraft-home/src/session.rs
+cargo test -p statecraft-home --test harness_skills
+cargo test -p statecraft-home --test bounded_integration
 ```
