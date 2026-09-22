@@ -63,6 +63,7 @@ pub mod home;
 pub mod ignore;
 pub mod producer;
 pub mod project;
+pub mod required;
 pub mod resolved;
 pub mod service;
 pub mod session;

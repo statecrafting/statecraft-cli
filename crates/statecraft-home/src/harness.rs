@@ -50,14 +50,53 @@ pub struct FileIdentity {
     pub bytes: u64,
 }
 
+/// How many hex characters of the full digest the display identifier carries.
+pub const DISPLAY_LEN: usize = 12;
+
+/// The display identifier derived from a full revision digest.
+///
+/// Spec 002 section 3.25: a short identifier is a **display** convenience,
+/// legible in a plan, a verdict and a log, and never on its own the thing an
+/// equality check is performed against. Every integrity comparison in this
+/// crate uses [`Revision::digest`]; this function exists so that the short form
+/// has exactly one definition and cannot drift into being a second identity.
+pub fn display_id(digest: &str) -> String {
+    let short: String = digest.chars().take(DISPLAY_LEN).collect();
+    format!("h-{short}")
+}
+
 /// A content-addressed harness revision.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Revision {
     /// The revision identity, `h-` followed by twelve hex characters.
+    ///
+    /// Display only. It names a revision directory and reads well in a report;
+    /// it is not what an integrity check compares. Two revisions sharing a
+    /// truncation are unlikely and "unlikely" is not a proof (section 3.25).
     pub id: String,
+    /// The full digest over the revision's files: the integrity proof.
+    ///
+    /// Section 3.25 fixes that the committed requirement carries this and that
+    /// a comparison is performed against this. Defaulted on deserialization so
+    /// a record written before this field existed still reads; such a record
+    /// carries no integrity proof, and [`Revision::has_full_digest`] is how a
+    /// caller asks rather than discovering it from an empty string.
+    #[serde(default)]
+    pub digest: String,
     /// Every file, ordered by path.
     pub files: Vec<FileIdentity>,
+}
+
+impl Revision {
+    /// True when this record carries the full digest an integrity check needs.
+    ///
+    /// False for a record deserialized from a shape written before the field
+    /// existed. A caller that needs the proof refuses rather than comparing
+    /// display identifiers and calling the result an integrity check.
+    pub fn has_full_digest(&self) -> bool {
+        !self.digest.is_empty()
+    }
 }
 
 /// The identity of a set of harness files.
@@ -83,9 +122,10 @@ pub fn revision_of(files: &[HarnessFile]) -> Revision {
         material.push_str(&i.digest);
         material.push('\n');
     }
-    let full = statecraft_environment::digest::digest_bytes(material.as_bytes());
+    let digest = statecraft_environment::digest::digest_bytes(material.as_bytes());
     Revision {
-        id: format!("h-{}", &full[..12]),
+        id: display_id(&digest),
+        digest,
         files: identities,
     }
 }
@@ -310,6 +350,63 @@ pub fn install(layout: &Layout, files: &[HarnessFile]) -> std::io::Result<Instal
         written,
         unchanged,
     })
+}
+
+/// Read an installed revision's files back off disk.
+///
+/// The counterpart of [`install`], and the reason section 3.25's **corrupt**
+/// state is decidable: an identity names a directory, and whether that
+/// directory still digests to the identity is a question about the bytes now
+/// present rather than about what was written once. Returns `None` when no
+/// directory exists under that identity.
+///
+/// Executability is not read back, because it is not part of the identity:
+/// [`revision_of`] digests path and content only, so a re-read of an installed
+/// tree is comparable with the shipped one.
+pub fn read_installed(layout: &Layout, id: &str) -> std::io::Result<Option<Vec<HarnessFile>>> {
+    let root = layout.harness_revision_dir(id);
+    if !root.is_dir() {
+        return Ok(None);
+    }
+    let mut files = Vec::new();
+    collect_files(&root, &root, &mut files)?;
+    files.sort_by(|a: &HarnessFile, b: &HarnessFile| a.rel_path.cmp(&b.rel_path));
+    Ok(Some(files))
+}
+
+/// Walk a revision directory, recording each file with its repository-relative
+/// path in forward-slash form.
+fn collect_files(
+    base: &std::path::Path,
+    dir: &std::path::Path,
+    out: &mut Vec<HarnessFile>,
+) -> std::io::Result<()> {
+    for entry in std::fs::read_dir(dir)? {
+        let entry = entry?;
+        let path = entry.path();
+        if path.is_dir() {
+            collect_files(base, &path, out)?;
+            continue;
+        }
+        let rel = path
+            .strip_prefix(base)
+            .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e.to_string()))?
+            .components()
+            .map(|c| c.as_os_str().to_string_lossy().to_string())
+            .collect::<Vec<_>>()
+            .join("/");
+        // Non-UTF-8 content is not a harness file. Reported as a read error
+        // rather than skipped: a file this product cannot digest inside a
+        // content-addressed directory is a corrupted store, and silently
+        // omitting it would make the recomputed identity match by accident.
+        let contents = std::fs::read_to_string(&path)?;
+        out.push(HarnessFile {
+            rel_path: rel,
+            contents,
+            executable: false,
+        });
+    }
+    Ok(())
 }
 
 /// Every revision identity present under the home.

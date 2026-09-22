@@ -665,7 +665,22 @@ fn environment_verb(
                 &UnobservedShadows,
                 &adapters::observed(),
             ) {
-                Ok(report) => emit(&bind::doctor_answer(report), format),
+                Ok(mut report) => {
+                    // Spec 002 section 3.25 names `doctor` as one of the four
+                    // things that stay possible while managed execution is
+                    // refused. The comparison needs a product home, which the
+                    // crate that owns `doctor` cannot see, so it is made here
+                    // and reported beside everything else the diagnostic found.
+                    let standing = statecraft_home::required::evaluate(
+                        &statecraft_home::home::Layout::new(home),
+                        &manifest,
+                        None,
+                    );
+                    if let Some(finding) = statecraft_home::required::doctor_finding(&standing) {
+                        report.findings.push(finding);
+                    }
+                    emit(&bind::doctor_answer(report), format)
+                }
                 Err(e) => emit(&bind::plan_error_answer(root, &e), format),
             }
         }
