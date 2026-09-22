@@ -2469,6 +2469,62 @@ the payload and the controls would otherwise measure the missing grant; and
 that a deny entry prevails over such a grant is what the refusal control
 tests, not what it assumes. Neither has been observed on a live provider here.
 
+**2026-09-22, authority: the deadline attempt's contract is corrected, recorded
+before the test changes.** The attempt
+`timeout_after_terminal_denial_cleans_settings_and_retains_evidence` in spec
+`004`'s `settings_transport.rs` asserts four properties inside one five-second
+wall-clock window that starts at `spawn`. Three of them are the supervisor's:
+supervision ends at the deadline and not before it, the process group is
+killed, and the supplied settings file is removed while the workspace's own
+settings are untouched. The fourth, that a terminal denial read before the
+deadline survives the interruption, needs a **precondition** the product does
+not promise: that the fixture child is `execve`d, runs, emits and is read
+inside those same five seconds. Spec `004` section 3.5 case 3 promises that a
+hung child is killed at the deadline with its descendants and the attempt is
+`interrupted`; it does not promise that any child starts within a bound, and the
+2026-09-21 entries above measured that on a loaded machine one does not. The
+test therefore could fail with the product correct, and the lock recorded above
+reduced how often without establishing anything about the bound.
+
+The corrected contract keeps every property and gives each the measurement that
+can establish it:
+
+1. **The deadline, the kill and the cleanup** are measured through this crate's
+   own execution path with the same five-second deadline and the same start
+   point, `spawn`, because the product's deadline covers that interval and
+   moving the start would remove part of what is promised. The child hangs from
+   its first line and backgrounds a descendant. Nothing here needs the child to
+   reach any point by any time: supervision must end no earlier than the
+   deadline, report no surviving process, remove the settings file and leave
+   the workspace's settings as they were, whether or not the child ever ran.
+   The upper bound on elapsed time is chosen to separate the defect it exists to
+   catch, a supervisor held by the process it supervises, from scheduling
+   latency in the `kill` it spawns: the child's hang is 300 seconds, so any
+   return well under that proves supervision was not held, and the bound is set
+   at 60 seconds rather than at the deadline plus a guess. A descendant the
+   child did start is checked dead by its process id.
+2. **Retention across an interruption** is measured where it is decided, and
+   without a race. In the claude-code crate, the mapping from what the
+   supervisor read to the execution's evidence is a function of the supervised
+   events and outcome, so it is tested with an interrupted supervision that read
+   a terminal denial: the denial must be in the structured evidence and the
+   outcome must stay `interrupted`. In the generic supervisor, an event the
+   reader thread had already delivered when the deadline fired was left unread
+   in the channel and lost. That is a product defect in the retention the
+   attempt was written to protect, found by stating the contract rather than by
+   timing it, and it is repaired by draining what was already delivered before
+   the kill; its test fills the channel deterministically.
+3. **What each failure means** is then separable. A fixture that could not
+   start is visible in the trace and fails nothing in (1). A child or
+   descendant that escaped the group fails (1) by the survivor report or its
+   process id. A deadline the supervisor did not honor fails (1)'s bounds. And
+   no remaining assertion is a scheduler-sensitive measurement of a property
+   the product does not promise.
+
+The lock is removed with the precondition it mitigated. The deadline stays five
+seconds, no assertion about the product is weakened, nothing is retried, and
+the earlier failure evidence in the entries above is kept as written.
+
 ## Verification
 
 Each line is one command. They run the acceptance this spec's behavior declares:
