@@ -101,6 +101,7 @@ group them:
 | `startup record <path> <session>` | `002` | Writes the startup record for one session, with the live observation absent. |
 | `startup capture <path> <control> <capture-dir>` | `002` | Launches one qualification control and records the launch and everything it produced. |
 | `startup qualify <path> <session> <capture-dir>` | `002` | Submits the three captured controls, which are admitted or refused. |
+| `startup show <path> <run> [--attempt <n>]` | `002` | One run attempt's startup records and their judgement: required, selected and observed harness, payload, supply, launch, and why it is or is not qualified. Reads only. |
 
 A verb is added by the change that implements the behavior behind it, never
 ahead of it: a command that prints "not implemented" is a worse answer than a
@@ -271,6 +272,7 @@ to script against the wrong distinction.
 | `run` whose attempt ends `completed` | 0 | The operation did what was asked. This says nothing about acceptance. |
 | `run` whose attempt ends `failed`, `refused` or `interrupted` | 1 | A finding. The operation ran and reports an outcome that is not clean. Nothing about the product failed. |
 | `run` whose supervisor could not write the record | 4 | Failed: neither the operator nor the target asked for this. |
+| `run` whose startup record could not be written after the process ended | 4 | Failed, and the answer says the evidence was not stored (section 3.11.3). |
 | `accept` where the attempt outcome is not `completed` | 1 | `not-attempted` with the reason named (`005` section 3.1.1). A finding, never a silent zero. |
 | `accept` where the suite fails | 1 | A finding with no receipt. |
 | `accept` where the suite never ran | 1 | No acceptance recorded and the unrun checks counted. Not a pass and not a fail. |
@@ -381,6 +383,46 @@ An unreadable capture is 4 for the reason an unreadable manifest is 4 in §3.3:
 it is not a precondition the operator declined, it is evidence that is not
 there. Reporting it as 2 made a missing file indistinguishable from a measured
 negative, which is the substitution `002` section 3.29 exists to prevent.
+
+### 3.11.3 The seventh verb, and what `run` adds to its answer
+
+Added on 2026-09-22, authorized by the owner and recorded here before the
+bindings were written. `002` section 3.31 makes `run` write two startup records
+per attempt and judge them. An operator has to be able to read that judgement
+without opening files under `.statecraft/state/`, and no existing verb reads
+them: `run show` is section 3.9's fold of the record and reads nothing else,
+and the `startup` verbs are keyed by a session an operator names, not by a
+run's attempt. So one read verb is added, and nothing that writes.
+
+**`startup show <path> <run> [--attempt <n>]`** reads the attempt's records
+(the latest attempt when `--attempt` is omitted) and renders the value `002`'s
+crate returns: whether the attempt launched; the required, selected and
+observed harness identities with the grade of the observation; the payload
+digest and the settings bytes' digest; the supply; where each record is; and
+the verdict with every reason. The attempt's existence and outcome are read
+from the run record, as `run show` reads them, and passed in; the judgement is
+the library's. Its codes, in section 3.3's vocabulary:
+
+| Code | Meaning for `startup show` |
+|---|---|
+| 0 | The attempt is `qualified`. Not reachable for a run attempt today, for the reason `002` section 3.31 rule 21 gives, and stated rather than hidden. |
+| 1 | A verdict that is not `qualified`: `not-launched`, `interrupted`, `mismatched` or `unverified`. A finding, with its reasons. |
+| 2 | Refused: no manifest, no such run, or no such attempt. Nothing was read as evidence. |
+| 4 | A record is present and could not be read. |
+
+**What `run` adds.** Its answer gains one field, `startup`, carrying the
+verdict and the two record paths, which section 3.4 permits as additive. One
+row is added to section 3.10: a `run` whose startup record could not be written
+after the process ended exits **4**, the same row as a supervisor that could
+not write the record, and says the evidence was not stored. An attempt refused
+because `intent.json` could not be written is a refused attempt and exits 1 as
+that row already says, because nothing was launched.
+
+**The two session-keyed verbs stop reporting an unmeasured resolution.**
+`startup record` and `startup qualify` measure no harness revision, so the
+records they write carry the resolved identity as absent and the standing as
+evaluated with nothing resolved. Before this, they recorded the required
+identity as the resolved one. Their codes are unchanged.
 
 ### 3.12 What the command surface does not unlock
 

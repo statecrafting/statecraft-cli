@@ -1164,6 +1164,90 @@ This is a cost of the consolidation and is recorded as one. A reader who wants
 to know what the provider half needs from acceptance and from the command
 surface reads the `extends` edges, which say more than the dropped lines did.
 
+**2026-09-22, authority: the adapter hands its caller the hook responses, the
+session id and the settings bytes it wrote.** Spec `002` section 3.31 measures
+which harness revision answered a run from a `SessionStart` hook's output, and
+records supply from the operation that performs it. Both readings are this
+adapter's: §3.9 owns the native stream and the settings file. So the `system`
+event's typing gains the three `hook_response` fields the recorded `2.1.267`
+streams carry (`stdout`, `exit_code`, `outcome`), and an execution carries,
+beside what it already carried, every `hook_response` in the order read with its
+session id, the init event's session id, and the exact bytes written to the
+settings file, read back from that file before the spawn. Additive: no mapping,
+outcome, classification or existing field changes, and the generic seam gains
+nothing. A field the provider does not emit stays absent, and no fixture
+invents one.
+
+**2026-09-22, authority: a run's constructed environment carries four
+attempt-binding names.** Section 3.6 constructs the child environment from an
+allowed set, and §3.14 names the two that set held. Spec `002` section 3.31
+rule 17 adds `STATECRAFT_RUN_ID`, `STATECRAFT_ATTEMPT`,
+`STATECRAFT_STARTUP_NONCE` and `STATECRAFT_HARNESS_SELECTED` for a run, so that
+a hook in the session can acknowledge which attempt and which selected revision
+it is running under. None is a credential, none carries one, each is set from a
+value this product generated or recorded, and the environment stays
+constructed: what the child receives is still the complete, recorded set.
+
+**2026-09-22, authority: the deadline suite's contract is corrected before the
+tests are.** `crates/statecraft-adapter/tests/deadline.rs` runs ten fixtures
+with a one-second deadline starting at `spawn` and asserts, for every one, that
+the child's init and refusal events were retained, that supervision returned
+inside four seconds, and, behind that, a six-second outer limit. The first
+assertion needs a precondition §3.5 case 3 does not promise, that the child is
+`execve`d, runs and is read inside that second; the 2026-09-21 measurement in
+spec `002` section 5 shows a loaded machine spending a whole deadline in
+`execve`. The four-second bound is scheduler-sensitive in the same way: after
+the deadline the supervisor spawns `kill` twice, and nothing bounds how long a
+spawn takes. Neither assertion can fail only when the product is wrong.
+
+**What the product promises about time, exactly.** The deadline runs from the
+spawn. A hung attempt is never ended before it. When it fires, the supervisor
+stops waiting on the child, on its pipes and on the prompt writer, keeps what
+the reader had already delivered, kills the process group, probes it, and
+returns without joining a reader a survivor could hold. The latency after the
+deadline is that kill sequence's, and no bound on it is promised.
+
+The corrected suite keeps every property and gives each the measurement that
+can establish it:
+
+1. **Deadline and cleanup, through a real process**, for the six fixtures that
+   hang: a terminal event then a hang, a malformed line then a hang, exit with
+   an inherited output pipe, end of file while the child lives, a prompt the
+   child never reads, and exit with an inherited input pipe. The deadline stays
+   one second from `spawn`. Unconditionally: supervision returns no earlier
+   than the deadline; returns within sixty seconds, a bound chosen to separate
+   the defect it exists to catch, a supervisor held by the child's 300-second
+   hang, from `kill` latency, and which is therefore a statement that the
+   supervisor was not held and not a measure of promptness; the outcome is
+   `interrupted`; no survivor is reported; the child and any descendant it
+   started are dead by process id. What was retained is checked against the
+   child's own trace, written after each line it emitted: every retained event
+   is, in order, one the child emitted, within the trusted prefix. Full
+   retention is not asserted here, because it needs the child to have run.
+2. **Event order and retention, deterministically**, in the supervisor's unit
+   tests, through the private reading seam with an injected clock: the scripted
+   stream is delivered, the clock is advanced past the deadline only once the
+   reader has asked for bytes beyond it, and the child is a real process in its
+   own group so the kill is real. That establishes, with no race, that a
+   terminal event followed by a hang is retained whole and ends `interrupted`
+   with the provider's claim kept, that a malformed line keeps the events
+   before it and its diagnostic, that end of file with a live child and a
+   blocked prompt writer both hold the supervisor until the deadline and no
+   longer, and that evidence delivered before the interruption survives it.
+   Production passes the real clock; nothing else about the seam changes.
+3. **Completion, through a real process**, for the four fixtures that end by
+   themselves: success, trailing output drained, exit with no result, and
+   unreadable output. The deadline is not what they measure, so each names a
+   sixty-second one as a watchdog, which the 2026-09-18 entry's convention
+   already requires, and they keep their exact assertions on events, outcome
+   and diagnostic. A fixture that has not started within sixty seconds reports
+   a timeout, which these assertions distinguish from the property under test.
+
+The outer limit on each disposable worker process becomes 120 seconds. It is a
+watchdog that kills and reaps a worker the supervisor failed to release, it runs
+its cleanup before any assertion, and it is not evidence of anything the product
+promises. Nothing is retried, serialized or repeated to obtain a pass.
+
 ## Verification
 
 Each line is one command. §3.5's suite is eight tests named `suite_1` to

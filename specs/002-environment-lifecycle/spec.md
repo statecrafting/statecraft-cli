@@ -41,7 +41,12 @@ summary: >
   that sharpens it: each control is judged from correlated structured events
   as refused or executed, a capture is one session read whole, and an
   invocation is bound to its settings by the launch that performed it rather
-  than by a description written afterwards.
+  than by a description written afterwards. Section 3.31 is the same day's
+  amendment for `run`: two write-once startup records per attempt, supply
+  recorded by the launch that performs it, the selected revision carried in the
+  launch configuration, the answering revision measured from a startup
+  acknowledgment in the session's own stream, a mismatch that refuses the
+  attempt, and a required revision never recorded as an observed one.
 establishes:
   - { kind: directory, path: "crates/statecraft-environment/" }
   - { kind: directory, path: "crates/statecraft-home/" }
@@ -1425,6 +1430,182 @@ route, and its contract is part of this amendment:
   provider. It never reads the provider approval, refuses to run when that
   approval is also set, marks every capture synthetic, and reports its result as
   synthetic.
+
+### 3.31 The startup record a run writes, and the harness revision that answered
+
+A narrowly scoped authority amendment, settled by the owner on 2026-09-22 and
+recorded before the implementation it authorizes. Section 3.26 fixed what a
+managed session records at its start, and section 3.25 fixed that the resolved
+identity is recorded per session and says which revision actually answered.
+Neither was true of `run`: it wrote no startup record at all, and the
+`startup record` and `startup qualify` verbs filled the resolved identity in
+with the **required** one, so a revision nobody measured read as `exact` and
+resolved. This section fixes when a run's record is written, what binds it to
+the attempt, what measures the answering revision, and what each grade of that
+measurement establishes.
+
+**The defect this closes, exactly.** A required revision is not an observed
+one, and a verified directory on disk is not proof that the launched session
+used it. Recording the requirement as the resolution is the substitution
+section 3.26 forbids between its first and third statements, applied to the
+harness instead of to the instructions.
+
+**Rule 13: a run's startup evidence is two write-once records per attempt,
+under the attempt's identity.** Both live under the project's ignored runtime
+state, at `.statecraft/state/startup/runs/<run>/<attempt>/`, where `<run>` and
+`<attempt>` are the run id and attempt number spec `003` section 3.4 assigned.
+
+| Record | Written | Holds |
+|---|---|---|
+| `intent.json` | after the attempt's intent is appended and every preflight has passed, **before** the process is created | the attempt identity; the project identity; the workspace the session starts in; the load chain and instruction-file identities evaluated **in that workspace**; the required identity; the standing before launch; the **selected** revision; the adapter identity; the resolved program; the payload's digest, length and argument; and a fresh binding nonce |
+| `record.json` | after the process ended, or after the launch failed | the section 3.26 record: its seven fields and the added evidence, plus the attempt identity, the digest of the `intent.json` bytes it finalizes, the provider's session id and version as its stream reported them, the process outcome, the settings bytes the adapter actually wrote, and the **observed** revision with the grade of its evidence |
+
+Neither is ever rewritten. A record already present under the attempt's
+identity refuses the write, so a previous attempt's evidence is never
+overwritten and never adopted by a later attempt. `record.json` names the
+digest of the intent it finalizes, so the pair is judged together and an intent
+changed after the fact no longer binds.
+
+**Rule 14: preflight refusal and a launch are different facts.** A run refused
+before its attempt is appended (section 3.25's refusals) writes neither record.
+An attempt concluded `refused` before a process was created (the adapter's
+preflight, an unresolvable executable) writes neither record, and its refusal
+stays in the attempt record where spec `003` puts it. `intent.json` exists if
+and only if this product was about to create the process. A record read without
+its intent is not evidence of a launch.
+
+**Rule 15: a recording failure stops or reports, never proceeds silently.** If
+`intent.json` cannot be written, nothing is launched: the attempt is concluded
+`refused` with the guard `startup-record` and the reason. If `record.json`
+cannot be written after the process ended, the attempt is concluded with its
+real outcome, its detail says the record was not stored and why, and `run`
+exits 4, spec `006` section 3.10's failed row. If this product's own process
+ends between the two writes, the intent stays and no record is fabricated: the
+attempt reads as launched and **interrupted**, and reconciliation (spec `003`
+section 3.6) owns the attempt record.
+
+**Rule 16: supply is recorded by the launch that performs it.** In a run, the
+bytes this product hands to the session are two things, and each is recorded
+by the operation that hands it. The **instruction chain** is in the workspace
+this product prepared and starts the session in: the launch reads each file the
+load rule reaches in that workspace immediately before the spawn and records
+its digest. The **settings payload** is the document the adapter writes: the
+adapter reports the exact bytes it wrote to the settings file it passes, and the
+record carries their digest. The supply is `supplied` only when the process was
+created, the chain reached the managed file, and the written bytes digest to
+the payload this build records; a spawn that failed is `failed`; a chain that
+does not arrive is `not-attempted`. Supply established this way says the bytes
+were in the session's working tree and on its command line at spawn. It does
+not say the provider read them, which is section 3.26's first and third
+statements, unchanged.
+
+**Rule 17: the selected revision is the launch configuration, and the observed
+revision is measured.** The run **selects** the required revision after the
+standing has established that it is installed and intact, and never any other
+(section 3.25: no latest, no substitute). A project that commits no
+requirement selects nothing. The selection is carried to the session in its
+constructed environment, beside the attempt binding: `STATECRAFT_RUN_ID`,
+`STATECRAFT_ATTEMPT`, `STATECRAFT_STARTUP_NONCE` and
+`STATECRAFT_HARNESS_SELECTED`. None of them is a credential and none carries
+one.
+
+What **answered** is measured by the shipped `SessionStart` hook. When the
+nonce is present in its environment and the manifest gate of section 3.14 rule
+3 passes, it prints one acknowledgment line on its standard output, and writes
+nothing:
+
+```text
+statecraft-startup<TAB>v1<TAB>nonce=<n><TAB>run=<id><TAB>attempt=<k><TAB>selected=<digest-or-none><TAB>project=<dir><TAB>root=<revision-dir>
+```
+
+`root` is the revision directory the executing script is in, resolved by the
+script from its own path. Claude Code `2.1.267` reports each hook's standard
+output in its stream as a `hook_response` event carrying the session id, the
+hook event, the exit code and the output verbatim, which the recorded streams
+under `crates/statecraft-adapter-claude-code/testdata/stream/` show. The
+adapter types those fields (spec `004` section 3.9) and hands the responses to
+the run; this spec's crate judges them.
+
+**Rule 18: what an acknowledgment must satisfy, and what each failure is.** The
+observed revision is admitted only from exactly one acknowledgment, in a
+`hook_response` event for `SessionStart` that exited `0`, in this attempt's own
+stream, whose session id is the session id of that stream's init event, and
+whose nonce, run, attempt, selected revision and project all equal what
+`intent.json` recorded (the project compared as the canonical workspace path).
+The revision directory it names is then read and digested, and that full digest
+is the **observed** identity. Anything else is **unverified**, and the record
+names which:
+
+| Evidence | Recorded as |
+|---|---|
+| no acknowledgment in any `SessionStart` response | `unverified: absent` |
+| a line that begins the acknowledgment and does not parse | `unverified: malformed` |
+| another attempt's nonce | `unverified: replayed` |
+| another run or attempt number, or another selection | `unverified: wrong-attempt` |
+| another project directory | `unverified: wrong-project` |
+| a session id that is not the stream's own | `unverified: wrong-session` |
+| a hook that exited non-zero | `unverified: hook-failed` |
+| two acknowledgments naming different directories | `unverified: conflicting` |
+| a revision directory that is not directly inside this home's harness store | `unverified: foreign-revision` |
+| a revision directory that cannot be read and digested | `unverified: unreadable-revision` |
+
+An unverified observation leaves the resolved identity absent, and absent is
+not a match: the standing stays `exact` with nothing resolved, which section
+3.25 already makes not qualified. An admitted observation becomes the resolved
+identity and the standing is evaluated against it. Its directory's current
+bytes are what the digest is over, so a revision that was altered after it
+answered reads as what it now is.
+
+**Rule 19: a mismatch observed after launch refuses the attempt.** Section 3.25
+refuses managed execution under a mismatch, and a run cannot detect one before
+the session starts, because the acknowledgment is emitted by the session. So a
+mismatched standing, measured from an admitted acknowledgment, is counted as a
+refusal under the guard `harness-identity` when the attempt is concluded, the
+attempt is `refused` (spec `003` section 3.5), and `accept` treats it as spec
+`005` section 3.1.1 treats any refused attempt. This build does not stop the
+session when the acknowledgment arrives: the supervisor recognizes only a
+terminal event, and the limit is stated rather than hidden. An unverified
+observation is not a mismatch and refuses nothing; it is recorded and the
+attempt is not qualified. A project that commits no requirement records
+whatever was observed and is `unrequired`, which never qualifies.
+
+**Rule 20: what each grade establishes, and does not.**
+
+| Grade | Establishes | Does not establish |
+|---|---|---|
+| installed integrity | the required directory's files digest to the committed full digest, before launch, and again when the record is written | that anything used them |
+| launch configuration | this product selected that revision and named it, with the attempt binding, in the environment it constructed for the process it created | that the provider or any hook read the environment |
+| runtime acknowledgment | a `SessionStart` hook script located in the named revision directory executed inside this attempt's session, with this attempt's binding, and the provider reported its output in this attempt's stream | that any other file of that revision (a skill, an agent, another hook) was loaded; that a model read, understood or complied with anything; and the acknowledgment's origin: the nonce is in the session's environment, so anything that runs there can print it, and nothing signs the line |
+
+The acknowledgment is **launcher-attested**, like section 3.30's launch record:
+this product reads it from the stream of the process it created, and no field
+claims more. Whether the live provider runs a globally registered
+`SessionStart` hook in `--print` mode, passes its environment to the hook, and
+reports it as `hook_response` in a session this product constructs has been
+measured on `2.1.267` for the last of the three and is **unobserved** for the
+first two in a managed run. Until a live run shows it, a live run's observation
+is expected to be `unverified: absent`, and that is the correct outcome.
+
+**Rule 21: a run attempt's judgement, and why `qualified` is not reachable
+through a run.** The judgement read back from the two records is one of:
+
+| Verdict | When |
+|---|---|
+| `not-launched` | the attempt exists and has no `intent.json` |
+| `interrupted` | an intent with no record, or a record whose launch failed or whose process was interrupted |
+| `mismatched` | an admitted acknowledgment naming a revision other than the required one |
+| `unverified` | launched and recorded, and not qualified for any other reason, each one named |
+| `qualified` | the record's `qualifies()` conjunction holds |
+
+A run session is not one of section 3.29's three controls, and rule 4 of that
+section refuses evidence for another invocation as evidence for this one. So a
+run attempt's observation is always `not-observed`, and `qualified` is not
+reachable through a run: a completed run with a matching acknowledgment is
+`unverified`, and it says the live observation is the missing class. The
+judgement is recomputed on every read from the bytes in the two records,
+including section 3.29 rule 5's re-admission, so a field edited by hand changes
+the judgement rather than asserting one, and one attempt's records are never
+read as another's.
 
 ## 4. Out of scope
 
