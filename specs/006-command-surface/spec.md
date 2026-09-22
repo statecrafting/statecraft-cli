@@ -97,9 +97,10 @@ group them:
 | `accept <run>` | `005` | Judges the candidate independently and records the acceptance or its absence. |
 | `harness show <path>` | `002` | The required harness identity, the resolved one, and the standing between them. Reads only. |
 | `harness upgrade <path>` | `002` | Commits the shipped revision as the project's required identity, as an explicit act. |
-| `session payload` | `002` | The exact managed-session settings bytes, or with `--digest` their identity. |
+| `session payload` | `002` | The exact managed-session settings bytes; with `--json`, also their identity and the argument that carries them. |
 | `startup record <path> <session>` | `002` | Writes the startup record for one session, with the live observation absent. |
-| `startup qualify <path> <session> <evidence>` | `002` | Submits captured qualification evidence, which is admitted or refused. |
+| `startup capture <path> <control> <capture-dir>` | `002` | Launches one qualification control and records the launch and everything it produced. |
+| `startup qualify <path> <session> <capture-dir>` | `002` | Submits the three captured controls, which are admitted or refused. |
 
 A verb is added by the change that implements the behavior behind it, never
 ahead of it: a command that prints "not implemented" is a worse answer than a
@@ -330,6 +331,57 @@ and they remain runnable, which keeps a second caller of the same library
 operations honest about §3.2. They are examples of calling the boundary, not
 the operator's route, and `002`'s handoff no longer names them as one.
 
+### 3.11.2 The sixth verb, and what a qualification exit code distinguishes
+
+Added on 2026-09-22, authorized by the owner and recorded here before the
+binding was written. `002` section 3.30 rule 12 binds a qualification control's
+invocation to its settings by the operation that **launches** it. A binding
+cannot supply that operation from a shell: an argument list a script wrote down
+beside the command it ran is exactly the after-the-fact description the rule
+refuses. So the launch is a library operation in `002`'s crate, and this verb is
+its binding.
+
+**`startup capture <path> <control> <capture-dir>`** launches one control, where
+`<control>` is `refusal`, `allowed-command` or `without-payload`, in `<path>`,
+and writes one capture record into `<capture-dir>`. Two options:
+`--program <executable>` names the provider (default `claude`), and
+`--deadline <seconds>` bounds the session (default 300). A third,
+`--synthetic`, is the operator stating that the executable is a local fake: it
+marks the capture synthetic, which `002` section 3.30 makes permanently
+non-qualifying. There is no option that names the arguments, the prompt, the
+commands or the settings: the verb constructs them, so a caller cannot describe
+an invocation that did not happen.
+
+Its exit codes, in §3.3's vocabulary:
+
+| Code | Meaning for `startup capture` |
+|---|---|
+| 0 | The control was launched, ended by itself inside its deadline, and its output reads as one complete session. The record is written. |
+| 1 | The record is written and the launch did not complete: a timeout, a signal, a survivor, or output that is not one complete session. A finding: it is recorded, and the next control should not be launched. |
+| 2 | Refused before launch: an unknown control, a capture record that already exists, a capture directory inside the project, or an executable that cannot be resolved. Nothing was launched. |
+| 4 | The launch or the record failed for a reason nobody asked for. |
+
+A 0 is a statement about the launch, never about the control's outcome: a
+refusal control that executed its command still exits 0 here, and it is the
+admission that refuses the claim.
+
+**`startup qualify` now takes the capture directory** the three launches wrote
+into, rather than a submission file naming captures by path. The three records
+are read by their fixed names. And §3.11.1's single exit 2 is split where it
+conflated two different facts:
+
+| Code | Meaning for `startup qualify` |
+|---|---|
+| 0 | The observation was admitted and the record qualifies. Not reachable through this verb today, because it records no supply (`002` section 3.26), and that is stated rather than hidden. |
+| 1 | The observation was admitted and recorded; the record does not qualify. It says which evidence class is missing. |
+| 2 | The claim was read and **refused** by the admission, or a record for the session already exists. Nothing was written, and the session is unverified. |
+| 4 | The captures could not be **read**: a record is missing, unreadable or not a capture record. No claim was judged and nothing was written. |
+
+An unreadable capture is 4 for the reason an unreadable manifest is 4 in §3.3:
+it is not a precondition the operator declined, it is evidence that is not
+there. Reporting it as 2 made a missing file indistinguishable from a measured
+negative, which is the substitution `002` section 3.29 exists to prevent.
+
 ### 3.12 What the command surface does not unlock
 
 Stated because an integration slice is exactly where scope grows quietly:
@@ -503,6 +555,16 @@ separate act §3.29 requires. `session payload` takes no path for the reason §3
 states; the other four take one and none of them requires it to be registered,
 because reading a requirement and recording a start are both things a target
 does before it is driven.
+
+**2026-09-22, authority: §3.11.2, recorded before the binding.** The launch
+verb and the split of `startup qualify`'s exit 2. The alternative considered for
+the launch was leaving it in the acceptance script and having the script write
+its argument list into the submission from the same variables it spawned with.
+That is the design `002` section 3.30 found insufficient, because the same
+variables can be written twice differently and nothing checks that they were
+not. The table row for `session payload` is corrected in the same change: it
+named a `--digest` option that never existed, since the identity moved to the
+`--json` rendering on 2026-09-21.
 
 ## Verification
 
