@@ -28,7 +28,12 @@ summary: >
   content delivered through the harness mechanism has to satisfy. Section 3.24
   is the one write into a harness's own settings file that section 3.14 rule 1
   admits: narrow, marked, reversible, refused by default, and able to add a
-  refusal but never a permission.
+  refusal but never a permission. Sections 3.25 to 3.28 carry the owner's
+  resolutions of 2026-09-21: the committed required harness identity beside the
+  per-session resolved one, what a managed session records about delivery and
+  what that record may not claim, the separation of global adapter registration
+  from managed-session permission delivery, and the rule that an unmarked
+  registration is the user's however much it resembles shipped content.
 establishes:
   - { kind: directory, path: "crates/statecraft-environment/" }
   - { kind: directory, path: "crates/statecraft-home/" }
