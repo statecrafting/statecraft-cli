@@ -33,7 +33,11 @@ summary: >
   per-session resolved one, what a managed session records about delivery and
   what that record may not claim, the separation of global adapter registration
   from managed-session permission delivery, and the rule that an unmarked
-  registration is the user's however much it resembles shipped content.
+  registration is the user's however much it resembles shipped content. Section
+  3.29 is the same day's narrow authority amendment over the admission itself:
+  what a claimed live observation has to carry, which controls the qualification
+  boundary enforces rather than describes, and that unverified is the answer
+  when the evidence cannot decide.
 establishes:
   - { kind: directory, path: "crates/statecraft-environment/" }
   - { kind: directory, path: "crates/statecraft-home/" }
@@ -1145,6 +1149,85 @@ is configured; it does not establish that it was enforced, in this version, in
 this session, for this command. The two are different claims and only the
 second qualifies a session.
 
+### 3.29 What admits a live observation
+
+A narrowly scoped authority amendment, settled by the owner on 2026-09-21 and
+recorded before the implementation it authorizes. Section 3.26 fixed that a
+live observation is the third evidence class and that only a session produces
+one. Section 3.28 fixed that qualification is measured rather than read off the
+configuration. This section fixes **what a claimed observation has to carry**
+before it is admitted as one, because the first implementation of that
+admission read the provider's prose and a sentence saying the opposite of a
+refusal satisfied it.
+
+**The defect this closes, exactly.** The admission accepted a transcript that
+contained the command text together with any of the words `permission`,
+`blocked`, `refus`, `denied` or `not allowed`. The transcript
+`cargo publish --dry-run: permission granted; command executed successfully`
+satisfies that predicate, and was admitted as evidence that the command had
+been refused. The repair is not a longer word list and not a more elaborate
+reading of natural language: a claim about enforcement is admitted from
+**structured evidence the harness itself emits**, or it is not admitted.
+
+**Rule 1: provider prose alone cannot establish enforced refusal.** Text a
+model emitted is a statement by the model. A refusal that survives as evidence
+is a structured record the harness produced, of the kind spec `004` section 3.4
+requires a refusal-bearing restriction to produce, naming the tool, the
+tool-use id and the tool input verbatim. Where the supported adapter exposes
+that record, it is what the admission reads. Prose may accompany it and is
+never what is read.
+
+**Rule 2: the controls are part of the evidence, not part of a procedure.**
+An observation qualifies only when all three of the following are present and
+each one succeeded:
+
+| Control | What it is | Why it is required |
+|---|---|---|
+| the refusal | the claimed command, run with the managed-session payload | the observation itself |
+| the allowed command | a command no floor entry claims, run with the same payload | without it the refusal is consistent with a payload that refuses everything |
+| the absent payload | the same claimed command, run with no payload | without it the refusal is evidence for the operator's own configuration rather than for this payload |
+
+These are conditions on the evidence a qualification boundary accepts. A
+document that describes them, a checklist that recommends them, or an operator
+who remembers them is not what this rule means: the boundary that admits the
+observation refuses one whose controls are absent or whose controls did not
+behave as the table says.
+
+**Rule 3: missing, contradictory, substituted or mismatched evidence refuses
+qualification.** A capture that is empty, that does not parse as the harness's
+own structured output, that reaches no terminal event, that carries no refusal
+record for the claimed command, or that carries a refusal for the allowed
+command, refuses the claim. Two controls presenting the same captured bytes is
+substituted evidence and refuses the claim, because one capture cannot be two
+measurements.
+
+**Rule 4: evidence for another invocation or settings payload cannot qualify
+this one.** The observation is bound to the invocation that produced it: the
+program and arguments as spawned, the working directory, the settings payload
+by digest, and the harness version the capture itself reports. A payload digest
+that is not this build's, a version that disagrees with the capture, a refusal
+control whose invocation does not carry the payload, or an absent-payload
+control whose invocation does carry one, all refuse the claim.
+
+**Rule 5: the same rules govern every route.** Construction, deserialization,
+and conversion from any other qualification type reach an admitted observation
+only through these rules. A record read back from a file is re-checked against
+them before it is treated as qualified, so writing the word into a file by hand
+is not a weaker route to the same claim; it is not a route at all.
+
+**Rule 6: unverified is the answer when the evidence cannot decide.** Where the
+supported adapter cannot expose evidence sufficient to distinguish a permission
+refusal from a model's statement about one, the result stays unverified and the
+session is reported as not qualified. Section 3.27's last paragraph already
+refuses the two repairs that would hide this. This section adds the third: the
+admission is not loosened so that a claim succeeds. A truthful inability to
+qualify is the correct outcome, and an invented proof is not an outcome at all.
+
+**What is preserved.** The original captured bytes and their provenance are
+kept with the record, not summarized into it. The admission is reviewable
+because what it was made from is kept and can be re-read, which is the property
+section 3.26 already relies on and which rules 3 and 5 now depend on.
+
 ## 4. Out of scope
 
 Installing the product itself; provider authentication; hosted registration;
@@ -2071,6 +2154,40 @@ through `crates/statecraft-home/examples/require-harness.rs`, which is also
 what builds the acceptance fixture. Named here rather than left for a reader to
 discover, because "implemented" and "reachable by an operator" are different
 claims and this is the second one missing.
+
+**2026-09-21: the admission reads a structured refusal record, and the
+adapter that produces one is a dependency.** §3.29 rule 1 requires the
+admission to read structured evidence the harness emits rather than prose. That
+record is spec `004` section 3.3's `permission_denials`, and its shape is
+already owned, parsed and tested in `crates/statecraft-adapter-claude-code/`.
+`crates/statecraft-home/` therefore takes that crate as a dependency and reads
+the provider capture through its types, rather than growing a second parser for
+the same bytes. The alternative considered and refused was a private copy of
+the event shapes in this spec's crate, which would have been two places to
+correct when the provider adds a field, and the one place nobody would look.
+The dependency is acyclic: nothing in `004`'s crate reaches back here. No unit
+of `004` is edited by this, so no new edge is declared; the `extends` edge
+already in this file's frontmatter covers the one test of `004`'s that this
+round repaired.
+
+**2026-09-21: the negative control was written before the repair, and it
+failed.** §3.29 names the exact transcript that defeated the first admission.
+It is a test in `crates/statecraft-home/tests/qualification_admission.rs`
+rather than a sentence in this section, and it was run against the unrepaired
+implementation first, where it failed with the admission returning
+`Ok(Observed { .. })` for a transcript stating the command had succeeded. Two
+further probes against the same build showed the deserialization route and the
+`from_qualification` route reaching `Observed` with no evidence at all, which
+is why §3.29 rule 5 covers every route rather than the one that was reported.
+
+**2026-09-21: the evidence bytes are kept in the record, not beside it.** §3.29
+rule 5 re-checks a deserialized record, and rule 3 refuses substituted
+evidence. Neither is decidable from a digest alone once the original file is
+gone, so the record carries each control's captured bytes verbatim along with
+the path they were read from. The cost is a record of a few kilobytes where it
+was a few hundred bytes, which is the price of a record that can be re-judged
+rather than believed. The captures are bounded by the acceptance's own
+`--max-turns 1`.
 
 ## Verification
 
