@@ -50,14 +50,53 @@ pub struct FileIdentity {
     pub bytes: u64,
 }
 
+/// How many hex characters of the full digest the display identifier carries.
+pub const DISPLAY_LEN: usize = 12;
+
+/// The display identifier derived from a full revision digest.
+///
+/// Spec 002 section 3.25: a short identifier is a **display** convenience,
+/// legible in a plan, a verdict and a log, and never on its own the thing an
+/// equality check is performed against. Every integrity comparison in this
+/// crate uses [`Revision::digest`]; this function exists so that the short form
+/// has exactly one definition and cannot drift into being a second identity.
+pub fn display_id(digest: &str) -> String {
+    let short: String = digest.chars().take(DISPLAY_LEN).collect();
+    format!("h-{short}")
+}
+
 /// A content-addressed harness revision.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Revision {
     /// The revision identity, `h-` followed by twelve hex characters.
+    ///
+    /// Display only. It names a revision directory and reads well in a report;
+    /// it is not what an integrity check compares. Two revisions sharing a
+    /// truncation are unlikely and "unlikely" is not a proof (section 3.25).
     pub id: String,
+    /// The full digest over the revision's files: the integrity proof.
+    ///
+    /// Section 3.25 fixes that the committed requirement carries this and that
+    /// a comparison is performed against this. Defaulted on deserialization so
+    /// a record written before this field existed still reads; such a record
+    /// carries no integrity proof, and [`Revision::has_full_digest`] is how a
+    /// caller asks rather than discovering it from an empty string.
+    #[serde(default)]
+    pub digest: String,
     /// Every file, ordered by path.
     pub files: Vec<FileIdentity>,
+}
+
+impl Revision {
+    /// True when this record carries the full digest an integrity check needs.
+    ///
+    /// False for a record deserialized from a shape written before the field
+    /// existed. A caller that needs the proof refuses rather than comparing
+    /// display identifiers and calling the result an integrity check.
+    pub fn has_full_digest(&self) -> bool {
+        !self.digest.is_empty()
+    }
 }
 
 /// The identity of a set of harness files.
@@ -83,9 +122,10 @@ pub fn revision_of(files: &[HarnessFile]) -> Revision {
         material.push_str(&i.digest);
         material.push('\n');
     }
-    let full = statecraft_environment::digest::digest_bytes(material.as_bytes());
+    let digest = statecraft_environment::digest::digest_bytes(material.as_bytes());
     Revision {
-        id: format!("h-{}", &full[..12]),
+        id: display_id(&digest),
+        digest,
         files: identities,
     }
 }
@@ -96,7 +136,7 @@ pub fn revision_of(files: &[HarnessFile]) -> Revision {
 /// not that it is a large one, and every file here has to earn the fact that it
 /// is delivered into an operator's agent home.
 pub fn shipped() -> Vec<HarnessFile> {
-    vec![
+    let mut files = vec![
         HarnessFile {
             rel_path: "rules/statecraft-governed-work.md".to_string(),
             contents: RULE_GOVERNED_WORK.to_string(),
@@ -113,17 +153,152 @@ pub fn shipped() -> Vec<HarnessFile> {
             executable: false,
         },
         HarnessFile {
-            rel_path: "hooks/statecraft-gate.sh".to_string(),
-            contents: HOOK_GATE.to_string(),
-            executable: true,
-        },
-        HarnessFile {
             rel_path: "adapters/claude-code.md".to_string(),
             contents: ADAPTER_CLAUDE_CODE.to_string(),
             executable: false,
         },
-    ]
+    ];
+    files.extend(ADOPTED_SKILLS.iter().map(|(name, contents)| HarnessFile {
+        rel_path: format!("skills/statecraft-{name}/SKILL.md"),
+        contents: (*contents).to_string(),
+        executable: false,
+    }));
+    files.extend(ADOPTED_AGENTS.iter().map(|(name, contents)| HarnessFile {
+        rel_path: format!("agents/statecraft-{name}.md"),
+        contents: (*contents).to_string(),
+        executable: false,
+    }));
+    files.extend(ADOPTED_HOOKS.iter().map(|hook| HarnessFile {
+        rel_path: format!("hooks/{}", hook.file),
+        contents: hook.contents.to_string(),
+        executable: true,
+    }));
+    files
 }
+
+/// The ten skills the owner adopted on 2026-09-21.
+///
+/// Spec 002 §3.23's inventory, delivered under Statecraft-namespaced names,
+/// which is §3.14 rule 2. Each file's own front matter carries the
+/// Statecraft-project gate of §3.14 rule 3, so a session choosing a skill sees
+/// the gate before it reads the body.
+///
+/// Held as files rather than as string literals in this module: they are 1900
+/// lines of authored prose, they are reviewed as prose, and a diff against the
+/// source they were adopted from is only legible while they are files.
+pub const ADOPTED_SKILLS: [(&str, &str); 10] = [
+    (
+        "prime",
+        include_str!("../harness/skills/statecraft-prime/SKILL.md"),
+    ),
+    (
+        "next",
+        include_str!("../harness/skills/statecraft-next/SKILL.md"),
+    ),
+    (
+        "build",
+        include_str!("../harness/skills/statecraft-build/SKILL.md"),
+    ),
+    (
+        "verify",
+        include_str!("../harness/skills/statecraft-verify/SKILL.md"),
+    ),
+    (
+        "ship",
+        include_str!("../harness/skills/statecraft-ship/SKILL.md"),
+    ),
+    (
+        "shepherd",
+        include_str!("../harness/skills/statecraft-shepherd/SKILL.md"),
+    ),
+    (
+        "spec",
+        include_str!("../harness/skills/statecraft-spec/SKILL.md"),
+    ),
+    (
+        "commit",
+        include_str!("../harness/skills/statecraft-commit/SKILL.md"),
+    ),
+    (
+        "code-review",
+        include_str!("../harness/skills/statecraft-code-review/SKILL.md"),
+    ),
+    (
+        "setup",
+        include_str!("../harness/skills/statecraft-setup/SKILL.md"),
+    ),
+];
+
+/// The four agents the owner adopted on 2026-09-21.
+pub const ADOPTED_AGENTS: [(&str, &str); 4] = [
+    (
+        "architect",
+        include_str!("../harness/agents/statecraft-architect.md"),
+    ),
+    (
+        "explorer",
+        include_str!("../harness/agents/statecraft-explorer.md"),
+    ),
+    (
+        "implementer",
+        include_str!("../harness/agents/statecraft-implementer.md"),
+    ),
+    (
+        "reviewer",
+        include_str!("../harness/agents/statecraft-reviewer.md"),
+    ),
+];
+
+/// One adopted event behavior: the harness event, the matcher, and the script.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct AdoptedHook {
+    /// The harness event it registers on.
+    pub event: &'static str,
+    /// The matcher the registration carries.
+    pub matcher: &'static str,
+    /// The file name under `hooks/`.
+    pub file: &'static str,
+    /// The script.
+    pub contents: &'static str,
+    /// Whether this event **enforces** or only **advises**.
+    ///
+    /// Spec 002 §3.23, as the owner settled it on 2026-09-21. An enforcing
+    /// operation gate refuses a failed or unavailable check; an end-of-turn
+    /// event reports what the check answered and never withholds a handback.
+    pub enforcing: bool,
+}
+
+/// The four event behaviors the owner adopted on 2026-09-21.
+pub const ADOPTED_HOOKS: [AdoptedHook; 4] = [
+    AdoptedHook {
+        event: "SessionStart",
+        matcher: "startup|resume|clear|compact",
+        file: "statecraft-session-start.sh",
+        contents: include_str!("../harness/hooks/statecraft-session-start.sh"),
+        enforcing: false,
+    },
+    AdoptedHook {
+        event: "PostToolUse",
+        matcher: "Edit|Write",
+        file: "statecraft-post-edit.sh",
+        contents: include_str!("../harness/hooks/statecraft-post-edit.sh"),
+        enforcing: false,
+    },
+    AdoptedHook {
+        event: "PreToolUse",
+        matcher: "Bash",
+        file: "statecraft-pre-bash.sh",
+        contents: include_str!("../harness/hooks/statecraft-pre-bash.sh"),
+        enforcing: true,
+    },
+    AdoptedHook {
+        event: "Stop",
+        matcher: "*",
+        file: "statecraft-stop.sh",
+        contents: include_str!("../harness/hooks/statecraft-stop.sh"),
+        enforcing: false,
+    },
+];
 
 /// What an install did.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -175,6 +350,63 @@ pub fn install(layout: &Layout, files: &[HarnessFile]) -> std::io::Result<Instal
         written,
         unchanged,
     })
+}
+
+/// Read an installed revision's files back off disk.
+///
+/// The counterpart of [`install`], and the reason section 3.25's **corrupt**
+/// state is decidable: an identity names a directory, and whether that
+/// directory still digests to the identity is a question about the bytes now
+/// present rather than about what was written once. Returns `None` when no
+/// directory exists under that identity.
+///
+/// Executability is not read back, because it is not part of the identity:
+/// [`revision_of`] digests path and content only, so a re-read of an installed
+/// tree is comparable with the shipped one.
+pub fn read_installed(layout: &Layout, id: &str) -> std::io::Result<Option<Vec<HarnessFile>>> {
+    let root = layout.harness_revision_dir(id);
+    if !root.is_dir() {
+        return Ok(None);
+    }
+    let mut files = Vec::new();
+    collect_files(&root, &root, &mut files)?;
+    files.sort_by(|a: &HarnessFile, b: &HarnessFile| a.rel_path.cmp(&b.rel_path));
+    Ok(Some(files))
+}
+
+/// Walk a revision directory, recording each file with its repository-relative
+/// path in forward-slash form.
+fn collect_files(
+    base: &std::path::Path,
+    dir: &std::path::Path,
+    out: &mut Vec<HarnessFile>,
+) -> std::io::Result<()> {
+    for entry in std::fs::read_dir(dir)? {
+        let entry = entry?;
+        let path = entry.path();
+        if path.is_dir() {
+            collect_files(base, &path, out)?;
+            continue;
+        }
+        let rel = path
+            .strip_prefix(base)
+            .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e.to_string()))?
+            .components()
+            .map(|c| c.as_os_str().to_string_lossy().to_string())
+            .collect::<Vec<_>>()
+            .join("/");
+        // Non-UTF-8 content is not a harness file. Reported as a read error
+        // rather than skipped: a file this product cannot digest inside a
+        // content-addressed directory is a corrupted store, and silently
+        // omitting it would make the recomputed identity match by accident.
+        let contents = std::fs::read_to_string(&path)?;
+        out.push(HarnessFile {
+            rel_path: rel,
+            contents,
+            executable: false,
+        });
+    }
+    Ok(())
 }
 
 /// Every revision identity present under the home.
@@ -265,109 +497,6 @@ Read `statecraft-cli run show <path> <run-id> --json` and report what the record
 establishes. Do not infer an outcome the record does not carry, and do not treat
 a completion the child declared as an acceptance: those are separate records and
 the product keeps them separate on purpose.
-"#;
-
-const HOOK_GATE: &str = r#"#!/bin/sh
-# Statecraft: the project gate, as a hook an operator may wire up themselves.
-#
-# Applies only inside a Statecraft project: a repository holding
-# `.statecraft/environment.json`. Outside one this exits 0 and does nothing,
-# which is what makes it safe to place on a path shared with other work.
-#
-# This product does NOT wire this hook into an agent's settings. Doing so would
-# mean rewriting a user's own configuration file, and spec 002 section 3.14
-# refuses that. Install it yourself if you want it.
-#
-# Spec 002 section 3.23 states the seven contracts this script is held to, and
-# crates/statecraft-home/tests/harness_hooks.rs extracts this body and runs it
-# as a program against each one. The numbered comments below name the contract
-# the lines under them exist for.
-#
-# Usage: statecraft-gate.sh [target-directory]
-set -eu
-
-# Contract 3: resolve the target repository from the command, not the session.
-# A caller that knows which tree it is acting on names it, and only a caller
-# with nothing to name falls back to the working directory. A multi-repository
-# session governs whichever tree the command named.
-target=${1:-.}
-root=$(git -C "$target" rev-parse --show-toplevel 2>/dev/null || true)
-
-# Not a repository, or not a Statecraft project. This is not a gate here at all,
-# so it is inert rather than refusing: section 3.14 rule 3. That is a different
-# thing from contract 6 below, which is about a gate that exists and did not run.
-[ -n "$root" ] || exit 0
-[ -f "$root/.statecraft/environment.json" ] || exit 0
-
-# Contract 2: $SPEC_SPINE_BIN, then the target repository's own build, then
-# PATH. A repository that builds its own binary must be governed by the one it
-# builds; the PATH fallback keeps an adopter on the published CLI working. A
-# bare name resolved from PATH alone is whichever copy the last unrelated
-# project on the machine installed.
-if [ -n "${SPEC_SPINE_BIN:-}" ]; then
-  bin=$SPEC_SPINE_BIN
-elif [ -x "$root/target/release/spec-spine" ]; then
-  bin=$root/target/release/spec-spine
-else
-  bin=$(command -v spec-spine 2>/dev/null || true)
-fi
-
-# Contract 6: a gate whose check did not run is not green. Inside a Statecraft
-# project, a binary this script cannot execute refuses. It does not pass.
-if [ -z "$bin" ] || [ ! -x "$bin" ]; then
-  echo "statecraft-gate: no spec-spine binary (SPEC_SPINE_BIN, target/release, PATH)" >&2
-  exit 1
-fi
-
-# Contract 5: establish the verb before reading its exit code. clap also spends
-# 2 on an unknown subcommand, so without this a binary older than the verb
-# reports a fresh tree as stale and sends the session to regenerate shards that
-# were already correct. The answer to a missing verb is a refusal naming the
-# binary, never a verdict about the tree.
-for verb in check lint; do
-  if ! "$bin" "$verb" --help >/dev/null 2>&1; then
-    echo "statecraft-gate: $bin does not carry the verb '$verb'; that is not a verdict about the tree" >&2
-    exit 1
-  fi
-done
-
-cd "$root"
-
-# Contract 1: read, never repair. Both verbs below are reads, and no writing
-# subcommand appears anywhere in this script. A hook fires where it cannot
-# commit what it regenerated, so a writing hook leaves the derived tree dirty;
-# an orchestrator that refuses to start on a dirty tree then never starts.
-#
-# Contract 4: read the verdict, never guess it. The four answers are not
-# interchangeable, and only one of them is repaired by regenerating.
-code=0
-"$bin" check --fail-on-warn || code=$?
-case $code in
-  0) ;;
-  1)
-    echo "statecraft-gate: the corpus does not validate; re-indexing cannot cure it" >&2
-    exit 1
-    ;;
-  2)
-    echo "statecraft-gate: stale; refresh and commit the shards with the change that staled them" >&2
-    exit 2
-    ;;
-  3)
-    echo "statecraft-gate: the read was not performed; that is not a verdict" >&2
-    exit 3
-    ;;
-  *)
-    echo "statecraft-gate: check answered $code, which this gate does not know how to read" >&2
-    exit "$code"
-    ;;
-esac
-
-code=0
-"$bin" lint --fail-on-warn || code=$?
-if [ "$code" -ne 0 ]; then
-  echo "statecraft-gate: lint refused with $code" >&2
-  exit "$code"
-fi
 "#;
 
 const ADAPTER_CLAUDE_CODE: &str = r#"# Adapter template: claude-code
@@ -477,13 +606,34 @@ mod tests {
 
     #[cfg(unix)]
     #[test]
-    fn a_script_arrives_executable() {
+    fn every_script_arrives_executable() {
         use std::os::unix::fs::PermissionsExt;
         let dir = tempfile::tempdir().unwrap();
         let layout = Layout::new(dir.path());
         let installed = install(&layout, &shipped()).unwrap();
-        let script = installed.root.join("hooks/statecraft-gate.sh");
-        let mode = std::fs::metadata(&script).unwrap().permissions().mode();
-        assert_eq!(mode & 0o111, 0o111);
+        assert_eq!(ADOPTED_HOOKS.len(), 4);
+        for hook in ADOPTED_HOOKS {
+            let script = installed.root.join("hooks").join(hook.file);
+            let mode = std::fs::metadata(&script)
+                .unwrap_or_else(|e| panic!("{} was not installed: {e}", hook.file))
+                .permissions()
+                .mode();
+            assert_eq!(mode & 0o111, 0o111, "{} is not executable", hook.file);
+        }
+    }
+}
+
+#[cfg(test)]
+mod revision_report {
+    /// Print the shipped revision identity. Not an assertion: a way to read
+    /// the identity a handoff has to record, without a second binary.
+    #[test]
+    #[ignore = "reporting, not an assertion: run with --ignored to print"]
+    fn print_shipped_revision() {
+        let r = super::revision_of(&super::shipped());
+        println!("revision {} over {} files", r.id, r.files.len());
+        for f in &r.files {
+            println!("  {}  {}  {} bytes", &f.digest[..16], f.rel_path, f.bytes);
+        }
     }
 }

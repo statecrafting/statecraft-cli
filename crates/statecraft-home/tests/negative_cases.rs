@@ -295,8 +295,19 @@ fn existing_user_global_agent_settings_are_byte_identical_afterwards() {
     let authority = Unreachable::default();
     let revisions = StaticRevision::default();
     let h = harness!(sandbox, &producer, &corpus, &probe, &authority, &revisions);
-    let answer = h.execute(Operation::HomeApply);
-    assert_eq!(answer.severity(), Severity::Ok, "{}", answer.render());
+    // Section 3.24 amended section 3.14 rule 1: an unconsented `home apply`
+    // still writes nothing into a settings file, and now says so rather than
+    // staying silent. A named, withheld write is a finding (spec 006 section
+    // 3.3), not a success.
+    let answer = h.execute(Operation::HomeApply {
+        settings: statecraft_home::settings::Intent::Withheld,
+    });
+    assert_eq!(answer.severity(), Severity::Finding, "{}", answer.render());
+    assert!(
+        answer.render().contains("refused by default"),
+        "{}",
+        answer.render()
+    );
 
     assert_eq!(std::fs::read(&settings).unwrap(), original);
     assert_eq!(std::fs::read(&mine).unwrap(), b"my own agent\n");
@@ -327,7 +338,9 @@ fn an_unrelated_repository_is_unaffected_and_the_delivered_behavior_is_inert_the
     let authority = Unreachable::default();
     let revisions = StaticRevision::default();
     let h = harness!(sandbox, &producer, &corpus, &probe, &authority, &revisions);
-    h.execute(Operation::HomeApply);
+    h.execute(Operation::HomeApply {
+        settings: statecraft_home::settings::Intent::Withheld,
+    });
     h.execute(Operation::InitApply {
         root: sandbox.project(),
     });
@@ -427,7 +440,9 @@ fn a_global_upgrade_cannot_alter_a_run_already_resolved() {
     let authority = Unreachable::default();
     let revisions = StaticRevision::default();
     let h = harness!(sandbox, &producer, &corpus, &probe, &authority, &revisions);
-    h.execute(Operation::HomeApply);
+    h.execute(Operation::HomeApply {
+        settings: statecraft_home::settings::Intent::Withheld,
+    });
     h.execute(Operation::InitApply {
         root: sandbox.project(),
     });

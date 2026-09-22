@@ -21,6 +21,7 @@ use crate::flow::{self, Corpus};
 use crate::harness;
 use crate::home::{Layout, Personal, Tools};
 use crate::project;
+use crate::settings::{self, SettingsOutcome};
 use crate::team::{self, CoordinationAuthority, Eligibility, LocalApproval, LocalApprovals};
 use serde::Serialize;
 use statecraft_environment::manifest::{Enrollment, Manifest, Project};
@@ -36,7 +37,15 @@ pub enum Operation {
     /// What `home apply` would write, inside the home and outside it.
     HomePlan,
     /// Create or repair the home, and perform native delivery.
-    HomeApply,
+    ///
+    /// The settings modification of spec 002 section 3.24 is carried as an
+    /// intent rather than performed by default: [`crate::settings::Intent`]'s
+    /// default is `Withheld`, so this verb shows the modification and writes
+    /// nothing unless the operator consented to that exact content.
+    HomeApply {
+        /// What the operator asked for, about the settings modification.
+        settings: crate::settings::Intent,
+    },
     /// Every project change initialization would make.
     InitPlan {
         /// The project.
@@ -95,6 +104,83 @@ pub enum Operation {
         root: PathBuf,
         /// The subject.
         subject: String,
+    },
+    /// What the project requires of the harness, and what the home holds.
+    ///
+    /// Spec 002 section 3.25's inspection, and spec 006 section 3.11.1's rule
+    /// that it activates nothing: no install, no requirement written, no
+    /// delivery. Reading the state must not be a way of changing it.
+    HarnessShow {
+        /// The project.
+        root: PathBuf,
+    },
+    /// Commit the shipped revision as the project's required identity.
+    ///
+    /// Section 3.25's explicit upgrade, which is the act inspection is not. The
+    /// revision is installed under the home first, because a requirement
+    /// pointing at a revision the home does not hold cannot stand `exact` on
+    /// this machine.
+    HarnessUpgrade {
+        /// The project.
+        root: PathBuf,
+    },
+    /// The exact managed-session settings bytes, and their identity.
+    ///
+    /// Section 3.27. No path: the payload is a property of this build and not
+    /// of any target.
+    SessionPayload,
+    /// Write one session's startup record, with the observation absent.
+    StartupRecord {
+        /// The project.
+        root: PathBuf,
+        /// The session.
+        session_id: String,
+    },
+    /// Submit captured evidence for admission, and record what it establishes.
+    ///
+    /// Sections 3.29 and 3.30. The capture directory is read and then judged,
+    /// as two steps, so an unreadable capture and a capture that shows no
+    /// refusal stay distinguishable: the first is a failure, the second a
+    /// refusal (spec 006 section 3.11.2). A refused claim writes nothing.
+    StartupQualify {
+        /// The project.
+        root: PathBuf,
+        /// The session.
+        session_id: String,
+        /// The capture directory the three launches wrote into.
+        submission: PathBuf,
+    },
+    /// Launch one qualification control and record the launch (spec 002
+    /// section 3.30 rule 12, spec 006 section 3.11.2).
+    StartupCapture {
+        /// The project the session runs in.
+        root: PathBuf,
+        /// Which control.
+        control: crate::admission::Control,
+        /// Where the record is written.
+        directory: PathBuf,
+        /// The provider, as named.
+        program: String,
+        /// The session's deadline.
+        deadline_seconds: u64,
+        /// Whether the operator stated the program is a local fake.
+        synthetic: bool,
+        /// The environment the provider runs with, exactly as the caller
+        /// supplies it.
+        environment: std::collections::BTreeMap<String, String>,
+    },
+    /// One run attempt's startup records and their judgement (spec 002
+    /// section 3.31, spec 006 section 3.11.3). Reads only.
+    StartupShow {
+        /// The project.
+        root: PathBuf,
+        /// The run.
+        run_id: String,
+        /// Which attempt; `None` is the latest.
+        attempt: Option<u32>,
+        /// Every attempt the run record holds for the run, as the caller that
+        /// reads that record found them.
+        facts: Vec<crate::launch::AttemptFact>,
     },
 }
 
@@ -160,6 +246,11 @@ pub struct HomeChange {
     pub linked: Vec<String>,
     /// Paths deliberately left alone, each with its reason.
     pub preserved: Vec<String>,
+    /// The consented settings modification, per native home.
+    ///
+    /// Section 3.24. Present in a plan as well as in an apply, because the
+    /// modification has to be named in the plan before anything is written.
+    pub settings: Vec<SettingsOutcome>,
 }
 
 /// What an enrollment change did.
@@ -193,6 +284,133 @@ pub struct ApprovalOutcome {
     pub authority: String,
 }
 
+/// The upgrade an inspection found, or the reason there is none.
+///
+/// A named enum rather than a `Result`, because this field is part of spec 006
+/// section 3.4's JSON contract and `Result`'s serialization is `Ok`/`Err`,
+/// which names nothing a caller would script against.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "kebab-case", tag = "availability", content = "value")]
+pub enum AvailableUpgrade {
+    /// What `harness upgrade` would commit.
+    Available(Box<crate::required::Upgrade>),
+    /// Why it would not.
+    Unavailable(Box<crate::required::UpgradeRefusal>),
+}
+
+/// What the project requires of the harness, and what this machine holds.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct HarnessStanding {
+    /// The project.
+    pub root: String,
+    /// The inspection: required, installed, shipped, and the standing.
+    pub inspection: crate::required::Inspection,
+    /// The upgrade this build would offer, or why it would not.
+    ///
+    /// Carried by the **inspection** because knowing what an upgrade would do
+    /// is a read. Performing it is [`Operation::HarnessUpgrade`], and nothing
+    /// here performs it.
+    pub available_upgrade: AvailableUpgrade,
+    /// Whether anything was installed, written or delivered by this call.
+    /// Always false: an inspection that activated something would make the
+    /// state unreadable without changing it.
+    pub activated_anything: bool,
+}
+
+/// What an explicit upgrade did.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct HarnessUpgraded {
+    /// The project.
+    pub root: String,
+    /// What was committed.
+    pub upgrade: crate::required::Upgrade,
+    /// Harness files this call wrote under the home.
+    pub installed: Vec<String>,
+    /// Whether the manifest changed on disk.
+    pub manifest_written: bool,
+    /// The standing that results, read back from what was written.
+    pub standing: crate::required::Standing,
+}
+
+/// The managed-session settings payload.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SessionPayload {
+    /// The deny floor's exact bytes: what the settings argument receives in a
+    /// qualification control, and in a run whose project commits no
+    /// requirement.
+    pub payload: String,
+    /// Their identity, which an observation is bound to.
+    pub digest: String,
+    /// The argument that carries them.
+    pub argument: String,
+    /// Which sessions receive exactly these bytes, and which receive more
+    /// (spec 002 section 3.32 rule 25). A run under a requirement is given
+    /// other bytes, so a qualification bound to these is not evidence for it.
+    pub receives: String,
+    /// Whether this call wrote the payload anywhere. Always false: obtaining
+    /// the bytes is a read, and delivering them is a session starting.
+    pub delivered: bool,
+}
+
+/// What a startup record says, and where it was written.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct StartupOutcome {
+    /// The project.
+    pub root: String,
+    /// The session.
+    pub session_id: String,
+    /// Where the record is.
+    pub path: String,
+    /// Whether this call wrote it.
+    pub written: bool,
+    /// The record itself.
+    pub record: Box<crate::startup::StartupRecord>,
+    /// Whether the session carries the managed-execution claim.
+    pub qualified: bool,
+}
+
+/// One launched control, as the operation recorded it.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CaptureOutcome {
+    /// Where the record is.
+    pub path: String,
+    /// Which control.
+    pub control: crate::admission::Control,
+    /// Whether the launch completed as one readable session. Says nothing
+    /// about the control's outcome, which only the admission judges.
+    pub complete: bool,
+    /// Why it did not, when it did not.
+    pub incomplete: Option<String>,
+    /// The record itself.
+    pub measurement: Box<crate::admission::Measurement>,
+}
+
+/// Why a submitted qualification was not recorded.
+///
+/// Two reasons, kept apart. A submission that could not be **read** never
+/// stated a claim; one that was read and **refused** stated one and was judged.
+/// Reporting them the same way would let a typo look like a measured negative,
+/// which is exactly the substitution section 3.29 exists to prevent.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "kebab-case", tag = "kind")]
+pub enum QualificationRefused {
+    /// The submission or a file it names could not be read.
+    Unread {
+        /// What went wrong.
+        reason: String,
+    },
+    /// The claim was judged and did not survive the admission.
+    NotAdmitted {
+        /// Which rule refused it.
+        reason: String,
+    },
+}
+
 /// What an operation answered.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "kebab-case", tag = "operation", content = "value")]
@@ -211,6 +429,20 @@ pub enum Answer {
     Configuration(Box<Resolution>),
     /// An approval or an eligibility.
     Approval(Box<ApprovalOutcome>),
+    /// The harness requirement, inspected.
+    Harness(Box<HarnessStanding>),
+    /// The harness requirement, changed.
+    HarnessUpgraded(Box<HarnessUpgraded>),
+    /// The managed-session payload.
+    SessionPayload(Box<SessionPayload>),
+    /// A startup record.
+    Startup(Box<StartupOutcome>),
+    /// A qualification submission that was not recorded.
+    QualificationRefused(Box<QualificationRefused>),
+    /// One launched control.
+    Captured(Box<CaptureOutcome>),
+    /// One run attempt's startup evidence, judged.
+    StartupAttempt(Box<crate::launch::AttemptStartup>),
     /// A precondition stopped the operation.
     Refused {
         /// Why.
@@ -236,7 +468,32 @@ impl Answer {
                     Severity::Finding
                 }
             }
-            Answer::HomeChange(_) => Severity::Ok,
+            Answer::HomeChange(change) => {
+                // Spec 006 section 3.3: a withheld write is a finding, a
+                // precondition that stopped something is a refusal, and
+                // something nobody asked for is a failure. The settings
+                // modification is the one part of this verb that can be any of
+                // the three, and saying so is what makes it scriptable.
+                //
+                // A **plan** withholds nothing: writing nothing is what it was
+                // asked to do, so naming the modification is success and not a
+                // finding. Only an apply that named a modification and did not
+                // perform it has withheld a write.
+                if change.settings.iter().any(SettingsOutcome::is_failure) {
+                    Severity::Failed
+                } else if change.settings.iter().any(SettingsOutcome::is_refusal) {
+                    Severity::Refused
+                } else if change.mode == flow::Mode::Apply
+                    && change
+                        .settings
+                        .iter()
+                        .any(SettingsOutcome::is_withheld_write)
+                {
+                    Severity::Finding
+                } else {
+                    Severity::Ok
+                }
+            }
             Answer::Init(report) => match report.outcome {
                 flow::Outcome::Complete => Severity::Ok,
                 flow::Outcome::Partial => Severity::Finding,
@@ -259,6 +516,67 @@ impl Answer {
                 if outcome.refused.is_some() {
                     Severity::Refused
                 } else if outcome.eligibility.eligible() {
+                    Severity::Ok
+                } else {
+                    Severity::Finding
+                }
+            }
+            // The DIAGNOSTIC question, not the execution one. A project whose
+            // requirement is committed, installed and intact disagrees with
+            // nothing, and no revision has resolved for it because an
+            // inspection is not a session. `permits_managed_execution` would
+            // report that healthy project as a finding forever, which is
+            // `required::Standing`'s own warning about conflating the two
+            // questions. Spec 006 section 3.3: a finding is a diagnostic
+            // state, and there is none here.
+            Answer::Harness(h) => {
+                if h.inspection.standing.disagreement().is_none() {
+                    Severity::Ok
+                } else {
+                    Severity::Finding
+                }
+            }
+            Answer::HarnessUpgraded(u) => {
+                if u.standing.disagreement().is_none() {
+                    Severity::Ok
+                } else {
+                    Severity::Finding
+                }
+            }
+            Answer::SessionPayload(_) => Severity::Ok,
+            // Spec 006 section 3.11.3: only `qualified` is 0, and it is not
+            // reachable through a run; every other verdict is a finding.
+            Answer::StartupAttempt(a) => {
+                if a.qualified() {
+                    Severity::Ok
+                } else {
+                    Severity::Finding
+                }
+            }
+            // A record that is not qualified is the ordinary case and it is a
+            // finding, not a failure: the session ran, the record says what it
+            // establishes, and what it does not establish is the finding.
+            Answer::Startup(s) => {
+                if s.qualified {
+                    Severity::Ok
+                } else {
+                    Severity::Finding
+                }
+            }
+            // Spec 006 section 3.11.2. A claim the admission refused is a
+            // refusal: it was read, judged, and nothing was written. Captures
+            // that could not be read are a failure, as an unreadable manifest
+            // is: no claim was judged, and reporting it as a refusal would make
+            // a missing file look like a measured negative.
+            Answer::QualificationRefused(r) => match **r {
+                QualificationRefused::NotAdmitted { .. } => Severity::Refused,
+                QualificationRefused::Unread { .. } => Severity::Failed,
+            },
+            // A launch that completed is success whatever the session did; one
+            // that did not is recorded and is a finding (spec 006 section
+            // 3.11.2).
+            Answer::Captured(c) => {
+                if c.complete {
                     Severity::Ok
                 } else {
                     Severity::Finding
@@ -300,6 +618,9 @@ impl Answer {
                 for note in &c.preserved {
                     out.push_str(&format!("preserve {note}\n"));
                 }
+                for outcome in &c.settings {
+                    out.push_str(&outcome.render());
+                }
                 out
             }
             Answer::Init(r) => r.render(),
@@ -326,6 +647,121 @@ impl Answer {
                 out.push_str(&format!("authority: {}\n", a.authority));
                 out
             }
+            Answer::Harness(h) => {
+                let mut out = format!("project   {}\n", h.root);
+                out.push_str(&format!(
+                    "required  {}\n",
+                    h.inspection
+                        .required_display
+                        .as_deref()
+                        .unwrap_or("none committed")
+                ));
+                out.push_str(&format!("shipped   {}\n", h.inspection.shipped));
+                for revision in &h.inspection.installed {
+                    out.push_str(&format!(
+                        "installed {} {}\n",
+                        revision.id,
+                        match (&revision.unreadable, revision.intact) {
+                            (Some(why), _) => format!("unreadable: {why}"),
+                            (None, true) => "intact".to_string(),
+                            (None, false) => "does not digest to its own name".to_string(),
+                        }
+                    ));
+                }
+                out.push_str(&format!("standing  {}\n", h.inspection.standing.describe()));
+                out.push_str(&match &h.available_upgrade {
+                    AvailableUpgrade::Available(upgrade) => {
+                        format!("upgrade   available: {}\n", upgrade.describe())
+                    }
+                    AvailableUpgrade::Unavailable(why) => {
+                        format!("upgrade   unavailable: {why}\n")
+                    }
+                });
+                out.push_str("nothing was installed, written or delivered by this read\n");
+                out
+            }
+            Answer::HarnessUpgraded(u) => {
+                let mut out = format!("project   {}\n", u.root);
+                out.push_str(&format!("upgrade   {}\n", u.upgrade.describe()));
+                out.push_str(&format!(
+                    "installed {} harness file(s) under the home\n",
+                    u.installed.len()
+                ));
+                out.push_str(&format!(
+                    "manifest  {}\n",
+                    if u.manifest_written {
+                        "written; commit it, because the requirement is a reviewed project change"
+                    } else {
+                        "unchanged"
+                    }
+                ));
+                out.push_str(&format!("standing  {}\n", u.standing.describe()));
+                out
+            }
+            // The bytes, and nothing else. This verb exists so an operator can
+            // put the payload where the settings argument will read it, and a
+            // rendering that appended a digest line would produce a settings
+            // file that is not the payload. The digest and the argument are in
+            // the `--json` rendering, which is where a caller reads them
+            // (spec 006 section 3.4).
+            Answer::SessionPayload(p) => p.payload.clone(),
+            Answer::StartupAttempt(a) => a.describe(),
+            Answer::Startup(s) => {
+                let mut out = format!("session   {}\n", s.session_id);
+                out.push_str(&s.record.describe());
+                out.push('\n');
+                out.push_str(&format!(
+                    "{}  {}\n",
+                    if s.written { "written " } else { "existing" },
+                    s.path
+                ));
+                out
+            }
+            Answer::Captured(c) => {
+                let m = &c.measurement;
+                let mut out = format!("control   {}\n", c.control.word());
+                if let Some(l) = &m.launch {
+                    if l.origin == crate::admission::Origin::Synthetic {
+                        out.push_str(
+                            "origin    SYNTHETIC: a local fake, never a live observation\n",
+                        );
+                    }
+                    out.push_str(&format!(
+                        "program   {} (probed {})\n",
+                        m.invocation.program,
+                        l.probe_version.as_deref().unwrap_or("no version")
+                    ));
+                    out.push_str(&format!(
+                        "process   exit {:?}, signal {:?}, timed out {}, survivors {}\n",
+                        l.process.code,
+                        l.process.signal,
+                        l.process.timed_out,
+                        l.process.surviving_processes.as_deref().unwrap_or("none")
+                    ));
+                    out.push_str(&format!(
+                        "stdout    {} byte(s)\nstderr    {} byte(s)\n",
+                        m.capture.bytes.len(),
+                        l.stderr.len()
+                    ));
+                }
+                out.push_str(&match &c.incomplete {
+                    None => "session   complete; the admission judges what it shows\n".to_string(),
+                    Some(why) => format!("session   incomplete: {why}\n"),
+                });
+                out.push_str(&format!("record    {}\n", c.path));
+                out
+            }
+            Answer::QualificationRefused(r) => match &**r {
+                QualificationRefused::Unread { reason } => format!(
+                    "failed: the captures could not be read, so no claim was judged: \
+                     {reason}\nnothing was written\n"
+                ),
+                QualificationRefused::NotAdmitted { reason } => format!(
+                    "refused: the claimed observation is not admitted: {reason}\nnothing was \
+                     written; the session is unverified, which is the answer and not a \
+                     weaker qualification\n"
+                ),
+            },
             Answer::Refused { reason } => format!("refused: {reason}\n"),
             Answer::Failed { reason } => format!("failed: {reason}\n"),
         }
@@ -362,8 +798,8 @@ pub struct Ports<'a> {
 pub fn execute(ports: &Ports<'_>, operation: Operation) -> Answer {
     match operation {
         Operation::HomeShow => home_show(ports),
-        Operation::HomePlan => home_change(ports, flow::Mode::Plan),
-        Operation::HomeApply => home_change(ports, flow::Mode::Apply),
+        Operation::HomePlan => home_change(ports, flow::Mode::Plan, settings::Intent::Withheld),
+        Operation::HomeApply { settings } => home_change(ports, flow::Mode::Apply, settings),
         Operation::InitPlan { root } => init(ports, &root, flow::Mode::Plan),
         Operation::InitApply { root } => init(ports, &root, flow::Mode::Apply),
         Operation::MigratePlan { root } => match derived::plan(&root) {
@@ -396,6 +832,301 @@ pub fn execute(ports: &Ports<'_>, operation: Operation) -> Answer {
             reason,
         } => approval_grant(ports, &root, &subject, &operator, &reason),
         Operation::ApprovalShow { root, subject } => approval_show(ports, &root, &subject),
+        Operation::HarnessShow { root } => harness_show(ports, &root),
+        Operation::HarnessUpgrade { root } => harness_upgrade(ports, &root),
+        Operation::SessionPayload => Answer::SessionPayload(Box::new(SessionPayload {
+            payload: crate::session::payload_json(),
+            digest: crate::startup::payload_identity(),
+            argument: crate::session::SETTINGS_ARGUMENT.to_string(),
+            receives: "exactly these bytes: a qualification control session, and a run in a \
+                       project that commits no harness requirement. A run under a requirement \
+                       receives these bytes plus its own startup hook and admission gate \
+                       registrations, a different document recorded by digest in that \
+                       attempt's intent, which no qualification of these bytes covers"
+                .to_string(),
+            delivered: false,
+        })),
+        Operation::StartupShow {
+            root,
+            run_id,
+            attempt,
+            facts,
+        } => {
+            if let Err(answer) = manifest_of(&root) {
+                return answer;
+            }
+            match crate::launch::inspect(&root, &run_id, attempt, &facts) {
+                Ok(shown) => Answer::StartupAttempt(Box::new(shown)),
+                Err(crate::launch::NotRead::NoSuchAttempt(reason)) => Answer::Refused { reason },
+                Err(e) => Answer::Failed {
+                    reason: e.to_string(),
+                },
+            }
+        }
+        Operation::StartupRecord { root, session_id } => {
+            startup_record(ports, &root, &session_id, None)
+        }
+        Operation::StartupCapture {
+            root,
+            control,
+            directory,
+            program,
+            deadline_seconds,
+            synthetic,
+            environment,
+        } => startup_capture(
+            &root,
+            crate::capture::Request {
+                root: root.clone(),
+                control,
+                directory,
+                program,
+                deadline_seconds,
+                origin: if synthetic {
+                    crate::admission::Origin::Synthetic
+                } else {
+                    crate::admission::Origin::Launched
+                },
+                environment,
+            },
+        ),
+        Operation::StartupQualify {
+            root,
+            session_id,
+            submission,
+        } => {
+            // A start happens once, and that is a precondition checked before
+            // any evidence is read, so a refusal for it is never mistaken for
+            // a judgement of the evidence.
+            if crate::startup::StartupRecord::path(&root, &session_id).exists() {
+                return Answer::Refused {
+                    reason: format!(
+                        "session {session_id} already has a startup record; a start happens once"
+                    ),
+                };
+            }
+            // Two steps, and the failures stay apart. Captures that could not
+            // be read never stated a claim; captures that were read and refused
+            // stated one and were judged.
+            let evidence = match crate::admission::load(&submission) {
+                Ok(evidence) => evidence,
+                Err(why) => {
+                    return Answer::QualificationRefused(Box::new(QualificationRefused::Unread {
+                        reason: why.to_string(),
+                    }));
+                }
+            };
+            let admitted = crate::admission::admit_in(&evidence, &root)
+                .and_then(|()| crate::startup::admit(&evidence));
+            match admitted {
+                Ok(observation) => startup_record(ports, &root, &session_id, Some(observation)),
+                Err(why) => {
+                    Answer::QualificationRefused(Box::new(QualificationRefused::NotAdmitted {
+                        reason: why.to_string(),
+                    }))
+                }
+            }
+        }
+    }
+}
+
+/// `startup capture`: launch one control in a target and record it.
+fn startup_capture(root: &Path, request: crate::capture::Request) -> Answer {
+    if let Err(answer) = manifest_of(root) {
+        return answer;
+    }
+    let control = request.control;
+    match crate::capture::launch(&request) {
+        Ok(launched) => Answer::Captured(Box::new(CaptureOutcome {
+            path: launched.path.display().to_string(),
+            control,
+            complete: launched.incomplete.is_none(),
+            incomplete: launched.incomplete,
+            measurement: Box::new(launched.measurement),
+        })),
+        Err(crate::capture::Failed::Refused(why)) => Answer::Refused {
+            reason: why.to_string(),
+        },
+        Err(e) => Answer::Failed {
+            reason: e.to_string(),
+        },
+    }
+}
+
+/// The manifest a project holds, or the answer that says it holds none.
+fn manifest_of(root: &Path) -> Result<Manifest, Answer> {
+    match Manifest::read(root) {
+        Ok(Some(manifest)) => Ok(manifest),
+        Ok(None) => Err(Answer::Refused {
+            reason: format!(
+                "{} holds no {}, so it is not a target and has no harness requirement",
+                root.display(),
+                statecraft_environment::manifest::MANIFEST_PATH
+            ),
+        }),
+        Err(e) => Err(Answer::Failed {
+            reason: e.to_string(),
+        }),
+    }
+}
+
+/// `harness show`. A read, and nothing else.
+fn harness_show(ports: &Ports<'_>, root: &Path) -> Answer {
+    let manifest = match manifest_of(root) {
+        Ok(m) => m,
+        Err(answer) => return answer,
+    };
+    let inspection = crate::required::inspect(ports.home, &manifest);
+    // What an upgrade WOULD do. Planning is a read; nothing below performs it.
+    let available_upgrade =
+        match crate::required::plan_upgrade(ports.home, &manifest, &inspection.shipped) {
+            Ok(upgrade) => AvailableUpgrade::Available(Box::new(upgrade)),
+            Err(why) => AvailableUpgrade::Unavailable(Box::new(why)),
+        };
+    Answer::Harness(Box::new(HarnessStanding {
+        root: root.display().to_string(),
+        inspection,
+        available_upgrade,
+        activated_anything: false,
+    }))
+}
+
+/// `harness upgrade`. The explicit, reviewed act of section 3.25.
+fn harness_upgrade(ports: &Ports<'_>, root: &Path) -> Answer {
+    let mut manifest = match manifest_of(root) {
+        Ok(m) => m,
+        Err(answer) => return answer,
+    };
+    // The revision is installed first. A requirement pointing at a revision
+    // this home does not hold cannot stand `exact` here, and committing one
+    // would commit a requirement that is already broken on the machine
+    // proposing it.
+    let installed = match harness::install(ports.home, &harness::shipped()) {
+        Ok(installed) => installed,
+        Err(e) => {
+            return Answer::Failed {
+                reason: e.to_string(),
+            };
+        }
+    };
+    let upgrade =
+        match crate::required::plan_upgrade(ports.home, &manifest, &installed.revision.digest) {
+            Ok(upgrade) => upgrade,
+            Err(refusal) => {
+                return Answer::Refused {
+                    reason: refusal.to_string(),
+                };
+            }
+        };
+    let changed = upgrade.from.as_deref() != Some(upgrade.to.as_str());
+    crate::required::apply_upgrade(&mut manifest, &upgrade);
+    if changed {
+        if let Err(e) = manifest.write(root) {
+            return Answer::Failed {
+                reason: e.to_string(),
+            };
+        }
+    }
+    // The standing is read back from what was written, not from what was
+    // intended: the two differ exactly when something went wrong quietly.
+    let written = match manifest_of(root) {
+        Ok(m) => m,
+        Err(answer) => return answer,
+    };
+    let standing =
+        crate::required::evaluate(ports.home, &written, crate::required::required_of(&written));
+    Answer::HarnessUpgraded(Box::new(HarnessUpgraded {
+        root: root.display().to_string(),
+        upgrade,
+        installed: installed.written,
+        manifest_written: changed,
+        standing,
+    }))
+}
+
+/// Assemble and write one session's startup record.
+///
+/// The observation is passed in, admitted or absent, because this function
+/// records and never judges: section 3.29's admission is the judge and it runs
+/// before anything reaches here.
+fn startup_record(
+    ports: &Ports<'_>,
+    root: &Path,
+    session_id: &str,
+    observation: Option<crate::startup::Observation>,
+) -> Answer {
+    let manifest = match manifest_of(root) {
+        Ok(m) => m,
+        Err(answer) => return answer,
+    };
+    let Some(rule) = delivery::load_rules()
+        .into_iter()
+        .find(|r| r.harness == crate::session::SUPPORTED_HARNESS)
+    else {
+        return Answer::Failed {
+            reason: format!(
+                "no documented load rule for {}",
+                crate::session::SUPPORTED_HARNESS
+            ),
+        };
+    };
+    let verdict = delivery::evaluate(root, &rule);
+    // Spec 002 section 3.31: this operation measures no harness revision, so
+    // nothing resolved. The required identity is not an observed one, and
+    // passing it here as the resolution recorded a match nobody measured.
+    let standing = crate::required::evaluate(ports.home, &manifest, None);
+    let resolved = None;
+
+    let record = crate::startup::assemble(
+        root,
+        session_id,
+        &rfc3339_utc(ports.clock.now_unix()),
+        &manifest,
+        crate::startup::AdapterIdentity {
+            name: crate::session::SUPPORTED_HARNESS.to_string(),
+            harness: crate::session::SUPPORTED_HARNESS.to_string(),
+            version: ports.product_version.clone(),
+        },
+        verdict,
+        standing,
+        resolved,
+        // This verb records; it delivers nothing, and says so rather than
+        // implying a supply it did not perform.
+        crate::startup::Supply::NotAttempted {
+            reason: "this operation reads and records; it performs no delivery, so nothing \
+                     about one is established here"
+                .to_string(),
+        },
+        observation.unwrap_or(crate::startup::Observation::NotObserved {
+            reason: "no live session was observed for this start".to_string(),
+        }),
+    );
+    let record = match record {
+        Ok(record) => record,
+        Err(e) => {
+            return Answer::Failed {
+                reason: e.to_string(),
+            };
+        }
+    };
+    let path = crate::startup::StartupRecord::path(root, session_id);
+    match record.write(root) {
+        Ok(()) => Answer::Startup(Box::new(StartupOutcome {
+            root: root.display().to_string(),
+            session_id: session_id.to_string(),
+            path: path.display().to_string(),
+            written: true,
+            qualified: record.qualifies(),
+            record: Box::new(record),
+        })),
+        // A start happens once, so a second record for the same session is a
+        // precondition that stopped the operation rather than a failure.
+        Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => Answer::Refused {
+            reason: e.to_string(),
+        },
+        Err(e) => Answer::Failed {
+            reason: e.to_string(),
+        },
     }
 }
 
@@ -441,7 +1172,7 @@ fn home_show(ports: &Ports<'_>) -> Answer {
     }))
 }
 
-fn home_change(ports: &Ports<'_>, mode: flow::Mode) -> Answer {
+fn home_change(ports: &Ports<'_>, mode: flow::Mode, intent: settings::Intent) -> Answer {
     let writing = mode == flow::Mode::Apply;
     let shipped = harness::shipped();
     let revision = harness::revision_of(&shipped);
@@ -492,11 +1223,13 @@ fn home_change(ports: &Ports<'_>, mode: flow::Mode) -> Answer {
                 };
             }
         }
-        if !ports.home.delivery_file().exists() {
-            if let Err(e) = std::fs::write(ports.home.delivery_file(), "[]\n") {
-                return Answer::Failed {
-                    reason: e.to_string(),
-                };
+        for file in [ports.home.delivery_file(), ports.home.modifications_file()] {
+            if !file.exists() {
+                if let Err(e) = std::fs::write(&file, "[]\n") {
+                    return Answer::Failed {
+                        reason: e.to_string(),
+                    };
+                }
             }
         }
     }
@@ -535,6 +1268,28 @@ fn home_change(ports: &Ports<'_>, mode: flow::Mode) -> Answer {
         plans.push(plan);
     }
 
+    // Section 3.24, and section 3.14 rule 4: the one write into a harness's own
+    // settings file happens under this verb and nowhere else, and only when the
+    // operator consented to that exact content. A plan computes it and writes
+    // nothing, which is what "named in the plan before anything is written"
+    // requires.
+    let settings_outcomes: Vec<SettingsOutcome> = delivery::native_homes_under(&ports.native_root)
+        .iter()
+        .map(|home| {
+            let intent = if writing {
+                intent.clone()
+            } else {
+                settings::Intent::Withheld
+            };
+            settings::perform(
+                ports.home,
+                home,
+                &intent,
+                &rfc3339_utc(ports.clock.now_unix()),
+            )
+        })
+        .collect();
+
     if writing {
         let record = delivery::Record {
             harness: plans
@@ -568,6 +1323,7 @@ fn home_change(ports: &Ports<'_>, mode: flow::Mode) -> Answer {
         delivery: plans,
         linked,
         preserved,
+        settings: settings_outcomes,
     }))
 }
 

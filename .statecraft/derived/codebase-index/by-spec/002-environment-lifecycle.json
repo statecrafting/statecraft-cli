@@ -29,7 +29,15 @@
         "source": "spec-edge"
       },
       {
+        "path": "scripts/acceptance/managed-session.sh",
+        "source": "spec-edge"
+      },
+      {
         "path": "scripts/check-authored-content.sh",
+        "source": "spec-edge"
+      },
+      {
+        "path": "specs/002-environment-lifecycle/handoff-2026-09-21.md",
         "source": "spec-edge"
       }
     ],
@@ -58,6 +66,37 @@
         "unit": {
           "kind": "directory",
           "path": "crates/statecraft-home/"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "scripts/acceptance/managed-session.sh"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "kind": "file",
+          "path": "scripts/acceptance/managed-session.sh"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "specs/002-environment-lifecycle/handoff-2026-09-21.md",
+            "span": {
+              "endLine": 594,
+              "startLine": 555
+            }
+          }
+        ],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "anchor": "7-truthful-implementation-state-of-spec-002",
+          "file": "specs/002-environment-lifecycle/handoff-2026-09-21.md",
+          "kind": "section"
         }
       },
       {
@@ -117,5 +156,5 @@
     "specStatus": "approved"
   },
   "schemaVersion": "1.1.0",
-  "shardHash": "041406676c7cacb0bae69094565b88595bfe8371189e8a204aa81327fea73b98"
+  "shardHash": "9a9a030fa3c06dd3174bbbf8efef5afd0cb4657994259a5a2256f841a407db04"
 }

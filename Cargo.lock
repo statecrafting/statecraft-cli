@@ -732,6 +732,8 @@ dependencies = [
  "serde_json",
  "sha2 0.11.0",
  "spec-spine-core",
+ "statecraft-adapter",
+ "statecraft-adapter-claude-code",
  "statecraft-environment",
  "tempfile",
  "thiserror",

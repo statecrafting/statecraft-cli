@@ -27,6 +27,20 @@ sha2 = "0.11.0"
 thiserror = "2.0.20"
 statecraft-environment = { path = "../statecraft-environment" }
 
+# The supported harness's own event shapes, for spec 002 section 3.29 rule 1.
+# The admission reads the structured refusal record spec 004 section 3.3 owns,
+# and that crate already parses, types and tests it. A private copy of the
+# event shapes here would be a second parser for the same bytes and the one
+# nobody corrects when the provider adds a field. Acyclic: nothing in that
+# crate reaches back into this one.
+statecraft-adapter-claude-code = { path = "../statecraft-adapter-claude-code" }
+
+# Spec 002 section 3.30 rule 12's launch is supervised by the process-group
+# supervisor spec 004 owns, which holds the deadline and kills descendants.
+# Writing a second supervisor here would be a second place for that to be
+# wrong. Acyclic for the same reason as the line above.
+statecraft-adapter = { path = "../statecraft-adapter" }
+
 # The governance producer (spec 002 section 3.15), as an exact, reproducible
 # crates.io dependency rather than a path to a sibling checkout. `=` is
 # deliberate: the contract this product consumes is the shape one release
