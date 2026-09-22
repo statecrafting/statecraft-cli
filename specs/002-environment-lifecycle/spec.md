@@ -1855,6 +1855,50 @@ read of a settings file substitutes for one. Until a live session produces one,
 this product reports a session as **not qualified** for the managed-execution
 claim, which is §3.27's answer and not a workaround for it.
 
+**2026-09-21: the bounded integration is demonstrated, and three obligations
+are named as outstanding rather than counted as met.**
+`crates/statecraft-home/tests/bounded_integration.rs` walks the whole flow
+once in one isolated home against one fixture repository, and asserts the
+properties that only exist **between** the mechanisms every other test file
+judges one at a time. Eleven tests: the full harness installs once under the
+home and the project receives no copy; the bytes written are the bytes the
+plan's digest predicted; the floor is delivered per session and reaches no
+global file; an unrelated repository is byte-identical afterwards; the managed
+instructions exist before the bridge names them; a pre-existing root
+`AGENTS.md`, `model`, `permissions.allow` and an unmarked user hook all
+survive; all four events resolve to installed, executable files inside the
+canonical revision; the modification reverses to the operator's own bytes and
+can be rebuilt afterwards; and nothing arms a target.
+
+Two of them are about the premise rather than the behavior. The authority
+port is `Unreachable` throughout, so **every assertion here holds with no
+platform login**, and that is asserted rather than left implicit. And a
+shipped hook is run with `env_clear()`, a bare `PATH` and no `$HOME` at all:
+it still reaches a verdict and still says nothing outside a Statecraft
+project, which is the converse of sandboxing and the half that matters on an
+operator's own machine.
+
+**What is not demonstrated, stated here so the spec does not read as though it
+were.** Three obligations from the 2026-09-21 authority changes are specified
+and not implemented, and `implementation` stays `in-progress` for them and not
+only for §3.24:
+
+1. **§3.25's required identity.** The per-session resolved identity exists in
+   `resolved.rs`. The **committed project requirement** it should resolve
+   against does not: the manifest header still pins this product's version,
+   the spec-spine version and the adapter set, and no harness revision. Until
+   it does, there is nothing for a mismatch to be a mismatch **with**, so the
+   refusals §3.25 requires have no precondition to test and are unwritten.
+2. **§3.26's startup record.** The three verdicts are implemented and
+   unchanged, which is what §3.26 mostly asks for. The seven-field record a
+   managed session writes at startup is not, and neither are the added
+   evidence fields.
+3. **The live-session observation.** `session::qualification_from` cannot
+   return `Qualified`, by construction and by test, and no session has been
+   run under this prompt. So no session has been shown to enforce the floor,
+   and every fixture result in this file is fixture evidence. A bounded
+   acceptance script for that observation is prepared and awaits approval.
+
 ## Verification
 
 Each line is one command. They run the acceptance this spec's behavior declares:
