@@ -281,21 +281,20 @@ PROSE
   [ ! -e "$PROJECT/.statecraft/state/startup/acc-prose.json" ] || fail "a refused claim wrote a record"
 
   step "10. The run path, against a local fake (SYNTHETIC)"
-  # Spec 002 section 3.31, end to end through the product: `run` writes its
-  # startup intent and record, the shipped SessionStart hook from the required
-  # revision acknowledges the attempt, and `startup show` reads the judgement
-  # back. The fake stands in for the provider and for the operator's global
-  # hook registration; it runs nothing else, and nothing here is live.
+  # Spec 002 sections 3.31 and 3.32, end to end through the product: `run`
+  # writes its startup intent, supplies the required revision's SessionStart
+  # hook and the attempt's admission gate in the settings it passes, confirms
+  # the spawn, decides at the init event, and `startup show` reads the
+  # judgement back. The fake stands in for a provider that honors hooks given
+  # through `--settings`: it reads the commands from the document it was given
+  # and runs them. Nothing in the operator's home registers anything, and
+  # nothing here is live.
   runbin="$ACC/runbin"
   mkdir -p "$runbin"
-  bounded 09-payload-bytes "$LOCAL_TIMEOUT" product session payload
-  [ "$RAN" = 0 ] || fail "the payload bytes could not be obtained"
-  cp "$CAPTURE/09-payload-bytes.out" "$runbin/payload"
   cp "$REPO/crates/statecraft-adapter-claude-code/testdata/stream/success.jsonl" "$runbin/session.jsonl"
   required="$(sed -n 's/^ *"required": "\([0-9a-f]\{64\}\)",*$/\1/p' "$CAPTURE/04-harness-show.out" | head -n 1)"
   display="$(sed -n 's/^ *"requiredDisplay": "\(h-[0-9a-f]*\)",*$/\1/p' "$CAPTURE/04-harness-show.out" | head -n 1)"
   [ -n "$required" ] && [ -n "$display" ] || fail "no required revision in $CAPTURE/04-harness-show.out"
-  printf '%s' "$HOME_DIR/harness/$display/hooks/statecraft-session-start.sh" >"$runbin/registered-hook"
   cat >"$runbin/spec-spine" <<'SPINE'
 #!/bin/sh
 # A synthetic scheduler input for the fixture: one ready unit of work.
@@ -317,15 +316,25 @@ while [ "$#" -gt 0 ]; do
   case "$1" in --settings) settings="$2"; shift ;; esac
   shift
 done
-cmp -s "$settings" "$here/payload" || { echo "the settings are not the payload" >&2; exit 3; }
+cp "$settings" "$here/received-settings"
 cat >/dev/null
+# The first command registered for an event, read from the document given.
+command_for() {
+  awk -v ev="\"$1\": [" 'index($0, ev) { inside = 1 } inside && /"command": / { sub(/^[^"]*"command": "/, ""); sub(/",?[ \t]*$/, ""); gsub(/\\\\/, "\001"); gsub(/\\"/, "\""); gsub(/\001/, "\\"); print; exit }' "$settings"
+}
+start_cmd="$(command_for SessionStart)"
+gate_cmd="$(command_for PreToolUse)"
+[ -n "$start_cmd" ] && [ -n "$gate_cmd" ] || { echo "the settings register no startup hook or no gate" >&2; exit 3; }
 session=11111111-1111-1111-1111-111111111111
-out="$(CLAUDE_PROJECT_DIR="$PWD" "$(cat "$here/registered-hook")" "$PWD" 2>/dev/null)"
+out="$(CLAUDE_PROJECT_DIR="$PWD" sh -c "$start_cmd" 2>/dev/null)"
 code=$?
 esc="$(printf '%s' "$out" | awk 'BEGIN { ORS = "" } { gsub(/\\/, "\\\\"); gsub(/"/, "\\\""); gsub(/\t/, "\\t"); if (NR > 1) printf "\\n"; print }')"
 printf '{"type":"system","subtype":"hook_started","hook_name":"SessionStart:startup","hook_event":"SessionStart","session_id":"%s"}\n' "$session"
 printf '{"type":"system","subtype":"hook_response","hook_name":"SessionStart:startup","hook_event":"SessionStart","stdout":"%s","stderr":"","exit_code":%s,"outcome":"success","session_id":"%s"}\n' "$esc" "$code" "$session"
-cat "$here/session.jsonl"
+sed -n '1,3p' "$here/session.jsonl"
+# One harmless tool call, through the gate the run registered.
+if printf '{"tool_name":"Bash"}' | sh -c "$gate_cmd" 2>/dev/null; then : >"$PWD/acc-sentinel"; fi
+sed -n '4,$p' "$here/session.jsonl"
 FAKE
   chmod 700 "$runbin/spec-spine" "$runbin/claude"
   runpath="$runbin:/usr/bin:/bin"
@@ -342,14 +351,18 @@ FAKE
     STATECRAFT_NATIVE_ROOT="$NATIVE_DIR" "$CLI" startup show "$PROJECT" acc-run --json
   # 1: unverified is a finding. A run never reaches qualified.
   [ "$RAN" = 1 ] || fail "startup show: $(cat "$CAPTURE/09-startup-show.status"); see $CAPTURE/09-startup-show.out"
-  holds 09-startup-show '"grade": "acknowledged"' \
-    || fail "the required revision's hook did not acknowledge the attempt; see $CAPTURE/09-startup-show.out"
+  holds 09-startup-show '"grade": "correlated"' \
+    || fail "no acknowledgment of the attempt was correlated; see $CAPTURE/09-startup-show.out"
+  holds 09-startup-show '"decision": "admitted"' \
+    || fail "the startup decision did not admit the attempt; see $CAPTURE/09-startup-show.out"
+  [ -e "$PROJECT/.statecraft/state/workspaces/acc-run/acc-sentinel" ] \
+    || fail "the gated tool call did not run after admission"
   holds 09-startup-show "\"resolvedHarness\": \"$required\"" \
     || fail "the observed revision is not the required one; see $CAPTURE/09-startup-show.out"
   holds 09-startup-show '"supply": "supplied"' || fail "the run did not record its supply"
   holds 09-startup-show 'no live observation' || fail "the run's verdict does not name the missing class"
-  say "  SYNTHETIC: run and startup show agree; the observed revision is the required one,"
-  say "  measured by the hook's acknowledgment in a fake stream. Nothing here is live."
+  say "  SYNTHETIC: run and startup show agree; the correlated revision is the required one,"
+  say "  admitted before the gated tool call ran, in a fake stream. Nothing here is live."
 
   printf 'cli %s\n' "$CLI" >"$ACC/preflight.ok"
   say ""

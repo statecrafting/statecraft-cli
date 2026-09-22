@@ -68,6 +68,26 @@ pub fn payload_json() -> String {
     )
 }
 
+/// A managed run's settings document: the floor, and the hooks the run
+/// registers for this one session (spec 002 section 3.32 rule 25).
+///
+/// Not [`payload`]: the floor alone is what `session payload` prints and what a
+/// qualification control is bound to, and this document is different bytes,
+/// so no qualification of the one is evidence for the other.
+pub fn managed_payload(hooks: serde_json::Value) -> serde_json::Value {
+    let mut document = payload();
+    document["hooks"] = hooks;
+    document
+}
+
+/// [`managed_payload`] as the exact bytes the argument receives.
+pub fn managed_payload_json(hooks: serde_json::Value) -> String {
+    format!(
+        "{}\n",
+        serde_json::to_string_pretty(&managed_payload(hooks)).expect("a Value serializes")
+    )
+}
+
 /// Whether the mechanism has been established well enough to rely on.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "kebab-case", tag = "state")]

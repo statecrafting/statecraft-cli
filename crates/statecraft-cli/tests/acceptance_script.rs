@@ -308,9 +308,10 @@ fn the_stage_refuses_without_a_preflight_and_clean_removes_only_its_own() {
     assert_eq!(code(&run.script("bogus", &[])), 3);
 }
 
-/// Spec 002 section 3.31, through the operator's script: the preflight drives
-/// `run` and `startup show` against a local fake, and what they wrote is the
-/// persisted startup evidence, read back. Synthetic, and the step says so.
+/// Spec 002 sections 3.31 and 3.32, through the operator's script: the
+/// preflight drives `run` and `startup show` against a local fake that honors
+/// the hooks the run supplied, and what they wrote is the persisted startup
+/// evidence, read back. Synthetic, and the step says so.
 #[test]
 fn the_preflight_runs_the_run_path_and_reads_its_startup_evidence_back() {
     let run = Run::new();
@@ -325,16 +326,33 @@ fn the_preflight_runs_the_run_path_and_reads_its_startup_evidence_back() {
     let required = v["intent"]["requiredHarness"].as_str().unwrap();
     assert_eq!(v["intent"]["selected"]["digest"], required);
     assert_eq!(v["record"]["resolvedHarness"], required);
-    assert_eq!(v["record"]["launch"]["harness"]["grade"], "acknowledged");
+    assert_eq!(v["record"]["launch"]["harness"]["grade"], "correlated");
+    assert_eq!(v["admission"]["decision"], "admitted");
     assert_eq!(
         v["record"]["launch"]["settingsWritten"]["digest"],
         v["intent"]["payload"]["digest"]
     );
+    // The fake was given exactly the document the intent names.
+    assert_eq!(
+        std::fs::read_to_string(run.acc().join("runbin/received-settings")).unwrap(),
+        v["intent"]["settingsDocument"].as_str().unwrap()
+    );
     let dir = run
         .acc()
         .join("project/.statecraft/state/startup/runs/acc-run/1");
-    assert!(dir.join("intent.json").is_file());
-    assert!(dir.join("record.json").is_file());
+    for file in [
+        "intent.json",
+        "launched.json",
+        "admission.json",
+        "record.json",
+    ] {
+        assert!(dir.join(file).is_file(), "{file}");
+    }
+    assert!(
+        run.acc()
+            .join("project/.statecraft/state/workspaces/acc-run/acc-sentinel")
+            .is_file()
+    );
 }
 
 /// Section 7 of the preflight: a toolchain file in an ancestor of the fixture

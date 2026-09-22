@@ -47,6 +47,13 @@ summary: >
   launch configuration, the answering revision measured from a startup
   acknowledgment in the session's own stream, a mismatch that refuses the
   attempt, and a required revision never recorded as an observed one.
+  Section 3.32 corrects four of 3.31's claims: an intent is not a launch, so
+  a launch is four write-once records read back as named states and an
+  uncertain one is never replayed; the acknowledgment is a correlated one and
+  not execution provenance; a managed run supplies its startup hook and an
+  admission gate per invocation instead of relying on global registration;
+  and startup identity is decided before governed work is released rather than
+  refused after the session ends.
 establishes:
   - { kind: directory, path: "crates/statecraft-environment/" }
   - { kind: directory, path: "crates/statecraft-home/" }
@@ -1480,9 +1487,10 @@ its intent is not evidence of a launch.
 cannot be written after the process ended, the attempt is concluded with its
 real outcome, its detail says the record was not stored and why, and `run`
 exits 4, spec `006` section 3.10's failed row. If this product's own process
-ends between the two writes, the intent stays and no record is fabricated: the
-attempt reads as launched and **interrupted**, and reconciliation (spec `003`
-section 3.6) owns the attempt record.
+ends between the two writes, the intent stays and no record is fabricated, and
+reconciliation (spec `003` section 3.6) owns the attempt record. *Amended by
+section 3.32 rules 22 and 23:* this rule first said such an attempt reads as
+launched and interrupted, and an intent does not establish either.
 
 **Rule 16: supply is recorded by the launch that performs it.** In a run, the
 bytes this product hands to the session are two things, and each is recorded
@@ -1562,11 +1570,12 @@ the session starts, because the acknowledgment is emitted by the session. So a
 mismatched standing, measured from an admitted acknowledgment, is counted as a
 refusal under the guard `harness-identity` when the attempt is concluded, the
 attempt is `refused` (spec `003` section 3.5), and `accept` treats it as spec
-`005` section 3.1.1 treats any refused attempt. This build does not stop the
-session when the acknowledgment arrives: the supervisor recognizes only a
-terminal event, and the limit is stated rather than hidden. An unverified
-observation is not a mismatch and refuses nothing; it is recorded and the
-attempt is not qualified. A project that commits no requirement records
+`005` section 3.1.1 treats any refused attempt. *Amended by section 3.32 rule
+26:* this rule first let the session run to its end and refused it afterwards,
+which section 3.25's "nothing was done" does not admit. An unverified
+observation is not a mismatch; for a project that commits a requirement it
+now withholds governed work under section 3.32 rule 26, and it never qualifies
+the attempt. A project that commits no requirement records
 whatever was observed and is `unrequired`, which never qualifies.
 
 **Rule 20: what each grade establishes, and does not.**
@@ -1575,16 +1584,18 @@ whatever was observed and is `unrequired`, which never qualifies.
 |---|---|---|
 | installed integrity | the required directory's files digest to the committed full digest, before launch, and again when the record is written | that anything used them |
 | launch configuration | this product selected that revision and named it, with the attempt binding, in the environment it constructed for the process it created | that the provider or any hook read the environment |
-| runtime acknowledgment | a `SessionStart` hook script located in the named revision directory executed inside this attempt's session, with this attempt's binding, and the provider reported its output in this attempt's stream | that any other file of that revision (a skill, an agent, another hook) was loaded; that a model read, understood or complied with anything; and the acknowledgment's origin: the nonce is in the session's environment, so anything that runs there can print it, and nothing signs the line |
+| correlated acknowledgment | see section 3.32 rule 27, which replaces this row | see section 3.32 rule 27 |
 
-The acknowledgment is **launcher-attested**, like section 3.30's launch record:
-this product reads it from the stream of the process it created, and no field
-claims more. Whether the live provider runs a globally registered
-`SessionStart` hook in `--print` mode, passes its environment to the hook, and
-reports it as `hook_response` in a session this product constructs has been
-measured on `2.1.267` for the last of the three and is **unobserved** for the
-first two in a managed run. Until a live run shows it, a live run's observation
-is expected to be `unverified: absent`, and that is the correct outcome.
+*Amended by section 3.32 rule 27.* This row first said the acknowledgment
+establishes that a hook script located in the named revision directory
+executed. It does not: the line's origin is not authenticated, the provider's
+response does not name the command that printed it, and the directory digest
+is taken when the record is written, not when anything ran. The grade is the
+**correlated acknowledgment**, and rule 27 fixes what it does and does not
+establish. The acknowledgment remains **launcher-attested**, like section
+3.30's launch record. Section 3.32 rule 25 replaces the operator's global
+registration with a per-invocation one, so a managed run no longer depends on
+ambient registration for its startup path.
 
 **Rule 21: a run attempt's judgement, and why `qualified` is not reachable
 through a run.** The judgement read back from the two records is one of:
@@ -1592,8 +1603,10 @@ through a run.** The judgement read back from the two records is one of:
 | Verdict | When |
 |---|---|
 | `not-launched` | the attempt exists and has no `intent.json` |
-| `interrupted` | an intent with no record, or a record whose launch failed or whose process was interrupted |
+| `launch-unknown`, `outcome-unknown`, `spawn-failed` | section 3.32 rule 23; an intent with no record is one of the first two and is never `interrupted` |
+| `interrupted` | a record whose process was created and did not end by itself as one readable session |
 | `mismatched` | an admitted acknowledgment naming a revision other than the required one |
+| `not-admitted` | section 3.32 rule 26: a requirement is committed and no correlated acknowledgment was admitted at the startup decision |
 | `unverified` | launched and recorded, and not qualified for any other reason, each one named |
 | `qualified` | the record's `qualifies()` conjunction holds |
 
@@ -1606,6 +1619,172 @@ judgement is recomputed on every read from the bytes in the two records,
 including section 3.29 rule 5's re-admission, so a field edited by hand changes
 the judgement rather than asserting one, and one attempt's records are never
 read as another's.
+
+### 3.32 Launch states, the correlated acknowledgment, per-invocation startup delivery, and when governed work is released
+
+A narrowly scoped authority correction to section 3.31, settled by the owner on
+2026-09-22 and recorded before the implementation it authorizes. It closes four
+defects, each a claim the evidence did not support.
+
+1. **An intent was read as a launch.** Section 3.31 wrote `intent.json` before
+   the process was created and read an intent with no record as launched and
+   interrupted. This product can stop after writing the intent and before the
+   spawn, and after the spawn and before anything else is written; neither
+   inference holds.
+2. **An acknowledgment was read as execution provenance.** Section 3.31 rule 20
+   said the acknowledgment establishes that a hook script in the named
+   directory executed, and in the same row that nobody authenticates who
+   printed the line. The second is right, so the first cannot be.
+3. **The managed startup path was ambient.** A run delivered only the deny
+   floor, and the `SessionStart` hook that acknowledges a start reached the
+   session only if the operator had registered it globally. A managed run's
+   startup evidence depended on the operator's home rather than on what the
+   run supplied.
+4. **A mismatch was refused after the fact.** Section 3.25 says a refused
+   managed execution is one where "nothing was done". Section 3.31 rule 19 let
+   the session run to its end and then concluded it refused.
+
+**Rule 22: a launch is four write-once records, each a separate fact.** Every
+file lives in the attempt's directory of section 3.31 rule 13 and is created
+exclusively: an existing file refuses the write, and nothing is ever replaced.
+
+| Record | Written | Establishes | Does not establish |
+|---|---|---|---|
+| `intent.json` | after every preflight has passed, before the spawn is attempted | this product was about to attempt a spawn, with this configuration | that a process was created |
+| `launched.json` | immediately after the spawn call returned a process, **before** the prompt is delivered to it | a process with this id was created for this attempt | anything the process did |
+| `admission.json` | at the startup decision of rule 26 | the decision, its reason, and when it was made | that the provider honored it |
+| `record.json` | after the process ended, after the launch failed, or after the confirmation of a spawn could not be persisted | the completion, as section 3.31 rule 13 describes it, and which of the earlier records this product wrote | anything the earlier records do not |
+
+The order is fixed: intent, spawn, confirmation, prompt, decision, record. The
+prompt is written to the process only after `launched.json` is persisted, so a
+confirmation that cannot be persisted stops the process before it has been
+given any work, and the record says so. A spawn and a file write are not one
+atomic transaction, and nothing here pretends they are: between the spawn
+returning and the confirmation being on disk there is a window in which a
+process exists and no record says so, and rule 23 names what that window reads
+as.
+
+**Rule 23: the launch states, read back, and what each does not prove.**
+
+| What is on disk | State | What it means | What it does not mean |
+|---|---|---|---|
+| no intent | `not-launched` | this product attempts no spawn before the intent is persisted, so it created no provider process for this attempt | that nothing else happened: the workspace was prepared |
+| an intent, nothing after it | `launch-unknown` | intent persisted; this product stopped before confirming a spawn | that no process exists, or that one does |
+| an intent and a confirmation, no record | `outcome-unknown` | a process with the recorded id was created and given its prompt; its outcome is unknown | that it was interrupted, or that it had no effect |
+| a record whose spawn call failed | `spawn-failed` | the operating system reported that no process was created | anything about the workspace beyond what the preparation did |
+| a record whose confirmation could not be persisted | `interrupted` | a process was created, and stopped before its prompt was delivered | that stopping it undid anything |
+| a record of a completed launch | section 3.31 rule 21, with `not-admitted` added by rule 26 | as there | as there |
+
+Absence of a final record never proves an interruption, and absence of a
+record never proves that no side effect occurred. `launch-unknown` and
+`outcome-unknown` are the honest words for a crash, and each names the files it
+read.
+
+**Rule 24: an uncertain launch is never replayed automatically.** The run
+record's attempt stays live when this product stops mid-launch, and spec `003`
+section 3.6 blocks a retry of an intent whose outcome is unknown. `run` refuses
+the next attempt, names the live attempt and its launch state, and gives the
+operator the inspection to perform: `startup show <path> <run-id> --attempt
+<n>`, the process id where one was confirmed, and the workspace where effects
+may have landed. This build has no verb that reconciles an attempt; the
+limitation is stated in that answer rather than worked around, and nothing
+here infers an outcome to free the lock.
+
+**Rule 25: a managed run supplies its startup hook and its gate explicitly.**
+Where the project commits a requirement, the run's settings document is the
+deny floor of section 3.27 plus two hook registrations, and nothing else:
+
+- `SessionStart`, matcher `startup`: the selected revision's
+  `hooks/statecraft-session-start.sh`, by absolute path in the installed
+  revision directory whose integrity section 3.25 has just checked.
+- `PreToolUse`, matcher `*`: the attempt's **admission gate**, a script this
+  product writes once into the attempt's directory before the spawn. It is
+  launcher content, not harness content, so it is in no revision's digest and
+  no harness upgrade changes it.
+
+The mechanism is the one section 3.27 already relies on: Claude Code documents
+`--settings <file-or-json>` as an additional settings source, and documents
+`hooks` as a settings key. Whether `2.1.267` honors hooks supplied that way, in
+`--print` mode, and passes the session's environment to them, is
+**unobserved** in a live run. Nothing here writes the operator's home, and a
+managed run no longer needs section 3.24's global registration to be
+acknowledged. The intent records the exact document by digest and length, each
+registration by event, matcher, command and the digest of the script it names,
+and, separately, the digest of the deny floor alone. The run's document is not
+the floor's bytes, so under section 3.29 rule 4 no qualification of the floor
+payload is evidence for a run's document, and the record never reads one as
+the other. Where the project commits no requirement, nothing is selected, the
+document is the floor alone, no gate is written, and the record says work was
+not gated by a startup decision.
+
+**Rule 26: startup identity is an admission prerequisite, and governed work is
+released only by the decision.** Section 3.25 promises prevention, so the
+decision is made before governed work is released, not after the session ends.
+*Governed work* is every tool call the session makes: the channel through which
+a session changes anything. The gate refuses every tool call until
+`admission.json` records `admitted`, waits a bounded time for a decision that
+has not yet been written, and refuses when that time passes.
+
+The launcher decides at the first event in the attempt's stream that is not a
+`SessionStart` hook event: in the recorded `2.1.267` streams, the init event,
+which follows every `SessionStart` `hook_response`. At that point it judges the
+acknowledgments it has read under section 3.31 rule 18, and writes:
+
+| Decision | When |
+|---|---|
+| `admitted` | exactly one correlated acknowledgment is admitted, and the standing evaluated against it is `exact` |
+| `refused: mismatched` | an admitted acknowledgment names a revision other than the required one |
+| `refused: not-established` | no acknowledgment is admitted, for any reason rule 18 names |
+
+On a refusal the launcher stops the process group at once and concludes the
+attempt `refused`, under the guard `harness-identity` for a mismatch and
+`startup-admission` otherwise. A stream that ends before the decision point is
+decided at its end, the same way.
+
+What this boundary establishes, and what it does not:
+
+- **Establishes:** a tool call that the provider routed through the gate did
+  not run before `admitted` was written, and did not run after a refusal. The
+  gate appends each consultation to the attempt's `gate.log`, so the record can
+  say whether the gate was consulted at all.
+- **Does not establish:** that the provider honors the registration. A provider
+  that ignores it runs neither the acknowledgment nor the gate; the decision is
+  then `refused: not-established`, the process is stopped, and the refusal is
+  **retrospective**: the record says effects before termination are not
+  excluded. Nor does it establish that nothing happened outside tool calls (the
+  provider's own startup, other hooks), or that stopping the process undid
+  anything. Prompt termination is not proof of no effect.
+
+**Rule 27: the correlated acknowledgment.** The grade section 3.31 called
+`acknowledged` is **`correlated`**, in the record, in the API and on the
+command line. An admitted correlated acknowledgment establishes, and no more:
+
+- a `hook_response` for `SessionStart` in this attempt's stream, exit `0`,
+  carrying the stream's own init session id, held one line whose nonce, run,
+  attempt, selection and project equal the intent;
+- the directory that line names is directly inside this home's harness store,
+  and its files, read when the record is written, digest to the recorded
+  identity;
+- the per-invocation registration of rule 25 named the script in the selected
+  revision directory.
+
+It does **not** establish which process printed the line: the provider's
+response does not name the command, and the nonce is in the session's
+environment, so any hook or process that runs there can print it. It does not
+establish that the script at that path is the one that ran, that its bytes when
+it ran equal the bytes digested, or that any other file of the revision was
+loaded. "Executed" is never claimed. A record written before this section
+carries the grade `acknowledged`; it is read as `correlated` with the same
+fields and judged the same, and nothing is rewritten.
+
+**Rule 28: the evidence words do not collapse.** Each names one fact and none
+implies another: **installed** (a revision directory whose files digest to its
+name), **selected** (named in the launch configuration), **supplied** (bytes
+in the work tree and on the command line at spawn), **correlated** (rule 27),
+**admitted** (rule 26's decision released governed work), and **qualified**
+(section 3.29's live observation, unreachable through a run). A record whose
+evidence is insufficient under these rules, including one written before them,
+stays inspectable and is never qualified by being read.
 
 ## 4. Out of scope
 
@@ -2826,6 +3005,52 @@ an acknowledged observation equal to the requirement, a supplied supply and
 the named missing class. The permission stage starts no run, because a run
 session would be a fourth session. `acceptance_script.rs` asserts the step's
 persisted records and the ancestor refusal.
+
+**2026-09-22: section 3.32 implemented, and six choices it left open.**
+
+1. *The exclusive write.* Each record is written to a private temporary name in
+   the attempt's directory and hard-linked to its final name. The link fails
+   if the name exists, so the write is exclusive and a reader never sees half
+   a file. The previous build checked for the file and then renamed over it,
+   and a rename replaces; between the check and the rename a second writer
+   could have been replaced. Every record, the gate included, now goes
+   through the one function.
+2. *The gate's wait.* Thirty seconds, passed to the gate as its first argument
+   in the registered command, so the intent records the exact bound and a test
+   can run the same script with a shorter one. The hook is registered with a
+   sixty-second timeout, longer than the wait, so what a provider reports is
+   the gate's refusal rather than its own timeout.
+3. *The decision file.* `admission.json` is one line of compact JSON, so the
+   gate reads it with `grep` for the exact member `"decision":"admitted"`. A
+   reason cannot forge that member: a quotation mark inside a string value is
+   escaped. The gate never parses anything else, and a decision it cannot read
+   is a decision that has not been written.
+4. *Where the decision point is.* The first event that is not a `SessionStart`
+   `hook_started` or `hook_response`. The recorded `2.1.267` streams put every
+   such response before `init`, so in them this is the init event. A provider
+   that reports a startup hook after `init` would be judged on what arrived
+   before it, which is refused as not established rather than waited for.
+5. *An unpersisted decision.* When `admission.json` cannot be written, a gated
+   attempt is stopped and refused under `startup-admission`: the gate cannot
+   read a decision that is not on disk, so it would hold every tool call until
+   its wait ran out, and stopping the process says that plainly instead.
+6. *What `run` refuses and what it reads.* A live attempt's refusal inspects
+   that attempt's records with its outcome absent, and says what they
+   establish; nothing in the refusal writes, reconciles or infers.
+
+Measured through the built binary: a run whose fake honors the registration is
+admitted at its init event and its tool call runs after it; a tool call begun
+before the decision waits at the gate and runs only after admission; a
+substituted startup hook naming another revision is refused, and neither the
+waiting tool call nor a later one produces its effect; a fake that ignores the
+registration produces an effect before the decision and the refusal says it
+is retrospective; and a launcher killed while its session runs leaves
+`outcome-unknown`, after which `run` refuses rather than replaying and the
+fake was launched once. Library tests inject each failure section 3.32 names:
+the intent, a spawn failure, a process created before its confirmation, a
+confirmation that cannot be persisted (the real supervisor, the prompt never
+delivered), a decision that cannot be persisted, and a record that cannot be
+persisted.
 
 ## Verification
 

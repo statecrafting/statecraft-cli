@@ -7,7 +7,7 @@ use crate::stream::{MapError, ProviderEvent, ResultEvent, map_stream};
 use statecraft_adapter::capability::Capability;
 use statecraft_adapter::environment::ChildEnvironment;
 use statecraft_adapter::protocol::{Classification, Request, StreamError};
-use statecraft_adapter::supervisor::{Supervised, supervise_stream};
+use statecraft_adapter::supervisor::{Supervised, Unwatched, Watch, supervise_watched};
 use statecraft_run::attempt::Outcome;
 use std::path::Path;
 
@@ -52,6 +52,47 @@ pub struct HookResponse {
     pub outcome: Option<String>,
     /// Its standard output, verbatim.
     pub stdout: Option<String>,
+}
+
+impl HookResponse {
+    /// Read one native event as a hook's reported response, where it is one.
+    ///
+    /// Spec 004 section 5, 2026-09-22: a caller watching a launch sees native
+    /// events, and this is the one reading of the provider's spelling it needs,
+    /// kept in the adapter that owns those bytes.
+    pub fn of(event: &ProviderEvent) -> Option<Self> {
+        match event {
+            ProviderEvent::System(s) if s.is_hook_response() => Some(Self {
+                session_id: s.session_id.clone(),
+                hook_event: s.hook_event.clone(),
+                hook_name: s.hook_name.clone(),
+                exit_code: s.exit_code,
+                outcome: s.outcome.clone(),
+                stdout: s.stdout.clone(),
+            }),
+            _ => None,
+        }
+    }
+}
+
+/// The session id an init event reports, where the event is one.
+pub fn init_session(event: &ProviderEvent) -> Option<&str> {
+    match event {
+        ProviderEvent::System(s) if s.is_init() => s.session_id.as_deref(),
+        _ => None,
+    }
+}
+
+/// Whether the event is the init event.
+pub fn is_init(event: &ProviderEvent) -> bool {
+    matches!(event, ProviderEvent::System(s) if s.is_init())
+}
+
+/// Whether the event is a `SessionStart` hook's start or response: the events
+/// that precede a session's first turn in the recorded streams.
+pub fn is_session_start_hook(event: &ProviderEvent) -> bool {
+    matches!(event, ProviderEvent::System(s)
+        if s.is_hook() && s.hook_event.as_deref() == Some("SessionStart"))
 }
 
 impl Execution {
@@ -112,21 +153,61 @@ pub fn supervise(
     environment: &ChildEnvironment,
     granted: &[Capability],
 ) -> std::io::Result<Execution> {
-    supervise_in(
+    supervise_watched_in(
         invocation,
         request,
         environment,
         granted,
         &std::env::temp_dir(),
+        &mut Unwatched,
     )
 }
 
+/// [`supervise`], with the caller's watch told of the spawn before the prompt
+/// is delivered and shown each native event, numbered, as it is read (spec 004
+/// section 5, 2026-09-22).
+pub fn supervise_with(
+    invocation: &Invocation,
+    request: &Request,
+    environment: &ChildEnvironment,
+    granted: &[Capability],
+    watch: &mut dyn Watch<(usize, ProviderEvent)>,
+) -> std::io::Result<Execution> {
+    supervise_watched_in(
+        invocation,
+        request,
+        environment,
+        granted,
+        &std::env::temp_dir(),
+        watch,
+    )
+}
+
+#[cfg(test)]
 fn supervise_in(
     invocation: &Invocation,
     request: &Request,
     environment: &ChildEnvironment,
     granted: &[Capability],
     temporary_root: &Path,
+) -> std::io::Result<Execution> {
+    supervise_watched_in(
+        invocation,
+        request,
+        environment,
+        granted,
+        temporary_root,
+        &mut Unwatched,
+    )
+}
+
+fn supervise_watched_in(
+    invocation: &Invocation,
+    request: &Request,
+    environment: &ChildEnvironment,
+    granted: &[Capability],
+    temporary_root: &Path,
+    watch: &mut dyn Watch<(usize, ProviderEvent)>,
 ) -> std::io::Result<Execution> {
     // --settings is singular. Do not silently change the precedence of a
     // caller's second document by appending ours or merging it ourselves.
@@ -172,7 +253,7 @@ fn supervise_in(
     })?;
     let mut args = invocation.args();
     args.extend(["--settings", settings_path]);
-    let native = supervise_stream(
+    let native = supervise_watched(
         Path::new(&invocation.program),
         &args,
         request,
@@ -186,6 +267,7 @@ fn supervise_in(
                 })
         },
         |(_, event)| matches!(event, ProviderEvent::Result(_)),
+        watch,
     )?;
     // Cleanup must not discard a readable terminal denial. Keep a failure as
     // a residual alongside the execution evidence rather than returning early.
@@ -216,27 +298,17 @@ fn map_native(
         outcome: native.outcome,
         stream_error: native.stream_error,
         surviving_processes: native.surviving_processes,
+        stopped: native.stopped,
     };
     let result_line = native.events.last().map(|(line, _)| *line).unwrap_or(1);
     let events: Vec<_> = native.events.into_iter().map(|(_, event)| event).collect();
     let mut hook_responses = Vec::new();
     let mut session_id = None;
     for event in &events {
-        if let ProviderEvent::System(s) = event {
-            if s.is_init() && session_id.is_none() {
-                session_id = s.session_id.clone();
-            }
-            if s.is_hook_response() {
-                hook_responses.push(HookResponse {
-                    session_id: s.session_id.clone(),
-                    hook_event: s.hook_event.clone(),
-                    hook_name: s.hook_name.clone(),
-                    exit_code: s.exit_code,
-                    outcome: s.outcome.clone(),
-                    stdout: s.stdout.clone(),
-                });
-            }
+        if session_id.is_none() {
+            session_id = init_session(event).map(str::to_string);
         }
+        hook_responses.extend(HookResponse::of(event));
     }
     let mut result = events.iter().find_map(|event| match event {
         ProviderEvent::Result(result) => Some((**result).clone()),
@@ -342,6 +414,7 @@ mod tests {
             outcome: Outcome::Interrupted,
             stream_error: None,
             surviving_processes: None,
+            stopped: None,
         };
         let execution = map_native(native, &[], None);
         assert_eq!(execution.supervised.outcome, Outcome::Interrupted);
@@ -540,6 +613,7 @@ mod tests {
             outcome: Outcome::Completed,
             stream_error: None,
             surviving_processes: None,
+            stopped: None,
         };
         let execution = map_native(native, &[], None);
         assert_eq!(
@@ -600,5 +674,75 @@ mod tests {
         assert_eq!(execution.settings_written, document.as_bytes());
         assert_eq!(execution.session_id.as_deref(), Some("s"));
         assert!(execution.hook_responses.is_empty());
+    }
+
+    /// A watch sees native events in order, can stop at the init event, and
+    /// the execution keeps the startup hook's response and says why it
+    /// stopped. Nothing after the stop is read or mapped as a completion.
+    #[test]
+    fn a_watch_stops_at_init_and_the_startup_evidence_before_it_survives() {
+        use statecraft_adapter::supervisor::Control;
+        use std::os::unix::fs::PermissionsExt;
+
+        struct AtInit(Vec<bool>);
+        impl Watch<(usize, ProviderEvent)> for AtInit {
+            fn spawned(&mut self, _pid: u32) -> Result<(), String> {
+                Ok(())
+            }
+            fn event(&mut self, (_, event): &(usize, ProviderEvent)) -> Control {
+                self.0.push(is_session_start_hook(event));
+                if is_init(event) {
+                    Control::Stop("decided at init".into())
+                } else {
+                    Control::Continue
+                }
+            }
+        }
+
+        let workspace = tempfile::tempdir().unwrap();
+        let temporary_root = tempfile::tempdir().unwrap();
+        let child = workspace.path().join("fixture.sh");
+        std::fs::write(
+            &child,
+            concat!(
+                "#!/bin/sh\n",
+                "/bin/cat > /dev/null\n",
+                r#"echo '{"type":"system","subtype":"hook_response","hook_event":"SessionStart","hook_name":"SessionStart:startup","stdout":"ack","exit_code":0,"session_id":"s"}'"#,
+                "\n",
+                r#"echo '{"type":"system","subtype":"init","claude_code_version":"fixture","session_id":"s"}'"#,
+                "\n",
+                "sleep 30\n",
+                r#"echo '{"type":"result","subtype":"success","is_error":false,"num_turns":1,"permission_denials":[],"session_id":"s"}'"#,
+                "\n",
+            ),
+        )
+        .unwrap();
+        std::fs::set_permissions(&child, std::fs::Permissions::from_mode(0o700)).unwrap();
+        let invocation = Invocation::new(child.to_str().unwrap(), &[], None);
+        let environment = construct(&Blueprint::empty(), &CheckSuiteCommands::default());
+        let mut request = request(workspace.path());
+        request.deadline_seconds = 60;
+        let mut watch = AtInit(Vec::new());
+        let started = std::time::Instant::now();
+        let execution = supervise_watched_in(
+            &invocation,
+            &request,
+            &environment,
+            &[],
+            temporary_root.path(),
+            &mut watch,
+        )
+        .unwrap();
+        assert!(started.elapsed() < std::time::Duration::from_secs(20));
+        assert_eq!(watch.0, [true, false]);
+        assert_eq!(
+            execution.supervised.stopped.as_deref(),
+            Some("decided at init")
+        );
+        assert_eq!(execution.supervised.outcome, Outcome::Interrupted);
+        assert!(execution.result.is_none());
+        assert_eq!(execution.session_id.as_deref(), Some("s"));
+        assert_eq!(execution.hook_responses.len(), 1);
+        assert_eq!(execution.hook_responses[0].stdout.as_deref(), Some("ack"));
     }
 }

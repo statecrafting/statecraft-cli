@@ -161,30 +161,34 @@ cargo run -p statecraft-cli -- startup show    <path> <run-id> [--attempt <n>]
 ```
 
 `run` refuses before any attempt when the required revision is missing,
-corrupt or unreadable (spec `002` section 3.25). Otherwise it writes two
-records per attempt under `.statecraft/state/startup/runs/<run>/<attempt>/`
-(spec `002` section 3.31): `intent.json` before the process exists, and
-`record.json` after it ends. `startup show` reads them back and answers, from
-their bytes:
+corrupt or unreadable (spec `002` section 3.25). Otherwise it writes up to four
+write-once records per attempt under
+`.statecraft/state/startup/runs/<run>/<attempt>/` (spec `002` sections 3.31 and
+3.32): `intent.json` before a spawn is attempted, `launched.json` once the spawn
+returned a process and before the prompt is delivered, `admission.json` at the
+startup decision, and `record.json` at the end. `startup show` reads them back
+and answers, from their bytes:
 
 | Question | Where the answer comes from |
 |---|---|
 | which revision was **required** | the committed manifest, full digest |
-| which was **selected** | the run's own choice, the required revision once it is verified intact, carried to the session in its environment |
-| which was **observed** | the shipped `SessionStart` hook's acknowledgment of this attempt, in this attempt's own stream; anything else is `unverified`, by kind, and never a match |
-| what payload was **delivered** | the settings bytes the adapter wrote, by digest, against this build's payload |
-| whether it **launched** | whether `intent.json` exists |
-| why it is **not qualified** | the verdict (`not-launched`, `interrupted`, `mismatched`, `unverified`) and its reasons |
+| which was **selected** | the run's own choice, the required revision once it is verified intact |
+| what was **supplied** | the settings document the run passed with `--settings`, by digest: the deny floor plus, when a revision is selected, that revision's `SessionStart` hook and the attempt's admission gate, registered for this session only; the floor's own digest is recorded beside it |
+| which was **correlated** | one acknowledgment in a `SessionStart` response of this attempt's own stream that carries this attempt's binding and names an installed revision; it does not establish which process printed it, so "executed" is never claimed |
+| whether work was **admitted** | the startup decision, made at the first event after the startup hooks: tool calls wait at the gate until it says `admitted`, and a refusal stops the process |
+| whether a process was **created** | `launched.json`; an intent alone is `launch-unknown`, and a confirmed spawn with no record is `outcome-unknown` |
+| why it is **not qualified** | the verdict and its reasons |
 
-Four statements stay apart: an **admitted synthetic observation** (a local fake,
-never qualifying), **payload delivered** (bytes on the command line),
-**harness observed** (a hook in the named revision ran in this session), and
-**live qualified**, which a run cannot reach: a run session is not one of the
-three qualification controls. A mismatch observed after launch refuses the
-attempt. What is still unobserved is whether the live provider runs a
-globally registered `SessionStart` hook in a managed run and reports it; until
-a live run shows it, a live run's observation is expected to read
-`unverified: absent`.
+Six words stay apart: **installed**, **selected**, **supplied**, **correlated**,
+**admitted** and **qualified**, and a run cannot reach the last: a run session
+is not one of the three qualification controls. A provider that ignores the
+registration runs neither the acknowledgment nor the gate, so the decision
+refuses and the process is stopped, and the refusal says effects before the stop
+are not excluded. What is still unobserved is whether the live provider honors
+hooks passed through `--settings` in `--print` mode; until a live run shows it,
+a live managed run with a requirement is expected to be refused as
+`not-admitted`. An attempt whose outcome is unknown stays live, and `run`
+refuses the next attempt and names what to inspect rather than replaying it.
 
 ### The exit codes a caller scripts against
 

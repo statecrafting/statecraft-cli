@@ -406,7 +406,7 @@ the library's. Its codes, in section 3.3's vocabulary:
 | Code | Meaning for `startup show` |
 |---|---|
 | 0 | The attempt is `qualified`. Not reachable for a run attempt today, for the reason `002` section 3.31 rule 21 gives, and stated rather than hidden. |
-| 1 | A verdict that is not `qualified`: `not-launched`, `interrupted`, `mismatched` or `unverified`. A finding, with its reasons. |
+| 1 | A verdict that is not `qualified`: `not-launched`, `launch-unknown`, `outcome-unknown`, `spawn-failed`, `interrupted`, `mismatched`, `not-admitted` or `unverified`. A finding, with its reasons. |
 | 2 | Refused: no manifest, no such run, or no such attempt. Nothing was read as evidence. |
 | 4 | A record is present and could not be read. |
 
@@ -417,6 +417,26 @@ after the process ended exits **4**, the same row as a supervisor that could
 not write the record, and says the evidence was not stored. An attempt refused
 because `intent.json` could not be written is a refused attempt and exits 1 as
 that row already says, because nothing was launched.
+
+**2026-09-22 correction: launch states, admission, and the live-attempt
+refusal.** Recorded before the bindings change, for `002` section 3.32.
+
+- `startup show` renders every record rule 22 names (intent, spawn
+  confirmation, admission decision, record), the grade word `correlated` where
+  it rendered `acknowledged`, and the admission decision with when governed work
+  was released or withheld. Its verdicts gain `launch-unknown`,
+  `outcome-unknown`, `spawn-failed` and `not-admitted`, all under exit **1**
+  with the rest: each is a finding with its reasons, and none is a failure of
+  the read. An attempt whose outcome is unknown says so and names the process
+  id and workspace the operator should inspect.
+- `run`'s `startup` field gains the launch state and the admission decision. A
+  refusal at the startup decision is a refused attempt and exits **1**, section
+  3.10's refused row, under the guard `002` names; the answer says whether the
+  refusal came before governed work or after it, in `002`'s words.
+- `run` refused because an attempt is live (`003` section 3.7) keeps its exit
+  **2** and additionally names that attempt's launch state and the `startup
+  show` invocation that inspects it. It infers no outcome and frees nothing:
+  `002` section 3.32 rule 24, and this surface has no reconciliation verb.
 
 **The two session-keyed verbs stop reporting an unmeasured resolution.**
 `startup record` and `startup qualify` measure no harness revision, so the

@@ -1097,4 +1097,23 @@ mod tests {
             "a run choice overrode the committed harness requirement: {answer:?}"
         );
     }
+
+    /// Spec 002 section 3.32 rule 28: installed and intact is not resolved,
+    /// and the rendering keeps them apart.
+    #[test]
+    fn exact_with_nothing_resolved_does_not_say_resolved() {
+        let required = "a".repeat(64);
+        let unresolved = Standing::Exact {
+            required: required.clone(),
+            resolved: None,
+        };
+        let text = unresolved.describe();
+        assert!(text.contains("no revision has resolved"), "{text}");
+        assert!(!text.contains("and resolved"), "{text}");
+        let resolved = Standing::Exact {
+            required: required.clone(),
+            resolved: Some(required),
+        };
+        assert!(resolved.describe().contains("and resolved"));
+    }
 }

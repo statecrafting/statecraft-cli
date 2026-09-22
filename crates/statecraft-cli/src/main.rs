@@ -409,8 +409,9 @@ fn run_verb(
     };
     let standing = match &project_manifest {
         // Nothing has resolved for this session yet, and nothing is claimed
-        // to have: a mismatch is measured from the session's own startup
-        // acknowledgment once it has started (spec 002 section 3.31).
+        // to have: a mismatch is decided from the session's own startup
+        // acknowledgment, before its tool calls are released (spec 002
+        // section 3.32 rule 26).
         Some(manifest) => statecraft_home::required::evaluate(&layout, manifest, None),
         None => statecraft_home::required::Standing::Unrequired,
     };
@@ -431,7 +432,34 @@ fn run_verb(
     let session =
         match statecraft_run::session::begin(&mut chain, root, &run_id, "HEAD", &SystemClock) {
             Ok(s) => s,
-            Err(e) => return emit(&slice::session_error_answer(&e), format),
+            Err(e) => {
+                // Spec 002 section 3.32 rule 24: a live attempt is never
+                // replayed, and the refusal names what its launch records
+                // establish.
+                if let statecraft_run::session::SessionError::LiveAttempt {
+                    run_id: live_run,
+                    attempt,
+                } = &e
+                {
+                    let startup = project_manifest.as_ref().and_then(|_| {
+                        statecraft_home::launch::inspect(
+                            root,
+                            live_run,
+                            Some(*attempt),
+                            &[statecraft_home::launch::AttemptFact {
+                                number: *attempt,
+                                outcome: None,
+                            }],
+                        )
+                        .ok()
+                    });
+                    return emit(
+                        &slice::live_attempt_answer(&e, &root.display().to_string(), startup),
+                        format,
+                    );
+                }
+                return emit(&slice::session_error_answer(&e), format);
+            }
         };
 
     // Preflight refuses before any process is created, naming the token (spec
@@ -557,20 +585,29 @@ fn run_verb(
     };
 
     // Spec 002 section 3.27: the floor reaches a managed session through the
-    // per-session settings argument, as the exact payload bytes an observation
-    // is bound to (section 3.29 rule 4). Delivering it claims nothing about
-    // enforcement; the posture below still says unqualified.
+    // per-session settings argument. Section 3.32 rule 25: where a revision is
+    // selected, the same document registers its startup hook and this
+    // attempt's admission gate, so nothing depends on a registration in the
+    // operator's home. The bytes are the intent's, exactly. Delivering them
+    // claims nothing about enforcement; the posture below still says
+    // unqualified.
     let floor: Vec<String> = statecraft_home::settings::DENY_FLOOR
         .iter()
         .map(|r| (*r).to_string())
         .collect();
-    let invocation = match statecraft_adapter_claude_code::Invocation::new(
+    let mut invocation = statecraft_adapter_claude_code::Invocation::new(
         &program.display().to_string(),
         &floor,
         None,
-    )
-    .with_settings_document(statecraft_home::session::payload_json())
-    {
+    );
+    if let Some(hooks) = prepared.as_ref().and_then(|p| p.intent.hooks()) {
+        invocation = invocation.with_hooks(hooks);
+    }
+    let document = prepared.as_ref().map_or_else(
+        statecraft_home::session::payload_json,
+        statecraft_home::launch::Prepared::settings_document,
+    );
+    let invocation = match invocation.with_settings_document(document) {
         Ok(invocation) => invocation,
         Err(e) => return fail(&e, format),
     };
@@ -586,12 +623,42 @@ fn run_verb(
         },
     };
 
-    let execution = match statecraft_adapter_claude_code::execution::supervise(
-        &invocation,
-        &request,
-        &environment,
-        &negotiation.granted,
-    ) {
+    // Spec 002 section 3.32 rules 22 and 26: a managed launch is watched. The
+    // spawn is confirmed on disk before the prompt is delivered, and the
+    // startup decision is made at the first event after the startup hooks,
+    // stopping the process when it refuses.
+    let now = || {
+        statecraft_environment::time::rfc3339_utc(statecraft_environment::time::Clock::now_unix(
+            &SystemClock,
+        ))
+    };
+    let mut watch = match (&prepared, &project_manifest) {
+        (Some(p), Some(m)) => Some(statecraft_home::launch::LaunchWatch::new(
+            root, &layout, m, p, &now,
+        )),
+        _ => None,
+    };
+    let supervised = match watch.as_mut() {
+        Some(w) => statecraft_adapter_claude_code::execution::supervise_with(
+            &invocation,
+            &request,
+            &environment,
+            &negotiation.granted,
+            w,
+        ),
+        None => statecraft_adapter_claude_code::execution::supervise(
+            &invocation,
+            &request,
+            &environment,
+            &negotiation.granted,
+        ),
+    };
+    if let (Some(w), Ok(_)) = (watch.as_mut(), &supervised) {
+        // A stream that ended before its decision point is decided at its end.
+        w.decide_at_end();
+    }
+    let watched = watch.map(|w| w.watched()).unwrap_or_default();
+    let execution = match supervised {
         Ok(s) => s,
         Err(e) => {
             let mut accounting = statecraft_run::refusal::Accounting::default();
@@ -607,6 +674,7 @@ fn run_verb(
                 &statecraft_home::launch::Launch::Failed {
                     reason: e.to_string(),
                 },
+                &watched,
             );
             return conclude_and_emit(
                 &mut chain,
@@ -629,7 +697,8 @@ fn run_verb(
     }
 
     // Spec 002 section 3.31: the record is written from what the launch
-    // produced, and a mismatch it measured refuses the attempt (rule 19).
+    // produced, and a startup decision that refused governed work refuses the
+    // attempt under its guard (section 3.32 rule 26).
     let version = provider_version(&execution);
     let startup = finalize_startup(
         root,
@@ -644,11 +713,13 @@ fn run_verb(
             outcome: supervised.outcome.word(),
             stream_error: supervised.stream_error.as_ref().map(ToString::to_string),
             surviving_processes: supervised.surviving_processes.clone(),
+            stopped: supervised.stopped.clone(),
         },
+        &watched,
     );
-    if let Some(why) = &startup.refusal {
+    if let Some((guard, why)) = &startup.refusal {
         accounting.observe(statecraft_run::refusal::RefusalEvent {
-            guard: statecraft_home::launch::HARNESS_IDENTITY_GUARD.to_string(),
+            guard: (*guard).to_string(),
             detail: why.clone(),
         });
     }
@@ -716,7 +787,7 @@ fn provider_version(
 struct Finalized {
     run: statecraft_home::launch::RunStartup,
     detail: serde_json::Value,
-    refusal: Option<String>,
+    refusal: Option<(&'static str, String)>,
 }
 
 /// Write the attempt's record (spec 002 section 3.31), or say why it was not
@@ -727,6 +798,7 @@ fn finalize_startup(
     manifest: Option<&statecraft_environment::manifest::Manifest>,
     prepared: Option<&statecraft_home::launch::Prepared>,
     launch: &statecraft_home::launch::Launch<'_>,
+    watched: &statecraft_home::launch::Watched,
 ) -> Finalized {
     let (Some(manifest), Some(prepared)) = (manifest, prepared) else {
         return Finalized {
@@ -735,11 +807,20 @@ fn finalize_startup(
             refusal: None,
         };
     };
-    let launched = matches!(launch, statecraft_home::launch::Launch::Spawned { .. });
+    let launched = watched.spawned.is_some();
+    let admission = watched.admission.as_ref().map(|a| {
+        format!(
+            "{} at {}: {}",
+            a.decision.describe(),
+            a.decided_at,
+            a.reason
+        )
+    });
     let now = statecraft_environment::time::rfc3339_utc(
         statecraft_environment::time::Clock::now_unix(&SystemClock),
     );
-    match statecraft_home::launch::finalize(root, layout, manifest, prepared, launch, &now) {
+    match statecraft_home::launch::finalize(root, layout, manifest, prepared, launch, watched, &now)
+    {
         Ok((record, path)) => {
             let harness = record.launch.as_ref().map(|l| l.harness.describe());
             let refusal = statecraft_home::launch::refuses_the_attempt(&record);
@@ -751,6 +832,8 @@ fn finalize_startup(
                     "record": path.display().to_string(),
                     "observed": harness,
                     "standing": record.standing.word(),
+                    "admission": watched.admission,
+                    "spawnConfirmed": watched.spawned.is_some() && watched.confirmation_error.is_none(),
                 }),
                 run: statecraft_home::launch::RunStartup {
                     managed: true,
@@ -759,6 +842,7 @@ fn finalize_startup(
                     record: Some(path.display().to_string()),
                     verdict: None,
                     observed: harness,
+                    admission,
                     error: None,
                 },
                 refusal,
@@ -779,6 +863,7 @@ fn finalize_startup(
                 record: None,
                 verdict: None,
                 observed: None,
+                admission,
                 error: Some(format!("the startup record could not be written: {e}")),
             },
             refusal: None,

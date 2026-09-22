@@ -67,6 +67,20 @@ impl Invocation {
         }
     }
 
+    /// Register hooks in this invocation's settings, beside its deny rules.
+    ///
+    /// `hooks` is the provider's own `hooks` settings value, event name to
+    /// matcher groups. Spec 004 section 5, 2026-09-22: spec 002 section 3.32
+    /// rule 25 supplies a managed run's startup hook and admission gate this
+    /// way, per invocation, rather than relying on a registration in the
+    /// operator's home. It replaces any hooks set before, and must be called
+    /// before [`Invocation::with_settings_document`], whose bytes must parse to
+    /// the settings including these.
+    pub fn with_hooks(mut self, hooks: serde_json::Value) -> Self {
+        self.settings["hooks"] = hooks;
+        self
+    }
+
     /// Deliver these exact settings bytes rather than a serialization of
     /// [`Invocation::settings`].
     ///
@@ -149,6 +163,26 @@ mod tests {
         let joined = i.args.join(" ");
         assert!(!joined.contains("prompt"));
         assert_eq!(i.args.len(), 6);
+    }
+
+    #[test]
+    fn hooks_join_the_deny_rules_and_the_document_must_carry_both() {
+        let hooks = serde_json::json!({"SessionStart": [{"matcher": "startup",
+            "hooks": [{"type": "command", "command": "/x/hook.sh"}]}]});
+        let invocation =
+            Invocation::new("claude", &["Bash(x*)".to_string()], None).with_hooks(hooks.clone());
+        assert_eq!(invocation.settings["hooks"], hooks);
+        assert_eq!(invocation.deny_rules(), ["Bash(x*)"]);
+        // The floor alone is no longer this invocation's settings.
+        let floor_only = r#"{"permissions":{"deny":["Bash(x*)"]}}"#.to_string();
+        assert!(
+            invocation
+                .clone()
+                .with_settings_document(floor_only)
+                .is_err()
+        );
+        let both = serde_json::to_string(&invocation.settings).unwrap();
+        assert!(invocation.with_settings_document(both).is_ok());
     }
 
     #[test]

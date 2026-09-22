@@ -86,7 +86,7 @@
           {
             "file": "specs/002-environment-lifecycle/handoff-2026-09-21.md",
             "span": {
-              "endLine": 593,
+              "endLine": 594,
               "startLine": 555
             }
           }
@@ -156,5 +156,5 @@
     "specStatus": "approved"
   },
   "schemaVersion": "1.1.0",
-  "shardHash": "218c10c442b3bda5f52fa686fe727514a868bbd05d57651fb476d5bd871abeb0"
+  "shardHash": "a96feea8a37dd25f13014c5f069c56ba4a03033d76abb629508b33fcd7562e7f"
 }

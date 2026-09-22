@@ -338,12 +338,18 @@ pub struct HarnessUpgraded {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SessionPayload {
-    /// The exact bytes the settings argument receives.
+    /// The deny floor's exact bytes: what the settings argument receives in a
+    /// qualification control, and in a run whose project commits no
+    /// requirement.
     pub payload: String,
     /// Their identity, which an observation is bound to.
     pub digest: String,
     /// The argument that carries them.
     pub argument: String,
+    /// Which sessions receive exactly these bytes, and which receive more
+    /// (spec 002 section 3.32 rule 25). A run under a requirement is given
+    /// other bytes, so a qualification bound to these is not evidence for it.
+    pub receives: String,
     /// Whether this call wrote the payload anywhere. Always false: obtaining
     /// the bytes is a read, and delivering them is a session starting.
     pub delivered: bool,
@@ -832,6 +838,12 @@ pub fn execute(ports: &Ports<'_>, operation: Operation) -> Answer {
             payload: crate::session::payload_json(),
             digest: crate::startup::payload_identity(),
             argument: crate::session::SETTINGS_ARGUMENT.to_string(),
+            receives: "exactly these bytes: a qualification control session, and a run in a \
+                       project that commits no harness requirement. A run under a requirement \
+                       receives these bytes plus its own startup hook and admission gate \
+                       registrations, a different document recorded by digest in that \
+                       attempt's intent, which no qualification of these bytes covers"
+                .to_string(),
             delivered: false,
         })),
         Operation::StartupShow {

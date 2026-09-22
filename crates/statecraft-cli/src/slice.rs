@@ -309,6 +309,64 @@ pub fn session_error_answer(e: &SessionError) -> Answer<String> {
     Answer::new(e.to_string(), exit, e.to_string())
 }
 
+/// A run refused because an attempt is live, with what that attempt's launch
+/// records establish (spec 002 section 3.32 rule 24).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct LiveAttemptView {
+    /// The refusal, as spec 003 section 3.7 words it.
+    pub refusal: String,
+    /// The live run.
+    pub run_id: String,
+    /// Its live attempt.
+    pub attempt: u32,
+    /// The launch state its records establish, where it has any.
+    pub launch_state: Option<String>,
+    /// Why, in order.
+    pub reasons: Vec<String>,
+    /// What to do next.
+    pub next: String,
+}
+
+/// `run` refused because an attempt is live. Exit 2, as for any live attempt;
+/// the answer adds what the attempt's launch records establish and infers no
+/// outcome.
+pub fn live_attempt_answer(
+    e: &SessionError,
+    root: &str,
+    startup: Option<statecraft_home::launch::AttemptStartup>,
+) -> Answer<LiveAttemptView> {
+    let (run_id, attempt) = match e {
+        SessionError::LiveAttempt { run_id, attempt } => (run_id.clone(), *attempt),
+        _ => (String::new(), 0),
+    };
+    let inspect = format!("startup show {root} {run_id} --attempt {attempt}");
+    let next = match startup.as_ref().and_then(|s| s.next.clone()) {
+        Some(next) => format!("read `{inspect}`; {next}"),
+        None => format!(
+            "read `{inspect}`; the attempt stays live until it is reconciled (spec 003 section \
+             3.6), and this build has no verb that reconciles it"
+        ),
+    };
+    let view = LiveAttemptView {
+        refusal: e.to_string(),
+        run_id,
+        attempt,
+        launch_state: startup.as_ref().map(|s| s.verdict.word().to_string()),
+        reasons: startup.map(|s| s.reasons).unwrap_or_default(),
+        next,
+    };
+    let mut summary = format!("{}\n", view.refusal);
+    if let Some(state) = &view.launch_state {
+        summary.push_str(&format!("  launch state: {state}\n"));
+    }
+    for reason in &view.reasons {
+        summary.push_str(&format!("  - {reason}\n"));
+    }
+    summary.push_str(&format!("  next: {}\n", view.next));
+    Answer::new(view, Exit::Refused, summary)
+}
+
 /// Every run for a target, as the JSON contract carries it.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "camelCase")]

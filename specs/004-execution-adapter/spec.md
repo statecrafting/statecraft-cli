@@ -1264,6 +1264,33 @@ blocked-writer tests. The seam's fixtures bound their own blocking at sixty
 seconds, so a supervisor that wrongly waits on them fails by outcome rather than
 holding the test run.
 
+**2026-09-22, authority: a caller may watch a supervised launch, confirm the
+spawn before the prompt is delivered, and stop the process at an event.** Spec
+`002` section 3.32 needs two things only this supervisor can give it. First, a
+point between the spawn and the prompt: rule 22 persists a spawn confirmation
+and delivers the prompt only after it, so a confirmation that cannot be
+persisted leaves a process that was never given work. Second, a decision at an
+event: rule 26 decides at the first non-startup event and stops the process
+group on a refusal. So the supervisor gains an optional **watch** the caller
+supplies. It is told the process id immediately after the spawn call returns a
+process and before the prompt writer starts, and may refuse, in which case the
+process group is killed, no prompt is written, and the supervision reports the
+refusal and an interrupted outcome. It is shown each decoded event, in order,
+on the supervising thread, and may ask for the process to be stopped, in which
+case the group is killed as at the deadline, the events read so far are kept,
+and the supervision reports why it was stopped. A supervision that stopped this
+way is `interrupted`: the process did not end by itself. Nothing changes for a
+caller that supplies no watch: its spawn, prompt timing, deadline, descendant
+handling and outcome are what they were, and the deadline suite is unchanged.
+The generic seam still names no provider; the claude-code adapter passes its
+native events to the watch unmapped, and adds a reading of one native event as
+a hook response or an init session id so the caller need not re-derive the
+provider's spelling. The same rule 25 supplies a managed run's hooks per
+invocation, so an invocation may carry a `hooks` value in its settings beside
+the deny rules; the exact-bytes rule of the settings document is unchanged and
+now covers both, and an invocation that registers no hooks writes what it
+wrote before.
+
 ## Verification
 
 Each line is one command. §3.5's suite is eight tests named `suite_1` to
