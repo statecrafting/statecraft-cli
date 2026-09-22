@@ -12,6 +12,33 @@ use statecraft_run::attempt::Outcome;
 use std::os::unix::fs::PermissionsExt;
 use std::path::{Path, PathBuf};
 
+/// Serialises the one attempt whose subject is a deadline against the four
+/// whose subject is not.
+///
+/// The other attempts in this file spawn children of their own, and the
+/// concurrent one spawns two that fork a `/bin/sleep` ten times a second while
+/// they wait at their barrier. Running the deadline measurement beside them
+/// puts this fixture's own process pressure inside the window the deadline is
+/// measuring: the budget is five seconds because five seconds is the subject,
+/// and it should not also have to absorb contention the suite creates for
+/// itself.
+///
+/// So the deadline attempt takes the write side and every other attempt takes
+/// the read side: the four still run in parallel with each other, and none of
+/// them runs while the deadline is being measured. This is synchronisation
+/// rather than a larger budget, the deadline is unchanged at five seconds, and
+/// no assertion is weakened.
+///
+/// Poisoning is ignored on both sides. A panic in one attempt must fail that
+/// attempt and no other: a poisoned lock would turn one real failure into five
+/// `PoisonError`s and bury the one that says what went wrong.
+///
+/// It does not make the measurement immune to load the suite does not control.
+/// A machine that cannot `execve` a shell script inside five seconds will still
+/// fail this attempt, and it will fail it with the trace below saying so rather
+/// than silently.
+static QUIET: std::sync::RwLock<()> = std::sync::RwLock::new(());
+
 struct Attempt {
     invocation: Invocation,
     request: Request,
@@ -57,8 +84,15 @@ printf '%s' "$settings" > observed-path
 # finish sleeping would end supervision by exiting, and the test would be
 # measuring an exit rather than a timeout.
 if [ -f hang ]; then
+  # Every step leaves a mark. An intermittent failure that destroys its own
+  # evidence is the thing to fix before the failure itself: the deadline is
+  # five seconds, stderr is /dev/null, and without this a child that exited
+  # early and one that was still working are the same observation.
+  echo entered >> trace
   /usr/bin/cmp "$settings" expected-settings
+  echo settings-match >> trace
   /bin/cat stream.jsonl
+  echo emitted >> trace
   : > settings-after-terminal
   /bin/sleep 60
   exit 0
@@ -203,6 +237,7 @@ const EXISTING_SETTINGS: &str = r#"{"permissions":{"deny":["Read(existing-secret
 
 #[test]
 fn declared_denials_reach_the_child_and_survive_as_structured_evidence() {
+    let _quiet = QUIET.read().unwrap_or_else(|e| e.into_inner());
     let root = tempfile::tempdir().unwrap();
     let attempt = Attempt::new(
         root.path(),
@@ -219,6 +254,7 @@ fn declared_denials_reach_the_child_and_survive_as_structured_evidence() {
 
 #[test]
 fn concurrent_attempts_keep_independent_settings_until_both_children_read_them() {
+    let _quiet = QUIET.read().unwrap_or_else(|e| e.into_inner());
     let root = tempfile::tempdir().unwrap();
     let a = Attempt::new(&root.path().join("a"), "Bash(first:*)", "concurrent", 30);
     let b = Attempt::new(&root.path().join("b"), "Bash(second:*)", "concurrent", 30);
@@ -259,6 +295,10 @@ fn concurrent_attempts_keep_independent_settings_until_both_children_read_them()
 fn timeout_after_terminal_denial_cleans_settings_and_retains_evidence() {
     use std::time::{Duration, Instant};
 
+    // The write side: no other attempt in this file runs while this one is
+    // measuring a five-second budget.
+    let _quiet = QUIET.write().unwrap_or_else(|e| e.into_inner());
+
     let root = tempfile::tempdir().unwrap();
     // The one test whose subject is the deadline, so the one short budget.
     let attempt = Attempt::new(root.path(), "Bash(hang:*)", "hang", 5);
@@ -281,7 +321,30 @@ fn timeout_after_terminal_denial_cleans_settings_and_retains_evidence() {
 
     // 1. The terminal denial reached the supervisor before the deadline.
     let seen = refusals(&execution.supervised.events);
-    assert_eq!(seen.len(), 1, "the terminal denial did not arrive");
+    assert_eq!(
+        seen.len(),
+        1,
+        "the terminal denial did not arrive. The child's trace is {:?} and the \
+         workspace holds {:?}; `entered` absent means it never started or exited \
+         on an argument check, `settings-match` absent means the settings it was \
+         given are not the ones written, and `emitted` present means the stream \
+         was written and the supervisor did not read it inside the deadline. \
+         Supervision reported {:?} after {elapsed:?}, stream error {:?}",
+        std::fs::read_to_string(root.path().join("trace")).unwrap_or_default(),
+        {
+            let mut names: Vec<String> = std::fs::read_dir(root.path())
+                .map(|d| {
+                    d.filter_map(Result::ok)
+                        .map(|e| e.file_name().to_string_lossy().to_string())
+                        .collect()
+                })
+                .unwrap_or_default();
+            names.sort();
+            names
+        },
+        execution.supervised.outcome,
+        execution.supervised.stream_error,
+    );
     assert_eq!(
         serde_json::from_str::<Value>(&seen[0].detail).unwrap(),
         attempt.denial
@@ -320,6 +383,7 @@ fn timeout_after_terminal_denial_cleans_settings_and_retains_evidence() {
 
 #[test]
 fn a_settings_cleanup_failure_cannot_erase_the_terminal_denial() {
+    let _quiet = QUIET.read().unwrap_or_else(|e| e.into_inner());
     let root = tempfile::tempdir().unwrap();
     let attempt = Attempt::new(root.path(), "Bash(cleanup:*)", "obstruct-cleanup", 30);
     let execution = attempt.run();
@@ -334,6 +398,7 @@ fn a_settings_cleanup_failure_cannot_erase_the_terminal_denial() {
 
 #[test]
 fn malformed_stream_cleanup_removes_the_settings_file() {
+    let _quiet = QUIET.read().unwrap_or_else(|e| e.into_inner());
     let root = tempfile::tempdir().unwrap();
     let attempt = Attempt::new(root.path(), "Bash(malformed:*)", "", 30);
     std::fs::write(root.path().join("stream.jsonl"), "not json\n").unwrap();

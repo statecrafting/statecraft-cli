@@ -155,10 +155,18 @@ pub enum Standing {
         /// The full digest that actually answered.
         resolved: String,
     },
-    /// The required revision is installed, intact, and is what resolved.
+    /// The required revision is installed and intact, and nothing disagrees.
     Exact {
         /// The required full digest.
         required: String,
+        /// The full digest that resolved for this session, where one has.
+        ///
+        /// `None` is the state an inspection or a `doctor` run is in: the
+        /// question has not been asked. Nothing **disagrees** in that state,
+        /// which is why it is not a finding, and nothing has **resolved**,
+        /// which is why it does not permit managed execution. Those are two
+        /// different questions and this field is what keeps them apart.
+        resolved: Option<String>,
     },
 }
 
@@ -208,7 +216,7 @@ impl Standing {
             | Standing::Corrupt { required, .. }
             | Standing::Unreadable { required, .. }
             | Standing::Mismatched { required, .. }
-            | Standing::Exact { required } => Some(required),
+            | Standing::Exact { required, .. } => Some(required),
         }
     }
 
@@ -227,17 +235,37 @@ impl Standing {
 
     /// The only state that permits managed execution.
     ///
+    /// `Exact` with nothing resolved does **not**: a requirement that nothing
+    /// has been resolved against is a healthy project, not a qualified
+    /// session, and treating an unasked question as an affirmative answer is
+    /// the same defect as treating a configured deny entry as an enforced one
+    /// (section 3.28).
+    ///
     /// Written as a match with every arm spelled out rather than as a negation,
     /// so that a state added later has to decide rather than inherit `true`.
     pub fn permits_managed_execution(&self) -> bool {
         match self {
-            Standing::Exact { .. } => true,
+            Standing::Exact { resolved, .. } => resolved.is_some(),
             Standing::Unrequired
             | Standing::MalformedRequirement { .. }
             | Standing::Missing { .. }
             | Standing::Corrupt { .. }
             | Standing::Unreadable { .. }
             | Standing::Mismatched { .. } => false,
+        }
+    }
+
+    /// Why the required identity and the home or the session **disagree**, or
+    /// `None` when nothing does.
+    ///
+    /// This is the diagnostic question, and it is not the execution question:
+    /// a project whose requirement is committed, installed and intact
+    /// disagrees with nothing, whether or not a session has resolved against
+    /// it yet. [`Standing::refusal`] is the other one.
+    pub fn disagreement(&self) -> Option<String> {
+        match self {
+            Standing::Exact { .. } => None,
+            other => other.refusal(),
         }
     }
 
@@ -251,7 +279,18 @@ impl Standing {
     pub fn refusal(&self) -> Option<String> {
         let short = |d: &str| harness::display_id(d);
         Some(match self {
-            Standing::Exact { .. } => return None,
+            Standing::Exact {
+                resolved: Some(_), ..
+            } => return None,
+            Standing::Exact {
+                required,
+                resolved: None,
+            } => format!(
+                "harness {} is required, installed and intact, and no revision has resolved \
+                 for this session; a requirement nothing has been resolved against is a \
+                 healthy project and not a qualified session",
+                short(required)
+            ),
             Standing::Unrequired => format!(
                 "this project commits no `{REQUIREMENT_KEY}` requirement, so there is nothing a \
                  resolved revision could be checked against; commit one with an explicit upgrade \
@@ -367,7 +406,10 @@ pub fn evaluate(layout: &Layout, manifest: &Manifest, resolved: Option<&str>) ->
             required,
             resolved: r.to_string(),
         },
-        _ => Standing::Exact { required },
+        other => Standing::Exact {
+            required,
+            resolved: other.map(str::to_string),
+        },
     }
 }
 
@@ -420,12 +462,12 @@ fn findings_against(required: &str, computed: &Revision) -> Vec<Finding> {
 /// reports it beside everything else it found rather than in a second report
 /// an operator has to know to ask for.
 pub fn doctor_finding(standing: &Standing) -> Option<statecraft_environment::doctor::Finding> {
-    standing.refusal().map(
-        |reason| statecraft_environment::doctor::Finding::HarnessRequirement {
+    standing.disagreement().map(|reason| {
+        statecraft_environment::doctor::Finding::HarnessRequirement {
             standing: standing.word().to_string(),
             reason,
-        },
-    )
+        }
+    })
 }
 
 /// One installed revision, as an inspection sees it.
@@ -787,9 +829,34 @@ mod tests {
     fn a_successful_exact_resolution_is_the_only_state_that_permits_execution() {
         let (_d, layout, digest) = home();
         let standing = evaluate(&layout, &with_requirement(&digest), Some(&digest));
-        assert_eq!(standing, Standing::Exact { required: digest });
+        assert_eq!(
+            standing,
+            Standing::Exact {
+                required: digest.clone(),
+                resolved: Some(digest.clone()),
+            }
+        );
         assert!(standing.permits_managed_execution());
         assert_eq!(standing.refusal(), None);
+        assert_eq!(standing.disagreement(), None);
+
+        // The same project, read without asking what resolved. Nothing
+        // disagrees, so `doctor` reports nothing; nothing resolved, so nothing
+        // may run on the strength of it.
+        let unasked = evaluate(&layout, &with_requirement(&digest), None);
+        assert_eq!(unasked.word(), "exact");
+        assert_eq!(unasked.disagreement(), None);
+        assert!(doctor_finding(&unasked).is_none());
+        assert!(
+            !unasked.permits_managed_execution(),
+            "a requirement nothing has been resolved against qualified a session"
+        );
+        assert!(
+            unasked
+                .refusal()
+                .unwrap()
+                .contains("no revision has resolved")
+        );
     }
 
     #[test]
@@ -901,7 +968,10 @@ mod tests {
         assert_eq!(required_of(&m), Some(digest.as_str()));
         assert_eq!(
             evaluate(&layout, &m, Some(&digest)),
-            Standing::Exact { required: digest }
+            Standing::Exact {
+                required: digest.clone(),
+                resolved: Some(digest),
+            }
         );
     }
 

@@ -1937,13 +1937,37 @@ deadline as well as above, so a child that exited early fails instead of
 passing as an interruption. The deadline stays five seconds, the negative
 behavior is unchanged, and nothing is retried or ignored.
 
-**What is not established.** The failure did not reproduce in this session.
-Two full `cargo test --workspace` runs were green, and six runs of the attempt
-under forty spin loops were green at a **one-second** budget on the repaired
-fixture and on the unrepaired one. So the diagnosis is from reading the
-fixture, not from a reproduction, and the repair removes a race that is
-demonstrably there rather than one that was demonstrably firing. Whether it
-ends the intermittency is a claim the next loaded run gets to make.
+**It then reproduced, and the reproduction changed the diagnosis.** The first
+repair was written from reading the fixture, because two full
+`cargo test --workspace` runs and six runs under CPU spin loops were all green.
+A later `make code` run failed, and so did a loop under **process-spawn**
+pressure rather than CPU pressure. The attempt now carries a trace, so the
+failure described itself instead of being a mystery: the child's trace was
+**empty**, the workspace held none of the files the child writes on its first
+two lines, supervision reported `Interrupted` after 5.03 seconds, and the
+stream error was `NoInit`. The child was spawned and never ran its body. The
+five seconds were consumed by process startup alone.
+
+That is a larger finding than the first one and it does not replace it: work
+inside the measured window was a real race and removing it was right. What it
+adds is that the residual cost is `execve` itself, which the fixture cannot
+shorten.
+
+**Two further repairs, and one thing that is not a defect.** The suite's own
+contention is serialised away: the deadline attempt takes an exclusive lock and
+the other four take a shared one, so the measurement never runs beside the
+concurrent attempt's two children and their ten-per-second `sleep` forks. The
+budget is unchanged at five seconds and no assertion is weakened, which is why
+this is synchronisation rather than a larger deadline. And the trace stays, so
+any residual failure names its cause.
+
+What remains is not a defect in this product. A machine that cannot start a
+shell script inside five seconds will still fail this attempt, and the
+supervisor's behavior in that case, interrupting at the deadline with `NoInit`
+and cleaning up, is exactly correct. The attempt fails there because the
+**precondition of its measurement** was not met, not because the behavior it
+measures is wrong, and it now says which of the two happened. Passing it in
+that state would be suppression.
 
 **2026-09-21: the adopted `PreToolUse` gate skipped a check it was required to
 refuse on, and the inherited wording is the reason.** A fourth adoption defect,
