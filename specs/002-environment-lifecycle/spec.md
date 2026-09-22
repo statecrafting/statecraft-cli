@@ -1743,6 +1743,47 @@ changed its expectation rather than its assertion, which is the visible trace
 of the third gap: it asserted that a repair after a lost record adopts the
 marked hook, and it now asserts that it does not.
 
+**2026-09-21: the published `0.21.0` and the source that calls itself `0.21.0`
+are two implementations, and the second one conforms.** §3.15's boundary
+reports the producer as non-conforming, and
+`the_producer_is_not_yet_conforming` holds that finding. Measuring what is
+actually depended on, and what actually exists, separates two things the
+version number hides.
+
+**What this build depends on.** `crates/statecraft-home/Cargo.toml` pins
+`spec-spine-core = { version = "=0.21.0", default-features = false }`, and
+`Cargo.lock` resolves it to `0.21.0` from crates.io with checksum
+`cf8d0b123bbf6ae494700924c727ba8a5d115a821f0ea18e6dce9f140276c308`. Called
+with this product's own `config_json()` it returns four out-of-contract paths:
+`AGENTS.md` and the three `.claude/rules/*` files. That is the
+non-conformance, unchanged, and the refusal that withholds those four stays
+exactly where it is.
+
+**Why the counterparty's tree says otherwise.** The published crate was cut at
+tag `v0.21.0`, commit `694dd294`, where the module is still the old `init`
+scaffolder. The narrowing landed **after** that tag, in `373ab506`, and the
+module's own documentation now says it emits no `AGENTS.md`, no `CLAUDE.md`
+and no `.claude/`. The workspace version was not raised with it, so the tree
+and the registry both say `0.21.0` and mean different code. A consumer cannot
+tell them apart by version, which is why this entry records a commit.
+
+**The candidate, measured.** Commit `df6fb4f7`, source digest
+`ac89a5423e053f04faa68ae69d124c28fef7393da8e7dfa73d4c811fd65bf859` over the
+two producer crates' sources. Built in a scratch worktree with a
+`[patch.crates-io]` that was never committed, it returns seven paths, all of
+them in contract: six governance files and the `.gitignore` fragment. Three
+tests invert, which is what the suite was built to show: the producer is
+conforming, no out-of-contract path is carried, and the end-to-end
+initialization is **complete** rather than partial, with 7 writes, 0 withheld,
+2 ignore patterns merged, and the project registered and qualified.
+
+So the boundary is correct and the blockage is entirely a publication. Nothing
+here changes the dependency: a candidate measured in a scratch worktree is
+evidence about a candidate, and the permanent exact dependency waits for a
+published version verified directly. The pinned governance CLI (`=0.20.0` in
+`spec-spine.toml`) and the scaffold library dependency are different surfaces
+and do not move together.
+
 ## Verification
 
 Each line is one command. They run the acceptance this spec's behavior declares:
