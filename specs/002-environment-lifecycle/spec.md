@@ -2009,26 +2009,44 @@ it still reaches a verdict and still says nothing outside a Statecraft
 project, which is the converse of sandboxing and the half that matters on an
 operator's own machine.
 
-**What is not demonstrated, stated here so the spec does not read as though it
-were.** Three obligations from the 2026-09-21 authority changes are specified
-and not implemented, and `implementation` stays `in-progress` for them and not
-only for §3.24:
+**§3.25 and §3.26 are implemented, and one obligation is not.** The paragraph
+this replaces named three; two of them are done.
 
-1. **§3.25's required identity.** The per-session resolved identity exists in
-   `resolved.rs`. The **committed project requirement** it should resolve
-   against does not: the manifest header still pins this product's version,
-   the spec-spine version and the adapter set, and no harness revision. Until
-   it does, there is nothing for a mismatch to be a mismatch **with**, so the
-   refusals §3.25 requires have no precondition to test and are unwritten.
-2. **§3.26's startup record.** The three verdicts are implemented and
-   unchanged, which is what §3.26 mostly asks for. The seven-field record a
-   managed session writes at startup is not, and neither are the added
-   evidence fields.
-3. **The live-session observation.** `session::qualification_from` cannot
-   return `Qualified`, by construction and by test, and no session has been
-   run under this prompt. So no session has been shown to enforce the floor,
-   and every fixture result in this file is fixture evidence. A bounded
-   acceptance script for that observation is prepared and awaits approval.
+**§3.25's required identity** is a committed project requirement in
+`required.rs`, carried as one key in the manifest's `project.requirements`,
+which is the governed contract for a committed requirement and already binds
+every configuration layer. The full digest is what is committed and what every
+comparison is against; `Revision` now keeps it, and the twelve-character form
+is derived from it by one function and is display only. Seven standings, one of
+which permits managed execution. A manifest with no requirement is
+`unrequired`, is **not** qualified, and is not repaired by a read; nothing
+selects the latest installed revision; and inspection, diagnosis through a new
+`doctor` finding, planning and an explicit upgrade all stay available under
+every refusal.
+
+**§3.26's startup record** is in `startup.rs`: seven fields, the §3.14 verdict
+unchanged beside them, and the three evidence classes as three types that no
+code path substitutes for one another. `Observation::Observed` is constructible
+only from a session qualification, so a probe cannot reach it. An incomplete
+record is refused rather than written, the write is a rename so no reader sees
+half of one, and a truncated record reads back as an error rather than as no
+record.
+
+**The live-session observation** is the one that remains, and it is the one
+this spec cannot produce for itself. `session::qualification_from` cannot
+return `Qualified`, by construction and by test, and no session has been run
+under this prompt. So no session has been shown to enforce the floor, and every
+fixture result in this file is fixture evidence. A bounded acceptance script is
+prepared and awaits approval as its own act.
+
+**One thing §3.25 requires has a library and no verb.** Committing a
+requirement is an explicit reviewed act, and the command tree carries no
+spelling for it: the verb table is `006`'s requirement and an entry in it is
+`006`'s change to make. Until that change is proposed, the act is performed
+through `crates/statecraft-home/examples/require-harness.rs`, which is also
+what builds the acceptance fixture. Named here rather than left for a reader to
+discover, because "implemented" and "reachable by an operator" are different
+claims and this is the second one missing.
 
 ## Verification
 
@@ -2062,4 +2080,10 @@ cargo test -p statecraft-home --test settings_modification
 test -f crates/statecraft-home/src/session.rs
 cargo test -p statecraft-home --test harness_skills
 cargo test -p statecraft-home --test bounded_integration
+test -f crates/statecraft-home/src/required.rs
+test -f crates/statecraft-home/src/startup.rs
+cargo test -p statecraft-home --lib required
+cargo test -p statecraft-home --lib startup
+cargo build -p statecraft-home --example require-harness
+cargo test -p statecraft-adapter-claude-code --test settings_transport
 ```
