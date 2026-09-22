@@ -269,6 +269,7 @@ pub fn usage(verb: crate::commands::Verb) -> &'static str {
              [--program <executable>] [--deadline <seconds>] [--synthetic]"
         }
         Verb::StartupQualify => " <path> <session-id> <capture-dir>",
+        Verb::StartupShow => " <path> <run-id> [--attempt <n>]",
         _ => " <path>",
     }
 }

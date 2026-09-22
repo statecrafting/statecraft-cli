@@ -328,6 +328,17 @@ fn startup_record_writes_an_unqualified_record_and_refuses_a_second_one() {
             .is_file()
     );
 
+    // Spec 002 section 3.31: this verb measures no harness revision, so the
+    // record says nothing resolved. The required identity is not an observed
+    // one, and recording it as the resolution was a false match.
+    let record = statecraft_home::startup::StartupRecord::read(&sandbox.project(), "s-1")
+        .unwrap()
+        .unwrap();
+    assert!(record.required_harness.is_some());
+    assert_eq!(record.resolved_harness, None, "an unmeasured resolution");
+    assert!(!record.standing.permits_managed_execution());
+    assert!(text.contains("standing exact"), "{text}");
+
     let second = sandbox.run(&["startup", "record", &sandbox.project_arg(), "s-1"]);
     assert_eq!(code(&second), 2, "{}", stdout(&second));
     assert!(stdout(&second).contains("a start happens once"));

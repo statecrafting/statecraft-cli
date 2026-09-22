@@ -364,6 +364,16 @@ pub struct StartupRecord {
     pub supply: Supply,
     /// Evidence class 3: did a live session demonstrate the behavior.
     pub observation: Observation,
+
+    // Spec 002 section 3.31: present on a run attempt's record and absent on a
+    // session-keyed one, so records written before it read unchanged.
+    /// The run attempt this record finalizes.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub attempt: Option<crate::launch::AttemptIdentity>,
+    /// What the launch recorded: the intent it finalizes, the selected and
+    /// observed revisions, the payload and the settings bytes, the process end.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub launch: Option<Box<crate::launch::LaunchEvidence>>,
 }
 
 /// Why a record is not written.
@@ -628,6 +638,8 @@ pub fn assemble(
         standing,
         supply,
         observation,
+        attempt: None,
+        launch: None,
     })
 }
 

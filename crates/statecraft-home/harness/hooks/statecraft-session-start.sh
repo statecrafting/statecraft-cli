@@ -3,6 +3,16 @@ cd "${CLAUDE_PROJECT_DIR:-.}" 2>/dev/null || exit 0
 # Spec 002 section 3.14 rule 3: gated to a Statecraft project by the
 # manifest, and inert everywhere else.
 [ -f ".statecraft/environment.json" ] || exit 0
+# Spec 002 section 3.31: a managed run's startup acknowledgment. Printed only
+# when the launching run named its attempt in this environment, after the gate
+# above, as one tab-separated line on stdout. It reports which revision
+# directory this script is in; it writes nothing.
+if [ -n "${STATECRAFT_STARTUP_NONCE:-}" ]; then
+  sc_revision=$(CDPATH='' cd -- "$(dirname -- "$0")/.." 2>/dev/null && pwd -P) || sc_revision=unresolved
+  printf 'statecraft-startup\tv1\tnonce=%s\trun=%s\tattempt=%s\tselected=%s\tproject=%s\troot=%s\n' \
+    "$STATECRAFT_STARTUP_NONCE" "${STATECRAFT_RUN_ID:-}" "${STATECRAFT_ATTEMPT:-}" \
+    "${STATECRAFT_HARNESS_SELECTED:-}" "$(pwd -P)" "$sc_revision"
+fi
 # Resolve the spec-spine binary for the repository this hook acts on:
 # $SPEC_SPINE_BIN, then that repository's own release build, then PATH. A repo
 # that builds its own binary must be governed by the one it builds; the PATH

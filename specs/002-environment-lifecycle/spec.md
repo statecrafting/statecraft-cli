@@ -2757,6 +2757,33 @@ repair the eight `native_stream` tests failed against the previous binding (the
 seven existing ones once the fixture child required the payload bytes, and the
 new refusal test); after it, all eight pass.
 
+**2026-09-22: `run` writes its startup records, and four choices §3.31 left
+open.** Implemented under §3.31, recorded after it. **A repository with no
+manifest** is registered and armed and still not a managed session: §3.14 rule 3
+gates every delivered behavior on the manifest, and no project identity exists
+to record. Such a run launches as before, writes no startup record, and its
+answer says `managed: false` rather than implying a record. **`startup show`
+does not require registration**, like the other `startup` verbs; it requires a
+manifest, and it reads the attempt list from the run record exactly as `run
+show` does. **The adapter identity** recorded is the adapter manifest's name and
+version with `claude-code` as the harness, the same three facts the posture
+already records. **The provider version** in the launch evidence is the one the
+stream's init event reported through the generic seam, and the reserved absence
+word when there was none.
+
+Measured. Before, the new `crates/statecraft-cli/tests/run_startup.rs` run
+against the tree at `2ee9704` failed all seven tests: `run` completed with no
+`startup` field and wrote no record, an unwritable startup directory did not
+stop the launch, a record that could not be stored did not change the exit
+code, and `startup show` was an unknown verb. The `startup record` test in
+`qualification_workflow.rs` failed on the resolved identity, `Some` of the
+required digest where nothing was measured. After, all seven pass, the thirteen
+`launch` unit tests pass, the three acknowledgment tests in `harness_hooks.rs`
+pass, and `cargo test --workspace --locked` passes 936 tests. The fake provider
+those tests use runs the shipped hook from the "registered" revision and
+streams its output as `hook_response`; that is locally exercised, and whether
+the live provider does it in a managed run is still unobserved (§3.31 rule 20).
+
 ## Verification
 
 Each line is one command. They run the acceptance this spec's behavior declares:
@@ -2802,5 +2829,7 @@ cargo test -p statecraft-home --lib capture
 cargo test -p statecraft-cli --test qualification_workflow
 cargo test -p statecraft-cli --test acceptance_script
 cargo test -p statecraft-cli --test native_stream
+cargo test -p statecraft-home --lib launch
+cargo test -p statecraft-cli --test run_startup
 sh -n scripts/acceptance/managed-session.sh
 ```

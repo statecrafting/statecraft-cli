@@ -63,6 +63,7 @@ pub mod flow;
 pub mod harness;
 pub mod home;
 pub mod ignore;
+pub mod launch;
 pub mod producer;
 pub mod project;
 pub mod required;

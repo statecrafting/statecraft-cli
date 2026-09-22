@@ -648,6 +648,10 @@ byte-identical, that a refused submission exits 2 and writes no record, and
 that an unreadable submission is reported differently from a refused one. Its
 captures are synthetic and the file says so at the top; **no test in this
 repository spawns a provider or claims a live qualification.**
+`crates/statecraft-cli/tests/run_startup.rs` carries §3.11.3: `run` and
+`startup show` through the built binary against a fake provider that runs the
+registered hook, including the exit 4 when a record cannot be stored and the
+refusal when the intent cannot be written.
 
 The three `--help` commands check reachability and nothing else. A verb that is
 absent from the tree exits `3` under §3.3, so they fail loudly on exactly the
@@ -667,6 +671,7 @@ cargo test -p statecraft-cli --test negative_cases
 cargo test -p statecraft-cli --test integration_slice
 cargo test -p statecraft-cli --test arming_consent
 cargo test -p statecraft-cli --test qualification_workflow
+cargo test -p statecraft-cli --test run_startup
 cargo run -q -p statecraft-cli -- harness --help
 cargo run -q -p statecraft-cli -- startup --help
 test -f crates/statecraft-cli/tests/integration_slice.rs

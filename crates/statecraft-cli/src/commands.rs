@@ -82,6 +82,8 @@ pub enum Verb {
     StartupCapture,
     /// `startup qualify <path> <session-id> <capture-dir>`
     StartupQualify,
+    /// `startup show <path> <run-id> [--attempt <n>]`
+    StartupShow,
     /// `--help`, optionally with a group or a verb as its topic.
     ///
     /// Not part of the command tree: [`Verb::all`] lists the operations, and a
@@ -127,6 +129,7 @@ impl Verb {
             Verb::StartupRecord => "startup record",
             Verb::StartupCapture => "startup capture",
             Verb::StartupQualify => "startup qualify",
+            Verb::StartupShow => "startup show",
             Verb::Help => "--help",
         }
     }
@@ -178,7 +181,8 @@ impl Verb {
             // Spec 006 section 3.11.2: the launch that binds a control to its
             // settings.
             | Verb::StartupCapture
-            | Verb::StartupQualify => "002-environment-lifecycle",
+            | Verb::StartupQualify
+            | Verb::StartupShow => "002-environment-lifecycle",
             Verb::Help => "006-command-surface",
         }
     }
@@ -187,7 +191,7 @@ impl Verb {
     ///
     /// [`Verb::Help`] is deliberately absent: it is not an operation, and a
     /// usage error listing it would offer help as a thing to do.
-    pub fn all() -> [Verb; 33] {
+    pub fn all() -> [Verb; 34] {
         [
             Verb::ProjectRegister,
             Verb::ProjectList,
@@ -222,6 +226,7 @@ impl Verb {
             Verb::StartupRecord,
             Verb::StartupCapture,
             Verb::StartupQualify,
+            Verb::StartupShow,
         ]
     }
 
@@ -272,6 +277,7 @@ impl Verb {
             ("startup", Some("record")) => Some((Verb::StartupRecord, 2)),
             ("startup", Some("capture")) => Some((Verb::StartupCapture, 2)),
             ("startup", Some("qualify")) => Some((Verb::StartupQualify, 2)),
+            ("startup", Some("show")) => Some((Verb::StartupShow, 2)),
             _ => None,
         }
     }

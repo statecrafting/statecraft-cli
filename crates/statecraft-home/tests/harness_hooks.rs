@@ -1274,3 +1274,73 @@ fn a_duplicate_registration_is_harmless_because_the_hook_only_reads() {
         "a second run of the same hook answered differently"
     );
 }
+
+// ---------------------------------------------------------------------------
+// Spec 002 section 3.31: the startup acknowledgment.
+// ---------------------------------------------------------------------------
+
+fn acknowledgments(out: &Output) -> Vec<String> {
+    String::from_utf8_lossy(&out.stdout)
+        .lines()
+        .filter(|l| l.starts_with("statecraft-startup"))
+        .map(str::to_string)
+        .collect()
+}
+
+const BINDING: [(&str, &str); 4] = [
+    (
+        "STATECRAFT_STARTUP_NONCE",
+        "0123456789abcdef0123456789abcdef",
+    ),
+    ("STATECRAFT_RUN_ID", "003-x"),
+    ("STATECRAFT_ATTEMPT", "2"),
+    ("STATECRAFT_HARNESS_SELECTED", "none"),
+];
+
+/// Inside a project, with a run's binding in its environment, the hook prints
+/// exactly one acknowledgment naming the binding it was given, the project it
+/// ran in and the directory it is installed in, and still reports as before.
+#[test]
+fn the_session_start_hook_acknowledges_a_run_it_was_bound_to() {
+    let fixture = Fixture::new();
+    fixture.stub(&fixture.path_dir.join("spec-spine"), "path", 0, true);
+    let out = fixture.run_project(SESSION_START, &BINDING);
+    assert!(out.status.success(), "{}", text(&out));
+    let acks = acknowledgments(&out);
+    assert_eq!(acks.len(), 1, "{}", text(&out));
+    let project = fixture.root.canonicalize().unwrap();
+    let installed = fixture.dir.parent().unwrap().canonicalize().unwrap();
+    assert_eq!(
+        acks[0],
+        format!(
+            "statecraft-startup\tv1\tnonce=0123456789abcdef0123456789abcdef\trun=003-x\t\
+             attempt=2\tselected=none\tproject={}\troot={}",
+            project.display(),
+            installed.display()
+        )
+    );
+    // The freshness report is unchanged beside it.
+    assert!(text(&out).contains("[session-freshness]"), "{}", text(&out));
+    fixture.assert_only_ran("path");
+}
+
+/// Without a binding the hook prints no acknowledgment: an ordinary session is
+/// not a run, and nothing here pretends it is one.
+#[test]
+fn the_session_start_hook_acknowledges_nothing_without_a_binding() {
+    let fixture = Fixture::new();
+    fixture.stub(&fixture.path_dir.join("spec-spine"), "path", 0, true);
+    let out = fixture.run_project(SESSION_START, &[]);
+    assert!(out.status.success());
+    assert!(acknowledgments(&out).is_empty(), "{}", text(&out));
+}
+
+/// Outside a project the gate holds first, binding or not: section 3.14 rule 3.
+#[test]
+fn the_session_start_hook_acknowledges_nothing_outside_a_project() {
+    let fixture = Fixture::unmanaged();
+    let out = fixture.run_project(SESSION_START, &BINDING);
+    assert!(out.status.success());
+    assert!(out.stdout.is_empty(), "{}", text(&out));
+    fixture.assert_nothing_ran();
+}

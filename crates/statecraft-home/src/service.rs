@@ -169,6 +169,19 @@ pub enum Operation {
         /// supplies it.
         environment: std::collections::BTreeMap<String, String>,
     },
+    /// One run attempt's startup records and their judgement (spec 002
+    /// section 3.31, spec 006 section 3.11.3). Reads only.
+    StartupShow {
+        /// The project.
+        root: PathBuf,
+        /// The run.
+        run_id: String,
+        /// Which attempt; `None` is the latest.
+        attempt: Option<u32>,
+        /// Every attempt the run record holds for the run, as the caller that
+        /// reads that record found them.
+        facts: Vec<crate::launch::AttemptFact>,
+    },
 }
 
 /// How an outcome should end a process.
@@ -422,6 +435,8 @@ pub enum Answer {
     QualificationRefused(Box<QualificationRefused>),
     /// One launched control.
     Captured(Box<CaptureOutcome>),
+    /// One run attempt's startup evidence, judged.
+    StartupAttempt(Box<crate::launch::AttemptStartup>),
     /// A precondition stopped the operation.
     Refused {
         /// Why.
@@ -523,6 +538,15 @@ impl Answer {
                 }
             }
             Answer::SessionPayload(_) => Severity::Ok,
+            // Spec 006 section 3.11.3: only `qualified` is 0, and it is not
+            // reachable through a run; every other verdict is a finding.
+            Answer::StartupAttempt(a) => {
+                if a.qualified() {
+                    Severity::Ok
+                } else {
+                    Severity::Finding
+                }
+            }
             // A record that is not qualified is the ordinary case and it is a
             // finding, not a failure: the session ran, the record says what it
             // establishes, and what it does not establish is the finding.
@@ -675,6 +699,7 @@ impl Answer {
             // the `--json` rendering, which is where a caller reads them
             // (spec 006 section 3.4).
             Answer::SessionPayload(p) => p.payload.clone(),
+            Answer::StartupAttempt(a) => a.describe(),
             Answer::Startup(s) => {
                 let mut out = format!("session   {}\n", s.session_id);
                 out.push_str(&s.record.describe());
@@ -809,6 +834,23 @@ pub fn execute(ports: &Ports<'_>, operation: Operation) -> Answer {
             argument: crate::session::SETTINGS_ARGUMENT.to_string(),
             delivered: false,
         })),
+        Operation::StartupShow {
+            root,
+            run_id,
+            attempt,
+            facts,
+        } => {
+            if let Err(answer) = manifest_of(&root) {
+                return answer;
+            }
+            match crate::launch::inspect(&root, &run_id, attempt, &facts) {
+                Ok(shown) => Answer::StartupAttempt(Box::new(shown)),
+                Err(crate::launch::NotRead::NoSuchAttempt(reason)) => Answer::Refused { reason },
+                Err(e) => Answer::Failed {
+                    reason: e.to_string(),
+                },
+            }
+        }
         Operation::StartupRecord { root, session_id } => {
             startup_record(ports, &root, &session_id, None)
         }
@@ -1017,12 +1059,11 @@ fn startup_record(
         };
     };
     let verdict = delivery::evaluate(root, &rule);
-    let required_digest = crate::required::required_of(&manifest).map(str::to_string);
-    let standing = crate::required::evaluate(ports.home, &manifest, required_digest.as_deref());
-    let resolved = standing
-        .permits_managed_execution()
-        .then(|| required_digest.clone())
-        .flatten();
+    // Spec 002 section 3.31: this operation measures no harness revision, so
+    // nothing resolved. The required identity is not an observed one, and
+    // passing it here as the resolution recorded a match nobody measured.
+    let standing = crate::required::evaluate(ports.home, &manifest, None);
+    let resolved = None;
 
     let record = crate::startup::assemble(
         root,

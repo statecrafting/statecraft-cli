@@ -55,8 +55,18 @@ pub fn declarations() -> Vec<Declaration> {
 ///   `api_error` shape, reading `Not logged in`. This is not a credential and
 ///   carries none; it is the name under which the operating system answers one.
 pub fn child_environment() -> ChildEnvironment {
+    child_environment_with(&[])
+}
+
+/// The same constructed environment, plus the names a run's attempt binding
+/// carries (spec 002 section 3.31 rule 17, spec 004 section 5 of 2026-09-22).
+/// The names and values are the library's; this only places them.
+pub fn child_environment_with(binding: &[(String, String)]) -> ChildEnvironment {
     let manifest = provider::manifest();
     let mut blueprint = Blueprint::empty();
+    for (name, value) in binding {
+        blueprint = blueprint.allowing(name, value);
+    }
     if let Ok(path) = std::env::var("PATH") {
         blueprint = blueprint.allowing("PATH", &path);
     }

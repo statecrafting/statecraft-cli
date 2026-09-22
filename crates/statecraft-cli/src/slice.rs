@@ -209,10 +209,16 @@ pub struct ConcludedView {
     pub base_moved: bool,
     /// The workspace retained for the next attempt.
     pub workspace_retained: String,
+    /// The attempt's startup evidence (spec 006 section 3.11.3).
+    pub startup: statecraft_home::launch::RunStartup,
 }
 
 impl ConcludedView {
-    fn of(c: &Concluded, posture: RecordedPosture) -> Self {
+    fn of(
+        c: &Concluded,
+        posture: RecordedPosture,
+        startup: statecraft_home::launch::RunStartup,
+    ) -> Self {
         Self {
             posture,
             run_id: c.run_id.clone(),
@@ -222,6 +228,7 @@ impl ConcludedView {
             refusals: c.refusals,
             base_moved: c.base_moved,
             workspace_retained: c.workspace_retained.clone(),
+            startup,
         }
     }
 }
@@ -237,6 +244,7 @@ pub fn run_answer(concluded: Concluded) -> Answer<ConcludedView> {
         statecraft_acceptance::absence::Recorded::Absent(
             statecraft_acceptance::absence::Absence::NotRecorded,
         ),
+        statecraft_home::launch::RunStartup::unmanaged(),
     )
 }
 
@@ -244,8 +252,12 @@ pub fn run_answer(concluded: Concluded) -> Answer<ConcludedView> {
 pub fn run_answer_with_posture(
     concluded: Concluded,
     posture: RecordedPosture,
+    startup: statecraft_home::launch::RunStartup,
 ) -> Answer<ConcludedView> {
     let exit = match concluded.outcome {
+        // Spec 006 section 3.11.3: a launch whose record was not stored is a
+        // failure nobody asked for, whatever the attempt's outcome.
+        _ if startup.not_stored() => Exit::Failed,
         Outcome::Completed => Exit::Ok,
         // The operation ran and reports an outcome that is not clean. Nothing
         // about the product failed.
@@ -276,7 +288,12 @@ pub fn run_answer_with_posture(
         summary.push_str("  completed says nothing about acceptance; run `accept` for that\n");
     }
     summary.push_str(&render_posture(&posture));
-    Answer::new(ConcludedView::of(&concluded, posture), exit, summary)
+    summary.push_str(&startup.describe());
+    Answer::new(
+        ConcludedView::of(&concluded, posture, startup),
+        exit,
+        summary,
+    )
 }
 
 /// A session that could not begin or conclude, mapped.
