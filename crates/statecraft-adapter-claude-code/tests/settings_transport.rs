@@ -37,11 +37,35 @@ set -eu
 [ "$7" = --settings ]
 settings=$8
 [ -f "$settings" ] && [ ! -L "$settings" ]
-/bin/ls -ln "$settings" > observed-mode
 [ "${USER+x}" != x ] && [ "${HOME+x}" != x ]
+printf '%s' "$settings" > observed-path
+# The deadline path, and it is deliberately the SHORTEST path through this
+# fixture. Everything the full path does below is asserted by the attempts that
+# name a generous deadline; repeating it here put five process spawns, a 100ms
+# sleep and a blocking read of stdin between this child starting and the point
+# the deadline test actually measures, and all of that had to finish inside the
+# five seconds that ARE the subject. That is not a bound, it is a race, and a
+# loaded machine lost it.
+#
+# What is left is the ordering the test needs and nothing else: the settings
+# arrived intact, the terminal denial is emitted, the child is STILL ALIVE
+# after emitting it, and only then does it hang past the deadline. The marker
+# is a shell redirect on the line after the emit, so nothing schedulable sits
+# between the two.
+#
+# The hang is far longer than the deadline on purpose: a child that could
+# finish sleeping would end supervision by exiting, and the test would be
+# measuring an exit rather than a timeout.
+if [ -f hang ]; then
+  /usr/bin/cmp "$settings" expected-settings
+  /bin/cat stream.jsonl
+  : > settings-after-terminal
+  /bin/sleep 60
+  exit 0
+fi
+/bin/ls -ln "$settings" > observed-mode
 /bin/cat "$settings" > observed-settings
 /usr/bin/cmp expected-settings observed-settings
-printf '%s' "$settings" > observed-path
 printf '%s\n' "$@" > observed-args
 if [ -f concurrent ]; then
   : > ready
@@ -59,12 +83,6 @@ fi
 # It does not remove every wait a stray descriptor can cause.
 /bin/cat > observed-prompt
 /bin/cat stream.jsonl
-if [ -f hang ]; then
-  /bin/sleep 0.1
-  /usr/bin/cmp "$settings" expected-settings
-  : > settings-after-terminal
-  /bin/sleep 30
-fi
 if [ -f obstruct-cleanup ]; then
   /bin/rm "$settings"
   /bin/mkdir "$settings"
@@ -214,17 +232,90 @@ fn concurrent_attempts_keep_independent_settings_until_both_children_read_them()
     assert_eq!(second.supervised.outcome, Outcome::Refused);
 }
 
+/// The deadline fires after a terminal denial: the denial survives as evidence
+/// and the settings file is still cleaned up.
+///
+/// Four distinct things, asserted as four rather than through the shared
+/// `check`, because only these four are this test's subject and everything
+/// else `check` asserts is covered by the attempts that name a generous
+/// deadline. Running all of it here is what made a five-second budget carry
+/// work it was never sized for.
+///
+/// 1. **The terminal denial** reached the supervisor and is in the events.
+/// 2. **The timeout**, and it is what ended supervision: the elapsed time is
+///    bounded below by the deadline as well as above, so a child that exited
+///    early would fail rather than pass as an interruption.
+/// 3. **The cleanup** removed the supplied settings file, and left the
+///    workspace's own two untouched.
+/// 4. **The durable evidence**: the denial is still in the structured evidence
+///    after the interruption, which is the thing an interruption could
+///    plausibly have cost.
+///
+/// The ordering the test needs is established in the fixture child rather than
+/// hoped for here: the marker it writes sits on the line after the terminal
+/// emit, so `settings-after-terminal` existing means the child outlived its own
+/// terminal event.
 #[test]
 fn timeout_after_terminal_denial_cleans_settings_and_retains_evidence() {
+    use std::time::{Duration, Instant};
+
     let root = tempfile::tempdir().unwrap();
     // The one test whose subject is the deadline, so the one short budget.
     let attempt = Attempt::new(root.path(), "Bash(hang:*)", "hang", 5);
-    let started = std::time::Instant::now();
+    let started = Instant::now();
     let execution = attempt.run();
-    assert!(started.elapsed() < std::time::Duration::from_secs(10));
-    attempt.check(&execution);
-    assert!(root.path().join("settings-after-terminal").exists());
+    let elapsed = started.elapsed();
+
+    // 2. The timeout, and that it is what ended supervision.
     assert_eq!(execution.supervised.outcome, Outcome::Interrupted);
+    assert!(
+        elapsed >= Duration::from_secs(5),
+        "supervision ended in {elapsed:?}, before the deadline it was given; an \
+         interruption that arrived early is not the timeout this test is about"
+    );
+    assert!(
+        elapsed < Duration::from_secs(10),
+        "supervision took {elapsed:?}, so it was held past its own deadline by \
+         the child it was supervising"
+    );
+
+    // 1. The terminal denial reached the supervisor before the deadline.
+    let seen = refusals(&execution.supervised.events);
+    assert_eq!(seen.len(), 1, "the terminal denial did not arrive");
+    assert_eq!(
+        serde_json::from_str::<Value>(&seen[0].detail).unwrap(),
+        attempt.denial
+    );
+
+    // And the child outlived it, which is what makes this a timeout AFTER a
+    // terminal denial rather than one instead of it.
+    assert!(
+        root.path().join("settings-after-terminal").exists(),
+        "the child did not reach the point past its own terminal event"
+    );
+
+    // 4. The evidence is durable across the interruption.
+    assert_eq!(
+        execution.evidence()["providerTerminal"]["permission_denials"],
+        json!([attempt.denial])
+    );
+    assert_eq!(execution.termination().adapter_claimed, Outcome::Completed);
+
+    // 3. The cleanup happened, and touched nothing of the workspace's own.
+    let supplied =
+        PathBuf::from(std::fs::read_to_string(root.path().join("observed-path")).unwrap());
+    assert!(supplied.is_absolute());
+    assert!(!supplied.starts_with(root.path().canonicalize().unwrap()));
+    assert!(
+        !supplied.exists(),
+        "the settings file survived an interrupted supervision"
+    );
+    for name in ["settings.json", "settings.local.json"] {
+        assert_eq!(
+            std::fs::read_to_string(root.path().join(".claude").join(name)).unwrap(),
+            EXISTING_SETTINGS
+        );
+    }
 }
 
 #[test]

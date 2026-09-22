@@ -9,6 +9,10 @@
     ],
     "implementingPaths": [
       {
+        "path": "crates/statecraft-adapter-claude-code/",
+        "source": "spec-edge"
+      },
+      {
         "path": "crates/statecraft-cli/",
         "source": "spec-edge"
       },
@@ -77,6 +81,19 @@
       {
         "locations": [
           {
+            "file": "crates/statecraft-adapter-claude-code/"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "directory",
+          "path": "crates/statecraft-adapter-claude-code/"
+        }
+      },
+      {
+        "locations": [
+          {
             "file": "crates/statecraft-cli/"
           }
         ],
@@ -105,5 +122,5 @@
     "specStatus": "approved"
   },
   "schemaVersion": "1.1.0",
-  "shardHash": "4156c08bbe7a4cf8a7d145a1c3bb59e0674e686a556e9065ba86c6587927924c"
+  "shardHash": "170304701653140fede17366a6105592a6ca6f1459b178e0311552a0abd2d9c0"
 }

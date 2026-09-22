@@ -65,6 +65,13 @@ extends:
   # 3.19 moves them. The script is 001's unit, so the edge is declared rather
   # than discovered by the coupling gate.
   - { spec: "001-boundaries-and-authority", unit: "scripts/check-authored-content.sh", nature: corrective }
+  # One test in 004's crate was repaired while this spec's round was measuring
+  # against it: `settings_transport.rs`'s deadline attempt raced its own
+  # subject. The repair is to the test's fixture and its assertions only, and
+  # 004's required behavior is untouched, which is why the nature is
+  # corrective. The edge is declared rather than left for the coupling gate to
+  # discover, and the diagnosis is a dated entry in section 5.
+  - { spec: "004-execution-adapter", unit: { kind: directory, path: "crates/statecraft-adapter-claude-code/" }, nature: corrective }
 depends_on:
   - "000-bootstrap"
   - "001-boundaries-and-authority"
@@ -1869,6 +1876,48 @@ is §3.26's third evidence class, an observation of a running session, and no
 read of a settings file substitutes for one. Until a live session produces one,
 this product reports a session as **not qualified** for the managed-execution
 claim, which is §3.27's answer and not a workaround for it.
+
+**2026-09-21: the adapter's deadline attempt raced its own subject, and the
+repair is structural rather than a larger budget.**
+`crates/statecraft-adapter-claude-code/tests/settings_transport.rs`, the
+attempt named `timeout_after_terminal_denial_cleans_settings_and_retains_evidence`,
+has been failing intermittently on loaded machines for several rounds. It is
+spec `004`'s file, and this spec declares a corrective `extends` edge for the
+repair; `004`'s required behavior is untouched and nothing here weakens it.
+
+**The event ordering the attempt needs**, which is four things and was written
+as one: the terminal denial reaches the supervisor; the child is still alive
+after emitting it; the **deadline** is what ends supervision; and the denial is
+still in the structured evidence afterwards, with the supplied settings file
+removed and the workspace's own two untouched.
+
+**The defect.** The deadline is five seconds because the deadline is the
+subject. But the attempt reused the shared fixture path, so those five seconds
+also had to cover five process spawns, a blocking read of stdin that waits on
+the supervisor's writer thread, and a deliberate 100-millisecond sleep, before
+the point the assertion measures. None of that is the subject: every one of
+those properties is asserted by the attempts that name a thirty-second
+deadline. A budget that has to cover work it was not sized for is a race, and a
+loaded machine loses it.
+
+**The repair.** The fixture child takes the shortest path when the deadline is
+the subject: settings intact, terminal denial emitted, marker written on the
+line after the emit, then a hang far longer than the deadline. Nothing
+schedulable sits between the terminal event and the marker, so
+`settings-after-terminal` existing means the child outlived its own terminal
+event rather than meaning it won a race. The assertions are the four above,
+spelled separately, and the elapsed time is now bounded **below** by the
+deadline as well as above, so a child that exited early fails instead of
+passing as an interruption. The deadline stays five seconds, the negative
+behavior is unchanged, and nothing is retried or ignored.
+
+**What is not established.** The failure did not reproduce in this session.
+Two full `cargo test --workspace` runs were green, and six runs of the attempt
+under forty spin loops were green at a **one-second** budget on the repaired
+fixture and on the unrepaired one. So the diagnosis is from reading the
+fixture, not from a reproduction, and the repair removes a race that is
+demonstrably there rather than one that was demonstrably firing. Whether it
+ends the intermittency is a claim the next loaded run gets to make.
 
 **2026-09-21: the adopted `PreToolUse` gate skipped a check it was required to
 refuse on, and the inherited wording is the reason.** A fourth adoption defect,
