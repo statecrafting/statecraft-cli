@@ -17,6 +17,10 @@ summary: >
   spec-spine reports because one of them does not carry status, inspection as a
   read-only fold of the run record and nothing else, and the rule that a binding
   needing a library entry point gets it from the crate that owns the behavior.
+  Section 3.11.1 adds the five verbs 002 sections 3.25 to 3.29 need: inspecting
+  and explicitly upgrading the required harness identity, obtaining the
+  managed-session payload, and recording startup evidence beside submitting
+  qualification evidence for admission.
 establishes:
   - { kind: directory, path: "crates/statecraft-cli/" }
 extends:
@@ -91,6 +95,11 @@ group them:
 | `run list` | `003` | Every run for a registered target, with its attempts and outcomes. |
 | `run show <run>` | `003`, `005` | The reviewable outcome of `005` section 3.9. |
 | `accept <run>` | `005` | Judges the candidate independently and records the acceptance or its absence. |
+| `harness show <path>` | `002` | The required harness identity, the resolved one, and the standing between them. Reads only. |
+| `harness upgrade <path>` | `002` | Commits the shipped revision as the project's required identity, as an explicit act. |
+| `session payload` | `002` | The exact managed-session settings bytes, or with `--digest` their identity. |
+| `startup record <path> <session>` | `002` | Writes the startup record for one session, with the live observation absent. |
+| `startup qualify <path> <session> <evidence>` | `002` | Submits captured qualification evidence, which is admitted or refused. |
 
 A verb is added by the change that implements the behavior behind it, never
 ahead of it: a command that prints "not implemented" is a worse answer than a
@@ -288,6 +297,39 @@ section 3.4 still holds over everything added here: human and `--json`
 output are two renderings of one returned value, and the JSON shape is a
 contract.
 
+### 3.11.1 The five verbs spec 002's sections 3.25 to 3.29 need
+
+Added on 2026-09-21, authorized by the owner and recorded here before the
+bindings were written. Three things `002` requires were implemented as library
+operations and reachable only through examples in that spec's crate, which made
+*implemented* and *reachable by an operator* two different claims with only the
+first one true. §3.1's table now carries the five verbs that close it, and each
+is a binding in the sense of §3.2 and nothing more.
+
+**Inspection activates nothing.** `harness show` reads the manifest, the home
+and the installed revisions and reports the standing. It does not install, does
+not write a requirement, and does not deliver. The act that changes the
+requirement is `harness upgrade`, spelled separately for that reason: an
+inspection that upgraded as a side effect would make reading the state
+impossible without changing it.
+
+**The payload verb takes no path.** `session payload` is about the bytes this
+build delivers to a managed session, which are a property of the build and not
+of any target, in the same way the `home` verbs are about the product's own
+home. Requiring a project in order to print them would be requiring a target in
+order to read a constant.
+
+**The qualification verb admits, it does not assert.** `startup qualify` hands
+captured evidence to `002` §3.29's admission and renders what came back. There
+is no flag that marks a session qualified, no flag that lowers what the
+admission requires, and a refused claim writes nothing. Under §3.3 a refused
+claim is exit 2: a precondition was not met and nothing was done.
+
+**The examples stay.** They are how the acts were reachable before these verbs
+and they remain runnable, which keeps a second caller of the same library
+operations honest about §3.2. They are examples of calling the boundary, not
+the operator's route, and `002`'s handoff no longer names them as one.
+
 ### 3.12 What the command surface does not unlock
 
 Stated because an integration slice is exactly where scope grows quietly:
@@ -448,6 +490,19 @@ trusted base. A base that carries no declared authority-set path at all is a
 **refusal**, because a digest nobody can compute identifies no policy. Which
 paths are members is `005` §3.3 case 2's declaration, by path, and the five this
 repository declares are listed in the binding.
+
+**2026-09-21: five verbs for `002`, and the spellings were chosen to match the
+tree rather than the library.** `harness` and `startup` are new groups;
+`session` is a third. Each groups a noun the way `project`, `env`, `home` and
+`config` already do, and each verb after it is the act. The alternatives
+considered were folding all five under `env`, which would have put a read of the
+harness requirement beside `env apply` and invited the reading that one implies
+the other, and folding the two `startup` verbs into one with a flag, which would
+have made submitting evidence look like an option on recording rather than the
+separate act §3.29 requires. `session payload` takes no path for the reason §3.11.1
+states; the other four take one and none of them requires it to be registered,
+because reading a requirement and recording a start are both things a target
+does before it is driven.
 
 ## Verification
 
