@@ -120,8 +120,17 @@ impl Qualification {
     }
 
     /// True only for a measured, live observation.
+    ///
+    /// The shape alone is not enough: a `Qualified` built by hand carries
+    /// evidence, and that evidence is re-judged here and must not be synthetic
+    /// (spec 002 sections 3.29 rule 5 and 3.30).
     pub fn qualified(&self) -> bool {
-        matches!(self, Qualification::Qualified { .. })
+        match self {
+            Qualification::Qualified { evidence, .. } => {
+                crate::admission::admit(evidence).is_ok() && !evidence.synthetic()
+            }
+            Qualification::NotQualified { .. } => false,
+        }
     }
 }
 

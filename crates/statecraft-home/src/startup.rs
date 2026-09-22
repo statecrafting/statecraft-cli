@@ -299,9 +299,27 @@ impl Observation {
         }
     }
 
+    /// Whether the evidence was launched against a local fake.
+    ///
+    /// Spec 002 section 3.30: synthetic evidence runs the whole admission and
+    /// is never a live observation, so a record carrying it never qualifies.
+    pub fn synthetic(&self) -> bool {
+        match self {
+            Observation::Observed { evidence, .. } => evidence.synthetic(),
+            Observation::NotObserved { .. } => false,
+        }
+    }
+
+    /// Whether this is an admitted, live observation: the shape, the evidence
+    /// re-judged, and not synthetic. The one predicate a qualification reads.
+    pub fn live(&self) -> bool {
+        self.observed() && self.admitted().is_ok() && !self.synthetic()
+    }
+
     /// A one-word rendering.
     pub fn word(&self) -> &'static str {
         match self {
+            Observation::Observed { .. } if self.synthetic() => "observed-synthetic",
             Observation::Observed { .. } => "observed",
             Observation::NotObserved { .. } => "not-observed",
         }
@@ -461,12 +479,12 @@ impl StartupRecord {
         self.standing.permits_managed_execution()
             && self.delivery.reached()
             && self.supply.supplied()
-            && self.observation.observed()
-            // Section 3.29 rule 5. The three conditions above are properties of
-            // this record; this one is a property of the evidence the record
-            // carries, re-judged rather than believed, so a record assembled by
-            // hand reaches this line and is refused by it.
-            && self.observation.admitted().is_ok()
+            // Section 3.29 rule 5 and section 3.30. The three conditions above
+            // are properties of this record; this one is a property of the
+            // evidence the record carries, re-judged rather than believed, so a
+            // record assembled by hand reaches this line and is refused by it,
+            // and so is one whose evidence came from a local fake.
+            && self.observation.live()
     }
 
     /// What this record establishes, one line per evidence class.

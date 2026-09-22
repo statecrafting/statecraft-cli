@@ -35,6 +35,12 @@ statecraft-environment = { path = "../statecraft-environment" }
 # crate reaches back into this one.
 statecraft-adapter-claude-code = { path = "../statecraft-adapter-claude-code" }
 
+# Spec 002 section 3.30 rule 12's launch is supervised by the process-group
+# supervisor spec 004 owns, which holds the deadline and kills descendants.
+# Writing a second supervisor here would be a second place for that to be
+# wrong. Acyclic for the same reason as the line above.
+statecraft-adapter = { path = "../statecraft-adapter" }
+
 # The governance producer (spec 002 section 3.15), as an exact, reproducible
 # crates.io dependency rather than a path to a sibling checkout. `=` is
 # deliberate: the contract this product consumes is the shape one release

@@ -138,16 +138,36 @@ pub enum Operation {
     },
     /// Submit captured evidence for admission, and record what it establishes.
     ///
-    /// Section 3.29. The submission is read and then judged, as two steps, so
-    /// an unreadable capture and a capture that shows no refusal stay
-    /// distinguishable. A refused claim writes nothing.
+    /// Sections 3.29 and 3.30. The capture directory is read and then judged,
+    /// as two steps, so an unreadable capture and a capture that shows no
+    /// refusal stay distinguishable: the first is a failure, the second a
+    /// refusal (spec 006 section 3.11.2). A refused claim writes nothing.
     StartupQualify {
         /// The project.
         root: PathBuf,
         /// The session.
         session_id: String,
-        /// The submission naming the three captures.
+        /// The capture directory the three launches wrote into.
         submission: PathBuf,
+    },
+    /// Launch one qualification control and record the launch (spec 002
+    /// section 3.30 rule 12, spec 006 section 3.11.2).
+    StartupCapture {
+        /// The project the session runs in.
+        root: PathBuf,
+        /// Which control.
+        control: crate::admission::Control,
+        /// Where the record is written.
+        directory: PathBuf,
+        /// The provider, as named.
+        program: String,
+        /// The session's deadline.
+        deadline_seconds: u64,
+        /// Whether the operator stated the program is a local fake.
+        synthetic: bool,
+        /// The environment the provider runs with, exactly as the caller
+        /// supplies it.
+        environment: std::collections::BTreeMap<String, String>,
     },
 }
 
@@ -334,6 +354,23 @@ pub struct StartupOutcome {
     pub qualified: bool,
 }
 
+/// One launched control, as the operation recorded it.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CaptureOutcome {
+    /// Where the record is.
+    pub path: String,
+    /// Which control.
+    pub control: crate::admission::Control,
+    /// Whether the launch completed as one readable session. Says nothing
+    /// about the control's outcome, which only the admission judges.
+    pub complete: bool,
+    /// Why it did not, when it did not.
+    pub incomplete: Option<String>,
+    /// The record itself.
+    pub measurement: Box<crate::admission::Measurement>,
+}
+
 /// Why a submitted qualification was not recorded.
 ///
 /// Two reasons, kept apart. A submission that could not be **read** never
@@ -383,6 +420,8 @@ pub enum Answer {
     Startup(Box<StartupOutcome>),
     /// A qualification submission that was not recorded.
     QualificationRefused(Box<QualificationRefused>),
+    /// One launched control.
+    Captured(Box<CaptureOutcome>),
     /// A precondition stopped the operation.
     Refused {
         /// Why.
@@ -494,9 +533,25 @@ impl Answer {
                     Severity::Finding
                 }
             }
-            // Both arms are refusals. A precondition was not met and nothing
-            // was written, which is spec 006 section 3.3's exit 2 exactly.
-            Answer::QualificationRefused(_) => Severity::Refused,
+            // Spec 006 section 3.11.2. A claim the admission refused is a
+            // refusal: it was read, judged, and nothing was written. Captures
+            // that could not be read are a failure, as an unreadable manifest
+            // is: no claim was judged, and reporting it as a refusal would make
+            // a missing file look like a measured negative.
+            Answer::QualificationRefused(r) => match **r {
+                QualificationRefused::NotAdmitted { .. } => Severity::Refused,
+                QualificationRefused::Unread { .. } => Severity::Failed,
+            },
+            // A launch that completed is success whatever the session did; one
+            // that did not is recorded and is a finding (spec 006 section
+            // 3.11.2).
+            Answer::Captured(c) => {
+                if c.complete {
+                    Severity::Ok
+                } else {
+                    Severity::Finding
+                }
+            }
         }
     }
 
@@ -631,9 +686,43 @@ impl Answer {
                 ));
                 out
             }
+            Answer::Captured(c) => {
+                let m = &c.measurement;
+                let mut out = format!("control   {}\n", c.control.word());
+                if let Some(l) = &m.launch {
+                    if l.origin == crate::admission::Origin::Synthetic {
+                        out.push_str(
+                            "origin    SYNTHETIC: a local fake, never a live observation\n",
+                        );
+                    }
+                    out.push_str(&format!(
+                        "program   {} (probed {})\n",
+                        m.invocation.program,
+                        l.probe_version.as_deref().unwrap_or("no version")
+                    ));
+                    out.push_str(&format!(
+                        "process   exit {:?}, signal {:?}, timed out {}, survivors {}\n",
+                        l.process.code,
+                        l.process.signal,
+                        l.process.timed_out,
+                        l.process.surviving_processes.as_deref().unwrap_or("none")
+                    ));
+                    out.push_str(&format!(
+                        "stdout    {} byte(s)\nstderr    {} byte(s)\n",
+                        m.capture.bytes.len(),
+                        l.stderr.len()
+                    ));
+                }
+                out.push_str(&match &c.incomplete {
+                    None => "session   complete; the admission judges what it shows\n".to_string(),
+                    Some(why) => format!("session   incomplete: {why}\n"),
+                });
+                out.push_str(&format!("record    {}\n", c.path));
+                out
+            }
             Answer::QualificationRefused(r) => match &**r {
                 QualificationRefused::Unread { reason } => format!(
-                    "refused: the submission could not be read, so no claim was judged: \
+                    "failed: the captures could not be read, so no claim was judged: \
                      {reason}\nnothing was written\n"
                 ),
                 QualificationRefused::NotAdmitted { reason } => format!(
@@ -723,14 +812,48 @@ pub fn execute(ports: &Ports<'_>, operation: Operation) -> Answer {
         Operation::StartupRecord { root, session_id } => {
             startup_record(ports, &root, &session_id, None)
         }
+        Operation::StartupCapture {
+            root,
+            control,
+            directory,
+            program,
+            deadline_seconds,
+            synthetic,
+            environment,
+        } => startup_capture(
+            &root,
+            crate::capture::Request {
+                root: root.clone(),
+                control,
+                directory,
+                program,
+                deadline_seconds,
+                origin: if synthetic {
+                    crate::admission::Origin::Synthetic
+                } else {
+                    crate::admission::Origin::Launched
+                },
+                environment,
+            },
+        ),
         Operation::StartupQualify {
             root,
             session_id,
             submission,
         } => {
-            // Two steps, and the failures stay apart. A submission that could
-            // not be read never stated a claim; one that was read and refused
-            // stated one and was judged.
+            // A start happens once, and that is a precondition checked before
+            // any evidence is read, so a refusal for it is never mistaken for
+            // a judgement of the evidence.
+            if crate::startup::StartupRecord::path(&root, &session_id).exists() {
+                return Answer::Refused {
+                    reason: format!(
+                        "session {session_id} already has a startup record; a start happens once"
+                    ),
+                };
+            }
+            // Two steps, and the failures stay apart. Captures that could not
+            // be read never stated a claim; captures that were read and refused
+            // stated one and were judged.
             let evidence = match crate::admission::load(&submission) {
                 Ok(evidence) => evidence,
                 Err(why) => {
@@ -739,7 +862,9 @@ pub fn execute(ports: &Ports<'_>, operation: Operation) -> Answer {
                     }));
                 }
             };
-            match crate::startup::admit(&evidence) {
+            let admitted = crate::admission::admit_in(&evidence, &root)
+                .and_then(|()| crate::startup::admit(&evidence));
+            match admitted {
                 Ok(observation) => startup_record(ports, &root, &session_id, Some(observation)),
                 Err(why) => {
                     Answer::QualificationRefused(Box::new(QualificationRefused::NotAdmitted {
@@ -748,6 +873,29 @@ pub fn execute(ports: &Ports<'_>, operation: Operation) -> Answer {
                 }
             }
         }
+    }
+}
+
+/// `startup capture`: launch one control in a target and record it.
+fn startup_capture(root: &Path, request: crate::capture::Request) -> Answer {
+    if let Err(answer) = manifest_of(root) {
+        return answer;
+    }
+    let control = request.control;
+    match crate::capture::launch(&request) {
+        Ok(launched) => Answer::Captured(Box::new(CaptureOutcome {
+            path: launched.path.display().to_string(),
+            control,
+            complete: launched.incomplete.is_none(),
+            incomplete: launched.incomplete,
+            measurement: Box::new(launched.measurement),
+        })),
+        Err(crate::capture::Failed::Refused(why)) => Answer::Refused {
+            reason: why.to_string(),
+        },
+        Err(e) => Answer::Failed {
+            reason: e.to_string(),
+        },
     }
 }
 

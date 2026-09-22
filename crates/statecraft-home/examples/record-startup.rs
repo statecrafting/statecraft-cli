@@ -7,16 +7,14 @@
 //!
 //! ```sh
 //! cargo run -q -p statecraft-home --example record-startup -- \
-//!   <project> <home> <session-id> [<evidence-submission.json>]
+//!   <project> <home> <session-id> [<capture-dir>]
 //! ```
 //!
 //! The optional fourth argument is the live-session observation, and it is
-//! **admitted rather than believed**. Spec 002 section 3.29: the submission
-//! names three captures, the admission reads the harness's structured refusal
-//! record out of them, and it refuses a claim whose payload is not this
-//! build's, whose command no deny-floor entry claims, whose controls are absent
-//! or misbehaved, whose captures are substituted, or whose refusal is prose
-//! rather than a structured denial. There is no argument that asserts
+//! **admitted rather than believed**. Spec 002 sections 3.29 and 3.30: the
+//! directory holds the three launch records `startup capture` wrote, and the
+//! admission judges each control from correlated structured events and each
+//! invocation against its launch. There is no argument that asserts
 //! qualification, and passing one is not possible rather than discouraged.
 //!
 //! Omit it and the record is written with the observation absent and says so.
@@ -24,8 +22,9 @@
 //! observed is recorded as one that was not observed.
 //!
 //! **This is an example of calling the boundary, not the operator's route.**
-//! `statecraft-cli startup record` and `statecraft-cli startup qualify` are
-//! the verbs, and spec 006 section 3.11.1 is where they are required. This
+//! `statecraft-cli startup record`, `startup capture` and `startup qualify` are
+//! the verbs, and spec 006 sections 3.11.1 and 3.11.2 are where they are
+//! required. This
 //! stays runnable as a second caller of the same library operations.
 
 use statecraft_environment::manifest::Manifest;
@@ -38,7 +37,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     if args.len() != 3 && args.len() != 4 {
         eprintln!(
             "usage: record-startup <project> <home> <session-id> \
-             [<evidence-submission.json>]"
+             [<capture-dir>]"
         );
         std::process::exit(3);
     }
@@ -82,7 +81,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         let evidence = match admission::load(std::path::Path::new(&args[3])) {
             Ok(evidence) => evidence,
             Err(why) => {
-                eprintln!("the submission could not be read: {why}");
+                eprintln!("the captures could not be read: {why}");
                 std::process::exit(2);
             }
         };
