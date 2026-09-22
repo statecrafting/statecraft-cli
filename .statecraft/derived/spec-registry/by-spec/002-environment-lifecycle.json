@@ -70,6 +70,7 @@
       "3.25 The required harness identity and the resolved one",
       "3.26 Startup delivery evidence",
       "3.27 Global adapter registration is not managed-session permission delivery",
+      "3.28 An unmarked registration is the user's, and resemblance is not ownership",
       "4. Out of scope",
       "5. Decisions recorded during implementation",
       "Verification"
@@ -79,6 +80,6 @@
     "summary": "How a repository becomes a target this product may work in, and how the product installs and maintains the working environment inside it. Fixes the three ownership classes (managed, adopted, user), the committed manifest that records every managed byte with its source and digest, the pins the environment records, what an upgrade does when a managed file has drifted, what removal leaves behind, and how an agent-harness adapter declares what it owns. Preserving a pre-existing user instruction file is a refusal, not a merge. Sections 3.11 to 3.21 carry the realignment that followed spec-spine withdrawing its kit and its public initializer, which left this product the sole user-facing initializer: one Statecraft-managed global environment under the product home and one per-project area under .statecraft/, the reusable harness as a single global source delivered by adapters rather than copied into every repository, the governance producer boundary as the spec-spine library's files-as-data result, the root instruction bridge as a tracked managed modification rather than ownership of a user's file, configuration authority as four layers with provenance rather than one last-writer-wins merge, and a solo and team boundary in which every capability has a local implementation and an unreachable platform is an honest unavailable state. Sections 3.22 and 3.23 record the counterparty's state at the moment it handed its harness over, the order the last of that harness moves in, and what any content delivered through the harness mechanism has to satisfy. Section 3.24 is the one write into a harness's own settings file that section 3.14 rule 1 admits: narrow, marked, reversible, refused by default, and able to add a refusal but never a permission.\n",
     "title": "Project registration and the Statecraft-managed environment: one global home, one project area, one initialization flow, and where authority comes from"
   },
-  "shardHash": "decaa685f14956375cbad18b1f0845d404cf69fb347c63914c29d0dbb80852fc",
+  "shardHash": "48d40f8e122c40eb4e1d1e0f02f533c7162b35781ce0bd52a1528708317f49fa",
   "specVersion": "1.3.0"
 }

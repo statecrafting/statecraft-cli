@@ -1081,6 +1081,43 @@ succeeds, and writing a repository-local generic harness copy so the
 limitation stops being visible. The second would also reintroduce exactly what
 section 3.14 removes.
 
+### 3.28 An unmarked registration is the user's, and resemblance is not ownership
+
+Settled by the owner on 2026-09-21. Section 3.24 already says that a conflict
+is named rather than resolved; this section says what "named rather than
+resolved" means for a registration that already exists, and closes the one
+route by which this product could take one over by accident.
+
+**Existing registrations are preserved.** The user's own hook registrations
+stay, including the global push gate §3.22 records at
+`~/.claude/hooks/push-gate.sh`. Coexistence is the behavior to exercise:
+this product's delivery runs alongside them and is tested doing so. Where a
+later replacement is wanted, it is prepared as an **exact plan** and performed
+as its own reviewed act, never folded into a delivery.
+
+**Resemblance is never ownership.** This product does not delete, take
+ownership of, or rewrite an **unmarked** registration, and it does so least of
+all when the registration looks like content this product ships. A user who
+copied a shipped hook, or wrote one that converged on the same commands, owns
+what they wrote. Ownership is established the way section 3.24 establishes it,
+by exact content, structural location and recorded provenance together; a
+marker resembling this product's satisfies one of the three and proves
+nothing.
+
+**The keys this product does not touch.** `defaultMode`, `allow` entries, `ask`
+entries, model selection, and every other user setting section 3.24 does not
+name. That section's closing rule is the general form: a key it does not name
+is not writable by any code path. This section names the ones an integration
+is most tempted by, because each of them would make a delivery smoother and
+each is the user's decision.
+
+**Qualification is measured, not read off the configuration.** Where this
+product judges whether a session is qualified, it inspects **effective
+behavior**. A deny entry present in a settings file establishes that the entry
+is configured; it does not establish that it was enforced, in this version, in
+this session, for this command. The two are different claims and only the
+second qualifies a session.
+
 ## 4. Out of scope
 
 Installing the product itself; provider authentication; hosted registration;
@@ -1621,6 +1658,29 @@ session as not qualified for the managed-execution claim. It is not to lower
 the floor until delivery succeeds, and it is not to write a repository-local
 generic harness copy so that the limitation stops being visible, which would
 also reintroduce the exact thing §3.14 removes.
+
+**2026-09-21, authority: §3.28, and the one route by which a delivery takes
+over a user's hook by accident.** §3.24 already refuses to resolve a conflict.
+What it did not say is what happens to a registration that resembles this
+product's own, and the answer matters here specifically: §3.22 records a global
+push gate the user already runs at `~/.claude/hooks/push-gate.sh`, and this
+product ships a gate with the same purpose. The two will look alike, and a
+delivery that recognizes its own content by resemblance will recognize that one
+too.
+
+So ownership keeps all three of §3.24's properties and is not satisfied by the
+first. A marker is content, and content can be copied; the recorded provenance
+is what this product actually knows about what it did. An unmarked registration
+is the user's, and this product neither deletes, adopts nor rewrites it, even
+when it is byte-identical to something shipped. Replacing one later is an exact
+plan and its own act. For this round the behavior under test is coexistence.
+
+The last rule is the one this round has to obey while measuring its own work. A
+deny entry read out of a settings file establishes that the entry is
+configured. Qualification is a claim about enforcement, in this version, in
+this session, for this command, and only an inspection of effective behavior
+establishes it. Reading the file and reporting the session qualified would be
+this section's failure committed by the tooling that was written to detect it.
 
 ## Verification
 
