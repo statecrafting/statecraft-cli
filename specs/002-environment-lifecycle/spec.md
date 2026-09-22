@@ -789,18 +789,45 @@ the operator consents to that modification specifically. Consent to one revision
 is not consent to the next: a modification whose lines have changed is presented
 again.
 
-**One marked region, recorded as a modification.** Every managed line lives
-inside a single marked region in the file. Outside that region nothing is
-rewritten, reordered or reformatted, and the file's own shape is preserved. The
-region is recorded in the home the way section 3.13 records the root instruction
-bridge: as a **modification** (path, the exact lines, the digest before and the
-digest after), never as a managed entry and never as ownership of the file.
+**One recorded modification, several valid locations.** All Statecraft-managed
+insertions are tracked by one recorded modification. They may occupy multiple
+syntactically valid locations. Each insertion is identified by its exact
+content, structural location, and recorded provenance. Unrelated bytes are
+preserved, and removal occurs only when Statecraft can establish that the
+content is an intact insertion it owns.
 
-**Reversible, and only while it is intact.** Removal removes exactly the marked
-region and nothing else, and only while the region is present and byte-identical
-to what was recorded. A region a user has edited is **reported and left**: an
-edited region is a user's file again, and this product does not take it back.
-Applying the modification twice changes nothing.
+That is the contract the owner approved on 2026-09-21, replacing a requirement
+that every managed line occupy one physically contiguous marked region. The
+replacement is about **representation only**. What the region requirement was
+carrying is not physical adjacency but attributability, and attributability is
+what the three identifying properties above supply: the same bytes, in the same
+place in the document's structure, with a record in the home that says this
+product put them there. Adjacency was one way to get it, and in a syntax with
+two non-adjacent insertion points it is not an available one. Section 5's
+2026-09-21 entries measure why.
+
+The record itself is unchanged: the home records **one modification** (path, the
+exact content, the digest before and the digest after) the way section 3.13
+records the root instruction bridge, never as a managed entry and never as
+ownership of the file. Outside the recorded insertions nothing is rewritten,
+reordered or reformatted, and the file's own shape is preserved.
+
+**The file stays strict JSON.** The representation this section permits is the
+one the harness's own parser already accepts. It does not extend to JSON5, to
+comments outside string values, to a deny entry that refuses nothing and exists
+only to mark a boundary, or to a metadata key the harness does not support. A
+marker this product needs travels inside content the harness already reads as
+content, or it does not travel.
+
+**Reversible, and only while ownership can be established.** Removal removes
+exactly the insertions this product can establish it owns, and nothing else. An
+insertion whose content no longer matches what was recorded is **reported and
+left**: an edited insertion is a user's file again, and this product does not
+take it back. Where ownership cannot be established, the insertion stays and
+the outcome says which one and why; losing the evidence costs a refusal
+nothing. A marker resembling this product's is not by itself proof of
+ownership, and a pre-existing user refusal is never claimed as a managed
+insertion. Applying the modification twice changes nothing.
 
 **A conflict is named, not resolved.** Where the user already registers a hook on
 the same event with a different command, both remain and the situation is
@@ -1179,6 +1206,44 @@ implementation. `SessionStart` is the event where the answer is the same under
 either reading, so the mechanism ships without deciding the policy. Registering
 the other three, and the ten skills and four agents §3.23 lists, remains the
 owner's adoption act.
+
+**2026-09-21, authority: the owner replaced §3.24's physical single-region
+requirement, and the code that already existed is a candidate for the new
+wording rather than a retroactive fit for the old one.** The entries above put
+the wording to the owner and said the behavior was ahead of it. The owner's
+answer is the contract now in §3.24: one recorded modification, insertions that
+may occupy multiple syntactically valid locations, each identified by exact
+content, structural location and recorded provenance, with unrelated bytes
+preserved and removal conditioned on establishing ownership.
+
+Two things follow, and the second is the one worth writing down.
+
+First, what the amendment does **not** touch. Every guarantee stated around the
+region survives verbatim: an exact reviewable plan, consent specific to the
+content, no widened permission, `settings.local.json` never written, the digest
+either side, idempotent application, conservative removal, and user edits and
+conflicts preserved rather than resolved. The owner also fixed the syntax floor
+in the same act: strict JSON, no JSON5, no comment outside a string value, no
+sentinel deny entry that refuses nothing, no unsupported metadata key. The
+sentinel was one of the two alternatives this build rejected on its own
+reasoning; it is now rejected on the owner's authority as well.
+
+Second, what this build must **not** now claim. The implementation of
+2026-09-21 was written against the old wording, did not satisfy it, and said
+so. The amendment does not convert it into an implementation that did. It is a
+**candidate implementation of the revised contract**, and the difference is not
+bookkeeping: the old wording was satisfied by a property of the file's layout,
+which a reader can see, and the new one is satisfied by three properties of
+each insertion, of which only the first is visible in the file. Ownership by
+structural location and by recorded provenance is a claim about state this
+build keeps elsewhere, and a claim of that shape is established by exercising
+the cases where the state disagrees with the file: an insertion moved, a
+marker forged, a record lost, a value duplicated, a user edit landing between
+the plan and the write. Passing the tests written for the old wording
+establishes none of those. §3.24's implementation is therefore reconciled
+against the revised contract as its own work, and `implementation` stays
+`in-progress` until that reconciliation is done rather than because the
+sentence is unsettled.
 
 ## Verification
 
