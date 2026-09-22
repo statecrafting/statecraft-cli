@@ -167,12 +167,15 @@ fn the_plan_shows_the_exact_lines_and_writes_nothing() {
     for entry in &plan.adding_deny {
         assert!(plan.render().contains(entry), "{entry} is not in the plan");
     }
-    assert_eq!(plan.adding_hooks.len(), 1);
-    let hook = &plan.adding_hooks[0];
-    assert!(plan.render().contains(&hook.event));
-    assert!(plan.render().contains(&hook.matcher));
-    for line in hook.command.lines() {
-        assert!(plan.render().contains(line), "{line} is not in the plan");
+    // The four event behaviors the owner adopted on 2026-09-21, each named in
+    // the exact lines it would add.
+    assert_eq!(plan.adding_hooks.len(), harness::ADOPTED_HOOKS.len());
+    for hook in &plan.adding_hooks {
+        assert!(plan.render().contains(&hook.event));
+        assert!(plan.render().contains(&hook.matcher));
+        for line in hook.command.lines() {
+            assert!(plan.render().contains(line), "{line} is not in the plan");
+        }
     }
 
     // And nothing was written: `home plan` does not create the file. A plan
@@ -208,7 +211,7 @@ fn the_registered_command_is_the_script_the_harness_installed() {
     let script = sandbox
         .layout()
         .harness_revision_dir(&revision)
-        .join("hooks/statecraft-gate.sh");
+        .join("hooks/statecraft-session-start.sh");
     assert!(script.is_file(), "{} was not installed", script.display());
     assert!(
         command.contains(&script.display().to_string()),
@@ -360,21 +363,32 @@ fn existing_deny_entries_keep_their_place_and_the_floor_is_appended() {
         .map(|v| v.as_str().unwrap())
         .collect();
 
-    // The three the user wrote are still the first three, in their own order.
+    // Section 3.27: the user's deny list is exactly what it was. Not "their
+    // entries kept their place while the floor was appended after them": the
+    // floor does not arrive here at all, because a deny entry is evaluated
+    // before anything of this product's runs and so carries no project gate.
     assert_eq!(
-        &deny[..3],
-        &["Bash(rm -rf /*)", "Bash(cargo publish*)", "Read(./.env)"]
+        deny,
+        ["Bash(rm -rf /*)", "Bash(cargo publish*)", "Read(./.env)"],
+        "the global deny list was written to"
     );
-    // The floor entry the user already refused is not appended a second time.
-    assert_eq!(
-        deny.iter()
-            .filter(|e| **e == "Bash(cargo publish*)")
-            .count(),
-        1
-    );
-    // And every floor entry is now refused.
+
+    // The floor is real and it is delivered per managed session instead.
+    let payload = statecraft_home::session::payload();
+    let carried: Vec<&str> = payload
+        .pointer("/permissions/deny")
+        .unwrap()
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|v| v.as_str().unwrap())
+        .collect();
     for entry in settings::DENY_FLOOR {
-        assert!(deny.contains(&entry), "{entry} is not refused");
+        assert!(
+            carried.contains(&entry),
+            "{entry} is in neither the file nor the session payload, so the \
+             floor was lowered rather than moved"
+        );
     }
 }
 
@@ -456,8 +470,10 @@ fn the_modification_records_the_path_the_content_and_both_digests() {
         record.revision,
         harness::revision_of(&harness::shipped()).id
     );
-    assert_eq!(record.deny.len(), settings::DENY_FLOOR.len());
-    assert_eq!(record.hooks.len(), 1);
+    // Section 3.27: the record describes hook registrations and no deny
+    // entry, because no deny entry was placed.
+    assert!(record.deny.is_empty(), "{:?}", record.deny);
+    assert_eq!(record.hooks.len(), harness::ADOPTED_HOOKS.len());
 
     // The digests are of the actual bytes either side, not of an intention.
     let after = std::fs::read_to_string(settings_path(&sandbox)).unwrap();
@@ -556,7 +572,7 @@ fn an_edited_region_is_reported_and_kept() {
 
     // The operator edits the command this product placed. It is theirs now.
     let written = std::fs::read_to_string(settings_path(&sandbox)).unwrap();
-    let edited = written.replace("statecraft-gate.sh", "my-own-gate.sh");
+    let edited = written.replace("statecraft-session-start.sh", "my-own-gate.sh");
     std::fs::write(settings_path(&sandbox), &edited).unwrap();
 
     let answer = suite.harness(&sandbox).execute(Operation::HomeApply {
@@ -716,14 +732,9 @@ fn an_apply_interrupted_before_the_record_is_repaired_by_running_it_again() {
         left.get("hooks").is_some(),
         "a marked hook with no recorded provenance was removed on the marker alone"
     );
-    assert_eq!(
-        left.pointer("/permissions/deny")
-            .unwrap()
-            .as_array()
-            .unwrap()
-            .len(),
-        settings::DENY_FLOOR.len(),
-        "a refusal this product could not prove it placed was removed"
+    assert!(
+        left.get("permissions").is_none(),
+        "section 3.27: no permissions block should ever have been written here"
     );
 
     // Nothing was written by the repair, so the file is still the bytes the
@@ -781,20 +792,21 @@ fn a_changed_revision_replaces_the_region_rather_than_accumulating() {
         .unwrap()
         .as_array()
         .unwrap();
-    assert_eq!(groups.len(), 1, "the superseded registration accumulated");
+    assert_eq!(
+        groups.len(),
+        1,
+        "the superseded SessionStart registration accumulated"
+    );
     assert!(
         !after.contains("h-000000000000"),
         "the old revision survived"
     );
     assert!(after.contains(&harness::revision_of(&harness::shipped()).id));
+    assert!(
+        value.get("permissions").is_none(),
+        "section 3.27: no deny entry is written into a user's global settings"
+    );
 
-    // The deny floor did not double.
-    let deny = value
-        .pointer("/permissions/deny")
-        .unwrap()
-        .as_array()
-        .unwrap();
-    assert_eq!(deny.len(), settings::DENY_FLOOR.len());
     assert_eq!(modifications(&sandbox).len(), 1);
 }
 
@@ -1002,7 +1014,7 @@ fn a_forged_marker_with_no_record_behind_it_is_never_adopted() {
     let script = sandbox
         .layout()
         .harness_revision_dir(&revision.id)
-        .join("hooks/statecraft-gate.sh");
+        .join("hooks/statecraft-session-start.sh");
     let forged = format!(
         "{}\n{{\n  \"hooks\": {{\n    \"{}\": [\n      {{\n        \"matcher\": \"{}\",\n        \"hooks\": [\n          {{\n            \"type\": \"command\",\n            \"command\": {}\n          }}\n        ]\n      }}\n    ]\n  }}\n}}\n",
         "",
@@ -1034,10 +1046,16 @@ fn a_forged_marker_with_no_record_behind_it_is_never_adopted() {
     let recorded = modifications(&sandbox);
     assert_eq!(recorded.len(), 1);
     assert!(
-        recorded[0].hooks.is_empty(),
-        "the record claims a registration this product did not place: {:?}",
+        !recorded[0]
+            .hooks
+            .iter()
+            .any(|h| h.event == settings::SHIPPED_EVENT),
+        "the record claims the forged registration this product did not place: {:?}",
         recorded[0].hooks
     );
+    // The three that were genuinely added ARE claimed, so the assertion above
+    // is about provenance and not about the record being empty.
+    assert_eq!(recorded[0].hooks.len(), harness::ADOPTED_HOOKS.len() - 1);
 
     // So removal leaves it. The user wrote those bytes and they are the
     // user's, however much they look like this product's.
@@ -1103,23 +1121,59 @@ fn a_pre_existing_user_deny_is_never_claimed_and_survives_removal() {
 }
 
 #[test]
-fn a_duplicate_deny_value_leaves_the_users_copy_behind() {
+fn the_deny_floor_never_reaches_a_users_global_settings() {
     let sandbox = sandbox_with_native_home();
     let suite = suite();
     apply_consented(&sandbox, &suite);
 
-    // After the floor is placed, the user adds their own copy of one of its
-    // entries. Two identical strings now sit in the array and only one of
-    // them is this product's. Removal must take exactly one.
-    let duplicated = settings::DENY_FLOOR[0];
+    // Section 3.27. The case this test replaced exercised a deny entry this
+    // product had placed being duplicated by the user, and it can no longer
+    // arise, because no deny entry is placed here at all. What is asserted
+    // instead is the reason: a deny entry is evaluated before anything of
+    // this product's runs, so it carries no project gate and would apply in
+    // every repository the user opens.
+    let after: serde_json::Value =
+        serde_json::from_str(&std::fs::read_to_string(settings_path(&sandbox)).unwrap()).unwrap();
+    assert!(
+        after.get("permissions").is_none(),
+        "a permissions block reached a user's global settings: {after}"
+    );
+
+    // And the floor was not lowered to achieve that: it is carried, whole, by
+    // the managed-session payload instead.
+    let payload = statecraft_home::session::payload();
+    let carried: Vec<&str> = payload
+        .pointer("/permissions/deny")
+        .unwrap()
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|v| v.as_str().unwrap())
+        .collect();
+    assert_eq!(carried.len(), settings::DENY_FLOOR.len());
+    for entry in settings::DENY_FLOOR {
+        assert!(carried.contains(&entry), "{entry} left the floor entirely");
+    }
+}
+
+#[test]
+fn a_duplicate_hook_registration_is_ambiguous_and_only_the_recorded_one_leaves() {
+    let sandbox = sandbox_with_native_home();
+    let suite = suite();
+    apply_consented(&sandbox, &suite);
+
+    // The user copies this product's own `Stop` registration and adds a
+    // second, byte-identical, group of their own. Two identical registrations
+    // now sit on one event and only one of them is this product's.
     let text = std::fs::read_to_string(settings_path(&sandbox)).unwrap();
     let mut value: serde_json::Value = serde_json::from_str(&text).unwrap();
-    value
-        .pointer_mut("/permissions/deny")
+    let groups = value
+        .pointer_mut("/hooks/Stop")
         .unwrap()
         .as_array_mut()
-        .unwrap()
-        .push(serde_json::Value::String(duplicated.into()));
+        .unwrap();
+    let theirs = groups[0].clone();
+    groups.push(theirs);
     std::fs::write(
         settings_path(&sandbox),
         format!("{}\n", serde_json::to_string_pretty(&value).unwrap()),
@@ -1131,20 +1185,14 @@ fn a_duplicate_deny_value_leaves_the_users_copy_behind() {
     });
     let left: serde_json::Value =
         serde_json::from_str(&std::fs::read_to_string(settings_path(&sandbox)).unwrap()).unwrap();
-    let deny: Vec<&str> = left
-        .pointer("/permissions/deny")
-        .map(|d| {
-            d.as_array()
-                .unwrap()
-                .iter()
-                .map(|v| v.as_str().unwrap())
-                .collect()
-        })
-        .unwrap_or_default();
+    let remaining = left
+        .pointer("/hooks/Stop")
+        .map(|g| g.as_array().unwrap().len())
+        .unwrap_or(0);
     assert_eq!(
-        deny.iter().filter(|e| **e == duplicated).count(),
-        1,
-        "removal did not leave the user's copy of a duplicated refusal: {deny:?}"
+        remaining, 1,
+        "removal took both copies of an ambiguous registration, or neither: \
+         the record describes one and exactly one may leave"
     );
 }
 
@@ -1156,29 +1204,32 @@ fn the_insertions_are_not_adjacent_and_neither_is_claimed_by_the_other() {
 
     // Section 3.24 as revised admits multiple syntactically valid locations,
     // which is the whole reason it was revised. This asserts the shape rather
-    // than assuming it: the two insertions land under two different top-level
-    // keys, and each is found at its own structural location.
+    // than assuming it: the four insertions land at four distinct structural
+    // locations, no two of them adjacent in the document, and one recorded
+    // modification tracks all four.
     let after: serde_json::Value =
         serde_json::from_str(&std::fs::read_to_string(settings_path(&sandbox)).unwrap()).unwrap();
-    assert!(
-        after.pointer("/permissions/deny").is_some(),
-        "the deny insertion is not at permissions.deny"
-    );
-    assert!(
-        after
-            .pointer(&format!("/hooks/{}", settings::SHIPPED_EVENT))
-            .is_some(),
-        "the hook insertion is not at hooks.{}",
-        settings::SHIPPED_EVENT
+    for hook in harness::ADOPTED_HOOKS {
+        assert!(
+            after.pointer(&format!("/hooks/{}", hook.event)).is_some(),
+            "the {} insertion is not at hooks.{}",
+            hook.event,
+            hook.event
+        );
+    }
+    assert_eq!(
+        after.pointer("/hooks").unwrap().as_object().unwrap().len(),
+        harness::ADOPTED_HOOKS.len(),
+        "the insertions did not land at one location each"
     );
 
     let recorded = modifications(&sandbox);
     assert_eq!(
         recorded.len(),
         1,
-        "two locations were tracked by more than one recorded modification"
+        "four locations were tracked by more than one recorded modification"
     );
-    assert!(!recorded[0].hooks.is_empty() && !recorded[0].deny.is_empty());
+    assert_eq!(recorded[0].hooks.len(), harness::ADOPTED_HOOKS.len());
 }
 
 #[test]

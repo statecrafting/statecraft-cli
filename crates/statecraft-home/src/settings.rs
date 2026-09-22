@@ -105,6 +105,15 @@ pub const MARKER: &str = "# statecraft-managed";
 /// recursive removal of a corpus or a derived tree. A floor, so these are only
 /// ever added; nothing here removes, weakens or reorders what a user already
 /// refused.
+///
+/// **Where this lands is section 3.27, and it is not here by default.** A deny
+/// entry is evaluated by the harness before anything of this product's runs,
+/// so it has nowhere to test for `.statecraft/environment.json` and exit. It
+/// carries no project gate and acquires none from the hook scripts registered
+/// beside it. Written into a user's global settings it would refuse these
+/// commands in every repository that user opens, managed or not, which is
+/// exactly what section 3.14 rule 3 forbids. So it is delivered to a **managed
+/// session** instead: see [`crate::session`].
 pub const DENY_FLOOR: [&str; 8] = [
     "Bash(cargo publish*)",
     "Bash(npm publish*)",
@@ -249,19 +258,43 @@ pub fn consent_token(content: &str, target: &str) -> String {
 /// the product home, which is section 3.24's rule 1: never a command assembled
 /// from anything else.
 pub fn managed(revision: &str, revision_root: &Path) -> Managed {
-    let script = revision_root.join("hooks/statecraft-gate.sh");
-    let command = format!(
-        "{MARKER} {revision}\n\"{}\" \"${{CLAUDE_PROJECT_DIR:-.}}\"",
-        script.display()
-    );
+    let registration = |event: &str, matcher: &str, file: &str| {
+        let script = revision_root.join("hooks").join(file);
+        HookRegistration {
+            event: event.to_string(),
+            matcher: matcher.to_string(),
+            command: format!(
+                "{MARKER} {revision}\n\"{}\" \"${{CLAUDE_PROJECT_DIR:-.}}\"",
+                script.display()
+            ),
+        }
+    };
+
+    // The four event behaviors the owner adopted on 2026-09-21, and nothing
+    // else. Every command resolves inside the canonical harness under the
+    // product home, which is section 3.24's rule 1.
+    //
+    // The hand-rolled `statecraft-gate.sh` this build shipped before the
+    // adoption is gone rather than registered beside them: it was a
+    // `SessionStart` freshness report written when no inventory had been
+    // adopted, and the adopted `SessionStart` behavior does the same job
+    // against the same contracts. Two registrations on one event would run
+    // two freshness reports per session and make "one canonical source" false
+    // in the only place a user would see it.
+    let hooks: Vec<HookRegistration> = harness::ADOPTED_HOOKS
+        .iter()
+        .map(|hook| registration(hook.event, hook.matcher, hook.file))
+        .collect();
+
     Managed {
         revision: revision.to_string(),
-        hooks: vec![HookRegistration {
-            event: SHIPPED_EVENT.to_string(),
-            matcher: SHIPPED_MATCHER.to_string(),
-            command,
-        }],
-        deny: DENY_FLOOR.iter().map(|s| s.to_string()).collect(),
+        hooks,
+        // Empty, and section 3.27 is why. The consented modification into a
+        // user's global settings carries hook registrations, which are
+        // project-gated because a script can test for the manifest and exit.
+        // It does not carry the deny floor, which cannot be. The floor is
+        // delivered per managed session by [`crate::session`].
+        deny: Vec::new(),
     }
 }
 
@@ -2304,15 +2337,24 @@ mod tests {
     }
 
     #[test]
-    fn a_hook_command_resolves_inside_the_canonical_harness_and_carries_its_marker() {
+    fn every_hook_command_resolves_inside_the_canonical_harness_and_carries_its_marker() {
         let managed = content();
-        let hook = &managed.hooks[0];
-        assert_eq!(hook.marked_revision(), Some("h-abcdef012345"));
-        let command = hook.command.lines().nth(1).unwrap();
-        assert!(
-            command.contains("/home/.statecraft/harness/h-abcdef012345/hooks/statecraft-gate.sh"),
-            "{command}"
-        );
+        assert_eq!(managed.hooks.len(), harness::ADOPTED_HOOKS.len());
+        for (hook, adopted) in managed.hooks.iter().zip(harness::ADOPTED_HOOKS) {
+            assert_eq!(hook.event, adopted.event);
+            assert_eq!(hook.marked_revision(), Some("h-abcdef012345"));
+            let command = hook.command.lines().nth(1).unwrap();
+            // Section 3.24 rule 1: never a command assembled from anything
+            // else. The executable path is inside this revision's directory
+            // under the product home, and the revision is in the path.
+            assert!(
+                command.contains(&format!(
+                    "/home/.statecraft/harness/h-abcdef012345/hooks/{}",
+                    adopted.file
+                )),
+                "{command}"
+            );
+        }
     }
 
     #[test]
@@ -2331,9 +2373,15 @@ mod tests {
         let plan = planned(None);
         assert_eq!(plan.action, Action::Create);
         let value: Value = serde_json::from_str(&plan.contents_after).unwrap();
-        assert!(value.get("permissions").is_some());
         assert!(value.get("hooks").is_some());
-        assert_eq!(value.as_object().unwrap().len(), 2);
+        // Section 3.27: the global modification carries hook registrations and
+        // not the deny floor. A deny entry has no project gate, so one written
+        // here would refuse in every repository the user opens.
+        assert!(
+            value.get("permissions").is_none(),
+            "the floor reached a user's global settings: {value}"
+        );
+        assert_eq!(value.as_object().unwrap().len(), 1);
     }
 
     #[test]
@@ -2354,40 +2402,44 @@ mod tests {
         assert!(after.contains("\"$schema\": \"https://example/s.json\""));
         assert!(after.contains("\"model\": \"opus\""));
         assert!(after.contains("            \"Bash(ls *)\""));
-        // The author's four-space indentation is read from the file, not imposed:
-        // the existing entry sits at twelve spaces and so does the appended one.
-        assert!(
-            after.contains("\n            \"Bash(cargo publish*)\""),
-            "{after}"
-        );
         assert!(after.contains("\n    \"hooks\": {"), "{after}");
-        // The existing refusal is still first.
+        // The user's own permissions block is untouched, entry for entry:
+        // section 3.27 stops this modification writing into it at all.
         let value: Value = serde_json::from_str(after).unwrap();
         let deny = value
             .pointer("/permissions/deny")
             .unwrap()
             .as_array()
             .unwrap();
-        assert_eq!(deny[0], Value::from("Bash(rm -rf /*)"));
+        assert_eq!(deny, &[Value::from("Bash(rm -rf /*)")]);
+        let allow = value
+            .pointer("/permissions/allow")
+            .unwrap()
+            .as_array()
+            .unwrap();
+        assert_eq!(allow, &[Value::from("Bash(ls *)")]);
     }
 
     #[test]
-    fn a_floor_entry_the_user_already_refuses_is_not_appended_twice() {
+    fn the_global_modification_adds_no_deny_entry_at_all() {
+        // Section 3.27. The floor is real and it is delivered per managed
+        // session by `crate::session`; what it may not do is arrive in a
+        // user's global settings, where it would apply to every repository.
         let before = "{\n  \"permissions\": {\n    \"deny\": [\n      \"Bash(cargo publish*)\"\n    ]\n  }\n}\n";
         let plan = planned(Some(before));
-        assert_eq!(plan.already_denied, ["Bash(cargo publish*)"]);
-        assert!(
-            !plan
-                .adding_deny
-                .contains(&"Bash(cargo publish*)".to_string())
-        );
+        assert!(plan.managed.deny.is_empty(), "{:?}", plan.managed.deny);
+        assert!(plan.adding_deny.is_empty(), "{:?}", plan.adding_deny);
         let value: Value = serde_json::from_str(&plan.contents_after).unwrap();
         let deny = value
             .pointer("/permissions/deny")
             .unwrap()
             .as_array()
             .unwrap();
-        assert_eq!(deny.len(), DENY_FLOOR.len());
+        assert_eq!(
+            deny,
+            &[Value::from("Bash(cargo publish*)")],
+            "the user's own deny list was written to"
+        );
     }
 
     #[test]
@@ -2442,7 +2494,7 @@ mod tests {
         let first = planned(None);
         let tampered = first
             .contents_after
-            .replace("statecraft-gate.sh", "something-else.sh");
+            .replace("statecraft-session-start.sh", "something-else.sh");
         let second = plan("/p", Some(&tampered), &content()).unwrap();
         assert!(!second.edited.is_empty());
         // The edited command is still there: this product does not take it back.
@@ -2487,7 +2539,9 @@ mod tests {
             digest_after: plan.digest_after.clone(),
             recorded_at: "2026-09-21T00:00:00Z".into(),
         };
-        let tampered = plan.contents_after.replace("statecraft-gate.sh", "mine.sh");
+        let tampered = plan
+            .contents_after
+            .replace("statecraft-session-start.sh", "mine.sh");
         let removal = removal(Some(&tampered), &record).unwrap();
         assert!(matches!(removal, Removal::Edited { .. }));
     }

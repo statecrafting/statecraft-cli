@@ -1784,6 +1784,77 @@ published version verified directly. The pinned governance CLI (`=0.20.0` in
 `spec-spine.toml`) and the scaffold library dependency are different surfaces
 and do not move together.
 
+**2026-09-21: the adopted inventory is delivered, and running the hooks as
+programs found three defects the files' own prose denied.** Ten skills, four
+agents and four event behaviors, adopted under the authority change above and
+now in `crates/statecraft-home/harness/`, reached through `include_str!` from
+`harness::ADOPTED_SKILLS`, `ADOPTED_AGENTS` and `ADOPTED_HOOKS`. They are held
+as files rather than as string literals because they are 1900 lines of
+authored prose: they are reviewed as prose, and a diff against the source they
+came from is only legible while they are files.
+
+**§3.23 said the inventory was already repository-invariant. The agents were
+not.** All four carried a table of the counterparty's own crate layout,
+`crates/{spec-spine-core,spec-spine-types}/` and `crates/spec-spine-cli/`, as
+"the surfaces this project has". That is the adoption defect the owner named,
+and it is invisible to a check that greps for a word, because the word
+`spec-spine` legitimately appears throughout as the name of the governance
+CLI. The tables are replaced by a pointer to the project's own `AGENTS.md`,
+with two facts an agent may rely on everywhere: the corpus is the source of
+truth, and the derived tree is read through the CLI. Four skills carried the
+same defect in a different shape: a fenced block listing a gate with exact
+flags, immediately after telling the session to run the gate exactly as
+`AGENTS.md` lists it.
+
+**Three defects were found by running the hooks, not by reading them.**
+
+1. **The push gate fired outside a Statecraft project.** The manifest test was
+   placed in the pull-request half, after the push half, so
+   `git push origin main` was refused in an unrelated repository that merely
+   happened to be open. That is §3.14 rule 3 broken in its most damaging form,
+   because the collision stops an operation rather than printing a line. The
+   gate now guards the whole hook, on the repository the **command** acts on.
+2. **`SessionStart` sent a session to a writing verb for a validation
+   failure**, advising `run spec-spine compile for the violations` on exit 1.
+   Contract 4 turns on exactly one of the four answers being the one
+   regenerating repairs, and `1` is not it.
+3. **The build's own `statecraft-gate.sh` duplicated the adopted
+   `SessionStart` behavior.** Registering both would run two freshness reports
+   per session and make "one canonical source" false in the only place a user
+   would see it. The hand-rolled gate is superseded and removed rather than
+   registered beside its replacement.
+
+**The assertions moved with the files, which is what §3.23 priced.**
+`harness_hooks.rs` is rewritten against the four adopted hooks: 22 tests, each
+writing a body out and running it with the input its event actually delivers,
+against a stub binary that records which copy was chosen. `harness_skills.rs`
+is new: nine tests over parsed front matter and fenced command blocks rather
+than over prose, because the owner named "finds a phrase in a file" as the
+failure to avoid. Two of them earned their keep immediately: the read-only
+assertion cannot be derived from `allowed-tools`, because `commit` declares
+`Bash` alone and looks read-only by that test while its whole purpose is to
+write, and a first draft of the fence parser read the closing ``` of a
+`markdown` block as the opening of a shell block.
+
+**§3.27 is implemented and the floor moved rather than shrank.** The consented
+global modification now carries hook registrations only. `crate::session`
+carries the deny floor as a managed-session payload, and carries nothing else:
+no allow entry, no `ask`, no `defaultMode`, no model, which is §3.28's list.
+Six existing tests asserted the floor landing in the global file and were
+rewritten to assert that it does not, each one paired with an assertion that
+the floor is still carried whole somewhere, so "not here" cannot be satisfied
+by lowering it.
+
+**The mechanism is verified as far as a read can verify it, and no further.**
+Claude Code 2.1.267 documents and carries `--settings <file-or-json>`, which
+`session::probe_version` establishes by running the installed binary.
+`qualification_from` cannot return `Qualified` from that, by construction and
+by test: whether a refusal passed through the argument is actually **enforced**
+is §3.26's third evidence class, an observation of a running session, and no
+read of a settings file substitutes for one. Until a live session produces one,
+this product reports a session as **not qualified** for the managed-execution
+claim, which is §3.27's answer and not a workaround for it.
+
 ## Verification
 
 Each line is one command. They run the acceptance this spec's behavior declares:

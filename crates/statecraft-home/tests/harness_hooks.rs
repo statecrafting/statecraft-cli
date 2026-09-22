@@ -1,43 +1,82 @@
-//! Spec 002 section 3.23's hook contracts, enforced against the hook this
-//! build actually ships.
+//! Spec 002 section 3.23's hook contracts, and the Stop policy the owner
+//! adopted on 2026-09-21, enforced against the hooks this build actually
+//! ships.
 //!
-//! Section 3.23 says whoever owns the files owns the assertions. This product
-//! owns `hooks/statecraft-gate.sh`, so the assertions live here. Each test
-//! extracts the shipped body, writes it out as a program, and runs it against
-//! a stub `spec-spine`: a contract asserted by reading the source for a phrase
-//! would pass on a script that happens to mention the phrase in a comment.
+//! Section 3.23 says whoever owns the files owns the assertions. The
+//! counterparty enforced these in its own tree, in a file that could not move
+//! because a hermetic test may not read `$HOME`. This product now owns the
+//! four adopted event behaviors, so the assertions live here.
 //!
-//! The stubs are fixtures and are labelled as one. What matters is which
-//! binary the script chose and what it did with the code it got back, and a
-//! stub can answer both without a real corpus.
+//! **Every test runs a hook as a program.** Each one writes the shipped body
+//! out, gives it the input its event actually delivers, and runs it against a
+//! stub `spec-spine`. A contract asserted by searching the source for a phrase
+//! would pass on a script that merely mentions the phrase in a comment, which
+//! is the failure mode the owner named.
+//!
+//! The four events take their input differently and the fixture reflects that
+//! rather than flattening it: `SessionStart` and `Stop` read
+//! `$CLAUDE_PROJECT_DIR`, and `PostToolUse` and `PreToolUse` read a JSON
+//! payload on stdin. A harness that fed all four the same way would be testing
+//! something no session does.
+//!
+//! | Contract | Hooks it binds | Tests |
+//! |---|---|---|
+//! | 1 read, never repair | all four | `contract_1_*` |
+//! | 2 binary resolution order | session-start, stop, post-edit | `contract_2_*` |
+//! | 3 target from the command | post-edit, pre-bash | `contract_3_*` |
+//! | 4 read the verdict, never guess it | session-start, stop | `contract_4_*` |
+//! | 5 establish the verb first | session-start, stop | `contract_5_*` |
+//! | 6 a gate whose check did not run is not green | pre-bash | `contract_6_*` |
+//! | 7 a branch gate resolves the protected branch | pre-bash | `contract_7_*` |
+//! | the Stop policy: advisory, and accurate | stop | `stop_policy_*` |
+//! | section 3.14 rule 3, the project gate | all four | `outside_a_statecraft_project_*` |
 
 use std::path::{Path, PathBuf};
-use std::process::{Command, Output};
+use std::process::{Command, Output, Stdio};
 
-/// The shipped hook body, read from the harness rather than duplicated here.
-fn hook_body() -> String {
+/// One shipped hook body, read from the harness rather than duplicated here.
+fn hook_body(file: &str) -> String {
     statecraft_home::harness::shipped()
         .into_iter()
-        .find(|f| f.rel_path == "hooks/statecraft-gate.sh")
-        .expect("the harness ships a gate hook")
+        .find(|f| f.rel_path == format!("hooks/{file}"))
+        .unwrap_or_else(|| panic!("the harness ships hooks/{file}"))
         .contents
 }
 
-/// The real `git`, resolved once from the environment the test inherited.
+const SESSION_START: &str = "statecraft-session-start.sh";
+const POST_EDIT: &str = "statecraft-post-edit.sh";
+const PRE_BASH: &str = "statecraft-pre-bash.sh";
+const STOP: &str = "statecraft-stop.sh";
+
+/// Every hook the build ships, so a contract that binds all four says so by
+/// iterating rather than by naming three of them and forgetting the fourth.
+const ALL: [&str; 4] = [SESSION_START, POST_EDIT, PRE_BASH, STOP];
+
+/// The system directories, which hold the ordinary tools a shell script needs
+/// and no `spec-spine`.
 ///
-/// The fixture's PATH deliberately holds nothing else, so the shim it writes
-/// has to name this absolutely.
-fn real_git() -> PathBuf {
-    let out = Command::new("sh")
-        .args(["-c", "command -v git"])
-        .output()
-        .expect("a shell");
-    let path = String::from_utf8_lossy(&out.stdout).trim().to_string();
-    assert!(!path.is_empty(), "these tests need git on PATH");
-    PathBuf::from(path)
+/// Asserted rather than assumed: if a `spec-spine` were installed here, every
+/// resolution-order test would silently start measuring it instead of a stub,
+/// and would still pass.
+fn system_path() -> String {
+    for dir in ["/usr/bin", "/bin", "/usr/sbin", "/sbin"] {
+        assert!(
+            !Path::new(dir).join("spec-spine").exists(),
+            "{dir} holds a spec-spine, so these fixtures cannot isolate one"
+        );
+    }
+    "/usr/bin:/bin:/usr/sbin:/sbin".to_string()
+}
+
+/// The PATH a fixture run uses: its own directory first, then the system.
+fn fixture_path(path_dir: &Path) -> String {
+    format!("{}:{}", path_dir.display(), system_path())
 }
 
 fn executable(path: &Path, body: &str) {
+    if let Some(parent) = path.parent() {
+        std::fs::create_dir_all(parent).unwrap();
+    }
     std::fs::write(path, body).unwrap();
     #[cfg(unix)]
     {
@@ -46,71 +85,99 @@ fn executable(path: &Path, body: &str) {
     }
 }
 
-/// A git repository that is a Statecraft project, plus the hook written out.
+/// A git repository that is a Statecraft project, plus a hook written out.
 struct Fixture {
     _dir: tempfile::TempDir,
     root: PathBuf,
-    hook: PathBuf,
-    /// A directory placed on PATH ahead of everything else.
+    dir: PathBuf,
     path_dir: PathBuf,
 }
 
 impl Fixture {
+    /// A fixture whose repository carries the manifest that makes it managed.
     fn new() -> Self {
+        Self::build(true)
+    }
+
+    /// A fixture whose repository is an ordinary one, with no manifest.
+    fn unmanaged() -> Self {
+        Self::build(false)
+    }
+
+    fn build(managed: bool) -> Self {
         let dir = tempfile::tempdir().unwrap();
         let root = dir.path().join("repo");
-        std::fs::create_dir_all(root.join(".statecraft")).unwrap();
-        std::fs::write(root.join(".statecraft/environment.json"), "{}").unwrap();
+        std::fs::create_dir_all(root.join("specs/000-x")).unwrap();
+        std::fs::write(root.join("specs/000-x/spec.md"), "# x\n").unwrap();
+        if managed {
+            std::fs::create_dir_all(root.join(".statecraft")).unwrap();
+            std::fs::write(root.join(".statecraft/environment.json"), "{}").unwrap();
+        }
         let out = Command::new("git")
-            .args(["init", "--quiet"])
+            .args(["init", "--quiet", "--initial-branch=main"])
             .current_dir(&root)
             .output()
             .expect("git is available");
         assert!(out.status.success(), "git init failed");
 
-        let hook = dir.path().join("statecraft-gate.sh");
-        executable(&hook, &hook_body());
-
-        // PATH holds exactly this directory, so nothing the developer happens
-        // to have installed can answer for a stub. `git` still has to work, so
-        // it arrives as a shim that execs the real one by absolute path.
+        // PATH is this directory followed by the system ones. The fixture
+        // directory comes first so a stub always wins, and the system
+        // directories supply the ordinary tools a shell script needs
+        // (`dirname`, `awk`, `jq`) without supplying a `spec-spine`: the
+        // developer's own copy lives under `~/.cargo/bin`, which is not here,
+        // and `system_path` asserts that rather than assuming it.
         let path_dir = dir.path().join("path");
         std::fs::create_dir_all(&path_dir).unwrap();
-        executable(
-            &path_dir.join("git"),
-            &format!("#!/bin/sh\nexec {} \"$@\"\n", real_git().display()),
-        );
 
+        let scripts = dir.path().join("scripts");
         Self {
             _dir: dir,
             root,
-            hook,
+            dir: scripts,
             path_dir,
         }
+    }
+
+    fn hook(&self, file: &str) -> PathBuf {
+        let path = self.dir.join(file);
+        executable(&path, &hook_body(file));
+        path
     }
 
     /// Place a stub `spec-spine` somewhere, recording which one ran.
     ///
     /// The stub appends its own label to `witness`, so a test can ask which
     /// binary the resolution order actually chose rather than inferring it.
+    /// `carries_verbs: false` is a binary older than `check`: `clap` spends
+    /// exit 2 on an unknown subcommand, which is also the staleness code.
     fn stub(&self, at: &Path, label: &str, check_code: i32, carries_verbs: bool) {
-        if let Some(parent) = at.parent() {
-            std::fs::create_dir_all(parent).unwrap();
-        }
+        self.stub_saying(at, label, check_code, carries_verbs, "");
+    }
+
+    /// A stub that also prints a report line, so contract 4 can assert that
+    /// the hook reads the report rather than guessing from the exit code.
+    fn stub_saying(
+        &self,
+        at: &Path,
+        label: &str,
+        check_code: i32,
+        carries_verbs: bool,
+        says: &str,
+    ) {
         let witness = self.root.join("witness");
         let body = if carries_verbs {
             format!(
                 "#!/bin/sh\nprintf '{label}\\n' >> '{}'\n\
-                 case \"$1 $2\" in\n  'check --help'|'lint --help') exit 0 ;;\nesac\n\
-                 [ \"$1\" = check ] && exit {check_code}\n\
+                 case \"$1\" in --version) echo 'spec-spine 9.9.9'; exit 0 ;; esac\n\
+                 case \"$1 $2\" in\n  'check --help'|'lint --help'|'couple --help') exit 0 ;;\nesac\n\
+                 for a in \"$@\"; do\n  if [ \"$a\" = check ]; then printf '%s\\n' '{says}'; exit {check_code}; fi\ndone\n\
                  exit 0\n",
                 witness.display()
             )
         } else {
-            // A binary older than the verb: clap spends 2 on an unknown
-            // subcommand, which is also the stale code.
             format!(
-                "#!/bin/sh\nprintf '{label}\\n' >> '{}'\nexit 2\n",
+                "#!/bin/sh\nprintf '{label}\\n' >> '{}'\n\
+                 case \"$1\" in --version) echo 'spec-spine 0.0.1'; exit 0 ;; esac\nexit 2\n",
                 witness.display()
             )
         };
@@ -134,249 +201,712 @@ impl Fixture {
         );
     }
 
-    /// Run the hook against this repository, naming it on the command line.
-    fn run(&self, env: &[(&str, &str)]) -> Output {
-        let mut cmd = Command::new(&self.hook);
-        cmd.arg(&self.root)
-            // A deliberately unrelated working directory: contract 3 says the
-            // target comes from the command, so the session's own cwd must not
-            // be what decides which tree is governed.
-            .current_dir(std::env::temp_dir())
-            .env("PATH", &self.path_dir)
+    fn assert_nothing_ran(&self) {
+        let w = self.witness();
+        assert!(
+            w.trim().is_empty(),
+            "a stub ran when none should have: {w:?}"
+        );
+    }
+
+    /// Run a `$CLAUDE_PROJECT_DIR` hook: `SessionStart` and `Stop`.
+    fn run_project(&self, file: &str, env: &[(&str, &str)]) -> Output {
+        let mut cmd = Command::new(self.hook(file));
+        cmd.current_dir(std::env::temp_dir())
+            .env("PATH", fixture_path(&self.path_dir))
+            .env("CLAUDE_PROJECT_DIR", &self.root)
             .env_remove("SPEC_SPINE_BIN");
         for (k, v) in env {
             cmd.env(k, v);
         }
         cmd.output().unwrap()
     }
+
+    /// Run a stdin-payload hook: `PostToolUse` and `PreToolUse`.
+    fn run_payload(&self, file: &str, payload: &str, env: &[(&str, &str)]) -> Output {
+        use std::io::Write;
+        let mut child = Command::new(self.hook(file))
+            // A deliberately unrelated working directory: contract 3 says the
+            // target comes from the command, so the session's own cwd must not
+            // be what decides which tree is acted on.
+            .current_dir(std::env::temp_dir())
+            .env("PATH", fixture_path(&self.path_dir))
+            .env("CLAUDE_PROJECT_DIR", &self.root)
+            .env_remove("SPEC_SPINE_BIN")
+            .envs(env.iter().copied())
+            .stdin(Stdio::piped())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped())
+            .spawn()
+            .unwrap();
+        child
+            .stdin
+            .as_mut()
+            .unwrap()
+            .write_all(payload.as_bytes())
+            .unwrap();
+        child.wait_with_output().unwrap()
+    }
 }
 
-fn stderr(out: &Output) -> String {
-    String::from_utf8_lossy(&out.stderr).into_owned()
+fn text(out: &Output) -> String {
+    format!(
+        "{}{}",
+        String::from_utf8_lossy(&out.stdout),
+        String::from_utf8_lossy(&out.stderr)
+    )
 }
 
-/// Contract 1: read, never repair.
-///
+/// A `PreToolUse` payload naming a Bash command in a repository.
+fn bash_payload(command: &str, cwd: &Path) -> String {
+    serde_json::json!({
+        "tool_input": { "command": command },
+        "cwd": cwd.display().to_string(),
+    })
+    .to_string()
+}
+
+/// A `PostToolUse` payload naming an edited file.
+fn edit_payload(file: &Path) -> String {
+    serde_json::json!({
+        "tool_input": { "file_path": file.display().to_string() },
+    })
+    .to_string()
+}
+
+// ---------------------------------------------------------------------------
+// Contract 1: read, never repair.
+// ---------------------------------------------------------------------------
+
 /// Asserted over the body rather than by running it, because the failure this
-/// contract prevents is a writing verb *reachable* on some branch, not one on
-/// the branch a test happened to take.
+/// contract prevents is a writing verb **reachable on some branch**, not one
+/// on the branch a test happened to take. Running the hook can only show that
+/// one path did not write.
 #[test]
-fn contract_1_the_hook_invokes_no_writing_subcommand() {
-    let body = hook_body();
-    // A shell script gives a scanner no clean way to tell an executed word
-    // from one inside a message, and a scan that cannot tell them apart gets
-    // reworded around rather than fixed. So this asserts over invocations of
-    // the binary specifically, which is what the contract is actually about.
-    let code: Vec<&str> = body
-        .lines()
-        .filter(|l| !l.trim_start().starts_with('#'))
-        .collect();
-
-    // An invocation is the binary in command position. `[ -x "$bin" ]` names
-    // it without running it, and a filter that cannot tell those apart is the
-    // same blunt scan in a different shape.
-    let verb_of = |line: &str| -> Option<String> {
-        let mut l = line.trim();
-        l = l.strip_prefix("if ").unwrap_or(l);
-        l = l.strip_prefix("! ").unwrap_or(l);
-        let rest = l.strip_prefix("\"$bin\" ")?;
-        rest.split_whitespace().next().map(str::to_string)
-    };
-    let verbs: Vec<String> = code.iter().filter_map(|l| verb_of(l)).collect();
-    assert!(!verbs.is_empty(), "the hook invokes nothing at all");
-    for verb in &verbs {
-        assert!(
-            matches!(verb.as_str(), "check" | "lint" | "\"$verb\""),
-            "the gate hook invokes the binary with something other than a read: {verb}"
-        );
-    }
-
-    // The probe loop is the one invocation whose verb is a variable, so the
-    // values it takes are part of the same assertion.
-    assert!(
-        code.iter()
-            .any(|l| l.trim() == "for verb in check lint; do"),
-        "the probe loop no longer enumerates exactly the two reads"
-    );
-
-    // And nothing reaches a second binary by bare name, which would be both a
-    // writing risk and contract 2's failure.
-    for line in &code {
-        let mut l = line.trim();
-        l = l.strip_prefix("if ").unwrap_or(l);
-        l = l.strip_prefix("! ").unwrap_or(l);
-        assert!(
-            !l.starts_with("spec-spine"),
-            "the gate hook runs spec-spine by bare name, outside the resolution order: {line}"
-        );
-    }
-}
-
-/// Contract 2, first position: `$SPEC_SPINE_BIN` wins over everything.
-#[test]
-fn contract_2_spec_spine_bin_is_preferred() {
-    let f = Fixture::new();
-    f.stub(&f.path_dir.join("spec-spine"), "path", 0, true);
-    f.stub(&f.root.join("target/release/spec-spine"), "local", 0, true);
-    let explicit = f.root.join("explicit-spec-spine");
-    f.stub(&explicit, "explicit", 0, true);
-
-    let out = f.run(&[("SPEC_SPINE_BIN", explicit.to_str().unwrap())]);
-    assert!(out.status.success(), "{}", stderr(&out));
-    f.assert_only_ran("explicit");
-}
-
-/// Contract 2, second position: the target repository's own build beats PATH.
-///
-/// This is the half the shipped hook used to get wrong, and it is the one that
-/// bites: a bare name is whichever copy the last unrelated project installed.
-#[test]
-fn contract_2_the_repositorys_own_build_beats_path() {
-    let f = Fixture::new();
-    f.stub(&f.path_dir.join("spec-spine"), "path", 0, true);
-    f.stub(&f.root.join("target/release/spec-spine"), "local", 0, true);
-
-    let out = f.run(&[]);
-    assert!(out.status.success(), "{}", stderr(&out));
-    f.assert_only_ran("local");
-}
-
-/// Contract 2, third position: PATH still keeps an adopter working.
-#[test]
-fn contract_2_path_is_the_fallback_and_still_works() {
-    let f = Fixture::new();
-    f.stub(&f.path_dir.join("spec-spine"), "path", 0, true);
-
-    let out = f.run(&[]);
-    assert!(out.status.success(), "{}", stderr(&out));
-    f.assert_only_ran("path");
-}
-
-/// Contract 3: the target comes from the command, not from the session.
-#[test]
-fn contract_3_the_target_repository_comes_from_the_command() {
-    let f = Fixture::new();
-    f.stub(&f.root.join("target/release/spec-spine"), "local", 0, true);
-
-    // `run` deliberately sets cwd to an unrelated directory and names the
-    // repository as the argument. If the script resolved from the session it
-    // would find no Statecraft project and exit 0 having run nothing.
-    let out = f.run(&[]);
-    assert!(out.status.success(), "{}", stderr(&out));
-    assert!(
-        !f.witness().is_empty(),
-        "the hook resolved from the session and governed nothing"
-    );
-}
-
-/// Contract 4: each of `check`'s four answers is read as itself.
-#[test]
-fn contract_4_each_verdict_is_read_as_itself() {
-    // (answer from check, exit code the gate must produce, phrase it must name)
-    let cases = [
-        (0, 0, ""),
-        (1, 1, "does not validate"),
-        (2, 2, "stale"),
-        (3, 3, "was not performed"),
-    ];
-    for (answer, expected, phrase) in cases {
-        let f = Fixture::new();
-        f.stub(&f.path_dir.join("spec-spine"), "path", answer, true);
-        let out = f.run(&[]);
-        assert_eq!(
-            out.status.code(),
-            Some(expected),
-            "check answered {answer}: {}",
-            stderr(&out)
-        );
-        if !phrase.is_empty() {
-            assert!(
-                stderr(&out).contains(phrase),
-                "check answered {answer} and the gate did not name it: {}",
-                stderr(&out)
-            );
+fn contract_1_no_hook_invokes_a_writing_subcommand() {
+    // The verbs that write. `compile` and `index` are the two that regenerate
+    // the derived tree; the rest change the corpus or the forge.
+    const WRITING: [&str; 4] = ["compile", "index", "init", "ratify"];
+    for file in ALL {
+        let body = hook_body(file);
+        for line in body.lines() {
+            let code = line.split('#').next().unwrap_or("");
+            for verb in WRITING {
+                // An INVOCATION, not advice. These hooks legitimately tell a
+                // session to `run spec-spine compile` in a report line; what
+                // contract 1 forbids is the hook running it. Every invocation
+                // in these scripts goes through the resolved binary `$sc`, so
+                // that is what is matched, plus a bare name in command
+                // position for a hook that skipped the resolution entirely.
+                let through_sc = code.contains(&format!("\"$sc\" {verb}"))
+                    || code.contains(&format!("\"$sc\" --repo \"$root\" {verb}"));
+                let bare = code.trim_start().starts_with(&format!("spec-spine {verb}"))
+                    || code.contains(&format!("$(spec-spine {verb}"))
+                    || code.contains(&format!("; spec-spine {verb}"));
+                if through_sc || bare {
+                    // The single sanctioned exception: a `compile` after an
+                    // edit to a spec.md, where the session is live and can
+                    // commit the result.
+                    let sanctioned = file == POST_EDIT && verb == "compile";
+                    assert!(
+                        sanctioned,
+                        "{file} invokes the writing verb `{verb}`: {line}"
+                    );
+                }
+            }
         }
     }
 }
 
-/// Contract 5: a binary older than the verb is not a stale tree.
+/// The sanctioned exception is exactly one verb, on exactly one trigger.
 ///
-/// The stub answers 2 to everything, which is what `clap` spends on an unknown
-/// subcommand and also what a stale tree answers. Without the `--help` probe
-/// the two are indistinguishable, and the session is sent to regenerate shards
-/// that were already correct.
+/// Not "post-edit may write": post-edit may recompile after a **spec edit**,
+/// and this asserts the guard is the spec path rather than any edit at all.
 #[test]
-fn contract_5_a_missing_verb_is_not_reported_as_stale() {
-    let f = Fixture::new();
-    f.stub(&f.path_dir.join("spec-spine"), "path", 2, false);
+fn contract_1_the_sanctioned_compile_is_guarded_on_a_spec_edit() {
+    let fixture = Fixture::new();
+    let sc = fixture.root.join("target/release/spec-spine");
+    fixture.stub(&sc, "repo-build", 0, true);
 
-    let out = f.run(&[]);
-    assert!(!out.status.success());
-    let err = stderr(&out);
+    // An ordinary source edit: nothing is regenerated.
+    let src = fixture.root.join("src/lib.rs");
+    std::fs::create_dir_all(src.parent().unwrap()).unwrap();
+    std::fs::write(&src, "// x\n").unwrap();
+    let out = fixture.run_payload(POST_EDIT, &edit_payload(&src), &[]);
     assert!(
-        err.contains("does not carry the verb"),
-        "a missing verb was not named: {err}"
+        !text(&out).contains("recompiled"),
+        "an ordinary edit triggered a regeneration: {}",
+        text(&out)
     );
+
+    // A spec edit: the one sanctioned write.
+    let spec = fixture.root.join("specs/000-x/spec.md");
+    let out = fixture.run_payload(POST_EDIT, &edit_payload(&spec), &[]);
     assert!(
-        !err.contains("stale"),
-        "a missing verb was reported as a stale tree: {err}"
+        text(&out).contains("recompiled"),
+        "the sanctioned compile did not run after a spec edit: {}",
+        text(&out)
     );
 }
 
-/// Contract 6, and its boundary: a gate that did not run refuses, but a script
-/// that is not a gate here at all is inert.
+// ---------------------------------------------------------------------------
+// Contract 2: resolve the binary in order.
+// ---------------------------------------------------------------------------
+
+/// `$SPEC_SPINE_BIN` wins over everything.
 #[test]
-fn contract_6_a_check_that_did_not_run_is_not_green() {
-    let f = Fixture::new();
-    // No stub anywhere: nothing on PATH, no local build, no SPEC_SPINE_BIN.
-    let out = f.run(&[]);
-    assert_eq!(out.status.code(), Some(1), "{}", stderr(&out));
-    assert!(
-        stderr(&out).contains("no spec-spine binary"),
-        "{}",
-        stderr(&out)
-    );
+fn contract_2_spec_spine_bin_is_preferred() {
+    for file in [SESSION_START, STOP] {
+        let fixture = Fixture::new();
+        let named = fixture.root.join("named-spec-spine");
+        fixture.stub(&named, "named", 0, true);
+        fixture.stub(
+            &fixture.root.join("target/release/spec-spine"),
+            "repo",
+            0,
+            true,
+        );
+        fixture.stub(&fixture.path_dir.join("spec-spine"), "path", 0, true);
+
+        fixture.run_project(file, &[("SPEC_SPINE_BIN", &named.display().to_string())]);
+        fixture.assert_only_ran("named");
+    }
 }
 
-/// Section 3.14 rule 3: inert outside a Statecraft project, which is what makes
-/// it safe on a path shared with other work. Not the same as contract 6.
+/// The repository's own release build beats `PATH`.
+///
+/// This is the half a shipped hook is most likely to get wrong, and it is the
+/// one that decides whether a repository is governed by the binary it builds
+/// or by whichever copy an unrelated project installed last.
 #[test]
-fn outside_a_statecraft_project_the_hook_is_inert() {
-    let f = Fixture::new();
-    f.stub(&f.path_dir.join("spec-spine"), "path", 1, true);
-    std::fs::remove_file(f.root.join(".statecraft/environment.json")).unwrap();
+fn contract_2_the_repositorys_own_build_beats_path() {
+    for file in [SESSION_START, STOP] {
+        let fixture = Fixture::new();
+        fixture.stub(
+            &fixture.root.join("target/release/spec-spine"),
+            "repo",
+            0,
+            true,
+        );
+        fixture.stub(&fixture.path_dir.join("spec-spine"), "path", 0, true);
 
-    let out = f.run(&[]);
-    assert!(
-        out.status.success(),
-        "a non-Statecraft repository was refused: {}",
-        stderr(&out)
-    );
-    assert!(
-        f.witness().is_empty(),
-        "the hook ran a verb outside a Statecraft project"
-    );
+        fixture.run_project(file, &[]);
+        fixture.assert_only_ran("repo");
+    }
 }
 
-/// Section 3.23's read-only skill assertion: the shipped skill invokes no
-/// writing verb.
+/// `PATH` is the fallback and still works, which is what keeps an adopter on
+/// the published CLI working.
 #[test]
-fn the_shipped_skill_is_read_only() {
-    let skill = statecraft_home::harness::shipped()
-        .into_iter()
-        .find(|f| f.rel_path.starts_with("skills/"))
-        .expect("the harness ships a skill");
-    for writing in [
-        "env apply",
-        "home apply",
-        "project arm",
-        "run start",
-        "init",
-    ] {
+fn contract_2_path_is_the_fallback_and_still_works() {
+    for file in [SESSION_START, STOP] {
+        let fixture = Fixture::new();
+        fixture.stub(&fixture.path_dir.join("spec-spine"), "path", 0, true);
+
+        fixture.run_project(file, &[]);
+        fixture.assert_only_ran("path");
+    }
+}
+
+/// The post-edit hook resolves against the repository the edited file is in.
+#[test]
+fn contract_2_post_edit_resolves_against_the_edited_repository() {
+    let fixture = Fixture::new();
+    fixture.stub(
+        &fixture.root.join("target/release/spec-spine"),
+        "repo",
+        0,
+        true,
+    );
+    fixture.stub(&fixture.path_dir.join("spec-spine"), "path", 0, true);
+
+    let spec = fixture.root.join("specs/000-x/spec.md");
+    fixture.run_payload(POST_EDIT, &edit_payload(&spec), &[]);
+    fixture.assert_only_ran("repo");
+}
+
+/// A binary that is simply absent is reported, not crashed on.
+#[test]
+fn contract_2_a_missing_binary_is_reported_and_is_not_a_crash() {
+    for file in [SESSION_START, STOP] {
+        let fixture = Fixture::new();
+        let out = fixture.run_project(file, &[]);
         assert!(
-            !skill.contents.contains(writing),
-            "{} invokes a writing verb ({writing})",
-            skill.rel_path
+            out.status.success(),
+            "{file} failed when the binary was absent"
+        );
+        assert!(
+            text(&out).contains("absent") || text(&out).contains("skipped"),
+            "{file} did not say the binary was missing: {}",
+            text(&out)
         );
     }
+}
+
+// ---------------------------------------------------------------------------
+// Contract 3: resolve the target repository from the command, not the session.
+// ---------------------------------------------------------------------------
+
+/// A multi-repository session acts in whichever tree the command names.
+#[test]
+fn contract_3_the_target_repository_comes_from_the_command() {
+    let fixture = Fixture::new();
+    // A second managed repository, which is the one the command will name.
+    let other = fixture.root.parent().unwrap().join("other");
+    std::fs::create_dir_all(other.join(".statecraft")).unwrap();
+    std::fs::write(other.join(".statecraft/environment.json"), "{}").unwrap();
+    std::fs::create_dir_all(other.join("specs")).unwrap();
+    let out = Command::new("git")
+        .args(["init", "--quiet", "--initial-branch=main"])
+        .current_dir(&other)
+        .output()
+        .unwrap();
+    assert!(out.status.success());
+
+    // The stub lives only in the OTHER repository, so if the hook ran it, the
+    // hook resolved the target from the command rather than from the session.
+    fixture.stub(&other.join("target/release/spec-spine"), "other", 0, true);
+    fixture.stub(
+        &fixture.root.join("target/release/spec-spine"),
+        "session",
+        0,
+        true,
+    );
+
+    let payload = bash_payload(
+        &format!("cd {} && git push origin main", other.display()),
+        &fixture.root,
+    );
+    fixture.run_payload(PRE_BASH, &payload, &[]);
+
+    let w = fixture.witness();
+    assert!(
+        !w.lines().any(|l| l == "session"),
+        "the hook governed the session's own repository rather than the one the \
+         command names: {w:?}"
+    );
+}
+
+/// An edit in a sibling checkout does not recompile this one.
+#[test]
+fn contract_3_an_edit_in_a_sibling_checkout_is_judged_there() {
+    let fixture = Fixture::new();
+    let sibling = fixture.root.parent().unwrap().join("sibling");
+    std::fs::create_dir_all(sibling.join("specs/000-y")).unwrap();
+    std::fs::write(sibling.join("specs/000-y/spec.md"), "# y\n").unwrap();
+    let out = Command::new("git")
+        .args(["init", "--quiet"])
+        .current_dir(&sibling)
+        .output()
+        .unwrap();
+    assert!(out.status.success());
+    // The sibling is NOT a Statecraft project, so the hook is inert there even
+    // though the session's own repository is one.
+    fixture.stub(
+        &fixture.root.join("target/release/spec-spine"),
+        "session",
+        0,
+        true,
+    );
+
+    let out = fixture.run_payload(
+        POST_EDIT,
+        &edit_payload(&sibling.join("specs/000-y/spec.md")),
+        &[],
+    );
+    assert!(out.status.success());
+    fixture.assert_nothing_ran();
+}
+
+// ---------------------------------------------------------------------------
+// Contract 4: read the verdict; never guess it.
+// ---------------------------------------------------------------------------
+
+/// `check` has four answers and they are not interchangeable.
+///
+/// Each row gives the stub an exit code and a report line, and asserts the
+/// hook reports the condition that code actually means. Only `2` is the one
+/// regenerating repairs, so only `2` may say so.
+#[test]
+fn contract_4_each_verdict_is_read_as_itself() {
+    let rows: [(i32, &str, &str, bool); 4] = [
+        (
+            0,
+            "spec-registry: fresh\ncodebase-index: fresh",
+            "fresh",
+            false,
+        ),
+        (
+            1,
+            "spec-registry: INVALID\ncodebase-index: INVALID",
+            "INVALID",
+            false,
+        ),
+        (
+            2,
+            "spec-registry: STALE\ncodebase-index: STALE",
+            "STALE",
+            true,
+        ),
+        (3, "", "NOT READ", false),
+    ];
+    for file in [SESSION_START, STOP] {
+        for (code, says, expect, may_advise_regenerating) in rows {
+            let fixture = Fixture::new();
+            fixture.stub_saying(
+                &fixture.path_dir.join("spec-spine"),
+                "path",
+                code,
+                true,
+                says,
+            );
+            let out = fixture.run_project(file, &[]);
+            let seen = text(&out);
+            if code == 0 {
+                // A fresh tree says nothing alarming, and above all does not
+                // send anyone to regenerate.
+                assert!(
+                    !seen.contains("compile") || !seen.contains("STALE"),
+                    "{file} reported a fresh tree as stale: {seen}"
+                );
+                continue;
+            }
+            assert!(
+                seen.contains(expect),
+                "{file} did not report exit {code} as {expect}: {seen}"
+            );
+            if !may_advise_regenerating {
+                assert!(
+                    !seen.contains("run `spec-spine compile`")
+                        && !seen.contains("run spec-spine compile"),
+                    "{file} sent a session to regenerate for exit {code}, which \
+                     regenerating does not repair: {seen}"
+                );
+            }
+        }
+    }
+}
+
+/// An unresolved claim is not staleness, and the hook says so.
+#[test]
+fn contract_4_an_unresolved_claim_is_distinguished_from_staleness() {
+    for file in [SESSION_START, STOP] {
+        let fixture = Fixture::new();
+        fixture.stub_saying(
+            &fixture.path_dir.join("spec-spine"),
+            "path",
+            2,
+            true,
+            "codebase-index: UNRESOLVED CLAIM",
+        );
+        let out = fixture.run_project(file, &[]);
+        let seen = text(&out);
+        assert!(
+            seen.contains("UNRESOLVED CLAIM"),
+            "{file} folded an unresolved claim into staleness: {seen}"
+        );
+        assert!(
+            seen.contains("regenerating does not clear") || seen.contains("not staleness"),
+            "{file} did not say regenerating will not clear it: {seen}"
+        );
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Contract 5: establish the verb before reading its exit code.
+// ---------------------------------------------------------------------------
+
+/// A binary older than the verb reports a fresh tree as stale unless the hook
+/// asks first: `clap` spends `2` on an unknown subcommand and this tool spends
+/// `2` on staleness.
+#[test]
+fn contract_5_a_missing_verb_is_not_reported_as_stale() {
+    for file in [SESSION_START, STOP] {
+        let fixture = Fixture::new();
+        fixture.stub(&fixture.path_dir.join("spec-spine"), "path", 2, false);
+        let out = fixture.run_project(file, &[]);
+        let seen = text(&out);
+        assert!(
+            !seen.contains("STALE"),
+            "{file} reported a binary older than the verb as a stale tree: {seen}"
+        );
+        // The two hooks word it differently and both are correct. What is
+        // asserted is that the report names the binary rather than the tree.
+        assert!(
+            seen.contains("predates")
+                || seen.contains("does not carry the check verb")
+                || seen.contains("rebuild")
+                || seen.contains("reinstall"),
+            "{file} did not name the real problem: {seen}"
+        );
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Contract 6: a gate whose check did not run is not green.
+// ---------------------------------------------------------------------------
+
+/// The enforcing gate refuses every non-zero code, including the ones that are
+/// not about the corpus at all.
+#[test]
+fn contract_6_an_enforcing_gate_refuses_every_non_zero_code() {
+    for code in [1, 2, 3, 7] {
+        let fixture = Fixture::new();
+        fixture.stub(
+            &fixture.root.join("target/release/spec-spine"),
+            "repo",
+            code,
+            true,
+        );
+        let payload = bash_payload("gh pr create --title x --body y", &fixture.root);
+        let out = fixture.run_payload(PRE_BASH, &payload, &[]);
+        assert!(
+            !out.status.success(),
+            "the pull-request gate allowed the operation on check exit {code}: {}",
+            text(&out)
+        );
+    }
+}
+
+/// Only `enforcing` hooks refuse. The others report and hand back.
+#[test]
+fn contract_6_only_the_enforcing_event_is_declared_enforcing() {
+    use statecraft_home::harness::ADOPTED_HOOKS;
+    let enforcing: Vec<&str> = ADOPTED_HOOKS
+        .iter()
+        .filter(|h| h.enforcing)
+        .map(|h| h.event)
+        .collect();
+    assert_eq!(
+        enforcing,
+        ["PreToolUse"],
+        "the set of enforcing events changed; section 3.23's Stop policy says \
+         an operation gate enforces and an end-of-turn event advises"
+    );
+}
+
+// ---------------------------------------------------------------------------
+// Contract 7: a branch gate resolves the protected branch.
+// ---------------------------------------------------------------------------
+
+/// The protected branch is resolved rather than assumed to be `main`.
+#[test]
+fn contract_7_the_protected_branch_is_resolved_not_assumed() {
+    let fixture = Fixture::new();
+    fixture.stub(
+        &fixture.root.join("target/release/spec-spine"),
+        "repo",
+        0,
+        true,
+    );
+
+    // A push to the branch the environment names is refused.
+    let payload = bash_payload("git push origin release", &fixture.root);
+    let out = fixture.run_payload(
+        PRE_BASH,
+        &payload,
+        &[("SPEC_SPINE_DEFAULT_BRANCH", "release")],
+    );
+    assert!(
+        !out.status.success(),
+        "a push to the declared protected branch was allowed: {}",
+        text(&out)
+    );
+
+    // And a push to `main` is not, because `main` is not this repository's
+    // protected branch. A gate that assumed `main` would refuse this one and
+    // allow the one above, which is both errors at once.
+    let payload = bash_payload("git push origin main", &fixture.root);
+    let out = fixture.run_payload(
+        PRE_BASH,
+        &payload,
+        &[("SPEC_SPINE_DEFAULT_BRANCH", "release")],
+    );
+    assert!(
+        out.status.success(),
+        "a push to an unprotected branch was refused because the gate assumed \
+         `main`: {}",
+        text(&out)
+    );
+}
+
+/// The gate is anchored on the command that invokes the verb, so text that
+/// merely contains the words still runs.
+#[test]
+fn contract_7_command_text_that_merely_mentions_a_push_is_not_a_push() {
+    let fixture = Fixture::new();
+    fixture.stub(
+        &fixture.root.join("target/release/spec-spine"),
+        "repo",
+        0,
+        true,
+    );
+    for command in [
+        "grep -rn 'git push origin main' docs/",
+        "echo 'remember to git push origin main later'",
+    ] {
+        let payload = bash_payload(command, &fixture.root);
+        let out = fixture.run_payload(PRE_BASH, &payload, &[("SPEC_SPINE_DEFAULT_BRANCH", "main")]);
+        assert!(
+            out.status.success(),
+            "a command that only mentions a push was refused: {command}: {}",
+            text(&out)
+        );
+    }
+}
+
+// ---------------------------------------------------------------------------
+// The Stop policy, adopted 2026-09-21.
+// ---------------------------------------------------------------------------
+
+/// `Stop` is advisory: it reports, and it never blocks.
+///
+/// Every answer `check` can give, including the ones that are refusals for a
+/// gate. A session that has something to hand back hands it back, and a stale
+/// derived tree is a fact the handback carries rather than a reason to
+/// withhold it.
+#[test]
+fn stop_policy_is_advisory_for_every_answer_check_can_give() {
+    for (code, says) in [
+        (0, "spec-registry: fresh"),
+        (1, ""),
+        (2, "spec-registry: STALE"),
+        (2, "codebase-index: UNRESOLVED CLAIM"),
+        (3, ""),
+        (9, ""),
+    ] {
+        let fixture = Fixture::new();
+        fixture.stub_saying(
+            &fixture.path_dir.join("spec-spine"),
+            "path",
+            code,
+            true,
+            says,
+        );
+        let out = fixture.run_project(STOP, &[]);
+        assert!(
+            out.status.success(),
+            "Stop blocked on check exit {code} ({says:?}), which would cost the \
+             handback that says why the work failed: {}",
+            text(&out)
+        );
+    }
+}
+
+/// And it is advisory when the read could not be performed at all.
+#[test]
+fn stop_policy_does_not_block_when_the_binary_is_absent() {
+    let fixture = Fixture::new();
+    let out = fixture.run_project(STOP, &[]);
+    assert!(
+        out.status.success(),
+        "Stop blocked because it could not find a binary: {}",
+        text(&out)
+    );
+}
+
+/// Advisory is not silent. Every non-zero answer is reported accurately.
+#[test]
+fn stop_policy_reports_accurately_rather_than_passing_quietly() {
+    for (code, says, expect) in [
+        (1, "", "INVALID"),
+        (2, "spec-registry: STALE", "STALE"),
+        (3, "", "NOT READ"),
+        (9, "", "UNRECOGNISED"),
+    ] {
+        let fixture = Fixture::new();
+        fixture.stub_saying(
+            &fixture.path_dir.join("spec-spine"),
+            "path",
+            code,
+            true,
+            says,
+        );
+        let out = fixture.run_project(STOP, &[]);
+        let seen = text(&out);
+        assert!(
+            seen.contains(expect),
+            "Stop exited 0 without reporting exit {code} as {expect}, which is \
+             advisory collapsed into silent: {seen}"
+        );
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Section 3.14 rule 3: gated to a Statecraft project.
+// ---------------------------------------------------------------------------
+
+/// Outside a Statecraft project every delivered behavior is inert.
+///
+/// The manifest is the gate, not the presence of a `specs/` directory: the
+/// fixture below is a git repository holding a spec corpus, and an unrelated
+/// corpus is not this product's to report on.
+#[test]
+fn outside_a_statecraft_project_every_hook_is_inert() {
+    for file in ALL {
+        let fixture = Fixture::unmanaged();
+        fixture.stub(
+            &fixture.root.join("target/release/spec-spine"),
+            "repo",
+            2,
+            true,
+        );
+        fixture.stub(&fixture.path_dir.join("spec-spine"), "path", 2, true);
+
+        let out = match file {
+            POST_EDIT => fixture.run_payload(
+                file,
+                &edit_payload(&fixture.root.join("specs/000-x/spec.md")),
+                &[],
+            ),
+            PRE_BASH => fixture.run_payload(
+                file,
+                &bash_payload("git push origin main", &fixture.root),
+                &[("SPEC_SPINE_DEFAULT_BRANCH", "main")],
+            ),
+            _ => fixture.run_project(file, &[]),
+        };
+        assert!(
+            out.status.success(),
+            "{file} refused an operation in an unrelated repository: {}",
+            text(&out)
+        );
+        fixture.assert_nothing_ran();
+    }
+}
+
+/// And inside one, the same hooks are not inert, so the test above is not
+/// passing because the fixture is broken.
+#[test]
+fn inside_a_statecraft_project_the_hooks_do_run() {
+    for file in [SESSION_START, STOP] {
+        let fixture = Fixture::new();
+        fixture.stub(&fixture.path_dir.join("spec-spine"), "path", 0, true);
+        fixture.run_project(file, &[]);
+        fixture.assert_only_ran("path");
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Duplicate registrations.
+// ---------------------------------------------------------------------------
+
+/// A hook registered twice runs twice and is still correct.
+///
+/// A user who already registers a shipped script keeps their registration
+/// (section 3.28), so a session can genuinely run the same body twice on one
+/// event. It must be idempotent in the only sense that matters here: reading
+/// twice reports twice and changes nothing.
+#[test]
+fn a_duplicate_registration_is_harmless_because_the_hook_only_reads() {
+    let fixture = Fixture::new();
+    fixture.stub(&fixture.path_dir.join("spec-spine"), "path", 0, true);
+    let first = fixture.run_project(SESSION_START, &[]);
+    let second = fixture.run_project(SESSION_START, &[]);
+    assert!(first.status.success() && second.status.success());
+    assert_eq!(
+        text(&first),
+        text(&second),
+        "a second run of the same hook answered differently"
+    );
 }

@@ -96,7 +96,7 @@ pub fn revision_of(files: &[HarnessFile]) -> Revision {
 /// not that it is a large one, and every file here has to earn the fact that it
 /// is delivered into an operator's agent home.
 pub fn shipped() -> Vec<HarnessFile> {
-    vec![
+    let mut files = vec![
         HarnessFile {
             rel_path: "rules/statecraft-governed-work.md".to_string(),
             contents: RULE_GOVERNED_WORK.to_string(),
@@ -113,17 +113,152 @@ pub fn shipped() -> Vec<HarnessFile> {
             executable: false,
         },
         HarnessFile {
-            rel_path: "hooks/statecraft-gate.sh".to_string(),
-            contents: HOOK_GATE.to_string(),
-            executable: true,
-        },
-        HarnessFile {
             rel_path: "adapters/claude-code.md".to_string(),
             contents: ADAPTER_CLAUDE_CODE.to_string(),
             executable: false,
         },
-    ]
+    ];
+    files.extend(ADOPTED_SKILLS.iter().map(|(name, contents)| HarnessFile {
+        rel_path: format!("skills/statecraft-{name}/SKILL.md"),
+        contents: (*contents).to_string(),
+        executable: false,
+    }));
+    files.extend(ADOPTED_AGENTS.iter().map(|(name, contents)| HarnessFile {
+        rel_path: format!("agents/statecraft-{name}.md"),
+        contents: (*contents).to_string(),
+        executable: false,
+    }));
+    files.extend(ADOPTED_HOOKS.iter().map(|hook| HarnessFile {
+        rel_path: format!("hooks/{}", hook.file),
+        contents: hook.contents.to_string(),
+        executable: true,
+    }));
+    files
 }
+
+/// The ten skills the owner adopted on 2026-09-21.
+///
+/// Spec 002 §3.23's inventory, delivered under Statecraft-namespaced names,
+/// which is §3.14 rule 2. Each file's own front matter carries the
+/// Statecraft-project gate of §3.14 rule 3, so a session choosing a skill sees
+/// the gate before it reads the body.
+///
+/// Held as files rather than as string literals in this module: they are 1900
+/// lines of authored prose, they are reviewed as prose, and a diff against the
+/// source they were adopted from is only legible while they are files.
+pub const ADOPTED_SKILLS: [(&str, &str); 10] = [
+    (
+        "prime",
+        include_str!("../harness/skills/statecraft-prime/SKILL.md"),
+    ),
+    (
+        "next",
+        include_str!("../harness/skills/statecraft-next/SKILL.md"),
+    ),
+    (
+        "build",
+        include_str!("../harness/skills/statecraft-build/SKILL.md"),
+    ),
+    (
+        "verify",
+        include_str!("../harness/skills/statecraft-verify/SKILL.md"),
+    ),
+    (
+        "ship",
+        include_str!("../harness/skills/statecraft-ship/SKILL.md"),
+    ),
+    (
+        "shepherd",
+        include_str!("../harness/skills/statecraft-shepherd/SKILL.md"),
+    ),
+    (
+        "spec",
+        include_str!("../harness/skills/statecraft-spec/SKILL.md"),
+    ),
+    (
+        "commit",
+        include_str!("../harness/skills/statecraft-commit/SKILL.md"),
+    ),
+    (
+        "code-review",
+        include_str!("../harness/skills/statecraft-code-review/SKILL.md"),
+    ),
+    (
+        "setup",
+        include_str!("../harness/skills/statecraft-setup/SKILL.md"),
+    ),
+];
+
+/// The four agents the owner adopted on 2026-09-21.
+pub const ADOPTED_AGENTS: [(&str, &str); 4] = [
+    (
+        "architect",
+        include_str!("../harness/agents/statecraft-architect.md"),
+    ),
+    (
+        "explorer",
+        include_str!("../harness/agents/statecraft-explorer.md"),
+    ),
+    (
+        "implementer",
+        include_str!("../harness/agents/statecraft-implementer.md"),
+    ),
+    (
+        "reviewer",
+        include_str!("../harness/agents/statecraft-reviewer.md"),
+    ),
+];
+
+/// One adopted event behavior: the harness event, the matcher, and the script.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct AdoptedHook {
+    /// The harness event it registers on.
+    pub event: &'static str,
+    /// The matcher the registration carries.
+    pub matcher: &'static str,
+    /// The file name under `hooks/`.
+    pub file: &'static str,
+    /// The script.
+    pub contents: &'static str,
+    /// Whether this event **enforces** or only **advises**.
+    ///
+    /// Spec 002 §3.23, as the owner settled it on 2026-09-21. An enforcing
+    /// operation gate refuses a failed or unavailable check; an end-of-turn
+    /// event reports what the check answered and never withholds a handback.
+    pub enforcing: bool,
+}
+
+/// The four event behaviors the owner adopted on 2026-09-21.
+pub const ADOPTED_HOOKS: [AdoptedHook; 4] = [
+    AdoptedHook {
+        event: "SessionStart",
+        matcher: "startup|resume|clear|compact",
+        file: "statecraft-session-start.sh",
+        contents: include_str!("../harness/hooks/statecraft-session-start.sh"),
+        enforcing: false,
+    },
+    AdoptedHook {
+        event: "PostToolUse",
+        matcher: "Edit|Write",
+        file: "statecraft-post-edit.sh",
+        contents: include_str!("../harness/hooks/statecraft-post-edit.sh"),
+        enforcing: false,
+    },
+    AdoptedHook {
+        event: "PreToolUse",
+        matcher: "Bash",
+        file: "statecraft-pre-bash.sh",
+        contents: include_str!("../harness/hooks/statecraft-pre-bash.sh"),
+        enforcing: true,
+    },
+    AdoptedHook {
+        event: "Stop",
+        matcher: "*",
+        file: "statecraft-stop.sh",
+        contents: include_str!("../harness/hooks/statecraft-stop.sh"),
+        enforcing: false,
+    },
+];
 
 /// What an install did.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -267,109 +402,6 @@ a completion the child declared as an acceptance: those are separate records and
 the product keeps them separate on purpose.
 "#;
 
-const HOOK_GATE: &str = r#"#!/bin/sh
-# Statecraft: the project gate, as a hook an operator may wire up themselves.
-#
-# Applies only inside a Statecraft project: a repository holding
-# `.statecraft/environment.json`. Outside one this exits 0 and does nothing,
-# which is what makes it safe to place on a path shared with other work.
-#
-# This product does NOT wire this hook into an agent's settings. Doing so would
-# mean rewriting a user's own configuration file, and spec 002 section 3.14
-# refuses that. Install it yourself if you want it.
-#
-# Spec 002 section 3.23 states the seven contracts this script is held to, and
-# crates/statecraft-home/tests/harness_hooks.rs extracts this body and runs it
-# as a program against each one. The numbered comments below name the contract
-# the lines under them exist for.
-#
-# Usage: statecraft-gate.sh [target-directory]
-set -eu
-
-# Contract 3: resolve the target repository from the command, not the session.
-# A caller that knows which tree it is acting on names it, and only a caller
-# with nothing to name falls back to the working directory. A multi-repository
-# session governs whichever tree the command named.
-target=${1:-.}
-root=$(git -C "$target" rev-parse --show-toplevel 2>/dev/null || true)
-
-# Not a repository, or not a Statecraft project. This is not a gate here at all,
-# so it is inert rather than refusing: section 3.14 rule 3. That is a different
-# thing from contract 6 below, which is about a gate that exists and did not run.
-[ -n "$root" ] || exit 0
-[ -f "$root/.statecraft/environment.json" ] || exit 0
-
-# Contract 2: $SPEC_SPINE_BIN, then the target repository's own build, then
-# PATH. A repository that builds its own binary must be governed by the one it
-# builds; the PATH fallback keeps an adopter on the published CLI working. A
-# bare name resolved from PATH alone is whichever copy the last unrelated
-# project on the machine installed.
-if [ -n "${SPEC_SPINE_BIN:-}" ]; then
-  bin=$SPEC_SPINE_BIN
-elif [ -x "$root/target/release/spec-spine" ]; then
-  bin=$root/target/release/spec-spine
-else
-  bin=$(command -v spec-spine 2>/dev/null || true)
-fi
-
-# Contract 6: a gate whose check did not run is not green. Inside a Statecraft
-# project, a binary this script cannot execute refuses. It does not pass.
-if [ -z "$bin" ] || [ ! -x "$bin" ]; then
-  echo "statecraft-gate: no spec-spine binary (SPEC_SPINE_BIN, target/release, PATH)" >&2
-  exit 1
-fi
-
-# Contract 5: establish the verb before reading its exit code. clap also spends
-# 2 on an unknown subcommand, so without this a binary older than the verb
-# reports a fresh tree as stale and sends the session to regenerate shards that
-# were already correct. The answer to a missing verb is a refusal naming the
-# binary, never a verdict about the tree.
-for verb in check lint; do
-  if ! "$bin" "$verb" --help >/dev/null 2>&1; then
-    echo "statecraft-gate: $bin does not carry the verb '$verb'; that is not a verdict about the tree" >&2
-    exit 1
-  fi
-done
-
-cd "$root"
-
-# Contract 1: read, never repair. Both verbs below are reads, and no writing
-# subcommand appears anywhere in this script. A hook fires where it cannot
-# commit what it regenerated, so a writing hook leaves the derived tree dirty;
-# an orchestrator that refuses to start on a dirty tree then never starts.
-#
-# Contract 4: read the verdict, never guess it. The four answers are not
-# interchangeable, and only one of them is repaired by regenerating.
-code=0
-"$bin" check --fail-on-warn || code=$?
-case $code in
-  0) ;;
-  1)
-    echo "statecraft-gate: the corpus does not validate; re-indexing cannot cure it" >&2
-    exit 1
-    ;;
-  2)
-    echo "statecraft-gate: stale; refresh and commit the shards with the change that staled them" >&2
-    exit 2
-    ;;
-  3)
-    echo "statecraft-gate: the read was not performed; that is not a verdict" >&2
-    exit 3
-    ;;
-  *)
-    echo "statecraft-gate: check answered $code, which this gate does not know how to read" >&2
-    exit "$code"
-    ;;
-esac
-
-code=0
-"$bin" lint --fail-on-warn || code=$?
-if [ "$code" -ne 0 ]; then
-  echo "statecraft-gate: lint refused with $code" >&2
-  exit "$code"
-fi
-"#;
-
 const ADAPTER_CLAUDE_CODE: &str = r#"# Adapter template: claude-code
 
 Applies only inside a Statecraft project: a repository holding
@@ -477,13 +509,19 @@ mod tests {
 
     #[cfg(unix)]
     #[test]
-    fn a_script_arrives_executable() {
+    fn every_script_arrives_executable() {
         use std::os::unix::fs::PermissionsExt;
         let dir = tempfile::tempdir().unwrap();
         let layout = Layout::new(dir.path());
         let installed = install(&layout, &shipped()).unwrap();
-        let script = installed.root.join("hooks/statecraft-gate.sh");
-        let mode = std::fs::metadata(&script).unwrap().permissions().mode();
-        assert_eq!(mode & 0o111, 0o111);
+        assert_eq!(ADOPTED_HOOKS.len(), 4);
+        for hook in ADOPTED_HOOKS {
+            let script = installed.root.join("hooks").join(hook.file);
+            let mode = std::fs::metadata(&script)
+                .unwrap_or_else(|e| panic!("{} was not installed: {e}", hook.file))
+                .permissions()
+                .mode();
+            assert_eq!(mode & 0o111, 0o111, "{} is not executable", hook.file);
+        }
     }
 }

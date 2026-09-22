@@ -65,6 +65,7 @@ pub mod producer;
 pub mod project;
 pub mod resolved;
 pub mod service;
+pub mod session;
 pub mod settings;
 pub mod team;
 
