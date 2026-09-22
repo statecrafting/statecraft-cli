@@ -1116,7 +1116,8 @@ mod tests {
 
         let original: serde_json::Value =
             serde_json::from_slice(&std::fs::read(&path).unwrap()).unwrap();
-        let edits: [(&str, fn(&mut serde_json::Value)); 3] = [
+        type Edit = (&'static str, fn(&mut serde_json::Value));
+        let edits: [Edit; 3] = [
             ("the launch stripped, as a pre-3.30 record", |v| {
                 v["observation"]["evidence"]["refusal"]
                     .as_object_mut()

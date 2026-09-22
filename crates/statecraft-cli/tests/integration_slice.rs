@@ -392,6 +392,7 @@ fn the_grown_command_tree_still_has_no_verb_that_publishes() {
     // is a deliberate edit here. Fifteen when the work, run and accept
     // bindings landed; twelve more with the managed environment; five more
     // with spec 006 section 3.11.1, which made 002's harness, payload and
-    // startup acts reachable.
-    assert_eq!(statecraft_cli::commands::Verb::all().len(), 32);
+    // startup acts reachable; one more with section 3.11.2's `startup capture`,
+    // the launch that binds a qualification control to its settings.
+    assert_eq!(statecraft_cli::commands::Verb::all().len(), 33);
 }
