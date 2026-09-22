@@ -37,11 +37,23 @@ set -eu
 [ "$7" = --settings ]
 settings=$8
 [ -f "$settings" ] && [ ! -L "$settings" ]
-/bin/ls -ln "$settings" > observed-mode
 [ "${USER+x}" != x ] && [ "${HOME+x}" != x ]
+printf '%s' "$settings" > observed-path
+# The deadline path. The child hangs from here on and backgrounds a
+# descendant that holds its output pipe, so the group kill is what ends both.
+# Nothing the deadline test asserts depends on this branch being reached by any
+# particular time: the product promises a deadline measured from spawn, not
+# that a child is scheduled inside it. The trace says whether it was reached,
+# for a failure message, and is never a precondition.
+if [ -f hang ]; then
+  echo entered >> trace
+  /bin/sleep 300 &
+  echo $! > descendant
+  exec /bin/sleep 300
+fi
+/bin/ls -ln "$settings" > observed-mode
 /bin/cat "$settings" > observed-settings
 /usr/bin/cmp expected-settings observed-settings
-printf '%s' "$settings" > observed-path
 printf '%s\n' "$@" > observed-args
 if [ -f concurrent ]; then
   : > ready
@@ -59,12 +71,6 @@ fi
 # It does not remove every wait a stray descriptor can cause.
 /bin/cat > observed-prompt
 /bin/cat stream.jsonl
-if [ -f hang ]; then
-  /bin/sleep 0.1
-  /usr/bin/cmp "$settings" expected-settings
-  : > settings-after-terminal
-  /bin/sleep 30
-fi
 if [ -f obstruct-cleanup ]; then
   /bin/rm "$settings"
   /bin/mkdir "$settings"
@@ -214,17 +220,93 @@ fn concurrent_attempts_keep_independent_settings_until_both_children_read_them()
     assert_eq!(second.supervised.outcome, Outcome::Refused);
 }
 
+/// The deadline, the kill and the cleanup, through this crate's execution path.
+///
+/// Spec 004 section 3.5 case 3, with the contract spec 002's 2026-09-22 entry
+/// records. The deadline is five seconds and runs from `spawn`, as the product's
+/// does. What is asserted holds whether or not the child was ever scheduled
+/// inside those five seconds, because the product does not promise that it
+/// would be:
+///
+/// 1. supervision ended **no earlier** than the deadline, so a child that
+///    exited early fails rather than passing as a timeout;
+/// 2. it ended well before the child's own 300-second hang, so it was not held
+///    by the process it supervises. The 60-second bound separates that defect
+///    from the latency of the `kill` the supervisor spawns;
+/// 3. the attempt is `interrupted`, nothing in the group survived, and a
+///    descendant the child did start is dead by its process id;
+/// 4. the workspace's own settings are untouched, and the supplied settings
+///    file, when the child lived to name it, is gone. The unconditional form of
+///    that last check is `execution`'s own
+///    `settings_are_removed_when_supervision_times_out`, where the temporary
+///    root is the test's.
+///
+/// Retention of a terminal denial across the interruption is measured where it
+/// is decided, without a race: `execution`'s
+/// `an_interruption_keeps_the_terminal_denial_the_supervisor_read` and the
+/// supervisor's `events_delivered_before_the_deadline_survive_it`.
 #[test]
-fn timeout_after_terminal_denial_cleans_settings_and_retains_evidence() {
+fn a_hung_child_is_interrupted_at_the_deadline_with_its_group_and_settings_cleaned() {
+    use std::time::{Duration, Instant};
+
     let root = tempfile::tempdir().unwrap();
-    // The one test whose subject is the deadline, so the one short budget.
     let attempt = Attempt::new(root.path(), "Bash(hang:*)", "hang", 5);
-    let started = std::time::Instant::now();
+    let started = Instant::now();
     let execution = attempt.run();
-    assert!(started.elapsed() < std::time::Duration::from_secs(10));
-    attempt.check(&execution);
-    assert!(root.path().join("settings-after-terminal").exists());
-    assert_eq!(execution.supervised.outcome, Outcome::Interrupted);
+    let elapsed = started.elapsed();
+    let trace = std::fs::read_to_string(root.path().join("trace")).unwrap_or_default();
+    let context = format!(
+        "after {elapsed:?}: outcome {:?}, stream error {:?}, survivors {:?}; the child's trace \
+         is {trace:?} (empty means it was never scheduled, which the product does not \
+         promise and nothing here requires)",
+        execution.supervised.outcome,
+        execution.supervised.stream_error,
+        execution.supervised.surviving_processes,
+    );
+
+    assert!(
+        elapsed >= Duration::from_secs(5),
+        "supervision ended before its deadline, so this is not a timeout: {context}"
+    );
+    assert!(
+        elapsed < Duration::from_secs(60),
+        "supervision was held far past its deadline by the child it supervises: {context}"
+    );
+    assert_eq!(
+        execution.supervised.outcome,
+        Outcome::Interrupted,
+        "{context}"
+    );
+    assert!(
+        execution.supervised.surviving_processes.is_none(),
+        "the group outlived the kill: {context}"
+    );
+    if let Ok(pid) = std::fs::read_to_string(root.path().join("descendant")) {
+        let alive = std::process::Command::new("kill")
+            .args(["-s", "0", pid.trim()])
+            .output()
+            .unwrap()
+            .status
+            .success();
+        assert!(
+            !alive,
+            "descendant {} escaped supervision: {context}",
+            pid.trim()
+        );
+    }
+    if let Ok(path) = std::fs::read_to_string(root.path().join("observed-path")) {
+        assert!(
+            !Path::new(&path).exists(),
+            "the settings file survived an interrupted supervision: {context}"
+        );
+    }
+    for name in ["settings.json", "settings.local.json"] {
+        assert_eq!(
+            std::fs::read_to_string(root.path().join(".claude").join(name)).unwrap(),
+            EXISTING_SETTINGS
+        );
+    }
+    assert!(execution.settings_cleanup_error.is_none(), "{context}");
 }
 
 #[test]

@@ -69,5 +69,6 @@ pub use probe::{ConstructedEnvironmentProbe, observe_provider_version};
 pub use qualification::{PairedRecord, ProviderPair, qualification_for_pair, record};
 pub use spawn::{Invocation, SETTINGS_DENY_KEY};
 pub use stream::{
-    PermissionDenial, ProviderEvent, ResultEvent, SystemEvent, map_stream, read_jsonl,
+    MessageEvent, PermissionDenial, ProviderEvent, ResultEvent, SystemEvent, ToolResult,
+    ToolResultMeta, ToolUse, map_stream, read_jsonl,
 };
