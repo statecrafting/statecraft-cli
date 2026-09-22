@@ -695,13 +695,37 @@ satisfy, whether this product authors it or adopts it from the counterparty.
 Adopting the inventory below is the owner's act; what adoption costs is stated
 here so the decision is not made by discovering the cost afterwards.
 
-**The inventory offered.** Ten skills (`prime`, `next`, `build`, `verify`,
-`ship`, `shepherd`, `spec`, `commit`, `code-review`, `setup`) and four agents
-(`architect`, `explorer`, `implementer`, `reviewer`). They are already
-**repository-invariant**: every project-specific fact lives in that project's
-`AGENTS.md`, which each skill ends by pointing at. That property was built for a
-distribution that was then cancelled, and it is what makes section 3.14's
-"maintained once, copied into no repository" viable for them unchanged.
+**The inventory offered, and adopted on 2026-09-21.** Ten skills (`prime`,
+`next`, `build`, `verify`, `ship`, `shepherd`, `spec`, `commit`, `code-review`,
+`setup`) and four agents (`architect`, `explorer`, `implementer`, `reviewer`).
+They are already **repository-invariant**: every project-specific fact lives in
+that project's `AGENTS.md`, which each skill ends by pointing at. That property
+was built for a distribution that was then cancelled, and it is what makes
+section 3.14's "maintained once, copied into no repository" viable for them
+unchanged.
+
+The owner adopted the whole inventory as Statecraft harness content, subject to
+the repository-invariant project-layer boundary above. What is delivered is a
+**Statecraft-namespaced equivalent** of each, which is section 3.14 rule 2 and
+not a new condition. The four event behaviors are adopted with it:
+`SessionStart`, `PostToolUse`, `PreToolUse` and `Stop`, including the push gate
+and the pull-request gate and the assertions each carries. `Stop` is adopted
+under the advisory policy below, not as a gate.
+
+**Adoption is delivery, and delivery is not authorization.** A delivered skill
+may be invoked; it acquires no standing permission by being delivered. Nothing
+in this adoption lets a skill publish, merge, release or execute without the
+authorization that operation independently requires, and a skill that reads as
+though it did is a skill to fix rather than an authority to infer. The deny
+floor below and section 3.14 rule 3's project gate both continue to apply to
+every adopted name.
+
+**The project layer keeps its facts.** Repository invariance is a condition on
+the delivered content, checked rather than assumed: a generic skill does not
+hardcode any project's crate layout, gate commands or workflow, and a project's
+`AGENTS.md` stays the authority for those. That applies to the counterparty's
+own repository as much as to any other, and an adopted file carrying
+spec-spine's specifics is an adoption defect.
 
 **Three assertions hold for a delivered skill**, wherever the file lands:
 
@@ -811,9 +835,11 @@ files land, or the requirements become unenforced. That cost is small and it is
 not optional, and it is the second reason section 3.22's ordering is not
 negotiable.
 
-The harness this build ships under section 3.14 is deliberately small, and
-adopting the inventory above would not change that judgment by itself: the point
-of a global harness is that it is one source, not that it is a large one.
+The harness this build ships under section 3.14 was deliberately small, and the
+adoption above does not change the judgment behind it: the point of a global
+harness is that it is one source, not that it is a large one. What grew is the
+inventory the owner decided to carry, and every added file still pays the same
+price, which is the assertion that judges it.
 
 ### 3.24 The consented settings modification
 
@@ -1496,6 +1522,30 @@ product's records claim none of the three. The distance between "supplied" and
 "complied" is exactly the distance a live-session acceptance has to cross,
 which is why §3.26 admits the third statement as a category and leaves
 producing one to a session rather than to this record.
+
+**2026-09-21, authority: the owner adopted the whole of §3.23's inventory, and
+the cost §3.23 quoted is now due.** Ten skills, four agents and four event
+behaviors, delivered under Statecraft-namespaced names. The entry above, on
+`SessionStart`, said registering the other three events remained the owner's
+adoption act. It has happened, and `Stop` arrives under the advisory policy
+rather than as a gate.
+
+§3.23 already priced this. "Whoever owns the files owns the assertions": the
+three skill assertions and the seven hook contracts are enforced in the
+counterparty's tree by two test files that a hermetic test cannot carry across,
+because neither may read `$HOME`. So the assertions are reimplemented where the
+files land or the requirements become unenforced, and there is no third
+outcome. Adoption is what converts that from a stated cost into scheduled work.
+
+Two boundaries recorded because both are easy to slide past. Adoption is
+delivery and not authorization: a delivered skill may be invoked and acquires
+no standing permission by existing, so publishing, merging, releasing and
+executing still need whatever authorizes them independently. And repository
+invariance is a condition to be checked rather than a property to be assumed.
+The inventory was written inside spec-spine's own repository; a file that
+arrives carrying that project's crate layout, gate commands or workflow is an
+adoption defect, and the check for it is not "does the word appear somewhere in
+the file".
 
 ## Verification
 
