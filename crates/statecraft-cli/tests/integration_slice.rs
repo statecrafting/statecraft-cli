@@ -390,6 +390,8 @@ fn the_grown_command_tree_still_has_no_verb_that_publishes() {
     }
     // The count is spelled out rather than derived, so a verb joining the tree
     // is a deliberate edit here. Fifteen when the work, run and accept
-    // bindings landed; twelve more with the managed environment.
-    assert_eq!(statecraft_cli::commands::Verb::all().len(), 27);
+    // bindings landed; twelve more with the managed environment; five more
+    // with spec 006 section 3.11.1, which made 002's harness, payload and
+    // startup acts reachable.
+    assert_eq!(statecraft_cli::commands::Verb::all().len(), 32);
 }

@@ -2225,6 +2225,8 @@ test -f crates/statecraft-home/src/required.rs
 test -f crates/statecraft-home/src/startup.rs
 cargo test -p statecraft-home --lib required
 cargo test -p statecraft-home --lib startup
+cargo test -p statecraft-home --lib admission
+cargo test -p statecraft-home --test qualification_admission
 cargo build -p statecraft-home --example require-harness
 cargo test -p statecraft-adapter-claude-code --test settings_transport
 ```

@@ -145,7 +145,11 @@ fn run(args: &[String]) -> i32 {
         // verbs are about the product's own home and not about a target, and
         // requiring one would be requiring a project in order to look at the
         // environment that exists before any project does.
-        Verb::HomeShow | Verb::HomePlan | Verb::HomeApply => {
+        // `session payload` joins them for the same reason (spec 006 section
+        // 3.11.1): the payload is a property of this build, and requiring a
+        // project in order to print it would be requiring a target in order to
+        // read a constant.
+        Verb::HomeShow | Verb::HomePlan | Verb::HomeApply | Verb::SessionPayload => {
             manage_verb(invocation.verb, &invocation.rest, None, &home, format)
         }
         // The rest take a path, and deliberately NOT a registered one:
@@ -160,7 +164,11 @@ fn run(args: &[String]) -> i32 {
         | Verb::ProjectUnenroll
         | Verb::ConfigShow
         | Verb::ApprovalGrant
-        | Verb::ApprovalShow => {
+        | Verb::ApprovalShow
+        | Verb::HarnessShow
+        | Verb::HarnessUpgrade
+        | Verb::StartupRecord
+        | Verb::StartupQualify => {
             let Some(path) = invocation.rest.first() else {
                 eprintln!(
                     "usage: {}{}",

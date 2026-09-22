@@ -190,6 +190,22 @@ pub fn operation(
             root: root()?,
             subject: rest.first()?.clone(),
         },
+        // Spec 006 section 3.11.1. Each is one operation on the same boundary,
+        // and the parse is the whole binding: nothing here decides what a
+        // standing means, what an upgrade would do, or whether evidence
+        // qualifies a session.
+        Verb::HarnessShow => Operation::HarnessShow { root: root()? },
+        Verb::HarnessUpgrade => Operation::HarnessUpgrade { root: root()? },
+        Verb::SessionPayload => Operation::SessionPayload,
+        Verb::StartupRecord => Operation::StartupRecord {
+            root: root()?,
+            session_id: rest.first()?.clone(),
+        },
+        Verb::StartupQualify => Operation::StartupQualify {
+            root: root()?,
+            session_id: rest.first()?.clone(),
+            submission: std::path::PathBuf::from(rest.get(1)?),
+        },
         _ => return None,
     })
 }
@@ -204,6 +220,9 @@ pub fn usage(verb: crate::commands::Verb) -> &'static str {
         Verb::ConfigShow => " <path> [key=value ...]",
         Verb::ApprovalGrant => " <path> <subject> <operator> <reason...>",
         Verb::ApprovalShow => " <path> <subject>",
+        Verb::SessionPayload => "",
+        Verb::StartupRecord => " <path> <session-id>",
+        Verb::StartupQualify => " <path> <session-id> <submission.json>",
         _ => " <path>",
     }
 }

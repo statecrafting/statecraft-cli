@@ -70,6 +70,16 @@ pub enum Verb {
     ApprovalGrant,
     /// `approval show <path> <subject>`
     ApprovalShow,
+    /// `harness show <path>`
+    HarnessShow,
+    /// `harness upgrade <path>`
+    HarnessUpgrade,
+    /// `session payload`
+    SessionPayload,
+    /// `startup record <path> <session-id>`
+    StartupRecord,
+    /// `startup qualify <path> <session-id> <submission>`
+    StartupQualify,
     /// `--help`, optionally with a group or a verb as its topic.
     ///
     /// Not part of the command tree: [`Verb::all`] lists the operations, and a
@@ -109,6 +119,11 @@ impl Verb {
             Verb::ConfigShow => "config show",
             Verb::ApprovalGrant => "approval grant",
             Verb::ApprovalShow => "approval show",
+            Verb::HarnessShow => "harness show",
+            Verb::HarnessUpgrade => "harness upgrade",
+            Verb::SessionPayload => "session payload",
+            Verb::StartupRecord => "startup record",
+            Verb::StartupQualify => "startup qualify",
             Verb::Help => "--help",
         }
     }
@@ -150,7 +165,14 @@ impl Verb {
             | Verb::ProjectUnenroll
             | Verb::ConfigShow
             | Verb::ApprovalGrant
-            | Verb::ApprovalShow => "002-environment-lifecycle",
+            | Verb::ApprovalShow
+            // Spec 006 section 3.11.1: the five verbs 002 sections 3.25 to
+            // 3.29 need. Same crate, same boundary, same edge.
+            | Verb::HarnessShow
+            | Verb::HarnessUpgrade
+            | Verb::SessionPayload
+            | Verb::StartupRecord
+            | Verb::StartupQualify => "002-environment-lifecycle",
             Verb::Help => "006-command-surface",
         }
     }
@@ -159,7 +181,7 @@ impl Verb {
     ///
     /// [`Verb::Help`] is deliberately absent: it is not an operation, and a
     /// usage error listing it would offer help as a thing to do.
-    pub fn all() -> [Verb; 27] {
+    pub fn all() -> [Verb; 32] {
         [
             Verb::ProjectRegister,
             Verb::ProjectList,
@@ -188,12 +210,18 @@ impl Verb {
             Verb::ConfigShow,
             Verb::ApprovalGrant,
             Verb::ApprovalShow,
+            Verb::HarnessShow,
+            Verb::HarnessUpgrade,
+            Verb::SessionPayload,
+            Verb::StartupRecord,
+            Verb::StartupQualify,
         ]
     }
 
     /// The groups a help topic may name.
-    pub const GROUPS: [&'static str; 9] = [
-        "project", "env", "work", "run", "accept", "home", "init", "migrate", "config",
+    pub const GROUPS: [&'static str; 12] = [
+        "project", "env", "work", "run", "accept", "home", "init", "migrate", "config", "harness",
+        "session", "startup",
     ];
 
     /// Parse a verb from the leading arguments, returning how many it consumed.
@@ -231,6 +259,11 @@ impl Verb {
             ("config", Some("show")) => Some((Verb::ConfigShow, 2)),
             ("approval", Some("grant")) => Some((Verb::ApprovalGrant, 2)),
             ("approval", Some("show")) => Some((Verb::ApprovalShow, 2)),
+            ("harness", Some("show")) => Some((Verb::HarnessShow, 2)),
+            ("harness", Some("upgrade")) => Some((Verb::HarnessUpgrade, 2)),
+            ("session", Some("payload")) => Some((Verb::SessionPayload, 2)),
+            ("startup", Some("record")) => Some((Verb::StartupRecord, 2)),
+            ("startup", Some("qualify")) => Some((Verb::StartupQualify, 2)),
             _ => None,
         }
     }

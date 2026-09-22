@@ -105,6 +105,50 @@ pub enum Operation {
         /// The subject.
         subject: String,
     },
+    /// What the project requires of the harness, and what the home holds.
+    ///
+    /// Spec 002 section 3.25's inspection, and spec 006 section 3.11.1's rule
+    /// that it activates nothing: no install, no requirement written, no
+    /// delivery. Reading the state must not be a way of changing it.
+    HarnessShow {
+        /// The project.
+        root: PathBuf,
+    },
+    /// Commit the shipped revision as the project's required identity.
+    ///
+    /// Section 3.25's explicit upgrade, which is the act inspection is not. The
+    /// revision is installed under the home first, because a requirement
+    /// pointing at a revision the home does not hold cannot stand `exact` on
+    /// this machine.
+    HarnessUpgrade {
+        /// The project.
+        root: PathBuf,
+    },
+    /// The exact managed-session settings bytes, and their identity.
+    ///
+    /// Section 3.27. No path: the payload is a property of this build and not
+    /// of any target.
+    SessionPayload,
+    /// Write one session's startup record, with the observation absent.
+    StartupRecord {
+        /// The project.
+        root: PathBuf,
+        /// The session.
+        session_id: String,
+    },
+    /// Submit captured evidence for admission, and record what it establishes.
+    ///
+    /// Section 3.29. The submission is read and then judged, as two steps, so
+    /// an unreadable capture and a capture that shows no refusal stay
+    /// distinguishable. A refused claim writes nothing.
+    StartupQualify {
+        /// The project.
+        root: PathBuf,
+        /// The session.
+        session_id: String,
+        /// The submission naming the three captures.
+        submission: PathBuf,
+    },
 }
 
 /// How an outcome should end a process.
@@ -207,6 +251,110 @@ pub struct ApprovalOutcome {
     pub authority: String,
 }
 
+/// The upgrade an inspection found, or the reason there is none.
+///
+/// A named enum rather than a `Result`, because this field is part of spec 006
+/// section 3.4's JSON contract and `Result`'s serialization is `Ok`/`Err`,
+/// which names nothing a caller would script against.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "kebab-case", tag = "availability", content = "value")]
+pub enum AvailableUpgrade {
+    /// What `harness upgrade` would commit.
+    Available(Box<crate::required::Upgrade>),
+    /// Why it would not.
+    Unavailable(Box<crate::required::UpgradeRefusal>),
+}
+
+/// What the project requires of the harness, and what this machine holds.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct HarnessStanding {
+    /// The project.
+    pub root: String,
+    /// The inspection: required, installed, shipped, and the standing.
+    pub inspection: crate::required::Inspection,
+    /// The upgrade this build would offer, or why it would not.
+    ///
+    /// Carried by the **inspection** because knowing what an upgrade would do
+    /// is a read. Performing it is [`Operation::HarnessUpgrade`], and nothing
+    /// here performs it.
+    pub available_upgrade: AvailableUpgrade,
+    /// Whether anything was installed, written or delivered by this call.
+    /// Always false: an inspection that activated something would make the
+    /// state unreadable without changing it.
+    pub activated_anything: bool,
+}
+
+/// What an explicit upgrade did.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct HarnessUpgraded {
+    /// The project.
+    pub root: String,
+    /// What was committed.
+    pub upgrade: crate::required::Upgrade,
+    /// Harness files this call wrote under the home.
+    pub installed: Vec<String>,
+    /// Whether the manifest changed on disk.
+    pub manifest_written: bool,
+    /// The standing that results, read back from what was written.
+    pub standing: crate::required::Standing,
+}
+
+/// The managed-session settings payload.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SessionPayload {
+    /// The exact bytes the settings argument receives.
+    pub payload: String,
+    /// Their identity, which an observation is bound to.
+    pub digest: String,
+    /// The argument that carries them.
+    pub argument: String,
+    /// Whether this call wrote the payload anywhere. Always false: obtaining
+    /// the bytes is a read, and delivering them is a session starting.
+    pub delivered: bool,
+}
+
+/// What a startup record says, and where it was written.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct StartupOutcome {
+    /// The project.
+    pub root: String,
+    /// The session.
+    pub session_id: String,
+    /// Where the record is.
+    pub path: String,
+    /// Whether this call wrote it.
+    pub written: bool,
+    /// The record itself.
+    pub record: Box<crate::startup::StartupRecord>,
+    /// Whether the session carries the managed-execution claim.
+    pub qualified: bool,
+}
+
+/// Why a submitted qualification was not recorded.
+///
+/// Two reasons, kept apart. A submission that could not be **read** never
+/// stated a claim; one that was read and **refused** stated one and was judged.
+/// Reporting them the same way would let a typo look like a measured negative,
+/// which is exactly the substitution section 3.29 exists to prevent.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "kebab-case", tag = "kind")]
+pub enum QualificationRefused {
+    /// The submission or a file it names could not be read.
+    Unread {
+        /// What went wrong.
+        reason: String,
+    },
+    /// The claim was judged and did not survive the admission.
+    NotAdmitted {
+        /// Which rule refused it.
+        reason: String,
+    },
+}
+
 /// What an operation answered.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "kebab-case", tag = "operation", content = "value")]
@@ -225,6 +373,16 @@ pub enum Answer {
     Configuration(Box<Resolution>),
     /// An approval or an eligibility.
     Approval(Box<ApprovalOutcome>),
+    /// The harness requirement, inspected.
+    Harness(Box<HarnessStanding>),
+    /// The harness requirement, changed.
+    HarnessUpgraded(Box<HarnessUpgraded>),
+    /// The managed-session payload.
+    SessionPayload(Box<SessionPayload>),
+    /// A startup record.
+    Startup(Box<StartupOutcome>),
+    /// A qualification submission that was not recorded.
+    QualificationRefused(Box<QualificationRefused>),
     /// A precondition stopped the operation.
     Refused {
         /// Why.
@@ -303,6 +461,42 @@ impl Answer {
                     Severity::Finding
                 }
             }
+            // The DIAGNOSTIC question, not the execution one. A project whose
+            // requirement is committed, installed and intact disagrees with
+            // nothing, and no revision has resolved for it because an
+            // inspection is not a session. `permits_managed_execution` would
+            // report that healthy project as a finding forever, which is
+            // `required::Standing`'s own warning about conflating the two
+            // questions. Spec 006 section 3.3: a finding is a diagnostic
+            // state, and there is none here.
+            Answer::Harness(h) => {
+                if h.inspection.standing.disagreement().is_none() {
+                    Severity::Ok
+                } else {
+                    Severity::Finding
+                }
+            }
+            Answer::HarnessUpgraded(u) => {
+                if u.standing.disagreement().is_none() {
+                    Severity::Ok
+                } else {
+                    Severity::Finding
+                }
+            }
+            Answer::SessionPayload(_) => Severity::Ok,
+            // A record that is not qualified is the ordinary case and it is a
+            // finding, not a failure: the session ran, the record says what it
+            // establishes, and what it does not establish is the finding.
+            Answer::Startup(s) => {
+                if s.qualified {
+                    Severity::Ok
+                } else {
+                    Severity::Finding
+                }
+            }
+            // Both arms are refusals. A precondition was not met and nothing
+            // was written, which is spec 006 section 3.3's exit 2 exactly.
+            Answer::QualificationRefused(_) => Severity::Refused,
         }
     }
 
@@ -368,6 +562,85 @@ impl Answer {
                 out.push_str(&format!("authority: {}\n", a.authority));
                 out
             }
+            Answer::Harness(h) => {
+                let mut out = format!("project   {}\n", h.root);
+                out.push_str(&format!(
+                    "required  {}\n",
+                    h.inspection
+                        .required_display
+                        .as_deref()
+                        .unwrap_or("none committed")
+                ));
+                out.push_str(&format!("shipped   {}\n", h.inspection.shipped));
+                for revision in &h.inspection.installed {
+                    out.push_str(&format!(
+                        "installed {} {}\n",
+                        revision.id,
+                        match (&revision.unreadable, revision.intact) {
+                            (Some(why), _) => format!("unreadable: {why}"),
+                            (None, true) => "intact".to_string(),
+                            (None, false) => "does not digest to its own name".to_string(),
+                        }
+                    ));
+                }
+                out.push_str(&format!("standing  {}\n", h.inspection.standing.describe()));
+                out.push_str(&match &h.available_upgrade {
+                    AvailableUpgrade::Available(upgrade) => {
+                        format!("upgrade   available: {}\n", upgrade.describe())
+                    }
+                    AvailableUpgrade::Unavailable(why) => {
+                        format!("upgrade   unavailable: {why}\n")
+                    }
+                });
+                out.push_str("nothing was installed, written or delivered by this read\n");
+                out
+            }
+            Answer::HarnessUpgraded(u) => {
+                let mut out = format!("project   {}\n", u.root);
+                out.push_str(&format!("upgrade   {}\n", u.upgrade.describe()));
+                out.push_str(&format!(
+                    "installed {} harness file(s) under the home\n",
+                    u.installed.len()
+                ));
+                out.push_str(&format!(
+                    "manifest  {}\n",
+                    if u.manifest_written {
+                        "written; commit it, because the requirement is a reviewed project change"
+                    } else {
+                        "unchanged"
+                    }
+                ));
+                out.push_str(&format!("standing  {}\n", u.standing.describe()));
+                out
+            }
+            Answer::SessionPayload(p) => format!(
+                "{}\ndigest    {}\nargument  {} <these bytes>\nnothing was delivered by this read\n",
+                p.payload.trim_end(),
+                p.digest,
+                p.argument
+            ),
+            Answer::Startup(s) => {
+                let mut out = format!("session   {}\n", s.session_id);
+                out.push_str(&s.record.describe());
+                out.push('\n');
+                out.push_str(&format!(
+                    "{}  {}\n",
+                    if s.written { "written " } else { "existing" },
+                    s.path
+                ));
+                out
+            }
+            Answer::QualificationRefused(r) => match &**r {
+                QualificationRefused::Unread { reason } => format!(
+                    "refused: the submission could not be read, so no claim was judged: \
+                     {reason}\nnothing was written\n"
+                ),
+                QualificationRefused::NotAdmitted { reason } => format!(
+                    "refused: the claimed observation is not admitted: {reason}\nnothing was \
+                     written; the session is unverified, which is the answer and not a \
+                     weaker qualification\n"
+                ),
+            },
             Answer::Refused { reason } => format!("refused: {reason}\n"),
             Answer::Failed { reason } => format!("failed: {reason}\n"),
         }
@@ -438,6 +711,220 @@ pub fn execute(ports: &Ports<'_>, operation: Operation) -> Answer {
             reason,
         } => approval_grant(ports, &root, &subject, &operator, &reason),
         Operation::ApprovalShow { root, subject } => approval_show(ports, &root, &subject),
+        Operation::HarnessShow { root } => harness_show(ports, &root),
+        Operation::HarnessUpgrade { root } => harness_upgrade(ports, &root),
+        Operation::SessionPayload => Answer::SessionPayload(Box::new(SessionPayload {
+            payload: crate::session::payload_json(),
+            digest: crate::startup::payload_identity(),
+            argument: crate::session::SETTINGS_ARGUMENT.to_string(),
+            delivered: false,
+        })),
+        Operation::StartupRecord { root, session_id } => {
+            startup_record(ports, &root, &session_id, None)
+        }
+        Operation::StartupQualify {
+            root,
+            session_id,
+            submission,
+        } => {
+            // Two steps, and the failures stay apart. A submission that could
+            // not be read never stated a claim; one that was read and refused
+            // stated one and was judged.
+            let evidence = match crate::admission::load(&submission) {
+                Ok(evidence) => evidence,
+                Err(why) => {
+                    return Answer::QualificationRefused(Box::new(QualificationRefused::Unread {
+                        reason: why.to_string(),
+                    }));
+                }
+            };
+            match crate::startup::admit(&evidence) {
+                Ok(observation) => startup_record(ports, &root, &session_id, Some(observation)),
+                Err(why) => {
+                    Answer::QualificationRefused(Box::new(QualificationRefused::NotAdmitted {
+                        reason: why.to_string(),
+                    }))
+                }
+            }
+        }
+    }
+}
+
+/// The manifest a project holds, or the answer that says it holds none.
+fn manifest_of(root: &Path) -> Result<Manifest, Answer> {
+    match Manifest::read(root) {
+        Ok(Some(manifest)) => Ok(manifest),
+        Ok(None) => Err(Answer::Refused {
+            reason: format!(
+                "{} holds no {}, so it is not a target and has no harness requirement",
+                root.display(),
+                statecraft_environment::manifest::MANIFEST_PATH
+            ),
+        }),
+        Err(e) => Err(Answer::Failed {
+            reason: e.to_string(),
+        }),
+    }
+}
+
+/// `harness show`. A read, and nothing else.
+fn harness_show(ports: &Ports<'_>, root: &Path) -> Answer {
+    let manifest = match manifest_of(root) {
+        Ok(m) => m,
+        Err(answer) => return answer,
+    };
+    let inspection = crate::required::inspect(ports.home, &manifest);
+    // What an upgrade WOULD do. Planning is a read; nothing below performs it.
+    let available_upgrade =
+        match crate::required::plan_upgrade(ports.home, &manifest, &inspection.shipped) {
+            Ok(upgrade) => AvailableUpgrade::Available(Box::new(upgrade)),
+            Err(why) => AvailableUpgrade::Unavailable(Box::new(why)),
+        };
+    Answer::Harness(Box::new(HarnessStanding {
+        root: root.display().to_string(),
+        inspection,
+        available_upgrade,
+        activated_anything: false,
+    }))
+}
+
+/// `harness upgrade`. The explicit, reviewed act of section 3.25.
+fn harness_upgrade(ports: &Ports<'_>, root: &Path) -> Answer {
+    let mut manifest = match manifest_of(root) {
+        Ok(m) => m,
+        Err(answer) => return answer,
+    };
+    // The revision is installed first. A requirement pointing at a revision
+    // this home does not hold cannot stand `exact` here, and committing one
+    // would commit a requirement that is already broken on the machine
+    // proposing it.
+    let installed = match harness::install(ports.home, &harness::shipped()) {
+        Ok(installed) => installed,
+        Err(e) => {
+            return Answer::Failed {
+                reason: e.to_string(),
+            };
+        }
+    };
+    let upgrade =
+        match crate::required::plan_upgrade(ports.home, &manifest, &installed.revision.digest) {
+            Ok(upgrade) => upgrade,
+            Err(refusal) => {
+                return Answer::Refused {
+                    reason: refusal.to_string(),
+                };
+            }
+        };
+    let changed = upgrade.from.as_deref() != Some(upgrade.to.as_str());
+    crate::required::apply_upgrade(&mut manifest, &upgrade);
+    if changed {
+        if let Err(e) = manifest.write(root) {
+            return Answer::Failed {
+                reason: e.to_string(),
+            };
+        }
+    }
+    // The standing is read back from what was written, not from what was
+    // intended: the two differ exactly when something went wrong quietly.
+    let written = match manifest_of(root) {
+        Ok(m) => m,
+        Err(answer) => return answer,
+    };
+    let standing =
+        crate::required::evaluate(ports.home, &written, crate::required::required_of(&written));
+    Answer::HarnessUpgraded(Box::new(HarnessUpgraded {
+        root: root.display().to_string(),
+        upgrade,
+        installed: installed.written,
+        manifest_written: changed,
+        standing,
+    }))
+}
+
+/// Assemble and write one session's startup record.
+///
+/// The observation is passed in, admitted or absent, because this function
+/// records and never judges: section 3.29's admission is the judge and it runs
+/// before anything reaches here.
+fn startup_record(
+    ports: &Ports<'_>,
+    root: &Path,
+    session_id: &str,
+    observation: Option<crate::startup::Observation>,
+) -> Answer {
+    let manifest = match manifest_of(root) {
+        Ok(m) => m,
+        Err(answer) => return answer,
+    };
+    let Some(rule) = delivery::load_rules()
+        .into_iter()
+        .find(|r| r.harness == crate::session::SUPPORTED_HARNESS)
+    else {
+        return Answer::Failed {
+            reason: format!(
+                "no documented load rule for {}",
+                crate::session::SUPPORTED_HARNESS
+            ),
+        };
+    };
+    let verdict = delivery::evaluate(root, &rule);
+    let required_digest = crate::required::required_of(&manifest).map(str::to_string);
+    let standing = crate::required::evaluate(ports.home, &manifest, required_digest.as_deref());
+    let resolved = standing
+        .permits_managed_execution()
+        .then(|| required_digest.clone())
+        .flatten();
+
+    let record = crate::startup::assemble(
+        root,
+        session_id,
+        &rfc3339_utc(ports.clock.now_unix()),
+        &manifest,
+        crate::startup::AdapterIdentity {
+            name: crate::session::SUPPORTED_HARNESS.to_string(),
+            harness: crate::session::SUPPORTED_HARNESS.to_string(),
+            version: ports.product_version.clone(),
+        },
+        verdict,
+        standing,
+        resolved,
+        // This verb records; it delivers nothing, and says so rather than
+        // implying a supply it did not perform.
+        crate::startup::Supply::NotAttempted {
+            reason: "this operation reads and records; it performs no delivery, so nothing \
+                     about one is established here"
+                .to_string(),
+        },
+        observation.unwrap_or(crate::startup::Observation::NotObserved {
+            reason: "no live session was observed for this start".to_string(),
+        }),
+    );
+    let record = match record {
+        Ok(record) => record,
+        Err(e) => {
+            return Answer::Failed {
+                reason: e.to_string(),
+            };
+        }
+    };
+    let path = crate::startup::StartupRecord::path(root, session_id);
+    match record.write(root) {
+        Ok(()) => Answer::Startup(Box::new(StartupOutcome {
+            root: root.display().to_string(),
+            session_id: session_id.to_string(),
+            path: path.display().to_string(),
+            written: true,
+            qualified: record.qualifies(),
+            record: Box::new(record),
+        })),
+        // A start happens once, so a second record for the same session is a
+        // precondition that stopped the operation rather than a failure.
+        Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => Answer::Refused {
+            reason: e.to_string(),
+        },
+        Err(e) => Answer::Failed {
+            reason: e.to_string(),
+        },
     }
 }
 
