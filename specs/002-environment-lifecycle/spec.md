@@ -28,7 +28,32 @@ summary: >
   content delivered through the harness mechanism has to satisfy. Section 3.24
   is the one write into a harness's own settings file that section 3.14 rule 1
   admits: narrow, marked, reversible, refused by default, and able to add a
-  refusal but never a permission.
+  refusal but never a permission. Sections 3.25 to 3.28 carry the owner's
+  resolutions of 2026-09-21: the committed required harness identity beside the
+  per-session resolved one, what a managed session records about delivery and
+  what that record may not claim, the separation of global adapter registration
+  from managed-session permission delivery, and the rule that an unmarked
+  registration is the user's however much it resembles shipped content. Section
+  3.29 is the same day's narrow authority amendment over the admission itself:
+  what a claimed live observation has to carry, which controls the qualification
+  boundary enforces rather than describes, and that unverified is the answer
+  when the evidence cannot decide. Section 3.30 is the 2026-09-22 amendment
+  that sharpens it: each control is judged from correlated structured events
+  as refused or executed, a capture is one session read whole, and an
+  invocation is bound to its settings by the launch that performed it rather
+  than by a description written afterwards. Section 3.31 is the same day's
+  amendment for `run`: two write-once startup records per attempt, supply
+  recorded by the launch that performs it, the selected revision carried in the
+  launch configuration, the answering revision measured from a startup
+  acknowledgment in the session's own stream, a mismatch that refuses the
+  attempt, and a required revision never recorded as an observed one.
+  Section 3.32 corrects four of 3.31's claims: an intent is not a launch, so
+  a launch is four write-once records read back as named states and an
+  uncertain one is never replayed; the acknowledgment is a correlated one and
+  not execution provenance; a managed run supplies its startup hook and an
+  admission gate per invocation instead of relying on global registration;
+  and startup identity is decided before governed work is released rather than
+  refused after the session ends.
 establishes:
   - { kind: directory, path: "crates/statecraft-environment/" }
   - { kind: directory, path: "crates/statecraft-home/" }
@@ -45,6 +70,20 @@ extends:
   # 3.19 moves them. The script is 001's unit, so the edge is declared rather
   # than discovered by the coupling gate.
   - { spec: "001-boundaries-and-authority", unit: "scripts/check-authored-content.sh", nature: corrective }
+  # One test in 004's crate was repaired while this spec's round was measuring
+  # against it: `settings_transport.rs`'s deadline attempt raced its own
+  # subject. The repair is to the test's fixture and its assertions only, and
+  # 004's required behavior is untouched, which is why the nature is
+  # corrective. The edge is declared rather than left for the coupling gate to
+  # discover, and the diagnosis is a dated entry in section 5.
+  - { spec: "004-execution-adapter", unit: { kind: directory, path: "crates/statecraft-adapter-claude-code/" }, nature: corrective }
+  # Section 3.30 rule 12's launch is supervised by the process-group supervisor
+  # 004 already owns, so the raw capture it needs is added there rather than
+  # written a second time here. Additive: no existing behavior of the
+  # supervisor changes. The same section's rule 7 types three stream fields in
+  # the claude-code crate above, which is also additive; that edge keeps the
+  # nature of the repair it was first declared for.
+  - { spec: "004-execution-adapter", unit: { kind: directory, path: "crates/statecraft-adapter/" }, nature: additive }
 depends_on:
   - "000-bootstrap"
   - "001-boundaries-and-authority"
@@ -695,13 +734,37 @@ satisfy, whether this product authors it or adopts it from the counterparty.
 Adopting the inventory below is the owner's act; what adoption costs is stated
 here so the decision is not made by discovering the cost afterwards.
 
-**The inventory offered.** Ten skills (`prime`, `next`, `build`, `verify`,
-`ship`, `shepherd`, `spec`, `commit`, `code-review`, `setup`) and four agents
-(`architect`, `explorer`, `implementer`, `reviewer`). They are already
-**repository-invariant**: every project-specific fact lives in that project's
-`AGENTS.md`, which each skill ends by pointing at. That property was built for a
-distribution that was then cancelled, and it is what makes section 3.14's
-"maintained once, copied into no repository" viable for them unchanged.
+**The inventory offered, and adopted on 2026-09-21.** Ten skills (`prime`,
+`next`, `build`, `verify`, `ship`, `shepherd`, `spec`, `commit`, `code-review`,
+`setup`) and four agents (`architect`, `explorer`, `implementer`, `reviewer`).
+They are already **repository-invariant**: every project-specific fact lives in
+that project's `AGENTS.md`, which each skill ends by pointing at. That property
+was built for a distribution that was then cancelled, and it is what makes
+section 3.14's "maintained once, copied into no repository" viable for them
+unchanged.
+
+The owner adopted the whole inventory as Statecraft harness content, subject to
+the repository-invariant project-layer boundary above. What is delivered is a
+**Statecraft-namespaced equivalent** of each, which is section 3.14 rule 2 and
+not a new condition. The four event behaviors are adopted with it:
+`SessionStart`, `PostToolUse`, `PreToolUse` and `Stop`, including the push gate
+and the pull-request gate and the assertions each carries. `Stop` is adopted
+under the advisory policy below, not as a gate.
+
+**Adoption is delivery, and delivery is not authorization.** A delivered skill
+may be invoked; it acquires no standing permission by being delivered. Nothing
+in this adoption lets a skill publish, merge, release or execute without the
+authorization that operation independently requires, and a skill that reads as
+though it did is a skill to fix rather than an authority to infer. The deny
+floor below and section 3.14 rule 3's project gate both continue to apply to
+every adopted name.
+
+**The project layer keeps its facts.** Repository invariance is a condition on
+the delivered content, checked rather than assumed: a generic skill does not
+hardcode any project's crate layout, gate commands or workflow, and a project's
+`AGENTS.md` stays the authority for those. That applies to the counterparty's
+own repository as much as to any other, and an adopted file carrying
+spec-spine's specifics is an adoption defect.
 
 **Three assertions hold for a delivered skill**, wherever the file lands:
 
@@ -743,6 +806,59 @@ failure, and the contract is worth more than the shell that carries it:
    still runs. A pull-request gate runs the coupling gate before the create verb
    and refuses without a human-written waiver line in the body.
 
+**An end-of-turn hook advises; an operation gate enforces.** Contract 6 above
+is a rule about **gates**, and a harness's end-of-turn event is not one. The
+owner settled the policy on 2026-09-21 and it has three parts:
+
+1. **Stop is advisory, and reports the result accurately.** It says what the
+   check answered, including that the check could not be performed. It does not
+   convert that answer into a block.
+2. **An enforcing operation gate refuses a failed or unavailable check.** A push
+   gate, a pull-request gate and any other gate standing in front of an
+   operation refuse on every non-zero code and on a check that did not run,
+   which is contract 6 unchanged.
+3. **Stop never prevents a useful failure handback.** A session that has
+   something to report, including a failure, hands it back. A stale derived tree
+   or a read that was not performed is a fact the handback carries, never a
+   reason to withhold it. The asymmetry is the point: a gate that wrongly
+   refuses costs an operation that can be retried, and an end-of-turn block that
+   wrongly fires costs the report of why the work failed, which is the thing
+   nobody can reconstruct afterwards.
+
+This changes no hook's repair behavior. Contract 1 stands exactly as written:
+read, never repair, with the single sanctioned exception of a `compile` after an
+edit to a `spec.md`, where the session is live and can commit the result. No
+part of the Stop policy authorizes a hook to write.
+
+**Two exit vocabularies, and no numeric passthrough between them.** Contract 4
+reads spec-spine's codes. Spec `006` §3.3 fixes this product's own. They are
+different closed vocabularies that share the integers, and three of the four
+overlapping values disagree:
+
+| Code | spec-spine `check` | Statecraft command (`006` §3.3) |
+|---|---|---|
+| 0 | fresh | did what was asked, found nothing wrong |
+| 1 | the corpus does not validate | a finding: a diagnostic state, a withheld write |
+| 2 | stale, or an unresolved claim | refused: a precondition was not met |
+| 3 | the read was not performed | usage error: no such operation |
+| 4 | not used | failed |
+
+Propagating a spec-spine code as a Statecraft code would report a stale tree as
+a refusal and an unperformed read as a usage error. Where this product runs a
+governance verb and answers in its own vocabulary, it **translates**:
+
+| spec-spine `check` answered | this product reports |
+|---|---|
+| 0 fresh | 0 |
+| 1 the corpus does not validate | 1, a finding: the check ran and the corpus is what it found |
+| 2 stale, or an unresolved claim | 1, a finding, and the two readings are distinguished in the text, not in the code |
+| 3 the read was not performed | 4, a failure: nothing about the corpus was established |
+| the binary is absent, or lacks the verb | 2, a refusal: a precondition was not met and nothing was done |
+
+An enforcing gate collapses the same answers to green and not-green, where only
+`0` is green. That is contract 6, and it is not a different translation: it is
+this one, read by something that has only two outcomes to spend.
+
 **A deny list is a safety floor, not an adapter's optional extra.** Where a
 delivery carries permissions at all, the refusals travel with it: no publish
 verb, no release verb, no force push, no recursive removal of a corpus or a
@@ -758,9 +874,11 @@ files land, or the requirements become unenforced. That cost is small and it is
 not optional, and it is the second reason section 3.22's ordering is not
 negotiable.
 
-The harness this build ships under section 3.14 is deliberately small, and
-adopting the inventory above would not change that judgment by itself: the point
-of a global harness is that it is one source, not that it is a large one.
+The harness this build ships under section 3.14 was deliberately small, and the
+adoption above does not change the judgment behind it: the point of a global
+harness is that it is one source, not that it is a large one. What grew is the
+inventory the owner decided to carry, and every added file still pays the same
+price, which is the assertion that judges it.
 
 ### 3.24 The consented settings modification
 
@@ -773,7 +891,10 @@ position as before this section existed.
 
 1. A **hook registration** whose command resolves inside the canonical harness
    under the product home. Never a command assembled from anything else.
-2. A **deny entry**, which is a refusal.
+2. A **deny entry**, which is a refusal. Where such an entry lands is fixed by
+   section 3.27: not in the user's global deny list by default, because a deny
+   entry carries no project gate and acquires none from the scripts registered
+   beside it.
 
 A merge may add a refusal. It may never add or widen a permission: no allow
 entry, no `ask` downgraded, no existing deny removed, weakened or reordered. The
@@ -789,18 +910,45 @@ the operator consents to that modification specifically. Consent to one revision
 is not consent to the next: a modification whose lines have changed is presented
 again.
 
-**One marked region, recorded as a modification.** Every managed line lives
-inside a single marked region in the file. Outside that region nothing is
-rewritten, reordered or reformatted, and the file's own shape is preserved. The
-region is recorded in the home the way section 3.13 records the root instruction
-bridge: as a **modification** (path, the exact lines, the digest before and the
-digest after), never as a managed entry and never as ownership of the file.
+**One recorded modification, several valid locations.** All Statecraft-managed
+insertions are tracked by one recorded modification. They may occupy multiple
+syntactically valid locations. Each insertion is identified by its exact
+content, structural location, and recorded provenance. Unrelated bytes are
+preserved, and removal occurs only when Statecraft can establish that the
+content is an intact insertion it owns.
 
-**Reversible, and only while it is intact.** Removal removes exactly the marked
-region and nothing else, and only while the region is present and byte-identical
-to what was recorded. A region a user has edited is **reported and left**: an
-edited region is a user's file again, and this product does not take it back.
-Applying the modification twice changes nothing.
+That is the contract the owner approved on 2026-09-21, replacing a requirement
+that every managed line occupy one physically contiguous marked region. The
+replacement is about **representation only**. What the region requirement was
+carrying is not physical adjacency but attributability, and attributability is
+what the three identifying properties above supply: the same bytes, in the same
+place in the document's structure, with a record in the home that says this
+product put them there. Adjacency was one way to get it, and in a syntax with
+two non-adjacent insertion points it is not an available one. Section 5's
+2026-09-21 entries measure why.
+
+The record itself is unchanged: the home records **one modification** (path, the
+exact content, the digest before and the digest after) the way section 3.13
+records the root instruction bridge, never as a managed entry and never as
+ownership of the file. Outside the recorded insertions nothing is rewritten,
+reordered or reformatted, and the file's own shape is preserved.
+
+**The file stays strict JSON.** The representation this section permits is the
+one the harness's own parser already accepts. It does not extend to JSON5, to
+comments outside string values, to a deny entry that refuses nothing and exists
+only to mark a boundary, or to a metadata key the harness does not support. A
+marker this product needs travels inside content the harness already reads as
+content, or it does not travel.
+
+**Reversible, and only while ownership can be established.** Removal removes
+exactly the insertions this product can establish it owns, and nothing else. An
+insertion whose content no longer matches what was recorded is **reported and
+left**: an edited insertion is a user's file again, and this product does not
+take it back. Where ownership cannot be established, the insertion stays and
+the outcome says which one and why; losing the evidence costs a refusal
+nothing. A marker resembling this product's is not by itself proof of
+ownership, and a pre-existing user refusal is never claimed as a managed
+insertion. Applying the modification twice changes nothing.
 
 **A conflict is named, not resolved.** Where the user already registers a hook on
 the same event with a different command, both remain and the situation is
@@ -810,6 +958,813 @@ reported. This product does not decide which of two hooks a user wants.
 migration, and not a path to any other key. A settings key this section does not
 name is not writable by any code path, and adding one is an amendment to this
 section rather than a use of it.
+
+### 3.25 The required harness identity and the resolved one
+
+Section 3.14 makes a harness revision content addressed. This section says who
+records which revision, and what a managed session does when the two answers
+disagree. The owner settled it on 2026-09-21.
+
+**Two records, and they are not the same record.**
+
+- The **required** identity is a **committed project requirement**. It travels
+  with the repository, it is reviewed like any other committed change, and it
+  is what the project says its managed sessions must run against.
+- The **resolved** identity is recorded **per managed session**, separately,
+  and says which revision actually answered. Section 3.16's last rule already
+  freezes it; this section fixes that the requirement it was resolving against
+  is a committed one rather than whatever the home happened to hold.
+
+Keeping them apart is what makes disagreement visible. One record that is
+rewritten as it is read cannot disagree with anything, which is precisely the
+failure this section refuses.
+
+**The full digest is the integrity proof.** A revision's identity is the digest
+over its files, as section 3.14 fixes it. The **full** digest is what the
+required record carries and what an integrity comparison uses. A short
+identifier derived from it is a **display** convenience: legible in a plan, in a
+verdict and in a log, and never on its own the thing an equality check is
+performed against. A truncated identifier that two revisions could share is not
+a proof, whatever the odds are.
+
+**Managed execution refuses.** A session that would be managed under a required
+identity refuses when the required content is **missing** (no such revision is
+installed), **corrupt** (a revision is installed under that identity and its
+files no longer digest to it), or **mismatched** (the resolved revision is not
+the required one). The refusal is a refusal in this product's vocabulary: a
+precondition was not met and nothing was done.
+
+**Four things stay possible under that refusal**, because a refusal that
+prevents diagnosis is worse than the state it refuses: **inspection** (what is
+required, what is installed, what each digests to), **diagnosis** (`doctor`
+reporting the disagreement), **planning** (what an apply or an upgrade would
+do), and an **explicit upgrade**.
+
+**Two things this product never does.** It never **silently selects the latest
+installed revision**: an installed revision that is not the required one is a
+mismatch to be reported, not a substitute to be chosen, and "the newest one is
+probably right" is how a project loses the ability to say what it ran. And it
+never **rewrites the project requirement during a read**: inspection, doctor
+and plan are reads, and a read that repairs its own precondition destroys the
+evidence that the precondition was unmet, which is the same defect the gate
+refuses in `compile` (AGENTS.md, "New sessions").
+
+**An upgrade is an explicit reviewed project change.** Changing the required
+identity is a committed change to the repository, proposed and reviewed like
+one. It is never a side effect of installing, of running, or of a newer
+revision appearing under the home.
+
+**An upgrade renews settings consent when the content changes.** Where the
+consented settings modification of section 3.24 embeds the revision, a new
+required identity produces different modification content, and different
+content is presented for consent again. That is section 3.24's rule
+("consent to one revision is not consent to the next") reached from the other
+direction, and it is stated here so an upgrade path cannot satisfy itself by
+reusing a consent given for other bytes. Where the modification content is
+byte-identical across the upgrade, there is nothing new to consent to and
+nothing is asked.
+
+### 3.26 Startup delivery evidence
+
+Section 3.14 fixed a three-valued verdict over a harness's documented load
+rule. This section fixes what a managed session **records** about delivery, and
+what that record is and is not allowed to claim. The owner settled it on
+2026-09-21.
+
+**What is recorded.** Seven things, at the start of a managed session:
+
+| Recorded | What it is |
+|---|---|
+| project identity | which repository, and the manifest that makes it a target |
+| instruction-file identities | each instruction file reached, by path and digest |
+| required harness identity | the committed requirement of section 3.25, full digest |
+| resolved harness identity | what actually answered, full digest |
+| adapter identity | which adapter performed the delivery, and its own identity |
+| load chain | the files traversed, entry first, managed file last |
+| delivery status | the section 3.14 verdict |
+
+**Three statements, kept distinct and never substituted for one another.**
+
+1. **The documented load chain reaches a file.** A rule was evaluated against
+   the tree and arrives. This is a statement about the tree and the rule.
+2. **Its bytes were resolved and supplied.** The file was read, it digests to
+   what is recorded, and its content was handed to the session. This is a
+   statement about what this product did.
+3. **A live session demonstrated the expected behavior.** A real session was
+   observed behaving as the instructions require. This is a statement about a
+   session, and only a session can produce it.
+
+Each is strictly weaker evidence for the next, and none of them implies the
+one after it. A record that states the first must not be read as the second,
+and a record that states the second must not be read as the third.
+
+**What a digest never proves.** A digest establishes that bytes are the bytes.
+An acknowledgement establishes that something emitted an acknowledgement.
+Neither establishes that a model **read**, **understood** or **complied with**
+the instructions, and no field in this record makes that claim. The three
+words are listed because each is a distinct overclaim and all three are easy to
+write by accident.
+
+**The three verdicts keep their meanings.** `reached`, `not-reached` and
+`unverified` mean exactly what section 3.14's table says. The new evidence is
+carried in **added fields**, narrowly defined, alongside the verdict. In
+particular `reached` is not quietly widened to mean supplied, and is not
+narrowed to require a live observation: a rule that arrives is a rule that
+arrives, and the fact that this is weaker than what an operator often wants is
+the reason it is reported separately rather than merged into a single richer
+word. Redefining an existing verdict changes the meaning of every record
+already written under it, which is a migration and not an improvement.
+
+### 3.27 Global adapter registration is not managed-session permission delivery
+
+A narrow amendment, settled by the owner on 2026-09-21 and recorded before the
+implementation it authorizes. It separates two things this build had joined:
+registering an adapter **globally**, and delivering the deny floor to a
+**managed session**.
+
+**Section 3.14 rule 3 is unchanged and is the reason.** Every delivered
+behavior applies only inside a repository holding
+`.statecraft/environment.json`, and is inert everywhere else. An unrelated
+project is unaffected by global integration.
+
+**The floor does not go into the user's global deny list by default.** A
+refusal written into the user-global `permissions.deny` applies to every
+session that user runs, in every repository, managed or not. Hook *scripts* can
+be project-gated because a script can test for the manifest and exit; a deny
+entry is evaluated by the harness before anything of this product's runs, so it
+carries no gate and acquires none from the scripts shipped beside it. Those
+entries are therefore **not project-gated merely because the hook scripts
+are**, and this product does not install them there by default.
+
+**The floor is delivered through a supported managed-session settings
+mechanism**, carrying the canonical Statecraft content. Claude Code documents a
+`--settings` argument for exactly this shape of need. Documentation is not
+evidence: the **installed version** and the **effective behavior** are verified
+before this product relies on the mechanism, and an unverified mechanism is an
+unavailable one.
+
+**Three conditions on whatever global registration remains.** A global hook
+registration, if used at all, is **inert outside a Statecraft project**.
+Delivered skills and agents stay **namespaced and project-gated**, which is
+section 3.14 rules 2 and 3. And consent asked for a write into a global native
+settings file **describes the actual scope of that write**: a modification that
+takes effect in every repository is presented as one, whatever the scripts it
+registers do afterwards.
+
+**The floor is never weakened to solve a delivery problem.** Section 3.23's
+refusals are a floor, and a floor a delivery can lower is not one. Where an
+ordinary unmanaged session cannot receive the scoped floor, the answer is to
+**report that session as not qualified** for the managed-execution claim.
+Two repairs are specifically refused: lowering the floor so that delivery
+succeeds, and writing a repository-local generic harness copy so the
+limitation stops being visible. The second would also reintroduce exactly what
+section 3.14 removes.
+
+### 3.28 An unmarked registration is the user's, and resemblance is not ownership
+
+Settled by the owner on 2026-09-21. Section 3.24 already says that a conflict
+is named rather than resolved; this section says what "named rather than
+resolved" means for a registration that already exists, and closes the one
+route by which this product could take one over by accident.
+
+**Existing registrations are preserved.** The user's own hook registrations
+stay, including the global push gate §3.22 records at
+`~/.claude/hooks/push-gate.sh`. Coexistence is the behavior to exercise:
+this product's delivery runs alongside them and is tested doing so. Where a
+later replacement is wanted, it is prepared as an **exact plan** and performed
+as its own reviewed act, never folded into a delivery.
+
+**Resemblance is never ownership.** This product does not delete, take
+ownership of, or rewrite an **unmarked** registration, and it does so least of
+all when the registration looks like content this product ships. A user who
+copied a shipped hook, or wrote one that converged on the same commands, owns
+what they wrote. Ownership is established the way section 3.24 establishes it,
+by exact content, structural location and recorded provenance together; a
+marker resembling this product's satisfies one of the three and proves
+nothing.
+
+**The keys this product does not touch.** `defaultMode`, `allow` entries, `ask`
+entries, model selection, and every other user setting section 3.24 does not
+name. That section's closing rule is the general form: a key it does not name
+is not writable by any code path. This section names the ones an integration
+is most tempted by, because each of them would make a delivery smoother and
+each is the user's decision.
+
+**Qualification is measured, not read off the configuration.** Where this
+product judges whether a session is qualified, it inspects **effective
+behavior**. A deny entry present in a settings file establishes that the entry
+is configured; it does not establish that it was enforced, in this version, in
+this session, for this command. The two are different claims and only the
+second qualifies a session.
+
+### 3.29 What admits a live observation
+
+A narrowly scoped authority amendment, settled by the owner on 2026-09-21 and
+recorded before the implementation it authorizes. Section 3.26 fixed that a
+live observation is the third evidence class and that only a session produces
+one. Section 3.28 fixed that qualification is measured rather than read off the
+configuration. This section fixes **what a claimed observation has to carry**
+before it is admitted as one, because the first implementation of that
+admission read the provider's prose and a sentence saying the opposite of a
+refusal satisfied it.
+
+**The defect this closes, exactly.** The admission accepted a transcript that
+contained the command text together with any of the words `permission`,
+`blocked`, `refus`, `denied` or `not allowed`. The transcript
+`cargo publish --dry-run: permission granted; command executed successfully`
+satisfies that predicate, and was admitted as evidence that the command had
+been refused. The repair is not a longer word list and not a more elaborate
+reading of natural language: a claim about enforcement is admitted from
+**structured evidence the harness itself emits**, or it is not admitted.
+
+**Rule 1: provider prose alone cannot establish enforced refusal.** Text a
+model emitted is a statement by the model. A refusal that survives as evidence
+is a structured record the harness produced, of the kind spec `004` section 3.4
+requires a refusal-bearing restriction to produce, naming the tool, the
+tool-use id and the tool input verbatim. Where the supported adapter exposes
+that record, it is what the admission reads. Prose may accompany it and is
+never what is read.
+
+**Rule 2: the controls are part of the evidence, not part of a procedure.**
+An observation qualifies only when all three of the following are present and
+each one succeeded:
+
+| Control | What it is | Why it is required |
+|---|---|---|
+| the refusal | the claimed command, run with the managed-session payload | the observation itself |
+| the allowed command | a command no floor entry claims, run with the same payload | without it the refusal is consistent with a payload that refuses everything |
+| the absent payload | the same claimed command, run with no payload | without it the refusal is evidence for the operator's own configuration rather than for this payload |
+
+These are conditions on the evidence a qualification boundary accepts. A
+document that describes them, a checklist that recommends them, or an operator
+who remembers them is not what this rule means: the boundary that admits the
+observation refuses one whose controls are absent or whose controls did not
+behave as the table says.
+
+**Rule 3: missing, contradictory, substituted or mismatched evidence refuses
+qualification.** A capture that is empty, that does not parse as the harness's
+own structured output, that reaches no terminal event, that carries no refusal
+record for the claimed command, or that carries a refusal for the allowed
+command, refuses the claim. Two controls presenting the same captured bytes is
+substituted evidence and refuses the claim, because one capture cannot be two
+measurements.
+
+**Rule 4: evidence for another invocation or settings payload cannot qualify
+this one.** The observation is bound to the invocation that produced it: the
+program and arguments as spawned, the working directory, the settings payload
+by digest, and the harness version the capture itself reports. A payload digest
+that is not this build's, a version that disagrees with the capture, a refusal
+control whose invocation does not carry the payload, or an absent-payload
+control whose invocation does carry one, all refuse the claim.
+
+**Rule 5: the same rules govern every route.** Construction, deserialization,
+and conversion from any other qualification type reach an admitted observation
+only through these rules. A record read back from a file is re-checked against
+them before it is treated as qualified, so writing the word into a file by hand
+is not a weaker route to the same claim; it is not a route at all.
+
+**Rule 6: unverified is the answer when the evidence cannot decide.** Where the
+supported adapter cannot expose evidence sufficient to distinguish a permission
+refusal from a model's statement about one, the result stays unverified and the
+session is reported as not qualified. Section 3.27's last paragraph already
+refuses the two repairs that would hide this. This section adds the third: the
+admission is not loosened so that a claim succeeds. A truthful inability to
+qualify is the correct outcome, and an invented proof is not an outcome at all.
+
+**What is preserved.** The original captured bytes and their provenance are
+kept with the record, not summarized into it. The admission is reviewable
+because what it was made from is kept and can be re-read, which is the property
+section 3.26 already relies on and which rules 3 and 5 now depend on.
+
+### 3.30 What each control must demonstrate, and what binds a capture to its launch
+
+A narrowly scoped authority amendment, settled by the owner on 2026-09-22 and
+recorded before the implementation it authorizes. It sharpens section 3.29
+rules 2 to 4. Rules 1, 5 and 6 are unchanged and govern everything below.
+
+**The defects this closes, exactly.** The admission written under section 3.29
+read each capture's assistant turns for tool-use **requests** and treated a
+request with no matching denial entry as a control that ran. A request is not
+an execution, and the absence of a denial entry is not the presence of a
+result. It matched a denial to a command by the command text alone, so a
+denial on another tool, or on another tool use, carrying the same text
+satisfied it. It kept only the last init event and the last terminal event, so
+a capture holding two sessions, or two disagreeing terminal events, was read as
+one. And it bound an invocation to its settings by checking that a
+`--settings` token appeared somewhere in a caller-authored argument list and,
+separately, that caller-supplied bytes digested to the payload. Neither check
+relates the argument to the bytes, and the argument list was written by the
+same caller after the fact.
+
+**Rule 7: a control is judged from correlated structured events.** Everything
+below is read through the supported adapter's own types (spec `004` section
+3.9), extended there where a field it carries was not yet typed, and never
+through a second parser in this spec's crate. The fields read are the ones the
+recorded Claude Code `2.1.267` streams under
+`crates/statecraft-adapter-claude-code/testdata/stream/` carry: the session id
+on every event; the init event's version and working directory; each assistant
+`tool_use` block's id, tool name and input; each `tool_result` block's
+tool-use id, error flag and content, with the carrying event's
+`tool_result_meta` and its `non_execution_kind`; the mid-stream
+`permission_denied` event's tool-use id, tool name and decision reason; and the
+terminal event's `permission_denials`. A field the provider does not emit is
+not required, and no fixture invents one.
+
+**Rule 8: a capture is one session, read whole.** A capture is admissible only
+when it holds exactly one init event and exactly one terminal event, the
+terminal event is its last event, no turn precedes the init event, every
+system, assistant, user and terminal event names the same session, tool-use ids
+are unique, every tool result names a tool use earlier in the same capture and
+no tool use has two results, every denial entry and every mid-stream denial
+names a tool use in the same capture whose tool name agrees, every denial
+entry's input is that tool use's input verbatim, and the init event's working
+directory is the directory the launch recorded. Anything else is conflicting,
+duplicated, mixed-session or incomplete evidence and refuses the claim.
+
+**Rule 9: each tool use is classified, not inferred.** The governed tool is the
+one the floor's entries name, `Bash`, and a command is its input's `command`
+string compared exactly. For one tool use:
+
+| Classification | What must be present |
+|---|---|
+| refused | a terminal denial entry for its id, and its tool result marked as not executed by `non_execution_kind` |
+| executed | a tool result for its id, no `non_execution_kind` on it, no denial entry and no mid-stream denial for its id |
+| unresolved | anything else: a request with no result, a result marked not executed with no denial behind it, or a denial whose result is not marked |
+
+An unresolved use refuses the claim. A request with the expected command text
+under another tool's name is not a use of the governed tool, and a denial on it
+proves nothing about the floor.
+
+**Rule 10: what each control proves.** Section 3.29 rule 2's table, stated as
+outcomes:
+
+| Control | Required outcome | Not required |
+|---|---|---|
+| the refusal | at least one governed use of the claimed command, and every such use **refused** | anything about the command's own exit |
+| the allowed command | at least one governed use of the allowed command, every such use **executed**, and at least one whose result is not an error and whose content, trailing line breaks removed, is exactly the expected output | |
+| the absent payload | at least one governed use of the claimed command, and every such use **executed** | the command succeeding |
+
+A control whose capture carries any other tool use refuses the claim, because
+evidence about a session that did something else is not evidence about this
+one. **Permission success and command success are different facts.** The
+absent-payload control proves that the claimed command reached execution with
+no permission refusal, under the same grant and without the payload. The
+command is chosen so that it fails harmlessly once it runs, and it is expected
+to: `cargo publish --dry-run --manifest-path statecraft-absent/Cargo.toml` names
+a manifest path that does not exist, so cargo stops before resolving anything,
+searches no ancestor directory, and contacts no registry. A result flagged as an
+error there is the command failing, which is what it was chosen to do, and it
+is not a refusal unless the harness marks it as one.
+
+A denied command that also shows evidence of executing is not a refusal. Two
+uses of the claimed command in the refusal control, one refused and one
+executed, refuse the claim.
+
+**Rule 11: terminal and process conditions are judged per observation, and
+kept.** A control is measurable only when the process ended by itself inside
+its deadline, no signal ended it, nothing in its process group outlived it,
+its exit code is `0` or `1`, and that code agrees with the terminal event's
+error flag the way every recorded stream agrees (`0` with `is_error: false`,
+`1` with `is_error: true`). Its terminal reason is `completed` or `max_turns`.
+The turn cap is admitted because the measurement shows the tool result arriving
+before the capped terminal event (`max-turns.jsonl`, `--max-turns 1`), so the
+cap ends a session whose control has already produced its evidence. An
+`api_error`, a terminal state spec `004` section 3.13 does not map, a timeout, a
+signal or a survivor leaves the control unmeasured and refuses the claim. The
+terminal state and the process end are preserved in the record either way.
+
+**Rule 12: the launch is the evidence of the invocation.** Section 3.29 rule 4's
+binding is made by the operation that launches the process, not by a
+description written afterwards. This product's own launch (spec `006` section
+3.11.2) constructs the argument vector, writes the payload to a settings file,
+resolves and digests the executable, reads its version, supervises the process
+in its own process group under a deadline, and records together: the executable
+as requested and as resolved, with its digest; the version it reported; the
+argument vector and working directory; the prompt, which travels on standard
+input and never in an argument; the settings path, the exact settings bytes, and
+their digest before the launch and after the process ended; standard output and
+standard error, separately and verbatim; the exit code, signal, timeout and
+survivors; a capture identity; and the control it is.
+
+The admission recomputes the argument vector this build constructs for the
+recorded control, commands and settings path, and requires it **exactly**. So
+a payload control carries one `--settings` argument naming the recorded file,
+and the absent-payload control carries none in either spelling, `--settings
+<path>` or `--settings=<path>`; a second settings argument, a substituted path,
+a reordered or additional argument, or bytes that changed while the process ran
+refuse the claim. Because the prompt is not an argument, no text in it can be
+read as an option. Three controls are three launches: their capture
+identities, their sessions and their tool-use ids are pairwise distinct, and
+two controls naming one session are substituted evidence however differently
+their bytes are formatted.
+
+**The trust boundary.** A launch record is **launcher-attested**. It
+establishes that this product started this executable with these arguments,
+this working directory and these settings bytes, and received these bytes back.
+It does not establish that the provider **loaded** the settings: that is
+inferred from behavior, which is what the three controls are for. It does not
+authenticate its own origin either. A record edited by hand after the fact and
+still consistent is admitted, because nothing here signs it, and no field and
+no rendering claims cryptographic provenance. What makes it reviewable is that
+the bytes are kept, which is section 3.29's closing paragraph.
+
+**Synthetic captures stay synthetic.** A capture launched against a fake
+provider is marked `synthetic` by the launching operation, at the operator's
+explicit request. Synthetic evidence runs the whole admission, so the path is
+testable end to end, and an observation admitted from any synthetic control is
+**never** a live observation: the record does not qualify and every rendering
+says synthetic. The mark prevents this product's own fixtures from being
+presented as earned; it does not detect a forgery, which the paragraph above
+already disclaims.
+
+**Records written before this section.** They carry no launch record. They
+still deserialize, their bytes and provenance stay in the file untouched, and
+the admission refuses them for the missing launch, so they read as not
+qualified. No record is rewritten, migrated or deleted.
+
+**The experiment these rules judge.** The acceptance script is the operator's
+route, and its contract is part of this amendment:
+
+- **Commands.** Refused: `cargo publish --dry-run --manifest-path
+  statecraft-absent/Cargo.toml`, which the floor's `Bash(cargo publish*)`
+  claims. Allowed: `echo statecraft-allowed-control`, whose expected output is
+  `statecraft-allowed-control` and which no floor entry claims.
+- **One grant, identical in all three.** Every launch carries
+  `--allowedTools` naming exactly those two commands. Without a grant a
+  non-interactive session refuses an unapproved command whatever the payload
+  says, so the absent-payload control could never show execution and the
+  refusal could not be attributed to the payload. With the grant identical,
+  the payload is the only difference between the refusal and the absent-payload
+  launches. That the provider's deny entry prevails over the grant is a premise
+  the refusal control **tests**: if it does not, the refusal control records an
+  execution and the claim is refused. The payload itself still carries no allow
+  entry, which is section 3.24's and section 3.28's rule and is untouched.
+- **Turns.** `--max-turns 1`, for rule 11's measured reason.
+- **Sessions.** At most **three** provider sessions: the refusal, the allowed
+  command and the absent payload, in that order. The first control whose launch
+  does not complete ends the experiment, and no later session is started. There
+  is no retry, no replay after an uncertain outcome, and no conditional extra
+  session. Each launch also runs the provider's `--version` once, which is a
+  version probe and not a session.
+- **Bounds.** Each session has its own deadline (default 300 seconds), each
+  version probe 30 seconds, so the whole stage is bounded by three sessions and
+  three probes.
+- **Approvals.** The provider stage refuses unless
+  `APPROVED_PROVIDER_SESSION=yes`; the real-home coexistence stage refuses unless
+  `APPROVED_REAL_HOME_COEXISTENCE=yes`. Neither implies the other.
+- **The local test route.** `SC_ACCEPTANCE_FAKE_PROVIDER=<path>` runs the
+  provider stage's whole control flow against a local executable instead of the
+  provider. It never reads the provider approval, refuses to run when that
+  approval is also set, marks every capture synthetic, and reports its result as
+  synthetic.
+
+### 3.31 The startup record a run writes, and the harness revision that answered
+
+A narrowly scoped authority amendment, settled by the owner on 2026-09-22 and
+recorded before the implementation it authorizes. Section 3.26 fixed what a
+managed session records at its start, and section 3.25 fixed that the resolved
+identity is recorded per session and says which revision actually answered.
+Neither was true of `run`: it wrote no startup record at all, and the
+`startup record` and `startup qualify` verbs filled the resolved identity in
+with the **required** one, so a revision nobody measured read as `exact` and
+resolved. This section fixes when a run's record is written, what binds it to
+the attempt, what measures the answering revision, and what each grade of that
+measurement establishes.
+
+**The defect this closes, exactly.** A required revision is not an observed
+one, and a verified directory on disk is not proof that the launched session
+used it. Recording the requirement as the resolution is the substitution
+section 3.26 forbids between its first and third statements, applied to the
+harness instead of to the instructions.
+
+**Rule 13: a run's startup evidence is two write-once records per attempt,
+under the attempt's identity.** Both live under the project's ignored runtime
+state, at `.statecraft/state/startup/runs/<run>/<attempt>/`, where `<run>` and
+`<attempt>` are the run id and attempt number spec `003` section 3.4 assigned.
+
+| Record | Written | Holds |
+|---|---|---|
+| `intent.json` | after the attempt's intent is appended and every preflight has passed, **before** the process is created | the attempt identity; the project identity; the workspace the session starts in; the load chain and instruction-file identities evaluated **in that workspace**; the required identity; the standing before launch; the **selected** revision; the adapter identity; the resolved program; the payload's digest, length and argument; and a fresh binding nonce |
+| `record.json` | after the process ended, or after the launch failed | the section 3.26 record: its seven fields and the added evidence, plus the attempt identity, the digest of the `intent.json` bytes it finalizes, the provider's session id and version as its stream reported them, the process outcome, the settings bytes the adapter actually wrote, and the **observed** revision with the grade of its evidence |
+
+Neither is ever rewritten. A record already present under the attempt's
+identity refuses the write, so a previous attempt's evidence is never
+overwritten and never adopted by a later attempt. `record.json` names the
+digest of the intent it finalizes, so the pair is judged together and an intent
+changed after the fact no longer binds.
+
+**Rule 14: preflight refusal and a launch are different facts.** A run refused
+before its attempt is appended (section 3.25's refusals) writes neither record.
+An attempt concluded `refused` before a process was created (the adapter's
+preflight, an unresolvable executable) writes neither record, and its refusal
+stays in the attempt record where spec `003` puts it. `intent.json` exists if
+and only if this product was about to create the process. A record read without
+its intent is not evidence of a launch.
+
+**Rule 15: a recording failure stops or reports, never proceeds silently.** If
+`intent.json` cannot be written, nothing is launched: the attempt is concluded
+`refused` with the guard `startup-record` and the reason. If `record.json`
+cannot be written after the process ended, the attempt is concluded with its
+real outcome, its detail says the record was not stored and why, and `run`
+exits 4, spec `006` section 3.10's failed row. If this product's own process
+ends between the two writes, the intent stays and no record is fabricated, and
+reconciliation (spec `003` section 3.6) owns the attempt record. *Amended by
+section 3.32 rules 22 and 23:* this rule first said such an attempt reads as
+launched and interrupted, and an intent does not establish either.
+
+**Rule 16: supply is recorded by the launch that performs it.** In a run, the
+bytes this product hands to the session are two things, and each is recorded
+by the operation that hands it. The **instruction chain** is in the workspace
+this product prepared and starts the session in: the launch reads each file the
+load rule reaches in that workspace immediately before the spawn and records
+its digest. The **settings payload** is the document the adapter writes: the
+adapter reports the exact bytes it wrote to the settings file it passes, and the
+record carries their digest. The supply is `supplied` only when the process was
+created, the chain reached the managed file, and the written bytes digest to
+the payload this build records; a spawn that failed is `failed`; a chain that
+does not arrive is `not-attempted`. Supply established this way says the bytes
+were in the session's working tree and on its command line at spawn. It does
+not say the provider read them, which is section 3.26's first and third
+statements, unchanged.
+
+**Rule 17: the selected revision is the launch configuration, and the observed
+revision is measured.** The run **selects** the required revision after the
+standing has established that it is installed and intact, and never any other
+(section 3.25: no latest, no substitute). A project that commits no
+requirement selects nothing. The selection is carried to the session in its
+constructed environment, beside the attempt binding: `STATECRAFT_RUN_ID`,
+`STATECRAFT_ATTEMPT`, `STATECRAFT_STARTUP_NONCE` and
+`STATECRAFT_HARNESS_SELECTED`. None of them is a credential and none carries
+one.
+
+What **answered** is measured by the shipped `SessionStart` hook. When the
+nonce is present in its environment and the manifest gate of section 3.14 rule
+3 passes, it prints one acknowledgment line on its standard output, and writes
+nothing:
+
+```text
+statecraft-startup<TAB>v1<TAB>nonce=<n><TAB>run=<id><TAB>attempt=<k><TAB>selected=<digest-or-none><TAB>project=<dir><TAB>root=<revision-dir>
+```
+
+`root` is the revision directory the executing script is in, resolved by the
+script from its own path. Claude Code `2.1.267` reports each hook's standard
+output in its stream as a `hook_response` event carrying the session id, the
+hook event, the exit code and the output verbatim, which the recorded streams
+under `crates/statecraft-adapter-claude-code/testdata/stream/` show. The
+adapter types those fields (spec `004` section 3.9) and hands the responses to
+the run; this spec's crate judges them.
+
+**Rule 18: what an acknowledgment must satisfy, and what each failure is.** The
+observed revision is admitted only from exactly one acknowledgment, in a
+`hook_response` event for `SessionStart` that exited `0`, in this attempt's own
+stream, whose session id is the session id of that stream's init event, and
+whose nonce, run, attempt, selected revision and project all equal what
+`intent.json` recorded (the project compared as the canonical workspace path).
+The revision directory it names is then read and digested, and that full digest
+is the **observed** identity. Anything else is **unverified**, and the record
+names which:
+
+| Evidence | Recorded as |
+|---|---|
+| no acknowledgment in any `SessionStart` response | `unverified: absent` |
+| a line that begins the acknowledgment and does not parse | `unverified: malformed` |
+| another attempt's nonce | `unverified: replayed` |
+| another run or attempt number, or another selection | `unverified: wrong-attempt` |
+| another project directory | `unverified: wrong-project` |
+| a session id that is not the stream's own | `unverified: wrong-session` |
+| a hook that exited non-zero | `unverified: hook-failed` |
+| two acknowledgments naming different directories | `unverified: conflicting` |
+| a revision directory that is not directly inside this home's harness store | `unverified: foreign-revision` |
+| a revision directory that cannot be read and digested | `unverified: unreadable-revision` |
+
+An unverified observation leaves the resolved identity absent, and absent is
+not a match: the standing stays `exact` with nothing resolved, which section
+3.25 already makes not qualified. An admitted observation becomes the resolved
+identity and the standing is evaluated against it. Its directory's current
+bytes are what the digest is over, so a revision that was altered after it
+answered reads as what it now is.
+
+**Rule 19: a mismatch observed after launch refuses the attempt.** Section 3.25
+refuses managed execution under a mismatch, and a run cannot detect one before
+the session starts, because the acknowledgment is emitted by the session. So a
+mismatched standing, measured from an admitted acknowledgment, is counted as a
+refusal under the guard `harness-identity` when the attempt is concluded, the
+attempt is `refused` (spec `003` section 3.5), and `accept` treats it as spec
+`005` section 3.1.1 treats any refused attempt. *Amended by section 3.32 rule
+26:* this rule first let the session run to its end and refused it afterwards,
+which section 3.25's "nothing was done" does not admit. An unverified
+observation is not a mismatch; for a project that commits a requirement it
+now withholds governed work under section 3.32 rule 26, and it never qualifies
+the attempt. A project that commits no requirement records
+whatever was observed and is `unrequired`, which never qualifies.
+
+**Rule 20: what each grade establishes, and does not.**
+
+| Grade | Establishes | Does not establish |
+|---|---|---|
+| installed integrity | the required directory's files digest to the committed full digest, before launch, and again when the record is written | that anything used them |
+| launch configuration | this product selected that revision and named it, with the attempt binding, in the environment it constructed for the process it created | that the provider or any hook read the environment |
+| correlated acknowledgment | see section 3.32 rule 27, which replaces this row | see section 3.32 rule 27 |
+
+*Amended by section 3.32 rule 27.* This row first said the acknowledgment
+establishes that a hook script located in the named revision directory
+executed. It does not: the line's origin is not authenticated, the provider's
+response does not name the command that printed it, and the directory digest
+is taken when the record is written, not when anything ran. The grade is the
+**correlated acknowledgment**, and rule 27 fixes what it does and does not
+establish. The acknowledgment remains **launcher-attested**, like section
+3.30's launch record. Section 3.32 rule 25 replaces the operator's global
+registration with a per-invocation one, so a managed run no longer depends on
+ambient registration for its startup path.
+
+**Rule 21: a run attempt's judgement, and why `qualified` is not reachable
+through a run.** The judgement read back from the two records is one of:
+
+| Verdict | When |
+|---|---|
+| `not-launched` | the attempt exists and has no `intent.json` |
+| `launch-unknown`, `outcome-unknown`, `spawn-failed` | section 3.32 rule 23; an intent with no record is one of the first two and is never `interrupted` |
+| `interrupted` | a record whose process was created and did not end by itself as one readable session |
+| `mismatched` | an admitted acknowledgment naming a revision other than the required one |
+| `not-admitted` | section 3.32 rule 26: a requirement is committed and no correlated acknowledgment was admitted at the startup decision |
+| `unverified` | launched and recorded, and not qualified for any other reason, each one named |
+| `qualified` | the record's `qualifies()` conjunction holds |
+
+A run session is not one of section 3.29's three controls, and rule 4 of that
+section refuses evidence for another invocation as evidence for this one. So a
+run attempt's observation is always `not-observed`, and `qualified` is not
+reachable through a run: a completed run with a matching acknowledgment is
+`unverified`, and it says the live observation is the missing class. The
+judgement is recomputed on every read from the bytes in the two records,
+including section 3.29 rule 5's re-admission, so a field edited by hand changes
+the judgement rather than asserting one, and one attempt's records are never
+read as another's.
+
+### 3.32 Launch states, the correlated acknowledgment, per-invocation startup delivery, and when governed work is released
+
+A narrowly scoped authority correction to section 3.31, settled by the owner on
+2026-09-22 and recorded before the implementation it authorizes. It closes four
+defects, each a claim the evidence did not support.
+
+1. **An intent was read as a launch.** Section 3.31 wrote `intent.json` before
+   the process was created and read an intent with no record as launched and
+   interrupted. This product can stop after writing the intent and before the
+   spawn, and after the spawn and before anything else is written; neither
+   inference holds.
+2. **An acknowledgment was read as execution provenance.** Section 3.31 rule 20
+   said the acknowledgment establishes that a hook script in the named
+   directory executed, and in the same row that nobody authenticates who
+   printed the line. The second is right, so the first cannot be.
+3. **The managed startup path was ambient.** A run delivered only the deny
+   floor, and the `SessionStart` hook that acknowledges a start reached the
+   session only if the operator had registered it globally. A managed run's
+   startup evidence depended on the operator's home rather than on what the
+   run supplied.
+4. **A mismatch was refused after the fact.** Section 3.25 says a refused
+   managed execution is one where "nothing was done". Section 3.31 rule 19 let
+   the session run to its end and then concluded it refused.
+
+**Rule 22: a launch is four write-once records, each a separate fact.** Every
+file lives in the attempt's directory of section 3.31 rule 13 and is created
+exclusively: an existing file refuses the write, and nothing is ever replaced.
+
+| Record | Written | Establishes | Does not establish |
+|---|---|---|---|
+| `intent.json` | after every preflight has passed, before the spawn is attempted | this product was about to attempt a spawn, with this configuration | that a process was created |
+| `launched.json` | immediately after the spawn call returned a process, **before** the prompt is delivered to it | a process with this id was created for this attempt | anything the process did |
+| `admission.json` | at the startup decision of rule 26 | the decision, its reason, and when it was made | that the provider honored it |
+| `record.json` | after the process ended, after the launch failed, or after the confirmation of a spawn could not be persisted | the completion, as section 3.31 rule 13 describes it, and which of the earlier records this product wrote | anything the earlier records do not |
+
+The order is fixed: intent, spawn, confirmation, prompt, decision, record. The
+prompt is written to the process only after `launched.json` is persisted, so a
+confirmation that cannot be persisted stops the process before it has been
+given any work, and the record says so. A spawn and a file write are not one
+atomic transaction, and nothing here pretends they are: between the spawn
+returning and the confirmation being on disk there is a window in which a
+process exists and no record says so, and rule 23 names what that window reads
+as.
+
+**Rule 23: the launch states, read back, and what each does not prove.**
+
+| What is on disk | State | What it means | What it does not mean |
+|---|---|---|---|
+| no intent | `not-launched` | this product attempts no spawn before the intent is persisted, so it created no provider process for this attempt | that nothing else happened: the workspace was prepared |
+| an intent, nothing after it | `launch-unknown` | intent persisted; this product stopped before confirming a spawn | that no process exists, or that one does |
+| an intent and a confirmation, no record | `outcome-unknown` | a process with the recorded id was created and given its prompt; its outcome is unknown | that it was interrupted, or that it had no effect |
+| a record whose spawn call failed | `spawn-failed` | the operating system reported that no process was created | anything about the workspace beyond what the preparation did |
+| a record whose confirmation could not be persisted | `interrupted` | a process was created, and stopped before its prompt was delivered | that stopping it undid anything |
+| a record of a completed launch | section 3.31 rule 21, with `not-admitted` added by rule 26 | as there | as there |
+
+Absence of a final record never proves an interruption, and absence of a
+record never proves that no side effect occurred. `launch-unknown` and
+`outcome-unknown` are the honest words for a crash, and each names the files it
+read.
+
+**Rule 24: an uncertain launch is never replayed automatically.** The run
+record's attempt stays live when this product stops mid-launch, and spec `003`
+section 3.6 blocks a retry of an intent whose outcome is unknown. `run` refuses
+the next attempt, names the live attempt and its launch state, and gives the
+operator the inspection to perform: `startup show <path> <run-id> --attempt
+<n>`, the process id where one was confirmed, and the workspace where effects
+may have landed. This build has no verb that reconciles an attempt; the
+limitation is stated in that answer rather than worked around, and nothing
+here infers an outcome to free the lock.
+
+**Rule 25: a managed run supplies its startup hook and its gate explicitly.**
+Where the project commits a requirement, the run's settings document is the
+deny floor of section 3.27 plus two hook registrations, and nothing else:
+
+- `SessionStart`, matcher `startup`: the selected revision's
+  `hooks/statecraft-session-start.sh`, by absolute path in the installed
+  revision directory whose integrity section 3.25 has just checked.
+- `PreToolUse`, matcher `*`: the attempt's **admission gate**, a script this
+  product writes once into the attempt's directory before the spawn. It is
+  launcher content, not harness content, so it is in no revision's digest and
+  no harness upgrade changes it.
+
+The mechanism is the one section 3.27 already relies on: Claude Code documents
+`--settings <file-or-json>` as an additional settings source, and documents
+`hooks` as a settings key. Whether `2.1.267` honors hooks supplied that way, in
+`--print` mode, and passes the session's environment to them, is
+**unobserved** in a live run. Nothing here writes the operator's home, and a
+managed run no longer needs section 3.24's global registration to be
+acknowledged. The intent records the exact document by digest and length, each
+registration by event, matcher, command and the digest of the script it names,
+and, separately, the digest of the deny floor alone. The run's document is not
+the floor's bytes, so under section 3.29 rule 4 no qualification of the floor
+payload is evidence for a run's document, and the record never reads one as
+the other. Where the project commits no requirement, nothing is selected, the
+document is the floor alone, no gate is written, and the record says work was
+not gated by a startup decision.
+
+**Rule 26: startup identity is an admission prerequisite, and governed work is
+released only by the decision.** Section 3.25 promises prevention, so the
+decision is made before governed work is released, not after the session ends.
+*Governed work* is every tool call the session makes: the channel through which
+a session changes anything. The gate refuses every tool call until
+`admission.json` records `admitted`, waits a bounded time for a decision that
+has not yet been written, and refuses when that time passes.
+
+The launcher decides at the first event in the attempt's stream that is not a
+`SessionStart` hook event: in the recorded `2.1.267` streams, the init event,
+which follows every `SessionStart` `hook_response`. At that point it judges the
+acknowledgments it has read under section 3.31 rule 18, and writes:
+
+| Decision | When |
+|---|---|
+| `admitted` | exactly one correlated acknowledgment is admitted, and the standing evaluated against it is `exact` |
+| `refused: mismatched` | an admitted acknowledgment names a revision other than the required one |
+| `refused: not-established` | no acknowledgment is admitted, for any reason rule 18 names |
+
+On a refusal the launcher stops the process group at once and concludes the
+attempt `refused`, under the guard `harness-identity` for a mismatch and
+`startup-admission` otherwise. A stream that ends before the decision point is
+decided at its end, the same way.
+
+What this boundary establishes, and what it does not:
+
+- **Establishes:** a tool call that the provider routed through the gate did
+  not run before `admitted` was written, and did not run after a refusal. The
+  gate appends each consultation to the attempt's `gate.log`, so the record can
+  say whether the gate was consulted at all.
+- **Does not establish:** that the provider honors the registration. A provider
+  that ignores it runs neither the acknowledgment nor the gate; the decision is
+  then `refused: not-established`, the process is stopped, and the refusal is
+  **retrospective**: the record says effects before termination are not
+  excluded. Nor does it establish that nothing happened outside tool calls (the
+  provider's own startup, other hooks), or that stopping the process undid
+  anything. Prompt termination is not proof of no effect.
+
+**Rule 27: the correlated acknowledgment.** The grade section 3.31 called
+`acknowledged` is **`correlated`**, in the record, in the API and on the
+command line. An admitted correlated acknowledgment establishes, and no more:
+
+- a `hook_response` for `SessionStart` in this attempt's stream, exit `0`,
+  carrying the stream's own init session id, held one line whose nonce, run,
+  attempt, selection and project equal the intent;
+- the directory that line names is directly inside this home's harness store,
+  and its files, read when the record is written, digest to the recorded
+  identity;
+- the per-invocation registration of rule 25 named the script in the selected
+  revision directory.
+
+It does **not** establish which process printed the line: the provider's
+response does not name the command, and the nonce is in the session's
+environment, so any hook or process that runs there can print it. It does not
+establish that the script at that path is the one that ran, that its bytes when
+it ran equal the bytes digested, or that any other file of the revision was
+loaded. "Executed" is never claimed. A record written before this section
+carries the grade `acknowledged`; it is read as `correlated` with the same
+fields and judged the same, and nothing is rewritten.
+
+**Rule 28: the evidence words do not collapse.** Each names one fact and none
+implies another: **installed** (a revision directory whose files digest to its
+name), **selected** (named in the launch configuration), **supplied** (bytes
+in the work tree and on the command line at spawn), **correlated** (rule 27),
+**admitted** (rule 26's decision released governed work), and **qualified**
+(section 3.29's live observation, unreachable through a run). A record whose
+evidence is insufficient under these rules, including one written before them,
+stays inspectable and is never qualified by being read.
 
 ## 4. Out of scope
 
@@ -1091,6 +2046,275 @@ that repository's own decision and not with this delivery. And the interim is
 that nothing moves: aicortex is specified and under construction, so the notes
 that exist today stay where they are until that store can hold them, which is a
 sibling's schedule and not a condition on this product's delivery.
+
+**2026-09-21, authority: the owner replaced §3.24's physical single-region
+requirement, and the code that already existed is a candidate for the new
+wording rather than a retroactive fit for the old one.** The entries above put
+the wording to the owner and said the behavior was ahead of it. The owner's
+answer is the contract now in §3.24: one recorded modification, insertions that
+may occupy multiple syntactically valid locations, each identified by exact
+content, structural location and recorded provenance, with unrelated bytes
+preserved and removal conditioned on establishing ownership.
+
+Two things follow, and the second is the one worth writing down.
+
+First, what the amendment does **not** touch. Every guarantee stated around the
+region survives verbatim: an exact reviewable plan, consent specific to the
+content, no widened permission, `settings.local.json` never written, the digest
+either side, idempotent application, conservative removal, and user edits and
+conflicts preserved rather than resolved. The owner also fixed the syntax floor
+in the same act: strict JSON, no JSON5, no comment outside a string value, no
+sentinel deny entry that refuses nothing, no unsupported metadata key. The
+sentinel was one of the two alternatives this build rejected on its own
+reasoning; it is now rejected on the owner's authority as well.
+
+Second, what this build must **not** now claim. The implementation of
+2026-09-21 was written against the old wording, did not satisfy it, and said
+so. The amendment does not convert it into an implementation that did. It is a
+**candidate implementation of the revised contract**, and the difference is not
+bookkeeping: the old wording was satisfied by a property of the file's layout,
+which a reader can see, and the new one is satisfied by three properties of
+each insertion, of which only the first is visible in the file. Ownership by
+structural location and by recorded provenance is a claim about state this
+build keeps elsewhere, and a claim of that shape is established by exercising
+the cases where the state disagrees with the file: an insertion moved, a
+marker forged, a record lost, a value duplicated, a user edit landing between
+the plan and the write. Passing the tests written for the old wording
+establishes none of those. §3.24's implementation is therefore reconciled
+against the revised contract as its own work, and `implementation` stays
+`in-progress` until that reconciliation is done rather than because the
+sentence is unsettled.
+
+**2026-09-21, authority: an end-of-turn hook advises, and the two exit
+vocabularies are translated rather than passed through.** §3.23's seven hook
+contracts were written from measured failures in gates, and contract 6 ("a gate
+whose check did not run is not green") was read here as though every hook were
+a gate. The owner's decision separates them, and the §3.23 text now carries
+both halves.
+
+The reason the separation matters is asymmetric cost, and it is worth stating
+once rather than rediscovering. A gate that wrongly refuses costs an operation
+the operator can retry with the same evidence in hand. An end-of-turn block
+that wrongly fires costs the handback itself, which is the only account of why
+the work failed and the one thing that cannot be reconstructed later. So the
+two answer differently to the same non-zero code: the gate refuses and the
+end-of-turn event reports.
+
+The exit-code table is the second half and was an unforced hazard. This
+product spends `3` on a usage error and spec-spine spends it on a read that was
+not performed; this product spends `2` on a refusal and spec-spine on a stale
+tree. Three of the four shared integers disagree, so a code propagated from one
+vocabulary into the other is not merely imprecise, it names a different
+condition. §3.23 now carries the translation and the collapse an enforcing gate
+performs on it.
+
+Two boundaries the owner drew explicitly, recorded so a later reading does not
+widen them. No new hook repair behavior is authorized: contract 1 stands, and
+the post-edit `compile` remains the single sanctioned exception. And nothing
+here decides which events this build registers; that is §3.23's inventory
+question, settled separately.
+
+**2026-09-21, authority: §3.25, and the measurement that made the full digest a
+requirement rather than a preference.** §3.14 made a revision content
+addressed and stopped there. Who holds the requirement, and what happens when
+the home does not hold it, were unfixed, and the two plausible answers differ
+in what a project can say afterwards about what it ran.
+
+`crates/statecraft-home/src/resolved.rs` already freezes a per-run `Identity`
+carrying `requested` and `resolved`, so half of §3.25 is a rule the code
+follows. The other half is not present: the manifest header (§3.3) pins this
+product's version, the spec-spine version and the adapter set, and pins no
+harness revision, so `requested` today resolves against whatever the home
+holds rather than against a committed statement. §3.25 fixes that the required
+identity is committed, and the implementation is separate work.
+
+The digest rule was measured, not assumed. `harness::revision_of` computes the
+full SHA-256 over path and content in path order and then keeps
+`format!("h-{}", &full[..12])`, discarding the rest. Twelve hex characters is
+48 bits, which is ample as a label an operator reads in a plan and is not an
+integrity proof: an integrity comparison must be able to say that these are
+the same bytes, and a comparison over a truncation says only that they agree
+about 48 bits of them. So §3.25 separates the two roles rather than lengthening
+the identifier, because the short form is genuinely the better thing to print
+and the worse thing to compare.
+
+The two prohibitions are there because each is the convenient behavior.
+Selecting the latest installed revision makes a mismatch disappear at the exact
+moment it should be reported. Rewriting the requirement during a read makes a
+`doctor` run into the repair that hides what `doctor` was asked to find, which
+is the same defect AGENTS.md refuses in a `compile` substituted for a `check`.
+
+**2026-09-21, authority: §3.26, and why the evidence is added beside the
+verdict rather than folded into it.** §3.14's three verdicts are already
+implemented, in `crates/statecraft-home/src/delivery.rs`, as `Reached { via }`,
+`NotReached { reason }` and `Unverified { reason }`. The owner's decision adds
+what a managed session records at startup and fixes the claims that record may
+carry; it does not touch the three words.
+
+That restraint is the substance of the entry. The tempting move is to make
+`reached` mean more, because `reached` is what an operator reads and what an
+operator wants to know is whether the instructions are actually in effect. But
+`reached` is written into records, and a verdict whose meaning changes rewrites
+the meaning of every record already carrying it, retroactively and silently.
+So the three evidence statements are separate fields: the chain arrives, the
+bytes were resolved and supplied, and a live session demonstrated the behavior.
+They are ordered by strength and each is strictly weaker evidence for the next.
+
+The prohibition is narrow and worth naming precisely. A digest proves bytes are
+bytes. An acknowledgement proves something emitted an acknowledgement. Neither
+proves that a model read, understood or complied with anything, and this
+product's records claim none of the three. The distance between "supplied" and
+"complied" is exactly the distance a live-session acceptance has to cross,
+which is why §3.26 admits the third statement as a category and leaves
+producing one to a session rather than to this record.
+
+**2026-09-21, authority: the owner adopted the whole of §3.23's inventory, and
+the cost §3.23 quoted is now due.** Ten skills, four agents and four event
+behaviors, delivered under Statecraft-namespaced names. The entry above, on
+`SessionStart`, said registering the other three events remained the owner's
+adoption act. It has happened, and `Stop` arrives under the advisory policy
+rather than as a gate.
+
+§3.23 already priced this. "Whoever owns the files owns the assertions": the
+three skill assertions and the seven hook contracts are enforced in the
+counterparty's tree by two test files that a hermetic test cannot carry across,
+because neither may read `$HOME`. So the assertions are reimplemented where the
+files land or the requirements become unenforced, and there is no third
+outcome. Adoption is what converts that from a stated cost into scheduled work.
+
+Two boundaries recorded because both are easy to slide past. Adoption is
+delivery and not authorization: a delivered skill may be invoked and acquires
+no standing permission by existing, so publishing, merging, releasing and
+executing still need whatever authorizes them independently. And repository
+invariance is a condition to be checked rather than a property to be assumed.
+The inventory was written inside spec-spine's own repository; a file that
+arrives carrying that project's crate layout, gate commands or workflow is an
+adoption defect, and the check for it is not "does the word appear somewhere in
+the file".
+
+**2026-09-21, authority: §3.27, and the gate a deny entry does not have.** This
+build writes the deny floor into `permissions.deny` in a native settings file
+and registers hook scripts beside it, and the two were reasoned about as one
+delivery. They are not one. A hook script can be project-gated because a script
+runs and can test for `.statecraft/environment.json` and exit, which is what
+`harness::GATE` states and what the shipped scripts do. A deny entry is
+evaluated by the harness itself, before anything of this product's runs, so it
+has no place to perform that test. Writing the floor into a user's global deny
+list therefore applies it to every repository that user opens, and the
+project-gated scripts sitting next to it do not narrow it by association.
+
+So the two are separated: global registration is one act with one scope, and
+delivering the floor to a managed session is another, through a mechanism that
+can carry a scope. Claude Code documents `--settings` for that shape of need.
+The amendment deliberately does not treat the documentation as the evidence:
+the installed version and the effective behavior are measured before this
+product relies on the mechanism, and an unverified mechanism is unavailable
+rather than assumed.
+
+The last paragraph of §3.27 is the one that will be under pressure, so it is
+written as two named refusals rather than as a principle. If the floor cannot
+be delivered to an ordinary unmanaged session, the answer is to report that
+session as not qualified for the managed-execution claim. It is not to lower
+the floor until delivery succeeds, and it is not to write a repository-local
+generic harness copy so that the limitation stops being visible, which would
+also reintroduce the exact thing §3.14 removes.
+
+**2026-09-21, authority: §3.28, and the one route by which a delivery takes
+over a user's hook by accident.** §3.24 already refuses to resolve a conflict.
+What it did not say is what happens to a registration that resembles this
+product's own, and the answer matters here specifically: §3.22 records a global
+push gate the user already runs at `~/.claude/hooks/push-gate.sh`, and this
+product ships a gate with the same purpose. The two will look alike, and a
+delivery that recognizes its own content by resemblance will recognize that one
+too.
+
+So ownership keeps all three of §3.24's properties and is not satisfied by the
+first. A marker is content, and content can be copied; the recorded provenance
+is what this product actually knows about what it did. An unmarked registration
+is the user's, and this product neither deletes, adopts nor rewrites it, even
+when it is byte-identical to something shipped. Replacing one later is an exact
+plan and its own act. For this round the behavior under test is coexistence.
+
+The last rule is the one this round has to obey while measuring its own work. A
+deny entry read out of a settings file establishes that the entry is
+configured. Qualification is a claim about enforcement, in this version, in
+this session, for this command, and only an inspection of effective behavior
+establishes it. Reading the file and reporting the session qualified would be
+this section's failure committed by the tooling that was written to detect it.
+
+**2026-09-22, authority: §3.30, recorded before the repair it authorizes.**
+Re-reading the §3.29 implementation at `62bde9a` against what each control has
+to prove found five defects the section's own negative controls did not reach,
+and §3.30 names them. None was a gap in a word list and none is closed by
+reading more prose: each is a place where a request stood in for a result, a
+text match stood in for an identity, or a description written after the launch
+stood in for the launch. The owner authorized the repair on 2026-09-22 with the
+instruction that the authority be recorded first and separately, which is this
+entry and the section it points at. §3.29's rules 1, 5 and 6 stand as written;
+§3.30 adds rules 7 to 12, which sharpen rules 2 to 4.
+
+Two design facts are recorded because they are premises rather than
+measurements. The experiment grants both commands to all three launches,
+because a non-interactive session refuses an ungranted command regardless of
+the payload and the controls would otherwise measure the missing grant; and
+that a deny entry prevails over such a grant is what the refusal control
+tests, not what it assumes. Neither has been observed on a live provider here.
+
+**2026-09-22, authority: the deadline attempt's contract is corrected, recorded
+before the test changes.** The attempt
+`timeout_after_terminal_denial_cleans_settings_and_retains_evidence` in spec
+`004`'s `settings_transport.rs` asserts four properties inside one five-second
+wall-clock window that starts at `spawn`. Three of them are the supervisor's:
+supervision ends at the deadline and not before it, the process group is
+killed, and the supplied settings file is removed while the workspace's own
+settings are untouched. The fourth, that a terminal denial read before the
+deadline survives the interruption, needs a **precondition** the product does
+not promise: that the fixture child is `execve`d, runs, emits and is read
+inside those same five seconds. Spec `004` section 3.5 case 3 promises that a
+hung child is killed at the deadline with its descendants and the attempt is
+`interrupted`; it does not promise that any child starts within a bound, and the
+2026-09-21 entries above measured that on a loaded machine one does not. The
+test therefore could fail with the product correct, and the lock recorded above
+reduced how often without establishing anything about the bound.
+
+The corrected contract keeps every property and gives each the measurement that
+can establish it:
+
+1. **The deadline, the kill and the cleanup** are measured through this crate's
+   own execution path with the same five-second deadline and the same start
+   point, `spawn`, because the product's deadline covers that interval and
+   moving the start would remove part of what is promised. The child hangs from
+   its first line and backgrounds a descendant. Nothing here needs the child to
+   reach any point by any time: supervision must end no earlier than the
+   deadline, report no surviving process, remove the settings file and leave
+   the workspace's settings as they were, whether or not the child ever ran.
+   The upper bound on elapsed time is chosen to separate the defect it exists to
+   catch, a supervisor held by the process it supervises, from scheduling
+   latency in the `kill` it spawns: the child's hang is 300 seconds, so any
+   return well under that proves supervision was not held, and the bound is set
+   at 60 seconds rather than at the deadline plus a guess. A descendant the
+   child did start is checked dead by its process id.
+2. **Retention across an interruption** is measured where it is decided, and
+   without a race. In the claude-code crate, the mapping from what the
+   supervisor read to the execution's evidence is a function of the supervised
+   events and outcome, so it is tested with an interrupted supervision that read
+   a terminal denial: the denial must be in the structured evidence and the
+   outcome must stay `interrupted`. In the generic supervisor, an event the
+   reader thread had already delivered when the deadline fired was left unread
+   in the channel and lost. That is a product defect in the retention the
+   attempt was written to protect, found by stating the contract rather than by
+   timing it, and it is repaired by draining what was already delivered before
+   the kill; its test fills the channel deterministically.
+3. **What each failure means** is then separable. A fixture that could not
+   start is visible in the trace and fails nothing in (1). A child or
+   descendant that escaped the group fails (1) by the survivor report or its
+   process id. A deadline the supervisor did not honor fails (1)'s bounds. And
+   no remaining assertion is a scheduler-sensitive measurement of a property
+   the product does not promise.
+
+The lock is removed with the precondition it mitigated. The deadline stays five
+seconds, no assertion about the product is weakened, nothing is retried, and
+the earlier failure evidence in the entries above is kept as written.
 
 ## Verification
 
