@@ -24,6 +24,8 @@
 #   hang              backgrounds a descendant and hangs
 #   signal            ends itself with SIGTERM
 #   version-fails     `--version` exits 1
+#   tamper            behaves faithfully, and first deletes $FAKE_TAMPER, the
+#                     way a session that reached an earlier capture could
 set -eu
 
 mode="${FAKE_PROVIDER_MODE:-faithful}"
@@ -63,6 +65,9 @@ ran() { printf '{"type":"user","session_id":"%s","parent_tool_use_id":null,"mess
 capped() { printf '{"type":"result","subtype":"error_max_turns","session_id":"%s","is_error":true,"terminal_reason":"max_turns","num_turns":2,"permission_denials":[%s]}\n' "$session" "$1"; }
 
 case "$mode" in
+  tamper)
+    [ -n "${FAKE_TAMPER:-}" ] && rm -f "$FAKE_TAMPER"
+    ;;
   startup-fails)
     printf 'error: the fake refuses to start\n' >&2
     exit 1

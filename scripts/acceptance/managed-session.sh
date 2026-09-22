@@ -1,81 +1,89 @@
 #!/bin/sh
-# The managed-session acceptance, as three separately authorized stages.
+# The managed-session acceptance, as separately authorized stages.
 #
-# Spec 002 sections 3.24 to 3.29. This replaces the prose outline that used to
-# live in the handoff: every step below is a command this script runs, every
-# capture has a location, every exit status is preserved, and there is no step
-# reading "same, with" or "open a session" for a human to interpret.
+# Spec 002 sections 3.24 to 3.30. Every step below is a command this script
+# runs, every capture has a location, every exit status is preserved with its
+# meaning, and the product, not this script, constructs every provider
+# invocation and judges every capture.
 #
 #   sh scripts/acceptance/managed-session.sh preflight
 #   sh scripts/acceptance/managed-session.sh permission-experiment
 #   sh scripts/acceptance/managed-session.sh coexistence
+#   sh scripts/acceptance/managed-session.sh clean
 #
-# THE THREE STAGES ARE THREE APPROVALS.
+# THE STAGES ARE SEPARATE APPROVALS.
 #
 #   preflight              Local only. Builds the fixture, runs the product's
-#                          own verbs against it, and checks every precondition
-#                          the next stage depends on. Spawns no provider,
+#                          own verbs against it, and checks, through the same
+#                          launch and admission path stage 2 uses, that the
+#                          admission refuses a prose claim. Spawns no provider,
 #                          writes nothing outside $ACC, needs no approval.
 #
-#   permission-experiment  Spawns the provider. Needs the owner's approval for
-#                          a paid provider session, given for THIS stage. It
-#                          does not activate anything in the real home and it
-#                          does not need to: every invocation carries its
-#                          settings on its own command line.
+#   permission-experiment  Spawns the provider: at most THREE sessions, one per
+#                          control, in order, each bounded by $STEP_TIMEOUT
+#                          seconds, stopping at the first launch that does not
+#                          complete. Each launch also runs the provider's
+#                          `--version` once (a probe, not a session, bounded at
+#                          30 seconds). No retry, no replay, no extra session.
+#                          Refuses unless APPROVED_PROVIDER_SESSION=yes.
+#                          Activates nothing in the real home: every launch
+#                          carries its settings on its own command line.
 #
-#   coexistence            Needs the settings modification applied to the real
-#                          home, which is a separate consent under section 3.24
-#                          and is NOT implied by approving the stage above.
-#                          This script refuses to run it unless that consent is
-#                          named explicitly, and it still performs no write of
-#                          its own.
+#   coexistence            Observes the real home. Needs the section 3.24
+#                          settings modification applied there, which is its
+#                          own consent and is NOT implied by approving the
+#                          stage above. Refuses unless
+#                          APPROVED_REAL_HOME_COEXISTENCE=yes, and performs no
+#                          write to the real home.
 #
-# Approval of one stage authorizes that stage. Nothing here treats approval of
-# the permission experiment as approval of the coexistence experiment, and the
-# refusal below is the enforcement of that rather than a note about it.
+# THE LOCAL TEST ROUTE.
 #
-# WHAT A PASSING RUN ESTABLISHES, AND WHAT IT DOES NOT.
+#   SC_ACCEPTANCE_FAKE_PROVIDER=<executable> runs the permission-experiment
+#   stage's whole control flow against a local fake instead of the provider.
+#   It never reads the provider approval, refuses to run if that approval is
+#   also set, marks every capture synthetic (spec 002 section 3.30), and
+#   reports its result as SYNTHETIC. A synthetic result is never a live
+#   observation and nothing downstream treats it as one.
 #
-# That a refusal delivered through the managed-session settings mechanism was
-# enforced by the installed harness, for one named command, in one named
-# version, on this machine. It establishes nothing about any other command, any
-# other version, or whether a model read or complied with anything.
+# WHAT AN ADMITTED LIVE RESULT ESTABLISHES, AND WHAT IT DOES NOT.
 #
-# AN UNVERIFIED RESULT IS A RESULT.
+# That, in one named harness version on this machine, the refused command was
+# refused through a structured denial and did not execute under the payload,
+# the allowed command executed under the same payload and printed its expected
+# output, and the refused command executed without the payload. The launch
+# record is launcher-attested, not provider-authenticated. Nothing is
+# established about any other command or version, or about whether a model
+# read or complied with anything. The record is not "qualified": that also
+# needs supply, which this stage does not perform.
 #
-# If the provider emits no structured refusal record, the admission refuses the
-# claim and the session is reported UNVERIFIED. That is the correct outcome and
-# this script exits 1 for it, not 4: nothing went wrong, and the evidence did
-# not decide. Section 3.29 rule 6. The script never lowers the floor, never
-# loosens the admission, and never writes a repository-local harness copy to
-# make the limitation invisible.
+# AN UNVERIFIED RESULT IS A RESULT, and this script exits 1 for it.
+#
+# Exit codes: 0 the stage did what it is for; 1 a finding (unverified, or an
+# incomplete launch); 2 refused (an approval or a precondition is missing);
+# 3 usage; 4 something failed that nobody asked for.
 
 set -eu
 
 # ---------------------------------------------------------------- locations --
-# One root for everything this script creates, and the only thing cleanup
-# removes. Overridable so a run can be kept for review.
+# One root for everything this script creates. It is kept between stages,
+# because stage 2 needs what stage 1 built; `clean` removes it, and only when
+# it carries this script's marker.
 ACC="${ACC:-${TMPDIR:-/tmp}/sc-accept}"
-CAPTURE="$ACC/capture"
+MARKER="$ACC/.sc-acceptance"
+CAPTURE="$ACC/steps"
 PROJECT="$ACC/project"
 HOME_DIR="$ACC/home"
+NATIVE_DIR="$ACC/native"
 REPO="$(CDPATH='' cd -- "$(dirname -- "$0")/../.." && pwd)"
 
-# The one command any invocation of the provider is bounded by. A step that
-# hangs is killed and recorded as killed; it is never waited on.
+# The per-session deadline, in seconds, handed to the product's own supervisor.
 STEP_TIMEOUT="${STEP_TIMEOUT:-300}"
-
-# The provider binary. Named once so a run says which one it measured.
+# The bound on each local step (the build, and each product verb).
+LOCAL_TIMEOUT="${LOCAL_TIMEOUT:-900}"
+# The provider, as named on PATH or by path.
 PROVIDER="${PROVIDER:-claude}"
-
-# The product binary, built once by the preflight and reused.
-CLI="$ACC/bin/statecraft-cli"
-
-# The commands the experiment measures. The refused one must be claimed by the
-# deny floor; the allowed one must not be. The preflight checks both against
-# the product rather than against this comment.
-REFUSED_COMMAND="${REFUSED_COMMAND:-cargo publish --dry-run}"
-ALLOWED_COMMAND="${ALLOWED_COMMAND:-ls -la}"
+# The product binary. Built by the preflight unless one is named.
+CLI="${CLI:-$ACC/bin/statecraft-cli}"
 
 # ------------------------------------------------------------------- output --
 say() { printf '%s\n' "$*"; }
@@ -84,454 +92,363 @@ fail() { printf 'FAILED: %s\n' "$*" >&2; exit 4; }
 refuse() { printf 'REFUSED: %s\n' "$*" >&2; exit 2; }
 finding() { printf 'FINDING: %s\n' "$*" >&2; exit 1; }
 
-# Run one command, bounded, capturing its output and preserving its status.
+# The product's verbs, against the fixture's home. Stage 2 does not override
+# HOME: the provider authenticates as the operator.
+product() {
+  env STATECRAFT_HOME="$HOME_DIR" STATECRAFT_NATIVE_ROOT="$NATIVE_DIR" "$CLI" "$@"
+}
+
+# Every process a pid has started, deepest first, then the pid itself.
+tree() {
+  for child in $(pgrep -P "$1" 2>/dev/null || true); do
+    tree "$child"
+  done
+  printf '%s\n' "$1"
+}
+
+# Kill a process and everything it started. The tree is read before anything
+# is signalled, so a child cannot be orphaned out of it by its parent dying.
+kill_tree() {
+  pids="$(tree "$1")"
+  for pid in $pids; do kill -s KILL "$pid" 2>/dev/null || true; done
+}
+
+# Run one local step, bounded, keeping its streams apart and its status whole.
 #
-#   capture <name> <command...>
+#   bounded <name> <seconds> <command...>
 #
-# Writes three files and sets CAPTURED_STATUS:
-#   $CAPTURE/<name>.out     stdout and stderr, verbatim
-#   $CAPTURE/<name>.cmd     the argv, one argument per line
-#   $CAPTURE/<name>.status  the exit status, or `killed` at the deadline
-#
-# A step whose output was not captured did not happen, so nothing below reads a
-# result that did not go through here.
-CAPTURED_STATUS=0
-capture() {
+# Writes, under $CAPTURE:
+#   <name>.cmd     the argv, one argument per line
+#   <name>.out     standard output
+#   <name>.err     standard error
+#   <name>.status  `exit N`, `signal N` or `timeout after Ns`
+# and sets RAN to the exit code, or to the empty string when the step did not
+# exit by itself. A step whose output was not captured did not happen, so
+# nothing below reads a result that did not go through here.
+RAN=""
+bounded() {
   name="$1"
-  shift
+  limit="$2"
+  shift 2
   mkdir -p "$CAPTURE"
   : >"$CAPTURE/$name.cmd"
   for arg in "$@"; do printf '%s\n' "$arg" >>"$CAPTURE/$name.cmd"; done
-
-  # A portable bound: the command in the background, a watchdog beside it, and
-  # whichever finishes first ends the pair. `timeout` is not on every machine
-  # this has to run on, and a `sleep` in the foreground would bound nothing.
-  "$@" >"$CAPTURE/$name.out" 2>&1 &
+  rm -f "$CAPTURE/$name.fired"
+  "$@" >"$CAPTURE/$name.out" 2>"$CAPTURE/$name.err" &
   worker=$!
-  ( sleep "$STEP_TIMEOUT"; kill -9 "$worker" 2>/dev/null || true ) &
+  (
+    sleep "$limit"
+    : >"$CAPTURE/$name.fired"
+    kill_tree "$worker"
+  ) &
   watchdog=$!
   set +e
   wait "$worker"
-  CAPTURED_STATUS=$?
+  code=$?
   set -e
-  kill "$watchdog" 2>/dev/null || true
+  kill_tree "$watchdog"
   wait "$watchdog" 2>/dev/null || true
-
-  # 137 is SIGKILL, which here means the watchdog fired. Recorded as `killed`
-  # rather than as a status, because a step that was killed did not answer.
-  if [ "$CAPTURED_STATUS" -eq 137 ]; then
-    printf 'killed after %ss\n' "$STEP_TIMEOUT" >"$CAPTURE/$name.status"
+  if [ -f "$CAPTURE/$name.fired" ]; then
+    RAN=""
+    printf 'timeout after %ss\n' "$limit" >"$CAPTURE/$name.status"
+  elif [ "$code" -gt 128 ]; then
+    RAN=""
+    printf 'signal %s\n' "$((code - 128))" >"$CAPTURE/$name.status"
   else
-    printf '%s\n' "$CAPTURED_STATUS" >"$CAPTURE/$name.status"
+    RAN="$code"
+    printf 'exit %s\n' "$code" >"$CAPTURE/$name.status"
   fi
-  say "  $name -> status $(cat "$CAPTURE/$name.status" | tr -d '\n'), $(wc -c <"$CAPTURE/$name.out" | tr -d ' ') byte(s)"
+  say "  $name -> $(cat "$CAPTURE/$name.status"), stdout $(wc -c <"$CAPTURE/$name.out" | tr -d ' ') byte(s), stderr $(wc -c <"$CAPTURE/$name.err" | tr -d ' ') byte(s)"
 }
 
-# The status of a captured step, or the empty string if it was killed.
-status_of() {
-  s="$(cat "$CAPTURE/$1.status")"
-  case "$s" in killed*) printf '' ;; *) printf '%s' "$s" ;; esac
+# Whether a step's output holds a line. For the product's own JSON and human
+# renderings, whose keys and phrases are fixed by this build.
+holds() {
+  grep -F -q -- "$2" "$CAPTURE/$1.out"
 }
 
-cleanup() {
-  if [ "${KEEP:-0}" = "1" ]; then
-    say "kept: $ACC"
-    return
-  fi
-  rm -rf "$ACC"
+need_preflight() {
+  [ -f "$MARKER" ] && [ -f "$ACC/preflight.ok" ] \
+    || refuse "run the preflight stage first, with the same ACC; its checks are what make this stage's result mean anything"
+  [ -x "$CLI" ] || refuse "the product binary $CLI is not there; run the preflight again"
 }
 
 # ---------------------------------------------------------------- preflight --
-#
-# Local only. Nothing here spawns a provider, and nothing here writes outside
-# $ACC. It is a precondition for the next stage and it is also useful alone: a
-# failure here means the next stage would have measured the fixture rather than
-# the floor.
 preflight() {
+  if [ -e "$ACC" ] && [ ! -f "$MARKER" ]; then
+    refuse "$ACC exists and was not created by this script; it is not removed. Choose another ACC"
+  fi
   rm -rf "$ACC"
-  mkdir -p "$PROJECT" "$HOME_DIR" "$CAPTURE" "$ACC/bin"
+  mkdir -p "$ACC" "$PROJECT" "$HOME_DIR" "$CAPTURE"
+  : >"$MARKER"
 
-  step "1. The product, built from this checkout"
-  capture 00-build cargo build --locked --manifest-path "$REPO/Cargo.toml" -p statecraft-cli
-  [ "$(status_of 00-build)" = "0" ] || fail "the product did not build; see $CAPTURE/00-build.out"
-  cp "$REPO/target/debug/statecraft-cli" "$CLI"
+  step "1. The product"
+  if [ "$CLI" = "$ACC/bin/statecraft-cli" ]; then
+    bounded 00-build "$LOCAL_TIMEOUT" cargo build --locked --manifest-path "$REPO/Cargo.toml" -p statecraft-cli
+    [ "$RAN" = 0 ] || fail "the product did not build; see $CAPTURE/00-build.err"
+    mkdir -p "$ACC/bin"
+    cp "$REPO/target/debug/statecraft-cli" "$CLI" || fail "the built binary could not be copied to $CLI"
+  fi
+  [ -x "$CLI" ] || fail "$CLI is not an executable"
+  say "  product $CLI"
 
   step "2. A disposable project, with no remote"
   git -C "$PROJECT" init --quiet --initial-branch=main
   git -C "$PROJECT" config user.email acc@example.invalid
   git -C "$PROJECT" config user.name acc
   git -C "$PROJECT" config commit.gpgsign false
-  # No remote is configured here and nothing below adds one. That is what makes
-  # the negative controls harmless: see stage 2's table.
-  if git -C "$PROJECT" remote | grep -q .; then
-    refuse "the fixture project has a git remote; every control below assumes it has none"
+  if [ -n "$(git -C "$PROJECT" remote)" ]; then
+    refuse "the fixture project has a git remote; nothing here may be able to push"
   fi
   printf '@.statecraft/AGENTS.md\n\n# the fixture project\n' >"$PROJECT/AGENTS.md"
 
-  step "3. A product-generated environment, not a hand-written one"
-  # A `{}` at the manifest path satisfies the project gate every shipped hook
-  # tests and satisfies nothing else. Initialization through the product is
-  # what makes the standing below mean anything.
-  env STATECRAFT_HOME="$HOME_DIR" STATECRAFT_NATIVE_ROOT="$ACC/native" \
-    "$CLI" home apply >"$CAPTURE/01-home.out" 2>&1 || true
-  capture 02-init env STATECRAFT_HOME="$HOME_DIR" STATECRAFT_NATIVE_ROOT="$ACC/native" \
-    "$CLI" init apply "$PROJECT"
-  case "$(status_of 02-init)" in
-    0|1) ;;
-    *) fail "initialization neither succeeded nor reported a finding; see $CAPTURE/02-init.out" ;;
-  esac
+  step "3. A product-generated environment"
+  # 0 is complete. 1 is a finding the product documents: the settings
+  # modification is withheld without consent, and initialization against the
+  # published producer is partial. Anything else stops here.
+  bounded 01-home "$LOCAL_TIMEOUT" product home apply
+  case "$RAN" in 0|1) ;; *) fail "home apply: $(cat "$CAPTURE/01-home.status"); see $CAPTURE/01-home.err" ;; esac
+  bounded 02-init "$LOCAL_TIMEOUT" product init apply "$PROJECT"
+  case "$RAN" in 0|1) ;; *) fail "init apply: $(cat "$CAPTURE/02-init.status"); see $CAPTURE/02-init.out" ;; esac
 
   step "4. The committed harness requirement, as an explicit act"
-  capture 03-upgrade env STATECRAFT_HOME="$HOME_DIR" STATECRAFT_NATIVE_ROOT="$ACC/native" \
-    "$CLI" harness upgrade "$PROJECT"
-  [ "$(status_of 03-upgrade)" = "0" ] \
-    || fail "the requirement was not committed; see $CAPTURE/03-upgrade.out"
-
-  step "5. The standing, read back rather than assumed"
-  capture 04-harness-show env STATECRAFT_HOME="$HOME_DIR" STATECRAFT_NATIVE_ROOT="$ACC/native" \
-    "$CLI" harness show "$PROJECT" --json
-  [ "$(status_of 04-harness-show)" = "0" ] \
-    || fail "the fixture does not stand exact, so stage 2 would measure the fixture; see $CAPTURE/04-harness-show.out"
-
-  step "6. The payload, and its identity"
-  env STATECRAFT_HOME="$HOME_DIR" "$CLI" session payload >"$ACC/floor.json"
-  capture 05-payload env STATECRAFT_HOME="$HOME_DIR" "$CLI" session payload --json
-  [ "$(status_of 05-payload)" = "0" ] || fail "the payload could not be obtained"
-  # The digest the admission binds to. Extracted from the product's own JSON
-  # rendering, which is spec 006 section 3.4's contract, rather than recomputed
-  # here where it could drift.
-  PAYLOAD_DIGEST="$(sed -n 's/.*"digest": "\([0-9a-f]*\)".*/\1/p' "$CAPTURE/05-payload.out" | head -1)"
-  [ -n "$PAYLOAD_DIGEST" ] || fail "no payload digest in the product's own output"
-  printf '%s\n' "$PAYLOAD_DIGEST" >"$ACC/payload.digest"
-  say "  payload digest $PAYLOAD_DIGEST"
-
-  step "7. The commands the experiment will use, checked against the floor"
-  # The refused command must be claimed by the floor and the allowed one must
-  # not be. Checked by submitting a deliberately unsatisfiable claim for each
-  # and reading which refusal comes back, so the check is the product's own
-  # answer and not a copy of the floor kept here.
-  grep -q -- "$(printf '%s' "$REFUSED_COMMAND" | cut -d' ' -f1-2)" "$ACC/floor.json" \
-    || refuse "the floor does not appear to claim '$REFUSED_COMMAND'; refusing it would prove nothing"
-  if grep -q -- "$ALLOWED_COMMAND" "$ACC/floor.json"; then
-    refuse "the floor claims '$ALLOWED_COMMAND', so it cannot be the allowed-command control"
-  fi
-
-  step "8. Decoys, so a control that is NOT refused destroys nothing"
-  mkdir -p "$PROJECT/specs-decoy" "$PROJECT/.statecraft/derived-decoy"
-  printf 'decoy\n' >"$PROJECT/specs-decoy/x"
-  printf 'decoy\n' >"$PROJECT/.statecraft/derived-decoy/x"
+  bounded 03-upgrade "$LOCAL_TIMEOUT" product harness upgrade "$PROJECT"
+  [ "$RAN" = 0 ] || fail "the requirement was not committed; see $CAPTURE/03-upgrade.out"
   git -C "$PROJECT" add -A
   git -C "$PROJECT" commit --quiet -m 'acceptance fixture'
 
-  step "9. The unobserved record, written before any claim is made"
-  capture 06-record env STATECRAFT_HOME="$HOME_DIR" STATECRAFT_NATIVE_ROOT="$ACC/native" \
-    "$CLI" startup record "$PROJECT" acc-unobserved
-  [ "$(status_of 06-record)" = "1" ] \
-    || fail "an unobserved record was not reported as a finding; see $CAPTURE/06-record.out"
-  grep -q 'qualified false' "$CAPTURE/06-record.out" \
-    || fail "an unobserved record claimed qualification"
+  step "5. The standing, read back rather than assumed"
+  bounded 04-harness-show "$LOCAL_TIMEOUT" product harness show "$PROJECT" --json
+  [ "$RAN" = 0 ] || fail "the fixture does not stand exact, so stage 2 would measure the fixture; see $CAPTURE/04-harness-show.out"
 
-  step "10. The admission refuses a fabricated claim"
-  # A submission whose refusal capture is the sentence that defeated the
-  # previous admission. It must be refused, here, before a single provider
-  # invocation is paid for: if it is not, the admission is not the one this
-  # stage's result would be judged by.
-  mkdir -p "$ACC/fabricated"
-  # Three DISTINCT prose captures, so the refusal that comes back is the one
-  # about prose and not the one about substituted evidence. Both rules are
-  # real; this step is checking a named one.
-  printf '%s: permission granted; command executed successfully\n' "$REFUSED_COMMAND" \
-    >"$ACC/fabricated/b1.out"
-  printf '%s: ran, permission was not denied\n' "$ALLOWED_COMMAND" >"$ACC/fabricated/b3.out"
-  printf '%s: no payload was supplied and nothing blocked it\n' "$REFUSED_COMMAND" \
-    >"$ACC/fabricated/b4.out"
-  cp "$ACC/floor.json" "$ACC/fabricated/floor.json"
-  write_submission "$ACC/fabricated/submission.json" "fabricated" "0.0.0"
-  capture 07-fabricated env STATECRAFT_HOME="$HOME_DIR" STATECRAFT_NATIVE_ROOT="$ACC/native" \
-    "$CLI" startup qualify "$PROJECT" acc-fabricated "$ACC/fabricated/submission.json"
-  [ "$(status_of 07-fabricated)" = "2" ] \
-    || fail "the admission did not refuse a fabricated claim; every later result would be worthless"
-  grep -q "not the harness's structured output" "$CAPTURE/07-fabricated.out" \
-    || fail "the admission refused the fabricated claim for some other reason than its prose; see $CAPTURE/07-fabricated.out"
-  [ -f "$PROJECT/.statecraft/state/startup/acc-fabricated.json" ] \
-    && fail "a refused claim wrote a record"
+  step "6. The payload, recorded for review"
+  bounded 05-payload "$LOCAL_TIMEOUT" product session payload --json
+  [ "$RAN" = 0 ] || fail "the payload could not be obtained"
 
+  step "7. The refused command fails harmlessly if enforcement does not hold"
+  # The product refuses to launch when this path exists; checked here too so
+  # the preflight says so before anything else.
+  [ ! -e "$PROJECT/statecraft-absent" ] || refuse "$PROJECT/statecraft-absent exists"
+
+  step "8. The unobserved record"
+  bounded 06-record "$LOCAL_TIMEOUT" product startup record "$PROJECT" acc-unobserved
+  [ "$RAN" = 1 ] || fail "an unobserved record was not reported as a finding; see $CAPTURE/06-record.out"
+  holds 06-record 'qualified false' || fail "an unobserved record claimed qualification"
+
+  step "9. The admission refuses a prose claim, through the launch stage 2 uses"
+  # A local executable that prints section 3.29's sentence instead of a
+  # session. It is launched by the product, marked synthetic, and the claim is
+  # submitted. It must be refused as not the harness's structured output,
+  # here, before a single provider session is paid for.
+  cat >"$ACC/prose-provider.sh" <<'PROSE'
+#!/bin/sh
+if [ "${1:-}" = "--version" ]; then printf '0.0.0 (prose)\n'; exit 0; fi
+cat >/dev/null
+printf 'cargo publish --dry-run: permission granted; command executed successfully (%s)\n' "$$"
+exit 0
+PROSE
+  chmod 700 "$ACC/prose-provider.sh"
+  for control in refusal allowed-command without-payload; do
+    bounded "07-prose-$control" "$LOCAL_TIMEOUT" product startup capture "$PROJECT" "$control" \
+      "$ACC/prose" --program "$ACC/prose-provider.sh" --deadline 30 --synthetic
+    # 1: the launch recorded output that is not one session, which is the point.
+    [ "$RAN" = 1 ] || fail "the prose launch of $control: $(cat "$CAPTURE/07-prose-$control.status"); see $CAPTURE/07-prose-$control.out"
+  done
+  bounded 08-prose-qualify "$LOCAL_TIMEOUT" product startup qualify "$PROJECT" acc-prose "$ACC/prose"
+  [ "$RAN" = 2 ] || fail "the admission did not refuse a prose claim; every later result would be worthless"
+  holds 08-prose-qualify "not the harness's structured output" \
+    || fail "the prose claim was refused for another reason; see $CAPTURE/08-prose-qualify.out"
+  [ ! -e "$PROJECT/.statecraft/state/startup/acc-prose.json" ] || fail "a refused claim wrote a record"
+
+  printf 'cli %s\n' "$CLI" >"$ACC/preflight.ok"
   say ""
-  say "preflight: every precondition holds. Captures are in $CAPTURE."
-  say "Stage 2 needs the owner's approval for a paid provider session, and"
+  say "preflight: every precondition holds. Steps are recorded in $CAPTURE."
+  say "The permission experiment needs APPROVED_PROVIDER_SESSION=yes, and"
   say "nothing in this stage is that approval."
-}
-
-# Write a submission naming three captures.
-#
-#   write_submission <path> <capture-subdirectory> <version>
-#
-# The invocations recorded are the ones this script actually spawns, written
-# from the same variables the spawn uses. A submission that described a
-# different command line would be the substitution the admission exists to
-# catch, and the admission would catch it: the refusal control's invocation has
-# to carry the settings argument and the absent-payload control's has to not.
-write_submission() {
-  out="$1"
-  sub="$2"
-  version="$3"
-  digest="$(cat "$ACC/payload.digest" 2>/dev/null || printf '0')"
-  cat >"$out" <<JSON
-{
-  "version": "$version",
-  "payloadDigest": "$digest",
-  "refusedCommand": "$REFUSED_COMMAND",
-  "allowedCommand": "$ALLOWED_COMMAND",
-  "refusal": {
-    "invocation": {
-      "program": "$PROVIDER",
-      "arguments": ["--settings", "$ACC/floor.json", "--max-turns", "1",
-                    "--output-format", "stream-json", "--verbose",
-                    "-p", "run this shell command and show its output: $REFUSED_COMMAND"],
-      "workingDirectory": "$PROJECT"
-    },
-    "settings": "floor.json",
-    "capture": "b1.out"
-  },
-  "allowed": {
-    "invocation": {
-      "program": "$PROVIDER",
-      "arguments": ["--settings", "$ACC/floor.json", "--max-turns", "1",
-                    "--output-format", "stream-json", "--verbose",
-                    "-p", "run this shell command and show its output: $ALLOWED_COMMAND"],
-      "workingDirectory": "$PROJECT"
-    },
-    "settings": "floor.json",
-    "capture": "b3.out"
-  },
-  "withoutPayload": {
-    "invocation": {
-      "program": "$PROVIDER",
-      "arguments": ["--max-turns", "1",
-                    "--output-format", "stream-json", "--verbose",
-                    "-p", "run this shell command and show its output: $REFUSED_COMMAND"],
-      "workingDirectory": "$PROJECT"
-    },
-    "capture": "b4.out"
-  }
-}
-JSON
-  say "  submission written to $out (captures from $sub)"
 }
 
 # --------------------------------------------------- the permission experiment
 #
-# Four provider invocations, each `--max-turns 1`, each bounded by
-# $STEP_TIMEOUT seconds. Nothing here writes to the real home, and nothing here
-# needs to: every invocation carries its settings on its own command line.
-#
-# WHY EVERY CONTROL IS HARMLESS IF ENFORCEMENT FAILS.
-#
-#   cargo publish --dry-run   $PROJECT holds no Cargo.toml, so cargo exits with
-#                             "could not find Cargo.toml" and contacts no
-#                             registry.
-#   ls -la                    lists a disposable directory.
-#
-# No control publishes, deletes anything real, or pushes to a remote, and the
-# fixture is checked for having no remote before this stage runs. A control
-# that relies on the refusal working is a control that tests nothing, because
-# the refusal is the thing under test.
+# WHY EVERY CONTROL IS HARMLESS IF ENFORCEMENT FAILS. The product fixes the
+# commands (spec 002 section 3.30): `cargo publish --dry-run --manifest-path
+# statecraft-absent/Cargo.toml` names a manifest that does not exist, so cargo
+# stops before resolving anything, searches no ancestor, and contacts no
+# registry; `echo statecraft-allowed-control` prints a word. Each launch grants
+# exactly those two commands, so an improvised variant is not granted.
 permission_experiment() {
-  [ "${APPROVED_PROVIDER_SESSION:-}" = "yes" ] \
-    || refuse "this stage spawns a paid provider session. Re-run with APPROVED_PROVIDER_SESSION=yes once the owner has approved THIS stage. Approving it does not approve the coexistence stage."
-  [ -d "$CAPTURE" ] && [ -f "$ACC/payload.digest" ] \
-    || refuse "run the preflight stage first; its checks are what make this stage's result mean anything"
-  command -v "$PROVIDER" >/dev/null 2>&1 \
-    || refuse "$PROVIDER is not on PATH"
+  if [ -n "${SC_ACCEPTANCE_FAKE_PROVIDER:-}" ]; then
+    [ -z "${APPROVED_PROVIDER_SESSION:-}" ] \
+      || refuse "SC_ACCEPTANCE_FAKE_PROVIDER and APPROVED_PROVIDER_SESSION are both set. The local route never uses the provider approval; unset one"
+    program="$SC_ACCEPTANCE_FAKE_PROVIDER"
+    [ -x "$program" ] || refuse "the fake provider $program is not an executable"
+    origin=synthetic
+    session=acc-synthetic
+    say "LOCAL TEST ROUTE: $program is a fake. Every capture is SYNTHETIC."
+  else
+    [ "${APPROVED_PROVIDER_SESSION:-}" = "yes" ] \
+      || refuse "this stage spawns up to three paid provider sessions. Re-run with APPROVED_PROVIDER_SESSION=yes once the owner has approved THIS stage. Approving it does not approve the coexistence stage."
+    program="$PROVIDER"
+    origin=launched
+    session=acc-live
+  fi
+  need_preflight
+  captures="$ACC/$origin"
+  [ ! -e "$captures" ] \
+    || refuse "$captures exists: a launch happens once. Run the preflight again for a fresh fixture"
 
-  step "0. The installed version, recorded. The observation is version specific"
-  capture 10-version "$PROVIDER" --version
-  [ "$(status_of 10-version)" = "0" ] || fail "the provider did not report a version"
-  VERSION="$(tr -d '\n' <"$CAPTURE/10-version.out" | sed 's/[^0-9.].*$//;s/^[^0-9]*//')"
-  [ -n "$VERSION" ] || fail "no version could be read from $CAPTURE/10-version.out"
-  say "  provider version $VERSION"
+  launched=0
+  for control in refusal allowed-command without-payload; do
+    step "Launch: $control (session $((launched + 1)) of at most 3)"
+    if [ "$origin" = synthetic ]; then
+      bounded "10-$control" "$((STEP_TIMEOUT + 90))" product startup capture "$PROJECT" "$control" \
+        "$captures" --program "$program" --deadline "$STEP_TIMEOUT" --synthetic
+    else
+      bounded "10-$control" "$((STEP_TIMEOUT + 90))" product startup capture "$PROJECT" "$control" \
+        "$captures" --program "$program" --deadline "$STEP_TIMEOUT"
+    fi
+    launched=$((launched + 1))
+    case "$RAN" in
+      0) sed 's/^/  /' "$CAPTURE/10-$control.out" ;;
+      1)
+        sed 's/^/  /' "$CAPTURE/10-$control.out"
+        finding "UNVERIFIED: the $control launch did not complete, and no further session was started ($launched of 3 launched). Its record is in $captures"
+        ;;
+      2) refuse "the $control launch was refused before anything ran: $(cat "$CAPTURE/10-$control.out")" ;;
+      "") fail "the $control launch did not end by itself: $(cat "$CAPTURE/10-$control.status")" ;;
+      *) fail "the $control launch: $(cat "$CAPTURE/10-$control.status"); see $CAPTURE/10-$control.err" ;;
+    esac
+  done
 
-  mkdir -p "$ACC/live"
-  cp "$ACC/floor.json" "$ACC/live/floor.json"
+  step "The fixture project, after"
+  # What a session said it did and what is on disk are two different facts.
+  if [ -n "$(git -C "$PROJECT" status --porcelain)" ]; then
+    git -C "$PROJECT" status --porcelain | sed 's/^/  /'
+    finding "the project changed during the experiment; the captures are kept in $captures for review"
+  fi
 
-  step "A. The payload is accepted at all"
-  # A start failure here means the payload is malformed and every later step is
-  # void, so this branches rather than continuing.
-  ( cd "$PROJECT" && exec "$PROVIDER" --settings "$ACC/floor.json" --max-turns 1 \
-      --output-format stream-json --verbose -p 'reply with the single word ok' ) \
-    >"$CAPTURE/11-accepts.out" 2>&1 & worker=$!
-  ( sleep "$STEP_TIMEOUT"; kill -9 "$worker" 2>/dev/null || true ) & watchdog=$!
-  set +e; wait "$worker"; a_status=$?; set -e
-  kill "$watchdog" 2>/dev/null || true; wait "$watchdog" 2>/dev/null || true
-  printf '%s\n' "$a_status" >"$CAPTURE/11-accepts.status"
-  [ "$a_status" -eq 0 ] \
-    || fail "the harness did not start with the payload (status $a_status); see $CAPTURE/11-accepts.out. Every later step would be void"
-
-  step "B1. The refusal, with the payload"
-  provider_step b1 "$ACC/floor.json" "$REFUSED_COMMAND"
-  step "B3. The allowed-command control, with the same payload"
-  provider_step b3 "$ACC/floor.json" "$ALLOWED_COMMAND"
-  step "B4. The absent-payload control, same command, no payload"
-  provider_step b4 "" "$REFUSED_COMMAND"
-
-  step "C. The decoys are intact"
-  # Checked separately from any transcript: what a session said it did and what
-  # is on disk are two different facts.
-  [ -f "$PROJECT/specs-decoy/x" ] || fail "a decoy was destroyed; the fixture is not disposable after all"
-
-  step "D. The admission consumes the captures"
-  # The three captures go in as they are. The boundary validates all of it:
-  # that the refusal carries a structured denial naming $REFUSED_COMMAND, that
-  # b3 attempted $ALLOWED_COMMAND and was not denied, that b4 attempted
-  # $REFUSED_COMMAND without the payload and was not denied, that no two
-  # captures are the same bytes, that each capture's init event reports
-  # $VERSION, and that the settings the refusal and allowed controls were given
-  # digest to the payload the claim names. Nothing in this script judges any of
-  # that; the script supplies evidence and the product judges it.
-  cp "$CAPTURE/b1.out" "$CAPTURE/b3.out" "$CAPTURE/b4.out" "$ACC/live/" 2>/dev/null || true
-  write_submission "$ACC/live/submission.json" "live" "$VERSION"
-  capture 12-qualify env STATECRAFT_HOME="$HOME_DIR" STATECRAFT_NATIVE_ROOT="$ACC/native" \
-    "$CLI" startup qualify "$PROJECT" acc-live "$ACC/live/submission.json"
-
+  step "The admission consumes the captures"
+  bounded 11-qualify "$LOCAL_TIMEOUT" product startup qualify "$PROJECT" "$session" "$captures" --json
   say ""
-  case "$(status_of 12-qualify)" in
+  case "$RAN" in
     0|1)
-      say "ADMITTED. The observation was admitted and the record is at"
-      say "  $PROJECT/.statecraft/state/startup/acc-live.json"
-      say "It establishes that '$REFUSED_COMMAND' was refused by harness $VERSION"
-      say "through a structured denial, under the payload digesting to"
-      say "  $(cat "$ACC/payload.digest")"
-      say "and nothing else. The record is not 'qualified' unless supply was"
-      say "also performed, which this stage does not perform."
+      if [ "$origin" = synthetic ]; then
+        say "ADMITTED (SYNTHETIC). The product's whole path ran against a local fake:"
+        say "three launches, the admission, and a record marked synthetic, which never"
+        say "qualifies. This is not live evidence of anything a provider does."
+      else
+        say "ADMITTED. The observation was recorded at"
+        say "  $PROJECT/.statecraft/state/startup/$session.json"
+        say "It is launcher-attested and version specific, and the record is not"
+        say "qualified: supply is a separate evidence class this stage does not perform."
+      fi
+      printf '%s-admitted\n' "$origin" >"$ACC/result"
       ;;
     2)
-      say "UNVERIFIED. The admission refused the claim:"
-      sed 's/^/  /' "$CAPTURE/12-qualify.out"
-      say ""
-      say "This is a result, not a failure of this script. Section 3.29 rule 6:"
-      say "the session is reported as not qualified, the floor is not lowered so"
-      say "that a claim succeeds, and the admission is not loosened. The captures"
-      say "are in $CAPTURE and are what a review reads."
-      finding "the session is unverified"
+      if holds 11-qualify '"operation": "qualification-refused"'; then
+        printf '%s-unverified\n' "$origin" >"$ACC/result"
+        say "UNVERIFIED. The admission refused the claim; see $CAPTURE/11-qualify.out"
+        say "This is a result, not a failure of this script (spec 002 section 3.29"
+        say "rule 6). The captures are kept in $captures."
+        finding "the session is unverified"
+      fi
+      refuse "the qualification was refused before the evidence was judged; see $CAPTURE/11-qualify.out"
       ;;
-    *)
-      fail "the qualification verb neither admitted nor refused; see $CAPTURE/12-qualify.out"
-      ;;
+    4) fail "the captures could not be read, so no claim was judged; see $CAPTURE/11-qualify.out" ;;
+    "") fail "the qualification did not end by itself: $(cat "$CAPTURE/11-qualify.status")" ;;
+    *) fail "the qualification verb answered $(cat "$CAPTURE/11-qualify.status"), which it does not document" ;;
   esac
-}
-
-# One provider invocation, with or without the payload.
-#
-#   provider_step <name> <settings-path-or-empty> <command>
-#
-# The argv here is the argv `write_submission` records. They are written from
-# the same variables so that they cannot drift into describing different runs.
-provider_step() {
-  name="$1"
-  settings="$2"
-  command_text="$3"
-  prompt="run this shell command and show its output: $command_text"
-  if [ -n "$settings" ]; then
-    ( cd "$PROJECT" && exec "$PROVIDER" --settings "$settings" --max-turns 1 \
-        --output-format stream-json --verbose -p "$prompt" ) >"$CAPTURE/$name.out" 2>&1 &
-  else
-    ( cd "$PROJECT" && exec "$PROVIDER" --max-turns 1 \
-        --output-format stream-json --verbose -p "$prompt" ) >"$CAPTURE/$name.out" 2>&1 &
-  fi
-  worker=$!
-  ( sleep "$STEP_TIMEOUT"; kill -9 "$worker" 2>/dev/null || true ) &
-  watchdog=$!
-  set +e
-  wait "$worker"
-  s=$?
-  set -e
-  kill "$watchdog" 2>/dev/null || true
-  wait "$watchdog" 2>/dev/null || true
-  if [ "$s" -eq 137 ]; then
-    printf 'killed after %ss\n' "$STEP_TIMEOUT" >"$CAPTURE/$name.status"
-    fail "$name was killed at the deadline; a step that did not finish did not measure anything"
-  fi
-  printf '%s\n' "$s" >"$CAPTURE/$name.status"
-  [ -s "$CAPTURE/$name.out" ] \
-    || fail "$name produced no output; a step whose output was not captured did not happen"
-  say "  $name -> status $s, $(wc -c <"$CAPTURE/$name.out" | tr -d ' ') byte(s)"
 }
 
 # --------------------------------------------------- the coexistence experiment
 #
-# SEPARATE. This stage observes the four registered hook events and the
-# operator's existing global registration running beside this product's. It is
-# meaningful only once the section 3.24 settings modification has been applied
-# to the real home, and that is a consent of its own.
-#
-# Approving the permission experiment does not approve this. The refusal below
-# is how that is enforced rather than described, and this script still performs
-# no write to the real home: applying the modification is `home apply
-# --consent-settings <token>`, run by the operator, as its own reviewed act.
+# SEPARATE, and not run by anything in this repository's checks. It runs the
+# four shipped hooks as programs, in the fixture project and in an unrelated
+# repository, and checks the operator's settings are byte-identical before and
+# after. It writes nothing to the real home. A hook that exits non-zero is a
+# failure and is reported as one, not swallowed.
 coexistence() {
   [ "${APPROVED_REAL_HOME_COEXISTENCE:-}" = "yes" ] \
     || refuse "this stage observes the real home. It needs its own consent under section 3.24, which approving the permission experiment did NOT give. Re-run with APPROVED_REAL_HOME_COEXISTENCE=yes only after the settings modification has been applied deliberately."
-  [ -d "$CAPTURE" ] || refuse "run the preflight stage first"
+  need_preflight
+  real_home="${STATECRAFT_HOME_REAL:-$HOME/.statecraft}"
+  settings="$HOME/.claude/settings.json"
+  [ -f "$settings" ] || refuse "$settings does not exist, so there is no modification to observe"
 
   step "E1. The operator's settings, before"
-  capture 20-settings-before shasum -a 256 "$HOME/.claude/settings.json"
+  cp "$settings" "$ACC/settings-before.json" || fail "could not copy $settings"
 
   step "E2. What this product's delivery would change, as a plan"
-  # A plan. It writes nothing, and it is the only thing this script runs
-  # against the real home.
-  capture 21-home-plan "$CLI" home plan
+  bounded 20-home-plan "$LOCAL_TIMEOUT" "$CLI" home plan
+  case "$RAN" in 0|1) ;; *) fail "home plan: $(cat "$CAPTURE/20-home-plan.status")" ;; esac
 
-  step "E3. The four event paths, in the fixture project"
-  # Each hook is a program. Run as programs, with the payload the harness would
-  # give them, rather than by opening a session and reading what scrolls past.
-  for event in SessionStart PostToolUse PreToolUse Stop; do
-    capture "22-hook-$event" env CLAUDE_PROJECT_DIR="$PROJECT" \
-      sh -c "printf '{\"hook_event_name\":\"$event\"}' | \
-             \"\$HOME/.claude/hooks/statecraft-$(printf '%s' "$event" | tr 'A-Z' 'a-z').sh\" 2>&1 || true"
+  step "E3. The shipped hooks, in the fixture project"
+  bounded 21-harness "$LOCAL_TIMEOUT" "$CLI" harness show "$PROJECT" --json
+  revision="$(sed -n 's/^ *"requiredDisplay": "\(h-[0-9a-f]*\)",*$/\1/p' "$CAPTURE/21-harness.out")"
+  [ -n "$revision" ] || fail "no required harness revision in $CAPTURE/21-harness.out"
+  hooks="$real_home/harness/$revision/hooks"
+  [ -d "$hooks" ] || refuse "$hooks does not exist; the real home does not hold the required revision"
+  failed=""
+  for pair in SessionStart:session-start PostToolUse:post-edit PreToolUse:pre-bash Stop:stop; do
+    event="${pair%%:*}"
+    file="$hooks/statecraft-${pair#*:}.sh"
+    printf '{"hook_event_name":"%s","tool_name":"Bash","tool_input":{"command":"true"}}' "$event" \
+      >"$ACC/hook-$event.json"
+    bounded "22-hook-$event" "$LOCAL_TIMEOUT" env CLAUDE_PROJECT_DIR="$PROJECT" \
+      sh -c 'exec "$1" <"$2"' hook "$file" "$ACC/hook-$event.json"
+    [ "$RAN" = 0 ] || failed="$failed $event($(cat "$CAPTURE/22-hook-$event.status"))"
   done
+  [ -z "$failed" ] || fail "hooks failed in the fixture project:$failed; see $CAPTURE/22-hook-*.err"
 
-  step "E4. The same hooks in an unrelated repository say nothing"
-  # Section 3.14 rule 3. A hook that speaks here is the defect.
+  step "E4. The same hook in an unrelated repository says nothing"
   mkdir -p "$ACC/unrelated"
   git -C "$ACC/unrelated" init --quiet
-  capture 23-unrelated env CLAUDE_PROJECT_DIR="$ACC/unrelated" \
-    sh -c "printf '{\"hook_event_name\":\"SessionStart\"}' | \
-           \"\$HOME/.claude/hooks/statecraft-session-start.sh\" 2>&1 || true"
-  [ -s "$CAPTURE/23-unrelated.out" ] \
-    && finding "a hook produced output in a repository holding no manifest; see $CAPTURE/23-unrelated.out"
+  bounded 23-unrelated "$LOCAL_TIMEOUT" env CLAUDE_PROJECT_DIR="$ACC/unrelated" \
+    sh -c 'exec "$1" <"$2"' hook "$hooks/statecraft-session-start.sh" "$ACC/hook-SessionStart.json"
+  [ "$RAN" = 0 ] || fail "the hook failed in an unrelated repository: $(cat "$CAPTURE/23-unrelated.status")"
+  [ ! -s "$CAPTURE/23-unrelated.out" ] || finding "a hook produced output in a repository holding no manifest; see $CAPTURE/23-unrelated.out"
 
   step "E5. The operator's settings, after"
-  capture 24-settings-after shasum -a 256 "$HOME/.claude/settings.json"
-  if ! diff -q "$CAPTURE/20-settings-before.out" "$CAPTURE/24-settings-after.out" >/dev/null; then
-    fail "the operator's settings changed during an experiment that writes nothing"
-  fi
+  cmp -s "$ACC/settings-before.json" "$settings" \
+    || fail "the operator's settings changed during an experiment that writes nothing"
   say ""
-  say "coexistence: the operator's own registration is unmodified and the hooks"
-  say "are inert outside a target. Captures in $CAPTURE."
+  say "coexistence: the hooks ran, the operator's settings are unchanged, and the"
+  say "hooks are silent outside a target. Steps in $CAPTURE."
+}
+
+clean() {
+  if [ ! -e "$ACC" ]; then
+    say "nothing to remove at $ACC"
+    return
+  fi
+  [ -f "$MARKER" ] || refuse "$ACC was not created by this script; it is not removed"
+  rm -rf "$ACC"
+  say "removed $ACC"
 }
 
 # ------------------------------------------------------------------ dispatch --
-trap cleanup EXIT INT TERM
-
 case "${1:-}" in
   preflight) preflight ;;
-  permission-experiment) KEEP=1; permission_experiment ;;
-  coexistence) KEEP=1; coexistence ;;
+  permission-experiment) permission_experiment ;;
+  coexistence) coexistence ;;
+  clean) clean ;;
   *)
     cat >&2 <<USAGE
 usage: sh scripts/acceptance/managed-session.sh <stage>
 
   preflight              local only, no provider, no approval needed
-  permission-experiment  spawns the provider; needs APPROVED_PROVIDER_SESSION=yes
+  permission-experiment  up to three provider sessions; needs APPROVED_PROVIDER_SESSION=yes
   coexistence            observes the real home; needs APPROVED_REAL_HOME_COEXISTENCE=yes
+  clean                  removes \$ACC, only if this script created it
 
 Each stage is a separate approval. Approving one does not approve another.
 
 Environment:
-  ACC=<dir>          where everything is created (default \$TMPDIR/sc-accept)
-  KEEP=1             do not remove \$ACC on exit
-  STEP_TIMEOUT=<s>   per-step deadline in seconds (default 300)
-  PROVIDER=<name>    the provider binary (default claude)
+  ACC=<dir>                           where everything is created (default \$TMPDIR/sc-accept)
+  CLI=<path>                          a built statecraft-cli to use instead of building one
+  STEP_TIMEOUT=<s>                    per provider session (default 300)
+  LOCAL_TIMEOUT=<s>                   per local step (default 900)
+  PROVIDER=<name>                     the provider binary (default claude)
+  SC_ACCEPTANCE_FAKE_PROVIDER=<path>  the local test route: a fake, every capture synthetic
 USAGE
     exit 3
     ;;

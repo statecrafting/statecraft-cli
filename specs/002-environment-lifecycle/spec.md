@@ -2565,4 +2565,9 @@ cargo test -p statecraft-home --lib admission
 cargo test -p statecraft-home --test qualification_admission
 cargo build -p statecraft-home --example require-harness
 cargo test -p statecraft-adapter-claude-code --test settings_transport
+cargo test -p statecraft-adapter --lib supervisor
+cargo test -p statecraft-home --lib capture
+cargo test -p statecraft-cli --test qualification_workflow
+cargo test -p statecraft-cli --test acceptance_script
+sh -n scripts/acceptance/managed-session.sh
 ```
