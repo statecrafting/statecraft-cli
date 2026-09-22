@@ -76,11 +76,20 @@ pub enum Qualification {
     ///
     /// Reachable only from a live-session observation. Nothing in this module
     /// produces it from a file read, and that is the point.
+    ///
+    /// It carries the evidence for the same reason
+    /// [`crate::startup::Observation::Observed`] does: section 3.29 rule 5
+    /// makes every route to an admitted observation run the same admission,
+    /// and a variant that carried only two strings would be a route that
+    /// carried none of it. Constructing this by hand is possible and is not a
+    /// shortcut: whatever is put in `evidence` is what the admission judges.
     Qualified {
         /// The harness version the observation was made against.
         version: String,
         /// What was observed, in one line.
         observed: String,
+        /// What it was admitted from.
+        evidence: Box<crate::admission::Evidence>,
     },
     /// The mechanism is not established, so this session does not qualify.
     ///
@@ -98,7 +107,9 @@ impl Qualification {
     /// A one-line rendering.
     pub fn describe(&self) -> String {
         match self {
-            Qualification::Qualified { version, observed } => {
+            Qualification::Qualified {
+                version, observed, ..
+            } => {
                 format!("qualified against {version}: {observed}")
             }
             Qualification::NotQualified { version, reason } => format!(

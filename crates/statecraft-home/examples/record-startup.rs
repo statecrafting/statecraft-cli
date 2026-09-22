@@ -7,30 +7,38 @@
 //!
 //! ```sh
 //! cargo run -q -p statecraft-home --example record-startup -- \
-//!   <project> <home> <session-id> <version> <refused-command> <transcript-file>
+//!   <project> <home> <session-id> [<evidence-submission.json>]
 //! ```
 //!
-//! The last three are the live-session observation, and they are **admitted
-//! rather than believed**: `startup::admit` refuses a claim whose payload
-//! digest is not this build's, whose command no deny-floor entry claims, whose
-//! transcript is empty, or whose transcript does not show the refusal. There is
-//! no argument that asserts qualification, and passing one is not possible
-//! rather than discouraged.
+//! The optional fourth argument is the live-session observation, and it is
+//! **admitted rather than believed**. Spec 002 section 3.29: the submission
+//! names three captures, the admission reads the harness's structured refusal
+//! record out of them, and it refuses a claim whose payload is not this
+//! build's, whose command no deny-floor entry claims, whose controls are absent
+//! or misbehaved, whose captures are substituted, or whose refusal is prose
+//! rather than a structured denial. There is no argument that asserts
+//! qualification, and passing one is not possible rather than discouraged.
 //!
-//! Omit the last three and the record is written with the observation absent
-//! and says so. That is the ordinary case and it is not a failure: a session
-//! that was not observed is recorded as one that was not observed.
+//! Omit it and the record is written with the observation absent and says so.
+//! That is the ordinary case and it is not a failure: a session that was not
+//! observed is recorded as one that was not observed.
+//!
+//! **This is an example of calling the boundary, not the operator's route.**
+//! `statecraft-cli startup record` and `statecraft-cli startup qualify` are
+//! the verbs, and spec 006 section 3.11.1 is where they are required. This
+//! stays runnable as a second caller of the same library operations.
 
 use statecraft_environment::manifest::Manifest;
-use statecraft_home::startup::{self, AdapterIdentity, Claim, Observation, StartupRecord, Supply};
+use statecraft_home::admission;
+use statecraft_home::startup::{self, AdapterIdentity, Observation, StartupRecord, Supply};
 use statecraft_home::{delivery, home::Layout, required};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let args: Vec<String> = std::env::args().skip(1).collect();
-    if args.len() != 3 && args.len() != 6 {
+    if args.len() != 3 && args.len() != 4 {
         eprintln!(
             "usage: record-startup <project> <home> <session-id> \
-             [<version> <refused-command> <transcript-file>]"
+             [<evidence-submission.json>]"
         );
         std::process::exit(3);
     }
@@ -67,16 +75,18 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     };
 
     // Evidence class 3: a live session, admitted or absent.
-    let transcript;
-    let observation = if args.len() == 6 {
-        transcript = std::fs::read_to_string(&args[5])?;
-        let claim = Claim {
-            version: &args[3],
-            payload_digest: &startup::payload_identity(),
-            refused_command: &args[4],
-            transcript: &transcript,
+    let observation = if args.len() == 4 {
+        // Reading and judging are two calls, so the two failures stay
+        // distinguishable: a capture that is not there is not a capture that
+        // showed no refusal.
+        let evidence = match admission::load(std::path::Path::new(&args[3])) {
+            Ok(evidence) => evidence,
+            Err(why) => {
+                eprintln!("the submission could not be read: {why}");
+                std::process::exit(2);
+            }
         };
-        match startup::admit(&claim) {
+        match startup::admit(&evidence) {
             Ok(observed) => observed,
             Err(why) => {
                 // Not admitted is not "recorded more weakly". Nothing is

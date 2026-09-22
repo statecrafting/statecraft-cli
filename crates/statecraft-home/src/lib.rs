@@ -53,6 +53,7 @@
 
 #![forbid(unsafe_code)]
 
+pub mod admission;
 pub mod authority;
 pub mod bridge;
 pub mod delivery;

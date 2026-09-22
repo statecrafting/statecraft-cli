@@ -43,6 +43,10 @@
 //! through a temporary file and a rename, so a reader never sees half a record
 //! and mistakes a truncation for a shorter answer.
 
+pub use crate::admission::{
+    Capture, Control, Evidence, Invocation, Measurement, NotAdmitted, floor_claims,
+};
+
 use crate::delivery::Delivery;
 use crate::required::Standing;
 use serde::{Deserialize, Serialize};
@@ -211,11 +215,23 @@ impl Supply {
 
 /// Evidence class 3: whether a live session demonstrated the expected behavior.
 ///
-/// Only a session produces this. It is constructed from a
-/// [`crate::session::Qualification`] and from nothing else, so no read of a
-/// file, no digest and no probe can reach [`Observation::Observed`]. Section
-/// 3.28: a deny entry present in a settings file establishes that the entry is
-/// configured, and configured is not enforced.
+/// Only a session produces this, and section 3.29 fixes what a claimed one has
+/// to carry. [`Observation::Observed`] carries the evidence it was admitted
+/// from, which makes two things true that were not true of the first version
+/// of this type:
+///
+/// 1. **Every route runs the same admission.** [`admit`] is the constructor,
+///    [`Observation::from_qualification`] carries what a qualification already
+///    carries, and a value that arrives by **deserialization** is re-judged by
+///    [`Observation::admitted`] before anything treats it as qualified.
+///    Section 3.29 rule 5: writing the word into a file by hand is not a weaker
+///    route to the claim, it is not a route at all.
+/// 2. **The bytes are kept.** The captures are in the record, not beside it,
+///    because rules 3 and 5 are not decidable from a digest once the original
+///    file is gone.
+///
+/// Section 3.28 still holds underneath: a deny entry present in a settings file
+/// establishes that the entry is configured, and configured is not enforced.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case", tag = "observation")]
 pub enum Observation {
@@ -225,6 +241,8 @@ pub enum Observation {
         version: String,
         /// What was observed, in one line.
         observed: String,
+        /// What it was admitted from, captures and all.
+        evidence: Box<crate::admission::Evidence>,
     },
     /// No live observation. What is established, and what is not.
     NotObserved {
@@ -236,19 +254,22 @@ pub enum Observation {
 impl Observation {
     /// Derive the observation from a session qualification.
     ///
-    /// The only constructor of [`Observation::Observed`] outside a
-    /// deserialization, which is what makes "a probe alone cannot qualify a
-    /// session" a property of the type rather than a habit: a probe produces
-    /// [`crate::session::Qualification::NotQualified`], and this maps it to
-    /// [`Observation::NotObserved`].
+    /// A probe produces [`crate::session::Qualification::NotQualified`], and
+    /// this maps it to [`Observation::NotObserved`], which is what makes "a
+    /// probe alone cannot qualify a session" a property of the type rather
+    /// than a habit. The qualified arm carries the same evidence this type
+    /// does, so the conversion moves evidence and never manufactures it.
     pub fn from_qualification(q: &crate::session::Qualification) -> Self {
         match q {
-            crate::session::Qualification::Qualified { version, observed } => {
-                Observation::Observed {
-                    version: version.clone(),
-                    observed: observed.clone(),
-                }
-            }
+            crate::session::Qualification::Qualified {
+                version,
+                observed,
+                evidence,
+            } => Observation::Observed {
+                version: version.clone(),
+                observed: observed.clone(),
+                evidence: evidence.clone(),
+            },
             crate::session::Qualification::NotQualified { reason, .. } => {
                 Observation::NotObserved {
                     reason: reason.clone(),
@@ -257,9 +278,25 @@ impl Observation {
         }
     }
 
-    /// True only for a live observation.
+    /// True for the shape of a live observation.
+    ///
+    /// Structural only. It says the value is an `Observed`, not that the
+    /// evidence inside it still stands, which is [`Observation::admitted`].
+    /// The two are separate because a record read back from a file has the
+    /// shape without having been judged.
     pub fn observed(&self) -> bool {
         matches!(self, Observation::Observed { .. })
+    }
+
+    /// Whether this observation's own evidence still admits it.
+    ///
+    /// Section 3.29 rule 5. Re-run rather than trusted, so a hand-written
+    /// record faces exactly the admission a live claim faces.
+    pub fn admitted(&self) -> Result<(), crate::admission::NotAdmitted> {
+        match self {
+            Observation::Observed { evidence, .. } => crate::admission::admit(evidence),
+            Observation::NotObserved { .. } => Ok(()),
+        }
     }
 
     /// A one-word rendering.
@@ -334,6 +371,16 @@ pub enum Incomplete {
         /// Why that cannot be written.
         why: &'static str,
     },
+    /// A recorded observation whose own evidence does not admit it.
+    #[error(
+        "the record carries an observation that its own evidence does not admit: {why}. \
+         Section 3.29 rule 5: every route to an admitted observation runs the same \
+         admission, deserialization included"
+    )]
+    ObservationNotAdmitted {
+        /// What the admission said.
+        why: String,
+    },
 }
 
 impl StartupRecord {
@@ -393,6 +440,15 @@ impl StartupRecord {
             }
             _ => {}
         }
+        // Section 3.29 rule 5, at the write. A record whose observation no
+        // longer admits itself is not written at all: it would sit in the tree
+        // carrying the word `observed` and read as evidence to anything that
+        // looked at the field rather than at the claim.
+        if let Err(why) = self.observation.admitted() {
+            return Some(Incomplete::ObservationNotAdmitted {
+                why: why.to_string(),
+            });
+        }
         None
     }
 
@@ -406,6 +462,11 @@ impl StartupRecord {
             && self.delivery.reached()
             && self.supply.supplied()
             && self.observation.observed()
+            // Section 3.29 rule 5. The three conditions above are properties of
+            // this record; this one is a property of the evidence the record
+            // carries, re-judged rather than believed, so a record assembled by
+            // hand reaches this line and is refused by it.
+            && self.observation.admitted().is_ok()
     }
 
     /// What this record establishes, one line per evidence class.
@@ -552,126 +613,25 @@ pub fn assemble(
     })
 }
 
-/// A claim that a live session was observed enforcing the floor.
-///
-/// Section 3.26's third evidence class is the only one a session can produce,
-/// and it is therefore the only one nothing in this crate can produce for
-/// itself. That makes it the field most easily filled in by assertion, so it
-/// is not fillable by assertion: [`admit`] is the only route to
-/// [`Observation::Observed`] outside a deserialization, and every field below
-/// is checked against something this build can compute or enumerate.
-#[derive(Debug, Clone)]
-pub struct Claim<'a> {
-    /// The harness version, exactly as the binary reported it.
-    pub version: &'a str,
-    /// The digest of the settings file the session was actually started with.
-    pub payload_digest: &'a str,
-    /// The command the floor should have refused.
-    pub refused_command: &'a str,
-    /// What the session printed, captured verbatim.
-    pub transcript: &'a str,
-}
-
-/// Why a claimed observation is not admitted as one.
-#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
-pub enum NotAdmitted {
-    /// The session ran with settings this build did not produce.
-    #[error(
-        "the session was started with settings digesting to {found}; this build's payload digests to {expected}, so the observation is of some other bytes"
-    )]
-    PayloadMismatch {
-        /// What this build produces.
-        expected: String,
-        /// What the session was given.
-        found: String,
-    },
-    /// The command is not one the floor claims, so refusing it proves nothing.
-    #[error(
-        "`{command}` matches no entry in the deny floor, so its refusal is not evidence that the floor was enforced"
-    )]
-    NotOnTheFloor {
-        /// The command claimed.
-        command: String,
-    },
-    /// Nothing was captured.
-    #[error("the transcript is empty; a step whose output was not captured did not happen")]
-    EmptyTranscript,
-    /// The transcript does not show the refusal being claimed.
-    #[error("the transcript does not show `{command}` being refused")]
-    RefusalNotShown {
-        /// The command claimed.
-        command: String,
-    },
-    /// No version was read.
-    #[error("no harness version was recorded; the observation is version specific")]
-    NoVersion,
-}
-
-/// Whether a deny-floor entry claims a command.
-///
-/// The entries are `Bash(<prefix>*)` or `Bash(<exact>)`. Matching them here
-/// rather than trusting a caller's word is what makes [`NotAdmitted::NotOnTheFloor`]
-/// decidable: an observation of some unrelated command being refused says
-/// nothing about this floor.
-fn floor_claims(command: &str) -> bool {
-    crate::settings::DENY_FLOOR.iter().any(|entry| {
-        let Some(body) = entry
-            .strip_prefix("Bash(")
-            .and_then(|b| b.strip_suffix(')'))
-        else {
-            return false;
-        };
-        match body.strip_suffix('*') {
-            Some(prefix) => command.starts_with(prefix),
-            None => command == body,
-        }
-    })
-}
-
 /// Admit a live-session observation, or say why it is not one.
 ///
-/// **The weakest link is named rather than hidden.** Three of the four checks
-/// are against something computable: the payload digest is this build's own,
-/// the command is enumerated in the floor, and the version is present. The
-/// fourth reads the provider's own output for the refusal, and that is a
-/// judgement about text a provider emitted. It cannot be made stronger from
-/// here, which is exactly why the acceptance keeps the captured output: the
-/// admission is reviewable because the bytes it was made from are kept, not
-/// because the check is clever.
-pub fn admit(claim: &Claim<'_>) -> Result<Observation, NotAdmitted> {
-    if claim.version.trim().is_empty() {
-        return Err(NotAdmitted::NoVersion);
-    }
-    let expected = payload_identity();
-    if claim.payload_digest != expected {
-        return Err(NotAdmitted::PayloadMismatch {
-            expected,
-            found: claim.payload_digest.to_string(),
-        });
-    }
-    if !floor_claims(claim.refused_command) {
-        return Err(NotAdmitted::NotOnTheFloor {
-            command: claim.refused_command.to_string(),
-        });
-    }
-    if claim.transcript.trim().is_empty() {
-        return Err(NotAdmitted::EmptyTranscript);
-    }
-    let shows_refusal = claim.transcript.contains(claim.refused_command)
-        && ["denied", "refus", "not allowed", "blocked", "permission"]
-            .iter()
-            .any(|marker| claim.transcript.to_lowercase().contains(marker));
-    if !shows_refusal {
-        return Err(NotAdmitted::RefusalNotShown {
-            command: claim.refused_command.to_string(),
-        });
-    }
+/// Section 3.29's admission, and the only constructor of
+/// [`Observation::Observed`] that is not a deserialization. The rules and the
+/// reasoning live in [`crate::admission`]; this is where they meet the record,
+/// and it does one thing the module below cannot: it builds the observation's
+/// one-line sentence **from the evidence**, so the sentence in a record cannot
+/// describe something the evidence does not show.
+///
+/// A refused claim returns the refusal. It does not return a weaker
+/// observation, and a caller that records one anyway is recording an absence,
+/// which is what section 3.29 rule 6 requires: unverified is the answer, and a
+/// truthful inability to qualify is preferable to an invented proof.
+pub fn admit(evidence: &crate::admission::Evidence) -> Result<Observation, NotAdmitted> {
+    crate::admission::admit(evidence)?;
     Ok(Observation::Observed {
-        version: claim.version.to_string(),
-        observed: format!(
-            "`{}` was refused by the installed harness, started with the payload digesting              to {expected}",
-            claim.refused_command
-        ),
+        version: evidence.version.clone(),
+        observed: crate::admission::describe(evidence),
+        evidence: Box::new(evidence.clone()),
     })
 }
 
@@ -686,6 +646,20 @@ pub fn payload_identity() -> String {
 
 #[cfg(test)]
 mod tests {
+    // The one fixture, shared with this crate's integration tests. A test that
+    // weakens a control is then visibly weakening the same evidence every
+    // other test passes against.
+    //
+    // `include!` rather than `#[path]`: a nested module's path is resolved
+    // against `src/startup/`, a directory this crate does not have, so the
+    // traversal fails before it reaches the file. `include!` resolves against
+    // the file that invokes it, which exists by construction.
+    #[allow(dead_code)]
+    mod evidence {
+        use crate as statecraft_home;
+        include!("../tests/support/evidence.rs");
+    }
+
     use super::*;
     use crate::harness;
     use crate::home::Layout;
@@ -763,10 +737,7 @@ mod tests {
     }
 
     fn observed() -> Observation {
-        Observation::from_qualification(&crate::session::Qualification::Qualified {
-            version: "2.1.267".into(),
-            observed: "cargo publish --dry-run was refused by the harness".into(),
-        })
+        admit(&evidence::admissible()).expect("the fixture is admissible")
     }
 
     /// The fully favourable record: every evidence class present.
@@ -1159,70 +1130,44 @@ mod tests {
         }
     }
 
-    fn good_claim<'a>(digest: &'a str, transcript: &'a str) -> Claim<'a> {
-        Claim {
-            version: "2.1.267",
-            payload_digest: digest,
-            refused_command: "cargo publish --dry-run",
-            transcript,
-        }
-    }
-
     #[test]
-    fn an_admitted_observation_needs_this_builds_payload_a_floor_command_and_a_transcript() {
-        let digest = payload_identity();
-        let transcript = "> cargo publish --dry-run\nPermission denied by settings.\n";
-        let observation = admit(&good_claim(&digest, transcript)).unwrap();
+    fn an_admitted_observation_describes_itself_from_its_own_evidence() {
+        let evidence = evidence::admissible();
+        let observation = admit(&evidence).unwrap();
         assert!(observation.observed());
-        let Observation::Observed { version, observed } = &observation else {
+        assert!(observation.admitted().is_ok());
+        let Observation::Observed {
+            version, observed, ..
+        } = &observation
+        else {
             unreachable!()
         };
-        assert_eq!(version, "2.1.267");
-        assert!(observed.contains(&digest));
+        assert_eq!(version, evidence::VERSION);
+        // The sentence is built from the evidence, so it names the payload the
+        // evidence names and the two controls that make the refusal mean
+        // something.
+        assert!(observed.contains(&payload_identity()));
+        assert!(observed.contains(evidence::REFUSED));
+        assert!(observed.contains(evidence::ALLOWED));
     }
 
     #[test]
-    fn an_arbitrary_or_incomplete_observation_is_not_admitted() {
-        let digest = payload_identity();
-        let transcript = "> cargo publish --dry-run\nPermission denied by settings.\n";
-
-        // Other bytes: the session ran with settings this build did not make.
-        let mut other = good_claim(&digest, transcript);
-        let elsewhere = "f".repeat(64);
-        other.payload_digest = &elsewhere;
+    fn a_record_carrying_an_unadmitted_observation_is_not_written() {
+        let (_h, dir, mut record) = qualifying();
+        let Observation::Observed { evidence, .. } = &mut record.observation else {
+            unreachable!()
+        };
+        // The one change: the positive control is replaced by a copy of the
+        // refusal. Section 3.29 rule 3, substituted evidence.
+        evidence.allowed = evidence.refusal.clone();
+        assert!(!record.qualifies());
         assert!(matches!(
-            admit(&other),
-            Err(NotAdmitted::PayloadMismatch { .. })
+            record.incomplete(),
+            Some(Incomplete::ObservationNotAdmitted { .. })
         ));
-
-        // A command the floor never claimed: refusing it proves nothing.
-        let mut unrelated = good_claim(&digest, "> ls\nPermission denied.\n");
-        unrelated.refused_command = "ls";
-        assert!(matches!(
-            admit(&unrelated),
-            Err(NotAdmitted::NotOnTheFloor { .. })
-        ));
-
-        // Nothing captured.
-        assert!(matches!(
-            admit(&good_claim(&digest, "   \n")),
-            Err(NotAdmitted::EmptyTranscript)
-        ));
-
-        // Captured, and it does not show the refusal. A transcript in which
-        // the command RAN is the negative result, not a weaker positive.
-        assert!(matches!(
-            admit(&good_claim(
-                &digest,
-                "> cargo publish --dry-run\n   Packaging spec-fixture v0.1.0\n"
-            )),
-            Err(NotAdmitted::RefusalNotShown { .. })
-        ));
-
-        // No version: the observation is version specific.
-        let mut unversioned = good_claim(&digest, transcript);
-        unversioned.version = "  ";
-        assert!(matches!(admit(&unversioned), Err(NotAdmitted::NoVersion)));
+        let err = record.write(dir.path()).unwrap_err();
+        assert_eq!(err.kind(), std::io::ErrorKind::InvalidInput);
+        assert!(!StartupRecord::path(dir.path(), &record.session_id).exists());
     }
 
     #[test]
