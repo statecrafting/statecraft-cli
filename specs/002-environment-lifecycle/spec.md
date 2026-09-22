@@ -891,6 +891,71 @@ migration, and not a path to any other key. A settings key this section does not
 name is not writable by any code path, and adding one is an amendment to this
 section rather than a use of it.
 
+### 3.25 The required harness identity and the resolved one
+
+Section 3.14 makes a harness revision content addressed. This section says who
+records which revision, and what a managed session does when the two answers
+disagree. The owner settled it on 2026-09-21.
+
+**Two records, and they are not the same record.**
+
+- The **required** identity is a **committed project requirement**. It travels
+  with the repository, it is reviewed like any other committed change, and it
+  is what the project says its managed sessions must run against.
+- The **resolved** identity is recorded **per managed session**, separately,
+  and says which revision actually answered. Section 3.16's last rule already
+  freezes it; this section fixes that the requirement it was resolving against
+  is a committed one rather than whatever the home happened to hold.
+
+Keeping them apart is what makes disagreement visible. One record that is
+rewritten as it is read cannot disagree with anything, which is precisely the
+failure this section refuses.
+
+**The full digest is the integrity proof.** A revision's identity is the digest
+over its files, as section 3.14 fixes it. The **full** digest is what the
+required record carries and what an integrity comparison uses. A short
+identifier derived from it is a **display** convenience: legible in a plan, in a
+verdict and in a log, and never on its own the thing an equality check is
+performed against. A truncated identifier that two revisions could share is not
+a proof, whatever the odds are.
+
+**Managed execution refuses.** A session that would be managed under a required
+identity refuses when the required content is **missing** (no such revision is
+installed), **corrupt** (a revision is installed under that identity and its
+files no longer digest to it), or **mismatched** (the resolved revision is not
+the required one). The refusal is a refusal in this product's vocabulary: a
+precondition was not met and nothing was done.
+
+**Four things stay possible under that refusal**, because a refusal that
+prevents diagnosis is worse than the state it refuses: **inspection** (what is
+required, what is installed, what each digests to), **diagnosis** (`doctor`
+reporting the disagreement), **planning** (what an apply or an upgrade would
+do), and an **explicit upgrade**.
+
+**Two things this product never does.** It never **silently selects the latest
+installed revision**: an installed revision that is not the required one is a
+mismatch to be reported, not a substitute to be chosen, and "the newest one is
+probably right" is how a project loses the ability to say what it ran. And it
+never **rewrites the project requirement during a read**: inspection, doctor
+and plan are reads, and a read that repairs its own precondition destroys the
+evidence that the precondition was unmet, which is the same defect the gate
+refuses in `compile` (AGENTS.md, "New sessions").
+
+**An upgrade is an explicit reviewed project change.** Changing the required
+identity is a committed change to the repository, proposed and reviewed like
+one. It is never a side effect of installing, of running, or of a newer
+revision appearing under the home.
+
+**An upgrade renews settings consent when the content changes.** Where the
+consented settings modification of section 3.24 embeds the revision, a new
+required identity produces different modification content, and different
+content is presented for consent again. That is section 3.24's rule
+("consent to one revision is not consent to the next") reached from the other
+direction, and it is stated here so an upgrade path cannot satisfy itself by
+reusing a consent given for other bytes. Where the modification content is
+byte-identical across the upgrade, there is nothing new to consent to and
+nothing is asked.
+
 ## 4. Out of scope
 
 Installing the product itself; provider authentication; hosted registration;
@@ -1326,6 +1391,36 @@ widen them. No new hook repair behavior is authorized: contract 1 stands, and
 the post-edit `compile` remains the single sanctioned exception. And nothing
 here decides which events this build registers; that is §3.23's inventory
 question, settled separately.
+
+**2026-09-21, authority: §3.25, and the measurement that made the full digest a
+requirement rather than a preference.** §3.14 made a revision content
+addressed and stopped there. Who holds the requirement, and what happens when
+the home does not hold it, were unfixed, and the two plausible answers differ
+in what a project can say afterwards about what it ran.
+
+`crates/statecraft-home/src/resolved.rs` already freezes a per-run `Identity`
+carrying `requested` and `resolved`, so half of §3.25 is a rule the code
+follows. The other half is not present: the manifest header (§3.3) pins this
+product's version, the spec-spine version and the adapter set, and pins no
+harness revision, so `requested` today resolves against whatever the home
+holds rather than against a committed statement. §3.25 fixes that the required
+identity is committed, and the implementation is separate work.
+
+The digest rule was measured, not assumed. `harness::revision_of` computes the
+full SHA-256 over path and content in path order and then keeps
+`format!("h-{}", &full[..12])`, discarding the rest. Twelve hex characters is
+48 bits, which is ample as a label an operator reads in a plan and is not an
+integrity proof: an integrity comparison must be able to say that these are
+the same bytes, and a comparison over a truncation says only that they agree
+about 48 bits of them. So §3.25 separates the two roles rather than lengthening
+the identifier, because the short form is genuinely the better thing to print
+and the worse thing to compare.
+
+The two prohibitions are there because each is the convenient behavior.
+Selecting the latest installed revision makes a mismatch disappear at the exact
+moment it should be reported. Rewriting the requirement during a read makes a
+`doctor` run into the repair that hides what `doctor` was asked to find, which
+is the same defect AGENTS.md refuses in a `compile` substituted for a `check`.
 
 ## Verification
 
