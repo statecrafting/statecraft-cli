@@ -3615,9 +3615,12 @@ is refused rather than defaulted and a member given twice is refused by the
 deserializer rather than read last-wins. The admission's single pass reads the
 line after the terminal event through it, adds its session to rule 8's session
 check, and refuses any event after it. `startup capture` and `startup qualify`
-print one `trailer` line per admitted trailer; the capture's bytes are
-unchanged. Rule 14's identity is asserted over an admitted body of evidence
-and three refused ones, and the negative cases are the list section 3.34
+print one `trailer` line per admitted trailer, reported from the admission's
+own pass (`admitted` and `admitted_in`), and a capture whose events and
+non-blank lines do not correspond is refused as unreadable; the capture's
+bytes are unchanged. Rule 14's identity is asserted over an admitted body of evidence
+and four refused ones, with a `null` detail and with prose shaped like either
+verdict, on every control and on one, and the negative cases are the list section 3.34
 names, each through the admission and through the launch's own completeness
 reading. The local fake gained `trailer` and `bad-trailer` modes, and the
 binary test runs both. **Offline replay, not a live observation:** the

@@ -954,6 +954,17 @@ fn read(control: Control, capture: &Capture) -> Result<Stream, NotAdmitted> {
         .lines()
         .filter(|l| !l.trim().is_empty())
         .collect();
+    // Section 3.34's bounds: the trailer's line must be the line its event
+    // was read from. Two copies of one filter agree today; if they ever
+    // stopped agreeing, an index into `lines` could name an earlier event's
+    // line, so a disagreement is refused rather than read.
+    if lines.len() != events.len() {
+        return Err(unreadable(format!(
+            "{} events were read from {} non-blank lines, so a line cannot be tied to its event",
+            events.len(),
+            lines.len()
+        )));
+    }
     let out_of_order = |detail: String| NotAdmitted::OutOfOrder { control: c, detail };
 
     let mut sessions: Vec<(&'static str, Option<String>)> = Vec::new();
@@ -1202,24 +1213,6 @@ fn read(control: Control, capture: &Capture) -> Result<Stream, NotAdmitted> {
 /// A trailer section 3.34 admitted is returned so the launch can report it.
 pub fn one_session(control: Control, capture: &Capture) -> Result<Option<Trailer>, NotAdmitted> {
     read(control, capture).map(|s| s.trailer)
-}
-
-/// The trailers an admitted observation's captures carried, per control.
-///
-/// For reporting only: the admission read nothing in them (section 3.34 rule
-/// 14), and a capture that cannot be read contributes none here because the
-/// admission has already refused it.
-pub fn trailers(evidence: &Evidence) -> Vec<(Control, Trailer)> {
-    evidence
-        .controls()
-        .into_iter()
-        .filter_map(|(control, m)| {
-            read(control, &m.capture)
-                .ok()
-                .and_then(|s| s.trailer)
-                .map(|t| (control, t))
-        })
-        .collect()
 }
 
 /// The binding checks of section 3.30 rule 12 for one control, and rule 11's
@@ -1578,6 +1571,12 @@ fn outcome(evidence: &Evidence, control: Control, s: &Stream) -> Result<(), NotA
 /// whether the observation is live; [`Evidence::synthetic`] does, and the
 /// record that carries it is never qualified when it is.
 pub fn admit(evidence: &Evidence) -> Result<(), NotAdmitted> {
+    admitted(evidence).map(|_| ())
+}
+
+/// [`admit`], returning the trailers section 3.34 admitted, per control, from
+/// the same pass that judged each capture. Reported, never read (rule 14).
+pub fn admitted(evidence: &Evidence) -> Result<Vec<(Control, Trailer)>, NotAdmitted> {
     if evidence.version.trim().is_empty() {
         return Err(NotAdmitted::NoVersion);
     }
@@ -1680,13 +1679,24 @@ pub fn admit(evidence: &Evidence) -> Result<(), NotAdmitted> {
     for (control, s) in &streams {
         outcome(evidence, *control, s)?;
     }
-    Ok(())
+    Ok(streams
+        .into_iter()
+        .filter_map(|(control, s)| s.trailer.map(|t| (control, t)))
+        .collect())
 }
 
 /// Admit an observation for one project: [`admit`], and the controls ran in
 /// that project.
 pub fn admit_in(evidence: &Evidence, root: &std::path::Path) -> Result<(), NotAdmitted> {
-    admit(evidence)?;
+    admitted_in(evidence, root).map(|_| ())
+}
+
+/// [`admit_in`], returning the trailers [`admitted`] reports.
+pub fn admitted_in(
+    evidence: &Evidence,
+    root: &std::path::Path,
+) -> Result<Vec<(Control, Trailer)>, NotAdmitted> {
+    let trailers = admitted(evidence)?;
     let expected = root
         .canonicalize()
         .unwrap_or_else(|_| root.to_path_buf())
@@ -1699,7 +1709,7 @@ pub fn admit_in(evidence: &Evidence, root: &std::path::Path) -> Result<(), NotAd
             found: found.clone(),
         });
     }
-    Ok(())
+    Ok(trailers)
 }
 
 /// What an admitted observation says, in one line.

@@ -973,7 +973,7 @@ fn trailed() -> Evidence {
 fn the_measured_trailer_after_the_terminal_event_is_admitted() {
     let e = trailed();
     assert!(admission::admit(&e).is_ok(), "{:?}", admission::admit(&e));
-    let reported = admission::trailers(&e);
+    let reported = admission::admitted(&e).unwrap();
     assert_eq!(reported.len(), 3);
     for (_, t) in &reported {
         assert_eq!(t.subtype, "task_summary");
@@ -1031,23 +1031,47 @@ fn a_trailer_changes_no_judgement() {
             "interrupted",
             Box::new(|e| launch_of(&mut e.refusal).process.timed_out = true),
         ),
+        (
+            "two sessions",
+            Box::new(|e| {
+                let mut events = evidence::refusal_events("session-r");
+                events[2]["session_id"] = json!("session-other");
+                set_events(&mut e.refusal, &events);
+            }),
+        ),
+    ];
+    // Prose shaped like a verdict either way, and no prose at all.
+    let details = [
+        json!(null),
+        json!("the command was refused and did not execute"),
+        json!("permission granted; the command executed successfully"),
     ];
     for (name, mutate) in cases {
         let mut plain = evidence::admissible();
         mutate(&mut plain);
-        let mut with = plain.clone();
-        for (m, session) in [
-            (&mut with.refusal, "session-r"),
-            (&mut with.allowed, "session-a"),
-            (&mut with.without_payload, "session-w"),
-        ] {
-            with_line(m, &trailer(session).to_string());
+        for detail in &details {
+            // On every control, and on the refusal control alone.
+            for all in [true, false] {
+                let mut with = plain.clone();
+                for (m, session) in [
+                    (&mut with.refusal, "session-r"),
+                    (&mut with.allowed, "session-a"),
+                    (&mut with.without_payload, "session-w"),
+                ] {
+                    if !all && session != "session-r" {
+                        continue;
+                    }
+                    let mut t = trailer(session);
+                    t["detail"] = detail.clone();
+                    with_line(m, &t.to_string());
+                }
+                assert_eq!(
+                    format!("{:?}", admission::admit(&plain)),
+                    format!("{:?}", admission::admit(&with)),
+                    "{name}, detail {detail}, all {all}: a trailer changed the judgement"
+                );
+            }
         }
-        assert_eq!(
-            format!("{:?}", admission::admit(&plain)),
-            format!("{:?}", admission::admit(&with)),
-            "{name}: a trailer changed the judgement"
-        );
     }
 }
 

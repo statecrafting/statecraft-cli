@@ -930,11 +930,12 @@ pub fn execute(ports: &Ports<'_>, operation: Operation) -> Answer {
                     }));
                 }
             };
-            let admitted = crate::admission::admit_in(&evidence, &root)
-                .and_then(|()| crate::startup::admit(&evidence));
+            let admitted = crate::admission::admitted_in(&evidence, &root).and_then(|trailers| {
+                crate::startup::admit(&evidence).map(|observation| (observation, trailers))
+            });
             match admitted {
-                Ok(observation) => {
-                    let trailers: Vec<String> = crate::admission::trailers(&evidence)
+                Ok((observation, trailers)) => {
+                    let trailers: Vec<String> = trailers
                         .into_iter()
                         .map(|(control, t)| format!("{}: {}", control.word(), t.note()))
                         .collect();
