@@ -770,6 +770,14 @@ with exit 2 before anything is judged, and `contract-moved` is a finding, exit
 1, like the other acceptances that ran and found something. Both fields are
 additive under section 3.4.
 
+**2026-09-23: `startup trial` records whether the deadline stopped the
+session.** The binding copies spec `004`'s new `timed_out` into the trial's
+process end, so spec `002` rule 37 is judged from the supervisor's observation.
+`startup_trial.rs` gains `a_session_stopped_before_its_first_event_is_uncertain_not_failed`,
+whose fake writes nothing, so its answer does not depend on scheduling. The
+older deadline test now holds under load for the same reason: a fake starved
+past its deadline is `uncertain` whether or not it wrote anything.
+
 **2026-09-23: where `work list` places a stale ledger and a refused pin.**
 Section 3.10 names the missing-field refusal and, through `003` section 3.8,
 the corpus that does not compile (a finding, **1**). It is silent on the two

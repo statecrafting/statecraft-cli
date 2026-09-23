@@ -58,17 +58,20 @@ pub struct Source {
 
 /// An ownership transfer for a path another installer claims.
 ///
-/// Section 3.7.3: per path, explicit, operator-initiated, and recorded with the
-/// digest observed at the moment of transfer. Section 3.7.5: it also records
-/// which kit revision the transfer was evaluated against, so a kit that moves
-/// afterwards is a `doctor` finding rather than a silent divergence.
+/// Spec 002 section 3.21, retained part 3 (it was section 3.7.3 and 3.7.5
+/// before section 3.7 was withdrawn): per path, explicit, operator-initiated,
+/// reversible, and recorded with the digest observed at the moment of transfer
+/// and the producer revision it was evaluated against, so a producer that moves
+/// afterwards is a `doctor` finding rather than a silent divergence. This build
+/// reads and carries a recorded transfer; no operation creates one.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Transfer {
     /// Who held the path before the transfer.
     pub from: Claimant,
     /// The digest observed at the moment of transfer.
     pub digest_at_transfer: String,
-    /// The kit revision the transfer was evaluated against, where one is known.
+    /// The producer revision the transfer was evaluated against, where one is
+    /// known.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub evaluated_against: Option<String>,
 }
