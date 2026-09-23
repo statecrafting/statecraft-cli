@@ -53,6 +53,31 @@
     ],
     "id": "004-execution-adapter",
     "implementation": "complete",
+    "sectionDigests": {
+      "004-the-execution-adapter-boundary-and-the-first-provider": "7a0c448d5ec30cc66a80fe8970d8dd70e8feebae2fc0e3ce1353de6a543cfab4",
+      "1-purpose": "ec32f21fea438da7d976970679b1977cba384f38738e9877fdd934bfa2aed41d",
+      "2-territory": "1c1c65e2d69832b369606d257498f77c77c85f26f8ac0083451508143f6055d1",
+      "3-1-the-protocol": "0dce0247a589f2e9b1dedb094952fd1bccd6df4e1ab0d90f1dfff31b88d4fd45",
+      "3-10-the-capability-tokens-each-against-a-measurement": "44d968b80385beb7e93bd700948d878161e0a9c2400ef25bf3f58466b3b86386",
+      "3-11-a-denied-session-classifies-itself-as-a-success": "2daeac9351a7d7f5dd0e2cbb55e8a3329e4f98857af9ad2e3fedfdea4f544c38",
+      "3-12-two-denial-mechanisms-with-opposite-evidence-properties": "2f1cad27b645aa9dcfe5872b910374b7558a5220cff4c9cd261f8b46586fa697",
+      "3-13-the-outcome-mapping": "00a7546f62074dd41585f851f09d94c436ff94e5609a37c8e164419a9c61bbd4",
+      "3-14-credentials-and-what-the-constructed-environment-cannot-drop": "1bc78ef8dc1f52cdc25dc95c2eaeb9160a46394f215b9988690ebca344632cbd",
+      "3-15-the-environment-half": "fc5767ec74da8e785e5e911cb545ffaa68de337e2edf303eea3d03a3bd120cd8",
+      "3-16-qualification-binds-to-a-version-and-to-nothing-else": "054794a877ba351927fb37e9dd45e173db1f91381c1f669d16c38d8d1e4c4547",
+      "3-2-the-capability-vocabulary": "13f0bcb6e3fa48482e5f10a274c0d6c68eaaed20295cecaea0211533ce2df05d",
+      "3-3-required-refuses-preferred-degrades": "bd51188680d4cadce1ae0bef0c1f09761682ed3d051492d480448b195b74c61d",
+      "3-4-qualification": "05043a15d8c68513f41f2a080f9175ba2493c1cb80a18f523ca88e5d4679c900",
+      "3-5-the-negative-suite": "708e6f3c31c6b5c5e64fb3a81f3cfd6b7b22b20b30585c7f973a150e3e95c96b",
+      "3-6-the-child-environment-is-constructed-not-filtered": "285f307ca6530f3db5394b458e07b5369dbe0eb155decaa9ae5acd3ffbebc1ca",
+      "3-7-every-attempt-reports-its-posture": "b1d13358cdbe793be90f7f3d4389103804c78ebd561fbfd5e39a7371cc5106ea",
+      "3-8-observable-negative-cases": "a2a3f3b3fb7726d376d70dfbded53a3c47ff3d44f4e208eb2680d5a1a5f452b8",
+      "3-9-what-is-spawned-and-the-three-parts": "f934b0c7a7d9a0a867f78eb191aba0ccd5c6250a4cdb19e4279fdc42408d03b6",
+      "3-behavior": "b7529e5e84aa82f16436fa18854a30709105b7e62773c4e0342a1ee0f2d57701",
+      "4-out-of-scope": "67f380d296900cedea18630586985feed73fd92f92d579a6683f6ebe5dff15fd",
+      "5-decisions-recorded-during-implementation": "16da159b03d1bb46ced866e72e0b4ca52db4e6e828311a5720319e5e42b89411",
+      "verification": "dff5799d4ff7bf61cd378973097e61c74ac01124f4b10d4954f579930ab9155c"
+    },
     "sectionHeadings": [
       "004: The execution adapter boundary, and the first provider",
       "1. Purpose",
@@ -84,5 +109,5 @@
     "title": "The execution adapter boundary and the first provider: one protocol, declared capabilities, a qualification suite, a constructed child environment, and what a real stream can witness"
   },
   "shardHash": "19b387195698d4b680a33c449d4701ea9ee5d299ba6a27597c2582e2c3a02869",
-  "specVersion": "1.3.0"
+  "specVersion": "1.6.0"
 }

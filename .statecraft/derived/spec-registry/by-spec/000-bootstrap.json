@@ -38,6 +38,16 @@
     ],
     "id": "000-bootstrap",
     "implementation": "n-a",
+    "sectionDigests": {
+      "000-bootstrap-spec-system": "b413e446ca04f368341a6f8dd6389df48af2cdfd32017a270f5b2ea5c7fb85de",
+      "1-the-authoring-derived-boundary": "eec9eedad9b27f476915f8f00a9b439dc53c3cca90b8d71793f3d09a9ee60193",
+      "2-the-typed-authority-graph": "66a2e7149a2776b93247b4957d86eba3c0b91a69ff0e6bc4c22841ea805154cc",
+      "3-determinism": "f4d1dfb1794fedb35593ef3479f14a6cafe92999a09b31f2aa95d52b4fbf7d82",
+      "4-refusal": "ac0a94e1b3927d69b323c22993bda6dc1252264fe5dfdbd548b3abb8357d6e8f",
+      "5-the-three-product-anchors-and-when-they-were-frozen": "51d322db0ec62e15b7f17feb5ce6d4cc22a32d2d9b1c1bbcc47c5b99dd8f4515",
+      "6-what-this-spec-does-not-do": "518f2425e6342b6ae46e1eb74e5c7160894d2e395bdd4e47640b46f1b81424de",
+      "verification": "4c8f849f93dd293335985e3893f8013a2f9d70d3f869143d3cbcea7cb1d67077"
+    },
     "sectionHeadings": [
       "000: Bootstrap spec system",
       "1. The authoring / derived boundary",
@@ -64,5 +74,5 @@
     ]
   },
   "shardHash": "afa5b09e3dacf416ccd5c1839d7e9ef5b5a13d0610c0809616a27a16c84e3de2",
-  "specVersion": "1.3.0"
+  "specVersion": "1.6.0"
 }

@@ -202,14 +202,14 @@ experiment does not answer it: that stage starts no run and supplies no hook.
 ### The contract a run was authorized against
 
 Where the producer resolves context closures (spec-spine's specs 106 and 107,
-unreleased), `run` asks it for one per attempt, the spec and every obligation
+released in 0.23.0), `run` asks it for one per attempt, the spec and every obligation
 the spec declares, and writes the answer into the attempt's intent before any
 effect (spec `003` section 3.1.3). `accept` asks for the same closure again and
 compares (spec `005` section 3.18): a contract that changed, lost a member or
 withdrew an obligation is no acceptance, reason `contract-moved`, naming each
-member with both identities. Under the pinned producer, which has no closures,
-the binding reads `unsupported` and the comparison `not-recorded`. The receipt
-is unchanged either way.
+member with both identities. A target whose pinned producer has no closures
+(before spec-spine 0.23.0) binds `unsupported` and compares `not-recorded`.
+The receipt is unchanged either way.
 
 ### The exit codes a caller scripts against
 
@@ -221,7 +221,7 @@ and a test keeps the set closed.
 ## Governance
 
 Governed by [spec-spine](https://github.com/statecrafting/spec-spine), pinned to
-**0.20.0** exactly in `spec-spine.toml`. Specs are the source of truth; the
+**0.23.0** exactly in `spec-spine.toml`. Specs are the source of truth; the
 derived shards under `.statecraft/derived/` are compiler output, committed, and read only
 through `spec-spine` subcommands.
 
