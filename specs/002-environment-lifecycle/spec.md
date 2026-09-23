@@ -4417,6 +4417,32 @@ shows both through the binary's `doctor` on every platform, and the owner in
 prerequisite can hold; the library rows are in the environment crate's
 `negative_cases.rs`.
 
+**2026-09-23: where section 3.16's frozen resolution is carried for `run`.**
+Section 3.16 says a run resolves its harness revision and its tools once and
+records the requested and the resolved identity, and section 3.25 places that
+record: "The **resolved** identity is recorded **per managed session** ...
+Section 3.16's last rule already freezes it". In `run` the managed session is
+the attempt, and sections 3.31 and 3.32 already write its evidence once: the
+intent carries the committed requirement, the selected revision and the
+resolved program, and the record carries the resolved revision. A later
+attempt selects the committed requirement's full digest and never the newest
+revision the home holds (section 3.31 rule 17), so a global upgrade cannot
+change what the next attempt uses. That was true before this entry and was
+exercised by no verb: the section 3.10 row "a global upgrade after a run
+resolved" was tested only against `resolved::ResolvedRun`, a type no verb
+writes, with a requested identity of `latest` that section 3.25 forbids
+selecting. `run_startup.rs` now shows the row through the binary: a run
+resolves, a newer revision is installed and `home apply` runs, and the next
+attempt selects, supplies and resolves the same revision while the first
+attempt's records stay byte-identical. No code changed, and `ResolvedRun` is
+not wired into `run`, because a second per-run record would duplicate what the
+intent already carries. What this entry does not settle is recorded rather
+than chosen: whether a run's later attempt may follow a requirement that
+`harness upgrade` changed after the run first resolved (section 3.31 rule 17
+selects the committed requirement; section 3.16 says the run resolved once),
+which matters because spec `003` keys a run by its spec id and so a run never
+ends.
+
 ## Verification
 
 `--fail-on-untraced` joined the corpus gate with this spec's first
