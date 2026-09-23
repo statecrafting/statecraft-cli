@@ -11,6 +11,14 @@
         "source": "spec-edge"
       },
       {
+        "path": "crates/statecraft-cli/",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/statecraft-environment/",
+        "source": "spec-edge"
+      },
+      {
         "path": "crates/statecraft-run/",
         "source": "spec-edge"
       }
@@ -41,11 +49,37 @@
           "kind": "directory",
           "path": "crates/statecraft-acceptance/"
         }
+      },
+      {
+        "locations": [
+          {
+            "file": "crates/statecraft-cli/"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "directory",
+          "path": "crates/statecraft-cli/"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "crates/statecraft-environment/"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "directory",
+          "path": "crates/statecraft-environment/"
+        }
       }
     ],
     "specId": "003-work-and-run-semantics",
     "specStatus": "approved"
   },
   "schemaVersion": "1.1.0",
-  "shardHash": "1bc985f7429bb07a72c42befa9a3af4e2b24b589cabc009395ec7f67967ff266"
+  "shardHash": "6e88cac63f7b37bf4f0cb79adad3cf8c4b32bb63481aa3acd5760356221ed1b2"
 }

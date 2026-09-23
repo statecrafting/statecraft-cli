@@ -34,9 +34,11 @@ pub const OPERATOR_PROVENANCE: &str = "operator-supplied";
 /// The journal file for a repository inside a product home.
 ///
 /// Keyed like the run record, so the two sit side by side and one repository's
-/// journal is never read for another (rule 4).
+/// journal is never read for another (rule 4), and by the registration's
+/// stored root ([`crate::repository`]), so one repository has one journal
+/// however its path was typed.
 pub fn journal_path(home: &Path, target: &Path) -> PathBuf {
-    let key = digest_bytes(target.to_string_lossy().as_bytes());
+    let key = crate::repository::key(target);
     home.join("records").join(format!("{key}.overrides.jsonl"))
 }
 
@@ -177,6 +179,16 @@ pub fn read(home: &Path, target: &Path) -> Result<Journal, JournalError> {
         path: path.display().to_string(),
         detail,
     };
+    // A journal filed under another spelling of this path is this
+    // repository's; an absent file here beside it is not "no override".
+    if let Some(records) = path.parent() {
+        let found = crate::repository::elsewhere(records, target, ".overrides.jsonl");
+        if !found.is_empty() {
+            return Err(failed(crate::repository::elsewhere_detail(
+                records, target, &found,
+            )));
+        }
+    }
     let text = match std::fs::read_to_string(&path) {
         Ok(t) => t,
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(Journal::default()),

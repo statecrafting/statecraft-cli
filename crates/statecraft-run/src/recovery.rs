@@ -555,10 +555,7 @@ mod tests {
     /// `Chain::open` rebuilds, so the chain verifies and the only unusual thing
     /// about it is the payload.
     fn chain_with_payloads(home: &std::path::Path, target: &std::path::Path, payloads: &[Value]) {
-        let anchor = format!(
-            "statecraft:{}",
-            statecraft_environment::digest::digest_bytes(target.to_string_lossy().as_bytes())
-        );
+        let anchor = format!("statecraft:{}", crate::repository::key(target));
         let mut writer = RecordChain::new(anchor);
         let path = chain_path(home, target);
         std::fs::create_dir_all(path.parent().expect("a parent")).expect("mkdir");

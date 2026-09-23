@@ -12,15 +12,34 @@ use std::fs::{File, OpenOptions};
 use std::path::{Path, PathBuf};
 
 /// The lock file for a repository inside a product home.
+///
+/// `target` is the registration's stored root ([`crate::repository`]), so every
+/// spelling of one registered path takes the one lock.
 pub fn lock_path(home: &Path, target: &Path) -> PathBuf {
-    let key = statecraft_environment::digest::digest_bytes(target.to_string_lossy().as_bytes());
+    let key = crate::repository::key(target);
     home.join("records").join(format!("{key}.lock"))
 }
 
 /// A held lock. Dropping it releases it.
 #[derive(Debug)]
 pub struct Held {
-    _file: File,
+    file: File,
+}
+
+/// Release explicitly, then close.
+///
+/// A `flock` belongs to the open file description, not to the descriptor, and
+/// closing a descriptor releases it only when no other descriptor refers to that
+/// description. A child this process spawns from another thread holds a copy of
+/// every descriptor, close-on-exec ones included, from its creation until its
+/// `exec`; that is so for `fork` and, measured on macOS, for `posix_spawn` too.
+/// A lock released by closing alone could therefore outlive its holder for that
+/// window, and the next taker would be told another process holds it. An
+/// explicit unlock releases it for every copy at once.
+impl Drop for Held {
+    fn drop(&mut self) {
+        let _ = rustix::fs::flock(&self.file, rustix::fs::FlockOperation::Unlock);
+    }
 }
 
 /// Why the lock was not taken.
@@ -62,7 +81,7 @@ pub fn try_acquire(home: &Path, target: &Path) -> Result<Held, LockError> {
         .open(&path)
         .map_err(|e| failed(e.to_string()))?;
     match rustix::fs::flock(&file, rustix::fs::FlockOperation::NonBlockingLockExclusive) {
-        Ok(()) => Ok(Held { _file: file }),
+        Ok(()) => Ok(Held { file }),
         Err(rustix::io::Errno::WOULDBLOCK) => Err(LockError::Busy {
             path: path.display().to_string(),
         }),
@@ -87,5 +106,53 @@ mod tests {
         assert!(try_acquire(home.path(), Path::new("/fixture/b")).is_ok());
         drop(first);
         assert!(try_acquire(home.path(), target).is_ok());
+    }
+
+    /// The copy a spawned child holds between its creation and its `exec` is
+    /// a second descriptor on the same open file description. Held here
+    /// deterministically, as a duplicate that outlives the holder.
+    #[test]
+    fn a_copy_of_the_descriptor_does_not_keep_a_released_lock() {
+        let home = tempfile::tempdir().unwrap();
+        let target = Path::new("/fixture/a");
+        let held = try_acquire(home.path(), target).unwrap();
+        let copy = held.file.try_clone().unwrap();
+        drop(held);
+        assert!(try_acquire(home.path(), target).is_ok());
+        drop(copy);
+    }
+
+    /// The measured failure, as it occurred: processes spawned from other
+    /// threads while this one takes and releases the lock.
+    #[test]
+    fn spawning_on_other_threads_never_makes_a_released_lock_busy() {
+        use std::sync::Arc;
+        use std::sync::atomic::{AtomicBool, Ordering};
+        let home = tempfile::tempdir().unwrap();
+        let target = Path::new("/fixture/a");
+        let stop = Arc::new(AtomicBool::new(false));
+        let spawners: Vec<_> = (0..4)
+            .map(|_| {
+                let stop = stop.clone();
+                std::thread::spawn(move || {
+                    while !stop.load(Ordering::Relaxed) {
+                        let _ = std::process::Command::new("true").output();
+                    }
+                })
+            })
+            .collect();
+        let mut busy = 0;
+        for _ in 0..2000 {
+            match try_acquire(home.path(), target) {
+                Ok(held) => drop(held),
+                Err(LockError::Busy { .. }) => busy += 1,
+                Err(e) => panic!("{e}"),
+            }
+        }
+        stop.store(true, Ordering::Relaxed);
+        for s in spawners {
+            s.join().unwrap();
+        }
+        assert_eq!(busy, 0, "a released lock was reported held {busy} times");
     }
 }

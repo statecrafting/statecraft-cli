@@ -1212,6 +1212,24 @@ fn a_concluded_attempt_an_unknown_attempt_number_and_an_empty_reason_are_refused
     let out = reconcile_as(&f, "1", "absent", "unverified", "alice", "done");
     assert_eq!(code(&out), 2, "{}", text(&out));
     assert!(text(&out).contains("not live"), "{}", text(&out));
+    // Another spelling of the registered root reads the same chain: the
+    // concluded attempt is found and refused as concluded, not missing.
+    let spelled = format!("{}/", f.root());
+    let out = f.cli(&[
+        "run",
+        "reconcile",
+        &spelled,
+        RUN,
+        "1",
+        "absent",
+        "not-launched",
+        "alice",
+        "none",
+    ]);
+    assert_eq!(code(&out), 2, "{}", text(&out));
+    assert!(!text(&out).contains("no attempt 1"), "{}", text(&out));
+    assert_eq!(chain_bytes(&f), before);
+
     // An attempt the record does not carry.
     let out = reconcile_as(&f, "7", "absent", "not-launched", "alice", "none");
     assert_eq!(code(&out), 2, "{}", text(&out));

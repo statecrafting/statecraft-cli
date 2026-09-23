@@ -58,11 +58,51 @@ fn run(args: &[String]) -> i32 {
                 return Exit::Usage.code();
             };
             let path = absolute(path);
+            // Spec 003 section 5 (2026-09-23): a re-registration keeps the
+            // stored spelling, except where the stored spelling has no records
+            // and the typed one has, which is the one case where re-storing it
+            // points the registration back at its only history. Held under the
+            // stored root's lock, so no run appends while the key moves.
+            // The lock is taken first and held until the registry is written,
+            // and the condition is decided again under it.
+            let records = home.join("records");
+            let mut held = None;
+            let respelled = match registry.get(&path).map(|r| r.root.clone()) {
+                Some(stored)
+                    if statecraft_run::repository::respell_allowed(&records, &stored, &path) =>
+                {
+                    held = Some(match statecraft_run::lock::try_acquire(&home, &stored) {
+                        Ok(held) => held,
+                        Err(e @ statecraft_run::lock::LockError::Busy { .. }) => {
+                            return emit(&slice::lock_busy_answer(&e.to_string()), format);
+                        }
+                        Err(e) => return fail(&e.to_string(), format),
+                    });
+                    if statecraft_run::repository::respell_allowed(&records, &stored, &path) {
+                        if let Err(e) = registry.respell(&path) {
+                            return fail(&e.to_string(), format);
+                        }
+                        Some(stored)
+                    } else {
+                        None
+                    }
+                }
+                _ => None,
+            };
             let probe = CommandProbe::default();
             match bind::project_register(&mut registry, &path, &probe) {
-                Ok(answer) => {
+                Ok(mut answer) => {
                     if let Err(e) = registry.write(&home) {
                         return fail(&e.to_string(), format);
+                    }
+                    drop(held);
+                    if let Some(stored) = respelled {
+                        answer.summary.push_str(&format!(
+                            "\nre-stored from {} as {}: the records filed under this spelling \
+                             are read again, and the previous spelling had none\n",
+                            stored.display(),
+                            path.display()
+                        ));
                     }
                     emit(&answer, format)
                 }
@@ -121,10 +161,11 @@ fn run(args: &[String]) -> i32 {
                 );
                 return Exit::Usage.code();
             };
-            let root = absolute(path);
-            let Some(registration) = registry.get(&root) else {
-                return emit(&bind::unregistered_answer(&root), format);
+            let root = match registered(&registry, &absolute(path)) {
+                Ok(root) => root,
+                Err(answer) => return emit(&answer, format),
             };
+            let registration = registry.get(&root).expect("resolved above");
             // Registration makes a target visible; arming is what consents to
             // it being driven (spec 002 section 3.1). `run` is the one verb
             // here that drives, so it is the one verb this gates: discovery
@@ -197,10 +238,11 @@ fn run(args: &[String]) -> i32 {
                 );
                 return Exit::Usage.code();
             };
-            let root = absolute(path);
-            let Some(registration) = registry.get(&root) else {
-                return emit(&bind::unregistered_answer(&root), format);
+            let root = match registered(&registry, &absolute(path)) {
+                Ok(root) => root,
+                Err(answer) => return emit(&answer, format),
             };
+            let registration = registry.get(&root).expect("resolved above");
             if !registration.armed {
                 return emit(&bind::unarmed_answer(&root), format);
             }
@@ -233,7 +275,12 @@ fn run(args: &[String]) -> i32 {
                     return Exit::Usage.code();
                 }
             };
-            let root = absolute(path);
+            // Not a registration precondition, as above; but where the path
+            // is registered, its records are filed under the stored root.
+            let root = match stored_or_typed(&registry, &absolute(path)) {
+                Ok(root) => root,
+                Err(answer) => return emit(&answer, format),
+            };
             let facts = match Chain::open(&home, &root) {
                 Ok((chain, _)) => statecraft_run::session::runs(&chain)
                     .into_iter()
@@ -282,10 +329,10 @@ fn run(args: &[String]) -> i32 {
             let Some(path) = invocation.rest.first() else {
                 return usage();
             };
-            let root = absolute(path);
-            if registry.get(&root).is_none() {
-                return emit(&bind::unregistered_answer(&root), format);
-            }
+            let root = match registered(&registry, &absolute(path)) {
+                Ok(root) => root,
+                Err(answer) => return emit(&answer, format),
+            };
             if invocation.verb == Verb::OverrideShow {
                 if invocation.rest.len() != 1 {
                     return usage();
@@ -528,7 +575,12 @@ fn reconcile_verb(
     if positional.len() < 7 {
         return usage();
     }
-    let root = absolute(positional[0]);
+    // Filed under the stored root, like every other verb that keys a record,
+    // so another spelling of a registered path reads the same chain.
+    let root = match stored_or_typed(registry, &absolute(positional[0])) {
+        Ok(root) => root,
+        Err(answer) => return emit(&answer, format),
+    };
     let run_id = positional[1].as_str();
     let Ok(attempt) = positional[2].parse::<u32>() else {
         return usage();
@@ -1962,6 +2014,36 @@ fn fail(detail: &str, format: Format) -> i32 {
     let answer = Answer::new(detail.to_string(), Exit::Failed, detail);
     print!("{}", answer.render(format));
     Exit::Failed.code()
+}
+
+/// The registration a typed path names, as the root it was stored under.
+///
+/// Spec 003 section 3.1.4 rule 7 and section 5 (2026-09-23): the register
+/// compares paths component-wise, so `<root>/` and `<root>/.` name the same
+/// registration, and every record this product keeps per repository is keyed
+/// by the stored root rather than by what was typed. Passing the typed path on
+/// would give one repository a second lock, run record and journal.
+fn registered(registry: &Registry, typed: &std::path::Path) -> Result<PathBuf, Answer<String>> {
+    use statecraft_run::repository::{Unresolved, resolve};
+    match resolve(registry, typed) {
+        Ok(registration) => Ok(registration.root.clone()),
+        Err(Unresolved::NotRegistered) => Err(bind::unregistered_answer(typed)),
+        Err(Unresolved::SameDirectory(roots)) => Err(bind::same_directory_answer(typed, &roots)),
+    }
+}
+
+/// As [`registered`], for a verb that does not require registration: an
+/// unregistered path is used as typed, and a registered one as stored.
+fn stored_or_typed(
+    registry: &Registry,
+    typed: &std::path::Path,
+) -> Result<PathBuf, Answer<String>> {
+    use statecraft_run::repository::{Unresolved, resolve};
+    match resolve(registry, typed) {
+        Ok(registration) => Ok(registration.root.clone()),
+        Err(Unresolved::NotRegistered) => Ok(typed.to_path_buf()),
+        Err(Unresolved::SameDirectory(roots)) => Err(bind::same_directory_answer(typed, &roots)),
+    }
 }
 
 /// Make a path absolute without touching the filesystem's opinion of it.
