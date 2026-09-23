@@ -506,6 +506,99 @@ and the **provider** binary it was measured against. Every finding in sections
 the qualification even when the adapter is byte-identical, because what was
 qualified was the pair.
 
+### 3.17 The command allowance, the suite's programs, and the comparison between them
+
+A narrowly scoped authority amendment, settled by the owner on 2026-09-23 and
+recorded before the implementation it authorizes. It gives section 3.5 row 8
+and section 3.8's matching row two independent inputs, where the product
+binding had one.
+
+**The gap, exactly.** `adapters::child_environment` supplies the adapter
+manifest's `requires_commands` (`claude`, `git`) as both the posture's
+declared commands and the check suite's required commands, so the two are
+equal by construction and the refusal cannot fire (section 5, the 2026-09-20
+qualification entry, row 8). A trial whose acceptance needed `python3` ran
+with nothing refused, because the child's `PATH` is the operator's.
+
+**Rule 1: the allowance is declared, separately from the suite.** The
+commands a posture allows are the adapter's own `requires_commands` plus the
+commands the repository declares in `.statecraft/posture.json`, committed in
+the target:
+
+```json
+{ "schemaVersion": 1, "commands": ["cargo", "make"] }
+```
+
+`commands` is a list of bare program names: non-empty, no `/`, no whitespace,
+no duplicates. Any other member, any other `schemaVersion`, or a malformed
+entry refuses the run and names the problem. An absent file declares nothing,
+and the allowance is then the adapter's own commands alone. The file is a
+repository-artifact member of the authority set (spec `005` section 3.3), read
+at the trusted base, so a candidate that widens it is an authority change.
+This product never adds a program to the allowance on its own account.
+
+**Rule 2: the requirement comes from the suite, independently.** The programs
+a run requires are read from the check suite the attempt's spec actually
+declares: `spec-spine verify <spec> --plan --json`, whose `commands` are the
+spec's `## Verification` commands, without running them. A command is **simple**
+when, outside single-quoted spans (POSIX: every character between two `'` is
+literal), it contains none of `|`, `&`, `;`, `<`, `>`, `(`, `)`, `$`, a
+backquote, a backslash or a line break, every single quote is closed, and its
+first word is a bare program name (letters, digits and `_ . + -`, not a
+`NAME=value` assignment); its program is that first word. A simple command
+whose first word contains `/` names a file rather than a program `PATH`
+resolves; it is listed as `path` and requires no program directly. A command
+that is neither is not parsed: it is listed as `unparsed`, by its text. `skipped` blocks are listed as
+skipped and require nothing.
+
+**Rule 3: what the comparison can and cannot claim.** A program required and
+absent from the allowance is **missing**. The coverage verdict is one of:
+
+| Verdict | When | The run |
+|---|---|---|
+| `refused` | any program is missing | refused before any process is created, naming each missing program and the commands that name it |
+| `partial` | nothing is missing, and at least one command is unparsed | proceeds; the unparsed commands are named as not checked |
+| `direct` | nothing is missing, and every command was parsed | proceeds |
+
+No verdict says `complete`. `direct` means every program the suite's commands
+name directly is allowed; a program one of them runs in turn (`make` running
+`cargo`, `cargo` running `rustc`) is not seen by this reading, and every
+rendering of the verdict says so. The allowance is compared, not enforced: the
+child's `PATH` still resolves through the operator's, which spec `004` section
+3.6's residuals already name, and the record says the allowance is checked and
+not enforced.
+
+**Rule 4: bound to what the attempt used, planned and then confirmed.** The
+comparison is made twice. At planning, before the attempt is appended, from
+the target as the operator invoked it. At launch, after the workspace is
+prepared at the base and before the spawn, from the workspace. The run is
+refused if the second verdict is `refused`, or if the suite's plan or the
+allowance differs between the two by digest, naming which changed. The launch
+comparison is the one recorded.
+
+**Rule 5: what is recorded.** The attempt's outcome detail carries, under
+`posture.coverage`: the spec, the digest of the suite's plan, each command with
+its program or `unparsed`, the skipped blocks, the allowance with each entry's
+source (`adapter` or the file, with the file's digest, or `absent`), the
+missing programs, the verdict, and the two limits of rule 3 as words. `run
+show` renders it. An attempt written before this section has no
+`posture.coverage` and reads as **not checked**, never as covered.
+
+**Rule 6: the vacuous binding is removed.** Nothing supplies the allowance as
+the requirement, or the reverse.
+
+**Acceptance.** Through the binary, against a fixture repository and a fake
+provider: a spec whose verification names `cargo` with no posture file is
+refused before any process is created, naming `cargo`; the same with `cargo`
+declared runs, verdict `direct`; a command with a pipe is named `unparsed` and
+the verdict is `partial`; a posture file with an unknown member or a path
+entry refuses; a posture changed between planning and launch (declared in the
+working tree, absent at the base) is refused naming the allowance; and the
+recorded coverage is what `run show` renders. Unit: the simple-command reading
+over each metacharacter and an assignment prefix, and a requirement and an
+allowance built from different inputs, so the comparison is no longer
+tautological.
+
 ## 4. Out of scope
 
 Any provider's adapter other than the Claude Code adapter this spec absorbed from `008` (sections 3.9 to 3.16); breadth across many providers; operating-system
