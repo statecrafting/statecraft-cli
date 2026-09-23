@@ -2203,6 +2203,66 @@ a reversal after an intervening edit or a later transfer; and a repeated
 request reported `already-satisfied` with nothing written. Every refusal
 leaves every byte of the repository as it was.
 
+### 3.36 When this spec's implementation is complete
+
+A narrowly scoped authority amendment, settled by the owner on 2026-09-23 and
+recorded before it is applied. Since section 3.24 moved `implementation` from
+`complete` to `in-progress`, no section has said what would move it back, so
+the field has been read either as waiting on a live result no local work can
+supply or as ready to flip because the product fails closed. This section
+fixes the rule. It changes no requirement in sections 3.1 to 3.35.
+
+**Rule 1: four facts, kept apart.** *Implemented* is a property of this
+repository's code measured against sections 3.1 to 3.35. *Provider
+qualification* is section 3.29's admitted live observation. *Activation* is
+this product acting on a real home. *Counterparty completion* is what section
+3.22 leaves to another repository. Only the first is what the frontmatter's
+`implementation` field records; the other three are reported beside it, on
+their own evidence, and none of them grants or withholds it.
+
+**Rule 2: every normative requirement is accounted for.** `implementation:
+complete` requires that, on one revision of `main`, every requirement of
+sections 3.1 to 3.35 is in exactly one of these classes, and nothing is in
+none:
+
+| Class | What it needs |
+|---|---|
+| implemented | Reachable through this product's command surface where the requirement is about the product's behavior, and exercised by a named test or declared acceptance command. Code no verb reaches is **not** this class. |
+| deferred | Deferred by name in section 4, by a deferral row of the decision record, or by a dated section 5 entry that says so and why. A requirement is not deferred by being hard. |
+| external | Decidable only by a provider session, a real home, a release, or another repository's act. Its current disposition is recorded, whatever it is. |
+
+**Rule 3: failing closed is not the same as implemented.** A requirement that
+the product *do* something is not satisfied by the product reporting that it
+cannot. A requirement that the product *refuse* or *report* something is
+satisfied by the refusal or the report. Where a requirement makes an outcome
+conditional on evidence (section 3.27's "verified before this product relies
+on the mechanism"), it is satisfied by the product not relying on the
+mechanism until that evidence exists, and the evidence itself is a
+qualification fact under rule 1.
+
+**Rule 4: the producer and acceptance.** The pinned producer is the published
+crate, resolving with no Git or path override, and conforms under section 3.15
+on that revision. Every spec's declared acceptance passes there, run serially,
+with every ignored, skipped or unavailable check named.
+
+**Rule 5: experiments need a disposition, not a success.** Every live
+experiment the owner authorized has a recorded disposition (established,
+unverified, not admitted, or not run with the reason), with its evidence kept
+and its original verdict never rewritten. A positive result is required only
+where a requirement of sections 3.1 to 3.35 explicitly promises the result
+itself rather than the procedure that measures it. None does at the time this
+section is written: section 3.29 rule 6 makes `unverified` the correct answer
+when evidence cannot decide. A later amendment that adds such a promise names
+itself here, and until its result is established that requirement is
+`external` and unresolved, and blocks `complete`.
+
+**Rule 6: how it is applied.** The evaluation is a dated section 5 entry
+naming the revision, the count of implemented requirements, and every
+requirement that is deferred or external with its class and evidence. The
+field then moves in its own lifecycle-only change. A requirement later found
+unmet, or a new requirement, moves it back to `in-progress` in the change that
+finds or adds it.
+
 ## 4. Out of scope
 
 Installing the product itself; provider authentication; hosted registration;
