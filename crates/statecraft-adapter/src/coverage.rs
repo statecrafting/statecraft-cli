@@ -179,7 +179,7 @@ impl SuitePlan {
 
 /// Why a suite plan could not be read. Every case refuses the run (rule 2):
 /// nothing is assumed about a suite that could not be read.
-#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
+#[derive(Debug, Clone, PartialEq, thiserror::Error)]
 pub enum PlanError {
     /// The reader could not be started.
     #[error(
@@ -206,6 +206,18 @@ pub enum PlanError {
         status: String,
         /// The first line it said.
         detail: String,
+    },
+    /// The reader did not answer within its deadline, and was killed.
+    #[error(
+        "the suite plan could not be read: `{program} verify {spec} --plan --json` did not answer within {seconds} seconds and was stopped"
+    )]
+    TimedOut {
+        /// The reader program.
+        program: String,
+        /// The spec asked about.
+        spec: String,
+        /// The deadline.
+        seconds: f64,
     },
     /// The reader answered something that does not parse as the plan.
     #[error("the suite plan could not be read: the answer does not parse as a verify plan: {0}")]
@@ -245,34 +257,65 @@ pub fn parse_plan(bytes: &[u8]) -> Result<SuitePlan, PlanError> {
     Ok(envelope.report)
 }
 
-/// Ask `program` for the plan of `spec`, in `dir`.
+/// How long the suite reader may take before the read is refused.
+///
+/// Reading a plan runs nothing the plan names, so this is generous for a
+/// read and short for a hang: a reader that does not answer is a plan that
+/// could not be read (rule 2), never a plan assumed empty.
+pub const PLAN_DEADLINE: std::time::Duration = std::time::Duration::from_secs(60);
+
+/// Ask `program` for the plan of `spec`, in `dir`, within [`PLAN_DEADLINE`].
 ///
 /// `program` is the `spec-spine` this product invokes for work selection, and
 /// `dir` is the tree being read: the target's working tree at planning, an
 /// export of the base commit at launch (rule 4).
 pub fn read_plan(program: &str, dir: &Path, spec: &str) -> Result<SuitePlan, PlanError> {
-    let output = std::process::Command::new(program)
-        .args(["verify", spec, "--plan", "--json"])
-        .current_dir(dir)
-        .stdin(std::process::Stdio::null())
-        .output()
-        .map_err(|e| PlanError::NotRunnable {
+    read_plan_within(program, dir, spec, PLAN_DEADLINE)
+}
+
+/// [`read_plan`] under a named deadline. The reader runs under the
+/// supervisor's own [`crate::supervisor::capture`]: its own process group,
+/// killed with its descendants at the deadline. It is given this process's
+/// environment, because it is the operator's tool reading the operator's tree,
+/// not a child session.
+pub fn read_plan_within(
+    program: &str,
+    dir: &Path,
+    spec: &str,
+    deadline: std::time::Duration,
+) -> Result<SuitePlan, PlanError> {
+    let environment: std::collections::BTreeMap<String, String> = std::env::vars().collect();
+    let captured = crate::supervisor::capture(
+        Path::new(program),
+        &["verify", spec, "--plan", "--json"],
+        dir,
+        &environment,
+        b"",
+        deadline,
+    )
+    .map_err(|e| PlanError::NotRunnable {
+        program: program.to_string(),
+        spec: spec.to_string(),
+        detail: e.to_string(),
+    })?;
+    if captured.timed_out {
+        return Err(PlanError::TimedOut {
             program: program.to_string(),
             spec: spec.to_string(),
-            detail: e.to_string(),
-        })?;
-    if !output.status.success() {
+            seconds: deadline.as_secs_f64(),
+        });
+    }
+    if captured.code != Some(0) {
         let said = format!(
             "{}{}",
-            String::from_utf8_lossy(&output.stderr),
-            String::from_utf8_lossy(&output.stdout)
+            String::from_utf8_lossy(&captured.stderr),
+            String::from_utf8_lossy(&captured.stdout)
         );
         return Err(PlanError::Exited {
             program: program.to_string(),
             spec: spec.to_string(),
-            status: output
-                .status
-                .code()
+            status: captured
+                .code
                 .map_or_else(|| "signal".to_string(), |c| format!("exit {c}")),
             detail: said
                 .lines()
@@ -282,7 +325,7 @@ pub fn read_plan(program: &str, dir: &Path, spec: &str) -> Result<SuitePlan, Pla
                 .to_string(),
         });
     }
-    parse_plan(&output.stdout)
+    parse_plan(&captured.stdout)
 }
 
 /// What the committed project block declares (rule 1).
@@ -742,8 +785,19 @@ impl Coverage {
 pub enum CoverageRecord {
     /// The comparison that was made.
     Checked(Box<Coverage>),
+    /// No comparison was made because an input could not be read at launch;
+    /// the attempt was refused for it, and this says why.
+    Unread(Unread),
     /// No comparison was recorded.
     NotChecked(NotChecked),
+}
+
+/// Why the launch reading could not be made.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct Unread {
+    /// The refusal, as the attempt's refusal account names it.
+    pub unread: String,
 }
 
 /// The one word for an attempt with no recorded comparison.
@@ -765,6 +819,10 @@ impl CoverageRecord {
     pub fn render(&self) -> String {
         match self {
             CoverageRecord::Checked(c) => c.render(),
+            CoverageRecord::Unread(u) => format!(
+                "command coverage: not checked, and the attempt was refused under {GUARD}: {}\n",
+                u.unread
+            ),
             CoverageRecord::NotChecked(_) => {
                 "command coverage: not checked (no comparison is recorded for this attempt)\n"
                     .to_string()
@@ -776,7 +834,7 @@ impl CoverageRecord {
     pub fn checked(&self) -> Option<&Coverage> {
         match self {
             CoverageRecord::Checked(c) => Some(c),
-            CoverageRecord::NotChecked(_) => None,
+            CoverageRecord::Unread(_) | CoverageRecord::NotChecked(_) => None,
         }
     }
 }
@@ -1001,6 +1059,47 @@ mod tests {
         }
     }
 
+    #[cfg(unix)]
+    #[test]
+    fn a_reader_that_hangs_is_stopped_at_its_deadline_and_the_plan_refuses() {
+        let dir = tempfile::tempdir().unwrap();
+        let reader = dir.path().join("hanging-spec-spine");
+        crate::fixture::install_script(&reader, "#!/bin/sh\nsleep 300 &\nexec sleep 300\n", 0o755)
+            .unwrap();
+        let started = std::time::Instant::now();
+        let err = read_plan_within(
+            reader.to_str().unwrap(),
+            dir.path(),
+            "007-x",
+            std::time::Duration::from_secs(1),
+        )
+        .unwrap_err();
+        assert!(matches!(err, PlanError::TimedOut { .. }), "{err}");
+        assert!(
+            err.to_string().contains("did not answer within 1 seconds"),
+            "{err}"
+        );
+        assert!(started.elapsed() < std::time::Duration::from_secs(30));
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn a_reader_that_answers_in_time_is_parsed_and_one_that_fails_is_named() {
+        let dir = tempfile::tempdir().unwrap();
+        let reader = dir.path().join("spec-spine");
+        crate::fixture::install_script(
+            &reader,
+            "#!/bin/sh\n[ \"$*\" = 'verify 007-x --plan --json' ] || { echo nope >&2; exit 2; }\necho '{\"exitCode\":0,\"ok\":true,\"report\":{\"commands\":[\"make gate\"],\"skipped\":[],\"specId\":\"007-x\"},\"verb\":\"verify\"}'\n",
+            0o755,
+        )
+        .unwrap();
+        let program = reader.to_str().unwrap();
+        let plan = read_plan(program, dir.path(), "007-x").unwrap();
+        assert_eq!(plan.commands, ["make gate"]);
+        let err = read_plan(program, dir.path(), "008-y").unwrap_err();
+        assert!(err.to_string().contains("exit 2: nope"), "{err}");
+    }
+
     #[test]
     fn the_declaration_is_read_and_malformed_entries_are_named() {
         assert_eq!(declared_commands(None).unwrap(), Declared::Absent);
@@ -1046,5 +1145,17 @@ mod tests {
             serde_json::from_value(serde_json::to_value(&checked).unwrap()).unwrap();
         assert_eq!(back, checked);
         assert!(back.render().contains("not-applicable"));
+        let unread = CoverageRecord::Unread(Unread {
+            unread: "the suite plan could not be read".into(),
+        });
+        let back: CoverageRecord =
+            serde_json::from_value(serde_json::to_value(&unread).unwrap()).unwrap();
+        assert_eq!(back, unread);
+        let line = back.render();
+        assert!(
+            line.contains("not checked") && line.contains("posture-coverage"),
+            "{line}"
+        );
+        assert!(line.contains("could not be read"), "{line}");
     }
 }

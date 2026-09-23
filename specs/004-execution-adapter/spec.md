@@ -1814,6 +1814,38 @@ new suite, `statecraft-cli`'s `posture_coverage`, drives the binary with a fake
 spec-spine that answers the plan from the directory it runs in and logs that
 directory, so planning and launch are observed reading different trees.
 
+**2026-09-23: the launch reading, corrected after review.** The entry above
+is kept as written; four of its implementation choices were wrong or silent,
+and nothing §3.17 requires changes.
+
+*The base is the intent's.* The launch reading took
+`session.workspace.base_commit`, which for a reused workspace is that
+worktree's `HEAD`: the first attempt's base, or a commit a session made there.
+Rule 4 names the attempt's base commit, and the intent records it as
+`baseCommit`. `Session` now carries that value (`base_commit`, written beside
+the workspace's own), and the launch reading uses it. So a second attempt after
+a committed change reads the new commit, and a commit made inside the
+workspace is never read as the base. The launch reading also takes the spec
+from the planning coverage rather than the run id.
+
+*The export is a temporary index, not an archive.* `git archive` honors
+`export-ignore` and `export-subst`, so an attribute could hide or rewrite the
+suite. The base's tree is now read into an index file of its own (`read-tree`)
+and every entry checked out into a private `tempfile` directory
+(`checkout-index --all`), with system and global git configuration disabled,
+hooks and fsmonitor off; only the target's own repository configuration still
+applies. Gitlinks are not populated, as before.
+
+*The plan read has a deadline.* The reader runs under the supervisor's
+`capture`, in its own process group, with 60 seconds to answer
+(`PLAN_DEADLINE`). At the deadline the group is killed and the read is
+refused as unreadable, naming the deadline.
+
+*A launch reading that could not be made is recorded as such.*
+`posture.coverage` holds `{"unread": <reason>}` for it, and `run show` renders
+that reason beside the coverage line, so it no longer reads as a bare
+`not checked`.
+
 ## Verification
 
 Each line is one command. §3.5's suite is eight tests named `suite_1` to

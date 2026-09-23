@@ -174,6 +174,11 @@ pub struct Session {
     pub workspace: Workspace,
     /// The base revision as it was named.
     pub base_revision: String,
+    /// The commit the base revision resolved to when this attempt began, as
+    /// its intent records it under `baseCommit`. Distinct from the
+    /// workspace's own `base_commit`, which for a reused workspace is that
+    /// worktree's `HEAD` and may carry commits a previous session made there.
+    pub base_commit: String,
 }
 
 /// Begin a run: refuse a second live attempt, prepare, and record the intent.
@@ -324,6 +329,7 @@ pub fn begin_with(
         attempt: number,
         workspace,
         base_revision: base_revision.to_string(),
+        base_commit,
     })
 }
 

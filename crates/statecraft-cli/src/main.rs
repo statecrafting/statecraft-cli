@@ -962,9 +962,11 @@ fn launch_attempt(
     // Spec 004 section 3.17 rule 4: the comparison is confirmed at launch,
     // after the base commit is resolved and before the spawn, from that
     // commit and never from the reused workspace. This is the one recorded.
-    let base_commit = session.workspace.base_commit.clone();
+    // The base is the one the intent recorded, never the reused workspace's
+    // `HEAD`, which a previous session may have moved (spec 003 section 3.2).
+    let base_commit = session.base_commit.clone();
     let covered = match &plan.planned {
-        Some(planned) => statecraft_cli::coverage::at_base(root, &base_commit, &run_id, planned),
+        Some(planned) => statecraft_cli::coverage::at_base(root, &base_commit, planned),
         None => statecraft_cli::coverage::not_applicable(root, &base_commit),
     };
 
@@ -986,8 +988,16 @@ fn launch_attempt(
         &[],
         &environment,
     );
-    if let Ok(c) = &covered {
-        posture = posture.with_coverage(c.clone());
+    match &covered {
+        Ok(c) => posture = posture.with_coverage(c.clone()),
+        // Nothing was compared; the record says why, beside the coverage line.
+        Err(why) => {
+            posture.coverage = statecraft_adapter::coverage::CoverageRecord::Unread(
+                statecraft_adapter::coverage::Unread {
+                    unread: why.clone(),
+                },
+            );
+        }
     }
     // A launch refusal comes after the intent, so the attempt is concluded
     // `refused` under the guard `posture-coverage`, the way a preflight

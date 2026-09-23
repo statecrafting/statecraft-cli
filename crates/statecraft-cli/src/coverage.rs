@@ -82,109 +82,103 @@ pub fn planning_record(planned: &Coverage) -> serde_json::Value {
     })
 }
 
+/// `git` against the target, isolated from configuration that could run code
+/// or change what a read returns: no system or global configuration, no hooks,
+/// no fsmonitor. Only the target's own repository configuration still applies.
+fn git(root: &Path) -> Command {
+    let mut command = Command::new("git");
+    command
+        .env("GIT_CONFIG_NOSYSTEM", "1")
+        .env("GIT_CONFIG_GLOBAL", "/dev/null")
+        .env_remove("GIT_INDEX_FILE")
+        .env_remove("GIT_DIR")
+        .env_remove("GIT_WORK_TREE")
+        .args(["-c", "core.hooksPath=/dev/null", "-c", "core.fsmonitor="])
+        .arg("-C")
+        .arg(root)
+        .stdin(Stdio::null());
+    command
+}
+
+fn run_git(mut command: Command, what: &str) -> Result<Vec<u8>, String> {
+    let out = command
+        .output()
+        .map_err(|e| format!("{what} could not run: {e}"))?;
+    if !out.status.success() {
+        return Err(format!(
+            "{what} failed: {}",
+            String::from_utf8_lossy(&out.stderr).trim()
+        ));
+    }
+    Ok(out.stdout)
+}
+
 /// The declaration at `base`, as `git show` returns it; `None` when the base
 /// commit holds no such file.
 fn declaration_at(root: &Path, base: &str) -> Result<Option<Vec<u8>>, String> {
-    let listed = Command::new("git")
-        .arg("-C")
-        .arg(root)
-        .args(["ls-tree", "--name-only", base, "--", DECLARATION_PATH])
-        .output()
-        .map_err(|e| format!("git ls-tree could not run: {e}"))?;
-    if !listed.status.success() {
-        return Err(format!(
-            "git ls-tree {base} failed: {}",
-            String::from_utf8_lossy(&listed.stderr).trim()
-        ));
-    }
-    if listed.stdout.iter().all(u8::is_ascii_whitespace) {
+    let mut listed = git(root);
+    listed.args(["ls-tree", "--name-only", base, "--", DECLARATION_PATH]);
+    let listed = run_git(listed, &format!("git ls-tree {base}"))?;
+    if listed.iter().all(u8::is_ascii_whitespace) {
         return Ok(None);
     }
-    let shown = Command::new("git")
-        .arg("-C")
-        .arg(root)
-        .args(["show", &format!("{base}:{DECLARATION_PATH}")])
-        .output()
-        .map_err(|e| format!("git show could not run: {e}"))?;
-    if !shown.status.success() {
-        return Err(format!(
-            "git show {base}:{DECLARATION_PATH} failed: {}",
-            String::from_utf8_lossy(&shown.stderr).trim()
-        ));
-    }
-    Ok(Some(shown.stdout))
+    let mut shown = git(root);
+    shown.args(["show", &format!("{base}:{DECLARATION_PATH}")]);
+    run_git(shown, &format!("git show {base}:{DECLARATION_PATH}")).map(Some)
 }
 
-/// An export of one commit's tree, removed when dropped.
-struct Export(PathBuf);
+/// An export of one commit's tree, in a fresh private temporary directory
+/// that is removed when this is dropped.
+struct Export {
+    scratch: tempfile::TempDir,
+}
 
-impl Drop for Export {
-    fn drop(&mut self) {
-        let _ = std::fs::remove_dir_all(&self.0);
+impl Export {
+    fn tree(&self) -> PathBuf {
+        self.scratch.path().join("tree")
     }
 }
 
-/// Export `base`'s tree into a fresh directory outside the target and outside
-/// the workspace: `git archive` piped into `tar`.
+/// Export `base`'s whole tree through a temporary index: `read-tree` into an
+/// index file of our own, then `checkout-index` of every entry into the export.
+/// Unlike `git archive`, no `export-ignore` or `export-subst` attribute can
+/// change what is read, so the tree read is the commit's tree. The target's
+/// own index and working tree are never touched.
 fn export(root: &Path, base: &str) -> Result<Export, String> {
-    let nanos = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .map(|d| d.as_nanos())
-        .unwrap_or_default();
-    let dir = std::env::temp_dir().join(format!(
-        "statecraft-base-export-{}-{nanos}",
-        std::process::id()
-    ));
-    std::fs::create_dir_all(&dir).map_err(|e| format!("{}: {e}", dir.display()))?;
-    let export = Export(dir);
-    let mut archive = Command::new("git")
-        .arg("-C")
-        .arg(root)
-        .args(["archive", "--format=tar", base])
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
-        .spawn()
-        .map_err(|e| format!("git archive could not run: {e}"))?;
-    let tar_in = archive
-        .stdout
-        .take()
-        .ok_or_else(|| "git archive gave no output".to_string())?;
-    let tar = Command::new("tar")
-        .args(["-x", "-f", "-", "-C"])
-        .arg(&export.0)
-        .stdin(Stdio::from(tar_in))
-        .output()
-        .map_err(|e| format!("tar could not run: {e}"))?;
-    let archived = archive
-        .wait_with_output()
-        .map_err(|e| format!("git archive: {e}"))?;
-    if !archived.status.success() {
-        return Err(format!(
-            "git archive {base} failed: {}",
-            String::from_utf8_lossy(&archived.stderr).trim()
-        ));
-    }
-    if !tar.status.success() {
-        return Err(format!(
-            "the export of {base} could not be unpacked: {}",
-            String::from_utf8_lossy(&tar.stderr).trim()
-        ));
-    }
+    let scratch = tempfile::Builder::new()
+        .prefix("statecraft-base-export-")
+        .tempdir()
+        .map_err(|e| format!("a temporary directory for the export: {e}"))?;
+    let export = Export { scratch };
+    let index = export.scratch.path().join("index");
+    let tree = export.tree();
+    std::fs::create_dir(&tree).map_err(|e| format!("{}: {e}", tree.display()))?;
+    let mut read = git(root);
+    read.env("GIT_INDEX_FILE", &index).args(["read-tree", base]);
+    run_git(read, &format!("git read-tree {base}"))?;
+    let mut checkout = git(root);
+    checkout.env("GIT_INDEX_FILE", &index).args([
+        "checkout-index",
+        "--all",
+        "--force",
+        &format!("--prefix={}/", tree.display()),
+    ]);
+    run_git(checkout, &format!("git checkout-index of {base}"))?;
     Ok(export)
 }
 
-/// Rule 4, at launch: the base commit. The launch comparison is the one
-/// recorded. A digest that differs from planning's is named in
+/// Rule 4, at launch: the base commit the attempt's intent records, never the
+/// reused workspace. The spec is the one planning read. The launch comparison
+/// is the one recorded. A digest that differs from planning's is named in
 /// [`Coverage::drift`], which refuses the run whatever the verdict.
-pub fn at_base(
-    root: &Path,
-    base: &str,
-    spec: &str,
-    planned: &Coverage,
-) -> Result<Coverage, String> {
+pub fn at_base(root: &Path, base: &str, planned: &Coverage) -> Result<Coverage, String> {
+    let spec = planned
+        .spec
+        .as_deref()
+        .ok_or_else(|| "the planning reading names no spec".to_string())?;
     let allowance = allowance(declaration_at(root, base)?.as_deref())?;
     let tree = export(root, base)?;
-    let plan = read_plan(&reader(), &tree.0, spec).map_err(|e| e.to_string())?;
+    let plan = read_plan(&reader(), &tree.tree(), spec).map_err(|e| e.to_string())?;
     drop(tree);
     let mut coverage = compare(spec, Some(base), &plan, &allowance);
     if coverage.allowance_digest != planned.allowance_digest {

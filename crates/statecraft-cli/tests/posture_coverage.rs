@@ -57,6 +57,7 @@ case "$*" in
   'verify fixture --plan --json')
     /bin/pwd -P >> "$here/verify-dirs"
     if [ -f "$here/plan-exit" ]; then echo 'error: the plan failed' >&2; exit "$(/bin/cat "$here/plan-exit")"; fi
+    if [ -f "$here/fail-outside-a-checkout" ] && [ ! -e .git ]; then echo 'error: no plan in the export' >&2; exit 4; fi
     [ -f suite-plan.json ] || exit 3
     /bin/cat suite-plan.json ;;
   *) exit 3 ;;
@@ -241,14 +242,27 @@ impl Fixture {
     }
 
     fn head(&self) -> String {
-        let out = Command::new("git")
-            .args(["rev-parse", "HEAD"])
-            .current_dir(self.project())
-            .output()
-            .unwrap();
-        String::from_utf8_lossy(&out.stdout).trim().to_string()
+        head_of(&self.project())
+    }
+
+    /// The run's retained workspace, reused by every attempt of the run.
+    fn workspace(&self) -> PathBuf {
+        self.project()
+            .join(".statecraft/state/workspaces")
+            .join(RUN)
     }
 }
+
+fn head_of(dir: &Path) -> String {
+    let out = Command::new("git")
+        .args(["rev-parse", "HEAD"])
+        .current_dir(dir)
+        .output()
+        .unwrap();
+    String::from_utf8_lossy(&out.stdout).trim().to_string()
+}
+
+impl Fixture {}
 
 /// A planning refusal: exit 2, the guard named, nothing appended, nothing
 /// launched.
@@ -602,4 +616,128 @@ fn a_plan_that_says_it_is_empty_is_direct() {
     let coverage = json_of(&out)["value"]["posture"]["value"]["coverage"].clone();
     assert_eq!(coverage["verdict"], "direct", "{coverage}");
     assert_eq!(coverage["commands"], json!([]));
+}
+
+/// A second attempt passed the coverage check and was launched. Its outcome
+/// is not asserted `completed`: spec 003's base-movement observation compares
+/// the target's base with the reused workspace's `HEAD`, which a second
+/// attempt after any new commit reports as moved (`interrupted`). That is the
+/// existing reading of spec 003 section 3.8 and is not this section's.
+fn assert_launched_past_coverage(f: &Fixture, out: &Output, launches: usize) -> Value {
+    let v = json_of(out);
+    assert_ne!(v["value"]["outcome"], "refused", "{v}");
+    assert_eq!(f.launches(), launches, "{v}");
+    let (outcome, _) = attempt_details(f);
+    assert!(outcome.get("postureCoverageRefusal").is_none(), "{outcome}");
+    v["value"]["posture"]["value"]["coverage"].clone()
+}
+
+/// A second attempt after a committed change to the suite and to the
+/// declaration reads the new base, not the first attempt's workspace, and
+/// is launched: the base is the one the intent records.
+#[test]
+fn a_second_attempt_after_a_committed_change_reads_the_new_base_and_runs() {
+    let f = Fixture::new(&["git status"], None);
+    let first = f.run();
+    assert_eq!(code(&first), 0, "{}", text(&first));
+    let first_base = f.head();
+
+    f.write_suite(&["git status", "cargo test"]);
+    f.declare(json!(["cargo"]));
+    f.git(&["add", "-A"]);
+    f.git(&["commit", "--quiet", "-m", "the suite needs cargo, declared"]);
+    let second = f.run();
+    let coverage = assert_launched_past_coverage(&f, &second, 2);
+    assert_eq!(coverage["verdict"], "direct", "{coverage}");
+    assert_eq!(coverage["baseCommit"], f.head());
+    assert_ne!(coverage["baseCommit"], first_base.as_str());
+    assert!(coverage.get("drift").is_none(), "{coverage}");
+    let (_, intent) = attempt_details(&f);
+    assert_eq!(intent["baseCommit"], coverage["baseCommit"]);
+}
+
+/// A commit a session made inside the reused workspace is not the base: the
+/// launch reading takes the commit the intent records, so a suite the session
+/// changed there is not what is compared.
+#[test]
+fn a_commit_made_inside_the_workspace_is_not_read_as_the_base() {
+    let f = Fixture::new(&["git status"], None);
+    let first = f.run();
+    assert_eq!(code(&first), 0, "{}", text(&first));
+
+    let ws = f.workspace();
+    std::fs::write(ws.join("suite-plan.json"), plan(&["cargo test"])).unwrap();
+    let out = Command::new("git")
+        .args([
+            "-c",
+            "user.email=s@example.invalid",
+            "-c",
+            "user.name=s",
+            "-c",
+            "commit.gpgsign=false",
+            "commit",
+            "--quiet",
+            "-am",
+            "a session's commit",
+        ])
+        .current_dir(&ws)
+        .output()
+        .unwrap();
+    assert!(out.status.success(), "{}", text(&out));
+    let session_commit = head_of(&ws);
+    assert_ne!(session_commit, f.head());
+
+    let second = f.run();
+    let coverage = assert_launched_past_coverage(&f, &second, 2);
+    assert_eq!(coverage["baseCommit"], f.head(), "{coverage}");
+    assert_ne!(coverage["baseCommit"], session_commit.as_str());
+    assert_eq!(coverage["commands"][0]["command"], "git status");
+    assert_eq!(coverage["verdict"], "direct");
+}
+
+/// `export-ignore` does not change what the launch reading sees: the base's
+/// tree is exported whole, so an attribute cannot hide the suite.
+#[test]
+fn an_export_ignore_attribute_does_not_change_the_plan_read_at_the_base() {
+    let f = Fixture::new(&["git status"], None);
+    std::fs::write(
+        f.project().join(".gitattributes"),
+        "suite-plan.json export-ignore\nspecs/ export-ignore\n",
+    )
+    .unwrap();
+    f.git(&["add", "-A"]);
+    f.git(&["commit", "--quiet", "-m", "hide the suite from an archive"]);
+    let out = f.run();
+    assert_eq!(code(&out), 0, "{}", text(&out));
+    let coverage = json_of(&out)["value"]["posture"]["value"]["coverage"].clone();
+    assert_eq!(coverage["verdict"], "direct", "{coverage}");
+    assert_eq!(coverage["commands"][0]["command"], "git status");
+    assert!(coverage.get("drift").is_none(), "{coverage}");
+}
+
+/// A launch reading that cannot be made refuses the attempt under
+/// `posture-coverage`, and `run show` renders the reason beside the coverage
+/// line rather than a bare "not checked".
+#[test]
+fn a_launch_reading_that_fails_is_refused_and_run_show_says_why() {
+    let f = Fixture::new(&["git status"], None);
+    std::fs::write(f.bin().join("fail-outside-a-checkout"), "").unwrap();
+    let out = f.run();
+    assert_eq!(code(&out), 1, "{}", text(&out));
+    let v = json_of(&out);
+    assert_eq!(v["value"]["outcome"], "refused", "{v}");
+    let unread = v["value"]["posture"]["value"]["coverage"]["unread"]
+        .as_str()
+        .unwrap_or_else(|| panic!("{v}"))
+        .to_string();
+    assert!(unread.contains("exit 4"), "{unread}");
+    assert_eq!(f.launches(), 0);
+    let human = text(&f.cli(&["run", "show", &f.root(), RUN]));
+    assert!(
+        human.contains(
+            "command coverage: not checked, and the attempt was refused under posture-coverage"
+        ),
+        "{human}"
+    );
+    assert!(human.contains("no plan in the export"), "{human}");
 }
