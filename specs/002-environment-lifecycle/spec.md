@@ -2308,7 +2308,7 @@ naming the revision, the count of implemented requirements, every requirement
 that is deferred or external with its class and evidence, each frozen
 obligation of rule 2a with its evidence, and a statement that no requirement is
 unresolved. The field then moves in its own lifecycle-only change, which is the
-owner's act under AGENTS.md. A requirement later found
+owner's act; this section makes it so. A requirement later found
 unmet, or a new requirement, moves it back to `in-progress` in the change that
 finds or adds it.
 
