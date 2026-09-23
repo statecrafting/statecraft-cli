@@ -572,6 +572,27 @@ Stated because an integration slice is exactly where scope grows quietly:
   appends a new attempt (`003` section 3.4).
 - **No second provider.** `004`'s Claude Code adapter (formerly `008`) is the first, and `004`'s out-of-scope section holds.
 
+### 3.11.8 The recover verb
+
+Added on 2026-09-23, authorized by the owner and recorded here before the
+binding was written, for `003` section 3.1.5.
+
+| Command | What it does |
+|---|---|
+| `override recover <path>` | Reports the journal and its state authority as found, and the choices section 3.1.5 rule 5 allows for that state. Writes nothing. |
+| `override recover <path> <choice> <operator> <reason...>` | Records the named choice and writes a new state authority. `<choice>` is `complete-pending`, `discard-pending` or `adopt-as-read`. |
+
+| Code | Meaning for `override recover` |
+|---|---|
+| 0 | Reported, or the choice recorded. |
+| 2 | Refused, and nothing written: an unregistered repository, a choice the found state does not allow, a journal and authority that already agree, an empty operator or reason, or another process holding the repository lock. |
+| 3 | Usage: a missing argument, or a choice word this verb does not have. |
+| 4 | The files could not be read, or the record could not be written durably. |
+
+`override show` and `run show` render an operator-adopted baseline as
+`operator-adopted, not verified`. The verb joins section 3.1's table with the
+change that implements it.
+
 ## 4. Out of scope
 
 Installing the binary; publishing it; a shell installer; per-target

@@ -1474,6 +1474,8 @@ harness instead of to the instructions.
 under the attempt's identity.** Both live under the project's ignored runtime
 state, at `.statecraft/state/startup/runs/<run>/<attempt>/`, where `<run>` and
 `<attempt>` are the run id and attempt number spec `003` section 3.4 assigned.
+*Amended by section 3.37:* the directory is now in the product home, and the
+gate's files are in a separate exchange directory.
 
 | Record | Written | Holds |
 |---|---|---|
@@ -2203,6 +2205,7 @@ a reversal after an intervening edit or a later transfer; and a repeated
 request reported `already-satisfied` with nothing written. Every refusal
 leaves every byte of the repository as it was.
 
+<<<<<<< HEAD
 ### 3.36 When this spec's implementation is complete
 
 A narrowly scoped authority amendment, settled by the owner on 2026-09-23 and
@@ -2311,6 +2314,53 @@ unresolved. The field then moves in its own lifecycle-only change, which is the
 owner's act; this section makes it so. A requirement later found
 unmet, or a new requirement, moves it back to `in-progress` in the change that
 finds or adds it.
+=======
+### 3.37 Where an attempt's launch records live
+
+An authority amendment, settled by the owner on 2026-09-23 with spec `004`
+section 3.18 and recorded before the implementation it authorizes. Sections
+3.31 and 3.32 put an attempt's launch directory at
+`.statecraft/state/startup/runs/<run>/<attempt>/` inside the target, beside the
+workspace the child works in, and put the gate's log in the same directory as
+the intent, the launch record, the admission decision and the record. A child
+can therefore read and rewrite the files its own startup judgement is
+recomputed from, and can write the admission decision before the supervisor
+does. Constitution IX does not admit that, and spec `004` section 3.18 is the
+boundary that keeps the child out.
+
+**Rule 1: the launch records move to the product home.** An attempt's
+`intent.json`, `launched.json`, `admission.json`, `record.json` and a trial's
+`trial.json` live in the product home under the repository's records, in one
+directory per run and attempt, keyed as the run record is keyed. Their names,
+contents, write-once rules and judgement are unchanged; only the directory
+moves. The child cannot read or write them (spec `004` section 3.18 rule 2).
+
+**Rule 2: the exchange directory.** The files the child needs are in a
+separate per-attempt exchange directory in the product home (spec `004` section
+3.18 rule 4): the admission gate script, the settings document the provider is
+given, a copy of the supervisor's admission decision written once by the
+supervisor, and the gate log, created empty by the supervisor before launch.
+The gate reads the decision there and appends to the log there. The settings
+document's digest is taken before launch and again when the record is written,
+as before. The supervisor's decision in the launch records is the evidence of
+what was admitted; the copy in the exchange directory is only what the gate
+reads, and the gate log is child-attested.
+
+**Rule 3: records written before this section.** Launch records already in a
+target's `.statecraft/state/startup/runs/` are read where they are, judged as
+before, and labelled as written where the child could reach them. They are not
+moved, rewritten or re-judged as protected, and no attempt that wrote them is
+reported as confined.
+
+**Rule 4: the other launches.** `startup trial` and `startup capture` confine
+the provider they start in the same way and refuse when the boundary cannot be
+established (spec `004` section 3.18 rule 6). A capture directory the operator
+names is protected for the capture's duration; one inside the project stays
+refused, as before. That the provider now runs confined is recorded with the
+launch, so a later observation made under confinement and an earlier one made
+without it are not the same invocation, and no earlier observation is re-judged
+by this section.
+>>>>>>> b5a24c0 (spec(004,003,002,006): the protected evidence boundary and the journal's state authority (004 3.18, 003 3.1.5, 002 3.37, 006 3.11.8))
 
 ## 4. Out of scope
 

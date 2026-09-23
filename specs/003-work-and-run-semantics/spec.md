@@ -256,6 +256,9 @@ Removing the last lines, which could delete a revocation, and deleting the
 whole file, which reads as no override, leave nothing to verify against. The
 journal is in the product home, which spec `004` section 3.6 already names as
 reachable by the same operating-system user; closing that is `F-09`'s.
+*Amended by section 3.1.5:* the owner did not accept this as an authorization
+guarantee; section 3.1.5 and spec `004` section 3.18 replace this paragraph's
+conclusion.
 
 *A torn last line.* A final line with no line break is a write that did not
 complete, as a torn tail is for the run record (section 3.8). It is not in
@@ -307,6 +310,110 @@ spec the report does not name as ready is not scheduled by an override; a
 grant while another process holds the repository lock is refused; a torn last
 line is reported and not in force; and an intent written before this section
 reads as not recorded.
+
+### 3.1.5 The journal's current state, and an authority the journal cannot roll back
+
+An authority amendment, settled by the owner on 2026-09-23 and recorded before
+the implementation it authorizes. It amends section 3.1.4 rule 3. That rule's
+predecessor links detect a line edited, reordered or removed from before the
+last one, and named what they cannot detect: removing the last lines, which can
+delete a revocation and so resurrect an earlier grant, and deleting or
+replacing the whole file. The owner does not accept that as an authorization
+guarantee. A checksum or checkpoint written beside the journal, where whoever
+can rewrite the journal can rewrite it too, adds nothing; so the repair has two
+parts: spec `004` section 3.18 keeps the supervised process out of both, and
+this section gives the journal's current state an authority of its own.
+
+**Rule 1: four causes, kept apart.**
+
+| Cause | What it looks like | Answer |
+|---|---|---|
+| malformed or accidentally corrupted bytes | a line that does not parse, or links that do not verify | a failure; nothing is read as in force |
+| an interrupted append | a final line with no line break, or one complete line past the state authority whose link names the authority's last digest | rule 4 |
+| modification by the supervised process | none: spec `004` section 3.18 keeps it from reaching either file, and its acceptance shows that | refused by the operating system, not detected afterwards |
+| modification by an operator, outside the declared threat model | a journal that disagrees with its state authority in any way rule 4 does not name | a failure, with the disagreement stated; rule 5 is the only way on |
+
+**Rule 2: the state authority.** Beside each journal, in the protected records,
+is one state authority: the journal's key, the number of complete lines, the
+digest of the last one, and the time it was written. It is replaced, never
+appended to, by writing a new file, making it durable, and renaming it over the
+old one. The journal is read only together with it, and agrees with it when the
+journal has exactly that many complete lines and the last one digests to the
+recorded digest. A journal and an authority are both absent for a repository
+that never had an override; that reads as no override.
+
+**Rule 3: every disagreement refuses.** Each of these is a failure for `run`,
+`work list`, `work show`, `override show`, `override grant` and `override
+revoke`, which read nothing as in force and write nothing:
+
+- fewer complete lines than the authority records, however many are missing,
+  including a deleted final revocation;
+- the right number of lines, and a last line that does not digest to the
+  recorded digest, including an edited final grant;
+- an older journal that is internally valid, restored over the current one;
+- a journal missing where an authority exists, or an authority missing where a
+  journal exists (rule 6 for a journal written before this section).
+
+**Rule 4: crash consistency.** A grant or a revocation holds the repository
+lock (section 3.1.4 rule 7) and: appends its line and makes it durable; then
+writes the new authority and makes it and its directory durable. It is
+acknowledged to the operator only after both. So an interruption leaves one of
+two states. A torn final line with the authority unchanged: the line is not in
+force, is reported, and the next write truncates it, as section 3.1.4 already
+says. One complete line past the authority, linked to the authority's last
+digest: the append was made durable and the authority was not, and the command
+that made it was never acknowledged. That line is **not in force** and is
+reported as pending; `run` and the override verbs refuse until the operator
+settles it with rule 5, because whether the operator still intends an
+unacknowledged grant or revocation is not something this product can decide.
+
+**Rule 5: operator recovery.** `override recover` (spec `006` section 3.11.8)
+is the only operation that brings a journal and its authority back into
+agreement. The operator names the repository, which of the states it will
+accept, an operator name and a reason. It can: complete a pending line from
+rule 4; discard a pending or torn line; or, for a disagreement of rule 3,
+accept the journal as it now reads, as a new baseline. It never picks a state
+by itself. Each recovery is recorded as a journal line of its own, with the
+state it found (counts and digests of both files), the choice, the operator as
+supplied and the reason, and then a new authority is written. A baseline
+accepted this way is recorded as **operator-adopted, not verified**, and `override
+show` and every attempt admitted under it say so; it is never rendered as a
+journal that verified.
+
+**Rule 6: journals written before this section.** A journal with no authority
+was written before this section. Its current state cannot be established after
+the fact, and none is invented: it refuses as rule 3 says, and the operator's
+way on is rule 5's baseline, recorded as operator-adopted. A repository with
+neither file is unaffected.
+
+**Rule 7: concurrency.** Grant, revoke, recover and `run` take the one
+repository lock, so no two of them interleave, and `run` reads the journal and
+its authority once, under the lock, before it appends its intent. A concurrent
+attempt to write is refused and writes nothing.
+
+**What this does not claim.** An operator, or the host administrator, who
+rewrites the journal and its authority consistently is not detected: both
+files are in a place the operator can write, and no key is held anywhere the
+operator cannot reach. The claim is that the supervised process cannot reach
+either (spec `004` section 3.18), that an accidental or partial change, an
+interrupted write and a restored copy are each refused rather than read as a
+different set of overrides, and that nothing an operator did not choose is
+read as their choice.
+
+**Acceptance.** Through the binary, in an isolated home, each of these refuses
+`run` and the override verbs with nothing in force and nothing written: the
+last line edited; the final revocation deleted, which would otherwise
+resurrect its grant; several valid lines removed from the end; an older,
+internally valid journal restored; a journal deleted whose authority remains;
+an authority deleted whose journal remains; and a journal written before this
+section. An interruption after the append and before the authority, simulated
+by the product's own write path with a fault injected between the two durable
+steps, leaves a pending line that is not in force, and `override recover`
+completes it or discards it, each recorded. A torn final line is reported, not
+in force, and truncated by the next write. Concurrent grant, revoke and `run`
+against one repository never interleave and each refusal writes nothing. From
+the confined child, the reads, writes and deletions of both files are refused
+(spec `004` section 3.18, acceptance).
 
 ### 3.2 Workspace preparation
 
@@ -473,7 +580,11 @@ applied, which is `F-09`'s), placement outside the workspace does **not** meet
 that text. This section does not resolve the conflict and does not amend
 section 3.5, section 3.8 or constitution IX; the conflict is the owner's to
 decide and is reported as open. What this section adds is that a use of the
-residual becomes visible in the record rather than silent.
+residual becomes visible in the record rather than silent. *Amended on
+2026-09-23:* the owner decided the conflict. Constitution IX stands as written,
+spec `004` section 3.18 closes the reachability, and section 3.1.5 gives the
+override journal a state authority. The evidence this section records remains
+useful beside that boundary and does not substitute for it.
 
 **Rule 1: two kinds of evidence, and only these.** This product records a
 tamper attempt when, and only when, one of the following is observed during an
@@ -541,6 +652,21 @@ product did not make rather than as proof of intent.
 first kind does not change the attempt's outcome; it is evidence beside it.
 The second kind leaves the attempt live, as rule 2 says, because its record is
 in doubt, not because the finding is a verdict.
+
+**Rule 6: three answers, never collapsed (added 2026-09-23 with section
+3.1.5).** Each attempt's tamper evidence reads as one of three words per kind,
+and none implies another: **attempted access** (rule 1's first kind was
+observed), **observed modification** (rule 1's second kind was observed), and
+**unknown** (the product could not establish the kind at all: the stream was
+not mapped, a digest was not taken before the spawn, or one could not be taken
+after). Unknown is recorded as unknown and is never rendered as "none found".
+The paths both kinds consider are spec `004` section 3.18 rule 2's protected
+set, not only the product home, and the second kind digests the launch records
+and the journal's state authority as well as the run record and the journal.
+Under that boundary a confined write is refused by the operating system and
+leaves no finding, which is the boundary working and not evidence of its
+absence; the finding is kept for an attempt whose confinement record is
+missing, and as a second line of evidence beside one that has it.
 
 **Acceptance.** Through the binary with a fake provider: a session requesting
 `Write` to a path in the product home records one tamper attempt of the first

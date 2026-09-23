@@ -219,7 +219,9 @@ spec 125.
 
 So the property is **integrity of the record against an ordinary session**, not
 against one that means to get around it, and not containment of hostile code.
-This spec claims no isolation. Constitution VIII requires the mechanism and the
+This spec claims no isolation. *Amended by section 3.18:* for the record, the product home
+and the launch records are now kept from the child by an operating-system
+mechanism; the residuals below about credentials and publishing are unchanged. Constitution VIII requires the mechanism and the
 residual to be named together, so:
 
 - A reachable absolute path bypasses any path-based redirection.
@@ -637,6 +639,147 @@ and the recorded coverage is what `run show` renders. Unit: the simple-command r
 over each metacharacter and an assignment prefix, and a requirement and an
 allowance built from different inputs, so the comparison is no longer
 tautological.
+
+### 3.18 The protected evidence boundary
+
+An authority amendment, settled by the owner on 2026-09-23 and recorded before
+the implementation it authorizes. Constitution IX, frozen by spec `000`,
+requires that refusals, interruptions and results are recorded by the
+supervisor "in a place the supervised process cannot reach". Section 3.6 names
+the product home as readable and writable by the child, because the child runs
+as the same operating-system user; spec `003` section 3.5.1 records the
+conflict. The owner's decision is that the principle is not amended, waived or
+reinterpreted, that the same-user reachability is an implementation gap against
+it, and that this section closes it. It changes nothing section 3.6 says about
+credentials or publishing: those residuals, and their deferral to `F-09`, are
+about what the child can do to the world, and this section is about what it can
+do to the record. `F-09` does not defer this section (spec `002` section 3.36
+rule 2a).
+
+**Rule 1: the supervised process.** The supervised process is every process
+this product creates to run a provider, and every process descended from one:
+the provider, its tools, the hooks it runs, and anything they start, including
+a process that leaves the process group. It is the child of `run`, of `startup
+trial` and of `startup capture` alike. A process the operator starts, including
+one that executes content the child produced, is not the supervised process;
+rule 7 says where that boundary is drawn and what this product still owes
+there.
+
+**Rule 2: the protected set.** These are protected, by path as this product
+resolves them at launch:
+
+| Protected | Why |
+|---|---|
+| the product home, except the harness store and the one exchange directory of rule 4 | the run chain, the override journal and its state authority (spec `003` section 3.1.5), reconciliation and audit records, the register, approvals, qualifications, and the home's own files |
+| an attempt's launch records (spec `002` section 3.37) | the intent, launch, admission, record and trial files the startup judgement is recomputed from |
+| every other part of the target's `.statecraft/state/` than the attempt's own workspace | other attempts' workspaces and the operator's startup records |
+
+The child may **read** the harness store, which its hooks, skills and agents
+are executed from, and may not write it. It may read the exchange directory and
+write only the gate log in it (rule 4). It may neither read nor write anything
+else in the protected set, by any spelling of a path: a relative path, a
+symbolic link, a hard link, a different case on a case-insensitive volume, a
+firmlink or alternate mount of the same volume, or a rename of an ancestor.
+
+**Rule 3: what the product itself later executes is protected too.** A path the
+child can write and this product's unsupervised supervisor later reads as code
+or configuration is a route to the protected set that does not go through the
+child. So the child may not write: the target's Git configuration and hooks
+(`.git/config`, `.git/hooks/`, `.git/info/`, a worktree's `config.worktree`,
+and any `config` file under `.git/modules/`); any directory on the `PATH` the
+supervisor resolves programs from, and the programs it resolved (this
+product's own binary, the provider, `git`, `spec-spine`); and the provider's
+installed version directory. A write the child needs to make its own commits
+(objects, references, logs, and its own worktree's `HEAD` and index) stays
+permitted.
+
+**Rule 4: the exchange directory.** The admission gate (spec `002` section 3.32
+rule 26) is executed by the child and has to learn the supervisor's decision
+and leave a trace. Each attempt therefore has one exchange directory in the
+product home, apart from its launch records, holding the gate script, the
+settings document, the supervisor's admission decision and a gate log the
+supervisor creates empty before launch. The child may read and execute in it
+and may write only to the gate log's existing bytes. It cannot create, replace
+or remove any file there, so it cannot write the admission decision before the
+supervisor does. The gate log is **child-attested**: it is evidence of what the
+gate wrote, never of what the supervisor decided, and the supervisor's own
+decision is copied into the launch records.
+
+**Rule 5: the mechanism, per platform.** The boundary is a confinement the
+operating system applies to the child before the provider's first instruction
+runs, inherited by every descendant, and not removable by it:
+
+| Platform | Mechanism | Established when |
+|---|---|---|
+| macOS | a Seatbelt profile applied by `/usr/bin/sandbox-exec`, which then executes the provider with its arguments unchanged | the program exists and a self-test under the generated profile is refused a protected read and allowed a workspace write |
+| Linux | Landlock, applied to the child after `fork` and before `exec` with `no_new_privs` set, and the supervisor marked non-dumpable for the attempt | the kernel reports a Landlock ABI that supports every access right the ruleset handles, and the same self-test passes |
+| anything else | none | never |
+
+The macOS profile also denies sending Apple events and asking LaunchServices to
+open anything, and denies signals to any process outside the confinement,
+because each of those would have a process outside the confinement act for the
+child. It was measured on 2026-09-23 on macOS 26.5.1: a confined child was
+refused a protected read by a relative path, a symbolic link, an upper-case
+spelling and the `/System/Volumes/Data` firmlink; refused a hard link to and a
+rename of the protected directory; refused `launchctl submit` and `launchctl
+bootstrap`, the setuid `at` and `crontab`, a LaunchServices open and an Apple
+event; refused a signal to its parent; and allowed an append to a pre-created
+file it was granted. On Linux, Landlock is an allowlist, so rule 2's denials
+are made by granting the siblings of every protected path's ancestors rather
+than by a deny rule; a supervisor that is not dumpable cannot be traced, and
+its memory and descriptors cannot be read through `/proc`, by a same-user
+child.
+
+**Rule 6: refusal.** `run`, `startup trial` and `startup capture` refuse,
+with nothing launched and a reason naming the platform and the step that failed,
+when the boundary cannot be established. There is no option, environment
+variable or configuration that launches a provider without it. A child the
+product created before this section is not affected; nothing is re-judged.
+
+**Rule 7: what this does not claim (constitution VIII).**
+
+- It does not protect against the host administrator or against the operator:
+  both act outside the supervised process, and the operator can edit the home.
+  Spec `003` section 3.1.5 says what the product detects of an operator's edit
+  and what it does not.
+- A signal the child cannot send on Linux without a Landlock ABI that scopes
+  signals is not claimed as refused there: a killed supervisor leaves an intent
+  with no outcome, which spec `003` section 3.6.1 reconciles and which is never
+  read as a result. On macOS signals outside the confinement are refused.
+- It does not stop the child writing content the operator later executes
+  outside the confinement: the workspace's own code, and the provider's own
+  configuration under `~/.claude`, which the provider needs to write. Such a
+  process is not the supervised process (rule 1). Closing that route for the
+  provider's configuration needs either a per-run provider configuration
+  directory, whose effect on authentication has not been measured, or a
+  separate operating-system principal for the child or for the records; both are
+  the owner's to authorize, and neither is claimed here.
+- It does not make the gate log trustworthy (rule 4).
+- It is not containment of hostile code in general and makes no claim about
+  network, credentials or publishing (section 3.6).
+
+**Rule 8: the record says so.** The attempt's posture (section 3.7) records the
+confinement: the platform, the mechanism, the profile's or ruleset's digest, the
+protected and the writable roots, and the self-test's result. An attempt without
+that record was not confined.
+
+**Acceptance.** Hostile, deterministic child fixtures, run through the product's
+real launch path in an isolated home and target, each asserting both that the
+attempt was refused access and that the protected bytes are unchanged: a
+fixture that reads, writes, truncates, renames and deletes the run chain, the
+override journal and its state authority, the launch records and another
+attempt's workspace, by absolute path, by relative path, through a symbolic
+link, a hard link and a case variant, and (macOS) through the firmlink; one that
+creates the admission decision before the supervisor; one that writes the
+target's Git configuration and hooks and a planted program on the supervisor's
+`PATH`; one that signals the supervisor (macOS); one that starts a descendant in
+a new session and repeats the reads from it; and one that inherits no
+descriptor beyond the three standard streams. Positive: the same fixtures'
+workspace writes, commits and gate-log append succeed, and a governed run
+through the fake provider concludes as before. Negative platform cases: an
+unavailable mechanism and a failed self-test each refuse the launch with
+nothing launched. Where a fixture cannot run on the platform executing the
+suite, the check is named as not run, never as passed.
 
 ## 4. Out of scope
 
