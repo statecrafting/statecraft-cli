@@ -2212,15 +2212,20 @@ the field has been read either as waiting on a live result no local work can
 supply or as ready to flip because the product fails closed. This section
 fixes the rule. It changes no requirement in sections 3.1 to 3.35.
 
-**Rule 1: four facts, kept apart.** *Implemented* is a property of this
-repository's code measured against sections 3.1 to 3.35. *Provider
-qualification* is section 3.29's admitted live observation. *Activation* is
-this product acting on a real home. *Counterparty completion* is what section
-3.22 leaves to another repository. Only the first is what the frontmatter's
-`implementation` field records; the other three are reported beside it, on
-their own evidence. None of them grants it, and none withholds it except
-through a requirement of sections 3.1 to 3.35 that mandates its result (rule
-5).
+**Rule 1: the facts, kept apart.** *Implemented* is a property of this
+repository's code measured against sections 3.1 to 3.35. The provider evidence
+is not one fact but several, and section 3.32 rule 28 already keeps them
+apart: a session was **observed** (section 3.29's three controls were
+captured), its observation was **admitted** (sections 3.29 and 3.30 accepted
+it), bytes were **supplied** (section 3.32 rule 28), and a session is
+**qualified** (the record's `qualifies()` conjunction). *Activation* is this
+product acting on a real home. *Counterparty completion* is what section 3.22
+leaves to another repository. Only the first is what the frontmatter's
+`implementation` field records; the others are reported beside it, each on its
+own evidence, and none is inferred from another: an admitted observation is
+not a qualification, and neither is an activation. None of them grants the
+field, and none withholds it except through a requirement of sections 3.1 to
+3.35 that mandates its result (rule 5).
 
 **Rule 2: every normative requirement is accounted for.** `implementation:
 complete` requires that, on one revision of `main`, every requirement of
@@ -2230,8 +2235,16 @@ none:
 | Class | What it needs |
 |---|---|
 | implemented | Reachable through this product's command surface where the requirement is about the product's behavior, and exercised by a named test or declared acceptance command. Code no verb reaches is **not** this class. |
-| deferred | Deferred by name in section 4, by a deferral row of the decision record, or by a dated section 5 entry that says so and why. A requirement is not deferred by being hard. |
+| deferred | Deferred by name in section 4 or by a deferral row of the decision record, as either stood before this section, or by a scope change the owner approved that names the requirement, says why, and records the approval where it is made. A dated section 5 entry an agent writes is a record of that approval, never a substitute for it. A requirement is not deferred by being hard. |
 | external | Decidable only by a provider session, a real home, a release, or another repository's act, **and** the requirement does not mandate a particular result. Its current disposition is recorded, whatever it is. A requirement that mandates a result and depends on such an act is accounted for only when that result is established; until then it is unresolved and blocks `complete` (rule 5). |
+
+**Rule 2a: a frozen obligation is never deferred or external.** A
+requirement that carries a principle spec `000` freezes, including
+Constitution IX's placement of records where the supervised process cannot
+reach them, is accounted for only as implemented. It is not deferred by any
+route in rule 2, it is not external because a platform or an operator's act
+would be needed to meet it, and recording it as a residual does not account
+for it. Until it is implemented it is unresolved and blocks `complete`.
 
 **Rule 3: failing closed is not the same as implemented.** A requirement that
 the product *do* something is not satisfied by the product reporting that it
@@ -2263,7 +2276,15 @@ document: the deny floor, the startup hook and the admission gate. So section
 is established for the installed provider version: the deny floor through an
 admitted observation of sections 3.29 and 3.30, and hooks supplied through
 `--settings` through an established trial of section 3.33. Evidence for one
-version is not evidence for another. The alternative, a `run` that treats the
+version is not evidence for another, and a matching version string is not by
+itself the same provider: the evaluation names the installed binary by path
+and digest and shows that it is the one each piece of evidence recorded, and
+that the settings payload a run on the evaluated revision supplies digests to
+the payload the admitted observation is bound to under section 3.29 rule 4. A
+difference in either is evidence for another invocation. What rule 5 requires
+here is the admission and the established trial; it does not require that any
+session be `qualified`, which section 3.32 rule 21 makes unreachable through a
+run, and it does not make an admitted observation into a qualification. The alternative, a `run` that treats the
 mechanism as unavailable for an unverified version, would be a change to
 section 3.32 and is the owner's to make; this section does not make it.
 
