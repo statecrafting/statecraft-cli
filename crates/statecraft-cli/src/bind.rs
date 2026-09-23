@@ -464,6 +464,23 @@ pub fn unregistered_answer(path: &Path) -> Answer<String> {
     Answer::new(detail.clone(), Exit::Refused, detail)
 }
 
+/// The refusal a path gets when two registrations name its directory.
+///
+/// Spec 003 section 3.1.4 rule 7 is one lock per repository, and each stored
+/// root keys its own lock, chain and journal. Choosing one of the two would
+/// leave the other spelling a second lock for the same repository, so both are
+/// refused until one registration names it.
+pub fn same_directory_answer(path: &Path, roots: &[std::path::PathBuf]) -> Answer<String> {
+    let listed: Vec<String> = roots.iter().map(|r| r.display().to_string()).collect();
+    let detail = format!(
+        "{} names a directory registered under more than one path ({}); each would key its own \
+         lock, run record and override journal for one repository, so nothing was read or written",
+        path.display(),
+        listed.join(", ")
+    );
+    Answer::new(detail.clone(), Exit::Refused, detail)
+}
+
 /// The refusal an unarmed target gets from a verb that would drive it.
 ///
 /// Spec 002 section 3.1: a repository is armed separately from being

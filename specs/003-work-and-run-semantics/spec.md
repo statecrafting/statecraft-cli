@@ -24,6 +24,12 @@ extends:
   # edit there is a single `effect_id: Identity::Absent`, and nothing `005`
   # requires changes.
   - { spec: "005-acceptance-and-evidence", unit: { kind: directory, path: "crates/statecraft-acceptance/" }, nature: additive }
+  # Section 5, 2026-09-23 (one repository key): the binding resolves a typed
+  # path to the registration's stored root before any record is keyed, and a
+  # re-registration keeps the root as first stored, so a re-evaluation does not
+  # re-key a repository's history. Neither changes what `006` or `002` requires.
+  - { spec: "006-command-surface", unit: { kind: directory, path: "crates/statecraft-cli/" }, nature: corrective }
+  - { spec: "002-environment-lifecycle", unit: { kind: directory, path: "crates/statecraft-environment/" }, nature: corrective }
 depends_on:
   - "000-bootstrap"
   - "001-boundaries-and-authority"
@@ -1215,6 +1221,81 @@ does not carry and an empty operator or reason are refused; a released tool
 call refuses `absent` with no manifest; an unreadable gate log fails and
 writes nothing. A drop guard releases a blocked fake provider however a test
 ends.
+
+**2026-09-23: one repository key for the lock, the run record and the
+journal.** Rule 7 is one lock per repository, rule 4 never reads one
+repository's override for another and so implies one journal per repository,
+and section 3.3 is one chain per registered repository. None of them says what
+identifies the repository when its path can be typed more than one way. The
+register compares paths component-wise, so `<root>`, `<root>/` and `<root>/.`
+are one registration, while the lock, the chain and the journal were each keyed
+by a digest of the bytes the operator typed. Measured by an independent review
+and reproduced live: during a supervised attempt, `run <root>/` took a second
+lock, passed the live-attempt refusal and began attempt 1 in a second chain.
+The binary tests reproduce it on the previous build: an override granted
+through one spelling is not seen through another, and a chain written under one
+is read as no runs under another.
+
+The choices, where the section is silent:
+
+- **The key is the registration's stored root, as the register holds it.** The
+  binding resolves a typed path through the register, refuses it if it is not
+  registered, and passes the stored root on; `statecraft_run::repository::key`
+  digests it exactly as the previous keys were digested. A home whose records
+  were written through the registered spelling therefore keeps every key, and a
+  canonicalized key was rejected because it would re-key exactly those homes
+  (a temporary directory on macOS is `/var/...` as typed and `/private/var/...`
+  canonical).
+- **A symbolic link is not resolved.** A link to a registered root that is not
+  itself registered stays unregistered and is refused, as it was, writing
+  nothing; spec `006`'s decision of 2026-09-16 not to canonicalize a typed path
+  stands. A link that is **also** registered makes two stored roots for one
+  directory. Choosing either would leave the other a second lock, so every
+  verb that keys a record here refuses both, exit 2, naming the roots, until one
+  registration names the directory. The comparison is the directory's device
+  and inode.
+- **A re-registration keeps the root as first stored.** `project register
+  <root>/` finds `<root>`, and replacing the stored spelling would re-key the
+  repository's history. Arming is already preserved across a re-registration
+  for the same reason.
+- **Records filed under another spelling are never read as absent and never
+  merged.** A home written by the previous build can hold a chain or a journal
+  keyed by a spelling the register equates with the stored root. Its first
+  record links to an anchor derived from that spelling, so it cannot be moved
+  under the stored key without breaking its links, and reading the stored key's
+  empty chain beside it would say "no history". So opening the chain or reading
+  the journal checks the spellings an operator produces for the same
+  registration (the root with and without a trailing separator, with a trailing
+  `.`, and the forms making a relative `.` or `./` absolute produces), and when
+  one has a file it fails, exit 4, naming the file and the spelling, having read
+  and written nothing. Only a record-bearing file counts: a stray lock file
+  carries no history. What to do with the other file is the operator's.
+
+*What this does not detect, named.* The set of spellings the register equates is
+unbounded (`/x//p`, `/x/./p`), and the check covers the ones listed. A home
+whose previous build was driven through another such spelling holds a file this
+check does not find. Spec `002`'s local approval records, keyed by the typed
+project path, are not per-repository records of this spec and are unchanged.
+
+**2026-09-23: a released repository lock no longer outlives its holder.** The
+`overrides` and `lock` unit tests failed intermittently with "another process
+holds this repository's lock" on a lock file no other test used. Measured on
+macOS with `cargo test -p statecraft-run --lib` at the default thread count, on
+the previous build: 1 failing run of 40 in one sample and 30 of 100 in a second,
+across five tests. On this build: 0 of 100, twice. A `flock` belongs to the
+open file description, and closing a descriptor releases it only when no other
+descriptor refers to that description. A process spawned from another thread
+holds a copy of every descriptor, close-on-exec ones included, from its creation
+until its `exec`. Measured with 20000 take-and-close cycles while four threads
+spawned `/usr/bin/true`: 439 were refused when spawning through `posix_spawn`,
+and 2354 to 2621 when spawning through `fork` (a `pre_exec` hook or a `PATH`
+lookup under a changed environment); none with no spawning. Releasing
+explicitly (`flock(LOCK_UN)`) before closing gave 0 in every mode. The lock now
+releases explicitly when dropped, so rule 7's lock is released by its holder
+for every copy at once, and the operating system still releases it when the
+holding process ends. Linux's open-file-description locks were considered and
+rejected: they belong to the description too, so a child's copy would hold them
+the same way. The tests were not serialized and nothing retries.
 
 ## Verification
 

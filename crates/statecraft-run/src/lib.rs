@@ -18,6 +18,8 @@
 //! - [`record`] is the append-only hash-linked chain, fsynced before it
 //!   acknowledges, kept in the product home so the supervised process cannot
 //!   reach it.
+//! - [`repository`] is the one key a repository's records in the product home
+//!   are filed under: the registration's stored root, never the typed spelling.
 //! - [`attempt`] holds the closed outcome set and the rule that a retry appends.
 //! - [`refusal`] is the supervisor's own accounting, which no exit code can
 //!   overrule.
@@ -47,6 +49,7 @@ pub mod record;
 pub mod recovery;
 pub mod refusal;
 pub mod report;
+pub mod repository;
 pub mod session;
 pub mod work;
 pub mod workspace;

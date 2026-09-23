@@ -364,3 +364,207 @@ fn while_another_process_holds_the_repository_lock_grant_and_run_refuse() {
         text(&listed)
     );
 }
+
+/// How many files in the home's records directory end with `suffix`.
+fn records_ending(f: &Fixture, suffix: &str) -> usize {
+    std::fs::read_dir(f.home().join("records"))
+        .map(|d| {
+            d.filter_map(Result::ok)
+                .filter(|e| {
+                    let name = e.file_name().to_string_lossy().to_string();
+                    name.ends_with(suffix)
+                        && (suffix != ".jsonl" || !name.ends_with(".overrides.jsonl"))
+                })
+                .count()
+        })
+        .unwrap_or(0)
+}
+
+/// Spec 003 section 3.1.4 rules 3, 4 and 7, section 5 (2026-09-23): the
+/// register equates `<root>`, `<root>/` and `<root>/.`, so all three name one
+/// repository, with one lock, one run record and one journal, filed under the
+/// root as registered.
+#[test]
+fn every_spelling_of_a_registered_root_keys_one_lock_one_chain_and_one_journal() {
+    let f = Fixture::new();
+    let root = f.repository("a");
+    let slash = format!("{root}/");
+    let dot = format!("{root}/.");
+
+    // Granted through one spelling, seen and refused as a duplicate through
+    // the others.
+    let out = f.cli(&["override", "grant", &slash, DRAFT, "alice", "why"]);
+    assert_eq!(code(&out), 0, "{}", text(&out));
+    assert!(statecraft_run::overrides::journal_path(&f.home(), Path::new(&root)).exists());
+    for spelling in [&root, &dot] {
+        let out = f.cli(&["override", "grant", spelling, DRAFT, "bob", "again"]);
+        assert_eq!(code(&out), 2, "{spelling}: {}", text(&out));
+        assert!(text(&out).contains("already in force"), "{}", text(&out));
+    }
+    for spelling in [&root, &slash, &dot] {
+        let out = f.cli(&["work", "list", spelling]);
+        assert_eq!(code(&out), 0, "{spelling}: {}", text(&out));
+        assert!(
+            text(&out).contains("override"),
+            "{spelling}: {}",
+            text(&out)
+        );
+    }
+
+    // Run through a third spelling; every spelling reads the one run.
+    let out = f.cli(&["run", &dot, DRAFT]);
+    assert!(code(&out) <= 1, "{}", text(&out));
+    assert!(statecraft_run::record::chain_path(&f.home(), Path::new(&root)).exists());
+    for spelling in [&root, &slash, &dot] {
+        let listed = f.cli(&["run", "list", spelling, "--json"]);
+        let v: serde_json::Value = serde_json::from_slice(&listed.stdout).unwrap();
+        assert_eq!(v["value"]["runs"][0]["id"], DRAFT, "{spelling}: {v}");
+        assert_eq!(
+            v["value"]["runs"][0]["attempts"].as_array().unwrap().len(),
+            1,
+            "{spelling}: {v}"
+        );
+    }
+    let out = f.cli(&["run", &slash, DRAFT]);
+    assert!(code(&out) <= 1, "{}", text(&out));
+    let listed = f.cli(&["run", "list", &root, "--json"]);
+    let v: serde_json::Value = serde_json::from_slice(&listed.stdout).unwrap();
+    assert_eq!(
+        v["value"]["runs"][0]["attempts"].as_array().unwrap().len(),
+        2,
+        "a retry through another spelling appends to the same run: {v}"
+    );
+
+    assert_eq!(records_ending(&f, ".jsonl"), 1, "one run record");
+    assert_eq!(records_ending(&f, ".overrides.jsonl"), 1, "one journal");
+    assert_eq!(records_ending(&f, ".lock"), 1, "one lock");
+
+    // A symbolic link to the root is not a registered path: refused, and
+    // nothing is keyed by it.
+    let link = f.project("link");
+    std::os::unix::fs::symlink(&root, &link).unwrap();
+    let link = link.display().to_string();
+    for args in [
+        vec!["run", &link, DRAFT],
+        vec!["override", "grant", &link, "010-unready", "alice", "why"],
+        vec!["work", "list", &link],
+    ] {
+        let out = f.cli(&args);
+        assert_eq!(code(&out), 2, "{args:?}: {}", text(&out));
+        assert!(text(&out).contains("not registered"), "{}", text(&out));
+    }
+    assert_eq!(records_ending(&f, ".jsonl"), 1);
+    assert_eq!(records_ending(&f, ".overrides.jsonl"), 1);
+    assert_eq!(records_ending(&f, ".lock"), 1);
+
+    // Registered as well, the link is a second root for one directory: both
+    // are refused rather than given a second lock.
+    assert!(code(&f.cli(&["project", "register", &link])) <= 1);
+    for spelling in [&root, &link] {
+        let out = f.cli(&["run", spelling, DRAFT]);
+        assert_eq!(code(&out), 2, "{spelling}: {}", text(&out));
+        assert!(
+            text(&out).contains("registered under more than one path"),
+            "{}",
+            text(&out)
+        );
+    }
+    assert_eq!(records_ending(&f, ".lock"), 1);
+}
+
+/// The reproduced race: while a run holds the repository, a second `run`
+/// through another spelling is refused, never started in a second chain.
+#[test]
+fn a_second_run_through_another_spelling_while_one_is_live_is_refused() {
+    let f = Fixture::new();
+    let root = f.repository("a");
+    assert_eq!(
+        code(&f.cli(&["override", "grant", &root, DRAFT, "alice", "why"])),
+        0
+    );
+    let spellings = [format!("{root}/"), format!("{root}/.")];
+
+    // The supervising process's lock, as `run` takes it.
+    let held = statecraft_run::lock::try_acquire(&f.home(), Path::new(&root)).unwrap();
+    for spelling in &spellings {
+        let out = f.cli(&["run", spelling, DRAFT]);
+        assert_eq!(code(&out), 2, "{spelling}: {}", text(&out));
+        assert!(text(&out).contains("lock"), "{}", text(&out));
+        let out = f.cli(&["override", "revoke", spelling, DRAFT, "alice", "why"]);
+        assert_eq!(code(&out), 2, "{spelling}: {}", text(&out));
+        assert!(text(&out).contains("lock"), "{}", text(&out));
+    }
+    drop(held);
+
+    // An attempt with an intent and no outcome is live in the one chain, and
+    // a run through another spelling sees it.
+    let (mut chain, _) = statecraft_run::record::Chain::open(&f.home(), Path::new(&root)).unwrap();
+    statecraft_run::session::begin(
+        &mut chain,
+        Path::new(&root),
+        DRAFT,
+        "HEAD",
+        &statecraft_environment::time::FixedClock(0),
+    )
+    .unwrap();
+    drop(chain);
+    for spelling in &spellings {
+        let out = f.cli(&["run", spelling, DRAFT]);
+        assert_eq!(code(&out), 2, "{spelling}: {}", text(&out));
+        assert!(text(&out).contains("live"), "{}", text(&out));
+    }
+    assert_eq!(records_ending(&f, ".jsonl"), 1, "no second chain");
+    let listed = f.cli(&["run", "list", &format!("{root}/"), "--json"]);
+    let v: serde_json::Value = serde_json::from_slice(&listed.stdout).unwrap();
+    assert_eq!(
+        v["value"]["runs"][0]["attempts"].as_array().unwrap().len(),
+        1,
+        "{v}"
+    );
+}
+
+/// Section 5 (2026-09-23): a home written before the key was the stored root
+/// may hold records filed under the spelling that was typed. They are never
+/// read as "no history" and never merged: every verb that would read them
+/// fails, naming the file.
+#[test]
+fn records_filed_under_another_spelling_are_neither_orphaned_nor_merged() {
+    let f = Fixture::new();
+    let root = f.repository("a");
+    let typed = format!("{root}/");
+    assert_eq!(
+        code(&f.cli(&["override", "grant", &root, DRAFT, "alice", "why"])),
+        0
+    );
+    // What the previous build wrote for `run <root>/`: a chain keyed by the
+    // typed spelling.
+    let (mut chain, _) = statecraft_run::record::Chain::open(&f.home(), Path::new(&typed)).unwrap();
+    statecraft_run::session::begin(
+        &mut chain,
+        Path::new(&typed),
+        "old",
+        "HEAD",
+        &statecraft_environment::time::FixedClock(0),
+    )
+    .unwrap();
+    drop(chain);
+    let stray = statecraft_run::record::chain_path(&f.home(), Path::new(&typed));
+    let before = std::fs::read(&stray).unwrap();
+    for spelling in [&root, &typed] {
+        for args in [
+            vec!["run", "list", spelling],
+            vec!["run", "show", spelling, "old"],
+            vec!["run", spelling, DRAFT],
+        ] {
+            let out = f.cli(&args);
+            assert_eq!(code(&out), 4, "{args:?}: {}", text(&out));
+            assert!(
+                text(&out).contains("another spelling"),
+                "{args:?}: {}",
+                text(&out)
+            );
+        }
+    }
+    assert_eq!(std::fs::read(&stray).unwrap(), before, "never rewritten");
+    assert!(!statecraft_run::record::chain_path(&f.home(), Path::new(&root)).exists());
+}

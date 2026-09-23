@@ -121,10 +121,11 @@ fn run(args: &[String]) -> i32 {
                 );
                 return Exit::Usage.code();
             };
-            let root = absolute(path);
-            let Some(registration) = registry.get(&root) else {
-                return emit(&bind::unregistered_answer(&root), format);
+            let root = match registered(&registry, &absolute(path)) {
+                Ok(root) => root,
+                Err(answer) => return emit(&answer, format),
             };
+            let registration = registry.get(&root).expect("resolved above");
             // Registration makes a target visible; arming is what consents to
             // it being driven (spec 002 section 3.1). `run` is the one verb
             // here that drives, so it is the one verb this gates: discovery
@@ -197,10 +198,11 @@ fn run(args: &[String]) -> i32 {
                 );
                 return Exit::Usage.code();
             };
-            let root = absolute(path);
-            let Some(registration) = registry.get(&root) else {
-                return emit(&bind::unregistered_answer(&root), format);
+            let root = match registered(&registry, &absolute(path)) {
+                Ok(root) => root,
+                Err(answer) => return emit(&answer, format),
             };
+            let registration = registry.get(&root).expect("resolved above");
             if !registration.armed {
                 return emit(&bind::unarmed_answer(&root), format);
             }
@@ -233,7 +235,16 @@ fn run(args: &[String]) -> i32 {
                     return Exit::Usage.code();
                 }
             };
-            let root = absolute(path);
+            // Not a registration precondition, as above; but where the path
+            // is registered, its records are filed under the stored root.
+            let typed = absolute(path);
+            let root = match statecraft_run::repository::resolve(&registry, &typed) {
+                Ok(registration) => registration.root.clone(),
+                Err(statecraft_run::repository::Unresolved::NotRegistered) => typed,
+                Err(statecraft_run::repository::Unresolved::SameDirectory(roots)) => {
+                    return emit(&bind::same_directory_answer(&typed, &roots), format);
+                }
+            };
             let facts = match Chain::open(&home, &root) {
                 Ok((chain, _)) => statecraft_run::session::runs(&chain)
                     .into_iter()
@@ -282,10 +293,10 @@ fn run(args: &[String]) -> i32 {
             let Some(path) = invocation.rest.first() else {
                 return usage();
             };
-            let root = absolute(path);
-            if registry.get(&root).is_none() {
-                return emit(&bind::unregistered_answer(&root), format);
-            }
+            let root = match registered(&registry, &absolute(path)) {
+                Ok(root) => root,
+                Err(answer) => return emit(&answer, format),
+            };
             if invocation.verb == Verb::OverrideShow {
                 if invocation.rest.len() != 1 {
                     return usage();
@@ -1962,6 +1973,22 @@ fn fail(detail: &str, format: Format) -> i32 {
     let answer = Answer::new(detail.to_string(), Exit::Failed, detail);
     print!("{}", answer.render(format));
     Exit::Failed.code()
+}
+
+/// The registration a typed path names, as the root it was stored under.
+///
+/// Spec 003 section 3.1.4 rule 7 and section 5 (2026-09-23): the register
+/// compares paths component-wise, so `<root>/` and `<root>/.` name the same
+/// registration, and every record this product keeps per repository is keyed
+/// by the stored root rather than by what was typed. Passing the typed path on
+/// would give one repository a second lock, run record and journal.
+fn registered(registry: &Registry, typed: &std::path::Path) -> Result<PathBuf, Answer<String>> {
+    use statecraft_run::repository::{Unresolved, resolve};
+    match resolve(registry, typed) {
+        Ok(registration) => Ok(registration.root.clone()),
+        Err(Unresolved::NotRegistered) => Err(bind::unregistered_answer(typed)),
+        Err(Unresolved::SameDirectory(roots)) => Err(bind::same_directory_answer(typed, &roots)),
+    }
 }
 
 /// Make a path absolute without touching the filesystem's opinion of it.

@@ -114,6 +114,12 @@ impl Registry {
     /// Re-registering preserves `armed`: arming is an operator's act, and a
     /// re-evaluation is not a withdrawal of consent. It does replace the
     /// verdict, because a stale verdict is worse than none.
+    ///
+    /// It also preserves the root **as first stored**. The register compares
+    /// paths component-wise, so re-registering `<root>/` finds `<root>`; and
+    /// spec 003 keys a repository's run record, override journal and lock by
+    /// the stored root (its section 5, 2026-09-23). Replacing the stored
+    /// spelling on a re-evaluation would re-key that history.
     pub fn register(
         &mut self,
         root: &Path,
@@ -123,9 +129,11 @@ impl Registry {
             return Err(RegistryError::NotAbsolute(root.to_path_buf()));
         }
         let qualification = qualify(root, probe);
-        let armed = self.get(root).map(|r| r.armed).unwrap_or(false);
+        let existing = self.get(root);
+        let armed = existing.map(|r| r.armed).unwrap_or(false);
+        let stored = existing.map_or_else(|| root.to_path_buf(), |r| r.root.clone());
         let registration = Registration {
-            root: root.to_path_buf(),
+            root: stored,
             qualification,
             armed,
         };
@@ -262,6 +270,26 @@ mod tests {
         assert!(reg.armed, "consent survives a re-evaluation");
         assert_eq!(reg.qualification.verdict, Verdict::Unqualified);
         assert!(!reg.eligible());
+    }
+
+    #[test]
+    fn re_registering_under_another_spelling_keeps_the_stored_root() {
+        let target = tempfile::tempdir().unwrap();
+        let first = target.path().to_path_buf();
+        let mut r = Registry::default();
+        r.register(&first, &Good).unwrap();
+        for again in [
+            PathBuf::from(format!("{}/", first.display())),
+            first.join("."),
+        ] {
+            r.register(&again, &Good).unwrap();
+            assert_eq!(r.projects.len(), 1);
+            assert_eq!(
+                r.get(&again).unwrap().root.as_os_str(),
+                first.as_os_str(),
+                "{again:?}"
+            );
+        }
     }
 
     #[test]

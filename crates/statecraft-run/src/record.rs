@@ -204,6 +204,14 @@ pub enum RecordError {
         /// What went wrong.
         detail: String,
     },
+    /// This repository has a chain filed under another spelling of its path.
+    #[error("chain {path} {detail}")]
+    FiledElsewhere {
+        /// The chain file this spelling keys.
+        path: String,
+        /// Which files, under which spellings.
+        detail: String,
+    },
     /// The chain's hash links do not verify.
     #[error("chain {path} does not verify: {detail}")]
     BrokenChain {
@@ -250,9 +258,11 @@ pub struct Chain {
 /// The chain file for a repository inside a product home.
 ///
 /// Keyed by a digest of the absolute path, because a repository's path is not a
-/// filename and two targets can share a basename.
+/// filename and two targets can share a basename. `target` is the
+/// registration's stored root ([`crate::repository`]), so every spelling of one
+/// registered path reads and appends the one chain.
 pub fn chain_path(home: &Path, target: &Path) -> PathBuf {
-    let key = statecraft_environment::digest::digest_bytes(target.to_string_lossy().as_bytes());
+    let key = crate::repository::key(target);
     home.join("records").join(format!("{key}.jsonl"))
 }
 
@@ -264,6 +274,18 @@ impl Chain {
     /// append lands after the last complete one.
     pub fn open(home: &Path, target: &Path) -> Result<(Self, OpenReport), RecordError> {
         let path = chain_path(home, target);
+        // A chain filed under another spelling of this path is this
+        // repository's history. Reading this one as empty beside it would say
+        // "no history", and reading both would merge two chains; neither.
+        if let Some(records) = path.parent() {
+            let found = crate::repository::elsewhere(records, target, ".jsonl");
+            if !found.is_empty() {
+                return Err(RecordError::FiledElsewhere {
+                    path: path.display().to_string(),
+                    detail: crate::repository::elsewhere_detail(&found),
+                });
+            }
+        }
         if let Some(parent) = path.parent() {
             std::fs::create_dir_all(parent).map_err(|source| RecordError::Io {
                 path: path.display().to_string(),
@@ -330,10 +352,7 @@ impl Chain {
 
         // The in-memory head: rebuilt once here, then carried, so an append is
         // O(1) rather than a re-read of the whole chain.
-        let anchor = format!(
-            "statecraft:{}",
-            statecraft_environment::digest::digest_bytes(target.to_string_lossy().as_bytes())
-        );
+        let anchor = format!("statecraft:{}", crate::repository::key(target));
         let mut chain = RecordChain::new(anchor);
         for r in &records {
             chain.append(r.id.clone(), r.timestamp.clone(), r.payload.clone());

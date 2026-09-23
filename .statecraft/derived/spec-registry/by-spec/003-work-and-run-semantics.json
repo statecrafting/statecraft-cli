@@ -20,12 +20,28 @@
           "kind": "directory",
           "path": "crates/statecraft-acceptance/"
         }
+      },
+      {
+        "nature": "corrective",
+        "spec": "006-command-surface",
+        "unit": {
+          "kind": "directory",
+          "path": "crates/statecraft-cli/"
+        }
+      },
+      {
+        "nature": "corrective",
+        "spec": "002-environment-lifecycle",
+        "unit": {
+          "kind": "directory",
+          "path": "crates/statecraft-environment/"
+        }
       }
     ],
     "id": "003-work-and-run-semantics",
     "implementation": "in-progress",
     "sectionDigests": {
-      "003-work-selection-workspace-preparation-the-run-record-and-recovery": "25dc385b2a4dd166fe56164508233677831cb86dd5977835a0cefb5b01538ca2",
+      "003-work-selection-workspace-preparation-the-run-record-and-recovery": "da8dc3350cac141d8c846832cc4df89aaf61752f728ce5e1fe552853af29eb30",
       "1-purpose": "6e2e713486514a4371080ee9ad901b71b92b198ff8944d2cac7db353dfdd1ee6",
       "2-territory": "f200d26f7fab70304d4ec5b21bbfba40301c0a2a5b38fc266d1d37da0f01b4a4",
       "3-1-1-ready-is-not-ratified": "e902124dba1a1dfc0ed218701ac4b36773d42c1359d537fe8dfce993379529fa",
@@ -46,7 +62,7 @@
       "3-8-observable-negative-cases": "64b35b1a553ef276500ef17c7ef9beff5d4488a934d422acddee2b429583bc0b",
       "3-behavior": "237d46d757464901295e709683c551332d6e0b9b2ca0bd1bb6577c7d54dd7752",
       "4-out-of-scope": "0953737fbaaf06f31c4272c3b10a57178c967c1127355c9826627a1267c76fdd",
-      "5-decisions-recorded-during-implementation": "71207eec0f26dd696cd46da8c9b398fc55235e4a2bf8c063767c47a733912311",
+      "5-decisions-recorded-during-implementation": "e1bd382682edc70a49f7ff0dc76104a2a402cb5d5634d84a3d41ff25f654c2d1",
       "verification": "31b33969410d5ba51a42678f60dc22264f541b2480ada745b3c0cc2f839d9a1e"
     },
     "sectionHeadings": [
@@ -79,6 +95,6 @@
     "summary": "The core loop's semantics. How a unit of work is identified by reading spec-spine's structured report rather than re-deriving it; how an isolated workspace is prepared so the operator's checkout is never edited; the append-only hash-linked run record with intent written before an effect and outcome after it; the closed outcome set (completed, failed, refused, interrupted, cancelled) and the rule that a retry appends an attempt rather than replacing history; supervisor-owned refusal accounting a supervised process cannot erase; and reconciliation of an ambiguous effect before any retry, with no exactly-once promise.\n",
     "title": "Work selection, workspace preparation, the run record, and recovery after interruption"
   },
-  "shardHash": "af9f6d0e51c7520a8a8a16dbd5afba1a001ede793458fc1f469a708ce10c7839",
+  "shardHash": "f0a9165b61319da18e38cc338250c52b8b042edfd194f4e334c713fd52f31586",
   "specVersion": "1.6.0"
 }
