@@ -2,7 +2,7 @@
 id: "004-execution-adapter"
 title: "The execution adapter boundary and the first provider: one protocol, declared capabilities, a qualification suite, a constructed child environment, and what a real stream can witness"
 status: approved
-implementation: complete
+implementation: in-progress
 created: "2026-09-16"
 summary: >
   The single seam through which this product runs an agent, and the first
@@ -224,7 +224,10 @@ residual to be named together, so:
 
 - A reachable absolute path bypasses any path-based redirection.
 - The home directory remains readable unless an operating-system mechanism is
-  applied, which this spec does not apply.
+  applied, which this spec does not apply. *Amended by section 3.18:* the product
+  home and the launch records are now kept from the child by an
+  operating-system mechanism, which section 3.18 names with what it does not
+  close; the residuals below about credentials and publishing are unchanged.
 - A credential held in an OS keychain answers a process that asks for it, and at
   least one supported provider authenticates from that same keychain, so denying
   it breaks the provider.
@@ -637,6 +640,284 @@ and the recorded coverage is what `run show` renders. Unit: the simple-command r
 over each metacharacter and an assignment prefix, and a requirement and an
 allowance built from different inputs, so the comparison is no longer
 tautological.
+
+### 3.18 The protected evidence boundary
+
+An authority amendment, settled by the owner on 2026-09-23 and recorded before
+the implementation it authorizes. Constitution IX, frozen by spec `000`,
+requires that refusals, interruptions and results are recorded by the
+supervisor "in a place the supervised process cannot reach". Section 3.6 named
+the product home as reachable, because the child runs as the same
+operating-system user, and spec `003` section 3.5.1 recorded the conflict. The
+owner's decision is that the principle is not amended, waived or reinterpreted:
+same-user reachability is an implementation gap against it, and this section is
+the boundary that closes the direct route and names, as an open gap, the route
+it does not close (rule 12). It changes nothing section 3.6 says about
+credentials or publishing, whose deferral to `F-09` stands; `F-09` does not
+defer this section (spec `002` section 3.36 rule 2a).
+
+**Rule 1: the supervised process.** Every process this product creates to run
+a provider, for `run`, `startup trial` and `startup capture`, and every process
+descended from one, including one that leaves the process group or the session.
+Every execution this product itself makes of content a confined child could
+have written (a verification suite, a check or a build run in or over an
+attempt's workspace, by `run`, `accept` or any other verb) is confined in the
+same way and is a supervised process too.
+
+**Rule 2: the protected set.** Nothing is readable or writable by the
+supervised process in:
+
+- the product home, except the harness store (readable and executable) and the
+  attempt's exchange directory (rule 5);
+- every attempt's launch records (spec `002` section 3.37);
+- the target's working tree (the operator's checkout) and every other attempt's
+  workspace, which the child may read and not write;
+- the target's Git directory, except the writable roots of rule 3, which the
+  child may read and not write.
+
+Neither access is available by any spelling of a path: a relative path, a
+symbolic link, a hard link, a different case on a case-insensitive volume, a
+firmlink or alternate mount of the same volume, or a rename of an ancestor.
+"Read and not write" is stated where reading is needed; everywhere else in the
+list, neither.
+
+**Rule 3: the writable roots, and nothing else.** The supervised process may
+write only:
+
+| Root | Why |
+|---|---|
+| the attempt's workspace | the work |
+| the attempt's own object directory, in the attempt's exchange area of the product home, created empty by the supervisor before launch and named to the child's Git as its object directory, with the target's shared object store as a read-only alternate; the run's own reference directory, `refs/heads/statecraft/<run>/`, holding the attempt's branch `work`, and its reflog directory under `logs/`, both created before launch; the attempt's worktree administrative directory | its own commits, without a grant on the shared object store or on any directory another run's branch lives in |
+| the gate log in the exchange directory, opened for writing only (rule 5) | the gate's trace |
+| one temporary directory per attempt, created by the supervisor and given to the child as its temporary directory | scratch |
+| the provider's configuration directory (for Claude Code, `~/.claude/`), and its configuration file beside it: on macOS the literal names `~/.claude.json` and its temporary siblings; on Linux that one existing file for writing in place only, because granting creation or removal in the home directory would grant it over every file there | the provider cannot run without it; rule 12 names what this leaves open |
+| the devices a process needs (`/dev/null`, `/dev/tty` and the like) | ordinary I/O |
+
+Everything else the child may read, except the protected set, and may not
+write. For a verification suite, the writable roots are those of spec `005`
+section 3.19 rule 1. A workspace created before this section, whose branch
+lives in the shared `refs/heads/statecraft/run/` directory, has its branch
+renamed into its own run directory by the supervisor, under the repository
+lock, before launch, and the rename is recorded (spec `003` section 3.2); a
+rename that fails refuses the launch, and the grant is never widened to the
+shared directory. A root that cannot be expressed exactly on a platform is not widened to
+fit: the launch refuses on that platform (rule 9).
+
+**Rule 4: what the unconfined product reads and runs.** This product, outside
+the confinement, invokes no program and reads no configuration from a path a
+confined child could have written, except as this rule names and treats as
+inert:
+
+- It resolves programs only from absolute `PATH` entries that lie outside every
+  writable root; a relative entry, or one inside a writable root, refuses the
+  launch. Every program it runs, the provider included, is checked by its real
+  path after resolving links: a program, or a directory on its real path, inside
+  a writable root refuses the launch. That covers `/usr/bin/sandbox-exec`, any
+  shell it runs, and the provider's installed version directory wherever the
+  provider keeps it.
+- Its own configuration and environment come from the product home and the
+  operator's invocation, which the child cannot write; `spec-spine` reads the
+  operator's checkout or an export of the base, which the child can read and
+  not write.
+- It brings an attempt's objects into the shared store only through a transfer
+  that re-hashes every object and checks connectivity, as Git's receiving side
+  does for a push, and reads an attempt's commits only after that import. The
+  side that reads the child's object directory to produce the transfer runs
+  inside the confinement and only emits a stream; the unconfined side only
+  receives and verifies it, and ignores any alternates list or configuration
+  found in the child's directory. At conclusion the supervisor removes any
+  reference in the run's reference directory other than `work`, and records
+  that it did. The attempt's object directory is kept until the import succeeds
+  or the operator reconciles the attempt; until then the run's branch may name
+  objects the shared store does not hold, and the operator's own Git operations
+  on the target can report them missing.
+- It runs `git` against the target's common Git directory named explicitly,
+  with system and global configuration disabled, hooks and the file-system
+  monitor switched off, and no attribute or filter driver, and reads the
+  attempt's result only through the attempt's branch in that directory. It never
+  follows the workspace's `.git` file or the worktree administrative directory's
+  `gitdir` and `commondir`, which the child can rewrite.
+- It reads an attempt's workspace, worktree administrative directory, gate log
+  and temporary directory as data only: opened relative to a directory handle taken before launch, never
+  following a symbolic link, refusing a device, pipe or socket, and bounded in
+  size.
+- It reads the provider's configuration (spec `002` section 3.24, `doctor`) as
+  data and never selects what it executes or records from it.
+
+**Rule 5: the exchange directory.** The admission gate (spec `002` section 3.32
+rule 26) is executed by the child and has to learn the supervisor's decision
+and leave a trace. Each attempt has one exchange directory in the product home,
+apart from its launch records, holding the gate script, the settings document
+the provider is given, a copy of the admission decision and a gate log the
+supervisor creates empty before launch. The child may read and execute in it
+and may open the gate log for writing; it may not create, rename, link or
+remove any entry there, so it cannot write the decision before the supervisor
+does. Neither platform prevents it from overwriting or truncating the log it
+may write, which is why the log is **child-attested**: evidence of what was
+written there, never of what the supervisor decided. The supervisor makes the
+decision durable in the launch records first and then writes the exchange copy
+by creating a new file and renaming it into place; if the copy cannot be
+written, the gate withholds and the attempt is refused with the failure named.
+
+**Rule 6: no other process acts for the child.** The supervised process may not
+reach a process outside the confinement that would act on its behalf:
+
+- signals to any process outside the confinement are refused;
+- a Unix-domain socket may be connected to only where the platform's name
+  resolution requires it (on macOS, `/private/var/run/mDNSResponder`); every
+  other connection, stream or datagram, including a user service manager, a
+  container engine, a terminal multiplexer and an agent, is refused; a pair of
+  connected sockets the process creates for itself is allowed;
+- a network connection may be opened only to TCP port 443, and name
+  resolution. On macOS the profile also refuses loopback and every UDP
+  connection, name resolution going through `mDNSResponder`. On Linux, Landlock
+  filters by port and not by address, and does not mediate UDP, so the launch
+  refuses while any process on the host listens on TCP port 443, or while a
+  process of the same user listens on UDP; a listener started after that check
+  is not seen, and rule 12 names that;
+- on macOS, Apple events, LaunchServices opens and job submission to `launchd`
+  are refused.
+
+On macOS these are the routes the profile refuses, each measured; the profile
+allows other Mach services by default, and rule 12 says what that leaves
+open.
+
+**Rule 7: the mechanism, per platform.** Applied by the operating system before
+the provider's first instruction, inherited by every descendant, and not
+removable by it. File descriptors beyond the three standard streams are closed
+before the program executes, by an explicit step and not only by
+close-on-exec.
+
+| Platform | Mechanism | Required |
+|---|---|---|
+| macOS | a Seatbelt profile applied by `/usr/bin/sandbox-exec`, which then executes the provider with its program and arguments unchanged: reads allowed except rule 2; writes denied except rule 3; the denials of rule 6 | the program exists and the self-test of rule 8 passes |
+| Linux | Landlock applied after `fork` and before `exec`, with `no_new_privs`: a ruleset handling every file-system right the kernel's ABI knows, including `TRUNCATE` and `REFER`, built from directory handles opened before `fork`; its network rule allowing TCP connect to port 443 only; its scopes refusing signals and abstract Unix sockets outside the domain; and a seccomp filter that admits `socket(2)` only for the IPv4 and IPv6 families, admits `socketpair(2)` for the Unix domain because child processes' standard streams use it, and refuses every other family, the creation of a user namespace, and `io_uring` setup, whose operations do not pass through the calls the filter sees. Opening a file by handle needs a capability the child does not hold, which the self-test confirms. The supervisor is not dumpable for as long as it holds any descriptor on the protected set. | Landlock ABI 6 or later, the seccomp filter installed, and the self-test passes |
+| anything else | none | refused |
+
+On Linux, Landlock is an allowlist: rule 2's read denials are made by granting
+read to the siblings of every protected path's ancestors, and a directory
+created after the ruleset is built is not readable. A path rule 3 needs whose
+parent is also the parent of a protected path, so that it cannot be granted
+without granting the protected path, is not expressible, and the launch refuses
+(rule 3's last sentence).
+
+*Measured on 2026-09-23.* On macOS 26.5.1, a Seatbelt-confined child was
+refused a protected read by a relative path, a symbolic link, an upper-case
+spelling and the `/System/Volumes/Data` firmlink; refused a hard link to and a
+rename of the protected directory; refused `launchctl submit`, `launchctl
+bootstrap`, the setuid `at` and `crontab`, a LaunchServices open, an Apple event
+and a signal to its parent; refused a connection to the container engine's Unix
+socket and to loopback TCP; and allowed name resolution through
+`mDNSResponder`, HTTPS to a remote host, a `socketpair`, and an append to a
+file it was granted. On the CI runner (Ubuntu 24.04, kernel 6.17, Landlock ABI
+7, Yama 1, unprivileged user namespaces refused), a Landlock-confined child was
+refused a protected read and a signal to its parent, and **was not refused a
+connection to the session bus, through which `systemd-run --user` ran an
+unconfined process that read the protected file**. That measurement is why rule
+6 refuses Unix-domain stream sockets on Linux by seccomp, and why Landlock alone
+does not meet this section.
+
+**Rule 8: the self-test.** Before each launch, a fixed probe program runs under
+the exact profile or ruleset of that launch and must be refused reading and
+writing a sentinel in the product home, in the launch records and in the
+target's working tree, refused a Unix-domain connection and a loopback
+connection, refused a socket of another family and `io_uring` setup (Linux),
+and allowed a write in the workspace and to the gate log. On Linux it
+must also be refused opening, through `/proc`, a descriptor the supervisor holds
+on the protected set. Any other result refuses the launch.
+
+**Rule 9: refusal.** `run`, `startup trial`, `startup capture`, and every verb
+that would execute workspace content under rule 1, refuse with exit code 2,
+nothing launched and nothing appended as an attempt, and a reason naming the
+platform and the step that failed, when the boundary cannot be established.
+The refusal is a preflight, like the other preflights of these verbs. There is
+no option, environment variable or configuration that launches without it.
+Nothing launched before this section is re-judged.
+
+**Rule 10: what binds an invocation.** The confinement is recorded apart from
+the invocation: spec `002` section 3.29 rule 4 and section 3.30 rule 12 bind the
+provider's program and arguments as handed to the confinement, and the
+confinement is bound by its mechanism and its profile or ruleset digest. The
+wrapper's own arguments are not part of the invocation. An observation made
+without confinement and one made with it are different invocations.
+
+**Rule 11: the record says so.** The attempt's posture (section 3.7) records
+the platform, the mechanism, the profile or ruleset digest, the protected set
+and the writable roots as resolved, the self-test's result, and each open item
+of rule 12 as open, so that no attempt's record reads as meeting IX while rule
+12 leaves a route open. An attempt without that record was not confined.
+
+**Rule 12: what this does not close (constitution VIII).**
+
+- **The route through a later unconfined process is open, and IX is not met on
+  it.** The child can write files that a same-user process outside the
+  confinement later loads: the provider's configuration (rule 3), which the
+  operator's own later provider sessions load and act on, so an instruction, a
+  setting or a hook placed there is executed by a process that can reach the
+  protected set. This is not a scope
+  exclusion; it is a gap against a frozen principle, it is reported wherever the
+  boundary is described, and it keeps every spec that accounts for IX from
+  `complete` (spec `002` section 3.36 rule 2a). Closing it needs an act this
+  section does not authorize: a separate operating-system principal for the
+  child, or a per-run provider configuration directory whose effect on the
+  provider's authentication has been measured live. Both are the owner's.
+- Content the operator deliberately executes outside the confinement (the
+  attempt's work, reviewed and run by the operator) is the operator's act, not
+  the supervised process's, and this section does not claim to protect the
+  record from it. Content this product itself executes is confined (rule 1), so
+  the product never runs it outside the confinement.
+- **On macOS, Mach services other than those rule 6 names are not measured.**
+  Whether one of them would start or instruct a process outside the
+  confinement is unknown, so IX's direct route on macOS is claimed only for the
+  routes measured. Closing that is a Mach-service allowlist measured against the
+  provider, which needs a confined provider session (the activation below). It
+  is an open item against IX in the same way as the first.
+- The host administrator and the operator are outside the supervised process
+  and can edit the home. Spec `003` section 3.1.5 says what the product detects
+  of that and what it does not.
+- The gate log is child-attested (rule 5).
+- Whether the provider runs correctly inside the confinement has not been
+  measured on either platform: every measurement above used a fixture. The
+  first confined provider session is an activation the owner authorizes
+  separately (on Linux, for instance, the socket allowlist also refuses the
+  netlink family, which some runtimes use to list network interfaces); until then a confined run's failure is reported as such and never
+  as a pass.
+- On Linux, a same-user UDP listener or TCP port 443 listener started after
+  the launch's check is not refused by the mechanism; the check narrows that
+  to what starts during the attempt.
+- It is not containment of hostile code in general and claims nothing about
+  credentials or publishing (section 3.6).
+
+**Acceptance.** Hostile, deterministic child fixtures run through the product's
+real launch path in an isolated home and target, each asserting both the
+refusal and that the protected bytes are unchanged:
+
+- read, write, truncate, rename and delete the run chain, the override journal
+  and its state authority, the launch records, the operator's checkout and
+  another attempt's workspace, by absolute and relative path, through a
+  symbolic link, a hard link and a case variant, and (macOS) the firmlink;
+- create the admission decision before the supervisor;
+- write the target's Git configuration and hooks, `objects/info/alternates`,
+  another branch, the workspace's `.git` file and the administrative
+  `commondir`, then show that the supervisor's next Git operation ignores all
+  of them;
+- plant a program on a `PATH` entry, and a relative `PATH` entry;
+- signal the supervisor; connect to a Unix-domain socket, to loopback, and
+  (Linux, where a user service manager runs) `systemd-run --user`;
+- start a descendant in a new session and repeat the reads from it;
+- hold no descriptor beyond the three standard streams;
+- replace a workspace path the supervisor reads at conclusion with a symbolic
+  link into the protected set.
+
+Positive: the same fixtures' workspace writes, commits and gate-log write
+succeed, and a governed run through the fake provider concludes as before.
+Negative platform cases: an unavailable mechanism, a Landlock ABI below 6, a
+missing seccomp filter and a failed self-test each refuse with nothing
+launched. The Linux fixtures run in CI. The macOS fixtures run in the local
+acceptance on macOS, whose result is kept with the other acceptance evidence
+outside the repository, and are named as not run in CI; where the suite itself
+runs inside another sandbox that prevents nesting, they are named as not run,
+never as failed and never as passed.
 
 ## 4. Out of scope
 
