@@ -2336,7 +2336,8 @@ workspace the child works in, and put the gate's script and log in the same
 directory as the intent, the launch record, the admission decision and the
 record. A child can therefore read and rewrite the files its own startup
 judgement is recomputed from, and can write the admission decision before the
-supervisor does. Constitution IX does not admit that.
+supervisor does. Constitution IX does not admit that. Section 3.36's accounting
+covers this section's requirements as it covers those of sections 3.1 to 3.35.
 
 **Rule 1: the launch records move to the product home.** An attempt's
 `intent.json`, `launched.json`, `admission.json`, `record.json`, and a trial's

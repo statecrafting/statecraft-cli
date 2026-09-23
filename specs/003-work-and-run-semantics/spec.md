@@ -473,7 +473,7 @@ re-preparing an existing one is a no-op that reports the existing path. Two runs
 never share a workspace.
 
 *Amended by spec `004` section 3.18 rule 3:* a run's branch lives in a
-directory of its own, `refs/heads/statecraft/<run>/`, so that the confinement
+directory of its own, as `refs/heads/statecraft/<run>/work`, so that the confinement
 can grant the attempt its branch without granting any other run's. A workspace
 created before that section has its branch renamed into that directory by the
 supervisor before its next launch, and the rename is recorded with the

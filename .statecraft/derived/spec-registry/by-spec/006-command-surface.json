@@ -36,19 +36,19 @@
     "id": "006-command-surface",
     "implementation": "in-progress",
     "sectionDigests": {
-      "006-the-command-surface": "b96df9a05399a292485e99fb0fc00d5f3c5f536e7ab3489735cbc63c3cdadb0b",
+      "006-the-command-surface": "467f5808fc98e231e5d19775df1c257469e2b191a3f9f67bece7bf7b82dfe197",
       "1-purpose": "e6e22a8e8dc18f59110b16adb2684860ed768cf61e37d71ed95a9ab10064a607",
       "2-territory": "2a51dc6c2d08c14c669875b1a001da52a60b50885e44feac976b7f3cd2dd7441",
       "3-1-the-command-tree": "5441b9eb01c61b7736e22c748f2ad4c550bcc4883d987ed681b5e3d36c9f0c51",
-      "3-10-placing-the-work-run-and-accept-verbs-in-the-vocabulary": "fa1c509d88ed43176f74347fe6b8b6088be678e5cf31b439f76b1a57caa9b8e5",
+      "3-10-placing-the-work-run-and-accept-verbs-in-the-vocabulary": "21df1628d7322ea67e7109319696d9738141ba618ab1baff7a2d513401d3d020",
       "3-11-1-the-five-verbs-spec-002-s-sections-3-25-to-3-29-need": "5de80bb2154649054b6ed6fb5d57b9d3225c34208a8ee64ecd0b0203c4339fcd",
       "3-11-2-the-sixth-verb-and-what-a-qualification-exit-code-distinguishes": "b56a8383cb270773ecdd5602a82899df014e3a3ace2da8262889fce39554d4c0",
       "3-11-3-the-seventh-verb-and-what-run-adds-to-its-answer": "78fd77315932b8785f093ec8d2cba79237996dd95423883d53072d703da6156d",
       "3-11-4-the-eighth-verb-and-the-trial-section-startup-show-gains": "91c4652d275fcf931b19942f7d21151e0e41169c3b26d1a838a4987fe7e40bf1",
       "3-11-5-the-override-verbs": "c91e5f3d3d5174bf7b20bf8c53b46e2961aa96ad670a7726e3378a19cc4780bf",
-      "3-11-6-the-reconcile-verb": "56321fb116313bbed224637f9be7c1250232084a3ba335be9f9a4e6216c3a4ff",
+      "3-11-6-the-reconcile-verb": "c94df072a8934035b71da82edd2ec5b73f229cae6843242b6cfe5ea80a87a71c",
       "3-11-7-the-transfer-verbs": "58a02df833453586fc3115076e3ddbf66e2618e2c9342a164b2ef67e634eb07c",
-      "3-11-8-the-recover-verb": "f7f4172118c2b2f9093eeb3e3e1ea9b3acade88c754e35f3db81438f00322a85",
+      "3-11-8-the-recover-verb": "763f4c1e890412c837b0308b5ea6dbc0a879f83911b6287b5d730a1c6f2abc61",
       "3-11-a-binding-needs-an-entry-point-not-an-implementation": "7a732159b342e4433566c881de357cdb1e0953816edd266e9880f8f9b7165e8b",
       "3-12-what-the-command-surface-does-not-unlock": "ee289bc9ca8f3fce35846d410292f688e59549dcc8d89f5668e07e42c7eccbbe",
       "3-2-a-command-is-a-binding-never-a-second-implementation": "f387426081e8a790f53767e1fb7c366bd291198009c47d99b0c8af9538751768",
@@ -59,7 +59,7 @@
       "3-7-observable-negative-cases": "9846430bc52a241fcccc05d1397a8eb1cf3c617956b63e939afaad9bf0b9b315",
       "3-8-discovery-is-a-join-because-one-report-does-not-carry-status": "4697defa17606339e21e7caaa1c4aea02e711ac2f7d1df042bc02c7268c9dab3",
       "3-9-inspection-is-a-fold-and-reads-nothing-else": "98671d6dcd95497894a5e7f80f2c8fbcc672b583b29c88af0b95b694f150bf38",
-      "3-behavior": "7c78761ed5f8f7faa663da533a3107117b32a1a371fa3382bbfa2ba06331522e",
+      "3-behavior": "e26823954f679f53bf72c59c8d54c9b2989d1bca9946845c58b824f29a1d593e",
       "4-out-of-scope": "55fb20ad589fed8825d78a3127c82be59f85d96bc4db3dba59887615afcb5c43",
       "5-decisions-recorded-during-implementation": "4e0e9525888c58886011876d5debb08e200f84b17e3b7820452d3b90b44425fc",
       "verification": "cf736a5f4fcf78897ed8021cd150d3f78edf86379ad2f6e784cb3d9b0c63cff0"
@@ -98,6 +98,6 @@
     "summary": "The binary, and every verb reachable through it. Specs 002 to 005 each describe operator verbs and then own only a library crate, so nothing they specify is runnable. This spec owns crates/statecraft-cli/ and binds those verbs to a process: the command tree, the rule that a command is a thin binding and never a second implementation, the closed exit-code vocabulary that distinguishes a refusal from a failure from a finding, human and --json output as two renderings of one value, and the binary's name being a recorded decision rather than a Cargo default. It also carries the work, run and accept bindings that were specified separately as 009: discovery as a join of two spec-spine reports because one of them does not carry status, inspection as a read-only fold of the run record and nothing else, and the rule that a binding needing a library entry point gets it from the crate that owns the behavior. Section 3.11.1 adds the five verbs 002 sections 3.25 to 3.29 need: inspecting and explicitly upgrading the required harness identity, obtaining the managed-session payload, and recording startup evidence beside submitting qualification evidence for admission.\n",
     "title": "The command surface: one binary, every verb the other specs name, and what an exit code means"
   },
-  "shardHash": "e2e44e935bef0a35b7fcfe332b73fa83ac713ecdb3ac76bebce56ec2565196e4",
+  "shardHash": "0f50ee68b395947c412d0bfc67af7460b407d2f1635b9ad7a02c9bf81d9d871b",
   "specVersion": "1.6.0"
 }

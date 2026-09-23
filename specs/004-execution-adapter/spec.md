@@ -687,17 +687,20 @@ write only:
 | Root | Why |
 |---|---|
 | the attempt's workspace | the work |
-| in the target's common Git directory: each object fan-out directory and `objects/pack/`, created by the supervisor before launch (not `objects/` itself and not `objects/info/`); the run's own reference directory, `refs/heads/statecraft/<run>/`, holding the attempt's branch, and its reflog directory under `logs/`, both created before launch; the attempt's worktree administrative directory | its own commits, without a grant on any directory another run's branch lives in |
+| the attempt's own object directory, created empty by the supervisor before launch and named to the child's Git as its object directory, with the target's shared object store as a read-only alternate; the run's own reference directory, `refs/heads/statecraft/<run>/`, holding the attempt's branch `work`, and its reflog directory under `logs/`, both created before launch; the attempt's worktree administrative directory | its own commits, without a grant on the shared object store or on any directory another run's branch lives in |
 | the gate log in the exchange directory, opened for writing only (rule 5) | the gate's trace |
 | one temporary directory per attempt, created by the supervisor and given to the child as its temporary directory | scratch |
-| the provider's configuration directory (for Claude Code, `~/.claude/`) and, where the platform can express it without granting more, the provider's own configuration file beside it (`~/.claude.json` and its temporary siblings) | the provider cannot run without it; rule 12 names what this leaves open |
+| the provider's configuration directory (for Claude Code, `~/.claude/`), and its configuration file beside it: on macOS the literal names `~/.claude.json` and its temporary siblings; on Linux that one existing file for writing in place only, because granting creation or removal in the home directory would grant it over every file there | the provider cannot run without it; rule 12 names what this leaves open |
 | the devices a process needs (`/dev/null`, `/dev/tty` and the like) | ordinary I/O |
 
 Everything else the child may read, except the protected set, and may not
-write. A workspace created before this section, whose branch lives in the
-shared `refs/heads/statecraft/run/` directory, has its branch renamed into its
-own run directory by the supervisor before launch, and the rename is recorded
-(spec `003` section 3.2); nothing else about the workspace changes. A root that cannot be expressed exactly on a platform is not widened to
+write. For a verification suite, the writable roots are those of spec `005`
+section 3.19 rule 1. A workspace created before this section, whose branch
+lives in the shared `refs/heads/statecraft/run/` directory, has its branch
+renamed into its own run directory by the supervisor, under the repository
+lock, before launch, and the rename is recorded (spec `003` section 3.2); a
+rename that fails refuses the launch, and the grant is never widened to the
+shared directory. A root that cannot be expressed exactly on a platform is not widened to
 fit: the launch refuses on that platform (rule 9).
 
 **Rule 4: what the unconfined product reads and runs.** This product, outside
@@ -716,6 +719,10 @@ inert:
   operator's invocation, which the child cannot write; `spec-spine` reads the
   operator's checkout or an export of the base, which the child can read and
   not write.
+- It brings an attempt's objects into the shared store only through a transfer
+  that re-hashes every object and checks connectivity, as Git's receiving side
+  does for a push, and reads an attempt's commits only after that import; the
+  child's object directory is otherwise read as data only.
 - It runs `git` against the target's common Git directory named explicitly,
   with system and global configuration disabled, hooks and the file-system
   monitor switched off, and no attribute or filter driver, and reads the
@@ -776,7 +783,7 @@ close-on-exec.
 | Platform | Mechanism | Required |
 |---|---|---|
 | macOS | a Seatbelt profile applied by `/usr/bin/sandbox-exec`, which then executes the provider with its program and arguments unchanged: reads allowed except rule 2; writes denied except rule 3; the denials of rule 6 | the program exists and the self-test of rule 8 passes |
-| Linux | Landlock applied after `fork` and before `exec`, with `no_new_privs`: a ruleset handling every file-system right the kernel's ABI knows, including `TRUNCATE` and `REFER`, built from directory handles opened before `fork`; its network rule allowing TCP connect to port 443 only; its scopes refusing signals and abstract Unix sockets outside the domain; and a seccomp filter refusing `socket(2)` for the Unix domain (any type), while `socketpair(2)` stays permitted because child processes' standard streams use it, and refusing the creation of a user namespace. Opening a file by handle needs a capability the child does not hold, which the self-test confirms. The supervisor is not dumpable for as long as it holds any descriptor on the protected set. | Landlock ABI 6 or later, the seccomp filter installed, and the self-test passes |
+| Linux | Landlock applied after `fork` and before `exec`, with `no_new_privs`: a ruleset handling every file-system right the kernel's ABI knows, including `TRUNCATE` and `REFER`, built from directory handles opened before `fork`; its network rule allowing TCP connect to port 443 only; its scopes refusing signals and abstract Unix sockets outside the domain; and a seccomp filter that admits `socket(2)` only for the IPv4 and IPv6 families, admits `socketpair(2)` for the Unix domain because child processes' standard streams use it, and refuses every other family, the creation of a user namespace, and `io_uring` setup, whose operations do not pass through the calls the filter sees. Opening a file by handle needs a capability the child does not hold, which the self-test confirms. The supervisor is not dumpable for as long as it holds any descriptor on the protected set. | Landlock ABI 6 or later, the seccomp filter installed, and the self-test passes |
 | anything else | none | refused |
 
 On Linux, Landlock is an allowlist: rule 2's read denials are made by granting
@@ -806,7 +813,8 @@ does not meet this section.
 the exact profile or ruleset of that launch and must be refused reading and
 writing a sentinel in the product home, in the launch records and in the
 target's working tree, refused a Unix-domain connection and a loopback
-connection, and allowed a write in the workspace and to the gate log. On Linux it
+connection, refused a socket of another family and `io_uring` setup (Linux),
+and allowed a write in the workspace and to the gate log. On Linux it
 must also be refused opening, through `/proc`, a descriptor the supervisor holds
 on the protected set. Any other result refuses the launch.
 
@@ -834,10 +842,11 @@ of rule 12 as open, so that no attempt's record reads as meeting IX while rule
 **Rule 12: what this does not close (constitution VIII).**
 
 - **The route through a later unconfined process is open, and IX is not met on
-  it.** The child can write the provider's configuration (rule 3), which the
-  operator's own later provider sessions load and act on outside any
-  confinement: an instruction, a setting or a hook placed there is executed by a
-  same-user process that can reach the protected set. This is not a scope
+  it.** The child can write files that a same-user process outside the
+  confinement later loads: the provider's configuration (rule 3), which the
+  operator's own later provider sessions load and act on, so an instruction, a
+  setting or a hook placed there is executed by a process that can reach the
+  protected set. This is not a scope
   exclusion; it is a gap against a frozen principle, it is reported wherever the
   boundary is described, and it keeps every spec that accounts for IX from
   `complete` (spec `002` section 3.36 rule 2a). Closing it needs an act this

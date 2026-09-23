@@ -660,12 +660,15 @@ common Git directory and the workspace read as data (spec `004` section 3.18
 rule 4): the branch's commit is recorded before and after the suite, and the
 workspace's files are compared with that commit's tree, never through `git
 status` run via the workspace's `.git` file or its administrative directory,
-which the child can rewrite. The comparison ignores nothing the suite's
-instructions do not name as generated.
+which the child can rewrite. Cleanliness is judged before the suite, against
+the branch's commit, using ignore rules read from the trusted base and never
+from the workspace. After the suite, only the branch's commit is compared, and
+files the suite creates are not part of the candidate.
 
 **Rule 3: refusal.** When the boundary cannot be established, `accept` refuses
-with exit code 2, runs nothing, writes no receipt, and records `not-run` with
-the reason. It is never a failing acceptance.
+with exit code 2, runs nothing and writes no receipt, and the acceptance record
+is `not-attempted` with reason `boundary-unavailable`, beside section 3.1.1's
+reasons. It is never a failing acceptance.
 
 **Rule 4: records written before this section.** A receipt written before this
 section records a suite run without confinement; it is read as it was and is

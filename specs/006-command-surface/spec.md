@@ -293,6 +293,8 @@ so it is stated twice: **0 means the attempt reached its own end, and carries no
 acceptance claim whatever.** A caller that wants an acceptance runs `accept` and
 reads its code.
 
+*Amended by spec `005` section 3.19 rule 3:* for `accept`, code 2 also covers a suite refused because the protected evidence boundary cannot be established.
+
 ### 3.11 A binding needs an entry point, not an implementation
 
 section 3.2 forbids a second implementation, and the practical form of that
@@ -543,6 +545,10 @@ launch state. The answer says that a provider process a dead supervisor
 started may still be running, and that reconciling stops nothing. The verb joins section 3.1's table with the change that
 implements it.
 
+*Amended by spec `003` section 3.6.1's note of 2026-09-23:* a conflicting
+`absent` can be caused by a consultation a process inside the confinement wrote
+to the gate log; the operator may still record `confirmed` or `unknown`.
+
 ### 3.11.7 The transfer verbs
 
 Added on 2026-09-23, authorized by the owner and recorded here before the
@@ -579,7 +585,7 @@ binding was written, for `003` section 3.1.5.
 |---|---|
 | 0 | Reported a journal and authority that agree, or the choice recorded. |
 | 1 | Reported a state that needs recovery: a finding, as `doctor` reports one. |
-| 2 | Refused, and nothing written: an unregistered repository, a choice the found state does not allow, digests that are not the state now found, files that already agree, an empty operator or reason, or another process holding the repository lock. |
+| 2 | Refused, and nothing written: an unregistered repository, a choice the found state does not allow, digests that are not the state now found, files that already agree and record no intended line, an empty operator or reason, or another process holding the repository lock. |
 | 3 | Usage: a missing argument, or a choice word this verb does not have. |
 | 4 | The files could not be read, or the record could not be written durably. |
 
