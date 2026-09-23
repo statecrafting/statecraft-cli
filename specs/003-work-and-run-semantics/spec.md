@@ -991,6 +991,24 @@ that has a successor, which is refused as a broken journal. Tests:
 through the binary with a fake `spec-spine` offering a `draft` and a fake
 provider replaying a recorded stream.
 
+**2026-09-23: section 3.6.1 implemented.** `statecraft_run::reconcile` decides
+and appends; the binding reads spec `002`'s launch records through
+`launch::inspect`, which only reads, and passes the launch state, whether
+`gate.log` holds an `admitted` line, the confirmed process id and whether a
+process with that id exists (`kill(pid, 0)` through `rustix`, an observation
+only) as facts. `session::runs` reads a reconciliation written under the
+section: a conclusive one sets the attempt's outcome to `interrupted` and keeps
+the reconciliation beside it, an `unknown` one leaves it live, and an older
+shape is ignored. `session::begin_admitted` writes `follows` into the next
+intent. The verb takes the repository lock of section 3.1.4 rule 7. Tests
+through the binary, in `run_startup.rs`, drive real crash boundaries with the
+fake provider: a launcher killed after admission (`outcome-unknown`, with and
+without a released tool call in the gate log) and an intent with no launch
+intent (`not-launched`); they check stale, conflicting, usage, unreadable
+evidence, lock, `unknown` then `absent`, a second reconciliation, `follows`,
+and that no launch is replayed. Unit tests cover the older shape and
+`unrecorded`.
+
 ## Verification
 
 Each line is one command. §3.8's twenty-two rows are integration tests named after

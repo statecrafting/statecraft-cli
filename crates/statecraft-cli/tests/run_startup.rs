@@ -297,7 +297,10 @@ fi
 /usr/bin/sed -n '1,3p' "$here/native.jsonl"
 log "init emitted"
 if [ -n "${early:-}" ]; then wait "$early"; fi
-if [ "$mode" = block ]; then
+if [ "$mode" = tool-then-block ]; then
+  tool sentinel-released
+fi
+if [ "$mode" = block ] || [ "$mode" = tool-then-block ]; then
   log blocked
   while [ ! -f "$here/release" ]; do /bin/sleep 0.05; done
 fi
@@ -746,4 +749,207 @@ fn a_corrupt_requirement_refuses_before_any_attempt() {
     let shown = f.show(None);
     assert_eq!(code(&shown), 2, "{}", text(&shown));
     assert!(text(&shown).contains("has no attempt"), "{}", text(&shown));
+}
+
+// ------------------------------------------- spec 003 section 3.6.1, through the binary
+
+/// Start `run` in the fake's `mode`, wait until the fake blocks after the
+/// startup decision, and kill the launcher: an intent with no outcome, the
+/// crash boundary reconciliation exists for. Returns the provider's pid.
+fn crash_mid_session(f: &Fixture, mode: &str) -> String {
+    f.mode(mode);
+    let mut launcher = Command::new(env!("CARGO_BIN_EXE_statecraft-cli"))
+        .args(["run", &f.root(), RUN, "--json"])
+        .env_clear()
+        .env("STATECRAFT_HOME", f.home())
+        .env("STATECRAFT_NATIVE_ROOT", f.dir.path().join("native"))
+        .env("HOME", f.dir.path())
+        .env("PATH", format!("{}:/usr/bin:/bin", f.bin().display()))
+        .env("USER", "fixture-operator")
+        .stdout(std::process::Stdio::null())
+        .stderr(std::process::Stdio::null())
+        .spawn()
+        .unwrap();
+    let started = std::time::Instant::now();
+    while !(f.order().iter().any(|l| l == "blocked")
+        && f.attempt_dir(1).join("admission.json").is_file())
+    {
+        assert!(
+            started.elapsed() < std::time::Duration::from_secs(60),
+            "the fake never blocked: {:?}",
+            f.order()
+        );
+        std::thread::sleep(std::time::Duration::from_millis(20));
+    }
+    launcher.kill().unwrap();
+    launcher.wait().unwrap();
+    let launched: serde_json::Value =
+        serde_json::from_slice(&std::fs::read(f.attempt_dir(1).join("launched.json")).unwrap())
+            .unwrap();
+    launched["pid"].as_u64().unwrap().to_string()
+}
+
+fn release(f: &Fixture, pid: &str) {
+    let _ = Command::new("kill")
+        .args(["-s", "KILL", "--", &format!("-{pid}")])
+        .output();
+    std::fs::write(f.bin().join("release"), "").unwrap();
+}
+
+fn reconcile(f: &Fixture, finding: &str, state: &str, extra: &[&str]) -> Output {
+    let root = f.root();
+    let mut args = vec![
+        "run",
+        "reconcile",
+        &root,
+        RUN,
+        "1",
+        finding,
+        state,
+        "alice",
+        "inspected",
+        "the",
+        "workspace",
+    ];
+    args.extend_from_slice(extra);
+    f.cli(&args)
+}
+
+#[test]
+fn an_unknown_attempt_stays_live_until_an_operator_reconciles_it_and_nothing_is_replayed() {
+    let f = Fixture::new();
+    let pid = crash_mid_session(&f, "block");
+    let released = || release(&f, &pid);
+
+    // Inspection releases nothing.
+    assert_eq!(code(&f.show(None)), 1);
+    assert_eq!(code(&f.cli(&["run", "show", &f.root(), RUN])), 0);
+    let again = f.run();
+    assert_eq!(code(&again), 2, "{}", text(&again));
+    assert!(text(&again).contains("run reconcile"), "{}", text(&again));
+
+    // Stale: the operator names a state the records do not show.
+    let out = reconcile(&f, "absent", "launch-unknown", &[]);
+    assert_eq!(code(&out), 2, "{}", text(&out));
+    assert!(text(&out).contains("stale"), "{}", text(&out));
+
+    // Usage: a finding or state word the verb does not have.
+    assert_eq!(code(&reconcile(&f, "probably", "outcome-unknown", &[])), 3);
+    assert_eq!(code(&reconcile(&f, "absent", "finished", &[])), 3);
+    // An evidence file that cannot be read refuses and writes nothing.
+    let out = reconcile(
+        &f,
+        "absent",
+        "outcome-unknown",
+        &["--evidence", "/nonexistent/evidence"],
+    );
+    assert_eq!(code(&out), 2, "{}", text(&out));
+
+    // `unknown` keeps the attempt live, and `run` refused.
+    let out = reconcile(&f, "unknown", "outcome-unknown", &[]);
+    assert_eq!(code(&out), 0, "{}", text(&out));
+    assert!(text(&out).contains("stays live"), "{}", text(&out));
+    assert!(text(&out).contains("stops nothing"), "{}", text(&out));
+    assert_eq!(code(&f.run()), 2);
+
+    // `absent` with no released tool call is a declaration, not corroborated,
+    // and it replaces the unknown.
+    let evidence = f.dir.path().join("notes.txt");
+    std::fs::write(&evidence, "workspace unchanged\n").unwrap();
+    let ev = evidence.display().to_string();
+    let out = reconcile(
+        &f,
+        "absent",
+        "outcome-unknown",
+        &["--evidence", &ev, "--json"],
+    );
+    assert_eq!(code(&out), 0, "{}", text(&out));
+    let r = json(&out)["value"].clone();
+    assert_eq!(r["verdict"], "absent");
+    assert_eq!(r["basis"], "operator-declared");
+    assert_eq!(r["corroborated"], false);
+    assert_eq!(r["operatorProvenance"], "operator-supplied");
+    assert_eq!(r["observed"]["launchState"], "outcome-unknown");
+    assert_eq!(r["observed"]["confirmedPid"].to_string(), pid);
+    assert_eq!(r["evidence"][0]["bytes"], 20);
+    assert!(r["replaces"].is_number(), "{r}");
+    assert_eq!(r["idempotentByKey"], true);
+
+    // Resolved as interrupted; a second reconciliation is refused.
+    let listed = f.cli(&["run", "list", &f.root()]);
+    assert!(text(&listed).contains("interrupted"), "{}", text(&listed));
+    let out = reconcile(&f, "confirmed", "outcome-unknown", &[]);
+    assert_eq!(code(&out), 2, "{}", text(&out));
+    assert!(text(&out).contains("not live"), "{}", text(&out));
+    assert_eq!(f.launches(), 1, "reconciliation replayed a launch");
+
+    // The next attempt is the operator's, and it names what it follows.
+    released();
+    f.mode("faithful");
+    let next = f.run();
+    assert!(code(&next) <= 1, "{}", text(&next));
+    let (chain, _) =
+        statecraft_run::record::Chain::open(&f.home(), &f.project()).expect("the record");
+    let second = chain
+        .entries()
+        .into_iter()
+        .find(|e| e.kind == statecraft_run::record::Kind::Intent && e.attempt == 2)
+        .expect("attempt 2's intent");
+    assert_eq!(
+        second.detail["follows"][0]["attempt"], 1,
+        "{}",
+        second.detail
+    );
+    assert_eq!(second.detail["follows"][0]["finding"], "absent");
+}
+
+#[test]
+fn absent_is_refused_when_the_gate_released_a_tool_call_and_confirmed_is_recorded() {
+    let f = Fixture::new();
+    let pid = crash_mid_session(&f, "tool-then-block");
+    let gate = std::fs::read_to_string(f.attempt_dir(1).join("gate.log")).unwrap_or_default();
+    assert!(gate.lines().any(|l| l == "admitted"), "{gate}");
+    let out = reconcile(&f, "absent", "outcome-unknown", &[]);
+    assert_eq!(code(&out), 2, "{}", text(&out));
+    assert!(text(&out).contains("conflicting"), "{}", text(&out));
+    let out = reconcile(&f, "confirmed", "outcome-unknown", &["--json"]);
+    assert_eq!(code(&out), 0, "{}", text(&out));
+    assert_eq!(
+        json(&out)["value"]["observed"]["gateReleasedToolCall"],
+        true
+    );
+    release(&f, &pid);
+}
+
+#[test]
+fn a_reconciliation_while_a_run_holds_the_lock_is_refused() {
+    let f = Fixture::new();
+    let pid = crash_mid_session(&f, "block");
+    let held = statecraft_run::lock::try_acquire(&f.home(), &f.project()).unwrap();
+    let out = reconcile(&f, "unknown", "outcome-unknown", &[]);
+    assert_eq!(code(&out), 2, "{}", text(&out));
+    assert!(text(&out).contains("lock"), "{}", text(&out));
+    drop(held);
+    release(&f, &pid);
+}
+
+#[test]
+fn absent_against_an_attempt_that_never_launched_is_corroborated() {
+    let f = Fixture::new();
+    // An intent in the run record and no launch intent: the crash boundary
+    // between the two, which the write order makes a guarantee.
+    let (mut chain, _) =
+        statecraft_run::record::Chain::open(&f.home(), &f.project()).expect("the record");
+    statecraft_run::session::begin(
+        &mut chain,
+        &f.project(),
+        RUN,
+        "HEAD",
+        &statecraft_environment::time::FixedClock(0),
+    )
+    .unwrap();
+    let out = reconcile(&f, "absent", "not-launched", &["--json"]);
+    assert_eq!(code(&out), 0, "{}", text(&out));
+    assert_eq!(json(&out)["value"]["corroborated"], true);
+    assert_eq!(f.launches(), 0);
 }

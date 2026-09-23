@@ -2081,14 +2081,15 @@ fn next_action(r: &ReadBack<'_>, verdict: Verdict) -> Option<String> {
         Verdict::LaunchUnknown => Some(format!(
             "whether a provider process was created is unknown: look for one started in {} and \
              inspect that workspace for effects; the attempt stays live, so `run` refuses run \
-             {run} until attempt {n} is reconciled (spec 003 section 3.6), and this build has \
-             no verb that reconciles it",
+             {run} until attempt {n} is reconciled with `run reconcile` (spec 003 section \
+             3.6.1), which reads these records and replays nothing",
             intent.workspace
         )),
         Verdict::OutcomeUnknown => Some(format!(
             "process {} was created{}; confirm it is no longer running, and inspect {} for \
              effects; the attempt stays live, so `run` refuses run {run} until attempt {n} is \
-             reconciled (spec 003 section 3.6), and this build has no verb that reconciles it",
+             reconciled with `run reconcile` (spec 003 section 3.6.1), which reads these \
+             records and replays nothing",
             r.launched
                 .map_or("(id not persisted)".to_string(), |l| l.pid.to_string()),
             r.launched
@@ -2976,13 +2977,7 @@ mod tests {
             "an intent was read as an interruption: {:?}",
             shown.reasons
         );
-        assert!(
-            shown
-                .next
-                .as_deref()
-                .unwrap()
-                .contains("no verb that reconciles")
-        );
+        assert!(shown.next.as_deref().unwrap().contains("run reconcile"));
         assert!(!p.intent.attempt.record_path(&w.root).exists());
         assert!(!p.intent.attempt.launched_path(&w.root).exists());
     }

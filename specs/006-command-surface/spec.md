@@ -94,6 +94,7 @@ group them:
 | `run <id>` | `003`, `004` | Prepares the workspace, supervises one attempt through the adapter, records intent and outcome. |
 | `run list` | `003` | Every run for a registered target, with its attempts and outcomes. |
 | `run show <run>` | `003`, `005` | The reviewable outcome of `005` section 3.9. |
+| `run reconcile <path> <run-id> <attempt> <finding> <launch-state> <operator> <reason...>` | `003` | Records one operator reconciliation of a live attempt (`003` section 3.6.1, section 3.11.6). Replays nothing. |
 | `accept <run>` | `005` | Judges the candidate independently and records the acceptance or its absence. |
 | `harness show <path>` | `002` | The required harness identity, the resolved one, and the standing between them. Reads only. |
 | `harness upgrade <path>` | `002` | Commits the shipped revision as the project's required identity, as an explicit act. |

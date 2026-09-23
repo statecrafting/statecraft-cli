@@ -31,7 +31,7 @@ statecraft-environment = { path = "../statecraft-environment" }
 # `flock`, which the operating system releases when the holder ends. Already in
 # the graph through `tempfile`; std's `File::try_lock` is newer than this
 # workspace's declared rust-version.
-rustix = { version = "1.1.5", features = ["fs"] }
+rustix = { version = "1.1.5", features = ["fs", "process"] }
 
 [dev-dependencies]
 tempfile = "3.27.0"

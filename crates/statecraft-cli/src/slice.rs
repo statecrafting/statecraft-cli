@@ -351,11 +351,15 @@ pub fn live_attempt_answer(
         _ => (String::new(), 0),
     };
     let inspect = format!("startup show {root} {run_id} --attempt {attempt}");
+    let reconcile = format!(
+        "run reconcile {root} {run_id} {attempt} <confirmed|absent|unknown> <launch-state> \
+         <operator> <reason...>"
+    );
     let next = match startup.as_ref().and_then(|s| s.next.clone()) {
-        Some(next) => format!("read `{inspect}`; {next}"),
+        Some(next) => format!("read `{inspect}`; {next}; then `{reconcile}`"),
         None => format!(
             "read `{inspect}`; the attempt stays live until it is reconciled (spec 003 section \
-             3.6), and this build has no verb that reconciles it"
+             3.6.1): `{reconcile}`"
         ),
     };
     let view = LiveAttemptView {
@@ -1068,4 +1072,53 @@ pub fn lock_busy_answer(detail: &str) -> Answer<String> {
         Exit::Refused,
         format!("refused: {detail}\n"),
     )
+}
+
+/// `run reconcile`, from what the run crate returned (spec 006 section 3.11.6).
+pub fn reconcile_answer(
+    result: Result<
+        statecraft_run::reconcile::Reconciliation,
+        statecraft_run::reconcile::ReconcileError,
+    >,
+) -> Answer<serde_json::Value> {
+    use statecraft_run::reconcile::ReconcileError;
+    match result {
+        Ok(r) => {
+            let mut summary = format!("{}\n", r.describe());
+            summary.push_str(if r.conclusive() {
+                "the attempt is resolved and reads `interrupted`; a later `run` is permitted and \
+                 names it\n"
+            } else {
+                "the attempt stays live and unresolved; `run` stays refused until a later \
+                 reconciliation says `confirmed` or `absent`\n"
+            });
+            if let Some(pid) = r.observed.confirmed_pid {
+                summary.push_str(&format!(
+                    "process {pid} was confirmed at launch; a process with that id {} now. A \
+                     provider process a dead supervisor started may still be running, and \
+                     reconciling stops nothing\n",
+                    if r.observed.pid_exists == Some(true) {
+                        "exists"
+                    } else {
+                        "does not exist"
+                    }
+                ));
+            }
+            Answer::new(
+                serde_json::to_value(&r).unwrap_or_default(),
+                Exit::Ok,
+                summary,
+            )
+        }
+        Err(ReconcileError::Refused(why)) => Answer::new(
+            serde_json::json!({ "refused": why }),
+            Exit::Refused,
+            format!("refused: {why}\n"),
+        ),
+        Err(e) => Answer::new(
+            serde_json::json!({ "failed": e.to_string() }),
+            Exit::Failed,
+            format!("failed: {e}\n"),
+        ),
+    }
 }
