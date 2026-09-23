@@ -95,6 +95,20 @@ cat "$here/native.jsonl"
 
     /// A registered, armed git repository.
     fn repository(&self, name: &str) -> String {
+        let root = self.git_repository(name);
+        self.register_and_arm(&root);
+        root
+    }
+
+    fn register_and_arm(&self, root: &str) {
+        for verb in ["register", "arm"] {
+            let out = self.cli(&["project", verb, root]);
+            assert!(code(&out) <= 1, "{verb}: {}", text(&out));
+        }
+    }
+
+    /// A git repository, not registered.
+    fn git_repository(&self, name: &str) -> String {
         let p = self.project(name);
         std::fs::create_dir_all(&p).unwrap();
         for args in [
@@ -119,12 +133,20 @@ cat "$here/native.jsonl"
                 .unwrap();
             assert!(out.status.success());
         }
-        let root = p.display().to_string();
-        for verb in ["register", "arm"] {
-            let out = self.cli(&["project", verb, &root]);
-            assert!(code(&out) <= 1, "{verb}: {}", text(&out));
-        }
-        root
+        p.display().to_string()
+    }
+
+    /// Replace the stored root in the register, as the previous build's
+    /// re-registration under another spelling did.
+    fn restore_as_previous_build(&self, from: &str, to: &str) {
+        let path = self.home().join("projects.json");
+        let text = std::fs::read_to_string(&path).unwrap();
+        let (a, b) = (
+            format!("\"root\": \"{from}\""),
+            format!("\"root\": \"{to}\""),
+        );
+        assert!(text.contains(&a), "{text}");
+        std::fs::write(&path, text.replacen(&a, &b, 1)).unwrap();
     }
 }
 
@@ -567,4 +589,176 @@ fn records_filed_under_another_spelling_are_neither_orphaned_nor_merged() {
     }
     assert_eq!(std::fs::read(&stray).unwrap(), before, "never rewritten");
     assert!(!statecraft_run::record::chain_path(&f.home(), Path::new(&root)).exists());
+}
+
+/// A stored root with a trailing separator is the key, and the unslashed and
+/// dotted spellings file under it.
+#[test]
+fn a_root_stored_with_a_trailing_separator_keys_every_spelling() {
+    let f = Fixture::new();
+    let bare = f.git_repository("a");
+    let stored = format!("{bare}/");
+    f.register_and_arm(&stored);
+    let out = f.cli(&["override", "grant", &bare, DRAFT, "alice", "why"]);
+    assert_eq!(code(&out), 0, "{}", text(&out));
+    let out = f.cli(&["run", &format!("{bare}/."), DRAFT]);
+    assert!(code(&out) <= 1, "{}", text(&out));
+    assert!(statecraft_run::overrides::journal_path(&f.home(), Path::new(&stored)).exists());
+    assert!(statecraft_run::record::chain_path(&f.home(), Path::new(&stored)).exists());
+    assert!(!statecraft_run::record::chain_path(&f.home(), Path::new(&bare)).exists());
+    for spelling in [&bare, &stored] {
+        let out = f.cli(&["override", "show", spelling]);
+        assert!(text(&out).contains(DRAFT), "{spelling}: {}", text(&out));
+        let listed = f.cli(&["run", "list", spelling, "--json"]);
+        let v: serde_json::Value = serde_json::from_slice(&listed.stdout).unwrap();
+        assert_eq!(v["value"]["runs"][0]["id"], DRAFT, "{spelling}: {v}");
+    }
+    assert_eq!(records_ending(&f, ".jsonl"), 1);
+    assert_eq!(records_ending(&f, ".overrides.jsonl"), 1);
+    assert_eq!(records_ending(&f, ".lock"), 1);
+}
+
+/// Two registrations for one directory refuse every verb that keys a record,
+/// not only `run`.
+#[test]
+fn one_directory_registered_twice_is_refused_by_every_record_verb() {
+    let f = Fixture::new();
+    let root = f.repository("a");
+    let link = f.project("link");
+    std::os::unix::fs::symlink(&root, &link).unwrap();
+    let link = link.display().to_string();
+    f.register_and_arm(&link);
+    for spelling in [&root, &link] {
+        for args in [
+            vec!["override", "grant", spelling, DRAFT, "alice", "why"],
+            vec!["override", "show", spelling],
+            vec!["work", "list", spelling],
+            vec!["run", "list", spelling],
+        ] {
+            let out = f.cli(&args);
+            assert_eq!(code(&out), 2, "{args:?}: {}", text(&out));
+            assert!(
+                text(&out).contains("registered under more than one path"),
+                "{args:?}: {}",
+                text(&out)
+            );
+        }
+    }
+    assert_eq!(records_ending(&f, ".overrides.jsonl"), 0);
+    assert_eq!(records_ending(&f, ".lock"), 0);
+}
+
+/// A journal filed under another spelling fails `override show` and `work
+/// list`, and names the remedy; the remedy restores it.
+#[test]
+fn a_journal_filed_under_another_spelling_fails_and_names_its_remedy() {
+    let f = Fixture::new();
+    let root = f.repository("a");
+    let typed = format!("{root}/");
+    // What the previous build wrote for `override grant <root>/`.
+    statecraft_run::overrides::grant(
+        &statecraft_run::overrides::Request {
+            home: &f.home(),
+            target: Path::new(&typed),
+            spec_id: DRAFT,
+            operator: "alice",
+            reason: "why",
+            at: "2026-09-23T00:00:00Z",
+        },
+        true,
+    )
+    .unwrap();
+    for args in [
+        vec!["override", "show", &root],
+        vec!["work", "list", &root],
+        vec!["override", "grant", &root, "010-unready", "bob", "why"],
+    ] {
+        let out = f.cli(&args);
+        assert_eq!(code(&out), 4, "{args:?}: {}", text(&out));
+        assert!(text(&out).contains("another spelling"), "{}", text(&out));
+        assert!(
+            text(&out).contains(&format!("`project register {typed}`")),
+            "{}",
+            text(&out)
+        );
+    }
+    assert!(!statecraft_run::overrides::journal_path(&f.home(), Path::new(&root)).exists());
+    let out = f.cli(&["project", "register", &typed]);
+    assert!(code(&out) <= 1, "{}", text(&out));
+    assert!(text(&out).contains("re-stored"), "{}", text(&out));
+    let out = f.cli(&["override", "show", &root]);
+    assert_eq!(code(&out), 0, "{}", text(&out));
+    assert!(text(&out).contains(DRAFT), "{}", text(&out));
+}
+
+/// The home the previous build could leave: registered as `<root>`, run as
+/// `<root>`, then re-registered as `<root>/`, which re-stored the spelling.
+/// Every record verb fails with the remedy; `project register <root>` is the
+/// remedy, and only while the stored spelling has no records.
+#[test]
+fn a_spelling_the_previous_build_re_stored_is_recovered_by_registering_the_old_one() {
+    let f = Fixture::new();
+    let root = f.repository("a");
+    assert_eq!(
+        code(&f.cli(&["override", "grant", &root, DRAFT, "alice", "why"])),
+        0
+    );
+    let out = f.cli(&["run", &root, DRAFT]);
+    assert!(code(&out) <= 1, "{}", text(&out));
+    let slash = format!("{root}/");
+    f.restore_as_previous_build(&root, &slash);
+
+    for args in [
+        vec!["run", "list", &root],
+        vec!["override", "show", &slash],
+        vec!["run", &root, DRAFT],
+    ] {
+        let out = f.cli(&args);
+        assert_eq!(code(&out), 4, "{args:?}: {}", text(&out));
+        assert!(
+            text(&out).contains(&format!("`project register {root}`")),
+            "{args:?}: {}",
+            text(&out)
+        );
+    }
+    let out = f.cli(&["project", "register", &root]);
+    assert!(code(&out) <= 1, "{}", text(&out));
+    assert!(text(&out).contains("re-stored"), "{}", text(&out));
+    let listed = f.cli(&["run", "list", &slash, "--json"]);
+    assert_eq!(code(&listed), 0, "{}", text(&listed));
+    let v: serde_json::Value = serde_json::from_slice(&listed.stdout).unwrap();
+    assert_eq!(v["value"]["runs"][0]["id"], DRAFT, "{v}");
+    // Registering again under the other spelling now changes nothing: the
+    // stored spelling has records.
+    let out = f.cli(&["project", "register", &slash]);
+    assert!(!text(&out).contains("re-stored"), "{}", text(&out));
+    assert_eq!(code(&f.cli(&["run", "list", &root])), 0);
+}
+
+/// Where both spellings carry history there is nothing safe to re-store:
+/// registering refuses to move the key, and the failure says to set one aside.
+#[test]
+fn two_histories_are_never_re_stored_or_merged() {
+    let f = Fixture::new();
+    let root = f.repository("a");
+    assert_eq!(
+        code(&f.cli(&["override", "grant", &root, DRAFT, "alice", "why"])),
+        0
+    );
+    let typed = format!("{root}/");
+    let (mut chain, _) = statecraft_run::record::Chain::open(&f.home(), Path::new(&typed)).unwrap();
+    statecraft_run::session::begin(
+        &mut chain,
+        Path::new(&typed),
+        "old",
+        "HEAD",
+        &statecraft_environment::time::FixedClock(0),
+    )
+    .unwrap();
+    drop(chain);
+    let out = f.cli(&["project", "register", &typed]);
+    assert!(!text(&out).contains("re-stored"), "{}", text(&out));
+    let out = f.cli(&["run", "list", &root]);
+    assert_eq!(code(&out), 4, "{}", text(&out));
+    assert!(text(&out).contains("move the other"), "{}", text(&out));
 }

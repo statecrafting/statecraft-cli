@@ -1268,14 +1268,44 @@ The choices, where the section is silent:
   registration (the root with and without a trailing separator, with a trailing
   `.`, and the forms making a relative `.` or `./` absolute produces), and when
   one has a file it fails, exit 4, naming the file and the spelling, having read
-  and written nothing. Only a record-bearing file counts: a stray lock file
-  carries no history. What to do with the other file is the operator's.
+  and written nothing. A file counts only when it holds at least one byte and
+  is a run record or an override journal: a lock file, and an empty file of
+  either kind, carry no history, and both readers already read an empty file
+  as absent. The failure names the remedy that applies (next item).
+- **An explicit `project register` re-stores the spelling in exactly one
+  case.** The previous build replaced the stored spelling on a
+  re-registration, so a home registered as `/x/p`, run as `/x/p` and
+  registered again as `/x/p/` has its history under `/x/p` and `/x/p/` stored,
+  and every record verb fails on it. `project register <typed>` re-stores the
+  registration under `<typed>` when the register already holds that path under
+  another spelling, nothing that carries history is filed under the stored
+  spelling, and a run record or journal is filed under exactly `<typed>`. That
+  moves the key onto the only history the repository has, loses nothing and
+  merges nothing, and it is an operator's explicit act; it is done under the
+  stored root's lock and the answer says it re-stored. In every other case a
+  re-registration keeps the stored spelling, as above. Where both spellings,
+  or more than one other spelling, carry history, they are separate histories
+  and nothing re-stores or merges them: the failure says so and names the one
+  way on, which is the operator moving the other spelling's files out of the
+  records directory, where this product never reads them. No requirement
+  changes: which spelling the register holds was already this binding's
+  choice, and the register gains only the operation that sets it.
 
 *What this does not detect, named.* The set of spellings the register equates is
 unbounded (`/x//p`, `/x/./p`), and the check covers the ones listed. A home
 whose previous build was driven through another such spelling holds a file this
 check does not find. Spec `002`'s local approval records, keyed by the typed
 project path, are not per-repository records of this spec and are unchanged.
+
+*What section 3.1.5 must add, when it is implemented.* The journal's state
+authority (rule 2) and the file `adopt-prefix` preserves beside the journal
+(rule 5) are per-repository records in the protected records directory. Each
+must be named by `statecraft_run::repository::key` from the stored root, never
+from a typed path, and must join the check above: listed in
+`repository::HISTORY_SUFFIXES`, so a copy filed under another spelling fails
+rather than reading as "neither file" (rule 2's "never had an override"), and
+counted as history under the stored key when deciding whether a spelling may
+be re-stored. A TODO in `repository.rs` marks the place.
 
 **2026-09-23: a released repository lock no longer outlives its holder.** The
 `overrides` and `lock` unit tests failed intermittently with "another process

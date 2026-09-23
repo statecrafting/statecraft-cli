@@ -282,7 +282,7 @@ impl Chain {
             if !found.is_empty() {
                 return Err(RecordError::FiledElsewhere {
                     path: path.display().to_string(),
-                    detail: crate::repository::elsewhere_detail(&found),
+                    detail: crate::repository::elsewhere_detail(records, target, &found),
                 });
             }
         }

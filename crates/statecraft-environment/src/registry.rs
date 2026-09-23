@@ -147,6 +147,23 @@ impl Registry {
         Ok(self.get(root).expect("just inserted"))
     }
 
+    /// Store a registered target's root under another spelling of it.
+    ///
+    /// The register itself treats the two as one path; this changes only which
+    /// spelling it holds. Whether that is safe is not the register's to judge:
+    /// spec 003 keys a repository's records by the stored root, and its caller
+    /// decides (spec 003 section 5, 2026-09-23). A path the register does not
+    /// already hold is refused.
+    pub fn respell(&mut self, root: &Path) -> Result<(), RegistryError> {
+        let p = self
+            .projects
+            .iter_mut()
+            .find(|p| p.root == root)
+            .ok_or_else(|| RegistryError::NotRegistered(root.to_path_buf()))?;
+        p.root = root.to_path_buf();
+        Ok(())
+    }
+
     /// Arm or disarm a registered target.
     pub fn set_armed(&mut self, root: &Path, armed: bool) -> Result<(), RegistryError> {
         let p = self
@@ -270,6 +287,25 @@ mod tests {
         assert!(reg.armed, "consent survives a re-evaluation");
         assert_eq!(reg.qualification.verdict, Verdict::Unqualified);
         assert!(!reg.eligible());
+    }
+
+    #[test]
+    fn respelling_changes_only_the_stored_spelling() {
+        let target = tempfile::tempdir().unwrap();
+        let first = target.path().to_path_buf();
+        let mut r = Registry::default();
+        r.register(&first, &Good).unwrap();
+        r.set_armed(&first, true).unwrap();
+        let slash = PathBuf::from(format!("{}/", first.display()));
+        r.respell(&slash).unwrap();
+        assert_eq!(r.projects.len(), 1);
+        let reg = r.get(&first).unwrap();
+        assert_eq!(reg.root.as_os_str(), slash.as_os_str());
+        assert!(reg.armed);
+        assert!(matches!(
+            r.respell(&target.path().join("other")),
+            Err(RegistryError::NotRegistered(_))
+        ));
     }
 
     #[test]

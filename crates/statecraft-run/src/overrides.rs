@@ -184,7 +184,9 @@ pub fn read(home: &Path, target: &Path) -> Result<Journal, JournalError> {
     if let Some(records) = path.parent() {
         let found = crate::repository::elsewhere(records, target, ".overrides.jsonl");
         if !found.is_empty() {
-            return Err(failed(crate::repository::elsewhere_detail(&found)));
+            return Err(failed(crate::repository::elsewhere_detail(
+                records, target, &found,
+            )));
         }
     }
     let text = match std::fs::read_to_string(&path) {

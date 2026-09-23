@@ -108,8 +108,39 @@ pub struct Elsewhere {
     pub file: PathBuf,
 }
 
+/// The record files this spec keeps per repository that carry history, by the
+/// suffix after the key: the run record and the override journal. The lock
+/// (`<key>.lock`) is not one of them: it carries no history.
+///
+/// TODO(spec 003 section 3.1.5): the journal's state authority and the file
+/// `adopt-prefix` preserves beside the journal are per-repository records too.
+/// When they are implemented they must be named by [`key`] and be listed here,
+/// so the check below finds them filed under another spelling and
+/// [`respell_allowed`] counts them as records under the stored key.
+pub const HISTORY_SUFFIXES: &[&str] = &[".jsonl", ".overrides.jsonl"];
+
+/// Whether a record file carries history.
+///
+/// It must exist and hold at least one byte. An empty file, which is what a
+/// write that created the file and never wrote to it leaves, holds nothing a
+/// reader could lose, and is read as absent by both readers here.
+fn holds_history(file: &Path) -> bool {
+    std::fs::metadata(file).is_ok_and(|m| m.len() > 0)
+}
+
+/// Whether any history-bearing record is filed under this exact spelling.
+pub fn has_history(records: &Path, spelling: &Path) -> bool {
+    let key = key(spelling);
+    HISTORY_SUFFIXES
+        .iter()
+        .any(|suffix| holds_history(&records.join(format!("{key}{suffix}"))))
+}
+
 /// Record files named `<key><suffix>` in `records` that belong to `root` under
-/// another spelling.
+/// another spelling and carry history.
+///
+/// The spellings checked are [`other_spellings`]; every file in
+/// [`HISTORY_SUFFIXES`] is checked by the reader of that file.
 pub fn elsewhere(records: &Path, root: &Path, suffix: &str) -> Vec<Elsewhere> {
     other_spellings(root)
         .into_iter()
@@ -117,20 +148,56 @@ pub fn elsewhere(records: &Path, root: &Path, suffix: &str) -> Vec<Elsewhere> {
             let file = records.join(format!("{}{suffix}", key(Path::new(&spelling))));
             Elsewhere { spelling, file }
         })
-        .filter(|e| e.file.exists())
+        .filter(|e| holds_history(&e.file))
         .collect()
 }
 
-/// The sentence a refusal to read records filed elsewhere carries.
-pub fn elsewhere_detail(found: &[Elsewhere]) -> String {
+/// Whether an explicit `project register <typed>` may re-store the
+/// registration whose stored root is `stored` under the spelling `typed`.
+///
+/// Only when the two are the same registration spelled differently, nothing
+/// carrying history is filed under the stored spelling, and something is filed
+/// under exactly the typed one. That is the one case where moving the key
+/// loses nothing and merges nothing: it points the registration back at the
+/// only history it has (section 5, 2026-09-23).
+pub fn respell_allowed(records: &Path, stored: &Path, typed: &Path) -> bool {
+    stored == typed
+        && stored.as_os_str() != typed.as_os_str()
+        && !has_history(records, stored)
+        && has_history(records, typed)
+}
+
+/// The sentence a refusal to read records filed elsewhere carries, with the
+/// remedy the operator has.
+pub fn elsewhere_detail(records: &Path, root: &Path, found: &[Elsewhere]) -> String {
     let listed: Vec<String> = found
         .iter()
         .map(|e| format!("{} (typed as {})", e.file.display(), e.spelling))
         .collect();
+    let mut spellings: Vec<&str> = found.iter().map(|e| e.spelling.as_str()).collect();
+    spellings.sort_unstable();
+    spellings.dedup();
+    let remedy = match spellings.as_slice() {
+        [one] if !has_history(records, root) => format!(
+            "The registered spelling {} has no records of its own, so `project register {one}` \
+             re-stores the registration under the spelling these records were filed by, and \
+             they are read again",
+            root.display()
+        ),
+        _ => format!(
+            "The registered spelling {} has records of its own, or more than one other spelling \
+             does, so these are separate histories of one repository and cannot be merged. To \
+             go on with one, move the other spelling's files out of {}; this product never reads \
+             them there. `project register <spelling>` re-stores a spelling only while the \
+             registered one has no records",
+            root.display(),
+            records.display()
+        ),
+    };
     format!(
         "has records filed under another spelling of the same registered path: {}. They were \
          neither read nor merged, and nothing was written, because an empty record here would \
-         otherwise read as no history",
+         otherwise read as no history. {remedy}",
         listed.join(", ")
     )
 }
@@ -227,12 +294,42 @@ mod tests {
         let records = home.path().join("records");
         std::fs::create_dir_all(&records).unwrap();
         assert!(elsewhere(&records, Path::new("/x/p"), ".jsonl").is_empty());
+        // An empty file carries no history, and is not counted.
+        let empty = records.join(format!("{}.jsonl", key(Path::new("/x/p/."))));
+        std::fs::write(&empty, "").unwrap();
+        assert!(elsewhere(&records, Path::new("/x/p"), ".jsonl").is_empty());
         let stray = records.join(format!("{}.jsonl", key(Path::new("/x/p/"))));
-        std::fs::write(&stray, "").unwrap();
+        std::fs::write(&stray, "{}\n").unwrap();
         let found = elsewhere(&records, Path::new("/x/p"), ".jsonl");
         assert_eq!(found.len(), 1);
         assert_eq!(found[0].file, stray);
         assert!(elsewhere(&records, Path::new("/x/p/"), ".jsonl").is_empty());
         assert!(elsewhere(&records, Path::new("/x/p"), ".overrides.jsonl").is_empty());
+    }
+
+    #[test]
+    fn a_spelling_is_re_stored_only_onto_the_only_history() {
+        let home = tempfile::tempdir().unwrap();
+        let records = home.path().join("records");
+        std::fs::create_dir_all(&records).unwrap();
+        let (stored, typed) = (Path::new("/x/p/"), Path::new("/x/p"));
+        // Nothing anywhere: nothing to point at.
+        assert!(!respell_allowed(&records, stored, typed));
+        std::fs::write(records.join(format!("{}.jsonl", key(typed))), "{}\n").unwrap();
+        assert!(respell_allowed(&records, stored, typed));
+        // Not the same registration, or the same spelling: never.
+        assert!(!respell_allowed(&records, Path::new("/x/q"), typed));
+        assert!(!respell_allowed(&records, typed, typed));
+        // An empty file under the stored key is not history.
+        let here = records.join(format!("{}.overrides.jsonl", key(stored)));
+        std::fs::write(&here, "").unwrap();
+        assert!(respell_allowed(&records, stored, typed));
+        // History under the stored key: two histories, never re-stored.
+        std::fs::write(&here, "{}\n").unwrap();
+        assert!(!respell_allowed(&records, stored, typed));
+        let found = elsewhere(&records, stored, ".jsonl");
+        assert!(elsewhere_detail(&records, stored, &found).contains("move the other"));
+        std::fs::remove_file(&here).unwrap();
+        assert!(elsewhere_detail(&records, stored, &found).contains("`project register /x/p`"));
     }
 }
