@@ -1963,7 +1963,7 @@ Implementing a hosted platform, a platform protocol or a platform client; any
 user interface, which `F-04` defers; publication, release and distribution,
 which `F-02` defers; multi-machine environment sync; a package registry or a
 plugin marketplace; migrating sibling repositories or any real home directory;
-adding a provider adapter, which is `008`'s boundary and `F-07`'s deferral; and
+adding a provider adapter, which is `004`'s boundary (it absorbed `008`) and `F-07`'s deferral; and
 any new work, run or acceptance ledger, because `003` and `005` already own
 those semantics and a second one would be the failure this product exists to
 avoid.

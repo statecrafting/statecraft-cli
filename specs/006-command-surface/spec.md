@@ -103,6 +103,12 @@ group them:
 | `startup qualify <path> <session> <capture-dir>` | `002` | Submits the three captured controls, which are admitted or refused. |
 | `startup show <path> <run> [--attempt <n>]` | `002` | One run attempt's startup records and their judgement: required, selected and observed harness, payload, supply, launch, and why it is or is not qualified. Reads only. |
 | `startup trial <path> (--provider-session \| --synthetic)` | `002` | Spends the project's one managed-startup trial: one `run` attempt with a read-only sentinel, judged by `002` section 3.33. |
+| `home show` / `home plan` / `home apply` | `002` | The global home: read it, plan it, create or repair it and perform adapter delivery (`002` section 3.17's table). |
+| `init plan <path>` / `init apply <path>` | `002` | Every project change initialization would make, then performing it. |
+| `migrate plan <path>` / `migrate apply <path>` | `002` | The one-time relocation of the derived tree (`002` section 3.19). |
+| `project enroll <path> <team>` / `project unenroll <path>` | `002` | Records, or removes, team enrollment in the project declaration. |
+| `config show <path>` | `002` | The resolved configuration for a run in that project, per key, with provenance. |
+| `approval grant <path> <subject> <operator> <reason...>` / `approval show <path> <subject>` | `002` | Records a local approval for one subject; shows one subject's eligibility and the authority behind it. |
 
 A verb is added by the change that implements the behavior behind it, never
 ahead of it: a command that prints "not implemented" is a worse answer than a
@@ -491,7 +497,7 @@ Stated because an integration slice is exactly where scope grows quietly:
   spec-spine's collision report, which is a separate change.
 - **No automatic retry.** A retry is an operator invoking `run` again, which
   appends a new attempt (`003` section 3.4).
-- **No second provider.** `008` is the first and its out-of-scope section holds.
+- **No second provider.** `004`'s Claude Code adapter (formerly `008`) is the first, and `004`'s out-of-scope section holds.
 
 ## 4. Out of scope
 
@@ -731,7 +737,10 @@ is in any release. The pin here stays `=0.20.0`, and nothing below repins it.
 
 None of the four is implemented here, because none has a released producer
 contract, and a compatibility fixture is the only mechanism this repository
-supports for an unreleased one.
+supports for an unreleased one. (Superseded in part by later entries: 102's
+cross-check is `003` section 3.1.2 and 107's closure binding is `003` section
+3.1.3, both implemented and both inert until a pinned producer carries them;
+103 and 106 are still not consumed.)
 
 **2026-09-22: `startup trial`, recorded before its binding.** Section
 3.11.4 adds the eighth verb and the trial section of `startup show`, for `002`

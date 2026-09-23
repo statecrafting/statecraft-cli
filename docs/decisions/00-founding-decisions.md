@@ -76,6 +76,14 @@ date and the command that established it. Nothing else in this section moved.
 
 ### The spec-spine facts this product consumes, and their release state
 
+**Read the ordinals below through the corpus map (appended 2026-09-23).** Every
+spec-spine ordinal in `C-16` and in this subsection was written before
+spec-spine renumbered its corpus on 2026-09-20, so each now resolves to a
+different document. `~/DevWork/spec-spine/docs/corpus-map.md` gives: 087 is now
+070, 088 is 071, 091 is 072, 092 is 073, 097 is 078, 098 is 079 and 101 is 080;
+090 was removed, its requirements now in 094. The dated statements are kept as
+written, because they record what was read then.
+
 Kept as a table so specs `003` and `005` cannot quietly fill a gap with local
 code. "Available" means: carried by a release this repository's pin admits.
 
@@ -114,6 +122,11 @@ out of the acceptance library, and no verb runs `spec-spine delta` yet: that is
 `009`'s integration slice, which is `approved` with `implementation: pending`.
 So nothing here claims the integration works end to end, and no run has produced
 an authority-set verdict from a live report.
+
+*Superseded, recorded 2026-09-23:* `009` was folded into `006`, and `accept`
+now obtains the report itself, in the target and not the workspace
+(`crates/statecraft-cli/src/accept.rs`, `006` section 5, 2026-09-17). The
+paragraph above is kept as the state it described.
 
 | Fact needed | spec-spine source | Available at =0.18.0 | What this product does meanwhile |
 |---|---|---|---|

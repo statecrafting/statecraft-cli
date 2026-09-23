@@ -841,7 +841,7 @@ after the rows they cover, in `tests/negative_cases.rs`. The delta reader's row
 is tested against a captured envelope the **pinned binary itself** wrote
 (`testdata/delta/`), so a reader that agreed only with invented JSON would fail.
 
-Each line is one command. The compatibility suite of section 3.14 is the
+The compatibility suite of section 3.14 is the
 acceptance: it runs from both sides, and each side fails independently.
 
 ```verify:cli

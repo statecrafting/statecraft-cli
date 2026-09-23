@@ -274,7 +274,7 @@ fn registering_a_path_that_is_not_a_git_work_tree_is_a_finding_and_writes_nothin
 }
 
 #[test]
-fn a_relative_path_is_a_usage_error_not_a_refusal() {
+fn a_relative_path_is_resolved_not_a_usage_error() {
     let home = tempfile::tempdir().unwrap();
     // The binary makes a relative path absolute against the working directory
     // before the library sees it, so this asserts the resulting path is judged
