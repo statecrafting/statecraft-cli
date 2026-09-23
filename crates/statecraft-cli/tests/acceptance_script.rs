@@ -337,17 +337,22 @@ fn the_preflight_runs_the_run_path_and_reads_its_startup_evidence_back() {
         std::fs::read_to_string(run.acc().join("runbin/received-settings")).unwrap(),
         v["intent"]["settingsDocument"].as_str().unwrap()
     );
-    let dir = run
-        .acc()
-        .join("project/.statecraft/state/startup/runs/acc-run/1");
-    for file in [
-        "intent.json",
-        "launched.json",
-        "admission.json",
-        "record.json",
+    // Spec 002 section 3.37: the four records are in the product home, and
+    // nothing of the attempt is in the target.
+    let project = run.acc().join("project");
+    for (field, file) in [
+        ("intentPath", "intent.json"),
+        ("launchedPath", "launched.json"),
+        ("admissionPath", "admission.json"),
+        ("recordPath", "record.json"),
     ] {
-        assert!(dir.join(file).is_file(), "{file}");
+        let path = Path::new(v[field].as_str().unwrap());
+        assert!(path.is_file(), "{file}");
+        assert!(path.ends_with(format!("acc-run/1/{file}")), "{path:?}");
+        assert!(!path.starts_with(&project), "{path:?} is in the target");
     }
+    assert_eq!(v["placement"], "home");
+    assert!(!project.join(".statecraft/state/startup/runs").exists());
     assert!(
         run.acc()
             .join("project/.statecraft/state/workspaces/acc-run/acc-sentinel")

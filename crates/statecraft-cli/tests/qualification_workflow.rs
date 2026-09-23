@@ -852,3 +852,82 @@ fn a_trailing_task_summary_is_admitted_through_the_binary_and_nothing_else_is() 
     assert!(text.contains("not the one trailer"), "{text}");
     assert!(!text.contains("trailer   "), "{text}");
 }
+
+/// Spec 002 section 3.37 rule 4: the settings file a capture hands the
+/// provider is in that capture's exchange directory in the product home, not
+/// in the directory the operator named, which holds none of the capture's
+/// files while the provider runs and receives them, the settings file's copy
+/// included, after it exits. The admission reads the path the provider was
+/// given, so the capture still qualifies as before.
+#[test]
+fn a_captures_settings_file_is_in_the_exchange_directory_and_not_the_operators_while_it_runs() {
+    let sandbox = upgraded();
+    let dir = sandbox.capture_dir();
+    std::fs::create_dir_all(&dir).unwrap();
+    let trace = sandbox.dir.path().join("trace");
+    let out = Command::new(binary())
+        .args([
+            "startup",
+            "capture",
+            &sandbox.project_arg(),
+            "refusal",
+            &dir.display().to_string(),
+            "--program",
+            &fake_provider(),
+            "--synthetic",
+            "--json",
+        ])
+        .env("STATECRAFT_HOME", sandbox.home())
+        .env("STATECRAFT_NATIVE_ROOT", sandbox.native())
+        .env("HOME", sandbox.dir.path())
+        .env("FAKE_PROVIDER_MODE", "faithful")
+        .env("FAKE_TRACE", &trace)
+        .env("FAKE_OPERATOR_DIR", &dir)
+        .output()
+        .expect("the binary runs");
+    assert_eq!(code(&out), 0, "{}", stdout(&out));
+    let trace = std::fs::read_to_string(&trace).expect("the fake traced its session");
+    let given = trace
+        .lines()
+        .find_map(|l| l.strip_prefix("settings "))
+        .expect("a settings argument");
+    let given = Path::new(given);
+    let exchange = statecraft_home::launch::Places::of(&sandbox.home(), &sandbox.project())
+        .exchange
+        .join("captures");
+    assert!(
+        given.starts_with(exchange.canonicalize().unwrap()),
+        "{given:?} is not in {exchange:?}"
+    );
+    assert!(!given.starts_with(&dir) && !given.starts_with(dir.canonicalize().unwrap()));
+    assert!(!given.starts_with(sandbox.project().canonicalize().unwrap()));
+    // While the provider ran, the operator's directory held nothing of this
+    // capture.
+    assert!(
+        !trace.lines().any(|l| l.starts_with("operator ")),
+        "the operator's directory was written before the provider exited:\n{trace}"
+    );
+    // Afterwards it holds the records, the settings file's copy with them.
+    for name in [
+        "refusal.json",
+        "refusal.stdout",
+        "refusal.stderr",
+        "refusal.settings.json",
+    ] {
+        assert!(dir.join(name).is_file(), "{name}");
+    }
+    assert_eq!(
+        std::fs::read(dir.join("refusal.settings.json")).unwrap(),
+        std::fs::read(given).unwrap()
+    );
+    let record: serde_json::Value =
+        serde_json::from_slice(&std::fs::read(dir.join("refusal.json")).unwrap()).unwrap();
+    assert_eq!(
+        Path::new(record["launch"]["settingsPath"].as_str().unwrap()),
+        given
+    );
+    assert_eq!(
+        record["launch"]["settingsDigestAfter"],
+        statecraft_environment::digest::digest_bytes(&std::fs::read(given).unwrap())
+    );
+}

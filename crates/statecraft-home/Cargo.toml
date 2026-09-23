@@ -41,6 +41,20 @@ statecraft-adapter-claude-code = { path = "../statecraft-adapter-claude-code" }
 # wrong. Acyclic for the same reason as the line above.
 statecraft-adapter = { path = "../statecraft-adapter" }
 
+# Spec 002 section 3.37 rule 1: an attempt's launch records live in the product
+# home, keyed as the run record is keyed. The key is the run record's own
+# (`statecraft_run::record::chain_path`), read from the crate that owns it
+# rather than recomputed here, so a change to how a repository is keyed moves
+# the launch records with the chain. Acyclic: that crate depends on
+# `statecraft-environment` alone.
+statecraft-run = { path = "../statecraft-run" }
+
+# Section 3.37 rule 2 and spec 004 section 3.18 rule 4: the gate log a child
+# can write is read by the supervisor without following a link, and a pipe or a
+# device is refused before it can block. `O_NOFOLLOW` and `O_NONBLOCK` differ
+# by platform and architecture, and the standard library does not name them.
+libc = "0.2.189"
+
 # The governance producer (spec 002 section 3.15), as an exact, reproducible
 # crates.io dependency rather than a path to a sibling checkout. `=` is
 # deliberate: the contract this product consumes is the shape one release

@@ -104,6 +104,9 @@ extends:
   # 004's required behavior is untouched, which is why the nature is
   # corrective. The edge is declared rather than left for the coupling gate to
   # discover, and the diagnosis is a dated entry in section 5.
+  # Section 3.37 rule 2 adds one entry point there, `supervise_with_in`, which
+  # writes the settings file into the attempt's exchange directory; additive,
+  # and the edge keeps the nature it was first declared with.
   - { spec: "004-execution-adapter", unit: { kind: directory, path: "crates/statecraft-adapter-claude-code/" }, nature: corrective }
   # Section 3.30 rule 12's launch is supervised by the process-group supervisor
   # 004 already owns, so the raw capture it needs is added there rather than
@@ -4306,6 +4309,72 @@ manifest is written, not deleted, still recording what remains. Tests:
 binary against bridges `init apply` itself recorded (once, twice, and over a
 file that already began with the line), and against recorded fixtures for
 each refused and interrupted case.
+
+**2026-09-23: section 3.37 implemented, without the confinement.** Rules 1 to
+5 are in `crates/statecraft-home/src/launch.rs`, `trial.rs`, `capture.rs` and
+`service.rs`, and bound in `crates/statecraft-cli/src/main.rs`. Spec `004`
+section 3.18's mechanism (its rules 5 to 9) is a later change: no Seatbelt
+profile or Landlock ruleset is applied here, no attempt is reported confined,
+and the exchange directory and the launch records are the two paths that
+mechanism will grant and deny. The choices the section is silent on:
+
+- *Where, exactly.* The launch records of a repository are
+  `<home>/records/<key>.startup/<run>/<attempt>/`, beside that repository's
+  run record `<home>/records/<key>.jsonl`; its exchange directories are
+  `<home>/exchange/<key>/runs/<run>/<attempt>/` and, for `startup capture`,
+  `<home>/exchange/<key>/captures/<control>-<nonce>/`. Both are derived from
+  `statecraft_run::record::chain_path` by `launch::Places::of`, with the same
+  target path the run record is opened with, and the key is computed nowhere
+  else, so a change to how spec `003` keys a repository moves the launch
+  records with the chain. `statecraft-home` takes `statecraft-run` as a
+  dependency for that one function; no unit of `003` is edited.
+- *A decision already in the exchange directory.* `prepare` refuses an attempt
+  whose exchange directory already exists, whose launch records hold anything,
+  or whose number already has records inside the target. At the decision, the
+  supervisor writes `admission.json` into the launch records, syncs the
+  directory, and only then writes the gate's copy (a new file, renamed into
+  place). A copy already at that name was written by something other than this
+  supervisor: it is removed, not adopted and not silently replaced, the copy is
+  refused, and the refusal is the rule 2 failure: the gate withholds, the
+  process is stopped, and the attempt is refused under `startup-admission`
+  with the failure in `admissionError`. An ungated attempt has no gate and no
+  copy.
+- *The gate log's copy.* Read from the exchange directory at record time with
+  `O_NOFOLLOW` and `O_NONBLOCK`, refused unless the opened handle is a regular
+  file, bounded at 64 KiB, and written once as `gate.log` in the launch
+  records. The record carries it additively as `launch.gateLog`, whose
+  `attestation` is `child-attested`, with its digest, length, truncation and
+  any failure; a failure is recorded rather than raised, because the record is
+  still owed. `LAUNCH_VERSION` is unchanged: every field section 3.32 defined
+  keeps its name, content and judgement. A reader, reconciliation included,
+  reads the copy where one exists and otherwise the exchange directory's log,
+  both through the same bounded read, and a log that exists and is not a
+  regular file is an error, never an empty log.
+- *The trial's statement.* A `trial.json` written now carries the additive
+  field `consultations: "child-attested"`; one written before carries none,
+  and `startup show` says it was recorded before this section and is read as
+  it was. The judgement is unchanged.
+- *The settings document.* A managed attempt's provider is handed the
+  adapter's exclusive temporary file created in the attempt's exchange
+  directory rather than the system temporary directory, through
+  `execution::supervise_with_in`, an additive entry point in `004`'s
+  `statecraft-adapter-claude-code` under this spec's existing edge. It is
+  removed when supervision returns, as before. A run in a repository holding
+  no manifest records nothing and keeps the system temporary directory.
+- *Capture.* The payload is written once into the capture's exchange
+  directory and the invocation names that path. After the provider exits, its
+  bytes are read back as data, digested for `settingsDigestAfter`, and copied
+  to `<control>.settings.json` in the operator's directory beside the other
+  capture records, which are written after the exit as before.
+- *Reading both layouts.* A reader locates one layout per attempt: the
+  product home where the launch records or the exchange directory of that
+  attempt exist, and otherwise the target's `.statecraft/state/startup/runs/`.
+  Where both hold something of the same attempt, neither is chosen: the read
+  fails naming both directories, and nothing in either is moved or rewritten,
+  because preferring one would silently set aside what the other holds.
+  `startup show` reports the layout as `placement`, `home` or `target`, and
+  says of `target` that the records were written where the child could reach
+  them and that nothing says the attempt was confined.
 
 ## Verification
 

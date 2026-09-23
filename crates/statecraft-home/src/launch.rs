@@ -56,8 +56,21 @@ use std::path::{Path, PathBuf};
 /// records, written before section 3.32, are read and judged.
 pub const LAUNCH_VERSION: u32 = 3;
 
-/// Where attempt records live, under the project's runtime state.
+/// Where attempt records written before section 3.37 live, under the
+/// project's runtime state. Read where they are; nothing is added there.
 pub const DIRECTORY: &str = "startup/runs";
+
+/// The product-home directory that holds every repository's exchange
+/// directories (section 3.37 rule 2; spec 004 section 3.18 rule 5).
+pub const EXCHANGE: &str = "exchange";
+
+/// The label every gate log carries: the gate runs inside the child, so what
+/// its log says was written by the supervised process (section 3.37 rule 2).
+pub const CHILD_ATTESTED: &str = "child-attested";
+
+/// How much of a gate log the supervisor copies into the launch records. A
+/// consultation is one short line; this is thousands of them.
+pub const GATE_LOG_LIMIT: u64 = 64 * 1024;
 
 /// The acknowledgment line's first field.
 pub const ACKNOWLEDGMENT: &str = "statecraft-startup";
@@ -105,9 +118,11 @@ pub mod files {
     pub const ADMISSION: &str = "admission.json";
     /// The completion.
     pub const RECORD: &str = "record.json";
-    /// The admission gate script.
+    /// The admission gate script, in the exchange directory.
     pub const GATE: &str = "admission-gate";
-    /// The gate's consultations, appended by the gate.
+    /// The gate's consultations, appended by the gate in the exchange
+    /// directory, and the supervisor's bounded copy of them in the launch
+    /// records.
     pub const GATE_LOG: &str = "gate.log";
 }
 
@@ -120,7 +135,8 @@ pub mod files {
 /// documented blocking code for a `PreToolUse` hook.
 pub const GATE_SCRIPT: &str = r#"#!/bin/sh
 # Statecraft admission gate for one run attempt: spec 002 section 3.32 rule 26.
-# Written once by the launcher into the attempt's directory. Not harness
+# Written once by the launcher into the attempt's exchange directory
+# (section 3.37), beside the copy of the decision it reads. Not harness
 # content. Every tool call waits here for the launcher's startup decision and
 # runs only if that decision is `admitted`.
 dir=$(CDPATH='' cd -- "$(dirname -- "$0")" 2>/dev/null && pwd -P) || {
@@ -161,10 +177,30 @@ pub struct AttemptIdentity {
 }
 
 impl AttemptIdentity {
-    /// The directory an attempt's records live in.
-    pub fn directory(&self, root: &Path) -> PathBuf {
+    /// Where this attempt's launch records are, in the product home (section
+    /// 3.37 rule 1).
+    pub fn records_dir(&self, places: &Places) -> PathBuf {
+        places
+            .records
+            .join(&self.run_id)
+            .join(self.attempt.to_string())
+    }
+
+    /// Where this attempt's exchange directory is, in the product home
+    /// (section 3.37 rule 2).
+    pub fn exchange_dir(&self, places: &Places) -> PathBuf {
+        places
+            .exchange
+            .join(RUNS)
+            .join(&self.run_id)
+            .join(self.attempt.to_string())
+    }
+
+    /// Where an attempt recorded before section 3.37 kept everything, inside
+    /// the target (section 3.37 rule 5).
+    pub fn legacy_dir(&self, target: &Path) -> PathBuf {
         statecraft_environment::claimant::resolve(
-            root,
+            target,
             &format!(
                 "{}/{DIRECTORY}/{}/{}",
                 crate::project::STATE,
@@ -174,34 +210,79 @@ impl AttemptIdentity {
         )
     }
 
-    /// Where the intent is.
-    pub fn intent_path(&self, root: &Path) -> PathBuf {
-        self.directory(root).join(files::INTENT)
+    /// Where the intent is written.
+    pub fn intent_path(&self, places: &Places) -> PathBuf {
+        self.records_dir(places).join(files::INTENT)
     }
 
-    /// Where the spawn confirmation is.
-    pub fn launched_path(&self, root: &Path) -> PathBuf {
-        self.directory(root).join(files::LAUNCHED)
+    /// Where the spawn confirmation is written.
+    pub fn launched_path(&self, places: &Places) -> PathBuf {
+        self.records_dir(places).join(files::LAUNCHED)
     }
 
-    /// Where the startup decision is.
-    pub fn admission_path(&self, root: &Path) -> PathBuf {
-        self.directory(root).join(files::ADMISSION)
+    /// Where the startup decision is written, the evidence of what was
+    /// admitted.
+    pub fn admission_path(&self, places: &Places) -> PathBuf {
+        self.records_dir(places).join(files::ADMISSION)
     }
 
-    /// Where the record is.
-    pub fn record_path(&self, root: &Path) -> PathBuf {
-        self.directory(root).join(files::RECORD)
+    /// Where the record is written.
+    pub fn record_path(&self, places: &Places) -> PathBuf {
+        self.records_dir(places).join(files::RECORD)
     }
 
-    /// Where the admission gate is.
-    pub fn gate_path(&self, root: &Path) -> PathBuf {
-        self.directory(root).join(files::GATE)
+    /// Where the admission gate is written, in the exchange directory.
+    pub fn gate_path(&self, places: &Places) -> PathBuf {
+        self.exchange_dir(places).join(files::GATE)
     }
 
-    /// Where the gate appends its consultations.
-    pub fn gate_log_path(&self, root: &Path) -> PathBuf {
-        self.directory(root).join(files::GATE_LOG)
+    /// Where the gate appends its consultations, in the exchange directory.
+    pub fn gate_log_path(&self, places: &Places) -> PathBuf {
+        self.exchange_dir(places).join(files::GATE_LOG)
+    }
+
+    /// Where the copy of the decision the gate reads is, in the exchange
+    /// directory. Never read as the decision.
+    pub fn exchange_admission_path(&self, places: &Places) -> PathBuf {
+        self.exchange_dir(places).join(files::ADMISSION)
+    }
+
+    /// Which layout this attempt's records are in, for a reader (section 3.37
+    /// rule 5). An attempt is read from exactly one layout: the product home's
+    /// where anything of it is there, the target's where only that exists, and
+    /// the product home's where neither does. Where both hold something of the
+    /// same attempt, neither is chosen: that is an error naming both, because
+    /// preferring one would silently set aside records the other holds.
+    pub fn locate(&self, places: &Places) -> Result<AttemptPaths, NotRead> {
+        let home = AttemptPaths {
+            records: self.records_dir(places),
+            exchange: self.exchange_dir(places),
+            placement: Placement::Home,
+        };
+        let in_home =
+            home.records.symlink_metadata().is_ok() || home.exchange.symlink_metadata().is_ok();
+        let legacy = self.legacy_dir(&places.target);
+        let in_target = legacy.symlink_metadata().is_ok();
+        match (in_home, in_target) {
+            (true, true) => Err(NotRead::Unreadable {
+                path: legacy.display().to_string(),
+                detail: format!(
+                    "attempt {} of run {} has records both in the product home ({}, {}) and in \
+                     the target ({}); neither layout is chosen over the other",
+                    self.attempt,
+                    self.run_id,
+                    home.records.display(),
+                    home.exchange.display(),
+                    legacy.display()
+                ),
+            }),
+            (false, true) => Ok(AttemptPaths {
+                records: legacy.clone(),
+                exchange: legacy,
+                placement: Placement::Target,
+            }),
+            _ => Ok(home),
+        }
     }
 
     /// Why this identity cannot name a directory, if it cannot.
@@ -222,6 +303,195 @@ impl AttemptIdentity {
         }
         (self.attempt == 0).then(|| "attempt numbers start at 1".to_string())
     }
+}
+
+/// The exchange area's subdirectory for run attempts.
+const RUNS: &str = "runs";
+
+/// The exchange area's subdirectory for `startup capture`.
+const CAPTURES: &str = "captures";
+
+/// Where one repository's launch records and exchange directories are in the
+/// product home (spec 002 section 3.37), and where its records written before
+/// that section are in the target.
+///
+/// Keyed as the run record is keyed: both directories are derived from
+/// `statecraft_run::record::chain_path`, the one place a repository's key is
+/// computed, so whatever that function keys a repository by, its launch
+/// records follow.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Places {
+    /// The target, where records written before section 3.37 are.
+    pub target: PathBuf,
+    /// `<home>/records/<key>.startup`: the launch records, one directory per
+    /// run and attempt. Nothing in it is given to the child.
+    pub records: PathBuf,
+    /// `<home>/exchange/<key>`: the exchange directories, the only part of
+    /// the home an attempt's child is given besides the harness store.
+    pub exchange: PathBuf,
+}
+
+impl Places {
+    /// The places for `target`, in the home at `home`. `target` is the same
+    /// path the run record is opened with.
+    pub fn of(home: &Path, target: &Path) -> Self {
+        let chain = statecraft_run::record::chain_path(home, target);
+        let key = chain
+            .file_stem()
+            .map(|k| k.to_string_lossy().into_owned())
+            .unwrap_or_default();
+        Self {
+            target: target.to_path_buf(),
+            records: chain.with_extension("startup"),
+            exchange: home.join(EXCHANGE).join(key),
+        }
+    }
+
+    /// A fresh exchange directory for one `startup capture` of `control`
+    /// (section 3.37 rule 4), not yet created.
+    pub fn capture_exchange(&self, control: &str) -> std::io::Result<PathBuf> {
+        Ok(self
+            .exchange
+            .join(CAPTURES)
+            .join(format!("{control}-{}", nonce()?)))
+    }
+}
+
+/// Where an attempt's records were found, and so what a reader may say of them
+/// (section 3.37 rule 5).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum Placement {
+    /// In the product home, apart from the exchange directory the child is
+    /// given. Not a claim of confinement: spec 004 section 3.18 says what
+    /// an attempt's posture must record for that.
+    Home,
+    /// Inside the target, written before section 3.37, where the child could
+    /// read and rewrite them. Read where they are and judged as before.
+    Target,
+}
+
+impl Placement {
+    /// How an operator reads it.
+    pub fn describe(self) -> &'static str {
+        match self {
+            Placement::Home => {
+                "launch records in the product home, apart from the exchange directory the \
+                 child is given (spec 002 section 3.37); this is not a claim of confinement"
+            }
+            Placement::Target => {
+                "launch records inside the target, written before spec 002 section 3.37 where \
+                 the child could reach them; read where they are and judged as before, and \
+                 nothing here says the attempt was confined"
+            }
+        }
+    }
+}
+
+/// One attempt's directories, as a reader found them.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct AttemptPaths {
+    /// The launch records.
+    pub records: PathBuf,
+    /// The exchange directory; the launch records' own directory for a
+    /// [`Placement::Target`] attempt.
+    pub exchange: PathBuf,
+    /// Which layout.
+    pub placement: Placement,
+}
+
+impl AttemptPaths {
+    /// The intent.
+    pub fn intent(&self) -> PathBuf {
+        self.records.join(files::INTENT)
+    }
+    /// The spawn confirmation.
+    pub fn launched(&self) -> PathBuf {
+        self.records.join(files::LAUNCHED)
+    }
+    /// The startup decision.
+    pub fn admission(&self) -> PathBuf {
+        self.records.join(files::ADMISSION)
+    }
+    /// The record.
+    pub fn record(&self) -> PathBuf {
+        self.records.join(files::RECORD)
+    }
+
+    /// Read the gate log a decision or a judgement rests on (spec 003 section
+    /// 3.6.1's note, section 3.37 rule 2): the supervisor's copy in the launch
+    /// records where it wrote one, and otherwise the exchange directory's, for
+    /// an attempt the supervisor did not conclude. Either is child-attested.
+    ///
+    /// Only a log that does not exist reads as `Ok(None)`; one that exists and
+    /// cannot be read as a regular file, a link included, is an error. Nothing
+    /// here writes.
+    pub fn read_gate_log(&self) -> Result<Option<GateLog>, NotRead> {
+        let copy = self.records.join(files::GATE_LOG);
+        let path = if self.placement == Placement::Home && copy.symlink_metadata().is_err() {
+            self.exchange.join(files::GATE_LOG)
+        } else {
+            copy
+        };
+        match read_child_file(&path, GATE_LOG_LIMIT) {
+            Ok(None) => Ok(None),
+            Ok(Some((bytes, truncated))) => Ok(Some(GateLog {
+                lines: String::from_utf8_lossy(&bytes)
+                    .lines()
+                    .map(str::to_string)
+                    .collect(),
+                truncated,
+                path: path.display().to_string(),
+            })),
+            Err(e) => Err(NotRead::Unreadable {
+                path: path.display().to_string(),
+                detail: e.to_string(),
+            }),
+        }
+    }
+}
+
+/// A gate log as a reader found it. Child-attested wherever it was read.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct GateLog {
+    /// One word per consultation.
+    pub lines: Vec<String>,
+    /// Whether the file was longer than [`GATE_LOG_LIMIT`] and only its start
+    /// was read.
+    pub truncated: bool,
+    /// Which file.
+    pub path: String,
+}
+
+/// Read a file a confined child could have written, as data only (spec 004
+/// section 3.18 rule 4): opened without following a link and without blocking
+/// on a pipe, refused unless the opened handle is a regular file, and read no
+/// further than `limit` bytes. `Ok(None)` when nothing is at the path.
+/// Returns the bytes and whether the file held more.
+pub(crate) fn read_child_file(path: &Path, limit: u64) -> std::io::Result<Option<(Vec<u8>, bool)>> {
+    use std::io::Read;
+    let mut options = std::fs::OpenOptions::new();
+    options.read(true);
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::OpenOptionsExt;
+        options.custom_flags(libc::O_NOFOLLOW | libc::O_NONBLOCK);
+    }
+    let file = match options.open(path) {
+        Ok(f) => f,
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(None),
+        Err(e) => return Err(e),
+    };
+    if !file.metadata()?.file_type().is_file() {
+        return Err(std::io::Error::other(
+            "not a regular file; a link, a directory, a pipe or a device is not read",
+        ));
+    }
+    let mut bytes = Vec::new();
+    file.take(limit + 1).read_to_end(&mut bytes)?;
+    let truncated = bytes.len() as u64 > limit;
+    bytes.truncate(limit as usize);
+    Ok(Some((bytes, truncated)))
 }
 
 /// The revision a run selected, by full digest and by where it is installed.
@@ -393,8 +663,10 @@ fn shell_quote(path: &str) -> String {
 /// What a run needs to prepare an attempt's intent.
 #[derive(Debug, Clone)]
 pub struct Preparation<'a> {
-    /// The project root, which holds the manifest and the runtime state.
+    /// The project root, which holds the manifest.
     pub root: &'a Path,
+    /// Where the attempt's launch records and exchange directory go.
+    pub places: &'a Places,
     /// The workspace the session starts in.
     pub workspace: &'a Path,
     /// The commit it was prepared at.
@@ -478,15 +750,24 @@ pub fn prepare(p: &Preparation<'_>) -> Result<Prepared, NotPrepared> {
         attempt: p.attempt.attempt,
         path: path.display().to_string(),
     };
-    let intent_path = p.attempt.intent_path(p.root);
+    let intent_path = p.attempt.intent_path(p.places);
+    let legacy = p.attempt.legacy_dir(&p.places.target);
     for existing in [
         intent_path.clone(),
-        p.attempt.launched_path(p.root),
-        p.attempt.admission_path(p.root),
-        p.attempt.record_path(p.root),
-        p.attempt.gate_path(p.root),
+        p.attempt.launched_path(p.places),
+        p.attempt.admission_path(p.places),
+        p.attempt.record_path(p.places),
+        p.attempt.records_dir(p.places).join(files::GATE_LOG),
+        // The exchange directory is the supervisor's to populate. Anything
+        // already in it, a decision above all, was not written for this
+        // attempt by this launcher, and is never adopted (section 3.37 rule 2).
+        p.attempt.exchange_dir(p.places),
+        // Section 3.37 rule 5: nothing is added to the target's tree, and an
+        // attempt is never read from both layouts.
+        legacy.join(files::INTENT),
+        legacy.join(files::RECORD),
     ] {
-        if existing.exists() {
+        if existing.symlink_metadata().is_ok() {
             return Err(exists(&existing));
         }
     }
@@ -548,12 +829,25 @@ pub fn prepare(p: &Preparation<'_>) -> Result<Prepared, NotPrepared> {
                 hook.display()
             ))
         })?;
-        let gate = p.attempt.gate_path(p.root);
+        // Section 3.37 rule 2: the gate and its log are the child's, in the
+        // exchange directory; the log is created empty before launch, so the
+        // gate only ever appends to a file the supervisor made.
+        let gate = p.attempt.gate_path(p.places);
         write_once(&gate, GATE_SCRIPT).map_err(|e| match e.kind() {
             std::io::ErrorKind::AlreadyExists => exists(&gate),
             _ => NotPrepared::Io(e.to_string()),
         })?;
         make_executable(&gate).map_err(io)?;
+        let log = p.attempt.gate_log_path(p.places);
+        std::fs::OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .open(&log)
+            .and_then(|f| f.sync_all())
+            .map_err(|e| match e.kind() {
+                std::io::ErrorKind::AlreadyExists => exists(&log),
+                _ => NotPrepared::Io(e.to_string()),
+            })?;
         let gate = std::fs::canonicalize(&gate).map_err(io)?;
         let hook = hook.display().to_string();
         let gate = gate.display().to_string();
@@ -578,6 +872,9 @@ pub fn prepare(p: &Preparation<'_>) -> Result<Prepared, NotPrepared> {
         Some(hooks) => crate::session::managed_payload_json(hooks),
         None => crate::session::payload_json(),
     };
+    // The settings document is written there by the adapter at launch
+    // (section 3.37 rule 2), gated or not.
+    std::fs::create_dir_all(p.attempt.exchange_dir(p.places)).map_err(io)?;
 
     let intent = Intent {
         version: LAUNCH_VERSION,
@@ -643,7 +940,7 @@ fn nonce() -> std::io::Result<String> {
 /// then hard-linked to the final name. The link is the exclusive step: it
 /// fails if the name exists, and a reader never sees half a file. A rename
 /// would replace an existing file, which is the one thing this must not do.
-pub(crate) fn write_once(path: &Path, contents: &str) -> std::io::Result<()> {
+pub(crate) fn write_once(path: &Path, contents: impl AsRef<[u8]>) -> std::io::Result<()> {
     let parent = path.parent().ok_or_else(|| {
         std::io::Error::new(std::io::ErrorKind::InvalidInput, "a record needs a parent")
     })?;
@@ -659,12 +956,68 @@ pub(crate) fn write_once(path: &Path, contents: &str) -> std::io::Result<()> {
             .write(true)
             .create_new(true)
             .open(&temporary)?;
-        file.write_all(contents.as_bytes())?;
+        file.write_all(contents.as_ref())?;
         file.sync_all()?;
         std::fs::hard_link(&temporary, path)
     })();
     // The temporary name goes whatever happened; the linked name stays.
     let _ = std::fs::remove_file(&temporary);
+    written
+}
+
+/// Make a new directory entry durable: its directory, synced.
+fn sync_parent(path: &Path) -> std::io::Result<()> {
+    match path.parent() {
+        Some(parent) => std::fs::File::open(parent)?.sync_all(),
+        None => Ok(()),
+    }
+}
+
+/// Write the exchange copy of the decision (section 3.37 rule 2; spec 004
+/// section 3.18 rule 5): a new file, created exclusively beside the final name
+/// and renamed into place.
+///
+/// A decision already at that name was not written by this supervisor, since
+/// nothing else writes it and it is written once. It is removed rather than
+/// adopted or silently replaced, and the copy is refused, so the gate
+/// withholds and the attempt is refused with the failure named.
+fn publish_exchange_copy(path: &Path, contents: &str) -> std::io::Result<()> {
+    let parent = path.parent().ok_or_else(|| {
+        std::io::Error::new(std::io::ErrorKind::InvalidInput, "a copy needs a parent")
+    })?;
+    if path.symlink_metadata().is_ok() {
+        let removed = std::fs::remove_file(path);
+        return Err(std::io::Error::new(
+            std::io::ErrorKind::AlreadyExists,
+            format!(
+                "{} already held a decision this supervisor did not write{}",
+                path.display(),
+                match removed {
+                    Ok(()) => "; it was removed and not adopted".to_string(),
+                    Err(e) => format!(", and it could not be removed: {e}"),
+                }
+            ),
+        ));
+    }
+    let temporary = parent.join(format!(
+        ".statecraft-partial-{}-{}",
+        std::process::id(),
+        nonce()?
+    ));
+    let written = (|| {
+        use std::io::Write;
+        let mut file = std::fs::OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .open(&temporary)?;
+        file.write_all(contents.as_bytes())?;
+        file.sync_all()?;
+        std::fs::rename(&temporary, path)?;
+        sync_parent(path)
+    })();
+    if written.is_err() {
+        let _ = std::fs::remove_file(&temporary);
+    }
     written
 }
 
@@ -1060,7 +1413,7 @@ pub struct Admission {
 /// Spec 002 section 3.32 rules 22 and 26, through the supervisor's watch of
 /// spec 004 section 5, 2026-09-22.
 pub struct LaunchWatch<'a> {
-    root: &'a Path,
+    places: &'a Places,
     layout: &'a Layout,
     manifest: &'a Manifest,
     prepared: &'a Prepared,
@@ -1081,14 +1434,14 @@ pub struct LaunchWatch<'a> {
 impl<'a> LaunchWatch<'a> {
     /// A watch for one prepared attempt. `now` gives RFC 3339 UTC.
     pub fn new(
-        root: &'a Path,
+        places: &'a Places,
         layout: &'a Layout,
         manifest: &'a Manifest,
         prepared: &'a Prepared,
         now: &'a dyn Fn() -> String,
     ) -> Self {
         Self {
-            root,
+            places,
             layout,
             manifest,
             prepared,
@@ -1187,13 +1540,28 @@ impl<'a> LaunchWatch<'a> {
             observation,
             intent_digest: self.prepared.digest.clone(),
         };
+        // Section 3.37 rule 2: the decision is durable in the launch records
+        // first, and only then copied to where the gate reads it. The copy is
+        // never the evidence of what was admitted.
         let written = serde_json::to_string(&admission)
-            .map_err(|e| std::io::Error::other(e.to_string()))
+            .map_err(|e| e.to_string())
             .and_then(|json| {
-                write_once(
-                    &intent.attempt.admission_path(self.root),
-                    &format!("{json}\n"),
-                )
+                let line = format!("{json}\n");
+                let path = intent.attempt.admission_path(self.places);
+                write_once(&path, &line)
+                    .and_then(|()| sync_parent(&path))
+                    .map_err(|e| format!("the startup decision could not be persisted: {e}"))?;
+                if !intent.gated() {
+                    // No gate reads a copy.
+                    return Ok(());
+                }
+                publish_exchange_copy(&intent.attempt.exchange_admission_path(self.places), &line)
+                    .map_err(|e| {
+                        format!(
+                            "the startup decision is recorded, and the copy the admission gate \
+                             reads could not be written, so the gate withholds: {e}"
+                        )
+                    })
             });
         let refuses = decision.refuses();
         self.admission = Some(admission);
@@ -1203,8 +1571,7 @@ impl<'a> LaunchWatch<'a> {
                 decision.describe()
             )),
             Ok(()) => None,
-            Err(e) => {
-                let why = format!("the startup decision could not be persisted: {e}");
+            Err(why) => {
                 self.admission_error = Some(why.clone());
                 // An unpersisted decision is one the gate cannot read, so it
                 // holds every tool call; a gated session is stopped rather
@@ -1240,8 +1607,8 @@ impl Watch<(usize, ProviderEvent)> for LaunchWatch<'_> {
             .map_err(|e| std::io::Error::other(e.to_string()))
             .and_then(|json| {
                 write_once(
-                    &intent.attempt.launched_path(self.root),
-                    &format!("{json}\n"),
+                    &intent.attempt.launched_path(self.places),
+                    format!("{json}\n"),
                 )
             });
         written.map_err(|e| {
@@ -1360,6 +1727,77 @@ pub struct LaunchEvidence {
     /// the record was written. Absent where the attempt was not gated.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub gate: Option<Vec<String>>,
+    /// What those consultations are evidence of, and the copy they were read
+    /// into (section 3.37 rule 2). Absent from a record written before that
+    /// section, and where the attempt was not gated.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub gate_log: Option<GateLogCopy>,
+}
+
+/// The supervisor's copy of an attempt's gate log, made when it writes the
+/// record (section 3.37 rule 2).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct GateLogCopy {
+    /// Always [`CHILD_ATTESTED`]: the gate runs inside the child, so the log
+    /// is evidence of what was written there, never of what the supervisor
+    /// decided.
+    pub attestation: String,
+    /// The exchange directory's log, as read.
+    pub source: String,
+    /// The copy in the launch records, where one was written.
+    pub copy: Option<String>,
+    /// SHA-256 of the bytes copied.
+    pub digest: Option<String>,
+    /// How many bytes were copied.
+    pub bytes: u64,
+    /// Whether the log was longer than [`GATE_LOG_LIMIT`] and only its start
+    /// was copied.
+    pub truncated: bool,
+    /// Why the log could not be read or copied, where it could not.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub failure: Option<String>,
+}
+
+/// Copy the exchange directory's gate log into the launch records: bounded,
+/// read without following a link, and labelled child-attested. Returns the
+/// consultations read and the copy's description; a failure is recorded, not
+/// raised, because the record is still owed.
+fn copy_gate_log(places: &Places, attempt: &AttemptIdentity) -> (Vec<String>, GateLogCopy) {
+    let source = attempt.gate_log_path(places);
+    let target = attempt.records_dir(places).join(files::GATE_LOG);
+    let mut copy = GateLogCopy {
+        attestation: CHILD_ATTESTED.to_string(),
+        source: source.display().to_string(),
+        copy: None,
+        digest: None,
+        bytes: 0,
+        truncated: false,
+        failure: None,
+    };
+    let (bytes, truncated) = match read_child_file(&source, GATE_LOG_LIMIT) {
+        Ok(Some(read)) => read,
+        Ok(None) => {
+            copy.failure = Some("the gate log the supervisor created is gone".to_string());
+            return (Vec::new(), copy);
+        }
+        Err(e) => {
+            copy.failure = Some(format!("the gate log could not be read as data: {e}"));
+            return (Vec::new(), copy);
+        }
+    };
+    copy.digest = Some(digest_bytes(&bytes));
+    copy.bytes = bytes.len() as u64;
+    copy.truncated = truncated;
+    match write_once(&target, &bytes) {
+        Ok(()) => copy.copy = Some(target.display().to_string()),
+        Err(e) => copy.failure = Some(format!("the gate log could not be copied: {e}")),
+    }
+    let words = String::from_utf8_lossy(&bytes)
+        .lines()
+        .map(str::to_string)
+        .collect();
+    (words, copy)
 }
 
 /// What the launch produced, as the run hands it over.
@@ -1392,41 +1830,30 @@ pub enum Launch<'a> {
     },
 }
 
-/// Read `gate.log`, one word per consultation. `None` when there is none.
-fn read_gate_log(path: &Path) -> Option<Vec<String>> {
-    std::fs::read_to_string(path)
-        .ok()
-        .map(|t| t.lines().map(str::to_string).collect())
-}
-
-/// Read an attempt's `gate.log` for a decision that relies on what it holds
-/// (spec 003 section 3.6.1 rule 3), whatever the manifest says.
+/// Read an attempt's gate log for a decision that relies on what it holds
+/// (spec 003 section 3.6.1 rule 3 and its note under section 3.37), whatever
+/// the manifest says: in whichever layout the attempt is, the supervisor's copy
+/// or, for an attempt it did not conclude, the exchange directory's.
 ///
-/// Unlike the rendering read above, only a log that does not exist reads as
-/// `Ok(None)`; a log that exists and cannot be read is an error, never
-/// "nothing released". Nothing here writes.
+/// Only a log that does not exist reads as `Ok(None)`; a log that exists and
+/// cannot be read is an error, never "nothing released". Nothing here writes.
+/// Returns where the attempt was found and the log read.
 pub fn read_gate_log_checked(
-    root: &Path,
+    places: &Places,
     identity: &AttemptIdentity,
-) -> Result<Option<Vec<String>>, NotRead> {
+) -> Result<(AttemptPaths, Option<GateLog>), NotRead> {
     if let Some(why) = identity.invalid() {
         return Err(NotRead::NoSuchAttempt(why));
     }
-    let path = identity.gate_log_path(root);
-    match std::fs::read_to_string(&path) {
-        Ok(t) => Ok(Some(t.lines().map(str::to_string).collect())),
-        Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(None),
-        Err(e) => Err(NotRead::Unreadable {
-            path: path.display().to_string(),
-            detail: e.to_string(),
-        }),
-    }
+    let paths = identity.locate(places)?;
+    let log = paths.read_gate_log()?;
+    Ok((paths, log))
 }
 
 /// Assemble and write an attempt's record. The only place `record.json` is
 /// written, and it is written once.
 pub fn finalize(
-    root: &Path,
+    places: &Places,
     layout: &Layout,
     manifest: &Manifest,
     prepared: &Prepared,
@@ -1523,6 +1950,12 @@ pub fn finalize(
         },
     };
 
+    let (gate, gate_log) = if intent.gated() {
+        let (words, copy) = copy_gate_log(places, &intent.attempt);
+        (Some(words), Some(copy))
+    } else {
+        (None, None)
+    };
     let resolved = harness.digest().map(str::to_string);
     let standing = crate::required::evaluate(layout, manifest, resolved.as_deref());
     let record = StartupRecord {
@@ -1554,11 +1987,8 @@ pub fn finalize(
             harness,
             admission: watched.admission.clone(),
             admission_error: watched.admission_error.clone(),
-            gate: if intent.gated() {
-                Some(read_gate_log(&intent.attempt.gate_log_path(root)).unwrap_or_default())
-            } else {
-                None
-            },
+            gate,
+            gate_log,
         })),
     };
     if let Some(why) = record.incomplete() {
@@ -1567,7 +1997,7 @@ pub fn finalize(
             why.to_string(),
         ));
     }
-    let path = intent.attempt.record_path(root);
+    let path = intent.attempt.record_path(places);
     let mut json = serde_json::to_string_pretty(&record)?;
     json.push('\n');
     write_once(&path, &json)?;
@@ -1777,6 +2207,9 @@ pub struct AttemptStartup {
     pub root: String,
     /// Which attempt.
     pub attempt: AttemptIdentity,
+    /// Where its records were found, and so what may be said of them
+    /// (section 3.37 rule 5).
+    pub placement: Placement,
     /// The attempt's outcome, as the run record has it.
     pub outcome: Option<String>,
     /// Where the intent is, and whether it is there.
@@ -1796,7 +2229,11 @@ pub struct AttemptStartup {
     /// The startup decision, where there is one.
     pub admission: Option<Box<Admission>>,
     /// The gate's consultations as `gate.log` holds them now, where it exists.
+    /// Child-attested wherever it was read (section 3.37 rule 2).
     pub gate: Option<Vec<String>>,
+    /// Which gate log was read, where one was.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub gate_log_path: Option<String>,
     /// The record, where there is one.
     pub record: Option<Box<StartupRecord>>,
     /// The verdict.
@@ -1886,7 +2323,8 @@ impl AttemptStartup {
         }
         if let Some(gate) = &self.gate {
             out.push_str(&format!(
-                "gate      consulted {} time(s){}\n",
+                "gate      consulted {} time(s){} ({CHILD_ATTESTED}: written by the gate the \
+                 child runs, never the supervisor's decision)\n",
                 gate.len(),
                 if gate.is_empty() {
                     String::new()
@@ -1926,6 +2364,7 @@ impl AttemptStartup {
             mark(&self.admission_path),
             mark(&self.record_path),
         ));
+        out.push_str(&format!("placement {}\n", self.placement.describe()));
         out.push_str(&format!("verdict   {}\n", self.verdict.word()));
         for reason in &self.reasons {
             out.push_str(&format!("  - {reason}\n"));
@@ -1961,7 +2400,7 @@ pub enum NotRead {
 /// `facts` is every attempt the run record holds for the run. `attempt`
 /// `None` means the latest. Nothing here writes.
 pub fn inspect(
-    root: &Path,
+    places: &Places,
     run_id: &str,
     attempt: Option<u32>,
     facts: &[AttemptFact],
@@ -1983,10 +2422,13 @@ pub fn inspect(
     if let Some(why) = identity.invalid() {
         return Err(NotRead::NoSuchAttempt(why));
     }
-    let intent_path = identity.intent_path(root);
-    let launched_path = identity.launched_path(root);
-    let admission_path = identity.admission_path(root);
-    let record_path = identity.record_path(root);
+    // Section 3.37 rule 5: one layout per attempt, the product home's where
+    // it holds anything of it, and an error where both layouts hold some.
+    let paths = identity.locate(places)?;
+    let intent_path = paths.intent();
+    let launched_path = paths.launched();
+    let admission_path = paths.admission();
+    let record_path = paths.record();
     let read = |path: &Path| -> Result<Option<Vec<u8>>, NotRead> {
         match std::fs::read(path) {
             Ok(b) => Ok(Some(b)),
@@ -2019,7 +2461,11 @@ pub fn inspect(
     let launched: Option<Launched> = parse_as(&launched_path, &launched_bytes)?;
     let admission: Option<Admission> = parse_as(&admission_path, &admission_bytes)?;
     let record: Option<StartupRecord> = parse_as(&record_path, &record_bytes)?;
-    let gate = read_gate_log(&identity.gate_log_path(root));
+    // A rendering read: a log that cannot be read shows as none, and the
+    // decision that relies on it reads it with `read_gate_log_checked`.
+    let gate_log = paths.read_gate_log().ok().flatten();
+    let gate_log_path = gate_log.as_ref().map(|g| g.path.clone());
+    let gate = gate_log.map(|g| g.lines);
 
     let read_back = ReadBack {
         identity: &identity,
@@ -2035,19 +2481,20 @@ pub fn inspect(
     let (verdict, reasons) = judge(&read_back);
     let next = next_action(&read_back, verdict);
     let trial = crate::trial::reload(
-        root,
+        &paths,
         &identity,
         admission.as_ref(),
         intent.as_ref().and_then(|i| i.required_harness.as_deref()),
         verdict,
     )
     .map_err(|detail| NotRead::Unreadable {
-        path: crate::trial::path(root, &identity).display().to_string(),
+        path: crate::trial::path(&paths).display().to_string(),
         detail,
     })?;
     Ok(AttemptStartup {
-        root: root.display().to_string(),
+        root: places.target.display().to_string(),
         attempt: identity,
+        placement: paths.placement,
         outcome: fact.outcome.clone(),
         intent_path: intent_path.display().to_string(),
         launched_path: launched_path.display().to_string(),
@@ -2058,6 +2505,7 @@ pub fn inspect(
         launched,
         admission: admission.map(Box::new),
         gate,
+        gate_log_path,
         record: record.map(Box::new),
         verdict,
         reasons,
@@ -2355,6 +2803,9 @@ fn judge(r: &ReadBack<'_>) -> (Verdict, Vec<String>) {
                 launch.admission_error.clone().unwrap_or_default()
             ),
         }];
+        if let (Some(_), Some(why)) = (&launch.admission, &launch.admission_error) {
+            reasons.push(format!("and the attempt was refused: {why}"));
+        }
         reasons.extend(boundary(launch));
         let verdict = if refused == Some(Decision::Mismatched) {
             Verdict::Mismatched
@@ -2423,9 +2874,14 @@ fn boundary(launch: &LaunchEvidence) -> Vec<String> {
         ),
         Some(consultations) => out.push(format!(
             "the admission gate was consulted {} time(s) and answered {}; a tool call routed \
-             through it did not run",
+             through it did not run{}",
             consultations.len(),
-            consultations.join(", ")
+            consultations.join(", "),
+            if launch.gate_log.is_some() {
+                format!(", as far as its {CHILD_ATTESTED} log says")
+            } else {
+                String::new()
+            }
         )),
     }
     out.push(
@@ -2464,6 +2920,7 @@ mod tests {
         _project: tempfile::TempDir,
         layout: Layout,
         root: PathBuf,
+        places: Places,
         workspace: PathBuf,
         manifest: Manifest,
         digest: String,
@@ -2504,10 +2961,12 @@ mod tests {
             format!("@{}\n", crate::project::INSTRUCTIONS),
         )
         .unwrap();
+        let places = Places::of(home.path(), &root);
         World {
             _home: home,
             _project: project,
             layout,
+            places,
             root,
             workspace,
             manifest,
@@ -2518,6 +2977,7 @@ mod tests {
     fn prepared(w: &World, attempt: u32) -> Prepared {
         prepare(&Preparation {
             root: &w.root,
+            places: &w.places,
             workspace: &w.workspace,
             base_commit: "0".repeat(40).as_str(),
             attempt: AttemptIdentity {
@@ -2597,7 +3057,7 @@ mod tests {
         written: &[u8],
     ) -> std::io::Result<(StartupRecord, PathBuf, Watched, Option<String>)> {
         let now = now;
-        let mut watch = LaunchWatch::new(&w.root, &w.layout, &w.manifest, p, &now);
+        let mut watch = LaunchWatch::new(&w.places, &w.layout, &w.manifest, p, &now);
         watch.spawned(4242).unwrap();
         let mut stop = None;
         for (i, event) in responses
@@ -2627,7 +3087,7 @@ mod tests {
             stopped: stop.clone(),
         };
         let (record, path) = finalize(
-            &w.root,
+            &w.places,
             &w.layout,
             &w.manifest,
             p,
@@ -2670,7 +3130,7 @@ mod tests {
         assert!(!record.qualifies());
         assert_eq!(refuses_the_attempt(&record), None);
 
-        let shown = inspect(&w.root, "003-x", None, &facts(1)).unwrap();
+        let shown = inspect(&w.places, "003-x", None, &facts(1)).unwrap();
         assert_eq!(shown.verdict, Verdict::Unverified, "{:?}", shown.reasons);
         assert!(
             shown
@@ -2812,7 +3272,7 @@ mod tests {
         assert_ne!(record.resolved_harness.as_deref(), Some(w.digest.as_str()));
         assert_eq!(record.standing.word(), "corrupt");
         assert!(!record.qualifies());
-        let shown = inspect(&w.root, "003-x", Some(1), &facts(1)).unwrap();
+        let shown = inspect(&w.places, "003-x", Some(1), &facts(1)).unwrap();
         assert_eq!(shown.verdict, Verdict::NotAdmitted, "{:?}", shown.reasons);
     }
 
@@ -2832,7 +3292,7 @@ mod tests {
             refuses_the_attempt(&record).map(|(guard, _)| guard),
             Some(HARNESS_IDENTITY_GUARD)
         );
-        let shown = inspect(&w.root, "003-x", None, &facts(1)).unwrap();
+        let shown = inspect(&w.places, "003-x", None, &facts(1)).unwrap();
         assert_eq!(shown.verdict, Verdict::Mismatched);
         // No gate was consulted here, and the answer does not pretend one was.
         assert!(
@@ -2857,7 +3317,7 @@ mod tests {
         // gate exists to hold anything.
         assert!(p.intent.registrations.is_empty());
         assert_eq!(p.settings_document(), crate::session::payload_json());
-        assert!(!p.intent.attempt.gate_path(&w.root).exists());
+        assert!(!p.intent.attempt.gate_path(&w.places).exists());
         let line = ack(&p.intent, &required_root(&w));
         let (record, _, watched, stop) =
             launch_through(&w, &p, &[response(&line)], &document(&p)).unwrap();
@@ -2879,6 +3339,7 @@ mod tests {
             .insert(crate::required::REQUIREMENT_KEY.into(), "e".repeat(64));
         let err = prepare(&Preparation {
             root: &w.root,
+            places: &w.places,
             workspace: &w.workspace,
             base_commit: "x",
             attempt: AttemptIdentity {
@@ -2893,14 +3354,12 @@ mod tests {
         })
         .unwrap_err();
         assert!(matches!(err, NotPrepared::Standing(_)), "{err}");
-        assert!(
-            !AttemptIdentity {
-                run_id: "003-x".into(),
-                attempt: 1
-            }
-            .directory(&w.root)
-            .exists()
-        );
+        let attempt = AttemptIdentity {
+            run_id: "003-x".into(),
+            attempt: 1,
+        };
+        assert!(!attempt.records_dir(&w.places).exists());
+        assert!(!attempt.exchange_dir(&w.places).exists());
     }
 
     #[test]
@@ -2914,11 +3373,12 @@ mod tests {
             &document(&first),
         )
         .unwrap();
-        let before = std::fs::read(first.intent.attempt.record_path(&w.root)).unwrap();
+        let before = std::fs::read(first.intent.attempt.record_path(&w.places)).unwrap();
 
         // The same attempt again is refused, before and after its record.
         let again = prepare(&Preparation {
             root: &w.root,
+            places: &w.places,
             workspace: &w.workspace,
             base_commit: "x",
             attempt: first.intent.attempt.clone(),
@@ -2932,7 +3392,7 @@ mod tests {
         assert!(matches!(again, NotPrepared::Exists { .. }));
         assert!(
             finalize(
-                &w.root,
+                &w.places,
                 &w.layout,
                 &w.manifest,
                 &first,
@@ -2960,16 +3420,16 @@ mod tests {
         ));
         assert_eq!(record.resolved_harness, None);
         assert_eq!(
-            std::fs::read(first.intent.attempt.record_path(&w.root)).unwrap(),
+            std::fs::read(first.intent.attempt.record_path(&w.places)).unwrap(),
             before
         );
         assert_eq!(
-            inspect(&w.root, "003-x", Some(1), &facts(2))
+            inspect(&w.places, "003-x", Some(1), &facts(2))
                 .unwrap()
                 .verdict,
             Verdict::Unverified
         );
-        let latest = inspect(&w.root, "003-x", None, &facts(2)).unwrap();
+        let latest = inspect(&w.places, "003-x", None, &facts(2)).unwrap();
         assert_eq!(latest.attempt.attempt, 2);
         assert_eq!(latest.verdict, Verdict::NotAdmitted);
         assert!(
@@ -2984,7 +3444,7 @@ mod tests {
         let w = world(true);
         let p = prepared(&w, 1);
         let shown = inspect(
-            &w.root,
+            &w.places,
             "003-x",
             None,
             &[AttemptFact {
@@ -3002,15 +3462,15 @@ mod tests {
             shown.reasons
         );
         assert!(shown.next.as_deref().unwrap().contains("run reconcile"));
-        assert!(!p.intent.attempt.record_path(&w.root).exists());
-        assert!(!p.intent.attempt.launched_path(&w.root).exists());
+        assert!(!p.intent.attempt.record_path(&w.places).exists());
+        assert!(!p.intent.attempt.launched_path(&w.places).exists());
     }
 
     #[test]
     fn a_refused_attempt_with_no_intent_was_not_launched() {
         let w = world(true);
         let shown = inspect(
-            &w.root,
+            &w.places,
             "003-x",
             None,
             &[AttemptFact {
@@ -3022,7 +3482,7 @@ mod tests {
         assert_eq!(shown.spawn, Spawn::NotAttempted);
         assert_eq!(shown.verdict, Verdict::NotLaunched);
         assert!(matches!(
-            inspect(&w.root, "003-x", Some(4), &facts(1)),
+            inspect(&w.places, "003-x", Some(4), &facts(1)),
             Err(NotRead::NoSuchAttempt(_))
         ));
     }
@@ -3032,7 +3492,7 @@ mod tests {
         let w = world(true);
         let p = prepared(&w, 1);
         let (record, _) = finalize(
-            &w.root,
+            &w.places,
             &w.layout,
             &w.manifest,
             &p,
@@ -3045,7 +3505,7 @@ mod tests {
         .unwrap();
         assert_eq!(record.supply.word(), "failed");
         assert_eq!(record.resolved_harness, None);
-        let shown = inspect(&w.root, "003-x", None, &facts(1)).unwrap();
+        let shown = inspect(&w.places, "003-x", None, &facts(1)).unwrap();
         assert_eq!(shown.spawn, Spawn::Failed);
         assert_eq!(shown.verdict, Verdict::SpawnFailed);
     }
@@ -3101,7 +3561,7 @@ mod tests {
             let mut v = original.clone();
             edit(&mut v);
             std::fs::write(&path, serde_json::to_vec_pretty(&v).unwrap()).unwrap();
-            let shown = inspect(&w.root, "003-x", None, &facts(1)).unwrap();
+            let shown = inspect(&w.places, "003-x", None, &facts(1)).unwrap();
             assert_ne!(shown.verdict, Verdict::Qualified, "{name}");
             assert!(
                 shown.reasons.iter().any(|r| r.contains("do not agree")),
@@ -3115,7 +3575,7 @@ mod tests {
             serde_json::from_slice(&std::fs::read(&p.path).unwrap()).unwrap();
         intent["nonce"] = serde_json::json!("1".repeat(32));
         std::fs::write(&p.path, serde_json::to_vec_pretty(&intent).unwrap()).unwrap();
-        let shown = inspect(&w.root, "003-x", None, &facts(1)).unwrap();
+        let shown = inspect(&w.places, "003-x", None, &facts(1)).unwrap();
         assert!(
             shown.reasons.iter().any(|r| r.contains("changed after")),
             "{:?}",
@@ -3124,7 +3584,7 @@ mod tests {
         // And an unreadable record is an error, not an absence.
         std::fs::write(&path, "{ truncated").unwrap();
         assert!(matches!(
-            inspect(&w.root, "003-x", None, &facts(1)),
+            inspect(&w.places, "003-x", None, &facts(1)),
             Err(NotRead::Unreadable { .. })
         ));
     }
@@ -3169,10 +3629,10 @@ mod tests {
         let w = world(true);
         let p = prepared(&w, 1);
         let now = now;
-        let mut watch = LaunchWatch::new(&w.root, &w.layout, &w.manifest, &p, &now);
+        let mut watch = LaunchWatch::new(&w.places, &w.layout, &w.manifest, &p, &now);
         watch.spawned(31337).unwrap();
         // This product stops here.
-        let shown = inspect(&w.root, "003-x", None, &live(1)).unwrap();
+        let shown = inspect(&w.places, "003-x", None, &live(1)).unwrap();
         assert_eq!(shown.spawn, Spawn::Confirmed);
         assert_eq!(
             shown.verdict,
@@ -3208,7 +3668,7 @@ mod tests {
             .spawn()
             .unwrap();
         // The spawn returned; this product stops before the watch hears of it.
-        let shown = inspect(&w.root, "003-x", None, &live(1)).unwrap();
+        let shown = inspect(&w.places, "003-x", None, &live(1)).unwrap();
         let alive = child.try_wait().unwrap().is_none();
         let _ = child.kill();
         let _ = child.wait();
@@ -3220,7 +3680,7 @@ mod tests {
             "{:?}",
             shown.reasons
         );
-        assert!(!p.intent.attempt.launched_path(&w.root).exists());
+        assert!(!p.intent.attempt.launched_path(&w.places).exists());
     }
 
     /// The confirmation cannot be persisted: the real supervisor stops the
@@ -3231,7 +3691,7 @@ mod tests {
 
         let w = world(true);
         let p = prepared(&w, 1);
-        block(&p.intent.attempt.launched_path(&w.root));
+        block(&p.intent.attempt.launched_path(&w.places));
         let bin = tempfile::tempdir().unwrap();
         let program = bin.path().join("provider");
         statecraft_adapter::fixture::install_script(
@@ -3258,7 +3718,7 @@ mod tests {
             &CheckSuiteCommands(vec![]),
         );
         let now = now;
-        let mut watch = LaunchWatch::new(&w.root, &w.layout, &w.manifest, &p, &now);
+        let mut watch = LaunchWatch::new(&w.places, &w.layout, &w.manifest, &p, &now);
         let execution = statecraft_adapter_claude_code::execution::supervise_with(
             &invocation,
             &request,
@@ -3276,7 +3736,7 @@ mod tests {
 
         let watched = watch.watched();
         let (record, _) = finalize(
-            &w.root,
+            &w.places,
             &w.layout,
             &w.manifest,
             &p,
@@ -3298,8 +3758,8 @@ mod tests {
             record.launch.as_ref().unwrap().process.confirmed,
             Some(false)
         );
-        std::fs::remove_dir(p.intent.attempt.launched_path(&w.root)).unwrap();
-        let shown = inspect(&w.root, "003-x", None, &facts(1)).unwrap();
+        std::fs::remove_dir(p.intent.attempt.launched_path(&w.places)).unwrap();
+        let shown = inspect(&w.places, "003-x", None, &facts(1)).unwrap();
         assert_eq!(shown.spawn, Spawn::Unconfirmed);
         assert_eq!(shown.verdict, Verdict::Interrupted, "{:?}", shown.reasons);
         assert!(shown.reasons[0].contains("before its prompt was delivered"));
@@ -3311,7 +3771,7 @@ mod tests {
     fn a_decision_that_cannot_be_persisted_withholds_work_and_stops_the_session() {
         let w = world(true);
         let p = prepared(&w, 1);
-        block(&p.intent.attempt.admission_path(&w.root));
+        block(&p.intent.attempt.admission_path(&w.places));
         let (record, _, watched, stop) = launch_through(
             &w,
             &p,
@@ -3323,8 +3783,8 @@ mod tests {
         assert!(stop.unwrap().contains("could not be persisted"));
         let (guard, _) = refuses_the_attempt(&record).unwrap();
         assert_eq!(guard, STARTUP_ADMISSION_GUARD);
-        std::fs::remove_dir(p.intent.attempt.admission_path(&w.root)).unwrap();
-        let shown = inspect(&w.root, "003-x", None, &facts(1)).unwrap();
+        std::fs::remove_dir(p.intent.attempt.admission_path(&w.places)).unwrap();
+        let shown = inspect(&w.places, "003-x", None, &facts(1)).unwrap();
         assert_eq!(shown.verdict, Verdict::NotAdmitted, "{:?}", shown.reasons);
     }
 
@@ -3334,7 +3794,7 @@ mod tests {
     fn a_record_that_cannot_be_persisted_leaves_the_outcome_unknown() {
         let w = world(true);
         let p = prepared(&w, 1);
-        block(&p.intent.attempt.record_path(&w.root));
+        block(&p.intent.attempt.record_path(&w.places));
         assert!(
             launch_through(
                 &w,
@@ -3344,8 +3804,8 @@ mod tests {
             )
             .is_err()
         );
-        std::fs::remove_dir(p.intent.attempt.record_path(&w.root)).unwrap();
-        let shown = inspect(&w.root, "003-x", None, &live(1)).unwrap();
+        std::fs::remove_dir(p.intent.attempt.record_path(&w.places)).unwrap();
+        let shown = inspect(&w.places, "003-x", None, &live(1)).unwrap();
         assert_eq!(
             shown.verdict,
             Verdict::OutcomeUnknown,
@@ -3370,9 +3830,9 @@ mod tests {
         let w = world(true);
         let p = prepared(&w, 1);
         let now = now;
-        let mut watch = LaunchWatch::new(&w.root, &w.layout, &w.manifest, &p, &now);
+        let mut watch = LaunchWatch::new(&w.places, &w.layout, &w.manifest, &p, &now);
         watch.spawned(1).unwrap();
-        let admission = p.intent.attempt.admission_path(&w.root);
+        let admission = p.intent.attempt.admission_path(&w.places);
         let started: ProviderEvent = serde_json::from_value(serde_json::json!({
             "type": "system", "subtype": "hook_started", "hook_event": "SessionStart",
             "hook_name": "SessionStart:startup", "session_id": "s-1"
@@ -3405,7 +3865,7 @@ mod tests {
         let w = world(true);
         let p = prepared(&w, 1);
         let now = now;
-        let mut watch = LaunchWatch::new(&w.root, &w.layout, &w.manifest, &p, &now);
+        let mut watch = LaunchWatch::new(&w.places, &w.layout, &w.manifest, &p, &now);
         watch.spawned(1).unwrap();
         let why = watch.decide_at_end().unwrap();
         assert!(why.contains("not-established"), "{why}");
@@ -3423,17 +3883,30 @@ mod tests {
             run_id: "003-x".into(),
             attempt: 1,
         };
-        for file in [
-            files::LAUNCHED,
-            files::ADMISSION,
-            files::RECORD,
-            files::GATE,
+        let records = attempt.records_dir(&w.places);
+        let exchange = attempt.exchange_dir(&w.places);
+        let legacy = attempt.legacy_dir(&w.root);
+        for (dir, file) in [
+            (&records, files::LAUNCHED),
+            (&records, files::ADMISSION),
+            (&records, files::RECORD),
+            (&records, files::GATE_LOG),
+            (&exchange, files::GATE),
+            (&exchange, files::GATE_LOG),
+            // A decision in the exchange directory before the supervisor
+            // wrote one (section 3.37 rule 2) is never adopted.
+            (&exchange, files::ADMISSION),
+            // Section 3.37 rule 5: an attempt already recorded inside the
+            // target is not recorded again in the home.
+            (&legacy, files::INTENT),
+            (&legacy, files::RECORD),
         ] {
-            let path = attempt.directory(&w.root).join(file);
+            let path = dir.join(file);
             std::fs::create_dir_all(path.parent().unwrap()).unwrap();
             std::fs::write(&path, "prior evidence").unwrap();
             let err = prepare(&Preparation {
                 root: &w.root,
+                places: &w.places,
                 workspace: &w.workspace,
                 base_commit: "x",
                 attempt: attempt.clone(),
@@ -3449,9 +3922,11 @@ mod tests {
             assert!(write_once(&path, "new").is_err());
             assert_eq!(std::fs::read_to_string(&path).unwrap(), "prior evidence");
             std::fs::remove_file(&path).unwrap();
+            // An empty exchange directory refuses too; each case is its own.
+            let _ = std::fs::remove_dir(&exchange);
         }
         // No temporary file is left behind by a refused write.
-        let leftovers: Vec<_> = std::fs::read_dir(attempt.directory(&w.root))
+        let leftovers: Vec<_> = std::fs::read_dir(&records)
             .unwrap()
             .filter_map(Result::ok)
             .filter(|e| e.file_name().to_string_lossy().contains("partial"))
@@ -3479,7 +3954,7 @@ mod tests {
             format!("'{}'", hook.display())
         );
         assert_eq!(doc["hooks"]["SessionStart"][0]["matcher"], "startup");
-        let gate = std::fs::canonicalize(p.intent.attempt.gate_path(&w.root)).unwrap();
+        let gate = std::fs::canonicalize(p.intent.attempt.gate_path(&w.places)).unwrap();
         assert_eq!(
             doc["hooks"]["PreToolUse"][0]["hooks"][0]["command"],
             format!("'{}' {GATE_WAIT_TENTHS}", gate.display())
@@ -3554,10 +4029,11 @@ mod tests {
         let before = serde_json::to_vec_pretty(&record).unwrap();
         std::fs::write(&record_path, &before).unwrap();
         for file in [files::LAUNCHED, files::ADMISSION, files::GATE_LOG] {
-            let _ = std::fs::remove_file(p.intent.attempt.directory(&w.root).join(file));
+            let _ = std::fs::remove_file(p.intent.attempt.records_dir(&w.places).join(file));
+            let _ = std::fs::remove_file(p.intent.attempt.exchange_dir(&w.places).join(file));
         }
 
-        let shown = inspect(&w.root, "003-x", None, &facts(1)).unwrap();
+        let shown = inspect(&w.places, "003-x", None, &facts(1)).unwrap();
         assert_eq!(shown.verdict, Verdict::Unverified, "{:?}", shown.reasons);
         assert_eq!(shown.spawn, Spawn::Confirmed);
         assert!(matches!(
@@ -3673,5 +4149,231 @@ mod tests {
         let out = waiting.join().unwrap();
         assert_eq!(out.status.code(), Some(0));
         assert!(started.elapsed() >= std::time::Duration::from_millis(400));
+    }
+
+    // ------------------------------------------- spec 002 section 3.37
+
+    /// Rule 1 and rule 2: the launch records are in the product home, keyed as
+    /// the run record is keyed; the gate, its empty log, the settings document
+    /// and a copy of the decision are in a separate exchange directory; and
+    /// nothing is written into the target.
+    #[test]
+    fn launch_records_are_in_the_home_and_the_child_is_given_only_the_exchange_directory() {
+        let w = world(true);
+        let p = prepared(&w, 1);
+        let attempt = &p.intent.attempt;
+        let chain = statecraft_run::record::chain_path(w.layout.root(), &w.root);
+        assert_eq!(w.places.records, chain.with_extension("startup"));
+        assert!(p.path.starts_with(w.layout.root()));
+        assert_eq!(p.path, attempt.intent_path(&w.places));
+        let exchange = attempt.exchange_dir(&w.places);
+        assert!(exchange.starts_with(w.layout.root().join(EXCHANGE)));
+        assert!(!exchange.starts_with(&w.places.records));
+        assert!(!attempt.records_dir(&w.places).starts_with(&exchange));
+        assert!(attempt.gate_path(&w.places).is_file());
+        assert_eq!(
+            std::fs::read(attempt.gate_log_path(&w.places)).unwrap(),
+            b"",
+            "the gate log is created empty before launch"
+        );
+        assert!(!attempt.legacy_dir(&w.root).exists());
+        assert_eq!(p.intent.registrations[1].script, {
+            std::fs::canonicalize(attempt.gate_path(&w.places))
+                .unwrap()
+                .display()
+                .to_string()
+        });
+
+        // The decision is durable in the launch records, and the gate reads
+        // an identical copy in the exchange directory.
+        let (record, _, watched, stop) = launch_through(
+            &w,
+            &p,
+            &[response(&ack(&p.intent, &required_root(&w)))],
+            &document(&p),
+        )
+        .unwrap();
+        assert_eq!(stop, None);
+        assert_eq!(
+            watched.admission.as_ref().unwrap().decision,
+            Decision::Admitted
+        );
+        assert_eq!(
+            std::fs::read(attempt.admission_path(&w.places)).unwrap(),
+            std::fs::read(attempt.exchange_admission_path(&w.places)).unwrap()
+        );
+        assert!(!attempt.records_dir(&w.places).join(files::GATE).exists());
+        let copy = record.launch.as_ref().unwrap().gate_log.clone().unwrap();
+        assert_eq!(copy.attestation, CHILD_ATTESTED);
+        assert!(copy.failure.is_none(), "{copy:?}");
+        let shown = inspect(&w.places, "003-x", None, &facts(1)).unwrap();
+        assert_eq!(shown.placement, Placement::Home);
+        assert!(shown.describe().contains(CHILD_ATTESTED));
+    }
+
+    /// Rule 2: a decision planted in the exchange directory before the
+    /// supervisor's is not the decision. The records hold the supervisor's,
+    /// the planted file is removed rather than adopted, the gate withholds,
+    /// and the attempt is refused with the failure named.
+    #[test]
+    fn a_decision_planted_in_the_exchange_directory_is_not_adopted_and_refuses_the_attempt() {
+        let w = world(true);
+        let p = prepared(&w, 1);
+        let attempt = &p.intent.attempt;
+        let planted = attempt.exchange_admission_path(&w.places);
+        std::fs::write(&planted, "{\"decision\":\"admitted\"}\n").unwrap();
+        let (record, _, watched, stop) = launch_through(
+            &w,
+            &p,
+            &[response(&ack(&p.intent, &required_root(&w)))],
+            &document(&p),
+        )
+        .unwrap();
+        let why = watched.admission_error.clone().unwrap();
+        assert!(why.contains("did not write"), "{why}");
+        assert!(stop.unwrap().contains("gate withholds"));
+        assert!(!planted.exists(), "the planted decision is still there");
+        // What was admitted is the supervisor's record, not the plant.
+        let recorded: Admission =
+            serde_json::from_slice(&std::fs::read(attempt.admission_path(&w.places)).unwrap())
+                .unwrap();
+        assert_eq!(recorded.intent_digest, p.digest);
+        let (guard, reason) = refuses_the_attempt(&record).unwrap();
+        assert_eq!(guard, STARTUP_ADMISSION_GUARD);
+        assert!(reason.contains("did not write"), "{reason}");
+        let shown = inspect(&w.places, "003-x", None, &facts(1)).unwrap();
+        assert_eq!(shown.verdict, Verdict::NotAdmitted, "{:?}", shown.reasons);
+        assert!(shown.reasons.iter().any(|r| r.contains("did not write")));
+    }
+
+    /// Rule 2: the gate log is copied bounded, never through a link, and a
+    /// log that is not a regular file is recorded as not copied.
+    #[test]
+    fn the_gate_log_is_copied_bounded_and_never_through_a_link() {
+        let w = world(true);
+        let p = prepared(&w, 1);
+        let attempt = &p.intent.attempt;
+        let log = attempt.gate_log_path(&w.places);
+        let long = "admitted\n".repeat((GATE_LOG_LIMIT / 9 + 10) as usize);
+        std::fs::write(&log, &long).unwrap();
+        let (record, _, _, _) = launch_through(
+            &w,
+            &p,
+            &[response(&ack(&p.intent, &required_root(&w)))],
+            &document(&p),
+        )
+        .unwrap();
+        let copy = record.launch.as_ref().unwrap().gate_log.clone().unwrap();
+        assert!(copy.truncated);
+        assert_eq!(copy.bytes, GATE_LOG_LIMIT);
+        let copied = std::fs::read(attempt.records_dir(&w.places).join(files::GATE_LOG)).unwrap();
+        assert_eq!(copied.len() as u64, GATE_LOG_LIMIT);
+        // The copy is what a reader relies on, whatever the exchange log
+        // says afterwards.
+        std::fs::write(&log, "refused\n").unwrap();
+        let (_, read) = read_gate_log_checked(&w.places, attempt).unwrap();
+        let read = read.unwrap();
+        assert!(Path::new(&read.path).starts_with(attempt.records_dir(&w.places)));
+        assert!(!read.lines.iter().any(|l| l == "refused"));
+
+        // A link where the log should be is not followed.
+        let w = world(true);
+        let p = prepared(&w, 1);
+        let log = p.intent.attempt.gate_log_path(&w.places);
+        let secret = w.layout.root().join("secret");
+        std::fs::write(&secret, "admitted\n").unwrap();
+        std::fs::remove_file(&log).unwrap();
+        std::os::unix::fs::symlink(&secret, &log).unwrap();
+        let (record, _, _, _) = launch_through(
+            &w,
+            &p,
+            &[response(&ack(&p.intent, &required_root(&w)))],
+            &document(&p),
+        )
+        .unwrap();
+        let launch = record.launch.as_ref().unwrap();
+        let copy = launch.gate_log.clone().unwrap();
+        assert!(copy.failure.unwrap().contains("could not be read"));
+        assert_eq!(launch.gate, Some(Vec::new()));
+        assert!(
+            read_gate_log_checked(&w.places, &p.intent.attempt).is_err(),
+            "a link read as a gate log"
+        );
+    }
+
+    /// Rule 5: records written inside the target before section 3.37 are
+    /// read where they are and labelled so; where both the home and the target
+    /// hold something of one attempt, neither is chosen and the read fails
+    /// naming both.
+    #[test]
+    fn records_written_inside_the_target_are_read_where_they_are_and_never_beside_the_homes() {
+        let w = world(true);
+        let p = prepared(&w, 1);
+        launch_through(
+            &w,
+            &p,
+            &[response(&ack(&p.intent, &required_root(&w)))],
+            &document(&p),
+        )
+        .unwrap();
+        let attempt = p.intent.attempt.clone();
+        let home = inspect(&w.places, "003-x", None, &facts(1)).unwrap();
+        // Move the attempt, byte for byte, to where section 3.32 wrote it.
+        let legacy = attempt.legacy_dir(&w.root);
+        std::fs::create_dir_all(&legacy).unwrap();
+        for entry in std::fs::read_dir(attempt.records_dir(&w.places)).unwrap() {
+            let entry = entry.unwrap();
+            std::fs::copy(entry.path(), legacy.join(entry.file_name())).unwrap();
+        }
+        // While the home holds it too, neither layout is read: an attempt is
+        // never silently selected from two.
+        let both = inspect(&w.places, "003-x", None, &facts(1)).unwrap_err();
+        let said = both.to_string();
+        assert!(said.contains("both in the product home"), "{said}");
+        assert!(
+            said.contains(&attempt.records_dir(&w.places).display().to_string()),
+            "{said}"
+        );
+        assert!(said.contains(&legacy.display().to_string()), "{said}");
+        assert!(read_gate_log_checked(&w.places, &attempt).is_err());
+        // The exchange directory alone is enough to count as the home's.
+        std::fs::remove_dir_all(attempt.records_dir(&w.places)).unwrap();
+        assert!(attempt.locate(&w.places).is_err());
+        std::fs::create_dir_all(attempt.records_dir(&w.places)).unwrap();
+        // Both layouts are left exactly as they were: the refused read moved,
+        // removed and rewrote nothing.
+        assert!(legacy.join(files::INTENT).is_file());
+        assert!(attempt.exchange_dir(&w.places).is_dir());
+        std::fs::remove_dir_all(attempt.records_dir(&w.places)).unwrap();
+        std::fs::remove_dir_all(attempt.exchange_dir(&w.places)).unwrap();
+        let shown = inspect(&w.places, "003-x", None, &facts(1)).unwrap();
+        assert_eq!(shown.placement, Placement::Target);
+        assert!(Path::new(&shown.intent_path).starts_with(&w.root));
+        assert_eq!(shown.verdict, home.verdict, "{:?}", shown.reasons);
+        assert_eq!(shown.reasons, home.reasons);
+        assert!(
+            shown
+                .describe()
+                .contains("where the child could reach them")
+        );
+        let (paths, log) = read_gate_log_checked(&w.places, &attempt).unwrap();
+        assert_eq!(paths.placement, Placement::Target);
+        assert!(Path::new(&log.unwrap().path).starts_with(&w.root));
+        // Nothing is added to that tree: a new attempt with that number is
+        // refused rather than recorded beside it.
+        let err = prepare(&Preparation {
+            root: &w.root,
+            places: &w.places,
+            workspace: &w.workspace,
+            base_commit: "x",
+            attempt,
+            recorded_at: "t",
+            layout: &w.layout,
+            manifest: &w.manifest,
+            adapter: adapter(),
+            program: "p",
+        })
+        .unwrap_err();
+        assert!(matches!(err, NotPrepared::Exists { .. }), "{err}");
     }
 }

@@ -679,21 +679,45 @@ fn reconcile_verb(
     // Rule 3: the attempt's gate log is read whatever the manifest says, and a
     // log that exists and cannot be read fails rather than reading as
     // "nothing released".
+    //
+    // Spec 002 section 3.37 and 003 section 3.6.1's note: the records are in
+    // the product home, or inside the target where they were written before
+    // that section, never read from both; the gate log is the supervisor's
+    // copy, or the exchange directory's for an attempt it did not conclude,
+    // and it is child-attested either way.
     let identity = statecraft_home::launch::AttemptIdentity {
         run_id: run_id.to_string(),
         attempt,
     };
-    let gate_log_path = identity.gate_log_path(&root).display().to_string();
-    let gate = match statecraft_home::launch::read_gate_log_checked(&root, &identity) {
-        Ok(gate) => gate,
-        Err(statecraft_home::launch::NotRead::NoSuchAttempt(why)) => {
-            return emit(
-                &slice::reconcile_refused_answer(&format!("{why}; nothing was written")),
-                format,
-            );
-        }
-        Err(e) => return fail(&format!("{e}; nothing was written"), format),
-    };
+    let places = statecraft_home::launch::Places::of(home, &root);
+    let (gate_log_path, gate) =
+        match statecraft_home::launch::read_gate_log_checked(&places, &identity) {
+            Ok((paths, gate)) => (
+                gate.as_ref().map_or_else(
+                    || {
+                        match paths.placement {
+                            statecraft_home::launch::Placement::Home => {
+                                identity.gate_log_path(&places)
+                            }
+                            statecraft_home::launch::Placement::Target => {
+                                paths.records.join(statecraft_home::launch::files::GATE_LOG)
+                            }
+                        }
+                        .display()
+                        .to_string()
+                    },
+                    |g| g.path.clone(),
+                ),
+                gate.map(|g| g.lines),
+            ),
+            Err(statecraft_home::launch::NotRead::NoSuchAttempt(why)) => {
+                return emit(
+                    &slice::reconcile_refused_answer(&format!("{why}; nothing was written")),
+                    format,
+                );
+            }
+            Err(e) => return fail(&format!("{e}; nothing was written"), format),
+        };
     let gate_released_tool_call = gate
         .as_ref()
         .is_some_and(|g| g.iter().any(|w| w == "admitted"));
@@ -721,7 +745,7 @@ fn reconcile_verb(
                             .collect()
                     })
                     .unwrap_or_default();
-            match statecraft_home::launch::inspect(&root, run_id, Some(attempt), &facts) {
+            match statecraft_home::launch::inspect(&places, run_id, Some(attempt), &facts) {
                 Ok(shown) => {
                     let pid = shown.launched.as_ref().map(|l| l.pid);
                     Observation {
@@ -950,6 +974,9 @@ fn launch_attempt(
         Ok(c) => c,
         Err(e) => return fail(&e.to_string(), format),
     };
+    // Spec 002 section 3.37: the attempt's launch records and its exchange
+    // directory, in the product home and keyed as the chain just opened.
+    let places = statecraft_home::launch::Places::of(home, root);
 
     // The run id is the spec id: spec 006 section 3.1 says the operator names a
     // unit of work, and spec 003 section 3.4 makes a retry an appended attempt
@@ -986,7 +1013,7 @@ fn launch_attempt(
             {
                 let startup = project_manifest.as_ref().and_then(|_| {
                     statecraft_home::launch::inspect(
-                        root,
+                        &places,
                         live_run,
                         Some(*attempt),
                         &[statecraft_home::launch::AttemptFact {
@@ -1034,7 +1061,7 @@ fn launch_attempt(
                 });
                 return conclude_and_emit(
                     &mut chain,
-                    root,
+                    &places,
                     &session,
                     statecraft_run::attempt::Outcome::Refused,
                     &accounting,
@@ -1103,7 +1130,7 @@ fn launch_attempt(
         });
         return conclude_and_emit(
             &mut chain,
-            root,
+            &places,
             &session,
             statecraft_run::attempt::Outcome::Refused,
             &accounting,
@@ -1132,7 +1159,7 @@ fn launch_attempt(
             });
             return conclude_and_emit(
                 &mut chain,
-                root,
+                &places,
                 &session,
                 statecraft_run::attempt::Outcome::Refused,
                 &accounting,
@@ -1158,7 +1185,7 @@ fn launch_attempt(
         });
         return conclude_and_emit(
             &mut chain,
-            root,
+            &places,
             &session,
             statecraft_run::attempt::Outcome::Refused,
             &accounting,
@@ -1183,6 +1210,7 @@ fn launch_attempt(
             );
             match statecraft_home::launch::prepare(&statecraft_home::launch::Preparation {
                 root,
+                places: &places,
                 workspace: &session.workspace.path,
                 base_commit: &session.workspace.base_commit,
                 attempt: statecraft_home::launch::AttemptIdentity {
@@ -1208,7 +1236,7 @@ fn launch_attempt(
                     });
                     return conclude_and_emit(
                         &mut chain,
-                        root,
+                        &places,
                         &session,
                         statecraft_run::attempt::Outcome::Refused,
                         &accounting,
@@ -1277,21 +1305,29 @@ fn launch_attempt(
     };
     let mut watch = match (&prepared, &project_manifest) {
         (Some(p), Some(m)) => Some(statecraft_home::launch::LaunchWatch::new(
-            root, &layout, m, p, &now,
+            &places, &layout, m, p, &now,
         )),
         _ => None,
     };
+    // Spec 002 section 3.37 rule 2: a managed attempt's settings document is
+    // written into its exchange directory, which `prepare` created.
+    let exchange = statecraft_home::launch::AttemptIdentity {
+        run_id: run_id.clone(),
+        attempt: session.attempt,
+    }
+    .exchange_dir(&places);
     let sentinel = trial.as_ref().and_then(|t| t.sentinel.clone());
     let supervised = match (watch.as_mut(), &sentinel) {
         // Spec 002 section 3.33 rule 34: the trial keeps a timeline beside
         // the attempt's own watch, which it forwards to unchanged.
         (Some(w), Some(sentinel)) => {
             let mut kept = statecraft_home::trial::TrialWatch::new(w, sentinel);
-            let supervised = statecraft_adapter_claude_code::execution::supervise_with(
+            let supervised = statecraft_adapter_claude_code::execution::supervise_with_in(
                 &invocation,
                 &request,
                 &environment,
                 &negotiation.granted,
+                &exchange,
                 &mut kept,
             );
             if supervised.is_ok() {
@@ -1304,11 +1340,12 @@ fn launch_attempt(
             supervised
         }
         (Some(w), None) => {
-            let supervised = statecraft_adapter_claude_code::execution::supervise_with(
+            let supervised = statecraft_adapter_claude_code::execution::supervise_with_in(
                 &invocation,
                 &request,
                 &environment,
                 &negotiation.granted,
+                &exchange,
                 w,
             );
             if supervised.is_ok() {
@@ -1356,7 +1393,7 @@ fn launch_attempt(
                 detail: e.to_string(),
             });
             let startup = finalize_startup(
-                root,
+                &places,
                 &layout,
                 project_manifest.as_ref(),
                 prepared.as_ref(),
@@ -1367,7 +1404,7 @@ fn launch_attempt(
             );
             return conclude_and_emit(
                 &mut chain,
-                root,
+                &places,
                 &session,
                 statecraft_run::attempt::Outcome::Interrupted,
                 &accounting,
@@ -1392,7 +1429,7 @@ fn launch_attempt(
     // attempt under its guard (section 3.32 rule 26).
     let version = provider_version(&execution);
     let startup = finalize_startup(
-        root,
+        &places,
         &layout,
         project_manifest.as_ref(),
         prepared.as_ref(),
@@ -1417,7 +1454,7 @@ fn launch_attempt(
 
     conclude_and_emit(
         &mut chain,
-        root,
+        &places,
         &session,
         execution.termination(),
         &accounting,
@@ -1581,7 +1618,7 @@ fn trial_verb(
 /// Write the trial's record from what the attempt produced, then read every
 /// record back and judge it again (spec 002 section 3.33 rule 34).
 fn trial_conclusion(
-    root: &std::path::Path,
+    places: &statecraft_home::launch::Places,
     concluded: &statecraft_run::session::Concluded,
     t: TrialRun,
 ) -> Answer<slice::TrialView> {
@@ -1596,7 +1633,7 @@ fn trial_conclusion(
     };
     let inspect = || {
         statecraft_home::launch::inspect(
-            root,
+            places,
             &attempt.run_id,
             Some(attempt.attempt),
             std::slice::from_ref(&fact),
@@ -1620,26 +1657,28 @@ fn trial_conclusion(
                 decision: t.decision,
                 process: t.process,
             };
-            let gate = trial::read_gate(root, &attempt);
-            let judgement = trial::judge(
-                &facts,
-                before.admission.as_deref(),
-                before
-                    .intent
-                    .as_ref()
-                    .and_then(|i| i.required_harness.as_deref()),
-                &gate,
-                before.verdict,
-            );
-            if let Err(e) = trial::write(
-                root,
-                &trial::TrialRecord {
-                    facts,
-                    gate,
-                    judgement,
-                },
-            ) {
-                not_stored = Some(format!("the trial's record could not be written: {e}"));
+            match attempt.locate(places) {
+                Ok(paths) => {
+                    let gate = trial::read_gate(&paths);
+                    let judgement = trial::judge(
+                        &facts,
+                        before.admission.as_deref(),
+                        before
+                            .intent
+                            .as_ref()
+                            .and_then(|i| i.required_harness.as_deref()),
+                        &gate,
+                        before.verdict,
+                    );
+                    if let Err(e) =
+                        trial::write(&paths, &trial::TrialRecord::new(facts, gate, judgement))
+                    {
+                        not_stored = Some(format!("the trial's record could not be written: {e}"));
+                    }
+                }
+                Err(e) => {
+                    not_stored = Some(format!("the trial's record was not written: {e}"));
+                }
             }
         }
         (Some(_), Err(e)) => {
@@ -1691,7 +1730,7 @@ struct Finalized {
 /// Write the attempt's record (spec 002 section 3.31), or say why it was not
 /// stored. The judgement is the library's; this places its answer.
 fn finalize_startup(
-    root: &std::path::Path,
+    places: &statecraft_home::launch::Places,
     layout: &statecraft_home::home::Layout,
     manifest: Option<&statecraft_environment::manifest::Manifest>,
     prepared: Option<&statecraft_home::launch::Prepared>,
@@ -1717,8 +1756,9 @@ fn finalize_startup(
     let now = statecraft_environment::time::rfc3339_utc(
         statecraft_environment::time::Clock::now_unix(&SystemClock),
     );
-    match statecraft_home::launch::finalize(root, layout, manifest, prepared, launch, watched, &now)
-    {
+    match statecraft_home::launch::finalize(
+        places, layout, manifest, prepared, launch, watched, &now,
+    ) {
         Ok((record, path)) => {
             let harness = record.launch.as_ref().map(|l| l.harness.describe());
             let refusal = statecraft_home::launch::refuses_the_attempt(&record);
@@ -1774,7 +1814,7 @@ fn finalize_startup(
 #[allow(clippy::too_many_arguments)]
 fn conclude_and_emit(
     chain: &mut Chain,
-    root: &std::path::Path,
+    places: &statecraft_home::launch::Places,
     session: &statecraft_run::session::Session,
     termination: impl Into<statecraft_run::session::Termination>,
     accounting: &statecraft_run::refusal::Accounting,
@@ -1786,7 +1826,7 @@ fn conclude_and_emit(
 ) -> i32 {
     match statecraft_run::session::conclude_observed(
         chain,
-        root,
+        &places.target,
         session,
         termination.into(),
         accounting,
@@ -1795,7 +1835,7 @@ fn conclude_and_emit(
     ) {
         Ok(concluded) => {
             if let Some(t) = trial {
-                return emit(&trial_conclusion(root, &concluded, t), format);
+                return emit(&trial_conclusion(places, &concluded, t), format);
             }
             let account = statecraft_acceptance::suite::fold(&session.run_id, &chain.entries());
             // The verdict is read back from what was written, beside the
@@ -1808,7 +1848,7 @@ fn conclude_and_emit(
                     outcome: Some(concluded.outcome.word().to_string()),
                 };
                 match statecraft_home::launch::inspect(
-                    root,
+                    places,
                     &concluded.run_id,
                     Some(concluded.attempt),
                     &[fact],
