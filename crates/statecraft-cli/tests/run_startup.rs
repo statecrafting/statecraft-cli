@@ -1319,6 +1319,11 @@ fn a_concluded_attempt_an_unknown_attempt_number_and_an_empty_reason_are_refused
     assert_eq!(code(&out), 2, "{}", text(&out));
     assert!(!text(&out).contains("no attempt 1"), "{}", text(&out));
     assert_eq!(chain_bytes(&f), before);
+    // The launch records are keyed as the chain is: the same attempt's
+    // records in the product home answer under that spelling too.
+    let shown = f.cli(&["startup", "show", &spelled, RUN, "--attempt", "1", "--json"]);
+    assert_eq!(value(&shown)["placement"], "home", "{}", text(&shown));
+    assert_eq!(value(&shown), value(&f.show(Some(1))));
 
     // An attempt the record does not carry.
     let out = reconcile_as(&f, "7", "absent", "not-launched", "alice", "none");
