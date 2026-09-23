@@ -69,6 +69,24 @@ pub enum RegistryError {
     /// An operation named a target that is not registered.
     #[error("{0} is not registered")]
     NotRegistered(PathBuf),
+    /// The target's corpus could not be judged: spec-spine is absent or lacks
+    /// `check`. A precondition, so nothing is recorded (spec 002 section 3.23).
+    #[error("{path} was not registered: {detail}")]
+    CorpusCheckUnavailable {
+        /// The target.
+        path: PathBuf,
+        /// What was observed.
+        detail: String,
+    },
+    /// The target's corpus was not judged: `check` did not perform its read.
+    /// Nothing is recorded, because no verdict was established.
+    #[error("{path} was not registered: {detail}")]
+    CorpusCheckNotPerformed {
+        /// The target.
+        path: PathBuf,
+        /// What the producer said.
+        detail: String,
+    },
 }
 
 /// The register's file inside a product home.
@@ -132,6 +150,24 @@ impl Registry {
         let existing = self.get(root);
         let armed = existing.map(|r| r.armed).unwrap_or(false);
         let stored = existing.map_or_else(|| root.to_path_buf(), |r| r.root.clone());
+        // Spec 002 section 3.23: a check that could not be asked, or did not
+        // perform its read, established no verdict, and recording one would
+        // put a verdict nobody reached into the register.
+        match qualification.unjudged() {
+            Some(crate::qualify::Unjudged::Unavailable(detail)) => {
+                return Err(RegistryError::CorpusCheckUnavailable {
+                    path: root.to_path_buf(),
+                    detail,
+                });
+            }
+            Some(crate::qualify::Unjudged::NotPerformed(detail)) => {
+                return Err(RegistryError::CorpusCheckNotPerformed {
+                    path: root.to_path_buf(),
+                    detail,
+                });
+            }
+            None => {}
+        }
         let registration = Registration {
             root: stored,
             qualification,

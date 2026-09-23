@@ -502,6 +502,18 @@ impl Answer {
                     Severity::Ok
                 }
             }
+            // A step that failed is a failure (4) whatever the outcome word
+            // says: spec 006 section 3.3 keeps 4 apart from a refusal, and
+            // spec 002 section 3.23 translates a `check` that did not perform
+            // its read into exactly that.
+            Answer::Init(report)
+                if report
+                    .steps
+                    .iter()
+                    .any(|s| matches!(s.state, flow::StepState::Failed { .. })) =>
+            {
+                Severity::Failed
+            }
             Answer::Init(report) => match report.outcome {
                 flow::Outcome::Complete => Severity::Ok,
                 flow::Outcome::Partial => Severity::Finding,

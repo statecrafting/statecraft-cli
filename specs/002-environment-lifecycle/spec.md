@@ -4443,6 +4443,54 @@ selects the committed requirement; section 3.16 says the run resolved once),
 which matters because spec `003` keys a run by its spec id and so a run never
 ends.
 
+**2026-09-23: section 3.23's translation of `check`, where this spec's crates
+answer with it.** Two places in this spec's territory run `spec-spine check`
+and answer in this product's vocabulary: the qualification behind `project
+register` and step 7 of `init apply`, and step 6 of `init apply`. Both passed
+the answer through as success or anything else, so a stale tree and a
+refused pin both read as a corpus that does not compile, and an absent binary
+as a finding. `statecraft_environment::probe::run_check` now reads the answer
+once, typed, and `CheckAnswer::exit_code` is the table: 0 to 0, 1 and 2 to 1,
+3 to 4, and an absent binary or a missing verb to 2. Contract 5 comes first:
+`check --help` must succeed before `check`'s code is read, because spec-spine
+0.23.0 spends 3 on an unknown subcommand (measured 2026-09-23), which would
+otherwise read as a read not performed. Four choices the section is silent on.
+An exit outside spec-spine's four answers (a signal, a panic's 101) is read as
+3: none of the four answers was given, so nothing about the corpus was
+established. The two readings of exit 2 are told apart from the producer's
+own text (`unresolved`, then `stale`), and a text naming neither says so
+rather than choosing. A register that meets a refusal or a failure records
+nothing, because spec `006` section 3.3 says a refusal did nothing and no
+verdict was reached to record; a finding is a verdict and is recorded as
+before. And an `init apply` with a failed step now exits 4 rather than 2,
+because its outcome word has no failure of its own and spec `006` section 3.3
+keeps 4 apart from a refusal; this also moves the steps that already failed
+(an unreadable declaration, a write that could not be made) from 2 to 4, which
+is the row that section names. In step 6 the verb is established before
+`compile` and `index` run, so a refusal there wrote nothing. That is a
+statement about the step: the initialization had already written its files in
+the governance and project steps, so a step refused after both completed
+leaves it `partial` (exit 1), and
+`refused` (exit 2) stays what section 3.17 makes it, a precondition that
+stopped the flow before any write. Section 3.23's row says "nothing was done",
+which is true of the corpus step and not of an initialization that wrote
+files. Measured on CI: this spec's own acceptance script runs `init apply`
+with no `spec-spine` on `PATH` and accepts only 0 or 1, and an overall
+`refused` failed it. The same measurement found two suites,
+`managed_environment.rs` and `env_remove_bridge.rs`, that initialized with
+whatever `spec-spine` the machine had and so needed the registration an
+absent producer no longer gets; each now puts a stub `spec-spine` first on its
+`PATH`, because neither is about the producer. Test doubles that
+answer `check` now answer `check --help` too, including the stub in
+`scripts/acceptance/managed-session.sh`; the probe test that read an absent
+binary as a broken corpus now reads it as unavailable, which is the row.
+Out of this spec's territory, and left as it stands: spec `003`'s report
+source, which `work list` and `run` read, runs `check` without `--help` and
+maps 2 and 3 to a refusal, as the 2026-09-23 entries of spec `003` and spec
+`006` record. That is a precondition reading of a verb whose answer is not the
+check's verdict, but it disagrees with this table's rows for 2 and 3, and
+reconciling the two is for their owner.
+
 ## Verification
 
 `--fail-on-untraced` joined the corpus gate with this spec's first

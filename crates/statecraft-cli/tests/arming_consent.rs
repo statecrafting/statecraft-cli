@@ -66,7 +66,7 @@ impl Fixture {
             r#"#!/bin/sh
 case "$*" in
   --version) echo 'spec-spine 0.20.0' ;;
-  check) exit 0 ;;
+  check|'check --help') exit 0 ;;
   'registry plan --json') echo '{"ready":[{"id":"fixture","title":"arming fixture"}]}' ;;
   'registry list --json') echo '{"items":[{"id":"fixture","status":"approved","implementation":"pending"}]}' ;;
   'verify '*' --plan --json') printf '{"exitCode":0,"ok":true,"report":{"commands":[],"skipped":[],"specId":"%s"},"schemaVersion":"0.6.0","verb":"verify"}' $2 ;;

@@ -92,6 +92,12 @@ pub fn project_register(
         Err(e @ RegistryError::NotAbsolute(_)) => {
             Err(Answer::new(e.to_string(), Exit::Usage, e.to_string()))
         }
+        // Spec 002 section 3.23's translation of `spec-spine check`: an absent
+        // binary or a missing verb is a refusal (2), and a read the producer
+        // did not perform is a failure (4). Either way nothing is recorded.
+        Err(e @ RegistryError::CorpusCheckUnavailable { .. }) => {
+            Err(Answer::new(e.to_string(), Exit::Refused, e.to_string()))
+        }
         Err(e) => Err(Answer::new(e.to_string(), Exit::Failed, e.to_string())),
     }
 }

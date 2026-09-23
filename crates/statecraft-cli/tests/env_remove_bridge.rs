@@ -72,6 +72,7 @@ impl Sandbox {
             .env("STATECRAFT_HOME", self.dir.path().join("home"))
             .env("STATECRAFT_NATIVE_ROOT", self.dir.path().join("native"))
             .env("HOME", self.dir.path())
+            .env("PATH", stub_path(self.dir.path()))
             .output()
             .expect("the binary runs")
     }
@@ -528,4 +529,26 @@ fn env_remove_takes_no_option_and_no_stray_argument() {
         let out = sandbox.run(&args);
         assert_eq!(code(&out), 3, "{args:?}: {out:?}");
     }
+}
+
+/// A `spec-spine` that answers every verb these suites' flows ask, first on
+/// `PATH`, so they do not depend on whichever one the machine has. Spec 002
+/// section 3.23: an absent producer is a refused corpus step and an
+/// unregistered project, which is not what these suites are about.
+const STUB_SPEC_SPINE: &str =
+    "#!/bin/sh\ncase \"$1\" in\n  --version) echo 'spec-spine 0.23.0' ;;\n  *) exit 0 ;;\nesac\n";
+
+fn stub_path(dir: &std::path::Path) -> String {
+    let bin = dir.join("stub-bin");
+    let spine = bin.join("spec-spine");
+    if !spine.exists() {
+        std::fs::create_dir_all(&bin).expect("the stub directory");
+        statecraft_adapter::fixture::install_script(&spine, STUB_SPEC_SPINE, 0o755)
+            .expect("the stub");
+    }
+    format!(
+        "{}:{}",
+        bin.display(),
+        std::env::var("PATH").unwrap_or_default()
+    )
 }

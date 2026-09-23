@@ -28,6 +28,7 @@ use statecraft_environment::adapter::{Declaration, ManagedFile, StaticProbe};
 use statecraft_environment::claimant::{ForeignClaims, resolve};
 use statecraft_environment::digest::{digest_bytes, digest_file};
 use statecraft_environment::manifest::{Class, Entry, Manifest, Pins, Source, SourceKind};
+use statecraft_environment::probe::{CheckAnswer, Unavailability, check_unavailable, run_check};
 use statecraft_environment::qualify::Qualification;
 use statecraft_environment::registry::Registry;
 use statecraft_environment::time::{Clock, rfc3339_utc};
@@ -54,6 +55,26 @@ pub trait Corpus {
     fn check(&self, root: &Path) -> Result<String, String>;
     /// The tool's version, when it can be asked.
     fn version(&self) -> Option<String>;
+
+    /// Whether the tool is there and carries `check`, asked before anything is
+    /// run (spec 002 section 3.23, contract 5). `Err` carries the answer that
+    /// says why not.
+    ///
+    /// The default is a tool that is always there, which is what a stated test
+    /// double is.
+    fn carries_check(&self, _root: &Path) -> Result<(), CheckAnswer> {
+        Ok(())
+    }
+
+    /// `check`'s answer in spec-spine's own vocabulary, for the translation of
+    /// section 3.23. The default reads [`Corpus::check`] as the two answers a
+    /// stated double can give: fresh, or a corpus that does not validate.
+    fn check_answer(&self, root: &Path) -> CheckAnswer {
+        match self.check(root) {
+            Ok(_) => CheckAnswer::Fresh,
+            Err(detail) => CheckAnswer::DoesNotValidate { detail },
+        }
+    }
 }
 
 /// The real one: the `spec-spine` binary, asked rather than reimplemented.
@@ -109,6 +130,15 @@ impl Corpus for SpecSpineCommand {
     fn check(&self, root: &Path) -> Result<String, String> {
         self.run(root, &["check"])
     }
+    fn carries_check(&self, root: &Path) -> Result<(), CheckAnswer> {
+        match check_unavailable(&self.program, root) {
+            Some(answer) => Err(answer),
+            None => Ok(()),
+        }
+    }
+    fn check_answer(&self, root: &Path) -> CheckAnswer {
+        run_check(&self.program, root)
+    }
     fn version(&self) -> Option<String> {
         let output = std::process::Command::new(&self.program)
             .arg("--version")
@@ -126,9 +156,9 @@ impl Corpus for SpecSpineCommand {
 
 /// A corpus tool that is not installed.
 ///
-/// Reports the absence rather than pretending the corpus compiled. The
-/// initialization then reports `partial`, which is the honest outcome: the
-/// files are in place and nothing has verified them.
+/// Reports the absence rather than pretending the corpus compiled. Spec 002
+/// section 3.23 translates an absent binary into a refusal: the corpus step
+/// does nothing, and says a precondition was not met.
 #[derive(Debug, Clone, Copy, Default)]
 pub struct NoCorpusTool;
 
@@ -144,6 +174,12 @@ impl Corpus for NoCorpusTool {
     }
     fn version(&self) -> Option<String> {
         None
+    }
+    fn carries_check(&self, _root: &Path) -> Result<(), CheckAnswer> {
+        Err(CheckAnswer::Unavailable {
+            why: Unavailability::Absent,
+            detail: "no spec-spine is available".to_string(),
+        })
     }
 }
 
@@ -359,12 +395,32 @@ impl Report {
     }
 
     fn finish(mut self) -> Self {
-        self.outcome = if self.steps.iter().any(|s| {
-            matches!(
-                s.state,
-                StepState::Refused { .. } | StepState::Failed { .. }
-            )
-        }) {
+        // Section 3.17: `refused` is a precondition that stopped the flow
+        // before any write. A step refused after the governance and project
+        // steps completed and wrote their files (section 3.23's translation
+        // of an absent producer at step 6, say) refused that step and nothing
+        // in it, and the initialization is `partial`: files are in place and
+        // a step did not run.
+        let completed = |step: Step| {
+            self.steps.iter().any(|s| {
+                s.step == step
+                    && !matches!(
+                        s.state,
+                        StepState::Refused { .. } | StepState::Failed { .. }
+                    )
+            })
+        };
+        let wrote =
+            self.mode == Mode::Apply && completed(Step::Governance) && completed(Step::Project);
+        let failed = self
+            .steps
+            .iter()
+            .any(|s| matches!(s.state, StepState::Failed { .. }));
+        let refused = self
+            .steps
+            .iter()
+            .any(|s| matches!(s.state, StepState::Refused { .. }));
+        self.outcome = if failed || (refused && !wrote) {
             Outcome::Refused
         } else if self.steps.len() < Step::all().len() || self.steps.iter().any(|s| !s.state.done())
         {
@@ -726,7 +782,12 @@ fn run(ctx: &Context<'_>, mode: Mode) -> Report {
                 detail,
             }
         }
-        Err(reason) => StepReport {
+        Err(RegisterFailure::Refused(reason)) => StepReport {
+            step: Step::Register,
+            state: StepState::Refused { reason },
+            detail: "the project was not registered".to_string(),
+        },
+        Err(RegisterFailure::Failed(reason)) => StepReport {
             step: Step::Register,
             state: StepState::Failed { reason },
             detail: "the project could not be registered".to_string(),
@@ -991,10 +1052,17 @@ fn write_project(
 }
 
 fn step_corpus(ctx: &Context<'_>) -> StepState {
+    // Spec 002 section 3.23, contract 5: the tool and its `check` are
+    // established before anything runs, so a binary that is absent or lacks
+    // the verb is a refusal and nothing in this step was done.
+    if let Err(answer) = ctx.corpus.carries_check(ctx.root) {
+        return StepState::Refused {
+            reason: answer.describe(),
+        };
+    }
     for (what, result) in [
         ("compile", ctx.corpus.compile(ctx.root)),
         ("index", ctx.corpus.index(ctx.root)),
-        ("check", ctx.corpus.check(ctx.root)),
     ] {
         if let Err(reason) = result {
             return StepState::Withheld {
@@ -1002,17 +1070,49 @@ fn step_corpus(ctx: &Context<'_>) -> StepState {
             };
         }
     }
-    StepState::Done
+    // `check`'s answer, translated rather than passed through: 1 and 2 are
+    // findings about the corpus (withheld, with the readings named in the
+    // text), 3 is a read not performed (failed), and absence is a refusal.
+    let answer = ctx.corpus.check_answer(ctx.root);
+    match answer {
+        CheckAnswer::Fresh => StepState::Done,
+        CheckAnswer::DoesNotValidate { .. } | CheckAnswer::Stale { .. } => StepState::Withheld {
+            reason: format!("check: {}", answer.describe()),
+        },
+        CheckAnswer::NotPerformed { .. } => StepState::Failed {
+            reason: format!("check: {}", answer.describe()),
+        },
+        CheckAnswer::Unavailable { .. } => StepState::Refused {
+            reason: format!("check: {}", answer.describe()),
+        },
+    }
 }
 
-fn step_register(ctx: &Context<'_>, writing: bool) -> Result<(Qualification, String), String> {
-    let mut registry = Registry::read(ctx.home.root()).map_err(|e| e.to_string())?;
+/// Why step 7 did not register the project.
+enum RegisterFailure {
+    /// A precondition: spec-spine is absent or lacks `check`.
+    Refused(String),
+    /// Anything else, including a `check` that did not perform its read.
+    Failed(String),
+}
+
+fn step_register(
+    ctx: &Context<'_>,
+    writing: bool,
+) -> Result<(Qualification, String), RegisterFailure> {
+    let failed = |e: statecraft_environment::registry::RegistryError| match e {
+        e @ statecraft_environment::registry::RegistryError::CorpusCheckUnavailable { .. } => {
+            RegisterFailure::Refused(e.to_string())
+        }
+        e => RegisterFailure::Failed(e.to_string()),
+    };
+    let mut registry = Registry::read(ctx.home.root()).map_err(failed)?;
     let registration = registry
         .register(ctx.root, ctx.target_probe)
-        .map_err(|e| e.to_string())?
+        .map_err(failed)?
         .clone();
     if writing {
-        registry.write(ctx.home.root()).map_err(|e| e.to_string())?;
+        registry.write(ctx.home.root()).map_err(failed)?;
     }
     let detail = format!(
         "{}; armed: {}. Arming and execution are separate explicit acts.",
