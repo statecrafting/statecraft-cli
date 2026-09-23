@@ -3240,6 +3240,47 @@ implementation: a separate managed-startup trial, one run attempt spending one
 session and one version probe, under its own approval, with the ordering
 premises it tests stated as premises. The handoff's section 7 is corrected in
 place and says it was corrected. No code changed with this entry.
+**2026-09-22: section 3.33 implemented, and five choices it left open.**
+
+1. *Where the trial lives.* `crates/statecraft-home/src/trial.rs` holds the
+   four values, the sentinel, the timeline watch and the judgement. The watch
+   wraps the attempt's `LaunchWatch` and forwards every spawn and event to it
+   unchanged, so the decision a trial reaches is the one `run` would reach at
+   the same line. `inspect` reads `trial.json` where one exists and recomputes
+   the judgement from the facts written and the admission, intent and gate log
+   on disk now; `agrees` says whether that equals what was written.
+2. *What counts as executed.* A tool result with no error flag and no
+   `non_execution_kind` note for its id. A result the gate blocked carries the
+   error flag, so it is not an execution, and a read that failed would not
+   count either; the sentinel's condition additionally needs the nonce.
+3. *The stop race.* A refusal stops the process group at the decision, and
+   events the provider wrote after that line may or may not have been read.
+   So for a provider that ignores the registration, effects read
+   `demonstrated-possible` when its execution was read and `unobserved` when
+   it was not, and a startup response written after `init` reads `late` or
+   `absent` the same way. Neither can read `excluded` or `established`, and
+   the tests assert exactly that set rather than a scheduling outcome.
+4. *The version probe.* The run path's probe runs `--version` once, without a
+   bound of its own. It is the one probe the budget counts; the acceptance
+   stage's watchdog bounds the whole verb, probe included, at the session
+   deadline plus 120 seconds.
+5. *Refusals the section did not list.* The trial drives a session, so it has
+   `run`'s preconditions as well: a registered and armed target, and no live
+   attempt anywhere in the project. Each is refused before an attempt is
+   appended and spends nothing.
+
+Measured through the built binary, `--synthetic` throughout: a faithful fake is
+`established` with effects `excluded`, one session and one probe; a second
+trial is refused as spent; a read that bypasses the gate is
+`demonstrated-possible`; a session requesting no tool leaves effects
+`unobserved`; a hook run without the session's environment is `unbound`; a
+tool request streamed before `init` is decided at that request, recorded as
+`tool-use`, and refused `wrong-session`; a provider ignoring the registration
+reads `absent`; a hung session with a descendant is stopped at a three-second
+deadline, `uncertain`, with no survivor; and an edited `trial.json` reads back
+as disagreeing. The acceptance script's `managed-startup` stage runs the same
+path through its local route. **No provider session was started**, so every
+premise P1 to P5 keeps the grade section 3.33 gives it.
 
 ## Verification
 
@@ -3288,5 +3329,7 @@ cargo test -p statecraft-cli --test acceptance_script
 cargo test -p statecraft-cli --test native_stream
 cargo test -p statecraft-home --lib launch
 cargo test -p statecraft-cli --test run_startup
+cargo test -p statecraft-home --lib trial
+cargo test -p statecraft-cli --test startup_trial
 sh -n scripts/acceptance/managed-session.sh
 ```

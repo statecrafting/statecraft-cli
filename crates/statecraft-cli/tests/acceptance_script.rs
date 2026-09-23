@@ -370,3 +370,105 @@ fn an_ancestor_toolchain_file_refuses_the_preflight() {
     assert_eq!(code(&out), 2, "{}", both(&out));
     assert!(both(&out).contains("rust-toolchain.toml"), "{}", both(&out));
 }
+
+fn trial_fake() -> PathBuf {
+    Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/fake-trial-provider.sh")
+}
+
+impl Run {
+    /// The managed-startup stage's local route, with the fake in `mode`.
+    fn trial_run(&self, mode: &str, extra: &[(&str, &str)]) -> Output {
+        let bin = self.acc().join("trialbin");
+        std::fs::create_dir_all(&bin).unwrap();
+        std::fs::write(bin.join("mode"), mode).unwrap();
+        let fake = trial_fake().display().to_string();
+        let mut env = vec![
+            ("SC_ACCEPTANCE_FAKE_PROVIDER", fake.as_str()),
+            ("TRIAL_TIMEOUT", "10"),
+        ];
+        env.extend_from_slice(extra);
+        self.script("managed-startup", &env)
+    }
+
+    fn trial_launches(&self) -> usize {
+        std::fs::read_to_string(self.acc().join("trialbin/launches"))
+            .unwrap_or_default()
+            .lines()
+            .count()
+    }
+}
+
+/// Spec 002 section 3.33 through the script: the run path, one session, the
+/// reload, and a result that says SYNTHETIC. Spent once per fixture.
+#[test]
+fn the_managed_startup_stage_runs_one_trial_and_says_synthetic() {
+    let run = Run::new();
+    run.preflight();
+    let out = run.trial_run("faithful", &[]);
+    let text = both(&out);
+    assert_eq!(code(&out), 0, "{text}");
+    assert!(text.contains("session 1 of at most 1"), "{text}");
+    assert!(text.contains("ESTABLISHED (SYNTHETIC)"), "{text}");
+    assert_eq!(run.trial_launches(), 1);
+    assert_eq!(
+        std::fs::read_to_string(run.acc().join("trial-result")).unwrap(),
+        "synthetic-established\n"
+    );
+    let shown = std::fs::read_to_string(run.acc().join("steps/31-trial-show.out")).unwrap();
+    assert!(
+        shown.contains("trial     established (synthetic)"),
+        "{shown}"
+    );
+    assert!(!shown.contains("RELOAD"), "{shown}");
+
+    // Spent: a second trial on the same fixture is refused, and nothing runs.
+    let again = run.trial_run("faithful", &[]);
+    assert_eq!(code(&again), 2, "{}", both(&again));
+    assert_eq!(run.trial_launches(), 1);
+}
+
+/// A fake that runs the read without consulting the gate: a finding, named
+/// by the product's verdict, with the records kept.
+#[test]
+fn an_ungated_read_makes_the_managed_startup_stage_a_finding() {
+    let run = Run::new();
+    run.preflight();
+    let out = run.trial_run("gate-ignored", &[]);
+    let text = both(&out);
+    assert_eq!(code(&out), 1, "{text}");
+    assert!(text.contains("not-established"), "{text}");
+    assert_eq!(
+        std::fs::read_to_string(run.acc().join("trial-result")).unwrap(),
+        "synthetic-not-established\n"
+    );
+    let shown = std::fs::read_to_string(run.acc().join("steps/31-trial-show.out")).unwrap();
+    assert!(shown.contains("demonstrated-possible"), "{shown}");
+}
+
+/// The two provider approvals are two approvals, and the local route mixes
+/// with neither.
+#[test]
+fn the_managed_startup_approval_is_its_own_and_the_routes_do_not_mix() {
+    let run = Run::new();
+    run.preflight();
+    // The permission stage's approval does not approve this one.
+    let out = run.script("managed-startup", &[("APPROVED_PROVIDER_SESSION", "yes")]);
+    assert_eq!(code(&out), 2, "{}", both(&out));
+    assert!(both(&out).contains("APPROVED_MANAGED_STARTUP_SESSION=yes"));
+    // Nor this one the permission stage.
+    let out = run.script(
+        "permission-experiment",
+        &[("APPROVED_MANAGED_STARTUP_SESSION", "yes")],
+    );
+    assert_eq!(code(&out), 2, "{}", both(&out));
+    // The fake route refuses beside either approval.
+    for approval in [
+        "APPROVED_PROVIDER_SESSION",
+        "APPROVED_MANAGED_STARTUP_SESSION",
+    ] {
+        let out = run.trial_run("faithful", &[(approval, "yes")]);
+        assert_eq!(code(&out), 2, "{approval}: {}", both(&out));
+    }
+    assert_eq!(run.trial_launches(), 0);
+    assert!(!run.acc().join("trial-result").exists());
+}

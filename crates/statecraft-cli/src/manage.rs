@@ -270,6 +270,7 @@ pub fn usage(verb: crate::commands::Verb) -> &'static str {
         }
         Verb::StartupQualify => " <path> <session-id> <capture-dir>",
         Verb::StartupShow => " <path> <run-id> [--attempt <n>]",
+        Verb::StartupTrial => " <path> (--provider-session | --synthetic) [--deadline <seconds>]",
         _ => " <path>",
     }
 }

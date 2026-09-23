@@ -739,6 +739,16 @@ section 3.33. The verb requires the operator to state provider execution or a
 fake, because a default would let a script spend a session nobody named.
 No code changed with this entry.
 
+**2026-09-22: `startup trial` bound.** Section 3.11.4's verb calls one
+path: `run`'s launch, factored so `run` and the trial share it and differ only
+in the plan (prompt, turn limit, deadline) and in the trial's watch. The
+binding checks the trial's preconditions before an attempt is appended, adds
+`run`'s own (a registered, armed target), and maps the library's judgement to
+section 3.11.4's codes. `startup show` gains its `trial` section through the
+library's `inspect`, so its binding did not change. The probe reports the
+version its single `--version` call read, so the trial records it without a
+second call.
+
 ## Verification
 
 Each line is one command. §3.7's rows are integration tests that **spawn the

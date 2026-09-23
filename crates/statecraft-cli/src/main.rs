@@ -187,6 +187,25 @@ fn run(args: &[String]) -> i32 {
                 format,
             )
         }
+        // Spec 006 section 3.11.4. The trial drives a session, so it has
+        // `run`'s preconditions: a registered and armed target.
+        Verb::StartupTrial => {
+            let Some(path) = invocation.rest.first() else {
+                eprintln!(
+                    "usage: startup trial{}",
+                    statecraft_cli::manage::usage(invocation.verb)
+                );
+                return Exit::Usage.code();
+            };
+            let root = absolute(path);
+            let Some(registration) = registry.get(&root) else {
+                return emit(&bind::unregistered_answer(&root), format);
+            };
+            if !registration.armed {
+                return emit(&bind::unarmed_answer(&root), format);
+            }
+            trial_verb(&root, &home, &invocation.rest[1..], format)
+        }
         // Spec 006 section 3.11.3. A read: the run record says which attempts
         // exist and how they ended, and the library judges their startup
         // records. Registration is not required, as for the other `startup`
@@ -398,7 +417,65 @@ fn run_verb(
     if !eligibility.schedulable() {
         return emit(&slice::work_show_answer(eligibility), format);
     }
+    launch_attempt(
+        root,
+        home,
+        spec_id,
+        AttemptPlan::work_order(spec_id),
+        None,
+        format,
+    )
+}
 
+/// What an attempt asks of its session. `run` asks for its unit of work; the
+/// managed-startup trial asks for the sentinel read (spec 002 section 3.33
+/// rule 30), and nothing else differs.
+struct AttemptPlan {
+    prompt: Vec<u8>,
+    max_turns: Option<u32>,
+    deadline_seconds: u64,
+}
+
+impl AttemptPlan {
+    fn work_order(spec_id: &str) -> Self {
+        Self {
+            prompt: format!("Implement {spec_id} in this workspace.").into_bytes(),
+            max_turns: None,
+            deadline_seconds: 900,
+        }
+    }
+
+    fn trial(deadline_seconds: u64) -> Self {
+        Self {
+            prompt: statecraft_home::trial::prompt().into_bytes(),
+            max_turns: Some(statecraft_home::trial::MAX_TURNS),
+            deadline_seconds,
+        }
+    }
+}
+
+/// What a trial carries through its attempt, filled in as the launch goes.
+struct TrialRun {
+    origin: statecraft_home::trial::Origin,
+    deadline_seconds: u64,
+    sentinel: Option<statecraft_home::trial::Sentinel>,
+    probed_version: Option<String>,
+    settings_written: Option<String>,
+    entries: Vec<statecraft_home::trial::Entry>,
+    decision: Option<statecraft_home::trial::DecisionPoint>,
+    process: statecraft_home::trial::ProcessEnd,
+}
+
+/// One attempt through the adapter: begin, prepare, supervise, conclude. The
+/// run path, shared by `run` and by `startup trial`.
+fn launch_attempt(
+    root: &std::path::Path,
+    home: &std::path::Path,
+    run_id: &str,
+    plan: AttemptPlan,
+    mut trial: Option<TrialRun>,
+    format: Format,
+) -> i32 {
     // Spec 002 section 3.25: managed execution refuses when the committed
     // requirement's content cannot be established. Judged by the library and
     // before the attempt is appended, so a refusal leaves no attempt behind.
@@ -428,7 +505,7 @@ fn run_verb(
     // unit of work, and spec 003 section 3.4 makes a retry an appended attempt
     // of the same run, so a fresh id per invocation would turn every retry into
     // a new run.
-    let run_id = spec_id.to_string();
+    let run_id = run_id.to_string();
     let session =
         match statecraft_run::session::begin(&mut chain, root, &run_id, "HEAD", &SystemClock) {
             Ok(s) => s,
@@ -461,6 +538,32 @@ fn run_verb(
                 return emit(&slice::session_error_answer(&e), format);
             }
         };
+
+    // Spec 002 section 3.33 rule 31: the trial's sentinel is in the attempt's
+    // own workspace before anything is prepared or launched.
+    if let Some(t) = trial.as_mut() {
+        match statecraft_home::trial::place_sentinel(&session.workspace.path) {
+            Ok(sentinel) => t.sentinel = Some(sentinel),
+            Err(e) => {
+                let mut accounting = statecraft_run::refusal::Accounting::default();
+                accounting.observe(statecraft_run::refusal::RefusalEvent {
+                    guard: "trial-sentinel".to_string(),
+                    detail: format!("the trial's sentinel could not be placed: {e}"),
+                });
+                return conclude_and_emit(
+                    &mut chain,
+                    root,
+                    &session,
+                    statecraft_run::attempt::Outcome::Refused,
+                    &accounting,
+                    serde_json::json!({ "trialRefusal": e.to_string() }),
+                    unlaunched(project_manifest.is_some(), None),
+                    trial,
+                    format,
+                );
+            }
+        }
+    }
 
     // Preflight refuses before any process is created, naming the token (spec
     // 004 section 3.3). The manifest is read here and only here.
@@ -504,12 +607,16 @@ fn run_verb(
                 &accounting,
                 serde_json::json!({ "preflightRefusal": refusal.to_string(), "posture": posture }),
                 unlaunched(project_manifest.is_some(), None),
+                trial,
                 format,
             );
         }
     };
 
-    let probe = adapters::probe(home);
+    let (probe, probed_version) = adapters::probe_reporting_version(home);
+    if let Some(t) = trial.as_mut() {
+        t.probed_version = probed_version;
+    }
     posture.qualification = probe.qualification();
     let Some(program) = probe.resolved_executable() else {
         let mut accounting = statecraft_run::refusal::Accounting::default();
@@ -525,6 +632,7 @@ fn run_verb(
             &accounting,
             serde_json::json!({ "preflightRefusal": "provider executable unresolvable", "posture": posture }),
             unlaunched(project_manifest.is_some(), None),
+            trial,
             format,
         );
     };
@@ -573,6 +681,7 @@ fn run_verb(
                         &accounting,
                         serde_json::json!({ "startupRefusal": why.to_string(), "posture": posture }),
                         unlaunched(true, Some(why.to_string())),
+                        trial,
                         format,
                     );
                 }
@@ -598,7 +707,7 @@ fn run_verb(
     let mut invocation = statecraft_adapter_claude_code::Invocation::new(
         &program.display().to_string(),
         &floor,
-        None,
+        plan.max_turns,
     );
     if let Some(hooks) = prepared.as_ref().and_then(|p| p.intent.hooks()) {
         invocation = invocation.with_hooks(hooks);
@@ -614,9 +723,9 @@ fn run_verb(
     let request = statecraft_adapter::protocol::Request {
         workspace: session.workspace.path.clone(),
         base_commit: session.workspace.base_commit.clone(),
-        prompt: format!("Implement {spec_id} in this workspace.").into_bytes(),
+        prompt: plan.prompt.clone(),
         capabilities: requested.clone(),
-        deadline_seconds: 900,
+        deadline_seconds: plan.deadline_seconds,
         attempt: statecraft_adapter::protocol::AttemptIdentity {
             run_id: run_id.clone(),
             number: session.attempt,
@@ -638,26 +747,71 @@ fn run_verb(
         )),
         _ => None,
     };
-    let supervised = match watch.as_mut() {
-        Some(w) => statecraft_adapter_claude_code::execution::supervise_with(
-            &invocation,
-            &request,
-            &environment,
-            &negotiation.granted,
-            w,
-        ),
-        None => statecraft_adapter_claude_code::execution::supervise(
+    let sentinel = trial.as_ref().and_then(|t| t.sentinel.clone());
+    let supervised = match (watch.as_mut(), &sentinel) {
+        // Spec 002 section 3.33 rule 34: the trial keeps a timeline beside
+        // the attempt's own watch, which it forwards to unchanged.
+        (Some(w), Some(sentinel)) => {
+            let mut kept = statecraft_home::trial::TrialWatch::new(w, sentinel);
+            let supervised = statecraft_adapter_claude_code::execution::supervise_with(
+                &invocation,
+                &request,
+                &environment,
+                &negotiation.granted,
+                &mut kept,
+            );
+            if supervised.is_ok() {
+                kept.decide_at_end();
+            }
+            if let Some(t) = trial.as_mut() {
+                t.entries = std::mem::take(&mut kept.entries);
+                t.decision = kept.decision.take();
+            }
+            supervised
+        }
+        (Some(w), None) => {
+            let supervised = statecraft_adapter_claude_code::execution::supervise_with(
+                &invocation,
+                &request,
+                &environment,
+                &negotiation.granted,
+                w,
+            );
+            if supervised.is_ok() {
+                // A stream that ended before its decision point is decided at
+                // its end.
+                w.decide_at_end();
+            }
+            supervised
+        }
+        (None, _) => statecraft_adapter_claude_code::execution::supervise(
             &invocation,
             &request,
             &environment,
             &negotiation.granted,
         ),
     };
-    if let (Some(w), Ok(_)) = (watch.as_mut(), &supervised) {
-        // A stream that ended before its decision point is decided at its end.
-        w.decide_at_end();
-    }
     let watched = watch.map(|w| w.watched()).unwrap_or_default();
+    if let Some(t) = trial.as_mut() {
+        t.process = match &supervised {
+            Ok(e) => statecraft_home::trial::ProcessEnd {
+                spawned: watched.spawned.is_some(),
+                outcome: Some(e.supervised.outcome.word().to_string()),
+                stopped: e.supervised.stopped.clone(),
+                stream_error: e.supervised.stream_error.as_ref().map(ToString::to_string),
+                surviving: e.supervised.surviving_processes.clone(),
+                failed: None,
+            },
+            Err(e) => statecraft_home::trial::ProcessEnd {
+                spawned: watched.spawned.is_some(),
+                failed: Some(e.to_string()),
+                ..statecraft_home::trial::ProcessEnd::default()
+            },
+        };
+        if let Ok(e) = &supervised {
+            t.settings_written = Some(String::from_utf8_lossy(&e.settings_written).into_owned());
+        }
+    }
     let execution = match supervised {
         Ok(s) => s,
         Err(e) => {
@@ -684,6 +838,7 @@ fn run_verb(
                 &accounting,
                 serde_json::json!({ "supervisorError": e.to_string(), "posture": posture, "startup": startup.detail }),
                 startup.run,
+                trial,
                 format,
             );
         }
@@ -739,7 +894,7 @@ fn run_verb(
             "applied": posture.applied.iter().map(|c| c.token()).collect::<Vec<_>>(),
             "posture": posture,
             "degraded": negotiation.degraded.iter().map(|c| c.token()).collect::<Vec<_>>(),
-            "specId": spec_id,
+            "specId": run_id,
             "execution": execution.evidence(),
             "payload": {
                 "digest": statecraft_home::startup::payload_identity(),
@@ -749,8 +904,213 @@ fn run_verb(
             "startup": startup.detail,
         }),
         startup.run,
+        trial,
         format,
     )
+}
+
+/// `startup trial <path> (--provider-session | --synthetic) [--deadline <s>]`
+///
+/// Spec 006 section 3.11.4 and spec 002 section 3.33. Every refusal here comes
+/// before an attempt is appended, so a refused trial spends nothing.
+fn trial_verb(
+    root: &std::path::Path,
+    home: &std::path::Path,
+    rest: &[String],
+    format: Format,
+) -> i32 {
+    use statecraft_home::trial;
+    let usage = || {
+        eprintln!(
+            "usage: startup trial{}",
+            statecraft_cli::manage::usage(Verb::StartupTrial)
+        );
+        Exit::Usage.code()
+    };
+    let mut stated = Vec::new();
+    let mut deadline = trial::DEFAULT_DEADLINE_SECONDS;
+    let mut args = rest.iter();
+    while let Some(arg) = args.next() {
+        match arg.as_str() {
+            "--provider-session" => stated.push(trial::Origin::ProviderSession),
+            "--synthetic" => stated.push(trial::Origin::Synthetic),
+            "--deadline" => match args.next().map(|n| n.parse::<u64>()) {
+                Some(Ok(n)) => deadline = n,
+                _ => return usage(),
+            },
+            _ => return usage(),
+        }
+    }
+    let origin = match stated.as_slice() {
+        [one] => *one,
+        [] => {
+            return emit(
+                &slice::trial_refused_answer(
+                    "the trial runs a provider session or a local fake, and the operator must                      say which: pass --provider-session or --synthetic",
+                ),
+                format,
+            );
+        }
+        _ => {
+            return emit(
+                &slice::trial_refused_answer(
+                    "--provider-session and --synthetic contradict each other; pass one",
+                ),
+                format,
+            );
+        }
+    };
+    if let Some(why) = trial::refuses_deadline(deadline) {
+        return emit(&slice::trial_refused_answer(&why), format);
+    }
+    let manifest = match Manifest::read(root) {
+        Ok(Some(m)) => m,
+        Ok(None) => {
+            return emit(
+                &slice::trial_refused_answer(&format!(
+                    "{} holds no manifest, so it is not a managed project",
+                    root.display()
+                )),
+                format,
+            );
+        }
+        Err(e) => return fail(&e.to_string(), format),
+    };
+    let layout = statecraft_home::home::Layout::new(home);
+    let standing = statecraft_home::required::evaluate(&layout, &manifest, None);
+    if matches!(standing, statecraft_home::required::Standing::Unrequired) {
+        return emit(
+            &slice::trial_refused_answer(
+                "the project commits no harness requirement, so a run is not gated and a trial                  could not answer its question; commit one with `harness upgrade` first",
+            ),
+            format,
+        );
+    }
+    if let Some(reason) = standing.refuses_a_run() {
+        return emit(&bind::harness_refused_answer(root, &reason), format);
+    }
+    match Chain::open(home, root) {
+        Ok((chain, _)) => {
+            if let Some(run) = statecraft_run::session::runs(&chain)
+                .into_iter()
+                .find(|r| r.id == trial::RUN_ID && !r.attempts.is_empty())
+            {
+                return emit(
+                    &slice::trial_refused_answer(&format!(
+                        "this project's trial is spent: run {} holds {} attempt(s). A trial \
+                         happens once per project, and an uncertain one is never replayed; \
+                         inspect it with `startup show {} {}`",
+                        trial::RUN_ID,
+                        run.attempts.len(),
+                        root.display(),
+                        trial::RUN_ID
+                    )),
+                    format,
+                );
+            }
+        }
+        Err(e) => return fail(&e.to_string(), format),
+    }
+    if root.join(trial::SENTINEL).exists() {
+        return emit(
+            &slice::trial_refused_answer(&format!(
+                "{} already exists in the project, so the sentinel's nonce could not be the \
+                 only copy",
+                trial::SENTINEL
+            )),
+            format,
+        );
+    }
+    launch_attempt(
+        root,
+        home,
+        trial::RUN_ID,
+        AttemptPlan::trial(deadline),
+        Some(TrialRun {
+            origin,
+            deadline_seconds: deadline,
+            sentinel: None,
+            probed_version: None,
+            settings_written: None,
+            entries: Vec::new(),
+            decision: None,
+            process: statecraft_home::trial::ProcessEnd::default(),
+        }),
+        format,
+    )
+}
+
+/// Write the trial's record from what the attempt produced, then read every
+/// record back and judge it again (spec 002 section 3.33 rule 34).
+fn trial_conclusion(
+    root: &std::path::Path,
+    concluded: &statecraft_run::session::Concluded,
+    t: TrialRun,
+) -> Answer<slice::TrialView> {
+    use statecraft_home::trial;
+    let attempt = statecraft_home::launch::AttemptIdentity {
+        run_id: concluded.run_id.clone(),
+        attempt: concluded.attempt,
+    };
+    let fact = statecraft_home::launch::AttemptFact {
+        number: concluded.attempt,
+        outcome: Some(concluded.outcome.word().to_string()),
+    };
+    let inspect = || {
+        statecraft_home::launch::inspect(
+            root,
+            &attempt.run_id,
+            Some(attempt.attempt),
+            std::slice::from_ref(&fact),
+        )
+    };
+    let mut not_stored = None;
+    match (&t.sentinel, inspect()) {
+        (None, _) => {}
+        (Some(sentinel), Ok(before)) => {
+            let facts = trial::Facts {
+                version: trial::TRIAL_VERSION,
+                origin: t.origin,
+                attempt: attempt.clone(),
+                deadline_seconds: t.deadline_seconds,
+                max_turns: trial::MAX_TURNS,
+                prompt: trial::prompt(),
+                sentinel: sentinel.clone(),
+                settings_written: t.settings_written,
+                probed_version: t.probed_version,
+                entries: t.entries,
+                decision: t.decision,
+                process: t.process,
+            };
+            let gate = trial::read_gate(root, &attempt);
+            let judgement = trial::judge(
+                &facts,
+                before.admission.as_deref(),
+                before
+                    .intent
+                    .as_ref()
+                    .and_then(|i| i.required_harness.as_deref()),
+                &gate,
+                before.verdict,
+            );
+            if let Err(e) = trial::write(
+                root,
+                &trial::TrialRecord {
+                    facts,
+                    gate,
+                    judgement,
+                },
+            ) {
+                not_stored = Some(format!("the trial's record could not be written: {e}"));
+            }
+        }
+        (Some(_), Err(e)) => {
+            not_stored = Some(format!(
+                "the attempt's records could not be read to judge the trial: {e}"
+            ));
+        }
+    }
+    slice::trial_answer(concluded, inspect(), t.sentinel.is_some(), not_stored)
 }
 
 /// A run attempt that never reached its launch: no record to write.
@@ -882,6 +1242,7 @@ fn conclude_and_emit(
     accounting: &statecraft_run::refusal::Accounting,
     detail: serde_json::Value,
     mut startup: statecraft_home::launch::RunStartup,
+    trial: Option<TrialRun>,
     format: Format,
 ) -> i32 {
     match statecraft_run::session::conclude_observed(
@@ -894,6 +1255,9 @@ fn conclude_and_emit(
         &SystemClock,
     ) {
         Ok(concluded) => {
+            if let Some(t) = trial {
+                return emit(&trial_conclusion(root, &concluded, t), format);
+            }
             let account = statecraft_acceptance::suite::fold(&session.run_id, &chain.entries());
             // The verdict is read back from what was written, beside the
             // outcome just recorded, so the answer is the persisted judgement
