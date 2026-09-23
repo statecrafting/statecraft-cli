@@ -3288,29 +3288,34 @@ separately: section 3.30's permission experiment, at most three sessions and
 stopping at the first that does not complete, and section 3.33's
 managed-startup trial, exactly one session. Neither authorization covered a
 retry, a longer limit or a second fixture, and none was used. Both ran from
-`main` at `01df484` through `scripts/acceptance/managed-session.sh`, each on
-its own fixture built by its own preflight. The two fixtures were `ACC` =
+`main` at `01df484` (the checkout's `HEAD` when each preflight built the
+product; the archives record the binary's digest, not its source revision)
+through `scripts/acceptance/managed-session.sh`, each on its own fixture built
+by its own preflight. The two fixtures were `ACC` =
 `$TMPDIR/sc-accept-A` and `$TMPDIR/sc-accept-B`, and both preflights exited 0.
 The product binary was built from that revision, SHA-256 `a6cf34ac…19335`. The
 provider was Claude Code `2.1.267` at
 `~/.local/share/claude/versions/2.1.267`, SHA-256 `a681f300…cd2558`, and each
-launch's probe and `init` event both reported `2.1.267`. Every capture, record
-and stream is kept, outside the repository, in two archives:
+launch's probe and `init` event both reported `2.1.267`. Every step's
+captured output, the permission experiment's raw stream and every record the
+product wrote are kept, outside the repository, in two archives:
 `sc-accept-A.tar.gz` (`8bf5f4f3…e2a6`) and `sc-accept-B.tar.gz`
 (`567c8ee9…60a5`). The two results are reported apart, and neither one, nor
 both together, is a qualification.
 
 *The permission experiment: unverified, stopped at session 1 of 3.* The
-refusal control launched at 08:10:10Z and exited by itself with status 1 in
-nine seconds, with no timeout and no survivor. `startup capture` recorded the
+stage started at 08:10:10Z and ended at 08:10:19Z, version probe included; the
+refusal control's session exited by itself with status 1, with no timeout and
+no survivor. `startup capture` recorded the
 launch as incomplete. Rule 8 requires the terminal event to be the capture's
 last event, and it was not: the provider wrote a `system` event of subtype
 `task_summary`, with `detail: null`, after its `result` event. The stage
 therefore stopped, as it is required to. The allowed-command and
 without-payload controls were never launched, the admission never judged a
 claim, and the fixture project was unchanged. The capture (`refusal.json`,
-SHA-256 `5d988271…b6dc`, stream `cc9b6e59…ea11`, 10775 bytes) records these
-events and nothing more:
+SHA-256 `5d988271…b6dc`, stream `cc9b6e59…ea11`, 10775 bytes, twelve
+events) records, besides two `hook_started` events and a `rate_limit_event`,
+which is not a turn:
 
 - two `SessionStart` responses from the operator's own settings, because the
   stage does not replace `HOME`, both before `init`;
@@ -3339,10 +3344,11 @@ what section 3.30 admits, and that is the owner's decision, recorded as open
 in the next entry.
 
 *The managed-startup trial: established, for one session on this machine.*
-`startup trial --provider-session` ran at 08:11:25Z with its defaults: a
-120-second session deadline, a 240-second bound on the whole verb, and
-`--max-turns 3`. The run was attempt 1 of `statecraft-startup-trial`, and it
-completed by itself at 08:11:33Z. The required and selected revision was
+`startup trial --provider-session` ran at 08:11:25Z with the product's
+120-second default session deadline and `--max-turns 3`, under the script's
+own bound on the whole verb (that deadline plus 120 seconds). The run was
+attempt 1 of `statecraft-startup-trial`, and it completed by itself; its
+record is dated 08:11:32Z. The required and selected revision was
 `h-33c417e1c3a4`. The settings document it wrote, `84293ea6…f430`, 993 bytes,
 registered the revision's `SessionStart` hook and the attempt's gate.
 
@@ -3350,8 +3356,11 @@ The timeline, as `trial.json` (`a81429f8…3ccf`) records it:
 
 - lines 1 to 6: three `SessionStart` hooks started and responded, all exiting
   0. Line 5 is the supplied hook's response, and it carried this attempt's
-  acknowledgment. The other two came from the operator's own settings and
-  carried none.
+  acknowledgment. The other two carried none; the settings the run wrote
+  register one `SessionStart` hook, so they are inferred to be the
+  operator's own, as in the permission experiment. The trial keeps its
+  per-line timeline, not the provider's raw stream, so this is an inference
+  and not a preserved observation.
 - line 7: `init`. The decision `admitted` was made there, because the one
   correlated acknowledgment named the required revision and the standing was
   exact.
@@ -3394,6 +3403,8 @@ The permission experiment's capture ended with `system`/`task_summary` after
 
 Such an amendment would need to say that those events are not turns, that
 they name the same session, and that nothing in them is read as evidence. The
+same capture also carries a `rate_limit_event` mid-stream, which the list
+should account for deliberately rather than by accident. The
 recommendation is the second option, narrowly: admit only `system` events
 whose subtype is on a closed list (today, `task_summary`), refuse any other
 trailing event, and record the list's provenance as this capture. It is an
