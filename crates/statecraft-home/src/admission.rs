@@ -27,7 +27,8 @@
 //!   its mid-stream denial and the harness's own non-execution note, and is
 //!   classified [`Use::Refused`], [`Use::Executed`] or unresolved (rule 9);
 //! - a capture is read whole: one session, one init, one terminal event, last
-//!   (rule 8);
+//!   but for the one allowlisted trailer section 3.34 admits and never reads
+//!   (rule 8, and rules 13 and 14);
 //! - each control's outcome is judged separately, and permission success is
 //!   not command success (rule 10);
 //! - the process end and terminal state are judged per observation (rule 11);
@@ -53,6 +54,7 @@ use crate::settings::DENY_FLOOR;
 use serde::{Deserialize, Serialize};
 use statecraft_adapter_claude_code::{
     PermissionDenial, ProviderEvent, ResultEvent, ToolResult, ToolUse, read_jsonl,
+    task_summary_trailer,
 };
 use statecraft_environment::digest::digest_bytes;
 use std::collections::{BTreeMap, BTreeSet};
@@ -859,6 +861,27 @@ struct Stream {
     not_executed: BTreeMap<String, String>,
     denials: Vec<PermissionDenial>,
     mid_stream_denials: BTreeSet<String>,
+    trailer: Option<Trailer>,
+}
+
+/// The one event a capture carried after its terminal event, admitted by
+/// section 3.34 rule 13 and read for nothing else (rule 14).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct Trailer {
+    /// Which event it was, one-based, counting non-blank lines.
+    pub event: usize,
+    /// Its subtype, from the closed list.
+    pub subtype: String,
+}
+
+impl Trailer {
+    /// One line an operator reads.
+    pub fn note(&self) -> String {
+        format!(
+            "event {}: system/{} after the terminal event, admitted by section 3.34 and not read",
+            self.event, self.subtype
+        )
+    }
 }
 
 impl Stream {
@@ -923,6 +946,25 @@ fn read(control: Control, capture: &Capture) -> Result<Stream, NotAdmitted> {
         detail,
     };
     let events = read_jsonl(&capture.bytes).map_err(|e| unreadable(e.to_string()))?;
+    // The same lines `read_jsonl` read, in the same order, so the one line
+    // section 3.34 admits after the terminal event is read by the adapter's
+    // closed type rather than by a second parser here.
+    let lines: Vec<&str> = capture
+        .bytes
+        .lines()
+        .filter(|l| !l.trim().is_empty())
+        .collect();
+    // Section 3.34's bounds: the trailer's line must be the line its event
+    // was read from. Two copies of one filter agree today; if they ever
+    // stopped agreeing, an index into `lines` could name an earlier event's
+    // line, so a disagreement is refused rather than read.
+    if lines.len() != events.len() {
+        return Err(unreadable(format!(
+            "{} events were read from {} non-blank lines, so a line cannot be tied to its event",
+            events.len(),
+            lines.len()
+        )));
+    }
     let out_of_order = |detail: String| NotAdmitted::OutOfOrder { control: c, detail };
 
     let mut sessions: Vec<(&'static str, Option<String>)> = Vec::new();
@@ -932,9 +974,17 @@ fn read(control: Control, capture: &Capture) -> Result<Stream, NotAdmitted> {
     let mut results = BTreeMap::new();
     let mut not_executed = BTreeMap::new();
     let mut mid_stream_denials = BTreeSet::new();
+    let mut trailer: Option<Trailer> = None;
 
     for (index, event) in events.iter().enumerate() {
         let line = index + 1;
+        if let Some(t) = &trailer {
+            return Err(out_of_order(format!(
+                "event {line} follows the trailer at event {}, which is the last event a \
+                 capture may carry (section 3.34 rule 13)",
+                t.event
+            )));
+        }
         if terminal.is_some() {
             if matches!(event, ProviderEvent::Result(_)) {
                 return Err(NotAdmitted::DuplicateEvent {
@@ -942,9 +992,26 @@ fn read(control: Control, capture: &Capture) -> Result<Stream, NotAdmitted> {
                     event: "terminal",
                 });
             }
-            return Err(out_of_order(format!(
-                "event {line} follows the terminal event, which is the last event of a session"
-            )));
+            // Section 3.34 rule 13: one event of a closed shape may follow the
+            // terminal event. Nothing in it is read beyond its session, which
+            // joins rule 8's session check below.
+            let raw = lines.get(index).copied().unwrap_or_default();
+            match task_summary_trailer(raw) {
+                Ok(t) => {
+                    sessions.push(("trailer", Some(t.session_id.clone())));
+                    trailer = Some(Trailer {
+                        event: line,
+                        subtype: t.subtype,
+                    });
+                    continue;
+                }
+                Err(why) => {
+                    return Err(out_of_order(format!(
+                        "event {line} follows the terminal event and is not the one trailer \
+                         section 3.34 admits: {why}"
+                    )));
+                }
+            }
         }
         match event {
             ProviderEvent::System(system) if system.is_init() => {
@@ -1133,6 +1200,7 @@ fn read(control: Control, capture: &Capture) -> Result<Stream, NotAdmitted> {
         not_executed,
         denials,
         mid_stream_denials,
+        trailer,
     })
 }
 
@@ -1141,8 +1209,10 @@ fn read(control: Control, capture: &Capture) -> Result<Stream, NotAdmitted> {
 /// A reading, not a judgement: the launching operation uses it to say whether
 /// the next control is worth launching, and says nothing about what the
 /// session showed.
-pub fn one_session(control: Control, capture: &Capture) -> Result<(), NotAdmitted> {
-    read(control, capture).map(|_| ())
+///
+/// A trailer section 3.34 admitted is returned so the launch can report it.
+pub fn one_session(control: Control, capture: &Capture) -> Result<Option<Trailer>, NotAdmitted> {
+    read(control, capture).map(|s| s.trailer)
 }
 
 /// The binding checks of section 3.30 rule 12 for one control, and rule 11's
@@ -1501,6 +1571,12 @@ fn outcome(evidence: &Evidence, control: Control, s: &Stream) -> Result<(), NotA
 /// whether the observation is live; [`Evidence::synthetic`] does, and the
 /// record that carries it is never qualified when it is.
 pub fn admit(evidence: &Evidence) -> Result<(), NotAdmitted> {
+    admitted(evidence).map(|_| ())
+}
+
+/// [`admit`], returning the trailers section 3.34 admitted, per control, from
+/// the same pass that judged each capture. Reported, never read (rule 14).
+pub fn admitted(evidence: &Evidence) -> Result<Vec<(Control, Trailer)>, NotAdmitted> {
     if evidence.version.trim().is_empty() {
         return Err(NotAdmitted::NoVersion);
     }
@@ -1603,13 +1679,24 @@ pub fn admit(evidence: &Evidence) -> Result<(), NotAdmitted> {
     for (control, s) in &streams {
         outcome(evidence, *control, s)?;
     }
-    Ok(())
+    Ok(streams
+        .into_iter()
+        .filter_map(|(control, s)| s.trailer.map(|t| (control, t)))
+        .collect())
 }
 
 /// Admit an observation for one project: [`admit`], and the controls ran in
 /// that project.
 pub fn admit_in(evidence: &Evidence, root: &std::path::Path) -> Result<(), NotAdmitted> {
-    admit(evidence)?;
+    admitted_in(evidence, root).map(|_| ())
+}
+
+/// [`admit_in`], returning the trailers [`admitted`] reports.
+pub fn admitted_in(
+    evidence: &Evidence,
+    root: &std::path::Path,
+) -> Result<Vec<(Control, Trailer)>, NotAdmitted> {
+    let trailers = admitted(evidence)?;
     let expected = root
         .canonicalize()
         .unwrap_or_else(|_| root.to_path_buf())
@@ -1622,7 +1709,7 @@ pub fn admit_in(evidence: &Evidence, root: &std::path::Path) -> Result<(), NotAd
             found: found.clone(),
         });
     }
-    Ok(())
+    Ok(trailers)
 }
 
 /// What an admitted observation says, in one line.

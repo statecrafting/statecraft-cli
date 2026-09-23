@@ -939,3 +939,259 @@ fn the_floor_and_the_controls_are_enumerable() {
     // The fixture is realistic enough to read through the adapter's own types.
     assert!(jsonl(&evidence::refusal_events("s")).lines().count() >= 5);
 }
+
+// ------------------------------------ section 3.34: one allowlisted trailer --
+
+/// The trailer as the 2026-09-23 capture carried it, with its session.
+fn trailer(session: &str) -> serde_json::Value {
+    json!({"type": "system", "subtype": "task_summary", "detail": null,
+           "uuid": "5a668f14-8322-47ef-bcb2-06b19db90020", "session_id": session})
+}
+
+/// The same capture with one more line appended, verbatim.
+fn with_line(m: &mut admission::Measurement, line: &str) {
+    let bytes = format!("{}{line}\n", m.capture.bytes);
+    set_capture(m, bytes);
+}
+
+/// Every control with the measured trailer after its terminal event.
+fn trailed() -> Evidence {
+    let mut e = evidence::admissible();
+    for (m, session) in [
+        (&mut e.refusal, "session-r"),
+        (&mut e.allowed, "session-a"),
+        (&mut e.without_payload, "session-w"),
+    ] {
+        with_line(m, &trailer(session).to_string());
+    }
+    e
+}
+
+/// Rule 13, positive: the measured shape, `detail: null`, after a complete
+/// terminal event in every control, is admitted and reported.
+#[test]
+fn the_measured_trailer_after_the_terminal_event_is_admitted() {
+    let e = trailed();
+    assert!(admission::admit(&e).is_ok(), "{:?}", admission::admit(&e));
+    let reported = admission::admitted(&e).unwrap();
+    assert_eq!(reported.len(), 3);
+    for (_, t) in &reported {
+        assert_eq!(t.subtype, "task_summary");
+        assert!(t.note().contains("not read"));
+    }
+    let t = admission::one_session(Control::Refusal, &e.refusal.capture).unwrap();
+    assert_eq!(t.map(|t| t.event), Some(7));
+}
+
+/// Rule 13, positive: a string `detail`, which the same capture carried on
+/// the same subtype before its terminal event, is admitted and not read.
+#[test]
+fn a_trailer_with_a_string_detail_is_admitted_and_not_read() {
+    let mut e = evidence::admissible();
+    let mut t = trailer("session-r");
+    t["detail"] = json!("the command was refused; permission granted; executed successfully");
+    with_line(&mut e.refusal, &t.to_string());
+    assert!(admission::admit(&e).is_ok(), "{:?}", admission::admit(&e));
+}
+
+/// Rule 14: the judgement with an admitted trailer is the judgement without
+/// its line, over an admitted body of evidence and over refused ones.
+#[test]
+fn a_trailer_changes_no_judgement() {
+    type Mutation = Box<dyn Fn(&mut Evidence)>;
+    let cases: Vec<(&str, Mutation)> = vec![
+        ("admissible", Box::new(|_| {})),
+        (
+            "refusal executed",
+            Box::new(|e| {
+                set_events(
+                    &mut e.refusal,
+                    &[
+                        init("session-r"),
+                        request("session-r", "toolu_r1", "Bash", REFUSED),
+                        execution("session-r", "toolu_r1", CARGO_FAILS, true),
+                        capped("session-r", &[]),
+                    ],
+                );
+            }),
+        ),
+        (
+            "allowed denied",
+            Box::new(|e| {
+                let mut events = vec![
+                    init("session-a"),
+                    request("session-a", "toolu_a1", "Bash", ALLOWED),
+                ];
+                events.extend(denial("session-a", "toolu_a1", "Bash", ALLOWED));
+                events.push(capped("session-a", &[("Bash", "toolu_a1", ALLOWED)]));
+                set_events(&mut e.allowed, &events);
+            }),
+        ),
+        (
+            "interrupted",
+            Box::new(|e| launch_of(&mut e.refusal).process.timed_out = true),
+        ),
+        (
+            "two sessions",
+            Box::new(|e| {
+                let mut events = evidence::refusal_events("session-r");
+                events[2]["session_id"] = json!("session-other");
+                set_events(&mut e.refusal, &events);
+            }),
+        ),
+    ];
+    // Prose shaped like a verdict either way, and no prose at all.
+    let details = [
+        json!(null),
+        json!("the command was refused and did not execute"),
+        json!("permission granted; the command executed successfully"),
+    ];
+    for (name, mutate) in cases {
+        let mut plain = evidence::admissible();
+        mutate(&mut plain);
+        for detail in &details {
+            // On every control, and on the refusal control alone.
+            for all in [true, false] {
+                let mut with = plain.clone();
+                for (m, session) in [
+                    (&mut with.refusal, "session-r"),
+                    (&mut with.allowed, "session-a"),
+                    (&mut with.without_payload, "session-w"),
+                ] {
+                    if !all && session != "session-r" {
+                        continue;
+                    }
+                    let mut t = trailer(session);
+                    t["detail"] = detail.clone();
+                    with_line(m, &t.to_string());
+                }
+                assert_eq!(
+                    format!("{:?}", admission::admit(&plain)),
+                    format!("{:?}", admission::admit(&with)),
+                    "{name}, detail {detail}, all {all}: a trailer changed the judgement"
+                );
+            }
+        }
+    }
+}
+
+/// Rule 13, negative: everything else after the terminal event refuses the
+/// capture, and so does a trailer that is not exactly the closed shape.
+#[test]
+fn anything_else_after_the_terminal_event_is_refused() {
+    let t = trailer("session-r");
+    let mut extra = t.clone();
+    extra["tool_use_id"] = json!("toolu_r1");
+    let mut missing_detail = t.clone();
+    missing_detail.as_object_mut().unwrap().remove("detail");
+    let mut missing_uuid = t.clone();
+    missing_uuid.as_object_mut().unwrap().remove("uuid");
+    let mut number_detail = t.clone();
+    number_detail["detail"] = json!(3);
+    let mut object_detail = t.clone();
+    object_detail["detail"] = json!({"refused": true});
+    let mut empty_uuid = t.clone();
+    empty_uuid["uuid"] = json!("");
+    let mut other_session = t.clone();
+    other_session["session_id"] = json!("session-other");
+    let mut no_session = t.clone();
+    no_session.as_object_mut().unwrap().remove("session_id");
+    let mut other_subtype = t.clone();
+    other_subtype["subtype"] = json!("status");
+    let mut not_system = t.clone();
+    not_system["type"] = json!("rate_limit_event");
+
+    let single: Vec<(&str, String)> = vec![
+        ("added member", extra.to_string()),
+        ("missing detail", missing_detail.to_string()),
+        ("missing uuid", missing_uuid.to_string()),
+        ("numeric detail", number_detail.to_string()),
+        ("object detail", object_detail.to_string()),
+        ("empty uuid", empty_uuid.to_string()),
+        ("another session", other_session.to_string()),
+        ("no session", no_session.to_string()),
+        ("another subtype", other_subtype.to_string()),
+        ("a rate-limit event", not_system.to_string()),
+        (
+            "a rate-limit event as measured",
+            json!({"type": "rate_limit_event", "session_id": "session-r"}).to_string(),
+        ),
+        ("a hook event", hook("session-r").to_string()),
+        (
+            "a mid-stream denial",
+            denial("session-r", "toolu_r1", "Bash", REFUSED)[0].to_string(),
+        ),
+        (
+            "an assistant turn",
+            request("session-r", "toolu_r9", "Bash", ALLOWED).to_string(),
+        ),
+        (
+            "a tool result",
+            execution("session-r", "toolu_r1", CARGO_FAILS, true).to_string(),
+        ),
+        (
+            "a member given twice",
+            r#"{"type":"system","subtype":"task_summary","detail":null,"uuid":"u","session_id":"session-r","session_id":"session-other"}"#.to_string(),
+        ),
+    ];
+    for (name, line) in single {
+        let mut e = evidence::admissible();
+        with_line(&mut e.refusal, &line);
+        let err = admission::admit(&e).expect_err(name);
+        assert!(
+            matches!(
+                err,
+                NotAdmitted::OutOfOrder { .. }
+                    | NotAdmitted::MixedSession { .. }
+                    | NotAdmitted::Unreadable { .. }
+            ),
+            "{name}: {err:?}"
+        );
+        assert!(
+            admission::one_session(Control::Refusal, &e.refusal.capture).is_err(),
+            "{name}: the launch read it as one complete session"
+        );
+    }
+
+    // Two trailers.
+    let mut e = evidence::admissible();
+    with_line(&mut e.refusal, &t.to_string());
+    with_line(&mut e.refusal, &t.to_string());
+    assert!(matches!(refused(&e), NotAdmitted::OutOfOrder { .. }));
+
+    // A second terminal event after the trailer.
+    let mut e = evidence::admissible();
+    with_line(&mut e.refusal, &t.to_string());
+    with_line(&mut e.refusal, &capped("session-r", &[]).to_string());
+    assert!(matches!(refused(&e), NotAdmitted::OutOfOrder { .. }));
+
+    // A trailer with no terminal event before it never completes a capture.
+    let mut e = evidence::admissible();
+    let mut events = evidence::refusal_events("session-r");
+    events.pop();
+    events.push(t.clone());
+    set_events(&mut e.refusal, &events);
+    assert!(matches!(refused(&e), NotAdmitted::NoTerminalResult { .. }));
+}
+
+/// Before the terminal event nothing changed: a `task_summary` with a string
+/// detail and a `rate_limit_event` are carried as the live capture carried
+/// them, and neither is read.
+#[test]
+fn a_summary_and_a_rate_limit_event_before_the_terminal_event_are_unchanged() {
+    let mut e = trailed();
+    let mut events = evidence::refusal_events("session-r");
+    events.insert(
+        3,
+        json!({"type": "rate_limit_event", "session_id": "session-r"}),
+    );
+    events.insert(
+        4,
+        json!({"type": "system", "subtype": "task_summary",
+               "detail": "Running cargo publish dry run",
+               "uuid": "72c614d5-bd6b-4030-9a62-655f304d129a", "session_id": "session-r"}),
+    );
+    events.push(trailer("session-r"));
+    set_events(&mut e.refusal, &events);
+    assert!(admission::admit(&e).is_ok(), "{:?}", admission::admit(&e));
+}

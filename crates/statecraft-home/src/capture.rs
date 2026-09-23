@@ -121,6 +121,9 @@ pub struct Launched {
     /// that executed its command completed as a launch, and the admission is
     /// what refuses the claim.
     pub incomplete: Option<String>,
+    /// The one event after the terminal event that spec 002 section 3.34
+    /// admitted, when the capture carried one. Reported, never read.
+    pub trailer: Option<admission::Trailer>,
 }
 
 /// Resolve a program the way a shell would, against the given environment.
@@ -328,13 +331,18 @@ pub fn launch(request: &Request) -> Result<Launched, Failed> {
         source: stdout_path.display().to_string(),
         bytes: stdout,
     };
+    let mut trailer = None;
     let incomplete = process.unmeasured().or_else(|| {
         if !undecodable.is_empty() {
             return Some(format!("{} was not UTF-8", undecodable.join(" and ")));
         }
-        admission::one_session(control, &capture)
-            .err()
-            .map(|e| e.to_string())
+        match admission::one_session(control, &capture) {
+            Ok(t) => {
+                trailer = t;
+                None
+            }
+            Err(e) => Some(e.to_string()),
+        }
     });
     let measurement = Measurement {
         invocation: Invocation {
@@ -371,6 +379,7 @@ pub fn launch(request: &Request) -> Result<Launched, Failed> {
         path: record,
         measurement,
         incomplete,
+        trailer,
     })
 }
 

@@ -371,6 +371,10 @@ pub struct StartupOutcome {
     pub record: Box<crate::startup::StartupRecord>,
     /// Whether the session carries the managed-execution claim.
     pub qualified: bool,
+    /// The trailers spec 002 section 3.34 admitted in the submitted captures,
+    /// one line each. Reported, never read. Empty for every other operation.
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub trailers: Vec<String>,
 }
 
 /// One launched control, as the operation recorded it.
@@ -386,6 +390,10 @@ pub struct CaptureOutcome {
     pub complete: bool,
     /// Why it did not, when it did not.
     pub incomplete: Option<String>,
+    /// The one event after the terminal event that spec 002 section 3.34
+    /// admitted, when there was one. Reported, never read.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub trailer: Option<crate::admission::Trailer>,
     /// The record itself.
     pub measurement: Box<crate::admission::Measurement>,
 }
@@ -710,6 +718,9 @@ impl Answer {
                 let mut out = format!("session   {}\n", s.session_id);
                 out.push_str(&s.record.describe());
                 out.push('\n');
+                for t in &s.trailers {
+                    out.push_str(&format!("trailer   {t}\n"));
+                }
                 out.push_str(&format!(
                     "{}  {}\n",
                     if s.written { "written " } else { "existing" },
@@ -748,6 +759,9 @@ impl Answer {
                     None => "session   complete; the admission judges what it shows\n".to_string(),
                     Some(why) => format!("session   incomplete: {why}\n"),
                 });
+                if let Some(t) = &c.trailer {
+                    out.push_str(&format!("trailer   {}\n", t.note()));
+                }
                 out.push_str(&format!("record    {}\n", c.path));
                 out
             }
@@ -916,10 +930,21 @@ pub fn execute(ports: &Ports<'_>, operation: Operation) -> Answer {
                     }));
                 }
             };
-            let admitted = crate::admission::admit_in(&evidence, &root)
-                .and_then(|()| crate::startup::admit(&evidence));
+            let admitted = crate::admission::admitted_in(&evidence, &root).and_then(|trailers| {
+                crate::startup::admit(&evidence).map(|observation| (observation, trailers))
+            });
             match admitted {
-                Ok(observation) => startup_record(ports, &root, &session_id, Some(observation)),
+                Ok((observation, trailers)) => {
+                    let trailers: Vec<String> = trailers
+                        .into_iter()
+                        .map(|(control, t)| format!("{}: {}", control.word(), t.note()))
+                        .collect();
+                    let mut answer = startup_record(ports, &root, &session_id, Some(observation));
+                    if let Answer::Startup(outcome) = &mut answer {
+                        outcome.trailers = trailers;
+                    }
+                    answer
+                }
                 Err(why) => {
                     Answer::QualificationRefused(Box::new(QualificationRefused::NotAdmitted {
                         reason: why.to_string(),
@@ -942,6 +967,7 @@ fn startup_capture(root: &Path, request: crate::capture::Request) -> Answer {
             control,
             complete: launched.incomplete.is_none(),
             incomplete: launched.incomplete,
+            trailer: launched.trailer,
             measurement: Box::new(launched.measurement),
         })),
         Err(crate::capture::Failed::Refused(why)) => Answer::Refused {
@@ -1118,6 +1144,7 @@ fn startup_record(
             written: true,
             qualified: record.qualifies(),
             record: Box::new(record),
+            trailers: Vec::new(),
         })),
         // A start happens once, so a second record for the same session is a
         // precondition that stopped the operation rather than a failure.

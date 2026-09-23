@@ -26,6 +26,10 @@
 #   version-fails     `--version` exits 1
 #   tamper            behaves faithfully, and first deletes $FAKE_TAMPER, the
 #                     way a session that reached an earlier capture could
+#   trailer           faithful, then one system/task_summary after the terminal
+#                     event, the shape Claude Code 2.1.267 wrote on 2026-09-23
+#   bad-trailer       faithful, then a task_summary carrying a tool-use id,
+#                     which spec 002 section 3.34 does not admit
 set -eu
 
 mode="${FAKE_PROVIDER_MODE:-faithful}"
@@ -119,6 +123,14 @@ case "$command" in
   *)
     ran "unexpected command" true
     capped ""
+    ;;
+esac
+case "$mode" in
+  trailer)
+    printf '{"type":"system","subtype":"task_summary","detail":null,"uuid":"trailer-%s","session_id":"%s"}\n' "$$" "$session"
+    ;;
+  bad-trailer)
+    printf '{"type":"system","subtype":"task_summary","detail":null,"uuid":"trailer-%s","session_id":"%s","tool_use_id":"%s"}\n' "$$" "$session" "$id"
     ;;
 esac
 exit 1
