@@ -19,13 +19,13 @@
 #![cfg(unix)]
 
 use serde_json::Value;
-use std::os::unix::fs::PermissionsExt;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Output};
 
 fn executable(path: &Path, script: &str) {
-    std::fs::write(path, script).unwrap();
-    std::fs::set_permissions(path, std::fs::Permissions::from_mode(0o755)).unwrap();
+    // Staged and copied, never written in place: a script this process wrote
+    // and then exec'd is the `ETXTBSY` race spec 004 records.
+    statecraft_adapter::fixture::install_script(path, script, 0o755).unwrap();
 }
 
 /// The target, the product home, and the stub tools the run would reach.

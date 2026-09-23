@@ -3107,6 +3107,10 @@ cargo build -p statecraft-home --example require-harness
 cargo test -p statecraft-adapter-claude-code --test settings_transport
 cargo test -p statecraft-adapter --lib supervisor
 cargo test -p statecraft-home --lib capture
+cargo test -p statecraft-cli --test qualification_workflow
+cargo test -p statecraft-cli --test acceptance_script
+cargo test -p statecraft-cli --test native_stream
 cargo test -p statecraft-home --lib launch
+cargo test -p statecraft-cli --test run_startup
 sh -n scripts/acceptance/managed-session.sh
 ```

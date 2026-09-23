@@ -209,10 +209,16 @@ pub struct ConcludedView {
     pub base_moved: bool,
     /// The workspace retained for the next attempt.
     pub workspace_retained: String,
+    /// The attempt's startup evidence (spec 006 section 3.11.3).
+    pub startup: statecraft_home::launch::RunStartup,
 }
 
 impl ConcludedView {
-    fn of(c: &Concluded, posture: RecordedPosture) -> Self {
+    fn of(
+        c: &Concluded,
+        posture: RecordedPosture,
+        startup: statecraft_home::launch::RunStartup,
+    ) -> Self {
         Self {
             posture,
             run_id: c.run_id.clone(),
@@ -222,6 +228,7 @@ impl ConcludedView {
             refusals: c.refusals,
             base_moved: c.base_moved,
             workspace_retained: c.workspace_retained.clone(),
+            startup,
         }
     }
 }
@@ -237,6 +244,7 @@ pub fn run_answer(concluded: Concluded) -> Answer<ConcludedView> {
         statecraft_acceptance::absence::Recorded::Absent(
             statecraft_acceptance::absence::Absence::NotRecorded,
         ),
+        statecraft_home::launch::RunStartup::unmanaged(),
     )
 }
 
@@ -244,8 +252,12 @@ pub fn run_answer(concluded: Concluded) -> Answer<ConcludedView> {
 pub fn run_answer_with_posture(
     concluded: Concluded,
     posture: RecordedPosture,
+    startup: statecraft_home::launch::RunStartup,
 ) -> Answer<ConcludedView> {
     let exit = match concluded.outcome {
+        // Spec 006 section 3.11.3: a launch whose record was not stored is a
+        // failure nobody asked for, whatever the attempt's outcome.
+        _ if startup.not_stored() => Exit::Failed,
         Outcome::Completed => Exit::Ok,
         // The operation ran and reports an outcome that is not clean. Nothing
         // about the product failed.
@@ -276,7 +288,12 @@ pub fn run_answer_with_posture(
         summary.push_str("  completed says nothing about acceptance; run `accept` for that\n");
     }
     summary.push_str(&render_posture(&posture));
-    Answer::new(ConcludedView::of(&concluded, posture), exit, summary)
+    summary.push_str(&startup.describe());
+    Answer::new(
+        ConcludedView::of(&concluded, posture, startup),
+        exit,
+        summary,
+    )
 }
 
 /// A session that could not begin or conclude, mapped.
@@ -290,6 +307,64 @@ pub fn session_error_answer(e: &SessionError) -> Answer<String> {
         SessionError::Record(_) => Exit::Failed,
     };
     Answer::new(e.to_string(), exit, e.to_string())
+}
+
+/// A run refused because an attempt is live, with what that attempt's launch
+/// records establish (spec 002 section 3.32 rule 24).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct LiveAttemptView {
+    /// The refusal, as spec 003 section 3.7 words it.
+    pub refusal: String,
+    /// The live run.
+    pub run_id: String,
+    /// Its live attempt.
+    pub attempt: u32,
+    /// The launch state its records establish, where it has any.
+    pub launch_state: Option<String>,
+    /// Why, in order.
+    pub reasons: Vec<String>,
+    /// What to do next.
+    pub next: String,
+}
+
+/// `run` refused because an attempt is live. Exit 2, as for any live attempt;
+/// the answer adds what the attempt's launch records establish and infers no
+/// outcome.
+pub fn live_attempt_answer(
+    e: &SessionError,
+    root: &str,
+    startup: Option<statecraft_home::launch::AttemptStartup>,
+) -> Answer<LiveAttemptView> {
+    let (run_id, attempt) = match e {
+        SessionError::LiveAttempt { run_id, attempt } => (run_id.clone(), *attempt),
+        _ => (String::new(), 0),
+    };
+    let inspect = format!("startup show {root} {run_id} --attempt {attempt}");
+    let next = match startup.as_ref().and_then(|s| s.next.clone()) {
+        Some(next) => format!("read `{inspect}`; {next}"),
+        None => format!(
+            "read `{inspect}`; the attempt stays live until it is reconciled (spec 003 section \
+             3.6), and this build has no verb that reconciles it"
+        ),
+    };
+    let view = LiveAttemptView {
+        refusal: e.to_string(),
+        run_id,
+        attempt,
+        launch_state: startup.as_ref().map(|s| s.verdict.word().to_string()),
+        reasons: startup.map(|s| s.reasons).unwrap_or_default(),
+        next,
+    };
+    let mut summary = format!("{}\n", view.refusal);
+    if let Some(state) = &view.launch_state {
+        summary.push_str(&format!("  launch state: {state}\n"));
+    }
+    for reason in &view.reasons {
+        summary.push_str(&format!("  - {reason}\n"));
+    }
+    summary.push_str(&format!("  next: {}\n", view.next));
+    Answer::new(view, Exit::Refused, summary)
 }
 
 /// Every run for a target, as the JSON contract carries it.
