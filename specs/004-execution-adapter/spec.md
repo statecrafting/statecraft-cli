@@ -1303,6 +1303,21 @@ execs a script it wrote goes through it: the failing row, four execution tests,
 the settings-transport fixture, and three probe tests, the last being the
 second site the 2026-09-19 repair left.
 
+**2026-09-22: the survivor probe waits for reaping, for a bounded time.** CI on
+a documentation-only pull request, with code identical to a `main` that had
+passed, failed the deadline suite's `late-start` row: supervision reported
+"process group still answers after SIGKILL". The fixture's shell runs `sleep`
+in the foreground before it emits anything; at the deadline the group is
+killed, the shell is reaped by the supervisor, and the `sleep` is reparented
+and remains a zombie until its new parent collects it. Signal 0 succeeds on a
+zombie, and the probe asked once, immediately, so it raced that reaping and
+reported a process the kill had ended as a survivor. The probe now repeats for
+up to two seconds and reports only what still answers then, naming the
+possibility of an uncollected zombie. A process that genuinely survives
+`SIGKILL` is still reported, two seconds later than before, and a supervision
+with no survivor pays nothing. The suite's assertion that no survivor is
+reported is unchanged.
+
 ## Verification
 
 Each line is one command. §3.5's suite is eight tests named `suite_1` to
