@@ -64,8 +64,9 @@ AGENTS.md records what to do if a spec genuinely needs to claim ahead.
   and proves nothing.
 - **There are no forward claims left, and the gate now refuses one.** Specs `002`
   to `005` once claimed crates that did not exist; all eight crates are written, and
-  `index check --fail-on-unresolved` is in the gate. Under the pin (0.20.0, and
-  measured again under 0.23.0 on 2026-09-23) an unresolved claim exits **1**, the validation code, not 2: it is a corpus that
+  `index check --fail-on-unresolved` is in the gate. Under the pin (0.20.0,
+  and measured again under 0.23.0 on 2026-09-23) an unresolved claim exits
+  **1**, the validation code, not 2: it is a corpus that
   does not describe its tree, and `make refresh` cannot cure it. Do not "fix" one
   by narrowing a spec's territory or by adding an empty crate; see AGENTS.md,
   which records what a spec that genuinely needs to claim ahead should do.

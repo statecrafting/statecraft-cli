@@ -55,8 +55,8 @@ date and the command that established it. Nothing else in this section moved.
 
 | ID | Constraint | How it was established |
 |---|---|---|
-| C-01 | **2026-09-17:** the binary this corpus is compiled, linted and pinned against is **0.20.0**, installed at the repository-local `.tooling/bin/spec-spine`. The shared `~/.cargo/bin/spec-spine` is no longer this repository's binary and is not consulted by `make`. Until 2026-09-16 the row read 0.18.0 at the shared path. | `.tooling/bin/spec-spine --version`; `make tools` installs it from `required_version`. |
-| C-02 | **2026-09-17:** 0.19.0 and 0.20.0 are both released and 0.20.0 is adopted (`D-06`). The development checkout at `~/DevWork/spec-spine` is ahead of both and sits on an unmerged branch; **no feature of that tree may be described here as available**, which is the part of this row that did not change. The rule is about unreleased work, not about 0.19.0 in particular. | `git tag --sort=-creatordate` and `git branch --show-current` in that checkout; `cargo search spec-spine-cli` reports 0.20.0. |
+| C-01 | **2026-09-23:** the binary is **0.23.0**, at the same repository-local path, adopted under `D-06`'s entry of that date; the rest of this row is unchanged. **2026-09-17:** the binary this corpus is compiled, linted and pinned against is **0.20.0**, installed at the repository-local `.tooling/bin/spec-spine`. The shared `~/.cargo/bin/spec-spine` is no longer this repository's binary and is not consulted by `make`. Until 2026-09-16 the row read 0.18.0 at the shared path. | `.tooling/bin/spec-spine --version`; `make tools` installs it from `required_version`. |
+| C-02 | **2026-09-23:** 0.21.0 and 0.23.0 are released and 0.23.0 is adopted (`D-06`); 0.21.0 never was, and 0.22.0 was prepared but never tagged or published (crates.io lists 0.21.0 then 0.23.0). The rule below still holds: unreleased producer work is never described here as available. **2026-09-17:** 0.19.0 and 0.20.0 are both released and 0.20.0 is adopted (`D-06`). The development checkout at `~/DevWork/spec-spine` is ahead of both and sits on an unmerged branch; **no feature of that tree may be described here as available**, which is the part of this row that did not change. The rule is about unreleased work, not about 0.19.0 in particular. | `git tag --sort=-creatordate` and `git branch --show-current` in that checkout; `cargo search spec-spine-cli` reports 0.20.0. |
 | C-03 | spec-spine 0.18.0's lifecycle is `status` in {draft, approved, superseded, retired} and `implementation` in {pending, in-progress, complete, n-a, deferred} or absent. `approved` plus `pending` is a work order; `draft` is never a claim about code; `approved` with an absent `implementation` makes an unresolved unit an **error**. | `standards/spec/contract.md`, scaffolded by the installed binary. |
 | C-04 | A corpus with no code is a supported steady state. `index coverage --fail-on-untraced` **refuses** on a code-free tree rather than passing vacuously, so it must not be in this repository's gate yet. | `~/DevWork/spec-spine/docs/specify-first.md`. |
 | C-05 | `compile --check` compares the corpus against the **committed** shard trees. Running it immediately after a plain `compile` in the same job passes unconditionally and proves nothing. | Same source, and the adoption guide's CI note. |
@@ -339,8 +339,9 @@ is identified by version and source revision, not by digest. The same
   - a waiver's lifecycle lines, inert without them (113).
 - Measured, not only read: `couple` over six merged ranges of this repository
   gives `OK` under both versions: `01df484..4d6a9d5`, `4d6a9d5..ea2076b`,
-  `ea2076b..f49ac76`, `f49ac76..323ac62`, `50a5269..1739131` and
-  `1739131..01df484`.
+  `ea2076b..f49ac76`, `f49ac76..323ac62`, `1739131..50a5269` and
+  `1739131..01df484`. (A first draft of this entry listed the fifth range
+  backwards, which is an empty diff and proves nothing; it was re-measured.)
 
 The checked-path counts differ by exactly the derived paths in each range:
 
@@ -350,6 +351,7 @@ The checked-path counts differ by exactly the derived paths in each range:
 | `4d6a9d5..ea2076b` | 6 | 4 | 2 |
 | `ea2076b..f49ac76` | 14 | 8 | 6 |
 | `f49ac76..323ac62` | 10 | 6 | 4 |
+| `1739131..50a5269` | 3 | 1 | 2 |
 | `1739131..01df484` | 35 | 17 | 18 |
 
 - One behavior is new and matters here. 0.23.0's `couple` refuses with exit 2
