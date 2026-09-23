@@ -536,6 +536,28 @@ launch state. The answer says that a provider process a dead supervisor
 started may still be running, and that reconciling stops nothing. The verb joins section 3.1's table with the change that
 implements it.
 
+### 3.11.7 The transfer verbs
+
+Added on 2026-09-23, authorized by the owner and recorded here before the
+bindings were written, for `002` section 3.35.
+
+| Command | What it does |
+|---|---|
+| `transfer plan <path> <file> <from> <to>` | Reports the transfer and its plan identity. Writes nothing. |
+| `transfer apply <path> <file> <from> <to> <plan-id> <operator> <reason...>` | Applies it, if the plan is still current. |
+| `transfer revert <path> <transfer-id> <operator> <reason...>` | Applies the inverse of a recorded transfer, if nothing changed since. |
+
+`<from>` and `<to>` are `user`, `adopted` or `managed`.
+
+| Code | Meaning for the transfer verbs |
+|---|---|
+| 0 | Planned, applied, reverted, or `already-satisfied`. |
+| 2 | Refused, and nothing written: a stale plan, a class that is not the path's, a move section 3.35 does not admit, a protected or escaping path, a symbolic link, a directory, a user instruction file, or a reversal with an intervening change. |
+| 3 | Usage. |
+| 4 | The manifest could not be read or written durably. |
+
+The verbs join section 3.1's table with the change that implements them.
+
 ### 3.12 What the command surface does not unlock
 
 Stated because an integration slice is exactly where scope grows quietly:
