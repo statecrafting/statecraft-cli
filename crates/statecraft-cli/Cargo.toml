@@ -45,6 +45,9 @@ statecraft-environment = { path = "../statecraft-environment" }
 # it is a binding onto `statecraft_home::service::execute`.
 statecraft-home = { path = "../statecraft-home" }
 statecraft-run = { path = "../statecraft-run" }
+# Spec 004 section 3.17: the launch reading exports the base commit's tree into
+# a private temporary directory.
+tempfile = "3.27.0"
 
 [dev-dependencies]
 tempfile = "3.27.0"

@@ -72,6 +72,7 @@ case "$*" in
   check) exit 0 ;;
   'registry plan --json') echo '{{"ready":[{{"id":"{DRAFT}","title":"a draft","status":"draft"}}]}}' ;;
   'registry list --json') echo '{{"items":[{{"id":"{DRAFT}","status":"draft","implementation":"pending"}},{{"id":"010-unready","status":"draft","implementation":"pending"}}]}}' ;;
+  'verify '*' --plan --json') printf '{{"exitCode":0,"ok":true,"report":{{"commands":[],"skipped":[],"specId":"%s"}},"schemaVersion":"0.6.0","verb":"verify"}}' $2 ;;
   *) exit 3 ;;
 esac
 "#

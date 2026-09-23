@@ -51,6 +51,7 @@ pub mod accept;
 pub mod adapters;
 pub mod bind;
 pub mod commands;
+pub mod coverage;
 pub mod exit;
 pub mod manage;
 pub mod render;

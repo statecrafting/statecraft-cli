@@ -21,6 +21,8 @@
 //!   version** and no other.
 //! - [`environment`] constructs the child's environment from an allowed set, and
 //!   names the residuals that a constructed environment does not close.
+//! - [`coverage`] compares the command allowance a posture declares with the
+//!   programs the attempt's suite names, read independently (section 3.17).
 //! - [`posture`] is what every attempt reports, so an operator never has to ask.
 //! - [`supervisor`] spawns, holds a deadline, and kills descendants.
 //! - [`fixture`] is the adapter the negative suite runs against with no real
@@ -37,6 +39,7 @@
 #![forbid(unsafe_code)]
 
 pub mod capability;
+pub mod coverage;
 pub mod environment;
 pub mod fixture;
 pub mod manifest;

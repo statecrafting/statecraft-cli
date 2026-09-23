@@ -296,6 +296,19 @@ fn a_faithful_synthetic_trial_is_established_and_says_it_is_synthetic() {
         assert!(h.contains(line), "missing {line:?} in:\n{h}");
     }
     assert!(!h.contains("RELOAD"), "{h}");
+
+    // Spec 004 section 3.17: the trial has no spec, so its coverage is
+    // `not-applicable` and nothing was compared, and the record says so.
+    let (chain, _) = statecraft_run::record::Chain::open(&f.home(), &f.project()).unwrap();
+    let outcome = chain
+        .entries()
+        .into_iter()
+        .rfind(|e| e.subject == "attempt")
+        .expect("the trial's outcome");
+    let coverage = &outcome.detail["posture"]["coverage"];
+    assert_eq!(coverage["verdict"], "not-applicable", "{coverage}");
+    assert_eq!(coverage["commands"], serde_json::json!([]));
+    assert!(coverage["spec"].is_null());
 }
 
 /// The budget is spent once. A second trial in the same project is refused

@@ -69,6 +69,7 @@ case "$*" in
   check) exit 0 ;;
   'registry plan --json') echo '{"ready":[{"id":"fixture","title":"arming fixture"}]}' ;;
   'registry list --json') echo '{"items":[{"id":"fixture","status":"approved","implementation":"pending"}]}' ;;
+  'verify '*' --plan --json') printf '{"exitCode":0,"ok":true,"report":{"commands":[],"skipped":[],"specId":"%s"},"schemaVersion":"0.6.0","verb":"verify"}' $2 ;;
   *) exit 3 ;;
 esac
 "#,

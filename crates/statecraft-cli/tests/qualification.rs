@@ -42,6 +42,7 @@ case "$*" in
   check) exit 0 ;;
   'registry plan --json') echo '{"ready":[{"id":"fixture","title":"qualification fixture"}]}' ;;
   'registry list --json') echo '{"items":[{"id":"fixture","status":"approved","implementation":"pending"}]}' ;;
+  'verify '*' --plan --json') printf '{"exitCode":0,"ok":true,"report":{"commands":[],"skipped":[],"specId":"%s"},"schemaVersion":"0.6.0","verb":"verify"}' $2 ;;
   *) exit 3 ;;
 esac
 "#,
@@ -119,6 +120,10 @@ if [ "$1" = --version ]; then /bin/cat "$(dirname "$0")/version"; exit 0; fi
         serde_json::json!(["structured-refusals"])
     );
     assert!(!posture["residuals"].as_array().unwrap().is_empty());
+    // Spec 004 section 3.17: a target with no declaration file declares
+    // nothing, and a suite that says it is empty requires nothing.
+    assert_eq!(posture["coverage"]["verdict"], "direct", "{posture}");
+    assert_eq!(posture["coverage"]["declaration"]["state"], "absent");
 
     let human = run(&["run", root, "fixture"]);
     assert_eq!(human.status.code(), Some(0), "{human:?}");
