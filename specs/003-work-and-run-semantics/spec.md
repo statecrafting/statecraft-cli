@@ -158,6 +158,52 @@ What this does not establish: that the producer's two answers are correct,
 only that they agree; or that the ledger did not move and move back between
 the two `list` reads. The second is recorded rather than excluded.
 
+### 3.1.3 The contract an attempt is bound to
+
+Recorded on 2026-09-22 before the implementation it authorizes. spec-spine's
+specs 106 and 107, merged on its `main` at `088d6d4b` and `6e123d2e` and
+present at `3b67b63d`, resolve qualified obligation references
+(`<spec-id>#<obligation-id>`) and **context closures**: a request naming specs,
+sections and obligations, answered with every member's identity and one digest
+over them that does not depend on order. Resolution is the producer's, and it
+is pure: the same request against the same ledger gives the same digest. No
+released version carries either; the pinned 0.20.0 answers
+`registry closure --help` with its usage code.
+
+An attempt at a unit of work is authorized against a spec, and the operator
+later needs to know whether the spec the candidate was built against is still
+the spec. So:
+
+1. **What is bound.** Before an attempt's intent is appended, `run` asks the
+   producer to resolve one closure: the unit of work's spec, and every
+   obligation `registry list` says that spec declares, each as a qualified
+   reference. Withdrawn obligations are included, and the producer marks them.
+   Nothing is added that the producer did not resolve, and nothing the
+   producer resolved is dropped.
+2. **Where it is written.** The intent's `detail.contract` holds the request,
+   the digest, every member verbatim, and the producer version and command
+   that answered. It is written once, with the intent, before any effect, and
+   no later record rewrites it.
+3. **Every other answer is named, and none stops the run.** The binding is
+   evidence, not a gate on starting work:
+
+   | `contract.state` | When |
+   |---|---|
+   | `bound` | the closure resolved; `digest` and `members` are present |
+   | `unsupported` | the installed producer answers `registry closure --help` with anything but success; the record names that producer's version and says this product asked and was not answered. It never asserts what a producer **release** carries (spec 005 section 3.3.3) |
+   | `unresolved` | the producer refused a member (its exit 1), naming it |
+   | `stale` | the producer refused a stale ledger (its exit 2) |
+   | `unreadable` | the answer was not the JSON this build reads |
+   | `not-a-unit-of-work` | the attempt is spec 002 section 3.33's trial, which is authorized against no spec |
+
+4. **Resolution stays the producer's.** This product computes no digest, reads
+   no ledger file, and does not decide which members a spec's closure should
+   have beyond rule 1's request. Whether a bound contract still holds is
+   judged where it is used, by spec 005 section 3.18, from a new resolution of
+   the same request.
+5. **An attempt's contract is a fact about that attempt.** A later attempt of
+   the same run binds its own; a comparison never updates the earlier one.
+
 ### 3.2 Workspace preparation
 
 A run prepares an **isolated git worktree** under `.statecraft/state/`, branched
@@ -499,6 +545,14 @@ against a binary and revision the operator names, on a scratch copy of this
 corpus whose ledger that binary compiled. Measured with it on 2026-09-22:
 spec-spine 0.20.0 (`v0.20.0`, `4d14cce6`) reads with `status` from `registry
 list` alone, and the unreleased `3b67b63d` reads with the plan agreeing.
+
+**2026-09-22: section 3.1.3, recorded before implementation.** `run` binds
+each attempt to one closure the producer resolves, the unit of work's spec and
+every obligation it declares, and writes it once into the intent. Every answer
+other than a resolved closure is a named state, none of which stops the run.
+Measured on the unreleased `3b67b63d`: a spec member alone does not carry the
+spec's obligations, so the request names them. No code changed with this
+entry.
 
 ## Verification
 
