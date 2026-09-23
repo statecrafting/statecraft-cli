@@ -1090,6 +1090,10 @@ fn anything_else_after_the_terminal_event_is_refused() {
     number_detail["detail"] = json!(3);
     let mut object_detail = t.clone();
     object_detail["detail"] = json!({"refused": true});
+    let mut bool_detail = t.clone();
+    bool_detail["detail"] = json!(false);
+    let mut array_detail = t.clone();
+    array_detail["detail"] = json!(["refused"]);
     let mut empty_uuid = t.clone();
     empty_uuid["uuid"] = json!("");
     let mut other_session = t.clone();
@@ -1107,6 +1111,8 @@ fn anything_else_after_the_terminal_event_is_refused() {
         ("missing uuid", missing_uuid.to_string()),
         ("numeric detail", number_detail.to_string()),
         ("object detail", object_detail.to_string()),
+        ("boolean detail", bool_detail.to_string()),
+        ("array detail", array_detail.to_string()),
         ("empty uuid", empty_uuid.to_string()),
         ("another session", other_session.to_string()),
         ("no session", no_session.to_string()),
@@ -1194,4 +1200,37 @@ fn a_summary_and_a_rate_limit_event_before_the_terminal_event_are_unchanged() {
     events.push(trailer("session-r"));
     set_events(&mut e.refusal, &events);
     assert!(admission::admit(&e).is_ok(), "{:?}", admission::admit(&e));
+}
+
+/// Section 3.34, bytes preserved: an admitted trailer's line, as the provider
+/// wrote it (member order, spacing and escapes included), is carried into the
+/// admitted observation byte for byte, and survives a write and a read of the
+/// observation. The admission reads nothing in it, so nothing is normalized.
+#[test]
+fn an_admitted_trailer_keeps_its_original_bytes_through_the_record() {
+    let line = r#"{"session_id" : "session-r","detail":"refus\u00e9 \"not\" read\tq","type":"system","uuid":"5a668f14-8322-47ef-bcb2-06b19db90020","subtype":"task_summary"}"#;
+    let mut e = evidence::admissible();
+    with_line(&mut e.refusal, line);
+    let before = e.refusal.capture.bytes.clone();
+    assert!(before.ends_with(&format!("{line}\n")));
+    let observation = startup::admit(&e).expect("admitted");
+    let Observation::Observed { evidence: kept, .. } = &observation else {
+        panic!("not observed: {observation:?}");
+    };
+    assert_eq!(
+        kept.refusal.capture.bytes, before,
+        "the admission rewrote the capture"
+    );
+    let written = serde_json::to_string(&observation).unwrap();
+    let read: Observation = serde_json::from_str(&written).unwrap();
+    let Observation::Observed {
+        evidence: reread, ..
+    } = &read
+    else {
+        panic!("not observed after a read: {read:?}");
+    };
+    assert_eq!(
+        reread.refusal.capture.bytes, before,
+        "a write and a read changed the capture"
+    );
 }

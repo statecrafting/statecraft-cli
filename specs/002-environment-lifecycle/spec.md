@@ -4028,6 +4028,18 @@ the entries: `004` refuses a malformed one where it reads the list, so the rule
 has one home. A test writes, reads and rewrites a declared list, and asserts an
 undeclared one is not serialized.
 
+**2026-09-23: section 3.34's trailer, confirmed by the owner, and the tests it
+asked for.** The owner confirmed the reading that the one admitted trailing
+`task_summary` event may carry `detail` as `null` or as a string, neither read
+nor used as evidence of refusal, execution, permission, qualification or
+outcome, with the original bytes kept, and that this confirms that
+representation only and relaxes nothing else in the admission. Two tests were
+added to `crates/statecraft-home/tests/qualification_admission.rs` for what was
+not yet asserted: a boolean or an array `detail` refuses the capture like a
+number or an object already did, and an admitted trailer's line, with its
+member order, spacing and escapes, reaches the admitted observation byte for
+byte and survives a write and a read of it. No requirement changed.
+
 ## Verification
 
 `--fail-on-untraced` joined the corpus gate with this spec's first
