@@ -3282,16 +3282,129 @@ as disagreeing. The acceptance script's `managed-startup` stage runs the same
 path through its local route. **No provider session was started**, so every
 premise P1 to P5 keeps the grade section 3.33 gives it.
 
+**2026-09-23: the two live experiments, each run once under its own approval,
+and what each one did and did not establish.** The owner authorized both
+separately: section 3.30's permission experiment, at most three sessions and
+stopping at the first that does not complete, and section 3.33's
+managed-startup trial, exactly one session. Neither authorization covered a
+retry, a longer limit or a second fixture, and none was used. Both ran from
+`main` at `01df484` through `scripts/acceptance/managed-session.sh`, each on
+its own fixture built by its own preflight. The two fixtures were `ACC` =
+`$TMPDIR/sc-accept-A` and `$TMPDIR/sc-accept-B`, and both preflights exited 0.
+The product binary was built from that revision, SHA-256 `a6cf34ac…19335`. The
+provider was Claude Code `2.1.267` at
+`~/.local/share/claude/versions/2.1.267`, SHA-256 `a681f300…cd2558`, and each
+launch's probe and `init` event both reported `2.1.267`. Every capture, record
+and stream is kept, outside the repository, in two archives:
+`sc-accept-A.tar.gz` (`8bf5f4f3…e2a6`) and `sc-accept-B.tar.gz`
+(`567c8ee9…60a5`). The two results are reported apart, and neither one, nor
+both together, is a qualification.
+
+*The permission experiment: unverified, stopped at session 1 of 3.* The
+refusal control launched at 08:10:10Z and exited by itself with status 1 in
+nine seconds, with no timeout and no survivor. `startup capture` recorded the
+launch as incomplete. Rule 8 requires the terminal event to be the capture's
+last event, and it was not: the provider wrote a `system` event of subtype
+`task_summary`, with `detail: null`, after its `result` event. The stage
+therefore stopped, as it is required to. The allowed-command and
+without-payload controls were never launched, the admission never judged a
+claim, and the fixture project was unchanged. The capture (`refusal.json`,
+SHA-256 `5d988271…b6dc`, stream `cc9b6e59…ea11`, 10775 bytes) records these
+events and nothing more:
+
+- two `SessionStart` responses from the operator's own settings, because the
+  stage does not replace `HOME`, both before `init`;
+- `init` with `permissionMode: bypassPermissions`, taken from the operator's
+  settings;
+- one `Bash` request for the refused command;
+- a mid-stream `permission_denied` for that tool-use id, with decision reason
+  type `subcommandResults`;
+- an error `tool_result` carrying the denial text;
+- a terminal `result` of subtype `error_max_turns` (the control's
+  `--max-turns 1`), whose `permission_denials` names the same tool-use id and
+  input;
+- one earlier `task_summary` event, between the request and the denial.
+
+None of that is an admitted observation. Rule 8 refused the capture before
+rules 9 to 11 were applied, so whether they would have held is not known, and
+the premise that the floor's deny beats the grant keeps the grade the
+2026-09-22 entry gave it: documented and read statically, not observed. The
+recorded `2.1.267` streams under
+`crates/statecraft-adapter-claude-code/testdata/stream/` carry no
+`task_summary` event and end on their terminal event. So the same provider
+version now emits an event those recordings never showed, and rule 8, as
+written, refuses every capture that carries one. This entry does not relax
+rule 8. Admitting a named non-turn event after the terminal one would change
+what section 3.30 admits, and that is the owner's decision, recorded as open
+in the next entry.
+
+*The managed-startup trial: established, for one session on this machine.*
+`startup trial --provider-session` ran at 08:11:25Z with its defaults: a
+120-second session deadline, a 240-second bound on the whole verb, and
+`--max-turns 3`. The run was attempt 1 of `statecraft-startup-trial`, and it
+completed by itself at 08:11:33Z. The required and selected revision was
+`h-33c417e1c3a4`. The settings document it wrote, `84293ea6…f430`, 993 bytes,
+registered the revision's `SessionStart` hook and the attempt's gate.
+
+The timeline, as `trial.json` (`a81429f8…3ccf`) records it:
+
+- lines 1 to 6: three `SessionStart` hooks started and responded, all exiting
+  0. Line 5 is the supplied hook's response, and it carried this attempt's
+  acknowledgment. The other two came from the operator's own settings and
+  carried none.
+- line 7: `init`. The decision `admitted` was made there, because the one
+  correlated acknowledgment named the required revision and the standing was
+  exact.
+- line 11: one `Read` request.
+- the gate: consulted once, and released on `admitted`.
+- line 13: the tool result, executed and carrying the sentinel's nonce.
+- line 15: the terminal event, which was the last event.
+
+The judgement was re-derived from the records on disk and agreed:
+
+| Word | Value |
+|---|---|
+| hook evidence | `correlated` |
+| effects before admission | `excluded`, tool calls only |
+| verdict | `established` |
+| origin | `provider-session` |
+
+Premises P1 and P2 are therefore observed once, for this version and this
+machine. P3 is observed as the gate being consulted and the call executing
+only after `admitted`; a refused decision was not exercised, because an
+admitted trial never refuses. P5 held in this stream. Nothing here says which
+process printed the acknowledgment, anything about the deny floor, or anything
+about another version. The run's own startup verdict is still `unverified`,
+because a run session is not one of section 3.29's three controls.
+
+*Consequence for the implementation state.* The managed-startup question has
+a recorded answer. The permission-enforcement question does not: its one
+authorized attempt is spent, and a new attempt needs a new authorization, and
+under rule 8 as written also a provider that ends its stream on the terminal
+event or a decision about rule 8. `implementation` stays `in-progress`.
+
+**2026-09-23, open for the owner: a non-turn event after the terminal event.**
+The permission experiment's capture ended with `system`/`task_summary` after
+`result`. The choice is between two options:
+
+- keep rule 8, so that the permission experiment cannot be admitted against a
+  provider that emits such an event;
+- amend section 3.30 to name the event subtypes a capture may carry after its
+  terminal event.
+
+Such an amendment would need to say that those events are not turns, that
+they name the same session, and that nothing in them is read as evidence. The
+recommendation is the second option, narrowly: admit only `system` events
+whose subtype is on a closed list (today, `task_summary`), refuse any other
+trailing event, and record the list's provenance as this capture. It is an
+authority change to an approved section and is not made here.
+
 ## Verification
 
-Each line is one command. They run the acceptance this spec's behavior declares:
-every row of §3.10 is one integration test, named after the row it covers, so a
-row that stops being covered shows up as a deleted test rather than as a
-quietly weakened assertion.
-
-`--fail-on-untraced` joins the corpus gate with this change, which is the
-condition AGENTS.md recorded for it: coverage is 13/13 specifically claimed, so
-the flag now defends that number instead of reporting it.
+`--fail-on-untraced` joined the corpus gate with this spec's first
+implementation, which is the condition AGENTS.md recorded for it; it defends
+every claimed file rather than reporting a number (13 then, 149 on
+2026-09-23).
 
 Each line is one command. Every row of section 3.10 is one integration test
 named after the row it covers, so a row that stops being covered shows up as a
