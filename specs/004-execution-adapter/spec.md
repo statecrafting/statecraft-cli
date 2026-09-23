@@ -536,7 +536,12 @@ no duplicates. A malformed entry refuses the run and names it. An absent
 member declares nothing, and the allowance is then the adapter's own commands
 alone. The declaration is already a member of the authority set (spec `005`
 section 3.3 case 3), so a candidate that widens it is an authority change. This
-product never adds a program to the allowance on its own account.
+product never adds a program to the allowance on its own account. Only the
+committed project layer supplies `commands`: no personal default, team value
+or run choice of spec `002` section 3.16 may, because a machine-local allowance
+is exactly what section 3.5 row 8 forbids. A shell builtin that also exists as
+a program, such as `test`, is compared by name like any other: a suite that
+uses it declares it.
 
 **This changes behavior, deliberately.** A target that declares no allowance
 and whose suite names a program beyond the adapter's own is refused on its next
@@ -595,7 +600,9 @@ edited:
   this, because section 3.2 of spec `003` reuses it across attempts and a
   previous session may have edited it.
 
-The launch comparison is the one recorded. The run is refused at launch if its
+The launch comparison is the one recorded, and section 3.7's attempt record
+carries it too: the intent records the planning verdict and the digests of the
+plan and the allowance it read. The run is refused at launch if its
 verdict is `refused`, or if the allowance or the attempt's spec's suite plan
 differs from planning by digest, naming which. So an uncommitted change to the
 allowance or to that spec's verification commands refuses the run; an
