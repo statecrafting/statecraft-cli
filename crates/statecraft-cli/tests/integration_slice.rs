@@ -164,9 +164,14 @@ fn work_list_against_a_real_corpus_names_the_report_each_field_came_from() {
         // came from, and the status half says it came from the other report.
         if let Some(from) = row["fromField"].as_str() {
             assert!(from.contains("registry plan"), "{from}");
-            assert_eq!(
-                row["statusFromField"].as_str().unwrap(),
-                "registry list --json: status"
+            // Spec 003 section 3.1.2: from the list alone, or from the list
+            // with the plan agreeing, and never from the plan alone.
+            assert!(
+                row["statusFromField"]
+                    .as_str()
+                    .unwrap()
+                    .starts_with("registry list --json: items[].status"),
+                "{row}"
             );
         }
     }

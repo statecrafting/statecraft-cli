@@ -485,6 +485,21 @@ the two `status` answers rather than preferring one, refuses a disagreement
 and refuses a ledger that moved between bracketed reads. No code changed with
 this entry.
 
+**2026-09-22: section 3.1.2 implemented.** `report::join` is the pure half:
+it takes the version, the plan's bytes and the two `list` answers, refuses
+`moved` when the two differ, refuses a plan of two shapes as unreadable,
+refuses a disagreement naming both values, and otherwise returns the report
+with its `StatusSource`. `SpecSpineCli::corpus_report` reads `list`, `plan`,
+`list` after `check` and hands the bytes over unchanged. Each `WorkItem`
+carries `status_from`. The tests read the two producers' own recorded answers
+(`testdata/producer/`, with their provenance), mutate a copy for the
+contradiction, and pair two different recorded `list` answers for the move.
+`tests/producer_candidate.rs` is ignored by default and runs the real read
+against a binary and revision the operator names, on a scratch copy of this
+corpus whose ledger that binary compiled. Measured with it on 2026-09-22:
+spec-spine 0.20.0 (`v0.20.0`, `4d14cce6`) reads with `status` from `registry
+list` alone, and the unreleased `3b67b63d` reads with the plan agreeing.
+
 ## Verification
 
 Each line is one command. §3.8's twenty-two rows are integration tests named after
@@ -501,4 +516,5 @@ cargo fmt --all --check
 spec-spine index coverage --fail-on-untraced
 test -f crates/statecraft-run/src/record.rs
 test -f crates/statecraft-run/tests/negative_cases.rs
+cargo test -p statecraft-run --lib report
 ```

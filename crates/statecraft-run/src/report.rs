@@ -20,6 +20,33 @@ pub struct ReadySpec {
     pub id: String,
     /// Its title.
     pub title: String,
+    /// Its status, where the producer's plan carries one (spec-spine 102;
+    /// section 3.1.2). Compared with `registry list`, never preferred to it.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub status: Option<String>,
+}
+
+/// Where a row's `status` came from (section 3.1.2 rule 5).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum StatusSource {
+    /// `registry list` alone: the plan carries no `status`.
+    ListOnly,
+    /// `registry list`, and `registry plan` agreed with it.
+    ListAgreeingWithPlan,
+}
+
+impl StatusSource {
+    /// The report fields, as `work list` prints them.
+    pub fn describe(self) -> &'static str {
+        match self {
+            StatusSource::ListOnly => "registry list --json: items[].status",
+            StatusSource::ListAgreeingWithPlan => {
+                "registry list --json: items[].status, agreeing with registry plan --json: \
+                 ready[].status"
+            }
+        }
+    }
 }
 
 /// A spec's lifecycle facts, from `registry list`.
@@ -43,6 +70,8 @@ pub struct CorpusReport {
     pub ready: Vec<ReadySpec>,
     /// What `registry list` says about every spec's lifecycle.
     pub lifecycle: Vec<SpecLifecycle>,
+    /// Where each ready row's `status` came from.
+    pub status_source: StatusSource,
 }
 
 impl CorpusReport {
@@ -99,6 +128,32 @@ pub enum ReportError {
         version: String,
         /// What went wrong.
         detail: String,
+    },
+    /// The two reports, read from one state, answer `status` differently
+    /// (section 3.1.2 rule 2). Neither is chosen.
+    #[error(
+        "spec-spine {version} contradicts itself about {id}: `registry plan --json` says \
+         status `{plan}` and `registry list --json` says `{list}`, read from one state; \
+         refusing to schedule from either"
+    )]
+    Disagreement {
+        /// The spec.
+        id: String,
+        /// What the plan said.
+        plan: String,
+        /// What the list said.
+        list: String,
+        /// The producer version.
+        version: String,
+    },
+    /// The ledger moved between the bracketing reads (section 3.1.2 rule 3).
+    #[error(
+        "the ledger moved while spec-spine {version} was being read: the two `registry list \
+         --json` answers around `registry plan --json` differ, so nothing was compared"
+    )]
+    Moved {
+        /// The producer version.
+        version: String,
     },
 }
 
@@ -186,42 +241,90 @@ impl ReportSource for SpecSpineCli {
             });
         }
 
+        // Section 3.1.2 rule 3: `list`, `plan`, `list`, so a disagreement is
+        // only ever reported from one state.
+        let first = self.run(target, &["registry", "list", "--json"])?;
         let plan = self.run(target, &["registry", "plan", "--json"])?;
-        let plan_json: serde_json::Value =
-            serde_json::from_slice(&plan.stdout).map_err(|e| ReportError::Unreadable {
-                command: "registry plan --json".into(),
-                version: version.clone(),
-                detail: e.to_string(),
-            })?;
-        let ready_raw = plan_json
-            .get("ready")
-            .ok_or_else(|| ReportError::MissingField {
-                command: "registry plan --json".into(),
-                field: "ready".into(),
-                version: version.clone(),
-            })?;
-        let ready: Vec<ReadySpec> =
-            serde_json::from_value(ready_raw.clone()).map_err(|e| ReportError::Unreadable {
-                command: "registry plan --json".into(),
-                version: version.clone(),
-                detail: e.to_string(),
-            })?;
-
-        let list = self.run(target, &["registry", "list", "--json"])?;
-        let list_json: serde_json::Value =
-            serde_json::from_slice(&list.stdout).map_err(|e| ReportError::Unreadable {
-                command: "registry list --json".into(),
-                version: version.clone(),
-                detail: e.to_string(),
-            })?;
-        let lifecycle = parse_lifecycle(&list_json, &version)?;
-
-        Ok(CorpusReport {
-            spec_spine_version: version,
-            ready,
-            lifecycle,
-        })
+        let second = self.run(target, &["registry", "list", "--json"])?;
+        join(&version, &plan.stdout, &first.stdout, &second.stdout)
     }
+}
+
+/// Join one bracketed read into a report (spec 003 sections 3.1.1 and 3.1.2).
+///
+/// `list_first` and `list_second` are the two `registry list --json` answers
+/// read around `plan`. Pure, so every rule is testable against recorded
+/// producer output without a producer.
+pub fn join(
+    version: &str,
+    plan: &[u8],
+    list_first: &[u8],
+    list_second: &[u8],
+) -> Result<CorpusReport, ReportError> {
+    if list_first != list_second {
+        return Err(ReportError::Moved {
+            version: version.to_string(),
+        });
+    }
+    let unreadable = |command: &str, detail: String| ReportError::Unreadable {
+        command: command.into(),
+        version: version.to_string(),
+        detail,
+    };
+    let plan_json: serde_json::Value = serde_json::from_slice(plan)
+        .map_err(|e| unreadable("registry plan --json", e.to_string()))?;
+    let ready_raw = plan_json
+        .get("ready")
+        .ok_or_else(|| ReportError::MissingField {
+            command: "registry plan --json".into(),
+            field: "ready".into(),
+            version: version.to_string(),
+        })?;
+    let ready: Vec<ReadySpec> = serde_json::from_value(ready_raw.clone())
+        .map_err(|e| unreadable("registry plan --json", e.to_string()))?;
+    let list_json: serde_json::Value = serde_json::from_slice(list_first)
+        .map_err(|e| unreadable("registry list --json", e.to_string()))?;
+    let lifecycle = parse_lifecycle(&list_json, version)?;
+
+    // Rule 4: all rows carry `status`, or none do.
+    let carrying = ready.iter().filter(|r| r.status.is_some()).count();
+    let status_source = if carrying == 0 {
+        StatusSource::ListOnly
+    } else if carrying == ready.len() {
+        StatusSource::ListAgreeingWithPlan
+    } else {
+        return Err(unreadable(
+            "registry plan --json",
+            format!(
+                "{carrying} of {} ready row(s) carry `status`; a report that is not one shape \
+                 is not one this build reads",
+                ready.len()
+            ),
+        ));
+    };
+    // Rule 2: compared, never preferred. A ready row the list does not carry
+    // is left to section 3.1.1, which excludes it as unknown.
+    for row in &ready {
+        if let (Some(plan), Some(list)) = (
+            row.status.as_deref(),
+            lifecycle.iter().find(|l| l.id == row.id),
+        ) {
+            if plan != list.status {
+                return Err(ReportError::Disagreement {
+                    id: row.id.clone(),
+                    plan: plan.to_string(),
+                    list: list.status.clone(),
+                    version: version.to_string(),
+                });
+            }
+        }
+    }
+    Ok(CorpusReport {
+        spec_spine_version: version.to_string(),
+        ready,
+        lifecycle,
+        status_source,
+    })
 }
 
 /// Parse `registry list --json` into lifecycle facts.
@@ -354,5 +457,113 @@ mod tests {
     fn the_version_a_refusal_names_is_the_version_and_not_the_program_name() {
         assert_eq!(version_token("spec-spine 0.20.0\n"), "0.20.0");
         assert_eq!(version_token(""), "");
+    }
+
+    fn recorded(producer: &str, report: &str) -> Vec<u8> {
+        std::fs::read(
+            std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+                .join("testdata/producer")
+                .join(producer)
+                .join(report),
+        )
+        .unwrap()
+    }
+
+    // Section 3.1.2 rule 4, against the pinned producer's own output.
+    #[test]
+    fn the_released_producer_joins_as_before_and_says_status_came_from_list_alone() {
+        let list = recorded("released-0.20.0", "list.json");
+        let report = join(
+            "0.20.0",
+            &recorded("released-0.20.0", "plan.json"),
+            &list,
+            &list,
+        )
+        .unwrap();
+        assert_eq!(report.status_source, StatusSource::ListOnly);
+        assert!(report.ready.iter().all(|r| r.status.is_none()));
+        assert_eq!(report.ready[0].id, "002-environment-lifecycle");
+        assert_eq!(
+            report
+                .lifecycle_of("002-environment-lifecycle")
+                .unwrap()
+                .status,
+            "approved"
+        );
+    }
+
+    // Rules 1 and 2, against the expansion producer's own output.
+    #[test]
+    fn the_expansion_producer_status_is_compared_and_agrees() {
+        let list = recorded("expansion-3b67b63d", "list.json");
+        let report = join(
+            "0.22.0",
+            &recorded("expansion-3b67b63d", "plan.json"),
+            &list,
+            &list,
+        )
+        .unwrap();
+        assert_eq!(report.status_source, StatusSource::ListAgreeingWithPlan);
+        assert_eq!(report.ready[0].status.as_deref(), Some("approved"));
+        // `implementation` still comes from the list, the only report with it.
+        assert_eq!(
+            report
+                .lifecycle_of("002-environment-lifecycle")
+                .unwrap()
+                .implementation
+                .as_deref(),
+            Some("in-progress")
+        );
+    }
+
+    // Rule 2: one flipped value in the expansion producer's own plan.
+    #[test]
+    fn a_plan_status_that_contradicts_the_list_is_refused_naming_both() {
+        let list = recorded("expansion-3b67b63d", "list.json");
+        let plan = String::from_utf8(recorded("expansion-3b67b63d", "plan.json"))
+            .unwrap()
+            .replacen("\"status\": \"approved\"", "\"status\": \"draft\"", 1);
+        match join("0.22.0", plan.as_bytes(), &list, &list) {
+            Err(e @ ReportError::Disagreement { .. }) => {
+                let text = e.to_string();
+                assert!(
+                    text.contains("`draft`") && text.contains("`approved`"),
+                    "{text}"
+                );
+                assert!(text.contains("002-environment-lifecycle"), "{text}");
+            }
+            other => panic!("expected a disagreement, got {other:?}"),
+        }
+    }
+
+    // Rule 3: the ledger moved between the bracketing reads.
+    #[test]
+    fn a_ledger_that_moved_between_reads_is_refused_and_nothing_is_compared() {
+        let first = recorded("expansion-3b67b63d", "list.json");
+        let second = recorded("released-0.20.0", "list.json");
+        // The plan would disagree with the second list; it is never compared.
+        assert!(matches!(
+            join(
+                "0.22.0",
+                &recorded("expansion-3b67b63d", "plan.json"),
+                &first,
+                &second
+            ),
+            Err(ReportError::Moved { .. })
+        ));
+    }
+
+    // Rule 4: a plan of two shapes.
+    #[test]
+    fn a_plan_with_status_on_some_rows_only_is_unreadable() {
+        let list = recorded("expansion-3b67b63d", "list.json");
+        let plan = serde_json::json!({"ready": [
+            {"id": "002-environment-lifecycle", "title": "x", "status": "approved"},
+            {"id": "003-work-and-run-semantics", "title": "y"}
+        ]});
+        assert!(matches!(
+            join("0.22.0", plan.to_string().as_bytes(), &list, &list),
+            Err(ReportError::Unreadable { .. })
+        ));
     }
 }

@@ -24,6 +24,9 @@ pub struct WorkItem {
     pub status: String,
     /// The report field this row came from, which `work list` prints.
     pub from_field: String,
+    /// The report fields its `status` came from (section 3.1.2 rule 5).
+    #[serde(default)]
+    pub status_from: String,
     /// Present when only an operator override made this eligible.
     ///
     /// Surfaced on **every** attempt it admits: an override that stopped being
@@ -101,8 +104,8 @@ impl Eligibility {
     pub fn describe(&self) -> String {
         match self {
             Eligibility::Eligible(item) => format!(
-                "{} eligible, status {} (from {})",
-                item.id, item.status, item.from_field
+                "{} eligible, status {} (from {}; status from {})",
+                item.id, item.status, item.from_field, item.status_from
             ),
             Eligibility::Excluded(e) => {
                 format!("{} excluded, status {}: {}", e.id, e.status, e.reason)
@@ -161,6 +164,7 @@ pub fn select(
                 title: ready.title.clone(),
                 status: lifecycle.status.clone(),
                 from_field: "registry plan --json: ready[]".into(),
+                status_from: report.status_source.describe().into(),
                 admitted_by_override: None,
             });
             continue;
@@ -174,6 +178,7 @@ pub fn select(
                 title: ready.title.clone(),
                 status: lifecycle.status.clone(),
                 from_field: "registry plan --json: ready[]".into(),
+                status_from: report.status_source.describe().into(),
                 admitted_by_override: Some(o.clone()),
             }),
             None => excluded.push(Excluded {
@@ -211,10 +216,12 @@ mod eligibility_tests {
                 ReadySpec {
                     id: "010".into(),
                     title: "approved".into(),
+                    status: None,
                 },
                 ReadySpec {
                     id: "011".into(),
                     title: "draft".into(),
+                    status: None,
                 },
             ],
             lifecycle: vec![
@@ -229,6 +236,7 @@ mod eligibility_tests {
                     implementation: Some("pending".into()),
                 },
             ],
+            status_source: crate::report::StatusSource::ListOnly,
         }
     }
 
@@ -281,6 +289,7 @@ mod tests {
                 .map(|(id, _)| ReadySpec {
                     id: (*id).into(),
                     title: format!("title of {id}"),
+                    status: None,
                 })
                 .collect(),
             lifecycle: rows
@@ -291,6 +300,7 @@ mod tests {
                     implementation: Some("pending".into()),
                 })
                 .collect(),
+            status_source: crate::report::StatusSource::ListOnly,
         }
     }
 
