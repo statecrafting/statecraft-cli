@@ -31,6 +31,7 @@
       "3. Behavior",
       "3.1 A unit of work",
       "3.1.1 Ready is not ratified",
+      "3.1.2 Two reports that both carry status, read from one state",
       "3.2 Workspace preparation",
       "3.3 The run record",
       "3.3.1 Effect identity and one-to-one closing",
@@ -48,6 +49,6 @@
     "summary": "The core loop's semantics. How a unit of work is identified by reading spec-spine's structured report rather than re-deriving it; how an isolated workspace is prepared so the operator's checkout is never edited; the append-only hash-linked run record with intent written before an effect and outcome after it; the closed outcome set (completed, failed, refused, interrupted, cancelled) and the rule that a retry appends an attempt rather than replacing history; supervisor-owned refusal accounting a supervised process cannot erase; and reconciliation of an ambiguous effect before any retry, with no exactly-once promise.\n",
     "title": "Work selection, workspace preparation, the run record, and recovery after interruption"
   },
-  "shardHash": "f50a7861c89359b36e68bf434be4a86aec90533468241bbd6b5b4935bb0041b2",
+  "shardHash": "1f7de38fe665be3ec596db01844fb22a98d9ceacfeaccb14d566bda5efcd8812",
   "specVersion": "1.3.0"
 }

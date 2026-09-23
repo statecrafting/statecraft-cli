@@ -110,6 +110,54 @@ read as having chosen one. This spec fixes **where the answer comes from and who
 may override it**; the format follows spec-spine's filing, and until that exists
 the product reads only the override and the default.
 
+### 3.1.2 Two reports that both carry status, read from one state
+
+Recorded on 2026-09-22 before the implementation it authorizes. spec-spine's
+spec 102, merged on its `main` at `75a998f7` and present at `3b67b63d`, adds
+`status` to each `ready` row of `registry plan --json`, copied from the
+registry record. Measured here on 2026-09-22 against a scratch copy of this
+corpus recompiled by the CLI built from `3b67b63d`: every `ready` row carries
+`id`, `title` and `status`, and no row carries `implementation`. The pinned
+0.20.0 carries neither. No released version carries `status` in the plan: the
+registry's newest is 0.21.0.
+
+So a producer may answer `status` twice, once in each report this section
+joins, and this product must not pick one silently. Five rules:
+
+1. **The join stays.** `registry list --json` is still the only report that
+   carries `implementation`, so it is still read, and `status` is still taken
+   from it. Nothing here narrows what section 3.1.1 reads.
+2. **Where the plan carries `status`, it is compared, not preferred.** For
+   every ready row, the plan's `status` must equal the list's `status` for the
+   same id. A difference is a **disagreement**, and the read is refused naming
+   the id, both values, both reports and the producer version. Nothing is
+   scheduled from a report that contradicts itself, and neither value is
+   chosen.
+3. **A disagreement is only reported from one state.** The reads are
+   bracketed: `registry list`, then `registry plan`, then `registry list`
+   again, after `check` has said the ledger is fresh. The two `list` answers
+   must be byte-identical; if they are not, the ledger moved while it was being
+   read, the read is refused as **moved**, and nothing is compared. This
+   product still never reads the ledger's files itself (section 3.1).
+4. **A plan row without `status` is the released shape, not a gap.** Under a
+   producer whose plan carries no `status`, the join proceeds exactly as
+   before, and each row records that its `status` came from `registry list`
+   alone. A plan that carries `status` on some rows and not others is refused
+   as unreadable, because a report that is not one shape is not a report this
+   build reads.
+5. **Every row says where each field came from.** `status` is recorded with
+   its sources: `registry list` alone, or `registry list` agreeing with
+   `registry plan`.
+
+A disagreement or a moved ledger is a refusal (exit **2** under spec 006
+section 3.3): the precondition that the producer answers consistently from one
+state was not met, and nothing was done. It is not a failure of this product,
+and it is not a finding about the target.
+
+What this does not establish: that the producer's two answers are correct,
+only that they agree; or that the ledger did not move and move back between
+the two `list` reads. The second is recorded rather than excluded.
+
 ### 3.2 Workspace preparation
 
 A run prepares an **isolated git worktree** under `.statecraft/state/`, branched
@@ -430,6 +478,12 @@ the historical bytes on disk are untouched regardless; and a record emitted with
 no identity omits the key and is byte-identical to what this product writes
 today. Making the decoder refuse rather than discard is a separate change, in a
 separate spec's territory, and is not made here.
+
+**2026-09-22: section 3.1.2, recorded before implementation.** spec-spine
+102 puts `status` in the plan report. Section 3.1.2 keeps the join, compares
+the two `status` answers rather than preferring one, refuses a disagreement
+and refuses a ledger that moved between bracketed reads. No code changed with
+this entry.
 
 ## Verification
 
