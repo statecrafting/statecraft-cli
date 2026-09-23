@@ -54,6 +54,9 @@ summary: >
   admission gate per invocation instead of relying on global registration;
   and startup identity is decided before governed work is released rather than
   refused after the session ends.
+  Section 3.34 amends one clause of 3.30 rule 8: a capture may end with one
+  allowlisted `task_summary` event after its terminal event, of a closed
+  shape, naming the session, and never read.
   Section 3.33 separates the managed-startup trial from the permission
   experiment: one run attempt with a read-only sentinel, one session and one
   version probe, its own approval, named outcomes for absent, unbound, late,
@@ -1952,6 +1955,126 @@ trial observes each or shows that it failed:
 None of these is weakened to make the trial pass: not the gate's wait, not the
 decision point, not the refusal on a missing session.
 
+### 3.34 One allowlisted event after the terminal event
+
+A narrowly scoped authority amendment, settled by the owner on 2026-09-23 and
+recorded before the implementation it authorizes. It amends section 3.30 rule 8
+in one clause, "the terminal event is its last event", and nothing else in
+sections 3.29 and 3.30. Rules 1 to 7 and 9 to 12 are unchanged and govern
+everything below.
+
+**The gap this closes, exactly.** The one authorized permission experiment
+(section 5, the 2026-09-23 entry on the two live experiments) stopped at its
+first session because Claude Code `2.1.267` wrote a `system` event of subtype
+`task_summary` after its `result` event, and rule 8 refuses any event after the
+terminal one. The measured trailer, event 12 of the refusal control's capture
+(stream `cc9b6e59…ea11`), is exactly:
+
+```json
+{"type":"system","subtype":"task_summary","detail":null,"uuid":"…","session_id":"…"}
+```
+
+with the capture's own session id. The same capture carries a second
+`task_summary`, before the terminal event, whose `detail` is a string. The
+recorded streams under `crates/statecraft-adapter-claude-code/testdata/stream/`
+carry neither. Nothing in this amendment treats a `system` event as harmless
+because of its type, and nothing treats a summary as proof that no further work
+happened: the trailer is admitted as an event that carries nothing the
+admission reads, and refused whenever it could carry more.
+
+**Rule 13: at most one trailer, and only this one.** A capture may carry, after
+its terminal event, at most one further event, the **trailer**, and only when
+every condition below holds. Otherwise rule 8 applies as written and the
+capture is out of order.
+
+1. **A complete terminal event precedes it.** The capture already holds exactly
+   one init event and exactly one terminal event, in that order, and the
+   terminal event deserializes as the adapter's result type. A trailer never
+   completes a capture that has no terminal event, and a trailer before the
+   terminal event is not a trailer (see "Before the terminal event").
+2. **It is the last event.** Nothing follows the trailer. A second trailer, a
+   second terminal event, or any other event after it refuses the capture.
+3. **Its shape is closed.** Its line is one JSON object whose members are
+   exactly `type`, `subtype`, `detail`, `uuid` and `session_id`: none missing,
+   none added. `type` is `system`. `subtype` is on the closed list, which has
+   one entry, `task_summary`, and whose provenance is the capture named above.
+   `detail` is JSON `null` or a string. `uuid` is a non-empty string.
+   `session_id` is a non-empty string.
+4. **It names the capture's session.** `session_id` equals the session every
+   other event in the capture names. A trailer naming another session, or none,
+   is mixed-session evidence under rule 8.
+5. **The shape is read by the adapter.** Rule 7 applies: the closed shape is a
+   type in the supported adapter's crate (spec `004` section 3.9), and this
+   spec's crate does not parse the line a second way.
+
+Anything else after the terminal event refuses the capture, including, for
+avoidance of doubt: an `assistant` or `user` turn; a tool request or tool
+result; a `permission_denied` or hook event; a `rate_limit_event` or any event
+of a type the adapter does not map; a `system` event of any other subtype; a
+`task_summary` with any additional member such as a tool-use id; and a second
+`result`.
+
+**Rule 14: the trailer is not evidence.** No field of the trailer is read for
+any decision: not the classification of a tool use (rule 9), not a control's
+outcome (rule 10), not the terminal or process judgement (rule 11), not the
+version or the binding (rules 4 and 12). `detail` is never read, so no prose in
+it can qualify, refuse, supply a denial, supply a result, or stand in for a
+control. The testable form of this rule: **the admission's judgement of a
+capture that carries an admitted trailer is identical to its judgement of the
+same capture with the trailer's line removed.** A trailer never turns a
+refused capture into an admitted one or the reverse.
+
+**Before the terminal event.** Unchanged. A `task_summary` before the terminal
+event is a `system` event naming the session, counted for rule 8's session
+check and carrying nothing read, as every `system` event of a subtype the
+admission does not name already is. A `rate_limit_event` before the terminal
+event is an event of a type the adapter does not map, which spec `004` section
+3.1 classifies as progress; its position already counts. This amendment
+accounts for both deliberately, and it admits neither after the terminal event
+except the one trailer rule 13 describes.
+
+**Bounds.** The trailer is read in the same single pass over the capture that
+rule 8 already makes. The product sets no byte limit on a capture today and
+this amendment adds none; the launch's deadline (section 3.30, "Bounds") bounds
+what a session can write, and rule 13 bounds what may follow the terminal event
+to one line of a closed shape.
+
+**Bytes and order are preserved.** The capture's bytes are kept whole,
+trailer included, in the order the provider wrote them. Nothing strips,
+rewrites or reorders the trailer before the admission reads it or after.
+
+**Where it applies.** Everywhere rule 8 applies through the admission's reading
+of a capture: the permission experiment's admission, and `startup capture`'s
+reading of whether a launch completed as one session. It does not change the
+managed-startup trial (section 3.33) or a run's startup records (sections 3.31
+and 3.32), which do not read a capture through rule 8.
+
+**Historical records.** The refusal control's record from the 2026-09-23
+experiment keeps its verdict, `incomplete` under rule 8 as then written, and its
+archive is not rewritten. Replaying its bytes through the amended reading is
+**offline regression evidence**: it is labeled a replay, it is not a live
+observation, and it neither counts toward nor spends any provider session. A
+record read back later is re-judged under the rules in force (section 3.29
+rule 5), and that single launch record cannot qualify anything, because an
+admitted observation needs all three controls.
+
+**The command surface is unchanged.** No verb, flag or exit code is added.
+`startup capture` and `startup qualify` report the trailer when one was
+admitted, as one line naming its event number and subtype and saying it was not
+read.
+
+**Acceptance.** Positive: the measured trailer shape, with `detail: null` and
+with a string `detail`, after a complete terminal event, admitted; the
+trailer-removed identity of rule 14, over both an admitted and a refused
+capture; and the archived capture's bytes, replayed offline, reading as one
+complete session with its trailer reported. Negative, each refusing the
+capture: a second trailer; any other `system` subtype after the terminal
+event; a `rate_limit_event` after it; an assistant or user turn after it; a
+second terminal event after the trailer; a trailer with an added member, a
+missing member, a non-string non-null `detail`, an empty `uuid`, or a
+`session_id` that is absent or names another session; and a trailer with no
+terminal event before it.
+
 ## 4. Out of scope
 
 Installing the product itself; provider authentication; hosted registration;
@@ -3463,6 +3586,23 @@ out of contract, and nothing is vendored. A conforming producer returns none,
 so such a file, written by an older spec-spine's initializer, is now treated
 as the user's own. It is preserved and bridged, never overwritten. That is the
 conservative reading, and no requirement asks for the other.
+
+**2026-09-23: the owner decided the open trailing-event question, as section
+3.34.** The entry above offered two options and recommended the second,
+narrowly. The owner chose it and set its safeguards: a complete terminal event
+first, the session correlated, a closed list of subtype and shape, no turn,
+request, result, outcome or second terminal event after termination, nothing
+qualified from the trailer's prose, no trailer standing in for a control,
+refusal of anything malformed, unknown, contradictory or misbound, no new
+unbounded read, and the original bytes and order kept. Section 3.34 records
+that contract before the code it authorizes. It sets the closed list to one
+subtype and one shape, from the one capture that showed it. It admits a string
+`detail` as well as `null`, because the same capture carries the same subtype
+with a string before its terminal event, and neither form is read. The earlier
+entries are not edited: the experiment's verdict under rule 8 as then written
+stands, and a new attempt is a new authorization, which the owner gave
+separately, bounded to at most three sessions and conditional on this
+amendment being implemented, reviewed, merged and exercised locally first.
 
 ## Verification
 
