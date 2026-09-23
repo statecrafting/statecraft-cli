@@ -3865,6 +3865,66 @@ bytes by a new evaluator and spends no session. The experiment's recorded
 verdict is unchanged, and the replay is kept outside the repository beside the
 archive.
 
+**2026-09-23: the permission experiment, second campaign: admitted, for
+Claude Code `2.1.267` on this machine.** A new owner authorization, separate
+from the first campaign's, for at most three provider sessions, stopping at the
+first incomplete, inadmissible or uncertain one, with the 300-second session
+deadline and the 30-second version probe unchanged. It ran only after section
+3.34 was implemented, independently reviewed, merged (`main` at `87a3f19`) and
+exercised against local positive and adversarial fixtures, and after the
+no-provider preflight passed on a fresh fixture, `$TMPDIR/sc-accept-A2`.
+The product binary the preflight built from `87a3f19` is `7529dbec…c28b`; the
+acceptance script is `f936d494…ca2e`. The provider was named by its absolute
+versioned path, `~/.local/share/claude/versions/2.1.267`, SHA-256
+`a681f300…cd2558`, the same binary as the first campaign, so a change of the
+`claude` symlink could not change it between sessions; each launch's probe and
+`init` event reported `2.1.267`.
+
+The stage ran from 10:17:52Z to 10:18:23Z and used all three sessions: the
+refusal, the allowed command and the absent payload, in that order. Each
+process exited by itself with status 1 and no timeout, signal or survivor, and
+each capture ended with one `system`/`task_summary` trailer after its terminal
+event (events 15, 14 and 11), which section 3.34 admitted and did not read. The
+fixture project was unchanged. `startup qualify` then admitted the
+observation: the claimed command was refused through a structured denial and
+did not execute under the payload, the allowed command executed under the same
+payload and printed `statecraft-allowed-control`, and the claimed command
+executed without the payload. The record, `acc-live.json` (`60f452cb…a84c`),
+says `observed`, harness `2.1.267` and payload `3a5c7fc2…5fe1`, and `startup
+qualify` reported **`qualified: false`**, computed from the record rather than
+stored in it: supply is a separate evidence class this stage does not perform.
+The captures are kept verbatim (`08a6623d…2083`, `e1fd2739…5500`,
+`3201d2ae…b5b1`) in `sc-accept-A2.tar.gz` (`be31d3d5…22d7`), outside the
+repository, beside the first campaign's archive, which is unchanged
+(`8bf5f4f3…e2a6`).
+
+*What this establishes, and what it does not.* For this version on this
+machine, the premise the 2026-09-22 entry graded "documented and read
+statically" is now observed once: the floor's deny entry, delivered through
+`--settings`, prevailed over an identical `--allowedTools` grant, and the grant
+alone let the command run. The first campaign's verdict, `incomplete` under
+rule 8 as then written, stands, and its record was not rewritten. Nothing is
+established about another provider version, another machine, another command,
+a run's own settings document (section 3.32 rule 25 carries hooks as well as
+the floor, and section 3.29 rule 4 keeps evidence for one payload from
+qualifying another), or whether a model read or complied with anything. In section
+3.36's words the observation is observed and observation-admitted, bound to the
+provider binary by the digest its launch record carries; it is not a
+qualification of any run, trial or session, and whether it covers the floor
+inside a run's composed document is the owner's decision that section 3.36 rule
+5 leaves open. The
+operator's own `SessionStart` hooks and settings were in force, because the
+stage does not replace `HOME`, as in the first campaign. This campaign's
+authorization is spent; there is no further session under it.
+
+*The managed-startup trial is not repeated.* Its one established observation
+(the 2026-09-23 entry above) stays as recorded: one session, Claude Code
+`2.1.267`, this machine. Its archive re-digests to the value recorded there
+(`567c8ee9…60a5`). It was not re-run, refreshed or re-evaluated under a changed
+rule, because no change in this round touches what it read: section 3.34
+applies to the admission's reading of a capture and not to the trial's
+timeline.
+
 ## Verification
 
 `--fail-on-untraced` joined the corpus gate with this spec's first
