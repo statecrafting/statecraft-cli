@@ -501,7 +501,7 @@ the one operation that section names.
 | Code | Meaning for the override verbs |
 |---|---|
 | 0 | `grant` or `revoke` recorded; `show` read the journal. |
-| 2 | Refused, and nothing written: an unregistered repository, an unknown spec id, an empty operator or reason, a grant duplicating one in force, or a revocation of nothing. |
+| 2 | Refused, and nothing written: an unregistered repository, an unknown spec id, an empty operator or reason, a grant duplicating one in force, a revocation of nothing, or another process holding the repository lock. |
 | 3 | Usage: a missing argument. |
 | 4 | The journal could not be read, did not verify, or could not be written durably. |
 
