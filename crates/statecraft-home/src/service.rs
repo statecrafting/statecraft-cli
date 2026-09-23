@@ -979,6 +979,35 @@ fn startup_capture(root: &Path, request: crate::capture::Request) -> Answer {
     }
 }
 
+/// The manifest lock every writer of the declaration holds from its read to
+/// its write, so no other writer's recorded change is erased in between.
+/// A root that does not exist holds no manifest, and the read that follows
+/// answers that, so there is nothing to lock.
+fn lock_manifest(
+    root: &Path,
+) -> Result<Option<statecraft_environment::manifest::ManifestLock>, Answer> {
+    use statecraft_environment::manifest::{Manifest, ManifestError, WRITER_WAIT, lock};
+    // No manifest: the read that follows refuses, and nothing is locked, so
+    // not even the runtime lock file is created.
+    if matches!(Manifest::read_bytes(root), Ok(None)) {
+        return Ok(None);
+    }
+    match lock(root, WRITER_WAIT) {
+        Ok(held) => Ok(Some(held)),
+        Err(ManifestError::Io { source, .. }) if source.kind() == std::io::ErrorKind::NotFound => {
+            Ok(None)
+        }
+        // Another writer held it past the wait: nothing was written, so a
+        // refusal, as for the transfer verbs.
+        Err(e @ ManifestError::Busy { .. }) => Err(Answer::Refused {
+            reason: e.to_string(),
+        }),
+        Err(e) => Err(Answer::Failed {
+            reason: e.to_string(),
+        }),
+    }
+}
+
 /// The manifest a project holds, or the answer that says it holds none.
 fn manifest_of(root: &Path) -> Result<Manifest, Answer> {
     match Manifest::read(root) {
@@ -1019,6 +1048,11 @@ fn harness_show(ports: &Ports<'_>, root: &Path) -> Answer {
 
 /// `harness upgrade`. The explicit, reviewed act of section 3.25.
 fn harness_upgrade(ports: &Ports<'_>, root: &Path) -> Answer {
+    // Read and written under the manifest lock (spec 002 section 3.35).
+    let _held = match lock_manifest(root) {
+        Ok(held) => held,
+        Err(answer) => return answer,
+    };
     let mut manifest = match manifest_of(root) {
         Ok(m) => m,
         Err(answer) => return answer,
@@ -1372,6 +1406,11 @@ fn init(ports: &Ports<'_>, root: &Path, mode: flow::Mode) -> Answer {
 }
 
 fn enrollment(ports: &Ports<'_>, root: &Path, next: Enrollment) -> Answer {
+    // Read and written under the manifest lock (spec 002 section 3.35).
+    let _held = match lock_manifest(root) {
+        Ok(held) => held,
+        Err(answer) => return answer,
+    };
     let mut manifest = match Manifest::read(root) {
         Ok(Some(m)) => m,
         Ok(None) => {

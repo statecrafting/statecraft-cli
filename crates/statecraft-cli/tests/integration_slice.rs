@@ -403,6 +403,6 @@ fn the_grown_command_tree_still_has_no_verb_that_publishes() {
     // startup evidence; and one more with section 3.11.4's `startup trial`,
     // which spends a project's one managed-startup trial; and three more with
     // section 3.11.5's override verbs; and one more with section 3.11.6's
-    // `run reconcile`.
-    assert_eq!(statecraft_cli::commands::Verb::all().len(), 39);
+    // `run reconcile`; and three more with section 3.11.7's transfer verbs.
+    assert_eq!(statecraft_cli::commands::Verb::all().len(), 42);
 }

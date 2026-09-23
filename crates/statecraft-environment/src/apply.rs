@@ -8,7 +8,7 @@
 use crate::adapter::{Declaration, HarnessProbe};
 use crate::claimant::{ForeignClaims, resolve};
 use crate::digest::digest_file;
-use crate::manifest::{Class, Entry, Manifest, Source, SourceKind};
+use crate::manifest::{Class, Entry, Manifest, Source, SourceKind, WRITER_WAIT};
 use crate::plan::{Plan, WithheldWrite, plan};
 use crate::time::{Clock, rfc3339_utc};
 use std::path::Path;
@@ -80,6 +80,12 @@ pub fn apply(
     foreign: &ForeignClaims,
     clock: &dyn Clock,
 ) -> Result<Outcome, ApplyError> {
+    // Under the manifest lock from the plan to the write, and refused before
+    // any file is touched when the manifest moved since `manifest` was read:
+    // otherwise this apply would erase another writer's recorded change, or a
+    // transfer already reported as applied (spec 002 section 3.35).
+    let _held = crate::manifest::lock(root, WRITER_WAIT)?;
+    manifest.ensure_current(root)?;
     let computed = plan(root, Some(manifest), declarations, probe, foreign).map_err(|source| {
         ApplyError::Io {
             path: root.display().to_string(),
@@ -87,6 +93,40 @@ pub fn apply(
         }
     })?;
     perform(root, manifest, &computed, declarations, clock)
+}
+
+/// [`apply`] against the manifest on disk, read under the manifest lock, or a
+/// new one with `pins` when there is none. This is the form a command uses:
+/// nothing another writer records between the read and the write can be lost.
+pub fn apply_current(
+    root: &Path,
+    declarations: &[Declaration],
+    probe: &dyn HarnessProbe,
+    foreign: &ForeignClaims,
+    clock: &dyn Clock,
+    pins: impl FnOnce() -> crate::manifest::Pins,
+) -> Result<Outcome, ApplyError> {
+    // A refusal at plan time depends on the declarations alone, and is
+    // answered before the lock, so it creates not even runtime state.
+    let colliding = crate::adapter::collisions(declarations);
+    if !colliding.is_empty() {
+        return Ok(Outcome::Refused {
+            reasons: colliding
+                .into_iter()
+                .map(|c| crate::plan::Refusal::AdapterPathCollision(c).describe())
+                .collect(),
+        });
+    }
+    let _held = crate::manifest::lock(root, WRITER_WAIT)?;
+    let mut manifest = match Manifest::read(root)? {
+        Some(m) => m,
+        None => {
+            let m = Manifest::new(pins());
+            m.belongs_to(root, None);
+            m
+        }
+    };
+    apply(root, &mut manifest, declarations, probe, foreign, clock)
 }
 
 /// Perform an already-computed plan.
@@ -101,6 +141,8 @@ pub fn perform(
     declarations: &[Declaration],
     clock: &dyn Clock,
 ) -> Result<Outcome, ApplyError> {
+    let _held = crate::manifest::lock(root, WRITER_WAIT)?;
+    manifest.ensure_current(root)?;
     if computed.refused() {
         return Ok(Outcome::Refused {
             reasons: computed.refusals.iter().map(|r| r.describe()).collect(),
@@ -173,6 +215,13 @@ pub const NO_MANIFEST: &str =
 /// and a wrong guess deletes a user's work.
 pub fn remove(root: &Path, clock: &dyn Clock) -> Result<Outcome, ApplyError> {
     let _ = clock;
+    // No manifest is a refusal with nothing written, not even the lock file.
+    if Manifest::read_bytes(root)?.is_none() {
+        return Ok(Outcome::Refused {
+            reasons: vec![NO_MANIFEST.to_string()],
+        });
+    }
+    let _held = crate::manifest::lock(root, WRITER_WAIT)?;
     let Some(mut manifest) = Manifest::read(root)? else {
         return Ok(Outcome::Refused {
             reasons: vec![NO_MANIFEST.to_string()],

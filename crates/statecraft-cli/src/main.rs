@@ -386,6 +386,25 @@ fn run(args: &[String]) -> i32 {
         }
         // Spec 006 section 3.11.6: the reconciliation of 003 section 3.6.1.
         Verb::RunReconcile => reconcile_verb(&invocation.rest, &registry, &home, format),
+        // Spec 006 section 3.11.7: the transfer verbs of 002 section 3.35. A
+        // registered target, as for the environment verbs whose manifest they
+        // change; usage is 3, everything else is the library's answer.
+        Verb::TransferPlan | Verb::TransferApply | Verb::TransferRevert => {
+            let request =
+                match statecraft_cli::transfer::parse(invocation.verb, &invocation.rest, |p| {
+                    absolute(p)
+                }) {
+                    Ok(r) => r,
+                    Err(why) => {
+                        eprintln!("{why}");
+                        return Exit::Usage.code();
+                    }
+                };
+            if registry.get(request.root()).is_none() {
+                return emit(&bind::unregistered_answer(request.root()), format);
+            }
+            emit(&statecraft_cli::transfer::execute(&request, &home), format)
+        }
         // A help request is not an operation, so it consults nothing and
         // changes nothing. Exit 0: the question was asked and answered.
         Verb::Help => {
@@ -1950,23 +1969,19 @@ fn environment_verb(
         // for the operator, not for the machine, and giving them different code
         // paths is how their conflict rules would drift.
         Verb::EnvApply | Verb::EnvUpgrade => {
-            let mut manifest = manifest.unwrap_or_else(|| Manifest::new(adapters::pins()));
-            match statecraft_environment::apply::apply(
+            // Read again under the manifest lock and written by the same
+            // operation, so a transfer or another writer's change recorded
+            // since the read above is never erased (spec 002 section 3.35).
+            let _ = manifest;
+            match statecraft_environment::apply::apply_current(
                 root,
-                &mut manifest,
                 &declarations,
                 &probe,
                 &foreign,
                 &clock,
+                adapters::pins,
             ) {
-                Ok(outcome) => {
-                    if !outcome.refused() {
-                        if let Err(e) = manifest.write(root) {
-                            return fail(&e.to_string(), format);
-                        }
-                    }
-                    emit(&bind::outcome_answer(outcome), format)
-                }
+                Ok(outcome) => emit(&bind::outcome_answer(outcome), format),
                 Err(e) => emit(&bind::apply_error_answer(&e), format),
             }
         }

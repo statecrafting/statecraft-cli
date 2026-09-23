@@ -36,10 +36,10 @@
     "id": "006-command-surface",
     "implementation": "in-progress",
     "sectionDigests": {
-      "006-the-command-surface": "467f5808fc98e231e5d19775df1c257469e2b191a3f9f67bece7bf7b82dfe197",
+      "006-the-command-surface": "36ee09d4d470c3a706e3354dd567246bdfabb60d786ba6f1f4ee63ec38b53589",
       "1-purpose": "e6e22a8e8dc18f59110b16adb2684860ed768cf61e37d71ed95a9ab10064a607",
       "2-territory": "2a51dc6c2d08c14c669875b1a001da52a60b50885e44feac976b7f3cd2dd7441",
-      "3-1-the-command-tree": "5441b9eb01c61b7736e22c748f2ad4c550bcc4883d987ed681b5e3d36c9f0c51",
+      "3-1-the-command-tree": "53d054af1bbfe0f1107f4693699ed455e82b102a530ba1e02739d40e3475512d",
       "3-10-placing-the-work-run-and-accept-verbs-in-the-vocabulary": "21df1628d7322ea67e7109319696d9738141ba618ab1baff7a2d513401d3d020",
       "3-11-1-the-five-verbs-spec-002-s-sections-3-25-to-3-29-need": "5de80bb2154649054b6ed6fb5d57b9d3225c34208a8ee64ecd0b0203c4339fcd",
       "3-11-2-the-sixth-verb-and-what-a-qualification-exit-code-distinguishes": "b56a8383cb270773ecdd5602a82899df014e3a3ace2da8262889fce39554d4c0",
@@ -59,10 +59,10 @@
       "3-7-observable-negative-cases": "9846430bc52a241fcccc05d1397a8eb1cf3c617956b63e939afaad9bf0b9b315",
       "3-8-discovery-is-a-join-because-one-report-does-not-carry-status": "4697defa17606339e21e7caaa1c4aea02e711ac2f7d1df042bc02c7268c9dab3",
       "3-9-inspection-is-a-fold-and-reads-nothing-else": "98671d6dcd95497894a5e7f80f2c8fbcc672b583b29c88af0b95b694f150bf38",
-      "3-behavior": "e26823954f679f53bf72c59c8d54c9b2989d1bca9946845c58b824f29a1d593e",
+      "3-behavior": "8c9bcbea34e42b8322002aacd4ab14a561118094c271015d67bf1742de6707bb",
       "4-out-of-scope": "55fb20ad589fed8825d78a3127c82be59f85d96bc4db3dba59887615afcb5c43",
-      "5-decisions-recorded-during-implementation": "4e0e9525888c58886011876d5debb08e200f84b17e3b7820452d3b90b44425fc",
-      "verification": "cf736a5f4fcf78897ed8021cd150d3f78edf86379ad2f6e784cb3d9b0c63cff0"
+      "5-decisions-recorded-during-implementation": "74506930c2c3da37985e55002b146d6ec2df7df7c5f5a86580f8abbd21e90bd7",
+      "verification": "6a62cc327ca3acc9851ddd16f36d49110e4eb737cb8064b674fa31c61fa94ac2"
     },
     "sectionHeadings": [
       "006: The command surface",
@@ -98,6 +98,6 @@
     "summary": "The binary, and every verb reachable through it. Specs 002 to 005 each describe operator verbs and then own only a library crate, so nothing they specify is runnable. This spec owns crates/statecraft-cli/ and binds those verbs to a process: the command tree, the rule that a command is a thin binding and never a second implementation, the closed exit-code vocabulary that distinguishes a refusal from a failure from a finding, human and --json output as two renderings of one value, and the binary's name being a recorded decision rather than a Cargo default. It also carries the work, run and accept bindings that were specified separately as 009: discovery as a join of two spec-spine reports because one of them does not carry status, inspection as a read-only fold of the run record and nothing else, and the rule that a binding needing a library entry point gets it from the crate that owns the behavior. Section 3.11.1 adds the five verbs 002 sections 3.25 to 3.29 need: inspecting and explicitly upgrading the required harness identity, obtaining the managed-session payload, and recording startup evidence beside submitting qualification evidence for admission.\n",
     "title": "The command surface: one binary, every verb the other specs name, and what an exit code means"
   },
-  "shardHash": "0f50ee68b395947c412d0bfc67af7460b407d2f1635b9ad7a02c9bf81d9d871b",
+  "shardHash": "e376b81e9ba5350af1cd351e12af832240758d048c896e188bfb1b7e2bc8c6cc",
   "specVersion": "1.6.0"
 }

@@ -17,6 +17,9 @@
 //! - [`plan`] computes what an apply would do; [`apply`] performs it and can
 //!   remove it again.
 //! - [`doctor`] diagnoses and never repairs.
+//! - [`transfer`] moves one path between the classes when, and only when, an
+//!   operator asks for it by path (spec 002 section 3.35), and journals the act
+//!   in the manifest.
 //!
 //! # What it does not do
 //!
@@ -43,6 +46,7 @@ pub mod probe;
 pub mod qualify;
 pub mod registry;
 pub mod time;
+pub mod transfer;
 
 pub use apply::{Outcome, apply, remove};
 pub use doctor::{Report, doctor};

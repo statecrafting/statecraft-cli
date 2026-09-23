@@ -503,6 +503,37 @@ fn run(ctx: &Context<'_>, mode: Mode) -> Report {
         project::managed_instructions(),
     ));
 
+    // Every write of the declaration below happens under the manifest lock,
+    // taken before the read, so a transfer or an `env apply` recorded in
+    // between cannot be erased by this run's write (spec 002 section 3.35).
+    let _manifest_lock = if writing {
+        match statecraft_environment::manifest::lock(
+            ctx.root,
+            statecraft_environment::manifest::WRITER_WAIT,
+        ) {
+            Ok(held) => Some(held),
+            Err(e) => {
+                // Another writer held it past the wait: nothing was written.
+                let busy = matches!(
+                    e,
+                    statecraft_environment::manifest::ManifestError::Busy { .. }
+                );
+                let reason = e.to_string();
+                report.steps.push(StepReport {
+                    step: Step::Reconcile,
+                    state: if busy {
+                        StepState::Refused { reason }
+                    } else {
+                        StepState::Failed { reason }
+                    },
+                    detail: "the declaration could not be locked for writing".to_string(),
+                });
+                return report.finish();
+            }
+        }
+    } else {
+        None
+    };
     let mut manifest = match Manifest::read(ctx.root) {
         Ok(Some(m)) => m,
         Ok(None) => Manifest::new(Pins {
@@ -951,7 +982,7 @@ fn write_project(
     // makes removal able to take the line back, and a re-run finding the line
     // already first must not lose it.
     manifest.upsert_modification(bridge::record(bridge_plan, now));
-    manifest.write(root).map_err(|e| e.to_string())
+    manifest.write(root).map(|_| ()).map_err(|e| e.to_string())
 }
 
 fn step_corpus(ctx: &Context<'_>) -> StepState {

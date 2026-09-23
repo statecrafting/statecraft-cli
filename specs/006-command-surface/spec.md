@@ -111,6 +111,9 @@ group them:
 | `config show <path>` | `002` | The resolved configuration for a run in that project, per key, with provenance. |
 | `approval grant <path> <subject> <operator> <reason...>` / `approval show <path> <subject>` | `002` | Records a local approval for one subject; shows one subject's eligibility and the authority behind it. |
 | `override grant <path> <spec-id> <operator> <reason...>` / `override revoke <path> <spec-id> <operator> <reason...>` / `override show <path>` | `003` | Records, removes and shows the single-spec readiness override of `003` section 3.1.4 (section 3.11.5). |
+| `transfer plan <path> <file> <from> <to>` | `002` | Reports one path's ownership transfer and its plan identity. Writes nothing (section 3.11.7). |
+| `transfer apply <path> <file> <from> <to> <plan-id> <operator> <reason...>` | `002` | Applies that transfer if the plan is still current, and journals it in the manifest. |
+| `transfer revert <path> <transfer-id> <operator> <reason...>` | `002` | Applies the inverse of a recorded transfer if nothing changed since. |
 
 A verb is added by the change that implements the behavior behind it, never
 ahead of it: a command that prints "not implemented" is a worse answer than a
@@ -932,6 +935,71 @@ refusal adds `reconciliation`, the live attempt's `unknown` one, and names it
 in the human rendering. A refusal of `run reconcile` that is not about the
 lock is its own answer, with exit 2 unchanged.
 
+**2026-09-23: the transfer verbs implemented, and what section 3.11.7 left to
+the binding.** The three verbs are bindings in `src/transfer.rs` onto `002`
+section 3.35's operation in the environment crate, and they join section 3.1's
+table and the group list the tree prints in this change. Six choices the
+section was silent on:
+
+- **A registered target, as for the environment verbs.** An unregistered path
+  is refused, exit 2, naming it, which is section 3.7's row for `env apply`
+  applied to the verbs that change the same manifest.
+- **Usage is shape; a blank value is a refusal.** A missing argument or a class
+  word other than `user`, `adopted` or `managed` is exit 3 with nothing on
+  standard output. An operator or reason that is present and blank is the
+  library's refusal, exit 2, which is how section 3.11.5 already reads the
+  same case for the override verbs. A class pair that parses but is not one of
+  rule 1's four moves is exit 2 (`move-not-admitted`), because the arguments do
+  name an operation and the operation declined.
+- **A refusal names its rule, and a stale plan names what changed.** The JSON
+  value is `{"refused": {"kind", "detail", "changed"}}`, where `kind` is one
+  closed kebab-case word per refusal (`stale-plan`, `class-mismatch`,
+  `move-not-admitted`, `no-source`, `adapter-not-claiming`,
+  `instruction-file`, `modification`, `protected`, `escaping`,
+  `not-relative`, `symbolic-link`, `directory`, `not-a-regular-file`,
+  `missing`, `spelling`, `alias`, `journal-disagrees`, `no-manifest`,
+  `unknown-transfer`, `later-transfer`, `class-changed`,
+  `unrecorded-change`, `missing-operator-or-reason`, `busy`), and `changed`,
+  present for `stale-plan`, lists which of the plan's inputs moved
+  (`classes`, `path`, `file`, `manifest`, `undetermined`, or `identity`).
+  `<plan-id>` is either the bare SHA-256 plan identity `transfer plan` prints
+  as `identity`, which is what `002` rule 4 names, or the token it prints as
+  `plan_id`, which carries that identity beside a short digest of each input;
+  a still-current identity is never refused in either spelling.
+- **A plan that finds the journal disagreeing still exits 0.** Rule 5 says
+  `transfer plan` reports it; section 3.11.7 gives `plan` no finding code. The
+  answer lists every disagreement and says that `apply` and `revert` will
+  refuse until it is resolved.
+- **Exit 4 covers the file as well as the manifest, and a write in force but
+  not durable.** A file whose digest a plan needs and that cannot be read
+  (anything but absent, which is a refusal) is a failure, which is section
+  3.3's general meaning of 4. When the manifest was renamed into place and its
+  directory could not be flushed, the answer is 4 with `{"failed":
+  "not-durable", "in_force": ...}`, naming the record that is in force, so
+  the code says what section 3.11.7 says and the value says what happened.
+  A temporary file an interrupted earlier write left, which the write
+  removes, is named in the answer (`write.removed_leftovers`).
+- **`env apply` and `env upgrade` read the manifest under the lock they
+  write it with** (`apply::apply_current`), so a transfer recorded between a
+  read and a write is never erased; this is `002`'s one-writer rule reaching
+  the binding, not a new rule here. When another writer holds the lock past
+  the wait, or the manifest changed since it was read, nothing was written,
+  so the answer is a refusal, exit 2, under section 3.3; a filesystem that
+  cannot take the lock at all is a failure, exit 4, naming the lock file.
+
+`tests/ownership_transfer.rs` exercises every acceptance and negative case of
+`002` section 3.35 through the built binary, with `STATECRAFT_HOME`, `HOME` and
+`PATH` constructed per test, including each stale-plan input, a second
+spelling, a disagreeing journal, and another holder of the lock. Rule 1 admits
+`managed` only where the adapter claims its paths, and the claude-code
+adapter's credential prerequisite is satisfied only on macOS (`004` section
+3.14): the tests that need a `managed` path assert it there, against a fake
+provider and a synthetic qualification record, and elsewhere assert the
+`adapter-not-claiming` refusal and report the rest skipped. The refusal is
+also asserted on every platform by removing the qualification record, and the
+library suite in the environment crate asserts the `managed` halves on every
+platform with a test probe.
+
 ## Verification
 
 Each line is one command. §3.7's rows are integration tests that **spawn the
@@ -1004,4 +1072,6 @@ cargo run -q -p statecraft-cli -- work --help
 cargo run -q -p statecraft-cli -- run --help
 cargo run -q -p statecraft-cli -- accept --help
 cargo test -p statecraft-cli --test contract_binding
+cargo test -p statecraft-cli --test ownership_transfer
+cargo run -q -p statecraft-cli -- transfer --help
 ```
