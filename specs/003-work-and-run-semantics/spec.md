@@ -537,7 +537,9 @@ written. Against each state:
 | `unrecorded` | admitted | admitted, declared only | admitted |
 
 Where the gate log records a released tool call, this product's own record
-says governed work ran, and `absent` contradicts it: refused as conflicting.
+says governed work ran, and `absent` contradicts it: refused as conflicting. The gate writes its log on a best-effort basis and only for a
+project that commits a requirement, so an absent or empty log proves nothing:
+it neither corroborates `absent` nor refuses it.
 
 **Rule 4: what each finding does.**
 
