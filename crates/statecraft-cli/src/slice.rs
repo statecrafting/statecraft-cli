@@ -405,6 +405,9 @@ pub struct AttemptRowView {
     pub base_commit: String,
     /// Its outcome, or `null` while it is live.
     pub outcome: Option<String>,
+    /// How its intent says the spec was admitted (spec 003 section 3.1.4 rule
+    /// 5), or `null` for an intent that predates that section: not recorded.
+    pub admission: Option<statecraft_run::work::Admission>,
 }
 
 /// `run list <path>`
@@ -424,6 +427,7 @@ pub fn run_list_answer(runs: Vec<Run>) -> Answer<RunListView> {
                         number: a.number,
                         base_commit: a.base_commit.clone(),
                         outcome: a.outcome.map(|o| o.word().to_string()),
+                        admission: a.admission.clone(),
                     })
                     .collect(),
             })
@@ -442,6 +446,9 @@ pub fn run_list_answer(runs: Vec<Run>) -> Answer<RunListView> {
                 a.outcome.clone().unwrap_or_else(|| "live".to_string()),
                 a.base_commit
             ));
+            if let Some(admission) = &a.admission {
+                summary.push_str(&format!("{:<20}   {}\n", "", admission.describe()));
+            }
         }
     }
     Answer::new(view, Exit::Ok, summary)
@@ -458,6 +465,59 @@ pub fn run_show_answer(account: ReviewableOutcome) -> Answer<ReviewableOutcome> 
     // checks before folding.
     let summary = account.render();
     Answer::new(account, Exit::Ok, summary)
+}
+
+/// `run show`, with each attempt's admission beside the account.
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RunShowView {
+    /// The account of spec 005 section 3.9, unchanged.
+    #[serde(flatten)]
+    pub account: ReviewableOutcome,
+    /// Each attempt's admission, by attempt number; `null` where the intent
+    /// predates spec 003 section 3.1.4 (not recorded).
+    pub admissions: Vec<AttemptAdmissionView>,
+}
+
+/// One attempt's admission.
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AttemptAdmissionView {
+    /// The attempt.
+    pub attempt: u32,
+    /// How it was admitted, or `null`: not recorded.
+    pub admission: Option<statecraft_run::work::Admission>,
+}
+
+/// `run show <path> <run>`, with admissions (spec 003 section 3.1.4 rule 5).
+pub fn run_show_with_admissions(account: ReviewableOutcome, run: &Run) -> Answer<RunShowView> {
+    let mut summary = account.render();
+    let admissions: Vec<AttemptAdmissionView> = run
+        .attempts
+        .iter()
+        .map(|a| AttemptAdmissionView {
+            attempt: a.number,
+            admission: a.admission.clone(),
+        })
+        .collect();
+    for a in &admissions {
+        summary.push_str(&format!(
+            "attempt {} {}\n",
+            a.attempt,
+            a.admission
+                .as_ref()
+                .map(statecraft_run::work::Admission::describe)
+                .unwrap_or_else(|| "admission not recorded".to_string())
+        ));
+    }
+    Answer::new(
+        RunShowView {
+            account,
+            admissions,
+        },
+        Exit::Ok,
+        summary,
+    )
 }
 
 /// The refusal for a run id the record does not carry.
@@ -904,5 +964,108 @@ pub fn trial_answer(
         },
         exit,
         summary,
+    )
+}
+
+/// The overrides in force for one repository, as the JSON contract carries
+/// them (spec 006 section 3.11.5).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct OverridesView {
+    /// The repository.
+    pub repository: String,
+    /// Each override in force, oldest grant first.
+    pub in_force: Vec<statecraft_run::overrides::InForce>,
+    /// Whether the journal ends in a torn line, which is not in force.
+    pub torn_last_line: bool,
+}
+
+/// `override show <path>`
+pub fn override_show_answer(
+    repository: &str,
+    journal: &statecraft_run::overrides::Journal,
+) -> Answer<OverridesView> {
+    let in_force = journal.in_force();
+    let mut summary = String::new();
+    if in_force.is_empty() {
+        summary.push_str("no override in force; the lifecycle policy decides alone\n");
+    }
+    if let Some(torn) = journal.torn() {
+        summary.push_str(&format!(
+            "a torn last line ({} byte(s)) is not in force; the next grant or revocation cuts it \
+             off\n",
+            torn.len()
+        ));
+    }
+    for o in &in_force {
+        summary.push_str(&format!(
+            "{}  by {} ({}), granted {}: {}\n",
+            o.spec_id, o.operator, o.operator_provenance, o.granted_at, o.reason
+        ));
+    }
+    Answer::new(
+        OverridesView {
+            repository: repository.to_string(),
+            in_force,
+            torn_last_line: journal.torn().is_some(),
+        },
+        Exit::Ok,
+        summary,
+    )
+}
+
+/// What `override grant` or `override revoke` recorded.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct OverrideChangeView {
+    /// `granted` or `revoked`.
+    pub change: &'static str,
+    /// The override as it was granted.
+    pub r#override: statecraft_run::overrides::InForce,
+}
+
+/// `override grant` / `override revoke`, from what the journal returned.
+pub fn override_change_answer(
+    change: &'static str,
+    result: Result<statecraft_run::overrides::InForce, statecraft_run::overrides::JournalError>,
+) -> Answer<serde_json::Value> {
+    use statecraft_run::overrides::JournalError;
+    match result {
+        Ok(o) => {
+            let summary = format!(
+                "{change} override for {} by {} ({}): {}\nit admits this one spec past the \
+                 lifecycle policy and nothing else; it does not ratify the spec\n",
+                o.spec_id, o.operator, o.operator_provenance, o.reason
+            );
+            Answer::new(
+                serde_json::to_value(OverrideChangeView {
+                    change,
+                    r#override: o,
+                })
+                .unwrap_or_default(),
+                Exit::Ok,
+                summary,
+            )
+        }
+        Err(JournalError::Refused(why)) => Answer::new(
+            serde_json::json!({ "refused": why }),
+            Exit::Refused,
+            format!("refused: {why}\n"),
+        ),
+        Err(e) => Answer::new(
+            serde_json::json!({ "failed": e.to_string() }),
+            Exit::Failed,
+            format!("failed: {e}\n"),
+        ),
+    }
+}
+
+/// Another process holds the repository lock (spec 003 section 3.1.4 rule 7):
+/// a precondition, so a refusal, and nothing was written.
+pub fn lock_busy_answer(detail: &str) -> Answer<String> {
+    Answer::new(
+        detail.to_string(),
+        Exit::Refused,
+        format!("refused: {detail}\n"),
     )
 }

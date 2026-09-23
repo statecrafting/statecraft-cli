@@ -86,6 +86,12 @@ pub enum Verb {
     StartupShow,
     /// `startup trial <path> (--provider-session | --synthetic) [--deadline <s>]`
     StartupTrial,
+    /// `override grant <path> <spec-id> <operator> <reason...>`
+    OverrideGrant,
+    /// `override revoke <path> <spec-id> <operator> <reason...>`
+    OverrideRevoke,
+    /// `override show <path>`
+    OverrideShow,
     /// `--help`, optionally with a group or a verb as its topic.
     ///
     /// Not part of the command tree: [`Verb::all`] lists the operations, and a
@@ -133,6 +139,9 @@ impl Verb {
             Verb::StartupQualify => "startup qualify",
             Verb::StartupShow => "startup show",
             Verb::StartupTrial => "startup trial",
+            Verb::OverrideGrant => "override grant",
+            Verb::OverrideRevoke => "override revoke",
+            Verb::OverrideShow => "override show",
             Verb::Help => "--help",
         }
     }
@@ -154,6 +163,11 @@ impl Verb {
             | Verb::EnvRemove
             | Verb::Doctor => "002-environment-lifecycle",
             Verb::WorkList | Verb::WorkShow | Verb::RunList => "003-work-and-run-semantics",
+            // Spec 006 section 3.11.5: the readiness override of 003 section
+            // 3.1.4, in 003's crate.
+            Verb::OverrideGrant | Verb::OverrideRevoke | Verb::OverrideShow => {
+                "003-work-and-run-semantics"
+            }
             // `run` is 003's semantics through 004's adapter, and 006 section
             // 3.1 names both. The record and the outcome are 003's, so that is
             // the owner; the adapter is how the attempt happens.
@@ -197,7 +211,7 @@ impl Verb {
     ///
     /// [`Verb::Help`] is deliberately absent: it is not an operation, and a
     /// usage error listing it would offer help as a thing to do.
-    pub fn all() -> [Verb; 35] {
+    pub fn all() -> [Verb; 38] {
         [
             Verb::ProjectRegister,
             Verb::ProjectList,
@@ -234,13 +248,16 @@ impl Verb {
             Verb::StartupQualify,
             Verb::StartupShow,
             Verb::StartupTrial,
+            Verb::OverrideGrant,
+            Verb::OverrideRevoke,
+            Verb::OverrideShow,
         ]
     }
 
     /// The groups a help topic may name.
-    pub const GROUPS: [&'static str; 12] = [
-        "project", "env", "work", "run", "accept", "home", "init", "migrate", "config", "harness",
-        "session", "startup",
+    pub const GROUPS: [&'static str; 14] = [
+        "project", "env", "work", "run", "accept", "home", "init", "migrate", "config", "approval",
+        "harness", "session", "startup", "override",
     ];
 
     /// Parse a verb from the leading arguments, returning how many it consumed.
@@ -286,6 +303,9 @@ impl Verb {
             ("startup", Some("qualify")) => Some((Verb::StartupQualify, 2)),
             ("startup", Some("show")) => Some((Verb::StartupShow, 2)),
             ("startup", Some("trial")) => Some((Verb::StartupTrial, 2)),
+            ("override", Some("grant")) => Some((Verb::OverrideGrant, 2)),
+            ("override", Some("revoke")) => Some((Verb::OverrideRevoke, 2)),
+            ("override", Some("show")) => Some((Verb::OverrideShow, 2)),
             _ => None,
         }
     }

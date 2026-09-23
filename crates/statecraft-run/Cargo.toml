@@ -27,6 +27,11 @@ serde = { version = "1.0.229", features = ["derive"] }
 serde_json = "1.0.151"
 thiserror = "2.0.20"
 statecraft-environment = { path = "../statecraft-environment" }
+# The repository lock (spec 003 section 3.1.4 rule 7): a safe advisory
+# `flock`, which the operating system releases when the holder ends. Already in
+# the graph through `tempfile`; std's `File::try_lock` is newer than this
+# workspace's declared rust-version.
+rustix = { version = "1.1.5", features = ["fs"] }
 
 [dev-dependencies]
 tempfile = "3.27.0"

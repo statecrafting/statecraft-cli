@@ -968,6 +968,29 @@ closure verb, and reads `status` from the list alone. So an older producer is
 refused by name where it lacks a capability, and nothing about it is read as
 the newer contract.
 
+**2026-09-23: section 3.1.4 implemented.** The journal is
+`statecraft_run::overrides`, one file per repository at
+`records/<key>.overrides.jsonl` in the product home beside the run record, and
+the lock is `statecraft_run::lock`, `records/<key>.lock`, taken with a
+non-blocking advisory `flock` through `rustix`, which the workspace already
+carried through `tempfile` (the standard library's `File::try_lock` is newer
+than the declared `rust-version`). `run` holds it from before the
+intent until the process returns; `override grant` and `override revoke` take
+it and refuse while it is held. `Override` gains three optional members, the
+provenance word, the grant's time and the grant line's digest, serialized only
+when present, so an override built in memory and one written before this
+entry read as before. The intent's `admission` member is written by
+`session::begin_admitted`, and `runs()` reads it back into `Attempt.admission`,
+which `run list` and `run show` render; an intent without it is rendered
+"admission not recorded". **One residual, measured while testing, that rule 3
+names only in part:** editing the **last** line leaves nothing after it whose
+link would notice, exactly as removing it does, so the operator or reason of
+the most recent grant can be changed undetected. The binary test edits a line
+that has a successor, which is refused as a broken journal. Tests:
+`overrides` and `lock` unit tests, and `crates/statecraft-cli/tests/readiness_override.rs`
+through the binary with a fake `spec-spine` offering a `draft` and a fake
+provider replaying a recorded stream.
+
 ## Verification
 
 Each line is one command. §3.8's twenty-two rows are integration tests named after

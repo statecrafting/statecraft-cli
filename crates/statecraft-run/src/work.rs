@@ -34,6 +34,64 @@ pub struct WorkItem {
     pub admitted_by_override: Option<crate::policy::Override>,
 }
 
+/// How the spec an attempt works on was admitted (section 3.1.4 rule 5).
+///
+/// Written into the attempt's intent. An intent written before that section
+/// carries none, and reads as **not recorded**: never as `defaulted`, and never
+/// as admitted by an override.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case", tag = "by")]
+pub enum Admission {
+    /// The lifecycle policy admitted it.
+    Policy {
+        /// `declared` or `defaulted`.
+        source: String,
+        /// The statuses the policy schedules.
+        statuses: Vec<String>,
+    },
+    /// An operator's override admitted it, past the policy.
+    Override(crate::policy::Override),
+}
+
+impl Admission {
+    /// One line an operator reads.
+    pub fn describe(&self) -> String {
+        match self {
+            Admission::Policy { source, statuses } => {
+                format!("admitted by the {source} policy ({})", statuses.join(", "))
+            }
+            Admission::Override(o) => format!(
+                "admitted by override: {} ({}), because {}{}",
+                o.operator,
+                o.operator_provenance
+                    .as_deref()
+                    .unwrap_or("operator-supplied"),
+                o.reason,
+                o.granted_at
+                    .as_deref()
+                    .map(|t| format!(", granted {t}"))
+                    .unwrap_or_default()
+            ),
+        }
+    }
+}
+
+impl WorkItem {
+    /// How this item was admitted under `policy`.
+    pub fn admission(&self, policy: &Policy) -> Admission {
+        match &self.admitted_by_override {
+            Some(o) => Admission::Override(o.clone()),
+            None => Admission::Policy {
+                source: match policy.source {
+                    PolicySource::Declared { .. } => "declared".to_string(),
+                    PolicySource::Defaulted => "defaulted".to_string(),
+                },
+                statuses: policy.schedulable_statuses.clone(),
+            },
+        }
+    }
+}
+
 /// A ready spec the policy did not admit.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Excluded {
