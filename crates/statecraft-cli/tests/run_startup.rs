@@ -228,11 +228,32 @@ esac
         self.cli(&args)
     }
 
+    fn places(&self) -> statecraft_home::launch::Places {
+        statecraft_home::launch::Places::of(&self.home(), &self.project())
+    }
+
+    fn identity(n: u32) -> statecraft_home::launch::AttemptIdentity {
+        statecraft_home::launch::AttemptIdentity {
+            run_id: RUN.to_string(),
+            attempt: n,
+        }
+    }
+
+    /// The attempt's launch records, in the product home (spec 002 section
+    /// 3.37 rule 1).
     fn attempt_dir(&self, n: u32) -> PathBuf {
-        self.project()
-            .join(".statecraft/state/startup/runs")
-            .join(RUN)
-            .join(n.to_string())
+        Self::identity(n).records_dir(&self.places())
+    }
+
+    /// The attempt's exchange directory, in the product home (rule 2).
+    fn exchange_dir(&self, n: u32) -> PathBuf {
+        Self::identity(n).exchange_dir(&self.places())
+    }
+
+    /// Where section 3.32 put an attempt's records, inside the target
+    /// (rule 5).
+    fn legacy_dir(&self, n: u32) -> PathBuf {
+        Self::identity(n).legacy_dir(&self.project())
     }
 }
 
@@ -248,6 +269,8 @@ while [ "$#" -gt 0 ]; do
 done
 mode="$(/bin/cat "$here/mode" 2>/dev/null || echo faithful)"
 /bin/cp "$settings" "$here/received-settings"
+echo "$settings" > "$here/received-settings-path"
+/bin/ls -A "$(dirname "$settings")" > "$here/exchange-listing"
 /usr/bin/env > "$here/received-env"
 /bin/cat > "$here/received-prompt"
 echo launched >> "$here/launches"
@@ -283,7 +306,14 @@ if [ "$mode" != ignores-hooks ] && [ ! -f "$here/skip-start-hook" ]; then
 fi
 if [ -f "$here/replay-line" ]; then respond "$(/bin/cat "$here/replay-line")" 0; fi
 if [ -f "$here/block-record" ]; then
-  /bin/mkdir -p "$PWD/../../startup/runs/$STATECRAFT_RUN_ID/$STATECRAFT_ATTEMPT/record.json"
+  /bin/mkdir -p "$(/bin/cat "$here/block-record")"
+fi
+# A child writing the decision before the supervisor does (spec 002 section
+# 3.37 rule 2), which the confinement of spec 004 section 3.18 will refuse and
+# this build does not yet: the gate's copy is beside the settings file.
+if [ "$mode" = plant-decision ]; then
+  printf '{"decision":"admitted"}\n' > "$(dirname "$settings")/admission.json"
+  log "planted"
 fi
 if [ "$mode" = ignores-hooks ]; then
   : > "$PWD/sentinel-before-decision"
@@ -350,9 +380,43 @@ fn a_managed_run_supplies_its_startup_hook_and_gate_and_releases_work_on_admissi
         "launched.json",
         "admission.json",
         "record.json",
+        "gate.log",
     ] {
         assert!(f.attempt_dir(1).join(file).is_file(), "{file}");
     }
+    // Spec 002 section 3.37: the launch records are in the product home, keyed
+    // as the run record is, and nothing of the attempt is in the target.
+    assert!(f.attempt_dir(1).starts_with(f.home().join("records")));
+    assert!(!f.legacy_dir(1).exists());
+    assert!(!f.project().join(".statecraft/state/startup").exists());
+    // The child was given its exchange directory: the gate, the gate log
+    // created empty before launch, and the settings document it was handed.
+    let given = String::from_utf8(f.received("received-settings-path")).unwrap();
+    let given = Path::new(given.trim());
+    assert_eq!(
+        given.parent().unwrap(),
+        f.exchange_dir(1).canonicalize().unwrap()
+    );
+    let listing = String::from_utf8(f.received("exchange-listing")).unwrap();
+    let mut listing: Vec<&str> = listing.lines().collect();
+    listing.sort_unstable();
+    assert_eq!(listing.len(), 3, "{listing:?}");
+    assert_eq!(&listing[..2], ["admission-gate", "gate.log"]);
+    assert!(
+        listing[2].starts_with("statecraft-settings-"),
+        "{listing:?}"
+    );
+    // After the run: the decision's copy the gate read, identical to the
+    // launch records' own, and the log the supervisor copied from.
+    assert_eq!(
+        std::fs::read(f.exchange_dir(1).join("admission.json")).unwrap(),
+        std::fs::read(f.attempt_dir(1).join("admission.json")).unwrap()
+    );
+    assert_eq!(
+        std::fs::read(f.exchange_dir(1).join("gate.log")).unwrap(),
+        std::fs::read(f.attempt_dir(1).join("gate.log")).unwrap()
+    );
+    assert!(!f.attempt_dir(1).join("admission-gate").exists());
 
     let shown = f.show(None);
     assert_eq!(code(&shown), 1, "unverified is a finding: {}", text(&shown));
@@ -419,6 +483,12 @@ fn a_managed_run_supplies_its_startup_hook_and_gate_and_releases_work_on_admissi
     assert!(position(&order, "init emitted") < position(&order, "effect sentinel-after"));
     assert!(f.workspace().join("sentinel-after").exists());
     assert_eq!(v["gate"], serde_json::json!(["admitted"]));
+    assert_eq!(v["placement"], "home");
+    assert_eq!(launch["gateLog"]["attestation"], "child-attested");
+    assert_eq!(
+        Path::new(launch["gateLog"]["copy"].as_str().unwrap()),
+        f.attempt_dir(1).join("gate.log")
+    );
 
     assert_eq!(record["supply"]["supply"], "supplied");
     assert_eq!(record["delivery"]["verdict"], "reached");
@@ -437,7 +507,8 @@ fn a_managed_run_supplies_its_startup_hook_and_gate_and_releases_work_on_admissi
         "hook      SessionStart startup -> ",
         "hook      PreToolUse * -> ",
         "admission admitted at ",
-        "gate      consulted 1 time(s): admitted",
+        "gate      consulted 1 time(s): admitted (child-attested",
+        "placement launch records in the product home",
         "observed  h-",
         "correlated",
         "which process printed it is not established",
@@ -622,6 +693,12 @@ fn an_unrequired_project_is_given_the_floor_alone_and_is_not_gated() {
     assert_eq!(v["admission"]["decision"], "not-gated");
     assert_eq!(v["gate"], serde_json::Value::Null);
     assert!(!f.attempt_dir(1).join("admission-gate").exists());
+    assert!(!f.exchange_dir(1).join("admission-gate").exists());
+    assert!(!f.exchange_dir(1).join("gate.log").exists());
+    assert!(!f.exchange_dir(1).join("admission.json").exists());
+    // The floor alone was still handed over from the exchange directory.
+    let given = String::from_utf8(f.received("received-settings-path")).unwrap();
+    assert!(Path::new(given.trim()).starts_with(f.exchange_dir(1).canonicalize().unwrap()));
     assert!(f.workspace().join("sentinel-after").exists());
     assert_eq!(v["verdict"], "unverified");
 }
@@ -691,9 +768,11 @@ fn a_launcher_killed_mid_session_leaves_the_outcome_unknown_and_nothing_is_repla
 #[test]
 fn an_intent_that_cannot_be_written_refuses_the_attempt_and_launches_nothing() {
     let f = Fixture::new();
-    let state = f.project().join(".statecraft/state/startup");
-    std::fs::create_dir_all(&state).unwrap();
-    std::fs::write(state.join("runs"), "not a directory").unwrap();
+    // The repository's launch records directory, in the product home, is
+    // not a directory.
+    let records = f.places().records;
+    std::fs::create_dir_all(records.parent().unwrap()).unwrap();
+    std::fs::write(&records, "not a directory").unwrap();
 
     let out = f.run();
     assert_eq!(code(&out), 1, "{}", text(&out));
@@ -715,7 +794,14 @@ fn an_intent_that_cannot_be_written_refuses_the_attempt_and_launches_nothing() {
 #[test]
 fn a_record_that_cannot_be_stored_fails_the_run_and_reads_back_as_unreadable() {
     let f = Fixture::new();
-    std::fs::write(f.bin().join("block-record"), "").unwrap();
+    // Something at the path the record belongs at, placed while the session
+    // runs. A stand-in for any failure of the record's write; not a claim
+    // that a child can reach the launch records.
+    std::fs::write(
+        f.bin().join("block-record"),
+        f.attempt_dir(1).join("record.json").display().to_string(),
+    )
+    .unwrap();
 
     let out = f.run();
     assert_eq!(code(&out), 4, "{}", text(&out));
@@ -1014,7 +1100,10 @@ fn an_unknown_attempt_stays_live_until_an_operator_reconciles_it_and_nothing_is_
 fn absent_is_refused_when_the_gate_released_a_tool_call_and_confirmed_is_recorded() {
     let f = Fixture::new();
     let (pid, _unblock) = crash_mid_session(&f, "tool-then-block");
-    let gate = std::fs::read_to_string(f.attempt_dir(1).join("gate.log")).unwrap_or_default();
+    // Not concluded, so no copy: the exchange directory's log is what the
+    // reconciliation reads (spec 003 section 3.6.1's note under 002 3.37).
+    assert!(!f.attempt_dir(1).join("gate.log").exists());
+    let gate = std::fs::read_to_string(f.exchange_dir(1).join("gate.log")).unwrap_or_default();
     assert!(gate.lines().any(|l| l == "admitted"), "{gate}");
     let out = reconcile(&f, "absent", "outcome-unknown", &[]);
     assert_eq!(code(&out), 2, "{}", text(&out));
@@ -1140,6 +1229,7 @@ fn absent_against_launch_unknown_is_declared_only_and_releases_the_attempt() {
     // confirmation: `intent.json` and nothing after it.
     for file in ["launched.json", "admission.json", "record.json", "gate.log"] {
         let _ = std::fs::remove_file(f.attempt_dir(1).join(file));
+        let _ = std::fs::remove_file(f.exchange_dir(1).join(file));
     }
     assert_eq!(value(&f.show(Some(1)))["verdict"], "launch-unknown");
 
@@ -1229,6 +1319,11 @@ fn a_concluded_attempt_an_unknown_attempt_number_and_an_empty_reason_are_refused
     assert_eq!(code(&out), 2, "{}", text(&out));
     assert!(!text(&out).contains("no attempt 1"), "{}", text(&out));
     assert_eq!(chain_bytes(&f), before);
+    // The launch records are keyed as the chain is: the same attempt's
+    // records in the product home answer under that spelling too.
+    let shown = f.cli(&["startup", "show", &spelled, RUN, "--attempt", "1", "--json"]);
+    assert_eq!(value(&shown)["placement"], "home", "{}", text(&shown));
+    assert_eq!(value(&shown), value(&f.show(Some(1))));
 
     // An attempt the record does not carry.
     let out = reconcile_as(&f, "7", "absent", "not-launched", "alice", "none");
@@ -1269,8 +1364,8 @@ fn a_released_tool_call_refuses_absent_even_with_no_manifest() {
     let f = Fixture::new();
     intent_only(&f);
     std::fs::remove_file(f.project().join(".statecraft/environment.json")).unwrap();
-    std::fs::create_dir_all(f.attempt_dir(1)).unwrap();
-    std::fs::write(f.attempt_dir(1).join("gate.log"), "admitted\n").unwrap();
+    std::fs::create_dir_all(f.exchange_dir(1)).unwrap();
+    std::fs::write(f.exchange_dir(1).join("gate.log"), "admitted\n").unwrap();
     let before = chain_bytes(&f);
     let out = reconcile(&f, "absent", "unrecorded", &[]);
     assert_eq!(code(&out), 2, "{}", text(&out));
@@ -1295,7 +1390,7 @@ fn a_gate_log_that_exists_and_cannot_be_read_fails_and_writes_nothing() {
     let f = Fixture::new();
     intent_only(&f);
     // A gate log that is there and cannot be read as a file.
-    std::fs::create_dir_all(f.attempt_dir(1).join("gate.log")).unwrap();
+    std::fs::create_dir_all(f.exchange_dir(1).join("gate.log")).unwrap();
     let before = chain_bytes(&f);
     let out = reconcile(&f, "absent", "not-launched", &[]);
     assert_eq!(code(&out), 4, "{}", text(&out));
@@ -1305,4 +1400,175 @@ fn a_gate_log_that_exists_and_cannot_be_read_fails_and_writes_nothing() {
         before,
         "an unreadable gate log was read as nothing"
     );
+}
+
+// ------------------------------------------- spec 002 section 3.37, through the binary
+
+/// A gate log that is a link is not followed: reconciliation fails rather
+/// than reading what the link names, and writes nothing.
+#[test]
+fn a_gate_log_that_is_a_link_is_not_followed_and_writes_nothing() {
+    let f = Fixture::new();
+    intent_only(&f);
+    let target = f.dir.path().join("elsewhere.log");
+    std::fs::write(&target, "admitted\n").unwrap();
+    std::fs::create_dir_all(f.exchange_dir(1)).unwrap();
+    std::os::unix::fs::symlink(&target, f.exchange_dir(1).join("gate.log")).unwrap();
+    let before = chain_bytes(&f);
+    let out = reconcile(&f, "absent", "not-launched", &[]);
+    assert_eq!(code(&out), 4, "{}", text(&out));
+    assert!(text(&out).contains("gate.log"), "{}", text(&out));
+    assert_eq!(chain_bytes(&f), before);
+}
+
+/// Rule 2: a child that writes the decision into its exchange directory
+/// before the supervisor does has not made the decision. The launch records
+/// hold the supervisor's; its copy is refused rather than adopted or silently
+/// put over the plant; and the attempt is refused with the failure named.
+#[test]
+fn a_decision_the_child_planted_before_the_supervisors_is_not_the_decision() {
+    let f = Fixture::new();
+    f.mode("plant-decision");
+    let out = f.run();
+    assert_eq!(code(&out), 1, "{}", text(&out));
+    let answer = json(&out);
+    assert_eq!(answer["value"]["outcome"], "refused", "{answer}");
+    assert!(f.order().iter().any(|l| l == "planted"), "{:?}", f.order());
+    // The plant is gone, and the records say what the supervisor decided.
+    assert!(!f.exchange_dir(1).join("admission.json").exists());
+    let v = value(&f.show(None));
+    // Unconfined, the gate trusts any decision file in its directory, so a
+    // tool call the child makes before the supervisor removes the plant can
+    // run (measured on CI's Linux runner, 2026-09-23; spec 004 section 3.18's
+    // confinement is what closes it). Whether or not the race was won, a call
+    // that ran is never invisible: the gate's own log, copied into the
+    // records, shows the admission it gave.
+    if f.workspace().join("sentinel-after").exists() {
+        assert!(
+            v["gate"]
+                .as_array()
+                .is_some_and(|g| g.iter().any(|l| l == "admitted")),
+            "a released call left no admission in the gate log: {v}"
+        );
+    }
+    assert_eq!(v["verdict"], "not-admitted", "{v}");
+    assert_eq!(
+        v["admission"]["intentDigest"].as_str().map(str::len),
+        Some(64)
+    );
+    let error = v["record"]["launch"]["admissionError"].as_str().unwrap();
+    assert!(error.contains("did not write"), "{error}");
+    assert!(error.contains("gate withholds"), "{error}");
+    assert!(v["reasons"].to_string().contains("did not write"), "{v}");
+    let (chain, _) =
+        statecraft_run::record::Chain::open(&f.home(), &f.project()).expect("the record");
+    let outcome = chain
+        .entries()
+        .into_iter()
+        .find(|e| e.kind == statecraft_run::record::Kind::Outcome && e.attempt == 1)
+        .expect("attempt 1's outcome");
+    assert_eq!(outcome.detail["refusals"], 1, "{}", outcome.detail);
+}
+
+/// Move an attempt's records, byte for byte, from the product home to where
+/// section 3.32 wrote them inside the target, and remove the home's: an
+/// attempt recorded before section 3.37.
+fn move_to_legacy(f: &Fixture, n: u32) {
+    let legacy = f.legacy_dir(n);
+    std::fs::create_dir_all(&legacy).unwrap();
+    for dir in [f.exchange_dir(n), f.attempt_dir(n)] {
+        for entry in std::fs::read_dir(&dir).unwrap() {
+            let entry = entry.unwrap();
+            if entry
+                .file_name()
+                .to_string_lossy()
+                .starts_with("statecraft-settings-")
+            {
+                continue;
+            }
+            let to = legacy.join(entry.file_name());
+            if !to.exists() {
+                std::fs::copy(entry.path(), to).unwrap();
+            }
+        }
+        std::fs::remove_dir_all(&dir).unwrap();
+    }
+}
+
+/// Rule 5: records written inside the target before section 3.37 are read
+/// where they are, judged as before, and labelled as written where the child
+/// could reach them; nothing moves them back or says they were confined.
+#[test]
+fn an_attempt_recorded_inside_the_target_is_read_where_it_is_and_labelled() {
+    let f = Fixture::new();
+    assert_eq!(code(&f.run()), 0);
+    let home = value(&f.show(None));
+    move_to_legacy(&f, 1);
+    let before: Vec<Vec<u8>> = ["intent.json", "record.json", "admission.json"]
+        .iter()
+        .map(|n| std::fs::read(f.legacy_dir(1).join(n)).unwrap())
+        .collect();
+
+    let shown = f.show(None);
+    assert_eq!(code(&shown), 1, "{}", text(&shown));
+    let v = value(&shown);
+    assert_eq!(v["placement"], "target");
+    assert_eq!(v["verdict"], home["verdict"]);
+    assert_eq!(v["reasons"], home["reasons"]);
+    assert_eq!(v["gate"], serde_json::json!(["admitted"]));
+    assert!(
+        Path::new(v["recordPath"].as_str().unwrap()).starts_with(f.project()),
+        "{v}"
+    );
+    let human = text(&f.cli(&["startup", "show", &f.root(), RUN]));
+    assert!(
+        human.contains("where the child could reach them"),
+        "{human}"
+    );
+    assert!(
+        human.contains("nothing here says the attempt was confined"),
+        "{human}"
+    );
+    // Read, never moved or rewritten.
+    assert!(!f.attempt_dir(1).exists());
+    let after: Vec<Vec<u8>> = ["intent.json", "record.json", "admission.json"]
+        .iter()
+        .map(|n| std::fs::read(f.legacy_dir(1).join(n)).unwrap())
+        .collect();
+    assert_eq!(before, after);
+
+    // A later attempt is recorded in the home, and each is read from its own
+    // layout.
+    assert!(code(&f.run()) <= 1);
+    assert!(f.attempt_dir(2).join("record.json").is_file());
+    assert!(!f.legacy_dir(2).exists());
+    assert_eq!(value(&f.show(Some(2)))["placement"], "home");
+    assert_eq!(value(&f.show(Some(1)))["placement"], "target");
+}
+
+/// Reconciliation reads a live attempt in either layout: the home's exchange
+/// gate log for one recorded after section 3.37, the target's for one
+/// recorded before it.
+#[test]
+fn reconciliation_reads_an_attempt_recorded_inside_the_target() {
+    let f = Fixture::new();
+    let (pid, _unblock) = crash_mid_session(&f, "tool-then-block");
+    release(&f, &pid);
+    move_to_legacy(&f, 1);
+    assert_eq!(value(&f.show(Some(1)))["placement"], "target");
+    // The gate released a tool call, as the target's log says.
+    let out = reconcile(&f, "absent", "outcome-unknown", &[]);
+    assert_eq!(code(&out), 2, "{}", text(&out));
+    assert!(text(&out).contains("conflicting"), "{}", text(&out));
+    let out = reconcile(&f, "confirmed", "outcome-unknown", &["--json"]);
+    assert_eq!(code(&out), 0, "{}", text(&out));
+    let observed = json(&out)["value"]["observed"].clone();
+    assert_eq!(observed["gateReleasedToolCall"], true, "{observed}");
+    assert_eq!(observed["confirmedPid"].to_string(), pid);
+    for file in observed["files"].as_array().unwrap() {
+        assert!(
+            Path::new(file.as_str().unwrap()).starts_with(f.project()),
+            "{observed}"
+        );
+    }
 }

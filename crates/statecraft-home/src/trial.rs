@@ -20,8 +20,8 @@
 //! read.
 
 use crate::launch::{
-    ACKNOWLEDGMENT, Admission, AttemptIdentity, Decision, HarnessObservation, LaunchWatch,
-    Unverified, Verdict, files,
+    ACKNOWLEDGMENT, Admission, AttemptIdentity, AttemptPaths, CHILD_ATTESTED, Decision,
+    HarnessObservation, LaunchWatch, Unverified, Verdict,
 };
 use serde::{Deserialize, Serialize};
 use statecraft_adapter::supervisor::{Control, Watch};
@@ -845,20 +845,38 @@ pub struct TrialRecord {
     pub facts: Facts,
     /// The gate's log when the record was written.
     pub gate: Vec<String>,
+    /// What the gate consultations the judgement reads are evidence of:
+    /// [`CHILD_ATTESTED`] in a trial recorded after spec 002 section 3.37
+    /// (its rule 3). Absent from a trial recorded before it, which was
+    /// recorded without confinement and is read as it was.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub consultations: Option<String>,
     /// The judgement written.
     pub judgement: Judgement,
 }
 
-/// Where a trial's record is.
-pub fn path(root: &Path, attempt: &AttemptIdentity) -> PathBuf {
-    attempt.directory(root).join(FILE)
+impl TrialRecord {
+    /// A record written now: its consultations are child-attested.
+    pub fn new(facts: Facts, gate: Vec<String>, judgement: Judgement) -> Self {
+        Self {
+            facts,
+            gate,
+            consultations: Some(CHILD_ATTESTED.to_string()),
+            judgement,
+        }
+    }
 }
 
-/// Write the record once.
-pub fn write(root: &Path, record: &TrialRecord) -> std::io::Result<PathBuf> {
-    let path = path(root, &record.facts.attempt);
+/// Where a trial's record is, beside the attempt's launch records.
+pub fn path(paths: &AttemptPaths) -> PathBuf {
+    paths.records.join(FILE)
+}
+
+/// Write the record once, into the attempt's launch records.
+pub fn write(paths: &AttemptPaths, record: &TrialRecord) -> std::io::Result<PathBuf> {
+    let path = path(paths);
     let json = serde_json::to_string_pretty(record).map_err(std::io::Error::other)?;
-    crate::launch::write_once(&path, &format!("{json}\n"))?;
+    crate::launch::write_once(&path, format!("{json}\n"))?;
     Ok(path)
 }
 
@@ -931,6 +949,18 @@ impl Reloaded {
                 .as_deref()
                 .unwrap_or("not reported")
         ));
+        out.push_str(&format!(
+            "  consultations  {}\n",
+            match self.record.consultations.as_deref() {
+                Some(word) => format!(
+                    "{word}: the gate log is written by the gate the child runs, so what it says \
+                     is the child's (spec 002 section 3.37 rule 3)"
+                ),
+                None => "recorded before spec 002 section 3.37, without confinement, and read \
+                         as it was"
+                    .to_string(),
+            }
+        ));
         out.push_str(&format!("  record         {}\n", self.path));
         if !self.agrees {
             out.push_str(
@@ -949,13 +979,13 @@ impl Reloaded {
 /// `Ok(None)` when there is no `trial.json`. The judgement is recomputed from
 /// the facts written and the admission, intent and gate log as they are now.
 pub fn reload(
-    root: &Path,
+    paths: &AttemptPaths,
     attempt: &AttemptIdentity,
     admission: Option<&Admission>,
     required: Option<&str>,
     launch: Verdict,
 ) -> Result<Option<Reloaded>, String> {
-    let path = path(root, attempt);
+    let path = path(paths);
     let text = match std::fs::read_to_string(&path) {
         Ok(t) => t,
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(None),
@@ -971,7 +1001,7 @@ pub fn reload(
             record.facts.attempt.attempt
         ));
     }
-    let gate = read_gate(root, attempt);
+    let gate = read_gate(paths);
     let judgement = judge(&record.facts, admission, required, &gate, launch);
     let agrees = judgement == record.judgement && gate == record.gate;
     Ok(Some(Reloaded {
@@ -982,10 +1012,14 @@ pub fn reload(
     }))
 }
 
-/// The gate's log as it is now; absent is empty.
-pub fn read_gate(root: &Path, attempt: &AttemptIdentity) -> Vec<String> {
-    std::fs::read_to_string(attempt.directory(root).join(files::GATE_LOG))
-        .map(|t| t.lines().map(str::to_string).collect())
+/// The gate's log as it is now, the supervisor's copy where it made one;
+/// absent or unreadable is empty. Child-attested either way.
+pub fn read_gate(paths: &AttemptPaths) -> Vec<String> {
+    paths
+        .read_gate_log()
+        .ok()
+        .flatten()
+        .map(|g| g.lines)
         .unwrap_or_default()
 }
 
@@ -1104,6 +1138,48 @@ mod tests {
             result(5, true, true),
             Entry::Terminal { line: 6 },
         ]
+    }
+
+    #[test]
+    fn a_trial_recorded_now_says_its_consultations_are_child_attested() {
+        // Spec 002 section 3.37 rule 3.
+        let facts = facts(faithful(), Some(3));
+        let gate = vec!["admitted".to_string()];
+        let j = judge(
+            &facts,
+            Some(&admission(Decision::Admitted, correlated("r"))),
+            Some("r"),
+            &gate,
+            Verdict::Unverified,
+        );
+        let now = TrialRecord::new(facts, gate, j.clone());
+        let json = serde_json::to_value(&now).unwrap();
+        assert_eq!(json["consultations"], CHILD_ATTESTED);
+        let reloaded = |record: TrialRecord| Reloaded {
+            path: "trial.json".into(),
+            record,
+            judgement: j.clone(),
+            agrees: true,
+        };
+        assert!(
+            reloaded(now.clone())
+                .describe()
+                .contains("consultations  child-attested")
+        );
+        // A trial recorded before that section carries no such word, and is
+        // read as it was: the judgement is unchanged, and so is the record.
+        let mut older = json;
+        older.as_object_mut().unwrap().remove("consultations");
+        let older: TrialRecord = serde_json::from_value(older.clone()).unwrap();
+        assert_eq!(older.consultations, None);
+        assert_eq!(older.judgement, now.judgement);
+        let text = reloaded(older.clone()).describe();
+        assert!(
+            text.contains("recorded before spec 002 section 3.37"),
+            "{text}"
+        );
+        let written = serde_json::to_value(&older).unwrap();
+        assert!(written.get("consultations").is_none(), "{written}");
     }
 
     #[test]

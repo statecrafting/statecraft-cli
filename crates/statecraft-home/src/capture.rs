@@ -30,14 +30,23 @@ pub const PROBE_DEADLINE: Duration = Duration::from_secs(30);
 /// The default deadline for one control's session, in seconds.
 pub const DEFAULT_DEADLINE_SECONDS: u64 = 300;
 
+/// The most of a settings file read back after a session. The payload is a
+/// few hundred bytes.
+const SETTINGS_LIMIT: u64 = 1024 * 1024;
+
 /// What a launch needs, all of it stated by the caller.
 #[derive(Debug, Clone)]
 pub struct Request {
+    /// Where the product home keeps this project's exchange directories. The
+    /// settings file the provider is given is written into a fresh one of
+    /// them (spec 002 section 3.37 rule 4).
+    pub exchange: crate::launch::Places,
     /// The project the session runs in.
     pub root: PathBuf,
     /// Which control.
     pub control: Control,
-    /// Where the record and the raw streams are written.
+    /// Where the record, the raw streams and a copy of the settings file are
+    /// written, after the provider has exited.
     pub directory: PathBuf,
     /// The provider, as the operator names it: a name looked up on the
     /// environment's `PATH`, or a path.
@@ -238,8 +247,12 @@ pub fn launch(request: &Request) -> Result<Launched, Failed> {
     let record = directory.join(admission::record_name(control));
     let stdout_path = directory.join(format!("{}.stdout", control.word()));
     let stderr_path = directory.join(format!("{}.stderr", control.word()));
-    let settings_path = directory.join(format!("{}.settings.json", control.word()));
-    for path in [&record, &stdout_path, &stderr_path, &settings_path] {
+    // Spec 002 section 3.37 rule 4: the directory the operator names receives
+    // the capture's records after the provider exits; the file the provider
+    // is handed is in the capture's own exchange directory in the product
+    // home, which this launch creates and nothing else writes.
+    let settings_copy = directory.join(format!("{}.settings.json", control.word()));
+    for path in [&record, &stdout_path, &stderr_path, &settings_copy] {
         if path.symlink_metadata().is_ok() {
             return Err(Refused::Exists {
                 path: path.display().to_string(),
@@ -272,12 +285,17 @@ pub fn launch(request: &Request) -> Result<Launched, Failed> {
         Control::Refusal | Control::WithoutPayload => REFUSED_COMMAND,
     };
     let payload = crate::session::payload_json();
-    let settings_arg = if control.carries_the_payload() {
-        crate::settings::write_atomically(&settings_path, &payload)?;
-        Some(settings_path.display().to_string())
+    let settings_path = if control.carries_the_payload() {
+        let exchange = request.exchange.capture_exchange(control.word())?;
+        std::fs::create_dir_all(&exchange)?;
+        let exchange = exchange.canonicalize()?;
+        let path = exchange.join(format!("{}.settings.json", control.word()));
+        crate::launch::write_once(&path, &payload)?;
+        Some(path)
     } else {
         None
     };
+    let settings_arg = settings_path.as_ref().map(|p| p.display().to_string());
     let arguments = admission::arguments(
         control,
         REFUSED_COMMAND,
@@ -295,11 +313,21 @@ pub fn launch(request: &Request) -> Result<Launched, Failed> {
         Duration::from_secs(request.deadline_seconds),
     )?;
 
-    let settings_digest_after = settings_arg.as_ref().map(|_| {
-        std::fs::read(&settings_path)
-            .map(|bytes| digest_bytes(&bytes))
-            .unwrap_or_else(|e| format!("unreadable: {e}"))
+    // The file as the provider left it, read as data: never through a link,
+    // never a pipe, and bounded. Its digest is the record's; its bytes are
+    // copied to the operator's directory now that the provider has exited.
+    let settings_after = settings_path
+        .as_ref()
+        .map(|p| crate::launch::read_child_file(p, SETTINGS_LIMIT));
+    let settings_digest_after = settings_after.as_ref().map(|read| match read {
+        Ok(Some((bytes, false))) => digest_bytes(bytes),
+        Ok(Some((_, true))) => format!("unreadable: longer than {SETTINGS_LIMIT} bytes"),
+        Ok(None) => "unreadable: the file is gone".to_string(),
+        Err(e) => format!("unreadable: {e}"),
     });
+    if let Some(Ok(Some((bytes, _)))) = &settings_after {
+        crate::launch::write_once(&settings_copy, bytes)?;
+    }
     std::fs::write(&stdout_path, &captured.stdout)?;
     std::fs::write(&stderr_path, &captured.stderr)?;
     let stdout_digest = digest_bytes(&captured.stdout);

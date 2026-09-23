@@ -157,11 +157,17 @@ impl Fixture {
         self.cli(&args)
     }
 
+    /// The trial attempt's launch records, in the product home (spec 002
+    /// section 3.37 rule 1).
     fn attempt_dir(&self) -> PathBuf {
-        self.project()
-            .join(".statecraft/state/startup/runs")
-            .join(TRIAL)
-            .join("1")
+        statecraft_home::launch::AttemptIdentity {
+            run_id: TRIAL.to_string(),
+            attempt: 1,
+        }
+        .records_dir(&statecraft_home::launch::Places::of(
+            &self.home(),
+            &self.project(),
+        ))
     }
 
     fn workspace(&self) -> PathBuf {
@@ -271,6 +277,10 @@ fn a_faithful_synthetic_trial_is_established_and_says_it_is_synthetic() {
     ] {
         assert!(f.attempt_dir().join(file).is_file(), "{file}");
     }
+    assert!(!f.project().join(".statecraft/state/startup").exists());
+    // Section 3.37 rule 3: a trial recorded now says its consultations are
+    // the child's.
+    assert_eq!(t["record"]["consultations"], "child-attested", "{t}");
     let facts = &t["record"]["facts"];
     assert_eq!(
         facts["settingsWritten"].as_str().unwrap().as_bytes(),
@@ -292,6 +302,7 @@ fn a_faithful_synthetic_trial_is_established_and_says_it_is_synthetic() {
         "hook evidence  correlated",
         "effects        excluded before admission; scope: tool calls only",
         "sentinel read after admission",
+        "consultations  child-attested",
     ] {
         assert!(h.contains(line), "missing {line:?} in:\n{h}");
     }

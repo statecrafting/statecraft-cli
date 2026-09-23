@@ -869,7 +869,10 @@ pub fn execute(ports: &Ports<'_>, operation: Operation) -> Answer {
             if let Err(answer) = manifest_of(&root) {
                 return answer;
             }
-            match crate::launch::inspect(&root, &run_id, attempt, &facts) {
+            // Spec 002 section 3.37 rule 5: the product home's records, or
+            // those written before it inside the target, never both.
+            let places = crate::launch::Places::of(ports.home.root(), &root);
+            match crate::launch::inspect(&places, &run_id, attempt, &facts) {
                 Ok(shown) => Answer::StartupAttempt(Box::new(shown)),
                 Err(crate::launch::NotRead::NoSuchAttempt(reason)) => Answer::Refused { reason },
                 Err(e) => Answer::Failed {
@@ -891,6 +894,7 @@ pub fn execute(ports: &Ports<'_>, operation: Operation) -> Answer {
         } => startup_capture(
             &root,
             crate::capture::Request {
+                exchange: crate::launch::Places::of(ports.home.root(), &root),
                 root: root.clone(),
                 control,
                 directory,

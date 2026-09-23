@@ -729,6 +729,7 @@ dependencies = [
 name = "statecraft-home"
 version = "0.0.0"
 dependencies = [
+ "libc",
  "serde",
  "serde_json",
  "sha2 0.11.0",
@@ -736,6 +737,7 @@ dependencies = [
  "statecraft-adapter",
  "statecraft-adapter-claude-code",
  "statecraft-environment",
+ "statecraft-run",
  "tempfile",
  "thiserror",
 ]

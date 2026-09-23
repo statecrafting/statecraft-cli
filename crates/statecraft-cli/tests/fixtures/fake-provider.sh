@@ -30,6 +30,10 @@
 #                     event, the shape Claude Code 2.1.267 wrote on 2026-09-23
 #   bad-trailer       faithful, then a task_summary carrying a tool-use id,
 #                     which spec 002 section 3.34 does not admit
+#
+# With FAKE_TRACE naming a file, the fake also writes there the settings path
+# it was handed and, where FAKE_OPERATOR_DIR names the capture directory, what
+# that directory held while the session ran (spec 002 section 3.37 rule 4).
 set -eu
 
 mode="${FAKE_PROVIDER_MODE:-faithful}"
@@ -41,13 +45,23 @@ if [ "${1:-}" = "--version" ]; then
 fi
 
 settings=no
+settings_path=
 while [ "$#" -gt 0 ]; do
   case "$1" in
-    --settings) settings=yes; shift ;;
-    --settings=*) settings=yes ;;
+    --settings) settings=yes; settings_path="${2:-}"; shift ;;
+    --settings=*) settings=yes; settings_path="${1#--settings=}" ;;
   esac
   shift
 done
+
+if [ -n "${FAKE_TRACE:-}" ]; then
+  {
+    printf 'settings %s\n' "$settings_path"
+    if [ -n "${FAKE_OPERATOR_DIR:-}" ] && [ -d "$FAKE_OPERATOR_DIR" ]; then
+      ls -A "$FAKE_OPERATOR_DIR" | sed 's/^/operator /'
+    fi
+  } >> "$FAKE_TRACE"
+fi
 
 prompt="$(cat)"
 command="$(printf '%s\n' "$prompt" | awk 'NF { last = $0 } END { print last }')"

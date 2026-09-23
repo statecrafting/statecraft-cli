@@ -183,6 +183,30 @@ pub fn supervise_with(
     )
 }
 
+/// [`supervise_with`], with the settings file written in `temporary_root`
+/// rather than the system's temporary directory: spec 002 section 3.37 rule 2
+/// puts the document a managed attempt's provider is given in that attempt's
+/// exchange directory. The same checks apply: the directory must be outside
+/// the request workspace, and the file is created exclusively and removed when
+/// supervision returns.
+pub fn supervise_with_in(
+    invocation: &Invocation,
+    request: &Request,
+    environment: &ChildEnvironment,
+    granted: &[Capability],
+    temporary_root: &Path,
+    watch: &mut dyn Watch<(usize, ProviderEvent)>,
+) -> std::io::Result<Execution> {
+    supervise_watched_in(
+        invocation,
+        request,
+        environment,
+        granted,
+        temporary_root,
+        watch,
+    )
+}
+
 #[cfg(test)]
 fn supervise_in(
     invocation: &Invocation,
