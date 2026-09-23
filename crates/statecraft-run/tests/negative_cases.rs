@@ -184,7 +184,13 @@ fn with_no_declaration_the_default_applies_and_the_attempt_records_it_as_default
 #[test]
 fn a_corpus_that_does_not_compile_refuses_and_never_falls_back_to_derived() {
     // A directory that looks like a corpus but whose tool cannot run: the
-    // refusal must be about the corpus, and no `.derived/` read may substitute.
+    // refusal names that, and no `.derived/` read may substitute. The other
+    // half of the row, a `check` that runs and reports a compile failure, is
+    // exercised through the built binary against a stub producer in
+    // `statecraft-cli`'s `producer_compatibility.rs`, beside a stale ledger and
+    // a refused pin, each of which is reported as itself (spec 003 section 5,
+    // 2026-09-23). This test once accepted either answer, so it passed with no
+    // spec-spine installed at all without saying which it had seen.
     let dir = tempfile::tempdir().unwrap();
     std::fs::write(dir.path().join("spec-spine.toml"), "").unwrap();
     std::fs::create_dir_all(dir.path().join(".derived/spec-registry")).unwrap();
@@ -199,8 +205,8 @@ fn a_corpus_that_does_not_compile_refuses_and_never_falls_back_to_derived() {
     };
     use statecraft_run::report::ReportSource;
     match source.corpus_report(dir.path()) {
-        Err(ReportError::NotRunnable { .. }) | Err(ReportError::CorpusDoesNotCompile { .. }) => {}
-        other => panic!("expected a refusal about the corpus, got {other:?}"),
+        Err(ReportError::NotRunnable { .. }) => {}
+        other => panic!("expected the producer to be named as not runnable, got {other:?}"),
     }
 }
 

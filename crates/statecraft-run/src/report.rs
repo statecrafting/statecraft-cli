@@ -126,6 +126,38 @@ pub enum ReportError {
         /// The first line of the compiler's complaint.
         detail: String,
     },
+    /// The ledger in the target is stale: `check` exited 2.
+    ///
+    /// Section 3.1.2 rule 3 reads only after `check` has said the ledger is
+    /// fresh. A stale ledger is a precondition that was not met, not a corpus
+    /// that does not compile, and it is cured by recompiling rather than by
+    /// editing a spec, so it is named as itself.
+    #[error("spec-spine {version} reports the ledger in {path} is stale: {detail}")]
+    LedgerStale {
+        /// The target.
+        path: String,
+        /// The producer version.
+        version: String,
+        /// The first line of the producer's complaint.
+        detail: String,
+    },
+    /// spec-spine ran and refused the target before judging its corpus:
+    /// `check` exited with neither 0, 1 nor 2.
+    ///
+    /// Measured on 2026-09-23: a spec-spine that does not satisfy the target's
+    /// `required_version` refuses with exit 3. That is not the corpus failing
+    /// to compile, so it is not reported as one.
+    #[error("spec-spine {version} refused to judge the corpus in {path} ({status}): {detail}")]
+    ProducerRefused {
+        /// The target.
+        path: String,
+        /// The producer version.
+        version: String,
+        /// How `check` ended: `exit N`, or `signal` where it had no code.
+        status: String,
+        /// The first line of the producer's complaint.
+        detail: String,
+    },
     /// spec-spine could not be run at all.
     #[error("could not run spec-spine in {path}: {detail}")]
     NotRunnable {
@@ -238,6 +270,11 @@ impl ReportSource for SpecSpineCli {
         // A corpus that does not compile is reported as itself. Falling back to
         // `.derived/` here is the exact move spec 001 forbids, and it would also
         // be reading a tree the compiler has just said is stale.
+        //
+        // `check`'s own exit status says which of three things it found, and
+        // each is reported as itself: 1 is a corpus that does not compile, 2 a
+        // stale ledger, and anything else a refusal to judge at all (a pin the
+        // running version does not satisfy exits 3).
         let check = self.run(target, &["check"])?;
         if !check.status.success() {
             let text = format!(
@@ -245,14 +282,26 @@ impl ReportSource for SpecSpineCli {
                 String::from_utf8_lossy(&check.stderr),
                 String::from_utf8_lossy(&check.stdout)
             );
-            return Err(ReportError::CorpusDoesNotCompile {
-                path: target.display().to_string(),
-                detail: text
-                    .lines()
-                    .map(str::trim)
-                    .find(|l| !l.is_empty())
-                    .unwrap_or("no detail")
-                    .to_string(),
+            let path = target.display().to_string();
+            let detail = text
+                .lines()
+                .map(str::trim)
+                .find(|l| !l.is_empty())
+                .unwrap_or("no detail")
+                .to_string();
+            return Err(match check.status.code() {
+                Some(1) => ReportError::CorpusDoesNotCompile { path, detail },
+                Some(2) => ReportError::LedgerStale {
+                    path,
+                    version,
+                    detail,
+                },
+                code => ReportError::ProducerRefused {
+                    path,
+                    version,
+                    status: code.map_or_else(|| "signal".to_string(), |c| format!("exit {c}")),
+                    detail,
+                },
             });
         }
 
