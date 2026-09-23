@@ -1,0 +1,15 @@
+name: probe-landlock
+on: pull_request
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    steps:
+      - run: |
+          uname -a; cat /etc/os-release | head -3; id
+          cat /sys/kernel/security/lsm; echo
+          python3 -c 'import ctypes;l=ctypes.CDLL(None,use_errno=True);print("landlock ABI", l.syscall(444,None,0,1), ctypes.get_errno())'
+          echo "userns_clone=$(cat /proc/sys/kernel/unprivileged_userns_clone 2>&1)"; echo "max_user_ns=$(cat /proc/sys/user/max_user_namespaces)"
+          echo "apparmor_restrict_userns=$(cat /proc/sys/kernel/apparmor_restrict_unprivileged_userns 2>&1)"
+          echo "yama=$(cat /proc/sys/kernel/yama/ptrace_scope 2>&1)"
+          echo "XDG_RUNTIME_DIR=$XDG_RUNTIME_DIR"; ls -la /run/user/$(id -u) 2>&1 | head; systemctl --user is-system-running 2>&1 | head -2
+          unshare -Ur true && echo "unshare -Ur ok" || echo "unshare -Ur refused"
