@@ -2001,8 +2001,9 @@ capture is out of order.
    `detail` is JSON `null` or a string. `uuid` is a non-empty string.
    `session_id` is a non-empty string.
 4. **It names the capture's session.** `session_id` equals the session every
-   other event in the capture names. A trailer naming another session, or none,
-   is mixed-session evidence under rule 8.
+   other event in the capture names. A trailer naming another session is
+   mixed-session evidence under rule 8; one naming none, or an empty one, is
+   not the closed shape of condition 3 and is refused as out of order.
 5. **The shape is read by the adapter.** Rule 7 applies: the closed shape is a
    type in the supported adapter's crate (spec `004` section 3.9), and this
    spec's crate does not parse the line a second way.
@@ -2034,7 +2035,10 @@ accounts for both deliberately, and it admits neither after the terminal event
 except the one trailer rule 13 describes.
 
 **Bounds.** The trailer is read in the same single pass over the capture that
-rule 8 already makes. The product sets no byte limit on a capture today and
+rule 8 already makes, and the admission reports the trailers it admitted from
+that pass rather than reading a capture again. The line the trailer is read
+from is the line the adapter read the event from: a capture whose events and
+non-blank lines do not correspond one to one is unreadable. The product sets no byte limit on a capture today and
 this amendment adds none; the launch's deadline (section 3.30, "Bounds") bounds
 what a session can write, and rule 13 bounds what may follow the terminal event
 to one line of a closed shape.
