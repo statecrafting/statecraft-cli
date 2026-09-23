@@ -198,7 +198,8 @@ suite so it can run with no real provider installed:
    machine. (spec-spine design note 06 section 3.7 records the observed
    instance: a baseline profile allowing git, the GitHub CLI, Bun and spec-spine
    but not the Rust and Make toolchain the family's gate actually needs, and
-   assigns the fix to this product.)
+   assigns the fix to this product. Section 3.17 fixes the two inputs and what
+   the comparison between them can and cannot see.)
 
 ### 3.6 The child environment is constructed, not filtered
 
@@ -522,65 +523,92 @@ with nothing refused, because the child's `PATH` is the operator's.
 
 **Rule 1: the allowance is declared, separately from the suite.** The
 commands a posture allows are the adapter's own `requires_commands` plus the
-commands the repository declares in `.statecraft/posture.json`, committed in
-the target:
+commands the repository declares in the project block of its committed
+`.statecraft/environment.json` (spec `002` sections 3.12 and 3.16), under one
+member:
 
 ```json
-{ "schemaVersion": 1, "commands": ["cargo", "make"] }
+"project": { "commands": ["cargo", "make"] }
 ```
 
 `commands` is a list of bare program names: non-empty, no `/`, no whitespace,
-no duplicates. Any other member, any other `schemaVersion`, or a malformed
-entry refuses the run and names the problem. An absent file declares nothing,
-and the allowance is then the adapter's own commands alone. The file is a
-repository-artifact member of the authority set (spec `005` section 3.3), read
-at the trusted base, so a candidate that widens it is an authority change.
-This product never adds a program to the allowance on its own account.
+no duplicates. A malformed entry refuses the run and names it. An absent
+member declares nothing, and the allowance is then the adapter's own commands
+alone. The declaration is already a member of the authority set (spec `005`
+section 3.3 case 3), so a candidate that widens it is an authority change. This
+product never adds a program to the allowance on its own account.
+
+**This changes behavior, deliberately.** A target that declares no allowance
+and whose suite names a program beyond the adapter's own is refused on its next
+`run`, naming each program to declare. Nothing is grandfathered: a run that
+worked only because the operator's `PATH` supplied a program is the case row 8
+exists to refuse.
 
 **Rule 2: the requirement comes from the suite, independently.** The programs
 a run requires are read from the check suite the attempt's spec actually
-declares: `spec-spine verify <spec> --plan --json`, whose `commands` are the
-spec's `## Verification` commands, without running them. A command is **simple**
-when, outside single-quoted spans (POSIX: every character between two `'` is
+declares: `spec-spine verify <spec> --plan --json`, run with the `spec-spine`
+this product invokes for work selection, whose `commands` are the spec's
+`## Verification` commands, without running them. A command is **simple** when,
+outside single-quoted spans (POSIX: every character between two `'` is
 literal), it contains none of `|`, `&`, `;`, `<`, `>`, `(`, `)`, `$`, a
-backquote, a backslash or a line break, every single quote is closed, and its
-first word is a bare program name (letters, digits and `_ . + -`, not a
-`NAME=value` assignment); its program is that first word. A simple command
-whose first word contains `/` names a file rather than a program `PATH`
-resolves; it is listed as `path` and requires no program directly. A command
-that is neither is not parsed: it is listed as `unparsed`, by its text. `skipped` blocks are listed as
-skipped and require nothing.
+backquote, a backslash or a line break, every single and double quote is
+closed, and its first word is a bare program name (letters, digits and
+`_ . + -`, not a `NAME=value` assignment) that is not a **wrapper**; its
+program is that first word. The wrappers are a closed list of programs that
+run another program named in their arguments: `env`, `exec`, `command`,
+`builtin`, `xargs`, `timeout`, `nice`, `nohup`, `time`, `sudo`, `doas`, `eval`,
+`source`, `.`, `sh`, `bash`, `dash`, `zsh` and `ksh`. A simple command whose
+first word contains `/` names a file rather than a program `PATH` resolves; it
+is listed as `path` and requires no program directly. Any other command is not
+parsed: it is listed as `unparsed`, by its text. `skipped` blocks are listed
+as skipped and require nothing.
 
 **Rule 3: what the comparison can and cannot claim.** A program required and
 absent from the allowance is **missing**. The coverage verdict is one of:
 
 | Verdict | When | The run |
 |---|---|---|
-| `refused` | any program is missing | refused before any process is created, naming each missing program and the commands that name it |
+| `refused` | any program is missing | refused, naming each missing program and the commands that name it |
 | `partial` | nothing is missing, and at least one command is unparsed | proceeds; the unparsed commands are named as not checked |
 | `direct` | nothing is missing, and every command was parsed | proceeds |
+| `not-applicable` | the attempt has no spec, as the managed-startup trial of spec `002` section 3.33 does not | proceeds; nothing was compared |
 
 No verdict says `complete`. `direct` means every program the suite's commands
 name directly is allowed; a program one of them runs in turn (`make` running
 `cargo`, `cargo` running `rustc`) is not seen by this reading, and every
 rendering of the verdict says so. The allowance is compared, not enforced: the
-child's `PATH` still resolves through the operator's, which spec `004` section
-3.6's residuals already name, and the record says the allowance is checked and
-not enforced.
+child's `PATH` still resolves through the operator's, which section 3.6's
+residuals already name, and the record says the allowance is checked and not
+enforced.
 
-**Rule 4: bound to what the attempt used, planned and then confirmed.** The
-comparison is made twice. At planning, before the attempt is appended, from
-the target as the operator invoked it. At launch, after the workspace is
-prepared at the base and before the spawn, from the workspace. The run is
-refused if the second verdict is `refused`, or if the suite's plan or the
-allowance differs between the two by digest, naming which changed. The launch
-comparison is the one recorded.
+**Rule 4: read at the base, planned and then confirmed.** The comparison is
+made twice, and neither reading comes from a workspace a session may have
+edited:
+
+- **At planning**, before the attempt is appended, from the target's working
+  tree as the operator invoked `run`. A `refused` verdict here refuses the run
+  with nothing appended.
+- **At launch**, after the attempt's base commit is resolved and before the
+  spawn, from that commit: the declaration as `git show
+  <base>:.statecraft/environment.json` returns it, and the suite planned
+  against an export of the base commit's tree. The workspace is not read for
+  this, because section 3.2 of spec `003` reuses it across attempts and a
+  previous session may have edited it.
+
+The launch comparison is the one recorded. The run is refused at launch if its
+verdict is `refused`, or if the allowance or the attempt's spec's suite plan
+differs from planning by digest, naming which. So an uncommitted change to the
+allowance or to that spec's verification commands refuses the run; an
+uncommitted change to anything else does not. A launch refusal comes after the
+intent, so the attempt is concluded `refused` under the guard
+`posture-coverage`, the way a preflight refusal after the intent is concluded.
 
 **Rule 5: what is recorded.** The attempt's outcome detail carries, under
-`posture.coverage`: the spec, the digest of the suite's plan, each command with
-its program or `unparsed`, the skipped blocks, the allowance with each entry's
-source (`adapter` or the file, with the file's digest, or `absent`), the
-missing programs, the verdict, and the two limits of rule 3 as words. `run
+`posture.coverage`: the spec, the base commit, the digest of the suite's plan,
+each command with its program, `path` or `unparsed`, the skipped blocks, the
+allowance with each entry's source (`adapter` or `declared`, with the
+declaration's digest at the base, or `absent`), the missing programs, the
+verdict, and the two limits of rule 3 as words. `run
 show` renders it. An attempt written before this section has no
 `posture.coverage` and reads as **not checked**, never as covered.
 
@@ -588,13 +616,14 @@ show` renders it. An attempt written before this section has no
 the requirement, or the reverse.
 
 **Acceptance.** Through the binary, against a fixture repository and a fake
-provider: a spec whose verification names `cargo` with no posture file is
-refused before any process is created, naming `cargo`; the same with `cargo`
-declared runs, verdict `direct`; a command with a pipe is named `unparsed` and
-the verdict is `partial`; a posture file with an unknown member or a path
-entry refuses; a posture changed between planning and launch (declared in the
-working tree, absent at the base) is refused naming the allowance; and the
-recorded coverage is what `run show` renders. Unit: the simple-command reading
+provider: a spec whose verification names `cargo` with no declared allowance
+is refused before any process is created, naming `cargo`; the same with
+`cargo` declared runs, verdict `direct`; a command with a pipe is named
+`unparsed` and the verdict is `partial`; a declared entry holding a `/` or
+whitespace refuses; an allowance changed between planning and launch (declared
+in the working tree, absent at the base) is refused naming the allowance; a
+command led by a wrapper is `unparsed`; the trial records `not-applicable`;
+and the recorded coverage is what `run show` renders. Unit: the simple-command reading
 over each metacharacter and an assignment prefix, and a requirement and an
 allowance built from different inputs, so the comparison is no longer
 tautological.

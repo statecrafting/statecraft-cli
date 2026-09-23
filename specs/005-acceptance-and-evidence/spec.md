@@ -156,9 +156,7 @@ So the split is:
    without it is not.
 2. **Repository-artifact members**: the check suite, the verifier, the hooks, and
    any acceptance instructions that live outside a `spec.md`. Membership is
-   declared **here, by path**. A target's `.statecraft/posture.json`, the
-   command allowance of spec `004` section 3.17, is one: it decides what a
-   run may need, so a candidate that widens it is an authority change. The delta report gives each such path a structural
+   declared **here, by path**. The delta report gives each such path a structural
    class, which is useful detail and is not a membership answer.
 3. **The environment manifest** (`002` section 3.3), which spec-spine cannot know
    about at all, because it is this product's own record of what it manages. Its
