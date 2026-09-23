@@ -319,6 +319,7 @@ fn two_adapters_declaring_one_path_are_refused_at_plan_time_naming_both() {
             assert_eq!(c.path, "shared.md");
             assert_eq!(c.adapters, ("alpha".to_string(), "beta".to_string()));
         }
+        other => panic!("expected a path collision, got {other:?}"),
     }
 
     let mut manifest = Manifest::new(pins());

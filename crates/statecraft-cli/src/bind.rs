@@ -292,6 +292,150 @@ pub fn outcome_answer(outcome: Outcome) -> Answer<OutcomeView> {
     Answer::new(OutcomeView::of(&outcome), exit, summary)
 }
 
+/// An apply or upgrade given the operator's per-path consents, as the JSON
+/// contract carries it: the outcome, plus what became of every named path.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ConsentedView {
+    /// The outcome, with the fields [`OutcomeView`] carries.
+    #[serde(flatten)]
+    pub outcome: OutcomeView,
+    /// Every path named with `--replace`, and what became of it. Empty when
+    /// nothing was named.
+    pub named: Vec<statecraft_environment::replace::Named>,
+    /// Staged files an interrupted earlier replacement left, removed before
+    /// this one staged anything.
+    pub swept: Vec<String>,
+}
+
+/// Map an apply that carried per-path consents (spec 002 section 3.4).
+///
+/// The exit is the outcome's: a stale plan or a path this product may not
+/// replace is a refusal (2) and nothing was written; a path already holding
+/// the replacement is not a finding, so a repeated request that changes nothing
+/// exits 0.
+pub fn consented_answer(
+    consented: statecraft_environment::apply::Consented,
+) -> Answer<ConsentedView> {
+    let base = outcome_answer(consented.outcome.clone());
+    let mut summary = base.summary.clone();
+    if !consented.outcome.refused() {
+        for n in &consented.named {
+            let line = match n {
+                statecraft_environment::replace::Named::Replace(r) => {
+                    format!("replaced {} ({} to {})", r.path, r.found, r.replacement)
+                }
+                other => other.describe(),
+            };
+            summary.push('\n');
+            summary.push_str(&line);
+        }
+        for s in &consented.swept {
+            summary.push_str(&format!("\nswept {s}, left by an interrupted replacement"));
+        }
+    }
+    Answer::new(
+        ConsentedView {
+            outcome: OutcomeView::of(&consented.outcome),
+            named: consented.named,
+            swept: consented.swept,
+        },
+        base.exit,
+        summary,
+    )
+}
+
+/// A removal, as the JSON contract carries it: the outcome, plus notes that
+/// are not findings.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RemovalView {
+    /// The outcome, with the fields [`OutcomeView`] carries.
+    #[serde(flatten)]
+    pub outcome: OutcomeView,
+    /// Observations that change no exit: a bridge line with no record, which
+    /// is not this product's, and a record dropped because its line was
+    /// already taken back.
+    pub notes: Vec<String>,
+}
+
+/// Map a removal (spec 002 sections 3.6 and 3.13 rule 4). The exit is the
+/// outcome's; a note never changes it.
+pub fn removal_answer(removal: statecraft_environment::apply::Removal) -> Answer<RemovalView> {
+    let base = outcome_answer(removal.outcome.clone());
+    let mut summary = base.summary.clone();
+    for n in &removal.notes {
+        summary.push_str(&format!("\nnote: {n}"));
+    }
+    Answer::new(
+        RemovalView {
+            outcome: OutcomeView::of(&removal.outcome),
+            notes: removal.notes,
+        },
+        base.exit,
+        summary,
+    )
+}
+
+/// The `--replace` arguments of an environment verb, parsed strictly.
+///
+/// `env plan` takes `--replace <file>`, and `env apply` and `env upgrade` take
+/// `--replace <file>=<plan-id>`, repeatable, one per path. Nothing is inferred:
+/// a path is replaced only when it is named here. Any other argument after the
+/// target, a value that is itself an option, a consent given to `env plan` and
+/// a path given to `env apply` without an identity are each a usage error
+/// (`Err`). Whether the verb takes `--replace` at all is the caller's check.
+pub fn replace_arguments(
+    consenting: bool,
+    rest: &[String],
+) -> Result<Vec<statecraft_environment::replace::Consent>, String> {
+    let is_id = |id: &str| id.len() == 64 && id.bytes().all(|b| b.is_ascii_hexdigit());
+    let mut out = Vec::new();
+    let mut i = 0;
+    while i < rest.len() {
+        if rest[i] != "--replace" {
+            return Err(format!(
+                "unexpected argument `{}`; the only option after the target is --replace",
+                rest[i]
+            ));
+        }
+        let Some(value) = rest.get(i + 1) else {
+            return Err("--replace needs a path".to_string());
+        };
+        if value.is_empty() || value.starts_with('-') {
+            return Err(format!("--replace needs a path, not `{value}`"));
+        }
+        if consenting {
+            let Some((path, id)) = value.rsplit_once('=') else {
+                return Err(format!(
+                    "--replace {value}: give <file>=<plan-id>, the identity `env plan --replace {value}` reported"
+                ));
+            };
+            if path.is_empty() || !is_id(id) {
+                return Err(format!(
+                    "--replace {value}: `{id}` is not a plan identity (64 hexadecimal digits) after a path"
+                ));
+            }
+            out.push(statecraft_environment::replace::Consent {
+                path: path.to_string(),
+                plan_id: id.to_ascii_lowercase(),
+            });
+        } else {
+            if value.rsplit_once('=').is_some_and(|(_, id)| is_id(id)) {
+                return Err(format!(
+                    "--replace {value}: env plan takes the path alone; the identity is what it reports"
+                ));
+            }
+            out.push(statecraft_environment::replace::Consent {
+                path: value.clone(),
+                plan_id: String::new(),
+            });
+        }
+        i += 2;
+    }
+    Ok(out)
+}
+
 /// An error from the environment library, mapped.
 ///
 /// Every one of these is a failure: an i/o error or an unreadable manifest is
@@ -346,6 +490,10 @@ pub struct PlanView {
     pub refusals: Vec<String>,
     /// What each configured adapter will do, including the ones that refuse.
     pub adapters: Vec<AdapterView>,
+    /// The paths the operator named with `--replace`, each replaceable, with
+    /// its plan identity, or already satisfied (spec 002 section 3.4). A named
+    /// path that is neither is in `refusals`. Empty when nothing was named.
+    pub named: Vec<statecraft_environment::replace::Named>,
 }
 
 /// One planned write, as the JSON contract carries it.
@@ -398,6 +546,7 @@ impl PlanView {
                 })
                 .collect(),
             refusals: plan.refusals.iter().map(|r| r.describe()).collect(),
+            named: plan.named.clone(),
             adapters: plan
                 .adapters
                 .iter()

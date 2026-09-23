@@ -43,6 +43,12 @@ pub enum Withholding {
     /// The manifest records this path as adopted, and adopted paths are never
     /// rewritten.
     Adopted,
+    /// A tracked modification removal will not take back (spec 002 section
+    /// 3.13 rule 4), because its ownership cannot be decided.
+    Modification {
+        /// Why, in one line.
+        why: String,
+    },
 }
 
 impl Withholding {
@@ -59,6 +65,7 @@ impl Withholding {
                 format!("pointer path already holds a file, {}", claimant.describe())
             }
             Withholding::Adopted => "adopted, never rewritten".to_string(),
+            Withholding::Modification { why } => format!("bridge withheld: {why}"),
         }
     }
 }
@@ -97,6 +104,14 @@ pub enum Refusal {
     /// Refused at plan time, naming both adapters and the path, rather than
     /// discovered when the second write clobbers the first.
     AdapterPathCollision(PathCollision),
+    /// The operator named a path for replacement that this product may not
+    /// replace (spec 002 section 3.4, and [`crate::replace`]).
+    Replacement {
+        /// The path as named.
+        path: String,
+        /// Why it is refused.
+        reason: String,
+    },
 }
 
 impl Refusal {
@@ -107,6 +122,9 @@ impl Refusal {
                 "adapters {} and {} both declare {}",
                 c.adapters.0, c.adapters.1, c.path
             ),
+            Refusal::Replacement { path, reason } => {
+                format!("replacement of {path} refused: {reason}")
+            }
         }
     }
 }
@@ -133,6 +151,11 @@ pub struct Plan {
     pub refusals: Vec<Refusal>,
     /// Per-adapter outcomes, including the ones that refused.
     pub adapters: Vec<AdapterOutcome>,
+    /// Paths the operator named for replacement, each replaceable or already
+    /// satisfied. A named path that is neither is a [`Refusal::Replacement`]
+    /// instead, and a replaceable one is no longer listed as withheld: this is
+    /// what the apply would do given the operator's consent for it.
+    pub named: Vec<crate::replace::Named>,
 }
 
 impl Plan {
@@ -172,6 +195,9 @@ impl Plan {
                 "write"
             };
             out.push_str(&format!("{verb} {} ({})\n", w.path, w.adapter));
+        }
+        for n in &self.named {
+            out.push_str(&format!("{}\n", n.describe()));
         }
         for w in &self.withheld {
             out.push_str(&format!("withhold {}: {}\n", w.path, w.reason.describe()));
@@ -304,6 +330,39 @@ pub fn plan(
 
     out.writes.sort_by(|a, b| a.path.cmp(&b.path));
     out.withheld.sort_by(|a, b| a.path.cmp(&b.path));
+    Ok(out)
+}
+
+/// Compute a plan in which the operator has named paths to replace.
+///
+/// Spec 002 section 3.4: replacing a drifted managed file requires the operator
+/// to say so per path. Every named path is assessed by [`crate::replace::assess`]
+/// against the ordinary plan. A replaceable or already-satisfied path moves out
+/// of `withheld` into `named`; any other named path refuses the whole plan,
+/// so an apply of it writes nothing. With no path named this is [`plan`].
+pub fn plan_naming(
+    root: &Path,
+    manifest: Option<&Manifest>,
+    declarations: &[Declaration],
+    probe: &dyn crate::adapter::HarnessProbe,
+    foreign: &ForeignClaims,
+    named: &[String],
+) -> std::io::Result<Plan> {
+    let mut out = plan(root, manifest, declarations, probe, foreign)?;
+    if named.is_empty() {
+        return Ok(out);
+    }
+    for n in crate::replace::assess(root, manifest, &out, declarations, named)? {
+        match n {
+            crate::replace::Named::Refused { path, reason } => {
+                out.refusals.push(Refusal::Replacement { path, reason });
+            }
+            other => {
+                out.withheld.retain(|w| w.path != other.path());
+                out.named.push(other);
+            }
+        }
+    }
     Ok(out)
 }
 

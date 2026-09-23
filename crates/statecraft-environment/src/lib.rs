@@ -15,7 +15,8 @@
 //!   which is what makes the three ownership classes exhaustive by construction.
 //! - [`adapter`] is what an agent-harness adapter declares, and when it refuses.
 //! - [`plan`] computes what an apply would do; [`apply`] performs it and can
-//!   remove it again.
+//!   remove it again, and [`replace`] is the one route by which a drifted
+//!   managed file is rewritten: per path, with the operator's consent.
 //! - [`doctor`] diagnoses and never repairs.
 //! - [`transfer`] moves one path between the classes when, and only when, an
 //!   operator asks for it by path (spec 002 section 3.35), and journals the act
@@ -45,6 +46,7 @@ pub mod plan;
 pub mod probe;
 pub mod qualify;
 pub mod registry;
+pub mod replace;
 pub mod time;
 pub mod transfer;
 
