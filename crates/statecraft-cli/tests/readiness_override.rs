@@ -735,6 +735,40 @@ fn a_spelling_the_previous_build_re_stored_is_recovered_by_registering_the_old_o
     assert_eq!(code(&f.cli(&["run", "list", &root])), 0);
 }
 
+/// The re-storing register waits for no one: while another process holds the
+/// stored spelling's lock it refuses, re-stores nothing, and the same request
+/// succeeds once the lock is released.
+#[test]
+fn a_re_storing_register_refuses_while_the_lock_is_held_and_changes_nothing() {
+    let f = Fixture::new();
+    let root = f.repository("a");
+    assert_eq!(
+        code(&f.cli(&["override", "grant", &root, DRAFT, "alice", "why"])),
+        0
+    );
+    let slash = format!("{root}/");
+    f.restore_as_previous_build(&root, &slash);
+
+    let held = statecraft_run::lock::try_acquire(&f.home(), Path::new(&slash)).unwrap();
+    let out = f.cli(&["project", "register", &root]);
+    assert_eq!(code(&out), 2, "{}", text(&out));
+    assert!(!text(&out).contains("re-stored"), "{}", text(&out));
+    // Still filed under the other spelling: the journal's reader keeps naming the remedy.
+    let out = f.cli(&["override", "show", &root]);
+    assert_eq!(code(&out), 4, "{}", text(&out));
+    assert!(
+        text(&out).contains(&format!("`project register {root}`")),
+        "{}",
+        text(&out)
+    );
+
+    drop(held);
+    let out = f.cli(&["project", "register", &root]);
+    assert!(code(&out) <= 1, "{}", text(&out));
+    assert!(text(&out).contains("re-stored"), "{}", text(&out));
+    assert_eq!(code(&f.cli(&["override", "show", &root])), 0);
+}
+
 /// Where both spellings carry history there is nothing safe to re-store:
 /// registering refuses to move the key, and the failure says to set one aside.
 #[test]
