@@ -63,22 +63,29 @@ fn run(args: &[String]) -> i32 {
             // and the typed one has, which is the one case where re-storing it
             // points the registration back at its only history. Held under the
             // stored root's lock, so no run appends while the key moves.
+            // The lock is taken first and held until the registry is written,
+            // and the condition is decided again under it.
             let records = home.join("records");
+            let mut held = None;
             let respelled = match registry.get(&path).map(|r| r.root.clone()) {
                 Some(stored)
                     if statecraft_run::repository::respell_allowed(&records, &stored, &path) =>
                 {
-                    let _held = match statecraft_run::lock::try_acquire(&home, &stored) {
+                    held = Some(match statecraft_run::lock::try_acquire(&home, &stored) {
                         Ok(held) => held,
                         Err(e @ statecraft_run::lock::LockError::Busy { .. }) => {
                             return emit(&slice::lock_busy_answer(&e.to_string()), format);
                         }
                         Err(e) => return fail(&e.to_string(), format),
-                    };
-                    if let Err(e) = registry.respell(&path) {
-                        return fail(&e.to_string(), format);
+                    });
+                    if statecraft_run::repository::respell_allowed(&records, &stored, &path) {
+                        if let Err(e) = registry.respell(&path) {
+                            return fail(&e.to_string(), format);
+                        }
+                        Some(stored)
+                    } else {
+                        None
                     }
-                    Some(stored)
                 }
                 _ => None,
             };
@@ -88,6 +95,7 @@ fn run(args: &[String]) -> i32 {
                     if let Err(e) = registry.write(&home) {
                         return fail(&e.to_string(), format);
                     }
+                    drop(held);
                     if let Some(stored) = respelled {
                         answer.summary.push_str(&format!(
                             "\nre-stored from {} as {}: the records filed under this spelling \

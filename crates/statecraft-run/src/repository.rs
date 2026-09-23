@@ -125,7 +125,29 @@ pub const HISTORY_SUFFIXES: &[&str] = &[".jsonl", ".overrides.jsonl"];
 /// write that created the file and never wrote to it leaves, holds nothing a
 /// reader could lose, and is read as absent by both readers here.
 fn holds_history(file: &Path) -> bool {
-    std::fs::metadata(file).is_ok_and(|m| m.len() > 0)
+    history_state(file) != Some(false)
+}
+
+/// `Some(true)` for a file with bytes, `Some(false)` for one that is absent or
+/// empty, and `None` when the lookup failed for any other reason: a lookup that
+/// cannot answer is never read as "no history".
+fn history_state(file: &Path) -> Option<bool> {
+    match std::fs::metadata(file) {
+        Ok(m) => Some(m.len() > 0),
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => Some(false),
+        Err(_) => None,
+    }
+}
+
+/// Whether every history-bearing suffix under this spelling answered, and
+/// whether any of them holds history.
+fn history_known(records: &Path, spelling: &Path) -> Option<bool> {
+    let key = key(spelling);
+    let mut any = false;
+    for suffix in HISTORY_SUFFIXES {
+        any |= history_state(&records.join(format!("{key}{suffix}")))?;
+    }
+    Some(any)
 }
 
 /// Whether any history-bearing record is filed under this exact spelling.
@@ -163,8 +185,8 @@ pub fn elsewhere(records: &Path, root: &Path, suffix: &str) -> Vec<Elsewhere> {
 pub fn respell_allowed(records: &Path, stored: &Path, typed: &Path) -> bool {
     stored == typed
         && stored.as_os_str() != typed.as_os_str()
-        && !has_history(records, stored)
-        && has_history(records, typed)
+        && history_known(records, stored) == Some(false)
+        && history_known(records, typed) == Some(true)
 }
 
 /// The sentence a refusal to read records filed elsewhere carries, with the
