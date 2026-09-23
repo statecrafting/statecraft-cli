@@ -1399,6 +1399,30 @@ fn read_gate_log(path: &Path) -> Option<Vec<String>> {
         .map(|t| t.lines().map(str::to_string).collect())
 }
 
+/// Read an attempt's `gate.log` for a decision that relies on what it holds
+/// (spec 003 section 3.6.1 rule 3), whatever the manifest says.
+///
+/// Unlike the rendering read above, only a log that does not exist reads as
+/// `Ok(None)`; a log that exists and cannot be read is an error, never
+/// "nothing released". Nothing here writes.
+pub fn read_gate_log_checked(
+    root: &Path,
+    identity: &AttemptIdentity,
+) -> Result<Option<Vec<String>>, NotRead> {
+    if let Some(why) = identity.invalid() {
+        return Err(NotRead::NoSuchAttempt(why));
+    }
+    let path = identity.gate_log_path(root);
+    match std::fs::read_to_string(&path) {
+        Ok(t) => Ok(Some(t.lines().map(str::to_string).collect())),
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(None),
+        Err(e) => Err(NotRead::Unreadable {
+            path: path.display().to_string(),
+            detail: e.to_string(),
+        }),
+    }
+}
+
 /// Assemble and write an attempt's record. The only place `record.json` is
 /// written, and it is written once.
 pub fn finalize(

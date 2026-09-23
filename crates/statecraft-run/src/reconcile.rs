@@ -267,20 +267,23 @@ pub fn reconcile(
         );
     }
 
-    let entries = chain.entries();
-    let intent = entries.iter().find(|e| {
+    let entries = chain.positioned_entries();
+    let intent = entries.iter().map(|(_, e)| e).find(|e| {
         e.kind == Kind::Intent
             && e.run_id == request.run_id
             && e.attempt == request.attempt
             && e.subject == INTENT_SUBJECT
     });
     let idempotency_key = intent.and_then(|e| e.idempotency_key.clone());
-    let replaces = entries.iter().enumerate().rev().find_map(|(i, e)| {
+    // The chain position of the reconciliation this replaces: the record's
+    // index in the chain, not an index into the decoded entries.
+    let replaces = entries.iter().rev().find_map(|(i, e)| {
         (e.run_id == request.run_id && e.attempt == request.attempt)
             .then(|| read(e))
             .flatten()
-            .map(|_| i)
+            .map(|_| *i)
     });
+    let position = chain.records().len();
 
     let corroborated = request.finding == Verdict::Absent
         && matches!(
@@ -305,9 +308,7 @@ pub fn reconcile(
     chain.append(
         &format!(
             "{}/{}/reconciliation/{}",
-            request.run_id,
-            request.attempt,
-            entries.len()
+            request.run_id, request.attempt, position
         ),
         request.at,
         &Entry {
@@ -348,7 +349,10 @@ pub fn since_last_intent(chain: &Chain) -> Vec<serde_json::Value> {
 /// Whether a process with this id exists now. An observation: a reused id
 /// reads as existing, and nothing is identified by it.
 pub fn process_exists(pid: u32) -> bool {
-    match rustix::process::Pid::from_raw(pid as i32) {
+    let Ok(raw) = i32::try_from(pid) else {
+        return false;
+    };
+    match rustix::process::Pid::from_raw(raw) {
         Some(p) => !matches!(
             rustix::process::test_kill_process(p),
             Err(rustix::io::Errno::SRCH)
@@ -450,6 +454,27 @@ mod tests {
         assert!(!done.corroborated);
         assert!(runs(&chain)[0].live_attempt().is_none());
         assert_eq!(since_last_intent(&chain).len(), 1);
+    }
+
+    #[test]
+    fn replaces_names_the_true_chain_position_and_a_bad_pid_does_not_exist() {
+        let (_h, _t, mut chain) = live();
+        reconcile(
+            &mut chain,
+            &request(Verdict::Unknown, "unrecorded"),
+            observed(LaunchState::Unrecorded),
+        )
+        .unwrap();
+        let unknown_at = chain.records().len() - 1;
+        let done = reconcile(
+            &mut chain,
+            &request(Verdict::Absent, "unrecorded"),
+            observed(LaunchState::Unrecorded),
+        )
+        .unwrap();
+        assert_eq!(done.replaces, Some(unknown_at));
+        assert!(!process_exists(u32::MAX));
+        assert!(!process_exists(0));
     }
 
     #[test]

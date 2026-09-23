@@ -439,4 +439,21 @@ impl Chain {
             .filter_map(|r| serde_json::from_value(r.payload.clone()).ok())
             .collect()
     }
+
+    /// Every record's payload, decoded, with its position in the chain.
+    ///
+    /// The position is the record's index among [`Chain::records`], so it
+    /// stays the record's true chain position where an earlier payload does
+    /// not decode and [`Chain::entries`] skips it.
+    pub fn positioned_entries(&self) -> Vec<(usize, Entry)> {
+        self.records
+            .iter()
+            .enumerate()
+            .filter_map(|(i, r)| {
+                serde_json::from_value(r.payload.clone())
+                    .ok()
+                    .map(|e| (i, e))
+            })
+            .collect()
+    }
 }

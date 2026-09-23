@@ -332,6 +332,9 @@ pub struct LiveAttemptView {
     pub attempt: u32,
     /// The launch state its records establish, where it has any.
     pub launch_state: Option<String>,
+    /// The attempt's latest reconciliation under spec 003 section 3.6.1, where
+    /// it has one: an `unknown` that keeps it live (rule 4).
+    pub reconciliation: Option<statecraft_run::reconcile::Reconciliation>,
     /// Why, in order.
     pub reasons: Vec<String>,
     /// What to do next.
@@ -340,11 +343,13 @@ pub struct LiveAttemptView {
 
 /// `run` refused because an attempt is live. Exit 2, as for any live attempt;
 /// the answer adds what the attempt's launch records establish and infers no
-/// outcome.
+/// outcome. Where the attempt carries an `unknown` reconciliation, the answer
+/// names it (spec 003 section 3.6.1 rule 4).
 pub fn live_attempt_answer(
     e: &SessionError,
     root: &str,
     startup: Option<statecraft_home::launch::AttemptStartup>,
+    reconciliation: Option<statecraft_run::reconcile::Reconciliation>,
 ) -> Answer<LiveAttemptView> {
     let (run_id, attempt) = match e {
         SessionError::LiveAttempt { run_id, attempt } => (run_id.clone(), *attempt),
@@ -367,12 +372,20 @@ pub fn live_attempt_answer(
         run_id,
         attempt,
         launch_state: startup.as_ref().map(|s| s.verdict.word().to_string()),
+        reconciliation,
         reasons: startup.map(|s| s.reasons).unwrap_or_default(),
         next,
     };
     let mut summary = format!("{}\n", view.refusal);
     if let Some(state) = &view.launch_state {
         summary.push_str(&format!("  launch state: {state}\n"));
+    }
+    if let Some(r) = &view.reconciliation {
+        summary.push_str(&format!(
+            "  reconciliation: {}; the attempt stays live until a later reconciliation says \
+             `confirmed` or `absent`\n",
+            r.describe()
+        ));
     }
     for reason in &view.reasons {
         summary.push_str(&format!("  - {reason}\n"));
@@ -412,6 +425,10 @@ pub struct AttemptRowView {
     /// How its intent says the spec was admitted (spec 003 section 3.1.4 rule
     /// 5), or `null` for an intent that predates that section: not recorded.
     pub admission: Option<statecraft_run::work::Admission>,
+    /// Its latest reconciliation under spec 003 section 3.6.1, or `null`. A
+    /// conclusive one is why an `interrupted` outcome reads as it does (rule
+    /// 4); an `unknown` one leaves the attempt live.
+    pub reconciliation: Option<statecraft_run::reconcile::Reconciliation>,
 }
 
 /// `run list <path>`
@@ -432,6 +449,7 @@ pub fn run_list_answer(runs: Vec<Run>) -> Answer<RunListView> {
                         base_commit: a.base_commit.clone(),
                         outcome: a.outcome.map(|o| o.word().to_string()),
                         admission: a.admission.clone(),
+                        reconciliation: a.reconciliation.clone(),
                     })
                     .collect(),
             })
@@ -452,6 +470,9 @@ pub fn run_list_answer(runs: Vec<Run>) -> Answer<RunListView> {
             ));
             if let Some(admission) = &a.admission {
                 summary.push_str(&format!("{:<20}   {}\n", "", admission.describe()));
+            }
+            if let Some(r) = &a.reconciliation {
+                summary.push_str(&format!("{:<20}   {}\n", "", r.describe()));
             }
         }
     }
@@ -481,6 +502,96 @@ pub struct RunShowView {
     /// Each attempt's admission, by attempt number; `null` where the intent
     /// predates spec 003 section 3.1.4 (not recorded).
     pub admissions: Vec<AttemptAdmissionView>,
+    /// Every reconciliation of the run, in chain order (spec 006 section
+    /// 3.11.6, spec 003 section 3.6.1 rules 5 and 6).
+    pub reconciliations: Vec<ReconciliationView>,
+}
+
+/// One reconciliation record, as `run show` renders it.
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ReconciliationView {
+    /// The attempt it names.
+    pub attempt: u32,
+    /// Its position in the chain.
+    pub position: usize,
+    /// The finding, as the record's `verdict` carries it.
+    pub verdict: String,
+    /// `operator-declared`, or `null` for a record in the older shape, which
+    /// carries no operator, reason or observation and releases nothing (rule
+    /// 6).
+    pub basis: Option<String>,
+    /// Whether this product's own write order corroborates the finding.
+    pub corroborated: bool,
+    /// The launch state observed when it was written, or `null` for the older
+    /// shape.
+    pub observed_launch_state: Option<String>,
+    /// The record whole, where it is in the shape of section 3.6.1.
+    pub record: Option<statecraft_run::reconcile::Reconciliation>,
+}
+
+impl ReconciliationView {
+    /// Every reconciliation record of `run_id`, from positioned entries.
+    pub fn of_run(entries: &[(usize, statecraft_run::record::Entry)], run_id: &str) -> Vec<Self> {
+        entries
+            .iter()
+            .filter(|(_, e)| {
+                e.kind == statecraft_run::record::Kind::Reconciliation && e.run_id == run_id
+            })
+            .map(|(position, e)| match statecraft_run::reconcile::read(e) {
+                Some(r) => ReconciliationView {
+                    attempt: e.attempt,
+                    position: *position,
+                    verdict: verdict_word(r.verdict).to_string(),
+                    basis: Some(r.basis.clone()),
+                    corroborated: r.corroborated,
+                    observed_launch_state: Some(r.observed.launch_state.word().to_string()),
+                    record: Some(r),
+                },
+                None => ReconciliationView {
+                    attempt: e.attempt,
+                    position: *position,
+                    verdict: e
+                        .detail
+                        .get("verdict")
+                        .and_then(|v| v.as_str())
+                        .unwrap_or("unknown")
+                        .to_string(),
+                    basis: None,
+                    corroborated: false,
+                    observed_launch_state: None,
+                    record: None,
+                },
+            })
+            .collect()
+    }
+
+    /// One line an operator reads.
+    pub fn describe(&self) -> String {
+        match &self.record {
+            Some(r) => format!(
+                "reconciliation #{} attempt {}: {}{}",
+                self.position,
+                self.attempt,
+                r.describe(),
+                r.replaces
+                    .map_or(String::new(), |p| format!(" (replaces #{p})"))
+            ),
+            None => format!(
+                "reconciliation #{} attempt {}: {}, in the older shape with no basis, operator, \
+                 reason or observation; it releases nothing",
+                self.position, self.attempt, self.verdict
+            ),
+        }
+    }
+}
+
+fn verdict_word(v: statecraft_run::recovery::Verdict) -> &'static str {
+    match v {
+        statecraft_run::recovery::Verdict::Confirmed => "confirmed",
+        statecraft_run::recovery::Verdict::Absent => "absent",
+        statecraft_run::recovery::Verdict::Unknown => "unknown",
+    }
 }
 
 /// One attempt's admission.
@@ -493,8 +604,13 @@ pub struct AttemptAdmissionView {
     pub admission: Option<statecraft_run::work::Admission>,
 }
 
-/// `run show <path> <run>`, with admissions (spec 003 section 3.1.4 rule 5).
-pub fn run_show_with_admissions(account: ReviewableOutcome, run: &Run) -> Answer<RunShowView> {
+/// `run show <path> <run>`, with admissions (spec 003 section 3.1.4 rule 5)
+/// and every reconciliation (spec 006 section 3.11.6).
+pub fn run_show_with_admissions(
+    account: ReviewableOutcome,
+    run: &Run,
+    reconciliations: Vec<ReconciliationView>,
+) -> Answer<RunShowView> {
     let mut summary = account.render();
     let admissions: Vec<AttemptAdmissionView> = run
         .attempts
@@ -514,10 +630,14 @@ pub fn run_show_with_admissions(account: ReviewableOutcome, run: &Run) -> Answer
                 .unwrap_or_else(|| "admission not recorded".to_string())
         ));
     }
+    for r in &reconciliations {
+        summary.push_str(&format!("{}\n", r.describe()));
+    }
     Answer::new(
         RunShowView {
             account,
             admissions,
+            reconciliations,
         },
         Exit::Ok,
         summary,
@@ -1067,6 +1187,17 @@ pub fn override_change_answer(
 /// Another process holds the repository lock (spec 003 section 3.1.4 rule 7):
 /// a precondition, so a refusal, and nothing was written.
 pub fn lock_busy_answer(detail: &str) -> Answer<String> {
+    Answer::new(
+        detail.to_string(),
+        Exit::Refused,
+        format!("refused: {detail}\n"),
+    )
+}
+
+/// `run reconcile` refused before the run crate was asked: an evidence file
+/// that cannot be read, or an attempt the launch records cannot name. A
+/// precondition, so exit 2, and nothing was written (spec 006 section 3.11.6).
+pub fn reconcile_refused_answer(detail: &str) -> Answer<String> {
     Answer::new(
         detail.to_string(),
         Exit::Refused,

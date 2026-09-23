@@ -22,6 +22,33 @@ pub fn digest_bytes(bytes: &[u8]) -> String {
         })
 }
 
+/// The SHA-256 of everything a reader yields, lowercase hex, and its length in
+/// bytes, read in chunks rather than held whole.
+pub fn digest_reader(mut reader: impl std::io::Read) -> std::io::Result<(String, u64)> {
+    let mut hasher = Sha256::new();
+    let mut buf = [0u8; 64 * 1024];
+    let mut total = 0u64;
+    loop {
+        let n = match reader.read(&mut buf) {
+            Ok(0) => break,
+            Ok(n) => n,
+            Err(e) if e.kind() == std::io::ErrorKind::Interrupted => continue,
+            Err(e) => return Err(e),
+        };
+        hasher.update(&buf[..n]);
+        total += n as u64;
+    }
+    let hex = hasher
+        .finalize()
+        .iter()
+        .fold(String::with_capacity(64), |mut acc, b| {
+            use std::fmt::Write as _;
+            let _ = write!(acc, "{b:02x}");
+            acc
+        });
+    Ok((hex, total))
+}
+
 /// The SHA-256 of a file's contents, and its length in bytes.
 ///
 /// `Ok(None)` when the file is absent, which is a state this crate reports
@@ -37,6 +64,14 @@ pub fn digest_file(path: &Path) -> std::io::Result<Option<(String, u64)>> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_streamed_digest_equals_the_whole_read_one() {
+        let bytes: Vec<u8> = (0..200_000u32).map(|i| (i % 251) as u8).collect();
+        let (hex, len) = digest_reader(&bytes[..]).unwrap();
+        assert_eq!(hex, digest_bytes(&bytes));
+        assert_eq!(len, bytes.len() as u64);
+    }
 
     #[test]
     fn empty_input_is_the_known_sha256_of_nothing() {
