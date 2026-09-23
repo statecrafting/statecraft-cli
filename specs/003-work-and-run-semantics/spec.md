@@ -466,6 +466,97 @@ effect is idempotent by a key, the key is recorded in the intent and named in th
 record. Where it is not, the record says so, and a repeat is possible and visible
 rather than impossible and claimed.
 
+### 3.6.1 Reconciling an unresolved attempt, as an operator's act
+
+A narrowly scoped authority amendment, settled by the owner on 2026-09-23 and
+recorded before the implementation it authorizes. Section 3.6 fixes that an
+intent with no outcome is reconciled before anything is retried, that the
+answer is `confirmed`, `absent` or `unknown`, and that `unknown` blocks the
+retry. It does not say who reconciles, from what, or what each answer does to
+the attempt.
+
+**The gap, exactly.** `recovery::reconcile` and `reconciliation_entry` exist
+and nothing calls them. `session::runs` folds only intents and outcomes, so an
+attempt whose process died between the two stays live forever: `run` refuses
+every later attempt in the repository, names the live one, and spec `002`
+section 3.32 rule 24 says "this build has no verb that reconciles an attempt".
+The only way out today is editing the record, which section 3.3 forbids.
+
+**Rule 1: the act names exactly one attempt.** The operator names a registered
+repository, a run id, an attempt number, a finding (`confirmed`, `absent` or
+`unknown`), the launch state they inspected, an operator name and a reason,
+and optionally files offered as supporting evidence. The attempt must be the
+repository's live attempt: an intent with no outcome and no conclusive
+reconciliation. Naming any other attempt, one already concluded, or one
+already reconciled `confirmed` or `absent`, is refused.
+
+**Rule 2: the finding is the operator's declaration; the observation is the
+product's.** Before writing, this product reads the attempt's launch state the
+way `startup show` does (spec `002` section 3.32 rule 23: `not-launched`,
+`launch-unknown`, `outcome-unknown`, `spawn-failed`, `interrupted`, or a
+completed launch record), and, for a repository with no manifest, `unrecorded`.
+It reads; it never launches, signals, replays or re-runs anything to find out
+whether an effect happened. The record keeps the two apart: the finding with
+`basis: operator-declared`, the operator as supplied and **not
+authenticated**, the reason, and each evidence file's path, byte length and
+SHA-256 (its content is not copied and not read for a decision); and beside it
+the observed launch state and the files it was read from. A finding is
+`corroborated` only where the product's own write order establishes it
+independently: `absent` against `not-launched` or `spawn-failed`, where section
+3.32 rule 22 guarantees no provider process was created for this attempt.
+Nothing else is corroborated, and no rendering calls a declaration verified.
+
+**Rule 3: stale and conflicting reconciliations are refused.** The launch state
+the operator names must equal the one this product reads at the moment of
+writing; otherwise the reconciliation is stale and refused, and nothing is
+written. `absent` is refused as conflicting when the launch records show a
+process was created and given its prompt (`outcome-unknown`, or a completed
+launch record): this product's own evidence then says governed work was
+released, and a declaration cannot overrule it. `confirmed` and `unknown` are
+admissible against every state.
+
+**Rule 4: what each finding does.**
+
+| Finding | The attempt | A later `run` of the repository |
+|---|---|---|
+| `unknown` | Stays live and unresolved. A later reconciliation of the same attempt may replace it with `confirmed` or `absent`, under rules 1 to 3. | Refused, naming the attempt and its `unknown` reconciliation, as today. |
+| `absent` | Resolved: its outcome reads `interrupted`, with the reconciliation beside it. | Permitted. The new attempt is appended (section 3.4) and its intent names the reconciled attempt it follows. |
+| `confirmed` | Resolved: its outcome reads `interrupted`, with the reconciliation beside it. | Permitted. The new attempt's intent names the attempt it follows and that its effect was confirmed, because the retained workspace carries it. |
+
+Nothing is retried automatically after either answer; a retry is an operator
+invoking `run`, which section 3.4 already makes an appended attempt. Reading an
+attempt through `run show`, `run list` or `startup show`, or dismissing an
+answer, writes nothing and releases nothing: only a reconciliation record
+changes whether an attempt is live. An `unknown` is never turned into either
+answer by the passage of time, a dead process, a missing file, an empty output
+or a deadline.
+
+**Rule 5: the record.** A reconciliation is one appended `reconciliation`
+record in the repository's run record, naming the run and the attempt, carrying
+rule 2's fields, `verdict` equal to the finding (the key the existing reader
+renders), `retryAllowed` per rule 4, and, when it replaces an `unknown`, the
+chain position of the reconciliation it replaces. The intent and every earlier
+record are unchanged. A record that cannot be made durable is a failure, and
+the attempt stays exactly as it was.
+
+**Rule 6: records written before this section.** A chain with no
+reconciliation record folds exactly as before. A `reconciliation` record in the
+older shape (`verdict`, `retryAllowed`, `idempotentByKey`, no `basis`), which
+no verb ever wrote, is read and rendered, and never releases an attempt,
+because it carries no operator, reason or observation.
+
+**Acceptance.** Deterministic, through the binary, with a fake provider and
+crash-boundary fixtures that leave an intent with no outcome at each launch
+state: `unknown` keeps `run` refused; `absent` against `not-launched` is
+corroborated and releases; `absent` against `launch-unknown` is recorded as a
+declaration and releases; `absent` against `outcome-unknown` is refused as
+conflicting; `confirmed` against `outcome-unknown` releases and the next
+attempt names it; a stale launch state is refused; a second conclusive
+reconciliation is refused; `unknown` then `absent` is accepted and names what
+it replaces; a concluded attempt, an unknown attempt number and an empty
+operator or reason are refused; `run show` and `startup show` leave a live
+attempt live; and the fake's effects are never re-run by any of these.
+
 ### 3.7 Concurrency bounds for the first slice
 
 One live attempt per registered repository, and the workspace is the lock. A

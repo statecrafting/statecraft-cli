@@ -25,7 +25,7 @@
     "id": "003-work-and-run-semantics",
     "implementation": "complete",
     "sectionDigests": {
-      "003-work-selection-workspace-preparation-the-run-record-and-recovery": "ecb9fcba557d8ef81a0fe50a0b8f7b97d34f33a7ea248d921b0168e5f5aa6541",
+      "003-work-selection-workspace-preparation-the-run-record-and-recovery": "8b8a1bc7d443dbdbc15b16a2d424791f520a6f71dd56d2bf1377bda3cd4d1cb8",
       "1-purpose": "6e2e713486514a4371080ee9ad901b71b92b198ff8944d2cac7db353dfdd1ee6",
       "2-territory": "f200d26f7fab70304d4ec5b21bbfba40301c0a2a5b38fc266d1d37da0f01b4a4",
       "3-1-1-ready-is-not-ratified": "e902124dba1a1dfc0ed218701ac4b36773d42c1359d537fe8dfce993379529fa",
@@ -38,10 +38,11 @@
       "3-3-the-run-record": "4216112648ad63a3214ec6017c03ab08756cec1e76433325058c425d181e9c25",
       "3-4-the-closed-outcome-set": "f2243f961b13080f994215dda098e7d629a8a42c7659642ec7c0fab0a750bb36",
       "3-5-refusal-accounting-belongs-to-the-supervisor": "7068baab891dbfd033c0fe09f68ea5795ffc2e295248a2a90d95c8026fa68d59",
+      "3-6-1-reconciling-an-unresolved-attempt-as-an-operator-s-act": "c721067b099392636d46b0fd960f6be39bc70ac7f3b99c8a175a6fcbd7948dff",
       "3-6-recovery-and-reconciliation": "50b88facefc2e4c69037b3f006fd9a464949c47498ed59d2b30ea066291d9bae",
       "3-7-concurrency-bounds-for-the-first-slice": "f20d713052cb52ff0e46e7d7bf723c4cfe5d831a66670c47ffea086423ced547",
       "3-8-observable-negative-cases": "64b35b1a553ef276500ef17c7ef9beff5d4488a934d422acddee2b429583bc0b",
-      "3-behavior": "31ab96e01f260c9d51640f5555fc47569dcfaaaa3e971776124d6c66b52b276d",
+      "3-behavior": "6e50e43458d201b2797867d7568d585ed5bbfe227c9c58335129bc5ae94903f9",
       "4-out-of-scope": "0953737fbaaf06f31c4272c3b10a57178c967c1127355c9826627a1267c76fdd",
       "5-decisions-recorded-during-implementation": "9d1a0fb86d725db8e7791bc6102a5a9796ee1cc659823cd08e638a7571e503c5",
       "verification": "31b33969410d5ba51a42678f60dc22264f541b2480ada745b3c0cc2f839d9a1e"
@@ -62,6 +63,7 @@
       "3.4 The closed outcome set",
       "3.5 Refusal accounting belongs to the supervisor",
       "3.6 Recovery and reconciliation",
+      "3.6.1 Reconciling an unresolved attempt, as an operator's act",
       "3.7 Concurrency bounds for the first slice",
       "3.8 Observable negative cases",
       "4. Out of scope",
@@ -73,6 +75,6 @@
     "summary": "The core loop's semantics. How a unit of work is identified by reading spec-spine's structured report rather than re-deriving it; how an isolated workspace is prepared so the operator's checkout is never edited; the append-only hash-linked run record with intent written before an effect and outcome after it; the closed outcome set (completed, failed, refused, interrupted, cancelled) and the rule that a retry appends an attempt rather than replacing history; supervisor-owned refusal accounting a supervised process cannot erase; and reconciliation of an ambiguous effect before any retry, with no exactly-once promise.\n",
     "title": "Work selection, workspace preparation, the run record, and recovery after interruption"
   },
-  "shardHash": "0fe581bf1fb225e5064454de3c8e80a71ca481f73d29938e9f53d19c737180b0",
+  "shardHash": "5993eb0755dc6d9df6cbdd421a2b9ff6ce677fee46f62d2b6a80aeeebe2e3c79",
   "specVersion": "1.6.0"
 }
