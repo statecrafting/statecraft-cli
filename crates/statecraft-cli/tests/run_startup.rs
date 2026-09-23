@@ -118,7 +118,7 @@ impl Fixture {
             r#"#!/bin/sh
 case "$*" in
   --version) echo 'spec-spine 0.20.0' ;;
-  check) exit 0 ;;
+  check|'check --help') exit 0 ;;
   'registry plan --json') echo '{"ready":[{"id":"replay","title":"recorded stream"}]}' ;;
   'registry list --json') echo '{"items":[{"id":"replay","status":"approved","implementation":"pending"}]}' ;;
   'verify '*' --plan --json') printf '{"exitCode":0,"ok":true,"report":{"commands":[],"skipped":[],"specId":"%s"},"schemaVersion":"0.6.0","verb":"verify"}' $2 ;;
@@ -603,6 +603,88 @@ fn a_mismatched_revision_is_refused_before_its_tool_calls_run() {
         first
     );
     assert_eq!(value(&f.show(Some(1)))["verdict"], "unverified");
+}
+
+/// Spec 002 section 3.16's last rule and section 3.10's row "a global upgrade
+/// after a run resolved": the home gains a newer harness revision and `home
+/// apply` runs, and neither the attempt already resolved nor the run's next
+/// attempt changes. Section 3.25 records the resolved identity per managed
+/// session, which is where the freeze lives: each attempt's write-once intent
+/// and record carry the requested (required) and the resolved identity, and a
+/// later attempt selects the committed requirement, never the newest revision
+/// the home holds (section 3.31 rule 17).
+#[test]
+fn a_global_upgrade_after_a_run_resolved_changes_nothing_about_that_run() {
+    let f = Fixture::new();
+    let required_dir = f.required_revision();
+    let out = f.run();
+    assert_eq!(code(&out), 0, "{}", text(&out));
+    let first = value(&f.show(Some(1)));
+    let required = first["intent"]["requiredHarness"]
+        .as_str()
+        .unwrap()
+        .to_string();
+    // Requested and resolved, both recorded, and they agree.
+    assert_eq!(first["intent"]["selected"]["digest"], required.as_str());
+    assert_eq!(first["record"]["resolvedHarness"], required.as_str());
+    let program = first["intent"]["program"].clone();
+    assert!(program.as_str().is_some_and(|p| p.ends_with("/claude")));
+    let intent_before = std::fs::read(f.attempt_dir(1).join("intent.json")).unwrap();
+    let record_before = std::fs::read(f.attempt_dir(1).join("record.json")).unwrap();
+
+    // The global upgrade: a newer harness revision lands in the home, and the
+    // operator's `home apply` runs. The project's committed requirement is not
+    // touched; changing it is `harness upgrade`, a reviewed project change.
+    let mut newer = statecraft_home::harness::shipped();
+    newer[0].contents.push_str("\na newer harness revision\n");
+    let installed =
+        statecraft_home::harness::install(&statecraft_home::home::Layout::new(f.home()), &newer)
+            .unwrap();
+    assert_ne!(installed.revision.digest, required, "a different revision");
+    let applied = f.cli(&["home", "apply"]);
+    assert!(code(&applied) <= 1, "{}", text(&applied));
+    assert!(installed.root.is_dir());
+    let revisions = std::fs::read_dir(f.home().join("harness")).unwrap().count();
+    assert!(revisions >= 2, "the home now holds {revisions} revision(s)");
+
+    // The run's next attempt.
+    let out = f.run();
+    assert_eq!(code(&out), 0, "{}", text(&out));
+    assert_eq!(json(&out)["value"]["attempt"], 2);
+    let second = value(&f.show(Some(2)));
+    assert_eq!(second["intent"]["requiredHarness"], required.as_str());
+    assert_eq!(second["intent"]["selected"]["digest"], required.as_str());
+    assert_eq!(second["record"]["resolvedHarness"], required.as_str());
+    assert_eq!(
+        second["record"]["launch"]["harness"]["digest"],
+        required.as_str()
+    );
+    assert_eq!(second["intent"]["program"], program, "the same tool");
+    assert_eq!(
+        Path::new(
+            second["intent"]["registrations"][0]["script"]
+                .as_str()
+                .unwrap()
+        ),
+        required_dir.join("hooks/statecraft-session-start.sh"),
+        "the startup hook is the resolved revision's, not the newer one's"
+    );
+    let env = String::from_utf8(f.received("received-env")).unwrap();
+    assert!(
+        env.lines()
+            .any(|l| l == format!("STATECRAFT_HARNESS_SELECTED={required}")),
+        "{env}"
+    );
+
+    // The attempt already resolved is unchanged, byte for byte.
+    assert_eq!(
+        std::fs::read(f.attempt_dir(1).join("intent.json")).unwrap(),
+        intent_before
+    );
+    assert_eq!(
+        std::fs::read(f.attempt_dir(1).join("record.json")).unwrap(),
+        record_before
+    );
 }
 
 /// A provider that ignores the registration runs neither the acknowledgment

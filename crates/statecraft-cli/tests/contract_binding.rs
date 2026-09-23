@@ -38,7 +38,7 @@ const EXPANSION: &str = r#"#!/bin/sh
 here="$(dirname "$0")"
 case "$*" in
   --version) echo 'spec-spine 0.22.0' ;;
-  check) exit 0 ;;
+  check|'check --help') exit 0 ;;
   'registry plan --json') echo '{"ready":[{"id":"107-x","status":"approved","title":"with obligations"}]}' ;;
   'registry list --json') echo '{"items":[{"id":"107-x","status":"approved","implementation":"pending","obligations":[{"id":"R-1","kind":"requirement","text":"t","anchor":"a"},{"id":"R-2","kind":"requirement","text":"u","anchor":"a","withdrawn":true}]}]}' ;;
   'verify '*' --plan --json') printf '{"exitCode":0,"ok":true,"report":{"commands":[],"skipped":[],"specId":"%s"},"schemaVersion":"0.6.0","verb":"verify"}' $2 ;;
@@ -55,7 +55,7 @@ esac
 const RELEASED: &str = r#"#!/bin/sh
 case "$*" in
   --version) echo 'spec-spine 0.20.0' ;;
-  check) exit 0 ;;
+  check|'check --help') exit 0 ;;
   'registry plan --json') echo '{"ready":[{"id":"107-x","title":"with obligations"}]}' ;;
   'registry list --json') echo '{"items":[{"id":"107-x","status":"approved","implementation":"pending"}]}' ;;
   'verify '*' --plan --json') printf '{"exitCode":0,"ok":true,"report":{"commands":[],"skipped":[],"specId":"%s"},"schemaVersion":"0.6.0","verb":"verify"}' $2 ;;

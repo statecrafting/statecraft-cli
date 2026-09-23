@@ -322,7 +322,7 @@ PROSE
 # A synthetic scheduler input for the fixture: one ready unit of work.
 case "$*" in
   --version) echo 'spec-spine 0.20.0' ;;
-  check) exit 0 ;;
+  check|'check --help') exit 0 ;;
   'registry plan --json') echo '{"ready":[{"id":"acc-run","title":"synthetic run"}]}' ;;
   'registry list --json') echo '{"items":[{"id":"acc-run","status":"approved","implementation":"pending"}]}' ;;
   # Spec 004 section 3.17: the suite plan the posture is compared against.

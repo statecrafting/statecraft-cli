@@ -141,7 +141,20 @@ fn apply_over_an_unmanifested_existing_file_withholds_it_as_foreign_and_reports_
             assert_eq!(written, ["fresh.md"]);
             assert_eq!(withheld.len(), 1);
             assert_eq!(withheld[0].path, "theirs.md");
-            assert!(matches!(withheld[0].reason, Withholding::Foreign { .. }));
+            // Section 3.21 part 1: the finding names an owner, not only a path.
+            match &withheld[0].reason {
+                Withholding::Foreign { claimant } => {
+                    assert_eq!(
+                        claimant,
+                        &Claimant::User {
+                            path: "theirs.md".into()
+                        }
+                    );
+                    assert_eq!(claimant.owner(), "user");
+                    assert!(withheld[0].reason.describe().contains("owner user"));
+                }
+                other => panic!("expected foreign, got {other:?}"),
+            }
         }
         other => panic!("expected partial, got {other:?}"),
     }
@@ -427,6 +440,11 @@ fn a_pointer_path_holding_a_user_file_degrades_the_adapter_and_is_not_appended_t
         withheld.reason,
         Withholding::PointerPathOccupied { .. }
     ));
+    assert_eq!(
+        withheld.reason.claimant().map(Claimant::owner).as_deref(),
+        Some("user"),
+        "the pointer path's file is named with its owner"
+    );
     assert!(
         computed
             .writes
@@ -457,11 +475,16 @@ fn a_pointer_path_holding_a_user_file_degrades_the_adapter_and_is_not_appended_t
 fn doctor_reports_a_declared_path_present_on_disk_and_absent_from_the_manifest_as_unmanaged_write()
 {
     let target = tempfile::tempdir().unwrap();
+    // The bytes the adapter declares, which are the only bytes this product
+    // writes there: a write that was not recorded.
     std::fs::write(target.path().join("stray.md"), b"written and not recorded").unwrap();
 
     let declarations = vec![adapter(
         "a",
-        vec![ManagedFile::owned("stray.md", b"x".to_vec())],
+        vec![ManagedFile::owned(
+            "stray.md",
+            b"written and not recorded".to_vec(),
+        )],
     )];
     let manifest = Manifest::new(pins());
 
@@ -481,6 +504,104 @@ fn doctor_reports_a_declared_path_present_on_disk_and_absent_from_the_manifest_a
         Finding::UnmanagedWrite { path, adapter } if path == "stray.md" && adapter == "a"
     )));
     assert_eq!(report.exit_code(), 1);
+}
+
+// Rows 3 and 9, as `doctor` reports them: a declared path held by bytes this
+// product did not write is the user's file, reported `foreign` with its owner
+// and never as a write this product made.
+#[test]
+fn doctor_reports_a_declared_path_holding_the_users_bytes_as_foreign_naming_the_owner() {
+    let target = tempfile::tempdir().unwrap();
+    std::fs::write(target.path().join("AGENTS.md"), b"the user's instructions").unwrap();
+
+    let declarations = vec![adapter(
+        "a",
+        vec![ManagedFile::pointer(
+            "AGENTS.md",
+            b"see .statecraft/adapter/notes.md".to_vec(),
+        )],
+    )];
+    let report = doctor(
+        target.path(),
+        &Manifest::new(pins()),
+        &declarations,
+        &present(),
+        &ForeignClaims::none(),
+        &UnobservedShadows,
+        &Observed::default(),
+    )
+    .unwrap();
+
+    assert!(
+        report.findings.iter().any(|f| matches!(
+            f,
+            Finding::Foreign { path, adapter, claimant }
+                if path == "AGENTS.md" && adapter == "a" && claimant.owner() == "user"
+        )),
+        "{:?}",
+        report.findings
+    );
+    assert!(
+        !report
+            .findings
+            .iter()
+            .any(|f| matches!(f, Finding::UnmanagedWrite { .. })),
+        "the user's file is not a write this product made"
+    );
+    assert!(report.render().contains("foreign AGENTS.md, owner user"));
+    assert_eq!(report.exit_code(), 1);
+    assert_eq!(
+        std::fs::read(target.path().join("AGENTS.md")).unwrap(),
+        b"the user's instructions",
+        "doctor repairs nothing"
+    );
+}
+
+// The owner is named by package identity where one exists (section 3.2's
+// `foreign` row), in both the plan and `doctor`.
+#[test]
+fn a_package_claimant_is_named_by_its_identity_in_the_plan_and_in_doctor() {
+    let target = tempfile::tempdir().unwrap();
+    std::fs::write(target.path().join("kit.md"), b"theirs").unwrap();
+    let declarations = vec![adapter(
+        "a",
+        vec![ManagedFile::owned("kit.md", b"ours".to_vec())],
+    )];
+    let foreign = ForeignClaims::none().claiming(
+        "kit.md",
+        Claimant::Package {
+            name: "some-kit".into(),
+            revision: "1.2.3".into(),
+        },
+    );
+
+    let computed = plan(target.path(), None, &declarations, &present(), &foreign).unwrap();
+    assert_eq!(
+        computed.withheld[0]
+            .reason
+            .claimant()
+            .map(Claimant::owner)
+            .as_deref(),
+        Some("package some-kit@1.2.3")
+    );
+
+    let report = doctor(
+        target.path(),
+        &Manifest::new(pins()),
+        &declarations,
+        &present(),
+        &foreign,
+        &UnobservedShadows,
+        &Observed::default(),
+    )
+    .unwrap();
+    assert!(
+        report
+            .render()
+            .contains("foreign kit.md, owner package some-kit@1.2.3"),
+        "{}",
+        report.render()
+    );
 }
 
 // Row 11: a managed path whose digest matches but which a session would not

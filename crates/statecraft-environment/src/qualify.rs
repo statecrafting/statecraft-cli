@@ -30,6 +30,17 @@ pub enum Reason {
     },
     /// No spec-spine corpus is present.
     NoCorpus,
+    /// A corpus is present and `spec-spine check` could not be asked: the
+    /// binary is absent or lacks the verb (spec 002 section 3.23).
+    CorpusCheckUnavailable {
+        /// What was observed.
+        detail: String,
+    },
+    /// A corpus is present and `spec-spine check` did not perform its read.
+    CorpusCheckNotPerformed {
+        /// What the producer said.
+        detail: String,
+    },
 }
 
 impl Reason {
@@ -45,6 +56,10 @@ impl Reason {
                 format!("a spec-spine corpus is present and does not compile: {detail}")
             }
             Reason::NoCorpus => "no spec-spine corpus is present".into(),
+            Reason::CorpusCheckUnavailable { detail }
+            | Reason::CorpusCheckNotPerformed { detail } => {
+                format!("a spec-spine corpus is present and was not judged: {detail}")
+            }
         }
     }
 }
@@ -90,7 +105,30 @@ pub struct Qualification {
     pub reasons: Vec<Reason>,
 }
 
+/// Why a qualification established no verdict about the corpus.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum Unjudged {
+    /// The judging binary is absent or lacks `check`: a refusal (2).
+    Unavailable(String),
+    /// `check` did not perform its read: a failure (4).
+    NotPerformed(String),
+}
+
 impl Qualification {
+    /// Whether the corpus half of this qualification was never judged, and
+    /// why. A register that meets one records nothing (spec 002 section 3.23).
+    pub fn unjudged(&self) -> Option<Unjudged> {
+        self.reasons.iter().find_map(|r| match r {
+            Reason::CorpusCheckUnavailable { detail } => {
+                Some(Unjudged::Unavailable(detail.clone()))
+            }
+            Reason::CorpusCheckNotPerformed { detail } => {
+                Some(Unjudged::NotPerformed(detail.clone()))
+            }
+            _ => None,
+        })
+    }
+
     /// A one-line rendering: the verdict and every reason behind it.
     pub fn describe(&self) -> String {
         format!(
@@ -129,6 +167,12 @@ pub enum CorpusState {
     Compiles,
     /// A corpus that does not compile, with the compiler's first line.
     Broken(String),
+    /// A corpus is present, and the binary that judges it is absent or lacks
+    /// `check`. A precondition, not a verdict about the corpus.
+    CheckUnavailable(String),
+    /// A corpus is present, and `check` did not perform its read. Nothing
+    /// about the corpus was established.
+    CheckNotPerformed(String),
 }
 
 /// Evaluate a target. Reads only; writes nothing anywhere.
@@ -167,6 +211,23 @@ pub fn qualify(path: &Path, probe: &dyn TargetProbe) -> Qualification {
         }
         CorpusState::Broken(detail) => {
             reasons.push(Reason::CorpusDoesNotCompile { detail });
+            Qualification {
+                verdict: Verdict::Unqualified,
+                reasons,
+            }
+        }
+        // Never `qualified`, and not a verdict about the corpus either: the
+        // register refuses or fails on these rather than recording them
+        // (spec 002 section 3.23's translation, spec 006 section 3.3).
+        CorpusState::CheckUnavailable(detail) => {
+            reasons.push(Reason::CorpusCheckUnavailable { detail });
+            Qualification {
+                verdict: Verdict::Unqualified,
+                reasons,
+            }
+        }
+        CorpusState::CheckNotPerformed(detail) => {
+            reasons.push(Reason::CorpusCheckNotPerformed { detail });
             Qualification {
                 verdict: Verdict::Unqualified,
                 reasons,

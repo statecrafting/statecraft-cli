@@ -7,7 +7,7 @@
 
 use crate::adapter::{Declaration, HarnessProbe, Readiness, readiness};
 use crate::claimant::{Claimant, ForeignClaims, ShadowResolver, resolve};
-use crate::digest::digest_file;
+use crate::digest::{digest_bytes, digest_file};
 use crate::manifest::{Class, Manifest};
 use std::path::Path;
 
@@ -104,6 +104,22 @@ pub enum Finding {
         /// The adapter whose declaration covers it.
         adapter: String,
     },
+    /// A path one of this product's adapters would write, held by a file this
+    /// product did not write and no manifest records.
+    ///
+    /// Sections 3.8 and 3.10: such a path is classed `foreign`, and section
+    /// 3.21 part 1 makes the finding name an owner, not only a path. Its bytes
+    /// are not the ones the adapter declares, so this product did not put them
+    /// there (see section 5, 2026-09-23), and section 3.2 makes the file the
+    /// user's.
+    Foreign {
+        /// The path.
+        path: String,
+        /// The adapter whose declaration covers it.
+        adapter: String,
+        /// Who holds it.
+        claimant: Claimant,
+    },
     /// A tracked modification is no longer in the file it was made to.
     ///
     /// Spec 002 section 3.13: the modification is one line inside a file this
@@ -164,6 +180,14 @@ impl Finding {
             Finding::UnmanagedWrite { path, adapter } => {
                 format!("unmanaged-write {path}, declared by adapter {adapter}")
             }
+            Finding::Foreign {
+                path,
+                adapter,
+                claimant,
+            } => format!(
+                "foreign {path}, owner {}, declared by adapter {adapter}; never written over",
+                claimant.owner()
+            ),
             Finding::ModificationLost { path, line } => {
                 format!("modification-lost {path}: `{line}` is no longer in the file")
             }
@@ -288,20 +312,46 @@ pub fn doctor(
             if manifest.records(&file.path) {
                 continue;
             }
-            let exists = resolve(root, &file.path).exists();
-            if !exists {
+            let at = resolve(root, &file.path);
+            if !at.exists() {
                 continue;
             }
-            // Present, declared by one of our own adapters, not recorded. If
-            // another installer claims it, it is that installer's file and the
-            // plan already reports it as foreign; anything else is a byte this
-            // product is responsible for and did not write down.
-            if foreign.claimant_of(&file.path).is_none() {
-                report.findings.push(Finding::UnmanagedWrite {
+            // A directory where a file is declared holds no bytes this product
+            // wrote; it digests to nothing and so matches nothing.
+            let found = if at.is_file() {
+                digest_file(&at)?.map(|(d, _)| d)
+            } else {
+                None
+            };
+            // Present, declared by one of our own adapters, not recorded. Who
+            // holds it decides which finding it is.
+            let finding = match foreign.claimant_of(&file.path) {
+                // Another installer's file: named with that owner.
+                Some(claimant) => Finding::Foreign {
                     path: file.path.clone(),
                     adapter: d.name.clone(),
-                });
-            }
+                    claimant: claimant.clone(),
+                },
+                // Exactly the bytes the adapter declares: this product writes
+                // nothing else, so this is a write it did not record.
+                None if found.as_deref() == Some(digest_bytes(&file.contents).as_str()) => {
+                    Finding::UnmanagedWrite {
+                        path: file.path.clone(),
+                        adapter: d.name.clone(),
+                    }
+                }
+                // Any other bytes were not written by this product, so the
+                // file is the user's (section 3.2), which is the `foreign`
+                // case of sections 3.8 and 3.10.
+                None => Finding::Foreign {
+                    path: file.path.clone(),
+                    adapter: d.name.clone(),
+                    claimant: Claimant::User {
+                        path: file.path.clone(),
+                    },
+                },
+            };
+            report.findings.push(finding);
         }
     }
 
