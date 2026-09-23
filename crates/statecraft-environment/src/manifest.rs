@@ -508,17 +508,40 @@ pub fn lock(root: &Path, wait: std::time::Duration) -> Result<ManifestLock, Mani
             key: None,
         });
     }
+    // The lock file is created inside the repository or not at all: a linked
+    // `.statecraft` or `.statecraft/state` would put it wherever the link
+    // points, so either one is refused, and the file itself is opened without
+    // following a link.
+    for dir in [".statecraft", ".statecraft/state"] {
+        match std::fs::symlink_metadata(key.join(dir)) {
+            Ok(m) if m.file_type().is_symlink() => {
+                return Err(ManifestError::SymbolicLink {
+                    path: dir.to_string(),
+                });
+            }
+            Ok(_) => {}
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => {}
+            Err(e) => return Err(io(e)),
+        }
+    }
     let path = key.join(LOCK_PATH);
     if let Some(dir) = path.parent() {
         std::fs::create_dir_all(dir).map_err(io)?;
     }
-    let file = std::fs::OpenOptions::new()
-        .create(true)
-        .truncate(false)
-        .read(true)
-        .write(true)
-        .open(&path)
-        .map_err(io)?;
+    let file = {
+        use std::os::unix::fs::OpenOptionsExt;
+        std::fs::OpenOptions::new()
+            .create(true)
+            .truncate(false)
+            .read(true)
+            .write(true)
+            .custom_flags(rustix::fs::OFlags::NOFOLLOW.bits() as i32)
+            .open(&path)
+            .map_err(|source| ManifestError::Io {
+                path: LOCK_PATH.to_string(),
+                source,
+            })?
+    };
     let deadline = std::time::Instant::now() + wait;
     loop {
         match rustix::fs::flock(&file, rustix::fs::FlockOperation::NonBlockingLockExclusive) {
@@ -1357,6 +1380,39 @@ mod tests {
         release.0.send(()).unwrap();
         holder.join().unwrap();
         assert!(root.join(LOCK_PATH).is_file());
+    }
+
+    // The lock file is created inside the repository or not at all: a linked
+    // state directory, a linked `.statecraft`, or a link at the lock file's
+    // own path is refused, and nothing is created where the link points.
+    #[cfg(unix)]
+    #[test]
+    fn a_linked_state_directory_or_lock_file_is_refused_and_nothing_is_created_elsewhere() {
+        let elsewhere = tempfile::tempdir().unwrap();
+        let empty = |d: &Path| std::fs::read_dir(d).unwrap().next().is_none();
+        for linked in [".statecraft", ".statecraft/state"] {
+            let dir = tempfile::tempdir().unwrap();
+            let link = dir.path().join(linked);
+            std::fs::create_dir_all(link.parent().unwrap()).unwrap();
+            std::os::unix::fs::symlink(elsewhere.path(), &link).unwrap();
+            assert!(
+                matches!(
+                    lock(dir.path(), std::time::Duration::ZERO),
+                    Err(ManifestError::SymbolicLink { .. })
+                ),
+                "{linked}"
+            );
+            assert!(empty(elsewhere.path()), "{linked}");
+        }
+        let dir = tempfile::tempdir().unwrap();
+        std::fs::create_dir_all(dir.path().join(".statecraft/state")).unwrap();
+        std::os::unix::fs::symlink(
+            elsewhere.path().join("planted.lock"),
+            dir.path().join(LOCK_PATH),
+        )
+        .unwrap();
+        assert!(lock(dir.path(), std::time::Duration::ZERO).is_err());
+        assert!(empty(elsewhere.path()));
     }
 
     // The copy a spawned child holds between its creation and its `exec` is a
