@@ -242,13 +242,25 @@ the time this product wrote it.
 append-only journal per registered repository beside that repository's run
 record, never in the target. Each line is one grant or one revocation, with the
 repository, the spec id, the operator, the reason, the time and the digest of
-the previous line, so a line removed or edited reads as a broken journal rather
-than as a changed set. The overrides in force are the fold of the journal:
-granted and not later revoked. A journal that does not read, or whose links do
-not verify, is a failure: `run` and `work list` refuse to proceed on it rather
-than reading it as empty, because an unreadable journal that read as "no
-override" would be indistinguishable from one an operator never wrote. A write
-that cannot be made durable is a failure and leaves nothing in force.
+the previous line, so a line edited, reordered or removed from before the last
+one reads as a broken journal rather than as a changed set. The overrides in
+force are the fold of the journal: granted and not later revoked. A journal
+that does not read, or whose links do not verify, is a failure: `run`, `work
+list` and `work show` refuse to proceed on it rather than reading it as empty,
+because an unreadable journal that read as "no override" would be
+indistinguishable from one an operator never wrote. A write that cannot be made
+durable is a failure and leaves nothing in force.
+
+*What the links do not detect, named with the mechanism (constitution VIII).*
+Removing the last lines, which could delete a revocation, and deleting the
+whole file, which reads as no override, leave nothing to verify against. The
+journal is in the product home, which spec `004` section 3.6 already names as
+reachable by the same operating-system user; closing that is `F-09`'s.
+
+*A torn last line.* A final line with no line break is a write that did not
+complete, as a torn tail is for the run record (section 3.8). It is not in
+force, `override show` reports it, and the next grant or revocation truncates it
+before appending. It is never read as a grant or a revocation.
 
 **Rule 4: scope.** An override admits one spec id, in one repository, past the
 lifecycle policy, and nothing else. It does not change the spec's status,
@@ -259,8 +271,9 @@ binding or any refusal in specs `002`, `004` or `005`. An override in one
 repository is not read for any other repository, including one whose corpus
 has a spec with the same id.
 
-**Rule 5: what an attempt records.** An attempt's intent records how the spec
-was admitted: `policy` with the policy's source (`declared` or `defaulted`)
+**Rule 5: what an attempt records.** An attempt's intent in the run record
+(section 3.3's intent entry, not a launch's `intent.json`, which is spec
+`002`'s) records how the spec was admitted: `policy` with the policy's source (`declared` or `defaulted`)
 when the policy admitted it, and `override` with the spec id, the operator as
 supplied, the reason, the grant's time and the digest of the grant's journal
 line when an override did. `run show` and `run list` render it. An intent
@@ -272,6 +285,15 @@ is never read as `defaulted` and never as admitted by an override.
 reason and `run` refuses it. A revocation restores that refusal for later
 invocations. Attempts already recorded keep the override they recorded.
 
+**Rule 7: the repository lock.** `run` holds an exclusive advisory lock on
+one lock file per repository in this product's home, beside the run record,
+from before it appends an intent until after its outcome is durable. The
+operating system releases the lock when the process holding it ends, however it
+ends; nothing infers anything about an effect from that. `override grant` and
+`override revoke` take the same lock and refuse, writing nothing, while
+another process holds it, so the journal never changes while an attempt is
+supervised. Sections 3.5.1 and 3.6.1 use the same lock.
+
 **Acceptance.** Positive, through the binary in an isolated home: a draft is
 refused by default; after a grant, `work list` shows it admitted by the named
 override and `run` schedules it, and its intent records the override; `override
@@ -281,8 +303,10 @@ reason, for an unregistered repository or an unknown spec id, or duplicating
 one in force, is refused and writes nothing; a revocation of nothing is
 refused; an override in repository A does not admit the same id in repository
 B; an edited journal line refuses `run` rather than reading as no override; a
-spec the report does not name as ready is not scheduled by an override; and an
-intent written before this section reads as not recorded.
+spec the report does not name as ready is not scheduled by an override; a
+grant while another process holds the repository lock is refused; a torn last
+line is reported and not in force; and an intent written before this section
+reads as not recorded.
 
 ### 3.2 Workspace preparation
 
