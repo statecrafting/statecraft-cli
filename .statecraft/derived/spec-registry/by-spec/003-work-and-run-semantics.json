@@ -25,9 +25,9 @@
     "id": "003-work-and-run-semantics",
     "implementation": "complete",
     "sectionDigests": {
-      "003-work-selection-workspace-preparation-the-run-record-and-recovery": "51890cca751716b338dd78f3f530268fec761543dd050fae5c488da91ab9f59d",
+      "003-work-selection-workspace-preparation-the-run-record-and-recovery": "26e17e48217681245260e54591844c65b3dfc9e7a5bfe1191d2379a97ddd7226",
       "1-purpose": "6e2e713486514a4371080ee9ad901b71b92b198ff8944d2cac7db353dfdd1ee6",
-      "2-territory": "4121de3baec5e1601d92c4ceff1afd3f7747b46fcf876415df5620a285c9c05a",
+      "2-territory": "f200d26f7fab70304d4ec5b21bbfba40301c0a2a5b38fc266d1d37da0f01b4a4",
       "3-1-1-ready-is-not-ratified": "e902124dba1a1dfc0ed218701ac4b36773d42c1359d537fe8dfce993379529fa",
       "3-1-2-two-reports-that-both-carry-status-read-from-one-state": "0722b17ba097b6735d32640f164f15f50c2fa2de195428e25a7dd0014c3a2d7a",
       "3-1-3-the-contract-an-attempt-is-bound-to": "6d3e8037f9525dd5346175188d538f8edc379a3e7e84fed79385efd9e07f7ac1",
@@ -71,6 +71,6 @@
     "summary": "The core loop's semantics. How a unit of work is identified by reading spec-spine's structured report rather than re-deriving it; how an isolated workspace is prepared so the operator's checkout is never edited; the append-only hash-linked run record with intent written before an effect and outcome after it; the closed outcome set (completed, failed, refused, interrupted, cancelled) and the rule that a retry appends an attempt rather than replacing history; supervisor-owned refusal accounting a supervised process cannot erase; and reconciliation of an ambiguous effect before any retry, with no exactly-once promise.\n",
     "title": "Work selection, workspace preparation, the run record, and recovery after interruption"
   },
-  "shardHash": "f6a9726fd5b5179110ae90d29034264595a068b5bf1978b6d90b0c1ea469b430",
+  "shardHash": "0e1997d3aab3ad817555ea375cde5d0c416a51df9147fb429d34ffea267cfde6",
   "specVersion": "1.6.0"
 }

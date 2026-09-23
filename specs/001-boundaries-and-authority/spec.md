@@ -71,7 +71,7 @@ outcome. It works on one machine, on one repository, with no account.
 
 | Capability | Owner | This product's relationship |
 |---|---|---|
-| Specification semantics, compilation, ownership analysis, freshness, verification contracts | spec-spine | Consumer of its supported commands and **its structured reports**. Never a second compiler, and never an ad-hoc read of `.derived/`. |
+| Specification semantics, compilation, ownership analysis, freshness, verification contracts | spec-spine | Consumer of its supported commands and **its structured reports**. Never a second compiler, and never an ad-hoc read of the derived tree (`.statecraft/derived/`, formerly `.derived/`). |
 | Application knowledge, recall, coordination semantics | aicortex | No dependency in the first slice. `005` places the interface out of scope; the narrow, optional, one-way boundary it would be is described in section 3.12, and implemented by neither side. |
 | Service chassis, identity, persistent cell enforcement | Rahi | Not a required local daemon, not a process sandbox, not a desktop framework. A future hosted backend consumes explicit contracts from this product. |
 | Ordered pure checks and decision composition | action-gate | Adapted at the boundary: this product supplies the required checks and the deny-by-default ceiling, because the library's own fallthrough is allow. |
@@ -110,6 +110,7 @@ age:
 | 2026-09-16 | `000` to `006` specified. `002` to `005` additionally **implemented and tested within their own territories**: four crates, 221 tests, and one integration test per row of each spec's observable-negative-cases table, named after the row it covers. `006` is ratified and not yet implemented, so the product is still not runnable. Nothing released. |
 | 2026-09-17 | `000` to `007` specified and approved. `002` to `007` additionally **implemented and tested within their own territories**: six crates, 320 tests, and 73 of 73 source files specifically claimed. For `002` to `006` the evidence is one integration test per row of each spec's observable-negative-cases table, named after the row it covers; `007` has no such table, and its acceptance is the compatibility suite of its section 3.4, which runs from two crates of this workspace, `statecraft-envelope` and `statecraft-acceptance`, and fails on each independently. That is a check within one implementation and not parity between two, so it claims nothing about a second reader. `006` is now implemented, so the product **is runnable as `statecraft-cli`**; what its verbs do is still bounded by the territories above. Nothing released; `F-02` defers publication and `crates/statecraft-envelope/` stays `publish = false`. |
 | 2026-09-21 | Seven specs, `000` to `006`, all specified and approved, after four pairs were consolidated into the spec that held each subject first. `002` to `006` additionally **implemented and tested**: eight crates, 683 tests, 117 of 117 source files specifically claimed, and 27 verbs bound in the binary. Measured with `make status`, `cargo test --workspace`, `spec-spine index coverage` and `statecraft-cli --help` on 2026-09-21. The consolidation changed no requirement and merged no crate, so no grade moves because of it. Nothing released; `F-02` defers publication and `crates/statecraft-envelope/` stays `publish = false`. |
+| 2026-09-23 | Seven specs, all approved. `002` is `in-progress`, not implemented: its local obligations are implemented and tested, and of the two live questions its section 3.33 separates, the managed-startup trial is `established` once and the permission experiment has no admitted result (`002` section 5, 2026-09-23). `003` to `006` implemented and tested; the workspace suite and `index coverage` are measured on each merge rather than restated here. Nothing released; `F-02` defers publication. |
 
 Each row is narrower than "the spec is implemented". The commands `002` to `005`
 name are not bound to a process by those crates, so the grade they claim is
@@ -211,7 +212,8 @@ proposes and neither side has built.
 
 | Component | State today | This product's relationship | Kind |
 |---|---|---|---|
-| spec-spine 0.20.0 | Implemented, released, installed locally at `.tooling/bin` | Invokes its supported commands, parses its structured reports | **actual dependency**, on a released binary |
+| spec-spine 0.23.0 (CLI; `=0.20.0` until 2026-09-23) | Implemented, released, installed locally at `.tooling/bin` | Invokes its supported commands, parses its structured reports | **actual dependency**, on a released binary |
+| `spec-spine-core` 0.21.0 | Implemented, released on crates.io | `scaffold_init_json`, the governance starter set `002` section 3.15 consumes | **actual dependency**, a library pinned `=0.21.0` in `crates/statecraft-home`, moved independently of the CLI pin; `002` section 5 records it as non-conforming |
 | `attest-ledger` 0.1.0 | Implemented, Apache-2.0 | Record envelope, chain hashing, verification | **actual dependency** as of 2026-09-19: `attest-ledger-core`, pinned to `a9c3595` in `crates/statecraft-run`. The disposition it was adopted under is the **reuse** row below. |
 | `canonical-keysort-json` 0.1.0 | Implemented, Apache-2.0, Rust only | Canonical serialization at the hashing boundary | **proposed reuse** |
 | `action-gate` 0.1.0 | Implemented, Apache-2.0 | Check composition only, with required checks and the deny ceiling supplied here | **proposed adaptation at the boundary** |
@@ -308,7 +310,7 @@ independent inspection, one reviewable outcome. **Publication is not part of it*
 |---|---|---|---|
 | 1 | `statecraft project register <path>` | 002 | A qualification verdict with reasons is recorded. Nothing is written inside the target. A non-git path is `unqualified`; a corpus-less repository is `ungoverned`. |
 | 2 | `statecraft env plan` then `env apply` | 002 | Managed bytes are written and recorded in a committed manifest with source and digest. A pre-existing user instruction file is left untouched and reported `foreign`. A second run is a no-op. |
-| 3 | `statecraft work list` | 003 | The ready set comes from spec-spine's structured report, with the field each row came from named. A target whose corpus does not compile refuses, rather than reading `.derived/` directly. |
+| 3 | `statecraft work list` | 003 | The ready set comes from spec-spine's structured report, with the field each row came from named. A target whose corpus does not compile refuses, rather than reading the derived tree directly. |
 | 4 | `statecraft run start --spec NNN` | 003, 004 | An isolated worktree is prepared from a recorded base commit; the operator's checkout is untouched. One adapter session runs under a constructed environment. Refusals are counted by the supervisor from the event stream. The attempt ends in exactly one of the five outcomes. |
 | 5 | `statecraft accept --run <id>` | 005 | The suite runs from instructions read **at the base**, over the candidate sha. A receipt is minted only on a clean tree with an unmoved HEAD. A candidate touching the authority set is reported as an authority change and is not accepted on its own suite. |
 | 6 | `statecraft run show <id>` | 005 | One account folded from the records, every value naming its record, the claim beside the independent result, each evidence dimension separately, and absence named as `none`, `not-recorded` or `stale`. |
@@ -328,7 +330,7 @@ table. Every verb takes the target path first and accepts `--json`.
 | 5 | `statecraft accept --run <id>` | `accept <path> <run-id>` |
 | 6 | `statecraft run show <id>` | `run show <path> <run-id>` |
 
-Spec `006` owns the surface and spec `009` bound steps 3 to 6. Nothing in the
+Spec `006` owns the surface and spec `009`, since folded into `006`, bound steps 3 to 6. Nothing in the
 right-hand column revises what the step must make observably true, and the
 acceptance below is untouched.
 
@@ -438,6 +440,31 @@ same defect pointing the other way. The rule this spec now holds: an ordinal is
 read together with the sentence that says whose it is, and a spec-spine ordinal
 is trusted only from `registry list` or the corpus map. AGENTS.md carries the
 operational form.
+
+**2026-09-23: stale references reconciled, and nothing required changed.** The
+2026-09-23 audit found references that were true when written and are not now.
+The fixes in this change are:
+
+- `.derived/` named where `002` section 3.19 moved the tree;
+- `009` named as a live spec;
+- the library dependency `spec-spine-core` missing from the component table;
+- the grade table stopping at a row that called `002` implemented;
+- the decision record's pre-renumbering spec-spine ordinals and its "no verb
+  runs `spec-spine delta`".
+
+Each is corrected in place where it was a current claim, or by an appended,
+dated note where it records what was read at the time. The same pass corrected
+cross-references in `002` to `006` and in `AGENTS.md`, and spec `000`'s own
+stale descriptions ("contains no product code", `.derived/`, "none is
+implemented"). Those are editorial: spec `000`'s section 5 says an anchor
+forbids contradiction and leaves ordinary editorial amendment available, and
+no anchored principle changes.
+
+**2026-09-23: the CLI pin moves to `=0.23.0`, with its `D-06` record.** The
+record is `D-06`'s dated entry in the decision record, and editing that record
+is a change to this spec's territory, so it is noted here. The component table
+names the new pin. The library row still reads `0.21.0`, because that
+dependency moves in its own change under spec `002`.
 
 ## Verification
 

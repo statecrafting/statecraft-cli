@@ -20,7 +20,7 @@
     "id": "005-acceptance-and-evidence",
     "implementation": "complete",
     "sectionDigests": {
-      "005-independent-acceptance-the-receipt-the-evidence-dimensions-and-the-envelope": "3410500249474965dd0719dea08e799cd323d17444758a6c2d898e38dad2d0ea",
+      "005-independent-acceptance-the-receipt-the-evidence-dimensions-and-the-envelope": "8ad80a437c94b55ce92c0b7745bab333a9eda24ecb2dc6b45c9b22f5965ab68e",
       "1-purpose": "1e83a18b7efb0bd0936e628cee0e8229ae71f51ca31b33142d0d4cf783896da8",
       "2-territory": "f9d6ce9ea66ef5a9886e38b1ff14df7b5124c6111f042a468679d38930581a1d",
       "3-1-1-which-outcomes-are-even-eligible": "9326d3e4ad2540938327f4131ec41afc880ecb733f592aae8faacff8c11d5388",
@@ -49,7 +49,7 @@
       "3-behavior": "55730ec9fa021b689602f793b2259662108057bb87e1d314d38232e062a9b49b",
       "4-out-of-scope": "328e6543fcfd8ae8ffb71f70d8c9cfb7e90e0bbaf1c611d43eb43c40fbf150f3",
       "5-decisions-recorded-during-implementation": "1b9a6f482334ec12a463033240462dfee32bf93cca0e7829110c60d2e0df5f53",
-      "verification": "6bfffac2b0c39bbd6e3fb267bbd4bdc2176930d5c6bf9f7e8cf20adbb53435ee"
+      "verification": "497d66613a5622ffd6a09d95869fa4080d6a7bea15d2defb722afc90976239c1"
     },
     "sectionHeadings": [
       "005: Independent acceptance, the receipt, the evidence dimensions, and the envelope",
@@ -88,6 +88,6 @@
     "summary": "How a claim of completion becomes, or fails to become, an acceptance. Fixes the identification of candidate bytes and the trusted base, the authority-set rule that stops a candidate from being judged by rules it wrote, the receipt that binds repository, base, candidate, suite, exit codes and policy digest, the four evidence dimensions reported separately from admission with closed value sets, independently supplied trust roots, the preservation of original bytes and named hash constructions, and the three names for absence, none of which reads as success. It also owns the envelope crate the statecraft platform wrote against these serializations and transferred here, which makes one owner for the reference, the dimensions, admission and the absence words rather than two implementations of one wire format.\n",
     "title": "Independent acceptance, the receipt, the separately reported evidence dimensions, and the envelope two products exchange"
   },
-  "shardHash": "29606498316368749c2cc756bae213d02d0ef0aed8a658ef453787c79800246e",
+  "shardHash": "8feb77f4c2c43669c81b1702d7bee1129f172f30c40634c5d76e6557ac89b4cf",
   "specVersion": "1.6.0"
 }

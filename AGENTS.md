@@ -21,7 +21,8 @@ it, and the coverage gate refuses an unclaimed source file.
    table that decides what is schedulable.
 4. `specs/NNN-slug/spec.md`: ordinary specs.
 5. `docs/decisions/00-founding-decisions.md`: what is intent, what is inherited,
-   what is proposed. Nothing in its section 3 is adopted.
+   what is proposed. A row of its section 3 binds only once its section 5
+   records the adoption; its opening paragraph says which have been.
 
 `.statecraft/derived/` is compiler output. Never hand-edit it, and never parse
 it with `jq`, `sed` or `awk`: read it through `spec-spine` subcommands, which
@@ -35,7 +36,7 @@ Read before working. None of these writes.
 
 ```sh
 make tools                                # install the pinned spec-spine locally
-.tooling/bin/spec-spine --version         # must satisfy the =0.20.0 pin
+.tooling/bin/spec-spine --version         # must satisfy the =0.23.0 pin
 make gate                                 # the whole read-only corpus surface
 make status                               # version, lifecycle counts, schedulable set
 git log --oneline -10
@@ -46,12 +47,14 @@ Run `spec-spine` through `make`, or as `.tooling/bin/spec-spine`. A bare
 this machine replaces, and this repository has been governed by the wrong
 version that way more than once. `make` prefers the local binary automatically.
 
-**Exit 2 means stale, and only stale, under the pinned 0.20.0.** A claim that
+**Exit 2 means stale, and only stale, under the pin** (0.20.0, and 0.23.0 since
+2026-09-23). A claim that
 cannot be resolved exits **1**, the validation code, because it is a corpus that
 does not describe its tree rather than a ledger that has fallen behind:
 re-indexing cannot cure it, and `refresh` against it produces shards that say the
-same thing. spec-spine's specs 079 and 080 separate the two readings, and 0.20.0
-carries both (`C-16`). Under the previous 0.18.0 pin both conditions exited 2 and
+same thing. spec-spine's specs 079 and 080 separate the two readings; 0.20.0
+carries both (`C-16`), and an unresolved claim was measured exiting 1 again under
+0.23.0 on 2026-09-23. Under the previous 0.18.0 pin both conditions exited 2 and
 the message was the only way to tell them apart.
 
 Read the message anyway. The codes are now distinct, so exit 1 from `check` sends
@@ -68,15 +71,19 @@ build it.** Verified against 0.18.0 on 2026-09-16, and re-verified against
 0.20.0 on 2026-09-17 by forcing one spec to `draft` plus `pending` in a scratch
 worktree: the lifecycle table makes that combination schedulable, so `plan`
 names a spec the owner has not agreed to exactly as it names one the owner has.
-`plan --json` still carries only `id` and `title`, which is why spec `003`
-section 3.1.1 joins it with `registry list --json` to read `status`. What `draft` withholds is
+Under 0.23.0 each `plan --json` ready row also carries `status` (spec-spine's
+102, which keeps readiness as scheduling, not approval), and spec `003` section
+3.1.2 compares it with `registry list --json`, which is still the only report
+carrying `implementation`, so the join stays. What `draft` withholds is
 *ratification*, which is why an unratified spec's unresolved units warn instead
 of refusing.
 
 All seven specs, `000` to `006`, are ratified, so what `plan` offers is a real
-work order. Today it offers nothing (measured 2026-09-21 with `make status`: 7
-specs, 0 ready, 0 blocked). The next `draft` written here will be offered as
-ready anyway; check the `status` field, not the plan output.
+work order. Measured 2026-09-23 with `make status`: 7 specs, 1 ready, 0 blocked.
+The ready one is `002`, `approved` with `implementation: in-progress`, because
+its live permission experiment has no admitted result, which no local
+implementation work can supply (spec `002` section 5, 2026-09-23). The next `draft` written here will be offered as ready
+anyway; check the `status` field, not the plan output.
 
 spec-spine does not enforce the difference, so this repository does. Until the
 owner ratifies a spec (see Approval semantics), `plan` naming it is a reading

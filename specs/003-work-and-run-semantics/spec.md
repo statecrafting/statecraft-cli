@@ -47,7 +47,7 @@ constitution IX exists to prevent.
 
 ## 2. Territory
 
-`crates/statecraft-run/` (forward claim; unresolved until implemented).
+`crates/statecraft-run/`, written and resolved.
 
 ## 3. Behavior
 
