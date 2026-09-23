@@ -351,7 +351,7 @@ two files that happened to be written there.
 | `delivery.json` | What each native-discovery adapter was asked to deliver, where, and what the delivery check observed. | this spec |
 | `approvals/` | Local approval records, one file per project. | this spec |
 | `projects.json` | The register of targets. | `002`, unchanged |
-| `qualifications.json` | Provider qualification records. | `008`, unchanged |
+| `qualifications.json` | Provider qualification records. | `004` (which absorbed `008`), unchanged |
 
 Three rules the shape has to keep:
 

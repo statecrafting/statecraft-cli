@@ -110,7 +110,6 @@ age:
 | 2026-09-16 | `000` to `006` specified. `002` to `005` additionally **implemented and tested within their own territories**: four crates, 221 tests, and one integration test per row of each spec's observable-negative-cases table, named after the row it covers. `006` is ratified and not yet implemented, so the product is still not runnable. Nothing released. |
 | 2026-09-17 | `000` to `007` specified and approved. `002` to `007` additionally **implemented and tested within their own territories**: six crates, 320 tests, and 73 of 73 source files specifically claimed. For `002` to `006` the evidence is one integration test per row of each spec's observable-negative-cases table, named after the row it covers; `007` has no such table, and its acceptance is the compatibility suite of its section 3.4, which runs from two crates of this workspace, `statecraft-envelope` and `statecraft-acceptance`, and fails on each independently. That is a check within one implementation and not parity between two, so it claims nothing about a second reader. `006` is now implemented, so the product **is runnable as `statecraft-cli`**; what its verbs do is still bounded by the territories above. Nothing released; `F-02` defers publication and `crates/statecraft-envelope/` stays `publish = false`. |
 | 2026-09-21 | Seven specs, `000` to `006`, all specified and approved, after four pairs were consolidated into the spec that held each subject first. `002` to `006` additionally **implemented and tested**: eight crates, 683 tests, 117 of 117 source files specifically claimed, and 27 verbs bound in the binary. Measured with `make status`, `cargo test --workspace`, `spec-spine index coverage` and `statecraft-cli --help` on 2026-09-21. The consolidation changed no requirement and merged no crate, so no grade moves because of it. Nothing released; `F-02` defers publication and `crates/statecraft-envelope/` stays `publish = false`. |
-
 | 2026-09-23 | Seven specs, all approved. `002` is `in-progress`, not implemented: its local obligations are implemented and tested, and of the two live questions its section 3.33 separates, the managed-startup trial is `established` once and the permission experiment has no admitted result (`002` section 5, 2026-09-23). `003` to `006` implemented and tested; the workspace suite and `index coverage` are measured on each merge rather than restated here. Nothing released; `F-02` defers publication. |
 
 Each row is narrower than "the spec is implemented". The commands `002` to `005`
@@ -455,9 +454,11 @@ The fixes in this change are:
 
 Each is corrected in place where it was a current claim, or by an appended,
 dated note where it records what was read at the time. The same pass corrected
-cross-references in `002` to `006` and in `AGENTS.md`. Spec `000`'s own stale
-descriptions ("holds no product code", `.derived/`) are **not** edited, because
-its section 1 carries an unamendable anchor. Amending them is the owner's act.
+cross-references in `002` to `006` and in `AGENTS.md`, and spec `000`'s own
+stale descriptions ("contains no product code", `.derived/`, "none is
+implemented"). Those are editorial: spec `000`'s section 5 says an anchor
+forbids contradiction and leaves ordinary editorial amendment available, and
+no anchored principle changes.
 
 ## Verification
 

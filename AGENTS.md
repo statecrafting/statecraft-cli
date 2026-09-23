@@ -77,9 +77,8 @@ of refusing.
 All seven specs, `000` to `006`, are ratified, so what `plan` offers is a real
 work order. Measured 2026-09-23 with `make status`: 7 specs, 1 ready, 0 blocked.
 The ready one is `002`, `approved` with `implementation: in-progress`, because
-its live permission experiment has no admitted result and the published
-producer is not conforming; neither is local implementation work (spec `002`
-section 5, 2026-09-23). The next `draft` written here will be offered as ready
+its live permission experiment has no admitted result, which no local
+implementation work can supply (spec `002` section 5, 2026-09-23). The next `draft` written here will be offered as ready
 anyway; check the `status` field, not the plan output.
 
 spec-spine does not enforce the difference, so this repository does. Until the

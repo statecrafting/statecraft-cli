@@ -740,7 +740,9 @@ contract, and a compatibility fixture is the only mechanism this repository
 supports for an unreleased one. (Superseded in part by later entries: 102's
 cross-check is `003` section 3.1.2 and 107's closure binding is `003` section
 3.1.3, both implemented and both inert until a pinned producer carries them;
-103 and 106 are still not consumed.)
+103 and 106 are not consumed at run time; `003` section 5 records an ignored
+test that replays 103's fixtures only as evidence about a named producer
+build.)
 
 **2026-09-22: `startup trial`, recorded before its binding.** Section
 3.11.4 adds the eighth verb and the trial section of `startup show`, for `002`

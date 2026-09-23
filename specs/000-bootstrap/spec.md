@@ -10,9 +10,9 @@ summary: >
   Foundational contract for this repository: authored truth lives only in
   markdown (+ YAML frontmatter); machine-consumable truth is compiler-emitted
   JSON only; every artifact is a deterministic function of (config, file
-  contents); a typed authority graph governs who-owns-what. This repository is
-  born governed and currently holds no product code: the corpus exists before
-  the first line is written, and no spec here may claim otherwise.
+  contents); a typed authority graph governs who-owns-what. This repository was
+  born governed: the corpus existed before the first line of product code, and
+  no spec here may claim code that does not exist.
 # The corpus documents that restate this spec. The contract is this spec's
 # normative summary (constitution, normative hierarchy, tier 3), the templates
 # are the shape it requires of an ordinary spec, and constitution principles I
@@ -49,18 +49,21 @@ unamendable:
 This is the spec that defines what a spec *is* in this repository. Every later
 spec, and the constitution, sit underneath it.
 
-This repository was created on 2026-09-16 and contains no product code.
+This repository was created on 2026-09-16 with no product code. The crates it
+holds now were written afterwards, each under the spec that claims it.
 
 **Why `origin.retroactive` is absent.** The scaffolded template carries
 `origin.retroactive: true` for a corpus adopting code that predates the graph.
 No code predates this graph, so the key would assert a history that does not
 exist. Constitution V (legacy as evidence) therefore has no subject here yet,
-and a spec that claims territory does so as a forward claim whose units are
-expected to be unresolved until the implementing change lands.
+and a spec that claimed territory did so as a forward claim whose units were
+expected to be unresolved until the implementing change landed. None is
+forward today, and the gate now refuses one.
 
 ## 1. The authoring / derived boundary
 
-Humans author markdown; the compiler owns the JSON under `.derived/`. A derived
+Humans author markdown; the compiler owns the JSON under `.statecraft/derived/`
+(`.derived/` until spec `002` section 3.19 moved it). A derived
 artifact is never hand-edited, and it is read only through `spec-spine`
 subcommands, never by parsing the JSON directly. Anchor:
 `markdown-truth-boundary`, `json-truth-boundary`.
@@ -121,7 +124,7 @@ never will.
 
 Each line below is one command; no line may depend on a variable another set.
 These assert the corpus's own shape, which exists today. They assert nothing
-about product behavior, because none is implemented.
+about product behavior, which specs `002` to `006` verify.
 
 The last three lines of the previous revision were written inverted, asserting that the three product
 anchors were **absent** and that the constitution carried no freeze marker. That
