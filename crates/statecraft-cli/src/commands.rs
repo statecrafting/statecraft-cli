@@ -84,6 +84,8 @@ pub enum Verb {
     StartupQualify,
     /// `startup show <path> <run-id> [--attempt <n>]`
     StartupShow,
+    /// `startup trial <path> (--provider-session | --synthetic) [--deadline <s>]`
+    StartupTrial,
     /// `--help`, optionally with a group or a verb as its topic.
     ///
     /// Not part of the command tree: [`Verb::all`] lists the operations, and a
@@ -130,6 +132,7 @@ impl Verb {
             Verb::StartupCapture => "startup capture",
             Verb::StartupQualify => "startup qualify",
             Verb::StartupShow => "startup show",
+            Verb::StartupTrial => "startup trial",
             Verb::Help => "--help",
         }
     }
@@ -182,7 +185,10 @@ impl Verb {
             // settings.
             | Verb::StartupCapture
             | Verb::StartupQualify
-            | Verb::StartupShow => "002-environment-lifecycle",
+            | Verb::StartupShow
+            // Spec 006 section 3.11.4: the managed-startup trial of 002
+            // section 3.33.
+            | Verb::StartupTrial => "002-environment-lifecycle",
             Verb::Help => "006-command-surface",
         }
     }
@@ -191,7 +197,7 @@ impl Verb {
     ///
     /// [`Verb::Help`] is deliberately absent: it is not an operation, and a
     /// usage error listing it would offer help as a thing to do.
-    pub fn all() -> [Verb; 34] {
+    pub fn all() -> [Verb; 35] {
         [
             Verb::ProjectRegister,
             Verb::ProjectList,
@@ -227,6 +233,7 @@ impl Verb {
             Verb::StartupCapture,
             Verb::StartupQualify,
             Verb::StartupShow,
+            Verb::StartupTrial,
         ]
     }
 
@@ -278,6 +285,7 @@ impl Verb {
             ("startup", Some("capture")) => Some((Verb::StartupCapture, 2)),
             ("startup", Some("qualify")) => Some((Verb::StartupQualify, 2)),
             ("startup", Some("show")) => Some((Verb::StartupShow, 2)),
+            ("startup", Some("trial")) => Some((Verb::StartupTrial, 2)),
             _ => None,
         }
     }

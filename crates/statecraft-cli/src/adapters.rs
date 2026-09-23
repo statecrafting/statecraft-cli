@@ -99,15 +99,26 @@ pub fn records(home: &Path) -> Vec<PairedRecord> {
 /// Built from the constructed child environment, so "is the provider resolvable"
 /// is asked of what the child would actually get and not of this process.
 pub fn probe(home: &Path) -> provider::ConstructedEnvironmentProbe {
+    probe_reporting_version(home).0
+}
+
+/// [`probe`], and the version its one `--version` call reported, for a caller
+/// that records it (spec 002 section 3.33 rule 34). The same single call: the
+/// trial's budget counts it once.
+pub fn probe_reporting_version(
+    home: &Path,
+) -> (provider::ConstructedEnvironmentProbe, Option<String>) {
     let environment = child_environment();
     let mut probe =
         provider::ConstructedEnvironmentProbe::from_child_environment(&environment.variables);
+    let mut observed = None;
     if let Some(executable) = probe.resolved_executable() {
         if let Some(version) = provider::observe_provider_version(&executable) {
             probe = probe.observing_provider_version(&version);
+            observed = Some(version);
         }
     }
-    probe.with_records(records(home))
+    (probe.with_records(records(home)), observed)
 }
 
 /// The pins a first `env apply` records in the manifest.

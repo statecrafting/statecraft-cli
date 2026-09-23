@@ -625,6 +625,11 @@ fn make_executable(_: &Path) -> std::io::Result<()> {
 }
 
 /// Sixteen bytes from the operating system's generator, as hex.
+/// A fresh nonce, for anything in this crate that binds one launch.
+pub(crate) fn fresh_nonce() -> std::io::Result<String> {
+    nonce()
+}
+
 fn nonce() -> std::io::Result<String> {
     use std::io::Read;
     let mut bytes = [0u8; 16];
@@ -638,7 +643,7 @@ fn nonce() -> std::io::Result<String> {
 /// then hard-linked to the final name. The link is the exclusive step: it
 /// fails if the name exists, and a reader never sees half a file. A rename
 /// would replace an existing file, which is the one thing this must not do.
-fn write_once(path: &Path, contents: &str) -> std::io::Result<()> {
+pub(crate) fn write_once(path: &Path, contents: &str) -> std::io::Result<()> {
     let parent = path.parent().ok_or_else(|| {
         std::io::Error::new(std::io::ErrorKind::InvalidInput, "a record needs a parent")
     })?;
@@ -1777,6 +1782,10 @@ pub struct AttemptStartup {
     /// What the operator should do next, where the records leave something to
     /// do.
     pub next: Option<String>,
+    /// The managed-startup trial's record and its judgement recomputed from
+    /// disk, where this attempt is a trial (section 3.33 rule 34).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub trial: Option<crate::trial::Reloaded>,
 }
 
 impl AttemptStartup {
@@ -1900,6 +1909,9 @@ impl AttemptStartup {
         if let Some(next) = &self.next {
             out.push_str(&format!("next      {next}\n"));
         }
+        if let Some(trial) = &self.trial {
+            out.push_str(&trial.describe());
+        }
         out
     }
 }
@@ -1998,6 +2010,17 @@ pub fn inspect(
     let spawn = read_back.spawn();
     let (verdict, reasons) = judge(&read_back);
     let next = next_action(&read_back, verdict);
+    let trial = crate::trial::reload(
+        root,
+        &identity,
+        admission.as_ref(),
+        intent.as_ref().and_then(|i| i.required_harness.as_deref()),
+        verdict,
+    )
+    .map_err(|detail| NotRead::Unreadable {
+        path: crate::trial::path(root, &identity).display().to_string(),
+        detail,
+    })?;
     Ok(AttemptStartup {
         root: root.display().to_string(),
         attempt: identity,
@@ -2015,6 +2038,7 @@ pub fn inspect(
         verdict,
         reasons,
         next,
+        trial,
     })
 }
 

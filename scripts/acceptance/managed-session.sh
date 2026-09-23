@@ -1,13 +1,14 @@
 #!/bin/sh
 # The managed-session acceptance, as separately authorized stages.
 #
-# Spec 002 sections 3.24 to 3.30. Every step below is a command this script
+# Spec 002 sections 3.24 to 3.33. Every step below is a command this script
 # runs, every capture has a location, every exit status is preserved with its
 # meaning, and the product, not this script, constructs every provider
 # invocation and judges every capture.
 #
 #   sh scripts/acceptance/managed-session.sh preflight
 #   sh scripts/acceptance/managed-session.sh permission-experiment
+#   sh scripts/acceptance/managed-session.sh managed-startup
 #   sh scripts/acceptance/managed-session.sh coexistence
 #   sh scripts/acceptance/managed-session.sh clean
 #
@@ -31,6 +32,23 @@
 #                          Refuses unless APPROVED_PROVIDER_SESSION=yes.
 #                          Activates nothing in the real home: every launch
 #                          carries its settings on its own command line.
+#                          Starts NO run and registers NO hook, so it says
+#                          nothing about managed startup (section 3.33).
+#
+#   managed-startup        Spawns the provider through the RUN PATH: exactly
+#                          ONE session and ONE version probe, spent once per
+#                          fixture, the session bounded by $TRIAL_TIMEOUT
+#                          seconds (at most 300) and the whole verb by that
+#                          plus 120. Supplies the SessionStart hook and the
+#                          admission gate through --settings, asks for one
+#                          read of a sentinel file in the run's disposable
+#                          workspace, and judges whether the hook was
+#                          correlated before the decision and the read ran
+#                          only after admission (section 3.33). No retry and
+#                          no replay after an uncertain launch. Refuses unless
+#                          APPROVED_MANAGED_STARTUP_SESSION=yes, which is NOT
+#                          APPROVED_PROVIDER_SESSION: neither approves the
+#                          other. Activates nothing in the real home.
 #
 #   coexistence            Observes the real home. Needs the section 3.24
 #                          settings modification applied there, which is its
@@ -42,11 +60,12 @@
 # THE LOCAL TEST ROUTE.
 #
 #   SC_ACCEPTANCE_FAKE_PROVIDER=<executable> runs the permission-experiment
-#   stage's whole control flow against a local fake instead of the provider.
-#   It never reads the provider approval, refuses to run if that approval is
-#   also set, marks every capture synthetic (spec 002 section 3.30), and
-#   reports its result as SYNTHETIC. A synthetic result is never a live
-#   observation and nothing downstream treats it as one.
+#   or the managed-startup stage's whole control flow against a local fake
+#   instead of the provider. It never reads a provider approval, refuses to
+#   run if one is also set, marks every capture and trial synthetic (spec 002
+#   sections 3.30 and 3.33), and reports its result as SYNTHETIC. A synthetic
+#   result is never a live observation and nothing downstream treats it as
+#   one.
 #
 # WHAT AN ADMITTED LIVE RESULT ESTABLISHES, AND WHAT IT DOES NOT.
 #
@@ -81,6 +100,9 @@ REPO="$(CDPATH='' cd -- "$(dirname -- "$0")/../.." && pwd)"
 
 # The per-session deadline, in seconds, handed to the product's own supervisor.
 STEP_TIMEOUT="${STEP_TIMEOUT:-300}"
+# The managed-startup trial's session deadline, in seconds; the product
+# refuses more than 300.
+TRIAL_TIMEOUT="${TRIAL_TIMEOUT:-120}"
 # The bound on each local step (the build, and each product verb).
 LOCAL_TIMEOUT="${LOCAL_TIMEOUT:-900}"
 # The provider, as named on PATH or by path.
@@ -367,8 +389,9 @@ FAKE
   printf 'cli %s\n' "$CLI" >"$ACC/preflight.ok"
   say ""
   say "preflight: every precondition holds. Steps are recorded in $CAPTURE."
-  say "The permission experiment needs APPROVED_PROVIDER_SESSION=yes, and"
-  say "nothing in this stage is that approval."
+  say "The permission experiment needs APPROVED_PROVIDER_SESSION=yes; the"
+  say "managed-startup trial needs APPROVED_MANAGED_STARTUP_SESSION=yes. Neither"
+  say "implies the other, and nothing in this stage is either approval."
 }
 
 # --------------------------------------------------- the permission experiment
@@ -481,6 +504,110 @@ permission_experiment() {
   esac
 }
 
+# ------------------------------------------------ the managed-startup trial
+#
+# SEPARATE from the permission experiment, which starts no run (spec 002
+# section 3.33). One `startup trial`: the product's run path, with the
+# required revision's SessionStart hook and the attempt's admission gate in
+# the settings it passes, a prompt asking for one Read of a sentinel file in
+# the run's own workspace, and the judgement the product computes. This script
+# constructs nothing and judges nothing.
+#
+# WHY IT IS HARMLESS. The only tool the prompt asks for is Read, on a file the
+# launcher wrote into the run's disposable workspace under $ACC. If the model
+# does something else, the turn limit is 3 and the deadline is
+# $TRIAL_TIMEOUT seconds. Nothing is written to the real home.
+#
+# WHAT AN ESTABLISHED RESULT ESTABLISHES. On this machine and this provider
+# version: the startup hook supplied through --settings reported a response
+# carrying this attempt's binding before the decision point, and the read ran
+# after the decision admitted the attempt, through the gate. Not which process
+# printed the acknowledgment, not that a refused decision blocks a call (an
+# admitted trial never refuses), not anything about the deny floor, which is
+# the permission experiment's question, and not qualification.
+managed_startup() {
+  if [ -n "${SC_ACCEPTANCE_FAKE_PROVIDER:-}" ]; then
+    [ -z "${APPROVED_PROVIDER_SESSION:-}${APPROVED_MANAGED_STARTUP_SESSION:-}" ] \
+      || refuse "SC_ACCEPTANCE_FAKE_PROVIDER is set beside a provider approval. The local route never uses one; unset it"
+    [ -x "$SC_ACCEPTANCE_FAKE_PROVIDER" ] || refuse "the fake provider $SC_ACCEPTANCE_FAKE_PROVIDER is not an executable"
+    need_preflight
+    flag=--synthetic
+    origin=synthetic
+    trialbin="$ACC/trialbin"
+    mkdir -p "$trialbin"
+    cp "$SC_ACCEPTANCE_FAKE_PROVIDER" "$trialbin/claude" && chmod 700 "$trialbin/claude" \
+      || fail "the fake could not be installed in $trialbin"
+    cp "$REPO/crates/statecraft-adapter-claude-code/testdata/stream/success.jsonl" "$trialbin/native.jsonl" \
+      || fail "the recorded stream could not be copied"
+    trialpath="$trialbin:/usr/bin:/bin"
+    say "LOCAL TEST ROUTE: $SC_ACCEPTANCE_FAKE_PROVIDER is a fake. The trial is SYNTHETIC."
+  else
+    [ "${APPROVED_MANAGED_STARTUP_SESSION:-}" = "yes" ] \
+      || refuse "this stage spawns ONE paid provider session through the run path. Re-run with APPROVED_MANAGED_STARTUP_SESSION=yes once the owner has approved THIS stage. APPROVED_PROVIDER_SESSION does not approve it, and approving it approves no other stage."
+    need_preflight
+    flag=--provider-session
+    origin=provider-session
+    # The run path resolves `claude` on the child's PATH, as `run` does.
+    case "$PROVIDER" in
+      */claude) [ -x "$PROVIDER" ] || refuse "$PROVIDER is not an executable"
+                trialpath="$(dirname -- "$PROVIDER"):$PATH" ;;
+      claude) command -v claude >/dev/null 2>&1 || refuse "claude does not resolve on PATH"
+              trialpath="$PATH" ;;
+      *) refuse "the run path resolves the provider as \`claude\`; PROVIDER must be claude or a path ending in /claude" ;;
+    esac
+  fi
+  [ ! -e "$ACC/trial-result" ] \
+    || refuse "a trial happens once per fixture, and $ACC/trial-result exists. Run the preflight again for a fresh one"
+
+  step "Trial: session 1 of at most 1, one version probe, deadline ${TRIAL_TIMEOUT}s"
+  bounded 30-trial "$((TRIAL_TIMEOUT + 120))" env PATH="$trialpath" STATECRAFT_HOME="$HOME_DIR" \
+    STATECRAFT_NATIVE_ROOT="$NATIVE_DIR" "$CLI" startup trial "$PROJECT" "$flag" --deadline "$TRIAL_TIMEOUT" --json
+  trial="$RAN"
+
+  step "Reload: every record read back and judged again"
+  bounded 31-trial-show "$LOCAL_TIMEOUT" env PATH="$trialpath" STATECRAFT_HOME="$HOME_DIR" \
+    STATECRAFT_NATIVE_ROOT="$NATIVE_DIR" "$CLI" startup show "$PROJECT" statecraft-startup-trial
+  verdict="$(sed -n 's/^trial     \([a-z-]*\) .*/\1/p' "$CAPTURE/31-trial-show.out" | head -n 1)"
+  if grep -q '^  RELOAD' "$CAPTURE/31-trial-show.out" 2>/dev/null; then
+    fail "the trial's judgement read back from disk differs from the one written; see $CAPTURE/31-trial-show.out"
+  fi
+
+  step "The fixture project, after"
+  if [ -n "$(git -C "$PROJECT" status --porcelain)" ]; then
+    git -C "$PROJECT" status --porcelain | sed 's/^/  /'
+    printf '%s-project-changed\n' "$origin" >"$ACC/trial-result"
+    finding "the project changed during the trial; the records are kept under $PROJECT/.statecraft/state"
+  fi
+
+  say ""
+  case "$trial" in
+    0)
+      printf '%s-established\n' "$origin" >"$ACC/trial-result"
+      if [ "$origin" = synthetic ]; then
+        say "ESTABLISHED (SYNTHETIC). The product's run path ran against a local fake"
+        say "that honors the registration. A statement about the procedure, not about"
+        say "any provider."
+      else
+        say "ESTABLISHED. See $CAPTURE/31-trial-show.out. Version specific, and not a"
+        say "qualification; the permission experiment's question is untouched."
+      fi
+      ;;
+    1)
+      printf '%s-%s\n' "$origin" "${verdict:-unread}" >"$ACC/trial-result"
+      say "The trial is ${verdict:-unread}. Its reasons are in $CAPTURE/31-trial-show.out,"
+      say "and its records are kept. It is spent: there is no retry."
+      finding "the managed-startup trial is ${verdict:-unread}"
+      ;;
+    2) refuse "the trial was refused before anything was launched: $(cat "$CAPTURE/30-trial.out")" ;;
+    4) fail "the trial's records could not be written or read back; see $CAPTURE/30-trial.out" ;;
+    "")
+      printf '%s-launcher-stopped\n' "$origin" >"$ACC/trial-result"
+      finding "the trial verb did not end by itself ($(cat "$CAPTURE/30-trial.status")); what its records establish is in $CAPTURE/31-trial-show.out, and there is no retry"
+      ;;
+    *) fail "the trial verb answered $(cat "$CAPTURE/30-trial.status"), which it does not document" ;;
+  esac
+}
+
 # --------------------------------------------------- the coexistence experiment
 #
 # SEPARATE, and not run by anything in this repository's checks. It runs the
@@ -551,6 +678,7 @@ clean() {
 case "${1:-}" in
   preflight) preflight ;;
   permission-experiment) permission_experiment ;;
+  managed-startup) managed_startup ;;
   coexistence) coexistence ;;
   clean) clean ;;
   *)
@@ -559,6 +687,8 @@ usage: sh scripts/acceptance/managed-session.sh <stage>
 
   preflight              local only, no provider, no approval needed
   permission-experiment  up to three provider sessions; needs APPROVED_PROVIDER_SESSION=yes
+  managed-startup        one provider session through the run path; needs
+                         APPROVED_MANAGED_STARTUP_SESSION=yes
   coexistence            observes the real home; needs APPROVED_REAL_HOME_COEXISTENCE=yes
   clean                  removes \$ACC, only if this script created it
 
@@ -567,10 +697,11 @@ Each stage is a separate approval. Approving one does not approve another.
 Environment:
   ACC=<dir>                           where everything is created (default \$TMPDIR/sc-accept)
   CLI=<path>                          a built statecraft-cli to use instead of building one
-  STEP_TIMEOUT=<s>                    per provider session (default 300)
+  STEP_TIMEOUT=<s>                    per permission-experiment session (default 300)
+  TRIAL_TIMEOUT=<s>                   the managed-startup session (default 120, at most 300)
   LOCAL_TIMEOUT=<s>                   per local step (default 900)
   PROVIDER=<name>                     the provider binary (default claude)
-  SC_ACCEPTANCE_FAKE_PROVIDER=<path>  the local test route: a fake, every capture synthetic
+  SC_ACCEPTANCE_FAKE_PROVIDER=<path>  the local test route: a fake, everything synthetic
 USAGE
     exit 3
     ;;

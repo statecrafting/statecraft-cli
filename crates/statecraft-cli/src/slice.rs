@@ -742,3 +742,94 @@ mod tests {
         assert!(a.summary.contains("nope"));
     }
 }
+
+/// Why `startup trial` refused before an attempt was appended (spec 006
+/// section 3.11.4, exit 2).
+pub fn trial_refused_answer(reason: &str) -> Answer<serde_json::Value> {
+    Answer::new(
+        serde_json::json!({ "operation": "trial-refused", "reason": reason }),
+        Exit::Refused,
+        format!("startup trial refused: {reason}\nNothing was launched.\n"),
+    )
+}
+
+/// What `startup trial` answers once its attempt is concluded.
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TrialView {
+    /// The trial's run.
+    pub run_id: String,
+    /// Its attempt.
+    pub attempt: u32,
+    /// The attempt's outcome.
+    pub outcome: String,
+    /// The attempt's startup records, read back, with the trial's section.
+    pub startup: Option<statecraft_home::launch::AttemptStartup>,
+    /// Why something was not stored or not read, where it was not.
+    pub not_stored: Option<String>,
+}
+
+/// Map a concluded trial onto spec 006 section 3.11.4's codes.
+pub fn trial_answer(
+    concluded: &Concluded,
+    shown: Result<statecraft_home::launch::AttemptStartup, statecraft_home::launch::NotRead>,
+    sentinel_placed: bool,
+    not_stored: Option<String>,
+) -> Answer<TrialView> {
+    use statecraft_home::trial::TrialVerdict;
+    let mut not_stored = not_stored;
+    let startup = match shown {
+        Ok(s) => Some(s),
+        Err(e) => {
+            not_stored.get_or_insert(format!("the trial's records could not be read back: {e}"));
+            None
+        }
+    };
+    let trial = startup.as_ref().and_then(|s| s.trial.as_ref());
+    if sentinel_placed && not_stored.is_none() {
+        match trial {
+            None => {
+                not_stored = Some("the trial's record was written and is not there".to_string());
+            }
+            Some(t) if !t.agrees => {
+                not_stored = Some(
+                    "the trial's judgement read back from disk differs from the one written"
+                        .to_string(),
+                );
+            }
+            Some(_) => {}
+        }
+    }
+    let exit = match (&not_stored, trial.map(|t| t.judgement.verdict)) {
+        (Some(_), _) => Exit::Failed,
+        (None, Some(TrialVerdict::Established)) => Exit::Ok,
+        _ => Exit::Finding,
+    };
+    let mut summary = format!(
+        "startup trial: run {} attempt {}: {}\n",
+        concluded.run_id,
+        concluded.attempt,
+        concluded.outcome.word()
+    );
+    if !sentinel_placed {
+        summary
+            .push_str("  no sentinel was placed and no session was started; the trial is spent\n");
+    }
+    if let Some(s) = &startup {
+        summary.push_str(&s.describe());
+    }
+    if let Some(why) = &not_stored {
+        summary.push_str(&format!("NOT STORED: {why}\n"));
+    }
+    Answer::new(
+        TrialView {
+            run_id: concluded.run_id.clone(),
+            attempt: concluded.attempt,
+            outcome: concluded.outcome.word().to_string(),
+            startup,
+            not_stored,
+        },
+        exit,
+        summary,
+    )
+}

@@ -395,6 +395,7 @@ fn the_grown_command_tree_still_has_no_verb_that_publishes() {
     // startup acts reachable; one more with section 3.11.2's `startup capture`,
     // the launch that binds a qualification control to its settings; and one
     // more with section 3.11.3's `startup show`, the read of a run attempt's
-    // startup evidence.
-    assert_eq!(statecraft_cli::commands::Verb::all().len(), 34);
+    // startup evidence; and one more with section 3.11.4's `startup trial`,
+    // which spends a project's one managed-startup trial.
+    assert_eq!(statecraft_cli::commands::Verb::all().len(), 35);
 }
