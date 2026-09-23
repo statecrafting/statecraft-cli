@@ -142,7 +142,25 @@ fn run(args: &[String]) -> i32 {
             if registry.get(&root).is_none() {
                 return emit(&bind::unregistered_answer(&root), format);
             }
-            environment_verb(invocation.verb, &root, &home, format)
+            // Spec 002 section 3.4: a drifted managed file is replaced only
+            // when the operator names it, so `--replace` is parsed strictly and
+            // only where a verb can carry it.
+            let consenting = matches!(invocation.verb, Verb::EnvApply | Verb::EnvUpgrade);
+            let named = match bind::replace_arguments(consenting, &invocation.rest[1..]) {
+                Ok(named) => named,
+                Err(detail) => {
+                    eprintln!("usage: {detail}");
+                    return Exit::Usage.code();
+                }
+            };
+            if !named.is_empty() && matches!(invocation.verb, Verb::EnvRemove | Verb::Doctor) {
+                eprintln!(
+                    "usage: {} does not take --replace; name a path to `env plan`, then consent to it with `env apply`",
+                    invocation.verb.spelling()
+                );
+                return Exit::Usage.code();
+            }
+            environment_verb(invocation.verb, &root, &home, &named, format)
         }
         // Spec 006's edges: the verbs 003, 004 and 005 name, bound here for the
         // first time. Same precondition as the environment verbs, for the same
@@ -1930,6 +1948,7 @@ fn environment_verb(
     verb: Verb,
     root: &std::path::Path,
     home: &std::path::Path,
+    named: &[statecraft_environment::replace::Consent],
     format: Format,
 ) -> i32 {
     let declarations = adapters::declarations();
@@ -1940,8 +1959,15 @@ fn environment_verb(
     // `env remove` reads the manifest itself and refuses when there is none, so
     // it is the one verb that does not need one read here.
     if verb == Verb::EnvRemove {
-        return match statecraft_environment::apply::remove(root, &clock) {
-            Ok(outcome) => emit(&bind::outcome_answer(outcome), format),
+        // Spec 002 section 3.13 rule 4: the root bridge is taken back by its
+        // record, and a bridge line with no record is reported, not removed.
+        let sites = [statecraft_environment::apply::BridgeSite {
+            path: statecraft_home::project::ROOT_INSTRUCTIONS.to_string(),
+            kind: statecraft_environment::manifest::ModificationKind::ImportBridge,
+            line: statecraft_home::bridge::IMPORT_LINE.to_string(),
+        }];
+        return match statecraft_environment::apply::remove_with(root, &clock, &sites) {
+            Ok(removal) => emit(&bind::removal_answer(removal), format),
             Err(e) => emit(&bind::apply_error_answer(&e), format),
         };
     }
@@ -1954,12 +1980,13 @@ fn environment_verb(
     };
 
     match verb {
-        Verb::EnvPlan => match statecraft_environment::plan::plan(
+        Verb::EnvPlan => match statecraft_environment::plan::plan_naming(
             root,
             manifest.as_ref(),
             &declarations,
             &probe,
             &foreign,
+            &named.iter().map(|c| c.path.clone()).collect::<Vec<_>>(),
         ) {
             Ok(plan) => emit(&bind::plan_answer(plan), format),
             Err(e) => emit(&bind::plan_error_answer(root, &e), format),
@@ -1969,19 +1996,19 @@ fn environment_verb(
         // for the operator, not for the machine, and giving them different code
         // paths is how their conflict rules would drift.
         Verb::EnvApply | Verb::EnvUpgrade => {
-            // Read again under the manifest lock and written by the same
-            // operation, so a transfer or another writer's change recorded
-            // since the read above is never erased (spec 002 section 3.35).
+            // Read again, planned and written by one library operation, so the
+            // manifest it writes is the one it planned against.
             let _ = manifest;
-            match statecraft_environment::apply::apply_current(
+            match statecraft_environment::apply::apply_consented_current(
                 root,
                 &declarations,
                 &probe,
                 &foreign,
                 &clock,
                 adapters::pins,
+                named,
             ) {
-                Ok(outcome) => emit(&bind::outcome_answer(outcome), format),
+                Ok(consented) => emit(&bind::consented_answer(consented), format),
                 Err(e) => emit(&bind::apply_error_answer(&e), format),
             }
         }

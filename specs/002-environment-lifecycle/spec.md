@@ -4174,6 +4174,139 @@ mode, symbolic link, leftover and changed-since-read; and
 `crates/statecraft-cli/tests/ownership_transfer.rs` covers them through the
 built binary (`006` section 5 of the same date).
 
+**2026-09-23: replacing a drifted managed file, per path (section 3.4).**
+Section 3.4 requires that "Replacing a drifted managed file requires the
+operator to say so per path", and until this entry nothing let the operator say
+it: every drifted managed file was withheld on every `env apply` and `env
+upgrade`, and the only cure was editing the file back or the committed manifest
+by hand. The section is silent on the mechanism, so these choices are recorded
+here and change none of its requirements. `crates/statecraft-environment/src/replace.rs`
+is new, inside this spec's directory unit.
+
+*Plan, then consent, per path.* `env plan <path> --replace <file>` names one
+path per `--replace`, repeatable. The plan reports, for each, the digest the
+manifest records, the digest on disk now, the replacement's digest and length,
+and a **plan identity**: SHA-256 over a domain string, the path, the adapter and
+those three digests. `env apply` and `env upgrade` take `--replace
+<file>=<plan-id>`, recompute the plan, and refuse unless every identity is
+still equal. Nothing is replaced that is not named, and naming a path is not
+enough without the identity, so a script cannot consent to a drift it did not
+read. A stale identity (the file edited again, the manifest entry changed, or
+the adapter's content changed) or an identity planned for another path refuses
+the whole apply, and nothing at all is written. Arguments are parsed strictly:
+anything after the target other than `--replace` pairs, a consent given to
+`env plan`, and a path given to `env apply` without an identity are usage
+errors.
+
+*What can be named.* Only a path a claiming adapter declares, recorded
+`managed`, and drifted. Every other named path refuses the plan by name, and
+with it the apply: an adopted path, a foreign or occupied pointer path, a user
+path, a path no adapter declares, a path that is not drifted (absent, or
+holding the bytes last written, which an ordinary apply handles), a path that
+is not relative or has an empty, `.` or `..` component, and a path that is, or
+passes through, a symbolic link. An adapter that does not claim its paths
+(section 3.9) replaces nothing.
+
+*Writing.* A refused plan or a stale identity is answered before the manifest
+lock and writes nothing, not even the lock file. Otherwise the lock of this
+date's section 3.35 entry is taken and held from here to the manifest write,
+and a manifest that changed since it was read refuses with nothing written.
+Staged files an earlier interrupted replacement left under
+`.statecraft/state/replace/` are removed first and reported as `swept`. Each
+replacement is then staged there with the target's permissions and flushed.
+Before any rename, every target is checked again: a regular file, reached
+through no symbolic link (the staging directory included), still holding the
+digest the plan saw; any change refuses with nothing renamed. The same file and
+link check is repeated immediately before each rename. The standard library has
+no rename relative to a directory handle, so a window of one system call
+remains between that check and the rename. A rename is atomic on one
+filesystem, so each file holds its old bytes or its replacement and never a
+mixture, and the manifest is written after the files.
+
+*Interruption and retry.* A failure (exit 4) can leave some named files
+replaced and others not, with the manifest not yet recording any of them:
+staging fails before anything is renamed, but a rename or the manifest write
+can fail after an earlier rename landed. Repeating the same request recovers:
+a named path already holding its replacement is `already-satisfied`, whatever
+identity is given, and the manifest records it without writing the file; a
+path not yet replaced still carries the drift its identity was planned for and
+is replaced. A repeated successful request reports `already-satisfied` and
+writes no file.
+
+*Exit codes*, in spec `006` section 3.3's vocabulary and recorded in its
+section 5: a refused plan or a stale identity is 2, a failure to stage or
+rename is 4, an apply that replaced what was named while withholding other
+drift is 1, and one that replaced or found satisfied everything named with
+nothing withheld is 0.
+
+*Tests.* `crates/statecraft-environment/tests/replace_per_path.rs` (every
+platform) and `crates/statecraft-cli/tests/env_replace.rs` (through the binary).
+The binary cases that need a claiming adapter are compiled on macOS only,
+because the configured adapter's credential-path prerequisite is measured on
+macOS only (spec `004`), so the check runner, which is Linux, runs the library
+half and the binary's refusal and usage cases, not the binary's replacement
+cases. They use a synthetic `claude` and a synthetic qualification record in a
+temporary home.
+
+**2026-09-23: `env remove` takes back the root bridge (section 3.13 rule 4).**
+Rule 4 requires: "Removal removes the inserted line and nothing else, and only
+while the file still begins with it." `env remove` did not: it read managed
+entries only, so the recorded modification and its line survived removal, and
+`bridge::unbridged` existed with no caller. It now takes the bridge back through
+`statecraft_environment::apply::remove_with`. Where the rule is silent, these
+choices are made, and none widens what may be removed:
+
+- *The record is the authority, and only a record this product could have
+  written counts.* A record is acted on only when its path is well formed (no
+  absolute path, no empty, `.` or `..` component, nothing under `.statecraft/`
+  or a `.git` component) and its path, kind and line equal the one place this
+  product puts a bridge: the root `AGENTS.md`, `import-bridge`,
+  `@.statecraft/AGENTS.md`. Any other record is withheld, named, and kept.
+- *A record must show an insertion.* `init apply` recorded a modification even
+  when the file already began with the line, with the same digest before and
+  after, and removal then took away a line the user wrote. Initialization now
+  records only when it inserts or moves the line; a re-run that finds the line
+  first keeps an earlier record unchanged, digest before included, and creates
+  none when there is none. Removal withholds any record whose digest before
+  equals its digest after.
+- *What "the inserted line" is.* The line with its terminator and, only where
+  the insertion added one, the blank separator after it. Section 3.13 rule 2's
+  insertion writes the line alone when the file had nothing else and the line
+  plus a blank line before existing content, so the record's digest after says
+  which: a digest after equal to the line alone means no separator. Every other
+  byte is kept, including edits the user made anywhere in the file since, which
+  is why the digest after is not required to match.
+- *The file is kept.* Rule 4 removes the line and nothing else, so a file this
+  product created is left, empty when nothing else is in it. The rewrite is
+  staged under `.statecraft/state/` with the file's permissions and renamed
+  into place, after checking again that it is a regular file reached through no
+  symbolic link.
+- *Ambiguous ownership refuses rather than guesses.* The bridge is withheld,
+  named, and its record kept when the file is absent (and was not created by
+  this product), is reached through a symbolic link, is not UTF-8, does not
+  begin with exactly the recorded line, or carries the line more than once; and
+  when the manifest records two modifications of one path.
+- *An interrupted removal finishes.* Where the file was rewritten and the
+  manifest was not, the file's digest equals the record's digest before, or,
+  for a file this product created, the file is empty or absent. The line is
+  then already gone, and removal drops the record and says so in a note.
+- *A bridge with no record is not this product's.* A root `AGENTS.md` that
+  begins with the import line while the manifest records no modification is
+  left and reported as a note, which changes no exit code.
+
+A withheld bridge is a finding in section 3.4's sense: the removal is
+`partial`, spec `006` exit **1**, beside every managed path it did remove, which
+is section 3.6's contract for a drifted managed path applied to a
+modification. Section 3.6's behavior is otherwise unchanged and is now
+exercised through the binary: a drifted managed path is withheld and named,
+every matching one is removed, adopted and user paths are untouched, and the
+manifest is written, not deleted, still recording what remains. Tests:
+`crates/statecraft-environment/tests/bridge_removal.rs` and
+`crates/statecraft-cli/tests/env_remove_bridge.rs`, the second spawning the
+binary against bridges `init apply` itself recorded (once, twice, and over a
+file that already began with the line), and against recorded fixtures for
+each refused and interrupted case.
+
 ## Verification
 
 `--fail-on-untraced` joined the corpus gate with this spec's first
@@ -4223,4 +4356,8 @@ sh -n scripts/acceptance/managed-session.sh
 test -f crates/statecraft-environment/src/transfer.rs
 cargo test -p statecraft-environment --test transfer
 cargo test -p statecraft-cli --test ownership_transfer
+cargo test -p statecraft-environment --test replace_per_path
+cargo test -p statecraft-cli --test env_replace
+cargo test -p statecraft-environment --test bridge_removal
+cargo test -p statecraft-cli --test env_remove_bridge
 ```

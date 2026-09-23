@@ -978,10 +978,15 @@ fn write_project(
         )
         .map_err(|e| format!("{}: {e}", project::ROOT_INSTRUCTIONS))?;
     }
-    // Recorded whether or not this run changed the file: the record is what
-    // makes removal able to take the line back, and a re-run finding the line
-    // already first must not lose it.
-    manifest.upsert_modification(bridge::record(bridge_plan, now));
+    // Recorded only when this run inserted or moved the line, because the
+    // record is the authority removal acts on (spec 002 section 3.13 rule 4).
+    // A file that already begins with the line gets no new record: if an
+    // earlier run recorded the insertion, that record, with its digest before,
+    // is kept as it is; if none did, the line is not this product's, and a
+    // record now would let removal take away a line the user wrote.
+    if bridge_plan.action.changes_the_file() {
+        manifest.upsert_modification(bridge::record(bridge_plan, now));
+    }
     manifest.write(root).map(|_| ()).map_err(|e| e.to_string())
 }
 

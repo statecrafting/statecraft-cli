@@ -1000,6 +1000,40 @@ also asserted on every platform by removing the qualification record, and the
 library suite in the environment crate asserts the `managed` halves on every
 platform with a test probe.
 
+**2026-09-23: `--replace` on `env plan`, `env apply` and `env upgrade`.** Spec
+`002` section 3.4 requires that replacing a drifted managed file needs the
+operator to say so per path, and its section 5 entry of this date records the
+mechanism. The binding adds one repeatable option and no verb:
+`env plan <path> --replace <file>` and `env apply|upgrade <path> --replace
+<file>=<plan-id>`. Arguments after the target are parsed strictly, for every
+environment verb and `doctor`: anything other than `--replace` pairs, a
+`--replace` with no path or with an option as its value, a consent with no
+path or an identity that is not 64 hexadecimal digits, a consent given to
+`env plan`, and `--replace` on `env remove` or `doctor` are usage, **3**. A
+refused named path or a stale identity is **2** and nothing is written; a
+failure to stage or rename is **4**; the outcome's own exit otherwise, so
+`already-satisfied` alone is **0**. Each command still calls one library
+operation (`plan_naming`, and `apply_consented_current`, which reads, plans
+and writes the manifest itself). Both answers gain a `named` list, the plan's
+with each replaceable path's plan identity, the apply's with what became of
+each named path; the apply's answer also gains `swept`, the staged files an
+interrupted replacement left and this one removed. The apply's outcome fields
+keep their places. All are additive under section 3.4. `tests/env_replace.rs`
+spawns the binary.
+
+**2026-09-23: `env remove` names where the root bridge lives.** Spec `002`
+section 3.13 rule 4 is now performed by `env remove` (its section 5 entry of
+this date). The binding still calls one library operation, `remove_with`, and
+passes it the one place this product puts a bridge, the root `AGENTS.md`, the
+`import-bridge` kind and the import line, the path and line taken from
+`statecraft-home` rather than restated. A bridge withheld for ambiguous or
+unauthorized ownership is a withheld path in the existing answer, exit **1**.
+The answer gains `notes`, flattened beside the outcome's fields, for what is
+not a finding: a bridge line the manifest does not record, and a record
+dropped because an interrupted removal had already taken its line back. A note
+never changes the exit. Additive under section 3.4.
+`tests/env_remove_bridge.rs` spawns the binary.
+
 ## Verification
 
 Each line is one command. §3.7's rows are integration tests that **spawn the
@@ -1074,4 +1108,6 @@ cargo run -q -p statecraft-cli -- accept --help
 cargo test -p statecraft-cli --test contract_binding
 cargo test -p statecraft-cli --test ownership_transfer
 cargo run -q -p statecraft-cli -- transfer --help
+cargo test -p statecraft-cli --test env_replace
+cargo test -p statecraft-cli --test env_remove_bridge
 ```

@@ -175,6 +175,11 @@ pub fn bridged(existing: &str) -> String {
 /// "tracked modification, not ownership". An empty result is an empty file, not
 /// a deleted one: this product did not create every file it bridged, and it
 /// cannot tell from the text which ones it did.
+///
+/// A pure text transform. `env remove` does not call it: it takes the bridge
+/// back through `statecraft_environment::apply::remove_with`, which locates
+/// the line by the manifest's record and refuses when ownership cannot be
+/// decided.
 pub fn unbridged(existing: &str) -> String {
     existing
         .split_inclusive('\n')
