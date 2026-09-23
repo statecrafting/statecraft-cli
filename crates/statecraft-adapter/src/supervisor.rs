@@ -786,16 +786,32 @@ fn kill_tree(child: &mut std::process::Child) -> Option<String> {
     // succeeds only if something is there to receive it, so this checks that the
     // kill took, rather than that the command was well formed. A `kill` that
     // exits zero has said nothing about whether the descendants are gone.
-    let still_there = Command::new("kill")
-        .args(["-s", "0", "--", &format!("-{pid}")])
-        .output()
-        .map(|o| o.status.success())
-        .unwrap_or(false);
+    //
+    // It is asked for a bounded time, not once. A descendant the kill ended is
+    // a zombie until whoever inherited it reaps it, and signal 0 succeeds on a
+    // zombie. Asked immediately, the probe raced that reaping and reported a
+    // process the kill had ended as one that outlived it: measured on Linux CI
+    // on 2026-09-22, where a fixture's foreground `sleep` was reparented and
+    // not yet reaped. A process that survived `SIGKILL` still answers when the
+    // bound runs out, and is reported.
+    let answers = || {
+        Command::new("kill")
+            .args(["-s", "0", "--", &format!("-{pid}")])
+            .output()
+            .map(|o| o.status.success())
+            .unwrap_or(false)
+    };
+    let settle = Instant::now() + Duration::from_secs(2);
+    let mut still_there = answers();
+    while still_there && Instant::now() < settle {
+        std::thread::sleep(Duration::from_millis(20));
+        still_there = answers();
+    }
 
     if still_there {
         Some(format!(
-            "process group {pid} still answers after SIGKILL; at least one descendant \
-             outlived the deadline"
+            "process group {pid} still answers two seconds after SIGKILL; at least one \
+             descendant outlived the kill, or is a zombie its reaper has not collected"
         ))
     } else {
         None
