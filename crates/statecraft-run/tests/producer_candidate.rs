@@ -188,7 +188,11 @@ fn the_named_producer_build_binds_a_contract_or_says_it_cannot() {
 /// attestations, and this builds none.
 ///
 /// The fixtures carry the tool version that produced them, so they are
-/// evidence about that build only: name the fixture directory from the same
+/// evidence about that build only. Since 2026-09-23 each case is checked for
+/// its exit code, the verifier's `ok`, and, where the verifier reports one, the
+/// outcome its recorded reason names (`non-canonical-bytes` is reported as a
+/// content mismatch). The published crate ships the set at
+/// `fixtures/verifier/`: name the fixture directory from the same
 /// revision as the binary, `STATECRAFT_PRODUCER_FIXTURES=<checkout>/crates/
 /// spec-spine-core/fixtures/verifier`.
 #[test]
@@ -233,15 +237,55 @@ fn the_named_producer_build_reproduces_its_portable_verifier_fixtures() {
             .output()
             .unwrap();
         let got = out.status.code().map_or(-1, i64::from);
-        println!("{id}: expected exit {expected}, got {got}");
+        // The verifier's own answer, read as the producer's envelope. Where it
+        // reports an outcome structurally (a recompute: `match`,
+        // `contentMismatch`, `versionMismatch`), that outcome is checked
+        // against the case's recorded outcome and reason. Where it refuses
+        // before the recompute, it reports an error kind (`parse`, `schema`)
+        // and a message, not the fixture's reason word, so the refusal is
+        // checked as present and its kind recorded; no message is parsed.
+        let answer: serde_json::Value =
+            serde_json::from_slice(&out.stdout).unwrap_or(serde_json::Value::Null);
+        let outcome = answer["report"]["outcome"].as_str().unwrap_or("");
+        let kind = answer["error"]["kind"].as_str().unwrap_or("");
+        let want_outcome = spec["expect"]["outcome"].as_str().unwrap_or("");
+        let reason = spec["expect"]["reason"].as_str().unwrap_or("");
+        println!(
+            "{id}: expected exit {expected} {want_outcome} {reason}, got exit {got} \
+             outcome `{outcome}` error kind `{kind}`"
+        );
         if got != expected {
-            mismatches.push(format!("{id}: expected {expected}, got {got}"));
+            mismatches.push(format!("{id}: expected exit {expected}, got {got}"));
+        }
+        if answer["ok"].as_bool() != Some(want_outcome == "accepted") {
+            mismatches.push(format!("{id}: `ok` disagrees with {want_outcome}"));
+        }
+        let expected_outcome = match (want_outcome, reason) {
+            ("accepted", _) => Some("match"),
+            (_, "content-mismatch" | "non-canonical-bytes") => Some("contentMismatch"),
+            (_, "version-mismatch") => Some("versionMismatch"),
+            _ => None,
+        };
+        match expected_outcome {
+            Some(o) if o != outcome => {
+                mismatches.push(format!("{id}: expected outcome {o}, got `{outcome}`"))
+            }
+            None if kind.is_empty() => mismatches.push(format!(
+                "{id}: a refusal before the recompute carried no structured error"
+            )),
+            _ => {}
         }
     }
+    // One case can fail several checks, so the count is of cases, not of
+    // mismatches.
+    let failed: std::collections::BTreeSet<&str> = mismatches
+        .iter()
+        .filter_map(|m| m.split(':').next())
+        .collect();
     assert!(
         mismatches.is_empty(),
-        "{} of {} case(s) did not reproduce: {mismatches:?}",
-        mismatches.len(),
+        "{} of {} case(s) did not reproduce ({failed:?}): {mismatches:?}",
+        failed.len(),
         cases.len()
     );
 }

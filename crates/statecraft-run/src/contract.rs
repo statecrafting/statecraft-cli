@@ -358,6 +358,43 @@ mod tests {
     use super::*;
     use crate::report::DeclaredObligation;
 
+    fn recorded(report: &str) -> Vec<u8> {
+        std::fs::read(
+            std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+                .join("testdata/producer/released-0.23.0")
+                .join(report),
+        )
+        .unwrap()
+    }
+
+    // The published 0.23.0's own answers, recorded; before these, every
+    // closure this crate read was written by hand in the shape measured.
+    #[test]
+    fn a_recorded_closure_answer_from_the_published_producer_resolves() {
+        match interpret(Some(0), &recorded("closure-002.json"), b"") {
+            Resolution::Resolved { digest, members } => {
+                assert_eq!(digest.len(), 64, "{digest}");
+                assert_eq!(members.len(), 1, "{members:?}");
+                assert_eq!(members[0]["kind"], "spec");
+                assert_eq!(members[0]["spec"], "002-environment-lifecycle");
+                assert!(members[0]["contentHash"].as_str().is_some());
+            }
+            other => panic!("expected a resolved closure, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn a_recorded_refusal_of_a_missing_member_is_unresolved_and_names_it() {
+        match interpret(
+            Some(1),
+            &recorded("closure-missing.stdout"),
+            &recorded("closure-missing.stderr"),
+        ) {
+            Resolution::Unresolved { detail } => assert!(detail.contains("999-absent"), "{detail}"),
+            other => panic!("expected an unresolved member, got {other:?}"),
+        }
+    }
+
     fn lifecycle() -> SpecLifecycle {
         SpecLifecycle {
             id: "107-x".into(),

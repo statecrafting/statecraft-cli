@@ -25,7 +25,7 @@
     "id": "003-work-and-run-semantics",
     "implementation": "complete",
     "sectionDigests": {
-      "003-work-selection-workspace-preparation-the-run-record-and-recovery": "26e17e48217681245260e54591844c65b3dfc9e7a5bfe1191d2379a97ddd7226",
+      "003-work-selection-workspace-preparation-the-run-record-and-recovery": "5fe9c5c1e782fd1ef34275278d0cf72e4a7571a06797514504d4bd19c59c5bda",
       "1-purpose": "6e2e713486514a4371080ee9ad901b71b92b198ff8944d2cac7db353dfdd1ee6",
       "2-territory": "f200d26f7fab70304d4ec5b21bbfba40301c0a2a5b38fc266d1d37da0f01b4a4",
       "3-1-1-ready-is-not-ratified": "e902124dba1a1dfc0ed218701ac4b36773d42c1359d537fe8dfce993379529fa",
@@ -42,7 +42,7 @@
       "3-8-observable-negative-cases": "64b35b1a553ef276500ef17c7ef9beff5d4488a934d422acddee2b429583bc0b",
       "3-behavior": "33f55270b942f4b9cb0c6de67a86f60400688cfb515fb5c6f1c556bf5e421e52",
       "4-out-of-scope": "0953737fbaaf06f31c4272c3b10a57178c967c1127355c9826627a1267c76fdd",
-      "5-decisions-recorded-during-implementation": "5692f6b495bedd498b9fb59ec1ec13a7241110a1373061d9b779f3bd41d7a0ac",
+      "5-decisions-recorded-during-implementation": "9d1a0fb86d725db8e7791bc6102a5a9796ee1cc659823cd08e638a7571e503c5",
       "verification": "31b33969410d5ba51a42678f60dc22264f541b2480ada745b3c0cc2f839d9a1e"
     },
     "sectionHeadings": [
@@ -71,6 +71,6 @@
     "summary": "The core loop's semantics. How a unit of work is identified by reading spec-spine's structured report rather than re-deriving it; how an isolated workspace is prepared so the operator's checkout is never edited; the append-only hash-linked run record with intent written before an effect and outcome after it; the closed outcome set (completed, failed, refused, interrupted, cancelled) and the rule that a retry appends an attempt rather than replacing history; supervisor-owned refusal accounting a supervised process cannot erase; and reconciliation of an ambiguous effect before any retry, with no exactly-once promise.\n",
     "title": "Work selection, workspace preparation, the run record, and recovery after interruption"
   },
-  "shardHash": "0e1997d3aab3ad817555ea375cde5d0c416a51df9147fb429d34ffea267cfde6",
+  "shardHash": "e60d5076c867d26786532c2669c436dc07275e85cbeb55efe926dda63be84bd5",
   "specVersion": "1.6.0"
 }

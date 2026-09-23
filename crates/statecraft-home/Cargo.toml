@@ -50,7 +50,7 @@ statecraft-adapter = { path = "../statecraft-adapter" }
 # its pinned tree-sitter grammars with it. The scaffolder is a pure function of
 # the configuration and needs none of them, and a `links = "tree-sitter"` clash
 # with some future dependency of this workspace is a cost with no benefit here.
-spec-spine-core = { version = "=0.21.0", default-features = false }
+spec-spine-core = { version = "=0.23.0", default-features = false }
 
 [dev-dependencies]
 tempfile = "3.27.0"

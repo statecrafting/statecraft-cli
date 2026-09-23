@@ -1,11 +1,11 @@
-//! Compatibility fixtures for producer capabilities that are specified in
-//! spec-spine and **not released**.
+//! Compatibility fixtures for producer shapes, driven through the built binary.
 //!
 //! Spec 006 section 5, 2026-09-22. Each test here drives the built binary
-//! against a stub `spec-spine` that emits a shape a spec-spine draft specifies,
-//! and asserts what **this** consumer does with it today. None of them claims
-//! the producer ships the shape, and none changes a dependency pin: the pin is
-//! `=0.20.0`, and adopting a newer one is its own change (`D-06`).
+//! against a stub `spec-spine` that emits a shape, and asserts what **this**
+//! consumer does with it. The first two were written when the shape was a
+//! spec-spine draft; it shipped in 0.23.0, now the pin (`D-06`, 2026-09-23),
+//! and the stubs stay because a stub can contradict itself on purpose and a
+//! published producer should not.
 //!
 //! The last three tests are not about an unreleased shape: they pin what
 //! `work list` does with each exit status of the released `check`.

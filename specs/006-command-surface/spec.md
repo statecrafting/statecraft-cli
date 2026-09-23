@@ -800,6 +800,14 @@ was done, and an operator can act. `producer_compatibility.rs` pins all three
 through the built binary against a stub producer. Two of them fail on the
 previous build, which reported both refusals as a compile failure under exit 1.
 
+**2026-09-23: the pinned producer carries 102, 106 and 107.** Under `=0.23.0`
+the entries above that frame spec-spine's 102 and 107 as future describe
+shipped behavior: `work list` compares plan and list `status`, and `run` binds
+a closure. 106's obligations resolve, but this corpus declares none. 103's
+fixtures are replayed only as evidence about a named build (`003` section 5).
+Nothing in this spec's crate changed for the adoption beyond
+`producer_compatibility.rs`'s module note, which named the old pin.
+
 ## Verification
 
 Each line is one command. §3.7's rows are integration tests that **spawn the

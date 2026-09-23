@@ -1,0 +1,11 @@
+{
+  "digest": "026d5eb599a0dd66f470d46d23b418929c0eb3d9a897036f8d7ea915671d90c2",
+  "members": [
+    {
+      "contentHash": "a2bf7a05ea422740574944fdbecd861fa2c8ca91d5255b06f91a6f5074fa51ff",
+      "kind": "spec",
+      "spec": "002-environment-lifecycle"
+    }
+  ],
+  "schemaVersion": "0.7.0"
+}

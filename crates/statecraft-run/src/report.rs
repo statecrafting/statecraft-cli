@@ -580,6 +580,31 @@ mod tests {
         );
     }
 
+    // Rules 1 and 2, against the published 0.23.0's own output: the pinned
+    // producer since 2026-09-23 (spec 003 section 5).
+    #[test]
+    fn the_published_producer_status_is_compared_and_agrees() {
+        let list = recorded("released-0.23.0", "list.json");
+        let report = join(
+            "0.23.0",
+            &recorded("released-0.23.0", "plan.json"),
+            &list,
+            &list,
+        )
+        .unwrap();
+        assert_eq!(report.status_source, StatusSource::ListAgreeingWithPlan);
+        assert_eq!(report.ready[0].id, "002-environment-lifecycle");
+        assert_eq!(report.ready[0].status.as_deref(), Some("approved"));
+        assert_eq!(
+            report
+                .lifecycle_of("002-environment-lifecycle")
+                .unwrap()
+                .implementation
+                .as_deref(),
+            Some("in-progress")
+        );
+    }
+
     // Rule 2: one flipped value in the expansion producer's own plan.
     #[test]
     fn a_plan_status_that_contradicts_the_list_is_refused_naming_both() {

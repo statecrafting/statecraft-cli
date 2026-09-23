@@ -608,6 +608,35 @@ producer, not only against a named candidate build. No rule changes. Section
 3.1.2 rule 4's released shape without `status` stays readable, because a
 target may pin an older producer.
 
+**2026-09-23: the published producer's own answers are recorded, and the
+fixture replay asserts outcomes, not only exit codes.**
+`testdata/producer/released-0.23.0/` holds what the pinned 0.23.0 answered on
+this corpus: `registry plan` and `registry list`, and two `registry closure`
+answers, one resolved and one refusing a missing member. Until now every
+closure this crate read was written by hand in the measured shape. `report.rs`
+and `contract.rs` test the join and `interpret` against those bytes. The older
+recorded sets stay, as the evidence they were.
+
+The ignored `producer_candidate` fixture test now checks, per case:
+
+- the exit code;
+- the verifier's `ok`;
+- the recompute outcome its recorded reason names (`match`,
+  `contentMismatch`, where `non-canonical-bytes` is reported as a content
+  mismatch, or `versionMismatch`);
+- that a refusal before the recompute carries a structured error.
+
+The verifier reports only an error kind for that last case, so no message
+text is parsed. Run against the published build and the fixture set shipped
+inside the published `spec-spine-core` 0.23.0 crate, all eleven cases
+reproduce. Run against the 0.20.0 binary with the same set, four do not:
+`control-untampered`, `flipped-verdict`, `minor-ahead-content-mismatch` and
+`reformatted-same-values`, each read as a version mismatch where the set
+expects `match` or `contentMismatch`. The same run binds `unsupported`, because 0.20.0 has no
+closure verb, and reads `status` from the list alone. So an older producer is
+refused by name where it lacks a capability, and nothing about it is read as
+the newer contract.
+
 ## Verification
 
 Each line is one command. §3.8's twenty-two rows are integration tests named after
