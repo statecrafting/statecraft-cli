@@ -4040,6 +4040,132 @@ number or an object already did, and an admitted trailer's line, with its
 member order, spacing and escapes, reaches the admitted observation byte for
 byte and survives a write and a read of it. No requirement changed.
 
+**2026-09-23: section 3.35 implemented, and the choices it was silent on.**
+The operation is `crates/statecraft-environment/src/transfer.rs`: `plan`,
+`apply` and `revert`, bound as `006` section 3.11.7's verbs. The manifest gains
+`transfers`, the journal, read with a default and omitted when empty, so a
+manifest written before this section reads as having no transfers and one
+nobody transferred in is byte-identical to what an earlier build wrote. Each
+choice below is one rule 1 to 7 did not make; none changes what they require.
+
+- **One writer of the manifest at a time, every writer.** The manifest lock
+  is an advisory `flock` on `.statecraft/state/manifest.lock`, runtime state
+  that is gitignored and created on demand, so the committed tree gains no
+  byte; a refusal that needs no lock (no manifest, colliding adapters) is
+  answered before it and creates not even that. A lock file rather than the
+  repository's root directory, because `flock` on a directory fails where it
+  is emulated with byte-range locks (NFS, some SMB and FUSE mounts) and a
+  user's own `flock .` would contend with it. A filesystem that cannot lock is
+  its own error, `LockUnsupported`, and nothing is written without the lock.
+  The lock is reentrant within a thread. `Manifest::write` takes it itself,
+  and every read-modify-write holds it from its read to its write:
+  `Manifest::update`, `env apply` (`apply::apply_current`, which the binary
+  uses), `env remove`, `init apply`, `harness upgrade`, enrollment, and the
+  transfer verbs. A transfer does not wait and refuses (`busy`); every other
+  writer waits up to 30 seconds and then refuses too (exit 2 through the
+  binary, a refused step in initialization): nothing was written. Independently
+  of the lock, a manifest value remembers the digest of the bytes it was read
+  from, keyed on the same canonical root the lock uses, so `/tmp/x` and
+  `/private/tmp/x` are one repository; a write refuses (nothing replaced) when
+  the manifest on disk is no longer those bytes, so a writer holding a stale
+  value can never erase what another writer recorded, a transfer already
+  reported as applied included.
+- **Every manifest write is atomic and durable.** The bytes go to a temporary
+  file beside the manifest in `.statecraft/`, with the old file's permissions,
+  which is flushed, renamed over it, and the directory flushed, so an
+  interruption leaves the old manifest or the new one. A manifest that is a
+  symbolic link is refused, never replaced through or over. A temporary file
+  an interrupted earlier write left is removed by the next write and named in
+  its answer, so none stays among section 3.12's four paths. When the
+  directory flush fails after the rename, the new manifest is in force and not
+  known to survive a crash: that is exit 4 under section 3.11.7 ("could not be
+  written durably"), and the answer says the transfer is in force and names
+  its record.
+- **An installed adapter, for rule 1's "a path this product would itself
+  write", is one in this build's configured set that claims its paths on this
+  machine**, judged by the same readiness `env apply` uses. A path an adapter
+  declares but does not claim here is refused for `managed`
+  (`adapter-not-claiming`). The entry's source is that adapter, and its
+  `transfer` names the prior claimant as `foreign` knows it, or the path
+  itself where nothing else is known, as `env plan` names a `foreign` path.
+- **An adopted entry's source is `template` with identity
+  `operator-transfer`.** An adopted file has no source here and the entry
+  format requires one. A new source kind would make the manifest unreadable to
+  a build that predates this section, which the compatibility paragraph
+  assumes can read it.
+- **No manifest is a refusal.** Creating one is `env apply`'s act; a transfer
+  that wrote the first manifest would be initialization by another name.
+- **One file, one name.** Names are compared ignoring ASCII case for rule 2's
+  list and for the `.statecraft` and `.git` components, and both components
+  are protected at any depth. Each component of the path must be listed by
+  its directory byte for byte, so on a case- or normalization-insensitive
+  volume a second spelling of a file (`notes.md` for `Notes.md`, a composed
+  `é` for a decomposed one) is refused (`spelling`). A path that is the same
+  file (device and inode) as another path the manifest, the journal, a
+  modification or an adapter already names is refused (`alias`).
+  `.github/copilot-instructions.md` is matched as its last two components, at
+  any depth.
+- **The file is read through one handle.** Under the lock, the path is opened
+  component by component without following a link, the handle is confirmed a
+  regular file, and the digest and length recorded are read from that same
+  handle, so nothing swapped in after the path checks is what gets recorded.
+- **Any path carrying a tracked modification is refused for `adopted` and
+  `managed`**, not only the root `AGENTS.md` the list already names: rule 2's
+  reason is that a modification is not an entry.
+- **Rule 2 holds over a reversal.** Reverting the release of a pointer file
+  would make an instruction file `managed`, so it is refused
+  (`instruction-file`), and so is any reversal rule 1 or rule 3 would refuse.
+  A reversal checks rule 3's path first, then the file's digest, and only then
+  what the inverse move itself would refuse, so an unrecorded edit is what it
+  names when there is one.
+- **What "disagrees" means (rule 5).** For each path, the latest record's
+  resulting class must be the manifest's class. Two differences are not
+  disagreements, because this product's own recorded operations make them: a
+  move to `managed` whose entry `env remove` then removed (whatever is at the
+  path now, since a user may restore a file there), and a move to `user` whose
+  file was deleted and which `env apply` then wrote afresh (a `managed` entry
+  from an adapter, carrying no `transfer`). A repeated record identity, or a
+  reversal naming a record not before it, is a disagreement. Checked first by
+  `apply` and `revert`, before rule 7.
+- **Rule 7's `already-satisfied` is exit 0**, reported before the plan
+  identity and after the path checks of rule 3 and the journal check of rule 5.
+- **How a stale plan names what changed.** The plan identity is rule 4's
+  SHA-256 of the JSON array `[path, from, to, file digest, manifest digest]`,
+  printed as `identity`, and `transfer apply` accepts it as given. `transfer
+  plan` also prints a token carrying it beside the first 16 hex digits of each
+  input, `pi1-<from>-<to>-<path>-<file>-<manifest>-<identity>`, as `plan_id`,
+  and `apply` accepts that too. A still-current identity, in either spelling,
+  is never refused. For a stale token, `apply` compares its fields with the
+  current inputs and names each that differs (`classes`, `path`, `file`,
+  `manifest`). For a stale bare identity, it searches the values the inputs
+  could have had (every admitted pair of classes, the file's digest now and
+  every digest the manifest and the journal record for the path, the
+  manifest's digest now and every digest the journal records it had), names
+  what differs in the combination that reproduces it, and otherwise says that
+  what changed could not be determined (`undetermined`). A string that is
+  neither is named as not an identity this build issues (`identity`). A class
+  that changed since the plan is named as the path's class and the class
+  given (`class-mismatch`), checked before the identity.
+- **A record's identity** is the SHA-256 of the JSON array of its other
+  fields; the producer is `spec-spine-core@0.23.0`, the name and exact version
+  `statecraft-home` pins.
+- **The operator is recorded verbatim**, beside `operator_provenance:
+  operator-supplied`; a blank operator or reason is refused.
+- **"Never rewritten" (the compatibility paragraph) is read as: nothing adds,
+  alters or backfills an entry's recorded `transfer`, and no journal record is
+  synthesized for it.** A move the operator asks for on such a path proceeds as
+  for any entry, which for `managed` to `user` removes the entry with the rest
+  of it.
+
+Tests: `crates/statecraft-environment/tests/transfer.rs` covers the
+acceptance and every negative case against the library on every platform,
+including concurrent applies of one plan, an `env apply` racing a transfer
+apply with nothing reported as done lost, second spellings and hard-link
+aliases, and a write that cannot commit; the manifest's own unit tests cover
+mode, symbolic link, leftover and changed-since-read; and
+`crates/statecraft-cli/tests/ownership_transfer.rs` covers them through the
+built binary (`006` section 5 of the same date).
+
 ## Verification
 
 `--fail-on-untraced` joined the corpus gate with this spec's first
@@ -4086,4 +4212,7 @@ cargo test -p statecraft-cli --test run_startup
 cargo test -p statecraft-home --lib trial
 cargo test -p statecraft-cli --test startup_trial
 sh -n scripts/acceptance/managed-session.sh
+test -f crates/statecraft-environment/src/transfer.rs
+cargo test -p statecraft-environment --test transfer
+cargo test -p statecraft-cli --test ownership_transfer
 ```

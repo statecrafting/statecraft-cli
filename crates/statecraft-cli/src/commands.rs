@@ -94,6 +94,12 @@ pub enum Verb {
     OverrideShow,
     /// `run reconcile <path> <run-id> <attempt> <finding> <launch-state> <operator> <reason...>`
     RunReconcile,
+    /// `transfer plan <path> <file> <from> <to>`
+    TransferPlan,
+    /// `transfer apply <path> <file> <from> <to> <plan-id> <operator> <reason...>`
+    TransferApply,
+    /// `transfer revert <path> <transfer-id> <operator> <reason...>`
+    TransferRevert,
     /// `--help`, optionally with a group or a verb as its topic.
     ///
     /// Not part of the command tree: [`Verb::all`] lists the operations, and a
@@ -145,6 +151,9 @@ impl Verb {
             Verb::OverrideRevoke => "override revoke",
             Verb::OverrideShow => "override show",
             Verb::RunReconcile => "run reconcile",
+            Verb::TransferPlan => "transfer plan",
+            Verb::TransferApply => "transfer apply",
+            Verb::TransferRevert => "transfer revert",
             Verb::Help => "--help",
         }
     }
@@ -207,7 +216,12 @@ impl Verb {
             | Verb::StartupShow
             // Spec 006 section 3.11.4: the managed-startup trial of 002
             // section 3.33.
-            | Verb::StartupTrial => "002-environment-lifecycle",
+            | Verb::StartupTrial
+            // Spec 006 section 3.11.7: per-path ownership transfer, 002
+            // section 3.35, in the environment crate.
+            | Verb::TransferPlan
+            | Verb::TransferApply
+            | Verb::TransferRevert => "002-environment-lifecycle",
             Verb::Help => "006-command-surface",
         }
     }
@@ -216,7 +230,7 @@ impl Verb {
     ///
     /// [`Verb::Help`] is deliberately absent: it is not an operation, and a
     /// usage error listing it would offer help as a thing to do.
-    pub fn all() -> [Verb; 39] {
+    pub fn all() -> [Verb; 42] {
         [
             Verb::ProjectRegister,
             Verb::ProjectList,
@@ -257,13 +271,16 @@ impl Verb {
             Verb::OverrideRevoke,
             Verb::OverrideShow,
             Verb::RunReconcile,
+            Verb::TransferPlan,
+            Verb::TransferApply,
+            Verb::TransferRevert,
         ]
     }
 
     /// The groups a help topic may name.
-    pub const GROUPS: [&'static str; 14] = [
+    pub const GROUPS: [&'static str; 15] = [
         "project", "env", "work", "run", "accept", "home", "init", "migrate", "config", "approval",
-        "harness", "session", "startup", "override",
+        "harness", "session", "startup", "override", "transfer",
     ];
 
     /// Parse a verb from the leading arguments, returning how many it consumed.
@@ -313,6 +330,9 @@ impl Verb {
             ("override", Some("grant")) => Some((Verb::OverrideGrant, 2)),
             ("override", Some("revoke")) => Some((Verb::OverrideRevoke, 2)),
             ("override", Some("show")) => Some((Verb::OverrideShow, 2)),
+            ("transfer", Some("plan")) => Some((Verb::TransferPlan, 2)),
+            ("transfer", Some("apply")) => Some((Verb::TransferApply, 2)),
+            ("transfer", Some("revert")) => Some((Verb::TransferRevert, 2)),
             _ => None,
         }
     }

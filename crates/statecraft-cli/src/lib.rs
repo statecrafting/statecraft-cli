@@ -40,6 +40,11 @@
 //! `statecraft_home::service::execute` and maps what it returns, which is the
 //! same rule as [`bind`] against a different owning spec.
 //!
+//! # Ownership transfer
+//!
+//! [`transfer`] holds the three transfer verbs of spec 006 section 3.11.7, each
+//! a binding on spec 002 section 3.35's operation in the environment crate.
+//!
 //! # Nothing here publishes
 //!
 //! There is no verb that publishes, releases or tags, and a test asserts the
@@ -56,6 +61,7 @@ pub mod exit;
 pub mod manage;
 pub mod render;
 pub mod slice;
+pub mod transfer;
 
 pub use commands::{Invocation, UsageError, Verb, parse};
 pub use exit::Exit;

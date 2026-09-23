@@ -298,7 +298,17 @@ pub fn outcome_answer(outcome: Outcome) -> Answer<OutcomeView> {
 /// not something the operator asked for and not a precondition the operation
 /// checked, which is exactly what distinguishes 4 from 2.
 pub fn apply_error_answer(e: &ApplyError) -> Answer<String> {
-    Answer::new(e.to_string(), Exit::Failed, e.to_string())
+    use statecraft_environment::manifest::ManifestError;
+    // Another writer held the manifest lock past the wait, or changed the
+    // manifest since it was read: a precondition, and nothing was written,
+    // so a refusal (2) under section 3.3, not a failure.
+    let exit = match e {
+        ApplyError::Manifest(ManifestError::Busy { .. } | ManifestError::Changed { .. }) => {
+            Exit::Refused
+        }
+        _ => Exit::Failed,
+    };
+    Answer::new(e.to_string(), exit, e.to_string())
 }
 
 /// `doctor`
@@ -521,6 +531,26 @@ mod tests {
     use statecraft_environment::manifest::{Manifest, Pins};
     use statecraft_environment::plan::{WithheldWrite, Withholding};
     use std::collections::BTreeMap;
+
+    // A writer that timed out on the manifest lock wrote nothing: refused (2),
+    // not failed (4). Likewise a manifest changed since it was read.
+    #[test]
+    fn a_writer_that_could_not_take_the_lock_is_refused_not_failed() {
+        use statecraft_environment::manifest::ManifestError;
+        let busy = ApplyError::Manifest(ManifestError::Busy { root: "/r".into() });
+        assert_eq!(apply_error_answer(&busy).exit.code(), 2);
+        let changed = ApplyError::Manifest(ManifestError::Changed {
+            path: "p".into(),
+            expected: "a".into(),
+            found: "b".into(),
+        });
+        assert_eq!(apply_error_answer(&changed).exit.code(), 2);
+        let io = ApplyError::Io {
+            path: "p".into(),
+            source: std::io::Error::other("x"),
+        };
+        assert_eq!(apply_error_answer(&io).exit.code(), 4);
+    }
 
     #[test]
     fn applied_is_zero_partial_is_a_finding_and_refused_is_two() {
