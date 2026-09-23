@@ -606,21 +606,26 @@ own answers, never from a digest this product computes.
 
    | Comparison | When | Effect on the acceptance |
    |---|---|---|
-   | `current` | the new digest equals the bound one | none; the receipt binds the digest |
+   | `current` | the new digest equals the bound one | none; the answer names the digest |
    | `changed` | the digest differs; every member whose identity differs is named, by kind and key, with both identities | **no acceptance**, reason `contract-moved` |
    | `withdrawn` | an obligation bound as in force is now withdrawn | **no acceptance**, reason `contract-moved`, naming it |
    | `missing` | a bound member no longer resolves (the producer's exit 1) | **no acceptance**, reason `contract-moved`, naming it |
    | `stale` | the producer refuses a stale ledger (its exit 2) | refused before anything is judged; nothing is recorded, and the answer says to refresh the ledger |
-   | `not-recorded` | the intent carries no `bound` contract (an attempt from before section 3.1.3, or one bound as `unsupported`, `unresolved`, `stale` or `unreadable`), or the producer answering now cannot resolve closures | none; the receipt's contract field reads `not-recorded` under section 3.8, with the reason |
+   | `not-recorded` | the intent carries no `bound` contract (an attempt from before section 3.1.3, or one bound as `unsupported`, `unresolved`, `stale` or `unreadable`), or the producer answering now cannot resolve closures | none; the answer's contract reads `not-recorded` under section 3.8, with the reason |
 
    `withdrawn` and `missing` are reported beside `changed` where both hold,
    because each names what an operator must look at.
 3. **The run record is never rewritten.** The comparison belongs to the
-   acceptance that made it: it is in the acceptance's answer and, where a
-   receipt is minted, in the receipt. The attempt's intent keeps the contract
-   it was bound to, and a later acceptance of the same attempt compares again.
-4. **The receipt binds the contract.** Section 3.4's list gains the bound
-   digest and the comparison word, read `not-recorded` where rule 2 says so.
+   acceptance that made it, and is carried in that acceptance's answer: the
+   bound digest, the digest now, the word, and every member named by rule 2.
+   The attempt's intent keeps the contract it was bound to, and a later
+   acceptance of the same attempt compares again.
+4. **The receipt is unchanged.** Its bytes are a compatibility contract with
+   the platform (section 3.14) that this section does not move. The comparison
+   travels beside the receipt in the answer, never inside it, so a receipt
+   says nothing about the contract, and a reader who needs to know reads the
+   answer that minted it. Adding the contract to the receipt is a change to
+   section 3.14's fixtures and is not made here.
 5. **What `current` does not establish.** That the candidate satisfies the
    contract; only that the contract it was authorized against is the one the
    producer resolves now. Acceptance still rests on sections 3.1 to 3.3.
@@ -816,7 +821,8 @@ intent will carry the contract spec 003 section 3.1.3 binds, and `accept`
 compares it with the producer's resolution now. A contract that changed, lost a
 member or withdrew an obligation is no acceptance, reason `contract-moved`; a
 stale ledger refuses before anything is judged; an unbound or unresolvable
-contract reads `not-recorded` in the receipt. No code changed with this entry.
+contract reads `not-recorded` in the answer, and the receipt's bytes do not
+change. No code changed with this entry.
 
 ## Verification
 
