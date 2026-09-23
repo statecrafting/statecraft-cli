@@ -1323,7 +1323,10 @@ lookup under a changed environment); none with no spawning. Releasing
 explicitly (`flock(LOCK_UN)`) before closing gave 0 in every mode. The lock now
 releases explicitly when dropped, so rule 7's lock is released by its holder
 for every copy at once, and the operating system still releases it when the
-holding process ends. Linux's open-file-description locks were considered and
+holding process ends, with one bounded exception: a holder that ends without
+dropping it (killed, say) leaves the lock held by a child it had just spawned
+until that child's `exec` closes its copy, because every descriptor this
+product opens is close-on-exec and no executed program keeps one. Linux's open-file-description locks were considered and
 rejected: they belong to the description too, so a child's copy would hold them
 the same way. The tests were not serialized and nothing retries.
 
