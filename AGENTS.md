@@ -223,6 +223,19 @@ One spec per pull request, then stop.
    cannot establish that the pull request was correctly coupled, because the
    endpoints it judged are gone. The verdict that counts is the one CI recorded
    against that pull request's own frozen endpoints.
+   **A commit follows a check only on that check's own exit status.** Chain it
+   with `&&` (`make gate && make code && git commit ...`), or run the check as
+   its own step and read its status before the next one. Never pipe a check
+   into `tail`, `head` or `grep` before a dependent step: a pipeline reports
+   the status of its last command, so `make gate | tail` exits 0 when the gate
+   failed. Never follow a check with `;`, and never leave a required check in
+   the background while committing. The targets themselves propagate failure:
+   measured on 2026-09-22, an em dash staged in `README.md` made
+   `make gate && git commit` exit 2 with no commit, a misformatted source
+   made `make fmt && git commit` exit 2 with no commit, and
+   `make gate 2>&1 | tail -1` reported 0 for the same failing gate. Earlier
+   series on this repository committed after checks that had failed; the
+   published commits stay as they are, and each later commit names its fix.
 6. **Verify.** `make verify SPEC=<id>` runs the spec's declared acceptance. A spec
    with no `## Verification` block declares none, which is honest for an
    unimplemented spec and is not a passing acceptance.
