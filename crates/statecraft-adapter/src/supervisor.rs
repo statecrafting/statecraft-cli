@@ -66,6 +66,11 @@ pub struct Supervised<E = Event> {
     /// process to be stopped, with the reason it gave. A stopped supervision is
     /// `interrupted`: the process did not end by itself.
     pub stopped: Option<String>,
+    /// Whether the deadline ended the process. Only the supervisor observes
+    /// this directly: a caller that maps the stream afterwards may add a
+    /// stream error of its own (no init event, say), and that error must not
+    /// hide that the deadline is what stopped the process.
+    pub timed_out: bool,
 }
 
 /// What a [`Watch`] asks of the supervisor after it has seen an event.
@@ -204,6 +209,7 @@ pub fn supervise_watched<E: Send + 'static>(
                 stream_error: None,
                 surviving_processes,
                 stopped: Some(reason),
+                timed_out: false,
             });
         }
     };
@@ -511,6 +517,7 @@ fn read_supervised<E: Send + 'static, R: Read + Send + 'static>(
         stream_error,
         surviving_processes: surviving,
         stopped,
+        timed_out,
     })
 }
 
@@ -1286,6 +1293,7 @@ mod tests {
             "a timeout is not a missing result"
         );
         assert!(dead(&s.child_pid.to_string()));
+        assert!(s.run.timed_out, "the deadline is what ended it");
     }
 
     #[test]
@@ -1316,6 +1324,7 @@ mod tests {
         assert_eq!(s.run.outcome, Outcome::Completed);
         assert_eq!(s.run.events.len(), 3);
         assert_eq!(s.run.stream_error, None);
+        assert!(!s.run.timed_out);
     }
 
     #[test]
@@ -1336,6 +1345,7 @@ mod tests {
             s.run.stream_error,
             Some(StreamError::NoResult { events: 2 })
         );
+        assert!(!s.run.timed_out, "an exit with no result is not a deadline");
     }
 
     // ---- The watch (spec 004 section 5, 2026-09-22) ----

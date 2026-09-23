@@ -3410,6 +3410,26 @@ whose subtype is on a closed list (today, `task_summary`), refuse any other
 trailing event, and record the list's provenance as this capture. It is an
 authority change to an approved section and is not made here.
 
+**2026-09-23: a trial the deadline stopped before its first event read as a
+failed launch, not an uncertain one.** Rule 37 makes a process the deadline
+stopped `uncertain`. The judgement inferred "the deadline stopped it" from an
+interrupted outcome with no stream error and no terminal event. A session the
+deadline stops before it writes `init`, however, also carries the adapter's
+"no init event" stream error, so that inference failed and the trial was judged
+`not-established`. It was found by the 2026-09-23 audit, when
+`startup_trial::a_session_stopped_at_its_deadline_is_uncertain_and_its_evidence_stays`
+failed under load: its fake was scheduled too late to write anything within
+three seconds. The supervisor now reports whether its deadline fired (spec `004`,
+entry of this date), `trial.json`'s process end records it as `timedOut`, and
+`deadline` is read from that flag first. A record written before the flag
+existed has no `timedOut` member and keeps the older inference, so reloading
+it cannot change its verdict. The reading follows rule 37's wording, so it
+is broader than the no-init case that exposed it: a flagged process the
+deadline stopped is `uncertain` even when it had written a terminal event, or
+a malformed line, before hanging; either used to read `not-established`.
+Neither live trial record is affected: the 2026-09-23 trial ended by itself. A new test uses a fake that writes nothing,
+and it fails without the fix and passes with it.
+
 ## Verification
 
 `--fail-on-untraced` joined the corpus gate with this spec's first
