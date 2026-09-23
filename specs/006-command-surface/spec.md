@@ -502,7 +502,7 @@ bindings were written, for `002` section 3.35.
 | Code | Meaning for the transfer verbs |
 |---|---|
 | 0 | Planned, applied, reverted, or `already-satisfied`. |
-| 2 | Refused, and nothing written: a stale plan, a class that is not the path's, a move section 3.35 does not admit, a protected or escaping path, a symbolic link, a directory, a user instruction file, or a reversal with an intervening change. |
+| 2 | Refused, and nothing written: a stale plan, a class that is not the path's, a move section 3.35 does not admit, a protected or escaping path, a symbolic link, a directory, a user instruction file, a journal that disagrees with the entries, or a reversal with an unrecorded change. |
 | 3 | Usage. |
 | 4 | The manifest could not be read or written durably. |
 
