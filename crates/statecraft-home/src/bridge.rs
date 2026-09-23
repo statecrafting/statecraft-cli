@@ -279,7 +279,7 @@ mod tests {
     fn generated_content_is_recognized_and_never_rewritten_away() {
         let generated = "# AGENTS.md\n\ngenerated body\n";
         let known = [KnownGenerated {
-            label: "producer spec-spine-core 0.21.0".into(),
+            label: "producer spec-spine-core 0.23.0".into(),
             contents: generated.to_string(),
         }];
         let p = plan(Some(generated), &known);

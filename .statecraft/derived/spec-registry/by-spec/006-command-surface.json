@@ -36,7 +36,7 @@
     "id": "006-command-surface",
     "implementation": "complete",
     "sectionDigests": {
-      "006-the-command-surface": "bb8ff4d8506de56ac7f20ff02205524c69f0906d2e619b87697a2c544ffb2e50",
+      "006-the-command-surface": "8740f0c9d62926844a1217d0a53ef74e57f844ad2bbeb60c56a8963284293c04",
       "1-purpose": "e6e22a8e8dc18f59110b16adb2684860ed768cf61e37d71ed95a9ab10064a607",
       "2-territory": "2a51dc6c2d08c14c669875b1a001da52a60b50885e44feac976b7f3cd2dd7441",
       "3-1-the-command-tree": "e260fbd5d469d829b7facc63d112632f06a80bb51dce8f22d7986369bd1c4c47",
@@ -57,7 +57,7 @@
       "3-9-inspection-is-a-fold-and-reads-nothing-else": "98671d6dcd95497894a5e7f80f2c8fbcc672b583b29c88af0b95b694f150bf38",
       "3-behavior": "5d3f1273a22ece5132fa2bd4232378aea2c36ce9344336c766d239a2c3df162f",
       "4-out-of-scope": "55fb20ad589fed8825d78a3127c82be59f85d96bc4db3dba59887615afcb5c43",
-      "5-decisions-recorded-during-implementation": "3f06171dc578aec9884dbdacb4fd3a681486f4743dff7f18a3bd85dbfa2654b7",
+      "5-decisions-recorded-during-implementation": "0664bee1cb5142e2641569a0d0470b4d0b381578fd736961b440fafd013386c1",
       "verification": "cf736a5f4fcf78897ed8021cd150d3f78edf86379ad2f6e784cb3d9b0c63cff0"
     },
     "sectionHeadings": [
@@ -90,6 +90,6 @@
     "summary": "The binary, and every verb reachable through it. Specs 002 to 005 each describe operator verbs and then own only a library crate, so nothing they specify is runnable. This spec owns crates/statecraft-cli/ and binds those verbs to a process: the command tree, the rule that a command is a thin binding and never a second implementation, the closed exit-code vocabulary that distinguishes a refusal from a failure from a finding, human and --json output as two renderings of one value, and the binary's name being a recorded decision rather than a Cargo default. It also carries the work, run and accept bindings that were specified separately as 009: discovery as a join of two spec-spine reports because one of them does not carry status, inspection as a read-only fold of the run record and nothing else, and the rule that a binding needing a library entry point gets it from the crate that owns the behavior. Section 3.11.1 adds the five verbs 002 sections 3.25 to 3.29 need: inspecting and explicitly upgrading the required harness identity, obtaining the managed-session payload, and recording startup evidence beside submitting qualification evidence for admission.\n",
     "title": "The command surface: one binary, every verb the other specs name, and what an exit code means"
   },
-  "shardHash": "875d41791b1e20a5871b8b7fed7b466b14c8e135a5e65c04d461674538137445",
+  "shardHash": "e671387256181b661fc468eba0309ab7bb3a8b50304813c0da0e3c0e807d87fe",
   "specVersion": "1.6.0"
 }

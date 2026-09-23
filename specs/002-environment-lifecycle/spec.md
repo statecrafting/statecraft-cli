@@ -3430,6 +3430,39 @@ a malformed line, before hanging; either used to read `not-established`.
 Neither live trial record is affected: the 2026-09-23 trial ended by itself. A new test uses a fake that writes nothing,
 and it fails without the fix and passes with it.
 
+**2026-09-23: the governance producer is the published `spec-spine-core`
+0.23.0, and it conforms.** Owner-directed. This moves the library dependency
+from `=0.21.0` to `=0.23.0`, from crates.io with no override, in step with
+the CLI pin (`D-06`, entry of this date). The crate records Git revision
+`d2bb4763` (tag `v0.23.0`), its registry checksum is `3dca8f68…e492`, and its
+unpacked source equals that revision's tree. `PRODUCER_VERSION` and the bridge
+test's label move with it, and the test that reads the manifest keeps them
+equal.
+
+Section 3.15's boundary is now satisfied by the published dependency, not
+only by a candidate:
+
+- `producer::produce` against the real library returns no path outside the
+  contract set, so `the_producer_is_conforming` asserts what
+  `the_producer_is_not_yet_conforming` asserted the opposite of.
+- Initialization end to end is `Complete`, not `Partial`. These are the three
+  tests section 8.2 of the handoff predicted would change, and the draft
+  adoption on a Git revision (#70) changed them first.
+- `an_out_of_contract_path_is_carried_so_it_can_be_recognized_and_never_placed`
+  is removed. Its one claim that no other test makes, that the real library
+  still returns `AGENTS.md` out of contract, is false for this producer.
+- The behavior it guarded is still asserted: against a recorded answer by
+  `producer::tests::an_out_of_contract_path_is_named_and_never_placed`, and by
+  section 3.10's row in `negative_cases.rs`. The classification of `AGENTS.md`
+  as out of contract is asserted in the conforming test.
+
+*One consequence, fail-safe and stated.* `flow::known_generated` recognizes an
+untouched generated root `AGENTS.md` only by the bytes the producer returns
+out of contract, and nothing is vendored. A conforming producer returns none,
+so such a file, written by an older spec-spine's initializer, is now treated
+as the user's own. It is preserved and bridged, never overwritten. That is the
+conservative reading, and no requirement asks for the other.
+
 ## Verification
 
 `--fail-on-untraced` joined the corpus gate with this spec's first

@@ -92,44 +92,23 @@ fn every_in_contract_path_the_producer_returns_is_one_the_contract_set_admits() 
 
 /// The state of the integration, measured rather than described.
 ///
-/// This test asserts the boundary is **not** yet satisfied. It is the test that
-/// changes when the trimmed producer releases: at that point the assertion
-/// inverts to `conforming`, and nothing else in this repository has to move
-/// except the version pin.
+/// Inverted when the published `spec-spine-core` 0.23.0 was adopted (spec 002
+/// section 5, 2026-09-23): it returns only in-contract paths, so the boundary
+/// is satisfied. Against the released 0.21.0 this asserted non-conformance and
+/// named the four out-of-contract paths; that measurement stays in spec 002's
+/// section 5 and its handoff, section 8.
 #[test]
-fn the_producer_is_not_yet_conforming() {
+fn the_producer_is_conforming() {
     let starter = producer::produce(&Library).expect("the real library answers");
     assert!(
-        !starter.conformance.conforming,
-        "the producer is now conforming: invert this assertion, and record the \
-         release that made it true"
+        starter.conformance.conforming,
+        "the producer is not conforming: {}",
+        starter.conformance.describe()
     );
-    assert_eq!(
-        starter.conformance.out_of_contract,
-        [
-            ".claude/rules/orchestrator-rules.md",
-            ".claude/rules/governed-artifact-reads.md",
-            ".claude/rules/adversarial-prompt-refusal.md",
-            "AGENTS.md",
-        ],
-        "the out-of-contract set is not the one this build measured; \
-         re-measure it and say what changed"
-    );
-    assert!(starter.conformance.describe().contains("non-conforming"));
-}
-
-#[test]
-fn an_out_of_contract_path_is_carried_so_it_can_be_recognized_and_never_placed() {
-    let starter = producer::produce(&Library).expect("the real library answers");
-    let generated = starter
-        .out_of_contract
-        .iter()
-        .find(|f| f.rel_path == "AGENTS.md")
-        .expect("this producer still returns one");
-    // Its bytes are what lets the bridge classify an untouched generated root
-    // file as generated rather than as the user's own. They are carried in
-    // memory and written nowhere.
-    assert!(!generated.contents.is_empty());
+    assert!(starter.conformance.out_of_contract.is_empty());
+    assert!(starter.out_of_contract.is_empty());
+    // A path outside the contract is still classified as one, and would
+    // still never be placed.
     assert_eq!(producer::classify("AGENTS.md"), Placement::OutOfContract);
 }
 
@@ -142,7 +121,7 @@ fn an_out_of_contract_path_is_carried_so_it_can_be_recognized_and_never_placed()
 /// registered and qualified: a non-conforming producer is a finding about the
 /// producer, not a failure of the project.
 #[test]
-fn the_real_library_end_to_end_is_partial_and_names_the_producer_as_the_reason() {
+fn the_real_library_end_to_end_is_complete_under_a_conforming_producer() {
     use statecraft_home::flow::{Outcome, Step};
     use statecraft_home::service::Operation;
     use support::{FixedClock, Harness, Sandbox};
@@ -173,9 +152,8 @@ fn the_real_library_end_to_end_is_partial_and_names_the_producer_as_the_reason()
 
     assert_eq!(
         report.outcome,
-        Outcome::Partial,
-        "the real producer is non-conforming, so a complete outcome would be a \
-         claim this boundary does not support: {:#?}",
+        Outcome::Complete,
+        "a conforming producer leaves nothing withheld: {:#?}",
         report.steps
     );
     let governance = report
@@ -184,7 +162,7 @@ fn the_real_library_end_to_end_is_partial_and_names_the_producer_as_the_reason()
         .find(|s| s.step == Step::Governance)
         .expect("the governance step ran");
     assert!(
-        format!("{:?}", governance.state).contains("non-conforming"),
+        !format!("{:?}", governance.state).contains("non-conforming"),
         "{governance:?}"
     );
 

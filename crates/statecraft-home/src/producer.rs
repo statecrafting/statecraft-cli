@@ -36,7 +36,7 @@ pub const PRODUCER_NAME: &str = "spec-spine-core";
 /// Spelled here as well as in `Cargo.toml` so a report can name it, and a test
 /// reads the manifest and refuses a drift between the two. A pin recorded in a
 /// report that is not the pin in the build is worse than no pin at all.
-pub const PRODUCER_VERSION: &str = "0.21.0";
+pub const PRODUCER_VERSION: &str = "0.23.0";
 
 /// The specs directory this product declares.
 pub const SPECS_DIR: &str = "specs";
