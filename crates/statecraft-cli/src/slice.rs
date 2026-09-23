@@ -75,9 +75,6 @@ pub struct ExcludedView {
     pub reason: String,
 }
 
-/// Where the `status` half of every row comes from.
-pub const STATUS_FIELD: &str = "registry list --json: status";
-
 impl WorkListView {
     fn of(list: &WorkList) -> Self {
         Self {
@@ -89,7 +86,7 @@ impl WorkListView {
                     title: i.title.clone(),
                     status: i.status.clone(),
                     from_field: i.from_field.clone(),
-                    status_from_field: STATUS_FIELD.to_string(),
+                    status_from_field: i.status_from.clone(),
                     admitted_by_override: i
                         .admitted_by_override
                         .as_ref()
@@ -185,6 +182,9 @@ pub fn report_error_answer(e: &ReportError) -> Answer<String> {
         ReportError::NotRunnable { .. } => Exit::Refused,
         // A report this build cannot read is nobody's request.
         ReportError::Unreadable { .. } => Exit::Failed,
+        // Spec 003 section 3.1.2: the producer did not answer consistently
+        // from one state, which is a precondition, and nothing was done.
+        ReportError::Disagreement { .. } | ReportError::Moved { .. } => Exit::Refused,
     };
     Answer::new(e.to_string(), exit, e.to_string())
 }
@@ -538,6 +538,7 @@ mod tests {
                     .map(|(id, _)| ReadySpec {
                         id: (*id).to_string(),
                         title: "t".into(),
+                        status: None,
                     })
                     .collect(),
                 lifecycle: ready
@@ -548,6 +549,7 @@ mod tests {
                         implementation: Some("pending".into()),
                     })
                     .collect(),
+                status_source: statecraft_run::report::StatusSource::ListOnly,
             },
             &Policy::default_policy(),
             &Overrides::none(),
@@ -567,7 +569,10 @@ mod tests {
         let a = work_list_answer(list(&[("010", "approved")]));
         let row = &a.value.eligible[0];
         assert!(row.from_field.contains("registry plan"));
-        assert_eq!(row.status_from_field, STATUS_FIELD);
+        assert_eq!(
+            row.status_from_field,
+            statecraft_run::report::StatusSource::ListOnly.describe()
+        );
         // And the human rendering carries both, so the two are never conflated
         // by a reader either.
         assert!(a.summary.contains("registry plan"));
@@ -590,8 +595,10 @@ mod tests {
             ready: vec![ReadySpec {
                 id: "012".into(),
                 title: "t".into(),
+                status: None,
             }],
             lifecycle: vec![],
+            status_source: statecraft_run::report::StatusSource::ListOnly,
         };
         let a = work_list_answer(select(
             &report,
