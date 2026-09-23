@@ -4375,6 +4375,18 @@ mechanism will grant and deny. The choices the section is silent on:
   `startup show` reports the layout as `placement`, `home` or `target`, and
   says of `target` that the records were written where the child could reach
   them and that nothing says the attempt was confined.
+- *A planted decision, measured.* Removing a decision the child wrote into
+  its exchange directory, and refusing the attempt, is what this change does;
+  it does not stop a tool call the child makes before the supervisor gets
+  there. The gate admits on any decision file in its directory, and an
+  unconfined child can write one, so on CI's Linux runner (2026-09-23) the
+  child's tool call ran in that window while the attempt still concluded
+  `refused` with the plant named. The call is not invisible: the gate's own
+  log, copied into the records and labelled child-attested, shows the
+  admission it gave. Rule 3's "a file the child cannot write" holds only under
+  spec `004` section 3.18's confinement, which is specified and not
+  implemented; until then this is a residual, recorded here and in the test
+  that measures it, not a guarantee.
 
 ## Verification
 
