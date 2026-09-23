@@ -3282,6 +3282,23 @@ as disagreeing. The acceptance script's `managed-startup` stage runs the same
 path through its local route. **No provider session was started**, so every
 premise P1 to P5 keeps the grade section 3.33 gives it.
 
+**2026-09-23: a trial the deadline stopped before its first event read as a
+failed launch, not an uncertain one.** Rule 37 makes a process the deadline
+stopped `uncertain`. The judgement inferred "the deadline stopped it" from an
+interrupted outcome with no stream error and no terminal event. A session the
+deadline stops before it writes `init`, however, also carries the adapter's
+"no init event" stream error, so that inference failed and the trial was judged
+`not-established`. It was found by the 2026-09-23 audit, when
+`startup_trial::a_session_stopped_at_its_deadline_is_uncertain_and_its_evidence_stays`
+failed under load: its fake was scheduled too late to write anything within
+three seconds. The supervisor now reports whether its deadline fired (spec `004`,
+entry of this date), `trial.json`'s process end records it as `timedOut`, and
+`deadline` is read from that flag first. A record written before the flag
+existed has no `timedOut` member and keeps the older inference, so reloading
+it cannot change its verdict. Neither live trial record is affected: the
+2026-09-23 trial ended by itself. A new test uses a fake that writes nothing,
+and it fails without the fix and passes with it.
+
 ## Verification
 
 Each line is one command. They run the acceptance this spec's behavior declares:

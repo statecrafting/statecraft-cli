@@ -408,12 +408,27 @@ pub struct ProcessEnd {
     pub surviving: Option<String>,
     /// Why the supervision itself failed, where it did.
     pub failed: Option<String>,
+    /// Whether the supervisor's deadline ended the process, as the supervisor
+    /// observed it. Absent from records written before 2026-09-23, which read
+    /// as `false` and are judged by the older inference below.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub timed_out: bool,
 }
 
 impl ProcessEnd {
-    /// Whether the deadline, rather than the process or the launcher, ended it:
-    /// interrupted, not stopped, with no stream error, and no terminal event.
+    /// Whether the deadline, rather than the process or the launcher, ended it
+    /// (rule 37: "a process the deadline stopped").
+    ///
+    /// The supervisor's own observation decides. A session the deadline stopped
+    /// before it wrote an `init` event also carries the adapter's "no init"
+    /// stream error, and reading that error as a reason the deadline did not
+    /// end it judged such a trial `not-established` instead of `uncertain`.
+    /// A record written before the flag existed keeps the older inference, so
+    /// it is judged on reload exactly as it was when written.
     pub fn deadline(&self, entries: &[Entry]) -> bool {
+        if self.timed_out {
+            return self.spawned && self.stopped.is_none() && self.failed.is_none();
+        }
         self.spawned
             && self.outcome.as_deref() == Some("interrupted")
             && self.stopped.is_none()
@@ -1285,6 +1300,46 @@ mod tests {
             Verdict::OutcomeUnknown,
         );
         assert_eq!(j.verdict, TrialVerdict::Uncertain);
+    }
+
+    /// A session the deadline stopped before it wrote any event carries the
+    /// adapter's "no init" stream error as well. Rule 37 makes it `uncertain`
+    /// all the same, because the deadline is what stopped it; a record
+    /// written before the supervisor reported its deadline keeps the older
+    /// reading, so reloading it cannot change its verdict.
+    #[test]
+    fn a_deadline_before_the_first_event_is_uncertain_despite_the_missing_init() {
+        let mut f = facts(Vec::new(), None);
+        f.process = ProcessEnd {
+            spawned: true,
+            outcome: Some("interrupted".to_string()),
+            stream_error: Some(
+                "event stream carried no init event, so what the provider applied is unknown"
+                    .to_string(),
+            ),
+            timed_out: true,
+            ..ProcessEnd::default()
+        };
+        let j = judge(&f, None, Some("r"), &[], Verdict::Unverified);
+        assert_eq!(j.verdict, TrialVerdict::Uncertain, "{:?}", j.reasons);
+        assert!(j.reasons[0].contains("deadline"), "{:?}", j.reasons);
+
+        f.process.timed_out = false;
+        let j = judge(&f, None, Some("r"), &[], Verdict::Unverified);
+        assert_eq!(j.verdict, TrialVerdict::NotEstablished);
+    }
+
+    #[test]
+    fn a_record_without_the_deadline_flag_reads_and_writes_as_it_did() {
+        let end = ProcessEnd {
+            spawned: true,
+            outcome: Some("completed".to_string()),
+            ..ProcessEnd::default()
+        };
+        let text = serde_json::to_string(&end).unwrap();
+        assert!(!text.contains("timedOut"), "{text}");
+        let read: ProcessEnd = serde_json::from_str(&text).unwrap();
+        assert!(!read.timed_out);
     }
 
     #[test]
