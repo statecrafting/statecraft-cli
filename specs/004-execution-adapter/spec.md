@@ -1846,6 +1846,15 @@ refused as unreadable, naming the deadline.
 that reason beside the coverage line, so it no longer reads as a bare
 `not checked`.
 
+**2026-09-23: the base export's Git invocation, per the second review.** Every
+inherited `GIT_*` variable is removed before system and global configuration
+are switched off, so none can name another index, directory, object store or
+injected configuration; the registered target is named as `safe.directory`,
+because switching global configuration off also drops an operator's own
+`safe.directory`. Filters the target's own `.git/config` defines still run
+during `checkout-index`: that file is the operator's, not committed content,
+and spec `004` section 3.18 rule 3 keeps it out of the child's writable roots.
+
 ## Verification
 
 Each line is one command. §3.5's suite is eight tests named `suite_1` to

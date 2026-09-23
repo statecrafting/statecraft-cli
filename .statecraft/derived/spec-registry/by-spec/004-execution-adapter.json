@@ -54,7 +54,7 @@
     "id": "004-execution-adapter",
     "implementation": "in-progress",
     "sectionDigests": {
-      "004-the-execution-adapter-boundary-and-the-first-provider": "284afd5a86410136c77303b78482b1dcfcc9f8fd78dfe7749294e887569bad80",
+      "004-the-execution-adapter-boundary-and-the-first-provider": "55e10efff5caaac5aa8d60031b7742e21b06ea67ba13790aa20d49a7dbb79276",
       "1-purpose": "ec32f21fea438da7d976970679b1977cba384f38738e9877fdd934bfa2aed41d",
       "2-territory": "1c1c65e2d69832b369606d257498f77c77c85f26f8ac0083451508143f6055d1",
       "3-1-the-protocol": "0dce0247a589f2e9b1dedb094952fd1bccd6df4e1ab0d90f1dfff31b88d4fd45",
@@ -77,7 +77,7 @@
       "3-9-what-is-spawned-and-the-three-parts": "f934b0c7a7d9a0a867f78eb191aba0ccd5c6250a4cdb19e4279fdc42408d03b6",
       "3-behavior": "e4217c949614c123853b5f7a0b9ce39bca6ead72338332394279cce0b34f3515",
       "4-out-of-scope": "cecc06485b9197d91bdec31e514a78cfa32f498d481abdcf074f50adee3a38c5",
-      "5-decisions-recorded-during-implementation": "e769df322d0578ab571d523e4e9b1d5c964e8d765e89dbd956d7f7564d41ae46",
+      "5-decisions-recorded-during-implementation": "dcc695011b6370e817d2b2817276e88dc130b1c2fb5e28774429c667a715de53",
       "verification": "2b489e1a5c9b6e1e43daba3dd6db9d7b7f9f7aa960357dd349a795aa36b5e50d"
     },
     "sectionHeadings": [
@@ -112,6 +112,6 @@
     "summary": "The single seam through which this product runs an agent, and the first provider behind it. Fixes the three-part protocol (a request the supervisor writes, an event stream it reads, a result it records), the closed capability vocabulary with required tokens refusing before any process starts and preferred tokens degrading visibly, the negative suite that qualifies an adapter binary version, and the constructed rather than filtered child environment whose property is a complete record and explicitly not containment of hostile code. Sections 3.9 to 3.16 name Claude Code as the first provider and fix what its stream can and cannot witness: which capability tokens the manifest may declare, each against a measurement rather than a reading of the flags; the finding that a mid-stream denial notification accompanies the terminal refusal record and that a denied session still classifies itself as a success; which of two denial mechanisms the adapter must use, because they have opposite evidence properties; and what a qualification record binds to.\n",
     "title": "The execution adapter boundary and the first provider: one protocol, declared capabilities, a qualification suite, a constructed child environment, and what a real stream can witness"
   },
-  "shardHash": "d3d47fffe649a862702ca1a4173e7bb3d11d383b5d435c133696b961c4417d4d",
+  "shardHash": "ff5f9f5fb4792b610bf7d5339e9ea06322a35d4eadc9933018d4b8d4046f2ddf",
   "specVersion": "1.6.0"
 }

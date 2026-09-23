@@ -87,13 +87,23 @@ pub fn planning_record(planned: &Coverage) -> serde_json::Value {
 /// no fsmonitor. Only the target's own repository configuration still applies.
 fn git(root: &Path) -> Command {
     let mut command = Command::new("git");
+    // Every inherited `GIT_*` variable goes: they can name another index,
+    // directory, object store or configuration, including configuration
+    // injected through `GIT_CONFIG_COUNT` and `GIT_CONFIG_PARAMETERS`.
+    for (name, _) in std::env::vars_os() {
+        if name.to_string_lossy().starts_with("GIT_") {
+            command.env_remove(name);
+        }
+    }
     command
         .env("GIT_CONFIG_NOSYSTEM", "1")
         .env("GIT_CONFIG_GLOBAL", "/dev/null")
-        .env_remove("GIT_INDEX_FILE")
-        .env_remove("GIT_DIR")
-        .env_remove("GIT_WORK_TREE")
         .args(["-c", "core.hooksPath=/dev/null", "-c", "core.fsmonitor="])
+        // With global configuration off, a `safe.directory` the operator set
+        // there is gone too; the target is the registered repository this
+        // product was asked to read, so it is named here.
+        .arg("-c")
+        .arg(format!("safe.directory={}", root.display()))
         .arg("-C")
         .arg(root)
         .stdin(Stdio::null());
