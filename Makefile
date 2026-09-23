@@ -54,7 +54,7 @@ SKIP_NOTE := no crate exists yet, so the workspace has no members and cargo has 
 ## `index coverage --fail-on-untraced` joined this list with the first source
 ## file, which is the condition AGENTS.md recorded for it. On a code-free tree it
 ## refused an empty universe rather than passing vacuously; now it defends
-## 117/117 specifically claimed instead of reporting the number.
+## every claimed file instead of reporting a number.
 ##
 ## `index check --fail-on-unresolved` joined this list when 006 built the last
 ## forward claim. Both flags the generic spec-spine kit carries are now present,
@@ -107,12 +107,18 @@ refresh:
 	$(SPEC_SPINE) compile
 	$(SPEC_SPINE) index
 
-## One spec's declared acceptance (spec-spine 049). Deliberately not part of
-## `gate`, because it runs code the corpus declares. Specs 002 to 005 declare
-## none, which is honest for an unimplemented spec.
+## One spec's declared acceptance (spec-spine 043). Deliberately not part of
+## `gate`, because it runs code the corpus declares, and not run in CI.
+##
+## A declared command that names `spec-spine` resolves it on PATH, the same way
+## any command does. So the repository-local directory is put first on PATH for
+## the whole run: without it, `make verify` judged a corpus pinned =0.20.0 with
+## the shared ~/.cargo/bin copy, which refuses the pin with exit 3. Measured on
+## 2026-09-23: specs 000, 002, 003, 005 and 006 failed that way and passed with
+## the local copy first.
 verify:
 	@test -n "$(SPEC)" || { echo "usage: make verify SPEC=<id>"; exit 3; }
-	$(SPEC_SPINE) verify $(SPEC)
+	PATH="$(CURDIR)/$(dir $(SPEC_SPINE_LOCAL)):$$PATH" $(SPEC_SPINE) verify $(SPEC)
 
 ## The coupling gate, over two COMMITS. **Commit first.** Run against BASE while
 ## HEAD is still BASE and the diff is empty: the gate reports "0 path(s)
@@ -124,7 +130,7 @@ verify:
 ## the authoritative one is what CI recorded against the pull request's own
 ## frozen endpoints, which a later run on merged main cannot reconstruct.
 ##
-## 0.20.0 adds `--include-uncommitted` (spec 102), which unions `git diff HEAD`
+## 0.20.0 adds `--include-uncommitted` (spec 081), which unions `git diff HEAD`
 ## into the range so a pre-commit run judges the change being committed. It is
 ## off here and off in CI, deliberately: CI judges a pushed range, where the
 ## working tree is irrelevant and must stay so. Wiring it into a commit-boundary
