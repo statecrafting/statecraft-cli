@@ -539,7 +539,16 @@ fn reconcile_verb(
     if positional.len() < 7 {
         return usage();
     }
-    let root = absolute(positional[0]);
+    // Filed under the stored root, like every other verb that keys a record,
+    // so another spelling of a registered path reads the same chain.
+    let typed = absolute(positional[0]);
+    let root = match statecraft_run::repository::resolve(registry, &typed) {
+        Ok(registration) => registration.root.clone(),
+        Err(statecraft_run::repository::Unresolved::NotRegistered) => typed,
+        Err(statecraft_run::repository::Unresolved::SameDirectory(roots)) => {
+            return emit(&bind::same_directory_answer(&typed, &roots), format);
+        }
+    };
     let run_id = positional[1].as_str();
     let Ok(attempt) = positional[2].parse::<u32>() else {
         return usage();
