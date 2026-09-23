@@ -35,6 +35,31 @@
     ],
     "id": "006-command-surface",
     "implementation": "complete",
+    "sectionDigests": {
+      "006-the-command-surface": "bb8ff4d8506de56ac7f20ff02205524c69f0906d2e619b87697a2c544ffb2e50",
+      "1-purpose": "e6e22a8e8dc18f59110b16adb2684860ed768cf61e37d71ed95a9ab10064a607",
+      "2-territory": "2a51dc6c2d08c14c669875b1a001da52a60b50885e44feac976b7f3cd2dd7441",
+      "3-1-the-command-tree": "e260fbd5d469d829b7facc63d112632f06a80bb51dce8f22d7986369bd1c4c47",
+      "3-10-placing-the-work-run-and-accept-verbs-in-the-vocabulary": "fa1c509d88ed43176f74347fe6b8b6088be678e5cf31b439f76b1a57caa9b8e5",
+      "3-11-1-the-five-verbs-spec-002-s-sections-3-25-to-3-29-need": "5de80bb2154649054b6ed6fb5d57b9d3225c34208a8ee64ecd0b0203c4339fcd",
+      "3-11-2-the-sixth-verb-and-what-a-qualification-exit-code-distinguishes": "2a9b7c93051e80ee9688724edccdbb4e1b069abef947bf58458ddafe04f45655",
+      "3-11-3-the-seventh-verb-and-what-run-adds-to-its-answer": "3c3d385e80e90829827b461c389bbbd749f298a9296ab13a656f8fa7f02b4279",
+      "3-11-4-the-eighth-verb-and-the-trial-section-startup-show-gains": "3c0521e9e4b9fce89bd39902c81e23436e9518aa5907493c9b1cd5f2012b546d",
+      "3-11-a-binding-needs-an-entry-point-not-an-implementation": "7a732159b342e4433566c881de357cdb1e0953816edd266e9880f8f9b7165e8b",
+      "3-12-what-the-command-surface-does-not-unlock": "9abea2bf994d1449ff89e71cae8d1a3805d328cb66ef1bc8900562902ed3cded",
+      "3-2-a-command-is-a-binding-never-a-second-implementation": "f387426081e8a790f53767e1fb7c366bd291198009c47d99b0c8af9538751768",
+      "3-3-the-exit-code-vocabulary": "f35a79008a237f5d879e0f9c6404a115623f82d503e462d4563e0a91936a5813",
+      "3-4-two-renderings-of-one-value": "d120bb76f4fd03b77c7671afa49fbeb0ad2bd1a0016a396b180d649358bf8045",
+      "3-5-the-binary-s-name-is-recorded-not-defaulted": "6158ff8b6dde08eda8a5c39df32bd8daf89e6a8ae0ddc665e2ea924f889e2f64",
+      "3-6-what-the-binary-reads-and-what-it-does-not": "684209925561eeb052043051004c71e20c8c30ae669b40a7c70c382d72f06170",
+      "3-7-observable-negative-cases": "9846430bc52a241fcccc05d1397a8eb1cf3c617956b63e939afaad9bf0b9b315",
+      "3-8-discovery-is-a-join-because-one-report-does-not-carry-status": "4697defa17606339e21e7caaa1c4aea02e711ac2f7d1df042bc02c7268c9dab3",
+      "3-9-inspection-is-a-fold-and-reads-nothing-else": "98671d6dcd95497894a5e7f80f2c8fbcc672b583b29c88af0b95b694f150bf38",
+      "3-behavior": "5d3f1273a22ece5132fa2bd4232378aea2c36ce9344336c766d239a2c3df162f",
+      "4-out-of-scope": "55fb20ad589fed8825d78a3127c82be59f85d96bc4db3dba59887615afcb5c43",
+      "5-decisions-recorded-during-implementation": "3f06171dc578aec9884dbdacb4fd3a681486f4743dff7f18a3bd85dbfa2654b7",
+      "verification": "cf736a5f4fcf78897ed8021cd150d3f78edf86379ad2f6e784cb3d9b0c63cff0"
+    },
     "sectionHeadings": [
       "006: The command surface",
       "1. Purpose",
@@ -66,5 +91,5 @@
     "title": "The command surface: one binary, every verb the other specs name, and what an exit code means"
   },
   "shardHash": "875d41791b1e20a5871b8b7fed7b466b14c8e135a5e65c04d461674538137445",
-  "specVersion": "1.3.0"
+  "specVersion": "1.6.0"
 }

@@ -212,7 +212,7 @@ proposes and neither side has built.
 
 | Component | State today | This product's relationship | Kind |
 |---|---|---|---|
-| spec-spine 0.20.0 | Implemented, released, installed locally at `.tooling/bin` | Invokes its supported commands, parses its structured reports | **actual dependency**, on a released binary |
+| spec-spine 0.23.0 (CLI; `=0.20.0` until 2026-09-23) | Implemented, released, installed locally at `.tooling/bin` | Invokes its supported commands, parses its structured reports | **actual dependency**, on a released binary |
 | `spec-spine-core` 0.21.0 | Implemented, released on crates.io | `scaffold_init_json`, the governance starter set `002` section 3.15 consumes | **actual dependency**, a library pinned `=0.21.0` in `crates/statecraft-home`, moved independently of the CLI pin; `002` section 5 records it as non-conforming |
 | `attest-ledger` 0.1.0 | Implemented, Apache-2.0 | Record envelope, chain hashing, verification | **actual dependency** as of 2026-09-19: `attest-ledger-core`, pinned to `a9c3595` in `crates/statecraft-run`. The disposition it was adopted under is the **reuse** row below. |
 | `canonical-keysort-json` 0.1.0 | Implemented, Apache-2.0, Rust only | Canonical serialization at the hashing boundary | **proposed reuse** |
@@ -459,6 +459,12 @@ stale descriptions ("contains no product code", `.derived/`, "none is
 implemented"). Those are editorial: spec `000`'s section 5 says an anchor
 forbids contradiction and leaves ordinary editorial amendment available, and
 no anchored principle changes.
+
+**2026-09-23: the CLI pin moves to `=0.23.0`, with its `D-06` record.** The
+record is `D-06`'s dated entry in the decision record, and editing that record
+is a change to this spec's territory, so it is noted here. The component table
+names the new pin. The library row still reads `0.21.0`, because that
+dependency moves in its own change under spec `002`.
 
 ## Verification
 

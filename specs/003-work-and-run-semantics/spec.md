@@ -592,6 +592,22 @@ report never falls back to the derived tree. Which binary is resolved is
 unchanged: the operator's `spec-spine`, never one the candidate chose, with
 the target's pin enforced by the producer itself.
 
+**2026-09-23: the pinned producer now carries both reports' `status` and
+resolves closures.** The CLI pin moved to `=0.23.0` (decisions `D-06`, entry
+of this date). Sections 3.1.2 and 3.1.3 were written against a pin that
+carried neither, and each says so as a dated measurement, which stays as
+written. Measured under the new pin, through the CLI, on this corpus:
+
+- `registry plan --json` is read schema 0.7.0, and its one ready row carries
+  `status`, which the join compares with `registry list` and finds agreeing.
+- `registry closure` for `002-environment-lifecycle` resolves to one member
+  and one digest.
+
+So rule 2's comparison and section 3.1.3's binding are live against the pinned
+producer, not only against a named candidate build. No rule changes. Section
+3.1.2 rule 4's released shape without `status` stays readable, because a
+target may pin an older producer.
+
 ## Verification
 
 Each line is one command. §3.8's twenty-two rows are integration tests named after

@@ -19,6 +19,38 @@
     ],
     "id": "005-acceptance-and-evidence",
     "implementation": "complete",
+    "sectionDigests": {
+      "005-independent-acceptance-the-receipt-the-evidence-dimensions-and-the-envelope": "8ad80a437c94b55ce92c0b7745bab333a9eda24ecb2dc6b45c9b22f5965ab68e",
+      "1-purpose": "1e83a18b7efb0bd0936e628cee0e8229ae71f51ca31b33142d0d4cf783896da8",
+      "2-territory": "f9d6ce9ea66ef5a9886e38b1ff14df7b5124c6111f042a468679d38930581a1d",
+      "3-1-1-which-outcomes-are-even-eligible": "9326d3e4ad2540938327f4131ec41afc880ecb733f592aae8faacff8c11d5388",
+      "3-1-what-is-judged": "cf530da3b16885eee10e869cd23ecc774db10266d9177f87af530f6957f0987c",
+      "3-10-observable-negative-cases": "62c18104d4841b12eadf351c2e3cf945f0092932e9eaa45c519b6b5ab9856e33",
+      "3-11-one-owner-and-who-re-exports": "2a662666889ae88c806e78fb4f395cf8082904367a43e2e929777906852e30d6",
+      "3-12-recorded-t-the-three-words-are-reserved": "27261f47a5c36dea375105fdd11bc7b52f45ba8c4401a458ad1bf659462e77b9",
+      "3-13-the-reference": "e30e651e7d26a7558370958a20ea58c9a2475461bbe1573921c721c0e14c64f3",
+      "3-14-what-a-compatibility-fixture-must-prove": "84673bd3abdd13adc051a2bea212cf8e67ca0022a1402cbab84751aba3732dc3",
+      "3-15-provenance-and-the-licence": "881136b257f9104e7543cafd3ff220161cda8c3f4cb13195045c8e385a5801cf",
+      "3-16-the-native-golden-vectors-stay-provisional": "9c6b985c8d27561f0d7fb15e1a3c1a6d6b9c64d64ed99049be333004aad59eae",
+      "3-17-the-platform-s-dependency": "773b9178d7dfc0024af6fd83d598c72bf4e98dd4f251ff12831b3c8cef1a166c",
+      "3-18-whether-the-contract-an-attempt-was-bound-to-still-holds": "7b938b6054fa8f6a5a5b9ae6bc1404443061780bc988ff1f727eba115ce6d0d1",
+      "3-2-independence": "36605a0bd5d8074ee179dff09a44230d7c44d9e6941f7ce97e5d1f2cfabe4f93",
+      "3-3-1-how-the-report-is-obtained": "a25ceabec0a5079ff7b7c06e908eded977aa2359f2f094fae018e613ec71f332",
+      "3-3-2-which-class-witnesses-which-member": "3a9a5f0680473a77c84e06bcf1ab357a01cc55cf2aef66f841419c5721484748",
+      "3-3-3-when-there-is-no-answer": "b308302c0f276e63ebd8a0d39a517c8cd5b04b62468270a419a5616b47477382",
+      "3-3-4-what-reading-the-report-permits-and-what-it-does-not": "f547af84cce5017e862f30274c5cc00240ec4e6becb8c835f0bb146ee4fa576e",
+      "3-3-the-authority-set-rule": "c610d76ed1cedcb1a3648d4f046312e9f7275d312778447edb21322c69542e21",
+      "3-4-the-receipt": "6e05e759c5a4129f59e98c2fef2cd3e1a5db4b5106da74cc640a4f557bbdb1cd",
+      "3-5-the-four-evidence-dimensions-and-admission": "1bac6db45b909e5e000096d6d0144a3687d06b92d2b3cbc60ee3e9a442c76e92",
+      "3-6-trust-roots": "8ec700924f63e0662d77d2af6cf812cc25a5c707676f310cb9ac2d9ada4af5ea",
+      "3-7-bytes-digests-and-constructions": "036391834465af64e01765a99107b3d82a5c86da67dca644259b37dd685a119e",
+      "3-8-the-three-names-for-absence": "a291b9b948751fb9c601934c7237f82e71133f952e9e49acf021340f6c1f5ba1",
+      "3-9-the-reviewable-outcome": "93e4ab658e40fade09f40d10425354720101245a2a648cf4718ca5aa4602eedb",
+      "3-behavior": "55730ec9fa021b689602f793b2259662108057bb87e1d314d38232e062a9b49b",
+      "4-out-of-scope": "328e6543fcfd8ae8ffb71f70d8c9cfb7e90e0bbaf1c611d43eb43c40fbf150f3",
+      "5-decisions-recorded-during-implementation": "1b9a6f482334ec12a463033240462dfee32bf93cca0e7829110c60d2e0df5f53",
+      "verification": "497d66613a5622ffd6a09d95869fa4080d6a7bea15d2defb722afc90976239c1"
+    },
     "sectionHeadings": [
       "005: Independent acceptance, the receipt, the evidence dimensions, and the envelope",
       "1. Purpose",
@@ -57,5 +89,5 @@
     "title": "Independent acceptance, the receipt, the separately reported evidence dimensions, and the envelope two products exchange"
   },
   "shardHash": "8feb77f4c2c43669c81b1702d7bee1129f172f30c40634c5d76e6557ac89b4cf",
-  "specVersion": "1.3.0"
+  "specVersion": "1.6.0"
 }

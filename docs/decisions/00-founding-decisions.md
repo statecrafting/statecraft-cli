@@ -55,8 +55,8 @@ date and the command that established it. Nothing else in this section moved.
 
 | ID | Constraint | How it was established |
 |---|---|---|
-| C-01 | **2026-09-17:** the binary this corpus is compiled, linted and pinned against is **0.20.0**, installed at the repository-local `.tooling/bin/spec-spine`. The shared `~/.cargo/bin/spec-spine` is no longer this repository's binary and is not consulted by `make`. Until 2026-09-16 the row read 0.18.0 at the shared path. | `.tooling/bin/spec-spine --version`; `make tools` installs it from `required_version`. |
-| C-02 | **2026-09-17:** 0.19.0 and 0.20.0 are both released and 0.20.0 is adopted (`D-06`). The development checkout at `~/DevWork/spec-spine` is ahead of both and sits on an unmerged branch; **no feature of that tree may be described here as available**, which is the part of this row that did not change. The rule is about unreleased work, not about 0.19.0 in particular. | `git tag --sort=-creatordate` and `git branch --show-current` in that checkout; `cargo search spec-spine-cli` reports 0.20.0. |
+| C-01 | **2026-09-23:** the binary is **0.23.0**, at the same repository-local path, adopted under `D-06`'s entry of that date; the rest of this row is unchanged. **2026-09-17:** the binary this corpus is compiled, linted and pinned against is **0.20.0**, installed at the repository-local `.tooling/bin/spec-spine`. The shared `~/.cargo/bin/spec-spine` is no longer this repository's binary and is not consulted by `make`. Until 2026-09-16 the row read 0.18.0 at the shared path. | `.tooling/bin/spec-spine --version`; `make tools` installs it from `required_version`. |
+| C-02 | **2026-09-23:** 0.21.0 and 0.23.0 are released and 0.23.0 is adopted (`D-06`); 0.21.0 never was, and 0.22.0 was prepared but never tagged or published (crates.io lists 0.21.0 then 0.23.0). The rule below still holds: unreleased producer work is never described here as available. **2026-09-17:** 0.19.0 and 0.20.0 are both released and 0.20.0 is adopted (`D-06`). The development checkout at `~/DevWork/spec-spine` is ahead of both and sits on an unmerged branch; **no feature of that tree may be described here as available**, which is the part of this row that did not change. The rule is about unreleased work, not about 0.19.0 in particular. | `git tag --sort=-creatordate` and `git branch --show-current` in that checkout; `cargo search spec-spine-cli` reports 0.20.0. |
 | C-03 | spec-spine 0.18.0's lifecycle is `status` in {draft, approved, superseded, retired} and `implementation` in {pending, in-progress, complete, n-a, deferred} or absent. `approved` plus `pending` is a work order; `draft` is never a claim about code; `approved` with an absent `implementation` makes an unresolved unit an **error**. | `standards/spec/contract.md`, scaffolded by the installed binary. |
 | C-04 | A corpus with no code is a supported steady state. `index coverage --fail-on-untraced` **refuses** on a code-free tree rather than passing vacuously, so it must not be in this repository's gate yet. | `~/DevWork/spec-spine/docs/specify-first.md`. |
 | C-05 | `compile --check` compares the corpus against the **committed** shard trees. Running it immediately after a plain `compile` in the same job passes unconditionally and proves nothing. | Same source, and the adoption guide's CI note. |
@@ -295,6 +295,87 @@ Fourteen codebase-index shards moved one field, `shardHash`, because
 change edits both. No shard said anything different about the corpus. That
 containment is a consequence of reading `.derived/` only through `spec-spine`
 subcommands: a schema label a consumer never parses cannot break the consumer.
+
+**2026-09-23: the pin moves to `=0.23.0`.** Owner-directed, as the scoped
+adoption of spec-spine's published expansion line. It moves the CLI pin only.
+The library dependency `spec-spine-core` moves in its own implementation
+change, because `D-02` gives that crate an owning spec and this pin has none.
+0.21.0 and 0.22.0 were never adopted here.
+
+*What was adopted, by identity.* `spec-spine-cli`, `spec-spine-core` and
+`spec-spine-types` 0.23.0 were published to crates.io at about 08:40Z on
+2026-09-23 by the producer's owner account. Each downloaded `.crate` matches
+the registry checksum:
+
+| Crate | Checksum |
+|---|---|
+| `spec-spine-cli` | `6b0e7800…ca91` |
+| `spec-spine-core` | `3dca8f68…e492` |
+| `spec-spine-types` | `dcd35073…9dc4` |
+
+Each records Git revision `d2bb4763`, the target of tag `v0.23.0`, in
+`.cargo_vcs_info.json`, and each unpacked source equals that revision's tree
+with no differing path. Between the candidate `97f82ee5` that the producer's
+preparation record measured and `d2bb4763`, nothing under `crates/` changed:
+the release adds only the ratification of its specs and documentation. A build
+is identified by version and source revision, not by digest. The same
+`cargo install --locked` gave `599d724d…f23a` under an empty `CARGO_HOME` and
+`365d87ab…02c0` under `make tools`.
+
+*The floor.*
+
+- `DEFAULT_BYPASS_PREFIXES` is byte-identical between `v0.20.0` and `v0.23.0`:
+  the same declaration, the same thirteen entries.
+- `config show` differs only by the pin line and one built-in floor entry,
+  `.statecraft/derived/`. From 0.23.0 the configured derived directory joins
+  the floor the gate applies, not only the default `.derived/`.
+- That is the one place the gate asks about fewer paths. It is compiler output
+  that no spec authors, and `check` judges its freshness on every gate run.
+  Spec `001` section 3.1 already forbids reading it except through the
+  producer.
+- The other coupling changes since 0.20.0 are narrower or stricter, not looser:
+  - a deleted path is judged where it lived (its spec 100);
+  - citations the renumber could not see (098);
+  - a waiver's lifecycle lines, inert without them (113).
+- Measured, not only read: `couple` over six merged ranges of this repository
+  gives `OK` under both versions: `01df484..4d6a9d5`, `4d6a9d5..ea2076b`,
+  `ea2076b..f49ac76`, `f49ac76..323ac62`, `1739131..50a5269` and
+  `1739131..01df484`. (A first draft of this entry listed the fifth range
+  backwards, which is an empty diff and proves nothing; it was re-measured.)
+
+The checked-path counts differ by exactly the derived paths in each range:
+
+| Range | 0.20.0 | 0.23.0 | Derived paths |
+|---|---|---|---|
+| `01df484..4d6a9d5` | 16 | 1 | 15 |
+| `4d6a9d5..ea2076b` | 6 | 4 | 2 |
+| `ea2076b..f49ac76` | 14 | 8 | 6 |
+| `f49ac76..323ac62` | 10 | 6 | 4 |
+| `1739131..50a5269` | 3 | 1 | 2 |
+| `1739131..01df484` | 35 | 17 | 18 |
+
+- One behavior is new and matters here. 0.23.0's `couple` refuses with exit 2
+  when the working tree's ledger is stale, before judging. That is stricter,
+  and it is why a pin move must be committed with its re-index.
+
+*The re-index.* The move regenerates 22 shards:
+
+- Seven spec-registry shards: registry `specVersion` 1.3.0 to 1.6.0, with each
+  record gaining `sectionDigests`, spec-spine's 106.
+- Fifteen codebase-index shards: `shardHash` only, because the tool version,
+  `spec-spine.toml` and the root documents are global inputs.
+
+Read through the CLI, `registry plan --json` is read schema 0.7.0 and each
+ready row carries `status`, and `registry closure` resolves: for
+`002-environment-lifecycle` alone it is one member, digest `419cc963…8dbd`. No
+shard says anything different about the corpus's specs, and the ready set is
+unchanged: `002`, `approved`.
+
+*What this does not do.* It does not move `spec-spine-core`, invert the
+producer-conformance tests, record new producer fixtures, or change any code.
+It adopts no new producer capability as a runtime feature. Work scopes,
+impacts, interface references and waiver lifecycles are available and not
+consumed, because no requirement here calls for them.
 
 **Consequence if rejected.** The pin returns to `=0.18.0` and `make tools`
 installs that instead, since the version is read from the pin. The rows corrected
