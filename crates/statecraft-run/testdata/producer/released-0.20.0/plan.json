@@ -1,0 +1,11 @@
+{
+  "blocked": [],
+  "notSchedulable": 6,
+  "ready": [
+    {
+      "id": "002-environment-lifecycle",
+      "title": "Project registration and the Statecraft-managed environment: one global home, one project area, one initialization flow, and where authority comes from"
+    }
+  ],
+  "schemaVersion": "0.1.0"
+}

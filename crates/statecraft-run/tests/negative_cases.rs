@@ -29,6 +29,7 @@ fn report(rows: &[(&str, &str)]) -> CorpusReport {
             .map(|(id, _)| ReadySpec {
                 id: (*id).into(),
                 title: format!("title of {id}"),
+                status: None,
             })
             .collect(),
         lifecycle: rows
@@ -39,6 +40,7 @@ fn report(rows: &[(&str, &str)]) -> CorpusReport {
                 implementation: Some("pending".into()),
             })
             .collect(),
+        status_source: statecraft_run::report::StatusSource::ListOnly,
     }
 }
 

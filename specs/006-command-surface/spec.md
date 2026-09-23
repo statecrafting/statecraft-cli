@@ -749,6 +749,19 @@ library's `inspect`, so its binding did not change. The probe reports the
 version its single `--version` call read, so the trial records it without a
 second call.
 
+**2026-09-22: section 3.8 rule 1 now names both sources of `status`.**
+`work list` printed a fixed `registry list --json: status` for every row. Spec
+003 section 3.1.2 records where each row's `status` came from, `registry list`
+alone or `registry list` with the plan agreeing, and the row now prints that
+value from the library rather than a constant. The join itself is unchanged,
+as rule 2 requires; dropping it would still be its own change, and it cannot be
+dropped while only `registry list` carries `implementation`.
+
+`tests/producer_compatibility.rs` asserted the rule 003 section 3.1.2 replaced:
+a plan `status` contradicting the list was ignored and the list decided. It
+now asserts the new rule in two tests, a contradiction refused (exit 2) naming
+both values, and an agreeing plan with the join still deciding.
+
 ## Verification
 
 Each line is one command. §3.7's rows are integration tests that **spawn the

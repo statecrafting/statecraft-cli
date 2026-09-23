@@ -1,0 +1,522 @@
+{
+  "items": [
+    {
+      "created": "2026-09-16",
+      "establishes": [
+        {
+          "kind": "file",
+          "path": "standards/spec/contract.md"
+        },
+        {
+          "kind": "directory",
+          "path": "standards/spec/templates/"
+        },
+        {
+          "anchor": "i-markdown-only-authored-truth",
+          "file": "standards/spec/constitution.md",
+          "kind": "section"
+        },
+        {
+          "anchor": "ii-compiler-owned-json-machine-truth",
+          "file": "standards/spec/constitution.md",
+          "kind": "section"
+        },
+        {
+          "anchor": "iii-spec-first-development",
+          "file": "standards/spec/constitution.md",
+          "kind": "section"
+        },
+        {
+          "anchor": "iv-determinism-and-validation",
+          "file": "standards/spec/constitution.md",
+          "kind": "section"
+        },
+        {
+          "anchor": "v-legacy-as-evidence",
+          "file": "standards/spec/constitution.md",
+          "kind": "section"
+        }
+      ],
+      "id": "000-bootstrap",
+      "implementation": "n-a",
+      "sectionHeadings": [
+        "000: Bootstrap spec system",
+        "1. The authoring / derived boundary",
+        "2. The typed authority graph",
+        "3. Determinism",
+        "4. Refusal",
+        "5. The three product anchors, and when they were frozen",
+        "6. What this spec does not do",
+        "Verification"
+      ],
+      "specPath": "specs/000-bootstrap/spec.md",
+      "status": "approved",
+      "summary": "Foundational contract for this repository: authored truth lives only in markdown (+ YAML frontmatter); machine-consumable truth is compiler-emitted JSON only; every artifact is a deterministic function of (config, file contents); a typed authority graph governs who-owns-what. This repository is born governed and currently holds no product code: the corpus exists before the first line is written, and no spec here may claim otherwise.\n",
+      "title": "Bootstrap spec system",
+      "unamendable": [
+        "markdown-truth-boundary",
+        "json-truth-boundary",
+        "determinism-requirement",
+        "typed-authority-graph",
+        "refusal-rule",
+        "independent-acceptance",
+        "no-self-granted-authority",
+        "evidence-outside-the-child"
+      ]
+    },
+    {
+      "created": "2026-09-16",
+      "dependsOn": [
+        "000-bootstrap"
+      ],
+      "establishes": [
+        {
+          "anchor": "vi-a-declaration-of-completion-is-not-an-acceptance",
+          "file": "standards/spec/constitution.md",
+          "kind": "section"
+        },
+        {
+          "anchor": "vii-a-candidate-cannot-enlarge-its-own-authority",
+          "file": "standards/spec/constitution.md",
+          "kind": "section"
+        },
+        {
+          "anchor": "viii-name-the-enforcement-or-do-not-claim-the-protection",
+          "file": "standards/spec/constitution.md",
+          "kind": "section"
+        },
+        {
+          "anchor": "ix-outcomes-are-recorded-outside-the-child-and-recovery-reconciles-before-it-repeats",
+          "file": "standards/spec/constitution.md",
+          "kind": "section"
+        },
+        {
+          "anchor": "x-intent-execution-verification-and-acceptance-are-separate-records",
+          "file": "standards/spec/constitution.md",
+          "kind": "section"
+        },
+        {
+          "anchor": "xi-a-capability-is-declared-and-qualified-never-assumed",
+          "file": "standards/spec/constitution.md",
+          "kind": "section"
+        },
+        {
+          "anchor": "xii-public-claims-are-graded",
+          "file": "standards/spec/constitution.md",
+          "kind": "section"
+        },
+        {
+          "anchor": "xiii-the-local-product-owes-nothing-to-a-hosted-one",
+          "file": "standards/spec/constitution.md",
+          "kind": "section"
+        },
+        {
+          "kind": "file",
+          "path": "docs/decisions/00-founding-decisions.md"
+        },
+        {
+          "kind": "file",
+          "path": "scripts/check-authored-content.sh"
+        }
+      ],
+      "id": "001-boundaries-and-authority",
+      "implementation": "n-a",
+      "sectionHeadings": [
+        "001: The product boundary, the component owners, and the separation of authority",
+        "1. Purpose",
+        "2. Territory",
+        "3. Behavior",
+        "3.1 What this product owns",
+        "3.2 What this product does not own, and who does",
+        "3.3 The claim vocabulary",
+        "3.4 The two interaction modes",
+        "3.5 An authority change is not an implementation change",
+        "3.6 Authored-content rules that hold repository-wide",
+        "3.7 Observable negative cases",
+        "3.8 The reuse dispositions, the archive, the slice, and the later interfaces",
+        "Component owners, and what this product's relationship actually is",
+        "The dispositions, stated as section 3.2 requires",
+        "3.9 What the archive is used for, and what it is not",
+        "3.10 The two interaction modes, drawn out",
+        "3.11 The bounded first vertical slice",
+        "The slice's acceptance, stated as refusals",
+        "What the slice deliberately does not prove",
+        "3.12 Interfaces this product would publish later",
+        "4. Out of scope",
+        "5. Decisions recorded during implementation",
+        "Verification"
+      ],
+      "specPath": "specs/001-boundaries-and-authority/spec.md",
+      "status": "approved",
+      "summary": "What this product is, what it is not, and who owns each capability it depends on. Fixes the claim vocabulary (specified / implemented / tested / released), the two interaction modes and which one is built first, the rule that separates an authority change from an implementation change, and the reuse disposition for every shared component this repository would otherwise reimplement. Owns the product half of the constitution and the two founding records under docs/. It owns no code.\n",
+      "title": "The product boundary, the component owners, and the separation of authority"
+    },
+    {
+      "amends": [
+        "006-command-surface"
+      ],
+      "created": "2026-09-16",
+      "dependsOn": [
+        "000-bootstrap",
+        "001-boundaries-and-authority"
+      ],
+      "establishes": [
+        {
+          "kind": "directory",
+          "path": "crates/statecraft-environment/"
+        },
+        {
+          "kind": "directory",
+          "path": "crates/statecraft-home/"
+        },
+        {
+          "anchor": "7-truthful-implementation-state-of-spec-002",
+          "file": "specs/002-environment-lifecycle/handoff-2026-09-21.md",
+          "kind": "section"
+        },
+        {
+          "kind": "file",
+          "path": "scripts/acceptance/managed-session.sh"
+        }
+      ],
+      "extends": [
+        {
+          "nature": "additive",
+          "spec": "006-command-surface",
+          "unit": {
+            "kind": "directory",
+            "path": "crates/statecraft-cli/"
+          }
+        },
+        {
+          "nature": "corrective",
+          "spec": "001-boundaries-and-authority",
+          "unit": {
+            "kind": "file",
+            "path": "scripts/check-authored-content.sh"
+          }
+        },
+        {
+          "nature": "corrective",
+          "spec": "004-execution-adapter",
+          "unit": {
+            "kind": "directory",
+            "path": "crates/statecraft-adapter-claude-code/"
+          }
+        },
+        {
+          "nature": "additive",
+          "spec": "004-execution-adapter",
+          "unit": {
+            "kind": "directory",
+            "path": "crates/statecraft-adapter/"
+          }
+        }
+      ],
+      "id": "002-environment-lifecycle",
+      "implementation": "in-progress",
+      "sectionHeadings": [
+        "002: Project registration and the Statecraft-managed environment",
+        "1. Purpose",
+        "2. Territory",
+        "3. Behavior",
+        "3.1 Registration and qualification",
+        "3.2 The three ownership classes",
+        "3.3 The manifest",
+        "3.4 Install, plan, upgrade",
+        "3.5 Drift, and what `doctor` reports",
+        "3.6 Removal",
+        "3.7 The transition contract with `spec-spine init --with-kit` (withdrawn)",
+        "3.8 User instructions are preserved",
+        "3.9 Adapters",
+        "3.10 Observable negative cases",
+        "3.11 One Statecraft-managed global environment",
+        "3.12 One per-project area",
+        "3.13 The root instruction bridge",
+        "3.14 One global harness, delivered by adapters, copied into no repository",
+        "3.15 The governance producer boundary",
+        "3.16 Configuration authority",
+        "3.17 Initialization, and the verbs",
+        "3.18 Solo and team",
+        "3.19 The one-time relocation of the compiled artifacts",
+        "3.20 The operation boundary a dashboard uses",
+        "3.21 What replaces the kit transition contract",
+        "3.22 The counterparty's state, and the order the last of its harness moves in",
+        "3.23 What delivered harness content must satisfy",
+        "3.24 The consented settings modification",
+        "3.25 The required harness identity and the resolved one",
+        "3.26 Startup delivery evidence",
+        "3.27 Global adapter registration is not managed-session permission delivery",
+        "3.28 An unmarked registration is the user's, and resemblance is not ownership",
+        "3.29 What admits a live observation",
+        "3.30 What each control must demonstrate, and what binds a capture to its launch",
+        "3.31 The startup record a run writes, and the harness revision that answered",
+        "3.32 Launch states, the correlated acknowledgment, per-invocation startup delivery, and when governed work is released",
+        "3.33 The managed-startup trial, and why it is not the permission experiment",
+        "4. Out of scope",
+        "5. Decisions recorded during implementation",
+        "Verification"
+      ],
+      "specPath": "specs/002-environment-lifecycle/spec.md",
+      "status": "approved",
+      "summary": "How a repository becomes a target this product may work in, and how the product installs and maintains the working environment inside it. Fixes the three ownership classes (managed, adopted, user), the committed manifest that records every managed byte with its source and digest, the pins the environment records, what an upgrade does when a managed file has drifted, what removal leaves behind, and how an agent-harness adapter declares what it owns. Preserving a pre-existing user instruction file is a refusal, not a merge. Sections 3.11 to 3.21 carry the realignment that followed spec-spine withdrawing its kit and its public initializer, which left this product the sole user-facing initializer: one Statecraft-managed global environment under the product home and one per-project area under .statecraft/, the reusable harness as a single global source delivered by adapters rather than copied into every repository, the governance producer boundary as the spec-spine library's files-as-data result, the root instruction bridge as a tracked managed modification rather than ownership of a user's file, configuration authority as four layers with provenance rather than one last-writer-wins merge, and a solo and team boundary in which every capability has a local implementation and an unreachable platform is an honest unavailable state. Sections 3.22 and 3.23 record the counterparty's state at the moment it handed its harness over, the order the last of that harness moves in, and what any content delivered through the harness mechanism has to satisfy. Section 3.24 is the one write into a harness's own settings file that section 3.14 rule 1 admits: narrow, marked, reversible, refused by default, and able to add a refusal but never a permission. Sections 3.25 to 3.28 carry the owner's resolutions of 2026-09-21: the committed required harness identity beside the per-session resolved one, what a managed session records about delivery and what that record may not claim, the separation of global adapter registration from managed-session permission delivery, and the rule that an unmarked registration is the user's however much it resembles shipped content. Section 3.29 is the same day's narrow authority amendment over the admission itself: what a claimed live observation has to carry, which controls the qualification boundary enforces rather than describes, and that unverified is the answer when the evidence cannot decide. Section 3.30 is the 2026-09-22 amendment that sharpens it: each control is judged from correlated structured events as refused or executed, a capture is one session read whole, and an invocation is bound to its settings by the launch that performed it rather than by a description written afterwards. Section 3.31 is the same day's amendment for `run`: two write-once startup records per attempt, supply recorded by the launch that performs it, the selected revision carried in the launch configuration, the answering revision measured from a startup acknowledgment in the session's own stream, a mismatch that refuses the attempt, and a required revision never recorded as an observed one. Section 3.32 corrects four of 3.31's claims: an intent is not a launch, so a launch is four write-once records read back as named states and an uncertain one is never replayed; the acknowledgment is a correlated one and not execution provenance; a managed run supplies its startup hook and an admission gate per invocation instead of relying on global registration; and startup identity is decided before governed work is released rather than refused after the session ends. Section 3.33 separates the managed-startup trial from the permission experiment: one run attempt with a read-only sentinel, one session and one version probe, its own approval, named outcomes for absent, unbound, late, conflicting and mismatched hook evidence, and three words for effects before admission.\n",
+      "title": "Project registration and the Statecraft-managed environment: one global home, one project area, one initialization flow, and where authority comes from"
+    },
+    {
+      "created": "2026-09-16",
+      "dependsOn": [
+        "000-bootstrap",
+        "001-boundaries-and-authority",
+        "002-environment-lifecycle"
+      ],
+      "establishes": [
+        {
+          "kind": "directory",
+          "path": "crates/statecraft-run/"
+        }
+      ],
+      "extends": [
+        {
+          "nature": "additive",
+          "spec": "005-acceptance-and-evidence",
+          "unit": {
+            "kind": "directory",
+            "path": "crates/statecraft-acceptance/"
+          }
+        }
+      ],
+      "id": "003-work-and-run-semantics",
+      "implementation": "complete",
+      "sectionHeadings": [
+        "003: Work selection, workspace preparation, the run record, and recovery",
+        "1. Purpose",
+        "2. Territory",
+        "3. Behavior",
+        "3.1 A unit of work",
+        "3.1.1 Ready is not ratified",
+        "3.2 Workspace preparation",
+        "3.3 The run record",
+        "3.3.1 Effect identity and one-to-one closing",
+        "3.4 The closed outcome set",
+        "3.5 Refusal accounting belongs to the supervisor",
+        "3.6 Recovery and reconciliation",
+        "3.7 Concurrency bounds for the first slice",
+        "3.8 Observable negative cases",
+        "4. Out of scope",
+        "5. Decisions recorded during implementation",
+        "Verification"
+      ],
+      "specPath": "specs/003-work-and-run-semantics/spec.md",
+      "status": "approved",
+      "summary": "The core loop's semantics. How a unit of work is identified by reading spec-spine's structured report rather than re-deriving it; how an isolated workspace is prepared so the operator's checkout is never edited; the append-only hash-linked run record with intent written before an effect and outcome after it; the closed outcome set (completed, failed, refused, interrupted, cancelled) and the rule that a retry appends an attempt rather than replacing history; supervisor-owned refusal accounting a supervised process cannot erase; and reconciliation of an ambiguous effect before any retry, with no exactly-once promise.\n",
+      "title": "Work selection, workspace preparation, the run record, and recovery after interruption"
+    },
+    {
+      "created": "2026-09-16",
+      "dependsOn": [
+        "000-bootstrap",
+        "001-boundaries-and-authority",
+        "002-environment-lifecycle",
+        "003-work-and-run-semantics"
+      ],
+      "establishes": [
+        {
+          "kind": "directory",
+          "path": "crates/statecraft-adapter/"
+        },
+        {
+          "kind": "directory",
+          "path": "crates/statecraft-adapter-claude-code/"
+        }
+      ],
+      "extends": [
+        {
+          "nature": "additive",
+          "spec": "005-acceptance-and-evidence",
+          "unit": {
+            "kind": "directory",
+            "path": "crates/statecraft-acceptance/"
+          }
+        },
+        {
+          "nature": "additive",
+          "spec": "003-work-and-run-semantics",
+          "unit": {
+            "kind": "directory",
+            "path": "crates/statecraft-run/"
+          }
+        },
+        {
+          "nature": "additive",
+          "spec": "002-environment-lifecycle",
+          "unit": {
+            "kind": "directory",
+            "path": "crates/statecraft-environment/"
+          }
+        },
+        {
+          "nature": "corrective",
+          "spec": "006-command-surface",
+          "unit": {
+            "kind": "directory",
+            "path": "crates/statecraft-cli/"
+          }
+        }
+      ],
+      "id": "004-execution-adapter",
+      "implementation": "complete",
+      "sectionHeadings": [
+        "004: The execution adapter boundary, and the first provider",
+        "1. Purpose",
+        "2. Territory",
+        "3. Behavior",
+        "3.1 The protocol",
+        "3.2 The capability vocabulary",
+        "3.3 Required refuses, preferred degrades",
+        "3.4 Qualification",
+        "3.5 The negative suite",
+        "3.6 The child environment is constructed, not filtered",
+        "3.7 Every attempt reports its posture",
+        "3.8 Observable negative cases",
+        "3.9 What is spawned, and the three parts",
+        "3.10 The capability tokens, each against a measurement",
+        "3.11 A denied session classifies itself as a success",
+        "3.12 Two denial mechanisms with opposite evidence properties",
+        "3.13 The outcome mapping",
+        "3.14 Credentials, and what the constructed environment cannot drop",
+        "3.15 The environment half",
+        "3.16 Qualification binds to a version, and to nothing else",
+        "4. Out of scope",
+        "5. Decisions recorded during implementation",
+        "Verification"
+      ],
+      "specPath": "specs/004-execution-adapter/spec.md",
+      "status": "approved",
+      "summary": "The single seam through which this product runs an agent, and the first provider behind it. Fixes the three-part protocol (a request the supervisor writes, an event stream it reads, a result it records), the closed capability vocabulary with required tokens refusing before any process starts and preferred tokens degrading visibly, the negative suite that qualifies an adapter binary version, and the constructed rather than filtered child environment whose property is a complete record and explicitly not containment of hostile code. Sections 3.9 to 3.16 name Claude Code as the first provider and fix what its stream can and cannot witness: which capability tokens the manifest may declare, each against a measurement rather than a reading of the flags; the finding that a mid-stream denial notification accompanies the terminal refusal record and that a denied session still classifies itself as a success; which of two denial mechanisms the adapter must use, because they have opposite evidence properties; and what a qualification record binds to.\n",
+      "title": "The execution adapter boundary and the first provider: one protocol, declared capabilities, a qualification suite, a constructed child environment, and what a real stream can witness"
+    },
+    {
+      "created": "2026-09-16",
+      "dependsOn": [
+        "000-bootstrap",
+        "001-boundaries-and-authority",
+        "003-work-and-run-semantics",
+        "004-execution-adapter"
+      ],
+      "establishes": [
+        {
+          "kind": "directory",
+          "path": "crates/statecraft-acceptance/"
+        },
+        {
+          "kind": "directory",
+          "path": "crates/statecraft-envelope/"
+        }
+      ],
+      "id": "005-acceptance-and-evidence",
+      "implementation": "complete",
+      "sectionHeadings": [
+        "005: Independent acceptance, the receipt, the evidence dimensions, and the envelope",
+        "1. Purpose",
+        "2. Territory",
+        "3. Behavior",
+        "3.1 What is judged",
+        "3.1.1 Which outcomes are even eligible",
+        "3.2 Independence",
+        "3.3 The authority-set rule",
+        "3.3.1 How the report is obtained",
+        "3.3.2 Which class witnesses which member",
+        "3.3.3 When there is no answer",
+        "3.3.4 What reading the report permits, and what it does not",
+        "3.4 The receipt",
+        "3.5 The four evidence dimensions, and admission",
+        "3.6 Trust roots",
+        "3.7 Bytes, digests and constructions",
+        "3.8 The three names for absence",
+        "3.9 The reviewable outcome",
+        "3.10 Observable negative cases",
+        "3.11 One owner, and who re-exports",
+        "3.12 `Recorded<T>`: the three words are reserved",
+        "3.13 The reference",
+        "3.14 What a compatibility fixture must prove",
+        "3.15 Provenance and the licence",
+        "3.16 The native golden vectors stay provisional",
+        "3.17 The platform's dependency",
+        "4. Out of scope",
+        "5. Decisions recorded during implementation",
+        "Verification"
+      ],
+      "specPath": "specs/005-acceptance-and-evidence/spec.md",
+      "status": "approved",
+      "summary": "How a claim of completion becomes, or fails to become, an acceptance. Fixes the identification of candidate bytes and the trusted base, the authority-set rule that stops a candidate from being judged by rules it wrote, the receipt that binds repository, base, candidate, suite, exit codes and policy digest, the four evidence dimensions reported separately from admission with closed value sets, independently supplied trust roots, the preservation of original bytes and named hash constructions, and the three names for absence, none of which reads as success. It also owns the envelope crate the statecraft platform wrote against these serializations and transferred here, which makes one owner for the reference, the dimensions, admission and the absence words rather than two implementations of one wire format.\n",
+      "title": "Independent acceptance, the receipt, the separately reported evidence dimensions, and the envelope two products exchange"
+    },
+    {
+      "created": "2026-09-16",
+      "dependsOn": [
+        "000-bootstrap",
+        "001-boundaries-and-authority",
+        "002-environment-lifecycle",
+        "003-work-and-run-semantics",
+        "004-execution-adapter",
+        "005-acceptance-and-evidence"
+      ],
+      "establishes": [
+        {
+          "kind": "directory",
+          "path": "crates/statecraft-cli/"
+        }
+      ],
+      "extends": [
+        {
+          "nature": "additive",
+          "spec": "003-work-and-run-semantics",
+          "unit": {
+            "kind": "directory",
+            "path": "crates/statecraft-run/"
+          }
+        },
+        {
+          "nature": "additive",
+          "spec": "005-acceptance-and-evidence",
+          "unit": {
+            "kind": "directory",
+            "path": "crates/statecraft-acceptance/"
+          }
+        }
+      ],
+      "id": "006-command-surface",
+      "implementation": "complete",
+      "sectionHeadings": [
+        "006: The command surface",
+        "1. Purpose",
+        "2. Territory",
+        "3. Behavior",
+        "3.1 The command tree",
+        "3.2 A command is a binding, never a second implementation",
+        "3.3 The exit-code vocabulary",
+        "3.4 Two renderings of one value",
+        "3.5 The binary's name is recorded, not defaulted",
+        "3.6 What the binary reads, and what it does not",
+        "3.7 Observable negative cases",
+        "3.8 Discovery is a join, because one report does not carry status",
+        "3.9 Inspection is a fold, and reads nothing else",
+        "3.10 Placing the work, run and accept verbs in the vocabulary",
+        "3.11 A binding needs an entry point, not an implementation",
+        "3.11.1 The five verbs spec 002's sections 3.25 to 3.29 need",
+        "3.11.2 The sixth verb, and what a qualification exit code distinguishes",
+        "3.11.3 The seventh verb, and what `run` adds to its answer",
+        "3.11.4 The eighth verb, and the trial section `startup show` gains",
+        "3.12 What the command surface does not unlock",
+        "4. Out of scope",
+        "5. Decisions recorded during implementation",
+        "Verification"
+      ],
+      "specPath": "specs/006-command-surface/spec.md",
+      "status": "approved",
+      "summary": "The binary, and every verb reachable through it. Specs 002 to 005 each describe operator verbs and then own only a library crate, so nothing they specify is runnable. This spec owns crates/statecraft-cli/ and binds those verbs to a process: the command tree, the rule that a command is a thin binding and never a second implementation, the closed exit-code vocabulary that distinguishes a refusal from a failure from a finding, human and --json output as two renderings of one value, and the binary's name being a recorded decision rather than a Cargo default. It also carries the work, run and accept bindings that were specified separately as 009: discovery as a join of two spec-spine reports because one of them does not carry status, inspection as a read-only fold of the run record and nothing else, and the rule that a binding needing a library entry point gets it from the crate that owns the behavior. Section 3.11.1 adds the five verbs 002 sections 3.25 to 3.29 need: inspecting and explicitly upgrading the required harness identity, obtaining the managed-session payload, and recording startup evidence beside submitting qualification evidence for admission.\n",
+      "title": "The command surface: one binary, every verb the other specs name, and what an exit code means"
+    }
+  ],
+  "schemaVersion": "0.1.0"
+}
