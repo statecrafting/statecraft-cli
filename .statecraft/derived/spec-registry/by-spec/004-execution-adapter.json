@@ -54,7 +54,7 @@
     "id": "004-execution-adapter",
     "implementation": "complete",
     "sectionDigests": {
-      "004-the-execution-adapter-boundary-and-the-first-provider": "dc79c2bb65e09b33940b4d9271df0a9b8471e45e029011ebe61febb3cbc5409d",
+      "004-the-execution-adapter-boundary-and-the-first-provider": "8694ee062b7810b24dac055554d96d4f8cc7d14ad0f79a091627ef7b8a24223d",
       "1-purpose": "ec32f21fea438da7d976970679b1977cba384f38738e9877fdd934bfa2aed41d",
       "2-territory": "1c1c65e2d69832b369606d257498f77c77c85f26f8ac0083451508143f6055d1",
       "3-1-the-protocol": "0dce0247a589f2e9b1dedb094952fd1bccd6df4e1ab0d90f1dfff31b88d4fd45",
@@ -65,15 +65,16 @@
       "3-14-credentials-and-what-the-constructed-environment-cannot-drop": "1bc78ef8dc1f52cdc25dc95c2eaeb9160a46394f215b9988690ebca344632cbd",
       "3-15-the-environment-half": "fc5767ec74da8e785e5e911cb545ffaa68de337e2edf303eea3d03a3bd120cd8",
       "3-16-qualification-binds-to-a-version-and-to-nothing-else": "05032c8b81754c062ce27af1768b93c944ec577c5970affdeee68627235f0105",
+      "3-17-the-command-allowance-the-suite-s-programs-and-the-comparison-between-them": "fc88720779e9140cda6872c66311807c55e20b3d5176c79b8adaa8086d766f77",
       "3-2-the-capability-vocabulary": "13f0bcb6e3fa48482e5f10a274c0d6c68eaaed20295cecaea0211533ce2df05d",
       "3-3-required-refuses-preferred-degrades": "bd51188680d4cadce1ae0bef0c1f09761682ed3d051492d480448b195b74c61d",
       "3-4-qualification": "05043a15d8c68513f41f2a080f9175ba2493c1cb80a18f523ca88e5d4679c900",
-      "3-5-the-negative-suite": "708e6f3c31c6b5c5e64fb3a81f3cfd6b7b22b20b30585c7f973a150e3e95c96b",
+      "3-5-the-negative-suite": "4b688db2818b5bac53ebe2b8dc09cdd3a566dd52d3832201bf2718abf42b83f8",
       "3-6-the-child-environment-is-constructed-not-filtered": "285f307ca6530f3db5394b458e07b5369dbe0eb155decaa9ae5acd3ffbebc1ca",
       "3-7-every-attempt-reports-its-posture": "b1d13358cdbe793be90f7f3d4389103804c78ebd561fbfd5e39a7371cc5106ea",
       "3-8-observable-negative-cases": "4eafa3ad8327bb9ea95628ef3a2c5327660f5ceeb372201db5efda20aff9eebb",
       "3-9-what-is-spawned-and-the-three-parts": "f934b0c7a7d9a0a867f78eb191aba0ccd5c6250a4cdb19e4279fdc42408d03b6",
-      "3-behavior": "03dbdb2a87e16754c8b292fddd032469f10399b2ba8d913017065584cf71bcf3",
+      "3-behavior": "91f653f960fa100553bff3647dfc5da1d08ace591bbd7066358dddb570151dd0",
       "4-out-of-scope": "cecc06485b9197d91bdec31e514a78cfa32f498d481abdcf074f50adee3a38c5",
       "5-decisions-recorded-during-implementation": "16da159b03d1bb46ced866e72e0b4ca52db4e6e828311a5720319e5e42b89411",
       "verification": "2b489e1a5c9b6e1e43daba3dd6db9d7b7f9f7aa960357dd349a795aa36b5e50d"
@@ -99,6 +100,7 @@
       "3.14 Credentials, and what the constructed environment cannot drop",
       "3.15 The environment half",
       "3.16 Qualification binds to a version, and to nothing else",
+      "3.17 The command allowance, the suite's programs, and the comparison between them",
       "4. Out of scope",
       "5. Decisions recorded during implementation",
       "Verification"
@@ -108,6 +110,6 @@
     "summary": "The single seam through which this product runs an agent, and the first provider behind it. Fixes the three-part protocol (a request the supervisor writes, an event stream it reads, a result it records), the closed capability vocabulary with required tokens refusing before any process starts and preferred tokens degrading visibly, the negative suite that qualifies an adapter binary version, and the constructed rather than filtered child environment whose property is a complete record and explicitly not containment of hostile code. Sections 3.9 to 3.16 name Claude Code as the first provider and fix what its stream can and cannot witness: which capability tokens the manifest may declare, each against a measurement rather than a reading of the flags; the finding that a mid-stream denial notification accompanies the terminal refusal record and that a denied session still classifies itself as a success; which of two denial mechanisms the adapter must use, because they have opposite evidence properties; and what a qualification record binds to.\n",
     "title": "The execution adapter boundary and the first provider: one protocol, declared capabilities, a qualification suite, a constructed child environment, and what a real stream can witness"
   },
-  "shardHash": "a7abf12285c0bfad27a8cbb839c82ecf2ceda5604f98d5917617c43b3fc9f834",
+  "shardHash": "e197e46bd46ab0ba73622c932a91cc4bbabac46ac4aeaa93e254f0343340e2f2",
   "specVersion": "1.6.0"
 }

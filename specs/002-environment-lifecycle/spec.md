@@ -550,6 +550,11 @@ layer that constrained it. Three rules make it honest:
   change, which is `001` section 3.5.2, and the resolution reports it as one and
   keeps using the base's answer.
 
+The project block carries one member another spec reads: `commands`, the
+command allowance of spec `004` section 3.17, a list of bare program names.
+It supplies a value (which programs a posture allows), not a rule; the
+comparison is `004`'s.
+
 **This is the precise reading of `006` section 3.6**, which says the binary
 reads no configuration file that could change a rule an owning spec fixed. It
 still does not. A layer supplies a **value**, never a rule: the rules stay in the
