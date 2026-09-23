@@ -38,6 +38,7 @@ fn report(rows: &[(&str, &str)]) -> CorpusReport {
                 id: (*id).into(),
                 status: (*status).into(),
                 implementation: Some("pending".into()),
+                obligations: vec![],
             })
             .collect(),
         status_source: statecraft_run::report::StatusSource::ListOnly,

@@ -229,11 +229,13 @@ mod eligibility_tests {
                     id: "010".into(),
                     status: "approved".into(),
                     implementation: Some("pending".into()),
+                    obligations: vec![],
                 },
                 SpecLifecycle {
                     id: "011".into(),
                     status: "draft".into(),
                     implementation: Some("pending".into()),
+                    obligations: vec![],
                 },
             ],
             status_source: crate::report::StatusSource::ListOnly,
@@ -298,6 +300,7 @@ mod tests {
                     id: (*id).into(),
                     status: (*status).into(),
                     implementation: Some("pending".into()),
+                    obligations: vec![],
                 })
                 .collect(),
             status_source: crate::report::StatusSource::ListOnly,

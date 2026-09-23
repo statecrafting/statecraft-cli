@@ -160,6 +160,19 @@ pub fn begin(
     base_revision: &str,
     clock: &dyn Clock,
 ) -> Result<Session, SessionError> {
+    begin_bound(chain, target, run_id, base_revision, clock, None)
+}
+
+/// [`begin`], writing the attempt's contract into its intent (section 3.1.3
+/// rule 2): once, with the intent, before any effect.
+pub fn begin_bound(
+    chain: &mut Chain,
+    target: &Path,
+    run_id: &str,
+    base_revision: &str,
+    clock: &dyn Clock,
+    contract: Option<&crate::contract::Binding>,
+) -> Result<Session, SessionError> {
     for run in runs(chain) {
         if let Some(live) = run.live_attempt() {
             return Err(SessionError::LiveAttempt {
@@ -193,10 +206,17 @@ pub fn begin(
                     .display()
                     .to_string(),
             ),
-            detail: serde_json::json!({
-                "baseRevision": base_revision,
-                "baseCommit": base_commit,
-            }),
+            detail: {
+                let mut detail = serde_json::json!({
+                    "baseRevision": base_revision,
+                    "baseCommit": base_commit,
+                });
+                if let Some(contract) = contract {
+                    detail["contract"] = serde_json::to_value(contract)
+                        .unwrap_or_else(|e| serde_json::json!({ "unserializable": e.to_string() }));
+                }
+                detail
+            },
         },
     )?;
 

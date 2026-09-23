@@ -59,6 +59,21 @@ pub struct SpecLifecycle {
     /// `implementation`, absent for a spec that declares none.
     #[serde(default)]
     pub implementation: Option<String>,
+    /// The obligations the spec declares, where the producer reports them
+    /// (spec-spine 106; section 3.1.3). Absent before that producer, and for
+    /// a spec that declares none.
+    #[serde(default)]
+    pub obligations: Vec<DeclaredObligation>,
+}
+
+/// One obligation a spec declares, as `registry list` reports it.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct DeclaredObligation {
+    /// Its id within the spec, for example `R-1`.
+    pub id: String,
+    /// Whether it is withdrawn. Still declared, and still bound.
+    #[serde(default)]
+    pub withdrawn: bool,
 }
 
 /// The two reports this product joins, and the version that produced them.

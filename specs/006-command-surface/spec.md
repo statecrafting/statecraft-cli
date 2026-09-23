@@ -762,6 +762,14 @@ a plan `status` contradicting the list was ignored and the list decided. It
 now asserts the new rule in two tests, a contradiction refused (exit 2) naming
 both values, and an agreeing plan with the join still deciding.
 
+**2026-09-22: the contract in `run`'s and `accept`'s answers.** `run`'s answer
+gains `contract`, the binding its attempt's intent holds, and one summary
+line. `accept`'s answer is the acceptance with `contract` beside it, flattened
+so the acceptance's own members keep their places; a stale ledger is refused
+with exit 2 before anything is judged, and `contract-moved` is a finding, exit
+1, like the other acceptances that ran and found something. Both fields are
+additive under section 3.4.
+
 ## Verification
 
 Each line is one command. §3.7's rows are integration tests that **spawn the
@@ -833,4 +841,5 @@ test -f crates/statecraft-cli/tests/integration_slice.rs
 cargo run -q -p statecraft-cli -- work --help
 cargo run -q -p statecraft-cli -- run --help
 cargo run -q -p statecraft-cli -- accept --help
+cargo test -p statecraft-cli --test contract_binding
 ```

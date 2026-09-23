@@ -211,6 +211,10 @@ pub struct ConcludedView {
     pub workspace_retained: String,
     /// The attempt's startup evidence (spec 006 section 3.11.3).
     pub startup: statecraft_home::launch::RunStartup,
+    /// The contract the attempt was bound to (spec 003 section 3.1.3), as its
+    /// intent records it. Set by `run`; absent where nothing bound one.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub contract: Option<statecraft_run::contract::Binding>,
 }
 
 impl ConcludedView {
@@ -229,6 +233,7 @@ impl ConcludedView {
             base_moved: c.base_moved,
             workspace_retained: c.workspace_retained.clone(),
             startup,
+            contract: None,
         }
     }
 }
@@ -470,7 +475,42 @@ pub fn no_such_run_answer(run_id: &str) -> Answer<String> {
 ///   which is neither a pass nor a fail;
 /// - the policy digest could not be computed at the base: refused, exit 2, and
 ///   the reason is recorded.
-pub fn accept_answer(acceptance: Acceptance) -> Answer<Acceptance> {
+pub fn accept_answer(acceptance: Acceptance) -> Answer<AcceptView> {
+    accept_answer_with(acceptance, None)
+}
+
+/// What `accept` answers: the acceptance, and beside it the contract
+/// comparison of spec 005 section 3.18, which never goes into the receipt.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct AcceptView {
+    /// The acceptance, as the library concluded it.
+    #[serde(flatten)]
+    pub acceptance: Acceptance,
+    /// Whether the contract the attempt was bound to still holds.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub contract: Option<statecraft_acceptance::contract::Comparison>,
+}
+
+/// A stale ledger at `accept`: refused before anything is judged, and nothing
+/// is recorded (spec 005 section 3.18 rule 2).
+pub fn contract_stale_answer(
+    comparison: &statecraft_acceptance::contract::Comparison,
+) -> Answer<statecraft_acceptance::contract::Comparison> {
+    Answer::new(
+        comparison.clone(),
+        Exit::Refused,
+        format!(
+            "accept refused before judging anything\n{}",
+            comparison.describe()
+        ),
+    )
+}
+
+/// [`accept_answer`], with the contract comparison beside the acceptance.
+pub fn accept_answer_with(
+    acceptance: Acceptance,
+    contract: Option<statecraft_acceptance::contract::Comparison>,
+) -> Answer<AcceptView> {
     let exit = match &acceptance {
         Acceptance::Accepted { .. } => Exit::Ok,
         Acceptance::Failed { .. } => Exit::Finding,
@@ -485,6 +525,8 @@ pub fn accept_answer(acceptance: Acceptance) -> Answer<Acceptance> {
             // The suite never ran. The operation ran and reports that, which is
             // a finding: not a pass and not a fail.
             NoAcceptance::SuiteDidNotRun { .. } => Exit::Finding,
+            // The operation ran and found that the contract moved: a finding.
+            NoAcceptance::ContractMoved { .. } => Exit::Finding,
         },
     };
 
@@ -515,11 +557,29 @@ pub fn accept_answer(acceptance: Acceptance) -> Answer<Acceptance> {
             }
             summary.push_str("  no receipt\n");
         }
+        Acceptance::None {
+            reason: NoAcceptance::ContractMoved { .. },
+        } => {
+            summary.push_str(
+                "  no acceptance: the contract the attempt was bound to is not the one the \
+                 producer resolves now\n",
+            );
+        }
         Acceptance::None { reason } => {
             summary.push_str(&format!("  {reason:?}\n"));
         }
     }
-    Answer::new(acceptance, exit, summary)
+    if let Some(c) = &contract {
+        summary.push_str(&c.describe());
+    }
+    Answer::new(
+        AcceptView {
+            acceptance,
+            contract,
+        },
+        exit,
+        summary,
+    )
 }
 
 #[cfg(test)]
@@ -547,6 +607,7 @@ mod tests {
                         id: (*id).to_string(),
                         status: (*status).to_string(),
                         implementation: Some("pending".into()),
+                        obligations: vec![],
                     })
                     .collect(),
                 status_source: statecraft_run::report::StatusSource::ListOnly,
@@ -708,7 +769,7 @@ mod tests {
         assert!(a.summary.contains("attempt-refused"));
         assert!(a.summary.contains("refusals counted: 2"));
         assert!(a.summary.contains("no receipt"));
-        assert!(a.value.receipt().is_none());
+        assert!(a.value.acceptance.receipt().is_none());
     }
 
     #[test]
@@ -739,7 +800,7 @@ mod tests {
             reason: statecraft_acceptance::receipt::NoReceipt::SuiteDidNotPass { unrun_checks: 0 },
         });
         assert_eq!(a.exit, Exit::Finding);
-        assert!(a.value.receipt().is_none());
+        assert!(a.value.acceptance.receipt().is_none());
     }
 
     #[test]

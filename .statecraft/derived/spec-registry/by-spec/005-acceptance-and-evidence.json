@@ -56,6 +56,6 @@
     "summary": "How a claim of completion becomes, or fails to become, an acceptance. Fixes the identification of candidate bytes and the trusted base, the authority-set rule that stops a candidate from being judged by rules it wrote, the receipt that binds repository, base, candidate, suite, exit codes and policy digest, the four evidence dimensions reported separately from admission with closed value sets, independently supplied trust roots, the preservation of original bytes and named hash constructions, and the three names for absence, none of which reads as success. It also owns the envelope crate the statecraft platform wrote against these serializations and transferred here, which makes one owner for the reference, the dimensions, admission and the absence words rather than two implementations of one wire format.\n",
     "title": "Independent acceptance, the receipt, the separately reported evidence dimensions, and the envelope two products exchange"
   },
-  "shardHash": "3870fa01400eb16c06e92d1a569d21f1de15f49364dfdc7da15717e6c0dd4a3c",
+  "shardHash": "29606498316368749c2cc756bae213d02d0ef0aed8a658ef453787c79800246e",
   "specVersion": "1.3.0"
 }

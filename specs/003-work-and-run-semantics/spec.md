@@ -554,6 +554,28 @@ Measured on the unreleased `3b67b63d`: a spec member alone does not carry the
 spec's obligations, so the request names them. No code changed with this
 entry.
 
+**2026-09-22: section 3.1.3 implemented.** `contract.rs` builds the request
+from the list row's declared obligations (`SpecLifecycle` now reads
+`obligations`, empty under a producer that reports none), asks
+`registry closure --help` before resolving so an unknown subcommand and a
+stale ledger are never read from one exit code, and reads the producer's exit
+0, 1 and 2 as resolved, unresolved and stale; anything else is unreadable.
+`session::begin_bound` writes the binding into the intent's `detail.contract`
+with the intent itself; `begin` is unchanged and writes none. `run` binds after
+the eligibility check and before `begin_bound`; the trial of spec 002 section
+3.33 binds `not-a-unit-of-work`. Measured with the ignored named-producer tests
+on 2026-09-22: the unreleased `3b67b63d` binds a closure for
+`002-environment-lifecycle` on a scratch copy of this corpus it compiled, and
+resolving it again answers the same digest; the pinned 0.20.0 is
+`unsupported`, naming itself. A third ignored test replays spec-spine 103's
+portable verifier fixtures through a named build's `verify-attestation
+--recompute`: `3b67b63d` reproduces all 11 cases from its own revision, and
+0.20.0 reproduces 10, refusing the control as a version mismatch, which is
+what fixtures bound to the tool that produced them should do. That test is
+adoption evidence for a producer build; nothing in this product verifies these
+attestations, and no verifier is built here to give the fixtures something to
+test.
+
 ## Verification
 
 Each line is one command. §3.8's twenty-two rows are integration tests named after
@@ -571,4 +593,5 @@ spec-spine index coverage --fail-on-untraced
 test -f crates/statecraft-run/src/record.rs
 test -f crates/statecraft-run/tests/negative_cases.rs
 cargo test -p statecraft-run --lib report
+cargo test -p statecraft-run --lib contract
 ```
