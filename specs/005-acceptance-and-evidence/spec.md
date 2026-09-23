@@ -2,7 +2,7 @@
 id: "005-acceptance-and-evidence"
 title: "Independent acceptance, the receipt, the separately reported evidence dimensions, and the envelope two products exchange"
 status: approved
-implementation: complete
+implementation: in-progress
 created: "2026-09-16"
 summary: >
   How a claim of completion becomes, or fails to become, an acceptance. Fixes
@@ -80,7 +80,9 @@ fixes what that record must contain.
 Acceptance is evaluated over three identified things, all named in the record:
 
 - **the candidate**: a commit sha in the prepared workspace, plus an assertion
-  that the work tree was clean and that HEAD did not move during the suite.
+  that the work tree was clean and that HEAD did not move during the suite. *Amended by section 3.19 rule 2:* both are computed from the
+  attempt's branch and the workspace read as data, not through the workspace's
+  own Git files.
 - **the trusted base**: a commit resolved at run start (`003` §3.2), from which
   the authority set is read.
 - **the policy**: the authority set as it exists **at the base**, identified by a
@@ -122,6 +124,9 @@ instructions read **at the base**. Three consequences:
    zero exit code is not substituted for one.
 3. A check that did not run is `unknown`. It is never a pass, and the count of
    checks that did not run is part of the outcome.
+
+*Amended by section 3.19:* the suite runs inside the protected evidence
+boundary of spec `004` section 3.18.
 
 ### 3.3 The authority-set rule
 
@@ -629,6 +634,42 @@ own answers, never from a digest this product computes.
 5. **What `current` does not establish.** That the candidate satisfies the
    contract; only that the contract it was authorized against is the one the
    producer resolves now. Acceptance still rests on sections 3.1 to 3.3.
+
+### 3.19 The suite runs inside the protected evidence boundary
+
+An authority amendment, settled by the owner on 2026-09-23 with spec `004`
+section 3.18 and recorded before the implementation it authorizes. That section
+confines every execution this product makes of content a confined child could
+have written, and the suite of section 3.2 is such content: it runs in the
+prepared workspace, which the session wrote. Run outside the confinement, the
+suite would be a route from the child's bytes to the protected set.
+
+**Rule 1: the suite is confined.** The suite runs under the confinement of spec
+`004` section 3.18, with the attempt's workspace, its temporary directory and a
+per-attempt cache root as its writable roots. The toolchains' cache and home
+variables (for Cargo, `CARGO_HOME`; for others, their documented equivalents)
+point into that cache root, which starts empty for each acceptance; the
+operator's own caches are readable and not writable. A suite that cannot run
+that way fails or does not run, and is recorded as such under section 3.2's
+third consequence; the writable roots are never widened to make it pass.
+
+**Rule 2: the candidate's checks are made without the workspace's own Git
+files.** Section 3.1's assertion that the work tree was clean and that HEAD did
+not move is computed by this product from the attempt's branch in the target's
+common Git directory and the workspace read as data (spec `004` section 3.18
+rule 4): the branch's commit is recorded before and after the suite, and the
+workspace's files are compared with that commit's tree, never through `git
+status` run via the workspace's `.git` file or its administrative directory,
+which the child can rewrite. The comparison ignores nothing the suite's
+instructions do not name as generated.
+
+**Rule 3: refusal.** When the boundary cannot be established, `accept` refuses
+with exit code 2, runs nothing, writes no receipt, and records `not-run` with
+the reason. It is never a failing acceptance.
+
+**Rule 4: records written before this section.** A receipt written before this
+section records a suite run without confinement; it is read as it was and is
+not re-judged.
 
 ## 4. Out of scope
 

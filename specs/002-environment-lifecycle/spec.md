@@ -1250,6 +1250,8 @@ that is not this build's, a version that disagrees with the capture, a refusal
 control whose invocation does not carry the payload, or an absent-payload
 control whose invocation does carry one, all refuse the claim.
 
+*Amended by section 3.37 rule 4:* for a confined launch, the program and arguments are the provider's as handed to the confinement; the confinement is bound apart from them, by its mechanism and profile or ruleset digest.
+
 **Rule 5: the same rules govern every route.** Construction, deserialization,
 and conversion from any other qualification type reach an admitted observation
 only through these rules. A record read back from a file is re-checked against
@@ -1450,6 +1452,8 @@ route, and its contract is part of this amendment:
   provider. It never reads the provider approval, refuses to run when that
   approval is also set, marks every capture synthetic, and reports its result as
   synthetic.
+
+*Amended by section 3.37 rule 4:* for a confined launch, the argument vector recomputed and required exactly is the provider's as handed to the confinement; the wrapper's own arguments are not part of it, and the confinement is recorded and bound apart.
 
 ### 3.31 The startup record a run writes, and the harness revision that answered
 
@@ -2213,7 +2217,6 @@ a reversal after an intervening edit or a later transfer; and a repeated
 request reported `already-satisfied` with nothing written. Every refusal
 leaves every byte of the repository as it was.
 
-<<<<<<< HEAD
 ### 3.36 When this spec's implementation is complete
 
 A narrowly scoped authority amendment, settled by the owner on 2026-09-23 and
@@ -2322,7 +2325,7 @@ unresolved. The field then moves in its own lifecycle-only change, which is the
 owner's act; this section makes it so. A requirement later found
 unmet, or a new requirement, moves it back to `in-progress` in the change that
 finds or adds it.
-=======
+
 ### 3.37 Where an attempt's launch records live, and what the child is given
 
 An authority amendment, settled by the owner on 2026-09-23 with spec `004`

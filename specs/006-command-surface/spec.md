@@ -455,7 +455,7 @@ records they write carry the resolved identity as absent and the standing as
 evaluated with nothing resolved. Before this, they recorded the required
 identity as the resolved one. Their codes are unchanged.
 
-*Amended by spec `004` section 3.18 rule 9:* code 2 also covers a launch refused because the protected evidence boundary cannot be established, with nothing launched and nothing appended.
+*Amended by spec `004` section 3.18 rule 9:* for `run`, code 2 also covers a launch refused because the protected evidence boundary cannot be established, with nothing launched and nothing appended.
 
 ### 3.11.4 The eighth verb, and the trial section `startup show` gains
 
@@ -492,7 +492,7 @@ judgement recomputed from the records on disk, and the human rendering adds its
 lines. Additive under section 3.4; its codes are unchanged, because the trial's
 judgement is `startup trial`'s answer, not `startup show`'s verdict.
 
-*Amended by spec `004` section 3.18 rule 9:* code 2 also covers a launch refused because the protected evidence boundary cannot be established, with nothing launched and nothing appended.
+*Amended by spec `004` section 3.18 rule 9:* for `startup trial`, code 2 also covers a launch refused because the protected evidence boundary cannot be established, with nothing launched and nothing appended.
 
 ### 3.11.5 The override verbs
 

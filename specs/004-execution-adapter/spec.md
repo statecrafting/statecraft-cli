@@ -687,14 +687,17 @@ write only:
 | Root | Why |
 |---|---|
 | the attempt's workspace | the work |
-| in the target's common Git directory: `objects/` except `objects/info/`; the attempt's branch, `refs/heads/statecraft/run/<run>`, and its reflog; the attempt's worktree administrative directory | its own commits |
+| in the target's common Git directory: each object fan-out directory and `objects/pack/`, created by the supervisor before launch (not `objects/` itself and not `objects/info/`); the run's own reference directory, `refs/heads/statecraft/<run>/`, holding the attempt's branch, and its reflog directory under `logs/`, both created before launch; the attempt's worktree administrative directory | its own commits, without a grant on any directory another run's branch lives in |
 | the gate log in the exchange directory, opened for writing only (rule 5) | the gate's trace |
 | one temporary directory per attempt, created by the supervisor and given to the child as its temporary directory | scratch |
 | the provider's configuration directory (for Claude Code, `~/.claude/`) and, where the platform can express it without granting more, the provider's own configuration file beside it (`~/.claude.json` and its temporary siblings) | the provider cannot run without it; rule 12 names what this leaves open |
 | the devices a process needs (`/dev/null`, `/dev/tty` and the like) | ordinary I/O |
 
 Everything else the child may read, except the protected set, and may not
-write. A root that cannot be expressed exactly on a platform is not widened to
+write. A workspace created before this section, whose branch lives in the
+shared `refs/heads/statecraft/run/` directory, has its branch renamed into its
+own run directory by the supervisor before launch, and the rename is recorded
+(spec `003` section 3.2); nothing else about the workspace changes. A root that cannot be expressed exactly on a platform is not widened to
 fit: the launch refuses on that platform (rule 9).
 
 **Rule 4: what the unconfined product reads and runs.** This product, outside
@@ -704,16 +707,23 @@ inert:
 
 - It resolves programs only from absolute `PATH` entries that lie outside every
   writable root; a relative entry, or one inside a writable root, refuses the
-  launch. The programs it resolves, including `/usr/bin/sandbox-exec` and any
-  shell it runs, are outside every writable root by rule 3.
+  launch. Every program it runs, the provider included, is checked by its real
+  path after resolving links: a program, or a directory on its real path, inside
+  a writable root refuses the launch. That covers `/usr/bin/sandbox-exec`, any
+  shell it runs, and the provider's installed version directory wherever the
+  provider keeps it.
+- Its own configuration and environment come from the product home and the
+  operator's invocation, which the child cannot write; `spec-spine` reads the
+  operator's checkout or an export of the base, which the child can read and
+  not write.
 - It runs `git` against the target's common Git directory named explicitly,
   with system and global configuration disabled, hooks and the file-system
   monitor switched off, and no attribute or filter driver, and reads the
   attempt's result only through the attempt's branch in that directory. It never
   follows the workspace's `.git` file or the worktree administrative directory's
   `gitdir` and `commondir`, which the child can rewrite.
-- It reads an attempt's workspace, gate log and temporary directory as data
-  only: opened relative to a directory handle taken before launch, never
+- It reads an attempt's workspace, worktree administrative directory, gate log
+  and temporary directory as data only: opened relative to a directory handle taken before launch, never
   following a symbolic link, refusing a device, pipe or socket, and bounded in
   size.
 - It reads the provider's configuration (spec `002` section 3.24, `doctor`) as
@@ -740,15 +750,22 @@ reach a process outside the confinement that would act on its behalf:
 - signals to any process outside the confinement are refused;
 - a Unix-domain socket may be connected to only where the platform's name
   resolution requires it (on macOS, `/private/var/run/mDNSResponder`); every
-  other connection, including a user service manager, a container engine, a
-  terminal multiplexer and an agent, is refused;
-- a network connection may be opened only to TCP port 443 of a non-loopback
-  address, and name resolution; the launch refuses while any process on the
-  host listens on TCP port 443, or while a process of the same user listens on
-  UDP other than the system resolver, because neither can then be told apart
-  from a remote service;
+  other connection, stream or datagram, including a user service manager, a
+  container engine, a terminal multiplexer and an agent, is refused; a pair of
+  connected sockets the process creates for itself is allowed;
+- a network connection may be opened only to TCP port 443, and name
+  resolution. On macOS the profile also refuses loopback and every UDP
+  connection, name resolution going through `mDNSResponder`. On Linux, Landlock
+  filters by port and not by address, and does not mediate UDP, so the launch
+  refuses while any process on the host listens on TCP port 443, or while a
+  process of the same user listens on UDP; a listener started after that check
+  is not seen, and rule 12 names that;
 - on macOS, Apple events, LaunchServices opens and job submission to `launchd`
   are refused.
+
+On macOS these are the routes the profile refuses, each measured; the profile
+allows other Mach services by default, and rule 12 says what that leaves
+open.
 
 **Rule 7: the mechanism, per platform.** Applied by the operating system before
 the provider's first instruction, inherited by every descendant, and not
@@ -759,7 +776,7 @@ close-on-exec.
 | Platform | Mechanism | Required |
 |---|---|---|
 | macOS | a Seatbelt profile applied by `/usr/bin/sandbox-exec`, which then executes the provider with its program and arguments unchanged: reads allowed except rule 2; writes denied except rule 3; the denials of rule 6 | the program exists and the self-test of rule 8 passes |
-| Linux | Landlock applied after `fork` and before `exec`, with `no_new_privs`: a ruleset handling every file-system right the kernel's ABI knows, including `TRUNCATE` and `REFER`, built from directory handles opened before `fork`; its network rule allowing TCP connect to port 443 only; its scopes refusing signals and abstract Unix sockets outside the domain; and a seccomp filter refusing the creation of stream and sequenced-packet Unix-domain sockets. The supervisor is not dumpable for as long as it holds any descriptor on the protected set. | Landlock ABI 6 or later, the seccomp filter installed, and the self-test passes |
+| Linux | Landlock applied after `fork` and before `exec`, with `no_new_privs`: a ruleset handling every file-system right the kernel's ABI knows, including `TRUNCATE` and `REFER`, built from directory handles opened before `fork`; its network rule allowing TCP connect to port 443 only; its scopes refusing signals and abstract Unix sockets outside the domain; and a seccomp filter refusing `socket(2)` for the Unix domain (any type), while `socketpair(2)` stays permitted because child processes' standard streams use it, and refusing the creation of a user namespace. Opening a file by handle needs a capability the child does not hold, which the self-test confirms. The supervisor is not dumpable for as long as it holds any descriptor on the protected set. | Landlock ABI 6 or later, the seccomp filter installed, and the self-test passes |
 | anything else | none | refused |
 
 On Linux, Landlock is an allowlist: rule 2's read denials are made by granting
@@ -789,8 +806,9 @@ does not meet this section.
 the exact profile or ruleset of that launch and must be refused reading and
 writing a sentinel in the product home, in the launch records and in the
 target's working tree, refused a Unix-domain connection and a loopback
-connection, and allowed a write in the workspace and to the gate log. Any other
-result refuses the launch.
+connection, and allowed a write in the workspace and to the gate log. On Linux it
+must also be refused opening, through `/proc`, a descriptor the supervisor holds
+on the protected set. Any other result refuses the launch.
 
 **Rule 9: refusal.** `run`, `startup trial`, `startup capture`, and every verb
 that would execute workspace content under rule 1, refuse with exit code 2,
@@ -809,8 +827,9 @@ without confinement and one made with it are different invocations.
 
 **Rule 11: the record says so.** The attempt's posture (section 3.7) records
 the platform, the mechanism, the profile or ruleset digest, the protected set
-and the writable roots as resolved, and the self-test's result. An attempt
-without that record was not confined.
+and the writable roots as resolved, the self-test's result, and each open item
+of rule 12 as open, so that no attempt's record reads as meeting IX while rule
+12 leaves a route open. An attempt without that record was not confined.
 
 **Rule 12: what this does not close (constitution VIII).**
 
@@ -828,7 +847,14 @@ without that record was not confined.
 - Content the operator deliberately executes outside the confinement (the
   attempt's work, reviewed and run by the operator) is the operator's act, not
   the supervised process's, and this section does not claim to protect the
-  record from it.
+  record from it. Content this product itself executes is confined (rule 1), so
+  the product never runs it outside the confinement.
+- **On macOS, Mach services other than those rule 6 names are not measured.**
+  Whether one of them would start or instruct a process outside the
+  confinement is unknown, so IX's direct route on macOS is claimed only for the
+  routes measured. Closing that is a Mach-service allowlist measured against the
+  provider, which needs a confined provider session (the activation below). It
+  is an open item against IX in the same way as the first.
 - The host administrator and the operator are outside the supervised process
   and can edit the home. Spec `003` section 3.1.5 says what the product detects
   of that and what it does not.
@@ -838,9 +864,9 @@ without that record was not confined.
   first confined provider session is an activation the owner authorizes
   separately; until then a confined run's failure is reported as such and never
   as a pass.
-- On macOS the profile allows reads by default and denies the IPC routes rule 6
-  names; a same-user service reachable through another Mach service that would
-  start an unconfined process is not claimed as refused beyond those measured.
+- On Linux, a same-user UDP listener or TCP port 443 listener started after
+  the launch's check is not refused by the mechanism; the check narrows that
+  to what starts during the attempt.
 - It is not containment of hostile code in general and claims nothing about
   credentials or publishing (section 3.6).
 

@@ -351,7 +351,8 @@ is replaced, never appended to: a new file is written and made durable, renamed
 over the old one, and the directory made durable. The journal agrees with it
 when it has exactly that many complete lines and the last digests to the
 recorded digest. A repository with neither file never had an override and
-reads as none.
+reads as none, and so does an authority of zero lines with no journal, which
+is what an interruption after rule 4's step 1 leaves.
 
 **Rule 3: every disagreement is a failure.** Each of these is exit 4 for `run`,
 `work list`, `work show`, `override show`, `override grant` and `override
@@ -388,7 +389,7 @@ leaves exactly one of:
 
 | State | Meaning | Answer |
 |---|---|---|
-| intended line recorded, journal without it | stopped before or during step 3, and nothing was appended | the intent is cleared by the next write or recovery, which records that it did; the line was never in force |
+| intended line recorded, journal without it | stopped before or during step 3, and nothing was appended; indistinguishable from an operator editing the authority alone, which is outside the threat model | the intent is cleared by the next write or recovery, which records that it did; the line was never in force |
 | intended line recorded, a torn final line | stopped during step 3 | not in force; reported; truncated by the next write or recovery, which records that it did |
 | intended line recorded, a complete final line that digests to it | stopped between steps 3 and 4 | **pending**: this product began the write and never acknowledged it. Not in force. `run` and the override verbs refuse with exit 2 until the operator settles it (rule 5), because whether the operator still intends it is not this product's to decide |
 
@@ -408,9 +409,9 @@ an operator name and a reason. The choices:
 | Choice | Allowed when | Effect |
 |---|---|---|
 | `complete-pending` | a pending line | the line comes into force with its own time; the authority is completed |
-| `discard-pending` | a pending line | the line is kept and a recovery line voids it; it is never in force |
-| `adopt-as-read` | any rule 3 disagreement where the journal itself reads and verifies | the journal as it reads becomes the new baseline |
-| `adopt-prefix` | a journal that does not read or verify | the longest prefix that verifies becomes the baseline; the whole file as found is preserved beside it, named and digested in the recovery line, and a new journal continues from that prefix |
+| `discard-pending` | any state of rule 4's table | a pending line is kept and a recovery line voids it; a torn line is truncated and an intent with no line cleared, each recorded; nothing it names is ever in force |
+| `adopt-as-read` | any rule 3 disagreement, or an authority that does not parse, where the journal itself reads and verifies | the journal as it reads becomes the new baseline |
+| `adopt-prefix` | a journal that does not read or verify | the longest prefix that verifies becomes the baseline; the whole file as found is preserved beside it in the protected records, named and digested in the recovery line, and a new journal continues from that prefix |
 | `adopt-empty` | an authority whose journal is missing | no override is in force from here |
 
 Each recovery appends a recovery line by rule 4's protocol, recording the state
@@ -470,6 +471,13 @@ operator's checkout is never edited, and no session, check or commit runs in it.
 Preparation is idempotent by identity: a run has exactly one workspace, and
 re-preparing an existing one is a no-op that reports the existing path. Two runs
 never share a workspace.
+
+*Amended by spec `004` section 3.18 rule 3:* a run's branch lives in a
+directory of its own, `refs/heads/statecraft/<run>/`, so that the confinement
+can grant the attempt its branch without granting any other run's. A workspace
+created before that section has its branch renamed into that directory by the
+supervisor before its next launch, and the rename is recorded with the
+attempt.
 
 ### 3.3 The run record
 
@@ -821,7 +829,7 @@ says governed work ran, and `absent` contradicts it: refused as conflicting. The
 project that commits a requirement, so an absent or empty log proves nothing:
 it neither corroborates `absent` nor refuses it.
 
-*Amended by spec `002` section 3.37:* the gate log is read from the attempt's launch records, where the supervisor copied it, or from the exchange directory for an attempt the supervisor did not conclude, and it is child-attested. Refusing `absent` when it records a released tool call stays, because that refusal is the conservative answer, but the stated reason is now that a process inside the confinement recorded one, not that this product's own record says governed work ran.
+*Amended by spec `002` section 3.37:* the gate log is read from the attempt's launch records, where the supervisor copied it, or from the exchange directory for an attempt the supervisor did not conclude, and it is child-attested. Refusing `absent` when it records a released tool call stays, because that refusal is the conservative answer, but the stated reason is now that a process inside the confinement recorded one, not that this product's own record says governed work ran. A child can therefore write a consultation that makes this refusal happen, so an operator cannot record `absent` for such an attempt; `confirmed` and `unknown` remain available to them, and this is named wherever the refusal is described.
 
 **Rule 4: what each finding does.**
 
