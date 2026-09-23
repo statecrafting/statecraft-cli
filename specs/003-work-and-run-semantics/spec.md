@@ -2,7 +2,7 @@
 id: "003-work-and-run-semantics"
 title: "Work selection, workspace preparation, the run record, and recovery after interruption"
 status: approved
-implementation: complete
+implementation: in-progress
 created: "2026-09-16"
 summary: >
   The core loop's semantics. How a unit of work is identified by reading
@@ -283,6 +283,8 @@ line when an override did. `run show` and `run list` render it. An intent
 written before this section carries neither, and reads as **not recorded**: it
 is never read as `defaulted` and never as admitted by an override.
 
+*Amended by section 3.1.5:* the journal also carries recovery lines, and an attempt admitted by an override records the state authority's digest and whether the grant is verified or operator-adopted (section 3.1.5 rule 7).
+
 **Rule 6: the default is unchanged.** Without an override in force, section
 3.1.1's default refusal holds exactly: an excluded spec is listed with its
 reason and `run` refuses it. A revocation restores that refusal for later
@@ -314,106 +316,150 @@ reads as not recorded.
 ### 3.1.5 The journal's current state, and an authority the journal cannot roll back
 
 An authority amendment, settled by the owner on 2026-09-23 and recorded before
-the implementation it authorizes. It amends section 3.1.4 rule 3. That rule's
-predecessor links detect a line edited, reordered or removed from before the
-last one, and named what they cannot detect: removing the last lines, which can
-delete a revocation and so resurrect an earlier grant, and deleting or
+the implementation it authorizes. It amends section 3.1.4 rules 3 and 5. That
+rule's predecessor links detect a line edited, reordered or removed from before
+the last one, and named what they cannot detect: removing the last lines, which
+can delete a revocation and so resurrect an earlier grant, and deleting or
 replacing the whole file. The owner does not accept that as an authorization
-guarantee. A checksum or checkpoint written beside the journal, where whoever
-can rewrite the journal can rewrite it too, adds nothing; so the repair has two
-parts: spec `004` section 3.18 keeps the supervised process out of both, and
-this section gives the journal's current state an authority of its own.
+guarantee. A checksum or checkpoint written beside the journal where whoever can
+rewrite the journal can rewrite it too adds nothing, so the repair has two
+parts: spec `004` section 3.18 keeps the supervised process from reaching
+either file, and this section gives the journal's current state an authority
+of its own, with a write protocol whose interruptions are distinguishable from
+edits.
 
 **Rule 1: four causes, kept apart.**
 
-| Cause | What it looks like | Answer |
+| Cause | How it shows | Answer |
 |---|---|---|
-| malformed or accidentally corrupted bytes | a line that does not parse, or links that do not verify | a failure; nothing is read as in force |
-| an interrupted append | a final line with no line break, or one complete line past the state authority whose link names the authority's last digest | rule 4 |
-| modification by the supervised process | none: spec `004` section 3.18 keeps it from reaching either file, and its acceptance shows that | refused by the operating system, not detected afterwards |
-| modification by an operator, outside the declared threat model | a journal that disagrees with its state authority in any way rule 4 does not name | a failure, with the disagreement stated; rule 5 is the only way on |
+| malformed or accidentally corrupted bytes | a line that does not parse, links that do not verify, or an authority that does not parse | failure (4); rule 5's `adopt-prefix` |
+| an interrupted write of this product | the authority records an intended line (rule 4) and the journal is in one of rule 4's states | rule 4 |
+| a change by the supervised process | none: spec `004` section 3.18 keeps it from reaching either file, and its acceptance shows the attempts refused | refused by the operating system, not detected afterwards |
+| a change by an operator or the host administrator, outside the declared threat model | a journal and authority that disagree in any way rule 4 does not name | failure (4), with the disagreement stated; rule 5 is the only way on |
+
+A consistent rewrite of both files together, including restoring an older pair
+from a backup, is not detected by design: nothing outside the operator's reach
+holds a counter. Every claim this section makes about rollback rests on the
+supervised process being unable to reach either file, and is made against it
+alone.
 
 **Rule 2: the state authority.** Beside each journal, in the protected records,
 is one state authority: the journal's key, the number of complete lines, the
-digest of the last one, and the time it was written. It is replaced, never
-appended to, by writing a new file, making it durable, and renaming it over the
-old one. The journal is read only together with it, and agrees with it when the
-journal has exactly that many complete lines and the last one digests to the
-recorded digest. A journal and an authority are both absent for a repository
-that never had an override; that reads as no override.
+digest of the last one (the genesis value section 3.1.4 links a first line to,
+for none), an optional intended line (rule 4), and the time it was written. It
+is replaced, never appended to: a new file is written and made durable, renamed
+over the old one, and the directory made durable. The journal agrees with it
+when it has exactly that many complete lines and the last digests to the
+recorded digest. A repository with neither file never had an override and
+reads as none.
 
-**Rule 3: every disagreement refuses.** Each of these is a failure for `run`,
+**Rule 3: every disagreement is a failure.** Each of these is exit 4 for `run`,
 `work list`, `work show`, `override show`, `override grant` and `override
-revoke`, which read nothing as in force and write nothing:
+revoke`, which read nothing as in force and write nothing, and it is named:
 
 - fewer complete lines than the authority records, however many are missing,
   including a deleted final revocation;
-- the right number of lines, and a last line that does not digest to the
-  recorded digest, including an edited final grant;
-- an older journal that is internally valid, restored over the current one;
+- the recorded count, and a last line that does not digest to the recorded
+  digest, including an edited final grant;
+- an older journal that is internally valid, restored over the current one
+  without its authority;
+- more complete lines than the authority records, other than rule 4's one
+  intended line;
 - a journal missing where an authority exists, or an authority missing where a
-  journal exists (rule 6 for a journal written before this section).
+  journal exists (rule 6).
 
-**Rule 4: crash consistency.** A grant or a revocation holds the repository
-lock (section 3.1.4 rule 7) and: appends its line and makes it durable; then
-writes the new authority and makes it and its directory durable. It is
-acknowledged to the operator only after both. So an interruption leaves one of
-two states. A torn final line with the authority unchanged: the line is not in
-force, is reported, and the next write truncates it, as section 3.1.4 already
-says. One complete line past the authority, linked to the authority's last
-digest: the append was made durable and the authority was not, and the command
-that made it was never acknowledged. That line is **not in force** and is
-reported as pending; `run` and the override verbs refuse until the operator
-settles it with rule 5, because whether the operator still intends an
-unacknowledged grant or revocation is not something this product can decide.
+The list names the shapes rule 1's operator row takes; any other disagreement
+between the two files is a failure in the same way.
 
-**Rule 5: operator recovery.** `override recover` (spec `006` section 3.11.8)
-is the only operation that brings a journal and its authority back into
-agreement. The operator names the repository, which of the states it will
-accept, an operator name and a reason. It can: complete a pending line from
-rule 4; discard a pending or torn line; or, for a disagreement of rule 3,
-accept the journal as it now reads, as a new baseline. It never picks a state
-by itself. Each recovery is recorded as a journal line of its own, with the
-state it found (counts and digests of both files), the choice, the operator as
-supplied and the reason, and then a new authority is written. A baseline
-accepted this way is recorded as **operator-adopted, not verified**, and `override
-show` and every attempt admitted under it say so; it is never rendered as a
-journal that verified.
+**Rule 4: the write protocol, and its interruptions.** Every write of the
+journal (a grant, a revocation, a recovery line) holds the repository lock
+(section 3.1.4 rule 7) and:
+
+1. on the first write for a repository, creates an authority of zero lines and
+   makes it and its directory durable before anything else;
+2. replaces the authority with one that records the **intended line**: its
+   position and its digest;
+3. appends the line and makes the journal durable (and its directory, when the
+   append created the file);
+4. replaces the authority with the new count and digest and no intended line.
+
+The command is acknowledged to the operator only after step 4. An interruption
+leaves exactly one of:
+
+| State | Meaning | Answer |
+|---|---|---|
+| intended line recorded, journal without it | stopped before or during step 3, and nothing was appended | the intent is cleared by the next write or recovery, which records that it did; the line was never in force |
+| intended line recorded, a torn final line | stopped during step 3 | not in force; reported; truncated by the next write or recovery, which records that it did |
+| intended line recorded, a complete final line that digests to it | stopped between steps 3 and 4 | **pending**: this product began the write and never acknowledged it. Not in force. `run` and the override verbs refuse with exit 2 until the operator settles it (rule 5), because whether the operator still intends it is not this product's to decide |
+
+A complete line past the authority that does not digest to a recorded intended
+line is not an interruption of this product's write; it is rule 3's
+disagreement. A reader that finds any of these states while another process
+holds the repository lock reports **in progress** and refuses as busy (exit 2),
+never as pending: `work list`, `work show` and `override show` take the lock
+when it is free and read under it.
+
+**Rule 5: operator recovery.** `override recover` (spec `006` section 3.11.8) is
+the only operation that brings a journal and its authority back into agreement
+after rule 3 or a pending line. The operator names the repository, the choice,
+the digests of both files as the report showed them (a changed state refuses),
+an operator name and a reason. The choices:
+
+| Choice | Allowed when | Effect |
+|---|---|---|
+| `complete-pending` | a pending line | the line comes into force with its own time; the authority is completed |
+| `discard-pending` | a pending line | the line is kept and a recovery line voids it; it is never in force |
+| `adopt-as-read` | any rule 3 disagreement where the journal itself reads and verifies | the journal as it reads becomes the new baseline |
+| `adopt-prefix` | a journal that does not read or verify | the longest prefix that verifies becomes the baseline; the whole file as found is preserved beside it, named and digested in the recovery line, and a new journal continues from that prefix |
+| `adopt-empty` | an authority whose journal is missing | no override is in force from here |
+
+Each recovery appends a recovery line by rule 4's protocol, recording the state
+it found (the counts and digests of both files), the choice, the operator as
+supplied, the reason and the time. A baseline adopted by any `adopt-` choice is
+**operator-adopted, not verified**: every grant whose line precedes the
+adoption line carries that label in `override show` and in the intent of every
+attempt it admits; lines after it verify normally. `run` proceeds under an
+adopted baseline. Recovery never picks a choice by itself, and refuses a choice
+the found state does not allow.
 
 **Rule 6: journals written before this section.** A journal with no authority
-was written before this section. Its current state cannot be established after
-the fact, and none is invented: it refuses as rule 3 says, and the operator's
-way on is rule 5's baseline, recorded as operator-adopted. A repository with
-neither file is unaffected.
+is reported as a journal with no authority; the product does not say whether it
+predates this section or had its authority removed. Its current state cannot be
+established after the fact and none is invented: it is rule 3's failure until
+the operator adopts it with rule 5, and the adoption is labelled
+operator-adopted.
 
-**Rule 7: concurrency.** Grant, revoke, recover and `run` take the one
+**Rule 7: what an attempt records.** Amending section 3.1.4 rule 5: an attempt
+admitted by an override records, beside the grant's facts, the authority's
+digest at admission and whether the grant is verified or operator-adopted.
+
+**Rule 8: concurrency.** Grant, revoke, recover and `run` take the one
 repository lock, so no two of them interleave, and `run` reads the journal and
 its authority once, under the lock, before it appends its intent. A concurrent
-attempt to write is refused and writes nothing.
+write is refused and writes nothing.
 
-**What this does not claim.** An operator, or the host administrator, who
-rewrites the journal and its authority consistently is not detected: both
-files are in a place the operator can write, and no key is held anywhere the
-operator cannot reach. The claim is that the supervised process cannot reach
-either (spec `004` section 3.18), that an accidental or partial change, an
-interrupted write and a restored copy are each refused rather than read as a
-different set of overrides, and that nothing an operator did not choose is
-read as their choice.
+**What this does not claim.** An operator or the host administrator who rewrites
+both files consistently is not detected (rule 1). The claim is that the
+supervised process cannot reach either file (spec `004` section 3.18), that an
+accidental or partial change, an interrupted write and a restored copy of one
+file are each distinguished and refused rather than read as a different set of
+overrides, and that nothing an operator did not choose is read as their choice.
 
-**Acceptance.** Through the binary, in an isolated home, each of these refuses
-`run` and the override verbs with nothing in force and nothing written: the
-last line edited; the final revocation deleted, which would otherwise
-resurrect its grant; several valid lines removed from the end; an older,
-internally valid journal restored; a journal deleted whose authority remains;
-an authority deleted whose journal remains; and a journal written before this
-section. An interruption after the append and before the authority, simulated
-by the product's own write path with a fault injected between the two durable
-steps, leaves a pending line that is not in force, and `override recover`
-completes it or discards it, each recorded. A torn final line is reported, not
-in force, and truncated by the next write. Concurrent grant, revoke and `run`
-against one repository never interleave and each refusal writes nothing. From
-the confined child, the reads, writes and deletions of both files are refused
-(spec `004` section 3.18, acceptance).
+**Acceptance.** Through the binary, in an isolated home, each of these is refused
+with nothing in force and nothing written: the last line edited; the final
+revocation deleted, which would otherwise resurrect its grant; several valid
+lines removed from the end; an older, internally valid journal restored without
+its authority; a journal deleted whose authority remains; an authority deleted
+whose journal remains; a line appended by hand past the authority; and a
+journal written before this section. With a fault injected by the product's own
+write path at each boundary of rule 4 (after step 1, 2, during 3, and between 3
+and 4), the resulting state is the one rule 4's table names, is not in force,
+and each recovery choice that state allows is exercised and recorded; a choice
+it does not allow, and a stale report, are refused. Concurrent grant, revoke,
+recover and `run` against one repository never interleave, a reader during a
+write reports in progress, and each refusal writes nothing. From the confined
+child, reads, writes, truncation, renames and deletions of both files are
+refused (spec `004` section 3.18, acceptance).
 
 ### 3.2 Workspace preparation
 
@@ -653,20 +699,24 @@ first kind does not change the attempt's outcome; it is evidence beside it.
 The second kind leaves the attempt live, as rule 2 says, because its record is
 in doubt, not because the finding is a verdict.
 
-**Rule 6: three answers, never collapsed (added 2026-09-23 with section
-3.1.5).** Each attempt's tamper evidence reads as one of three words per kind,
-and none implies another: **attempted access** (rule 1's first kind was
-observed), **observed modification** (rule 1's second kind was observed), and
-**unknown** (the product could not establish the kind at all: the stream was
-not mapped, a digest was not taken before the spawn, or one could not be taken
-after). Unknown is recorded as unknown and is never rendered as "none found".
-The paths both kinds consider are spec `004` section 3.18 rule 2's protected
-set, not only the product home, and the second kind digests the launch records
-and the journal's state authority as well as the run record and the journal.
-Under that boundary a confined write is refused by the operating system and
-leaves no finding, which is the boundary working and not evidence of its
-absence; the finding is kept for an attempt whose confinement record is
-missing, and as a second line of evidence beside one that has it.
+**Rule 6: three answers per kind, never collapsed (added 2026-09-23 with
+section 3.1.5 and spec `004` section 3.18).** Each kind of rule 1 is answered
+for each attempt as one of `observed`, `none observed` or `unknown`, and none
+implies another. `unknown` means the product could not establish the kind: for
+the first, the stream was not mapped; for the second, a digest was not taken
+before the spawn or could not be taken after; for both, the attempt's
+confinement record is present and its self-test result is missing. `unknown` is
+never rendered as `none observed`. The first kind still counts write requests
+only, now over every path spec `004` section 3.18 rules 2 and 3 forbid the child
+to write. The second kind digests, before the spawn and after the process ends,
+the run record, the override journal and its state authority, and every launch
+record of other attempts; the files the supervisor itself writes for this
+attempt during that window (`launched.json`, `admission.json`, `record.json`)
+are compared with the bytes the supervisor wrote, not with a digest taken
+before the spawn. Under confinement a forbidden write is refused by the
+operating system and leaves no finding, which is the boundary working and not
+evidence of its absence; the finding remains the second line of evidence beside
+the confinement record, and the only one for an attempt without it.
 
 **Acceptance.** Through the binary with a fake provider: a session requesting
 `Write` to a path in the product home records one tamper attempt of the first
@@ -770,6 +820,8 @@ Where the gate log records a released tool call, this product's own record
 says governed work ran, and `absent` contradicts it: refused as conflicting. The gate writes its log on a best-effort basis and only for a
 project that commits a requirement, so an absent or empty log proves nothing:
 it neither corroborates `absent` nor refuses it.
+
+*Amended by spec `002` section 3.37:* the gate log is read from the attempt's launch records, where the supervisor copied it, or from the exchange directory for an attempt the supervisor did not conclude, and it is child-attested. Refusing `absent` when it records a released tool call stays, because that refusal is the conservative answer, but the stated reason is now that a process inside the confinement recorded one, not that this product's own record says governed work ran.
 
 **Rule 4: what each finding does.**
 

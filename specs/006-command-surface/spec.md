@@ -2,7 +2,7 @@
 id: "006-command-surface"
 title: "The command surface: one binary, every verb the other specs name, and what an exit code means"
 status: approved
-implementation: complete
+implementation: in-progress
 created: "2026-09-16"
 summary: >
   The binary, and every verb reachable through it. Specs 002 to 005 each
@@ -393,6 +393,8 @@ it is not a precondition the operator declined, it is evidence that is not
 there. Reporting it as 2 made a missing file indistinguishable from a measured
 negative, which is the substitution `002` section 3.29 exists to prevent.
 
+*Amended by spec `004` section 3.18 rule 9:* for `startup capture`, code 2 also covers a launch refused because the protected evidence boundary cannot be established.
+
 ### 3.11.3 The seventh verb, and what `run` adds to its answer
 
 Added on 2026-09-22, authorized by the owner and recorded here before the
@@ -453,6 +455,8 @@ records they write carry the resolved identity as absent and the standing as
 evaluated with nothing resolved. Before this, they recorded the required
 identity as the resolved one. Their codes are unchanged.
 
+*Amended by spec `004` section 3.18 rule 9:* code 2 also covers a launch refused because the protected evidence boundary cannot be established, with nothing launched and nothing appended.
+
 ### 3.11.4 The eighth verb, and the trial section `startup show` gains
 
 Added on 2026-09-22, authorized by the owner and recorded here before the
@@ -487,6 +491,8 @@ directory holds `trial.json`, the answer carries a `trial` field with the
 judgement recomputed from the records on disk, and the human rendering adds its
 lines. Additive under section 3.4; its codes are unchanged, because the trial's
 judgement is `startup trial`'s answer, not `startup show`'s verdict.
+
+*Amended by spec `004` section 3.18 rule 9:* code 2 also covers a launch refused because the protected evidence boundary cannot be established, with nothing launched and nothing appended.
 
 ### 3.11.5 The override verbs
 
@@ -559,6 +565,31 @@ bindings were written, for `002` section 3.35.
 
 The verbs join section 3.1's table with the change that implements them.
 
+### 3.11.8 The recover verb
+
+Added on 2026-09-23, authorized by the owner and recorded here before the
+binding was written, for `003` section 3.1.5.
+
+| Command | What it does |
+|---|---|
+| `override recover <path>` | Reports the journal and its state authority as found, their digests, the state `003` section 3.1.5 names for them, and the choices its rule 5 allows. Writes nothing. |
+| `override recover <path> <choice> <journal-digest> <authority-digest> <operator> <reason...>` | Records the named choice against the state the digests name. `<choice>` is `complete-pending`, `discard-pending`, `adopt-as-read`, `adopt-prefix` or `adopt-empty`; a digest of a missing file is `absent`. |
+
+| Code | Meaning for `override recover` |
+|---|---|
+| 0 | Reported a journal and authority that agree, or the choice recorded. |
+| 1 | Reported a state that needs recovery: a finding, as `doctor` reports one. |
+| 2 | Refused, and nothing written: an unregistered repository, a choice the found state does not allow, digests that are not the state now found, files that already agree, an empty operator or reason, or another process holding the repository lock. |
+| 3 | Usage: a missing argument, or a choice word this verb does not have. |
+| 4 | The files could not be read, or the record could not be written durably. |
+
+*Amending section 3.11.5's table:* for the override verbs, and for `run`,
+`work list` and `work show` reading the journal, a pending line or a write in
+progress is 2, refused, naming `override recover`; a journal and authority that
+disagree are 4, as "did not verify" already is. `override show` and `run show`
+render an operator-adopted baseline as `operator-adopted, not verified`. The
+verb joins section 3.1's table with the change that implements it.
+
 ### 3.12 What the command surface does not unlock
 
 Stated because an integration slice is exactly where scope grows quietly:
@@ -572,26 +603,7 @@ Stated because an integration slice is exactly where scope grows quietly:
   appends a new attempt (`003` section 3.4).
 - **No second provider.** `004`'s Claude Code adapter (formerly `008`) is the first, and `004`'s out-of-scope section holds.
 
-### 3.11.8 The recover verb
 
-Added on 2026-09-23, authorized by the owner and recorded here before the
-binding was written, for `003` section 3.1.5.
-
-| Command | What it does |
-|---|---|
-| `override recover <path>` | Reports the journal and its state authority as found, and the choices section 3.1.5 rule 5 allows for that state. Writes nothing. |
-| `override recover <path> <choice> <operator> <reason...>` | Records the named choice and writes a new state authority. `<choice>` is `complete-pending`, `discard-pending` or `adopt-as-read`. |
-
-| Code | Meaning for `override recover` |
-|---|---|
-| 0 | Reported, or the choice recorded. |
-| 2 | Refused, and nothing written: an unregistered repository, a choice the found state does not allow, a journal and authority that already agree, an empty operator or reason, or another process holding the repository lock. |
-| 3 | Usage: a missing argument, or a choice word this verb does not have. |
-| 4 | The files could not be read, or the record could not be written durably. |
-
-`override show` and `run show` render an operator-adopted baseline as
-`operator-adopted, not verified`. The verb joins section 3.1's table with the
-change that implements it.
 
 ## 4. Out of scope
 

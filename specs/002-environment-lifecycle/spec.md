@@ -1679,6 +1679,8 @@ returning and the confirmation being on disk there is a window in which a
 process exists and no record says so, and rule 23 names what that window reads
 as.
 
+*Amended by section 3.37:* the four records live in the product home, and the gate's files in a separate exchange directory.
+
 **Rule 23: the launch states, read back, and what each does not prove.**
 
 | What is on disk | State | What it means | What it does not mean |
@@ -1733,6 +1735,8 @@ the other. Where the project commits no requirement, nothing is selected, the
 document is the floor alone, no gate is written, and the record says work was
 not gated by a startup decision.
 
+*Amended by section 3.37:* the gate script is written into the attempt's exchange directory, not beside the launch records.
+
 **Rule 26: startup identity is an admission prerequisite, and governed work is
 released only by the decision.** Section 3.25 promises prevention, so the
 decision is made before governed work is released, not after the session ends.
@@ -1770,6 +1774,8 @@ What this boundary establishes, and what it does not:
   excluded. Nor does it establish that nothing happened outside tool calls (the
   provider's own startup, other hooks), or that stopping the process undid
   anything. Prompt termination is not proof of no effect.
+
+*Amended by section 3.37:* the gate reads its copy of the decision, and writes its log, in the exchange directory; the log is child-attested.
 
 **Rule 27: the correlated acknowledgment.** The grade section 3.31 called
 `acknowledged` is **`correlated`**, in the record, in the API and on the
@@ -1909,6 +1915,8 @@ section for the trial's run.
 Each word is scoped to tool calls. None covers the provider's own startup,
 other hooks, or anything outside a tool call, and the record says so beside the
 word (rule 26).
+
+*Amended by section 3.37 rule 3:* under confinement the gate consultations these rules read are child-attested; a trial recorded before section 3.37 is read as it was.
 
 **Rule 37: the verdict.**
 
@@ -2315,52 +2323,71 @@ owner's act; this section makes it so. A requirement later found
 unmet, or a new requirement, moves it back to `in-progress` in the change that
 finds or adds it.
 =======
-### 3.37 Where an attempt's launch records live
+### 3.37 Where an attempt's launch records live, and what the child is given
 
 An authority amendment, settled by the owner on 2026-09-23 with spec `004`
 section 3.18 and recorded before the implementation it authorizes. Sections
 3.31 and 3.32 put an attempt's launch directory at
 `.statecraft/state/startup/runs/<run>/<attempt>/` inside the target, beside the
-workspace the child works in, and put the gate's log in the same directory as
-the intent, the launch record, the admission decision and the record. A child
-can therefore read and rewrite the files its own startup judgement is
-recomputed from, and can write the admission decision before the supervisor
-does. Constitution IX does not admit that, and spec `004` section 3.18 is the
-boundary that keeps the child out.
+workspace the child works in, and put the gate's script and log in the same
+directory as the intent, the launch record, the admission decision and the
+record. A child can therefore read and rewrite the files its own startup
+judgement is recomputed from, and can write the admission decision before the
+supervisor does. Constitution IX does not admit that.
 
 **Rule 1: the launch records move to the product home.** An attempt's
-`intent.json`, `launched.json`, `admission.json`, `record.json` and a trial's
-`trial.json` live in the product home under the repository's records, in one
+`intent.json`, `launched.json`, `admission.json`, `record.json`, and a trial's
+`trial.json`, live in the product home under the repository's records, one
 directory per run and attempt, keyed as the run record is keyed. Their names,
 contents, write-once rules and judgement are unchanged; only the directory
-moves. The child cannot read or write them (spec `004` section 3.18 rule 2).
+moves. The child can neither read nor write them (spec `004` section 3.18 rule
+2).
 
-**Rule 2: the exchange directory.** The files the child needs are in a
+**Rule 2: the exchange directory.** The files the child is given live in a
 separate per-attempt exchange directory in the product home (spec `004` section
-3.18 rule 4): the admission gate script, the settings document the provider is
-given, a copy of the supervisor's admission decision written once by the
-supervisor, and the gate log, created empty by the supervisor before launch.
-The gate reads the decision there and appends to the log there. The settings
-document's digest is taken before launch and again when the record is written,
-as before. The supervisor's decision in the launch records is the evidence of
-what was admitted; the copy in the exchange directory is only what the gate
-reads, and the gate log is child-attested.
+3.18 rule 5): the admission gate script, the settings document the provider is
+given, a copy of the admission decision, and the gate log, created empty before
+launch. The gate reads the decision and writes its log there. The supervisor
+makes `admission.json` durable in the launch records first and then writes the
+exchange copy by creating a new file and renaming it into place; the launch
+records' copy is the evidence of what was admitted, and the exchange copy is
+only what the gate reads. The settings document's digest is taken before launch
+and again when the record is written, as before, and a difference is recorded
+as before. The gate log is **child-attested**: the supervisor copies it into the
+launch records when it writes `record.json`, bounded in size, read without
+following a link, and labelled as written by a process inside the confinement.
 
-**Rule 3: records written before this section.** Launch records already in a
+**Rule 3: what rests on the gate log.** Section 3.32 rule 26's gate withholds
+every tool call until the decision admits; that withholding is enforced by the
+gate reading a file the child cannot write, and is unchanged. What the log
+reports afterwards (each consultation, and section 3.33's `established` and
+`excluded`, which rest on every tool request having a gate consultation) is
+child-attested evidence under spec `004` section 3.18's confinement. A trial
+recorded before this section, including the one established observation of
+section 5's 2026-09-23 entry, was recorded without confinement and is read as it
+was; a trial recorded after it states that its consultations are
+child-attested. Section 3.36 rule 5 relies on an established trial and inherits
+that statement.
+
+**Rule 4: `startup trial` and `startup capture` are confined too.** Both start
+a provider and refuse, as a preflight with nothing launched, when the boundary
+cannot be established (spec `004` section 3.18 rule 9). A capture writes the
+settings file it hands the provider into that capture's exchange directory, not
+into the directory the operator names; the operator's directory receives the
+capture records after the provider has exited, and a directory inside the
+project stays refused, as before. Section 3.29 rule 4 and section 3.30 rule 12
+bind the provider's program and arguments as handed to the confinement; the
+confinement is bound apart from them by its mechanism and its profile or
+ruleset digest, and the wrapper's own arguments are not part of the invocation
+(spec `004` section 3.18 rule 10). A confined observation and an unconfined one
+are not the same invocation, and no earlier observation is re-judged.
+
+**Rule 5: records written before this section.** Launch records already in a
 target's `.statecraft/state/startup/runs/` are read where they are, judged as
 before, and labelled as written where the child could reach them. They are not
 moved, rewritten or re-judged as protected, and no attempt that wrote them is
-reported as confined.
-
-**Rule 4: the other launches.** `startup trial` and `startup capture` confine
-the provider they start in the same way and refuse when the boundary cannot be
-established (spec `004` section 3.18 rule 6). A capture directory the operator
-names is protected for the capture's duration; one inside the project stays
-refused, as before. That the provider now runs confined is recorded with the
-launch, so a later observation made under confinement and an earlier one made
-without it are not the same invocation, and no earlier observation is re-judged
-by this section.
->>>>>>> b5a24c0 (spec(004,003,002,006): the protected evidence boundary and the journal's state authority (004 3.18, 003 3.1.5, 002 3.37, 006 3.11.8))
+reported as confined. A confined child cannot write that tree (spec `004`
+section 3.18 rule 2), so no record can be added to it after this section.
 
 ## 4. Out of scope
 
