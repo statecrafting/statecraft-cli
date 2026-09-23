@@ -102,6 +102,7 @@ group them:
 | `startup capture <path> <control> <capture-dir>` | `002` | Launches one qualification control and records the launch and everything it produced. |
 | `startup qualify <path> <session> <capture-dir>` | `002` | Submits the three captured controls, which are admitted or refused. |
 | `startup show <path> <run> [--attempt <n>]` | `002` | One run attempt's startup records and their judgement: required, selected and observed harness, payload, supply, launch, and why it is or is not qualified. Reads only. |
+| `startup trial <path> (--provider-session \| --synthetic)` | `002` | Spends the project's one managed-startup trial: one `run` attempt with a read-only sentinel, judged by `002` section 3.33. |
 
 A verb is added by the change that implements the behavior behind it, never
 ahead of it: a command that prints "not implemented" is a worse answer than a
@@ -444,6 +445,41 @@ records they write carry the resolved identity as absent and the standing as
 evaluated with nothing resolved. Before this, they recorded the required
 identity as the resolved one. Their codes are unchanged.
 
+### 3.11.4 The eighth verb, and the trial section `startup show` gains
+
+Added on 2026-09-22, authorized by the owner and recorded here before the
+binding was written, for `002` section 3.33. The trial is a `run` attempt, so
+it needs the run path; it is not a unit of work, so `run` cannot name it; and
+it spends a provider session, so it must be an act an operator states rather
+than an option a script can default. One verb is added.
+
+**`startup trial <path> (--provider-session | --synthetic)`** launches the
+project's managed-startup trial through the run path and renders the judgement
+`002`'s crate returns. Exactly one of the two flags is required: neither, or
+both, is refused before anything is prepared. `--deadline <seconds>` bounds the
+session, 120 by default, refused above 300. There is no option naming the
+prompt, the turn limit, the run id, the sentinel or the settings: `002` fixes
+them, so a caller cannot describe a trial that did not happen. The provider is
+resolved as `run` resolves it, from the constructed child environment.
+
+| Code | Meaning for `startup trial` |
+|---|---|
+| 0 | The trial is `established`. The answer names its origin; a synthetic `established` is a statement about the procedure. |
+| 1 | The trial ran and is `not-established` or `uncertain`. A finding, with every reason; the records are written and no further trial is possible in this project. |
+| 2 | Refused before launch: no manifest, no committed requirement, neither or both flags, a deadline over 300, a trial attempt already recorded for the project, or a sentinel path already present. Nothing was launched. |
+| 4 | The trial's records could not be written, could not be read back, or read back to a different judgement than the one written. |
+
+A refused trial whose refusal comes from the run path after the attempt was
+appended (the provider does not resolve) is a concluded attempt with no
+session, exits 1, and spends the trial, as a refused `run` attempt stays
+recorded. The answer says no session was started.
+
+**`startup show` gains one section.** For the trial's run, where the attempt's
+directory holds `trial.json`, the answer carries a `trial` field with the
+judgement recomputed from the records on disk, and the human rendering adds its
+lines. Additive under section 3.4; its codes are unchanged, because the trial's
+judgement is `startup trial`'s answer, not `startup show`'s verdict.
+
 ### 3.12 What the command surface does not unlock
 
 Stated because an integration slice is exactly where scope grows quietly:
@@ -696,6 +732,12 @@ is in any release. The pin here stays `=0.20.0`, and nothing below repins it.
 None of the four is implemented here, because none has a released producer
 contract, and a compatibility fixture is the only mechanism this repository
 supports for an unreleased one.
+
+**2026-09-22: `startup trial`, recorded before its binding.** Section
+3.11.4 adds the eighth verb and the trial section of `startup show`, for `002`
+section 3.33. The verb requires the operator to state provider execution or a
+fake, because a default would let a script spend a session nobody named.
+No code changed with this entry.
 
 ## Verification
 
