@@ -770,6 +770,17 @@ with exit 2 before anything is judged, and `contract-moved` is a finding, exit
 1, like the other acceptances that ran and found something. Both fields are
 additive under section 3.4.
 
+**2026-09-23: where `work list` places a stale ledger and a refused pin.**
+Section 3.10 names the missing-field refusal and, through `003` section 3.8,
+the corpus that does not compile (a finding, **1**). It is silent on the two
+answers `003` now separates from that finding (its section 5 entry of this
+date). A stale ledger is **2**: a precondition, nothing read, cured by
+recompiling. A producer that refused the target, such as a pin it does not
+satisfy, is **2** as well, like the absent producer beside it. Either way nothing
+was done, and an operator can act. `producer_compatibility.rs` pins all three
+through the built binary against a stub producer. Two of them fail on the
+previous build, which reported both refusals as a compile failure under exit 1.
+
 ## Verification
 
 Each line is one command. §3.7's rows are integration tests that **spawn the

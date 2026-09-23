@@ -175,6 +175,11 @@ pub fn report_error_answer(e: &ReportError) -> Answer<String> {
         // A corpus that does not compile is the target's state, reported as
         // itself: the operation ran and found it.
         ReportError::CorpusDoesNotCompile { .. } => Exit::Finding,
+        // Spec 003 section 5, 2026-09-23: a stale ledger is the freshness
+        // precondition of section 3.1.2 rule 3 unmet, and a producer that
+        // refuses the target (a pin it does not satisfy) answered nothing.
+        // Both are refusals: nothing was read, and nothing was done.
+        ReportError::LedgerStale { .. } | ReportError::ProducerRefused { .. } => Exit::Refused,
         // spec-spine absent is a precondition, and nothing was done: spec 001
         // section 3.2 makes it the only thing that may answer a specification
         // question here, so without it there is no answer to have. An operator
