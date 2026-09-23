@@ -276,10 +276,16 @@ fn the_named_producer_build_reproduces_its_portable_verifier_fixtures() {
             _ => {}
         }
     }
+    // One case can fail several checks, so the count is of cases, not of
+    // mismatches.
+    let failed: std::collections::BTreeSet<&str> = mismatches
+        .iter()
+        .filter_map(|m| m.split(':').next())
+        .collect();
     assert!(
         mismatches.is_empty(),
-        "{} of {} case(s) did not reproduce: {mismatches:?}",
-        mismatches.len(),
+        "{} of {} case(s) did not reproduce ({failed:?}): {mismatches:?}",
+        failed.len(),
         cases.len()
     );
 }

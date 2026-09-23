@@ -629,8 +629,10 @@ The ignored `producer_candidate` fixture test now checks, per case:
 The verifier reports only an error kind for that last case, so no message
 text is parsed. Run against the published build and the fixture set shipped
 inside the published `spec-spine-core` 0.23.0 crate, all eleven cases
-reproduce. Run against the 0.20.0 binary with the same set, six do not, each
-as a version mismatch. The same run binds `unsupported`, because 0.20.0 has no
+reproduce. Run against the 0.20.0 binary with the same set, four do not:
+`control-untampered`, `flipped-verdict`, `minor-ahead-content-mismatch` and
+`reformatted-same-values`, each read as a version mismatch where the set
+expects `match` or `contentMismatch`. The same run binds `unsupported`, because 0.20.0 has no
 closure verb, and reads `status` from the list alone. So an older producer is
 refused by name where it lacks a capability, and nothing about it is read as
 the newer contract.

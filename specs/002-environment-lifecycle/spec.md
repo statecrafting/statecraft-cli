@@ -3432,8 +3432,9 @@ and it fails without the fix and passes with it.
 
 **2026-09-23: the governance producer is the published `spec-spine-core`
 0.23.0, and it conforms.** Owner-directed. This moves the library dependency
-from `=0.21.0` to `=0.23.0`, from crates.io with no override, in step with
-the CLI pin (`D-06`, entry of this date). The crate records Git revision
+from `=0.21.0` to `=0.23.0`, from crates.io with no override. It moves as its
+own change, after the CLI pin moved to the same version (`D-06`, entry of this
+date). The crate records Git revision
 `d2bb4763` (tag `v0.23.0`), its registry checksum is `3dca8f68…e492`, and its
 unpacked source equals that revision's tree. `PRODUCER_VERSION` and the bridge
 test's label move with it, and the test that reads the manifest keeps them
