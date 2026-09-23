@@ -2085,6 +2085,124 @@ missing member, a non-string non-null `detail`, an empty `uuid`, or a
 `session_id` that is absent or names another session; and a trailer with no
 terminal event before it.
 
+### 3.35 Per-path ownership transfer, as an operator's act
+
+A narrowly scoped authority amendment, settled by the owner on 2026-09-23 and
+recorded before the implementation it authorizes. Section 3.21 retains, from
+the withdrawn section 3.7, that ownership transfer is "per path, explicit,
+operator-initiated, reversible, and recorded with the digest observed at the
+moment of transfer and with the producer revision it was evaluated against".
+This section is the operation.
+
+**The gap, exactly.** The manifest can carry a `transfer` on an entry, and
+`env plan` and `doctor` read one, but nothing creates one and nothing reverses
+one. A path this product would manage and finds occupied is withheld as
+`foreign` on every apply, and the only way to change that is to edit the
+committed manifest by hand.
+
+**Rule 1: three classes, four moves, one path.** The classes are section 3.2's.
+A transfer names exactly one repository-relative path, its current class and
+the class it is to take, and is one of:
+
+| From | To | What changes |
+|---|---|---|
+| `user` | `adopted` | An `adopted` entry is recorded with the digest observed now. Nothing is written to the file. |
+| `user` | `managed` | A `managed` entry is recorded with the digest observed now, and a `transfer` naming the prior claimant. Only for a path this product would itself write: one an installed adapter declares, with that adapter as its source. A later `env apply` or `env upgrade` may then rewrite it; the bytes it held before are not kept by this product. |
+| `adopted` | `user` | The entry is removed. |
+| `managed` | `user` | The entry is removed. The file stays, byte for byte; `env remove` no longer deletes it. |
+
+`adopted` to `managed` and back is two transfers through `user`, each recorded.
+A path this product has no source for cannot become `managed`: management
+means upgrades rewrite it, and there would be nothing to rewrite it with.
+
+**Rule 2: never inferred.** A transfer happens only when an operator asks for
+it by path. Nothing moves a path between classes because its bytes resemble
+something this product generates, because a producer returns it, or because a
+directory holds it. Initialization and upgrade never transfer. In particular a
+user instruction file is `user` class under section 3.8 and **cannot** be
+transferred to `adopted` or `managed` by this operation. The list is closed, by
+file name at any depth: `AGENTS.md`, `CLAUDE.md`, `GEMINI.md`, `.cursorrules`,
+`.windsurfrules`, and `.github/copilot-instructions.md`. A pointer file this
+product wrote under section 3.8 is already `managed` and may be released to
+`user`. The root instruction bridge of section 3.13 is a modification, not an
+entry, and is not transferable either.
+
+**Rule 3: what may be named.** The path is relative, uses forward slashes, has
+no empty, `.` or `..` component, and names a regular file that exists. No
+component may be a symbolic link. A directory is refused, so nothing is adopted
+wholesale. Anything under `.statecraft/` and anything under a `.git`
+component are refused. Every refusal names the
+rule and writes nothing.
+
+**Rule 4: plan, then apply.** `transfer plan` reports, and writes nothing: the
+path, its current class as the manifest and the file say, its digest and length
+now, the resulting entry, the producer revision, and a **plan identity**, the
+SHA-256 of the path, both classes, the file's digest and the manifest's digest.
+`transfer apply` takes the same path and classes, that plan identity, an
+operator name and a reason, recomputes the plan, and refuses unless the
+identity is equal: a file edited, a manifest changed or a class that is no
+longer the one named in between is a stale plan, refused, with what changed
+named. The operator name is recorded as supplied and not authenticated.
+
+**Rule 5: the record.** An applied transfer changes the manifest entry as rule
+1 says and appends one record to the transfer journal, a `transfers` list
+inside `.statecraft/environment.json` itself, so that section 3.12's four
+paths stay four: its
+identity, the path, both classes, the digest and length observed, the producer
+revision it was evaluated against (the `spec-spine-core` version this build
+links), the operator as supplied, the reason, the time, and the manifest's
+digest before. Nothing else in the manifest and no byte of any file changes.
+The journal is append-only. A manifest whose journal disagrees with its
+entries is reported by `transfer plan`, and `transfer apply` and `transfer
+revert` refuse on it.
+
+**Rule 6: reversal.** `transfer revert` names a recorded transfer, an operator
+and a reason, and applies the inverse move when, and only when, that transfer
+is the latest for its path, the path's class is still the one it produced, and
+the file's digest is what this product's record says it should be: the digest
+the manifest entry records now, where the transfer produced an entry (so a
+rewrite this product made and recorded, such as an `env apply` after a move
+to `managed`, is not an intervening change), and the digest the transfer
+observed, where it removed one. An unrecorded edit, a later transfer or a
+missing file refuses the reversal and names which. Reversal changes ownership,
+never content: reversing a move to `managed` does not bring back bytes an
+apply replaced. A reversal is a new journal record that names the one it
+reverses; the reversed record is kept.
+
+**Rule 7: repeating a satisfied request.** Checked before the plan identity:
+applying a transfer whose latest journal record already moved the same path
+between the same classes, with the path still in that class and the file's
+digest what rule 6 says it should be, reports `already-satisfied` and writes
+nothing, whatever plan identity was given. Any other request whose named
+current class is not the path's class is refused.
+
+**Rule 8: the producer boundary is unchanged.** Adopting a conforming producer
+(section 3.15) transfers nothing. A user's pre-existing instruction files stay
+`user`, and section 3.13's recognition of a generated, unmodified root
+`AGENTS.md` is not a transfer.
+
+**The command surface.** Spec `006` section 3.11.7 adds `transfer plan`,
+`transfer apply` and `transfer revert`.
+
+**Compatibility.** A manifest written before this section has no journal and
+reads as having no transfers. An entry carrying a `transfer` with no journal
+record is read as before, reported by `transfer plan` as recorded without a
+journal, and never rewritten. A build that predates this section and rewrites
+the manifest does not carry the `transfers` list; none is distributed
+(`F-02`), and a manifest that lost its journal reads as above.
+
+**Acceptance.** In an isolated home and fixture repositories, through the
+binary: `user` to `adopted` and back; `user` to `managed` for an adapter path
+that `env apply` withheld as `foreign`, after which `env apply` writes it, and
+the reversal, after which it is withheld again; `managed` to `user`, after
+which `env remove` leaves the file. Negative: a stale plan after the file, the
+manifest or the class changed; a named class that is not the path's; `user` to
+`managed` for a path no adapter declares; a root `AGENTS.md`; a symbolic link,
+a `..` path, a directory, `.statecraft/environment.json` and a `.git` path;
+a reversal after an intervening edit or a later transfer; and a repeated
+request reported `already-satisfied` with nothing written. Every refusal
+leaves every byte of the repository as it was.
+
 ## 4. Out of scope
 
 Installing the product itself; provider authentication; hosted registration;
