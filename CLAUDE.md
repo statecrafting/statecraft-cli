@@ -15,8 +15,8 @@ what is proposed versus adopted is
 
 All seven specs, `000` to `006`, are `approved`. `registry list` is the
 authority on the second half: `000` and `001` carry `implementation: n-a`,
-because they own prose and no code, and `002` to `006` carry
-`implementation: complete`.
+because they own prose and no code, and each of `002` to `006` carries the
+implementation state `registry list` reports, which this file does not restate.
 
 **A spec may own more than one crate.** Four pairs were consolidated on
 2026-09-21 and no crate moved, so `002`, `004` and `005` own two crates each.
@@ -41,7 +41,9 @@ make verify SPEC=001       # one spec's declared acceptance
 make status                # version, lifecycle counts, what is schedulable
 ```
 
-`make code` judges eight crates and 683 tests. Both surfaces are required
+`make code` builds, tests, lints and format-checks all eight crates; the test
+count is whatever `cargo test --workspace` reports, and no file restates it,
+because a restated count is wrong after the next test lands. Both surfaces are required
 through the `ci-gate` status check. The guard that made the cargo verbs skip on
 an empty workspace is still there and still correct; it simply no longer fires.
 
