@@ -8,9 +8,8 @@ It runs on one machine, on one repository, with no account and no hosted service
 
 ## Status: specified, implemented and tested, not released
 
-Every verb the specs name is bound. There are twenty-seven, and
-`cargo run -p statecraft-cli -- --help` prints each one beside the spec it
-answers to:
+Every verb the specs name is bound, and `cargo run -p statecraft-cli -- --help`
+prints each one beside the spec it answers to:
 
 ```
 project register   project list   project arm   project disarm
@@ -20,13 +19,15 @@ work list   work show   run   run list   run show   accept
 home show   home plan   home apply
 init plan   init apply   migrate plan   migrate apply
 config show   approval grant   approval show
+harness show   harness upgrade   session payload
+startup record   startup capture   startup qualify   startup show
 ```
 
-Measured on 2026-09-21: seven specs, `000` to `006`, all `approved`. Eight
-crates and one binary; `cargo test --workspace` passes **683 tests**, none
-ignored; `spec-spine index coverage` reports 117 of 117 source files
-specifically claimed. Every spec that claims code has built it, and no forward
-claim is outstanding.
+Seven specs, `000` to `006`, all `approved`; eight crates and one binary.
+`make code` runs the whole workspace suite and `make gate` requires every
+source file to be specifically claimed by a spec, so neither a test count nor a
+coverage figure is restated here: run them. Every spec that claims code has
+built it, and no forward claim is outstanding.
 
 Seven specs and eight crates, because **a spec may own more than one crate**.
 The corpus was eleven specs until 2026-09-21, when four pairs that each
@@ -52,12 +53,15 @@ what has been adopted in
 
 This repository distinguishes four claims and makes them separately: *specified*,
 *implemented*, *tested*, *released*. Today `000` to `006` are specified and
-approved; `002` to `006` are additionally implemented and tested: eight crates
-and 683 passing tests, from `cargo test --workspace` on 2026-09-21. The
-machine-checkable rows of each spec's observable-negative-cases table are
-carried by tests named after them; the rows those tables state as refused in
-review are review obligations, and no test is claimed for them. **Nothing is
-released**, and `F-02` defers publication.
+approved; `002` to `006` are additionally implemented and tested by
+`cargo test --workspace`, except what only a live provider session can
+establish, and `registry list` is the authority on each spec's implementation
+state. The machine-checkable rows of each spec's
+observable-negative-cases table are carried by tests named after them; the rows
+those tables state as refused in review are review obligations, and no test is
+claimed for them. **No managed session has been live-qualified**: every
+qualification path is exercised against local fakes, which the records mark
+synthetic. **Nothing is released**, and `F-02` defers publication.
 
 ## The idea
 
@@ -143,6 +147,49 @@ inside the repository it registers.
 What the slice must make observably true, stated as refusals rather than as
 assertions, is
 [spec 001](specs/001-boundaries-and-authority/spec.md) section 3.11.
+
+### What a managed run records at its start
+
+A **managed** run is one in a project holding `.statecraft/environment.json`.
+The route to one, from a checkout:
+
+```sh
+cargo run -p statecraft-cli -- home apply                 # the product home and its harness revision
+cargo run -p statecraft-cli -- init apply      <path>     # the project area and its manifest
+cargo run -p statecraft-cli -- harness upgrade <path>     # commit the required harness revision, explicitly
+cargo run -p statecraft-cli -- run             <path> <spec-id>
+cargo run -p statecraft-cli -- startup show    <path> <run-id> [--attempt <n>]
+```
+
+`run` refuses before any attempt when the required revision is missing,
+corrupt or unreadable (spec `002` section 3.25). Otherwise it writes up to four
+write-once records per attempt under
+`.statecraft/state/startup/runs/<run>/<attempt>/` (spec `002` sections 3.31 and
+3.32): `intent.json` before a spawn is attempted, `launched.json` once the spawn
+returned a process and before the prompt is delivered, `admission.json` at the
+startup decision, and `record.json` at the end. `startup show` reads them back
+and answers, from their bytes:
+
+| Question | Where the answer comes from |
+|---|---|
+| which revision was **required** | the committed manifest, full digest |
+| which was **selected** | the run's own choice, the required revision once it is verified intact |
+| what was **supplied** | the settings document the run passed with `--settings`, by digest: the deny floor plus, when a revision is selected, that revision's `SessionStart` hook and the attempt's admission gate, registered for this session only; the floor's own digest is recorded beside it |
+| which was **correlated** | one acknowledgment in a `SessionStart` response of this attempt's own stream that carries this attempt's binding and names an installed revision; it does not establish which process printed it, so "executed" is never claimed |
+| whether work was **admitted** | the startup decision, made at the first event after the startup hooks: tool calls wait at the gate until it says `admitted`, and a refusal stops the process |
+| whether a process was **created** | `launched.json`; an intent alone is `launch-unknown`, and a confirmed spawn with no record is `outcome-unknown` |
+| why it is **not qualified** | the verdict and its reasons |
+
+Six words stay apart: **installed**, **selected**, **supplied**, **correlated**,
+**admitted** and **qualified**, and a run cannot reach the last: a run session
+is not one of the three qualification controls. A provider that ignores the
+registration runs neither the acknowledgment nor the gate, so the decision
+refuses and the process is stopped, and the refusal says effects before the stop
+are not excluded. What is still unobserved is whether the live provider honors
+hooks passed through `--settings` in `--print` mode; until a live run shows it,
+a live managed run with a requirement is expected to be refused as
+`not-admitted`. An attempt whose outcome is unknown stays live, and `run`
+refuses the next attempt and names what to inspect rather than replaying it.
 
 ### The exit codes a caller scripts against
 
