@@ -1694,9 +1694,10 @@ section 3.6 blocks a retry of an intent whose outcome is unknown. `run` refuses
 the next attempt, names the live attempt and its launch state, and gives the
 operator the inspection to perform: `startup show <path> <run-id> --attempt
 <n>`, the process id where one was confirmed, and the workspace where effects
-may have landed. This build has no verb that reconciles an attempt; the
-limitation is stated in that answer rather than worked around, and nothing
-here infers an outcome to free the lock.
+may have landed. Nothing here infers an outcome to free the lock. The one way
+to free it is an operator's reconciliation (spec `003` section 3.6.1, the
+`run reconcile` verb of spec `006` section 3.11.6), which the answer names;
+until that section, this build had no such verb and the answer said so.
 
 **Rule 25: a managed run supplies its startup hook and its gate explicitly.**
 Where the project commits a requirement, the run's settings document is the
