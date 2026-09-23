@@ -1,10 +1,11 @@
 //! Who claims a path, and whether the claimed copy is the one in force.
 //!
-//! Spec 002 section 3.7: a `foreign` finding names an OWNER, not only a path.
+//! Spec 002 section 3.21, retained parts 1 and 2 (first stated in section 3.7,
+//! since withdrawn): a `foreign` finding names an OWNER, not only a path.
 //! Once the claimant can be a globally cached package rather than a file
 //! somebody copied in, a path alone stops describing the conflict.
 //!
-//! The same section names the precedence trap that makes `shadowed` necessary:
+//! Section 3.7 named the precedence trap that makes `shadowed` necessary:
 //! a personal file can resolve ahead of a project file of the same name, so the
 //! governed copy is present, readable, and not what runs. A digest match is not
 //! evidence that a file is in force.
@@ -31,7 +32,7 @@ pub enum Claimant {
     },
     /// Something claims the path and this product cannot say what.
     ///
-    /// Section 3.7's closing sentence: neither the package nor the declaration
+    /// Withdrawn section 3.7's closing sentence: neither the package nor the declaration
     /// exists yet, so an unobservable claimant is recorded as not-recorded
     /// rather than guessed at or silently omitted.
     NotRecorded,
@@ -107,8 +108,9 @@ impl ShadowResolver for StaticShadows {
 
 /// Paths another installer owns, which this product must not write.
 ///
-/// Spec 002 section 3.7.1: the product never writes a path spec-spine's kit
-/// owns unless the manifest records an explicit transfer. This is that set,
+/// Spec 002 section 3.21 part 3 (first stated in withdrawn section 3.7.1): the
+/// product never writes a path another installer owns unless the manifest
+/// records an explicit transfer. This is that set,
 /// supplied by the caller rather than hardcoded, because spec-spine owns its
 /// kit and this repository does not vendor a copy of its file list.
 #[derive(Debug, Clone, Default)]
