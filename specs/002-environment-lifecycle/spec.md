@@ -54,6 +54,11 @@ summary: >
   admission gate per invocation instead of relying on global registration;
   and startup identity is decided before governed work is released rather than
   refused after the session ends.
+  Section 3.33 separates the managed-startup trial from the permission
+  experiment: one run attempt with a read-only sentinel, one session and one
+  version probe, its own approval, named outcomes for absent, unbound, late,
+  conflicting and mismatched hook evidence, and three words for effects before
+  admission.
 establishes:
   - { kind: directory, path: "crates/statecraft-environment/" }
   - { kind: directory, path: "crates/statecraft-home/" }
@@ -1786,6 +1791,167 @@ in the work tree and on the command line at spawn), **correlated** (rule 27),
 evidence is insufficient under these rules, including one written before them,
 stays inspectable and is never qualified by being read.
 
+### 3.33 The managed-startup trial, and why it is not the permission experiment
+
+Settled by the owner on 2026-09-22 and recorded before the implementation it
+authorizes. It corrects a reading, adds one bounded experiment, and states what
+the ordering in section 3.32 rule 26 assumes of the provider.
+
+**The correction.** Section 3.30's permission experiment launches its three
+controls through `startup capture`. Each carries the deny floor's payload and
+nothing else: no `SessionStart` registration, no admission gate, no `run`, no
+intent and no decision. Its result says whether the floor's deny rule was
+enforced against one command on one version. It says nothing about whether a
+provider runs hooks supplied through `--settings`, reports them before `init`,
+consults a `PreToolUse` gate or waits for it, which are the premises section
+3.32 rules 25 and 26 rest on. The handoff's statement of what is outstanding
+put that uncertainty beside the permission stage's approval as though running
+the stage would retire it; it would not, and the handoff is corrected. The
+two experiments answer two questions, their results are reported separately,
+and neither result, nor both together, is a qualification: section 3.29's
+observation is unreachable through a run (rule 28), and the trial adds no
+route to it.
+
+**Rule 29: the trial asks one question.** On the installed provider version,
+when a managed run supplies its startup hook and its admission gate through
+`--settings` in `--print --output-format stream-json --verbose` mode:
+
+1. does the startup hook's response arrive in the attempt's own stream,
+   carrying this attempt's binding;
+2. does it arrive before the decision point;
+3. is the gate consulted before a requested tool executes; and
+4. does a tool execute only after the decision admitted the attempt?
+
+**Rule 30: the trial is a run attempt, not a second launcher.** It goes
+through the same preparation (intent, gate, settings document, sentinel of
+rule 31), the same supervisor and launch watch, the same finalization and the
+same run record as `run`. It differs from `run` in four values and in nothing
+else: the run id is the fixed `statecraft-startup-trial`; the prompt is rule
+31's instruction; the turn limit is `--max-turns 3`; and the deadline is the
+operator's, 120 seconds by default and never more than 300. It consults no
+scheduler, because the trial is not a unit of work, and it refuses in a
+project that commits no harness requirement, because an ungated run cannot
+answer rule 29.
+
+**Rule 31: a harmless sentinel.** Before the intent is written, the launcher
+writes `STATECRAFT-TRIAL-SENTINEL` into the attempt's workspace: one line
+carrying a fresh nonce. The prompt asks the session to read that file once
+with the `Read` tool and to reply with its contents. `Read` changes nothing,
+and the workspace is the run's own disposable one. A tool result for a `Read`
+request that carries the nonce, with no non-execution note from the harness,
+is the evidence that the tool executed; the nonce exists nowhere else, so a
+reply cannot carry it without the read. This is the provider's report of the
+execution, not a disk observation, and the trial says so.
+
+**Rule 32: the budget is one session and one version probe, and it is spent
+once.** The run path's own version probe is the only probe. The trial verb
+refuses when the run `statecraft-startup-trial` holds any attempt, live or
+concluded, so an uncertain launch is never replayed and a completed trial is
+never repeated: a second trial needs a fresh project. The supervisor enforces
+the deadline and stops the process group at it; the acceptance script bounds
+the whole verb separately. There is no retry of any kind.
+
+**Rule 33: provider execution is a stated act.** The verb refuses unless the
+operator names what it is doing: `--provider-session`, which runs the provider,
+or `--synthetic`, which states that the executable is a local fake, marks every
+trial record synthetic, and can never be read as a provider observation. The
+acceptance script's `managed-startup` stage refuses unless
+`APPROVED_MANAGED_STARTUP_SESSION=yes`. That approval is not
+`APPROVED_PROVIDER_SESSION`, neither satisfies the other, and the local test
+route refuses when either is set.
+
+**Rule 34: what the trial keeps.** `trial.json`, written once in the attempt's
+directory beside section 3.32's four records, carries: the origin
+(`provider-session` or `synthetic`); the sentinel's path, nonce and digest; the
+settings bytes the adapter wrote, verbatim; the provider version the probe and
+the init event reported; a timeline of the stream by line (each `SessionStart`
+`hook_started` and `hook_response`, whether the response carried an
+acknowledgment line, the init event, each tool request by id and name, each
+tool result by id with whether it executed and whether it carried the nonce,
+and the terminal event); the line and the event kind the decision was made at;
+the gate's log; the process end (exit or signal, whether the supervisor stopped
+it, and surviving processes); and the judgement of rules 35 to 37. Nothing is
+removed afterwards. After writing, the verb reads the attempt's records back
+from disk and judges them again; a reloaded judgement that differs from the
+one written is a failure, not a result. `startup show` renders the trial's
+section for the trial's run.
+
+**Rule 35: the hook evidence has a name for each shape.**
+
+| Hook evidence | When |
+|---|---|
+| `correlated` | exactly the acknowledgment rule 27 describes, read before the decision point |
+| `absent` | no `SessionStart` response anywhere in the stream |
+| `unbound` | a `SessionStart` response before the decision point, whose acknowledgment did not bind; the kind is section 3.31 rule 18's word |
+| `late` | acknowledgments only after the decision point, which rule 26 never waits for |
+| `conflicting` | acknowledgments naming different revisions |
+| `mismatched` | correlated, naming a revision other than the required one |
+
+**Rule 36: effects before admission get one of three words, never more.**
+
+| Word | When |
+|---|---|
+| `excluded` | the decision was `admitted`, every tool request in the stream has a gate consultation, every consultation released the call only on `admitted`, and every executed tool result follows the decision line |
+| `demonstrated-possible` | a tool executed with no consultation to account for it, or executed before the decision line, or executed while the decision refused, or after the gate withheld or refused it |
+| `unobserved` | neither: nothing executed, or the stream is incomplete, so the records cannot say |
+
+Each word is scoped to tool calls. None covers the provider's own startup,
+other hooks, or anything outside a tool call, and the record says so beside the
+word (rule 26).
+
+**Rule 37: the verdict.**
+
+| Verdict | When |
+|---|---|
+| `established` | hook evidence `correlated`, the decision `admitted`, at least one tool request, every request consulted, the sentinel executed carrying its nonce after the decision line, effects `excluded`, and a process that ended by itself with no survivor |
+| `not-established` | a completed launch in which any of those fails; every failing condition is a named reason |
+| `uncertain` | a launch state of `launch-unknown`, `outcome-unknown`, `spawn-failed` or `interrupted`, or a process the deadline stopped |
+
+A synthetic trial reaches these words with its origin beside them, and a
+synthetic `established` is a statement about the procedure, never about a
+provider.
+
+**What an established trial does not establish.** Which process printed the
+acknowledgment (rule 27); that the hook's bytes when it ran equal the bytes
+digested; that a refused decision blocks a tool call, since an admitted trial
+never refuses and a refusal would be a second session; anything about another
+version; anything about the deny floor, which is section 3.30's question; or
+qualification.
+
+**The ordering the gate implements, and what it assumes.** The gate opens
+exactly when `admission.json` exists holding `"decision":"admitted"`, and that
+file is written when the launcher reads the first stream event that is not a
+`SessionStart` `hook_started` or `hook_response` (the 2026-09-22 entry's fourth
+choice). A tool call requested before that event reaches a gate that polls for
+the file every tenth of a second for thirty seconds: an admitted decision
+releases it, a refusal refuses it with the provider's blocking code `2`, and no
+decision within the wait refuses it the same way and logs `withheld`. The gate
+never releases on a timeout. Five provider behaviors are premises, and the
+trial observes each or shows that it failed:
+
+- **P1.** A `SessionStart` hook supplied through `--settings` runs in
+  `--print` mode and is reported as a `hook_response` before `init`. Recorded
+  only for a globally registered hook (the committed 2.1.267 streams); through
+  `--settings`, unobserved. If it arrives after `init`, it is `late`.
+- **P2.** That hook receives the session's environment, which carries the
+  binding. Unobserved. If not, the evidence is `unbound`.
+- **P3.** A `PreToolUse` hook supplied through `--settings` runs before the
+  tool executes, the provider waits for it up to the registration's
+  `timeout` (sixty seconds, which is also the documented default), and exit `2`
+  blocks the call. Documented; unobserved here. If the provider does not wait,
+  or runs the tool anyway, the effects word is `demonstrated-possible`.
+- **P4.** `Read` needs no approval inside the working directory in the
+  default permission mode. Documented. If it is denied, the sentinel does not
+  execute and the verdict names that.
+- **P5.** No event other than a `SessionStart` hook event precedes `init`. If
+  one does, the decision is made there with no init session read, the
+  acknowledgment is judged `wrong-session`, and the attempt is refused. That is
+  fail-closed, and the trial records the event kind the decision was made at
+  so the cause is visible rather than inferred.
+
+None of these is weakened to make the trial pass: not the gate's wait, not the
+decision point, not the refusal on a missing session.
+
 ## 4. Out of scope
 
 Installing the product itself; provider authentication; hosted registration;
@@ -3064,6 +3230,16 @@ came and went while the test ran. This product wrote nothing there. The test's
 git helper now passes `maintenance.auto=false` and `gc.auto=0` to every
 invocation, so the repositories a test snapshots change only when something
 under test changes them; the snapshot itself still covers `.git`.
+
+**2026-09-22: the permission experiment does not resolve managed startup.**
+The handoff's statement of what remained outstanding placed the unobserved
+hook delivery of section 3.32 beside the approval of the permission stage, and
+a reader could take running that stage as retiring it. The stage starts no
+`run` and supplies no hook, so it cannot. Section 3.33 is recorded before any
+implementation: a separate managed-startup trial, one run attempt spending one
+session and one version probe, under its own approval, with the ordering
+premises it tests stated as premises. The handoff's section 7 is corrected in
+place and says it was corrected. No code changed with this entry.
 
 ## Verification
 
