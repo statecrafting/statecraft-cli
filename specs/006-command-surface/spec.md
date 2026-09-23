@@ -486,6 +486,32 @@ judgement recomputed from the records on disk, and the human rendering adds its
 lines. Additive under section 3.4; its codes are unchanged, because the trial's
 judgement is `startup trial`'s answer, not `startup show`'s verdict.
 
+### 3.11.5 The override verbs
+
+Added on 2026-09-23, authorized by the owner and recorded here before the
+bindings were written, for `003` section 3.1.4. Three verbs, each a binding on
+the one operation that section names.
+
+| Command | What it does |
+|---|---|
+| `override grant <path> <spec-id> <operator> <reason...>` | Records an override for one spec id in one registered repository. |
+| `override revoke <path> <spec-id> <operator> <reason...>` | Records its removal. |
+| `override show <path>` | The overrides in force for that repository, each with its operator as supplied, its reason and its time. Reads only. |
+
+| Code | Meaning for the override verbs |
+|---|---|
+| 0 | `grant` or `revoke` recorded; `show` read the journal. |
+| 2 | Refused, and nothing written: an unregistered repository, an unknown spec id, an empty operator or reason, a grant duplicating one in force, a revocation of nothing, or another process holding the repository lock. |
+| 3 | Usage: a missing argument. |
+| 4 | The journal could not be read, did not verify, or could not be written durably. |
+
+`work list`, `work show` and `run` read the journal; a journal that does not
+read or verify is exit 4 for them too, never an empty set. `run show` and `run
+list` render the admission rule 5 of that section records. The verbs join
+section 3.1's table and the group list the tree prints with the change that
+implements them, under section 3.1's rule that a verb is never added ahead of
+its behavior.
+
 ### 3.12 What the command surface does not unlock
 
 Stated because an integration slice is exactly where scope grows quietly:

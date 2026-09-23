@@ -25,12 +25,13 @@
     "id": "003-work-and-run-semantics",
     "implementation": "complete",
     "sectionDigests": {
-      "003-work-selection-workspace-preparation-the-run-record-and-recovery": "5fe9c5c1e782fd1ef34275278d0cf72e4a7571a06797514504d4bd19c59c5bda",
+      "003-work-selection-workspace-preparation-the-run-record-and-recovery": "ecb9fcba557d8ef81a0fe50a0b8f7b97d34f33a7ea248d921b0168e5f5aa6541",
       "1-purpose": "6e2e713486514a4371080ee9ad901b71b92b198ff8944d2cac7db353dfdd1ee6",
       "2-territory": "f200d26f7fab70304d4ec5b21bbfba40301c0a2a5b38fc266d1d37da0f01b4a4",
       "3-1-1-ready-is-not-ratified": "e902124dba1a1dfc0ed218701ac4b36773d42c1359d537fe8dfce993379529fa",
       "3-1-2-two-reports-that-both-carry-status-read-from-one-state": "0722b17ba097b6735d32640f164f15f50c2fa2de195428e25a7dd0014c3a2d7a",
       "3-1-3-the-contract-an-attempt-is-bound-to": "6d3e8037f9525dd5346175188d538f8edc379a3e7e84fed79385efd9e07f7ac1",
+      "3-1-4-the-operator-override-as-an-operation-this-product-performs": "9142f49b83bec0d4238e7fc5903025f3cf17f5700fd219539f5420a89763b276",
       "3-1-a-unit-of-work": "a1ed8a7d68644074b10d1aa89c49c11667a967a0ed1004cf423bd0119657c8fe",
       "3-2-workspace-preparation": "1f3e3927b95e6c084212d89215d2e5222053a5c4bf2159549834c3c514d39a19",
       "3-3-1-effect-identity-and-one-to-one-closing": "fe9215ff1d25660f0740dd4be1546a3ee2b3c18baad2cd8bbfd582d14fbca8e4",
@@ -40,7 +41,7 @@
       "3-6-recovery-and-reconciliation": "50b88facefc2e4c69037b3f006fd9a464949c47498ed59d2b30ea066291d9bae",
       "3-7-concurrency-bounds-for-the-first-slice": "f20d713052cb52ff0e46e7d7bf723c4cfe5d831a66670c47ffea086423ced547",
       "3-8-observable-negative-cases": "64b35b1a553ef276500ef17c7ef9beff5d4488a934d422acddee2b429583bc0b",
-      "3-behavior": "33f55270b942f4b9cb0c6de67a86f60400688cfb515fb5c6f1c556bf5e421e52",
+      "3-behavior": "31ab96e01f260c9d51640f5555fc47569dcfaaaa3e971776124d6c66b52b276d",
       "4-out-of-scope": "0953737fbaaf06f31c4272c3b10a57178c967c1127355c9826627a1267c76fdd",
       "5-decisions-recorded-during-implementation": "9d1a0fb86d725db8e7791bc6102a5a9796ee1cc659823cd08e638a7571e503c5",
       "verification": "31b33969410d5ba51a42678f60dc22264f541b2480ada745b3c0cc2f839d9a1e"
@@ -54,6 +55,7 @@
       "3.1.1 Ready is not ratified",
       "3.1.2 Two reports that both carry status, read from one state",
       "3.1.3 The contract an attempt is bound to",
+      "3.1.4 The operator override, as an operation this product performs",
       "3.2 Workspace preparation",
       "3.3 The run record",
       "3.3.1 Effect identity and one-to-one closing",
@@ -71,6 +73,6 @@
     "summary": "The core loop's semantics. How a unit of work is identified by reading spec-spine's structured report rather than re-deriving it; how an isolated workspace is prepared so the operator's checkout is never edited; the append-only hash-linked run record with intent written before an effect and outcome after it; the closed outcome set (completed, failed, refused, interrupted, cancelled) and the rule that a retry appends an attempt rather than replacing history; supervisor-owned refusal accounting a supervised process cannot erase; and reconciliation of an ambiguous effect before any retry, with no exactly-once promise.\n",
     "title": "Work selection, workspace preparation, the run record, and recovery after interruption"
   },
-  "shardHash": "e60d5076c867d26786532c2669c436dc07275e85cbeb55efe926dda63be84bd5",
+  "shardHash": "0fe581bf1fb225e5064454de3c8e80a71ca481f73d29938e9f53d19c737180b0",
   "specVersion": "1.6.0"
 }
