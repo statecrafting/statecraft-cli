@@ -2218,7 +2218,9 @@ qualification* is section 3.29's admitted live observation. *Activation* is
 this product acting on a real home. *Counterparty completion* is what section
 3.22 leaves to another repository. Only the first is what the frontmatter's
 `implementation` field records; the other three are reported beside it, on
-their own evidence, and none of them grants or withholds it.
+their own evidence. None of them grants it, and none withholds it except
+through a requirement of sections 3.1 to 3.35 that mandates its result (rule
+5).
 
 **Rule 2: every normative requirement is accounted for.** `implementation:
 complete` requires that, on one revision of `main`, every requirement of
@@ -2229,32 +2231,41 @@ none:
 |---|---|
 | implemented | Reachable through this product's command surface where the requirement is about the product's behavior, and exercised by a named test or declared acceptance command. Code no verb reaches is **not** this class. |
 | deferred | Deferred by name in section 4, by a deferral row of the decision record, or by a dated section 5 entry that says so and why. A requirement is not deferred by being hard. |
-| external | Decidable only by a provider session, a real home, a release, or another repository's act. Its current disposition is recorded, whatever it is. |
+| external | Decidable only by a provider session, a real home, a release, or another repository's act, **and** the requirement does not mandate a particular result. Its current disposition is recorded, whatever it is. A requirement that mandates a result and depends on such an act is accounted for only when that result is established; until then it is unresolved and blocks `complete` (rule 5). |
 
 **Rule 3: failing closed is not the same as implemented.** A requirement that
 the product *do* something is not satisfied by the product reporting that it
 cannot. A requirement that the product *refuse* or *report* something is
-satisfied by the refusal or the report. Where a requirement makes an outcome
-conditional on evidence (section 3.27's "verified before this product relies
-on the mechanism"), it is satisfied by the product not relying on the
-mechanism until that evidence exists, and the evidence itself is a
-qualification fact under rule 1.
+satisfied by the refusal or the report. A requirement that makes the product's
+reliance on a mechanism conditional on evidence is satisfied only by that
+evidence or by the product demonstrably not relying on the mechanism; where
+another requirement of these sections itself relies on the mechanism, the
+second reading is not available.
 
 **Rule 4: the producer and acceptance.** The pinned producer is the published
 crate, resolving with no Git or path override, and conforms under section 3.15
 on that revision. Every spec's declared acceptance passes there, run serially,
 with every ignored, skipped or unavailable check named.
 
-**Rule 5: experiments need a disposition, not a success.** Every live
-experiment the owner authorized has a recorded disposition (established,
-unverified, not admitted, or not run with the reason), with its evidence kept
-and its original verdict never rewritten. A positive result is required only
-where a requirement of sections 3.1 to 3.35 explicitly promises the result
-itself rather than the procedure that measures it. None does at the time this
-section is written: section 3.29 rule 6 makes `unverified` the correct answer
-when evidence cannot decide. A later amendment that adds such a promise names
-itself here, and until its result is established that requirement is
-`external` and unresolved, and blocks `complete`.
+**Rule 5: experiments need a disposition; a mandated result needs the result.**
+Every live experiment the owner authorized has a recorded disposition
+(established, unverified, not admitted, or not run with the reason), with its
+evidence kept and its original verdict never rewritten. A positive result is
+required where a requirement of sections 3.1 to 3.35 mandates the result
+itself rather than the procedure that measures it. Section 3.29 rule 6 is not
+such a requirement: it makes `unverified` the correct answer when evidence
+cannot decide. **Section 3.27 is one.** It requires that "the installed version
+and the effective behavior are verified before this product relies on the
+mechanism, and an unverified mechanism is an unavailable one", and section
+3.32 rule 25 relies on that mechanism to deliver a managed run's settings
+document: the deny floor, the startup hook and the admission gate. So section
+3.27 is unresolved, and blocks `complete`, until the behavior a run relies on
+is established for the installed provider version: the deny floor through an
+admitted observation of sections 3.29 and 3.30, and hooks supplied through
+`--settings` through an established trial of section 3.33. Evidence for one
+version is not evidence for another. The alternative, a `run` that treats the
+mechanism as unavailable for an unverified version, would be a change to
+section 3.32 and is the owner's to make; this section does not make it.
 
 **Rule 6: how it is applied.** The evaluation is a dated section 5 entry
 naming the revision, the count of implemented requirements, and every
