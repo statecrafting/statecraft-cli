@@ -451,6 +451,89 @@ which is the concrete failure the archived predecessor measured before its spec
 beside an otherwise completed turn still makes the attempt's outcome `refused`,
 and the completed turn is retained beside it.
 
+### 3.5.1 What records an attempted write to the record, and what does not
+
+A narrowly scoped authority amendment, settled by the owner on 2026-09-23 and
+recorded before the implementation it authorizes. Section 3.8's row "The
+supervised process attempts to alter the refusal count: impossible by
+placement, and the attempted write is itself recorded" states a result and no
+mechanism.
+
+**The gap, exactly.** `Accounting::note_tamper_attempt` exists and nothing
+outside a test calls it. Every attempt's accounting is written with an empty
+`tamper_attempts`, whatever the session did, and nothing compares the record
+before and after the supervised process ran. Placement is also weaker than the
+row's first half suggests: the record is in the product home, and the
+supervised process runs as the same operating-system user, so a session that
+knows the path can reach it (spec `004` section 3.6 names the same residual for
+the home directory).
+
+**Rule 1: two kinds of evidence, and only these.** This product records a
+tamper attempt when, and only when, one of the following is observed during an
+attempt:
+
+1. **A structured request to write a protected path.** A tool request in the
+   session's own structured stream, for a tool whose documented input names a
+   file it writes (`Write`, `Edit` and `MultiEdit` by `file_path`,
+   `NotebookEdit` by `notebook_path`), whose target, resolved against the
+   attempt's workspace, lies inside this product's home. Recorded whether the
+   request was refused, executed or unresolved, with that classification beside
+   it.
+2. **A change to the record while the process ran.** The supervisor digests
+   the repository's run record, and the override journal where one exists,
+   after the intent is durable and before the spawn, and again after the
+   process has ended and before anything else is appended. Any difference is a
+   write this product did not make.
+
+A shell command's text is **not** interpreted: a `Bash` request that writes the
+record through a redirection is caught by the second kind if it succeeds, and
+by neither if it fails. A write the operating system refused, and any write
+outside the attempt's lifetime, leaves no evidence this product reads. Both are
+residuals and are stated as such wherever the rule is described.
+
+**Rule 2: what is recorded, and where.** Each tamper attempt records its kind,
+the target as the evidence names it, the tool and tool-use id for the first
+kind, the before and after digests and lengths for the second, and never the
+content of anything written. The first kind is recorded in the attempt's
+accounting record, beside the refusal count, which it does not change. The
+second kind means the record itself was altered, so nothing more is appended
+to it by this attempt: the finding is written to a separate append-only audit
+file beside the record, named for the repository, and the attempt stays live,
+which sends it to reconciliation (section 3.6.1) rather than letting a new
+outcome sit on a record nobody can vouch for.
+
+**Rule 3: an audit that cannot be written is a failure, not a silence.** If
+the accounting record or the audit file cannot be made durable, `run` exits
+with the failure code, prints the finding it could not record in its answer,
+and leaves the attempt live. A finding is never dropped because its record
+failed.
+
+**Rule 4: older shapes are not corruption.** An accounting record written
+before this section carries `tamper_attempts` as an array of strings, and a
+record written before that field existed carries none; both read as "no
+structured finding recorded", never as a clean result that was checked. A
+record whose hash links do not verify is corruption and is refused on opening,
+as today. A torn tail is a crash artifact, reported and appended after, as
+today. A difference found by rule 1's second kind is tampering by this
+section's definition, whatever its cause, and is reported as a change this
+product did not make rather than as proof of intent.
+
+**Rule 5: nothing here is a refusal of the attempt.** A tamper attempt of the
+first kind does not change the attempt's outcome; it is evidence beside it.
+The second kind leaves the attempt live, as rule 2 says, because its record is
+in doubt, not because the finding is a verdict.
+
+**Acceptance.** Through the binary with a fake provider: a session requesting
+`Write` to a path in the product home records one tamper attempt of the first
+kind with its tool-use id and classification, and the refusal count is
+unchanged; a request to a workspace path records none; a fake that appends to
+the run record during the session produces an audit entry of the second kind,
+no outcome appended, the attempt live, and `run show` and a later `run` naming
+it; an audit file that cannot be written exits with the failure code and
+prints the finding; `run show` renders both kinds; an accounting record in the
+older shape reads as "no structured finding recorded"; and an edited earlier
+record is refused on opening as corruption, not reported as tampering.
+
 ### 3.6 Recovery and reconciliation
 
 On start, the product folds the record and finds every **intent with no
