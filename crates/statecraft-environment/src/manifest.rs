@@ -476,8 +476,18 @@ pub struct ManifestLock {
     key: Option<PathBuf>,
 }
 
+/// Release explicitly, then close. A `flock` belongs to the open file
+/// description, and a child spawned from another thread holds a copy of the
+/// descriptor until its `exec`; releasing by closing alone would leave the lock
+/// held for that window, and the next writer would be told another process
+/// holds it. An explicit unlock releases it for every copy at once (the same
+/// repair spec 003 section 5 records for the repository lock).
 impl Drop for ManifestLock {
     fn drop(&mut self) {
+        #[cfg(unix)]
+        if let Some(file) = &self._file {
+            let _ = rustix::fs::flock(file, rustix::fs::FlockOperation::Unlock);
+        }
         if let Some(key) = self.key.take() {
             HELD.with(|h| h.borrow_mut().retain(|k| *k != key));
         }
@@ -1347,6 +1357,26 @@ mod tests {
         release.0.send(()).unwrap();
         holder.join().unwrap();
         assert!(root.join(LOCK_PATH).is_file());
+    }
+
+    // The copy a spawned child holds between its creation and its `exec` is a
+    // second descriptor on the same open file description. Held here
+    // deterministically, as a duplicate that outlives the holder: the next
+    // writer, waiting for no one, still takes the lock.
+    #[cfg(unix)]
+    #[test]
+    fn a_copy_of_the_descriptor_does_not_keep_a_released_lock() {
+        let dir = tempfile::tempdir().unwrap();
+        let root = dir.path().to_path_buf();
+        let held = lock(&root, std::time::Duration::ZERO).unwrap();
+        let copy = held._file.as_ref().unwrap().try_clone().unwrap();
+        drop(held);
+        let other = root.clone();
+        let taken = std::thread::spawn(move || lock(&other, std::time::Duration::ZERO).is_ok())
+            .join()
+            .unwrap();
+        assert!(taken, "a released lock was still held through a copy");
+        drop(copy);
     }
 
     #[test]

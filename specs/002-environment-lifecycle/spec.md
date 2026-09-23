@@ -4057,6 +4057,12 @@ choice below is one rule 1 to 7 did not make; none changes what they require.
   is emulated with byte-range locks (NFS, some SMB and FUSE mounts) and a
   user's own `flock .` would contend with it. A filesystem that cannot lock is
   its own error, `LockUnsupported`, and nothing is written without the lock.
+  Only local APFS (macOS) and the CI runner's Linux filesystem were exercised;
+  no network or FUSE filesystem was, so behavior there is reasoned, not
+  measured. Dropping the lock unlocks explicitly before closing, as spec 003's
+  repository lock does: a child spawned from another thread holds a copy of
+  the descriptor until its `exec`, and a release by closing alone would leave
+  the lock held for that window.
   The lock is reentrant within a thread. `Manifest::write` takes it itself,
   and every read-modify-write holds it from its read to its write:
   `Manifest::update`, `env apply` (`apply::apply_current`, which the binary
