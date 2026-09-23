@@ -325,6 +325,9 @@ case "$*" in
   check) exit 0 ;;
   'registry plan --json') echo '{"ready":[{"id":"acc-run","title":"synthetic run"}]}' ;;
   'registry list --json') echo '{"items":[{"id":"acc-run","status":"approved","implementation":"pending"}]}' ;;
+  # Spec 004 section 3.17: the suite plan the posture is compared against.
+  # The synthetic unit of work declares no verification commands.
+  'verify acc-run --plan --json') echo '{"exitCode":0,"ok":true,"report":{"commands":[],"skipped":[],"specId":"acc-run"},"schemaVersion":"0.6.0","verb":"verify"}' ;;
   *) exit 3 ;;
 esac
 SPINE

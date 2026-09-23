@@ -566,7 +566,10 @@ run another program named in their arguments: `env`, `exec`, `command`,
 first word contains `/` names a file rather than a program `PATH` resolves; it
 is listed as `path` and requires no program directly. Any other command is not
 parsed: it is listed as `unparsed`, by its text. `skipped` blocks are listed
-as skipped and require nothing.
+as skipped and require nothing. A plan that cannot be read (the command fails,
+exits non-zero, or answers something that does not parse as the plan) refuses
+the run, naming why: nothing is assumed about a suite that could not be read,
+and an empty plan is only one that says it is empty.
 
 **Rule 3: what the comparison can and cannot claim.** A program required and
 absent from the allowance is **missing**. The coverage verdict is one of:
