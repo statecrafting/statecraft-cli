@@ -20,7 +20,7 @@ home show   home plan   home apply
 init plan   init apply   migrate plan   migrate apply
 config show   approval grant   approval show
 harness show   harness upgrade   session payload
-startup record   startup capture   startup qualify   startup show
+startup record   startup capture   startup qualify   startup show   startup trial
 ```
 
 Seven specs, `000` to `006`, all `approved`; eight crates and one binary.
@@ -190,6 +190,26 @@ hooks passed through `--settings` in `--print` mode; until a live run shows it,
 a live managed run with a requirement is expected to be refused as
 `not-admitted`. An attempt whose outcome is unknown stays live, and `run`
 refuses the next attempt and names what to inspect rather than replaying it.
+
+`startup trial <path> (--provider-session | --synthetic)` is the one verb that
+asks that question (spec `002` section 3.33): one run attempt through the same
+launch, a read-only sentinel, one session and one version probe, spent once per
+project, judged `established`, `not-established` or `uncertain`, with the hook
+evidence and the effects before admission each named. The acceptance script's
+`managed-startup` stage runs it under its own approval. The permission
+experiment does not answer it: that stage starts no run and supplies no hook.
+
+### The contract a run was authorized against
+
+Where the producer resolves context closures (spec-spine's specs 106 and 107,
+unreleased), `run` asks it for one per attempt, the spec and every obligation
+the spec declares, and writes the answer into the attempt's intent before any
+effect (spec `003` section 3.1.3). `accept` asks for the same closure again and
+compares (spec `005` section 3.18): a contract that changed, lost a member or
+withdrew an obligation is no acceptance, reason `contract-moved`, naming each
+member with both identities. Under the pinned producer, which has no closures,
+the binding reads `unsupported` and the comparison `not-recorded`. The receipt
+is unchanged either way.
 
 ### The exit codes a caller scripts against
 

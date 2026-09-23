@@ -136,8 +136,11 @@ esac
     assert_eq!(answer["value"]["refusals"], refusals);
     // Spec 006 section 3.4 permits additive fields. The original seven stay,
     // the run exposes its recorded posture alongside them, and section 3.11.3
-    // adds its startup evidence.
-    assert_eq!(answer["value"].as_object().unwrap().len(), 9);
+    // adds its startup evidence, and spec 003 section 3.1.3 the contract the
+    // attempt was bound to (this stub producer has no closures, so
+    // `unsupported`).
+    assert_eq!(answer["value"].as_object().unwrap().len(), 10);
+    assert_eq!(answer["value"]["contract"]["state"], "unsupported");
     // This fixture holds no manifest, so it is not a managed session and
     // records no startup evidence, and the answer says so rather than
     // claiming a record (spec 002 section 3.31).

@@ -320,22 +320,25 @@ fn slice_verb(
     // Discovery is the join spec 003 section 3.1.1 prescribes, performed by the
     // crate that owns it. Both halves come from spec-spine's structured output.
     let needs_report = matches!(verb, Verb::WorkList | Verb::WorkShow | Verb::Run);
-    let work = if needs_report {
+    let (work, report) = if needs_report {
         match SpecSpineCli::default().corpus_report(root) {
             Ok(report) => {
                 let (policy, disagreement) =
                     statecraft_run::policy::resolve(root, &NoDeclarationFiled, None);
-                Some(statecraft_run::work::select(
-                    &report,
-                    &policy,
-                    &Overrides::none(),
-                    disagreement,
-                ))
+                (
+                    Some(statecraft_run::work::select(
+                        &report,
+                        &policy,
+                        &Overrides::none(),
+                        disagreement,
+                    )),
+                    Some(report),
+                )
             }
             Err(e) => return emit(&slice::report_error_answer(&e), format),
         }
     } else {
-        None
+        (None, None)
     };
 
     match verb {
@@ -355,7 +358,14 @@ fn slice_verb(
                 eprintln!("usage: run <path> <spec-id>");
                 return Exit::Usage.code();
             };
-            run_verb(root, home, id, work.expect("read above"), format)
+            run_verb(
+                root,
+                home,
+                id,
+                work.expect("read above"),
+                report.as_ref().expect("read above"),
+                format,
+            )
         }
         Verb::RunList => match Chain::open(home, root) {
             Ok((chain, _)) => emit(
@@ -409,6 +419,7 @@ fn run_verb(
     home: &std::path::Path,
     spec_id: &str,
     work: statecraft_run::work::WorkList,
+    report: &statecraft_run::report::CorpusReport,
     format: Format,
 ) -> i32 {
     // A unit of work the policy did not admit is never run, and the reason is
@@ -417,11 +428,20 @@ fn run_verb(
     if !eligibility.schedulable() {
         return emit(&slice::work_show_answer(eligibility), format);
     }
+    // Spec 003 section 3.1.3: the contract is resolved by the producer and
+    // written with the intent, before any effect. It is evidence, not a gate.
+    let contract = statecraft_run::contract::bind(
+        &SpecSpineCli::default(),
+        root,
+        spec_id,
+        report.lifecycle_of(spec_id),
+    );
     launch_attempt(
         root,
         home,
         spec_id,
         AttemptPlan::work_order(spec_id),
+        contract,
         None,
         format,
     )
@@ -473,6 +493,7 @@ fn launch_attempt(
     home: &std::path::Path,
     run_id: &str,
     plan: AttemptPlan,
+    contract: statecraft_run::contract::Binding,
     mut trial: Option<TrialRun>,
     format: Format,
 ) -> i32 {
@@ -506,38 +527,44 @@ fn launch_attempt(
     // of the same run, so a fresh id per invocation would turn every retry into
     // a new run.
     let run_id = run_id.to_string();
-    let session =
-        match statecraft_run::session::begin(&mut chain, root, &run_id, "HEAD", &SystemClock) {
-            Ok(s) => s,
-            Err(e) => {
-                // Spec 002 section 3.32 rule 24: a live attempt is never
-                // replayed, and the refusal names what its launch records
-                // establish.
-                if let statecraft_run::session::SessionError::LiveAttempt {
-                    run_id: live_run,
-                    attempt,
-                } = &e
-                {
-                    let startup = project_manifest.as_ref().and_then(|_| {
-                        statecraft_home::launch::inspect(
-                            root,
-                            live_run,
-                            Some(*attempt),
-                            &[statecraft_home::launch::AttemptFact {
-                                number: *attempt,
-                                outcome: None,
-                            }],
-                        )
-                        .ok()
-                    });
-                    return emit(
-                        &slice::live_attempt_answer(&e, &root.display().to_string(), startup),
-                        format,
-                    );
-                }
-                return emit(&slice::session_error_answer(&e), format);
+    let session = match statecraft_run::session::begin_bound(
+        &mut chain,
+        root,
+        &run_id,
+        "HEAD",
+        &SystemClock,
+        Some(&contract),
+    ) {
+        Ok(s) => s,
+        Err(e) => {
+            // Spec 002 section 3.32 rule 24: a live attempt is never
+            // replayed, and the refusal names what its launch records
+            // establish.
+            if let statecraft_run::session::SessionError::LiveAttempt {
+                run_id: live_run,
+                attempt,
+            } = &e
+            {
+                let startup = project_manifest.as_ref().and_then(|_| {
+                    statecraft_home::launch::inspect(
+                        root,
+                        live_run,
+                        Some(*attempt),
+                        &[statecraft_home::launch::AttemptFact {
+                            number: *attempt,
+                            outcome: None,
+                        }],
+                    )
+                    .ok()
+                });
+                return emit(
+                    &slice::live_attempt_answer(&e, &root.display().to_string(), startup),
+                    format,
+                );
             }
-        };
+            return emit(&slice::session_error_answer(&e), format);
+        }
+    };
 
     // Spec 002 section 3.33 rule 31: the trial's sentinel is in the attempt's
     // own workspace before anything is prepared or launched.
@@ -558,6 +585,7 @@ fn launch_attempt(
                     &accounting,
                     serde_json::json!({ "trialRefusal": e.to_string() }),
                     unlaunched(project_manifest.is_some(), None),
+                    &contract,
                     trial,
                     format,
                 );
@@ -607,6 +635,7 @@ fn launch_attempt(
                 &accounting,
                 serde_json::json!({ "preflightRefusal": refusal.to_string(), "posture": posture }),
                 unlaunched(project_manifest.is_some(), None),
+                &contract,
                 trial,
                 format,
             );
@@ -632,6 +661,7 @@ fn launch_attempt(
             &accounting,
             serde_json::json!({ "preflightRefusal": "provider executable unresolvable", "posture": posture }),
             unlaunched(project_manifest.is_some(), None),
+            &contract,
             trial,
             format,
         );
@@ -681,6 +711,7 @@ fn launch_attempt(
                         &accounting,
                         serde_json::json!({ "startupRefusal": why.to_string(), "posture": posture }),
                         unlaunched(true, Some(why.to_string())),
+                        &contract,
                         trial,
                         format,
                     );
@@ -838,6 +869,7 @@ fn launch_attempt(
                 &accounting,
                 serde_json::json!({ "supervisorError": e.to_string(), "posture": posture, "startup": startup.detail }),
                 startup.run,
+                &contract,
                 trial,
                 format,
             );
@@ -904,6 +936,7 @@ fn launch_attempt(
             "startup": startup.detail,
         }),
         startup.run,
+        &contract,
         trial,
         format,
     )
@@ -1026,6 +1059,7 @@ fn trial_verb(
         home,
         trial::RUN_ID,
         AttemptPlan::trial(deadline),
+        statecraft_run::contract::Binding::not_a_unit_of_work(),
         Some(TrialRun {
             origin,
             deadline_seconds: deadline,
@@ -1242,6 +1276,7 @@ fn conclude_and_emit(
     accounting: &statecraft_run::refusal::Accounting,
     detail: serde_json::Value,
     mut startup: statecraft_home::launch::RunStartup,
+    contract: &statecraft_run::contract::Binding,
     trial: Option<TrialRun>,
     format: Format,
 ) -> i32 {
@@ -1282,10 +1317,14 @@ fn conclude_and_emit(
                     Err(_) => {}
                 }
             }
-            emit(
-                &slice::run_answer_with_posture(concluded, account.posture, startup),
-                format,
-            )
+            let mut answer = slice::run_answer_with_posture(concluded, account.posture, startup);
+            // Spec 003 section 3.1.3: what this attempt was bound to, as its
+            // intent records it.
+            answer.value.contract = Some(contract.clone());
+            answer
+                .summary
+                .push_str(&format!("contract  {}\n", contract.describe()));
+            emit(&answer, format)
         }
         Err(e) => emit(&slice::session_error_answer(&e), format),
     }
@@ -1345,6 +1384,32 @@ fn accept_verb(
         );
     }
 
+    // Spec 005 section 3.18: the contract the attempt was bound to, compared
+    // with the producer's resolution now, before anything else is observed.
+    let contract = statecraft_acceptance::contract::check(
+        &chain.entries(),
+        run_id,
+        attempt.number,
+        root,
+        &SpecSpineCli::default(),
+    );
+    if contract.word == statecraft_acceptance::contract::Word::Stale {
+        return emit(&slice::contract_stale_answer(&contract), format);
+    }
+    if contract.word.moved() {
+        return emit(
+            &slice::accept_answer_with(
+                statecraft_acceptance::outcome::Acceptance::None {
+                    reason: statecraft_acceptance::judged::NoAcceptance::ContractMoved {
+                        comparison: Box::new(contract.clone()),
+                    },
+                },
+                Some(contract),
+            ),
+            format,
+        );
+    }
+
     let workspace = statecraft_run::workspace::workspace_path(root, run_id);
     let context = statecraft_cli::accept::Context {
         repository: root.display().to_string(),
@@ -1364,7 +1429,10 @@ fn accept_verb(
         true,
         &context,
     );
-    emit(&slice::accept_answer(acceptance), format)
+    emit(
+        &slice::accept_answer_with(acceptance, Some(contract)),
+        format,
+    )
 }
 
 /// One environment verb against one registered target.

@@ -78,6 +78,13 @@ pub enum NoAcceptance {
         /// How many checks never ran.
         unrun_checks: u32,
     },
+    /// The contract the attempt was bound to is not the one the producer
+    /// resolves now (section 3.18): it changed, lost a member, or withdrew an
+    /// obligation. The candidate was built against a different contract.
+    ContractMoved {
+        /// The comparison, naming every member involved.
+        comparison: Box<crate::contract::Comparison>,
+    },
 }
 
 /// Why acceptance was not attempted for this attempt.

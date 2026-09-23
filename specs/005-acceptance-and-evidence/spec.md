@@ -824,6 +824,16 @@ stale ledger refuses before anything is judged; an unbound or unresolvable
 contract reads `not-recorded` in the answer, and the receipt's bytes do not
 change. No code changed with this entry.
 
+**2026-09-22: section 3.18 implemented.** `contract::compare` is pure over
+the binding and a resolution: it keys members as `spec:`, `section:` and
+`obligation:` and quotes the identity the producer gave each, the content hash,
+the section digest, or the obligation's own fields other than its key, so a
+change is named rather than inferred. `contract::check` is the one operation
+`accept` calls: it finds the attempt's intent, reads its binding, asks the
+producer to resolve the same request only where the binding is `bound`, and
+compares. `NoAcceptance::ContractMoved` carries the comparison. The receipt is
+untouched, as rule 4 requires.
+
 ## Verification
 
 Each line is one command. §3.10's twenty-two rows are integration tests named
@@ -848,4 +858,5 @@ cargo test -p statecraft-acceptance --test envelope_compat
 cargo test -p statecraft-envelope --test vectors
 test -f crates/statecraft-envelope/PROVENANCE.md
 grep -q 'license = "Apache-2.0"' crates/statecraft-envelope/Cargo.toml
+cargo test -p statecraft-acceptance --lib contract
 ```

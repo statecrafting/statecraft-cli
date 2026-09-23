@@ -38,6 +38,7 @@
 #![forbid(unsafe_code)]
 
 pub mod attempt;
+pub mod contract;
 pub mod policy;
 pub mod record;
 pub mod recovery;

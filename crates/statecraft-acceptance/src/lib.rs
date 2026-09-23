@@ -49,6 +49,7 @@
 
 pub mod absence;
 pub mod authority;
+pub mod contract;
 pub mod delta;
 pub mod dimensions;
 pub mod evidence;
