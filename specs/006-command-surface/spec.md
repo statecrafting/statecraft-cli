@@ -525,13 +525,14 @@ is the state the operator inspected, as `startup show` names it, or
 | Code | Meaning for `run reconcile` |
 |---|---|
 | 0 | Recorded. The answer says whether the attempt is now resolved and whether a later `run` is permitted. |
-| 2 | Refused, and nothing written: not the live attempt, already concluded or conclusively reconciled, a stale launch state, a conflicting `absent`, an unknown finding word, or an empty operator or reason. |
-| 3 | Usage: a missing argument. |
-| 4 | The record could not be read or written durably, or an evidence file could not be read. |
+| 2 | Refused, and nothing written: not the live attempt, already concluded or conclusively reconciled, a `run` still holding the repository lock, a stale launch state, a conflicting `absent`, an evidence file that cannot be read, or an empty operator or reason. |
+| 3 | Usage: a missing argument, or a finding or launch-state word this verb does not have. |
+| 4 | The record could not be read or written durably. |
 
 `run`'s live-attempt answer names this verb, and `run show` renders each
 reconciliation with its basis, whether it was corroborated, and the observed
-launch state. The verb joins section 3.1's table with the change that
+launch state. The answer says that a provider process a dead supervisor
+started may still be running, and that reconciling stops nothing. The verb joins section 3.1's table with the change that
 implements it.
 
 ### 3.12 What the command surface does not unlock
