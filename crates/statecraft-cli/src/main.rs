@@ -832,6 +832,7 @@ fn launch_attempt(
                 stream_error: e.supervised.stream_error.as_ref().map(ToString::to_string),
                 surviving: e.supervised.surviving_processes.clone(),
                 failed: None,
+                timed_out: e.supervised.timed_out,
             },
             Err(e) => statecraft_home::trial::ProcessEnd {
                 spawned: watched.spawned.is_some(),

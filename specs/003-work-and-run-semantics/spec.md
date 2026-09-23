@@ -576,6 +576,22 @@ adoption evidence for a producer build; nothing in this product verifies these
 attestations, and no verifier is built here to give the fixtures something to
 test.
 
+**2026-09-23: `check`'s exit status is carried into the refusal, not folded
+into "does not compile".** Section 3.1.2 rule 3 reads the reports only after
+`check` has said the ledger is fresh. The report source treated every non-zero
+`check` as the section 3.8 row "a corpus that does not compile". The 2026-09-23
+audit measured what that hides. Run with a `spec-spine` on `PATH` that did not
+satisfy this repository's `=0.20.0` pin, `work list` said the corpus did not
+compile, when the producer had refused the pin with exit 3 and judged nothing.
+The section was silent on which answer is which, so this records the reading.
+`check` exiting 1 is still `CorpusDoesNotCompile`, and the row is unchanged.
+Exiting 2 is `LedgerStale`, the rule's freshness precondition unmet. Any other
+end is `ProducerRefused`, naming the version, the exit status and the
+producer's first line. Nothing is read in any of the three cases, and the
+report never falls back to the derived tree. Which binary is resolved is
+unchanged: the operator's `spec-spine`, never one the candidate chose, with
+the target's pin enforced by the producer itself.
+
 ## Verification
 
 Each line is one command. §3.8's twenty-two rows are integration tests named after

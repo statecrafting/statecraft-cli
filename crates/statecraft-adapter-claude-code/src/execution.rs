@@ -299,6 +299,7 @@ fn map_native(
         stream_error: native.stream_error,
         surviving_processes: native.surviving_processes,
         stopped: native.stopped,
+        timed_out: native.timed_out,
     };
     let result_line = native.events.last().map(|(line, _)| *line).unwrap_or(1);
     let events: Vec<_> = native.events.into_iter().map(|(_, event)| event).collect();
@@ -415,6 +416,7 @@ mod tests {
             stream_error: None,
             surviving_processes: None,
             stopped: None,
+            timed_out: false,
         };
         let execution = map_native(native, &[], None);
         assert_eq!(execution.supervised.outcome, Outcome::Interrupted);
@@ -614,6 +616,7 @@ mod tests {
             stream_error: None,
             surviving_processes: None,
             stopped: None,
+            timed_out: false,
         };
         let execution = map_native(native, &[], None);
         assert_eq!(

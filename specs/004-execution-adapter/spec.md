@@ -1318,6 +1318,16 @@ possibility of an uncollected zombie. A process that genuinely survives
 with no survivor pays nothing. The suite's assertion that no survivor is
 reported is unchanged.
 
+**2026-09-23: the supervisor reports that its deadline fired.** `Supervised`
+gains `timed_out`, set from the supervisor's own observation and carried
+unchanged through the Claude Code adapter's mapping. Before this, a caller had
+to infer a deadline from an interrupted outcome and the absence of a stream
+error. That inference fails when the mapping adds an error of its own: a stream
+stopped before `init` also carries "no init event", and spec `002` section
+3.33's trial judged such a session a failed launch rather than an uncertain one.
+Outcomes, stream errors and every existing field are unchanged. The seam tests
+assert the flag for a deadline, a normal completion and an exit with no result.
+
 ## Verification
 
 Each line is one command. §3.5's suite is eight tests named `suite_1` to

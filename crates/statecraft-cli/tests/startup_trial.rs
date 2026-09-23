@@ -223,6 +223,7 @@ case "$mode" in
   tool-before-init) start; request; gated; init; finish ;;
   ignores-hooks) request; execute; init; finish ;;
   hangs) start; init; request; gated; /bin/sleep 60 & /bin/sleep 60 ;;
+  silent) /bin/sleep 60 & /bin/sleep 60 ;;
 esac
 "#;
 
@@ -476,6 +477,27 @@ fn a_session_stopped_at_its_deadline_is_uncertain_and_its_evidence_stays() {
     );
     assert!(f.attempt_dir().join("trial.json").is_file());
     assert_eq!(code(&f.trial(&["--synthetic"])), 2);
+    assert_eq!(f.launches(), 1);
+}
+
+/// A session the deadline stops before it writes a single event is uncertain,
+/// not a completed launch that failed: the adapter's missing-init error does
+/// not hide that the deadline stopped it (spec 002 section 3.33 rule 37). The
+/// fake writes nothing at all, so this holds however slowly it is scheduled.
+#[test]
+fn a_session_stopped_before_its_first_event_is_uncertain_not_failed() {
+    let f = Fixture::new();
+    f.mode("silent");
+    let out = f.trial(&["--synthetic", "--deadline", "3"]);
+    assert_eq!(code(&out), 1, "{}", text(&out));
+    let t = trial_of(&out);
+    let j = &t["judgement"];
+    assert_eq!(j["verdict"], "uncertain", "{j}");
+    assert!(
+        j["reasons"][0].as_str().unwrap().contains("deadline"),
+        "{j}"
+    );
+    assert_eq!(t["record"]["facts"]["process"]["timedOut"], true);
     assert_eq!(f.launches(), 1);
 }
 
