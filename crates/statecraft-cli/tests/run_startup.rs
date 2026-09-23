@@ -778,6 +778,11 @@ impl Drop for Unblock {
             let _ = l.kill();
             let _ = l.wait();
         }
+        // A test that already released the fake has killed its group; a
+        // second kill could hit a recycled group leader, so skip it.
+        if self.bin.join("release").exists() {
+            return;
+        }
         let pid = std::fs::read(&self.launched)
             .ok()
             .and_then(|b| serde_json::from_slice::<serde_json::Value>(&b).ok())
@@ -1211,6 +1216,22 @@ fn a_concluded_attempt_an_unknown_attempt_number_and_an_empty_reason_are_refused
     assert_eq!(code(&out), 2, "{}", text(&out));
     assert!(text(&out).contains("no attempt 7"), "{}", text(&out));
     assert_eq!(chain_bytes(&f), before);
+    // Every refusal of this verb answers in one JSON shape.
+    let out = f.cli(&[
+        "run",
+        "reconcile",
+        &f.root(),
+        RUN,
+        "7",
+        "absent",
+        "not-launched",
+        "alice",
+        "none",
+        "--json",
+    ]);
+    assert_eq!(code(&out), 2, "{}", text(&out));
+    let answer: serde_json::Value = serde_json::from_slice(&out.stdout).unwrap();
+    assert!(answer["value"]["refused"].is_string(), "{answer}");
 
     // An empty reason or operator, against a live attempt.
     let g = Fixture::new();

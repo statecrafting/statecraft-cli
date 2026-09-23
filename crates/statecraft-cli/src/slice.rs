@@ -1197,9 +1197,9 @@ pub fn lock_busy_answer(detail: &str) -> Answer<String> {
 /// `run reconcile` refused before the run crate was asked: an evidence file
 /// that cannot be read, or an attempt the launch records cannot name. A
 /// precondition, so exit 2, and nothing was written (spec 006 section 3.11.6).
-pub fn reconcile_refused_answer(detail: &str) -> Answer<String> {
+pub fn reconcile_refused_answer(detail: &str) -> Answer<serde_json::Value> {
     Answer::new(
-        detail.to_string(),
+        serde_json::json!({ "refused": detail }),
         Exit::Refused,
         format!("refused: {detail}\n"),
     )
