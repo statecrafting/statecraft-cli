@@ -204,6 +204,86 @@ the spec. So:
 5. **An attempt's contract is a fact about that attempt.** A later attempt of
    the same run binds its own; a comparison never updates the earlier one.
 
+### 3.1.4 The operator override, as an operation this product performs
+
+A narrowly scoped authority amendment, settled by the owner on 2026-09-23 and
+recorded before the implementation it authorizes. Section 3.1.1 point 2 fixed
+that this product's own state holds only an explicit, recorded override for a
+single named spec id per repository, operator-initiated, journaled and surfaced
+on every attempt it admits. It did not say how an operator makes one, where it
+is kept, how it ends or what an attempt records.
+
+**The gap, exactly.** `policy::Override` and `work::select` admit a named spec
+the policy excludes, and the `Attempt` type has fields for it. Nothing reaches
+them: `run` and `work list` always pass `Overrides::none()`, no verb creates,
+shows or removes an override, nothing persists one, and no attempt's intent
+records one. The row in section 3.8 ("Scheduled, and the attempt records the
+override, the operator and the spec id") therefore holds only in a library
+test.
+
+**Rule 1: the operation.** An override is created by the operator naming
+exactly one registered repository, exactly one spec id, an operator name and a
+reason. The repository must be registered with this product; the spec id must
+be one the corpus report names; the name and the reason must be non-empty
+after trimming. An override for a spec id that already has one in force in
+that repository is refused, so one repository holds at most one override per
+spec id and a changed reason is a revocation followed by a new grant. An
+override is removed by the operator naming the repository, the spec id, an
+operator name and a reason; removing one that is not in force is refused.
+Nothing else creates or removes one.
+
+**Rule 2: provenance, stated as it is.** The operator name is **supplied by
+the operator and not authenticated**. This product has no identity of its own
+to check it against, so the record says `operator-supplied` beside the name,
+and no rendering calls it verified. Every grant and every revocation records
+the time this product wrote it.
+
+**Rule 3: the journal.** Overrides live in this product's home, in one
+append-only journal per registered repository beside that repository's run
+record, never in the target. Each line is one grant or one revocation, with the
+repository, the spec id, the operator, the reason, the time and the digest of
+the previous line, so a line removed or edited reads as a broken journal rather
+than as a changed set. The overrides in force are the fold of the journal:
+granted and not later revoked. A journal that does not read, or whose links do
+not verify, is a failure: `run` and `work list` refuse to proceed on it rather
+than reading it as empty, because an unreadable journal that read as "no
+override" would be indistinguishable from one an operator never wrote. A write
+that cannot be made durable is a failure and leaves nothing in force.
+
+**Rule 4: scope.** An override admits one spec id, in one repository, past the
+lifecycle policy, and nothing else. It does not change the spec's status,
+which stays what the corpus says; it never ratifies. It does not make a spec
+ready that the report does not name as ready, and it does not bypass arming,
+the harness requirement, the one-live-attempt lock, preflight, the contract
+binding or any refusal in specs `002`, `004` or `005`. An override in one
+repository is not read for any other repository, including one whose corpus
+has a spec with the same id.
+
+**Rule 5: what an attempt records.** An attempt's intent records how the spec
+was admitted: `policy` with the policy's source (`declared` or `defaulted`)
+when the policy admitted it, and `override` with the spec id, the operator as
+supplied, the reason, the grant's time and the digest of the grant's journal
+line when an override did. `run show` and `run list` render it. An intent
+written before this section carries neither, and reads as **not recorded**: it
+is never read as `defaulted` and never as admitted by an override.
+
+**Rule 6: the default is unchanged.** Without an override in force, section
+3.1.1's default refusal holds exactly: an excluded spec is listed with its
+reason and `run` refuses it. A revocation restores that refusal for later
+invocations. Attempts already recorded keep the override they recorded.
+
+**Acceptance.** Positive, through the binary in an isolated home: a draft is
+refused by default; after a grant, `work list` shows it admitted by the named
+override and `run` schedules it, and its intent records the override; `override
+show` lists it; after a revocation `run` refuses it again and the earlier
+attempt still records its override. Negative: a grant with no operator or no
+reason, for an unregistered repository or an unknown spec id, or duplicating
+one in force, is refused and writes nothing; a revocation of nothing is
+refused; an override in repository A does not admit the same id in repository
+B; an edited journal line refuses `run` rather than reading as no override; a
+spec the report does not name as ready is not scheduled by an override; and an
+intent written before this section reads as not recorded.
+
 ### 3.2 Workspace preparation
 
 A run prepares an **isolated git worktree** under `.statecraft/state/`, branched
