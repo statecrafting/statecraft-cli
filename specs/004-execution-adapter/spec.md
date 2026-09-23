@@ -271,13 +271,13 @@ and are named as such.
 | A required capability token this manifest does not declare | Refused before any process is spawned, naming the token (section 3.3). No partial spawn. |
 | A run prefers `workspace-write` | Runs, and the degradation is recorded on the attempt and carried in the result. Never silent. |
 | `terminal_reason: "max_turns"` | Attempt `interrupted`, not `failed`. Acceptance `not-attempted`, reason `attempt-interrupted` (`005` section 3.1.1). |
-| The provider exits 0 with a denial recorded | The exit code is not read. Section 3.3. |
-| The provider exits 1 on a turn cap | The exit code is not read. Section 3.5. |
-| `subtype: "success"` with `is_error: true` and no denials | Attempt `interrupted`, never `completed`. The provider's `failed` claim is retained beside it. Section 3.5. |
-| The applied tool allowlist is asked for | `not-recorded`, never the requested list restated as applied. Section 3.4. |
-| A tool restriction expressed as tool-set removal where a refusal record is required | Fails qualification: the manifest declared `structured-refusals` and this path produces none. Section 3.4. |
+| The provider exits 0 with a denial recorded | The exit code is not read. Section 3.11. |
+| The provider exits 1 on a turn cap | The exit code is not read. Section 3.13. |
+| `subtype: "success"` with `is_error: true` and no denials | Attempt `interrupted`, never `completed`. The provider's `failed` claim is retained beside it. Section 3.13. |
+| The applied tool allowlist is asked for | `not-recorded`, never the requested list restated as applied. Section 3.12. |
+| A tool restriction expressed as tool-set removal where a refusal record is required | Fails qualification: the manifest declared `structured-refusals` and this path produces none. Section 3.12. |
 | `claude` is absent from the constructed environment | The environment adapter refuses to claim its paths and names the absent prerequisite. No files written. |
-| The constructed environment carries `PATH` without `USER` | The provider cannot reach the keychain and terminates with section 3.13's `api_error` shape. The environment carries `USER` so that this does not happen. Section 3.6. |
+| The constructed environment carries `PATH` without `USER` | The provider cannot reach the keychain and terminates with section 3.13's `api_error` shape. The environment carries `USER` so that this does not happen. Section 3.14. |
 | The provider binary version differs from the qualification record | Labelled `unqualified` in the posture, the attempt record and the outcome. It still runs. |
 | A second provider adapter declaring a path this one declares | Refused at plan time, naming both adapters and the path (`002` section 3.10). |
 
@@ -502,13 +502,13 @@ and is labelled `unqualified` everywhere it appears.
 
 For this adapter the record names two versions, not one: the adapter's own build
 and the **provider** binary it was measured against. Every finding in sections
-3.9 to 3.6 is a fact about Claude Code 2.1.267. A provider upgrade invalidates
+3.9 to 3.14 is a fact about Claude Code 2.1.267. A provider upgrade invalidates
 the qualification even when the adapter is byte-identical, because what was
 qualified was the pair.
 
 ## 4. Out of scope
 
-Any specific provider's adapter; breadth across many providers; operating-system
+Any provider's adapter other than the Claude Code adapter this spec absorbed from `008` (sections 3.9 to 3.16); breadth across many providers; operating-system
 sandbox profiles; adaptive autonomy or trust scoring; cost ceilings and quota
 parking; and model selection policy. Each is deferred by name in the decision
 record.
@@ -1335,12 +1335,14 @@ Each line is one command. §3.5's suite is eight tests named `suite_1` to
 fixture adapter, so the table runs with no real provider installed, which is
 what §3.5 requires of it.
 
-Each line is one command. §3.8's eleven rows are integration tests named after
-the rows they cover. Nine live in this adapter's own crate, in
+The rows §3.8 absorbed from `008` are integration tests named after the rows
+they cover. Most live in the Claude Code adapter's crate, in
 `tests/negative_cases.rs`. Two are the environment half (§3.15): the absent
 prerequisite and the colliding declared path are behaviors of the environment
 adapter, so they live in the crate `002` owns, under the `extends` edge this
-spec's frontmatter declares, and the second `cargo test` line is what runs them.
+spec's frontmatter declares, and the `statecraft-environment` line runs them.
+(This paragraph once counted eleven rows; the table has grown since, and a
+restated count is wrong after the next row lands.)
 
 **The provider is not spawned by the acceptance, and that is a decision rather
 than a shortfall.** Every finding in §3.9 to §3.14 was measured against a live

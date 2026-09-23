@@ -50,7 +50,7 @@
     ],
     "specPath": "specs/000-bootstrap/spec.md",
     "status": "approved",
-    "summary": "Foundational contract for this repository: authored truth lives only in markdown (+ YAML frontmatter); machine-consumable truth is compiler-emitted JSON only; every artifact is a deterministic function of (config, file contents); a typed authority graph governs who-owns-what. This repository is born governed and currently holds no product code: the corpus exists before the first line is written, and no spec here may claim otherwise.\n",
+    "summary": "Foundational contract for this repository: authored truth lives only in markdown (+ YAML frontmatter); machine-consumable truth is compiler-emitted JSON only; every artifact is a deterministic function of (config, file contents); a typed authority graph governs who-owns-what. This repository was born governed: the corpus existed before the first line of product code, and no spec here may claim code that does not exist.\n",
     "title": "Bootstrap spec system",
     "unamendable": [
       "markdown-truth-boundary",
@@ -63,6 +63,6 @@
       "evidence-outside-the-child"
     ]
   },
-  "shardHash": "afa5b09e3dacf416ccd5c1839d7e9ef5b5a13d0610c0809616a27a16c84e3de2",
+  "shardHash": "6ec63eaef0c26b8019b5e4cbec079323aec352b8b02c64309953d81dcb96b80c",
   "specVersion": "1.3.0"
 }
