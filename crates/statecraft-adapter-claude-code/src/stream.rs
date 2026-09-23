@@ -341,6 +341,77 @@ impl ResultEvent {
     }
 }
 
+/// The one event spec 002 section 3.34 admits after a terminal event.
+///
+/// Measured once, on Claude Code `2.1.267`, as the last line of a live
+/// capture: `{"type":"system","subtype":"task_summary","detail":null,"uuid":
+/// ...,"session_id":...}`. The shape is closed. A line with any member added
+/// or missing, another subtype, a `detail` that is neither `null` nor a
+/// string, or an empty `uuid` or `session_id` is not this event, and
+/// [`task_summary_trailer`] says why. `detail` is carried and never read:
+/// section 3.34 rule 14 forbids reading anything in a trailer for a decision.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TaskSummaryTrailer {
+    /// The subtype, which is always [`TRAILER_SUBTYPES`]' one entry.
+    pub subtype: String,
+    /// The session the event names.
+    pub session_id: String,
+    /// The event's own id.
+    pub uuid: String,
+}
+
+/// The closed list of `system` subtypes spec 002 section 3.34 admits after a
+/// terminal event. One entry, from one capture.
+pub const TRAILER_SUBTYPES: [&str; 1] = ["task_summary"];
+
+/// A trailer's line, exactly: every member required, none other admitted,
+/// and a member given twice refused by the deserializer rather than read
+/// last-wins.
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct RawTrailer {
+    #[serde(rename = "type")]
+    kind: String,
+    subtype: String,
+    detail: serde_json::Value,
+    uuid: String,
+    session_id: String,
+}
+
+/// Read one line as the trailer spec 002 section 3.34 admits, or say why it
+/// is not one.
+///
+/// The line is parsed once. Nothing is defaulted, so an absent `detail` is
+/// refused rather than read as `null`, and an added member is refused rather
+/// than ignored.
+pub fn task_summary_trailer(line: &str) -> Result<TaskSummaryTrailer, String> {
+    let raw: RawTrailer = serde_json::from_str(line)
+        .map_err(|e| format!("it is not the closed trailer shape: {e}"))?;
+    if raw.kind != "system" {
+        return Err(format!("its type is {:?}, not \"system\"", raw.kind));
+    }
+    if !TRAILER_SUBTYPES.contains(&raw.subtype.as_str()) {
+        return Err(format!(
+            "its subtype is {:?}, and the closed list is {TRAILER_SUBTYPES:?}",
+            raw.subtype
+        ));
+    }
+    if !(raw.detail.is_null() || raw.detail.is_string()) {
+        return Err("its detail is neither null nor a string".to_string());
+    }
+    if raw.uuid.is_empty() {
+        return Err("its uuid is empty".to_string());
+    }
+    if raw.session_id.is_empty() {
+        return Err("its session_id is empty".to_string());
+    }
+    Ok(TaskSummaryTrailer {
+        subtype: raw.subtype,
+        session_id: raw.session_id,
+        uuid: raw.uuid,
+    })
+}
+
 /// Why a stream could not be mapped.
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
 pub enum MapError {
@@ -621,5 +692,33 @@ mod tests {
         let d: PermissionDenial = serde_json::from_str(line).unwrap();
         assert_eq!(d.tool_input["command"], "echo hello");
         assert_eq!(d.tool_input["description"], "Run echo hello");
+    }
+
+    /// Spec 002 section 3.34 rule 13: the measured shape reads, and every
+    /// departure from it is refused with a reason.
+    #[test]
+    fn the_trailer_shape_is_closed() {
+        let measured = r#"{"type":"system","subtype":"task_summary","detail":null,"uuid":"5a668f14-8322-47ef-bcb2-06b19db90020","session_id":"da14779f-13ed-4a1a-8aac-39b6042489f3"}"#;
+        let t = task_summary_trailer(measured).unwrap();
+        assert_eq!(t.subtype, "task_summary");
+        assert_eq!(t.session_id, "da14779f-13ed-4a1a-8aac-39b6042489f3");
+        let with_text = measured.replace("\"detail\":null", "\"detail\":\"Running\"");
+        assert!(task_summary_trailer(&with_text).is_ok());
+
+        for bad in [
+            measured.replace("\"detail\":null,", ""),
+            measured.replace("\"detail\":null", "\"detail\":1"),
+            measured.replace("\"detail\":null", "\"detail\":[]"),
+            measured.replace("task_summary", "status"),
+            measured.replace("\"system\"", "\"user\""),
+            measured.replace("5a668f14-8322-47ef-bcb2-06b19db90020", ""),
+            measured.replace("da14779f-13ed-4a1a-8aac-39b6042489f3", ""),
+            measured.replace("}", ",\"tool_use_id\":\"toolu_1\"}"),
+            measured.replace("}", ",\"session_id\":\"other\"}"),
+            "[]".to_string(),
+            "not json".to_string(),
+        ] {
+            assert!(task_summary_trailer(&bad).is_err(), "{bad}");
+        }
     }
 }

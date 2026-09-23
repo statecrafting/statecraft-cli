@@ -803,3 +803,52 @@ fn a_second_record_for_a_session_is_refused_before_the_evidence_is_read() {
     let value: serde_json::Value = serde_json::from_str(&stdout(&out)).expect("json");
     assert_eq!(value["value"]["operation"], serde_json::json!("refused"));
 }
+
+/// Spec 002 section 3.34, through the binary: a capture ending with the one
+/// allowlisted trailer is a complete session, the launch names the trailer,
+/// and the three controls qualify exactly as they do without it. A trailer of
+/// any other shape leaves the launch incomplete.
+///
+/// **Synthetic, and it says so.** The fake writes the measured shape; nothing
+/// here is a live observation.
+#[test]
+fn a_trailing_task_summary_is_admitted_through_the_binary_and_nothing_else_is() {
+    let sandbox = upgraded();
+    for control in ["refusal", "allowed-command", "without-payload"] {
+        let out = sandbox.capture(control, "trailer", &["--deadline", "60"]);
+        assert_eq!(code(&out), 0, "{control}: {}", stdout(&out));
+        let text = stdout(&out);
+        assert!(text.contains("session   complete"), "{text}");
+        assert!(
+            text.contains(": system/task_summary after the terminal event, admitted by section 3.34 and not read"),
+            "{text}"
+        );
+    }
+    let out = sandbox.run(&[
+        "startup",
+        "qualify",
+        &sandbox.project_arg(),
+        "s-trailer",
+        &sandbox.capture_dir().display().to_string(),
+    ]);
+    assert_eq!(code(&out), 1, "{}", stdout(&out));
+    let text = stdout(&out);
+    assert!(text.contains("observation observed-synthetic"), "{text}");
+    assert_eq!(text.matches("trailer   ").count(), 3, "{text}");
+    // The bytes are kept whole, trailer included.
+    let written = std::fs::read_to_string(
+        sandbox
+            .project()
+            .join(".statecraft/state/startup/s-trailer.json"),
+    )
+    .unwrap();
+    assert!(written.contains("task_summary"), "the trailer was stripped");
+
+    let sandbox = upgraded();
+    let out = sandbox.capture("refusal", "bad-trailer", &["--deadline", "60"]);
+    assert_eq!(code(&out), 1, "{}", stdout(&out));
+    let text = stdout(&out);
+    assert!(text.contains("session   incomplete"), "{text}");
+    assert!(text.contains("not the one trailer"), "{text}");
+    assert!(!text.contains("trailer   "), "{text}");
+}

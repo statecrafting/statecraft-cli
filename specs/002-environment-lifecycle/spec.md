@@ -3608,6 +3608,27 @@ stands, and a new attempt is a new authorization, which the owner gave
 separately, bounded to at most three sessions and conditional on this
 amendment being implemented, reviewed, merged and exercised locally first.
 
+**2026-09-23: section 3.34 implemented.** The closed shape is
+`task_summary_trailer` in the claude-code adapter's `stream.rs`, a
+`deny_unknown_fields` type with every member required, so an absent `detail`
+is refused rather than defaulted and a member given twice is refused by the
+deserializer rather than read last-wins. The admission's single pass reads the
+line after the terminal event through it, adds its session to rule 8's session
+check, and refuses any event after it. `startup capture` and `startup qualify`
+print one `trailer` line per admitted trailer; the capture's bytes are
+unchanged. Rule 14's identity is asserted over an admitted body of evidence
+and three refused ones, and the negative cases are the list section 3.34
+names, each through the admission and through the launch's own completeness
+reading. The local fake gained `trailer` and `bad-trailer` modes, and the
+binary test runs both. **Offline replay, not a live observation:** the
+archived refusal record (`5d988271…b6dc`) re-read through this build's
+`one_session` is a complete session with its trailer at event 12. Its tool use
+would classify as refused under rule 9, since it carries both the terminal
+denial and the `permission-rule` non-execution note. That is a reading of old
+bytes by a new evaluator and spends no session. The experiment's recorded
+verdict is unchanged, and the replay is kept outside the repository beside the
+archive.
+
 ## Verification
 
 `--fail-on-untraced` joined the corpus gate with this spec's first
