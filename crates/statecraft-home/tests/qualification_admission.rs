@@ -1221,7 +1221,7 @@ fn an_admitted_trailer_keeps_its_original_bytes_through_the_record() {
         kept.refusal.capture.bytes, before,
         "the admission rewrote the capture"
     );
-    let written = serde_json::to_string(&observation).unwrap();
+    let written = serde_json::to_string_pretty(&observation).unwrap();
     let read: Observation = serde_json::from_str(&written).unwrap();
     let Observation::Observed {
         evidence: reread, ..
@@ -1232,5 +1232,9 @@ fn an_admitted_trailer_keeps_its_original_bytes_through_the_record() {
     assert_eq!(
         reread.refusal.capture.bytes, before,
         "a write and a read changed the capture"
+    );
+    assert!(
+        read.admitted().is_ok(),
+        "the stored evidence no longer admits"
     );
 }
