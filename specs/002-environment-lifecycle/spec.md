@@ -4018,6 +4018,16 @@ empty log. The rendering read `inspect` uses is unchanged. `digest::digest_reade
 computes the same SHA-256 as `digest_bytes` over a reader, in chunks, so an
 evidence file is not held whole. Neither writes.
 
+**2026-09-23: the project block carries `commands` as an optional list.**
+Section 3.16 names the member and spec `004` section 3.17 owns what it means.
+`Project` in `manifest.rs` gains `commands: Option<Vec<String>>`, defaulted on
+read and omitted on write when absent, so a manifest this crate rewrites keeps
+an operator's declaration and never invents one, and an absent
+member stays distinguishable from an empty list. This crate does not validate
+the entries: `004` refuses a malformed one where it reads the list, so the rule
+has one home. A test writes, reads and rewrites a declared list, and asserts an
+undeclared one is not serialized.
+
 ## Verification
 
 `--fail-on-untraced` joined the corpus gate with this spec's first

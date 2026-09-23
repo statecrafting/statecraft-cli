@@ -20,6 +20,7 @@
 //! adapter `unqualified`: spec 004 section 3.4 says such an adapter still runs,
 //! and spec 004 section 3.15 says it does not claim a target's paths.
 
+use statecraft_adapter::coverage::Coverage;
 use statecraft_adapter::environment::{Blueprint, CheckSuiteCommands, ChildEnvironment, construct};
 use statecraft_adapter_claude_code as provider;
 use statecraft_adapter_claude_code::qualification::PairedRecord;
@@ -55,13 +56,25 @@ pub fn declarations() -> Vec<Declaration> {
 ///   `api_error` shape, reading `Not logged in`. This is not a credential and
 ///   carries none; it is the name under which the operating system answers one.
 pub fn child_environment() -> ChildEnvironment {
-    child_environment_with(&[])
+    child_environment_with(&[], None)
 }
 
 /// The same constructed environment, plus the names a run's attempt binding
 /// carries (spec 002 section 3.31 rule 17, spec 004 section 5 of 2026-09-22).
 /// The names and values are the library's; this only places them.
-pub fn child_environment_with(binding: &[(String, String)]) -> ChildEnvironment {
+///
+/// **The two command inputs are independent** (spec 004 section 3.17 rule 6).
+/// With a `coverage`, the posture's commands are its allowance (the adapter's
+/// own plus the committed declaration's) and the check suite's are the
+/// programs `spec-spine verify <spec> --plan --json` named, each read by its
+/// own path in [`crate::coverage`]. Without one (the environment verbs, which
+/// run no suite), the posture declares the adapter's own commands and no suite
+/// is compared: nothing here supplies the allowance as the requirement, which
+/// is the binding that made section 3.5 row 8's refusal unable to fire.
+pub fn child_environment_with(
+    binding: &[(String, String)],
+    coverage: Option<&Coverage>,
+) -> ChildEnvironment {
     let manifest = provider::manifest();
     let mut blueprint = Blueprint::empty();
     for (name, value) in binding {
@@ -73,16 +86,17 @@ pub fn child_environment_with(binding: &[(String, String)]) -> ChildEnvironment 
     if let Ok(user) = std::env::var("USER") {
         blueprint = blueprint.allowing("USER", &user);
     }
-    for command in &manifest.requires_commands {
+    let (allowed, required): (Vec<String>, Vec<String>) = match coverage {
+        Some(c) => (
+            c.allowance.iter().map(|e| e.program.clone()).collect(),
+            c.required_programs(),
+        ),
+        None => (manifest.requires_commands.clone(), Vec::new()),
+    };
+    for command in &allowed {
         blueprint = blueprint.needing_command(command);
     }
-    // The suite's commands are the manifest's own, so a posture that omitted one
-    // would be refused here rather than discovered mid-attempt (spec 004
-    // section 3.5.8).
-    construct(
-        &blueprint,
-        &CheckSuiteCommands(manifest.requires_commands.clone()),
-    )
+    construct(&blueprint, &CheckSuiteCommands(required))
 }
 
 /// Every qualification record recorded under the product home.
@@ -200,6 +214,50 @@ mod tests {
         // Spec 004 section 3.14: the home directory is not among them, so the
         // keychain is reached by the account name and not by a home path.
         assert!(!environment.variables.contains_key("HOME"));
+    }
+
+    fn coverage(declared: &[&str], suite: &[&str]) -> Coverage {
+        use statecraft_adapter::coverage::{Allowance, Declared, SuitePlan};
+        let declared = if declared.is_empty() {
+            Declared::Absent
+        } else {
+            Declared::Commands(declared.iter().map(|c| (*c).to_string()).collect())
+        };
+        let allowance = Allowance::new(
+            &provider::manifest().requires_commands,
+            &declared,
+            Some("d".into()),
+        );
+        let plan = SuitePlan {
+            spec_id: "fixture".into(),
+            commands: suite.iter().map(|c| (*c).to_string()).collect(),
+            skipped: vec![],
+            acceptance_from: None,
+        };
+        Coverage::compare("fixture", None, &plan, "p".into(), &allowance, "a".into())
+    }
+
+    #[test]
+    fn the_suite_is_not_the_allowance_so_an_environment_can_be_refused() {
+        // Spec 004 section 3.17 rule 6: the requirement comes from the suite
+        // plan, the allowance from the adapter and the declaration. A suite
+        // naming `cargo` against an allowance without it is refused here too.
+        let refused = child_environment_with(&[], Some(&coverage(&[], &["cargo test"])));
+        match refused.state {
+            statecraft_adapter::EnvironmentState::Refused { reasons } => {
+                assert!(reasons.iter().any(|r| r.contains("`cargo`")), "{reasons:?}");
+            }
+            other => panic!("expected refused, got {other:?}"),
+        }
+        let applied = child_environment_with(&[], Some(&coverage(&["cargo"], &["cargo test"])));
+        assert_eq!(applied.state, statecraft_adapter::EnvironmentState::Applied);
+        assert!(applied.commands.contains(&"cargo".to_string()));
+        // With no suite (the environment verbs), nothing is compared, and the
+        // manifest's commands are the posture's, never also the requirement.
+        assert_eq!(
+            child_environment().commands,
+            provider::manifest().requires_commands
+        );
     }
 
     #[test]

@@ -27,14 +27,19 @@ extends:
   # Inspection folds the recorded posture through the reviewable account.
   - { spec: "005-acceptance-and-evidence", unit: { kind: directory, path: "crates/statecraft-acceptance/" }, nature: additive }
   # Keep the provider claim separate from the mapped termination when the
-  # run supervisor records both in its existing outcome shape.
+  # run supervisor records both in its existing outcome shape. Section 3.17
+  # adds the planning coverage to the intent (`session::begin_with`).
   - { spec: "003-work-and-run-semantics", unit: { kind: directory, path: "crates/statecraft-run/" }, nature: additive }
   # The environment half of this adapter (002 section 3.9) registers a harness
   # adapter, its managed paths and its prerequisites, which is a declaration
   # inside the crate 002 owns as one directory unit. Nothing 002 requires
   # changes: it already specifies what an adapter declares and what it does
-  # when its harness is absent.
+  # when its harness is absent. Section 3.17 carries `project.commands` in the
+  # project declaration so a rewrite keeps it (002 section 3.16 names it).
   - { spec: "002-environment-lifecycle", unit: { kind: directory, path: "crates/statecraft-environment/" }, nature: additive }
+  # Section 3.17 removes the vacuous binding in `adapters::child_environment`
+  # and binds `run` to the command coverage it compares at planning and at
+  # launch, in a new `coverage` module of that crate.
   # `env plan`, `env apply`, `env upgrade`, `env remove` and `doctor` were bound
   # to a refusal whose stated reason was that no spec ratifies an adapter.
   # Naming one falsified the reason, so the binding changed in the same change,
@@ -1740,6 +1745,74 @@ stopped before `init` also carries "no init event", and spec `002` section
 3.33's trial judged such a session a failed launch rather than an uncertain one.
 Outcomes, stream errors and every existing field are unchanged. The seam tests
 assert the flag for a deadline, a normal completion and an exit with no result.
+
+**2026-09-23: section 3.17 implemented, and the choices it was silent on.**
+Nothing §3.17 requires changed. The reading, the comparison and the verdicts
+are `statecraft-adapter`'s new `coverage` module; which tree each input is read
+from is `statecraft-cli`'s `coverage` module; the attempt record is written
+through the edges this spec already declares on `003`'s and `006`'s crates, and
+`002`'s crate carries the declared list (its own section 5 of this date).
+
+*The two inputs, and how they stay independent.* The requirement is
+`spec-spine verify <spec> --plan --json`, run with `SpecSpineCli`'s binary, the
+one work selection runs, in the tree being read; each `commands` entry is read
+by `coverage::classify`. The allowance is the adapter manifest's
+`requires_commands` plus `project.commands` read from the declaration's bytes.
+`Coverage::compare` takes the plan and the allowance as separate arguments and
+nothing derives one from the other. `adapters::child_environment_with` now
+gives `construct` the allowance as the posture's commands and the plan's
+programs as the suite's, so `environment` reports `refused` for the same
+missing program; without a suite (the environment verbs) it compares nothing,
+and never passes the manifest's list as both.
+
+*The plan's reading.* The envelope must name verb `verify`, say `ok: true` with
+exit code 0, and carry a report whose `specId`, `commands` and `skipped` are
+present; a missing `commands` is unreadable, not empty. `specId` is recorded
+and not compared with the asked id, because spec-spine resolves a short form to
+the directory name. A skipped block is `{tag, count}`, as spec-spine emits it.
+
+*The simple-command reading.* Within a double-quoted span a `'` is literal and
+opens no single-quoted span, as POSIX has it; the metacharacters are still
+refused there, since the rule exempts single-quoted spans only. A line break is
+`\n` or `\r`. The first word ends at the first space or tab. A first word
+holding `/` is `path` only when it holds no `=` and no quote; otherwise it is
+`unparsed`.
+
+*Digests.* SHA-256, lowercase hex, over the serialization of what was read:
+the parsed plan (`specId`, `commands`, `skipped`, `acceptanceFrom` when
+present), the allowance (its entries with their sources, and the declaration
+record), and the declared list. So whitespace or member order in spec-spine's
+output does not move a digest, and a change to either input does.
+
+*What planning refuses, and how.* A malformed declaration, an unreadable plan
+and a `refused` verdict each return exit 2 with `guard: posture-coverage`,
+`phase: planning`, the reason and, where one was computed, the coverage.
+Nothing is appended and no process is created. The intent records the planning
+reading under `postureCoverage`: `phase`, `spec`, `verdict`, `planDigest` and
+`allowanceDigest`.
+
+*What launch refuses, and how.* The base's declaration is read with `git
+ls-tree` (no entry is absent) and `git show`; the base's tree is exported with
+`git archive` into a fresh directory under the system temporary directory,
+which is removed once the plan is read. A digest that differs from planning's is
+named in the coverage's `drift` (`allowance`, `suite plan`), which refuses
+whatever the verdict. The attempt concludes `refused` under `posture-coverage`
+with `postureCoverageRefusal` beside the posture, which the existing mapping
+reports as exit 1, a finding. A read that fails at launch refuses the same way
+and records no `posture.coverage`, so it reads as not checked, with the reason
+in the refusal.
+
+*An absent coverage.* `posture.coverage` is `not-checked` on an attempt that
+has none, and deserializes that way from a record written before this date.
+The managed-startup trial reads the declaration at its base too, so a malformed
+one refuses it as it would a run (rule 1); its verdict is `not-applicable` and
+it reads no plan.
+
+*Fixtures.* Every fake `spec-spine` in the binary's existing tests now answers
+`verify <spec> --plan --json` with an empty plan, the only change to them. The
+new suite, `statecraft-cli`'s `posture_coverage`, drives the binary with a fake
+spec-spine that answers the plan from the directory it runs in and logs that
+directory, so planning and launch are observed reading different trees.
 
 ## Verification
 

@@ -8,6 +8,7 @@
 //! An operator never has to ask what posture a run actually had.
 
 use crate::capability::Capability;
+use crate::coverage::{Coverage, CoverageRecord};
 use crate::environment::{ChildEnvironment, EnvironmentState, RESIDUALS};
 use crate::manifest::{Manifest, Qualification};
 use serde::{Deserialize, Serialize};
@@ -43,6 +44,11 @@ pub struct Posture {
     /// a clean termination**.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub surviving_processes: Option<String>,
+    /// The command coverage (section 3.17 rule 5): the allowance compared with
+    /// the programs the attempt's suite names. An attempt recorded before that
+    /// section has none and reads as `not-checked`, never as covered.
+    #[serde(default)]
+    pub coverage: CoverageRecord,
 }
 
 impl Posture {
@@ -84,7 +90,15 @@ impl Posture {
             residuals: RESIDUALS.iter().map(|s| (*s).to_string()).collect(),
             unverifiable_refusal_account: negotiation.unverifiable_refusal_account(),
             surviving_processes: None,
+            coverage: CoverageRecord::default(),
         }
+    }
+
+    /// Record the command coverage this attempt was compared under.
+    #[must_use]
+    pub fn with_coverage(mut self, coverage: Coverage) -> Self {
+        self.coverage = CoverageRecord::Checked(Box::new(coverage));
+        self
     }
 
     /// Note that a process outlived the kill.
@@ -131,6 +145,7 @@ impl Posture {
         if let Some(s) = &self.surviving_processes {
             out.push_str(&format!("residual: a process outlived the kill: {s}\n"));
         }
+        out.push_str(&self.coverage.render());
         for r in &self.residuals {
             out.push_str(&format!("residual: {r}\n"));
         }
@@ -205,6 +220,23 @@ mod tests {
             .with_surviving_processes("pid 4242 in the process group");
         assert!(!p.clean_termination());
         assert!(p.render().contains("outlived the kill"));
+    }
+
+    #[test]
+    fn a_posture_recorded_before_section_3_17_reads_as_not_checked() {
+        let (m, env) = parts();
+        let requested = Requested::none();
+        let n = negotiate(&requested, &m.supports);
+        let p = Posture::new(&m, Qualification::Qualified, &requested, &n, &[], &env);
+        let mut old = serde_json::to_value(&p).unwrap();
+        old.as_object_mut().unwrap().remove("coverage");
+        let read: Posture = serde_json::from_value(old).unwrap();
+        assert_eq!(read.coverage, CoverageRecord::default());
+        assert!(read.render().contains("command coverage: not checked"));
+        assert_eq!(
+            serde_json::to_value(&read).unwrap()["coverage"],
+            "not-checked"
+        );
     }
 
     #[test]

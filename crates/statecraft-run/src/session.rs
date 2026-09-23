@@ -216,6 +216,48 @@ pub fn begin_admitted(
     contract: Option<&crate::contract::Binding>,
     admission: Option<&crate::work::Admission>,
 ) -> Result<Session, SessionError> {
+    begin_with(
+        chain,
+        target,
+        run_id,
+        base_revision,
+        clock,
+        &IntentDetail {
+            contract,
+            admission,
+            posture_coverage: None,
+        },
+    )
+}
+
+/// What an intent carries beyond its base, each written once, with the
+/// intent, before any effect.
+#[derive(Debug, Clone, Copy, Default)]
+pub struct IntentDetail<'a> {
+    /// The attempt's contract (section 3.1.3 rule 2).
+    pub contract: Option<&'a crate::contract::Binding>,
+    /// How the spec was admitted (section 3.1.4 rule 5).
+    pub admission: Option<&'a crate::work::Admission>,
+    /// The planning reading of spec 004 section 3.17 rule 4: the verdict and
+    /// the digests of the plan and the allowance planning read. Written under
+    /// `postureCoverage`; this crate carries it and judges nothing about it.
+    pub posture_coverage: Option<&'a serde_json::Value>,
+}
+
+/// [`begin_admitted`], with every part of the intent's detail named.
+pub fn begin_with(
+    chain: &mut Chain,
+    target: &Path,
+    run_id: &str,
+    base_revision: &str,
+    clock: &dyn Clock,
+    intent: &IntentDetail<'_>,
+) -> Result<Session, SessionError> {
+    let IntentDetail {
+        contract,
+        admission,
+        posture_coverage,
+    } = *intent;
     for run in runs(chain) {
         if let Some(live) = run.live_attempt() {
             return Err(SessionError::LiveAttempt {
@@ -267,6 +309,9 @@ pub fn begin_admitted(
                 let follows = crate::reconcile::since_last_intent(chain);
                 if !follows.is_empty() {
                     detail["follows"] = serde_json::Value::Array(follows);
+                }
+                if let Some(coverage) = posture_coverage {
+                    detail["postureCoverage"] = coverage.clone();
                 }
                 detail
             },

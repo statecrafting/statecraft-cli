@@ -722,6 +722,27 @@ fn run_verb(
     };
     // Spec 003 section 3.1.4 rule 5: how it was admitted goes into the intent.
     let admission = item.admission(&work.policy);
+    // Spec 004 section 3.17 rule 4: the command coverage at planning, from the
+    // working tree as the operator invoked `run`, before anything is appended.
+    // The requirement is read from the suite this spec declares and the
+    // allowance from the adapter and the committed declaration; a suite that
+    // cannot be read, a malformed declaration and a missing program each
+    // refuse here, with nothing appended and no process created.
+    let planned = match statecraft_cli::coverage::at_planning(root, spec_id) {
+        Ok(planned) => planned,
+        Err(why) => {
+            return emit(
+                &statecraft_cli::coverage::planning_refused_answer(&why, None),
+                format,
+            );
+        }
+    };
+    if let Some(why) = planned.refusal() {
+        return emit(
+            &statecraft_cli::coverage::planning_refused_answer(&why, Some(&planned)),
+            format,
+        );
+    }
     // Spec 003 section 3.1.3: the contract is resolved by the producer and
     // written with the intent, before any effect. It is evidence, not a gate.
     let contract = statecraft_run::contract::bind(
@@ -734,7 +755,7 @@ fn run_verb(
         root,
         home,
         spec_id,
-        AttemptPlan::work_order(spec_id, admission),
+        AttemptPlan::work_order(spec_id, admission, planned),
         contract,
         None,
         format,
@@ -751,15 +772,24 @@ struct AttemptPlan {
     /// How the unit of work was admitted, written into the intent (spec 003
     /// section 3.1.4 rule 5). The trial is not a unit of work and has none.
     admission: Option<statecraft_run::work::Admission>,
+    /// The planning reading of the command coverage (spec 004 section 3.17
+    /// rule 4). The trial has no spec, so none, and its coverage is
+    /// `not-applicable`.
+    planned: Option<statecraft_adapter::coverage::Coverage>,
 }
 
 impl AttemptPlan {
-    fn work_order(spec_id: &str, admission: statecraft_run::work::Admission) -> Self {
+    fn work_order(
+        spec_id: &str,
+        admission: statecraft_run::work::Admission,
+        planned: statecraft_adapter::coverage::Coverage,
+    ) -> Self {
         Self {
             prompt: format!("Implement {spec_id} in this workspace.").into_bytes(),
             max_turns: None,
             deadline_seconds: 900,
             admission: Some(admission),
+            planned: Some(planned),
         }
     }
 
@@ -769,6 +799,7 @@ impl AttemptPlan {
             max_turns: Some(statecraft_home::trial::MAX_TURNS),
             deadline_seconds,
             admission: None,
+            planned: None,
         }
     }
 }
@@ -836,14 +867,23 @@ fn launch_attempt(
     // of the same run, so a fresh id per invocation would turn every retry into
     // a new run.
     let run_id = run_id.to_string();
-    let session = match statecraft_run::session::begin_admitted(
+    // Spec 004 section 3.17 rule 4: the intent records the planning verdict
+    // and the digests of the plan and the allowance it read.
+    let planning = plan
+        .planned
+        .as_ref()
+        .map(statecraft_cli::coverage::planning_record);
+    let session = match statecraft_run::session::begin_with(
         &mut chain,
         root,
         &run_id,
         "HEAD",
         &SystemClock,
-        Some(&contract),
-        plan.admission.as_ref(),
+        &statecraft_run::session::IntentDetail {
+            contract: Some(&contract),
+            admission: plan.admission.as_ref(),
+            posture_coverage: planning.as_ref(),
+        },
     ) {
         Ok(s) => s,
         Err(e) => {
@@ -919,11 +959,20 @@ fn launch_attempt(
         }
     }
 
+    // Spec 004 section 3.17 rule 4: the comparison is confirmed at launch,
+    // after the base commit is resolved and before the spawn, from that
+    // commit and never from the reused workspace. This is the one recorded.
+    let base_commit = session.workspace.base_commit.clone();
+    let covered = match &plan.planned {
+        Some(planned) => statecraft_cli::coverage::at_base(root, &base_commit, &run_id, planned),
+        None => statecraft_cli::coverage::not_applicable(root, &base_commit),
+    };
+
     // Preflight refuses before any process is created, naming the token (spec
     // 004 section 3.3). The manifest is read here and only here.
     let manifest_adapter = statecraft_adapter_claude_code::manifest();
     let manifest = &manifest_adapter;
-    let environment = adapters::child_environment();
+    let environment = adapters::child_environment_with(&[], covered.as_ref().ok());
     let requested = statecraft_adapter::capability::Requested::none()
         .requiring(statecraft_adapter::capability::Capability::StructuredRefusals)
         .preferring(statecraft_adapter::capability::Capability::TurnLimit)
@@ -937,6 +986,35 @@ fn launch_attempt(
         &[],
         &environment,
     );
+    if let Ok(c) = &covered {
+        posture = posture.with_coverage(c.clone());
+    }
+    // A launch refusal comes after the intent, so the attempt is concluded
+    // `refused` under the guard `posture-coverage`, the way a preflight
+    // refusal after the intent is concluded (spec 004 section 3.17 rule 4).
+    let coverage_refusal = match &covered {
+        Err(why) => Some(why.clone()),
+        Ok(c) => c.refusal(),
+    };
+    if let Some(why) = coverage_refusal {
+        let mut accounting = statecraft_run::refusal::Accounting::default();
+        accounting.observe(statecraft_run::refusal::RefusalEvent {
+            guard: statecraft_adapter::coverage::GUARD.to_string(),
+            detail: why.clone(),
+        });
+        return conclude_and_emit(
+            &mut chain,
+            root,
+            &session,
+            statecraft_run::attempt::Outcome::Refused,
+            &accounting,
+            serde_json::json!({ "postureCoverageRefusal": why, "posture": posture }),
+            unlaunched(project_manifest.is_some(), None),
+            &contract,
+            trial,
+            format,
+        );
+    }
     let negotiation = match statecraft_adapter::supervisor::preflight(
         manifest,
         &requested,
@@ -1046,7 +1124,7 @@ fn launch_attempt(
         }
     };
     let environment = match &prepared {
-        Some(p) => adapters::child_environment_with(&p.intent.environment()),
+        Some(p) => adapters::child_environment_with(&p.intent.environment(), covered.as_ref().ok()),
         None => environment,
     };
 

@@ -164,6 +164,13 @@ pub struct Project {
     /// Solo, or the team this project is enrolled into.
     #[serde(default)]
     pub enrollment: Enrollment,
+    /// The command allowance of spec 004 section 3.17: a list of bare program
+    /// names a posture allows beyond the adapter's own. Carried here so that a
+    /// rewrite of this declaration keeps it; spec 004 reads and validates it,
+    /// and this crate supplies the value, not the rule (section 3.16). Absent
+    /// is not the same as empty, so an absent member stays absent on write.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub commands: Option<Vec<String>>,
 }
 
 /// A declared value this product refuses to commit, and why.
@@ -490,6 +497,24 @@ mod tests {
             written_at: "1970-01-01T00:00:00Z".into(),
             transfer: None,
         }
+    }
+
+    #[test]
+    fn a_declared_command_allowance_survives_a_rewrite_and_an_absent_one_stays_absent() {
+        // Spec 004 section 3.17 rule 1 reads `project.commands`; a rewrite of
+        // the declaration by this crate must neither drop it nor invent one.
+        let dir = tempfile::tempdir().unwrap();
+        let mut m = Manifest::new(pins());
+        m.write(dir.path()).unwrap();
+        let text = std::fs::read_to_string(dir.path().join(MANIFEST_PATH)).unwrap();
+        assert!(!text.contains("commands"), "{text}");
+        m.project.commands = Some(vec!["cargo".into(), "make".into()]);
+        m.write(dir.path()).unwrap();
+        let read = Manifest::read(dir.path()).unwrap().unwrap();
+        assert_eq!(read.project.commands, m.project.commands);
+        read.write(dir.path()).unwrap();
+        let again = Manifest::read(dir.path()).unwrap().unwrap();
+        assert_eq!(again.project.commands, m.project.commands);
     }
 
     #[test]

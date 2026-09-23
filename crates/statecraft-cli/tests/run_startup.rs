@@ -121,6 +121,7 @@ case "$*" in
   check) exit 0 ;;
   'registry plan --json') echo '{"ready":[{"id":"replay","title":"recorded stream"}]}' ;;
   'registry list --json') echo '{"items":[{"id":"replay","status":"approved","implementation":"pending"}]}' ;;
+  'verify '*' --plan --json') printf '{"exitCode":0,"ok":true,"report":{"commands":[],"skipped":[],"specId":"%s"},"schemaVersion":"0.6.0","verb":"verify"}' $2 ;;
   *) exit 3 ;;
 esac
 "#,

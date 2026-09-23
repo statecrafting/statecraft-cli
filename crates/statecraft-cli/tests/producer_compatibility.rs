@@ -64,7 +64,7 @@ fn stub_target_checking(
     statecraft_adapter::fixture::install_script(
         &bin.path().join("spec-spine"),
         format!(
-            "#!/bin/sh\ncase \"$*\" in\n  --version) echo 'spec-spine 0.22.0' ;;\n  check) {check_body} ;;\n  'registry plan --json') echo '{plan}' ;;\n  'registry list --json') echo '{list}' ;;\n  *) exit 3 ;;\nesac\n"
+            "#!/bin/sh\ncase \"$*\" in\n  --version) echo 'spec-spine 0.22.0' ;;\n  check) {check_body} ;;\n  'registry plan --json') echo '{plan}' ;;\n  'registry list --json') echo '{list}' ;;\n  'verify '*' --plan --json') printf '{{\"exitCode\":0,\"ok\":true,\"report\":{{\"commands\":[],\"skipped\":[],\"specId\":\"%s\"}},\"schemaVersion\":\"0.6.0\",\"verb\":\"verify\"}}' $2 ;;\n  *) exit 3 ;;\nesac\n"
         ),
         0o755,
     )
