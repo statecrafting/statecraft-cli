@@ -94,6 +94,7 @@ group them:
 | `run <id>` | `003`, `004` | Prepares the workspace, supervises one attempt through the adapter, records intent and outcome. |
 | `run list` | `003` | Every run for a registered target, with its attempts and outcomes. |
 | `run show <run>` | `003`, `005` | The reviewable outcome of `005` section 3.9. |
+| `run reconcile <path> <run-id> <attempt> <finding> <launch-state> <operator> <reason...>` | `003` | Records one operator reconciliation of a live attempt (`003` section 3.6.1, section 3.11.6). Replays nothing. |
 | `accept <run>` | `005` | Judges the candidate independently and records the acceptance or its absence. |
 | `harness show <path>` | `002` | The required harness identity, the resolved one, and the standing between them. Reads only. |
 | `harness upgrade <path>` | `002` | Commits the shipped revision as the project's required identity, as an explicit act. |
@@ -879,6 +880,18 @@ a closure. 106's obligations resolve, but this corpus declares none. 103's
 fixtures are replayed only as evidence about a named build (`003` section 5).
 Nothing in this spec's crate changed for the adoption beyond
 `producer_compatibility.rs`'s module note, which named the old pin.
+
+**2026-09-23: how the reconciliations of section 3.11.6 are rendered.** `run
+show` adds `reconciliations`, every reconciliation record of the run in chain
+order, each with its attempt, chain position, `verdict`, `basis` (`null` for
+the older shape of `003` section 3.6.1 rule 6, rendered as releasing nothing),
+`corroborated`, `observedLaunchState` and the record whole; the human
+rendering prints one line per record. The reviewable account of `005` section
+3.9 is unchanged. `run list` adds `reconciliation` to each attempt, the latest
+one `003` rule 4 folds (`null` where there is none). `run`'s live-attempt
+refusal adds `reconciliation`, the live attempt's `unknown` one, and names it
+in the human rendering. A refusal of `run reconcile` that is not about the
+lock is its own answer, with exit 2 unchanged.
 
 ## Verification
 

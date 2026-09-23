@@ -991,6 +991,45 @@ that has a successor, which is refused as a broken journal. Tests:
 through the binary with a fake `spec-spine` offering a `draft` and a fake
 provider replaying a recorded stream.
 
+**2026-09-23: section 3.6.1 implemented.** `statecraft_run::reconcile` decides
+and appends; the binding reads spec `002`'s launch records through
+`launch::inspect`, which only reads, and passes the launch state, whether
+`gate.log` holds an `admitted` line, the confirmed process id and whether a
+process with that id exists (`kill(pid, 0)` through `rustix`, an observation
+only) as facts. `session::runs` reads a reconciliation written under the
+section: a conclusive one sets the attempt's outcome to `interrupted` and keeps
+the reconciliation beside it, an `unknown` one leaves it live, and an older
+shape is ignored. `session::begin_admitted` writes `follows` into the next
+intent. The verb takes the repository lock of section 3.1.4 rule 7. Tests
+through the binary, in `run_startup.rs`, drive real crash boundaries with the
+fake provider: a launcher killed after admission (`outcome-unknown`, with and
+without a released tool call in the gate log) and an intent with no launch
+intent (`not-launched`); they check stale, conflicting, usage, unreadable
+evidence, lock, `unknown` then `absent`, a second reconciliation, `follows`,
+and that no launch is replayed. Unit tests cover the older shape and
+`unrecorded`.
+
+**2026-09-23: section 3.6.1, corrections from review.** Five choices the
+section was silent on, fixed without changing what it requires. The attempt's
+`gate.log` is read for rule 3 whatever the manifest says, so a repository with
+no manifest cannot bypass the conflict, and a log that exists and cannot be
+read fails the reconciliation (exit 4) rather than reading as "nothing
+released"; its path is always among the files the observation read. The
+launch state is mapped from spec `002`'s verdict exhaustively, with no
+fallback word. `replaces` is the record's index in the chain
+(`Chain::positioned_entries`), not an index into the decoded entries. Evidence
+files are hashed as they are read, never held whole. Rule 4's "with the
+reconciliation beside it" is carried by `run list`, and `run`'s refusal names
+the live attempt's `unknown` reconciliation (spec `006` section 5). Tests
+through the binary in `run_startup.rs`: a reconciliation while a real `run` is
+blocked is refused and leaves the chain byte for byte; `absent` against
+`launch-unknown` is declared only and releases; `confirmed` releases and the
+next intent's `follows` names it; a concluded attempt, an attempt the record
+does not carry and an empty operator or reason are refused; a released tool
+call refuses `absent` with no manifest; an unreadable gate log fails and
+writes nothing. A drop guard releases a blocked fake provider however a test
+ends.
+
 ## Verification
 
 Each line is one command. §3.8's twenty-two rows are integration tests named after

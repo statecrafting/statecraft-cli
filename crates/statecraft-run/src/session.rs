@@ -84,6 +84,20 @@ pub fn runs(chain: &Chain) -> Vec<Run> {
                     }
                 }
             }
+            // Spec 003 section 3.6.1 rule 4. Only a reconciliation written
+            // under that section counts; an older shape releases nothing.
+            Kind::Reconciliation => {
+                if let Some(r) = crate::reconcile::read(&entry) {
+                    if let Some(a) = run.attempts.iter_mut().find(|a| a.number == entry.attempt) {
+                        if a.outcome.is_none() {
+                            if r.conclusive() {
+                                a.outcome = Some(Outcome::Interrupted);
+                            }
+                            a.reconciliation = Some(r);
+                        }
+                    }
+                }
+            }
             Kind::Outcome if entry.subject == OUTCOME_SUBJECT => {
                 if let Some(word) = entry.detail.get("outcome").and_then(|v| v.as_str()) {
                     if let Some(outcome) = outcome_from_word(word) {
@@ -247,6 +261,12 @@ pub fn begin_admitted(
                 if let Some(admission) = admission {
                     detail["admission"] = serde_json::to_value(admission)
                         .unwrap_or_else(|e| serde_json::json!({ "unserializable": e.to_string() }));
+                }
+                // Section 3.6.1 rule 4: the attempts reconciled since the
+                // previous intent, whichever run they belong to.
+                let follows = crate::reconcile::since_last_intent(chain);
+                if !follows.is_empty() {
+                    detail["follows"] = serde_json::Value::Array(follows);
                 }
                 detail
             },

@@ -1399,6 +1399,30 @@ fn read_gate_log(path: &Path) -> Option<Vec<String>> {
         .map(|t| t.lines().map(str::to_string).collect())
 }
 
+/// Read an attempt's `gate.log` for a decision that relies on what it holds
+/// (spec 003 section 3.6.1 rule 3), whatever the manifest says.
+///
+/// Unlike the rendering read above, only a log that does not exist reads as
+/// `Ok(None)`; a log that exists and cannot be read is an error, never
+/// "nothing released". Nothing here writes.
+pub fn read_gate_log_checked(
+    root: &Path,
+    identity: &AttemptIdentity,
+) -> Result<Option<Vec<String>>, NotRead> {
+    if let Some(why) = identity.invalid() {
+        return Err(NotRead::NoSuchAttempt(why));
+    }
+    let path = identity.gate_log_path(root);
+    match std::fs::read_to_string(&path) {
+        Ok(t) => Ok(Some(t.lines().map(str::to_string).collect())),
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(None),
+        Err(e) => Err(NotRead::Unreadable {
+            path: path.display().to_string(),
+            detail: e.to_string(),
+        }),
+    }
+}
+
 /// Assemble and write an attempt's record. The only place `record.json` is
 /// written, and it is written once.
 pub fn finalize(
@@ -2081,14 +2105,15 @@ fn next_action(r: &ReadBack<'_>, verdict: Verdict) -> Option<String> {
         Verdict::LaunchUnknown => Some(format!(
             "whether a provider process was created is unknown: look for one started in {} and \
              inspect that workspace for effects; the attempt stays live, so `run` refuses run \
-             {run} until attempt {n} is reconciled (spec 003 section 3.6), and this build has \
-             no verb that reconciles it",
+             {run} until attempt {n} is reconciled with `run reconcile` (spec 003 section \
+             3.6.1), which reads these records and replays nothing",
             intent.workspace
         )),
         Verdict::OutcomeUnknown => Some(format!(
             "process {} was created{}; confirm it is no longer running, and inspect {} for \
              effects; the attempt stays live, so `run` refuses run {run} until attempt {n} is \
-             reconciled (spec 003 section 3.6), and this build has no verb that reconciles it",
+             reconciled with `run reconcile` (spec 003 section 3.6.1), which reads these \
+             records and replays nothing",
             r.launched
                 .map_or("(id not persisted)".to_string(), |l| l.pid.to_string()),
             r.launched
@@ -2976,13 +3001,7 @@ mod tests {
             "an intent was read as an interruption: {:?}",
             shown.reasons
         );
-        assert!(
-            shown
-                .next
-                .as_deref()
-                .unwrap()
-                .contains("no verb that reconciles")
-        );
+        assert!(shown.next.as_deref().unwrap().contains("run reconcile"));
         assert!(!p.intent.attempt.record_path(&w.root).exists());
         assert!(!p.intent.attempt.launched_path(&w.root).exists());
     }

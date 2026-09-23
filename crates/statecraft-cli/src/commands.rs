@@ -92,6 +92,8 @@ pub enum Verb {
     OverrideRevoke,
     /// `override show <path>`
     OverrideShow,
+    /// `run reconcile <path> <run-id> <attempt> <finding> <launch-state> <operator> <reason...>`
+    RunReconcile,
     /// `--help`, optionally with a group or a verb as its topic.
     ///
     /// Not part of the command tree: [`Verb::all`] lists the operations, and a
@@ -142,6 +144,7 @@ impl Verb {
             Verb::OverrideGrant => "override grant",
             Verb::OverrideRevoke => "override revoke",
             Verb::OverrideShow => "override show",
+            Verb::RunReconcile => "run reconcile",
             Verb::Help => "--help",
         }
     }
@@ -165,9 +168,11 @@ impl Verb {
             Verb::WorkList | Verb::WorkShow | Verb::RunList => "003-work-and-run-semantics",
             // Spec 006 section 3.11.5: the readiness override of 003 section
             // 3.1.4, in 003's crate.
-            Verb::OverrideGrant | Verb::OverrideRevoke | Verb::OverrideShow => {
-                "003-work-and-run-semantics"
-            }
+            // Section 3.11.6: the reconciliation of 003 section 3.6.1.
+            Verb::OverrideGrant
+            | Verb::OverrideRevoke
+            | Verb::OverrideShow
+            | Verb::RunReconcile => "003-work-and-run-semantics",
             // `run` is 003's semantics through 004's adapter, and 006 section
             // 3.1 names both. The record and the outcome are 003's, so that is
             // the owner; the adapter is how the attempt happens.
@@ -211,7 +216,7 @@ impl Verb {
     ///
     /// [`Verb::Help`] is deliberately absent: it is not an operation, and a
     /// usage error listing it would offer help as a thing to do.
-    pub fn all() -> [Verb; 38] {
+    pub fn all() -> [Verb; 39] {
         [
             Verb::ProjectRegister,
             Verb::ProjectList,
@@ -251,6 +256,7 @@ impl Verb {
             Verb::OverrideGrant,
             Verb::OverrideRevoke,
             Verb::OverrideShow,
+            Verb::RunReconcile,
         ]
     }
 
@@ -278,11 +284,12 @@ impl Verb {
             ("doctor", _) => Some((Verb::Doctor, 1)),
             ("work", Some("list")) => Some((Verb::WorkList, 2)),
             ("work", Some("show")) => Some((Verb::WorkShow, 2)),
-            // `list` and `show` are reserved after `run`, so a run id may not
+            // `list`, `show` and `reconcile` are reserved after `run`, so a run id may not
             // be spelled either of them. Stated here rather than discovered:
             // the alternative is an id that silently becomes a subcommand.
             ("run", Some("list")) => Some((Verb::RunList, 2)),
             ("run", Some("show")) => Some((Verb::RunShow, 2)),
+            ("run", Some("reconcile")) => Some((Verb::RunReconcile, 2)),
             ("run", _) => Some((Verb::Run, 1)),
             ("accept", _) => Some((Verb::Accept, 1)),
             ("home", Some("show")) => Some((Verb::HomeShow, 2)),

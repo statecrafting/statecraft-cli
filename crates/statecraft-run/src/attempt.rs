@@ -78,6 +78,11 @@ pub struct Attempt {
     /// predates spec 003 section 3.1.4 and so records nothing (not recorded).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub admission: Option<crate::work::Admission>,
+    /// The latest reconciliation written under spec 003 section 3.6.1, where
+    /// one was. `confirmed` and `absent` resolve the attempt as `interrupted`;
+    /// `unknown` leaves it live.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub reconciliation: Option<crate::reconcile::Reconciliation>,
 }
 
 impl Attempt {
@@ -91,6 +96,7 @@ impl Attempt {
             admitted_by_override: None,
             policy_was_declared: false,
             admission: None,
+            reconciliation: None,
         }
     }
 

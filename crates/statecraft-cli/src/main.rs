@@ -337,6 +337,8 @@ fn run(args: &[String]) -> i32 {
                 format,
             )
         }
+        // Spec 006 section 3.11.6: the reconciliation of 003 section 3.6.1.
+        Verb::RunReconcile => reconcile_verb(&invocation.rest, &registry, &home, format),
         // A help request is not an operation, so it consults nothing and
         // changes nothing. Exit 0: the question was asked and answered.
         Verb::Help => {
@@ -471,6 +473,7 @@ fn slice_verb(
                         &slice::run_show_with_admissions(
                             statecraft_acceptance::suite::fold(run_id, &chain.entries()),
                             &run,
+                            slice::ReconciliationView::of_run(&chain.positioned_entries(), run_id),
                         ),
                         format,
                     )
@@ -486,6 +489,215 @@ fn slice_verb(
             accept_verb(root, home, run_id, format)
         }
         _ => Exit::Usage.code(),
+    }
+}
+
+/// `run reconcile <path> <run-id> <attempt> <finding> <launch-state> <operator> <reason...>`
+///
+/// Spec 006 section 3.11.6 and spec 003 section 3.6.1. The binding reads the
+/// launch records through spec 002's `launch::inspect`, which only reads, and
+/// passes what it observed to the run crate, which decides and records.
+fn reconcile_verb(
+    rest: &[String],
+    registry: &statecraft_environment::registry::Registry,
+    home: &std::path::Path,
+    format: Format,
+) -> i32 {
+    use statecraft_run::reconcile::{EvidenceFile, LaunchState, Observation, Request};
+    use statecraft_run::recovery::Verdict;
+    let usage = || {
+        eprintln!(
+            "usage: run reconcile <path> <run-id> <attempt> <confirmed|absent|unknown> \
+             <launch-state> <operator> <reason...> [--evidence <file>]..."
+        );
+        Exit::Usage.code()
+    };
+    let mut positional: Vec<&String> = Vec::new();
+    let mut evidence_paths: Vec<&String> = Vec::new();
+    let mut args = rest.iter();
+    while let Some(arg) = args.next() {
+        if arg == "--evidence" {
+            match args.next() {
+                Some(p) => evidence_paths.push(p),
+                None => return usage(),
+            }
+        } else {
+            positional.push(arg);
+        }
+    }
+    if positional.len() < 7 {
+        return usage();
+    }
+    let root = absolute(positional[0]);
+    let run_id = positional[1].as_str();
+    let Ok(attempt) = positional[2].parse::<u32>() else {
+        return usage();
+    };
+    let finding = match positional[3].as_str() {
+        "confirmed" => Verdict::Confirmed,
+        "absent" => Verdict::Absent,
+        "unknown" => Verdict::Unknown,
+        _ => return usage(),
+    };
+    let inspected = positional[4].as_str();
+    if LaunchState::from_word(inspected).is_none() {
+        return usage();
+    }
+    let operator = positional[5].as_str();
+    let reason = positional[6..]
+        .iter()
+        .map(|s| s.as_str())
+        .collect::<Vec<_>>()
+        .join(" ");
+    if registry.get(&root).is_none() {
+        return emit(&bind::unregistered_answer(&root), format);
+    }
+    let mut evidence = Vec::new();
+    for p in evidence_paths {
+        // Hashed as it is read, never held whole: its content is not copied and
+        // not read for a decision (spec 003 section 3.6.1 rule 2).
+        match std::fs::File::open(p).and_then(statecraft_environment::digest::digest_reader) {
+            Ok((sha256, bytes)) => evidence.push(EvidenceFile {
+                path: p.clone(),
+                bytes,
+                sha256,
+            }),
+            Err(e) => {
+                return emit(
+                    &slice::reconcile_refused_answer(&format!(
+                        "the evidence file {p} could not be read: {e}; nothing was written"
+                    )),
+                    format,
+                );
+            }
+        }
+    }
+
+    // Rule 1: a run still supervising holds the lock.
+    let _held = match statecraft_run::lock::try_acquire(home, &root) {
+        Ok(held) => held,
+        Err(e @ statecraft_run::lock::LockError::Busy { .. }) => {
+            return emit(&slice::lock_busy_answer(&e.to_string()), format);
+        }
+        Err(e) => return fail(&e.to_string(), format),
+    };
+    let (mut chain, _) = match Chain::open(home, &root) {
+        Ok(c) => c,
+        Err(e) => return fail(&e.to_string(), format),
+    };
+
+    // Rule 2: read the launch records; never launch, signal or replay.
+    // Rule 3: the attempt's gate log is read whatever the manifest says, and a
+    // log that exists and cannot be read fails rather than reading as
+    // "nothing released".
+    let identity = statecraft_home::launch::AttemptIdentity {
+        run_id: run_id.to_string(),
+        attempt,
+    };
+    let gate_log_path = identity.gate_log_path(&root).display().to_string();
+    let gate = match statecraft_home::launch::read_gate_log_checked(&root, &identity) {
+        Ok(gate) => gate,
+        Err(statecraft_home::launch::NotRead::NoSuchAttempt(why)) => {
+            return emit(
+                &slice::reconcile_refused_answer(&format!("{why}; nothing was written")),
+                format,
+            );
+        }
+        Err(e) => return fail(&format!("{e}; nothing was written"), format),
+    };
+    let gate_released_tool_call = gate
+        .as_ref()
+        .is_some_and(|g| g.iter().any(|w| w == "admitted"));
+    let observation = match statecraft_environment::manifest::Manifest::read(&root) {
+        Err(e) => return fail(&e.to_string(), format),
+        Ok(None) => Observation {
+            launch_state: LaunchState::Unrecorded,
+            gate_released_tool_call,
+            confirmed_pid: None,
+            pid_exists: None,
+            files: vec![gate_log_path],
+        },
+        Ok(Some(_)) => {
+            let facts: Vec<statecraft_home::launch::AttemptFact> =
+                statecraft_run::session::runs(&chain)
+                    .into_iter()
+                    .find(|r| r.id == run_id)
+                    .map(|r| {
+                        r.attempts
+                            .iter()
+                            .map(|a| statecraft_home::launch::AttemptFact {
+                                number: a.number,
+                                outcome: a.outcome.map(|o| o.word().to_string()),
+                            })
+                            .collect()
+                    })
+                    .unwrap_or_default();
+            match statecraft_home::launch::inspect(&root, run_id, Some(attempt), &facts) {
+                Ok(shown) => {
+                    let pid = shown.launched.as_ref().map(|l| l.pid);
+                    Observation {
+                        launch_state: observed_launch_state(shown.verdict),
+                        gate_released_tool_call,
+                        confirmed_pid: pid,
+                        pid_exists: pid.map(statecraft_run::reconcile::process_exists),
+                        files: vec![
+                            shown.intent_path.clone(),
+                            shown.launched_path.clone(),
+                            shown.admission_path.clone(),
+                            shown.record_path.clone(),
+                            gate_log_path,
+                        ],
+                    }
+                }
+                Err(statecraft_home::launch::NotRead::NoSuchAttempt(why)) => {
+                    return emit(
+                        &slice::reconcile_refused_answer(&format!("{why}; nothing was written")),
+                        format,
+                    );
+                }
+                Err(e) => return fail(&e.to_string(), format),
+            }
+        }
+    };
+    let at = statecraft_environment::time::rfc3339_utc(
+        statecraft_environment::time::Clock::now_unix(&SystemClock),
+    );
+    let request = Request {
+        run_id,
+        attempt,
+        finding,
+        inspected,
+        operator,
+        reason: &reason,
+        evidence,
+        at: &at,
+    };
+    emit(
+        &slice::reconcile_answer(statecraft_run::reconcile::reconcile(
+            &mut chain,
+            &request,
+            observation,
+        )),
+        format,
+    )
+}
+
+/// Spec 002's launch verdict as the reconciliation's observed launch state,
+/// word for word and with no fallback (spec 003 section 3.6.1 rule 3).
+fn observed_launch_state(
+    verdict: statecraft_home::launch::Verdict,
+) -> statecraft_run::reconcile::LaunchState {
+    use statecraft_home::launch::Verdict as V;
+    use statecraft_run::reconcile::LaunchState as S;
+    match verdict {
+        V::NotLaunched => S::NotLaunched,
+        V::LaunchUnknown => S::LaunchUnknown,
+        V::OutcomeUnknown => S::OutcomeUnknown,
+        V::SpawnFailed => S::SpawnFailed,
+        V::Interrupted => S::Interrupted,
+        V::Mismatched | V::NotAdmitted | V::Unverified | V::Qualified => {
+            S::Completed(verdict.word().to_string())
+        }
     }
 }
 
@@ -655,8 +867,24 @@ fn launch_attempt(
                     )
                     .ok()
                 });
+                // Spec 003 section 3.6.1 rule 4: the refusal names the
+                // attempt's `unknown` reconciliation where it has one.
+                let reconciliation = statecraft_run::session::runs(&chain)
+                    .into_iter()
+                    .find(|r| r.id == *live_run)
+                    .and_then(|r| {
+                        r.attempts
+                            .into_iter()
+                            .find(|a| a.number == *attempt)
+                            .and_then(|a| a.reconciliation)
+                    });
                 return emit(
-                    &slice::live_attempt_answer(&e, &root.display().to_string(), startup),
+                    &slice::live_attempt_answer(
+                        &e,
+                        &root.display().to_string(),
+                        startup,
+                        reconciliation,
+                    ),
                     format,
                 );
             }

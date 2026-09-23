@@ -3925,6 +3925,18 @@ rule, because no change in this round touches what it read: section 3.34
 applies to the admission's reading of a capture and not to the trial's
 timeline.
 
+**2026-09-23: the launch-state answer names `run reconcile`.** With spec `003`
+section 3.6.1 implemented, `launch::inspect`'s next-action text for
+`launch-unknown` and `outcome-unknown` names the verb instead of saying none
+exists, as section 3.32 rule 24 now reads. Nothing it reads or judges changed.
+
+**2026-09-23: two reads for reconciliation.** `launch::read_gate_log_checked`
+reads an attempt's `gate.log` for spec `003` section 3.6.1 rule 3: an absent
+log is `None`, and a log that exists and cannot be read is an error, never an
+empty log. The rendering read `inspect` uses is unchanged. `digest::digest_reader`
+computes the same SHA-256 as `digest_bytes` over a reader, in chunks, so an
+evidence file is not held whole. Neither writes.
+
 ## Verification
 
 `--fail-on-untraced` joined the corpus gate with this spec's first
