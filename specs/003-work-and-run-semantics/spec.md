@@ -465,13 +465,15 @@ outside a test calls it. Every attempt's accounting is written with an empty
 before and after the supervised process ran.
 
 **Placement, and its residual.** The record is placed outside the workspace the
-session is given, in the product home, which is what section 3.5 and
-constitution IX require of placement. Spec `004` section 3.6 already names the
-residual: the supervised process runs as the same operating-system user, and
-the home is reachable unless an operating-system mechanism is applied, which
-is `F-09`'s. This section does not close that residual and does not amend
-section 3.5, section 3.8 or constitution IX. It is how a use of the residual
-becomes visible in the record rather than silent.
+session is given, in the product home. Section 3.5 and constitution IX require
+more: a place the supervised process cannot reach. While spec `004` section
+3.6's residual stands (the supervised process runs as the same operating-system
+user, and the home is reachable unless an operating-system mechanism is
+applied, which is `F-09`'s), placement outside the workspace does **not** meet
+that text. This section does not resolve the conflict and does not amend
+section 3.5, section 3.8 or constitution IX; the conflict is the owner's to
+decide and is reported as open. What this section adds is that a use of the
+residual becomes visible in the record rather than silent.
 
 **Rule 1: two kinds of evidence, and only these.** This product records a
 tamper attempt when, and only when, one of the following is observed during an

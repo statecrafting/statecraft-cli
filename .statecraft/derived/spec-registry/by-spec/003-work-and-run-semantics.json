@@ -25,7 +25,7 @@
     "id": "003-work-and-run-semantics",
     "implementation": "complete",
     "sectionDigests": {
-      "003-work-selection-workspace-preparation-the-run-record-and-recovery": "05d8f3c9381f76c35480a1c29a08f0e778fc9a648e8400daef368ce567cde802",
+      "003-work-selection-workspace-preparation-the-run-record-and-recovery": "3be32154eacd307a510436e7d9a629f78d0461d376bdbc187cf7ac8beb39d7a2",
       "1-purpose": "6e2e713486514a4371080ee9ad901b71b92b198ff8944d2cac7db353dfdd1ee6",
       "2-territory": "f200d26f7fab70304d4ec5b21bbfba40301c0a2a5b38fc266d1d37da0f01b4a4",
       "3-1-1-ready-is-not-ratified": "e902124dba1a1dfc0ed218701ac4b36773d42c1359d537fe8dfce993379529fa",
@@ -36,12 +36,12 @@
       "3-3-1-effect-identity-and-one-to-one-closing": "fe9215ff1d25660f0740dd4be1546a3ee2b3c18baad2cd8bbfd582d14fbca8e4",
       "3-3-the-run-record": "4216112648ad63a3214ec6017c03ab08756cec1e76433325058c425d181e9c25",
       "3-4-the-closed-outcome-set": "f2243f961b13080f994215dda098e7d629a8a42c7659642ec7c0fab0a750bb36",
-      "3-5-1-what-records-an-attempted-write-to-the-record-and-what-does-not": "1deadee4b58cba61931ceac19c797c431393c1fb9857a3637eec4b0c30d5f8be",
+      "3-5-1-what-records-an-attempted-write-to-the-record-and-what-does-not": "5724ece47e5080673f304a0d509b6a98280ac57160a746e0f02e924ec95f472b",
       "3-5-refusal-accounting-belongs-to-the-supervisor": "7068baab891dbfd033c0fe09f68ea5795ffc2e295248a2a90d95c8026fa68d59",
       "3-6-recovery-and-reconciliation": "50b88facefc2e4c69037b3f006fd9a464949c47498ed59d2b30ea066291d9bae",
       "3-7-concurrency-bounds-for-the-first-slice": "f20d713052cb52ff0e46e7d7bf723c4cfe5d831a66670c47ffea086423ced547",
       "3-8-observable-negative-cases": "64b35b1a553ef276500ef17c7ef9beff5d4488a934d422acddee2b429583bc0b",
-      "3-behavior": "66d13dc71a8b9e899e49405ad22c677b22cbab016a5afd7ef16b6a77ef7802ef",
+      "3-behavior": "d42a84e93f212cecfc5228fdf0dce3068a9006734497bc4a118bb983f8183919",
       "4-out-of-scope": "0953737fbaaf06f31c4272c3b10a57178c967c1127355c9826627a1267c76fdd",
       "5-decisions-recorded-during-implementation": "9d1a0fb86d725db8e7791bc6102a5a9796ee1cc659823cd08e638a7571e503c5",
       "verification": "31b33969410d5ba51a42678f60dc22264f541b2480ada745b3c0cc2f839d9a1e"
@@ -73,6 +73,6 @@
     "summary": "The core loop's semantics. How a unit of work is identified by reading spec-spine's structured report rather than re-deriving it; how an isolated workspace is prepared so the operator's checkout is never edited; the append-only hash-linked run record with intent written before an effect and outcome after it; the closed outcome set (completed, failed, refused, interrupted, cancelled) and the rule that a retry appends an attempt rather than replacing history; supervisor-owned refusal accounting a supervised process cannot erase; and reconciliation of an ambiguous effect before any retry, with no exactly-once promise.\n",
     "title": "Work selection, workspace preparation, the run record, and recovery after interruption"
   },
-  "shardHash": "6fa061f4bb390af158f52ac97718956f7938dd36ee7552d55da6cde4bfb19029",
+  "shardHash": "22d998d515f59e560e6829edb8aff9e8c517454cbe1a9af23c4143c71f489273",
   "specVersion": "1.6.0"
 }
