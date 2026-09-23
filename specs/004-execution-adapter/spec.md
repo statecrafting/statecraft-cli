@@ -687,7 +687,7 @@ write only:
 | Root | Why |
 |---|---|
 | the attempt's workspace | the work |
-| the attempt's own object directory, created empty by the supervisor before launch and named to the child's Git as its object directory, with the target's shared object store as a read-only alternate; the run's own reference directory, `refs/heads/statecraft/<run>/`, holding the attempt's branch `work`, and its reflog directory under `logs/`, both created before launch; the attempt's worktree administrative directory | its own commits, without a grant on the shared object store or on any directory another run's branch lives in |
+| the attempt's own object directory, in the attempt's exchange area of the product home, created empty by the supervisor before launch and named to the child's Git as its object directory, with the target's shared object store as a read-only alternate; the run's own reference directory, `refs/heads/statecraft/<run>/`, holding the attempt's branch `work`, and its reflog directory under `logs/`, both created before launch; the attempt's worktree administrative directory | its own commits, without a grant on the shared object store or on any directory another run's branch lives in |
 | the gate log in the exchange directory, opened for writing only (rule 5) | the gate's trace |
 | one temporary directory per attempt, created by the supervisor and given to the child as its temporary directory | scratch |
 | the provider's configuration directory (for Claude Code, `~/.claude/`), and its configuration file beside it: on macOS the literal names `~/.claude.json` and its temporary siblings; on Linux that one existing file for writing in place only, because granting creation or removal in the home directory would grant it over every file there | the provider cannot run without it; rule 12 names what this leaves open |
@@ -721,8 +721,16 @@ inert:
   not write.
 - It brings an attempt's objects into the shared store only through a transfer
   that re-hashes every object and checks connectivity, as Git's receiving side
-  does for a push, and reads an attempt's commits only after that import; the
-  child's object directory is otherwise read as data only.
+  does for a push, and reads an attempt's commits only after that import. The
+  side that reads the child's object directory to produce the transfer runs
+  inside the confinement and only emits a stream; the unconfined side only
+  receives and verifies it, and ignores any alternates list or configuration
+  found in the child's directory. At conclusion the supervisor removes any
+  reference in the run's reference directory other than `work`, and records
+  that it did. The attempt's object directory is kept until the import succeeds
+  or the operator reconciles the attempt; until then the run's branch may name
+  objects the shared store does not hold, and the operator's own Git operations
+  on the target can report them missing.
 - It runs `git` against the target's common Git directory named explicitly,
   with system and global configuration disabled, hooks and the file-system
   monitor switched off, and no attribute or filter driver, and reads the
@@ -871,7 +879,8 @@ of rule 12 as open, so that no attempt's record reads as meeting IX while rule
 - Whether the provider runs correctly inside the confinement has not been
   measured on either platform: every measurement above used a fixture. The
   first confined provider session is an activation the owner authorizes
-  separately; until then a confined run's failure is reported as such and never
+  separately (on Linux, for instance, the socket allowlist also refuses the
+  netlink family, which some runtimes use to list network interfaces); until then a confined run's failure is reported as such and never
   as a pass.
 - On Linux, a same-user UDP listener or TCP port 443 listener started after
   the launch's check is not refused by the mechanism; the check narrows that

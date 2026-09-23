@@ -112,6 +112,10 @@ than left blank:
 from the three names for absence in section 3.8. A reader must never have to infer
 from a missing receipt whether the suite ran and failed, or never ran at all.
 
+*Amended by section 3.19 rule 3:* a `completed` attempt whose suite cannot be run
+inside the protected evidence boundary is `not-attempted` with reason
+`boundary-unavailable`.
+
 ### 3.2 Independence
 
 The suite is run by this product, in the prepared workspace, from the

@@ -20,10 +20,10 @@
     "id": "005-acceptance-and-evidence",
     "implementation": "in-progress",
     "sectionDigests": {
-      "005-independent-acceptance-the-receipt-the-evidence-dimensions-and-the-envelope": "2b8dd859ff692222ceadc4b52fdf4fe2ec62954b9e063834bce809cbfaab0bf2",
+      "005-independent-acceptance-the-receipt-the-evidence-dimensions-and-the-envelope": "92942922ca028d657f74c43cea161cfa9d8d0718746b65c35f436cfde1c9ee1c",
       "1-purpose": "1e83a18b7efb0bd0936e628cee0e8229ae71f51ca31b33142d0d4cf783896da8",
       "2-territory": "f9d6ce9ea66ef5a9886e38b1ff14df7b5124c6111f042a468679d38930581a1d",
-      "3-1-1-which-outcomes-are-even-eligible": "9326d3e4ad2540938327f4131ec41afc880ecb733f592aae8faacff8c11d5388",
+      "3-1-1-which-outcomes-are-even-eligible": "36b92dd50dee9db09a5865013b27221d49d575961e0445a977105edc8a0030b8",
       "3-1-what-is-judged": "227dbfb987b613ed46f7455146182cca2b84029ec8b1436700f5a30502fc799e",
       "3-10-observable-negative-cases": "62c18104d4841b12eadf351c2e3cf945f0092932e9eaa45c519b6b5ab9856e33",
       "3-11-one-owner-and-who-re-exports": "2a662666889ae88c806e78fb4f395cf8082904367a43e2e929777906852e30d6",
@@ -47,7 +47,7 @@
       "3-7-bytes-digests-and-constructions": "036391834465af64e01765a99107b3d82a5c86da67dca644259b37dd685a119e",
       "3-8-the-three-names-for-absence": "a291b9b948751fb9c601934c7237f82e71133f952e9e49acf021340f6c1f5ba1",
       "3-9-the-reviewable-outcome": "93e4ab658e40fade09f40d10425354720101245a2a648cf4718ca5aa4602eedb",
-      "3-behavior": "aef42358e0f38b139a92f8f0d0877ee694c36b7d51e9af2492ed29915c918a47",
+      "3-behavior": "c7e11ed3049f79712a63c4bc818d4f39e5bcf4e0c474ad445984e527a61f0cea",
       "4-out-of-scope": "328e6543fcfd8ae8ffb71f70d8c9cfb7e90e0bbaf1c611d43eb43c40fbf150f3",
       "5-decisions-recorded-during-implementation": "1b9a6f482334ec12a463033240462dfee32bf93cca0e7829110c60d2e0df5f53",
       "verification": "497d66613a5622ffd6a09d95869fa4080d6a7bea15d2defb722afc90976239c1"
@@ -90,6 +90,6 @@
     "summary": "How a claim of completion becomes, or fails to become, an acceptance. Fixes the identification of candidate bytes and the trusted base, the authority-set rule that stops a candidate from being judged by rules it wrote, the receipt that binds repository, base, candidate, suite, exit codes and policy digest, the four evidence dimensions reported separately from admission with closed value sets, independently supplied trust roots, the preservation of original bytes and named hash constructions, and the three names for absence, none of which reads as success. It also owns the envelope crate the statecraft platform wrote against these serializations and transferred here, which makes one owner for the reference, the dimensions, admission and the absence words rather than two implementations of one wire format.\n",
     "title": "Independent acceptance, the receipt, the separately reported evidence dimensions, and the envelope two products exchange"
   },
-  "shardHash": "07870c2c45385d5e05ff526011255a792b1740f05913271c63004ddb6acd735c",
+  "shardHash": "e26cdaf5cd6cfbe4814d0cb4c060bef281bc61e9f89e12273caef87ae4804074",
   "specVersion": "1.6.0"
 }
