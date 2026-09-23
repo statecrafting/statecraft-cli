@@ -18,7 +18,7 @@ use statecraft_environment::manifest::Manifest;
 use statecraft_environment::probe::CommandProbe;
 use statecraft_environment::registry::Registry;
 use statecraft_environment::time::SystemClock;
-use statecraft_run::policy::{NoDeclarationFiled, Overrides};
+use statecraft_run::policy::NoDeclarationFiled;
 use statecraft_run::record::Chain;
 use statecraft_run::report::{ReportSource, SpecSpineCli};
 use std::path::PathBuf;
@@ -263,6 +263,80 @@ fn run(args: &[String]) -> i32 {
                 format,
             )
         }
+        // Spec 006 section 3.11.5: the readiness override of 003 section
+        // 3.1.4. A registered target, as for the work verbs; the journal is
+        // the product's own state, so arming is not required to change it.
+        Verb::OverrideGrant | Verb::OverrideRevoke | Verb::OverrideShow => {
+            let usage = || {
+                eprintln!(
+                    "usage: {} <path>{}",
+                    invocation.verb.spelling(),
+                    if invocation.verb == Verb::OverrideShow {
+                        ""
+                    } else {
+                        " <spec-id> <operator> <reason...>"
+                    }
+                );
+                Exit::Usage.code()
+            };
+            let Some(path) = invocation.rest.first() else {
+                return usage();
+            };
+            let root = absolute(path);
+            if registry.get(&root).is_none() {
+                return emit(&bind::unregistered_answer(&root), format);
+            }
+            if invocation.verb == Verb::OverrideShow {
+                if invocation.rest.len() != 1 {
+                    return usage();
+                }
+                return match statecraft_run::overrides::read(&home, &root) {
+                    Ok(journal) => emit(
+                        &slice::override_show_answer(&root.display().to_string(), &journal),
+                        format,
+                    ),
+                    Err(e) => fail(&e.to_string(), format),
+                };
+            }
+            let (Some(spec_id), Some(operator)) = (invocation.rest.get(1), invocation.rest.get(2))
+            else {
+                return usage();
+            };
+            let reason = invocation.rest.get(3..).unwrap_or_default().join(" ");
+            let at = statecraft_environment::time::rfc3339_utc(
+                statecraft_environment::time::Clock::now_unix(&SystemClock),
+            );
+            let request = statecraft_run::overrides::Request {
+                home: &home,
+                target: &root,
+                spec_id,
+                operator,
+                reason: &reason,
+                at: &at,
+            };
+            if invocation.verb == Verb::OverrideRevoke {
+                return emit(
+                    &slice::override_change_answer(
+                        "revoked",
+                        statecraft_run::overrides::revoke(&request),
+                    ),
+                    format,
+                );
+            }
+            // Rule 1: the spec id must be one the corpus report names. The
+            // report is spec-spine's, read the way `work list` reads it.
+            let known = match SpecSpineCli::default().corpus_report(&root) {
+                Ok(report) => report.lifecycle_of(spec_id).is_some(),
+                Err(e) => return emit(&slice::report_error_answer(&e), format),
+            };
+            emit(
+                &slice::override_change_answer(
+                    "granted",
+                    statecraft_run::overrides::grant(&request, known),
+                ),
+                format,
+            )
+        }
         // A help request is not an operation, so it consults nothing and
         // changes nothing. Exit 0: the question was asked and answered.
         Verb::Help => {
@@ -325,11 +399,17 @@ fn slice_verb(
             Ok(report) => {
                 let (policy, disagreement) =
                     statecraft_run::policy::resolve(root, &NoDeclarationFiled, None);
+                // Spec 003 section 3.1.4 rule 3: a journal that does not read
+                // or verify is a failure, never an empty set of overrides.
+                let overrides = match statecraft_run::overrides::read(home, root) {
+                    Ok(journal) => journal.overrides(),
+                    Err(e) => return fail(&e.to_string(), format),
+                };
                 (
                     Some(statecraft_run::work::select(
                         &report,
                         &policy,
-                        &Overrides::none(),
+                        &overrides,
                         disagreement,
                     )),
                     Some(report),
@@ -381,17 +461,17 @@ fn slice_verb(
             };
             match Chain::open(home, root) {
                 Ok((chain, _)) => {
-                    if !statecraft_run::session::runs(&chain)
-                        .iter()
-                        .any(|r| r.id == *run_id)
-                    {
+                    let Some(run) = statecraft_run::session::runs(&chain)
+                        .into_iter()
+                        .find(|r| r.id == *run_id)
+                    else {
                         return emit(&slice::no_such_run_answer(run_id), format);
-                    }
+                    };
                     emit(
-                        &slice::run_show_answer(statecraft_acceptance::suite::fold(
-                            run_id,
-                            &chain.entries(),
-                        )),
+                        &slice::run_show_with_admissions(
+                            statecraft_acceptance::suite::fold(run_id, &chain.entries()),
+                            &run,
+                        ),
                         format,
                     )
                 }
@@ -425,9 +505,11 @@ fn run_verb(
     // A unit of work the policy did not admit is never run, and the reason is
     // the answer (spec 003 section 3.1.1).
     let eligibility = work.eligibility_of(spec_id);
-    if !eligibility.schedulable() {
+    let statecraft_run::work::Eligibility::Eligible(item) = &eligibility else {
         return emit(&slice::work_show_answer(eligibility), format);
-    }
+    };
+    // Spec 003 section 3.1.4 rule 5: how it was admitted goes into the intent.
+    let admission = item.admission(&work.policy);
     // Spec 003 section 3.1.3: the contract is resolved by the producer and
     // written with the intent, before any effect. It is evidence, not a gate.
     let contract = statecraft_run::contract::bind(
@@ -440,7 +522,7 @@ fn run_verb(
         root,
         home,
         spec_id,
-        AttemptPlan::work_order(spec_id),
+        AttemptPlan::work_order(spec_id, admission),
         contract,
         None,
         format,
@@ -454,14 +536,18 @@ struct AttemptPlan {
     prompt: Vec<u8>,
     max_turns: Option<u32>,
     deadline_seconds: u64,
+    /// How the unit of work was admitted, written into the intent (spec 003
+    /// section 3.1.4 rule 5). The trial is not a unit of work and has none.
+    admission: Option<statecraft_run::work::Admission>,
 }
 
 impl AttemptPlan {
-    fn work_order(spec_id: &str) -> Self {
+    fn work_order(spec_id: &str, admission: statecraft_run::work::Admission) -> Self {
         Self {
             prompt: format!("Implement {spec_id} in this workspace.").into_bytes(),
             max_turns: None,
             deadline_seconds: 900,
+            admission: Some(admission),
         }
     }
 
@@ -470,6 +556,7 @@ impl AttemptPlan {
             prompt: statecraft_home::trial::prompt().into_bytes(),
             max_turns: Some(statecraft_home::trial::MAX_TURNS),
             deadline_seconds,
+            admission: None,
         }
     }
 }
@@ -517,6 +604,16 @@ fn launch_attempt(
         return emit(&bind::harness_refused_answer(root, &reason), format);
     }
 
+    // Spec 003 section 3.1.4 rule 7: the repository lock, held from before
+    // the intent until the outcome is durable, released by the operating
+    // system when this process ends however it ends.
+    let _held = match statecraft_run::lock::try_acquire(home, root) {
+        Ok(held) => held,
+        Err(e @ statecraft_run::lock::LockError::Busy { .. }) => {
+            return emit(&slice::lock_busy_answer(&e.to_string()), format);
+        }
+        Err(e) => return fail(&e.to_string(), format),
+    };
     let (mut chain, _) = match Chain::open(home, root) {
         Ok(c) => c,
         Err(e) => return fail(&e.to_string(), format),
@@ -527,13 +624,14 @@ fn launch_attempt(
     // of the same run, so a fresh id per invocation would turn every retry into
     // a new run.
     let run_id = run_id.to_string();
-    let session = match statecraft_run::session::begin_bound(
+    let session = match statecraft_run::session::begin_admitted(
         &mut chain,
         root,
         &run_id,
         "HEAD",
         &SystemClock,
         Some(&contract),
+        plan.admission.as_ref(),
     ) {
         Ok(s) => s,
         Err(e) => {

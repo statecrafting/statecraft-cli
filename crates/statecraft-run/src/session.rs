@@ -67,6 +67,21 @@ pub fn runs(chain: &Chain) -> Vec<Run> {
                 // intent must not multiply what it describes.
                 if !run.attempts.iter().any(|a| a.number == entry.attempt) {
                     run.append_attempt(base);
+                    // Section 3.1.4 rule 5. An intent without the key predates
+                    // the section and stays not recorded.
+                    let admission: Option<crate::work::Admission> = entry
+                        .detail
+                        .get("admission")
+                        .and_then(|v| serde_json::from_value(v.clone()).ok());
+                    if let Some(a) = run.attempts.last_mut() {
+                        if let Some(crate::work::Admission::Override(o)) = &admission {
+                            a.admitted_by_override = Some(o.clone());
+                        }
+                        if let Some(crate::work::Admission::Policy { source, .. }) = &admission {
+                            a.policy_was_declared = source == "declared";
+                        }
+                        a.admission = admission;
+                    }
                 }
             }
             Kind::Outcome if entry.subject == OUTCOME_SUBJECT => {
@@ -173,6 +188,20 @@ pub fn begin_bound(
     clock: &dyn Clock,
     contract: Option<&crate::contract::Binding>,
 ) -> Result<Session, SessionError> {
+    begin_admitted(chain, target, run_id, base_revision, clock, contract, None)
+}
+
+/// [`begin_bound`], writing how the spec was admitted into the intent as well
+/// (section 3.1.4 rule 5): once, with the intent, before any effect.
+pub fn begin_admitted(
+    chain: &mut Chain,
+    target: &Path,
+    run_id: &str,
+    base_revision: &str,
+    clock: &dyn Clock,
+    contract: Option<&crate::contract::Binding>,
+    admission: Option<&crate::work::Admission>,
+) -> Result<Session, SessionError> {
     for run in runs(chain) {
         if let Some(live) = run.live_attempt() {
             return Err(SessionError::LiveAttempt {
@@ -213,6 +242,10 @@ pub fn begin_bound(
                 });
                 if let Some(contract) = contract {
                     detail["contract"] = serde_json::to_value(contract)
+                        .unwrap_or_else(|e| serde_json::json!({ "unserializable": e.to_string() }));
+                }
+                if let Some(admission) = admission {
+                    detail["admission"] = serde_json::to_value(admission)
                         .unwrap_or_else(|e| serde_json::json!({ "unserializable": e.to_string() }));
                 }
                 detail

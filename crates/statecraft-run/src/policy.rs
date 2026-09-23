@@ -108,6 +108,17 @@ pub struct Override {
     pub operator: String,
     /// Why, recorded so the attempt can surface it.
     pub reason: String,
+    /// `operator-supplied`: the name is not authenticated (section 3.1.4 rule
+    /// 2). Absent on an override built in memory rather than read from the
+    /// journal.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub operator_provenance: Option<String>,
+    /// When the journal recorded the grant.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub granted_at: Option<String>,
+    /// The SHA-256 of the grant's journal line.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub grant_line: Option<String>,
 }
 
 /// The overrides in force for one repository.
@@ -131,6 +142,9 @@ impl Overrides {
             spec_id: spec_id.to_string(),
             operator: operator.to_string(),
             reason: reason.to_string(),
+            operator_provenance: None,
+            granted_at: None,
+            grant_line: None,
         });
         self
     }

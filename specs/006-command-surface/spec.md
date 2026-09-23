@@ -109,6 +109,7 @@ group them:
 | `project enroll <path> <team>` / `project unenroll <path>` | `002` | Records, or removes, team enrollment in the project declaration. |
 | `config show <path>` | `002` | The resolved configuration for a run in that project, per key, with provenance. |
 | `approval grant <path> <subject> <operator> <reason...>` / `approval show <path> <subject>` | `002` | Records a local approval for one subject; shows one subject's eligibility and the authority behind it. |
+| `override grant <path> <spec-id> <operator> <reason...>` / `override revoke <path> <spec-id> <operator> <reason...>` / `override show <path>` | `003` | Records, removes and shows the single-spec readiness override of `003` section 3.1.4 (section 3.11.5). |
 
 A verb is added by the change that implements the behavior behind it, never
 ahead of it: a command that prints "not implemented" is a worse answer than a

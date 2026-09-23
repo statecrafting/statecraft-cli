@@ -74,6 +74,10 @@ pub struct Attempt {
     pub admitted_by_override: Option<crate::policy::Override>,
     /// Whether the lifecycle policy was declared by the target or defaulted.
     pub policy_was_declared: bool,
+    /// How the intent says the spec was admitted, or `None` when the intent
+    /// predates spec 003 section 3.1.4 and so records nothing (not recorded).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub admission: Option<crate::work::Admission>,
 }
 
 impl Attempt {
@@ -86,6 +90,7 @@ impl Attempt {
             outcome: None,
             admitted_by_override: None,
             policy_was_declared: false,
+            admission: None,
         }
     }
 

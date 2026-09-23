@@ -39,6 +39,8 @@
 
 pub mod attempt;
 pub mod contract;
+pub mod lock;
+pub mod overrides;
 pub mod policy;
 pub mod record;
 pub mod recovery;

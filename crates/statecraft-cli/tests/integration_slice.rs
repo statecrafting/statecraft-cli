@@ -401,6 +401,7 @@ fn the_grown_command_tree_still_has_no_verb_that_publishes() {
     // the launch that binds a qualification control to its settings; and one
     // more with section 3.11.3's `startup show`, the read of a run attempt's
     // startup evidence; and one more with section 3.11.4's `startup trial`,
-    // which spends a project's one managed-startup trial.
-    assert_eq!(statecraft_cli::commands::Verb::all().len(), 35);
+    // which spends a project's one managed-startup trial; and three more with
+    // section 3.11.5's override verbs.
+    assert_eq!(statecraft_cli::commands::Verb::all().len(), 38);
 }
