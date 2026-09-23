@@ -2214,16 +2214,21 @@ fixes the rule. It changes no requirement in sections 3.1 to 3.35.
 
 **Rule 1: the facts, kept apart.** *Implemented* is a property of this
 repository's code measured against sections 3.1 to 3.35. The provider evidence
-is not one fact but several, and section 3.32 rule 28 already keeps them
-apart: a session was **observed** (section 3.29's three controls were
-captured), its observation was **admitted** (sections 3.29 and 3.30 accepted
-it), bytes were **supplied** (section 3.32 rule 28), and a session is
-**qualified** (the record's `qualifies()` conjunction). *Activation* is this
-product acting on a real home. *Counterparty completion* is what section 3.22
-leaves to another repository. Only the first is what the frontmatter's
-`implementation` field records; the others are reported beside it, each on its
-own evidence, and none is inferred from another: an admitted observation is
-not a qualification, and neither is an activation. None of them grants the
+is not one fact but several. Section 3.32 rule 28 keeps installed, selected,
+supplied, correlated, admitted (the startup decision of its rule 26) and
+qualified apart. This section adds two words of its own: a session was
+**observed** (section 3.29's three controls were captured), and an observation
+was **observation-admitted** (sections 3.29 and 3.30 accepted it). Neither kind
+of admission is a qualification, and neither implies the other. An
+observation-admitted observation is not the verdict `qualified` of section 3.31
+rule 21: it makes no run, trial or session qualified, and this section treats
+it only as evidence under section 3.27. Where section 3.29 says an observation
+"qualifies", it speaks of the floor payload for the invocation the observation
+is bound to, and this section does not read that as a session's qualification.
+*Activation* is this product acting on a real home. *Counterparty completion*
+is what section 3.22 leaves to another repository. Only the first is what the
+frontmatter's `implementation` field records; the others are reported beside
+it, each on its own evidence, and none is inferred from another. None of them grants the
 field, and none withholds it except through a requirement of sections 3.1 to
 3.35 that mandates its result (rule 5).
 
@@ -2235,16 +2240,18 @@ none:
 | Class | What it needs |
 |---|---|
 | implemented | Reachable through this product's command surface where the requirement is about the product's behavior, and exercised by a named test or declared acceptance command. Code no verb reaches is **not** this class. |
-| deferred | Deferred by name in section 4 or by a deferral row of the decision record, as either stood before this section, or by a scope change the owner approved that names the requirement, says why, and records the approval where it is made. A dated section 5 entry an agent writes is a record of that approval, never a substitute for it. A requirement is not deferred by being hard. |
+| deferred | Deferred by name in section 4, or by an adopted deferral row of the decision record (an `F-` row, not a proposed one), as either stood before this section; or by a scope change the owner approved. That approval names the requirement by section and rule, says why, and is the owner's own act (a review approval, a commit, or a dated statement), cited in the section 5 entry that records it. A dated section 5 entry an agent writes records that approval and never substitutes for it. A requirement is not deferred by being hard. |
 | external | Decidable only by a provider session, a real home, a release, or another repository's act, **and** the requirement does not mandate a particular result. Its current disposition is recorded, whatever it is. A requirement that mandates a result and depends on such an act is accounted for only when that result is established; until then it is unresolved and blocks `complete` (rule 5). |
 
-**Rule 2a: a frozen obligation is never deferred or external.** A
-requirement that carries a principle spec `000` freezes, including
-Constitution IX's placement of records where the supervised process cannot
-reach them, is accounted for only as implemented. It is not deferred by any
-route in rule 2, it is not external because a platform or an operator's act
-would be needed to meet it, and recording it as a residual does not account
-for it. Until it is implemented it is unresolved and blocks `complete`.
+**Rule 2a: a frozen obligation is never deferred or external.** Each
+principle spec `000` freezes is accounted for, in this spec's territory, as
+implemented, whether or not a section of 3.1 to 3.35 restates it; that
+includes Constitution IX's placement of records where the supervised process
+cannot reach them. It is not deferred by any route in rule 2, including a
+decision-record deferral such as `F-09`'s of operating-system enforcement; it
+is not external because a platform or an operator's act would be needed to
+meet it; and recording it as a residual does not account for it. Until it is
+implemented it is unresolved and blocks `complete`.
 
 **Rule 3: failing closed is not the same as implemented.** A requirement that
 the product *do* something is not satisfied by the product reporting that it
@@ -2258,7 +2265,9 @@ second reading is not available.
 **Rule 4: the producer and acceptance.** The pinned producer is the published
 crate, resolving with no Git or path override, and conforms under section 3.15
 on that revision. Every spec's declared acceptance passes there, run serially,
-with every ignored, skipped or unavailable check named.
+with every ignored, skipped or unavailable check named. A skipped or
+unavailable check that is the only evidence for a requirement leaves that
+requirement unaccounted for under rule 2.
 
 **Rule 5: experiments need a disposition; a mandated result needs the result.**
 Every live experiment the owner authorized has a recorded disposition
@@ -2277,21 +2286,29 @@ is established for the installed provider version: the deny floor through an
 admitted observation of sections 3.29 and 3.30, and hooks supplied through
 `--settings` through an established trial of section 3.33. Evidence for one
 version is not evidence for another, and a matching version string is not by
-itself the same provider: the evaluation names the installed binary by path
-and digest and shows that it is the one each piece of evidence recorded, and
-that the settings payload a run on the evaluated revision supplies digests to
-the payload the admitted observation is bound to under section 3.29 rule 4. A
-difference in either is evidence for another invocation. What rule 5 requires
-here is the admission and the established trial; it does not require that any
-session be `qualified`, which section 3.32 rule 21 makes unreachable through a
-run, and it does not make an admitted observation into a qualification. The alternative, a `run` that treats the
+itself the same provider. The evaluation names the installed binary by path
+and digest and shows that each piece of evidence recorded that digest; evidence
+that does not record the binary's digest cannot be bound under this rule and
+does not count, and recording it on the run and trial paths is a change to
+sections 3.31 and 3.33. The deny floor a run supplies, digested alone as
+section 3.32 rule 25 records it, must equal the payload the observation is
+bound to under section 3.29 rule 4, and the trial's startup-hook and gate
+registrations must match the run's by event, matcher and script digest.
+Section 3.32 rule 25 says a floor-only observation is not evidence for a run's
+whole document; whether it is enough for the floor inside that document is the
+owner's decision, and until the owner makes it, section 3.27 is unresolved.
+What this rule requires is the observation's admission and the established
+trial; it does not require that any session be `qualified`, which section 3.31
+rule 21 makes unreachable through a run (restated in section 3.32 rule 28). The alternative, a `run` that treats the
 mechanism as unavailable for an unverified version, would be a change to
 section 3.32 and is the owner's to make; this section does not make it.
 
 **Rule 6: how it is applied.** The evaluation is a dated section 5 entry
-naming the revision, the count of implemented requirements, and every
-requirement that is deferred or external with its class and evidence. The
-field then moves in its own lifecycle-only change. A requirement later found
+naming the revision, the count of implemented requirements, every requirement
+that is deferred or external with its class and evidence, each frozen
+obligation of rule 2a with its evidence, and a statement that no requirement is
+unresolved. The field then moves in its own lifecycle-only change, which is the
+owner's act under AGENTS.md. A requirement later found
 unmet, or a new requirement, moves it back to `in-progress` in the change that
 finds or adds it.
 
