@@ -54,6 +54,7 @@
       "3.11.1 The five verbs spec 002's sections 3.25 to 3.29 need",
       "3.11.2 The sixth verb, and what a qualification exit code distinguishes",
       "3.11.3 The seventh verb, and what `run` adds to its answer",
+      "3.11.4 The eighth verb, and the trial section `startup show` gains",
       "3.12 What the command surface does not unlock",
       "4. Out of scope",
       "5. Decisions recorded during implementation",
@@ -64,6 +65,6 @@
     "summary": "The binary, and every verb reachable through it. Specs 002 to 005 each describe operator verbs and then own only a library crate, so nothing they specify is runnable. This spec owns crates/statecraft-cli/ and binds those verbs to a process: the command tree, the rule that a command is a thin binding and never a second implementation, the closed exit-code vocabulary that distinguishes a refusal from a failure from a finding, human and --json output as two renderings of one value, and the binary's name being a recorded decision rather than a Cargo default. It also carries the work, run and accept bindings that were specified separately as 009: discovery as a join of two spec-spine reports because one of them does not carry status, inspection as a read-only fold of the run record and nothing else, and the rule that a binding needing a library entry point gets it from the crate that owns the behavior. Section 3.11.1 adds the five verbs 002 sections 3.25 to 3.29 need: inspecting and explicitly upgrading the required harness identity, obtaining the managed-session payload, and recording startup evidence beside submitting qualification evidence for admission.\n",
     "title": "The command surface: one binary, every verb the other specs name, and what an exit code means"
   },
-  "shardHash": "20a4138026070e7f62e9ac4b6aae43c6446427a3d529b77ffcc9b1ff6c3a8d9b",
+  "shardHash": "ba9a3c909a14534deb67567427a4c446d45ae46e3b27fc04e461df539e3db41a",
   "specVersion": "1.3.0"
 }
