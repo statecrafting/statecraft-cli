@@ -591,6 +591,40 @@ written, which is the one ordering constraint in the handoff: **this change
 first, the platform's second.** No publication of either is authorized by this
 spec.
 
+### 3.18 Whether the contract an attempt was bound to still holds
+
+Recorded on 2026-09-22 before the implementation it authorizes, for the binding
+spec `003` section 3.1.3 writes into an attempt's intent. `accept` judges a
+candidate against the spec it was built for, and a spec that moved while the
+attempt ran is a different contract. The judgement is made from the producer's
+own answers, never from a digest this product computes.
+
+1. **When.** After the eligibility of section 3.1.1 and before anything else
+   is observed, `accept` asks the producer, in the target, to resolve the
+   request the intent recorded, and compares the answer with the binding.
+2. **The words.**
+
+   | Comparison | When | Effect on the acceptance |
+   |---|---|---|
+   | `current` | the new digest equals the bound one | none; the receipt binds the digest |
+   | `changed` | the digest differs; every member whose identity differs is named, by kind and key, with both identities | **no acceptance**, reason `contract-moved` |
+   | `withdrawn` | an obligation bound as in force is now withdrawn | **no acceptance**, reason `contract-moved`, naming it |
+   | `missing` | a bound member no longer resolves (the producer's exit 1) | **no acceptance**, reason `contract-moved`, naming it |
+   | `stale` | the producer refuses a stale ledger (its exit 2) | refused before anything is judged; nothing is recorded, and the answer says to refresh the ledger |
+   | `not-recorded` | the intent carries no `bound` contract (an attempt from before section 3.1.3, or one bound as `unsupported`, `unresolved`, `stale` or `unreadable`), or the producer answering now cannot resolve closures | none; the receipt's contract field reads `not-recorded` under section 3.8, with the reason |
+
+   `withdrawn` and `missing` are reported beside `changed` where both hold,
+   because each names what an operator must look at.
+3. **The run record is never rewritten.** The comparison belongs to the
+   acceptance that made it: it is in the acceptance's answer and, where a
+   receipt is minted, in the receipt. The attempt's intent keeps the contract
+   it was bound to, and a later acceptance of the same attempt compares again.
+4. **The receipt binds the contract.** Section 3.4's list gains the bound
+   digest and the comparison word, read `not-recorded` where rule 2 says so.
+5. **What `current` does not establish.** That the candidate satisfies the
+   contract; only that the contract it was authorized against is the one the
+   producer resolves now. Acceptance still rests on sections 3.1 to 3.3.
+
 ## 4. Out of scope
 
 Signing and key custody; hosted admission; export bundles and corpus
@@ -776,6 +810,13 @@ about what the fixtures are evidence of, not about a defect in them.
 - Whether `VerifierRecord` (section 3.6) and the envelope's
   `EvidenceVerdict` verifier identity should be one type. They overlap in intent
   and not in shape.
+
+**2026-09-22: section 3.18, recorded before implementation.** An attempt's
+intent will carry the contract spec 003 section 3.1.3 binds, and `accept`
+compares it with the producer's resolution now. A contract that changed, lost a
+member or withdrew an obligation is no acceptance, reason `contract-moved`; a
+stale ledger refuses before anything is judged; an unbound or unresolvable
+contract reads `not-recorded` in the receipt. No code changed with this entry.
 
 ## Verification
 
