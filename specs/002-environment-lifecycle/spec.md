@@ -3890,8 +3890,9 @@ observation: the claimed command was refused through a structured denial and
 did not execute under the payload, the allowed command executed under the same
 payload and printed `statecraft-allowed-control`, and the claimed command
 executed without the payload. The record, `acc-live.json` (`60f452cb…a84c`),
-says `observed`, harness `2.1.267`, payload `3a5c7fc2…5fe1`, and **`qualified:
-false`**: supply is a separate evidence class this stage does not perform.
+says `observed`, harness `2.1.267` and payload `3a5c7fc2…5fe1`, and `startup
+qualify` reported **`qualified: false`**, computed from the record rather than
+stored in it: supply is a separate evidence class this stage does not perform.
 The captures are kept verbatim (`08a6623d…2083`, `e1fd2739…5500`,
 `3201d2ae…b5b1`) in `sc-accept-A2.tar.gz` (`be31d3d5…22d7`), outside the
 repository, beside the first campaign's archive, which is unchanged
