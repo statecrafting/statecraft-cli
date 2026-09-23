@@ -462,28 +462,38 @@ mechanism.
 **The gap, exactly.** `Accounting::note_tamper_attempt` exists and nothing
 outside a test calls it. Every attempt's accounting is written with an empty
 `tamper_attempts`, whatever the session did, and nothing compares the record
-before and after the supervised process ran. Placement is also weaker than the
-row's first half suggests: the record is in the product home, and the
-supervised process runs as the same operating-system user, so a session that
-knows the path can reach it (spec `004` section 3.6 names the same residual for
-the home directory).
+before and after the supervised process ran.
+
+**Placement, and its residual.** The record is placed outside the workspace the
+session is given, in the product home, which is what section 3.5 and
+constitution IX require of placement. Spec `004` section 3.6 already names the
+residual: the supervised process runs as the same operating-system user, and
+the home is reachable unless an operating-system mechanism is applied, which
+is `F-09`'s. This section does not close that residual and does not amend
+section 3.5, section 3.8 or constitution IX. It is how a use of the residual
+becomes visible in the record rather than silent.
 
 **Rule 1: two kinds of evidence, and only these.** This product records a
 tamper attempt when, and only when, one of the following is observed during an
 attempt:
 
-1. **A structured request to write a protected path.** A tool request in the
-   session's own structured stream, for a tool whose documented input names a
-   file it writes (`Write`, `Edit` and `MultiEdit` by `file_path`,
-   `NotebookEdit` by `notebook_path`), whose target, resolved against the
-   attempt's workspace, lies inside this product's home. Recorded whether the
+1. **A structured request to write a protected path.** A file-write request
+   the adapter reports from the session's own structured stream: a tool request
+   whose documented input names a file the tool writes. Which tools and which
+   fields is the adapter's to say (spec `004`); for Claude Code they are
+   `Write`, `Edit` and `MultiEdit` by `file_path`, and `NotebookEdit` by
+   `notebook_path`. A request counts when its target, resolved against the
+   attempt's workspace and following symbolic links through the part of the
+   path that exists, lies inside this product's home. Recorded whether the
    request was refused, executed or unresolved, with that classification beside
    it.
 2. **A change to the record while the process ran.** The supervisor digests
    the repository's run record, and the override journal where one exists,
    after the intent is durable and before the spawn, and again after the
-   process has ended and before anything else is appended. Any difference is a
-   write this product did not make.
+   process has ended and before anything else is appended. The supervisor holds
+   the repository lock (section 3.1.4 rule 7) throughout, and every write this
+   product makes to those files outside the supervisor takes the same lock, so
+   any difference is a write this product did not make.
 
 A shell command's text is **not** interpreted: a `Bash` request that writes the
 record through a redirection is caught by the second kind if it succeeds, and
@@ -495,12 +505,16 @@ residuals and are stated as such wherever the rule is described.
 the target as the evidence names it, the tool and tool-use id for the first
 kind, the before and after digests and lengths for the second, and never the
 content of anything written. The first kind is recorded in the attempt's
-accounting record, beside the refusal count, which it does not change. The
-second kind means the record itself was altered, so nothing more is appended
-to it by this attempt: the finding is written to a separate append-only audit
-file beside the record, named for the repository, and the attempt stays live,
-which sends it to reconciliation (section 3.6.1) rather than letting a new
-outcome sit on a record nobody can vouch for.
+accounting record, under a new member, `tamperFindings`, beside the refusal
+count, which it does not change. The second kind means the record itself was
+altered, so nothing more is appended to it by this attempt: the finding is
+written to a separate append-only audit file beside the record, named for the
+repository, and the attempt stays live. If the record still verifies, the
+attempt goes to reconciliation (section 3.6.1), whose answer names the audit
+finding. If it no longer verifies, every verb that opens it refuses as
+corruption, as today, and no verb repairs it: recovery is restoring the record
+from outside this product, and this section says so rather than offering a
+repair that would rewrite history.
 
 **Rule 3: an audit that cannot be written is a failure, not a silence.** If
 the accounting record or the audit file cannot be made durable, `run` exits
@@ -509,9 +523,12 @@ and leaves the attempt live. A finding is never dropped because its record
 failed.
 
 **Rule 4: older shapes are not corruption.** An accounting record written
-before this section carries `tamper_attempts` as an array of strings, and a
-record written before that field existed carries none; both read as "no
-structured finding recorded", never as a clean result that was checked. A
+before this section has no `tamperFindings` member: it carries
+`tamper_attempts`, an array of strings that no build ever filled, or neither.
+It reads as "no structured finding recorded", never as a clean result that was
+checked. A record with `tamperFindings`, empty or not, was checked by this
+section's rules. The member's presence is the marker, so an empty old array and
+an empty new one are never confused. A
 record whose hash links do not verify is corruption and is refused on opening,
 as today. A torn tail is a crash artifact, reported and appended after, as
 today. A difference found by rule 1's second kind is tampering by this
@@ -531,8 +548,10 @@ the run record during the session produces an audit entry of the second kind,
 no outcome appended, the attempt live, and `run show` and a later `run` naming
 it; an audit file that cannot be written exits with the failure code and
 prints the finding; `run show` renders both kinds; an accounting record in the
-older shape reads as "no structured finding recorded"; and an edited earlier
-record is refused on opening as corruption, not reported as tampering.
+older shape reads as "no structured finding recorded"; an `override grant`
+attempted while the run holds the lock is refused and produces no finding; and
+an edited earlier record is refused on opening as corruption, not reported as
+tampering.
 
 ### 3.6 Recovery and reconciliation
 
