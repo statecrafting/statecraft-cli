@@ -1993,6 +1993,10 @@ fn environment_verb(
 ) -> i32 {
     let declarations = adapters::declarations();
     let probe = adapters::probe(home);
+    // No second installer is left to claim a path (spec 002 sections 3.21 and
+    // 3.22), so no package identity exists to name. An occupied path is still
+    // named with its owner: the library classes a file no manifest records as
+    // the user's (section 3.2) and says so in every `foreign` finding.
     let foreign = ForeignClaims::none();
     let clock = SystemClock;
 

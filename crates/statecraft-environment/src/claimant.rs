@@ -30,6 +30,18 @@ pub enum Claimant {
         /// Absolute or repository-relative, as observed.
         path: String,
     },
+    /// The user: a file at `path` that no manifest records and no other
+    /// installer claims.
+    ///
+    /// Section 3.2 makes `user` everything that is neither `managed` nor
+    /// `adopted`, and section 3.8 makes a pre-existing file at a pointer path
+    /// the user's. With the kit withdrawn (sections 3.21 and 3.22) there is no
+    /// second installer left to name, so this is the owner a `foreign` finding
+    /// names for an occupied path: the owner, and the path it holds.
+    User {
+        /// Repository-relative, as declared.
+        path: String,
+    },
     /// Something claims the path and this product cannot say what.
     ///
     /// Withdrawn section 3.7's closing sentence: neither the package nor the declaration
@@ -44,7 +56,23 @@ impl Claimant {
         match self {
             Claimant::Package { name, revision } => format!("package {name}@{revision}"),
             Claimant::Path { path } => format!("path {path}"),
+            Claimant::User { path } => {
+                format!("owner user: {path} is in no manifest and no other installer claims it")
+            }
             Claimant::NotRecorded => "not-recorded".to_string(),
+        }
+    }
+
+    /// The owner alone, for a report field that carries it apart from the path.
+    ///
+    /// Section 3.21 part 1: a `foreign` finding names an owner, not only a
+    /// path. A [`Claimant::Path`] names only a path, so its owner is the
+    /// reserved absence word rather than the path restated as an owner.
+    pub fn owner(&self) -> String {
+        match self {
+            Claimant::Package { name, revision } => format!("package {name}@{revision}"),
+            Claimant::User { .. } => "user".to_string(),
+            Claimant::Path { .. } | Claimant::NotRecorded => "not-recorded".to_string(),
         }
     }
 }
@@ -168,7 +196,22 @@ mod tests {
             revision: "0.18.0".into(),
         };
         assert_eq!(p.describe(), "package spec-spine-kit@0.18.0");
+        assert_eq!(p.owner(), "package spec-spine-kit@0.18.0");
         assert_eq!(Claimant::NotRecorded.describe(), "not-recorded");
+    }
+
+    #[test]
+    fn a_user_claimant_names_its_owner_and_the_path_it_holds() {
+        let u = Claimant::User {
+            path: "CLAUDE.md".into(),
+        };
+        assert_eq!(u.owner(), "user");
+        assert!(u.describe().starts_with("owner user: CLAUDE.md"));
+        // A bare path is not an owner, and is not dressed up as one.
+        let p = Claimant::Path {
+            path: "CLAUDE.md".into(),
+        };
+        assert_eq!(p.owner(), "not-recorded");
     }
 
     #[test]

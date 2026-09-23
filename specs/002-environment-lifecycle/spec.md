@@ -4388,6 +4388,35 @@ mechanism will grant and deny. The choices the section is silent on:
   implemented; until then this is a residual, recorded here and in the test
   that measures it, not a guarantee.
 
+**2026-09-23: the owner a `foreign` finding names, and how `doctor` tells a
+user's file from an unrecorded write.** Section 3.21 part 1 retains that a
+`foreign` finding names an owner, not only a path, and section 3.2's `foreign`
+row names it by package identity where one exists. The binary passed no
+claimant, so every occupied path was reported as `path <p>`, which is a path
+and no owner. With the kit withdrawn no second installer is left (section
+3.22), so no package identity exists for the binary to supply, and section 3.2
+answers the rest: a file no manifest records is `user` class. `Claimant::User`
+carries that owner with the path it holds; `env plan` and `env apply` name it
+in each withheld path's reason and in an additive `owner` field of the JSON
+view, and a package claimant a caller supplies is still named by its identity.
+`doctor` checked the same declared, unrecorded, present path and reported
+every one as `unmanaged-write`, because the 2026-09-16 entry decided that
+finding by declaration and let a claimed path through as `foreign` only when
+another installer claimed it. With no installer to claim it, a user's own
+`CLAUDE.md` at the adapter's pointer path was reported as a write this product
+made, which section 3.8 and section 3.28's "resemblance is never ownership"
+both refuse. The sections are silent on how `doctor` tells the two apart, so
+this records the choice: this product writes exactly the bytes an adapter
+declares and nothing else, so a declared path holding those bytes is still
+`unmanaged-write`, and one holding any other bytes (or a directory) is
+`foreign`, owner `user`, and exits 1 like every other `foreign`. Nothing is
+inferred from resemblance in the other direction: neither finding makes a path
+managed, and both leave it untouched. `crates/statecraft-cli/tests/foreign_owner.rs`
+shows both through the binary's `doctor` on every platform, and the owner in
+`env plan` and `env apply` on macOS, where the adapter's credential-path
+prerequisite can hold; the library rows are in the environment crate's
+`negative_cases.rs`.
+
 ## Verification
 
 `--fail-on-untraced` joined the corpus gate with this spec's first

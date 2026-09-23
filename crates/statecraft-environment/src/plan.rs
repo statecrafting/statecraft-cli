@@ -52,6 +52,20 @@ pub enum Withholding {
 }
 
 impl Withholding {
+    /// Who holds the path, where the withholding is because someone does.
+    pub fn claimant(&self) -> Option<&Claimant> {
+        match self {
+            Withholding::Foreign { claimant } | Withholding::PointerPathOccupied { claimant } => {
+                Some(claimant)
+            }
+            // A modification is withheld because its ownership cannot be
+            // decided, so it names no holder.
+            Withholding::Drifted { .. }
+            | Withholding::Adopted
+            | Withholding::Modification { .. } => None,
+        }
+    }
+
     /// A one-line rendering for a report.
     pub fn describe(&self) -> String {
         match self {
@@ -284,13 +298,16 @@ pub fn plan(
                     (Some(_), None) => out.writes.push(planned(declaration, file, true)),
                     // Not manifested, and something is already there. This is
                     // the case section 3.10 requires: classed foreign, withheld,
-                    // named, no overwrite.
+                    // named, no overwrite. Section 3.21 part 1: the finding
+                    // names an owner, not only a path. No manifest records the
+                    // file and no other installer claims it, so section 3.2
+                    // makes it the user's.
                     (None, Some(_)) => {
                         let claimant =
                             foreign
                                 .claimant_of(&file.path)
                                 .cloned()
-                                .unwrap_or(Claimant::Path {
+                                .unwrap_or(Claimant::User {
                                     path: file.path.clone(),
                                 });
                         if file.pointer {

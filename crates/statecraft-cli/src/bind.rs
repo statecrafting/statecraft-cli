@@ -198,6 +198,22 @@ pub struct WithheldView {
     pub adapter: String,
     /// Why it was withheld.
     pub reason: String,
+    /// Who holds the path, where it was withheld because someone does: `user`,
+    /// a package identity, or `not-recorded`. Spec 002 section 3.21 part 1: a
+    /// `foreign` finding names an owner, not only a path.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub owner: Option<String>,
+}
+
+impl WithheldView {
+    fn of(w: &statecraft_environment::plan::WithheldWrite) -> Self {
+        Self {
+            path: w.path.clone(),
+            adapter: w.adapter.clone(),
+            reason: w.reason.describe(),
+            owner: w.reason.claimant().map(|c| c.owner()),
+        }
+    }
 }
 
 impl OutcomeView {
@@ -208,14 +224,7 @@ impl OutcomeView {
             },
             Outcome::Partial { written, withheld } => OutcomeView::Partial {
                 written: written.clone(),
-                withheld: withheld
-                    .iter()
-                    .map(|w| WithheldView {
-                        path: w.path.clone(),
-                        adapter: w.adapter.clone(),
-                        reason: w.reason.describe(),
-                    })
-                    .collect(),
+                withheld: withheld.iter().map(WithheldView::of).collect(),
             },
             Outcome::Refused { reasons } => OutcomeView::Refused {
                 reasons: reasons.clone(),
@@ -536,15 +545,7 @@ impl PlanView {
                     replaces_existing: w.replaces_existing,
                 })
                 .collect(),
-            withheld: plan
-                .withheld
-                .iter()
-                .map(|w| WithheldView {
-                    path: w.path.clone(),
-                    adapter: w.adapter.clone(),
-                    reason: w.reason.describe(),
-                })
-                .collect(),
+            withheld: plan.withheld.iter().map(WithheldView::of).collect(),
             refusals: plan.refusals.iter().map(|r| r.describe()).collect(),
             named: plan.named.clone(),
             adapters: plan
