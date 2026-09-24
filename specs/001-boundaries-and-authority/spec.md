@@ -466,6 +466,53 @@ is a change to this spec's territory, so it is noted here. The component table
 names the new pin. The library row moved in its own, later change under spec
 `002`.
 
+**2026-09-24: PROPOSED, NOT ADOPTED. Decision identifiers that cannot be
+read as a spec-spine diagnostic (owner Addendum 2, item N).** Proposal only;
+nothing is renamed by this entry.
+
+*The collision.* The decision record's identifiers are a letter, a dash and two
+digits: `C-01` to `C-18`, `D-01` to `D-10`, `I-01` to `I-10`, `F-01` onward,
+`G-04`. spec-spine's diagnostics are a letter, a dash and three digits:
+`C-001` (coupling drift), `I-004`, `L-001`, `V-014`, `W-001`. The two share a
+shape and, for `C` and `I`, a letter, so `C-01` and `C-001` read as the same
+kind of thing and differ by one character. Both families appear in the same
+documents: `docs/decisions/00-founding-decisions.md`, `AGENTS.md` and spec
+`002` cite `C-001` beside `C-01`.
+
+*Measured at main `17dbdb6`* (ripgrep over `specs`, `standards`, `docs`, the
+root documents, `crates`, `Makefile`, `scripts` and `.github`, excluding
+`target/` and JSON): `C-nn` 58 references, `D-nn` 116, `I-nn` 15, `F-nn` 82,
+`G-nn` 10; spec-spine forms `C-nnn` 15, `V-nnn` 8, `L-nnn` 3, `W-nnn` 3,
+`I-nnn` 1. The per-file map is kept with the session evidence.
+
+*Proposed scheme.* A permanent decision identifier is `FD-<class><nn>`, the
+record's initials, a dash, then the class letter and two digits with no dash
+between them: `FD-D06`, `FD-C01`, `FD-I04`, `FD-F02`, `FD-G04`. The pattern
+`FD-[A-Z][0-9]{2}` cannot match spec-spine's `[A-Z]-[0-9]{3}`, and a reader
+who sees `FD-` knows which record to open. A later record (the adoption ledger
+of section 3.13, if it ever needs identifiers) takes its own initials.
+
+*Proposal-local labels stay out of permanent documents.* Labels coined inside
+a proposal or a decision sheet (`D1`, `D2`, `H-n`, `Q-n`, `S-n`, `R4d`,
+`P-1`, `F13`, `A1` to `A12`, `L1` to `L5`) are scaffolding for one
+conversation. Measured: `H-n` 122 references (91 in spec `002`, 2 in `003`,
+one comment in each of the four delivered hooks and `harness_hooks.rs`),
+`Q-n` 19 (spec `002` and one hook comment), `S-n` 31 (spec `002`,
+`setup.rs`, the setup tests and the profile templates), `A-n` 39, `F1n` 10,
+`L1` to `L5` 7, `D1`/`D2` 2, `P-1` 2, `R4d` 1, all in spec `002` except as
+listed. Rule proposed: when a proposal is adopted, its entry names each choice
+by what it decided (for example "one producer identity" rather than "H-3 (a)")
+and may cite the label once, in parentheses, as provenance; code comments and
+delivered files cite the spec section, never a label. A bundle entry's own
+internal part numbering (`P1.1`, `P6.3`) is section structure, not a label,
+and stays.
+
+*How the map would be applied.* Not by a sweep in this entry. Renaming 281
+decision-record references and roughly 230 label references is a
+relocation-only change of the kind the owner's spec-structure item (S) already
+sequences, so it rides with those relocation PRs, each demonstrating that no
+requirement text changed except the identifier.
+
 ## Verification
 
 Each line below is one command. These assert the authored foundation, which
