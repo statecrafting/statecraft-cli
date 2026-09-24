@@ -24,7 +24,7 @@
 //! | 1 read, never repair | all four | `contract_1_*` |
 //! | 2 binary resolution order, and the pin (amended 2026-09-24) | all four | `contract_2_*`, `pin_*` |
 //! | 3 target from the command | post-edit, pre-bash | `contract_3_*` |
-//! | 4 read the verdict, never guess it | session-start, stop | `contract_4_*` |
+//! | 4 read the verdict, never guess it; the gate's unresolved flag (amended 2026-09-24) | all four | `contract_4_*`, `h4_*` |
 //! | 5 establish the verb first | session-start, stop | `contract_5_*` |
 //! | 6 a gate whose check did not run is not green | pre-bash | `contract_6_*`, and the seven derived-tree cases below |
 //! | 7 a branch gate resolves the protected branch | pre-bash | `contract_7_*` |
@@ -265,17 +265,58 @@ impl Fixture {
         says: &str,
         config: ConfigAnswer,
     ) {
+        self.stub_full(at, label, check_code, carries_verbs, says, config, false);
+    }
+
+    /// A binary that carries `check` but not `--fail-on-unresolved`: its help
+    /// does not name the flag, and `clap` spends exit 2 on the argument.
+    fn stub_flagless(&self, at: &Path, label: &str, check_code: i32) {
+        self.stub_full(
+            at,
+            label,
+            check_code,
+            true,
+            "",
+            ConfigAnswer::Reports(DERIVED_DIR),
+            true,
+        );
+    }
+
+    /// Every argument vector any carrying stub was invoked with, one per line.
+    fn argv(&self) -> String {
+        std::fs::read_to_string(self.root.join("argv")).unwrap_or_default()
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    fn stub_full(
+        &self,
+        at: &Path,
+        label: &str,
+        check_code: i32,
+        carries_verbs: bool,
+        says: &str,
+        config: ConfigAnswer,
+        flagless: bool,
+    ) {
         let witness = self.root.join("witness");
         let body = if carries_verbs {
             format!(
-                "#!/bin/sh\nprintf '{label}\\n' >> '{}'\n\
+                "#!/bin/sh\nprintf '{label}\\n' >> '{}'\nprintf '%s\\n' \"$*\" >> '{}'\n\
                  case \"$1\" in --version) echo 'spec-spine 9.9.9'; exit 0 ;; esac\n\
-                 case \"$1 $2\" in\n  'check --help'|'lint --help'|'couple --help') exit 0 ;;\nesac\n\
+                 case \"$1 $2\" in\n  'check --help') {help}; exit 0 ;;\n  'lint --help'|'couple --help') exit 0 ;;\nesac\n\
                  for a in \"$@\"; do\n  if [ \"$a\" = config ]; then {}; fi\ndone\n\
+                 for a in \"$@\"; do\n  if [ \"$a\" = --fail-on-unresolved ] && [ {flagless} = 1 ]; then exit 2; fi\ndone\n\
                  for a in \"$@\"; do\n  if [ \"$a\" = check ]; then printf '%s\\n' '{says}'; exit {check_code}; fi\ndone\n\
                  exit 0\n",
                 witness.display(),
-                config.shell()
+                self.root.join("argv").display(),
+                config.shell(),
+                help = if flagless {
+                    "true"
+                } else {
+                    "echo '      --fail-on-unresolved'"
+                },
+                flagless = u8::from(flagless),
             )
         } else {
             format!(
@@ -787,6 +828,201 @@ fn contract_4_an_unresolved_claim_is_distinguished_from_staleness() {
             seen.contains("regenerating does not clear") || seen.contains("not staleness"),
             "{file} did not say regenerating will not clear it: {seen}"
         );
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Contract 4 as amended on 2026-09-24 (owner decision H-4): the gate's
+// unresolved-claim flag. Spec 002 section 5, obligations 1 to 5.
+// ---------------------------------------------------------------------------
+
+/// What spec-spine 0.25.0 prints for a draft's unresolved claim under the
+/// flag, measured (`session10/H4/measure-draft-claim-ahead.txt`).
+const REFUSED_UNRESOLVED: &str = "spec-registry: fresh\ncodebase-index: fresh, but REFUSED: 1 unresolved unit diagnostic(s) (--fail-on-unresolved)";
+
+/// Obligation 1: every hook that runs `check` passes the flag, and passing it
+/// brings no writing verb with it.
+#[test]
+fn h4_every_freshness_read_passes_the_gates_unresolved_flag() {
+    let spec_edit = |f: &Fixture| edit_payload(&f.root.join("specs/000-x/spec.md"));
+    for file in ALL {
+        let fixture = Fixture::new();
+        fixture.stub_saying(
+            &fixture.path_dir.join("spec-spine"),
+            "path",
+            0,
+            true,
+            "spec-registry: fresh\ncodebase-index: fresh",
+        );
+        let _ = match file {
+            PRE_BASH => fixture.run_payload(
+                file,
+                &bash_payload("gh pr create --title x --body y", &fixture.root),
+                &[],
+            ),
+            POST_EDIT => fixture.run_payload(file, &spec_edit(&fixture), &[]),
+            _ => fixture.run_project(file, &[]),
+        };
+        let argv = fixture.argv();
+        let checks: Vec<&str> = argv
+            .lines()
+            .filter(|l| l.split(' ').any(|w| w == "check") && !l.contains("--help"))
+            .collect();
+        assert!(!checks.is_empty(), "{file} never ran check: {argv:?}");
+        for line in &checks {
+            assert!(
+                line.contains("--fail-on-unresolved"),
+                "{file} ran check without the gate's unresolved flag: {line:?}"
+            );
+        }
+    }
+}
+
+/// Obligation 2: a draft's unresolved claim is refused by the gate, reported
+/// by session start as refused (never fresh), and reported by Stop without a
+/// block.
+#[test]
+fn h4_a_drafts_unresolved_claim_is_what_the_gate_refuses() {
+    let fixture = Fixture::new();
+    let sc = fixture.path_dir.join("spec-spine");
+    fixture.stub_saying(&sc, "path", 1, true, REFUSED_UNRESOLVED);
+    let out = fixture.run_payload(
+        PRE_BASH,
+        &bash_payload("gh pr create --title x --body y", &fixture.root),
+        &[],
+    );
+    let seen = text(&out);
+    assert!(!out.status.success(), "the gate passed: {seen}");
+    assert!(seen.contains("unresolved claim"), "{seen}");
+    assert!(
+        !seen.contains("does not validate"),
+        "the gate called an unresolved claim an invalid corpus: {seen}"
+    );
+
+    let fixture = Fixture::new();
+    fixture.stub_saying(
+        &fixture.path_dir.join("spec-spine"),
+        "path",
+        1,
+        true,
+        REFUSED_UNRESOLVED,
+    );
+    let out = fixture.run_project(SESSION_START, &[]);
+    let seen = text(&out);
+    assert!(
+        seen.contains("codebase index: REFUSED by the gate"),
+        "{seen}"
+    );
+    assert!(!seen.contains("codebase index: fresh"), "{seen}");
+
+    let fixture = Fixture::new();
+    fixture.stub_saying(
+        &fixture.path_dir.join("spec-spine"),
+        "path",
+        1,
+        true,
+        REFUSED_UNRESOLVED,
+    );
+    let out = fixture.run_project(STOP, &[]);
+    let seen = text(&out);
+    assert!(out.status.success(), "Stop blocked: {seen}");
+    assert!(seen.contains("UNRESOLVED CLAIM"), "{seen}");
+    assert!(!seen.contains("INVALID"), "{seen}");
+}
+
+/// Obligation 3: an unresolved claim riding with stale shards is exit 1, and
+/// each hook names both and says regenerating clears only the stale part.
+#[test]
+fn h4_an_unresolved_claim_with_stale_shards_names_both() {
+    let says = "spec-registry: fresh\ncodebase-index: STALE (run `spec-spine index`)\ncodebase-index: UNRESOLVED CLAIM: 1 unresolved claim(s) over 1 spec(s), which is not staleness";
+    let fixture = Fixture::new();
+    fixture.stub_saying(&fixture.path_dir.join("spec-spine"), "path", 1, true, says);
+    let out = fixture.run_payload(
+        PRE_BASH,
+        &bash_payload("gh pr create --title x --body y", &fixture.root),
+        &[],
+    );
+    let seen = text(&out);
+    assert!(!out.status.success(), "{seen}");
+    assert!(
+        seen.contains("unresolved claim") && seen.contains("stale"),
+        "{seen}"
+    );
+    assert!(seen.contains("clear that part only"), "{seen}");
+
+    let fixture = Fixture::new();
+    fixture.stub_saying(&fixture.path_dir.join("spec-spine"), "path", 1, true, says);
+    let seen = text(&fixture.run_project(SESSION_START, &[]));
+    assert!(seen.contains("STALE plus UNRESOLVED CLAIM"), "{seen}");
+
+    let fixture = Fixture::new();
+    fixture.stub_saying(&fixture.path_dir.join("spec-spine"), "path", 1, true, says);
+    let seen = text(&fixture.run_project(STOP, &[]));
+    assert!(
+        seen.contains("UNRESOLVED CLAIM") && seen.contains("STALE as well"),
+        "{seen}"
+    );
+}
+
+/// Obligation 4: an invalid corpus is reported as today.
+#[test]
+fn h4_an_invalid_corpus_is_still_reported_as_invalid() {
+    let says = "spec-registry: INVALID\ncodebase-index: fresh";
+    let fixture = Fixture::new();
+    fixture.stub_saying(&fixture.path_dir.join("spec-spine"), "path", 1, true, says);
+    let seen = text(&fixture.run_payload(
+        PRE_BASH,
+        &bash_payload("gh pr create --title x --body y", &fixture.root),
+        &[],
+    ));
+    assert!(seen.contains("does not validate"), "{seen}");
+    assert!(!seen.contains("unresolved claim"), "{seen}");
+    let fixture = Fixture::new();
+    fixture.stub_saying(&fixture.path_dir.join("spec-spine"), "path", 1, true, says);
+    let seen = text(&fixture.run_project(STOP, &[]));
+    assert!(
+        seen.contains("INVALID") && !seen.contains("UNRESOLVED"),
+        "{seen}"
+    );
+}
+
+/// Obligation 5: a binary whose `check --help` does not name the flag is
+/// treated as lacking the verb, never read as stale.
+#[test]
+fn h4_a_binary_without_the_flag_is_not_read_as_stale() {
+    for file in ALL {
+        let fixture = Fixture::new();
+        fixture.stub_flagless(&fixture.path_dir.join("spec-spine"), "path", 0);
+        let out = match file {
+            PRE_BASH => fixture.run_payload(
+                file,
+                &bash_payload("gh pr create --title x --body y", &fixture.root),
+                &[],
+            ),
+            POST_EDIT => fixture.run_payload(
+                file,
+                &edit_payload(&fixture.root.join("specs/000-x/spec.md")),
+                &[],
+            ),
+            _ => fixture.run_project(file, &[]),
+        };
+        let seen = text(&out);
+        assert!(
+            !seen.contains("STALE") && !seen.contains("is stale"),
+            "{file}: {seen}"
+        );
+        assert!(
+            seen.contains("--fail-on-unresolved"),
+            "{file} did not name the missing flag: {seen}"
+        );
+        if file == PRE_BASH {
+            assert!(
+                !out.status.success(),
+                "the gate passed an unjudged tree: {seen}"
+            );
+        } else {
+            assert!(out.status.success(), "{file} blocked: {seen}");
+        }
     }
 }
 

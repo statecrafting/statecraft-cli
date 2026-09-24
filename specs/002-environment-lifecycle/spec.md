@@ -6832,6 +6832,35 @@ copies removed (section 3.22's order). A check writes nothing.
 
 This entry is the authority. The implementation is a separate change.
 
+**2026-09-24: contract 4 as amended, implemented (the entry above on the
+gate's unresolved-claim flag).** The four shipped hooks in
+`crates/statecraft-home/harness/hooks/` run `check --fail-on-unresolved`
+wherever they read freshness, and
+`crates/statecraft-home/tests/harness_hooks.rs` runs each extracted hook
+against stub binaries for obligations 1 to 5 (`h4_*`). Choices the entry left
+open, recorded here:
+
+- **Establishing the flag** is one read: `check --help` must succeed and name
+  `--fail-on-unresolved`. The pull-request gate still asks only on its exit-2
+  arm, so its fresh path costs one process as before; a binary lacking the
+  flag answers 2 there (clap's unknown argument), and the probe then names the
+  missing flag instead of reporting a stale tree.
+- **The pull-request gate's exit-1 message** names the unresolved claim, the
+  invalid corpus, or both, and adds one line when the same report also names a
+  stale tree; an exit 1 whose text matches none keeps the previous "does not
+  validate" message.
+- **Session start** reports `fresh, but REFUSED` as "REFUSED by the gate", ahead
+  of the plain `fresh` match that used to absorb it.
+- **Stop** reads exit 1 the same way and stays advisory; a stale tree riding
+  with an unresolved claim is reported as "STALE as well".
+- **Post-edit** prints the flagged `check` report, or "check NOT READ" naming
+  the missing flag; the sanctioned `compile` is unchanged.
+- The stubs now print the flag in `check --help` and record every argument
+  vector, which is what obligation 1 reads. Obligation 4 passes on the previous
+  hooks too, as "reported as today" requires; the other four fail on them.
+- The harness revision digest changes with the hook bytes; no committed file
+  records it.
+
 ## Verification
 
 `--fail-on-untraced` joined the corpus gate with this spec's first

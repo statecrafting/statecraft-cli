@@ -203,7 +203,10 @@ judge=$(spec_spine_judge)
 # release before 0.18.0), and calling that "stale" sent adopters to regenerate
 # shards that were already correct. Every non-zero code still refuses: a gate
 # whose check did not run is not green (spec 052 3.2, the same reasoning).
-"$sc" --repo "$root" check >/dev/null 2>&1; cec=$?
+# Contract 4 as amended (H-4): the gate's unresolved-claim flag, so this gate
+# refuses what the merge gate refuses. Exit 1 then carries two readings and
+# the report text says which; exit 2 is stale and nothing else.
+cout=$("$sc" --repo "$root" check --fail-on-unresolved 2>&1); cec=$?
 case "$cec" in
   0) ;;
   2) # Spec 093 3.1, on spec 093's rule: exit 2 is the ONE ambiguous code. This
@@ -212,20 +215,38 @@ case "$cec" in
      # staleness message and sent to regenerate shards that were already
      # correct. The probe runs only on this arm, so spec 093 3.2's happy path
      # is untouched: exit 0 still costs one process.
-     if "$sc" check --help >/dev/null 2>&1; then
+     # Contract 5: the verb AND the flag this gate passes. A binary whose
+     # `check` lacks `--fail-on-unresolved` spent clap's 2 on the argument.
+     if "$sc" check --help 2>/dev/null | grep -q -- '--fail-on-unresolved'; then
        { echo "[pr-gate] BLOCKED: a committed shard tree is stale in $root."
          echo '[pr-gate] Run: spec-spine compile and index, whichever tree it named, then commit the shards, push, and retry.'
     echo "[pr-gate] $judge"; } >&2
      else
        ver=$("$sc" --version 2>/dev/null) || ver='(no answer to --version)'
-       { echo "[pr-gate] BLOCKED: the freshness read was not performed in $root (the binary does not carry the check verb, and clap spent exit 2 on the unknown subcommand)."
+       { echo "[pr-gate] BLOCKED: the freshness read was not performed in $root (the binary does not carry check --fail-on-unresolved, and clap spent exit 2 on the unknown subcommand or argument)."
          echo "[pr-gate] The binary is $sc, which answers: ${ver:-(nothing)}. The check verb needs spec-spine 0.18.0 or later. The tree has NOT been judged and is not known to be stale; regenerating repairs nothing here. Run /setup to install the floor."
     echo "[pr-gate] $judge"; } >&2
      fi
      exit 2 ;;
-  1) { echo "[pr-gate] BLOCKED: the corpus in $root does not validate (spec-spine check exit 1)."
-       echo '[pr-gate] Run: spec-spine check, fix the violations it names, and retry. The tree is not stale; staleness is not meaningful against a corpus that does not compile.'
-    echo "[pr-gate] $judge"; } >&2
+  1) named=0
+     case "$cout" in *'codebase-index: UNRESOLVED CLAIM'*|*'codebase-index: fresh, but REFUSED'*)
+       { echo "[pr-gate] BLOCKED: the index in $root records an unresolved claim, which the gate refuses (spec-spine check --fail-on-unresolved exit 1)."
+         echo '[pr-gate] Run: spec-spine index diagnostics, then fix the spec or write the unit it claims. Regenerating does not clear it: the diagnostic is recomputed from the corpus on every run.'; } >&2
+       named=1 ;;
+     esac
+     case "$cout" in *'spec-registry: INVALID'*|*'spec-registry: REFUSED'*)
+       { echo "[pr-gate] BLOCKED: the corpus in $root does not validate (spec-spine check exit 1)."
+         echo '[pr-gate] Run: spec-spine check, fix the violations it names, and retry. Staleness is not meaningful against a corpus that does not compile.'; } >&2
+       named=1 ;;
+     esac
+     case "$cout" in *'spec-registry: STALE'*|*'codebase-index: STALE'*)
+       [ "$named" = 1 ] && echo '[pr-gate] The same report also names a stale shard tree: spec-spine compile and index clear that part only; commit the shards with the fix.' >&2 ;;
+     esac
+     if [ "$named" = 0 ]; then
+       { echo "[pr-gate] BLOCKED: the corpus in $root does not validate (spec-spine check exit 1)."
+         echo '[pr-gate] Run: spec-spine check, fix the violations it names, and retry. The tree is not stale; staleness is not meaningful against a corpus that does not compile.'; } >&2
+     fi
+     echo "[pr-gate] $judge" >&2
      exit 2 ;;
   3) # Spec 093 3.2: the version read qualifies a non-answer, so it is asked
      # only here, never on the happy path.

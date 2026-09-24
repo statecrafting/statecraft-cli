@@ -129,7 +129,13 @@ case "$fp" in
 esac
 case "$fp" in
   */specs/*/spec.md|*/spec-spine.toml|*/.claude/settings.json|*/.mcp.json|*/.claude/agents/*.md|*/.claude/skills/*/*.md|*/.github/workflows/*.yml|*/standards/*|*/AGENTS.md|*/CLAUDE.md|*/Makefile|*/docs/*)
-    echo "[spec-registry] check $judge:"
-    "$sc" --repo "$root" check 2>&1 | tail -6 ;;
+    # Contract 4 as amended (H-4): the gate's unresolved-claim flag, once the
+    # binary's own help establishes that it carries it (contract 5).
+    if "$sc" check --help 2>/dev/null | grep -q -- '--fail-on-unresolved'; then
+      echo "[spec-registry] check --fail-on-unresolved $judge:"
+      "$sc" --repo "$root" check --fail-on-unresolved 2>&1 | tail -6
+    else
+      echo "[spec-registry] check NOT READ: $sc does not carry check --fail-on-unresolved, so the tree was not judged as the gate judges it (run /setup) $judge"
+    fi ;;
 esac
 true
