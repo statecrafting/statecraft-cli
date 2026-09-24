@@ -113,5 +113,5 @@
     "title": "The execution adapter boundary and the first provider: one protocol, declared capabilities, a qualification suite, a constructed child environment, and what a real stream can witness"
   },
   "shardHash": "ff5f9f5fb4792b610bf7d5339e9ea06322a35d4eadc9933018d4b8d4046f2ddf",
-  "specVersion": "1.6.0"
+  "specVersion": "1.8.0"
 }

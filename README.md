@@ -221,7 +221,7 @@ and a test keeps the set closed.
 ## Governance
 
 Governed by [spec-spine](https://github.com/statecrafting/spec-spine), pinned to
-**0.23.0** exactly in `spec-spine.toml`. Specs are the source of truth; the
+**0.25.0** exactly in `spec-spine.toml`. Specs are the source of truth; the
 derived shards under `.statecraft/derived/` are compiler output, committed, and read only
 through `spec-spine` subcommands.
 
