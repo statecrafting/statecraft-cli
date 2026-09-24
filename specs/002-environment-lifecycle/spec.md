@@ -4866,6 +4866,1827 @@ because the governance step was `done`.
    human and JSON output, and the file's bytes are unchanged; the unedited
    re-run stays `complete`, exit 0.
 
+**2026-09-23, adopted 2026-09-24 as the bundle proposal's Part 9 step 1. One
+qualified release bundle, a global artifact store, explicit project adoption,
+and frozen run resolution.** The repository owner adopted this entry in the
+session request of 2026-09-24 ("Bundle step 1. Adopt the r5 bundle contract
+entry ... with the selected direction already recorded"), with decision H-3
+changed from (b) to (a) by owner Addendum 2 of the same day. It was written as
+a proposal through five revisions (below, kept as the record), and this
+paragraph states what binds from the merge that adopts it:
+
+- **Binding, as this spec's requirements until they move to `007`:** Parts 1
+  to 4 (P1 to P10) and Part 7's acceptance cases, read with Part 8's selected
+  answers as the decisions. Part 8's table is the decision; the option text
+  under each H is the record of what was weighed. Where a binding part says
+  "would", "proposed" or "if adopted", read "must". Where it conflicts with
+  Part 8's table, the table wins.
+- **Not bound by this entry:** the changes Part 5 names for specs `001`,
+  `003`, `005` and `006`, which bind only through those specs' own changes
+  (Part 9 steps 2, 4 and 5); Part 9 step 3a, adopted as its own entry, and
+  step 3b, a separate change to this spec; and everything the selection
+  deferred (H-8 (a), bundle publication under `F-02` (H-9), H-18, P9.4 rules 4
+  to 7, `trust reset`, A12).
+- **Nothing here is implemented.** Each part's grade stays *specified* until
+  the change that builds it lands with its tests.
+- **Where it moves.** These requirements are `007`'s, reached by route P in
+  Part 9 as adopted: once spec-spine publishes planned claims (announced for
+  0.26.0) and this repository adopts that release under `D-06`, spec `007` is
+  drafted with these requirements moved without change and
+  `crates/statecraft-bundle/` as a planned claim, the owner ratifies it, and
+  only then is it built. Route R1's narrow exception is **not adopted**; its
+  text (`r1-exception-text.md`, with this entry's evidence) is a fallback only
+  if the producer's feature is refused or proves unusable, and using it would
+  need the owner's separate adoption.
+
+It absorbs, and replaces, two
+earlier drafts that were never committed (scaffold provenance for this spec,
+and run lifetime for spec `003`), so that no two proposals cover the same
+behavior. Its labels are its own: findings F1 to F12, proposal parts P1 to
+P10, the owner's acceptance cases 1 to 15 with proposed additions A1 to A15,
+and decisions H-1 to H-18. "Section" always means a section of a named spec.
+
+*Revision 2 (2026-09-23, after the owner's review, still proposal only).*
+Eight review findings are addressed where they arise: the bundle identity is
+made acyclic (P1.0); the `supported` state that let a non-current bundle
+start new work is removed, and a support window survives only as an explicit
+exception the owner may request (P1.3, H-17); an existing run's frozen
+resolution now precedes any explicit choice, which may only restate it (P3);
+the migration transaction is ordered as stage, validate, journal, publish and
+recover, with edits made after an interruption protected (P6.1); the upgrade
+bootstrap says how bundle A judges a candidate whose pin and derived output
+require B without ever running A's executable on it (P6.2); bounded grace
+gains a maximum age, clock rules and a separate rule for metadata never seen
+(P9.3); the trust model gains rollback protection and key transition
+(P9.4); and the implementation sequence no longer ratifies `007` before any
+code exists (Part 2 and Part 9).
+
+*Revision 3 (2026-09-23, after the second review, still proposal only).*
+Four findings are addressed where they arise: the migration plan identity no
+longer hashes a declaration that contains it, and `adoptedAt` is a plan input
+rather than a clock reading, so CI can recompute it (P6.0); an older project
+converges through intermediate bundles admitted for migration only, which
+start no new work, so "exactly one current" still holds (P6.3); the apply
+transaction states which writers it excludes and which it only detects, moves
+each original aside instead of overwriting it, and names what a reader can
+observe mid-transaction (P6.1); and the loss of a signing threshold has a
+separate, locally authorized recovery, since a newer binary alone cannot
+satisfy the chain rule (P9.4 rule 7, H-18).
+
+*Revision 4 (2026-09-23, after the third review, still proposal only).*
+Seven findings are addressed where they arise. The apply transaction now
+rechecks every path it already published, the declaration included, and
+re-enumerates the read set rather than only re-digesting it, before its
+commit point and again at close; it journals its temporary files, names the
+state in which an original is moved aside and not yet replaced, and states
+detection as checks at named points rather than as a guarantee about every
+concurrent write (P6.1). A revoked bundle's programs are never run, including
+for the mechanical comparison: an adoption away from a revoked source is a
+separate, owner-authorized recovery performed by a verified non-revoked tool
+(P6.2, P6.3, H-11). Route R1 states the authority each of its steps needs
+(Part 9). The binary's embedded digests exclude its own, which would
+otherwise make the bundle identity depend on itself (P1.0). A failure to
+persist the clock high-water mark refuses new work (P9.3), a reset root starts
+a new root epoch so versions an attacker chained cannot outrank it (P9.4 rule
+7), and release metadata keeps every bundle a migration path may cross
+(P6.3). Acceptance additions A13 to A15 test them.
+
+*Revision 5 (2026-09-24, after the owner selected a design direction, still
+proposal only).* The owner chose an answer for each of H-1 to H-18 on
+2026-09-24 (Part 8 opens with the table). That choice is a **design
+direction**: it tells the next revision what to write, and it adopts nothing.
+Every part of this entry still binds only when the owner adopts it in the
+change Part 9 names, and that act remains the owner's. Three texts change
+with the direction. P9.2's release metadata gains a schema for its lists: each
+superseded or revoked entry names its qualification record, the lists never
+drop a bundle, and revocation and reinstatement move a bundle between them
+(this closes the review's finding R4d). Under H-8 (b), P9.4 rules 4 to 7,
+`trust reset` and A12 are specified for later and not built, and every place
+that named them says so (P5.2, P9.4, Part 5, Part 7, Part 9 step 13). H-16
+names its target: the published spec-spine 0.25.0, carrying spec-spine's 126
+to 129. Part 9 step 3 is split so that the provenance slice (step 6) waits
+only on the authority it uses (step 3a). The narrow authority for creating
+`007` under route R1 is written as its own proposed text, kept with this
+entry's evidence (`statecraft-cli.evidence/2026-09-24/session9/`,
+`r1-exception-text.md`), for the owner's review.
+
+**Part 1: Purpose.**
+
+Four initialization findings from adopting this product in another repository
+(rustev's decision record, rows `C-02`, `C-03`, `C-04` and `C-04a`) and one
+open run-semantics question (F7) have one cause in common: the
+product has no single identity for the tools it governs with, and no rule for
+where each invocation finds them. Every product-driven `spec-spine` call runs
+whatever `PATH` offers; the scaffold producer is a linked library the
+declaration does not name; the judge in CI is chosen by the candidate's own
+pin; and a run re-resolves its judge at every attempt.
+
+This proposal defines:
+
+1. a **release bundle**: one exact, digest-identified set of the Statecraft
+   build, the spec-spine executable, the embedded scaffold producer, the
+   harness revision and the adapter and provider compatibility it was
+   qualified with (P1);
+2. a **global artifact store** in the product home, immutable and
+   content-addressed, with verified, concurrency-safe, recoverable installation
+   and no background service (P2);
+3. **one resolution**, used by every managed execution path, from a declared
+   identity to a verified artifact (P3);
+4. **explicit project adoption and mandatory convergence**: the adopted bundle
+   is committed, a project behind the required bundle is refused new managed
+   work, and inspection, diagnosis, migration and recovery stay available
+   (P4 and P5);
+5. a **trusted migration** that is itself a reviewed authority change and
+   cannot choose a more permissive judge, and **CI** that reproduces the
+   authorized judge (P6 and P7);
+6. an ownership rule for **authored governance inputs** that ends false drift
+   alarms without hiding a real change (P8);
+7. **recovery and offline** behavior (P9).
+
+Statecraft manages its own tooling dependencies. This proposal does **not**
+centralize application dependencies such as a project's Cargo graph, and it
+keeps the existing boundary: Statecraft is the environment and execution
+coordinator; spec-spine is the governance producer and the judge.
+
+**Part 2: Territory.**
+
+None today. Part 6 proposes where each part would live. This proposal is an
+entry here rather than a draft spec because the gate admits neither shape a
+spec could take before its code exists. Both measured on 2026-09-23 with
+0.23.0 in scratch worktrees of `96e9f2d`: a draft `007` with no `establishes`
+raises lint `L-001` ("declares no ownership edge"), which `lint
+--fail-on-warn` refuses; a draft `007` that claims the unwritten
+`crates/statecraft-bundle/` passes `check`, `lint` and `index coverage`, and
+`index check --fail-on-unresolved` refuses it (one `W-001`, exit 1). So `007`
+below names the new spec H-1 recommends; no such spec exists, and Part 9 says
+how its authority can precede its code without either shape.
+
+**Part 3: Findings, with source evidence.**
+
+Measured on 2026-09-23. The rustev findings were reproduced first at `ba118f9`
+in disposable repositories with an isolated `STATECRAFT_HOME` and `HOME` and a
+`PATH` of one chosen `spec-spine` plus `/usr/bin:/bin` (evidence folder
+`statecraft-cli.evidence/2026-09-23/handoff-session3/rustev-repro/`), and
+re-measured on the revision named in F12. The Statecraft actions are
+distinguished from operator actions throughout: rustev's `.tooling/bin` install
+and its `PATH` edit were done by the operator, not by this product.
+
+*F1: C-02: two producer identities, and only one is recorded as a pin (remains).*
+
+- The scaffold comes from the linked library `spec-spine-core =0.23.0`
+  (`crates/statecraft-home/Cargo.toml`); `init plan` reports
+  `producer spec-spine-core@0.23.0 conforming`.
+- The corpus step runs whatever `spec-spine` is first on `PATH`. The manifest's
+  `pins.spec_spine` records that executable's `--version` answer
+  (`crates/statecraft-home/src/flow.rs`, `Manifest::new(Pins { spec_spine:
+  ctx.corpus.version() ... })`). With 0.24.0 on `PATH` it records `0.24.0`;
+  with 0.22.0 it records `0.22.0`, and the older CLI compiled a 0.23.0
+  scaffold without comment.
+- `Pins` (`crates/statecraft-environment/src/manifest.rs`) has `product`,
+  `spec_spine` and `adapters` and no producer member, although spec `002`
+  section 3.15 says the producer identity is recorded "in the report and in
+  the declaration's pins". Each entry's source identity does carry
+  `spec-spine-core@0.23.0`.
+- `pins.product` records `0.0.0`, the crate version, which has never been
+  bumped: no build of this product has an identity beyond that string. No
+  binary digest or source commit is recorded anywhere.
+- `doctor` compares `pins.spec_spine` with the version on `PATH`
+  (`crates/statecraft-cli/src/adapters.rs`, `observed_spec_spine`) and says
+  nothing about the producer.
+- The scaffold's commented `required_version` is the library's own version,
+  whichever CLI runs.
+- `home.json`'s sibling `tools.json` records `spec-spine` as requested `any`,
+  observed from `path` (`flow.rs`, `tools.upsert`).
+
+Owner: this product. No section says which CLI versions may run a corpus a
+given library scaffolded; that is a missing decision (H-3, since decided
+as (a), equality), and it
+is not this product's to invent by equating version strings.
+
+*F2: C-03: every product invocation resolves a bare `spec-spine` from `PATH` (remains, broader than reported).*
+
+The complete inventory of managed execution paths that run the judge, with how
+each resolves it today:
+
+| Path | Where | Resolution today |
+|---|---|---|
+| Initialization, corpus step | `statecraft-home/src/flow.rs` `SpecSpineCommand::default()`, used by `statecraft-cli/src/manage.rs` | bare `spec-spine`, `PATH` |
+| Qualification probe (`project register`, init step 7) | `statecraft-environment/src/probe.rs` `CommandProbe::default()`, used by `main.rs` and `manage.rs` | bare, `PATH` |
+| Work selection (`work list`, `work show`) | `statecraft-run/src/report.rs` `SpecSpineCli::default()`, used by `main.rs` | bare, `PATH` |
+| Run: contract binding and readiness | `main.rs`, `SpecSpineCli::default()` passed to the run path | bare, `PATH`, at **every attempt** |
+| Posture coverage, suite plan | `statecraft-cli/src/coverage.rs`, `SpecSpineCli::default().binary` | bare, `PATH` |
+| Acceptance suite (`accept`) | `statecraft-cli/src/accept.rs`, `SpecSpineVerify::default()` | bare, `PATH` |
+| Acceptance delta report | `accept.rs`, `Command::new("spec-spine")` | bare, `PATH` |
+| Diagnostics (`doctor`) | `statecraft-cli/src/adapters.rs`, `observed_spec_spine` | bare, `PATH` |
+| Delivered hooks | `statecraft-home/harness/hooks/*.sh` | `$SPEC_SPINE_BIN`, then the target's `target/release/spec-spine`, then `PATH` (spec `002` section 3.23 contract 2) |
+| This repository's `make` | `Makefile` | `.tooling/bin/spec-spine` if present, else `PATH` |
+| This repository's CI | `.github/workflows/govern.yml` | `.tooling/bin`, installed from the `required_version` **read from the checked-out candidate** |
+
+Consequences:
+
+- `$SPEC_SPINE_BIN` and a repository-local `.tooling/bin` are both ignored by
+  every product invocation. With none on `PATH`, `init apply`'s corpus step is
+  refused and the initialization is `partial`, although the repository holds
+  a local binary.
+- The product's own invocations meet a weaker rule than the one section 3.23
+  contract 2 imposes on its hooks. No contract mentions `.tooling/bin`; it is a
+  convention of this repository's `Makefile` and of rustev.
+- Spec `001` section 3.5 puts "its verifier" in the authority set, read at the
+  trusted base. Nothing resolves the verifier from the base: acceptance runs
+  whatever `PATH` holds when `accept` runs.
+
+*F3: C-04: files the scaffold tells the adopter to edit are recorded as `managed` (remains).*
+
+After initialization, uncommenting `required_version` in `spec-spine.toml`
+(whose comment invites it) and replacing `created: "REPLACE-WITH-DATE"` in
+`specs/000-bootstrap/spec.md` (whose body says to customize it) makes `doctor`
+report both as `drifted`, exit 1. Rustev also reports the constitution
+placeholder, which its template invites the adopter to replace. This is
+exactly what spec `002` sections 3.2, 3.5 and 3.15 specify: a contract path
+that did not exist is written and recorded `managed`. The contradiction is
+inside section 3.15, which also says "existing configuration and authored
+standards or specs are not disposable templates", and between it and the
+producer's own instructions.
+
+Measured in the code, not only the text: `doctor` compares every entry's digest
+without consulting its class (`crates/statecraft-environment/src/doctor.rs`,
+the per-entry loop), so an `adopted` entry that is later edited is also
+`drifted`. Re-recording the seeds as `adopted` would not remove the alarm.
+Section 3.35's transfer can release one path to `user` by hand; that is a
+remedy per repository, not a lifecycle.
+
+*F4: C-04a: the scaffold declares one derived directory and excludes another (remains).*
+
+The `spec-spine.toml` the library returns sets `derived_dir =
+".statecraft/derived"` and `resolver_exclusions = ["target", "node_modules",
+".derived", "dist", "build", ".next"]`; `.tooling` is not excluded.
+Origin, read at the source: `spec-spine-core`'s scaffold emits the `[index]`
+it is given; this product's `producer::config_json()` passes `[layout]` only,
+so the list is `spec-spine-types`' `IndexConfig::default()`, which hard-codes
+`.derived` (0.23.0 and 0.24.0 alike). The scaffold's `.gitignore` follows
+`layout.derived_dir` and is coherent. The coverage walk skips the configured
+derived and state roots on its own, so the stale entry misstates the layout
+without changing what is walked; a missing `.tooling` exclusion puts a local
+tool directory's files into the walk (read from the code, not measured).
+Obligations: spec-spine owns the incoherent default; this product owns leaving
+`[index]` defaulted, which section 3.15's "passed explicitly, never defaulted"
+covers only for the layout. The byte equality between the library's returned
+`spec-spine.toml` and the file this product writes is recorded in F12.
+
+*F5: A resolved run is not frozen for its tools (new).*
+
+Spec `002` section 3.16 says "a run resolves its harness revision and its
+tools once". `resolved::ResolvedRun::freeze` implements that record and **no
+verb writes it**; only `crates/statecraft-home/tests/negative_cases.rs` calls
+it. The harness half is carried per attempt by the intent and record (spec
+`002` sections 3.31 and 3.32, and the L4 binary test merged in `#96`, which
+shows a later attempt selecting the committed
+requirement across a `harness upgrade`). The tools half is not: every attempt,
+and `accept`, resolves `spec-spine` from `PATH` afresh (F2). A newer
+spec-spine installed between two attempts of one run, or between a run and
+its acceptance, changes the judge without any record saying so.
+
+*F6: The candidate chooses its own judge in CI (new).*
+
+`govern.yml` reads `required_version` from the candidate's `spec-spine.toml`
+and installs that version into `.tooling/bin`. A pull request that changes the
+pin is judged by the version it names. This repository treats a pin change as
+an authority change decided by a human (`D-06`; AGENTS.md, "What a green gate
+means"), so the effect is limited by review, not by mechanism. The same holds
+locally: `make` resolves `.tooling/bin`, which `make tools` fills from the
+working tree's pin.
+
+*F7: Run lifetime (remains).*
+
+- The run id is the spec id (spec `006` section 5, 2026-09-17), so every `run
+  <spec>` appends an attempt to one run, and `workspace::release` ("used when a
+  run ends") has no caller: a run never ends (spec `006` section 5,
+  2026-09-17, "when a run ends is a question section 3 does not answer").
+- `workspace::base_moved` compares the target's current base with the
+  workspace's recorded `base_commit`, the first attempt's. Once the target's
+  `HEAD` moves, every later attempt of that run ends `interrupted` ("the base
+  revision moved"), and no later attempt of that spec runs on the new base.
+- Spec `003` section 3.2 fixes a run's base at run start; its section 3.4 gives each
+  retry "its own number, base revision and outcome" and lists "a base revision
+  that moved" as `interrupted`, which it defines as "stopped without reaching an
+  outcome", although nothing stopped.
+- Harness: each attempt selects the committed requirement (spec `002` section
+  3.31 rule 17), while section 3.16 says a run resolves it once.
+
+*F8: No store, no bundle, no current-release knowledge (new).*
+
+The product home (spec `002` section 3.11) has `tools.json` and
+`harness/<revision>/` and nothing that holds or verifies an executable.
+Nothing downloads, and nothing records which release is current, supported or
+revoked. The harness revision is the one artifact that is already content
+addressed, with a committed required identity and a per-session resolved one
+(spec `002` section 3.25); this proposal generalizes that model.
+
+*F9: A standalone spec-spine release exists that nothing has qualified (new).*
+
+`cargo search` on 2026-09-23 lists `spec-spine-cli`, `-core` and `-types`
+0.24.0. This repository pins `=0.23.0` and links `spec-spine-core =0.23.0`.
+The decision record's `C-02` row still says crates.io lists 0.21.0 then
+0.23.0; it is stale as an observation (not corrected here: the record is spec
+`001`'s, and a correction is its own change). Rustev ran 0.24.0; the shared
+`~/.cargo/bin` holds 0.22.0, a version this record says was never published.
+Nothing states which of these may judge a corpus this product scaffolded.
+On 2026-09-24 `cargo search` still lists 0.24.0 as newest, and spec-spine's
+`main` carries three corrections after `v0.24.0` (its specs 126 to 128) that
+no release contains; H-16 says what is qualified next and how. Later the
+same day spec-spine's `main` added 129 (a configuration passed as JSON obeys
+the loader's rules) and moved to version 0.25.0 for its next release, which is
+prepared and not published; H-16 now names it.
+
+*F10: The two absorbed drafts.*
+
+Two drafts were written on 2026-09-23 and never committed; their branches
+`002-proposal-scaffold-provenance` and `003-proposal-run-lifetime` point at
+`e1d74fa` and carry no commit. Their text is in the evidence folder
+(`proposal-002.md`, `proposal-003.md`). Everything they propose is absorbed
+here: scaffold provenance into P1 and P3, executable resolution into
+P3, authored-file ownership into P8, explicit exclusions into
+P8.2, and run lifetime into P5. The two branches stay empty,
+as coordination markers only.
+
+*F11: Coordination with work in flight.*
+
+The implementation slices merged on 2026-09-23 (`#90` transfer,
+`#94` per-path replacement and bridge removal, `#95` launch-record placement,
+and the L3 to L5 slice, `#96`) implement no behavior proposed here. Two are adjacent:
+L5 translates spec-spine's exit codes for `check` after establishing the verb
+(section 3.23 contract 5), which the resolution of P3 would call; and
+`#90`'s manifest lock is the lock an adoption would take (P6).
+
+*F12: Re-measurement on the final revision.* Re-run on 2026-09-23 with this
+product built from `3afa22c`, whose product code is identical to `main` at
+`96e9f2d` (the merged L3 to L5 change; only tests and text differ), with the
+same three executables (0.24.0 `bcb6fe52...`, 0.23.0 `365d87ab...`, 0.22.0
+`c572d9f5...`) and an isolated home, in disposable repositories. All four
+findings remain. C-02: with 0.24.0 on `PATH` the plan names `producer
+spec-spine-core@0.23.0 conforming`, the corpus step says `compiled, indexed and
+checked` without naming the executable, `pins` is `{product: 0.0.0,
+spec_spine: 0.24.0}`, and each governance entry's source is
+`spec-spine-core@0.23.0`; with 0.22.0 on `PATH`, `spec_spine` is `0.22.0`.
+C-03: a repository-local `.tooling/bin/spec-spine` (0.24.0) with 0.22.0 on
+`PATH` pins `0.22.0`, and adding `SPEC_SPINE_BIN` naming the local binary
+changes nothing; with no `spec-spine` on `PATH` the corpus step is `refused`
+("spec-spine is not available") and the initialization is `partial`, exit 1
+(before the L5 change the step was `withheld`, also `partial`). C-04: after the
+two documented edits `doctor` reports both files `drifted`, exit 1, with the
+seed digests `5b2ab9fb...` and `2316c27b...` expected. C-04a: the written
+`spec-spine.toml` names `.derived` in `resolver_exclusions` and does not
+exclude `.tooling`; its SHA-256 is `5b2ab9fb...`, the same as the bytes the
+linked library returns when called once with this product's configuration, so
+this product writes the producer's bytes unchanged and the stale entry is the
+producer's default. One more fact bears on P1: the binary has no `--version`
+(it answers `unknown verb`), so today it cannot state its own identity at all.
+
+*F13: A second adopter's binary resolution (reported, not measured here).*
+Reported on 2026-09-24 by the session that upgraded rahi to spec-spine 0.24.0
+(rahi PR `#78`, merge `d17a638`, rahi spec `001` `D-14`), and not reproduced
+by this product: rahi's hooks choose their binary by `$SPEC_SPINE_BIN`, then
+`target/release`, then `PATH`, which is section 3.23 contract 2's order, and
+never compare it with the pin; stale 0.20.0 binaries left in two worktrees'
+`target/release` would have outranked `PATH`; and rahi's merge driver also
+prefers `target/release`. So contract 2's second rule can select a binary
+older than the repository's own pin with no signal. This bears on H-13 and
+P3: inside a managed session the supervisor's resolved path replaces the
+order, and outside one the order is kept only if the owner accepts that
+residual or adds a pin comparison to contract 2, which is a section 3.23
+amendment of its own.
+
+*F13, reproduced here on 2026-09-24.* This product's own shipped hooks at
+`fa000c6`, run as programs in disposable clones of this repository, with each
+candidate binary behind a shim that records which one answered. Pinned
+(`required_version = "=0.23.0"`): a 0.20.0, 0.22.0 or 0.24.0 build in
+`target/release` is chosen over a 0.23.0 on `PATH`; the chosen binary refuses
+itself (exit 3), so the pull-request gate blocks and the session-start line
+reads "NOT READ (check exit 3: I/O, parse, schema or config)", which fails
+closed but misnames the cause and never tries the matching binary. A
+`$SPEC_SPINE_BIN` naming no executable is skipped silently and the next rule
+answers. Unpinned, which is what `init apply` writes (the producer's
+`spec-spine.toml` carries the pin commented out; measured through the built
+binary), every wrong candidate judges: 0.20.0, 0.22.0 and 0.24.0 each report
+the 0.23.0 shards `STALE` and the gate tells the session to regenerate, and on
+a `spec.md` edit the post-edit hook's sanctioned `compile` rewrote all seven
+registry shards in 0.22.0's format (203 lines removed, against one shard for
+the same edit under 0.23.0), which the adopted 0.23.0 then reads as stale.
+The remedy for unmanaged use is a separate amendment of contract 2, decided
+without this entry: the owner chose Q-1 (a), Q-2 (i) and Q-3 (b) on
+2026-09-24 (the first compatible convention candidate is used and each one
+passed over is named; an incompatible or non-executable explicit override
+refuses without fallback; an unpinned repository is reported as unpinned; and
+the hook-triggered `compile` is withheld when the repository is unpinned).
+That amendment lands as its own change; this entry keeps only the managed
+half (H-13).
+
+**Part 4: The proposed contract.**
+
+*P1: The release bundle and its identity.*
+
+A **bundle** is a manifest, serialized as canonical JSON (`canonical-keysort-
+json`), whose SHA-256 over those bytes is the **bundle identity**. A short
+prefix is a display convenience and never the thing compared (the rule spec
+`002` section 3.25 already applies to harness revisions). The manifest names:
+
+| Member | What it identifies | Bundled or external |
+|---|---|---|
+| `statecraft` | Version, source commit, and per platform the binary's SHA-256 | bundled |
+| `specSpine` | One producer release (P1.1): its version and source revision, the linked `spec-spine-core` and `spec-spine-types` crates.io checksums from `Cargo.lock`, and per platform the executable's SHA-256 | the executable bundled, the library embedded in `statecraft`; **one identity** |
+| `harness` | The full harness revision digest (spec `002` section 3.14) | bundled (it is compiled into `statecraft` today) |
+| `adapters` | Each adapter's name and version | embedded in `statecraft` |
+| `providers` | Per adapter, each provider version the bundle is to be qualified with, by version **and binary digest** | external prerequisite |
+| `prerequisites` | Other external programs a managed path runs (`git`, with a minimum version) | external prerequisite |
+| `schema` | The manifest, declaration and record schema versions this build reads and writes | bundled |
+| `migratesFrom` | The bundle identities a project may adopt this bundle from (P6.2), each already fixed when this manifest is written | reference to earlier manifests only |
+
+**P1.0 Identity is acyclic.** Three records, each hashed over its own
+canonical bytes, each referring only to records that already exist:
+
+1. the **artifact manifest** above. Its SHA-256 is the bundle identity. It
+   names artifacts and earlier bundle identities, and nothing about
+   qualification, promotion, state or time, so it can be hashed before any
+   evidence about it exists;
+2. the **qualification record** `{ bundle, evidence: [{case, digest,
+   result}], environment, qualifiedAt, qualifiedBy }`, written after the
+   evidence, naming the bundle identity. Its own identity is its SHA-256. A
+   provider qualification record of spec `004` section 3.16 that it cites
+   names an adapter and a provider binary, never a bundle, so it cannot close
+   a loop;
+3. the **promotion record**, one entry of the release metadata (P9.2), naming
+   the bundle identity and the qualification record identity it relies on.
+
+A bundle's state is read from records 2 and 3 and never written into record 1.
+Adding evidence, promoting, superseding or revoking never changes a bundle
+identity, and a project that adopted a bundle is never told its identity
+changed.
+
+**No artifact embeds an identity that covers it.** The manifest names the
+`statecraft` binary's digest, so that binary cannot embed the bundle identity
+or its own digest: either would make the digest depend on itself. What the
+binary embeds (H-8 (b)) is limited to the digests of the artifacts it is
+bundled **with**: the spec-spine executable per platform, and the harness
+revision it already compiles in. A binary verifies its own bundle by reading
+the manifest shipped beside it, hashing it to the bundle identity, digesting
+its own file (the path the operating system reports for the running program),
+and requiring both that the manifest names that digest for this platform and
+that the manifest's co-bundled digests equal the embedded ones. A qualification
+record, a promotion record and release metadata name the bundle identity and
+are never embedded in any artifact the manifest names.
+
+**P1.1 Producer and executable are one identity (H-3 (a), owner Addendum 2,
+2026-09-24).** The embedded producer (`spec-spine-core`, with
+`spec-spine-types`) and the spec-spine executable must be the same release:
+equal versions, built from the same source revision. A bundle records them as
+**one** producer identity, the `specSpine` member above, never as two fields
+that may disagree. A bundle whose linked library and executable are different
+releases is not qualifiable, and no evidence makes it so: there is no
+qualified combination of two releases. Qualification still measures that a
+corpus scaffolded by that library compiles, indexes, checks and verifies under
+that executable (P1.2), because equal version strings are asserted, not
+assumed to work.
+
+**P1.2 Qualification before promotion.** A bundle is `qualified` only when a
+qualification record (P1.0, record 2) names its identity and cites an
+evidence set containing at least: the
+workspace suite (`make code`) and every spec's declared acceptance on the
+bundle's source commit; a fresh initialization of a fixture repository by the
+bundle's own `statecraft` with no tool on `PATH` (case 7); the
+producer release's library and executable run together (P1.1); the negative suite of spec `004`
+section 3.5 for each adapter against each provider the bundle names; and,
+for every identity in `migratesFrom`, a migration from it on a fixture judged
+as P6.2 prescribes (case 10). A standalone spec-spine release does not become
+part of any bundle by being published: it enters only through a new bundle
+that is qualified.
+
+**P1.3 States.** A bundle is one of `built` (a manifest and nothing else),
+`qualified` (a qualification record names it), `current`, `superseded` or
+`revoked`. **Exactly one bundle is `current` at a time,** and it is the only
+one that may start new managed work (P5.2). Promoting a bundle to `current`
+makes the previous one `superseded` in the same metadata issue: no new work,
+while runs already frozen on it keep it (H-6). `revoked` means no new work, and
+retries and acceptance of runs frozen on it are refused (H-6 (a), P9.1),
+with their records flagged. There is no state in which a non-current bundle
+starts new work (an older project converges through bundles admitted for
+migration only, P6.3, which start none); that is the convergence the owner required, and its cost is
+stated rather than softened: a promotion makes every project on the previous
+bundle unable to start new work until its adoption change merges. A support
+window would relax that and is not proposed; H-17 records it as an exception
+the owner may request. Promotion and revocation are publication acts (H-9).
+
+*P2: The global artifact store.*
+
+Under the product home, beside the paths spec `002` section 3.11 names:
+
+| Path | Holds |
+|---|---|
+| `store/sha256/<digest>/` | One immutable artifact, named by the SHA-256 of its bytes. Never rewritten. |
+| `store/bundles/<bundle-id>.json` | A bundle manifest, named by its identity. |
+| `store/tmp/` | In-progress downloads, one directory per attempt. |
+| `store/locks/<digest>.lock` | One advisory lock per artifact being installed. |
+| `store/refs/` | Which runs and projects reference which bundle (P2 rule 7). |
+| `releases.json` | Cached release metadata (P9.2). |
+
+Rules:
+
+1. **Verified before visible.** An artifact is fetched into `store/tmp/`,
+   digested, compared with the digest the bundle manifest names, made durable,
+   and renamed into `store/sha256/<digest>/` in one rename. A reader either
+   sees a complete verified artifact or none. A digest mismatch deletes the
+   temporary copy and is a refusal naming both digests.
+2. **Concurrency-safe.** An installer takes `store/locks/<digest>.lock`
+   (advisory, non-blocking with a bounded wait, released explicitly as `#93`
+   and `#90` do), rechecks whether the final path exists and verifies it, and
+   only then fetches. Two installers of the same artifact never write the same
+   path; two of different artifacts never wait for each other.
+3. **Interrupted download recovery.** A leftover temporary directory is
+   removed, named, by the next installer holding that artifact's lock. A
+   partial file is never renamed into place and never resumed without a
+   digest check of the whole.
+4. **Atomic availability of a bundle.** A bundle is `available` only when its
+   manifest and every bundled artifact it names are present and verified; its
+   manifest is renamed into `store/bundles/` last.
+5. **Corruption is detected on use.** Every resolution (P3) checks the
+   artifact's digest before running it, or checks a recorded digest of an
+   immutable file whose metadata has not changed since it was verified (an
+   owner decision on cost, H-12). A mismatch quarantines the artifact and
+   refuses; it is never repaired silently.
+6. **No background service.** Nothing runs between commands. Downloading
+   happens only inside an explicit verb (`bundle fetch`, or `bundle adopt apply`
+   when the operator passes `--fetch`); no schedule, daemon or login item is
+   installed. Downloading is separate from project migration and from any
+   native-agent settings change (spec `002` section 3.24 consent stays its own
+   act).
+7. **Garbage collection and retention.** `bundle gc plan` names what would be
+   removed; `bundle gc apply` removes it. An artifact is never removed while
+   a bundle referenced by an unended run, an adopted project declaration known
+   to this home, or a record the operator pins references it
+   (`store/refs/`). Historical reproducibility is served by **archival
+   retrieval** (re-fetching a digest-identified artifact), not by keeping every
+   artifact forever and not by accepting new work on an old bundle.
+
+**P2.1 The `.tooling/bin` transition.** Existing repository-local installs are
+user-owned files and are never deleted, moved or rewritten by this product.
+`doctor` reports a `.tooling/bin/spec-spine` whose digest differs from the
+adopted bundle's executable as `shadowing-candidate`, naming both, and whether
+any managed path would run it (none would, under P3). A repository's
+own `Makefile` or CI keeps using `.tooling/bin` until its owner changes them;
+P7 gives the replacement. Whether `.tooling/bin` joins the resolution
+order at all is H-10; the selected direction is that it does not.
+
+*P3: One resolution for every managed execution path.*
+
+Every managed path of F2 resolves the judge through one function,
+with one order, and records what it resolved. The operation's kind selects
+exactly one source; nothing falls through from one source to the next:
+
+1. **An operation on an existing run** (an attempt that appends to an unended
+   run, reconciliation, recovery, and acceptance of that run's attempts) uses
+   the run's **frozen resolution** (P5), always. A later adoption, a newer
+   download, a promotion, a changed working-tree declaration and an explicit
+   argument all leave it unchanged.
+2. **A new run and work selection** use the **adopted bundle** of the
+   declaration **at the trusted base revision** (spec `001` section 3.5.1).
+3. **Inspection, diagnosis and migration planning** use the working tree's
+   declaration, and say so in their output; nothing they resolve judges a
+   candidate.
+4. Nothing else. `PATH`, `$SPEC_SPINE_BIN`, `.tooling/bin` and another
+   repository's installation are never consulted by a managed path. Absent the
+   artifact, the operation is refused, naming the bundle, the digest, and the
+   command that fetches it; it is never satisfied by whatever is installed.
+
+An **explicit bundle argument** never selects. It is an assertion: accepted
+when it equals the identity rules 1 to 3 resolve for that operation, and
+otherwise refused, exit 2, naming both identities. For an existing run the
+only identity it can name is the frozen one; for a new run, the adopted one,
+which under P1.3 must also be `current`. This keeps section 3.16's "resolved
+once" true, and leaves no argument through which an operator, a script or an
+agent could run a retry or an acceptance under a judge the run did not
+start with.
+
+`$SPEC_SPINE_BIN` remains an **operator** override for unmanaged use (a hook
+run by hand, a development checkout). A managed session's hooks receive the
+resolved executable's absolute path in their constructed environment
+(`STATECRAFT_SPEC_SPINE`), set by the supervisor, so the hook's section 3.23
+contract 2 order is used only outside a managed session. How an unmanaged
+selection is checked against the repository's pin is the separate amendment of
+contract 2 that F13 names, which keeps the `target/release/spec-spine`
+candidate only when it satisfies the pin. Inside a managed session a version match is never
+enough: the supervisor's path is the artifact P1.2 verified by digest.
+
+Each resolution records `{bundle, artifact, path, digest, rule, asserted}`,
+where `rule` is which of 1 to 3 answered and `asserted` is the explicit
+argument, if one was given. `doctor` reports a `spec-spine` on `PATH` that
+differs from the adopted bundle's as information, never as the judge.
+
+*P4: Project adoption: the declaration commits the exact bundle.*
+
+The committed declaration (`.statecraft/environment.json`) gains an
+`adopted` member: `{ bundle: <identity>, adoptedAt, migration: <plan
+identity> }`. The declaration and the files the bundle governs stay mutually
+consistent, and `doctor` reports any disagreement as a finding naming both
+values:
+
+- `spec-spine.toml` `required_version` equals the bundle's producer release
+  (a **tracked modification** of that one line, as the root instruction bridge
+  of spec `002` section 3.13 is of `AGENTS.md`; the rest of the file is an
+  authored input, P8);
+- `pins` gains `producer` (the bundle's one producer identity, P1.1) and
+  `bundle`; `pins.spec_spine` becomes that release's version, never an observed
+  `PATH` answer; `pins.product` becomes the Statecraft version **and** source
+  commit, not the crate's `0.0.0`;
+- the harness requirement of spec `002` section 3.25 equals the bundle's harness
+  revision unless the owner keeps them separate (H-2);
+- `.statecraft/derived/` is fresh under the bundle's executable.
+
+A manifest written before this change reads with `adopted`, `producer` and
+`bundle` absent, and says so ("adopted before bundles"); it is never given a
+guessed value.
+
+*P5: Frozen run resolution, and what "new work" means.*
+
+**P5.1 A run is fixed and ends** (absorbs the run-lifetime draft's option A; H-5
+records option B). A run's bundle, base commit and harness requirement are
+resolved at its first attempt, written with `ResolvedRun::freeze` (spec `002`
+section 3.16), and reused by every later attempt; "the base moved" then means
+only that the recorded commit no longer resolves. A run ends when an attempt
+concludes `completed` and its acceptance (spec `005`) is recorded, or when the
+operator ends it; ending releases the workspace. The next `run <spec>` after an
+end begins a new run, whose identity is the spec id plus an ordinal
+(amending spec `006` section 5, 2026-09-17). Downloading or promoting a newer
+bundle never changes a frozen resolution.
+
+**P5.2 New managed work** is any operation that starts something a bundle
+will judge and that no existing frozen resolution already covers:
+
+| Operation | New work? | Under a project behind the required bundle |
+|---|---|---|
+| `run <spec>` that begins a new run (none unended for that spec) | yes | refused, exit 2 |
+| `run <spec>` that appends an attempt to an unended run (a retry) | no: it uses the run's frozen bundle | allowed, unless that bundle is revoked (P9) |
+| Continuation of an attempt that did not conclude | no such verb: spec `003` section 3.6 reconciles and never repeats | `reconcile` and `recover` allowed |
+| A resumed provider process | not a product operation; a restarted supervisor reconciles | allowed as reconciliation only |
+| A new workspace (worktree) | only as part of a new run | refused with the run |
+| `accept` of an attempt of an existing run | no: acceptance uses the run's frozen bundle | allowed, unless revoked |
+| Further commits on an open pull request after its run ended | yes: a new run | refused until the project converges |
+| `startup trial`, `startup capture` | yes: they start a provider under a bundle's harness | refused |
+| `work list`, `work show`, `run list`, `run show`, `startup show`, `doctor`, `status`, `home show`, `env plan`, `bundle show`, `override show` | no: inspection and diagnosis | allowed |
+| `bundle fetch`, `bundle adopt plan`, `bundle adopt apply`, `reconcile`, `recover`, `override grant/revoke` | no: acquisition, migration and recovery | allowed |
+| `trust reset` | not built under the selected H-8 (b); if H-8 (a) is adopted later, acquisition, allowed | not applicable until then |
+
+A refusal names the adopted bundle, the required one, why it is required
+(P9.2), and the exact commands to converge.
+
+*P6: Trusted migration: `bundle adopt plan | apply`.*
+
+`plan` computes, writes nothing, and prints a plan identity (the pattern of
+spec `002` section 3.35): source and target bundle identities; every file
+change with its current and proposed digest (the pin line, `pins`, `adopted`,
+the harness requirement, managed reference artifacts per spec `002` section
+3.4's rule, the explicit `[index]` of P8.2, and `.statecraft/derived/`
+regenerated by the target executable); preconditions; and the validation
+`apply` will run. The plan identity is defined in P6.0.
+
+- **Preconditions.** A tracked modification to any path the plan writes, a
+  drifted managed file the plan would rewrite (per-path consent, spec `002`
+  section 3.4), a manifest that changed since the plan, a leftover journal
+  (P6.1 step 7), or an unavailable target artifact is a refusal naming each,
+  with nothing written.
+- **The migration is a reviewed change, not a side effect.** `apply` produces
+  working-tree changes; adoption is in force for a project only when the
+  change is committed on the branch the trusted base is read from.
+
+**P6.0 The plan identity, without a cycle.** The declaration's
+`adopted.migration` holds the plan identity, and the plan lists the
+declaration among the files it changes, so the identity cannot be a hash over
+the declaration's final bytes. It is a hash over a **canonical plan** that
+contains everything except that one value:
+
+- `{ schema, source, target, adoptedAt, paths }`, serialized as canonical
+  JSON. `source` and `target` are the bundle identities; `paths` is sorted by
+  path, each `{ path, current, proposed }` with digests or `absent`.
+- For every path but the declaration, `proposed` is the digest of the exact
+  bytes `apply` will write.
+- For the declaration, `proposed` is the digest of its **body**: the proposed
+  declaration serialized canonically with `adopted.migration` omitted, and
+  nothing else omitted. The published declaration is that body with
+  `adopted.migration` set to the plan identity, serialized canonically; its
+  digest is written to the journal (P6.1 step 4) as `published`, and is the
+  digest recovery and CI compare against the file.
+- No other path's bytes may depend on the plan identity. The derived shards
+  are generated from a tree in which the declaration is outside the target
+  executable's read set (P8.2's exclusions); `plan` checks that the read set
+  it computes excludes the declaration, and refuses otherwise, rather than
+  hashing a value that would change with its own hash. Measured on
+  2026-09-23 with 0.23.0 in a scratch worktree of `96e9f2d`: adding, committing
+  and then editing `.statecraft/environment.json` left `check` fresh (exit 0),
+  while one appended line in `README.md` turned it stale (exit 2). So under
+  this repository's layout the declaration is outside the index's hashed
+  inputs today. On 2026-09-24, in a disposable clone of `fa000c6` with the
+  same binary, committing a declaration that gained `adopted` and `pins`
+  left the exit code and the SHA-256 of the complete output unchanged for
+  each of `check`, `lint --fail-on-warn`, `index check --fail-on-unresolved`
+  and `index coverage --fail-on-untraced`, so step 3's other reads do not see
+  it either. That is one layout and one version; the guard stays, and a
+  project whose layout puts the declaration in the read set is refused by it.
+
+`adoptedAt` is an **input** of the plan, not a clock reading taken during
+comparison: `plan` fixes it once (UTC, whole seconds, RFC 3339, from the wall
+clock unless given), it enters the canonical plan, and `apply` writes the
+plan's value. **Reconstruction**, used by `apply --resume` and by P6.2 rule 1:
+read the candidate declaration; take `adopted.migration` as the claimed
+identity M and `adopted.adoptedAt` as the input; recompute the canonical plan
+from the base tree and the two bundle identities with that input; require its
+identity to equal M, the candidate's declaration with `adopted.migration`
+removed to hash to the plan's body digest, and every other path to carry its
+`proposed` digest. `adoptedAt` is the only value the candidate supplies, so CI
+also refuses one earlier than the base commit's committer time or later than
+its own clock plus P9.3's skew; it is a record of when, never an authority.
+
+The shards `apply` regenerates in step 2 must equal the plan's `proposed`
+digests; a difference means the generator is not deterministic for this tree,
+and `apply` refuses, exit 1, naming each shard, rather than publishing bytes
+the plan identity does not cover.
+
+**P6.1 The apply transaction.** `apply` runs these steps in this order. A
+step that fails ends the transaction at that step with the result stated, and
+no later step runs.
+
+*The concurrency boundary.* Two kinds of writer are distinguished, and the
+contract differs for each:
+
+- **Cooperating writers** are Statecraft processes. They take the manifest
+  lock of `#90` before writing any governed path, so `apply`, recovery,
+  initialization, `env apply` and another `apply` exclude one another for the
+  whole transaction.
+- **Non-cooperating writers** are everything else: an editor, `git`, a
+  formatter, another tool. No lock excludes them, and none is claimed. Two
+  properties are promised for them, and they are different in kind:
+  - **No overwrite by this product.** `apply` and recovery never replace or
+    delete bytes they did not write: every placement is a no-replace rename,
+    and every original is moved aside and kept rather than removed. A
+    retained copy is deleted only at step 7's close, and only after its
+    digest equals the journal's original, so what is deleted is the original
+    the plan replaces and nothing another writer put there; a write through a
+    held descriptor after that check is the residual stated below. So a
+    byte another writer puts at a planned path is, after the transaction,
+    either at that path or in a retained copy under `orig/`, unless that
+    writer itself removed it.
+  - **Detection at named checkpoints, not continuously.** A write is detected
+    when a checkpoint's digest or path enumeration sees it: step 5.2 (the
+    moved original), step 5.3 (the path reappearing), step 6 (every published
+    path, every read-set file, and the read set's membership) and step 7 (the
+    same, plus every retained copy). Ordinary file-system operations offer no
+    compare-and-swap across a digest and a rename, so a write that lands
+    between a checkpoint's digest and the rename after it, or after step 7,
+    is not detected by `apply`. It is detected afterwards by the P6.2
+    comparison, which refuses a candidate whose bytes differ from the plan,
+    and by `bundle adopt plan`, which then reports the project neither
+    adopted-and-consistent nor untouched. Nothing claims that every
+    concurrent write is caught at the moment it happens.
+
+  One residual is also stated: a process that holds a planned file open for
+  writing across the transaction and writes through that descriptor after
+  step 7 writes into an inode the product has released. `apply` is
+  operator-initiated, and its precondition text says that files it names must
+  not be held open for writing.
+
+1. **Lock and recompute.** Take the manifest lock for the whole transaction;
+   recompute the plan (P6.0); refuse, writing nothing, unless its identity
+   equals the one given. Refuse, exit 2, if `.statecraft/state/` is not on the
+   same file system as every planned path, since steps 5 and 6 rely on rename
+   within one file system.
+2. **Stage.** Build a validation tree under
+   `.statecraft/state/adopt/<plan-id>/tree/`: a copy of every file the target
+   executable reads (tracked and untracked, not ignored) as it is now, with
+   each planned file replaced by its proposed bytes, and record each copied
+   file's digest as the **read-set snapshot**. `.statecraft/derived/` is
+   regenerated there by the target executable and must equal the plan (P6.0).
+   Nothing outside `.statecraft/state/` is written in this step.
+3. **Validate.** Run the plan's validation (the target executable's `check`,
+   `lint` and `index check`, and `doctor`'s consistency rules of P4) against
+   the validation tree only. On failure: remove the stage, exit 1 naming the
+   failed check; no project file changed and no journal exists.
+4. **Journal.** Write `.statecraft/state/adopt/<plan-id>/journal.json`
+   durably (below): the plan identity, the read-set snapshot, and per path
+   the original digest (or `absent`), the proposed digest, the name of its
+   temporary file (`<path>.statecraft-adopt-<plan-id>`, fixed before it is
+   created), and for the declaration the `published` digest of P6.0. The
+   journal exists before the first project file changes, so no file this
+   transaction creates in the project tree is unnamed by it.
+5. **Publish every path except the declaration,** one at a time, each as
+   follows:
+   1. write the proposed bytes to the journaled temporary file beside the
+      path, created exclusively (an existing file of that name is a conflict,
+      never overwritten), and make them durable;
+   2. **move the original aside**: rename the path into
+      `.statecraft/state/adopt/<plan-id>/orig/<n>`, which moves the file
+      itself rather than copying it, then digest the moved file. If its digest
+      is not the journal's original, a writer changed it after staging: rename
+      it back only if the path is still absent (a no-replace rename:
+      `renameat2(RENAME_NOREPLACE)` on Linux, `renamex_np(RENAME_EXCL)` on
+      macOS, `link` then `unlink` where neither exists), and stop with a
+      conflict (below). An original that was `absent` must still be absent;
+   3. **place the proposed file with a no-replace rename.** If the path exists
+      again, a writer created it after step 5.2; the proposed file is not
+      placed, and the transaction stops with a conflict;
+   4. make both directories durable, and only then mark the path `published`
+      in the journal.
+6. **Revalidate, then publish the declaration, last.** Before the commit
+   point, three checks, each against what step 3 validated:
+   1. every **published** planned path still exists and carries its
+      `proposed` digest. A path that is missing, or carries other bytes, was
+      changed by a writer after this transaction placed it;
+   2. every file in the read-set snapshot that is not a planned path carries
+      its snapshot digest, and is present;
+   3. the read set, **enumerated again** by the same rule as step 2, has
+      exactly the snapshot's members: a new file the target executable would
+      read (an untracked spec, say) changes what step 3 validated as surely
+      as an edit does.
+
+   Any difference stops the transaction with a conflict before the commit
+   point, and the declaration is not published. Otherwise publish the
+   declaration by step 5's procedure. Its rename is the commit point: before
+   it, nothing records the target as adopted; after it, every other path has
+   been published and was checked once after publication.
+7. **Close.** Repeat step 6's three checks, now also requiring the
+   declaration to carry its `published` digest, and digest each file under
+   `orig/` against the journal's original. Any difference is a conflict
+   **after** the commit point: the declaration records the target, and the
+   tree no longer equals the plan. `apply` then keeps the journal and every
+   copy, exits 1, and reports `adopted-with-conflict`, naming each path with
+   its proposed and found digests; it does not close, and it does not undo
+   the commit point on its own. Each named path is `neither` to recovery, so
+   the operator first repairs those paths by hand, and then chooses
+   `--resume`, which then only closes, or `--rollback`. A project in that
+   state reads `migrating`, and the P6.2 comparison refuses to adopt it as it
+   stands. With no difference, mark the journal `committed`, then remove the
+   stage, the copies, and the journal, in that order.
+
+A **conflict** exits 1, leaves the journal in place, names each path with its
+original, proposed and found digests and where each set of bytes now is, and
+never removes a retained copy. The next `plan` or `apply` finds the journal
+and requires recovery.
+
+*Durability.* A durable write is: write a temporary file, flush it (`fsync`;
+`fcntl(F_FULLFSYNC)` on macOS, where `fsync` does not reach the medium),
+rename it into place, and flush the containing directory. Every journal
+update and every rename of steps 5 to 7 is durable before the next step, so a
+crash leaves each path either original (at the path or under `orig/`) or
+proposed, and the journal says which it expected.
+
+*What a reader can observe.* A multi-file publish is not atomic on the file
+systems this product supports, and nothing pretends otherwise:
+
+- a **Statecraft reader** that finds an uncommitted journal reports the
+  project as `migrating`, starts no new work, and judges nothing; recovery
+  and inspection proceed;
+- a **cooperating writer** is excluded by the lock, so it never builds on a
+  partial tree;
+- a **non-cooperating reader** (an editor, `git status`, a `spec-spine` run by
+  hand) can see a mixture of original and proposed files between steps 5 and
+  6. A commit made from that mixture differs from the plan, so P6.2 rule 1
+  refuses it; that byte-for-byte comparison, not the file system, is what
+  keeps a partial tree from being adopted.
+
+**Recovery** from a leftover journal is `apply --resume <plan-id>` or `apply
+--rollback <plan-id>`, never automatic. Each takes the manifest lock, checks
+the file system as step 1 does, and first classifies every journaled path by
+what is on disk, at the path and under `orig/`:
+
+| At the path | Retained copy | Class | Crash point it corresponds to |
+|---|---|---|---|
+| original digest (or absent, if the original was) | none | `original` | before step 5.2 for this path |
+| absent, the original having existed | original digest | `moved-aside` | between 5.2 and 5.3 |
+| `proposed` (`published` for the declaration) | original digest, or none if the original was absent | `proposed` | after 5.3 |
+| anything else, or absent where the plan expected bytes | any | `neither` | a writer after the last checkpoint |
+| any | present with another digest | `neither` | a writer through a held descriptor |
+
+and every journaled temporary file by whether it exists. An absent one needs
+nothing. A present one is this transaction's own file whatever its bytes,
+because step 5.1 created it exclusively under a name fixed in the journal: a
+leftover from a crash inside step 5.1 (complete or partly written), removed by
+either direction and named in the report. A temporary file is never a
+`neither`. **`neither`, or a changed retained copy,
+means someone wrote after the transaction's own last check, and no recovery
+touches that path:** both directions refuse, exit 2, naming each such path
+with its digests and the location of every copy, and leave the journal in
+place until the operator resolves those paths by hand and runs the command
+again. Otherwise:
+
+- `--resume` requires the target artifact to be present and verified,
+  rebuilds and revalidates the stage (steps 2 and 3, against the tree as it
+  now is), then completes every `moved-aside` path by steps 5.1 and 5.3 (a
+  fresh temporary file, then the no-replace placement), publishes
+  every path still `original` by step 5's procedure, the declaration last by
+  step 6's (with all three of its checks), and closes by step 7;
+- a `moved-aside` path under `--rollback` is restored from its retained copy
+  by a no-replace rename, so a file created at the path in the meantime is a
+  conflict, not an overwrite;
+- `--rollback` puts back, for every path whose digest is `proposed` or
+  `published`, the retained original from `orig/` (or removes the path where
+  the original was `absent`), each by step 5's move-aside and no-replace
+  procedure so that a write during recovery is also a conflict and never lost;
+  the declaration is restored first, so the project stops recording the target
+  as adopted before any other path reverts; then it closes.
+
+A stage with no journal (a crash in steps 2 to 4, before the journal was
+durable) changed no project file; the next `plan` or `apply` removes it and
+names it. A journal marked `committed` needs only step 7. A crash after step 6 and
+before the mark is recognized by the declaration's digest being `published`,
+and is closed the same way. No recovery path ever reports adoption that the
+declaration does not record.
+
+**P6.2 Bootstrap: how bundle A judges a move to B.** The pull request that
+adopts B carries a pin that A's executable refuses outright (it checks
+`required_version` on every run) and derived shards that B generated in a
+format A may not read. So A's executable is **never run on the candidate
+tree**, and authority is split three ways, none of them chosen by the
+candidate:
+
+1. **Mechanical identity, decided by A's product.** CI resolves A from the
+   base (P7). A's `statecraft` recomputes `bundle adopt plan` from the base
+   tree to B, using B's executable only as a digest-verified tool to generate
+   the shards, and requires the candidate's diff against the base to equal
+   that plan **byte for byte**: the plan's paths with exactly their proposed
+   digests, and no other change. An adoption is therefore its own pull
+   request; mixing it with any other change is a refusal.
+2. **Admissibility of B, decided by records, not by the candidate.** A must
+   be listed in B's `migratesFrom`, which B's qualification exercised (P1.2),
+   and A's `statecraft` must be able to read B's manifest schema. B must be
+   either `current` in verified release metadata (P9.2), or a **migration
+   step** admitted by P6.3 on a path that ends at the current bundle.
+3. **Governance of the resulting tree, judged by B.** B's executable runs the
+   full gate on the candidate. Because rule 1 has established that the
+   candidate differs from the base only by B's own mechanical output, this
+   judges exactly the corpus the base already held, as B reads it.
+
+The pull request passes only when all three hold, and the adoption remains an
+authority change (spec `001` section 3.5 rule 2) with a human decision
+recorded outside the candidate.
+
+**A revoked source is never executed.** Revocation may mean the build itself
+is wrong or compromised, and a byte comparison performed by such a build
+proves nothing, so no program of a revoked bundle runs on any managed path,
+including rule 1's comparison and the stage validation of P6.1. Where A is
+revoked, the adoption is a **recovery adoption**, separate from an ordinary
+one in three ways:
+
+1. **Authority.** It needs an owner authorization recorded outside the
+   candidate before CI judges it (a decision entry naming the project, A, the
+   target and the reason), in addition to the ordinary adoption review.
+2. **The comparing tool.** Rule 1 is performed by a **recovery tool**: a
+   `statecraft` from a bundle that verified metadata lists and does not
+   revoke, verified by digest, and named in the authorization. The preferred
+   tool is one from a bundle **other than the target** (the newest
+   non-revoked bundle able to read both manifests), so the target does not
+   check its own admission. When the only such bundle is the target itself,
+   that is allowed only when the authorization says so, and the record states
+   that the target compared its own adoption. A's manifest and the base
+   tree's files are read as data, digest-bound (P9.4 rule 3); nothing of A's
+   is run.
+3. **Admission.** Rule 2's `migratesFrom` edge from A is still required, and
+   the path of P6.3 starts at A, the one revoked bundle it may contain, and
+   only in this recovery form.
+
+Rule 3 is unchanged: the target's executable judges the result.
+
+*Alternatives, and what each trusts.* (i) Run revoked A's `statecraft` for the
+comparison only: trusts a build that was revoked, possibly for being wrong or
+compromised; not proposed. (ii) Always use the target's `statecraft`: needs
+no third bundle, but the target checks its own admission, which only the
+owner's authorization and the comparison's reproducibility (anyone can rerun
+it with another non-revoked tool) offset. (iii) A separately qualified
+recovery tool (preferred above): trusts a verified, non-revoked build that is
+neither the source nor, where one exists, the target. (iv) No migration from
+a revoked source: re-initialize the project under the current bundle by hand;
+loses the adoption record's continuity. Under H-8 (b) every non-revoked status
+is as trustworthy as the one fixed origin that states it, which is P9.4's
+stated residual. H-11 decides.
+
+The same shape covers a repository not yet
+adopted (P7): a pin bump judged with the merge base's pin fails under the old
+executable for the same reason, so its pull request is likewise confined to
+the pin line and the regenerated shards, compared mechanically, and judged by
+the new version.
+- **Automatic mechanical migrations.** Only within a scope the owner adopts
+  (H-12): the pin line, `pins`, `adopted`, derived output, explicit `[index]`
+  entries computed from the declared layout, and managed reference artifacts
+  whose digest still matches. Automatic means planned and applied without
+  per-path consent; it still produces a reviewed change and never runs in the
+  background. A change to governance requirements (constitution, contract, a
+  spec's text), to ownership classes or roles, or to approval policy is never
+  in that scope and is surfaced separately.
+
+**P6.3 Stepped convergence, without a second current bundle.** A bundle that
+changes the manifest schema names in `migratesFrom` only sources that can read
+it, so a project far enough behind cannot reach the current bundle C in one
+adoption. It converges through intermediate bundles, and each intermediate I
+is admitted **for migration only**:
+
+- **Admission.** I is admissible as a step when verified metadata (P9.2)
+  lists it `superseded`, never `revoked`; its qualification record exists and
+  names it; and `plan` finds a path A, I1, ..., C in which every hop is a
+  `migratesFrom` edge of the later bundle, every hop's source `statecraft` can
+  read the next manifest, and no bundle after A is revoked. A itself may be
+  revoked only in P6.2's recovery form, with its authorization, and then no
+  program of A's runs. `plan` chooses the
+  shortest such path, prints all of it, and plans only its first hop. No
+  path, or only a path through a revoked bundle after A, is a refusal naming
+  the gap; the remedy is a publisher's bridge bundle, never a skipped check.
+- **Metadata keeps the path.** Admission reads each hop from the `superseded`
+  list, with the qualification record that entry names, so release metadata
+  never drops a bundle: the union of its lists only grows (P9.2 rule 2), a
+  hop is admissible only while it is in `superseded`, and a bundle a later
+  document omits is treated as unknown, not admissible, and named. A
+  reinstated bundle is admissible again from the issue that reinstated it
+  (P9.2 rule 5). An intermediate revoked while a project
+  sits on it makes that project's adopted bundle revoked, and its next hop is
+  a recovery adoption (P6.2).
+- **What a migration-only bundle may do.** While a project's adopted bundle is
+  an intermediate, the project is `converging`: every row of P5.2 that
+  refuses new work for a project behind C refuses it here too, and the only
+  admissible adoption is the path's next hop. Inspection, `reconcile`,
+  `recover` and the adoption verbs behave as P5.2's table says. A run frozen
+  on a bundle before the project began converging keeps that bundle, as P5.1
+  says; no run is ever frozen on an intermediate, because no run starts under
+  one.
+- **Judgment of each hop.** Each hop is its own adoption pull request, judged
+  exactly as P6.2 says, with the hop's source as A and the hop's target as B.
+  That B's executable judges the resulting tree is a governance judgment by a
+  qualified bundle that the metadata still lists and has not revoked; it
+  starts no work.
+- **Where this sits in P1.3.** "Exactly one bundle is `current`" is
+  unchanged: an intermediate is `superseded` and stays so; migration-only
+  admission is a property of an adoption hop, not a state, and gives no
+  bundle other than C the right to start new work. Each hop's plan records
+  the whole path and its position on it, so review sees that the adoption is
+  a step and not a destination.
+
+*P7: CI reproduces the authorized judge.*
+
+CI resolves the judge from the **base** revision's declaration, fetches it by
+digest into a clean store, verifies it, and runs every governed check with it.
+A release arriving while a pull request is open changes nothing: the base's
+declaration did not change. The result records the bundle identity and
+executable digest that judged. For a repository not yet adopted, CI keeps its
+current mechanism, but reads the pin at the merge base rather than from the
+candidate (F6), and judges a pin bump as P6.2's last paragraph says; that
+is a change to `.github/workflows/`, an authority
+change decided by a human, never bundled with the product change.
+
+*P8: Authored governance inputs and generated files.*
+
+The existing classes (`managed`, `adopted`, `user`) and the transfer
+mechanism of spec `002` section 3.35 are kept. Evaluated against the
+requirement (no perpetual false alarm, no silent adoption, a genuine
+unauthorized change still detectable):
+
+- recording the seeds `adopted` does not end the alarm (F3);
+- transferring them to `user` at initialization ends it, but the product then
+  forgets it seeded them and cannot remove an untouched seed;
+- ignoring digest mismatches for them is forbidden by the request and hides a
+  real change.
+
+**Proposed: a role on `managed` entries**, keeping section 3.2's three classes
+(H-4 records a fourth class as the alternative):
+
+- `role: reference` (default, today's behavior): templates under
+  `<standards_dir>/templates/**`, `.statecraft/AGENTS.md`, adapter pointer
+  files. An edit is `drifted`, as now.
+- `role: authored-input`: `spec-spine.toml` (except its pin line, a tracked
+  modification per P4), `<specs_dir>/000-bootstrap/spec.md`,
+  `<standards_dir>/constitution.md` and `<standards_dir>/contract.md`. The list
+  is closed, in the spec, and never inferred from bytes.
+
+For an authored input:
+
+| Moment | Behavior |
+|---|---|
+| Initialization | Written only when absent, recorded with the **seed digest** and the producer identity; an existing file is `adopted` as today. |
+| Editing | Expected. Not drift. |
+| `doctor` | `seeded` when the digest equals the seed, `customized` when not, both information with no finding; `missing` as today. |
+| Genuine unauthorized change | Detected where authored governance is governed: spec-spine's `check`, the coupling gate, the constitution's own Amendment rule, and review. The digest comparison is not the control for authored text, and `doctor` says so. |
+| Upgrade or adoption | Never rewritten. A newer producer that seeds different bytes is reported, naming the new seed digest. |
+| Removal | Deleted only while its digest equals the seed; otherwise kept and named. |
+| Transfer | May be released to `user` (section 3.35); nothing moves a path into this role. |
+
+A manifest written before the change reads every entry as `role: reference`,
+as it was recorded. Changing an existing entry's role is itself a per-path,
+operator-initiated, recorded act (the transfer mechanism), never automatic.
+
+**P8.0 The rest of the governed tree, unchanged in class.** Ordinary specs
+(`<specs_dir>/NNN-*/spec.md` other than the bootstrap) are written by the
+project, never by this product, and stay `user`: no manifest entry, no digest,
+governed by spec-spine's `check` and the coupling gate, as today. The
+integration files this product writes, `.statecraft/AGENTS.md` and each
+adapter's pointer file, stay `managed` with `role: reference`. The two tracked
+modifications stay modifications with their own records: the root
+instruction bridge (section 3.13) and the `.gitignore` fragment (section
+3.15), and P4 adds a third of the same kind, the `required_version` line of
+`spec-spine.toml`. A modification is never promoted to ownership of the file
+it modifies.
+
+**P8.1 Derived output.** `.statecraft/derived/` is the executable's output,
+not a manifest entry; its freshness is spec-spine's `check`, and adoption
+regenerates it with the adopted executable.
+
+**P8.2 Pins and exclusions match the layout.** This product passes `[index]`
+explicitly: `resolver_exclusions` derived from the declared layout (the derived
+and state roots) plus build directories, and no other derived directory. A test
+built on the real library asserts it, so a producer change that reintroduces a
+literal is caught at the pin bump. The producer boundary is kept: no governance
+template is copied into this product; the upstream requests (P10) ask
+spec-spine to make its own defaults coherent.
+
+*P9: Recovery, revocation and offline.*
+
+**P9.1 States and what each allows.**
+
+| Condition | Result |
+|---|---|
+| Conflicting local edits to a path a migration writes | refused, naming each path and both digests; nothing written |
+| Dirty worktree outside those paths | not a precondition; untouched |
+| Validation fails after `apply` staged | nothing renamed; exit 1 naming the failed check; staged files removed and named |
+| Artifact unavailable (not in store, offline) | refused naming the digest and `bundle fetch`; inspection unaffected |
+| Schema this build cannot read (declaration, manifest or record newer than the build) | refused with both schema versions; never rewritten down |
+| Interrupted migration | reported by the next `plan`, and the project reads `migrating`; `apply --resume` or `--rollback` per P6.1; a path or retained copy written since the transaction's last check blocks both and is never overwritten; never reported adopted unless the declaration records it |
+| A non-Statecraft write during `apply` | a conflict per P6.1: stopped before the commit point, or blocked at close; every written byte kept at the path or under `orig/`; exit 1 |
+| A project too far behind for one adoption | stepped convergence per P6.3; `converging` until it reaches the current bundle, with no new work |
+| Concurrent runs during an adoption | runs keep their frozen bundle; adoption takes only the manifest lock, not the repository lock |
+| Revoked bundle | no new work; retries and acceptance of runs frozen on it are refused under H-6 (a) and (b), and allowed and flagged only under H-6 (c), which would execute a revoked bundle's programs and is not recommended; records made under it are never rewritten, and later readers flag them |
+
+**P9.2 How "current" is learned and trusted.** Release metadata is one
+document, fetched by an explicit verb or side-loaded, verified under P9.4, and
+stored as `releases.json` with the local time it was accepted:
+
+```
+{ schema, sequence, issuedAt, expiresAt,
+  current:    { bundle, qualification, since },
+  superseded: [ { bundle, qualification, since } ],
+  revoked:    [ { bundle, qualification, since, reason } ],
+  reinstated: [ { bundle, since, reason } ] }
+```
+
+`sequence` is an integer that every issue increments. `bundle` is a bundle
+identity and `qualification` the identity of the qualification record (P1.0,
+record 2) the bundle was promoted on; `since` is the `sequence` of the issue
+that put the entry in its list. The lists obey five rules, and a reader checks
+each one against the last document it accepted:
+
+1. **Every bundle is in exactly one place.** `current`, `superseded` and
+   `revoked` are disjoint; `reinstated` is a history, not a state, and a
+   bundle named there is in `current` or `superseded` as well.
+2. **Nothing listed is ever dropped.** The set of bundles in `current`,
+   `superseded` and `revoked` together only grows from one issue to the next;
+   an entry's `bundle`, `qualification` and `since` never change while it
+   stays in its list. This is the "only grows" obligation P6.3 relies on,
+   stated over the union, because revocation moves a bundle out of
+   `superseded`: `superseded` alone does not only grow, and was never meant
+   to.
+3. **Promotion.** A new `current` is a qualified bundle not previously listed,
+   or a `superseded` one whose promotion names a qualification record. The
+   previous `current` moves to `superseded` in the same issue, keeping its
+   `qualification`, with `since` set to that issue (P1.3).
+4. **Revocation** moves a bundle from `current` or `superseded` to `revoked`,
+   keeping its `qualification`, with the issue's `sequence` as `since` and a
+   stated reason. A revoked `current` needs a new `current` in the same issue;
+   there is never an issue with no current bundle.
+5. **Reinstatement** moves a bundle from `revoked` to `superseded`, never to
+   `current` directly, and adds a `reinstated` entry with the reason. Its
+   `qualification` is the one it was revoked with; becoming `current` again is
+   a separate promotion under rule 3. `reinstated` only grows.
+
+A reader that finds rule 2 broken (a bundle it knew is absent from every
+list) treats that bundle as unknown: not admissible as a migration step,
+named in the report, and, if the home had seen it `revoked`, still revoked in
+this home (P9.4 rule 1). A document that breaks rule 1, 3, 4 or 5 is refused
+whole, naming the rule. So the history P6.3 reads is exactly the lists: a
+bundle a project may cross is found in `superseded` with the qualification it
+was admitted on, a revoked hop is found in `revoked` and needs P6.2's recovery
+form, and nothing a publisher omits can make an unknown bundle admissible.
+Runs frozen on a bundle follow its list at the moment of use (H-6): while it
+is `superseded` their retries and acceptance proceed, while it is `revoked`
+they are refused, and after a reinstatement they proceed again; records made
+while it was revoked are never rewritten, and are flagged with the `sequence`
+of the revocation. A disconnected machine cannot prove it knows the newest release,
+so the product distinguishes four freshness states and never conflates them.
+Each is computed at the moment of use, from the verified document and the
+clock rules of P9.3:
+
+- **fresh**: verified metadata whose `expiresAt` has not passed;
+- **stale**: verified metadata past `expiresAt` by no more than the grace
+  bound G;
+- **expired**: verified metadata past `expiresAt` by more than G, or whose
+  age cannot be established (P9.3, clock rules);
+- **absent**: no verified metadata was ever accepted by this home.
+
+Whether the adopted bundle is `current`, `superseded` or `revoked` is read
+from the document in every state but `absent`, and is reported with that
+state beside it.
+
+**P9.3 Offline policy options** (H-7):
+
+- **O1, strict.** New work requires `fresh` metadata naming the adopted bundle
+  `current`. Safest, and unusable offline beyond `expiresAt`.
+- **O2, bounded grace (the selected direction).** New work proceeds without comment when
+  metadata is `fresh` and names the adopted bundle `current`. When it is
+  `stale` and names the adopted bundle `current`, new work requires an explicit
+  per-invocation acknowledgment (`--metadata-stale`), recorded in the run
+  record with the metadata's `sequence`, `issuedAt`, `expiresAt` and age;
+  nothing claims the bundle is current as of now. `expired` and `absent` are
+  refused exactly as O1 refuses, and no acknowledgment unlocks them: the
+  remedy is `bundle fetch`, or `bundle import` of a side-loaded metadata file.
+  **Absent is never treated as stale:** a home that has never verified
+  metadata has no evidence the adopted bundle was ever current. Metadata
+  naming the adopted bundle `superseded` or `revoked` refuses new work in
+  every state. Revocation learned later flags runs recorded as stale.
+- **O3, permissive.** The adopted bundle is used indefinitely and freshness is
+  recorded as unknown without acknowledgment. Silent divergence; not
+  recommended.
+
+*The bound.* G is a fixed number in the product, not an operator setting; the
+proposed value is 14 days, and the owner sets it with H-7. `expiresAt` minus
+`issuedAt` is chosen by the publisher; the proposal is 7 days, so under O2 new
+work stops at most 21 days after the last issue this machine verified.
+
+*Clock rules.* Every comparison uses the local wall clock, never a time taken
+from the document or from the network. The home keeps a high-water mark: the
+latest of every accepted `issuedAt` and every wall-clock reading taken at a
+freshness decision. A document whose `issuedAt` is more than a stated skew
+(5 minutes proposed) ahead of the wall clock is refused as not yet valid. A
+wall clock earlier than the high-water mark by more than the same skew means
+the age cannot be established, and the state is `expired` until the clock
+passes the mark again or a newer document is accepted, which resets the mark
+to that document's `issuedAt` or the wall clock, whichever is later. A clock
+set forward only brings expiry closer (and, once corrected, reads as set back
+until a newer document is accepted), and a clock set back cannot extend grace
+past the mark. Advancing the mark is a durable write to the home under its own
+lock; if it cannot be written, the decision that needed it refuses new work
+(the freshness it would rely on is not recorded, so a later set-back clock
+could not be detected), and inspection is unaffected. An offline machine
+whose clock was set forward and then corrected stays `expired` until a newer
+document is imported; that cost is stated, not avoided.
+
+A first installation on a machine with no network uses a side-loaded bundle
+and metadata file (`bundle import <dir>`), verified exactly as a download
+under P9.4, including its freshness: an old side-loaded file is `expired`, not
+a way around the bound.
+
+**P9.4 Trust: rollback protection and key transition.** H-8 chooses the root.
+The selected direction is H-8 (b) initially, with signing (H-8 (a)) and H-18
+deferred until `F-03` lifts: rules 1 to 3 are built with the first metadata
+slice, and rules 4 to 7 below are specified so that a later adoption of (a)
+has its text, and are **not built** under (b). Whatever the root, these rules
+hold:
+
+1. **No rollback.** The home stores the highest `sequence` it has accepted.
+   A document with a lower `sequence` is refused, as is one with an equal
+   `sequence` and different bytes; the refusal names both. A later document
+   can un-revoke nothing: a bundle once seen `revoked` stays revoked in this
+   home unless a document with a higher `sequence` reinstates it under P9.2
+   rule 5, with a `reinstated` entry and a reason. So an attacker, a mirror or a stale cache
+   that replays an older document cannot restore a revoked bundle, demote the
+   current one, or reset the grace clock.
+2. **Freeze is bounded.** An attacker who withholds new documents can keep
+   this home on the last one it verified only until P9.3's bound; that is why
+   `expired` cannot be acknowledged.
+3. **Bundles are bound by digest.** Metadata names bundle identities; a
+   bundle is accepted only when its manifest hashes to the identity named.
+   The trust root authenticates metadata, and metadata authenticates
+   everything else.
+
+Under H-8 (a), signed metadata, four more rules apply. They are deferred with
+H-8 (a) and H-18, and nothing in Part 9 builds them now:
+
+4. **A root of keys, not one key.** The binary embeds a root document listing
+   the metadata-signing public keys and a threshold (1 of 1 is allowed at
+   first, and stated as such). Metadata verifies only with the threshold of
+   listed keys.
+5. **Transition by chained roots.** A new root document, version n+1, is
+   accepted only when signed by the threshold of version n's keys **and** by
+   the threshold of its own keys. The home stores the highest root version it
+   has accepted and walks the chain one version at a time from its stored or
+   embedded root; it never skips a version and never accepts a lower one,
+   where "lower" is by (epoch, version) as rule 7 defines it. A
+   newer binary may embed a newer root, which the home accepts only if the
+   chain from its stored root reaches it.
+6. **Removal while the threshold survives.** A compromised or lost key is
+   removed by the next root version. Rule 5 still applies: version n's
+   threshold must be met, and the removed key's signature is not counted
+   toward it, so this works only while version n's **other** keys can meet
+   version n's threshold. Metadata signed by a removed key is refused from
+   then on, whatever its `sequence`. A root document carries its own
+   `expiresAt`; the chain walk of rule 5 checks each intermediate root's
+   signatures and not its expiry, and only the root reached at the end must
+   be unexpired, since an expired root verifies no metadata. Key custody is
+   `F-03`'s decision.
+7. **Reset when the threshold is lost.** When version n's remaining keys
+   cannot meet its threshold (a 1-of-1 root whose key is lost or compromised
+   is the certain case; a 2-of-3 root that loses two keys is another), no
+   root the chain rule accepts can follow n, and a newer binary embedding a
+   newer root does not help, because the home accepts an embedded root only
+   through the chain. Recovery is therefore a separate procedure, never an
+   exception to rule 5 taken silently:
+   - the publisher issues a **reset root**: version n+1, marked `reset`,
+     naming the version it replaces and the reason, carrying a
+     `sequenceFloor` no lower than the last metadata `sequence` it issued,
+     and signed by the threshold of its own keys. It is announced through a
+     channel H-18 names, with its full SHA-256;
+   - a home accepts it only after an **explicit local authorization** by the
+     home's operator: `trust reset --root <sha256>`, giving that digest as
+     obtained from the announcement. The home refuses a reset root whose
+     digest was not so authorized, and until one is, it refuses metadata
+     signed under any root it cannot chain to, names the pending reset, and
+     keeps its current state (which then ages under P9.3 like any other);
+   - the act is appended to a trust log in the home: the replaced version,
+     the reset root's digest, the operator, the local time and the stated
+     reason. It is never inferred from a download, a newer binary, or a
+     document's own claim;
+   - rule 1 survives the reset: the home keeps the higher of its stored
+     `sequence` and the reset's `sequenceFloor`, and every bundle it has seen
+     `revoked` stays revoked. Where the reset follows a compromise, the reset
+     root also names every root version above n it supersedes, and a home
+     that had accepted one of those (an attacker's chained root) discards it
+     and says so;
+   - roots are ordered by **(epoch, version)**, not by version alone. Each
+     reset root carries an `epoch` one higher than the root it replaces, and
+     rule 5's chain walk runs within an epoch. So an attacker's chained root
+     n+3 in the old epoch cannot outrank the reset's n+1 in the new one, and
+     the authorized reset is the only way the epoch moves. A root in an
+     earlier epoch is refused after a reset, whatever its version.
+
+   A 1-of-1 root is still allowed, but only as a stated choice: its loss
+   forces every home through rule 7. The proposal recommends starting at
+   2 of 3 so that one lost key is ordinary rotation under rule 6. The initial
+   threshold, the announcement channel and whether rule 7 exists at all are
+   H-18.
+
+Under H-8 (b), TLS to one fixed origin with the digests of the running binary's
+co-bundled artifacts embedded (P1.0), rules 1 to 3 still hold locally, and there are no keys to
+rotate: a change of origin or of TLS roots is a new product release. The
+residual is stated, not hidden: whoever controls that origin, or a TLS root
+the platform trusts, can issue a new higher-`sequence` document, so (b)
+protects against rollback and freeze but not against a forged current
+release.
+
+*P10: Proposed upstream handoff to spec-spine.*
+
+A request, not a requirement on spec-spine, and nothing here edits that corpus
+(its ordinals are resolved through its `docs/corpus-map.md` before any is
+cited): (1) derive the derived-root exclusion from `layout.derived_dir`, or
+drop it, since the walk skips that root; (2) say whose version the scaffold's
+commented `required_version` is, or accept a caller-supplied value; (3)
+publish which executable versions accept which scaffold output, so a consumer
+can qualify a combination instead of inventing one (unneeded under H-3 (a),
+which forbids mixing releases); (4) accept a
+caller-supplied creation date for the bootstrap spec; (5) carry a per-file
+role (authored input or reference artifact) in the files-as-data answer, so
+P8's list can come from the producer.
+
+**Part 5: Exact contract changes, per spec.**
+
+Each is proposed text for that spec's own change, in the order of part 9.
+None is made by this draft.
+
+- **`001` section 3.5, authority set.** Add, after "its verifier": "and the
+  adopted bundle identity that names it, read at the trusted base like every
+  other member". Component table: the spec-spine CLI row becomes "bundled
+  executable, resolved only through the adopted bundle"; the `spec-spine-core`
+  row gains "its identity recorded as the bundle's producer". Decision record:
+  proposed rows `D-11` (the release bundle), `D-12` (distribution channel and
+  trust root, interacting with `F-02` and `F-03`), and a proposed amendment of
+  `D-06` (the pin follows the adopted bundle).
+- **`002`.** Section 3.3: pins gain `producer` and `bundle`; `spec_spine` is the
+  bundle's producer release (H-3 (a)). Section 3.2 or 3.3: the `role` of P8.
+  Section 3.5: `seeded` and `customized`, information, for `authored-input`.
+  Section 3.6: removal of an authored input only at its seed digest. Section
+  3.11: the store paths of P2 (owned by `007`; see the ownership map). Section
+  3.12: the declaration carries `adopted`. Section 3.15: "passed explicitly,
+  never defaulted" extends to `[index]`; the contract set is split by role;
+  the producer identity is recorded in `pins.producer`. Section 3.16: "its
+  tools" means the adopted bundle, frozen by `ResolvedRun` at run start.
+  Section 3.23 contract 2: the order applies outside a managed session; inside
+  one, the supervisor supplies `STATECRAFT_SPEC_SPINE`. Section 3.25: the
+  required harness identity is the bundle's, or stays separate (H-2).
+- **`003`.** Section 3.2: the base commit and bundle are fixed for the run.
+  Section 3.4: a retry reuses the run's base; `interrupted` loses "a base
+  revision that moved" except where the recorded commit no longer resolves.
+  New section: when a run ends, and what ending releases (P5.1).
+- **`004`.** Section 3.16: a qualification record is also cited by the bundle
+  that names the adapter and provider pair; a provider version absent from the
+  adopted bundle's list is `unqualified`, as today, and a managed run refuses
+  it only if the owner adopts that (H-15).
+- **`005`.** Section 3.2: the suite runs with the executable the run's frozen
+  resolution names. Section 3.6: the receipt records the judge's bundle
+  identity and executable digest. New: CI reproduction of the judge (P7).
+- **`006`.** Section 3.1: verbs `bundle show | fetch | import | adopt plan |
+  adopt apply [--resume | --rollback] | gc plan | gc apply` and `run end`;
+  `trust reset` only if H-8 (a) is adopted later, and not under the selected
+  H-8 (b). Section 3.3: the behind
+  refusal is exit 2. Section 5 (2026-09-17): the run id becomes the spec id
+  plus an ordinal.
+- **`007` (the new spec of H-1, if the owner creates and ratifies it).** P1 to
+  P4, P6 and P9, owning a new crate for bundle identity, store and resolution.
+
+**Part 6: Ownership map.**
+
+| Concern | Owner | Crate |
+|---|---|---|
+| Bundle manifest, identity, states | `007` | new, `crates/statecraft-bundle/` (name is H-1's) |
+| Store, locking, recovery, gc | `007` | same |
+| Resolution function and its record | `007`; every caller reaches it through an `extends` edge | same |
+| Adoption plan and apply, journal | `007` | same, using `002`'s manifest lock |
+| Declaration members `adopted`, `pins.producer`, `pins.bundle`, `role` | `002` | `statecraft-environment` |
+| Authored-input lifecycle in doctor, upgrade, removal | `002` | `statecraft-environment` |
+| Explicit `[index]` in the producer call | `002` | `statecraft-home` |
+| Run lifetime, ending, frozen resolution use | `003` | `statecraft-run`, `statecraft-home` (`ResolvedRun`) |
+| Provider compatibility cited by the bundle | `004` | `statecraft-adapter-claude-code` |
+| Judge identity in receipts; CI reproduction | `005` | `statecraft-acceptance` |
+| Verbs and exit codes | `006` | `statecraft-cli` |
+| `.github/workflows/`, `Makefile` | unclaimed; human authority change | none |
+| Release metadata publication, promotion, revocation | owner; blocked by `F-02` | none |
+
+**Part 7: Acceptance cases.**
+
+The fifteen cases the owner required, recovered verbatim from the request of
+2026-09-23, each mapped to an owning spec and to the kind of evidence it
+needs. **None is tested.** Every row is `not executed`; nothing here was run
+against an implementation that does not exist.
+
+| # | Case (owner's requirement) | Owner | Evidence kind | Status |
+|---|---|---|---|---|
+| 1 | Two projects with different recorded identities sharing one global artifact store | `007` | local fixture: two repositories adopting bundles A and B, one home; each run resolves its own digest | not executed |
+| 2 | A global update during an active run and an open PR | `007`, `003`, `005` | local fixture for the run (fetch and promote B mid-run; attempts and `accept` keep A); CI evidence for the PR (judge stays the base's) | not executed |
+| 3 | A stale project refused new work while diagnostics and upgrade remain usable | `007`, `006` | local fixture through the binary: every row of P5.2 | not executed |
+| 4 | Continuation or retry governed by the agreed run-lifetime contract | `003` | local fixture: retry after `HEAD` moved reaches a real outcome; run end releases the workspace; next run is distinct | not executed; H-5 (A) selected, not adopted |
+| 5 | An unexpected spec-spine executable first on `PATH` | `007` | local fixture: a hostile `spec-spine` first on `PATH` is never run by any path of F2 | not executed |
+| 6 | Producer, executable, project pin and manifest identity disagreement | `002`, `007` | local fixture: each disagreement is a distinct `doctor` finding naming both values; `run` refuses | not executed |
+| 7 | First initialization without manual dependency installation or `PATH` surgery | `007`, `002` | release qualification: a clean machine with only `statecraft` and a side-loaded or fetched bundle | not executed |
+| 8 | Expected authored customization versus genuine managed-file drift | `002` | local fixture: pin line and date edits are `customized`, exit 0; a template edit is `drifted` | not executed |
+| 9 | Correct exclusions for a non-default derived directory | `002` | local fixture on the real library: a non-default `derived_dir` appears in no exclusion but its own | not executed |
+| 10 | Interrupted, concurrent and repeated upgrades | `007` | local fixture: kill between staged and declaration write; two concurrent `apply`; repeat is `already-satisfied` | not executed |
+| 11 | Conflicting local edits preserved with an actionable result | `007` | local fixture: refusal names paths and digests; bytes unchanged | not executed |
+| 12 | Offline operation with current, stale and absent cached release metadata | `007` | local fixture with a controlled clock and metadata file; no network | not executed; H-7 (O2) and H-8 (b) selected, not adopted |
+| 13 | CI reproducing the authorized judge from a clean environment | `005` | external: a CI run on a fresh runner fetching the base's bundle by digest | not executed |
+| 14 | Migration failure leaving no false success record | `007` | local fixture: failed validation leaves the declaration unchanged and no `adopted` | not executed |
+| 15 | Artifact cleanup preserving referenced run identities | `007` | local fixture: `gc apply` keeps every artifact an unended run or adopted project references; archival retrieval restores a removed one by digest | not executed |
+
+**Proposed additions**, distinct from the owner's list and not required unless
+adopted:
+
+| # | Case | Owner | Evidence kind |
+|---|---|---|---|
+| A1 | A corrupted artifact in the store is quarantined and refused, never repaired silently | `007` | local fixture |
+| A2 | A candidate that changes its declared bundle is judged by the base's bundle, and the change is reported as an authority change | `005`, `007` | local fixture plus CI evidence |
+| A3 | A manifest written before bundles reads without guessed values | `002` | local fixture |
+| A4 | A revoked bundle refuses retries of runs frozen on it, per H-6 | `007`, `003` | local fixture |
+| A5 | Every bare `spec-spine` invocation site of F2 is replaced; a source test fails on a new one | `007` | local test |
+| A6 | Replayed older metadata, and equal-`sequence` metadata with different bytes, are refused; a revoked bundle stays revoked | `007` | local fixture |
+| A7 | `stale` needs the acknowledgment; `expired`, `absent` and a clock set back past the mark refuse new work with no acknowledgment that unlocks them | `007` | local fixture with a controlled clock |
+| A8 | An adoption candidate carrying any change outside its plan is refused; a path edited after an interrupted `apply` blocks both `--resume` and `--rollback` and keeps its bytes | `007`, `005` | local fixture |
+| A9 | The plan identity is reproducible: CI reconstructs it from the candidate's `adoptedAt` and gets the declared identity; a changed `adoptedAt` or one outside its bounds is refused; the declaration is the only path whose bytes contain the identity | `007`, `005` | local fixture |
+| A10 | A project two schema generations behind converges through an intermediate admitted for migration only; while on it, every new-work row of P5.2 is refused; a path through a revoked bundle is refused naming the gap | `007` | local fixture with three bundles |
+| A11 | A write to a planned path, and to an unplanned read-set file, between staging and publication: each is a conflict before the commit point, every written byte is at the path or in `orig/`, and the declaration is not published; a mid-transaction commit is refused by the P6.2 comparison | `007`, `005` | local fixture with an injected writer |
+| A12 | (Deferred with H-8 (a) and H-18; not built or tested under the selected H-8 (b).) A 1-of-1 root whose key is lost: new metadata is refused until `trust reset` is authorized with the reset root's digest; an unauthorized reset root is refused; `sequence` and revocations survive the reset; an old-epoch root with a higher version is refused after the reset | `007` | local fixture with test keys |
+| A13 | Between a path's publication and the commit point, an injected writer (a) edits the published path, (b) deletes it, (c) creates a new file in the read set, (d) edits a retained original under `orig/`, (f) creates a planned path whose original was `absent` between 5.2 and 5.3; after the commit point and before close, (e) edits a published path. (a) to (c) and (f): a conflict before the commit point, (f) with the writer's file left at the path and the proposed file not placed, declaration unpublished, every byte at its path or under `orig/`. (d) and (e): `adopted-with-conflict`, exit 1, journal kept. Each asserted against a digest walk of the tree and `orig/` | `007` | local fixture with an injected writer, on disk |
+| A14 | A crash (the process killed by a test failpoint, then a real `SIGKILL` at a sample of the same points) at each of: during stage, after the journal, inside 5.1, between 5.2 and 5.3, after 5.3 before the mark, between the last path and step 6, after the commit point before `committed`, after `committed` before cleanup. For each: the classification of P6.1's recovery table, `--resume` and `--rollback` each reaching a consistent tree, a path written after the crash blocking both, and a temporary file absent, complete or partly written each classified as P6.1 says (never `neither`); then a second crash inside `--resume` and inside `--rollback`, and inside step 6's and step 7's checks, each recovered by the same rules to a consistent tree | `007` | local fixture, on disk |
+| A15 | A project adopted on a bundle later revoked: an ordinary adoption is refused; a recovery adoption without an authorization is refused; with one, the recovery tool performs the comparison, no program of the revoked bundle runs (a revoked `statecraft` and executable replaced by programs that record any invocation, which must record none), and the record names the tool and, where it is the target, says so | `007`, `005` | local fixture |
+
+**Release qualification requirements** (P1.2): the workspace suite
+and every spec's declared acceptance on the bundle's source commit; case 7 on
+each supported platform; the producer release's library and executable run together (P1.1); the adapter
+negative suite against each named provider binary, bound by digest; a
+migration from each identity in `migratesFrom`, judged as P6.2 prescribes.
+The record names the bundle identity and is kept with it.
+
+**Part 8: Decisions for the owner.**
+
+Each names the options, the recommendation, and the authority requested. On
+2026-09-24 the owner selected a design direction, one answer per decision,
+tabled here. A selection adopts nothing: each answer binds only when the
+owner adopts it in the change named in its "Authority" line, in Part 9's
+order. The option text below each decision is kept so that the adopting
+change can cite what was weighed.
+
+| H | Selected direction (2026-09-24) |
+|---|---|
+| 1 | (a) a new `007` owning `crates/statecraft-bundle/`, created through the normal route once planned claims are adopted (Part 9, route P; the owner's update of 2026-09-24, R1 kept as a fallback only) |
+| 2 | (a) the bundle fixes the harness revision |
+| 3 | (a) equality: the CLI and the linked library are the same release, recorded as one identity (owner Addendum 2, 2026-09-24; the direction first selected (b)) |
+| 4 | (a) `role` on `managed` |
+| 5 | (A) a run is fixed and ends; the next run gets an ordinal |
+| 6 | (a) superseded: retries and acceptance continue; revoked: execution refused |
+| 7 | O2 bounded offline grace: G 14 days, validity 7 days, skew 5 minutes |
+| 8 | (b) initially; signing (a) deferred with `F-03`, so P9.4 rules 4 to 7, `trust reset` and A12 are not built |
+| 9 | keep `F-02`: Statecraft bundle publication stays deferred; local work proceeds |
+| 10 | (a) `.tooling/bin` never consulted by a managed path |
+| 11 | (a) recovery adoption through a verified non-revoked tool, with an owner authorization |
+| 12 | P6's scope; digest verification on every use |
+| 13 | managed: the supervisor's artifact only; unmanaged: the separate contract-2 amendment (Q-1 (a), Q-2 (i), Q-3 (b)) |
+| 14 | as recommended: this repository moves to the store only after it exists, as its own unclaimed change |
+| 15 | as recommended: `unqualified` label and a `doctor` finding, no refusal |
+| 16 | target the published spec-spine 0.25.0 carrying 126 to 129, after the producer's registry-backed consumer check passes |
+| 17 | no support window |
+| 18 | deferred with H-8 (a) |
+
+- **H-1: where the contract lives.** (a) A new spec `007` owning a new crate
+  (this draft); (b) new sections of `002`. (a) keeps `002`, already over 4000
+  lines, from owning distribution, and gives the store one owner; it adds a
+  spec and a crate. (b) needs no new spec but mixes lifecycle and
+  distribution. *Recommend (a),* reached by Part 9's route, which never
+  ratifies `007` ahead of its crate. Authority: adopt the contract as Part 9
+  step 1 describes, then ratify `007` in the pull request that brings its
+  crate, and name the crate.
+- **H-2: harness inside the bundle.** (a) The bundle fixes the harness
+  revision; (b) the harness requirement stays separately committed. (a) is one
+  identity to converge; (b) lets a project hold a harness back. *Recommend
+  (a),* keeping section 3.25's refusal rules. Authority: amend `002` section
+  3.25.
+- **H-3: producer and executable versions.** (a) Require equality; (b) allow a
+  qualified combination recorded in two fields. (a) is simple and false today
+  (0.23.0 library, 0.24.0 released CLI). *Recommend (b).* Authority: adopt
+  P1.1. *Selected (a) by owner Addendum 2, 2026-09-24,* replacing the
+  direction's (b): one release, one identity; P1.1 is written accordingly.
+- **H-4: authored inputs.** (a) A role on `managed` (recommended; three classes
+  stay); (b) a fourth class, amending section 3.2's "disjoint and exhaustive
+  three"; (c) transfer to `user` at initialization. Authority: amend `002`
+  sections 3.2, 3.5, 3.6 and 3.15.
+- **H-5: run lifetime.** (A) A run is fixed and ends, and the next run gets an
+  ordinal (recommended: keeps section 3.2's single base and section 3.16's
+  "resolved once" true, restores `interrupted`'s meaning, makes
+  `workspace::release` reachable). (B) Each attempt takes the current base,
+  rebasing the run's workspace and keeping the prior branch; a run still never
+  ends (keeps the run id; turns every retry into a rebase of work the product
+  did not author). Authority: amend `003` sections 3.2 and 3.4, and `006`
+  section 5.
+- **H-6: retries on a superseded or revoked bundle.** (a) Superseded: retries
+  and acceptance allowed, revoked: refused (recommended); (b) both refused;
+  (c) both allowed and flagged. Authority: adopt P9.1's last row.
+- **H-7: offline policy.** O1, O2 (recommended), O3, P9.3; under O2, the
+  grace bound G (14 days proposed), the publisher's validity period (7 days
+  proposed) and the clock skew (5 minutes proposed). Authority: adopt one
+  policy and its numbers.
+- **H-8: trust root for release metadata and bundles.** (a) Signed metadata,
+  which needs `F-03` (signing, key custody) lifted; (b) digests pinned in the
+  running binary for its co-bundled artifacts (P1.0) plus TLS to one fixed origin for metadata;
+  (c) TLS only. (a) is the only one that survives a compromised origin.
+  P9.4 rules 1 to 3 (no rollback, bounded freeze, digest binding) hold under
+  every option; rules 4 to 7 (key threshold, chained root rotation, removal
+  of a compromised key, root expiry, reset after threshold loss) apply under
+  (a). *Recommend (b) now and
+  (a) when `F-03` lifts,* with (b)'s residual stated in P9.4. (c) differs from
+  (b) only by dropping the embedded digests, which are what let a binary
+  verify its own bundle with no metadata at all (a first offline install).
+  Authority: a decision-record row, and lifting or keeping `F-03`, which also
+  decides key custody and the initial threshold. *Selected 2026-09-24:* (b)
+  initially; (a) and H-18 wait for `F-03`.
+- **H-9: publication.** Promotion, support windows and revocation are releases;
+  `F-02` defers all publication. Authority: lift `F-02` for bundle publication,
+  name the channel, or keep this proposal local until then. *Selected
+  2026-09-24:* `F-02` stays; Statecraft bundle publication is deferred, so Part
+  9 step 14 waits, and steps 1 to 13 are local work.
+- **H-10: `.tooling/bin` in resolution.** (a) Never consulted by a managed path
+  (recommended; reported only); (b) consulted when its digest equals the
+  adopted bundle's (harmless but redundant); (c) consulted first (reintroduces
+  F2). Authority: amend `002` section 3.23 and adopt P2.1.
+- **H-11: the adoption bootstrap, and a revoked source.** P6.2 splits an
+  adoption's judgment into A's mechanical comparison, the records that admit
+  B, and B's governance judgment, and (revision 4) never runs a revoked
+  bundle's programs, so P6.2 and P6.3 now agree. Where A is revoked: (a) a
+  recovery adoption with an owner authorization, compared by a verified
+  non-revoked recovery tool that is not the target where one exists, and by
+  the target only when the authorization says so (recommended; P6.2's
+  alternative iii, falling back to ii); (b) always the target's
+  `statecraft` (alternative ii); (c) no migration from a revoked source, only
+  re-initialization (alternative iv). Running revoked A (alternative i),
+  which revision 3 recommended, is withdrawn. Authority: adopt P6.2 with the
+  chosen form.
+- **H-12: scope of automatic mechanical migration, and verification cost.** The
+  scope in P6 (recommended), narrower, or none; and whether every use
+  digests the artifact or trusts unchanged metadata. *Recommend digesting on
+  every use:* a version string or an unchanged modification time is not
+  identity, and digesting an executable costs milliseconds against a
+  judgment. Authority: adopt the list.
+- **H-13: the hook's `target/release/spec-spine` rule.** (a) Keep it for
+  unmanaged use only (recommended); (b) remove it. Authority: amend `002`
+  section 3.23 contract 2. *Revised 2026-09-24:* F13 is now reproduced, and
+  the unmanaged half of this decision moves to a separate proposed amendment of
+  contract 2 (unmanaged selection checks each candidate against the
+  repository's pin; an incompatible explicit override refuses; an
+  incompatible convention candidate is never used and never skipped
+  silently). What stays here is the managed half: a managed session's hooks
+  use only the supervisor's resolved artifact (P3), because a matching version
+  string does not establish artifact identity. *Selected 2026-09-24:* the
+  managed half as written; the unmanaged half is the contract-2 amendment
+  with Q-1 (a), Q-2 (i) and Q-3 (b), decided and landed separately.
+- **H-14: this repository's own adoption.** Whether statecraft-cli's `Makefile`
+  and CI move from `.tooling/bin` to the store, and when. Authority: an
+  unclaimed-file change, decided by the owner, after `007`'s store exists.
+- **H-15: provider versions outside the bundle.** Whether a managed run refuses
+  a provider version the adopted bundle does not name, or runs it labelled
+  `unqualified` as spec `004` section 3.16 does today. *Recommend the label
+  plus a `doctor` finding, no refusal,* until qualification records are bound
+  by digest. Authority: amend `004` section 3.16.
+- **H-16: which producer release is qualified next (revised 2026-09-24).** The
+  CLI pin and the linked `spec-spine-core` both stay at `=0.23.0`, and there is
+  no intermediate adoption of 0.24.0: nothing in this corpus needs a capability
+  0.24.0 adds, and the one defect measured here that a newer producer fixes is
+  in 0.24.0 too. On 2026-09-24, in a disposable clone, a spec whose `id` named
+  a path outside the derived directory made `compile` overwrite a file outside
+  the repository under 0.23.0 and under the published 0.24.0 alike, while
+  exiting 1; spec-spine's specs 126 to 128 fix it on its `main` after `v0.24.0`
+  and are in no published release. The release qualified next is the next
+  published producer release that carries those corrections, and it is
+  selected and qualified by **exact identity**, not by version number: the tag
+  object and its target revision; each of `spec-spine-cli`, `spec-spine-core`
+  and `spec-spine-types` by version, registry checksum and recorded VCS
+  revision, with the unpacked source equal to that revision's tree; and the
+  installed executable by the install command, toolchain and lock file that
+  produced it and by its digest. A candidate built from a branch or an
+  unpublished revision is **candidate testing**: it can find a reason not to
+  adopt, and it qualifies nothing. **Published-package qualification** is the
+  `D-06` review of that exact identity, and it moves the CLI pin as its own
+  authority change with its own re-index and adoption record; the linked
+  `spec-spine-core` follows as a separate implementation change under this
+  spec, with real scaffold-conformance and initialization tests. **Bundle
+  qualification** (P1.3) is a third thing, over the one producer release
+  (its library and executable, P1.1) and the harness, and it exists only once `007`'s store does; a
+  qualified package is not a qualified bundle. If a concrete need for an
+  intermediate release appears first, it is stated with its measurement, and
+  that release is qualified the same way. Authority: `D-06` for the pin; this
+  spec for the linked library. *Selected 2026-09-24:* the target is the
+  published spec-spine 0.25.0, whose prepared source carries spec-spine's 126
+  to 129 (129 added the loader's rules to the JSON configuration the linked
+  library takes). It is qualified only after it is published and the
+  producer's registry-backed consumer check passes; the CLI pin moves first,
+  as its own `D-06` authority change, and the linked library follows under
+  this spec. Candidate testing, published-package qualification and bundle
+  qualification stay three separate records.
+- **H-17: a support window (an exception, not recommended).** The owner's
+  request requires convergence to one current qualified bundle, and P1.3
+  provides exactly that. If the owner nevertheless wants a superseded bundle
+  to keep starting new work for a stated period after a promotion, that is an
+  explicit exception to the requirement, recorded as such, with its period,
+  and every run it admits records `admittedBy: support-window`. *Recommend
+  no window;* the cost it would remove (new work stops until adoption merges)
+  is better paid by making adoption a mechanical, reviewable change (P6).
+  Authority: amend the requirement itself, not this proposal.
+- **H-18: signing threshold and threshold loss (only under H-8 (a)).** The
+  initial root threshold (2 of 3 recommended; 1 of 1 allowed and stated);
+  the channel that announces a reset root's digest; and whether P9.4 rule 7
+  exists. Without rule 7, losing the threshold means every home must be
+  reinstalled from nothing, which discards its sequence and revocation
+  memory. *Recommend rule 7 as written,* with a local authorization that no
+  download can supply. Authority: a decision-record row alongside `D-12`,
+  and `F-03`'s key custody. *Selected 2026-09-24:* deferred with H-8 (a);
+  nothing of rule 7 is built.
+
+**Part 9: Implementation sequence.**
+
+Dependency ordered, one owning spec per pull request, authority before the
+implementation it authorizes. Each step names what it needs.
+
+*How `007`'s authority precedes its code.* Part 2's measurement rules out
+both direct routes: a ratified `007` with no claim fails lint, and one
+claiming its unwritten crate fails `index check --fail-on-unresolved`. Two
+routes that fail nothing remain, and neither adds a placeholder crate:
+
+- **Route P (adopted 2026-09-24): planned claims, then the normal route.**
+  spec-spine is adding planned claims, announced for 0.26.0: an approved spec
+  may claim a unit that does not exist yet, declared as planned, without
+  `index check --fail-on-unresolved` refusing it. Step 1 adopts this entry's
+  requirements here in `002`, binding from its merge. Once that release is
+  published and adopted under `D-06`, with its qualification covering planned
+  claims, `007` is created through the normal route: a `spec(007)` draft whose
+  requirements are this entry's, moved without change (a mechanical diff
+  recorded in the pull request), with `crates/statecraft-bundle/` as a planned
+  claim; the owner ratifies it; then `feat(007)` builds it. From `007`'s
+  ratification its requirements supersede this entry's, which a later
+  `spec(002)` change marks moved, so the two never bind at once. No pull
+  request builds code a ratified spec does not claim, and the gate is
+  unchanged.
+- **Route R1 (fallback only, not adopted): adopt in `002`, relocate with the
+  crate.** Used only if the producer's planned-claim feature is refused or
+  proves unusable, and then only by the owner's separate adoption of
+  `r1-exception-text.md`. Its text as proposed is kept below. Step 1
+  turns the parts of this entry the owner accepts into an **adopted** decision
+  entry here in `002` section 5, amended as decided, which is valid under the
+  gate today because `002` already claims territory, and which is binding from
+  its merge. The first `feat(007)` pull request then creates `spec 007` whose
+  requirements are that adopted text, moved without change, together with the
+  first real slice of its crate; the owner ratifies `007` in that pull
+  request, and the gate sees a claim and the code it claims at once. `002`'s
+  entry is then marked as moved to `007`. Authority precedes code because
+  the requirements were adopted in step 1; the pull request that creates
+  `007` adds no requirement, which review can check by comparing the two
+  texts.
+  *The authority each step of R1 needs, under this repository's rules* (an
+  agent never ratifies, never adopts, and builds nothing a ratified spec does
+  not claim; AGENTS.md, "Approval semantics" and "New sessions"):
+  1. **Requirements first.** The owner adopts the requirement text itself
+     (not a summary and not a pointer to this proposal) as a dated `002`
+     section 5 entry, with the H-answers written in. From its merge it binds
+     as `002`'s, and it is `002`'s only until step 3.
+  2. **The relocation is authorized in the same entry, in these words or
+     equivalent:** "The owner authorizes creating spec `007` whose
+     requirements are this entry's, moved without change, in the pull request
+     that brings the first slice of the crate it claims; that pull request
+     may add ownership edges, section 2 territory and a verification block,
+     and nothing that adds or alters a requirement." It also names the crate
+     and the first slice's scope. This is what lets an implementation branch
+     open for a spec that is not yet ratified: the authority is `002`'s
+     adopted entry, not `007`'s draft.
+  3. **Ratification stays the owner's act.** The `feat(007)` pull request
+     carries `007` as `draft`; the owner changes it to `approved` in that pull
+     request, after review has compared its requirement text with step 1's
+     byte for byte (a mechanical diff recorded in the pull request). An
+     agent does not flip it. From that merge, `002`'s entry is superseded by
+     `007` for those requirements, as the entry says in advance, so the two
+     never bind at once; a later `spec(002)` change only marks it moved.
+  4. **The gate is unchanged.** `index check --fail-on-unresolved` stays;
+     `007` claims `crates/statecraft-bundle/` only in the pull request that
+     writes it, with real code and tests (no empty crate, no placeholder
+     module, no claim ahead of code).
+  5. **It is an exception, and a narrow one.** Step 2 authorizes one pull
+     request to build code that a ratified spec does not yet claim, which
+     AGENTS.md otherwise forbids ("Working the backlog", "Approval
+     semantics"). It covers only the first `feat(007)` pull request, only
+     requirements already adopted in step 1, and only with the relocation
+     shown unchanged; it is not a general waiver of ratify-before-build, and
+     it grants no other spec, crate or slice anything. The exact text proposed
+     for the owner's review is kept with this entry's evidence
+     (`r1-exception-text.md`).
+- **Route R2: remove the flag deliberately.** AGENTS.md names removing
+  `--fail-on-unresolved` "deliberately, as its own change" as the case for a
+  spec that must claim ahead. That is a change to the `Makefile`, an unclaimed
+  authority change, and it weakens the gate for every spec until restored. It
+  is listed because AGENTS.md provides for it, not recommended.
+
+Under route P (the numbering is kept from the proposal):
+
+1. `spec(002)` section 5: adopt this entry's accepted parts as a decision,
+   binding, with the owner's H-answers written in. **Done 2026-09-24** by this
+   entry's adoption; route P replaces R1's narrow authority for `007`. Needs H-1 to H-3, H-5 to H-8, H-10 to H-12 and H-17
+   (H-18 is deferred with H-8 (a)).
+2. `spec(001)`: authority set names the adopted bundle; proposed rows `D-11`,
+   `D-12`; `D-06` amendment. Needs H-8, H-9.
+3. `spec(002)`, in two separable changes, so that step 6 waits only on what it
+   uses:
+   - **3a, provenance:** the `role` of P8 (H-4), `pins.producer` and what
+     `pins.spec_spine` records, and the explicit `[index]` of P8.2. Needs H-4
+     only, and no bundle concept: it names no bundle identity, store or
+     resolution. Its proposed text is kept with this entry's evidence
+     (`provenance-slice-authority.md`), for the owner to adopt alone.
+   - **3b, bundle-bound:** `pins.bundle`, the managed half of section 3.23
+     contract 2 (`STATECRAFT_SPEC_SPINE`, H-13), `.tooling/bin` (H-10) and
+     section 3.25's harness requirement as the bundle's (H-2). Needs step 1.
+     The unmanaged half of contract 2 is the separate amendment already
+     decided (Q-1 (a), Q-2 (i), Q-3 (b)), not this step.
+4. `spec(003)` then `spec(006)` section 5: run lifetime and run identity.
+   Needs H-5.
+5. `spec(005)`: judge identity in receipts; CI reproduction. Needs step 2.
+6. `feat(002)`: explicit `[index]`, `pins.producer`, authored-input role
+   (closes C-04 and C-04a, and C-02's recording half) with cases 8 and 9, and
+   case 6's rows that need no bundle (producer, executable and project pin
+   disagreeing). Independent of the store and of steps 1, 2 and 3b; it may
+   land first, after step 3a. This is the **independent provenance slice**,
+   and it is the first implementation the selected direction prioritizes.
+7. After the planned-claim release is adopted: `spec(007)` as a draft from
+   step 1's adopted text, with a planned claim; the owner's ratification; then
+   `feat(007)`, the first slice of
+   `crates/statecraft-bundle/`: bundle manifest, identity, store,
+   verification, locking, recovery, `bundle show | import | gc`, no network.
+   Cases 1, 15, A1.
+8. `feat(007)`: the one resolution; every site of F2 routed through
+   it by `extends` edges; hooks get `STATECRAFT_SPEC_SPINE`. Cases 5, A5.
+   Closes C-03.
+9. `feat(003)`: run lifetime, `ResolvedRun` written by `run`, `run end`. Cases
+   2 (run half), 4, A4.
+10. `feat(007)`: `bundle adopt plan | apply`, the P6.1 transaction and its
+    recovery, stepped convergence, the behind refusal and its table. Cases 3,
+    10, 11, 14, A3, A8 (its local half), A9 (its local half), A10, A11 (its
+    local half), A13, A14, A15 (its local half).
+11. `feat(005)`: judge from the frozen resolution; receipts record it; the
+    P6.2 comparison. Case A2.
+12. Unclaimed change, owner's act: CI reads the base's bundle (or, before
+    adoption, the merge base's pin). Case 13 (external evidence).
+13. `feat(007)`: release metadata with P9.2's list rules, offline policy O2,
+    P9.4 rules 1 to 3, and `bundle fetch`. Cases 12, A6, A7. Needs H-7 and
+    H-8. Under the selected H-8 (b), `trust reset`, P9.4 rules 4 to 7 and case
+    A12 are not built; they would be a later step of their own once `F-03`
+    lifts and the owner adopts H-8 (a) and H-18.
+14. Release qualification of the first bundle, and its promotion. Case 7 and
+    P1.2. Needs H-9, which the selected direction keeps deferred under
+    `F-02`: this step does not start until the owner lifts it.
+
+**Part 10: What this proposal does not do.**
+
+It implements nothing, commits nothing, publishes nothing, bumps no pin,
+touches no real product home, runs no provider session, and modifies neither
+spec-spine nor rustev. It does not centralize application dependencies, add a
+background service, or claim that any case above was tested.
+
 ## Verification
 
 `--fail-on-untraced` joined the corpus gate with this spec's first

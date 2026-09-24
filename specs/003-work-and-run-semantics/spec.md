@@ -1330,6 +1330,27 @@ product opens is close-on-exec and no executed program keeps one. Linux's open-f
 rejected: they belong to the description too, so a child's copy would hold them
 the same way. The tests were not serialized and nothing retries.
 
+**2026-09-23: PROPOSED, NOT ADOPTED. When a run ends, what base a later attempt
+uses, and which bundle and harness it follows.** This entry binds nothing and
+changes no behavior. The question is stated, with its measurements, as F7 of
+spec `002` section 5's proposed entry of the same date ("One qualified release
+bundle ..."), and the two options are its decision H-5: (A) a run's base
+commit, bundle and harness requirement are resolved at its first attempt and
+reused by every later attempt, and a run ends when an attempt concludes
+`completed` and its acceptance is recorded, or when the operator ends it,
+which releases the workspace and makes the next `run <spec>` a new run with an
+ordinal; or (B) each attempt resolves its own base and the run's workspace is
+moved to it, keeping the previous branch, and a run never ends. The proposal
+prefers (A), and on 2026-09-24 the owner selected (A) as the design direction,
+which adopts nothing. Until the owner adopts it in this spec's own change, the
+established behavior stands: the run
+id is the spec id (spec `006` section 5, 2026-09-17), a run never ends, and a
+retry after the target's `HEAD` moved concludes `interrupted`. The proposal is
+kept in one place so that this spec and spec `002` do not carry competing
+versions of it. Spec `002`'s entry was adopted as its Part 9 step 1 on
+2026-09-24; that adoption does not reach this spec, whose part (Part 9 step
+4, H-5) is still not adopted here.
+
 ## Verification
 
 Each line is one command. §3.8's twenty-two rows are integration tests named after
