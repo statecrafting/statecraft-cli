@@ -282,11 +282,13 @@ rules, so that adopting a release is its own change and needs no waiver:
    `docs/adoption/spec-spine.md`, which no spec claims. This row keeps only the
    decision. The dated entries that stood here (2026-09-17, 2026-09-23 and
    2026-09-24) were relocated there verbatim.
-3. **One change may move the CLI pin and the linked library together** when
-   both come from the same release. Their identities are still recorded
-   separately in the ledger entry: one identity block for the binary and one
-   for each crate. Moving them in one change is a convenience, never a merged
-   identity.
+3. **The CLI and the linked library are one producer identity** (owner
+   Addendum 2 of 2026-09-24, bundle decision H-3 (a): equality, replacing the
+   earlier two-field choice). Both are the same spec-spine release, they move
+   in the same change, and the ledger entry records one identity: the release
+   (tag and target revision) with each artifact's checksum and install digest
+   under it. Two pins naming different releases are a defect, refused by a
+   test, not a combination to qualify.
 
 **Consequence if rejected.** The pin stays exact and repository-local, but each
 adoption edits this record, which spec `001` claims, and so needs either an
@@ -620,9 +622,9 @@ A-1: "I adopt this direction"), and ratifies it by merging the change that
 carries this entry. `D-06`'s recommendation and reason are unchanged. Its three
 added rules are in the row itself: one stated source for each pin
 (`spec-spine.toml` for the CLI, the root `Cargo.toml` for the linked library),
-per-release entries in `docs/adoption/spec-spine.md`, and one change allowed
-to move the CLI and the library together from the same release, with their
-identities recorded separately.
+per-release entries in `docs/adoption/spec-spine.md`, and one producer
+identity: the CLI and the library are the same release and move together
+(H-3 (a), owner Addendum 2 of 2026-09-24).
 
 **Why.** The 0.25.0 adoption (#102) edited this record, which spec `001`
 claims, so the coupling gate raised `C-001` and the change merged only under a
