@@ -22,7 +22,7 @@
 //! | Contract | Hooks it binds | Tests |
 //! |---|---|---|
 //! | 1 read, never repair | all four | `contract_1_*` |
-//! | 2 binary resolution order | session-start, stop, post-edit | `contract_2_*` |
+//! | 2 binary resolution order, and the pin (amended 2026-09-24) | all four | `contract_2_*`, `pin_*` |
 //! | 3 target from the command | post-edit, pre-bash | `contract_3_*` |
 //! | 4 read the verdict, never guess it | session-start, stop | `contract_4_*` |
 //! | 5 establish the verb first | session-start, stop | `contract_5_*` |
@@ -56,6 +56,10 @@ fn hook_body(file: &str) -> String {
 /// The real path this repository uses, so the test exercises the shape the
 /// hook meets rather than a convenient one.
 const DERIVED_DIR: &str = ".statecraft/derived";
+
+/// The version every stub that carries the verbs reports, and the pin a
+/// default fixture declares, so the stubs are compatible by construction.
+const STUB_PIN: &str = "=9.9.9";
 
 const SESSION_START: &str = "statecraft-session-start.sh";
 const POST_EDIT: &str = "statecraft-post-edit.sh";
@@ -152,17 +156,25 @@ struct Fixture {
 }
 
 impl Fixture {
-    /// A fixture whose repository carries the manifest that makes it managed.
+    /// A fixture whose repository carries the manifest that makes it managed,
+    /// pinned to the version every carrying stub reports, so contract 2's
+    /// compatibility test admits the stubs and each older test keeps its
+    /// meaning.
     fn new() -> Self {
-        Self::build(true)
+        Self::build(true, Some(STUB_PIN))
+    }
+
+    /// A managed fixture with a chosen pin, or none at all.
+    fn pinned(pin: Option<&str>) -> Self {
+        Self::build(true, pin)
     }
 
     /// A fixture whose repository is an ordinary one, with no manifest.
     fn unmanaged() -> Self {
-        Self::build(false)
+        Self::build(false, Some(STUB_PIN))
     }
 
-    fn build(managed: bool) -> Self {
+    fn build(managed: bool, pin: Option<&str>) -> Self {
         let dir = tempfile::tempdir().unwrap();
         let root = dir.path().join("repo");
         std::fs::create_dir_all(root.join("specs/000-x")).unwrap();
@@ -170,6 +182,13 @@ impl Fixture {
         if managed {
             std::fs::create_dir_all(root.join(".statecraft")).unwrap();
             std::fs::write(root.join(".statecraft/environment.json"), "{}").unwrap();
+        }
+        if let Some(pin) = pin {
+            std::fs::write(
+                root.join("spec-spine.toml"),
+                format!("[meta]\nrequired_version = \"{pin}\"\n"),
+            )
+            .unwrap();
         }
         let out = Command::new("git")
             .args(["init", "--quiet", "--initial-branch=main"])
@@ -369,6 +388,8 @@ impl Fixture {
             .env("PATH", fixture_path(&self.path_dir))
             .env("CLAUDE_PROJECT_DIR", &self.root)
             .env_remove("SPEC_SPINE_BIN")
+            .env_remove("STATECRAFT_SPEC_SPINE")
+            .env_remove("STATECRAFT_RUN_ID")
             .envs(self.isolated());
         for (k, v) in env {
             cmd.env(k, v);
@@ -387,6 +408,8 @@ impl Fixture {
             .env("PATH", fixture_path(&self.path_dir))
             .env("CLAUDE_PROJECT_DIR", &self.root)
             .env_remove("SPEC_SPINE_BIN")
+            .env_remove("STATECRAFT_SPEC_SPINE")
+            .env_remove("STATECRAFT_RUN_ID")
             .envs(self.isolated())
             .envs(env.iter().copied())
             .stdin(Stdio::piped())
@@ -777,7 +800,9 @@ fn contract_4_an_unresolved_claim_is_distinguished_from_staleness() {
 #[test]
 fn contract_5_a_missing_verb_is_not_reported_as_stale() {
     for file in [SESSION_START, STOP] {
-        let fixture = Fixture::new();
+        // Pinned to the version the old binary reports, so contract 2 admits
+        // it and contract 5 is what is measured.
+        let fixture = Fixture::pinned(Some("=0.0.1"));
         fixture.stub(&fixture.path_dir.join("spec-spine"), "path", 2, false);
         let out = fixture.run_project(file, &[]);
         let seen = text(&out);
@@ -1340,4 +1365,436 @@ fn the_session_start_hook_acknowledges_nothing_outside_a_project() {
     assert!(out.status.success());
     assert!(out.stdout.is_empty(), "{}", text(&out));
     fixture.assert_nothing_ran();
+}
+
+// ---------------------------------------------------------------------------
+/// macOS spells a temporary directory both with and without `/private`, and
+/// git answers with the resolved spelling, so paths are compared normalised.
+fn norm(s: &str) -> String {
+    s.replace("/private/var/", "/var/")
+        .replace("/private/tmp/", "/tmp/")
+}
+
+// Contract 2 as amended on 2026-09-24 (section 5): the selected binary is
+// checked against the repository's pin. One test per acceptance obligation.
+// ---------------------------------------------------------------------------
+
+/// What a versioned stub answers to a bare `config show`, the probe a
+/// non-exact pin is put to.
+#[derive(Clone, Copy)]
+enum Probe {
+    /// The configuration loads: the binary satisfies the pin.
+    Admits,
+    /// spec-spine's own refusal at configuration load.
+    RefusesThePin,
+    /// Exit 3 for another reason: not a compatibility verdict.
+    OtherFailure,
+}
+
+impl Fixture {
+    /// A stub reporting `version`, which logs every invocation with its
+    /// arguments to `calls`, and whose `check` answers stale unless
+    /// `STUB_CHECK_EXIT=0` asks for fresh, so a test can tell `--version` from `check` and
+    /// `compile` and can assert a binary was never invoked at all.
+    fn versioned(&self, at: &Path, label: &str, version: &str, probe: Probe) {
+        let calls = self.root.join("calls");
+        let probe = match probe {
+            Probe::Admits => "exit 0".to_string(),
+            Probe::RefusesThePin => "echo 'config error: this repository requires spec-spine >=0.23, <0.24 (spec-spine.toml [meta] required_version)' >&2; exit 3".to_string(),
+            Probe::OtherFailure => "echo 'config error: spec-spine.toml: parse error' >&2; exit 3".to_string(),
+        };
+        let body = format!(
+            "#!/bin/sh\nprintf '%s %s\\n' '{label}' \"$*\" >> '{calls}'\n\
+             case \"$1\" in --version) echo 'spec-spine {version}'; exit 0 ;; esac\n\
+             case \"$1 $2\" in 'check --help') exit 0 ;; esac\n\
+             case \" $* \" in\n\
+             *' config show --json '*) printf '%s\\n' '{{\"layout\":{{\"derived_dir\":\"{DERIVED_DIR}\"}}}}'; exit 0 ;;\n\
+             *' config show '*) {probe} ;;\n\
+             *' check '*) if [ \"${{STUB_CHECK_EXIT:-2}}\" = 0 ]; then printf 'spec-registry: fresh\\ncodebase-index: fresh\\n'; exit 0; fi; printf 'spec-registry: fresh\\ncodebase-index: STALE\\n'; exit 2 ;;\n\
+             esac\nexit 0\n",
+            calls = calls.display(),
+        );
+        executable(at, &body);
+    }
+
+    fn calls(&self) -> String {
+        std::fs::read_to_string(self.root.join("calls")).unwrap_or_default()
+    }
+
+    /// Whether `label` was invoked with an argument list containing `verb`.
+    fn invoked(&self, label: &str, verb: &str) -> bool {
+        self.calls().lines().any(|l| {
+            l.strip_prefix(label)
+                .and_then(|rest| rest.strip_prefix(' '))
+                .is_some_and(|args| args.split_whitespace().any(|a| a == verb))
+        })
+    }
+
+    fn never_invoked(&self, label: &str) -> bool {
+        !self
+            .calls()
+            .lines()
+            .any(|l| l.split(' ').next() == Some(label))
+    }
+
+    fn repo_build(&self) -> PathBuf {
+        self.root.join("target/release/spec-spine")
+    }
+
+    fn on_path(&self) -> PathBuf {
+        self.path_dir.join("spec-spine")
+    }
+
+    /// Run any of the four hooks the way its event runs it: a session hook
+    /// against the project, post-edit on a spec edit, pre-bash on a
+    /// pull-request create.
+    fn run_any(&self, file: &str, env: &[(&str, &str)]) -> Output {
+        match file {
+            POST_EDIT => {
+                let spec = self.root.join("specs/000-x/spec.md");
+                self.run_payload(POST_EDIT, &edit_payload(&spec), env)
+            }
+            PRE_BASH => {
+                // The gate's green path: `check` answers fresh, so the
+                // verdict measured is the resolver's. The advisory hooks get
+                // a stale answer instead, because the Stop hook is silent on
+                // a fresh tree and every verdict line is asserted below.
+                let mut env = env.to_vec();
+                env.push(("SPEC_SPINE_DEFAULT_BRANCH", "main"));
+                env.push(("STUB_CHECK_EXIT", "0"));
+                let payload = bash_payload("gh pr create --title x --body y", &self.root);
+                self.run_payload(PRE_BASH, &payload, &env)
+            }
+            _ => self.run_project(file, env),
+        }
+    }
+}
+
+/// A pinned fixture whose tree is committed, so the pull-request gate's
+/// derived-tree reads find a clean tree and the verdict is the resolver's.
+fn pinned_fixture(pin: Option<&str>) -> Fixture {
+    let fixture = Fixture::pinned(pin);
+    fixture.write_derived("spec-registry.json", "{}\n");
+    fixture.commit_everything("the committed tree");
+    fixture
+}
+
+/// Obligations 1 and 11: an incompatible repository build is passed over and
+/// named, the compatible binary on `PATH` judges, and the verdict names it.
+#[test]
+fn pin_an_incompatible_repository_build_is_passed_over_and_named() {
+    for file in ALL {
+        let fixture = pinned_fixture(Some("=0.23.0"));
+        fixture.versioned(&fixture.repo_build(), "repo", "0.24.0", Probe::Admits);
+        fixture.versioned(&fixture.on_path(), "path", "0.23.0", Probe::Admits);
+        let out = fixture.run_any(file, &[]);
+        let seen = norm(&text(&out));
+        assert!(
+            out.status.success(),
+            "{file} refused though a compatible binary exists: {seen}"
+        );
+        assert!(
+            fixture.invoked("path", "check"),
+            "{file}: the compatible binary did not judge: {}",
+            fixture.calls()
+        );
+        assert!(
+            !fixture.invoked("repo", "check") && !fixture.invoked("repo", "compile"),
+            "{file}: the incompatible build judged: {}",
+            fixture.calls()
+        );
+        let repo = norm(&fixture.repo_build().display().to_string());
+        assert!(
+            seen.contains(&format!("passed over {repo}"))
+                && seen.contains("0.24.0")
+                && seen.contains("=0.23.0"),
+            "{file} did not name the build it passed over: {seen}"
+        );
+        // Obligation 11: the verdict names path, version, rule and pin.
+        let path = norm(&fixture.on_path().display().to_string());
+        assert!(
+            seen.contains(&format!("judged by {path} (0.23.0, PATH; pin =0.23.0 from")),
+            "{file}'s verdict does not name its judge: {seen}"
+        );
+    }
+}
+
+fn assert_not_performed(file: &str, out: &Output) {
+    let seen = text(out);
+    if file == PRE_BASH {
+        assert!(
+            !out.status.success(),
+            "the gate allowed the operation with no admitted binary: {seen}"
+        );
+    } else {
+        assert!(out.status.success(), "{file} blocked: {seen}");
+    }
+    assert!(
+        seen.contains("NOT PERFORMED"),
+        "{file} did not report the check as not performed: {seen}"
+    );
+}
+
+/// Obligations 2 and 11: an incompatible override refuses without falling
+/// back, and says which override, what it reports, the pin and both remedies.
+#[test]
+fn pin_an_incompatible_override_refuses_without_fallback() {
+    for file in ALL {
+        let fixture = pinned_fixture(Some("=0.23.0"));
+        let named = fixture.root.join("named-spec-spine");
+        fixture.versioned(&named, "named", "0.24.0", Probe::Admits);
+        fixture.versioned(&fixture.on_path(), "path", "0.23.0", Probe::Admits);
+        let named_s = named.display().to_string();
+        let out = fixture.run_any(file, &[("SPEC_SPINE_BIN", &named_s)]);
+        assert_not_performed(file, &out);
+        assert!(
+            fixture.never_invoked("path"),
+            "{file} fell back past the override: {}",
+            fixture.calls()
+        );
+        assert!(!fixture.invoked("named", "check"));
+        let seen = norm(&text(&out));
+        for needle in [
+            &format!("SPEC_SPINE_BIN={}", norm(&named_s)) as &str,
+            "reports 0.24.0",
+            "=0.23.0",
+            "Unset SPEC_SPINE_BIN",
+            "point it at a binary that satisfies the pin",
+        ] {
+            assert!(seen.contains(needle), "{file} omits {needle:?}: {seen}");
+        }
+    }
+}
+
+/// Obligation 3: an override naming no executable refuses; never a silent
+/// skip to the next rule.
+#[test]
+fn pin_an_override_naming_no_executable_refuses() {
+    for file in ALL {
+        let fixture = pinned_fixture(Some("=0.23.0"));
+        fixture.versioned(&fixture.on_path(), "path", "0.23.0", Probe::Admits);
+        let missing = fixture
+            .root
+            .join("no-such-spec-spine")
+            .display()
+            .to_string();
+        let out = fixture.run_any(file, &[("SPEC_SPINE_BIN", &missing)]);
+        assert_not_performed(file, &out);
+        assert!(fixture.never_invoked("path"), "{file}: {}", fixture.calls());
+        assert!(
+            norm(&text(&out)).contains("names no executable")
+                && norm(&text(&out)).contains(&norm(&missing)),
+            "{file}: {}",
+            text(&out)
+        );
+    }
+}
+
+/// Obligation 4: candidates present, none compatible: the gate refuses, the
+/// advisory hooks say not performed, and every candidate is listed.
+#[test]
+fn pin_no_compatible_candidate_is_not_performed_and_lists_them() {
+    for file in ALL {
+        let fixture = pinned_fixture(Some("=0.23.0"));
+        fixture.versioned(&fixture.repo_build(), "repo", "0.24.0", Probe::Admits);
+        fixture.versioned(&fixture.on_path(), "path", "0.22.0", Probe::Admits);
+        let out = fixture.run_any(file, &[]);
+        assert_not_performed(file, &out);
+        let seen = norm(&text(&out));
+        for (p, v) in [
+            (fixture.repo_build(), "0.24.0"),
+            (fixture.on_path(), "0.22.0"),
+        ] {
+            assert!(
+                seen.contains(&format!("passed over {}", norm(&p.display().to_string())))
+                    && seen.contains(v),
+                "{file} did not list {}: {seen}",
+                p.display()
+            );
+        }
+        assert!(!fixture.invoked("repo", "check") && !fixture.invoked("path", "check"));
+    }
+}
+
+/// Obligations 5 and 11: an unpinned repository is judged by the first
+/// candidate, says so on every verdict line, and the post-edit hook withholds
+/// its compile while the check still runs.
+#[test]
+fn pin_an_unpinned_repository_says_so_and_withholds_the_compile() {
+    for file in ALL {
+        let fixture = pinned_fixture(None);
+        fixture.versioned(&fixture.repo_build(), "repo", "0.24.0", Probe::Admits);
+        fixture.versioned(&fixture.on_path(), "path", "0.23.0", Probe::Admits);
+        let out = fixture.run_any(file, &[]);
+        let seen = norm(&text(&out));
+        assert!(
+            fixture.invoked("repo", "check"),
+            "{file}: {}",
+            fixture.calls()
+        );
+        assert!(fixture.never_invoked("path"), "{file}: {}", fixture.calls());
+        let repo = norm(&fixture.repo_build().display().to_string());
+        assert!(
+            seen.contains(&format!(
+                "judged by {repo} (0.24.0, repository build; unpinned)"
+            )),
+            "{file}'s verdict does not say unpinned: {seen}"
+        );
+        if file == POST_EDIT {
+            assert!(
+                !fixture.invoked("repo", "compile"),
+                "an unpinned repository's shards were rewritten: {}",
+                fixture.calls()
+            );
+            assert!(seen.contains("compile WITHHELD"), "{seen}");
+        }
+    }
+}
+
+/// Obligation 6: a pinned repository with a compatible binary keeps contract
+/// 1's sanctioned compile.
+#[test]
+fn pin_a_compatible_binary_keeps_the_sanctioned_compile() {
+    let fixture = pinned_fixture(Some("=0.23.0"));
+    fixture.versioned(&fixture.on_path(), "path", "0.23.0", Probe::Admits);
+    let out = fixture.run_any(POST_EDIT, &[]);
+    assert!(fixture.invoked("path", "compile"), "{}", text(&out));
+    assert!(
+        norm(&text(&out)).contains("recompiled after spec edit"),
+        "{}",
+        text(&out)
+    );
+}
+
+/// Obligation 7: a non-exact requirement is put to the binary, and one the
+/// probe refuses is passed over for the next.
+#[test]
+fn pin_a_non_exact_requirement_is_decided_by_the_probe() {
+    for file in ALL {
+        let fixture = pinned_fixture(Some(">=0.23, <0.24"));
+        fixture.versioned(
+            &fixture.repo_build(),
+            "repo",
+            "0.24.0",
+            Probe::RefusesThePin,
+        );
+        fixture.versioned(&fixture.on_path(), "path", "0.23.5", Probe::Admits);
+        let out = fixture.run_any(file, &[]);
+        assert!(out.status.success(), "{file}: {}", text(&out));
+        assert!(fixture.invoked("repo", "config"), "{file}: no probe ran");
+        assert!(
+            fixture.invoked("path", "check"),
+            "{file}: {}",
+            fixture.calls()
+        );
+        assert!(
+            !fixture.invoked("repo", "check"),
+            "{file}: {}",
+            fixture.calls()
+        );
+        assert!(
+            norm(&text(&out)).contains("passed over"),
+            "{file}: {}",
+            text(&out)
+        );
+    }
+}
+
+/// Obligation 8: a probe that fails for another reason is not a verdict, and
+/// no later candidate is tried.
+#[test]
+fn pin_a_probe_that_fails_otherwise_is_not_performed() {
+    for file in ALL {
+        let fixture = pinned_fixture(Some(">=0.23, <0.24"));
+        fixture.versioned(&fixture.repo_build(), "repo", "0.23.1", Probe::OtherFailure);
+        fixture.versioned(&fixture.on_path(), "path", "0.23.5", Probe::Admits);
+        let out = fixture.run_any(file, &[]);
+        assert_not_performed(file, &out);
+        assert!(fixture.never_invoked("path"), "{file}: {}", fixture.calls());
+        assert!(
+            norm(&text(&out)).contains("probe failed"),
+            "{file}: {}",
+            text(&out)
+        );
+    }
+}
+
+/// Obligations 9 and 11: in a managed session the supervisor's binary is the
+/// only candidate; one that is not executable refuses as rule 2 does.
+#[test]
+fn pin_the_supervisors_binary_is_the_only_candidate() {
+    for file in ALL {
+        let fixture = pinned_fixture(Some("=0.23.0"));
+        let supervised = fixture.root.join("supervised-spec-spine");
+        let named = fixture.root.join("named-spec-spine");
+        fixture.versioned(&supervised, "supervisor", "0.23.0", Probe::Admits);
+        fixture.versioned(&named, "named", "0.23.0", Probe::Admits);
+        fixture.versioned(&fixture.repo_build(), "repo", "0.23.0", Probe::Admits);
+        fixture.versioned(&fixture.on_path(), "path", "0.23.0", Probe::Admits);
+        let sup = supervised.display().to_string();
+        let sup_n = norm(&sup);
+        let named_s = named.display().to_string();
+        let env = [
+            ("STATECRAFT_SPEC_SPINE", sup.as_str()),
+            ("STATECRAFT_RUN_ID", "003-x"),
+            ("SPEC_SPINE_BIN", named_s.as_str()),
+        ];
+        let out = fixture.run_any(file, &env);
+        assert!(out.status.success(), "{file}: {}", text(&out));
+        assert!(
+            fixture.invoked("supervisor", "check"),
+            "{file}: {}",
+            fixture.calls()
+        );
+        for other in ["named", "repo", "path"] {
+            assert!(
+                fixture.never_invoked(other),
+                "{file} invoked {other}: {}",
+                fixture.calls()
+            );
+        }
+        assert!(
+            norm(&text(&out)).contains(&format!(
+                "judged by {sup_n} (0.23.0, supervisor; pin =0.23.0"
+            )),
+            "{file}: {}",
+            text(&out)
+        );
+        assert!(
+            !norm(&text(&out)).contains("identity not verified"),
+            "{}",
+            text(&out)
+        );
+
+        // Not executable: refused, nothing else consulted.
+        let fixture = pinned_fixture(Some("=0.23.0"));
+        fixture.versioned(&fixture.on_path(), "path", "0.23.0", Probe::Admits);
+        let gone = fixture.root.join("gone").display().to_string();
+        let out = fixture.run_any(file, &[("STATECRAFT_SPEC_SPINE", gone.as_str())]);
+        assert_not_performed(file, &out);
+        assert!(fixture.never_invoked("path"), "{file}: {}", fixture.calls());
+        assert!(
+            norm(&text(&out)).contains("STATECRAFT_SPEC_SPINE"),
+            "{}",
+            text(&out)
+        );
+    }
+}
+
+/// Obligation 10: a managed session without the supervisor's path is resolved
+/// by rules 1 to 4 and says its identity was not verified.
+#[test]
+fn pin_a_managed_session_without_the_supervisors_path_is_only_version_checked() {
+    for file in ALL {
+        let fixture = pinned_fixture(Some("=0.23.0"));
+        fixture.versioned(&fixture.on_path(), "path", "0.23.0", Probe::Admits);
+        let out = fixture.run_any(file, &[("STATECRAFT_RUN_ID", "003-x")]);
+        assert!(out.status.success(), "{file}: {}", text(&out));
+        assert!(fixture.invoked("path", "check"));
+        assert!(
+            norm(&text(&out)).contains("version-checked, identity not verified"),
+            "{file}: {}",
+            text(&out)
+        );
+    }
 }

@@ -83,17 +83,116 @@ case "$cmd" in 'git push'*|*'&& git push'*|*'; git push'*)
 esac
 
 case "$cmd" in 'gh pr create'*|*'&& gh pr create'*|*'; gh pr create'*) ;; *) exit 0 ;; esac
-# Resolve the spec-spine binary for the repository this hook acts on:
-# $SPEC_SPINE_BIN, then that repository's own release build, then PATH. A repo
-# that builds its own binary must be governed by the one it builds; the PATH
-# fallback keeps an adopter on the published CLI working (spec 093).
-spec_spine_bin() {
-  if [ -n "${SPEC_SPINE_BIN:-}" ] && [ -x "${SPEC_SPINE_BIN}" ]; then echo "${SPEC_SPINE_BIN}"; return 0; fi
-  if [ -x "$1/target/release/spec-spine" ]; then echo "$1/target/release/spec-spine"; return 0; fi
-  command -v spec-spine 2>/dev/null
+# Spec 002 section 3.23 contract 2, as amended on 2026-09-24 (section 5):
+# resolve the binary, then establish that the repository admits it. The same
+# resolver is in all four hooks. A managed session's supervisor path
+# (STATECRAFT_SPEC_SPINE) is the only candidate when it is set. Otherwise an
+# explicit $SPEC_SPINE_BIN is the only candidate, and a broken or incompatible
+# one refuses rather than falling back. Otherwise the repository's own
+# target/release/spec-spine, then PATH, and the first one compatible with the
+# repository's pin ([meta] required_version) judges; each one passed over is
+# named. An unpinned repository takes the first candidate and says it is
+# unpinned. Returns 0 with sc set, 1 with sc_why set (not performed), or 2
+# when no candidate exists at all.
+spec_spine_pin() {
+  [ -f "$1/spec-spine.toml" ] || return 0
+  awk '
+    /^[[:space:]]*\[/ { t=$0; sub(/#.*/, "", t); gsub(/[[:space:]]/, "", t); inmeta = (t == "[meta]"); next }
+    inmeta && /^[[:space:]]*required_version[[:space:]]*=/ {
+      s=$0; sub(/^[^=]*=[[:space:]]*/, "", s)
+      if (substr(s, 1, 1) == "\"") { s=substr(s, 2); i=index(s, "\""); if (i > 0) { print substr(s, 1, i-1); exit } }
+    }' "$1/spec-spine.toml" 2>/dev/null
 }
-sc=$(spec_spine_bin "$root") || sc=''
-[ -n "$sc" ] || { echo '[pr-gate] spec-spine absent, coupling gate skipped (run /setup)'; exit 0; }
+spec_spine_version() {
+  "$1" --version 2>/dev/null | head -1 | awk '{print $NF}'
+}
+# 0 compatible, 1 incompatible, 2 not performed. An exact pin is compared with
+# the reported version; any other requirement is put to the binary itself,
+# which refuses at configuration load when its version does not satisfy it.
+spec_spine_admits() {
+  case "$3" in
+    =*)
+      want=$(printf '%s' "${3#=}" | tr -d '[:space:]')
+      if printf '%s' "$want" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$'; then
+        [ -n "$4" ] || return 2
+        [ "$4" = "$want" ] && return 0
+        return 1
+      fi ;;
+  esac
+  probe=$("$1" --repo "$2" config show 2>&1); prc=$?
+  [ "$prc" = 0 ] && return 0
+  if [ "$prc" = 3 ]; then case "$probe" in *'requires spec-spine'*) return 1 ;; esac; fi
+  return 2
+}
+spec_spine_resolve() {
+  sc=''; sc_rule=''; sc_ver=''; sc_passed=''; sc_why=''
+  sc_pin=$(spec_spine_pin "$1")
+  if [ -n "$sc_pin" ]; then sc_pinned="pin $sc_pin from $1/spec-spine.toml [meta] required_version"; else sc_pinned='unpinned'; fi
+  if [ -n "${STATECRAFT_SPEC_SPINE:-}" ]; then
+    if [ -f "$STATECRAFT_SPEC_SPINE" ] && [ -x "$STATECRAFT_SPEC_SPINE" ]; then
+      sc=$STATECRAFT_SPEC_SPINE; sc_rule=supervisor; sc_ver=$(spec_spine_version "$sc"); return 0
+    fi
+    sc_why="the supervisor's binary STATECRAFT_SPEC_SPINE=$STATECRAFT_SPEC_SPINE is not an executable, and no other binary is consulted in a managed session"
+    return 1
+  fi
+  if [ -n "${SPEC_SPINE_BIN:-}" ]; then
+    remedy="Unset SPEC_SPINE_BIN, or point it at a binary that satisfies the pin; the pin itself moves only as a D-06 change"
+    if [ ! -f "$SPEC_SPINE_BIN" ] || [ ! -x "$SPEC_SPINE_BIN" ]; then
+      sc_why="the override SPEC_SPINE_BIN=$SPEC_SPINE_BIN names no executable ($sc_pinned). $remedy"
+      return 1
+    fi
+    v=$(spec_spine_version "$SPEC_SPINE_BIN")
+    if [ -z "$sc_pin" ]; then sc=$SPEC_SPINE_BIN; sc_rule=override; sc_ver=$v; return 0; fi
+    spec_spine_admits "$SPEC_SPINE_BIN" "$1" "$sc_pin" "$v"
+    case $? in
+      0) sc=$SPEC_SPINE_BIN; sc_rule=override; sc_ver=$v; return 0 ;;
+      1) sc_why="the override SPEC_SPINE_BIN=$SPEC_SPINE_BIN reports ${v:-no version}, which does not satisfy $sc_pinned. $remedy" ;;
+      *) sc_why="the override SPEC_SPINE_BIN=$SPEC_SPINE_BIN (reports ${v:-no version}) could not be checked against $sc_pinned: its configuration probe failed. $remedy" ;;
+    esac
+    return 1
+  fi
+  found=''; n=0
+  for c in "$1/target/release/spec-spine" "$(command -v spec-spine 2>/dev/null)"; do
+    n=$((n+1)); if [ "$n" = 1 ]; then rule='repository build'; else rule=PATH; fi
+    { [ -n "$c" ] && [ -f "$c" ] && [ -x "$c" ]; } || continue
+    found=1
+    v=$(spec_spine_version "$c")
+    if [ -z "$sc_pin" ]; then sc=$c; sc_rule=$rule; sc_ver=$v; return 0; fi
+    spec_spine_admits "$c" "$1" "$sc_pin" "$v"
+    case $? in
+      0) sc=$c; sc_rule=$rule; sc_ver=$v; return 0 ;;
+      1) sc_passed="${sc_passed}passed over $c ($rule, reports ${v:-no version}): it does not satisfy $sc_pinned
+" ;;
+      *) sc_why="$c ($rule, reports ${v:-no version}) could not be checked against $sc_pinned: its configuration probe failed, so no later candidate is tried"
+         return 1 ;;
+    esac
+  done
+  if [ -n "$found" ]; then
+    sc_why="no candidate satisfies $sc_pinned"
+    return 1
+  fi
+  return 2
+}
+# The judge, for every line that reports a verdict: path, version, rule, pin.
+spec_spine_judge() {
+  j="judged by $sc (${sc_ver:-no version}, $sc_rule; $sc_pinned"
+  if [ -n "${STATECRAFT_RUN_ID:-}" ] && [ "$sc_rule" != supervisor ]; then
+    if [ -n "$sc_pin" ]; then j="$j; version-checked, identity not verified"; else j="$j; identity not verified"; fi
+  fi
+  printf '%s)' "$j"
+}
+spec_spine_resolve "$root"; rrc=$?
+[ -n "$sc_passed" ] && printf '%s' "$sc_passed" | sed 's/^/[pr-gate] /' >&2
+[ "$rrc" = 2 ] && { echo '[pr-gate] spec-spine absent, coupling gate skipped (run /setup)'; exit 0; }
+# Contract 2 rules 2 and 3 with contract 6: a binary the repository does not
+# admit is a check that did not run, and a gate whose check did not run is not
+# green.
+if [ "$rrc" != 0 ]; then
+  { echo "[pr-gate] BLOCKED: the freshness read was NOT PERFORMED in $root: $sc_why."
+    echo '[pr-gate] The tree has not been judged and is not known to be stale; regenerating repairs nothing here.'; } >&2
+  exit 2
+fi
+judge=$(spec_spine_judge)
 
 # Read-only. The gate must never write into the repo it is judging: `index`
 # rewrites committed shards, a hook cannot commit them, and doing it from here
@@ -115,23 +214,28 @@ case "$cec" in
      # is untouched: exit 0 still costs one process.
      if "$sc" check --help >/dev/null 2>&1; then
        { echo "[pr-gate] BLOCKED: a committed shard tree is stale in $root."
-         echo '[pr-gate] Run: spec-spine compile and index, whichever tree it named, then commit the shards, push, and retry.'; } >&2
+         echo '[pr-gate] Run: spec-spine compile and index, whichever tree it named, then commit the shards, push, and retry.'
+    echo "[pr-gate] $judge"; } >&2
      else
        ver=$("$sc" --version 2>/dev/null) || ver='(no answer to --version)'
        { echo "[pr-gate] BLOCKED: the freshness read was not performed in $root (the binary does not carry the check verb, and clap spent exit 2 on the unknown subcommand)."
-         echo "[pr-gate] The binary is $sc, which answers: ${ver:-(nothing)}. The check verb needs spec-spine 0.18.0 or later. The tree has NOT been judged and is not known to be stale; regenerating repairs nothing here. Run /setup to install the floor."; } >&2
+         echo "[pr-gate] The binary is $sc, which answers: ${ver:-(nothing)}. The check verb needs spec-spine 0.18.0 or later. The tree has NOT been judged and is not known to be stale; regenerating repairs nothing here. Run /setup to install the floor."
+    echo "[pr-gate] $judge"; } >&2
      fi
      exit 2 ;;
   1) { echo "[pr-gate] BLOCKED: the corpus in $root does not validate (spec-spine check exit 1)."
-       echo '[pr-gate] Run: spec-spine check, fix the violations it names, and retry. The tree is not stale; staleness is not meaningful against a corpus that does not compile.'; } >&2
+       echo '[pr-gate] Run: spec-spine check, fix the violations it names, and retry. The tree is not stale; staleness is not meaningful against a corpus that does not compile.'
+    echo "[pr-gate] $judge"; } >&2
      exit 2 ;;
   3) # Spec 093 3.2: the version read qualifies a non-answer, so it is asked
      # only here, never on the happy path.
      ver=$("$sc" --version 2>/dev/null) || ver='(no answer to --version)'
      { echo "[pr-gate] BLOCKED: the freshness read was not performed in $root (spec-spine check exit 3)."
-       echo "[pr-gate] The binary is $sc, which answers: ${ver:-(nothing)}. The check verb needs spec-spine 0.18.0 or later; below that the binary is too old to have read the tree, and the tree itself has not been judged. Run /setup to install the floor, or read spec-spine check directly for an I/O, parse or config error."; } >&2
+       echo "[pr-gate] The binary is $sc, which answers: ${ver:-(nothing)}. The check verb needs spec-spine 0.18.0 or later; below that the binary is too old to have read the tree, and the tree itself has not been judged. Run /setup to install the floor, or read spec-spine check directly for an I/O, parse or config error."
+    echo "[pr-gate] $judge"; } >&2
      exit 2 ;;
-  *) { echo "[pr-gate] BLOCKED: spec-spine check exited $cec in $root, which this gate does not recognise; it is not reported as fresh."; } >&2
+  *) { echo "[pr-gate] BLOCKED: spec-spine check exited $cec in $root, which this gate does not recognise; it is not reported as fresh."
+    echo "[pr-gate] $judge"; } >&2
      exit 2 ;;
 esac
 # Spec 093 3.13: the derived tree is asked about in all three states git
@@ -161,7 +265,8 @@ esac
 derived=$("$sc" --repo "$root" config show --json 2>/dev/null | jq -r '.layout.derived_dir // empty' 2>/dev/null) || derived=''
 if [ -z "$derived" ]; then
   { echo "[pr-gate] BLOCKED: the derived-tree check was NOT PERFORMED in $root (spec-spine config show did not report layout.derived_dir)."
-    echo "[pr-gate] The binary is $sc. The derived tree has not been judged and is not known to be clean; a gate whose check did not run is not green. Repair the configuration read (spec-spine config show --json must report layout.derived_dir) and retry. Regenerating shards repairs nothing here."; } >&2
+    echo "[pr-gate] The binary is $sc. The derived tree has not been judged and is not known to be clean; a gate whose check did not run is not green. Repair the configuration read (spec-spine config show --json must report layout.derived_dir) and retry. Regenerating shards repairs nothing here."
+    echo "[pr-gate] $judge"; } >&2
   exit 2
 fi
 
@@ -176,7 +281,8 @@ dt_staged=$(git -C "$root" diff --cached --name-only -- "$derived" 2>/dev/null);
 dt_untracked=$(git -C "$root" ls-files --others --exclude-standard -- "$derived" 2>/dev/null); rc_untracked=$?
 if [ "$rc_unstaged" -ne 0 ] || [ "$rc_staged" -ne 0 ] || [ "$rc_untracked" -ne 0 ]; then
   { echo "[pr-gate] BLOCKED: a derived-tree read was NOT PERFORMED in $root (git diff exited $rc_unstaged, git diff --cached exited $rc_staged, git ls-files exited $rc_untracked)."
-    echo "[pr-gate] An empty answer from a command that failed is not a clean tree. The derived tree under $derived has not been judged; fix the repository read and retry."; } >&2
+    echo "[pr-gate] An empty answer from a command that failed is not a clean tree. The derived tree under $derived has not been judged; fix the repository read and retry."
+    echo "[pr-gate] $judge"; } >&2
   exit 2
 fi
 if [ -n "$dt_unstaged" ] || [ -n "$dt_staged" ] || [ -n "$dt_untracked" ]; then
@@ -193,7 +299,8 @@ if [ -n "$dt_unstaged" ] || [ -n "$dt_staged" ] || [ -n "$dt_untracked" ]; then
       echo '[pr-gate] untracked files (git add, then commit):'
       printf '%s\n' "$dt_untracked" | sed 's/^/  /'
     fi
-    echo '[pr-gate] Commit the regenerated shards with the change that made them stale, push, and retry.'; } >&2
+    echo '[pr-gate] Commit the regenerated shards with the change that made them stale, push, and retry.'
+    echo "[pr-gate] $judge"; } >&2
   exit 2
 fi
 
@@ -203,8 +310,10 @@ if [ $ec -ne 0 ]; then
     *--body*Spec-Drift-Waiver*) echo '[pr-gate] coupling gate failed; Spec-Drift-Waiver present after --body, allowing (CI honours the body-at-creation waiver).' ;;
     *) { echo "[pr-gate] BLOCKED: coupling gate failed in $root and no Spec-Drift-Waiver in the PR body:"
          echo "$out" | tail -25
-         echo '[pr-gate] Either fix the coupling (claim every changed path in the spec being implemented, or add an extends edge naming the owning spec) or, with explicit human approval, include the Spec-Drift-Waiver line inline in --body (not --body-file) and retry. A waiver is a human instrument: never write one on your own authority.'; } >&2
+         echo '[pr-gate] Either fix the coupling (claim every changed path in the spec being implemented, or add an extends edge naming the owning spec) or, with explicit human approval, include the Spec-Drift-Waiver line inline in --body (not --body-file) and retry. A waiver is a human instrument: never write one on your own authority.'
+    echo "[pr-gate] $judge"; } >&2
        exit 2 ;;
   esac
 fi
+echo "[pr-gate] passed, $judge"
 true
