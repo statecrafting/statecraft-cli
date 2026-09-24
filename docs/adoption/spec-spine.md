@@ -15,14 +15,14 @@ reading those two files.
 
 ## How an entry is written
 
-- **Heading:** `### YYYY-MM-DD: <release>`, and whether it moves the CLI pin,
-  the linked core, or both. `D-06` as amended on 2026-09-24 lets one change move
-  both when they come from the same release.
-- **Identities, recorded separately.** The CLI binary and each library crate
-  get their own identity block (tag and target revision, registry checksum,
-  `.cargo_vcs_info.json` revision and `dirty` flag, source-tree comparison,
-  install digest with toolchain). Moving both in one change never merges their
-  identities into one line.
+- **Heading:** `### YYYY-MM-DD: <release>`. The CLI pin and the linked core
+  move together in one change: `D-06` as amended on 2026-09-24 makes them one
+  producer identity (H-3 (a)).
+- **One identity, the release.** The tag and its target revision, then under
+  it each artifact's evidence: registry checksum, `.cargo_vcs_info.json`
+  revision and `dirty` flag, source-tree comparison, and the CLI's install
+  digest with toolchain. Every artifact must name the same revision; one that
+  does not refuses the adoption.
 - **The review `D-06` requires:** the bypass floor compared, coupling over
   merged ranges, exit codes, the hook-read report text, the re-index shape.
 - **Evidence kinds kept apart:** the producer's evidence, this repository's

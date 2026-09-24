@@ -33,8 +33,9 @@ publish = false
 # the SINGLE STATED SOURCE of its version: a member takes it with
 # `spec-spine-core.workspace = true`, and a report that names the version
 # derives it from the build. Moving it is an adoption, recorded in
-# docs/adoption/spec-spine.md; it may move in the same change as the CLI pin
-# in spec-spine.toml when both come from the same release. Changing it is an
+# docs/adoption/spec-spine.md. It names the same release as the CLI pin in
+# spec-spine.toml and moves in the same change (one producer identity, H-3 (a)); a
+# test refuses a difference. Changing it is an
 # authority change (AGENTS.md, Source ownership).
 [workspace.dependencies]
 spec-spine-core = { version = "=0.25.0", default-features = false }

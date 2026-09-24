@@ -396,9 +396,11 @@ corpus requires of it.
    governs. An entry follows the ledger's own entry format: identity, the
    bypass-floor and coupling review, exit codes, hook-read text, the re-index,
    evidence kinds kept apart, and what the adoption does not do.
-3. **One change may move both pins when both come from the same release.**
-   The ledger entry still records the binary's identity and each crate's
-   identity separately.
+3. **One producer identity.** The CLI pin and the linked library name the
+   same spec-spine release and move in the same change; the ledger entry
+   records that release as one identity with each artifact's evidence under
+   it (bundle decision H-3 (a), owner Addendum 2 of 2026-09-24). A test
+   refuses two pins that name different releases.
 4. **The consequence this buys.** An adoption that changes no behavior edits
    only files no spec claims (`spec-spine.toml`, the root `Cargo.toml`,
    `Cargo.lock`, the ledger and the regenerated shards), so it couples with no
@@ -412,8 +414,8 @@ number is a defect to correct, not a second source to keep in step; a dated
 record of what was measured under a named release is history, not a
 restatement. An adoption entry written into
 the decision record instead of the ledger is a defect: it re-creates the `C-001`
-the ledger exists to avoid. A single identity line naming the binary and the
-crates together does not satisfy rule 3.
+the ledger exists to avoid. A CLI pin and a library version naming different
+releases do not satisfy rule 3, however each was qualified.
 
 ## 4. Out of scope
 
