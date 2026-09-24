@@ -4772,6 +4772,34 @@ product home. Choices the entry left open, recorded here:
 - T2 holds the lock from the test process, so it waits out the writer wait
   (30 seconds). T4, T6 and T11 skip, saying so, when run as root.
 
+**2026-09-24: contract 2 as amended, implemented (the entry above on the pin
+check).** The four shipped hooks in `crates/statecraft-home/harness/hooks/`
+carry one resolver, the same block in each, and
+`crates/statecraft-home/tests/harness_hooks.rs` runs each extracted hook
+against stub binaries for obligations 1 to 11. Choices the entry left open,
+recorded here:
+
+- **The pin is read with `awk`** from the uncommented `required_version`
+  line of the `[meta]` table. An exact pin is `=` followed by three numeric
+  parts; `=0.23`, a caret or a range goes to the `config show` probe.
+- **A refusal's shape per hook.** The pull-request gate exits 2; the
+  session-start, post-edit and Stop hooks print "NOT PERFORMED" with the
+  reason and exit 0, which is the Stop policy's advisory rule.
+- **The gate now prints one line on success**, "[pr-gate] passed, judged by
+  ...", because rule 6 requires every verdict line to name its judge; it
+  printed nothing on success before. Candidates passed over go to stderr.
+- **In an unpinned managed session** the suffix is "identity not verified"
+  without "version-checked", since nothing was version-checked.
+- **The supervisor's path is not put to the pin.** Rule 5 makes its identity
+  the supervisor's digest-verified resolution, so a version test would add
+  nothing that rule accepts as identity.
+- **The existing contract tests keep their meaning** under a pin: their
+  fixture's `spec-spine.toml` pins the version the stubs report, and contract
+  5's test pins the old binary it uses, so the missing verb is still what it
+  measures.
+- The harness revision digest changes with the hook bytes
+  (`harness::revision_of`); no committed file records it.
+
 ## Verification
 
 `--fail-on-untraced` joined the corpus gate with this spec's first
