@@ -466,6 +466,163 @@ is a change to this spec's territory, so it is noted here. The component table
 names the new pin. The library row moved in its own, later change under spec
 `002`.
 
+**2026-09-24: PROPOSED, NOT ADOPTED. The corpus moves to spec-spine's amendment
+model, and `002` is split along its seams by relocation only (owner item S).**
+Prepared at the owner's request of 2026-09-24 for the owner's ratification
+decisions; nothing below binds until the owner adopts it, and each decision is
+in the table at the end. It is recorded here because spec `001` owns the
+component boundaries and `D-02`, which the split touches, and because a
+proposal filed beside the corpus would be a second place for a requirement to
+live (`AGENTS.md`, Source ownership). Measurements are in the evidence
+repository under `2026-09-24/session10/S/`, taken in disposable clones of `main`
+at `17dbdb6` with the pinned spec-spine (the release `spec-spine.toml` names);
+nothing was pushed from them.
+
+*Part 1: the amendment model.* From adoption on, a change to what a spec
+requires is a **new spec** with an `amends` edge to the spec it changes, not a
+dated section 5 entry and not an edit to the amended spec's section 3. This is
+spec-spine's rule (its specs 037, 082 and 083): the amended `spec.md` is not
+edited to record the amendment, and `registry relationships <id>` reports
+`amended_by (incoming)`. Section 5 of every spec keeps only genuine
+implementation decisions: a choice the spec was silent on, with its reason.
+Two measured consequences shape the rule:
+
+1. **`amends` does not make the amending spec an owner of the amended spec's
+   code.** The gate widens ownership through `amends` only for the amended
+   `spec.md` itself. Measured (S3): a new spec `amends: [002]`, then a commit
+   changing `crates/statecraft-home/src/flow.rs` with an authoring edit to the
+   amending spec only: `couple` exit 1, `C-001` naming `002` alone. With an
+   added `extends: { spec: 002, unit: crates/statecraft-home/, nature:
+   corrective }`, the same commit couples (exit 0). So an amending spec that
+   changes behavior in code **declares `extends` on each unit it changes**, in
+   the same change that introduces it. That amends nobody's text and needs no
+   waiver.
+2. **An amendment that replaces acceptance says so** with
+   `amends_verification` (spec-spine 082), so `verify <amended>` runs the
+   replacement and prints the substitution.
+
+*Part 2: the split of `002`, relocation only.* Four seams, as the owner named
+them. `002` keeps initialization and lifecycle; two new specs take the harness
+and the producer seams; distribution goes to `007` when `007` is created.
+
+| Destination | Section 3 of `002` today | Section 5 entries of `002` today (by date and first words) |
+|---|---|---|
+| `002` initialization and lifecycle (stays) | 3.1 to 3.8, 3.10, 3.11, 3.12, 3.13, 3.16 to 3.21, 3.35, 3.36 | 2026-09-16 (all four); 2026-09-20 native root, relocation rewrites, manifest v2, two references left, ratified; 2026-09-21 dependency on 006, derived tree's three states; 2026-09-23 project block commands, 3.35 implemented, replacing a drifted file, env remove takes back the bridge, foreign finding, 3.16 frozen resolution; 2026-09-24 what initialization reports, outcomes implemented, withheld means partial (authority and implementation), setup profile (authority and implementation), provenance (authority and implementation) |
+| `008` harness, hooks and skills (new) | 3.9, 3.14, 3.22 to 3.34, 3.37 | 2026-09-20 hooks ship in the harness, delivery verdict; 2026-09-21 every entry from the handoff fold through the deadline-attempt synchronisation except the three producer entries in the `009` row and the derived-tree coverage entry in the `002` row; 2026-09-22 all; 2026-09-23 the two live experiments, non-turn event, trial deadline, trailing-event decision, 3.34 implemented, permission experiment second campaign, launch-state answer, two reads for reconciliation, 3.34 trailer, 3.37 implemented, translation of `check`, gate log planted decision; 2026-09-24 contract 2 (authority and implementation), contract 4 (authority and implementation) |
+| `009` producer adoption (new) | 3.15 | 2026-09-20 exact crates.io pin, trimmed producer tested, governance files written by this crate, contract path adopted; 2026-09-21 published 0.21.0 versus source, version literal, `.crate` digest; 2026-09-23 core 0.23.0; 2026-09-24 core 0.25.0, exact pin in new projects |
+| `007` distribution (created after spec-spine 0.26.0) | none | 2026-09-23, adopted 2026-09-24: the release bundle contract (Part 9 step 1) |
+
+Three rows are judgement calls and are named as such: 3.9 (adapters declare
+what they own, and the code is `crates/statecraft-environment/src/adapter.rs`)
+goes with the harness because an adapter is how a harness is delivered; 3.29
+to 3.34 and 3.37 (admission, launch and startup records) could be a fifth seam,
+"managed-session delivery and admission", and are kept with the harness only
+because the owner named four; 3.36, the completion rule, cannot move whole
+because it describes all of `002`, so it stays and each new spec gets its own
+completion rule as an ordinary amendment after the split (Part 1), which is not
+a relocation.
+
+**Code ownership under `D-02`.** The code does not split along these seams:
+`crates/statecraft-home` holds `flow.rs` (initialization), `harness.rs` and
+`harness/` (the harness), `producer.rs` (the producer) and `launch.rs`
+(startup). `D-02` as amended says a crate has exactly one owning spec. Three
+ways to hold that:
+
+- (a) **New specs own no code.** `008` and `009` carry requirements and declare
+  `extends` on `002`'s crates; `002` keeps both crates. `D-02` holds unchanged,
+  and a harness change couples by editing `002` or `008` (measured, S1b: any
+  owner's `spec.md` clears the path).
+- (b) **Sub-crate units.** `002` replaces its directory claims with file and
+  directory units, and `008` and `009` establish theirs. The tool accepts
+  overlapping claims silently (measured, S1: `002` owning
+  `crates/statecraft-home/` and a new spec establishing
+  `crates/statecraft-home/harness/` gives `lint`, `check --fail-on-unresolved`,
+  `index coverage --fail-on-untraced` and `index check --fail-on-unresolved`
+  all exit 0, and `index owner` lists both), so exclusivity would rest on
+  authoring discipline. It amends `D-02`.
+- (c) **Split the crates** (a harness crate, a producer crate). Code moves, so
+  it is not relocation-only and is its own implementation change later.
+
+*Part 3: how a relocation PR proves it changed no requirement.* Each
+relocation PR moves whole sections, keeps each heading's text (the number may
+change), and edits nothing inside a moved section. Its body carries the output
+of a relocation proof run over its own base and head: for every `spec.md`,
+split the body at every heading, key each section by its heading text with the
+number removed, hash its body, and require every base section to appear at
+head with the same digest (in any spec). New sections are allowed only as
+scaffolding (a new spec's purpose, territory, out-of-scope and section 5
+headers, and a one-line pointer where a section left). The script is in the
+evidence (`relocation-proof.py`); measured on a relocation of 3.1 to 3.6 into
+a new spec it reports 7 sections moved unchanged, 0 changed, exit 0, and after
+one inserted word in a moved section it reports that section, exit 1. The
+registry's own `sectionDigests` cannot serve: each digest is salted with the
+spec's path (`<spec_path>#<anchor>`), so a verbatim move changes every digest
+(measured: all six moved sections differ). If the owner adopts the proof, the
+script becomes a claimed file under `scripts/` in the first relocation PR.
+
+Each relocation PR also: moves the ownership edges that name a moved unit
+(measured, S2: `003` and `004` declare `extends` naming `002` for
+`crates/statecraft-environment/`; if that unit moves, the edges keep resolving
+by path and nothing reports that they name a spec which no longer claims it,
+so the PR retargets them); updates citations. There are 327 citations of the
+form "`002` section 3.x" outside `002` (code comments in six crates and one
+line in each of `003` to `006`) and 447 section references inside `002`.
+Keeping each moved section's number in its new spec (so 3.14 stays 3.14 in
+`008`) would leave every in-spec reference true and turn each outside citation
+into a mechanical "`002` to `008`" rewrite that the proof script cannot see but
+a citation map can; renumbering would make every one a semantic edit.
+
+*Order.* Each step is its own PR; the relocations fall under the owner
+delegation (#111) once this split is adopted.
+
+1. This proposal, adopted or amended by the owner (one authority PR changing
+   this entry to adopted, the `D-02` choice, and `AGENTS.md` for the
+   amendment model).
+2. The 0.26.0 migration (adoption, the exit and JSON contract amendment of
+   spec `006`, the one-identity rule) lands before any relocation, so the
+   relocations do not race the code it changes.
+3. Relocation R1: `009` producer adoption (3.15 and its entries), the smallest
+   seam, to prove the method.
+4. Relocation R2: `008` harness, hooks and skills.
+5. `007` is drafted from the bundle entry by relocation (the distribution
+   seam), after 0.26.0's planned claims are adopted; the owner ratifies it;
+   then it is built.
+6. Fold, per spec: each adopted section 5 entry that states a requirement is
+   folded into section 3 of the spec that now holds it, one spec per PR,
+   `002` last because it is largest. A fold is not a relocation (it rewrites
+   requirement text into its final form), so each fold PR is an authority
+   change for the owner, and it keeps the folded entry's date and decision
+   reference beside the rule. After the fold, section 5 holds implementation
+   decisions only, and Part 1 governs every later change.
+
+*Friction measured, for spec-spine.* (1) No exclusive claim transfer: partial
+`supersedes` is additive by design (its spec 018 section 4 defers the
+owner-stripping operation), and a plain second `establishes` overlapping an
+existing directory claim raises no lint, so "exactly one owner" is not
+checkable. (2) An `extends` edge naming a spec that no longer claims the unit
+resolves silently. (3) `sectionDigests` are path-salted, so they cannot prove
+a verbatim move. (4) `amends` never widens code ownership; the gate's
+remediation text says so for `extends`, but nothing tells an amending spec it
+also needs one. (5) `couple` resolves ownership from the checked-out tree's
+committed index, not from `--head`: judging the same base and head gave exit 1
+with the head checked out and exit 0 while a later commit that adds an
+`extends` edge was checked out. CI checks out the pull request, so CI is
+consistent, but a local reproduction depends on the checkout. (6) `compact`
+merges specs and rewrites their citations; there is no inverse for a split.
+(7) A new approved spec claiming a crate that does not exist yet still exits
+1 under `index check --fail-on-unresolved` (`W-001`), which is what 0.26.0's
+planned claims are to change for `007`. None of these blocks the split; (1),
+(2) and (5) are recorded as authoring discipline the relocation PRs carry.
+
+| Item | Options | Recommended default | Consequence of the default |
+|---|---|---|---|
+| S-A: amendment model | adopt as Part 1 / keep section 5 amendments | adopt, with the `extends` rule | Every later behavioral change is a new spec; section 5 stops growing with requirements |
+| S-B: code ownership during the split | (a) new specs own no code / (b) sub-crate units, amending `D-02` / (c) split crates later | (a) | `D-02` unchanged; harness and producer code still couple through `002` or the seam spec |
+| S-C: section numbers on relocation | keep numbers / renumber | keep numbers | Outside citations change only their spec number; no in-spec reference breaks |
+| S-D: fifth seam for admission and launch (3.29 to 3.34, 3.37) | with `008` / own spec | with `008` | `008` is large; a later split of it is another relocation |
+| S-E: the relocation proof | adopt the script as a claimed file / proof in PR bodies only | claimed file under `scripts/` | Each relocation PR carries a mechanical proof CI can rerun |
+| S-F: fold PRs | owner merges each / delegated | owner merges each | The fold rewrites requirement text, so it stays the owner's act |
+
 ## Verification
 
 Each line below is one command. These assert the authored foundation, which
