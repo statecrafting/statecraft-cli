@@ -4800,6 +4800,37 @@ recorded here:
 - The harness revision digest changes with the hook bytes
   (`harness::revision_of`); no committed file records it.
 
+**2026-09-24: the governance producer is the published `spec-spine-core`
+0.25.0, and it conforms.** Under `D-06`'s entry of the same date, which moved
+the CLI pin, the linked library moves too: `spec-spine-core =0.25.0`
+(`default-features = false`) in `crates/statecraft-home/Cargo.toml`, and
+`spec-spine-types` 0.25.0 with it. `Cargo.lock` carries both from crates.io
+with the checksums `D-06` recorded (`d96d89fb…3b2c` and `a941756c…5495`).
+`PRODUCER_VERSION` moves with the manifest, and the two ownership-transfer
+assertions that name `spec-spine-core@0.23.0` now name 0.25.0.
+
+*Conformance, on the real library.* `producer_integration.rs` passes in full,
+and `make code` passes (1296 tests). The producer's handoff measured the
+scaffold for this product's `config_json()` as byte-identical to 0.23.0's
+except the commented `# required_version` line, and 129's rules refuse
+`derived_dir = "../outside"` and `state_dir = "."`, which 0.23.0 accepted.
+
+*An upgrade, through the built binaries.* A project initialized by the
+0.23.0-core build and committed, then `init apply` by this build: `complete`,
+and the mutation list names exactly one governance file, `spec-spine.toml`
+(the managed template whose source changed), besides the declaration, the
+progress record, the tools record and two derived files the corpus tool
+rewrote. The plan listed all seven managed paths as writes; the disk shows
+the six unchanged ones were not changed. With `spec-spine.toml` edited by
+hand first, the same run withholds it as `drifted`, names both digests, and
+leaves the file byte-identical.
+
+*Found, not changed here.* That drifted run reports `complete`: the
+governance step is `done` while one of its paths is withheld. Section 3.17
+says partial work is never reported as complete. Whether a withheld path in
+an otherwise completed step makes the initialization `partial` is left to
+the owner. This change does not alter it.
+
 ## Verification
 
 `--fail-on-untraced` joined the corpus gate with this spec's first
