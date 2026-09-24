@@ -1034,6 +1034,99 @@ dropped because an interrupted removal had already taken its line back. A note
 never changes the exit. Additive under section 3.4.
 `tests/env_remove_bridge.rs` spawns the binary.
 
+**2026-09-24: PROPOSED, NOT ADOPTED. The family exit and JSON contract
+(owner Addendum 2, item X).** To be adopted and implemented **only in the
+0.26.0 migration**, in the same change as the single-producer-identity
+adoption (bundle decision H-3 (a)), as one migration. Nothing below binds until
+then, and no verb changes before it.
+
+*What the family contract is.* spec-spine is defining one exit and JSON
+contract for the tools of this family: exit 0 ok, 1 finding, 2 refused, 3
+usage, 4 failed; and one envelope,
+`{schemaVersion, tool, verb, outcome, exitCode, summary, report | error}`,
+where `error` carries `kind` from a closed set: `validation`, `stale`,
+`not-found`, `drift`, `refused`, `config`, `io`, `schema`, `usage`,
+`internal`. It is not published in any spec-spine release yet; this entry is
+written against the owner's statement of it and is re-checked against the
+producer's text when 0.26.0 is qualified under `D-06`.
+
+*Numbers: already equal.* Section 3.3's closed vocabulary (`exit.rs`,
+`Exit::{Ok, Finding, Refused, Usage, Failed}` as 0 to 4, fixed by
+`the_vocabulary_is_five_codes_with_fixed_numbers`) is the family's. No exit
+number moves for any verb. Owner decision I-3 (a withheld path makes an
+initialization `partial`, exit 1, never complete; #106 and #113) is not new
+under the family contract: it is what `exit.rs`'s own vocabulary already
+requires, since its module note and section 3.3 both say "a `partial` apply is
+1, because every withheld path was named".
+
+*The envelope, mapped from today's.* Today every `--json` answer is
+`render::Answer<T>` serialized as `{value, exit, summary}`, with `exit` the
+word (`ok`, `finding`, `refused`, `usage`, `failed`). The migration makes it:
+
+| Family field | Today | Mapping |
+|---|---|---|
+| `schemaVersion` | absent | added; the envelope's own version, starting at the family's first published version |
+| `tool` | absent | added; the recorded binary name (section 3.5), not a literal |
+| `verb` | absent | added; `Verb::name()` (`"env apply"`, `"work list"`, ...) |
+| `outcome` | `exit` (word) | renamed; same five words |
+| `exitCode` | implied by `exit` | added; the number, equal to the process status |
+| `summary` | `summary` | kept, unchanged |
+| `report` | `value`, when the exit is 0 or 1 | moved; the value's own fields are unchanged |
+| `error` | `value`, when the exit is 2, 3 or 4 | moved to `{kind, message, details?}`; `message` is today's detail string, `details` any structured value a refusal already carries |
+
+Removing `value` and `exit` is a removal under section 3.4, which is why this
+is an amendment and not an additive change.
+
+*`error.kind` for today's sites.* Every refusal and failure constructed today
+must name one kind; assigning them is part of the implementation, from these
+starting points: `fail()` in `main.rs` (an unreadable registry, journal or
+lock) is `io` unless the cause is a parse error (`schema`); the
+`bind.rs` refusals at `unregistered_answer` and `same_directory_answer` are
+`not-found` and `refused`; `slice::report_error_answer` passes the producer's
+kind through; a `doctor` or `env` withholding stays a finding (`report`), not
+an error. A site that fits no kind is a finding to report to the producer, not
+a reason to add a local kind: the set is closed.
+
+*Usage errors (exit 3).* Today they go to stderr as text, deliberately, "so a
+caller piping `--json` into a parser does not filter help out of its input"
+(`main.rs`). Proposed: when `--json` is present in the arguments, the usage
+error is also emitted as an envelope with `error.kind = usage` on stdout;
+without `--json`, unchanged. Open until the family contract states it.
+
+*The spec-spine translation from #96 goes.* Section 3.23's table in spec
+`002` and `statecraft_environment::probe::run_check` translate the producer's
+`check` exits into this vocabulary (0 to 0, 1 and 2 to 1 with stale and
+unresolved told apart by reading text, 3 to 4, absent or lacking the verb to
+2). Once the producer emits the family contract, the migration **removes that
+translation layer** and consumes the producer's exit code and
+`error.kind` directly: `stale` and `validation` arrive as kinds rather than
+being recovered from message text, and the disagreement recorded in this
+section's 2026-09-23 entry ("where `work list` places a stale ledger and a
+refused pin") is resolved by the producer's own answer. Contract 5's
+`check --help` probe stays: an absent binary or a missing verb is still
+Statecraft's refusal, because no producer answered.
+
+*Every verb whose JSON output changes: all of them.* The envelope is shared,
+so each of the 42 operations in `Verb::all()` changes shape (fields added,
+`value`/`exit` moved): `project register|list|arm|disarm|enroll|unenroll`,
+`env plan|apply|upgrade|remove`, `doctor`, `work list|show`, `run`,
+`run list|show|reconcile`, `accept`, `home show|plan|apply`,
+`init plan|apply`, `migrate plan|apply`, `config show`,
+`approval grant|show`, `harness show|upgrade`, `session payload`,
+`startup record|capture|qualify|show|trial`,
+`override grant|revoke|show`, `transfer plan|apply|revert`. No verb's exit
+number changes. The verbs whose **meaning** also changes are those that call
+the producer: `init plan|apply` (steps 6 and 7), `project register`,
+`work list|show`, `run`, and `doctor`'s producer rows, because they stop
+translating.
+
+*Acceptance at adoption.* A test that every verb's `--json` output parses as
+the envelope with `exitCode` equal to the process status; a test that every
+`error.kind` emitted is in the closed set; the binary tests that read
+`["value"]` (183 sites across `crates/statecraft-cli/tests/`) move to
+`["report"]` or `["error"]` in the same change; and `check_translation.rs` is
+replaced by tests against the producer's envelope.
+
 ## Verification
 
 Each line is one command. §3.7's rows are integration tests that **spawn the
