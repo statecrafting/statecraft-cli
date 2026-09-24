@@ -1028,6 +1028,7 @@ fn a_declared_absolute_path_is_refused_at_write_time_with_the_key_named() {
         product: "0".into(),
         spec_spine: "0".into(),
         adapters: Default::default(),
+        producer: None,
     });
     manifest
         .project

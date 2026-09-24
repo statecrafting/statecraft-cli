@@ -46,6 +46,10 @@ pub struct ManagedFile {
     /// have different collision behavior: a pointer path already holding a file
     /// degrades the adapter, it does not merely withhold a write.
     pub pointer: bool,
+    /// What the entry this file becomes is for. `reference` unless the
+    /// declaration says otherwise; only a first write records it, because a
+    /// recorded role never changes automatically.
+    pub role: crate::manifest::Role,
 }
 
 impl ManagedFile {
@@ -55,6 +59,17 @@ impl ManagedFile {
             path: path.to_string(),
             contents: contents.into(),
             pointer: false,
+            role: crate::manifest::Role::Reference,
+        }
+    }
+
+    /// A file this product seeds for the project to author (spec 002 section
+    /// 5, 2026-09-24, provenance item 2): written only when absent, and never
+    /// rewritten once recorded as an authored input.
+    pub fn authored_input(path: &str, contents: impl Into<Vec<u8>>) -> Self {
+        Self {
+            role: crate::manifest::Role::AuthoredInput,
+            ..Self::owned(path, contents)
         }
     }
 
@@ -64,6 +79,7 @@ impl ManagedFile {
             path: path.to_string(),
             contents: contents.into(),
             pointer: true,
+            role: crate::manifest::Role::Reference,
         }
     }
 }

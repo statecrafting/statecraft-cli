@@ -360,6 +360,7 @@ esac
             product: "0.1.0".into(),
             spec_spine: "0.20.0".into(),
             adapters: Default::default(),
+            producer: None,
         });
     manifest.project.requirements.insert(
         statecraft_home::required::REQUIREMENT_KEY.to_string(),

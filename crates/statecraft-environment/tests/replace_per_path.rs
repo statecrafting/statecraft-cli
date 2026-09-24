@@ -24,6 +24,7 @@ fn pins() -> Pins {
         product: "0.0.0".into(),
         spec_spine: "0.23.0".into(),
         adapters: BTreeMap::new(),
+        producer: None,
     }
 }
 

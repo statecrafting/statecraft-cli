@@ -50,6 +50,49 @@ pub enum SourceKind {
     Template,
 }
 
+/// What a `managed` entry is for (spec 002 section 5, 2026-09-24, provenance
+/// item 1).
+///
+/// The three classes stay as they are; this is a property of a `managed`
+/// entry only. An entry recorded before the role existed reads as
+/// `reference`, and serializes without the field, so a manifest nobody
+/// initialized since stays byte-identical. A role is never inferred from
+/// bytes, and changing a recorded one is an operator's act, never automatic.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[serde(rename_all = "kebab-case")]
+pub enum Role {
+    /// A file this product maintains: a digest difference is `drifted`.
+    #[default]
+    Reference,
+    /// A file this product seeds for the project to author: written only when
+    /// absent, never rewritten, and its digest is the seed. A difference is
+    /// `customized`, which is information and not a finding.
+    AuthoredInput,
+}
+
+impl Role {
+    /// True for the default, which is left out of the serialized entry.
+    pub fn is_reference(&self) -> bool {
+        *self == Role::Reference
+    }
+}
+
+/// The linked governance producer, as this build links it (spec 002 section
+/// 5, 2026-09-24, provenance item 3).
+///
+/// One identity: the CLI pin a project declares names the same release, so
+/// this and [`Pins::spec_spine`] are never two independently qualified
+/// identities. Fixed when this product is built, from the lock file.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Producer {
+    /// The crate name.
+    pub name: String,
+    /// Its exact version.
+    pub version: String,
+    /// The crates.io checksum `Cargo.lock` records for it.
+    pub checksum: String,
+}
+
 /// The source of an entry's content, and the identity of that source.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Source {
@@ -99,6 +142,10 @@ pub struct Entry {
     /// Present when this path was taken over from another claimant.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub transfer: Option<Transfer>,
+    /// What a `managed` entry is for. For an `authored-input`, `digest` is
+    /// the seed digest. Absent reads as `reference`.
+    #[serde(default, skip_serializing_if = "Role::is_reference")]
+    pub role: Role,
 }
 
 /// The versions an environment was installed against.
@@ -109,11 +156,67 @@ pub struct Entry {
 pub struct Pins {
     /// This product's version at install time.
     pub product: String,
-    /// The spec-spine version the environment was installed against.
+    /// The spec-spine pin the project declares: the version of the exact
+    /// `required_version` in its `spec-spine.toml`, or [`UNPINNED`]. Never the
+    /// version found on `PATH`, which is an observation and is reported as
+    /// one (spec 002 section 5, 2026-09-24, provenance item 4). A declaration
+    /// written before that entry may still hold an observation here.
     pub spec_spine: String,
     /// Adapter name to version, ordered so the committed file is stable.
     #[serde(default)]
     pub adapters: BTreeMap<String, String>,
+    /// The linked governance producer. Absent from a declaration recorded
+    /// before provenance, which says so rather than being given a guess.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub producer: Option<Producer>,
+}
+
+/// What [`Pins::spec_spine`] holds when the project declares no exact pin.
+pub const UNPINNED: &str = "unpinned";
+
+/// The spec-spine pin a repository declares, read from the uncommented
+/// `required_version` line of `spec-spine.toml`'s `[meta]` table.
+///
+/// An exact requirement (`=` followed by three numeric parts, the reading
+/// spec 002 section 3.23 contract 2 gives the same line) yields its version;
+/// no such line, no file, or any other requirement yields [`UNPINNED`],
+/// because only an exact requirement pins one release.
+pub fn declared_pin(root: &Path) -> String {
+    let Ok(text) = std::fs::read_to_string(root.join("spec-spine.toml")) else {
+        return UNPINNED.to_string();
+    };
+    declared_pin_in(&text).unwrap_or_else(|| UNPINNED.to_string())
+}
+
+/// [`declared_pin`] over the file's text: the exact version, or `None`.
+pub fn declared_pin_in(text: &str) -> Option<String> {
+    let mut in_meta = false;
+    for raw in text.lines() {
+        let line = raw.trim();
+        if line.starts_with('[') {
+            in_meta = line == "[meta]";
+            continue;
+        }
+        if !in_meta || line.starts_with('#') {
+            continue;
+        }
+        let Some(rest) = line.strip_prefix("required_version") else {
+            continue;
+        };
+        let Some(value) = rest.trim_start().strip_prefix('=') else {
+            continue;
+        };
+        let value = value.split('#').next().unwrap_or("").trim();
+        let value = value.strip_prefix('"')?.strip_suffix('"')?;
+        let version = value.strip_prefix('=')?;
+        let parts: Vec<&str> = version.split('.').collect();
+        let exact = parts.len() == 3
+            && parts
+                .iter()
+                .all(|p| !p.is_empty() && p.bytes().all(|b| b.is_ascii_digit()));
+        return exact.then(|| version.to_string());
+    }
+    None
 }
 
 /// Whether a project coordinates with a team, and which one.
@@ -999,7 +1102,51 @@ mod tests {
             product: "0.0.0".into(),
             spec_spine: "0.18.0".into(),
             adapters: BTreeMap::new(),
+            producer: None,
         }
+    }
+
+    #[test]
+    fn only_an_exact_required_version_in_meta_is_a_declared_pin() {
+        let pin = |t: &str| declared_pin_in(t);
+        assert_eq!(
+            pin("[meta]\nrequired_version = \"=0.25.0\"\n"),
+            Some("0.25.0".into())
+        );
+        assert_eq!(
+            pin("[meta]\nrequired_version = \"=0.25.0\" # adopted\n"),
+            Some("0.25.0".into())
+        );
+        // Commented, as the producer's scaffold writes it today.
+        assert_eq!(pin("[meta]\n# required_version = \"=0.25.0\"\n"), None);
+        // Not exact: a caret, a two-part version, a range.
+        assert_eq!(pin("[meta]\nrequired_version = \"0.25.0\"\n"), None);
+        assert_eq!(pin("[meta]\nrequired_version = \"=0.25\"\n"), None);
+        assert_eq!(pin("[meta]\nrequired_version = \">=0.25.0\"\n"), None);
+        // Another table's key is not the pin.
+        assert_eq!(pin("[other]\nrequired_version = \"=0.25.0\"\n"), None);
+        let root = tempfile::tempdir().unwrap();
+        assert_eq!(declared_pin(root.path()), UNPINNED);
+    }
+
+    #[test]
+    fn a_reference_role_and_an_absent_producer_leave_the_bytes_as_they_were() {
+        let e = entry("a.md");
+        let json = serde_json::to_string(&e).unwrap();
+        assert!(!json.contains("role"));
+        let back: Entry = serde_json::from_str(&json).unwrap();
+        assert_eq!(back.role, Role::Reference);
+        let authored = Entry {
+            role: Role::AuthoredInput,
+            ..entry("b.md")
+        };
+        assert!(
+            serde_json::to_string(&authored)
+                .unwrap()
+                .contains("\"role\":\"authored-input\"")
+        );
+        let p = pins();
+        assert!(!serde_json::to_string(&p).unwrap().contains("producer"));
     }
 
     fn entry(path: &str) -> Entry {
@@ -1014,6 +1161,7 @@ mod tests {
             bytes: 1,
             written_at: "1970-01-01T00:00:00Z".into(),
             transfer: None,
+            role: Role::Reference,
         }
     }
 

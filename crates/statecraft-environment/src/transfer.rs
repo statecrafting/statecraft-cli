@@ -354,6 +354,7 @@ impl ResultingEntry {
             bytes: self.bytes,
             written_at: at.to_string(),
             transfer: self.transfer,
+            role: crate::manifest::Role::Reference,
         }
     }
 }

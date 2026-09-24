@@ -8,7 +8,7 @@
 use crate::adapter::{Declaration, HarnessProbe, Readiness, readiness};
 use crate::claimant::{Claimant, ForeignClaims, ShadowResolver, resolve};
 use crate::digest::{digest_bytes, digest_file};
-use crate::manifest::{Class, Manifest};
+use crate::manifest::{Class, Manifest, Role, UNPINNED};
 use std::path::Path;
 
 /// The state of one manifest entry.
@@ -38,6 +38,18 @@ pub enum State {
         /// The claimant that wins resolution.
         claimant: Claimant,
     },
+    /// An authored input whose bytes are still its seed (spec 002 section 5,
+    /// 2026-09-24, provenance item 2). Information, not a finding.
+    Seeded,
+    /// An authored input the project has edited. Information, not a finding:
+    /// editing it is expected, and the digest comparison is not the control
+    /// for authored text.
+    Customized {
+        /// The seed digest the manifest records.
+        seed: String,
+        /// What is on disk.
+        found: String,
+    },
 }
 
 impl State {
@@ -46,7 +58,10 @@ impl State {
     /// `shadowed` counts: a file that is present, correct, and not what runs is
     /// exactly as broken as one that is missing, and harder to notice.
     pub fn is_finding(&self) -> bool {
-        !matches!(self, State::Present)
+        !matches!(
+            self,
+            State::Present | State::Seeded | State::Customized { .. }
+        )
     }
 
     /// A one-word rendering, the vocabulary of section 3.5's table.
@@ -57,6 +72,8 @@ impl State {
             State::Missing => "missing",
             State::Foreign { .. } => "foreign",
             State::Shadowed { .. } => "shadowed",
+            State::Seeded => "seeded",
+            State::Customized { .. } => "customized",
         }
     }
 }
@@ -170,6 +187,13 @@ impl Finding {
                 pin,
                 recorded,
                 found,
+            } if pin == "spec-spine" => {
+                format!("pin spec-spine: declared {recorded}, observed executable {found}")
+            }
+            Finding::PinMismatch {
+                pin,
+                recorded,
+                found,
             } => format!("pin {pin}: recorded {recorded}, found {found}"),
             Finding::AdapterUnavailable { adapter, missing } => {
                 format!(
@@ -208,6 +232,8 @@ pub struct Report {
     pub entries: Vec<EntryReport>,
     /// Everything else.
     pub findings: Vec<Finding>,
+    /// Information that is not a finding: it never changes the exit code.
+    pub notes: Vec<String>,
 }
 
 impl Report {
@@ -234,6 +260,9 @@ impl Report {
                 State::Drifted { expected, found } => {
                     out.push_str(&format!(" (expected {expected}, found {found})"));
                 }
+                State::Customized { seed, found } => {
+                    out.push_str(&format!(" (seed {seed}, found {found})"));
+                }
                 State::Foreign { claimant } | State::Shadowed { claimant } => {
                     out.push_str(&format!(" ({})", claimant.describe()));
                 }
@@ -243,6 +272,9 @@ impl Report {
         }
         for f in &self.findings {
             out.push_str(&format!("finding   {}\n", f.describe()));
+        }
+        for n in &self.notes {
+            out.push_str(&format!("info      {n}\n"));
         }
         out
     }
@@ -255,7 +287,9 @@ impl Report {
 pub struct Observed {
     /// This product's running version.
     pub product: Option<String>,
-    /// The spec-spine version now available.
+    /// The version the `spec-spine` executable found now answers: an
+    /// observation, compared against the declared pin and never recorded as
+    /// one.
     pub spec_spine: Option<String>,
 }
 
@@ -274,8 +308,14 @@ pub fn doctor(
 
     for entry in &manifest.entries {
         let on_disk = digest_file(&resolve(root, &entry.path))?;
+        let authored = entry.class == Class::Managed && entry.role == Role::AuthoredInput;
         let state = match on_disk {
             None => State::Missing,
+            Some((found, _)) if authored && found != entry.digest => State::Customized {
+                seed: entry.digest.clone(),
+                found,
+            },
+            Some(_) if authored => State::Seeded,
             Some((found, _)) if found != entry.digest => State::Drifted {
                 expected: entry.digest.clone(),
                 found,
@@ -389,14 +429,51 @@ pub fn doctor(
             });
         }
     }
-    if let Some(found) = &observed.spec_spine {
-        if *found != manifest.pins.spec_spine {
-            report.findings.push(Finding::PinMismatch {
-                pin: "spec-spine".into(),
-                recorded: manifest.pins.spec_spine.clone(),
-                found: found.clone(),
-            });
+    // Spec 002 section 5, 2026-09-24, provenance item 4. The declared pin is
+    // compared twice, and each disagreement is its own line naming both
+    // values: against the executable observed now, a finding; against the
+    // producer identity recorded beside it, information, because a project
+    // may move its own pin (the exact-pin entry of the same date, item 7).
+    // `unpinned` has nothing to compare and is reported as information.
+    let declared = &manifest.pins.spec_spine;
+    if declared == UNPINNED {
+        report.notes.push(
+            "spec-spine unpinned: the project declares no exact required_version".to_string(),
+        );
+    } else {
+        if let Some(producer) = &manifest.pins.producer {
+            if producer.version != *declared {
+                report.notes.push(format!(
+                    "pin spec-spine: declared {declared}, producer identity {}@{}",
+                    producer.name, producer.version
+                ));
+            }
         }
+        if let Some(found) = &observed.spec_spine {
+            if found != declared {
+                report.findings.push(Finding::PinMismatch {
+                    pin: "spec-spine".into(),
+                    recorded: declared.clone(),
+                    found: found.clone(),
+                });
+            }
+        }
+    }
+    if manifest.pins.producer.is_none() {
+        report.notes.push(
+            "producer recorded before provenance: no producer identity in the pins".to_string(),
+        );
+    }
+    if report
+        .entries
+        .iter()
+        .any(|e| matches!(e.state, State::Seeded | State::Customized { .. }))
+    {
+        report.notes.push(
+            "authored inputs are compared with their seed for information only; \
+             the control for authored text is spec-spine's check, the coupling gate and review"
+                .to_string(),
+        );
     }
     for d in declarations {
         if let Some(recorded) = manifest.pins.adapters.get(&d.name) {

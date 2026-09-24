@@ -713,6 +713,7 @@ mod tests {
             product: "0.1.0".into(),
             spec_spine: "0.20.0".into(),
             adapters: Default::default(),
+            producer: None,
         })
     }
 

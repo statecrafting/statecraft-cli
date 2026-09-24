@@ -138,25 +138,21 @@ pub fn probe_reporting_version(
 /// The pins a first `env apply` records in the manifest.
 ///
 /// Spec 002 section 3.4 makes the manifest carry the product version, the
-/// spec-spine version and each adapter's version. The product's is this build's;
-/// each adapter's is its own declaration's; spec-spine's is **asked of
-/// spec-spine**, because spec 001 section 3.2 forbids this product from
-/// answering a specification question itself, and its version is one.
-///
-/// An unresolvable spec-spine pins `not-recorded`, which is spec 005 section
-/// 3.8's word for "no record of this kind exists" rather than a guess or a zero.
-pub fn pins() -> statecraft_environment::manifest::Pins {
+/// spec-spine pin and each adapter's version. The product's is this build's;
+/// each adapter's is its own declaration's. spec-spine's is the pin the
+/// repository **declares** in its `spec-spine.toml`, or `unpinned`, and never
+/// the version found on `PATH`, which is an observation that `doctor` compares
+/// against it (spec 002 section 5, 2026-09-24, provenance item 4). The linked
+/// producer is this build's, fixed from the lock file (item 3).
+pub fn pins(root: &std::path::Path) -> statecraft_environment::manifest::Pins {
     statecraft_environment::manifest::Pins {
         product: env!("CARGO_PKG_VERSION").to_string(),
-        spec_spine: observed_spec_spine().unwrap_or_else(|| {
-            statecraft_envelope::absence::Absence::NotRecorded
-                .word()
-                .to_string()
-        }),
+        spec_spine: statecraft_environment::manifest::declared_pin(root),
         adapters: declarations()
             .iter()
             .map(|d| (d.name.clone(), d.version.clone()))
             .collect(),
+        producer: Some(statecraft_home::producer::linked()),
     }
 }
 
@@ -273,13 +269,21 @@ mod tests {
 
     #[test]
     fn the_pins_name_every_configured_adapter_and_this_builds_product_version() {
-        let pins = pins();
+        let root = tempfile::tempdir().unwrap();
+        let pins = pins(root.path());
         assert_eq!(pins.product, env!("CARGO_PKG_VERSION"));
         assert_eq!(pins.adapters.len(), declarations().len());
         assert!(pins.adapters.contains_key(provider::environment::HARNESS));
-        // Either a version was observed or the absence is the reserved word,
-        // never an empty string and never a zero.
-        assert!(!pins.spec_spine.is_empty());
+        // No `spec-spine.toml` declares a pin, so the pin says so; whatever
+        // `spec-spine` is on `PATH` is not consulted.
+        assert_eq!(pins.spec_spine, "unpinned");
+        assert_eq!(pins.producer, Some(statecraft_home::producer::linked()));
+        std::fs::write(
+            root.path().join("spec-spine.toml"),
+            "[meta]\nrequired_version = \"=9.8.7\"\n",
+        )
+        .unwrap();
+        assert_eq!(super::pins(root.path()).spec_spine, "9.8.7");
     }
 
     #[test]

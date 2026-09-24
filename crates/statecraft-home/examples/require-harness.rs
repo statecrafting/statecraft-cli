@@ -68,6 +68,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 product: env!("CARGO_PKG_VERSION").to_string(),
                 spec_spine: "0.20.0".to_string(),
                 adapters: Default::default(),
+                producer: None,
             });
             println!("manifest  created, version {}", created.version);
             created

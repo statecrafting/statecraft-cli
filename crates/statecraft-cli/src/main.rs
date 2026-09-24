@@ -2049,7 +2049,7 @@ fn environment_verb(
                 &probe,
                 &foreign,
                 &clock,
-                adapters::pins,
+                || adapters::pins(root),
                 named,
             ) {
                 Ok(consented) => emit(&bind::consented_answer(consented), format),
@@ -2057,7 +2057,7 @@ fn environment_verb(
             }
         }
         Verb::Doctor => {
-            let manifest = manifest.unwrap_or_else(|| Manifest::new(adapters::pins()));
+            let manifest = manifest.unwrap_or_else(|| Manifest::new(adapters::pins(root)));
             match statecraft_environment::doctor::doctor(
                 root,
                 &manifest,

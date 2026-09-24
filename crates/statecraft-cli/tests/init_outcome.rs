@@ -545,8 +545,11 @@ fn t12_a_re_run_lists_only_what_changed() {
 
 // I-3 (spec 002 section 5, 2026-09-24): a managed governance file edited by
 // hand is withheld on the next initialization, and the run is `partial`,
-// exit 1, never `complete`. The report names the path and both digests, in
-// JSON and in the human rendering, and the file keeps its edited bytes.
+// exit 1, never `complete`. The file is a template, a `reference` entry: the
+// provenance entry of the same date makes `spec-spine.toml` an authored
+// input, which an edit leaves `customized` and kept rather than withheld.
+// The report names the path and both digests, in JSON and in the human
+// rendering, and the file keeps its edited bytes.
 #[test]
 fn i3_a_withheld_drifted_path_is_partial_and_named_with_both_digests() {
     use statecraft_environment::digest::digest_bytes;
@@ -558,7 +561,7 @@ fn i3_a_withheld_drifted_path_is_partial_and_named_with_both_digests() {
         "{}",
         first.text
     );
-    let target = f.at("spec-spine.toml");
+    let target = f.at("standards/spec/templates/spec-template.md");
     let original = std::fs::read(&target).unwrap();
     let expected = digest_bytes(&original);
     let mut edited = original.clone();
@@ -576,7 +579,8 @@ fn i3_a_withheld_drifted_path_is_partial_and_named_with_both_digests() {
         "the withheld file changed"
     );
     assert!(
-        !r.listed_paths().contains("spec-spine.toml"),
+        !r.listed_paths()
+            .contains("standards/spec/templates/spec-template.md"),
         "a withheld path was listed as changed"
     );
     let governance = r.step("governance");
@@ -585,7 +589,7 @@ fn i3_a_withheld_drifted_path_is_partial_and_named_with_both_digests() {
         governance["state"]["reason"]
             .as_str()
             .unwrap()
-            .contains("spec-spine.toml"),
+            .contains("standards/spec/templates/spec-template.md"),
         "{governance}"
     );
     let withheld: Vec<&str> = r.report["withheld"]
@@ -596,7 +600,7 @@ fn i3_a_withheld_drifted_path_is_partial_and_named_with_both_digests() {
         .collect();
     let line = withheld
         .iter()
-        .find(|w| w.starts_with("spec-spine.toml:"))
+        .find(|w| w.starts_with("standards/spec/templates/spec-template.md:"))
         .unwrap_or_else(|| panic!("not named: {withheld:?}"));
     assert!(line.contains("drifted"), "{line}");
     assert!(line.contains(&expected) && line.contains(&found), "{line}");
@@ -608,7 +612,9 @@ fn i3_a_withheld_drifted_path_is_partial_and_named_with_both_digests() {
     assert_eq!(human.status.code(), Some(1), "{out}");
     let withhold = out
         .lines()
-        .find(|l| l.starts_with("withhold") && l.contains("spec-spine.toml"))
+        .find(|l| {
+            l.starts_with("withhold") && l.contains("standards/spec/templates/spec-template.md")
+        })
         .unwrap_or_else(|| panic!("no withhold line: {out}"));
     assert!(withhold.contains("drifted"), "{withhold}");
     assert!(
