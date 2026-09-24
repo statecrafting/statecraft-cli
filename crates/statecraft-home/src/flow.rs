@@ -1706,10 +1706,12 @@ fn perform_writes(
         // committed manifest changed on each run although no file did.
         let on_disk = digest_file(&target)?.map(|(d, _)| d);
         let unchanged = on_disk.as_deref() == Some(write.digest.as_str())
-            && manifest.entry(&write.path).is_some_and(|recorded| Entry {
-                written_at: recorded.written_at.clone(),
-                ..entry.clone()
-            } == *recorded);
+            && manifest.entry(&write.path).is_some_and(|recorded| {
+                Entry {
+                    written_at: recorded.written_at.clone(),
+                    ..entry.clone()
+                } == *recorded
+            });
         if unchanged {
             continue;
         }
