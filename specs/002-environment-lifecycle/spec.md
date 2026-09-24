@@ -7178,6 +7178,92 @@ binding.
   own authority change, so a template edit in this spec never changes this
   repository's gate in the same change.
 
+**2026-09-24: provenance of what initialization writes (amends sections
+3.2, 3.3, 3.5, 3.6 and 3.15).** Adopted by the repository owner in the
+session request of 2026-09-24: bundle proposal Part 9 step 3a, with the
+proposal's H-4 option (a) (a role on `managed` entries), P-1 option (i) (the
+declared pin, or `unpinned`), and H-3 option (a) (owner Addendum 2,
+2026-09-24: one producer identity, the CLI pin and the linked library being
+the same release). It adopts only the parts of the 2026-09-23 proposed bundle
+entry named here, and none of its bundle, store, resolution, migration or
+trust parts. Its implementation is a separate `feat(002)` change.
+
+1. **A role on `managed` entries (amends 3.2 and 3.3).** The three classes of
+   section 3.2 stay disjoint and exhaustive. A `managed` entry gains `role`:
+   `reference` (the default, and every entry recorded before this entry) or
+   `authored-input`. The `authored-input` list is closed and stated here,
+   never inferred from bytes: `spec-spine.toml`,
+   `<specs_dir>/000-bootstrap/spec.md`, `<standards_dir>/constitution.md`
+   and `<standards_dir>/contract.md`. Everything else this product writes
+   (templates under `<standards_dir>/templates/**`, `.statecraft/AGENTS.md`,
+   adapter pointer files) is `reference`. Changing an existing entry's role
+   is a per-path, operator-initiated, recorded act through section 3.35's
+   transfer mechanism, never automatic.
+2. **What an authored input means (amends 3.5 and 3.6).** Written only when
+   absent, and recorded with its **seed digest** and the producer identity;
+   an existing file is `adopted`, as today. Editing it is expected. `doctor`
+   reports `seeded` while its digest equals the seed and `customized` when
+   not, both as information with no finding, and `missing` as today; it
+   states that the digest comparison is not the control for authored text
+   (spec-spine's `check`, the coupling gate and review are). Upgrade never
+   rewrites it and reports a newer seed by its digest. Removal deletes it
+   only while its digest equals the seed, and otherwise keeps and names it.
+   A `reference` entry that differs from its digest is `drifted`, as today.
+3. **The producer is one recorded identity (amends 3.3 and 3.15).** The
+   declaration's pins gain `producer`: the linked library's crate name, exact
+   version, and the crates.io checksum `Cargo.lock` records for it, fixed
+   when this product is built and derived from the build, never from a
+   second literal (`D-06` as amended, spec `001` section 3.13); a test checks
+   it against the lock file. Section 3.15's "recorded in the declaration's
+   pins" is thereby true. Under H-3 (a) the CLI pin and the linked library
+   are **one producer identity, one release**: `pins.producer` and
+   `pins.spec_spine` (item 4) are never written or reported as two
+   independently qualified identities. `pins.producer` is that identity as
+   this build links it; `pins.spec_spine` is what the project declares it
+   requires of the same release. A declaration written before this entry
+   reads with `producer` absent, and says so ("recorded before
+   provenance"); it is never given a guessed value.
+4. **`pins.spec_spine` stops recording an observation as a pin (amends 3.3;
+   P-1 (i)).** Until now it held the `--version` answer of whatever
+   `spec-spine` was first on `PATH` when `init` ran (`C-02`). From this entry
+   it holds the repository's declared exact pin, read from the uncommented
+   `required_version` line of `spec-spine.toml`'s `[meta]` table after the
+   governance step, as the bare version (`0.25.0` for `"=0.25.0"`), or the
+   word `unpinned` when there is no such line or its requirement is not
+   exact (`=` followed by three numeric parts, section 3.23 contract 2's
+   reading of the same line). It is **never** the version found on `PATH`.
+   The observation is kept, and named as one: the init report carries
+   `observed_spec_spine` (the path, the version it answered, and how it was
+   found), and the home's `tools.json` keeps its `spec-spine` record as the
+   observation it already is (`resolved`, `observed_from`). Neither is a
+   pin. `doctor` reports two disagreements, each on its own line naming both
+   values: the observed executable differing from the declared pin, as a
+   finding; and the declared pin differing from the producer identity's
+   version, as information, because a project may move its own pin (the
+   entry above, item 7). `unpinned` is itself reported, as information. Until the producer's scaffold can write an
+   exact pin (the owner's exact-pin decision of 2026-09-24, through the
+   producer's own option, never a post-edit of library output), a newly
+   initialized project records `unpinned`.
+5. **`[index]` is passed explicitly (amends 3.15).** "Passed explicitly,
+   never defaulted" extends from `[layout]` to `[index]`:
+   `resolver_exclusions` is derived from the declared layout (the derived and
+   state roots) plus build directories (`target`, `node_modules`, `dist`,
+   `build`, `.next`) and the local tool directory `.tooling`, and names no
+   other derived directory. A test on the real library asserts it, so a
+   producer change that reintroduces a literal is caught when the producer
+   moves.
+6. **Evidence.** The implementation is a separate `feat(002)` change, tested
+   through the built binary on real directories with an isolated `HOME`:
+   pin-line and date edits to an authored input read `customized`, exit 0,
+   and a template edit reads `drifted`; a non-default `derived_dir` appears
+   in no exclusion but its own; the producer version, the observed
+   executable and the project pin disagreeing are distinct reports naming
+   both values (a finding and information, item 4); and a declaration written before this entry is read without
+   guessed values.
+
+This entry names no bundle, store or resolution, and changes no section
+3.23 contract.
+
 ## Verification
 
 `--fail-on-untraced` joined the corpus gate with this spec's first
