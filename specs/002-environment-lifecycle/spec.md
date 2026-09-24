@@ -4491,6 +4491,29 @@ maps 2 and 3 to a refusal, as the 2026-09-23 entries of spec `003` and spec
 check's verdict, but it disagrees with this table's rows for 2 and 3, and
 reconciling the two is for their owner.
 
+**2026-09-23: correcting what the gate log shows of a planted decision.** The
+entry above on section 3.37 ("section 3.37 implemented, without the
+confinement"), under *A planted decision, measured*, says a tool call released
+in the plant's window "is not invisible: the gate's own log ... shows the
+admission it gave". That is broader than section 3.37 rules 2 and 3 allow,
+and this entry corrects it; the entry above stays as written. Unconfined, the
+child can write every file in its exchange directory, which holds the gate
+script and the gate log. So a child that plants a decision can also rewrite or
+truncate the log, or replace the script so that a call passes with no entry
+at all; the supervisor's copy is also bounded (`launch::GATE_LOG_LIMIT`,
+64 KiB), and a log past the bound is recorded truncated. The rule that holds
+is rule 3's: the log is **child-attested**. An `admitted` entry in the copy is
+evidence that the gate released a call; **no entry shows nothing**, neither
+that no call ran nor that the plant released none. What the implementation
+guarantees without confinement is what the test asserts unconditionally: the
+plant is removed, never adopted, the attempt is refused under
+`startup-admission`, and the launch records hold the supervisor's decision.
+The test's conditional check (when the fixture's sentinel shows that a call
+ran, the copy holds an `admitted` line) is measured on a fixture child that
+does not tamper with the log, and says nothing about one that does; its
+comment is corrected to say so. The residual is closed only by spec `004`
+section 3.18's confinement, which is specified and not implemented.
+
 ## Verification
 
 `--fail-on-untraced` joined the corpus gate with this spec's first
