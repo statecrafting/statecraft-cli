@@ -6872,6 +6872,312 @@ JSON `withheld` list and in the human `withhold` line, leaves the file's bytes
 unchanged and lists no mutation for it; the unedited re-run stays `complete`,
 exit 0, with the governance step `done`.
 
+**2026-09-24: a repository setup profile: the first one renders a GitHub
+Actions and Rust CI surface with an aggregate gate and an AI review (amends
+sections 3.2, 3.15 and 3.17; adopted by the owner, session request of
+2026-09-24, decisions S-0 to S-5 as recorded at the end of this entry).** It
+is the authority for a product capability; this repository's own adoption of that capability, and
+any acceptance against a real remote, are separate later acts (*Order* below).
+
+*Why here, and not in a new spec.* The capability is initialization, the
+manifest and reconciliation, which this spec owns (sections 3.2 to 3.4, 3.15,
+3.17), and the entry point is the existing flow
+(`crates/statecraft-home/src/flow.rs`, `plan` and `apply`), whose preflight
+and observed-mutation list the 2026-09-24 entry on initialization outcomes
+established. A new spec would own a second installer beside this one. The
+code is a new module, `crates/statecraft-home/src/setup.rs`, and the profile
+content is data under `crates/statecraft-home/profiles/github-actions-rust/`,
+both already inside this spec's directory claim; no new crate. The provider
+reviewer the profile invokes is a CI step, not a provider adapter, so spec
+`004`'s boundary and `F-07` are not engaged. **What changes in this spec's
+stance:** section 3.22 records that no counterparty verb writes a CI workflow
+or a `Makefile`, and a recommendation made to an adopter on 2026-09-24 said
+this product never delivers them either. For a project that **selects** a
+profile, this entry supersedes that recommendation. It migrates no existing
+consumer; a consumer's own files stay its own until its owner applies a plan.
+
+*Two delivery surfaces, and neither proves the other.* The global harness
+(section 3.14) is content-addressed under the home and reaches sessions
+through adapters. A profile renders **committed repository files**, which
+GitHub reads from the repository and nowhere else. Installing one says
+nothing about the other, and each has its own evidence. The governance
+producer (section 3.15) is **unchanged**: `scaffold_init_json` still returns
+governance starter content only, its contract set is still closed, and a
+workflow or `Makefile` from the producer is still out of contract. The profile
+composes with the producer's output; it does not widen it.
+
+**1. The profile.** A profile is `(id, revision)`, content-addressed like a
+harness revision: its identity is a digest over its template files and its
+policy document, so a changed byte is a different revision. This entry
+admits one: `github-actions-rust`. Its schema, rendered into the target as
+`.statecraft/setup/github-actions-rust.json` and recorded in the declaration:
+
+| Field | Holds |
+|---|---|
+| `id`, `revision`, `identity` | the profile, its revision number, and the content digest |
+| `files` | each rendered path with its content digest and role (`workflow`, `script`, `policy`, `makefile`, `ignore-fragment`) |
+| `commands` | named command selections (`governance`, `code`), each a fixed argument vector the profile defines |
+| `parameters` | the only values a project may set, each typed and bounded (below) |
+| `jobs` | each CI job, whether it is required, and its applicability per event (section 4) |
+| `review` | the reviewer tool and its pinned version, the credential **name**, skip classes and the release-candidate rule (section 5) |
+| `prerequisites` | local: an exact `spec-spine` pin, `rust-toolchain.toml`, a `Cargo.lock`, a git work tree |
+| `remote` | obligations the product states and never performs (section 6) |
+
+**Commands come from the profile and from explicit project configuration,
+never from a guess.** The profile fixes each command's program and arguments.
+A project can set only declared parameters, in its declaration's `setup`
+block, each validated before planning: `default_branch` (a ref name; default:
+the remote's own `HEAD`, then `main`), `review.diff_cap` (an integer in a
+bounded range), `review.exclude` (repository-relative path prefixes),
+`release.branch_pattern` (a glob over ref names), and `jobs.<name>.enabled`
+only for a job the profile marks optional. No parameter holds a command
+string, and an unknown key refuses the plan. Nothing is read from the
+project's own `Makefile`, `package.json` or scripts to infer a command.
+
+**Extensibility, without building it.** `setup.rs` defines the profile as a
+closed Rust type with one registered value. Another CI provider or language
+is a new `(id, revision)` with its own templates and tests, admitted by its
+own entry. There is no plugin loading, no template language beyond named
+parameter substitution, and no provider or language other than this one is
+built.
+
+**2. What `github-actions-rust` renders.**
+
+| Path | Role | Note |
+|---|---|---|
+| `.github/workflows/statecraft-ci.yml` | workflow | `pull_request` (`opened`, `synchronize`, `reopened`, `ready_for_review`) and `push` to the default branch. Jobs `governance`, `code`, `ai-review` (a caller of the reusable workflow) and `ci-gate`. No `merge_group` trigger. |
+| `.github/workflows/statecraft-ai-review.yml` | workflow | `workflow_call` only; declares the one credential secret by name. |
+| `scripts/statecraft/install-spec-spine.sh` | script | installs the version the exact pin names into `.tooling/bin`; refuses a non-exact or absent pin |
+| `scripts/statecraft/gate.sh` | script | the local gate: `governance` (check, lint, index coverage, index check, authored-content if the project has the script) and `code` (cargo build, test, clippy `-D warnings`, fmt check, each `--workspace --locked`), using only `.tooling/bin/spec-spine`. CI calls the same script, so there is one definition. |
+| `scripts/statecraft/ci-gate.sh` | script | the aggregate policy (section 4), reading the needs record from the environment as JSON |
+| `scripts/statecraft/ai-review.sh` | script | invocation, classification and the evidence record (section 5) |
+| `.statecraft/setup/github-actions-rust.json` | policy | the rendered schema above; read at the trusted base by `ci-gate.sh` |
+| `Makefile` | makefile | **only when no `Makefile` exists**: `gate` and `code` targets calling `gate.sh`. An existing one is the user's and is never edited; the plan names the two lines an operator may add. |
+| `.gitignore` | ignore-fragment | `.tooling/` merged into the existing marked block (section 3.15's merge) |
+
+Every action is pinned by commit SHA; the reviewer CLI by exact version; the
+governance tool by the project's exact pin; the Rust toolchain by the
+project's `rust-toolchain.toml`, which the profile requires and never writes.
+The rendered workflows and scripts are members of the target's **authority
+set** (spec `001` section 3.5: its check suite and hooks). The plan says so for
+each, and applying them is the operator's act.
+
+**3. Plan and apply.** The profile is selected with `init plan|apply <path>
+--profile github-actions-rust`, recorded in the declaration, and re-planned by
+`env plan|apply` and `env upgrade` after that. No parallel command family.
+
+1. **One typed plan.** The preflight computes the profile plan beside the
+   governance plan and from the same reconciliation: each file's intended
+   bytes and digest, its role, whether it is in the authority set, the
+   command selections, prerequisites with their observed state, remote
+   obligations, and each existing-file conflict. `init plan` shows exactly
+   this and writes nothing (the 2026-09-24 rule). The plan has an identity: a
+   digest over the profile identity, the declaration's `setup` block, and the
+   observed digest of every path the plan reads or would write.
+2. **Approved inputs.** `apply` accepts `--plan <identity>`. When given, apply
+   recomputes the plan and refuses, writing nothing but the lock, if the
+   identity differs. Without it, apply is the unattended form and reports the
+   identity it performed.
+3. **Authored content is preserved.** A profile path that exists and is not
+   in the manifest is **not adopted and not replaced**: it is an
+   `existing-authored` conflict, named with its digest, and the profile is
+   `partial` for that path. Replacing it needs section 3.21's per-path
+   ownership transfer, which is explicit, operator-initiated and recorded.
+   Unlike a governance starter file, a workflow cannot be adopted in place,
+   because adopting it would claim that the operator's CI is the profile's.
+4. **Managed upgrade compares three digests**: previous (the manifest's),
+   current (on disk) and intended (the new revision's). Current equals
+   intended: record only. Current equals previous: replace. Otherwise the
+   file is `customized`: left intact, and the conflict names all three
+   digests and writes the intended bytes to
+   `.statecraft/state/setup/<path>.intended` so the operator can merge by
+   hand. Never a silent choice.
+5. **Resume after interruption.** Before its first write, apply records the
+   plan identity and the ordered path list under `.statecraft/state/`. A
+   re-run with that record present re-plans; each path whose disk bytes equal
+   the intended bytes is done, each whose bytes equal the previous (or
+   absent) is written, and anything else is a conflict, never overwritten.
+   The manifest is written last, under the lock, so an interrupted run leaves
+   no manifest entry for a file it did not finish.
+6. **Idempotent.** A repeat apply of the same plan writes no project file,
+   and its mutation list shows at most the runtime state.
+7. **Observed, not inferred.** Every write goes through the mutation recorder
+   of the initialization-outcome entry.
+
+**4. The gate policy.** `ci-gate` always runs (`if: always()`), needs every
+other job, and passes only when each required job ended as its event
+requires:
+
+| Job | `pull_request` | `push` to default branch | Otherwise |
+|---|---|---|---|
+| `governance` | required: `success` | required: `success` | not triggered |
+| `code` | required: `success` | required: `success` | not triggered |
+| `ai-review` | required: `success`, carrying a review result (section 5) | **inapplicable** (no subject pull request): must be `skipped` | not triggered |
+| `ci-gate` | aggregates | aggregates | |
+
+- `failure` or `cancelled` in any required job blocks.
+- **A required job that is `skipped` where it applies blocks** (an unexpected
+  skip). A skip is accepted only where the table says the job is
+  inapplicable, and the gate prints which rule admitted it.
+- **A job that vanished blocks.** `ci-gate.sh` reads the required set from the
+  policy document **at the trusted base** (`git show <base>:.statecraft/setup/...`)
+  and refuses when the needs record lacks one of them. The coupling step
+  inside `governance` runs only on `pull_request` with frozen
+  `base.sha...head.sha` endpoints, as this repository's gate does; that is a
+  documented step-level inapplicability, printed, not a skip of a job.
+- **No `merge_group`.** A queue is not rendered until queued-candidate
+  coupling and a waiver transport exist and are tested (AGENTS.md, "Before
+  enabling a merge queue"). A trigger alone proves neither.
+- **A candidate cannot weaken the policy that judges it.** GitHub runs the
+  workflow definitions in the candidate on `pull_request`, so no file in the
+  candidate can be the last word. The profile therefore does three things:
+  the gate reads its required set from the base, not the candidate; any
+  candidate that changes a profile path or the policy document is reported by
+  `ci-gate` as an **authority change** (spec `001` section 3.5.2) in its
+  summary; and the profile states a remote obligation that branch protection
+  require code-owner review for those paths (section 6). The residual is
+  named: a writer who can both change the workflow and satisfy the review
+  can still weaken it, as on any GitHub repository.
+
+**5. The AI review.**
+
+1. **Subject.** The event's `base.sha` and `head.sha`, and the digest of the
+   exact three-dot diff reviewed. Context is read from the base commit only.
+2. **Permissions.** Workflow default `contents: read`; the review job adds
+   `pull-requests: write` for its comment, nothing else. The caller forwards
+   exactly one secret by name, never `secrets: inherit`. The product names the
+   credential (`CLAUDE_CODE_OAUTH_TOKEN` for the pinned Claude Code CLI) and
+   the operator command that sets it; it never reads, copies or prints a
+   value, and no test uses a real one.
+3. **Contributor content is data.** The diff and any body-derived line reach
+   the reviewer on stdin, never through shell interpolation; `${{ }}`
+   expressions carrying contributor text are bound to environment variables,
+   never spliced into `run:`. The reviewer runs from an empty directory with a
+   temporary `HOME`, so no configuration in the checkout is discovered.
+4. **Untrusted code never meets a credential.** The trigger is
+   `pull_request`, never `pull_request_target`; a fork receives no secret and
+   is a visible skip, not a privileged run.
+5. **A review is evidence, not text.** The reviewer must end its output with a
+   fenced JSON block naming the subject head it was given, a verdict
+   (`findings` or `no-findings`) and, for `findings`, entries whose paths are
+   among the diff's changed paths. The runner builds the evidence record:
+   profile identity, tool and version, subject (repository, pull request,
+   base, head, diff digest), result, findings, and timestamps. It is posted as
+   a comment and uploaded as an artifact named for the head sha.
+6. **What is not a review, and blocks:** a missing credential on a
+   same-repository pull request; empty output; output without the block, or
+   whose block names another head or cites paths outside the diff (an
+   unrelated last message); an explicit provider refusal; any unclassified
+   failure; a head that moved before publication (stale subject, not
+   counted); and a failed comment or artifact upload.
+7. **Visible skips.** `draft`, `fork`, `dependabot`, `oversized` (over
+   `review.diff_cap`) and a **recognized** transient provider failure, by the
+   contextual signals spec-spine's 091 classifier uses. Each is posted, and
+   each is recorded as `skipped:<class>`. **A green `ci-gate` therefore does not
+   mean every pull request was reviewed**, and the report says which it was.
+8. **AI findings never become human approval.** The job posts a comment,
+   never an approving review, and nothing in the profile counts it toward a
+   required approval.
+9. **Release candidates** (pull requests whose head matches
+   `release.branch_pattern`): *owner decision S-1 below*.
+
+**6. Six results, reported separately.** `init`, `env` and `doctor` report,
+per selected profile:
+
+| Result | Means | Local init sets it |
+|---|---|---|
+| `files-installed` | every rendered path is present with the intended digest, or named as a conflict | yes |
+| `local-checks` | `gate.sh governance` and `gate.sh code` ran here and passed | only with `--verify-local`; otherwise `not-run` |
+| `remote-prerequisites` | the credential secret exists by name, Actions enabled, workflow token read-only by default | `unverified` |
+| `required-checks` | branch protection on the default branch requires `ci-gate` (and, per section 4, code-owner review of profile paths) | `unverified` |
+| `ci-executed` | a `ci-gate` run exists for the recorded head | `unverified` |
+| `ai-review-produced` | an evidence record exists for that head, with its result | `unverified` |
+
+Local initialization can be `complete` while the remote results are
+`unverified`: the initialization-outcome words describe local steps, and a
+setup is **complete** only when all six are satisfied. The product performs
+no remote write: no secret, no branch protection, no pull request. A
+read-only verification against the host is performed only when the operator
+asks for it (`doctor --remote`), and without a reachable host it reports
+`unverified`, never success.
+
+**7. Acceptance obligations.** Each is a test in `crates/statecraft-home/tests/`
+or through the built binary in `crates/statecraft-cli/tests/`, hermetic, with
+no provider, host or network call:
+
+1. A fresh temporary Rust repository: `init apply --profile
+   github-actions-rust` then the rendered `install-spec-spine.sh` and `gate.sh
+   governance` and `gate.sh code` run with the **real pinned** spec-spine and
+   cargo, and exit 0.
+2. A customized existing repository (an authored `.github/workflows/ci.yml`, a
+   `Makefile`, a `.gitignore`): the authored files are byte-identical after
+   apply, each is named as a conflict or left alone as specified, and every
+   unrelated file is byte-identical (a digest walk before and after).
+3. A repeat apply changes no project file.
+4. An interrupted apply (the process killed after its Nth write) resumes to the
+   same final tree as an uninterrupted one, and a file edited between the two
+   runs is a conflict, not overwritten.
+5. A managed upgrade from revision N to N+1: an unmodified file is replaced,
+   a customized one is kept with the three digests and the `.intended` copy.
+6. `--plan <identity>` refuses when an input changed after the plan.
+7. The rendered workflows parse, and their `run:` scalars are **executed** in
+   fixtures (spec-spine 091's method: the real scalars, stubbed `claude` and
+   `gh`, and a harness that panics on an expression it does not support),
+   covering: each required job `failure`, `cancelled`, missing from the needs
+   record, and skipped where applicable; an inapplicable skip accepted on
+   `push`; a missing credential; a valid review with findings and with
+   none; empty output; unrelated output; a head mismatch; a classified
+   transient failure; an explicit refusal; a fork; a stale subject; and a
+   failed evidence upload.
+8. **Mutation tests:** removing a required job from `ci-gate`'s `needs`, or
+   from the base policy's required set only in the candidate, makes a test
+   fail; so does inverting any blocking branch of `ai-review.sh`.
+9. The plan reports each rendered workflow and script as an authority-set
+   path, and the credential by name only (a test asserts no secret value
+   appears in any output).
+
+**8. Order.** (1) This entry, decided by the owner. (2) The planner,
+renderer and reconciler as one `feat(002)` change under it. (3) This
+repository's own adoption of the profile, as a **separate authority change**:
+its `.github/workflows/**` and `Makefile` are unclaimed judging files, and
+replacing them with rendered ones is decided on its own (decision S-5). (4) A
+disposable remote acceptance run, only under an authorization that names the
+remote target and the provider use (given by the owner on 2026-09-24: a new
+private `statecraft-setup-acceptance-<YYYYMMDD>` repository and at most three
+review invocations, run by the operator's session, not by this change). Publication of a released binary and a
+fresh released-binary consumer are separate from the source merge.
+
+*Decisions, as the owner made them (session request of 2026-09-24).* S-0:
+this entry is adopted as written, with the choices below. Each item keeps the
+option text it was decided from; the option not taken is recorded, not
+binding.
+
+- **S-1: release candidates. Decided: (a).** A release candidate needs an
+  actual review (`findings` or `no-findings`) or an explicit owner exception
+  recorded outside the candidate: an approval on a GitHub Environment
+  `statecraft-review-exception` whose required reviewers the operator sets,
+  which GitHub records by name and which the author cannot grant. (b) Release
+  candidates take the same visible skips as any other pull request.
+- **S-2: ordinary pull requests. Decided: (a).** Keep the five visible skip
+  classes of section 5 item 7 non-blocking, as spec-spine does today. (b)
+  Make `oversized` block, so a large change needs the exception of S-1.
+- **S-3: the trusted-base defense. Decided: (a), all three.** Base-read required set,
+  authority-change reporting, and code-owner review of profile paths stated as
+  a remote obligation (a `CODEOWNERS` rendered only when none exists). (b)
+  The first two only, with the residual accepted.
+- **S-4: the exact pin prerequisite. Decided: (a).** The profile requires an
+  exact `spec-spine` pin and is withheld, naming the prerequisite, in an
+  unpinned project; how a new project gets one is the separate exact-pin
+  proposal. (b) The profile writes the pin itself, which amends section 3.15's
+  unchanged-bytes rule here instead of there.
+- **S-5 (at step 3, named now). Decided: adopt by rendering.** Whether this
+  repository adopts the rendered surface. Its current judging files are claimed by no spec (constitution VII:
+  a spec does not own the rules it is judged by), while the profile's
+  templates are this spec's territory. Decided: adopt by rendering, keep
+  the rendered paths unclaimed, and make every later profile upgrade here its
+  own authority change, so a template edit in this spec never changes this
+  repository's gate in the same change.
+
 ## Verification
 
 `--fail-on-untraced` joined the corpus gate with this spec's first
