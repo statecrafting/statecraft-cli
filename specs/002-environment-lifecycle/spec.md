@@ -7442,6 +7442,44 @@ declaration is byte-identical across a re-run a second apart and that no
 project path is a mutation; without the fix it fails ("a re-run re-dated the
 declaration").
 
+**2026-09-24: profile revision 2, the AI review is the final approver
+(adopted by the owner on 2026-09-24, decisions R2-1 (a) and R2-2 (a); amends the
+setup-profile entry's gate policy, S-1 and S-3).** Measured in the remote
+acceptance run of 2026-09-24 (evidence commit 420979f, `session10/R`): the
+review job succeeds whatever its verdict, so on PR B a `findings` verdict did
+not block by itself (clippy did), and `ci-gate` could pass a head the reviewer
+flagged. The owner's direction is `ci-gate` with the AI review as the final
+approver and no human approval for ordinary changes.
+
+1. **A findings verdict blocks.** `ci-gate` refuses a head whose review
+   result is `findings` unless the owner's exception was approved for that
+   run. The exception is the S-1 protected Environment
+   (`statecraft-review-exception`), which now applies to two cases: a release
+   candidate whose review was skipped (as in revision 1), and any pull request
+   whose review returned `findings`. Approving it is the owner's act in the
+   forge; rejecting it, or leaving it pending, keeps the head unmergeable. A
+   verdict recorded for another head never counts: the review's verdict is
+   already bound to the subject head and diff digest.
+2. **No human approval for ordinary changes; code-owner review stays for the
+   profile's own files (R2-2 (a)).** The operator steps name required
+   approvals 0 with code-owner review required, so only a change to a path
+   CODEOWNERS lists waits for the owner. `doctor --remote` keeps judging
+   code-owner review as required.
+3. **`ci-gate` is bound to its source.** The operator steps require
+   `ci-gate` from GitHub Actions (or, under the local gate once adopted, the
+   organization's app), so a status any token posts does not satisfy it;
+   `doctor --remote` reports an unbound `ci-gate` as not satisfied.
+4. **Skips stay non-blocking (S-2).** A visible `skipped:<class>` result is not
+   a `findings` verdict and is admitted as in revision 1.
+5. **Revision.** The profile becomes revision 2, a new identity; a project on
+   revision 1 upgrades through `init apply --profile`, which rewrites the
+   profile's unchanged files and withholds drifted ones as for any managed
+   path. Acceptance obligations: a `findings` result without an approved
+   exception blocks `ci-gate`; with one it passes; `no-findings` and each skip
+   class behave as in revision 1; the operator steps and `doctor --remote`
+   carry items 2 and 3; tests in `crates/statecraft-home/tests/` extend the
+   revision-1 suites.
+
 ## Verification
 
 `--fail-on-untraced` joined the corpus gate with this spec's first
