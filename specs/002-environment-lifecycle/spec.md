@@ -6756,6 +6756,82 @@ compatible binary.
 This entry is the authority. The implementation is a separate change, after
 the release that carries the option is adopted.
 
+**2026-09-24: a hook reads freshness with the gate's unresolved-claim flag
+(amends section 3.23 contract 4; owner decision H-4, session request of
+2026-09-24).** A delivered hook ran `spec-spine check` with no flags, while
+this repository's gate runs `index check --fail-on-unresolved`. So a session
+could be told a tree is fresh that the gate then refuses.
+
+*What was measured* (0.25.0, disposable clones of `5ed8780`; evidence
+`statecraft-cli.evidence/2026-09-24/session10/H4/`):
+
+- A `draft` spec claiming a crate it has not written: `check` exits 0 and
+  prints `codebase-index: fresh`; `check --fail-on-unresolved` exits 1 and
+  prints `codebase-index: fresh, but REFUSED: 1 unresolved unit
+  diagnostic(s) (--fail-on-unresolved)`; `index check --fail-on-unresolved`
+  exits 1. The shipped session-start hook matched the first line and reported
+  the index fresh.
+- An `approved` spec claiming a missing file (`I-004`, an error): `check`
+  exits 1 with or without the flag, and prints `codebase-index: UNRESOLVED
+  CLAIM`.
+- The same unresolved claim with stale shards: exit 1 (spec-spine's order is
+  3, then 1, then 2, then 0), and the text carries both `STALE` and
+  `UNRESOLVED CLAIM`.
+- `check` has carried `--fail-on-unresolved` since spec-spine 0.18.0, the same
+  release the hooks already require for the verb.
+
+*Contract 4 now reads as follows.* It replaces the text of section 3.23's
+contract 4 and the `check` column of the exit-vocabulary table; the other six
+contracts, the Stop policy and the translation's shape are unchanged.
+
+> 4. **Read the verdict the gate would give; never guess it.** Every hook that
+>    reads freshness runs `check --fail-on-unresolved`, the flag the gate
+>    passes to its unresolved-claim read, so the session learns in the
+>    session what the gate refuses at merge. It does not add the gate's other
+>    reads (`check --fail-on-warn`, `lint --fail-on-warn`, `index coverage
+>    --fail-on-untraced`): those judge authoring quality rather than whether
+>    the committed tree describes the corpus, and a hook that ran them would
+>    be a second gate. The four answers are then: `0` fresh with no unresolved
+>    claim; `1` either the corpus does not validate or the index records an
+>    unresolved claim the gate refuses, which a hook distinguishes by the
+>    report text (`spec-registry: INVALID` or `REFUSED`, `codebase-index:
+>    UNRESOLVED CLAIM` or `fresh, but REFUSED`) and names, together with any
+>    `STALE` line the same report carries; `2` stale and nothing else; `3` a
+>    read that was not performed. Only `2`, and the `STALE` part of a `1`, is
+>    repaired by regenerating; an unresolved claim is repaired in the spec or
+>    the tree. Before passing the flag, the hook establishes that the binary's
+>    `check --help` names it (contract 5); a binary that does not is treated as
+>    lacking the verb.
+
+The translation table's row "2 stale, or an unresolved claim" is corrected
+to "2 stale": under the flag an unresolved claim is a `1`, and this product
+still reports both as a finding (1), distinguished in the text.
+
+*Obligations for the implementation*, each a test in
+`crates/statecraft-home/tests/harness_hooks.rs` that runs the extracted hook
+against stub binaries:
+
+1. Every hook that runs `check` passes `--fail-on-unresolved`, and no hook
+   passes a writing verb because of it (contract 1 unchanged).
+2. A draft's unresolved claim (`fresh, but REFUSED`, exit 1): the
+   pull-request gate refuses and names the unresolved claim, not an invalid
+   corpus; the session-start line reports the index as refused by the gate
+   for an unresolved claim, never as fresh; Stop reports it and does not
+   block.
+3. An unresolved claim with stale shards (exit 1, both lines): each hook names
+   both, and says regenerating clears only the stale part.
+4. An invalid corpus (exit 1, `spec-registry: INVALID`): reported as today.
+5. A binary whose `check --help` does not name the flag: treated as lacking
+   the verb, never read as stale.
+
+The change reaches adopters only through a harness revision (section 3.14).
+It does not touch another project's own hooks, and Rahi is untouched: an
+adopter's copies stay its own until Statecraft delivers, the adopter confirms
+its sessions still have their loop and hooks, and only then are the project
+copies removed (section 3.22's order). A check writes nothing.
+
+This entry is the authority. The implementation is a separate change.
+
 ## Verification
 
 `--fail-on-untraced` joined the corpus gate with this spec's first
