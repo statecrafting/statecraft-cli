@@ -7425,6 +7425,75 @@ once per process and reused, the same cases took 23 to 39 s. That is the
 fresh-executable first-exec stall the 002 and 003 acceptance diagnostic
 investigates, observed here incidentally and not measured in isolation.
 
+**2026-09-24: PROPOSED, NOT ADOPTED. A local gate: the setup profile's
+checks and AI review run on the operator's machine, with a result branch
+protection can require.** The owner set the direction on 2026-09-24: a private
+repository's Actions minutes are billed, so the profile's guarantees need a
+local route that costs no Actions minutes and no API spend, and that is as good
+as `ci-gate` plus the AI review on a public repository. Nothing below binds
+until the owner adopts it.
+
+*What must carry over.* `ci-gate` with the AI review gives four properties, and
+the local route keeps each one:
+
+1. **An independent environment.** The judged tree is a fresh worktree at the
+   exact head commit, fetched from the remote, never the author's working
+   tree; the product home is isolated and the toolchain is the one
+   `rust-toolchain.toml` pins.
+2. **A trusted base.** The gate and review scripts run from the base commit
+   (the profile's rule, S-3), so a change cannot weaken the judge that judges
+   it. The required set is read from the base, as `ci-gate` reads it.
+3. **The same checks.** One command list, the profile's declared
+   `setup.commands` (governance and code), run by both routes. A difference
+   between the routes' verdicts on one head is a defect, not a variant.
+4. **A result bound to the head that protection can require.** The verdict is
+   published as a check run named `ci-gate` on the exact head SHA, created by
+   the organization's GitHub App (`statecraft-ing-github-app`, which already
+   holds `checks: write`), so branch protection can require `ci-gate` from
+   that app and a plain commit status posted by anyone with write access does
+   not satisfy it. The check run's summary carries the evidence digest.
+
+*The AI review.* It runs as a supervised run (Mode B, spec 001 section 3.4)
+through the Claude Code adapter on the operator's own subscription: the same
+prompt, the same diff cap and the same skip classes as
+`statecraft-ai-review.yml`, with the diff and the reviewer's output recorded in
+the run journal (spec 005). No Actions minutes and no API key are used. The
+review's result joins the check run as the workflow's review does.
+
+*Verb.* `statecraft-cli gate run <path> --pr <n>` (or `--base <sha> --head
+<sha>`): fetch, create the worktree, run the base's scripts over the head, run
+the review, record, and publish. `--no-publish` judges without publishing.
+Exit codes follow section 3.3's vocabulary: 0 passed, 1 a finding, 2 refused
+(for example the head moved after judging began, or a precondition is
+missing), 4 failed.
+
+*Trust.* The app's private key is a trust root and stays the owner's: the
+local route reads it from a location the owner names and never records it.
+The app today also holds administration, secrets and workflow write, which the
+local route does not need; the proposal recommends a key or installation
+scoped to `checks: write`, `contents: read` and `pull_requests: read` for this
+use. A published check run names the machine-independent inputs (base, head,
+profile identity, plan identity, spec-spine pin, reviewer version) so a second
+run anywhere can be compared.
+
+*Proof of equivalence.* On the public acceptance repository
+(`statecrafting/statecraft-setup-acceptance-20260924`, where Actions are
+free), each acceptance pull request is judged by both routes: A (correct)
+passes both, B (a clippy warning) fails both, C (a weakened `ci-gate`) is
+refused by both from the base-read required set. The acceptance criterion is
+the same verdict on the same head and review findings that a reader judges
+comparable; the provider budget is the owner's (3 invocations for the current
+run).
+
+*Decisions for the owner.*
+
+| Item | Options | Recommended default | Consequence of the default |
+|---|---|---|---|
+| L-1 publication | (a) check run by the org app; (b) commit status plus signed evidence | (a), with (b) only as an interim | Protection requires `ci-gate` from the app; the app key is a trust root |
+| L-2 app scope | (a) a narrower key or second app for the gate; (b) reuse the current app as is | (a) | The local route cannot touch secrets, workflows or administration |
+| L-3 public repositories | (a) the local route is optional there; (b) replace Actions | (a) | Public repositories keep Actions; the local route is a second opinion |
+| L-4 where it is built | (a) spec 002 now; (b) the new harness spec after the split (#120) | (a), relocated with the split | The verb lands before the split and moves with it |
+
 ## Verification
 
 `--fail-on-untraced` joined the corpus gate with this spec's first
