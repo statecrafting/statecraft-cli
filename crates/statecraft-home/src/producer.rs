@@ -31,12 +31,13 @@ use serde::{Deserialize, Serialize};
 /// The producer crate this build depends on.
 pub const PRODUCER_NAME: &str = "spec-spine-core";
 
-/// The exact version pinned in this crate's manifest.
+/// The exact version this build links.
 ///
-/// Spelled here as well as in `Cargo.toml` so a report can name it, and a test
-/// reads the manifest and refuses a drift between the two. A pin recorded in a
-/// report that is not the pin in the build is worse than no pin at all.
-pub const PRODUCER_VERSION: &str = "0.25.0";
+/// Derived by `build.rs` from `Cargo.lock`, never spelled in source: the root
+/// `Cargo.toml` states the version once (spec 001 section 3.13), and a report
+/// that named a second literal could drift from the build. A test still reads
+/// the root manifest and `spec-spine.toml` and refuses a difference.
+pub const PRODUCER_VERSION: &str = env!("STATECRAFT_PRODUCER_VERSION");
 
 /// The specs directory this product declares.
 pub const SPECS_DIR: &str = "specs";
@@ -286,21 +287,43 @@ pub fn produce(producer: &dyn Producer) -> Result<Starter, ProducerError> {
 mod tests {
     use super::*;
 
-    #[test]
-    fn the_recorded_version_is_the_version_the_manifest_pins() {
-        // Two spellings of one number is how a pin and a report drift. This is
-        // the check that keeps them equal.
-        let manifest = include_str!("../Cargo.toml");
-        let line = manifest
+    /// The exact version in a `version = "=X"` or `required_version = "=X"` line.
+    fn exact_pin(text: &str, key_line_prefix: &str, what: &str) -> String {
+        let line = text
             .lines()
-            .find(|l| l.starts_with("spec-spine-core"))
-            .expect("the producer dependency is declared");
-        let pinned = line
-            .split("version = \"=")
+            .find(|l| l.starts_with(key_line_prefix))
+            .unwrap_or_else(|| panic!("{what} is declared"));
+        line.split("\"=")
             .nth(1)
             .and_then(|s| s.split('"').next())
-            .expect("the dependency is pinned exactly");
+            .unwrap_or_else(|| panic!("{what} is pinned exactly: {line}"))
+            .to_string()
+    }
+
+    #[test]
+    fn the_recorded_version_is_the_version_the_workspace_pins() {
+        // The root manifest states the version once; the build links what the
+        // lock resolved. A report naming anything else would name a producer
+        // this build does not contain.
+        let manifest = include_str!("../../../Cargo.toml");
+        let pinned = exact_pin(manifest, "spec-spine-core", "the producer dependency");
         assert_eq!(pinned, PRODUCER_VERSION);
+        let member = include_str!("../Cargo.toml");
+        assert!(
+            member
+                .lines()
+                .any(|l| l == "spec-spine-core.workspace = true"),
+            "the member inherits the workspace's statement instead of restating it"
+        );
+    }
+
+    #[test]
+    fn the_cli_pin_and_the_linked_library_are_one_release() {
+        // One producer identity (H-3 (a), spec 001 section 3.13 rule 3): the
+        // governing CLI and the linked library name the same release.
+        let config = include_str!("../../../spec-spine.toml");
+        let cli = exact_pin(config, "required_version", "the CLI pin");
+        assert_eq!(cli, PRODUCER_VERSION);
     }
 
     #[test]

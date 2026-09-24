@@ -4831,6 +4831,20 @@ says partial work is never reported as complete. Whether a withheld path in
 an otherwise completed step makes the initialization `partial` is left to
 the owner. This change does not alter it.
 
+**2026-09-24: the linked producer's version is stated once and derived by the
+build (spec `001` section 3.13, `D-06` as amended).** `crates/statecraft-home`
+takes `spec-spine-core.workspace = true`, so the root `Cargo.toml`'s
+`[workspace.dependencies]` is the only statement of the version and features.
+`PRODUCER_VERSION` is no longer a literal: `build.rs` reads the single
+`spec-spine-core` package from `Cargo.lock` (refusing zero or two) and exports
+it, so what a report names is what the build links. Two tests replace the old
+manifest check: the root manifest's exact version equals `PRODUCER_VERSION` and
+the member inherits it, and `spec-spine.toml`'s `required_version` names the
+same release (one producer identity, H-3 (a)); pinning the CLI to a different
+release fails the second. The two ownership-transfer assertions derive the
+expected `spec-spine-core@<version>` from the same constant. `Cargo.lock` does
+not change. Nothing about what initialization writes or reports changes.
+
 ## Verification
 
 `--fail-on-untraced` joined the corpus gate with this spec's first

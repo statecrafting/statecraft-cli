@@ -269,7 +269,13 @@ fn user_to_adopted_and_back_through_the_binary() {
     assert_eq!(v["current"]["class"], "user");
     assert_eq!(v["resulting"]["class"], "adopted");
     assert_eq!(v["bytes"], 18);
-    assert_eq!(v["producer"], "spec-spine-core@0.25.0");
+    assert_eq!(
+        v["producer"],
+        format!(
+            "spec-spine-core@{}",
+            statecraft_home::producer::PRODUCER_VERSION
+        )
+    );
     let human = s.run(&[
         "transfer",
         "plan",
@@ -340,7 +346,10 @@ fn a_withheld_adapter_path_moved_to_managed_is_written_then_withheld_after_rever
     assert_eq!(entry["source"]["identity"], "claude-code");
     assert_eq!(
         entry["transfer"]["evaluated_against"],
-        "spec-spine-core@0.25.0"
+        format!(
+            "spec-spine-core@{}",
+            statecraft_home::producer::PRODUCER_VERSION
+        )
     );
     assert_eq!(
         s.read(OWNED),
