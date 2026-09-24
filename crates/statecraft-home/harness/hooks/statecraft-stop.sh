@@ -122,9 +122,10 @@ say() { echo "$1 $judge"; }
 # subcommand and this tool spends exit 2 on staleness, so a binary predating
 # the check verb (every release before 0.18.0) hands back the staleness code
 # without having read either tree.
-if ! "$sc" check --help >/dev/null 2>&1; then
+# Contract 4 as amended (H-4): the flag this hook passes is established too.
+if ! "$sc" check --help 2>/dev/null | grep -q -- '--fail-on-unresolved'; then
   ver=$("$sc" --version 2>/dev/null)
-  say "[freshness] NOT READ: the binary at $sc does not carry the check verb, so neither committed tree was judged. It answers: ${ver:-(nothing)}. The verb needs spec-spine 0.18.0 or later; run /setup."
+  say "[freshness] NOT READ: the binary at $sc does not carry the check verb with --fail-on-unresolved, so neither committed tree was judged. It answers: ${ver:-(nothing)}. The verb needs spec-spine 0.18.0 or later; run /setup."
   exit 0
 fi
 # Spec 093 3.1: read the verdict, do not guess it. The body this replaced ran
@@ -133,7 +134,7 @@ fi
 # none of them: exit 1 is a corpus that does not validate, exit 3 is a read
 # that was not performed, and since spec 079 exit 2 itself carries an
 # unresolved claim whose diagnostic is recomputed from the corpus every run.
-out=$("$sc" check 2>&1); c=$?
+out=$("$sc" check --fail-on-unresolved 2>&1); c=$?
 [ "$c" = 0 ] && exit 0
 case "$c" in
   2)
@@ -146,14 +147,28 @@ case "$c" in
       echo '[freshness] Not regenerated here: a write at session end leaves .statecraft/derived/ uncommitted, and the next run refuses a dirty tree.'
       named=1 ;;
     esac
-    case "$out" in *'codebase-index: UNRESOLVED CLAIM'*)
+    case "$out" in *'codebase-index: UNRESOLVED CLAIM'*|*'codebase-index: fresh, but REFUSED'*)
       say '[freshness] UNRESOLVED CLAIM: a spec claims a unit that does not resolve. That is not staleness and regenerating does not clear it, because the diagnostic is recomputed from the corpus on every run. Fix the spec or the tree; `spec-spine index diagnostics` lists them.'
       named=1 ;;
     esac
     [ "$named" = 1 ] || say "[freshness] REFUSED: spec-spine check exited 2 with a report this hook does not recognise; it is not reported as fresh, and no remedy is guessed for it."
     ;;
   1)
-    say '[freshness] INVALID: the corpus does not validate, which is not staleness and regenerating does not clear it. Run `spec-spine check` and fix the violations it names.' ;;
+    # Under --fail-on-unresolved exit 1 carries two readings (contract 4 as
+    # amended), and a stale tree can ride along with either; each is named.
+    named=0
+    case "$out" in *'codebase-index: UNRESOLVED CLAIM'*|*'codebase-index: fresh, but REFUSED'*)
+      say '[freshness] UNRESOLVED CLAIM: a spec claims a unit that does not resolve, and the gate refuses it. That is not staleness and regenerating does not clear it, because the diagnostic is recomputed from the corpus on every run. Fix the spec or the tree; `spec-spine index diagnostics` lists them.'
+      named=1 ;;
+    esac
+    case "$out" in *'spec-registry: INVALID'*|*'spec-registry: REFUSED'*)
+      say '[freshness] INVALID: the corpus does not validate, which is not staleness and regenerating does not clear it. Run `spec-spine check` and fix the violations it names.'
+      named=1 ;;
+    esac
+    case "$out" in *'spec-registry: STALE'*|*'codebase-index: STALE'*)
+      [ "$named" = 1 ] && say '[freshness] STALE as well: `spec-spine compile` and `index` clear that part only; commit the regenerated shards with the fix.' ;;
+    esac
+    [ "$named" = 1 ] || say '[freshness] INVALID: the corpus does not validate, which is not staleness and regenerating does not clear it. Run `spec-spine check` and fix the violations it names.' ;;
   3)
     # Spec 093 3.2: the version read qualifies a non-answer, so it is asked
     # here and never on the happy path.

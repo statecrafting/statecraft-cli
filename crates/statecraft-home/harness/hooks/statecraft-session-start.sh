@@ -136,8 +136,10 @@ if [ "$rrc" = 0 ]; then
   # commit artifacts that were already correct. `--version` is answered by every
   # binary ever released, so asking is safe against any version.
   ver=$sc_ver
-  if ! "$sc" check --help >/dev/null 2>&1; then
-    reg="spec-spine ${ver:-?} predates the \`check\` verb, rebuild or reinstall (see /setup)"
+  # Contract 4 as amended (H-4): the verb and the gate's unresolved-claim flag
+  # are both established before the exit code means anything.
+  if ! "$sc" check --help 2>/dev/null | grep -q -- '--fail-on-unresolved'; then
+    reg="spec-spine ${ver:-?} predates the \`check\` verb or its --fail-on-unresolved flag, rebuild or reinstall (see /setup)"
     idx="$reg"
   else
   # Spec 062: one verb, both committed trees. Read-only, exactly as the two
@@ -147,7 +149,7 @@ if [ "$rrc" = 0 ]; then
   # The composed exit code is the more severe of the two halves, so it cannot
   # say WHICH tree moved. The report lines can, and this hook reads them back
   # rather than guessing from the code.
-  out=$("$sc" check 2>&1); c=$?
+  out=$("$sc" check --fail-on-unresolved 2>&1); c=$?
   case "$out" in *'spec-registry: fresh'*) reg='fresh' ;;
     *'spec-registry: STALE'*) reg='STALE, run spec-spine compile and commit the shards' ;;
     *'spec-registry: INVALID'*) reg='INVALID, the corpus fails validation, which regenerating does not clear (run spec-spine check for the violations)' ;;
@@ -157,7 +159,9 @@ if [ "$rrc" = 0 ]; then
   # and the composed code cannot say which. Matching STALE alone reported the
   # half regeneration fixes while dropping the half it does not, and left the
   # unresolved-only case to the `unknown` fallback below.
-  case "$out" in *'codebase-index: fresh'*) idx='fresh' ;;
+  case "$out" in
+    *'codebase-index: fresh, but REFUSED'*) idx='REFUSED by the gate: the index is fresh but records an unresolved claim (--fail-on-unresolved), which regenerating does not clear (run spec-spine index diagnostics for the list)' ;;
+    *'codebase-index: fresh'*) idx='fresh' ;;
     *'codebase-index: STALE'*)
       case "$out" in
         *'codebase-index: UNRESOLVED CLAIM'*) idx='STALE plus UNRESOLVED CLAIM: run spec-spine index for the stale shard(s), which does not clear the unresolved claim(s)' ;;
