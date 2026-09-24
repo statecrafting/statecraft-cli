@@ -6687,6 +6687,75 @@ touches no real product home, runs no provider session, and modifies neither
 spec-spine nor rustev. It does not centralize application dependencies, add a
 background service, or claim that any case above was tested.
 
+**2026-09-24: a new project is pinned exactly to the linked producer's
+release, and the producer writes the pin (amends sections 3.3 and 3.15;
+adopted by the owner on 2026-09-24; implementation waits for the producer
+release).** The repository owner decided this in the session request of
+2026-09-24: "new projects get an exact required_version equal to the linked
+core's release. Implement through the producer's upcoming scaffold exact-pin
+option (spec-spine is adding it for 0.26.0) so init still writes library
+output byte for byte. Until that release is adopted, land the authority text
+only; do not post-edit library output." It adopts the separate proposal of the
+same day (kept with the session evidence as `init-exact-pin-proposal.md`) in
+that form. Under H-3 (a) (owner Addendum 2, 2026-09-24) the linked library and
+the governance executable are one release, so the proposal's options E1 (the
+qualified executable's version) and E2 (the producer's own version) name the
+same number; the mechanism is its E3 (the producer writes it).
+
+1. **The value.** A new project's `spec-spine.toml` gets an uncommented
+   `[meta]` table and `required_version = "=X.Y.Z"`, where `X.Y.Z` is the
+   release of the `spec-spine-core` this build links: the version `D-06` (as
+   amended 2026-09-24) states once, and which this product reports as its
+   producer version, derived from the build. It is never taken from `PATH`, an
+   installed binary, `pins.spec_spine`, `$SPEC_SPINE_BIN`, `.tooling/bin` or
+   any repository's configuration at run time. The pin is exact: a caret range
+   is never written.
+2. **The producer writes it.** `init` passes that version to the producer's
+   scaffold exact-pin option and writes the returned `spec-spine.toml` byte
+   for byte, as section 3.15 requires. This product never post-edits library
+   output: there is no tracked modification of `spec-spine.toml`, and section
+   3.15's "bytes unchanged" keeps no exception.
+3. **Until that option is adopted, nothing changes.** The option is announced
+   for spec-spine 0.26.0. Until a release carrying it is qualified and adopted
+   under `D-06` (the CLI and the linked library together, as one release), a
+   new project stays unpinned exactly as today, and `init` reports it as
+   today. No interim edit of the producer's output is made, and the proposal's
+   E1 tracked modification is not adopted.
+4. **Adopted files are never modified.** A project that already has
+   `spec-spine.toml` keeps it, pinned or not; the report says which, and to
+   what.
+5. **The corpus step reads the pin it wrote.** Step 6 runs an executable only
+   if it satisfies the project's pin, choosing it as section 3.23 contract 2
+   (as amended on 2026-09-24) chooses for a hook; with none compatible, step 6
+   is refused naming the pin and each executable passed over, and stays
+   degradable (the initialization is `partial`).
+6. **Qualification.** The `D-06` review of the release that adds the option
+   covers it: the scaffold with the option equals the scaffold without it
+   except the `[meta]` header and the pin line, and the pinned scaffold passes
+   `check`, `lint`, `index check` and `index coverage` under the same
+   release's executable.
+7. **What it does not do.** It pins no existing project, verifies no artifact
+   identity (a pin is a version, not a digest), and implements no bundle.
+   `doctor` reports a project pin that differs from the linked release as
+   information, since a project may move its own pin.
+
+*Acceptance obligations, for the implementation,* through the built binary on
+real directories with an isolated `HOME`: (1) a fresh `init apply` writes
+`required_version = "=X.Y.Z"` equal to the linked release, whatever
+`spec-spine` is on `PATH` (an older one, a newer one, none); (2) the written
+file equals the producer's returned bytes exactly; (3) an existing
+`spec-spine.toml`, pinned or unpinned, is adopted byte for byte and reported
+as such; (4) `doctor` after init reports no drift, and an operator edit of the
+pin line reads as information naming both values; (5) with only an
+incompatible `spec-spine` on `PATH`, step 6 is refused naming the pin and the
+skipped binary, outcome `partial`, exit 1; (6) a unit test holds the written
+value equal to the build's producer version; (7) the shipped hooks in a fresh
+project print pinned verdict lines, and the post-edit `compile` runs under a
+compatible binary.
+
+This entry is the authority. The implementation is a separate change, after
+the release that carries the option is adopted.
+
 ## Verification
 
 `--fail-on-untraced` joined the corpus gate with this spec's first
