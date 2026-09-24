@@ -86,13 +86,17 @@ impl Fixture {
     }
 
     fn cli(&self, verb: &str) -> Output {
+        self.cli_with(verb, true)
+    }
+
+    fn cli_with(&self, verb: &str, json: bool) -> Output {
+        let project = self.project().display().to_string();
+        let mut args = vec!["init", verb, project.as_str()];
+        if json {
+            args.push("--json");
+        }
         Command::new(env!("CARGO_BIN_EXE_statecraft-cli"))
-            .args([
-                "init",
-                verb,
-                &self.project().display().to_string(),
-                "--json",
-            ])
+            .args(&args)
             .env_clear()
             .env("STATECRAFT_HOME", self.home())
             .env("STATECRAFT_NATIVE_ROOT", self.dir.path().join("native"))
@@ -537,4 +541,92 @@ fn t12_a_re_run_lists_only_what_changed() {
             assert_eq!(m["path"], ".statecraft/environment.json", "{m}");
         }
     }
+}
+
+// I-3 (spec 002 section 5, 2026-09-24): a managed governance file edited by
+// hand is withheld on the next initialization, and the run is `partial`,
+// exit 1, never `complete`. The report names the path and both digests, in
+// JSON and in the human rendering, and the file keeps its edited bytes.
+#[test]
+fn i3_a_withheld_drifted_path_is_partial_and_named_with_both_digests() {
+    use statecraft_environment::digest::digest_bytes;
+    let f = Fixture::new();
+    let first = f.run("apply");
+    assert_eq!(
+        (first.exit, first.outcome()),
+        (0, "complete"),
+        "{}",
+        first.text
+    );
+    let target = f.at("spec-spine.toml");
+    let original = std::fs::read(&target).unwrap();
+    let expected = digest_bytes(&original);
+    let mut edited = original.clone();
+    edited.extend_from_slice(b"\n# edited by hand\n");
+    std::fs::write(&target, &edited).unwrap();
+    let found = digest_bytes(&edited);
+
+    let r = f.run("apply");
+    assert_eq!((r.exit, r.outcome()), (1, "partial"), "{}", r.text);
+    assert_ne!(r.outcome(), "complete");
+    r.list_is_the_disk();
+    assert_eq!(
+        std::fs::read(&target).unwrap(),
+        edited,
+        "the withheld file changed"
+    );
+    assert!(
+        !r.listed_paths().contains("spec-spine.toml"),
+        "a withheld path was listed as changed"
+    );
+    let governance = r.step("governance");
+    assert_eq!(governance["state"]["state"], "withheld", "{governance}");
+    assert!(
+        governance["state"]["reason"]
+            .as_str()
+            .unwrap()
+            .contains("spec-spine.toml"),
+        "{governance}"
+    );
+    let withheld: Vec<&str> = r.report["withheld"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|w| w.as_str().unwrap())
+        .collect();
+    let line = withheld
+        .iter()
+        .find(|w| w.starts_with("spec-spine.toml:"))
+        .unwrap_or_else(|| panic!("not named: {withheld:?}"));
+    assert!(line.contains("drifted"), "{line}");
+    assert!(line.contains(&expected) && line.contains(&found), "{line}");
+
+    // The human rendering names the same path, reason and digests, and ends
+    // `partial`, with the same exit.
+    let human = f.cli_with("apply", false);
+    let out = text(&human);
+    assert_eq!(human.status.code(), Some(1), "{out}");
+    let withhold = out
+        .lines()
+        .find(|l| l.starts_with("withhold") && l.contains("spec-spine.toml"))
+        .unwrap_or_else(|| panic!("no withhold line: {out}"));
+    assert!(withhold.contains("drifted"), "{withhold}");
+    assert!(
+        withhold.contains(&expected) && withhold.contains(&found),
+        "{withhold}"
+    );
+    assert!(out.lines().any(|l| l.trim() == "partial"), "{out}");
+    assert!(!out.lines().any(|l| l.trim() == "complete"), "{out}");
+    assert_eq!(std::fs::read(&target).unwrap(), edited);
+}
+
+// The unedited re-run stays complete: the rule is about withheld paths, and
+// an adopted or rewritten-in-place path is not one.
+#[test]
+fn i3_an_unedited_re_run_stays_complete() {
+    let f = Fixture::new();
+    assert_eq!(f.run("apply").exit, 0);
+    let r = f.run("apply");
+    assert_eq!((r.exit, r.outcome()), (0, "complete"), "{}", r.text);
+    assert_eq!(r.step("governance")["state"]["state"], "done");
 }
