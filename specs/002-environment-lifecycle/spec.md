@@ -4596,6 +4596,146 @@ it.
 
 This entry is the authority. The implementation is a separate change.
 
+**2026-09-24: an unmanaged hook checks the binary it selects against the
+repository's pin (amends section 3.23 contract 2; adopted by the owner on
+2026-09-24, decisions Q-1 (a), Q-2 (i) and Q-3 (b)).** Contract 2's order
+(`$SPEC_SPINE_BIN`, then the repository's own `target/release/spec-spine`,
+then `PATH`) never consults the pin the repository declares, so it can hand a
+verdict, and the one sanctioned write, to a binary the repository never
+adopted.
+
+*What was measured.* This product's shipped hooks at `fa000c6`, run as
+programs in disposable clones of this repository, with each candidate binary
+behind a shim that records which one answered (0.20.0 and 0.24.0 installed
+from crates.io, a 0.22.0 development build, the adopted 0.23.0 on `PATH`):
+
+- **Pinned** (`required_version = "=0.23.0"`). A 0.20.0, 0.22.0 or 0.24.0 in
+  `target/release` is chosen over the 0.23.0 on `PATH`. The chosen binary
+  refuses itself at configuration load, exit 3, so the pull-request gate
+  blocks and the session-start line reads "NOT READ (check exit 3: I/O,
+  parse, schema or config)". That fails closed, but it names the wrong cause
+  and never tries the binary that matches. A mismatched `$SPEC_SPINE_BIN`
+  gives the same answer.
+- **An override that names no executable** is skipped silently, and the next
+  rule answers.
+- **Unpinned**, which is what `init apply` writes today: the producer's
+  `spec-spine.toml` carries the pin commented out, measured through the built
+  binary. Every wrong candidate judges. 0.20.0, 0.22.0 and 0.24.0 each report
+  the 0.23.0 shards `STALE`, and the gate tells the session to regenerate. On
+  a `spec.md` edit, the post-edit hook's sanctioned `compile` by 0.22.0
+  rewrote all seven registry shards (203 lines removed), where the same edit
+  under 0.23.0 changes one; the adopted 0.23.0 then reads those shards as
+  stale.
+
+In the pinned clone, `config show` exits 3 under 0.20.0, 0.22.0 and 0.24.0
+with "config error: this repository requires spec-spine =0.23.0
+(spec-spine.toml [meta] required_version)" and exits 0 under 0.23.0. Evidence:
+`statecraft-cli.evidence/2026-09-24/session8/f13/` (the script, its log, the
+binaries' digests, the control, and the `init apply` output).
+
+*Contract 2 now reads as follows.* It replaces the text of section 3.23's
+contract 2; the other six contracts, the Stop policy and the translation
+table are unchanged.
+
+> 2. **Resolve the binary, then establish that the repository admits it.**
+>    1. **The pin.** The repository's pin is `[meta] required_version` in its
+>       `spec-spine.toml`, read as an uncommented line of that table. A
+>       candidate is **compatible** when its reported version satisfies that
+>       requirement under Cargo's semantics, which are the ones spec-spine
+>       applies to it. An exact pin (`=X.Y.Z`) is compared with the version
+>       the candidate's `--version` reports. Any other requirement is put to
+>       the candidate itself by a read-only probe (`config show`): spec-spine
+>       refuses at configuration load when its version does not satisfy the
+>       pin. Only that refusal is read as "incompatible"; any other failure of
+>       the probe is contract 4's "not performed", never a compatibility
+>       verdict, and no later candidate is tried after it.
+>    2. **An explicit override is the only candidate.** When
+>       `$SPEC_SPINE_BIN` is set and not empty, no other rule is consulted. If
+>       it names no executable, or names one that is not compatible, the hook
+>       does not fall back. A gate refuses. An advisory hook reports the check
+>       as not performed. Either way the hook names the override, the path,
+>       the version it reports, the pin and the file that declares it, and the
+>       two remedies: unset the override, or point it at a compatible binary.
+>       Changing the pin is not offered as a remedy, because it is a `D-06`
+>       change.
+>    3. **Otherwise the convention candidates are tried in order**: the
+>       target repository's own `target/release/spec-spine`, then `PATH`. The
+>       first compatible one is used (Q-1 (a)). Every candidate passed over
+>       is named in the hook's output with its path, its version and the pin
+>       it fails, so no incompatible binary is bypassed silently. If
+>       candidates exist and none is compatible, the check is not performed:
+>       a gate refuses (contract 6), an advisory hook says so, and both list
+>       what was found. When no candidate exists at all, each hook keeps the
+>       behavior it has for an absent binary; this amendment does not change
+>       it.
+>    4. **An unpinned repository** (Q-2 (i)) keeps the order of rules 2 and 3
+>       with no compatibility test, because it has declared none. Every line
+>       that reports a verdict says that the repository is unpinned, and names
+>       the binary and its version. **The sanctioned `compile` of contract 1
+>       is withheld in an unpinned repository** (Q-3 (b)): a binary the
+>       repository never adopted does not rewrite its committed shards. The
+>       hook says that it withheld the compile, why, and that the read-only
+>       check still ran. Contract 1's exception is otherwise unchanged.
+>    5. **A managed session is outside this contract.** When the supervisor
+>       supplies the resolved executable (`STATECRAFT_SPEC_SPINE`), the hook
+>       uses that path and nothing else; if it is not executable, the hook
+>       refuses or reports as in rule 2. Artifact identity there is the
+>       supervisor's digest-verified resolution; a matching version string is
+>       not identity and is never used as a substitute. Until the supervisor
+>       supplies the path, a managed session (one whose launch named a run in
+>       `STATECRAFT_RUN_ID`) is resolved by rules 1 to 4, and its report says
+>       "version-checked, identity not verified".
+>    6. **Every verdict line names its judge**: the path, the version, the
+>       rule that chose it (override, repository build, `PATH`, supervisor),
+>       and the pin with its source, or "unpinned".
+>
+> A repository that builds its own binary is still governed by the one it
+> builds whenever that build satisfies its own pin. A stale build left in
+> `target/release` stops judging, and the hook says so.
+
+*Acceptance obligations.* The implementation is a separate `fix(002)` change
+to the four shipped hooks and their reports. Each obligation is a test in
+`crates/statecraft-home/tests/harness_hooks.rs` that extracts the shipped hook
+body and runs it as a program against stub binaries that record whether they
+were invoked:
+
+1. A pinned repository with an incompatible repository build and a compatible
+   binary on `PATH`: the `PATH` binary judges, and the repository build is
+   named as passed over, with its version and the pin.
+2. An incompatible override, with a compatible binary on `PATH`: the gate
+   refuses, the advisory hooks report not performed, the `PATH` binary is
+   never invoked, and the output names the override, its version, the pin and
+   both remedies.
+3. An override naming no executable: the same refusal, never a silent skip.
+4. Candidates present and none compatible: the gate refuses, the advisory
+   hooks report not performed, and every candidate is listed.
+5. An unpinned repository: the first candidate judges, every verdict line says
+   "unpinned", and on a `spec.md` edit the post-edit hook does **not** invoke
+   `compile` and says so, while `check` still runs.
+6. A pinned repository with a compatible binary: the post-edit hook's
+   sanctioned `compile` still runs (contract 1 unchanged).
+7. A non-exact requirement decided by the probe: a candidate the probe
+   refuses is passed over and the next one judges.
+8. A probe that fails for another reason: not performed, and no later
+   candidate is tried.
+9. The supervisor's path in a managed session: used, and nothing else is
+   invoked; not executable, refused as in rule 2.
+10. A managed session without the supervisor's path: resolved by rules 1 to 4,
+    reported "version-checked, identity not verified".
+11. Every verdict line of obligations 1, 5 and 9 names the path, the version,
+    the rule and the pin or "unpinned".
+
+Contract 2's existing tests keep their meaning and gain a pin. The change
+reaches adopters only through a harness revision (section 3.14). It does not
+touch another project's own hooks: an adopter's copies are its own until
+Statecraft delivers, the adopter confirms its sessions still have their loop
+and hooks, and only then are the project copies removed (section 3.22's
+order). It implements no managed resolution and verifies no artifact
+identity, which remains the bundle proposal's. Whether `init` writes an
+explicit pin into a new project is a separate question, not decided here.
+
+This entry is the authority. The implementation is a separate change.
+
 ## Verification
 
 `--fail-on-untraced` joined the corpus gate with this spec's first
