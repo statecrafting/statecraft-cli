@@ -71,6 +71,7 @@ pub mod resolved;
 pub mod service;
 pub mod session;
 pub mod settings;
+pub mod setup;
 pub mod startup;
 pub mod team;
 pub mod trial;

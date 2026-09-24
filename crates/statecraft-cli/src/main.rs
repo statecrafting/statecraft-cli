@@ -146,7 +146,21 @@ fn run(args: &[String]) -> i32 {
             // when the operator names it, so `--replace` is parsed strictly and
             // only where a verb can carry it.
             let consenting = matches!(invocation.verb, Verb::EnvApply | Verb::EnvUpgrade);
-            let named = match bind::replace_arguments(consenting, &invocation.rest[1..]) {
+            // `doctor --remote [--head <sha>]` (spec 002 section 5, 2026-09-24,
+            // the setup-profile entry): a read-only verification against the
+            // host, asked for explicitly and never performed otherwise.
+            let (remote, rest) = if invocation.verb == Verb::Doctor {
+                match bind::remote_arguments(&invocation.rest[1..]) {
+                    Ok(split) => split,
+                    Err(detail) => {
+                        eprintln!("usage: {detail}");
+                        return Exit::Usage.code();
+                    }
+                }
+            } else {
+                (None, invocation.rest[1..].to_vec())
+            };
+            let named = match bind::replace_arguments(consenting, &rest) {
                 Ok(named) => named,
                 Err(detail) => {
                     eprintln!("usage: {detail}");
@@ -160,7 +174,7 @@ fn run(args: &[String]) -> i32 {
                 );
                 return Exit::Usage.code();
             }
-            environment_verb(invocation.verb, &root, &home, &named, format)
+            environment_verb(invocation.verb, &root, &home, &named, remote, format)
         }
         // Spec 006's edges: the verbs 003, 004 and 005 name, bound here for the
         // first time. Same precondition as the environment verbs, for the same
@@ -1989,6 +2003,7 @@ fn environment_verb(
     root: &std::path::Path,
     home: &std::path::Path,
     named: &[statecraft_environment::replace::Consent],
+    remote: Option<bind::RemoteAsk>,
     format: Format,
 ) -> i32 {
     let declarations = adapters::declarations();
@@ -2081,7 +2096,18 @@ fn environment_verb(
                     if let Some(finding) = statecraft_home::required::doctor_finding(&standing) {
                         report.findings.push(finding);
                     }
-                    emit(&bind::doctor_answer(report), format)
+                    match remote {
+                        None => emit(&bind::doctor_answer(report), format),
+                        Some(ask) => {
+                            let results = statecraft_home::setup::remote_results(
+                                root,
+                                &manifest,
+                                &statecraft_home::setup::GhHost::default(),
+                                ask.head.as_deref(),
+                            );
+                            emit(&bind::doctor_remote_answer(report, results), format)
+                        }
+                    }
                 }
                 Err(e) => emit(&bind::plan_error_answer(root, &e), format),
             }

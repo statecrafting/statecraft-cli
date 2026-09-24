@@ -496,6 +496,90 @@ pub fn doctor_answer(report: Report) -> Answer<ReportView> {
     Answer::new(ReportView::of(&report), exit, summary)
 }
 
+/// What `doctor --remote` was asked.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct RemoteAsk {
+    /// The commit the CI and review results are asked about; absent, `HEAD`.
+    pub head: Option<String>,
+}
+
+/// Split `--remote [--head <sha>]` out of `doctor`'s arguments. `--head`
+/// without `--remote`, a repeated flag, or a head that is not a hexadecimal
+/// commit id is a usage error.
+pub fn remote_arguments(rest: &[String]) -> Result<(Option<RemoteAsk>, Vec<String>), String> {
+    let mut remote = false;
+    let mut head: Option<String> = None;
+    let mut others = Vec::new();
+    let mut i = 0;
+    while i < rest.len() {
+        match rest[i].as_str() {
+            "--remote" if !remote => remote = true,
+            "--head" if head.is_none() => {
+                let Some(value) = rest.get(i + 1) else {
+                    return Err("--head needs a commit id".to_string());
+                };
+                let ok =
+                    (7..=64).contains(&value.len()) && value.bytes().all(|b| b.is_ascii_hexdigit());
+                if !ok {
+                    return Err(format!("--head `{value}` is not a commit id"));
+                }
+                head = Some(value.to_ascii_lowercase());
+                i += 1;
+            }
+            "--remote" | "--head" => return Err(format!("{} given twice", rest[i])),
+            _ => others.push(rest[i].clone()),
+        }
+        i += 1;
+    }
+    if head.is_some() && !remote {
+        return Err("--head is asked with --remote".to_string());
+    }
+    Ok((remote.then_some(RemoteAsk { head }), others))
+}
+
+/// `doctor --remote`: the diagnostic, and the setup profile's six results.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DoctorRemoteView {
+    /// The local diagnostic, as `doctor` reports it.
+    pub report: ReportView,
+    /// The six results, reported separately.
+    pub setup: statecraft_home::setup::Results,
+    /// Whether all six are satisfied.
+    pub setup_complete: bool,
+}
+
+/// `doctor --remote`. The exit is the diagnostic's: a result that is not
+/// satisfied is reported, and is not a finding about the local tree.
+pub fn doctor_remote_answer(
+    report: Report,
+    results: statecraft_home::setup::Results,
+) -> Answer<DoctorRemoteView> {
+    let exit = if report.has_findings() {
+        Exit::Finding
+    } else {
+        Exit::Ok
+    };
+    let mut summary = if report.has_findings() {
+        report.render()
+    } else {
+        "no findings\n".to_string()
+    };
+    for (name, outcome) in statecraft_home::setup::results_rows(&results) {
+        summary.push_str(&format!(
+            "result {name:<22} {} ({})\n",
+            outcome.state.word(),
+            outcome.detail
+        ));
+    }
+    let view = DoctorRemoteView {
+        report: ReportView::of(&report),
+        setup_complete: results.complete(),
+        setup: results,
+    };
+    Answer::new(view, exit, summary.trim_end().to_string())
+}
+
 /// A plan, as the JSON contract carries it.
 ///
 /// A view type for the same two reasons the outcome and report views are ones

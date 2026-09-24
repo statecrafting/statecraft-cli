@@ -56,6 +56,17 @@ pub enum Operation {
         /// The project.
         root: PathBuf,
     },
+    /// Initialization with a setup profile request (spec 002 section 5,
+    /// 2026-09-24, the setup-profile entry): `init plan|apply <path>
+    /// --profile <id> [--plan <identity>] [--verify-local]`.
+    InitWithSetup {
+        /// The project.
+        root: PathBuf,
+        /// Preview or perform.
+        mode: flow::Mode,
+        /// What was asked of the profile.
+        setup: flow::SetupRequest,
+    },
     /// The one-time relocation, previewed.
     MigratePlan {
         /// The project.
@@ -827,8 +838,9 @@ pub fn execute(ports: &Ports<'_>, operation: Operation) -> Answer {
         Operation::HomeShow => home_show(ports),
         Operation::HomePlan => home_change(ports, flow::Mode::Plan, settings::Intent::Withheld),
         Operation::HomeApply { settings } => home_change(ports, flow::Mode::Apply, settings),
-        Operation::InitPlan { root } => init(ports, &root, flow::Mode::Plan),
-        Operation::InitApply { root } => init(ports, &root, flow::Mode::Apply),
+        Operation::InitPlan { root } => init(ports, &root, flow::Mode::Plan, Default::default()),
+        Operation::InitApply { root } => init(ports, &root, flow::Mode::Apply, Default::default()),
+        Operation::InitWithSetup { root, mode, setup } => init(ports, &root, mode, setup),
         Operation::MigratePlan { root } => match derived::plan(&root) {
             Ok(verdict) => Answer::Migrate(Box::new(derived::Outcome {
                 verdict,
@@ -1405,7 +1417,7 @@ fn home_change(ports: &Ports<'_>, mode: flow::Mode, intent: settings::Intent) ->
     }))
 }
 
-fn init(ports: &Ports<'_>, root: &Path, mode: flow::Mode) -> Answer {
+fn init(ports: &Ports<'_>, root: &Path, mode: flow::Mode, setup: flow::SetupRequest) -> Answer {
     let ctx = flow::Context {
         home: ports.home,
         root,
@@ -1414,6 +1426,7 @@ fn init(ports: &Ports<'_>, root: &Path, mode: flow::Mode) -> Answer {
         target_probe: ports.target_probe,
         clock: ports.clock,
         product_version: ports.product_version.clone(),
+        setup,
     };
     let report = match mode {
         flow::Mode::Plan => flow::plan(&ctx),

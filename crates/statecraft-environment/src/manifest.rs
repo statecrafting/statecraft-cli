@@ -279,6 +279,31 @@ pub struct Project {
     /// is not the same as empty, so an absent member stays absent on write.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub commands: Option<Vec<String>>,
+    /// The selected repository setup profile and the parameters this project
+    /// set for it (spec 002 section 5, 2026-09-24, the setup-profile entry).
+    /// Absent for a project that selected none, and omitted on write, so a
+    /// declaration written before profiles existed is byte-identical.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub setup: Option<SetupSelection>,
+}
+
+/// A selected setup profile, as the declaration records it.
+///
+/// This crate carries the value; `statecraft-home`'s `setup` module validates
+/// the parameters and renders the profile. `parameters` holds only the
+/// profile's declared parameters, keyed by their dotted names; an unknown key
+/// refuses the plan there.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct SetupSelection {
+    /// The profile id.
+    pub profile: String,
+    /// The revision last applied, or planned for the first time.
+    pub revision: u32,
+    /// The profile's content identity at that revision.
+    pub identity: String,
+    /// The project's parameter values.
+    #[serde(default)]
+    pub parameters: BTreeMap<String, serde_json::Value>,
 }
 
 /// A declared value this product refuses to commit, and why.

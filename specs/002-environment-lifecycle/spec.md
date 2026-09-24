@@ -7321,6 +7321,110 @@ edit reads `drifted`, exit 1; a declared 0.24.0 against the producer and a
 0.23.0 executable gives a finding and a note, each naming both values; a declaration
 written before this entry reads with no producer guessed and a note saying so.
 
+**2026-09-24: the setup profile implemented (the entry above on a
+repository setup profile, adopted with S-0 to S-5).** The planner, renderer
+and reconciler are one change under that entry, its order item (2). This
+repository's own adoption (S-5, item 3) and the disposable remote run (item
+4) are not part of it.
+
+*What is built.* `crates/statecraft-home/src/setup.rs` holds the one
+registered profile, `github-actions-rust` revision 1, as a closed value; its
+templates are data under `crates/statecraft-home/profiles/github-actions-rust/`
+and its identity is a digest over them, the ignore fragment and the static
+policy. `init plan|apply <path> --profile <id> [--plan <identity>]
+[--verify-local]` plans it in the preflight beside the governance plan and
+from the same reconciliation; an unknown profile, an unknown or out-of-bounds
+parameter, or an approved plan identity that is not the plan now is a
+refusal before any write. The apply writes the resume record first, each file
+through the flow's observed recorder, the `.intended` copies, and records the
+manifest entries, which the flow writes last; the resume record is removed
+after that write. A declaration that selects a profile is re-planned by `init
+plan|apply` without the flag. The governance step reports `withheld`, naming
+each conflict, when the profile is withheld or has a conflict, so the outcome
+is `partial` (the I-3 rule). `doctor --remote [--head <sha>]` reads the four
+remote results through `gh api -X GET` only and reports the six separately;
+a host that cannot be asked is `unverified`.
+
+*Choices the entry left open, decided here.*
+
+1. **Parameter marker.** Templates name parameters as `{{sc:name}}`, so a
+   GitHub expression (`${{ ... }}`) is template text and never substituted.
+   An unknown or unterminated marker is a template defect, reported and never
+   written.
+2. **`review.code_owners`.** S-3 (a) renders a `CODEOWNERS` "only when none
+   exists", and a `CODEOWNERS` needs owners, which the entry's parameter list
+   does not carry. One declared parameter supplies them: a list of `@handle`
+   values. Absent, no `CODEOWNERS` is rendered and the plan says code-owner
+   review stays a remote obligation. An existing `CODEOWNERS` at any of the
+   three places GitHub reads is the user's and is left alone.
+3. **Coverage is reported, not enforced, in the rendered gate.** `gate.sh
+   governance` runs `check --fail-on-warn`, `lint --fail-on-warn`, `index
+   coverage` and `index check --fail-on-unresolved`. Measured on 2026-09-24
+   with the pinned spec-spine on a fresh `cargo new --lib` project initialized
+   with the profile: every verb exits 0 except `index coverage
+   --fail-on-untraced`, which exits 1 because the project's own `src/lib.rs`
+   and the four rendered scripts are unclaimed until it writes the specs that
+   claim them. A project adds the flag when its coverage debt is retired, as
+   this repository did.
+4. **Every local prerequisite withholds, not only the pin.** S-4 withholds an
+   unpinned project; the same rule applies to a missing `rust-toolchain.toml`,
+   `Cargo.lock` or git work tree, because the rendered gate cannot run without
+   them. Each is named with its observed state.
+5. **The gate and the reviewer run the base's scripts.** `ci-gate` reads both
+   its policy and `ci-gate.sh` at the base commit, and the review job reads
+   `ai-review.sh` at the base, falling back to the candidate's copy only when
+   the base carries none (the adoption), which each says. The residual the
+   entry names is unchanged: the candidate's workflow definition still runs.
+6. **A fork or Dependabot skip is not posted as a comment.** Their token is
+   read-only; the skip is recorded in the evidence record and the job summary.
+   Every other visible skip is posted before its result is claimed, and a skip
+   notice that cannot be posted blocks.
+7. **The review tool.** The Claude Code CLI pinned at 2.1.116, spec-spine's
+   own pin for the same reviewer, installed by `npm` only when a review will
+   run.
+8. **Actions pinned by commit:** `actions/checkout` v7.0.0 and
+   `actions/upload-artifact` v7.0.1, as spec-spine's workflows pin them.
+
+*Evidence (tested, local).* Through the built binary, with an isolated
+product home, `crates/statecraft-cli/tests/setup_profile.rs`: a fresh Rust
+project applies the profile with `--verify-local` and its rendered
+`install-spec-spine.sh`, `gate.sh governance` and `gate.sh code` exit 0 with
+the real pinned spec-spine and cargo (obligation 1); authored files stay
+byte-identical by a digest walk, with the conflict and the two left-alone
+files named (2); a repeat apply changes no profile file and no profile record in the
+declaration (3; on this base the governance step re-dates some of its own
+declaration entries on a repeat run, which is that step's behavior and is
+reported separately); an apply stopped
+at its first script write by a read-only directory resumes to the same profile bytes
+and manifest entries as an uninterrupted run, and a file edited in between is
+a conflict with its `.intended` copy (4); `--plan` refuses a changed input,
+writing no project file (6); the plan marks the authority set and names the
+credential only, and a credential value in the environment appears in no
+output and no file (9); `doctor --remote` against a stub `gh` reports all six,
+issues reads only, and reports `unverified` for an unreachable host. The
+library, `crates/statecraft-home/tests/setup_upgrade.rs`: revision N to N+1
+replaces an unmodified file and keeps a customized one with three digests and
+the `.intended` copy (5). The rendered workflows,
+`crates/statecraft-home/tests/setup_workflows.rs`: the aggregate step's and
+the review step's real `run:` scalars run under `bash -e` with stub `claude`,
+`gh` and `npm`, and an expression the harness does not state panics; every
+case of obligation 7 is covered, and each blocking branch of `ci-gate.sh`
+(8) and `ai-review.sh` (15) is inverted in turn and caught, as is a
+candidate that drops a job from its own policy (8).
+
+*Not built here.* `env plan|apply|upgrade` do not re-plan the profile; `init
+apply` does, and is the only verb that writes it. Job-level `if:` conditions
+(the review exception's) are asserted by structure, not executed. The remote
+results read existence: `ai-review-produced` names the artifact, and the
+review's result is in the record and the pull-request comment, not read back
+by `doctor`. No remote was touched and no provider was invoked.
+
+*Measured on the way.* The workflow harness first wrote its three stub
+programs afresh for every case: 330 s for the suite on this machine. Written
+once per process and reused, the same cases took 23 to 39 s. That is the
+fresh-executable first-exec stall the 002 and 003 acceptance diagnostic
+investigates, observed here incidentally and not measured in isolation.
+
 ## Verification
 
 `--fail-on-untraced` joined the corpus gate with this spec's first
@@ -7357,6 +7461,10 @@ cargo test -p statecraft-home --lib admission
 cargo test -p statecraft-home --test qualification_admission
 cargo build -p statecraft-home --example require-harness
 cargo test -p statecraft-adapter-claude-code --test settings_transport
+cargo test -p statecraft-home --lib setup
+cargo test -p statecraft-home --test setup_workflows
+cargo test -p statecraft-home --test setup_upgrade
+cargo test -p statecraft-cli --test setup_profile
 cargo test -p statecraft-adapter --lib supervisor
 cargo test -p statecraft-home --lib capture
 cargo test -p statecraft-cli --test qualification_workflow

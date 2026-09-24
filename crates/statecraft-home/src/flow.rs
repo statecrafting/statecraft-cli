@@ -504,6 +504,10 @@ pub struct Report {
     /// a pin (spec 002 section 5, 2026-09-24, provenance item 4). The pin the
     /// project declares is the declaration's `pins.spec_spine`.
     pub observed_spec_spine: ObservedExecutable,
+    /// The selected setup profile's plan, and its six results (spec 002
+    /// section 5, 2026-09-24, the setup-profile entry).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub setup: Option<crate::setup::Plan>,
     /// How it ended.
     pub outcome: Outcome,
 }
@@ -593,6 +597,9 @@ impl Report {
                 d.verdict.describe()
             ));
         }
+        if let Some(setup) = &self.setup {
+            out.push_str(&setup.render());
+        }
         out.push_str(&format!("{}\n", self.outcome.word()));
         out
     }
@@ -677,6 +684,23 @@ pub struct Context<'a> {
     pub clock: &'a dyn Clock,
     /// This build's version, for the pins.
     pub product_version: String,
+    /// What the operator asked of a setup profile.
+    pub setup: SetupRequest,
+}
+
+/// What the operator asked of a setup profile: `init plan|apply <path>
+/// --profile <id> [--plan <identity>] [--verify-local]`. A project whose
+/// declaration already selects a profile is re-planned with it when no
+/// profile is named.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct SetupRequest {
+    /// The profile named on the command line.
+    pub profile: Option<String>,
+    /// The plan identity the operator approved: apply refuses, writing
+    /// nothing but the lock, when the recomputed plan differs.
+    pub plan: Option<String>,
+    /// Run the rendered gate here after applying.
+    pub verify_local: bool,
 }
 
 /// Compute the initialization: the preflight alone. Writes nothing, takes no
@@ -885,6 +909,7 @@ struct Prepared {
     ignore: IgnorePlan,
     bridge: bridge::Plan,
     corpus: Result<(), CheckAnswer>,
+    setup: Option<crate::setup::Plan>,
 }
 
 /// The `.gitignore` merge, decided in the preflight.
@@ -1014,23 +1039,45 @@ fn preflight(ctx: &Context<'_>, now: &str, report: &mut Report) -> Result<Prepar
             .push(format!("{}: {}", held.path, held.reason.describe()));
     }
 
+    // The setup profile, planned beside the governance plan and from the
+    // same reconciliation. A parameter it refuses, or an approved plan that
+    // is not the plan now, is a precondition: nothing is written.
+    let setup = plan_setup(ctx, &starter, &manifest)?;
+    if let Some(plan) = &setup {
+        for f in plan.files.iter().filter(|f| f.action.writes()) {
+            report.writes.push(f.path.clone());
+        }
+    }
+    let fragment = match (&setup, starter.ignore_fragment.as_deref()) {
+        (Some(plan), governance) if plan.withheld.is_none() => Some(format!(
+            "{}{}{}",
+            governance.unwrap_or(""),
+            if governance.is_some_and(|g| !g.ends_with('\n')) {
+                "\n"
+            } else {
+                ""
+            },
+            plan.ignore_fragment
+        )),
+        (_, governance) => governance.map(str::to_string),
+    };
+
     // The ignore fragment is merged, never installed as a file, and its
     // refusal is a precondition decided here, before anything is written.
-    let ignore =
-        plan_ignore(ctx.root, starter.ignore_fragment.as_deref()).map_err(|e| match e {
-            IgnoreStop::Refused(refusal) => StepReport::new(
-                Step::Governance,
-                StepState::Refused {
-                    reason: refusal.describe(),
-                },
-                "the ignore rules would take the project area out of version control",
-            ),
-            IgnoreStop::Unreadable(reason) => failed(
-                Step::Governance,
-                reason,
-                "the ignore rules could not be read",
-            ),
-        })?;
+    let ignore = plan_ignore(ctx.root, fragment.as_deref()).map_err(|e| match e {
+        IgnoreStop::Refused(refusal) => StepReport::new(
+            Step::Governance,
+            StepState::Refused {
+                reason: refusal.describe(),
+            },
+            "the ignore rules would take the project area out of version control",
+        ),
+        IgnoreStop::Unreadable(reason) => failed(
+            Step::Governance,
+            reason,
+            "the ignore rules could not be read",
+        ),
+    })?;
 
     // 5. project. The instruction bridge is a tracked modification of a file
     //    this product does not own.
@@ -1066,7 +1113,73 @@ fn preflight(ctx: &Context<'_>, now: &str, report: &mut Report) -> Result<Prepar
         ignore,
         bridge: bridge_plan,
         corpus,
+        setup,
     })
+}
+
+/// The setup profile's plan, when one is selected.
+fn plan_setup(
+    ctx: &Context<'_>,
+    starter: &producer::Starter,
+    manifest: &Manifest,
+) -> Result<Option<crate::setup::Plan>, StepReport> {
+    let refused = |reason: String| {
+        StepReport::new(
+            Step::Plan,
+            StepState::Refused { reason },
+            "the setup profile could not be planned",
+        )
+    };
+    let recorded = manifest.project.setup.as_ref();
+    let Some(id) = ctx
+        .setup
+        .profile
+        .clone()
+        .or_else(|| recorded.map(|s| s.profile.clone()))
+    else {
+        if ctx.setup.plan.is_some() {
+            return Err(refused(
+                "--plan names a setup plan, and no setup profile is selected".to_string(),
+            ));
+        }
+        return Ok(None);
+    };
+    let Some(profile) = crate::setup::Profile::named(&id) else {
+        return Err(refused(format!(
+            "unknown setup profile `{id}`; this build knows {}",
+            crate::setup::PROFILE_ID
+        )));
+    };
+    let block = recorded
+        .filter(|s| s.profile == id)
+        .map(|s| s.parameters.clone())
+        .unwrap_or_default();
+    let toml = match std::fs::read_to_string(resolve(ctx.root, "spec-spine.toml")) {
+        Ok(text) => Some(text),
+        Err(_) => starter
+            .governance
+            .iter()
+            .find(|f| f.rel_path == "spec-spine.toml")
+            .map(|f| f.contents.clone()),
+    };
+    let plan = crate::setup::plan(&crate::setup::Inputs {
+        root: ctx.root,
+        profile: &profile,
+        block: &block,
+        manifest,
+        spec_spine_toml: toml.as_deref(),
+        derived_dir: project::DERIVED,
+    })
+    .map_err(refused)?;
+    if let Some(approved) = &ctx.setup.plan {
+        if *approved != plan.plan_identity {
+            return Err(refused(format!(
+                "the approved setup plan {approved} is not the plan now, {}: an input changed after it was planned",
+                plan.plan_identity
+            )));
+        }
+    }
+    Ok(Some(plan))
 }
 
 fn run(ctx: &Context<'_>, mode: Mode) -> Report {
@@ -1086,6 +1199,7 @@ fn run(ctx: &Context<'_>, mode: Mode) -> Report {
         delivery: Vec::new(),
         qualification: None,
         observed_spec_spine: ObservedExecutable::of(ctx.corpus),
+        setup: None,
         outcome: Outcome::Partial,
     };
     let mut rec = Recorder::new(ctx);
@@ -1148,6 +1262,7 @@ fn run(ctx: &Context<'_>, mode: Mode) -> Report {
         ignore,
         bridge: bridge_plan,
         corpus: corpus_ready,
+        setup,
     } = prepared;
 
     macro_rules! stop_failed {
@@ -1235,6 +1350,26 @@ fn run(ctx: &Context<'_>, mode: Mode) -> Report {
                 );
             }
         }
+        if let Some(plan) = &setup {
+            let root = ctx.root;
+            let performed =
+                crate::setup::apply(root, plan, &mut manifest, &now, &mut |path, bytes| {
+                    rec.around(Step::Governance.word(), chain(path), || {
+                        if let Some(parent) = path.parent() {
+                            std::fs::create_dir_all(parent)?;
+                        }
+                        std::fs::write(path, bytes)
+                    })
+                });
+            if let Err(e) = performed {
+                report.setup = Some(plan.clone());
+                stop_failed!(
+                    Step::Governance,
+                    format!("setup profile: {e}"),
+                    "a setup profile file could not be written"
+                );
+            }
+        }
     }
     // Spec 002 section 5, 2026-09-24 (I-3): a path withheld for any reason
     // but `adopted` leaves this step withheld, so the initialization is
@@ -1246,19 +1381,29 @@ fn run(ctx: &Context<'_>, mode: Mode) -> Report {
         .filter(|held| !matches!(held.reason, Withholding::Adopted))
         .map(|held| held.path.as_str())
         .collect();
+    let setup_shortfall = setup.as_ref().and_then(crate::setup::Plan::shortfall);
     report.steps.push(StepReport::new(
         Step::Governance,
         if !starter.conformance.conforming {
             StepState::Withheld {
                 reason: starter.conformance.describe(),
             }
-        } else if !conflicts.is_empty() {
-            StepState::Withheld {
-                reason: format!(
+        } else if !conflicts.is_empty() || setup_shortfall.is_some() {
+            // Both are named when both hold: the governance paths withheld,
+            // then the setup profile's shortfall.
+            let governance = (!conflicts.is_empty()).then(|| {
+                format!(
                     "{} path(s) withheld: {}",
                     conflicts.len(),
                     conflicts.join(", ")
-                ),
+                )
+            });
+            StepState::Withheld {
+                reason: governance
+                    .into_iter()
+                    .chain(setup_shortfall)
+                    .collect::<Vec<_>>()
+                    .join("; "),
             }
         } else {
             StepState::Done
@@ -1291,6 +1436,20 @@ fn run(ctx: &Context<'_>, mode: Mode) -> Report {
                     bridge_plan.action.word()
                 )
             );
+        }
+        // The manifest is written, so the setup's resume record has done its
+        // work: an interrupted run before this point re-plans from it.
+        if setup.is_some() {
+            let path = ctx.root.join(crate::setup::RESUME_PATH);
+            if let Err(e) = rec.around(Step::Project.word(), chain(&path), || {
+                crate::setup::finish(ctx.root)
+            }) {
+                stop_failed!(
+                    Step::Project,
+                    format!("{}: {e}", crate::setup::RESUME_PATH),
+                    "the setup resume record could not be removed"
+                );
+            }
         }
         if let Err(e) = progress(&mut rec, ctx.root, Step::Project, &now) {
             stop_failed!(
@@ -1402,6 +1561,15 @@ fn run(ctx: &Context<'_>, mode: Mode) -> Report {
             harness: rule.harness.clone(),
             verdict: delivery::evaluate(ctx.root, &rule),
         });
+    }
+
+    // The six results, after everything else, because `local-checks` runs the
+    // rendered gate over the finished tree.
+    if let Some(mut plan) = setup {
+        if writing {
+            plan.results = crate::setup::applied_results(ctx.root, &plan, ctx.setup.verify_local);
+        }
+        report.setup = Some(plan);
     }
 
     report.writes.sort();
