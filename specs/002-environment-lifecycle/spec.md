@@ -7264,6 +7264,63 @@ trust parts. Its implementation is a separate `feat(002)` change.
 This entry names no bundle, store or resolution, and changes no section
 3.23 contract.
 
+**2026-09-24: provenance of what initialization writes, implemented (the
+entry above).** Choices the entry left open, recorded here:
+
+- **The producer identity comes from the lock file at build time.**
+  `crates/statecraft-home/build.rs` reads the workspace `Cargo.lock` and
+  fixes `PRODUCER_VERSION` and `PRODUCER_CHECKSUM` for `spec-spine-core`;
+  `producer::linked()` is what the pins record. No literal version remains in
+  `producer.rs`, and a test compares both constants with the lock file.
+- **`role` is written only by a first write.** `ManagedFile::authored_input`
+  marks the four closed-list paths in the governance declaration; a path
+  already recorded keeps its recorded role, so a declaration from before this
+  entry keeps `reference` for all of them. A move to `managed` through
+  section 3.35 records `reference`; the operator's role-change act is not
+  built.
+- **The seed is the entry's `digest`.** An authored input is never rewritten,
+  so its recorded digest stays the seed; no second field is added.
+- **What is kept is not withheld.** An authored input on disk goes to the
+  plan's `kept` list (`seeded` or `customized`, and a newer seed by its
+  digest), never to `withheld`, so it never makes an initialization partial.
+  The init report carries `kept`; `env plan` prints `keep` lines.
+- **`doctor` carries `notes`,** information that never changes the exit
+  code: `unpinned`, "recorded before provenance", and the sentence that the
+  seed comparison is not the control for authored text, and the declared pin
+  against the producer ("declared X, producer identity spec-spine-core@Y").
+  The executable disagreement is the finding "declared X, observed
+  executable Z". Both compare the recorded `pins.spec_spine`.
+- **The declared pin needs an uncommented `[meta]` header.** The producer's
+  scaffold comments the whole table, so a new project records `unpinned`;
+  pinning is adding the table. The pins are re-read on every `init apply` and
+  on an `env apply` that creates the declaration, so a project that adds a pin
+  records it on the next run.
+- **The observation is `observedSpecSpine`** in the init report: `program`,
+  `version`, and `foundBy` (`path` for a bare name, `explicit` for a path).
+  The home's `tools.json` record is unchanged.
+- **I-3 keeps its meaning for reference files.** The I-3 implementation
+  entry above tested a hand-edited `spec-spine.toml`; under this entry a
+  newly initialized `spec-spine.toml` is an authored input, so an edit is
+  `customized` and kept, and the run stays `complete`. The I-3 test in
+  `init_outcome.rs` now edits a template (a `reference` entry), which is
+  still withheld as `drifted`, `partial`, exit 1, both digests named. A
+  `spec-spine.toml` recorded before this entry keeps `reference`, so for it
+  the I-3 behavior is unchanged.
+- **`[index] resolver_exclusions`** is `target`, `node_modules`, `dist`,
+  `build`, `.next`, `.statecraft/derived`, `.statecraft/state` and
+  `.tooling`, passed in `config_json()`; the real library renders exactly
+  that list and not `.derived`.
+
+Evidence, through the built binary on real directories with an isolated
+`HOME` (`crates/statecraft-cli/tests/provenance.rs`) and on the library
+(`crates/statecraft-environment/tests/authored_inputs.rs`,
+`producer_integration.rs`): roles, the linked producer and `unpinned` on a
+fresh project whose `PATH` answers 0.23.0; pin-line and date edits read
+`customized` and add no finding, and a re-run keeps them as `kept`; a template
+edit reads `drifted`, exit 1; a declared 0.24.0 against the producer and a
+0.23.0 executable gives a finding and a note, each naming both values; a declaration
+written before this entry reads with no producer guessed and a note saying so.
+
 ## Verification
 
 `--fail-on-untraced` joined the corpus gate with this spec's first

@@ -28,6 +28,7 @@ fn manifest_with(target: &Path, before: Option<&str>, after: &str) -> Manifest {
         product: "0.0.0".into(),
         spec_spine: "0.23.0".into(),
         adapters: BTreeMap::new(),
+        producer: None,
     });
     m.upsert_modification(Modification {
         path: "AGENTS.md".into(),
@@ -178,6 +179,7 @@ fn a_bridge_with_no_record_is_a_note_and_left() {
         product: "0.0.0".into(),
         spec_spine: "0.23.0".into(),
         adapters: BTreeMap::new(),
+        producer: None,
     })
     .write(target.path())
     .unwrap();

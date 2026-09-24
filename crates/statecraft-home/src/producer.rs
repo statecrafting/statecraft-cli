@@ -31,12 +31,27 @@ use serde::{Deserialize, Serialize};
 /// The producer crate this build depends on.
 pub const PRODUCER_NAME: &str = "spec-spine-core";
 
-/// The exact version pinned in this crate's manifest.
+/// The exact version of the linked library, as `Cargo.lock` records it.
 ///
-/// Spelled here as well as in `Cargo.toml` so a report can name it, and a test
-/// reads the manifest and refuses a drift between the two. A pin recorded in a
-/// report that is not the pin in the build is worse than no pin at all.
-pub const PRODUCER_VERSION: &str = "0.25.0";
+/// Derived from the build (`build.rs`), never a second literal: `D-06` as
+/// amended on 2026-09-24 and spec 002 section 5's provenance entry of the same
+/// date. A test still reads the manifest and refuses a drift between the pin
+/// and what is linked. A pin recorded in a report that is not the pin in the
+/// build is worse than no pin at all.
+pub const PRODUCER_VERSION: &str = env!("STATECRAFT_PRODUCER_VERSION");
+
+/// The crates.io checksum `Cargo.lock` records for the linked library.
+pub const PRODUCER_CHECKSUM: &str = env!("STATECRAFT_PRODUCER_CHECKSUM");
+
+/// The linked producer as the declaration's pins record it (spec 002 section
+/// 5, 2026-09-24, provenance item 3): one identity, fixed by this build.
+pub fn linked() -> statecraft_environment::manifest::Producer {
+    statecraft_environment::manifest::Producer {
+        name: PRODUCER_NAME.to_string(),
+        version: PRODUCER_VERSION.to_string(),
+        checksum: PRODUCER_CHECKSUM.to_string(),
+    }
+}
 
 /// The specs directory this product declares.
 pub const SPECS_DIR: &str = "specs";
@@ -64,9 +79,40 @@ pub fn config_json() -> String {
             "standalone_rust_workspaces": [],
             "standalone_npm_packages": [],
             "state_dir": STATE_DIR
+        },
+        "index": {
+            "resolver_exclusions": resolver_exclusions()
         }
     })
     .to_string()
+}
+
+/// Whether a governance path is an authored input (spec 002 section 5,
+/// 2026-09-24, provenance item 1). The list is closed and stated, never
+/// inferred from bytes: the configuration, the bootstrap spec, and the
+/// constitution and contract. Everything else this product writes is a
+/// reference.
+pub fn is_authored_input(rel_path: &str) -> bool {
+    rel_path == "spec-spine.toml"
+        || rel_path == format!("{SPECS_DIR}/000-bootstrap/spec.md")
+        || rel_path == format!("{STANDARDS_DIR}/constitution.md")
+        || rel_path == format!("{STANDARDS_DIR}/contract.md")
+}
+
+/// Build directories no project's resolver should walk.
+pub const BUILD_DIRS: [&str; 5] = ["target", "node_modules", "dist", "build", ".next"];
+/// The repository-local tool directory (`make tools` installs into it).
+pub const TOOL_DIR: &str = ".tooling";
+
+/// `[index] resolver_exclusions`, derived from the declared layout (spec 002
+/// section 5, 2026-09-24, provenance item 5): the derived and state roots this
+/// product declares, the build directories, and the local tool directory. It
+/// names no other derived directory, so a producer default that spells one is
+/// never what a project receives.
+pub fn resolver_exclusions() -> Vec<&'static str> {
+    let mut out = BUILD_DIRS.to_vec();
+    out.extend([DERIVED_DIR, STATE_DIR, TOOL_DIR]);
+    out
 }
 
 /// One file the producer returned.
@@ -301,6 +347,23 @@ mod tests {
             .and_then(|s| s.split('"').next())
             .expect("the dependency is pinned exactly");
         assert_eq!(pinned, PRODUCER_VERSION);
+    }
+
+    #[test]
+    fn the_linked_identity_is_what_the_lock_file_records() {
+        let lock = include_str!("../../../Cargo.lock");
+        let block = lock
+            .split("[[package]]")
+            .find(|b| b.contains(&format!("name = \"{PRODUCER_NAME}\"")))
+            .expect("the producer is in the lock file");
+        assert!(block.contains(&format!("version = \"{PRODUCER_VERSION}\"")));
+        assert!(block.contains(&format!("checksum = \"{PRODUCER_CHECKSUM}\"")));
+        assert_eq!(PRODUCER_CHECKSUM.len(), 64);
+        let p = linked();
+        assert_eq!(
+            (p.name.as_str(), p.version.as_str(), p.checksum.as_str()),
+            (PRODUCER_NAME, PRODUCER_VERSION, PRODUCER_CHECKSUM)
+        );
     }
 
     #[test]

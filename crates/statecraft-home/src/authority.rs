@@ -829,6 +829,7 @@ mod tests {
             product: "0".into(),
             spec_spine: "0".into(),
             adapters: Default::default(),
+            producer: None,
         });
         base.project = project(&[("model", "approved-a")], &[]);
         let reader = StaticRevision(
@@ -875,6 +876,7 @@ mod tests {
             product: "0".into(),
             spec_spine: "0".into(),
             adapters: Default::default(),
+            producer: None,
         });
         base.project = project(&[("model", "a")], &[]);
         let reader = StaticRevision(

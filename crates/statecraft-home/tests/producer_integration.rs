@@ -69,6 +69,46 @@ fn the_declared_layout_reaches_the_producer_and_shapes_what_it_returns() {
     assert!(statecraft_home::ignore::area_ignored(&fragment).is_none());
 }
 
+/// Spec 002 section 5, 2026-09-24, provenance item 5: `[index]` is passed
+/// explicitly, so the derived directory the project declares is the only one
+/// its resolver excludes, and the producer's own default is not in the list.
+#[test]
+fn the_resolver_exclusions_come_from_the_declared_layout_and_name_no_other_derived_directory() {
+    let starter = producer::produce(&Library).expect("the real library answers");
+    let toml = starter
+        .governance
+        .iter()
+        .find(|f| f.rel_path == "spec-spine.toml")
+        .expect("the configuration is in contract");
+    let line = toml
+        .contents
+        .lines()
+        .find(|l| l.trim_start().starts_with("resolver_exclusions"))
+        .unwrap_or_else(|| panic!("no resolver_exclusions line in:\n{}", toml.contents));
+    let listed: Vec<String> = line
+        .split('[')
+        .nth(1)
+        .and_then(|r| r.split(']').next())
+        .expect("a list")
+        .split(',')
+        .map(|v| v.trim().trim_matches('"').to_string())
+        .filter(|v| !v.is_empty())
+        .collect();
+    let mut expected: Vec<String> = producer::resolver_exclusions()
+        .iter()
+        .map(|s| s.to_string())
+        .collect();
+    let mut got = listed.clone();
+    expected.sort();
+    got.sort();
+    assert_eq!(got, expected, "the rendered line: {line}");
+    assert!(
+        !listed.iter().any(|v| v == ".derived"),
+        "the producer default derived directory is excluded: {line}"
+    );
+    assert!(listed.iter().any(|v| v == producer::DERIVED_DIR));
+}
+
 #[test]
 fn every_in_contract_path_the_producer_returns_is_one_the_contract_set_admits() {
     let starter = producer::produce(&Library).expect("the real library answers");

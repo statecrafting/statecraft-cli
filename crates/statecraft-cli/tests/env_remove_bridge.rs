@@ -115,6 +115,7 @@ fn pins() -> Pins {
         product: "0.0.0".into(),
         spec_spine: "0.23.0".into(),
         adapters: BTreeMap::new(),
+        producer: None,
     }
 }
 
@@ -458,6 +459,7 @@ fn env_remove_withholds_a_drifted_managed_path_removes_the_rest_and_writes_the_m
             bytes: 1,
             written_at: "2026-09-23T00:00:00Z".into(),
             transfer: None,
+            role: Default::default(),
         });
     }
     std::fs::write(root.join("adopted.md"), "a").unwrap();
@@ -472,6 +474,7 @@ fn env_remove_withholds_a_drifted_managed_path_removes_the_rest_and_writes_the_m
         bytes: 1,
         written_at: "2026-09-23T00:00:00Z".into(),
         transfer: None,
+        role: Default::default(),
     });
     m.write(&root).unwrap();
     std::fs::write(root.join("dirty.md"), "the operator's now").unwrap();

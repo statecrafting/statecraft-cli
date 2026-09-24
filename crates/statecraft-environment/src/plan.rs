@@ -14,7 +14,7 @@
 use crate::adapter::{Declaration, PathCollision, Readiness, collisions, readiness};
 use crate::claimant::{Claimant, ForeignClaims, resolve};
 use crate::digest::{digest_bytes, digest_file};
-use crate::manifest::{Class, Manifest};
+use crate::manifest::{Class, Manifest, Role};
 use std::path::Path;
 
 /// Why a planned write will not happen.
@@ -97,6 +97,52 @@ pub struct PlannedWrite {
     pub digest: String,
     /// True when the path is already managed and the write replaces it.
     pub replaces_existing: bool,
+    /// The role the entry it records carries: the recorded one when the path
+    /// is already managed, the declaration's for a first write.
+    pub role: Role,
+}
+
+/// An authored input this product leaves alone (spec 002 section 5,
+/// 2026-09-24, provenance item 2).
+///
+/// Not a withholding: nothing was held back from the operator. The file is
+/// the project's to author, so an upgrade never rewrites it, and a newer seed
+/// is reported by its digest rather than written.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct KeptAuthored {
+    /// Repository-relative path.
+    pub path: String,
+    /// The seed digest the manifest records.
+    pub seed: String,
+    /// The digest on disk.
+    pub found: String,
+    /// The digest of the seed this product would write today, when it
+    /// differs from the recorded one.
+    pub newer_seed: Option<String>,
+}
+
+impl KeptAuthored {
+    /// `seeded` while the file is its seed, `customized` otherwise.
+    pub fn word(&self) -> &'static str {
+        if self.found == self.seed {
+            "seeded"
+        } else {
+            "customized"
+        }
+    }
+
+    /// A one-line rendering for a report.
+    pub fn describe(&self) -> String {
+        let mut out = format!(
+            "{} {}, authored input, never rewritten",
+            self.word(),
+            self.path
+        );
+        if let Some(newer) = &self.newer_seed {
+            out.push_str(&format!("; a newer seed is available: {newer}"));
+        }
+        out
+    }
 }
 
 /// A write that will not happen, and why.
@@ -170,6 +216,8 @@ pub struct Plan {
     /// instead, and a replaceable one is no longer listed as withheld: this is
     /// what the apply would do given the operator's consent for it.
     pub named: Vec<crate::replace::Named>,
+    /// Authored inputs on disk, left alone. Information, never a withholding.
+    pub kept: Vec<KeptAuthored>,
 }
 
 impl Plan {
@@ -215,6 +263,9 @@ impl Plan {
         }
         for w in &self.withheld {
             out.push_str(&format!("withhold {}: {}\n", w.path, w.reason.describe()));
+        }
+        for k in &self.kept {
+            out.push_str(&format!("keep {}\n", k.describe()));
         }
         out
     }
@@ -277,11 +328,24 @@ pub fn plan(
                             reason: Withholding::Adopted,
                         });
                     }
+                    // An authored input on disk: the project's to author, so
+                    // never rewritten, whatever its bytes. Its seed is compared
+                    // only to report whether it was edited and whether this
+                    // product would seed it differently today.
+                    (Some(e), Some((found, _))) if e.role == Role::AuthoredInput => {
+                        let offered = digest_bytes(&file.contents);
+                        out.kept.push(KeptAuthored {
+                            path: file.path.clone(),
+                            seed: e.digest.clone(),
+                            found,
+                            newer_seed: (offered != e.digest).then_some(offered),
+                        });
+                    }
                     // Managed and on disk: write only if the bytes are the ones
                     // this product last wrote.
                     (Some(e), Some((found, _))) => {
                         if found == e.digest {
-                            out.writes.push(planned(declaration, file, true));
+                            out.writes.push(planned(declaration, file, true, e.role));
                         } else {
                             out.withheld.push(WithheldWrite {
                                 path: file.path.clone(),
@@ -295,7 +359,7 @@ pub fn plan(
                     }
                     // Managed and absent: restoring a file we own is a write,
                     // not a conflict. Nobody's edit is at risk.
-                    (Some(_), None) => out.writes.push(planned(declaration, file, true)),
+                    (Some(e), None) => out.writes.push(planned(declaration, file, true, e.role)),
                     // Not manifested, and something is already there. This is
                     // the case section 3.10 requires: classed foreign, withheld,
                     // named, no overwrite. Section 3.21 part 1: the finding
@@ -327,7 +391,9 @@ pub fn plan(
                         }
                     }
                     // Nothing there, nothing recorded: an ordinary first write.
-                    (None, None) => out.writes.push(planned(declaration, file, false)),
+                    (None, None) => out
+                        .writes
+                        .push(planned(declaration, file, false, file.role)),
                 }
             }
         }
@@ -347,6 +413,7 @@ pub fn plan(
 
     out.writes.sort_by(|a, b| a.path.cmp(&b.path));
     out.withheld.sort_by(|a, b| a.path.cmp(&b.path));
+    out.kept.sort_by(|a, b| a.path.cmp(&b.path));
     Ok(out)
 }
 
@@ -387,8 +454,10 @@ fn planned(
     declaration: &Declaration,
     file: &crate::adapter::ManagedFile,
     replaces_existing: bool,
+    role: Role,
 ) -> PlannedWrite {
     PlannedWrite {
+        role,
         path: file.path.clone(),
         adapter: declaration.name.clone(),
         digest: digest_bytes(&file.contents),

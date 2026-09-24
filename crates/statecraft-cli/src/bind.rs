@@ -247,6 +247,11 @@ pub struct ReportView {
     pub entries: Vec<EntryView>,
     /// Everything else.
     pub findings: Vec<String>,
+    /// Information that is not a finding (spec 002 section 5, 2026-09-24,
+    /// provenance): an unpinned project, a producer recorded before
+    /// provenance, what an authored input's seed comparison means.
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub notes: Vec<String>,
     /// Whether anything is wrong.
     pub has_findings: bool,
 }
@@ -273,6 +278,7 @@ impl ReportView {
                 })
                 .collect(),
             findings: report.findings.iter().map(|f| f.describe()).collect(),
+            notes: report.notes.clone(),
             has_findings: report.has_findings(),
         }
     }
@@ -479,8 +485,10 @@ pub fn doctor_answer(report: Report) -> Answer<ReportView> {
     };
     let summary = if report.has_findings() {
         report.render()
-    } else {
+    } else if report.notes.is_empty() {
         "no findings".to_string()
+    } else {
+        format!("no findings\n{}", report.render())
     };
     // The exit code the report itself implies, and the one this command uses,
     // are the same number by construction rather than by coincidence.
@@ -790,6 +798,7 @@ mod tests {
             product: "0.0.0".into(),
             spec_spine: "0.18.0".into(),
             adapters: BTreeMap::new(),
+            producer: None,
         });
         assert!(m.entries.is_empty());
     }

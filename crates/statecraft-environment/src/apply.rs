@@ -183,6 +183,7 @@ pub fn perform(
             bytes: w.contents.len() as u64,
             written_at: written_at.clone(),
             transfer: manifest.entry(&w.path).and_then(|e| e.transfer.clone()),
+            role: w.role,
         });
         written.push(w.path.clone());
     }
@@ -233,7 +234,7 @@ pub fn apply_consented_current(
     probe: &dyn HarnessProbe,
     foreign: &ForeignClaims,
     clock: &dyn Clock,
-    pins: fn() -> crate::manifest::Pins,
+    pins: impl FnOnce() -> crate::manifest::Pins,
     consents: &[crate::replace::Consent],
 ) -> Result<Consented, ApplyError> {
     // A refusal at plan time depends on the declarations alone, and is
@@ -455,6 +456,9 @@ fn record_managed(
     written_at: &str,
 ) {
     let transfer = manifest.entry(path).and_then(|e| e.transfer.clone());
+    // A replacement keeps the role the entry was recorded with: a role never
+    // changes as a side effect of rewriting bytes.
+    let role = manifest.entry(path).map(|e| e.role).unwrap_or_default();
     manifest.upsert(Entry {
         path: path.to_string(),
         class: Class::Managed,
@@ -466,6 +470,7 @@ fn record_managed(
         bytes,
         written_at: written_at.to_string(),
         transfer,
+        role,
     });
 }
 

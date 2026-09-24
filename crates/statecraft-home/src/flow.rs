@@ -65,6 +65,12 @@ pub trait Corpus {
     /// The tool's version, when it can be asked.
     fn version(&self) -> Option<String>;
 
+    /// The program this double or command runs, when it names one. What
+    /// [`Report::observed_spec_spine`] reports as the executable observed.
+    fn program(&self) -> Option<String> {
+        None
+    }
+
     /// Whether the tool is there and carries `check`, asked before anything is
     /// run (spec 002 section 3.23, contract 5). `Err` carries the answer that
     /// says why not.
@@ -200,6 +206,9 @@ impl Corpus for SpecSpineCommand {
     }
     fn check_answer(&self, root: &Path) -> CheckAnswer {
         run_check(&self.program, root)
+    }
+    fn program(&self) -> Option<String> {
+        Some(self.program.clone())
     }
     fn version(&self) -> Option<String> {
         let output = std::process::Command::new(&self.program)
@@ -473,6 +482,11 @@ pub struct Report {
     pub withheld: Vec<String>,
     /// Paths already there and now depended on rather than rewritten.
     pub adopted: Vec<String>,
+    /// Authored inputs on disk, left alone: `seeded` or `customized`, with a
+    /// newer seed named by its digest (spec 002 section 5, 2026-09-24,
+    /// provenance item 2). Information, never a withholding.
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub kept: Vec<String>,
     /// Every change made, observed on disk. Always empty for a plan.
     pub mutations: Vec<Mutation>,
     /// What the producer returned, and whether it stayed in contract.
@@ -486,8 +500,42 @@ pub struct Report {
     /// The qualification, when the project was registered.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub qualification: Option<Qualification>,
+    /// The `spec-spine` executable this run observed: an observation, never
+    /// a pin (spec 002 section 5, 2026-09-24, provenance item 4). The pin the
+    /// project declares is the declaration's `pins.spec_spine`.
+    pub observed_spec_spine: ObservedExecutable,
     /// How it ended.
     pub outcome: Outcome,
+}
+
+/// An executable as observed: which program, what it answered, and how it
+/// was found. Reported, never recorded as a pin.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ObservedExecutable {
+    /// The program as invoked, or `not-recorded` when none was named.
+    pub program: String,
+    /// The version it answered to `--version`, or `not-recorded`.
+    pub version: String,
+    /// `path` when the program is a bare name resolved through `PATH`,
+    /// `explicit` when it names a file, `not-recorded` otherwise.
+    pub found_by: String,
+}
+
+impl ObservedExecutable {
+    fn of(corpus: &dyn Corpus) -> Self {
+        let program = corpus.program();
+        let found_by = match &program {
+            Some(p) if p.contains('/') => "explicit",
+            Some(_) => "path",
+            None => NOT_RECORDED,
+        };
+        Self {
+            program: program.unwrap_or_else(|| NOT_RECORDED.to_string()),
+            version: corpus.version().unwrap_or_else(|| NOT_RECORDED.to_string()),
+            found_by: found_by.to_string(),
+        }
+    }
 }
 
 /// One harness's delivery verdict.
@@ -912,13 +960,13 @@ fn preflight(ctx: &Context<'_>, now: &str, report: &mut Report) -> Result<Prepar
     //    recorded with the digest observed, depended on, and never rewritten.
     let mut manifest = match Manifest::read(ctx.root) {
         Ok(Some(m)) => m,
+        // The declared pin is read after the governance step, below; until
+        // then nothing is declared. Never the version found on `PATH`.
         Ok(None) => Manifest::new(Pins {
             product: ctx.product_version.clone(),
-            spec_spine: ctx
-                .corpus
-                .version()
-                .unwrap_or_else(|| NOT_RECORDED.to_string()),
+            spec_spine: statecraft_environment::manifest::UNPINNED.to_string(),
             adapters: Default::default(),
+            producer: None,
         }),
         Err(e) => {
             return Err(failed(
@@ -956,6 +1004,9 @@ fn preflight(ctx: &Context<'_>, now: &str, report: &mut Report) -> Result<Prepar
     })?;
     for write in &computed.writes {
         report.writes.push(write.path.clone());
+    }
+    for kept in &computed.kept {
+        report.kept.push(kept.describe());
     }
     for held in &computed.withheld {
         report
@@ -1028,11 +1079,13 @@ fn run(ctx: &Context<'_>, mode: Mode) -> Report {
         writes: Vec::new(),
         withheld: Vec::new(),
         adopted: Vec::new(),
+        kept: Vec::new(),
         mutations: Vec::new(),
         conformance: None,
         bridge: None,
         delivery: Vec::new(),
         qualification: None,
+        observed_spec_spine: ObservedExecutable::of(ctx.corpus),
         outcome: Outcome::Partial,
     };
     let mut rec = Recorder::new(ctx);
@@ -1218,6 +1271,15 @@ fn run(ctx: &Context<'_>, mode: Mode) -> Report {
         ),
     ));
 
+    // Spec 002 section 5, 2026-09-24, provenance items 3 and 4: the pins
+    // record the one producer identity this build links, and the pin the
+    // project now declares, read after the governance step wrote or adopted
+    // `spec-spine.toml`. The executable observed is in the report, not here.
+    if writing {
+        manifest.pins.spec_spine = statecraft_environment::manifest::declared_pin(ctx.root);
+        manifest.pins.producer = Some(producer::linked());
+    }
+
     // 5. project. The declaration and the instruction bridge.
     if writing {
         if let Err(e) = write_project(ctx.root, &mut rec, &bridge_plan, &mut manifest, &now) {
@@ -1346,6 +1408,7 @@ fn run(ctx: &Context<'_>, mode: Mode) -> Report {
     report.writes.dedup();
     report.withheld.sort();
     report.adopted.sort();
+    report.kept.sort();
     report.mutations = rec.list;
     report.finish(false)
 }
@@ -1407,6 +1470,7 @@ fn step_reconcile(
             bytes,
             written_at: now.to_string(),
             transfer: None,
+            role: Default::default(),
         });
         adopted.push(path.clone());
     }
@@ -1420,7 +1484,13 @@ fn governance_declaration(managed: &[(String, String)]) -> Declaration {
         version: env!("CARGO_PKG_VERSION").to_string(),
         files: managed
             .iter()
-            .map(|(path, contents)| ManagedFile::owned(path, contents.as_bytes().to_vec()))
+            .map(|(path, contents)| {
+                if producer::is_authored_input(path) {
+                    ManagedFile::authored_input(path, contents.as_bytes().to_vec())
+                } else {
+                    ManagedFile::owned(path, contents.as_bytes().to_vec())
+                }
+            })
             .collect(),
         unexpressible: Vec::new(),
         prerequisites: Vec::new(),
@@ -1465,6 +1535,7 @@ fn perform_writes(
             bytes: write.contents.len() as u64,
             written_at: now.to_string(),
             transfer: manifest.entry(&write.path).and_then(|e| e.transfer.clone()),
+            role: write.role,
         });
     }
     Ok(())
