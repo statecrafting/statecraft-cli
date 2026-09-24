@@ -1,0 +1,6 @@
+# The repository owner owns the whole tree (owner decision Q, 2026-09-24).
+# The setup profile's trusted-base defense (spec 002 section 5, S-3 (a)) relies
+# on a code-owner review obligation; this file names who owes it. Whether
+# branch protection REQUIRES that review is a separate protection setting,
+# changed only by the owner.
+* @bartekus
