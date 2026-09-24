@@ -7425,6 +7425,23 @@ once per process and reused, the same cases took 23 to 39 s. That is the
 fresh-executable first-exec stall the 002 and 003 acceptance diagnostic
 investigates, observed here incidentally and not measured in isolation.
 
+**2026-09-24: a re-run keeps the declaration's bytes when nothing it records
+changed.** Found by the setup-profile implementation (#115) and reproduced
+through the built binary: a second `init apply` of an unchanged project
+rewrote the planned governance files with the bytes already on disk and
+re-dated their entries, so the committed `.statecraft/environment.json`
+changed on every run although no file did. The section is silent on what
+`written_at` means for an unchanged write; it now means when this product last
+wrote the file. A planned write whose digest is already on disk, over an entry
+that records exactly what the write would record apart from `written_at`, is
+skipped: no file write, no entry change. The plan still lists it as a write,
+because the plan's decision (the bytes are this product's to write) is
+unchanged; the mutation list, which reports what the run changed, no longer
+names the declaration. `t12_a_re_run_lists_only_what_changed` asserts the
+declaration is byte-identical across a re-run a second apart and that no
+project path is a mutation; without the fix it fails ("a re-run re-dated the
+declaration").
+
 ## Verification
 
 `--fail-on-untraced` joined the corpus gate with this spec's first

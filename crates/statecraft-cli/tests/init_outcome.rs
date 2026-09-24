@@ -525,21 +525,29 @@ fn t11_an_unwritable_progress_record_fails() {
 }
 
 // T12: a re-run of an initialized project is complete, and lists only what it
-// actually changed: no project file outside the runtime state.
+// actually changed: no project file outside the runtime state, and not the
+// declaration either, whose entries keep the time they were really written.
 #[test]
 fn t12_a_re_run_lists_only_what_changed() {
     let f = Fixture::new();
     let first = f.run("apply");
     assert_eq!(first.exit, 0, "{}", first.text);
+    let declaration = std::fs::read(f.at(".statecraft/environment.json")).unwrap();
+    // A second apply observed later than the first must not look like a new write:
+    // the entries' `written_at` has one-second resolution.
+    std::thread::sleep(std::time::Duration::from_millis(1100));
     let r = f.run("apply");
     assert_eq!((r.exit, r.outcome()), (0, "complete"), "{}", r.text);
     r.list_is_the_disk();
-    // The declaration is this product's own record and is rewritten under
-    // the lock; it is reported because it changed. No other project path is.
+    // Nothing a re-run writes is new, so the committed declaration keeps its
+    // bytes (no entry is re-dated) and no project path is a mutation.
+    assert_eq!(
+        std::fs::read(f.at(".statecraft/environment.json")).unwrap(),
+        declaration,
+        "a re-run re-dated the declaration"
+    );
     for m in r.report["mutations"].as_array().unwrap() {
-        if m["category"] == "project" {
-            assert_eq!(m["path"], ".statecraft/environment.json", "{m}");
-        }
+        assert_ne!(m["category"], "project", "{m}");
     }
 }
 

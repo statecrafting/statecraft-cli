@@ -1682,13 +1682,7 @@ fn perform_writes(
     let identity = producer.identity().describe();
     for write in &computed.writes {
         let target = resolve(root, &write.path);
-        rec.around(Step::Governance.word(), chain(&target), || {
-            if let Some(parent) = target.parent() {
-                std::fs::create_dir_all(parent)?;
-            }
-            std::fs::write(&target, &write.contents)
-        })?;
-        manifest.upsert(Entry {
+        let entry = Entry {
             path: write.path.clone(),
             class: Class::Managed,
             source: Source {
@@ -1704,7 +1698,28 @@ fn perform_writes(
             written_at: now.to_string(),
             transfer: manifest.entry(&write.path).and_then(|e| e.transfer.clone()),
             role: write.role,
-        });
+        };
+        // A write whose bytes are already on disk, over an entry that records
+        // exactly what this one would, changes nothing: the file is left
+        // alone and the entry keeps the time it was really written. Without
+        // this a repeated `init apply` re-dated every such entry, so the
+        // committed manifest changed on each run although no file did.
+        let on_disk = digest_file(&target)?.map(|(d, _)| d);
+        let unchanged = on_disk.as_deref() == Some(write.digest.as_str())
+            && manifest.entry(&write.path).is_some_and(|recorded| Entry {
+                written_at: recorded.written_at.clone(),
+                ..entry.clone()
+            } == *recorded);
+        if unchanged {
+            continue;
+        }
+        rec.around(Step::Governance.word(), chain(&target), || {
+            if let Some(parent) = target.parent() {
+                std::fs::create_dir_all(parent)?;
+            }
+            std::fs::write(&target, &write.contents)
+        })?;
+        manifest.upsert(entry);
     }
     Ok(())
 }
