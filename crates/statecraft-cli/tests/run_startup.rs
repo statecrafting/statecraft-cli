@@ -1522,9 +1522,11 @@ fn a_decision_the_child_planted_before_the_supervisors_is_not_the_decision() {
     // Unconfined, the gate trusts any decision file in its directory, so a
     // tool call the child makes before the supervisor removes the plant can
     // run (measured on CI's Linux runner, 2026-09-23; spec 004 section 3.18's
-    // confinement is what closes it). Whether or not the race was won, a call
-    // that ran is never invisible: the gate's own log, copied into the
-    // records, shows the admission it gave.
+    // confinement is what closes it). The gate log is child-attested (spec
+    // 002 section 3.37 rule 3): this fixture's child does not touch it, so a
+    // call that ran shows up as an admission in the copy. A child that
+    // rewrites the log or the gate script could leave no entry, so an absent
+    // entry proves nothing (spec 002 section 5, 2026-09-23 correction).
     if f.workspace().join("sentinel-after").exists() {
         assert!(
             v["gate"]
