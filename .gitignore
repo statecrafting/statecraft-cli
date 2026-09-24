@@ -49,3 +49,6 @@ target
 
 # JetBrains project files are per-developer, not per-repository.
 .idea/
+
+# macOS Finder metadata. Never authored content.
+.DS_Store

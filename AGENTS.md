@@ -304,6 +304,49 @@ One spec per pull request, then stop.
 - **Publication is not authorized by default.** No push to `main`, pull request,
   merge, release or deploy happens without the owner asking for it in the request
   at hand. Deferral `F-02` in the decision record holds until separately lifted.
+  Publication here means an act outside this repository's own review flow;
+  what an agent may do within an owner's standing authorization is in "Owner
+  delegation" below, and nothing there overrides a rule of this section.
+
+## Owner delegation
+
+Decided by the repository owner on 2026-09-24. It says which decisions an
+agent takes on its own and which stay the owner's. It never widens "Approval
+semantics" above: where the two could be read differently, the reserved list
+wins.
+
+**Agents decide, record and report afterwards:**
+
+- reversible choices inside a direction the owner has adopted;
+- relocation-only changes, which move text or code without changing a
+  requirement, shown unchanged by a mechanical comparison;
+- test and evidence design;
+- repository and worktree hygiene;
+- unambiguous corrections of internal inconsistencies.
+
+Each such decision is recorded where it takes effect (a dated section 5 entry,
+a commit message, a pull-request body) and named in the next handoff.
+
+**Reserved to the owner:**
+
+- ratification;
+- waivers;
+- publication;
+- spending money, or provider usage;
+- trust roots and signing;
+- changes to the gate, the check suite or the acceptance authority;
+- anything visible outside this repository, or affecting another adopter
+  (Rahi);
+- deleting anything remote.
+
+**Proposals are never left uncommitted.** A proposal is committed and pushed,
+as a draft branch or a pull request, the day it is written; a worktree holding
+it is removed when its pull request merges. An uncommitted proposal in a
+worktree is invisible to the owner and to the next session.
+
+**Every handoff ends with one decision table:** item, options, recommended
+default, consequence of the default. Only decisions that are the owner's
+appear in it; everything an agent decided is reported above it.
 
 ## Authored-content rules
 
