@@ -4514,6 +4514,88 @@ does not tamper with the log, and says nothing about one that does; its
 comment is corrected to say so. The residual is closed only by spec `004`
 section 3.18's confinement, which is specified and not implemented.
 
+**2026-09-24: what initialization reports, and in what order it decides
+(amends section 3.17; adopted by the owner on 2026-09-24, decisions D1 (a) and
+D2 (a)).** Section 3.17 has three outcome words and no rule for an execution
+error, and its `refused` ("a precondition stopped it before any write") was not
+true of the code at `fa000c6`: step 1 wrote the product home before the
+project's preconditions were read, the governance files were written before
+the `.gitignore` check, a failed step was reported `refused` whatever it had
+written, and a `.gitignore` write error was reported as the area being
+ignored. This entry amends section 3.17 as follows.
+
+1. **Mutations are observed, not inferred.** `init apply` reports every change
+   it made, in three categories: `project` (any path under the project root
+   outside `.statecraft/state/`), `project-state` (under `.statecraft/state/`,
+   including the step-progress record, the manifest lock file and each
+   directory created to hold them) and `home` (the product home, including each
+   directory created). Each entry names the path, the step, and its state
+   before (a SHA-256 digest, `absent`, or `directory`) and after (a digest,
+   `removed`, `directory`, or `unreadable`), read from disk after the
+   operation, including an operation that failed part-way. Changes made before
+   an error are reported. A mutation list is never computed from the plan.
+   Files the corpus tool writes in step 6 are found by reading the derived
+   directory before and after the tool runs, since this product does not
+   write them itself.
+2. **Four outcomes, one exit each.** `complete`, exit 0: every step done.
+   `partial`, exit 1: at least one mutation, no step failed, and a step
+   withheld, skipped or refused. `refused`, exit 2: a precondition of the
+   initialization stopped it, and the mutation list holds nothing but what
+   taking the manifest lock created. `failed`, exit 4: an execution error in
+   any step, whether or not anything was written; the mutation list says what
+   was, and an empty list means nothing changed. An execution error is
+   anything spec `006` section 3.3 row 4 names: an I/O error, an unreadable
+   declaration or record, a program that did not run or did not perform its
+   read (a `check`, `compile` or `index` exit outside spec-spine's findings, a
+   signal, a spawn error), and a step-progress record that could not be
+   written.
+3. **Preconditions before mutation, and a plan that writes nothing.** The
+   preflight is one computation, shared by `init plan` and `init apply`: the
+   product home's reads and the writes step 1 would make, the producer's
+   answer, the declaration, reconciliation, the governance plan, the
+   `.gitignore` merge and its refusal, the instruction bridge, and whether the
+   corpus tool is present and carries `check`. The preflight itself writes
+   nothing, takes no lock and creates no file or directory. **`init plan`
+   runs only the preflight**, so it still computes what `init apply`
+   performs, from the same code, and it leaves the project and the product
+   home byte-for-byte and entry-for-entry as they were. **`init apply` takes
+   the manifest lock first**, then runs the preflight, then performs. Taking
+   the lock can create `.statecraft/`, `.statecraft/state/` and the lock
+   file; `init apply` reports each one it created in its mutation list under
+   `project-state`, including when it stops there. A precondition that fails
+   in the preflight ends the initialization `refused` (exit 2), and nothing
+   else is written. The lock held by another writer past the wait is such a
+   precondition.
+4. **Steps 6 and 7 stay degradable.** Whether the corpus tool is present and
+   carries `check` is decided in the preflight and reported, and a refusal
+   there refuses that step only; the earlier steps are performed and the
+   initialization is `partial` (exit 1). Registration is the same: a corpus
+   check that is unavailable refuses step 7 only. A step refusal carries
+   `phase: preflight` when it was decided before any mutation and
+   `phase: late` when a producer refused after mutations although the
+   preflight passed (the tool removed between the preflight and step 6, or
+   registration's check unavailable at step 7). A late refusal leaves the
+   initialization `partial`, never `refused`. This keeps this spec's acceptance
+   script, which runs `init apply` with no `spec-spine` on `PATH` and accepts
+   0 or 1, true as written.
+5. **Evidence.** Each outcome is tested through the built binary on a real
+   directory with an isolated `HOME`, and each test compares the report's
+   mutation list with a digest walk of the project root and the product home
+   before and after. Failures are arranged on disk (permission bits, a
+   directory where a file belongs, a held lock, stub programs), never by a
+   mock. `init plan` is tested the same way, and its walk must show no change.
+   A test that finds itself running as root, where permission bits do not
+   refuse, skips with that reason rather than passing.
+
+The earlier entries stay as written. Where the 2026-09-23 entry on section
+3.23's translation says a failed step exits 4 under the word `refused`, this
+entry gives that failure its own word, `failed`. Section 3.17's sentence on
+`refused` is read with this entry: "before any write" means before any write
+other than what taking the manifest lock created, and only `init apply` takes
+it.
+
+This entry is the authority. The implementation is a separate change.
+
 ## Verification
 
 `--fail-on-untraced` joined the corpus gate with this spec's first
