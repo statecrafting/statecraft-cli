@@ -1034,6 +1034,80 @@ dropped because an interrupted removal had already taken its line back. A note
 never changes the exit. Additive under section 3.4.
 `tests/env_remove_bridge.rs` spawns the binary.
 
+**2026-09-24: PROPOSED, NOT ADOPTED. A JSON naming convention, and input
+documents that refuse unknown fields (owner Addendum 2, item N).** Proposal
+only; the enforcing test is designed here and not implemented.
+
+*What the source says today* (main `17dbdb6`; the scan and the key list are in
+the session evidence). Of the serialized types in `crates/*/src`, 116 structs
+carry `rename_all = "camelCase"`, 63 structs have only one-word fields (the
+case does not show), and **55 structs carry snake_case field names** because
+they have no `rename_all`. Enums are consistent: 61 plain and 46 tagged enums
+use `rename_all = "kebab-case"`; the exceptions are 2 camelCase-tagged, 1
+snake_case-tagged, 1 lowercase and 4 untagged. The binary tests read 245
+distinct keys: 53 camelCase, 14 snake_case (`spec_spine`, `plan_id`,
+`evaluated_against`, `declared_by`, `manifest_digest`, `num_turns`,
+`permission_denials`, ...), the rest one word. So one document can mix both:
+`init apply --json` reports `observedSpecSpine` beside a manifest whose pins
+say `spec_spine`.
+
+Where the snake_case structs are: the environment manifest
+(`statecraft-environment/src/manifest.rs`: `Entry`, `Pins`, `Project`,
+`Transfer`, `Modification`, `Written`) and transfer records; the run record and
+journal (`statecraft-run`: `record::Entry`, `Attempt`, `Workspace`, `Policy`,
+`WorkItem`, `WorkList`); acceptance and evidence (`statecraft-acceptance`:
+`Receipt`, `SuiteEntry`, `ReviewableOutcome`, `VerifierRecord`;
+`statecraft-envelope`: `Dimensions`, `Root`, `RootSet`, `EvidenceVerdict`,
+`Reference`); and the provider mirror (`statecraft-adapter-claude-code/src/stream.rs`),
+whose names are the provider's.
+
+*Proposed convention.* Keys this product authors are **camelCase**; string
+enum values are **kebab-case**; a type whose names are someone else's (the
+provider's stream, the producer's report mirror in `producer.rs`) keeps that
+owner's names and says so in a comment. The persisted snake_case documents
+above are **grandfathered**, not renamed in place: renaming a key in a
+committed manifest or a hash-chained run record is a schema change for every
+existing file, so each moves only with a `schemaVersion` bump and a reader
+for the old version, as its owning spec decides.
+
+*Enforcing test (design, not implemented).* In `statecraft-cli`'s tests, one
+helper walks any `--json` value and asserts every object key matches
+`^[a-z][a-zA-Z0-9]*$` except under a named, shrinking exemption list (the
+grandfathered types' paths, the provider mirror); every binary test that
+parses `--json` output calls it, so the convention is checked on real output
+rather than on declarations. A second, source-level test lists every
+`Serialize` type without `rename_all` and fails when one appears outside the
+same exemption list, which catches a new type before any test prints it.
+
+*Refusing unknown fields in input documents: what it would break.* Today four
+types use `deny_unknown_fields` (`statecraft-run/src/overrides.rs`,
+`statecraft-adapter/src/coverage.rs`, two in the provider stream). Making the
+documents this product reads refuse unknown fields would:
+
+1. **Environment manifest** (`.statecraft/environment.json`): an older binary
+   reading a declaration written by a newer one would refuse instead of
+   ignoring the field. This week alone added `role`, `pins.producer`,
+   `project.setup` and transfer records, all additive and all read today by
+   older builds. Needs a `schemaVersion` check first, so the refusal says
+   "written by a newer version" rather than naming a field.
+2. **Run records and the journal**: the same, across every recorded run;
+   and a record is never rewritten, so an old binary could not read a run a
+   newer one wrote.
+3. **Evidence and receipts**: section 3.4 calls adding a field compatible;
+   refusing unknown fields in a portable receipt makes every additive field a
+   breaking one for verifiers. Strictness here is a spec `005` decision.
+4. **Producer report mirror** (`producer.rs`): deliberately tolerant, so the
+   producer can add a field without breaking this consumer; stays tolerant.
+5. **Bundle metadata**: not implemented yet; can be strict from its first
+   version at no cost.
+6. **Home settings, the registry, adapter manifests**: the same forward
+   incompatibility as 1, smaller in scope.
+
+Recommended: strict **within** a `schemaVersion`, with an unknown field under
+the current version refused and a newer version refused by name; items 4 kept
+tolerant; item 5 strict from birth; items 1 to 3 changed only with their
+owning spec's schema bump.
+
 ## Verification
 
 Each line is one command. §3.7's rows are integration tests that **spawn the
