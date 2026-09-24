@@ -64,8 +64,8 @@ AGENTS.md records what to do if a spec genuinely needs to claim ahead.
   and proves nothing.
 - **There are no forward claims left, and the gate now refuses one.** Specs `002`
   to `005` once claimed crates that did not exist; all eight crates are written, and
-  `index check --fail-on-unresolved` is in the gate. Under the pin (0.20.0,
-  measured again under 0.23.0 on 2026-09-23 and under 0.25.0 on 2026-09-24) an unresolved claim exits
+  `index check --fail-on-unresolved` is in the gate. Under every pin since 0.20.0
+  (each adoption re-measures it; see `docs/adoption/spec-spine.md`) an unresolved claim exits
   **1**, the validation code, not 2: it is a corpus that
   does not describe its tree, and `make refresh` cannot cure it. Do not "fix" one
   by narrowing a spec's territory or by adding an empty crate; see AGENTS.md,
@@ -81,11 +81,14 @@ AGENTS.md records what to do if a spec genuinely needs to claim ahead.
   `harness::shipped()`, read 3.23 first and run
   `cargo test -p statecraft-home --test harness_hooks`, which extracts the
   shipped body and runs it as a program against each contract.
-- **The pin is exact, and the binary is local.** `required_version = "=0.25.0"`,
+- **The pin is exact, stated once, and the binary is local.** `required_version`
+  in `spec-spine.toml` is the only place the CLI pin is written (the linked
+  core's is `[workspace.dependencies]` in the root `Cargo.toml`); the binary is
   installed at the gitignored `.tooling/bin` by `make tools`, which reads the
   version from the pin. Run spec-spine through `make` or as
   `.tooling/bin/spec-spine`; a bare `spec-spine` is the shared `~/.cargo/bin`
   copy that any project on this machine replaces. Adopting a newer spine is its
-  own change, with its own re-index and its own bypass-floor review (`D-06`).
+  own change, with its own re-index, its own bypass-floor review and its own
+  entry in `docs/adoption/spec-spine.md` (`D-06`).
 - **No em dash, no session links.** `make gate` enforces both. This applies to
   commit messages and pull-request bodies too, where the gate cannot see them.
