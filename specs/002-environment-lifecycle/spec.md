@@ -4831,6 +4831,41 @@ says partial work is never reported as complete. Whether a withheld path in
 an otherwise completed step makes the initialization `partial` is left to
 the owner. This change does not alter it.
 
+**2026-09-24: a withheld path makes the initialization `partial`, never
+`complete` (amends section 3.17 and the outcome rule 2 of this section's
+2026-09-24 initialization entry; owner decision I-3, session request of
+2026-09-24).** It answers the finding recorded in the 0.25.0 producer entry
+above: a run that withheld a drifted `spec-spine.toml` reported `complete`
+because the governance step was `done`.
+
+1. **The rule.** When `init apply` (or `init plan`, which computes the same
+   plan) withholds a path it would otherwise write, for any reason except
+   `adopted`, the governance step's state is `withheld`, not `done`, and the
+   initialization's outcome is `partial`, exit 1, provided no step failed
+   (`failed`, exit 4) and no precondition stopped it (`refused`, exit 2). The
+   reasons that count are the plan's: `drifted` (the on-disk digest differs
+   from the manifest's), `foreign` (claimed by someone else), a pointer path
+   already occupied, and an undecidable tracked modification. It holds whether
+   or not the same run changed anything else, so rule 2's "at least one
+   mutation" does not apply to a withheld path: a re-run that changes nothing
+   and withholds a drifted file is still `partial`.
+2. **`adopted` is not a withholding in this sense.** A path the manifest
+   records as `adopted` is the reconcile step's intended result (section 3.17
+   step 3: preserve every user file), is listed under `adopted`, and does not
+   by itself make the outcome `partial`. `env apply` and `env upgrade` keep
+   section 3.4's rule unchanged.
+3. **Each withheld path is named with why.** The human report prints one
+   `withhold` line per path with its reason, and the JSON report's `withheld`
+   list carries the same entries; a `drifted` entry names both digests
+   (expected, found). The governance step's own reason names how many paths
+   were withheld. The withheld file is left byte-identical.
+4. **Evidence.** The implementation is a separate change, tested through the
+   built binary on real directories with an isolated `HOME`: an initialized
+   project whose managed `spec-spine.toml` is edited by hand, then `init
+   apply` again, reports `partial`, exit 1, the path with both digests, in
+   human and JSON output, and the file's bytes are unchanged; the unedited
+   re-run stays `complete`, exit 0.
+
 ## Verification
 
 `--fail-on-untraced` joined the corpus gate with this spec's first
