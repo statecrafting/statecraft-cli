@@ -7425,6 +7425,57 @@ once per process and reused, the same cases took 23 to 39 s. That is the
 fresh-executable first-exec stall the 002 and 003 acceptance diagnostic
 investigates, observed here incidentally and not measured in isolation.
 
+**2026-09-24: PROPOSED, NOT ADOPTED. One environment variable selects the
+spec-spine binary (owner Addendum 2, item N; amends section 3.23 contract 2
+rules 2 and 5).** Proposal text only; the implementation is folded into the
+contract-2 work after the owner adopts it.
+
+*Today three names do one job.* Measured at main `17dbdb6`:
+
+| Variable | Read by | Meaning today |
+|---|---|---|
+| `SPEC_SPINE_BIN` | the four delivered hooks (`crates/statecraft-home/harness/hooks/statecraft-{session-start,pre-bash,post-edit,stop}.sh`), 16 lines each; `harness_hooks.rs`; this section's contract 2 rule 2 | operator override, unmanaged use; the only candidate when set |
+| `STATECRAFT_SPEC_SPINE` | the same four hooks; contract 2 rule 5; the bundle entry (P2.1, H-13) | the supervisor's resolved executable in a managed session; no Rust source sets it yet |
+| `STATECRAFT_PRODUCER_BIN` | `crates/statecraft-run/tests/producer_candidate.rs` only (three `#[ignore]` tests, with `STATECRAFT_PRODUCER_REV` and `STATECRAFT_PRODUCER_FIXTURES`) | the exact producer build an operator-run candidate test judges |
+
+This repository's `Makefile` variable `SPEC_SPINE` is a fourth spelling, but
+it is the check surface's own, unclaimed, and not read by the product; aligning
+it is a separate authority change and not proposed here.
+
+*Proposed: `STATECRAFT_SPEC_SPINE` is the one variable*, namespaced as this
+product's, with this precedence:
+
+1. **In a managed session** (the launch named a run in `STATECRAFT_RUN_ID`),
+   the supervisor always sets `STATECRAFT_SPEC_SPINE` in the constructed
+   environment, overwriting any inherited value, so an operator's shell value
+   cannot reach a managed hook. It is the only candidate (rule 5 unchanged in
+   substance).
+2. **Outside a managed session**, a non-empty `STATECRAFT_SPEC_SPINE` is the
+   operator override of rule 2: the only candidate, no fallback, named with its
+   path, version, the pin and the two remedies.
+3. **Otherwise** the convention candidates of rule 3, then rule 4 for an
+   unpinned repository, unchanged.
+4. **The retired names are reported, never read.** A hook that finds
+   `SPEC_SPINE_BIN` set and `STATECRAFT_SPEC_SPINE` unset says the old name
+   was ignored and names the new one; it never selects by it. The candidate
+   tests read `STATECRAFT_SPEC_SPINE` (the revision and fixtures variables
+   stay, since they name different things).
+
+*Cost, stated.* An operator or script that sets `SPEC_SPINE_BIN` for
+Statecraft's hooks loses the override silently in behavior, loudly in output
+(rule 4). Rahi's own copied hooks read `SPEC_SPINE_BIN` and are untouched:
+this changes only what Statecraft delivers, and the migration order (Statecraft
+delivers, the adopter confirms loop and hooks live, then copies are removed)
+is unchanged. The one-variable rule is what lets rule 1's overwrite be the
+whole isolation argument, instead of two variables whose precedence a reader
+must remember.
+
+*Acceptance at implementation.* `harness_hooks.rs`: with only
+`SPEC_SPINE_BIN` set, no hook selects it and each names it as ignored; with
+`STATECRAFT_SPEC_SPINE` set outside a managed session, the override rules of
+contract 2 rule 2 hold unchanged; in a managed session an inherited value is
+replaced by the supervisor's. `producer_candidate.rs` reads the new name.
+
 ## Verification
 
 `--fail-on-untraced` joined the corpus gate with this spec's first
