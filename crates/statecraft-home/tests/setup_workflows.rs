@@ -1,0 +1,1232 @@
+//! The setup profile's rendered workflows, executed: spec 002 section 5,
+//! 2026-09-24, the setup-profile entry, acceptance obligations 7 and 8.
+//!
+//! spec-spine 091's method: the real `run:` scalars of the rendered
+//! workflows, not a copy of their logic, run by `bash -e` as a runner runs
+//! them, with stubbed `claude`, `gh` and `npm` on `PATH`. Every `${{ }}`
+//! expression is resolved from a table this file states, and an expression
+//! the table does not carry **panics**, so a workflow edit that introduces a
+//! new expression cannot pass by being silently substituted with nothing.
+//!
+//! The mutation tests edit one blocking branch at a time in the rendered
+//! `ci-gate.sh` and `ai-review.sh` and require the case suite to notice: a
+//! suite that still passes with a branch inverted does not test that branch.
+//!
+//! Nothing here reaches a provider, a host or the network.
+
+#![cfg(unix)]
+
+use statecraft_environment::manifest::{Manifest, Pins};
+use statecraft_home::setup::{self, Inputs, Profile};
+use std::collections::BTreeMap;
+use std::path::{Path, PathBuf};
+use std::process::Command;
+
+const TOML: &str = "[meta]\nrequired_version = \"=0.25.0\"\n";
+
+fn git(dir: &Path, args: &[&str]) -> String {
+    let out = Command::new("git")
+        .args(args)
+        .current_dir(dir)
+        .output()
+        .unwrap();
+    assert!(
+        out.status.success(),
+        "git {args:?}: {}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    String::from_utf8_lossy(&out.stdout).trim().to_string()
+}
+
+fn write(root: &Path, rel: &str, text: &str) {
+    let path = root.join(rel);
+    std::fs::create_dir_all(path.parent().unwrap()).unwrap();
+    std::fs::write(path, text).unwrap();
+}
+
+/// Render the registered profile into `root` through the library's own plan
+/// and apply, so every test below runs the bytes a project receives.
+fn render(root: &Path) {
+    // The local prerequisites, so the profile is not withheld.
+    for (rel, text) in [
+        ("rust-toolchain.toml", "[toolchain]\nchannel = \"1.96.0\"\n"),
+        ("Cargo.lock", "version = 4\n"),
+    ] {
+        if !root.join(rel).exists() {
+            write(root, rel, text);
+        }
+    }
+    std::fs::create_dir_all(root.join(".git")).unwrap();
+    let profile = Profile::registered();
+    let manifest = Manifest::new(Pins {
+        product: "0.0.0".into(),
+        spec_spine: "unpinned".into(),
+        adapters: Default::default(),
+        producer: None,
+    });
+    let mut block = BTreeMap::new();
+    block.insert("default_branch".to_string(), serde_json::json!("main"));
+    let plan = setup::plan(&Inputs {
+        root,
+        profile: &profile,
+        block: &block,
+        manifest: &manifest,
+        spec_spine_toml: Some(TOML),
+        derived_dir: ".statecraft/derived",
+    })
+    .unwrap();
+    assert!(plan.withheld.is_none(), "{:?}", plan.withheld);
+    let mut manifest = manifest;
+    setup::apply(
+        root,
+        &plan,
+        &mut manifest,
+        "2026-09-24T00:00:00Z",
+        &mut |p, b| {
+            std::fs::create_dir_all(p.parent().unwrap())?;
+            std::fs::write(p, b)
+        },
+    )
+    .unwrap();
+    setup::finish(root).unwrap();
+}
+
+/// A repository with a base commit and a head commit. `at_base` names the
+/// profile paths committed at the base (the rest of the rendered profile is
+/// in the work tree only, which is the adoption case the workflows fall back
+/// to the candidate for).
+struct Repo {
+    dir: tempfile::TempDir,
+    base: String,
+    head: String,
+}
+
+impl Repo {
+    fn new(at_base: &[&str], head_edits: &[(&str, &str)]) -> Repo {
+        let dir = tempfile::tempdir().unwrap();
+        let root = dir.path();
+        for args in [
+            vec!["init", "--quiet", "--initial-branch=main"],
+            vec!["config", "user.email", "fixture@example.invalid"],
+            vec!["config", "user.name", "fixture"],
+            vec!["config", "commit.gpgsign", "false"],
+        ] {
+            git(root, &args);
+        }
+        write(root, "src/lib.rs", "pub fn one() -> u32 {\n    1\n}\n");
+        write(root, "README.md", "# fixture\n");
+        write(root, "spec-spine.toml", TOML);
+        render(root);
+        git(root, &["add", "src", "README.md", "spec-spine.toml"]);
+        for rel in at_base {
+            git(root, &["add", rel]);
+        }
+        git(root, &["commit", "--quiet", "-m", "base"]);
+        let base = git(root, &["rev-parse", "HEAD"]);
+        git(root, &["checkout", "--quiet", "-b", "topic"]);
+        write(
+            root,
+            "src/lib.rs",
+            "pub fn one() -> u32 {\n    1\n}\n\npub fn two() -> u32 {\n    2\n}\n",
+        );
+        git(root, &["add", "src/lib.rs"]);
+        for (rel, text) in head_edits {
+            write(root, rel, text);
+            git(root, &["add", rel]);
+        }
+        git(root, &["commit", "--quiet", "-m", "head"]);
+        let head = git(root, &["rev-parse", "HEAD"]);
+        Repo { dir, base, head }
+    }
+
+    fn root(&self) -> &Path {
+        self.dir.path()
+    }
+}
+
+fn workflow(root: &Path, name: &str) -> serde_yaml::Value {
+    let text = std::fs::read_to_string(root.join(".github/workflows").join(name)).unwrap();
+    serde_yaml::from_str(&text).unwrap()
+}
+
+/// A named step of a job: its `run:` scalar and its `env:` map, raw.
+fn step(wf: &serde_yaml::Value, job: &str, name: &str) -> (String, Vec<(String, String)>) {
+    let steps = wf["jobs"][job]["steps"].as_sequence().unwrap();
+    let s = steps
+        .iter()
+        .find(|s| s["name"].as_str() == Some(name))
+        .unwrap_or_else(|| panic!("no step {name} in {job}"));
+    let run = s["run"].as_str().unwrap().to_string();
+    let env = s["env"]
+        .as_mapping()
+        .map(|m| {
+            m.iter()
+                .map(|(k, v)| {
+                    let v = match v {
+                        serde_yaml::Value::String(s) => s.clone(),
+                        serde_yaml::Value::Number(n) => n.to_string(),
+                        serde_yaml::Value::Bool(b) => b.to_string(),
+                        other => panic!("unsupported env value {other:?}"),
+                    };
+                    (k.as_str().unwrap().to_string(), v)
+                })
+                .collect()
+        })
+        .unwrap_or_default();
+    (run, env)
+}
+
+/// Resolve every `${{ expr }}`. An expression the table does not carry is a
+/// panic: the harness supports what it states and nothing else.
+fn resolve(text: &str, ctx: &BTreeMap<String, String>) -> String {
+    let mut out = String::new();
+    let mut rest = text;
+    while let Some(start) = rest.find("${{") {
+        out.push_str(&rest[..start]);
+        let after = &rest[start + 3..];
+        let end = after.find("}}").expect("an unterminated expression");
+        let expr = after[..end].trim();
+        let value = ctx
+            .get(expr)
+            .unwrap_or_else(|| panic!("the harness does not support the expression `{expr}`"));
+        out.push_str(value);
+        rest = &after[end + 2..];
+    }
+    out.push_str(rest);
+    out
+}
+
+struct Ran {
+    exit: i32,
+    outputs: BTreeMap<String, String>,
+    text: String,
+    stubs: PathBuf,
+    runner: tempfile::TempDir,
+}
+
+impl Ran {
+    fn output(&self, key: &str) -> &str {
+        self.outputs.get(key).map_or("", String::as_str)
+    }
+    fn stub_file(&self, name: &str) -> Option<String> {
+        std::fs::read_to_string(self.stubs.join(name)).ok()
+    }
+}
+
+const CLAUDE: &str = r#"#!/usr/bin/env bash
+here="$STUB_STATE"
+mode="$(cat "$here/claude-mode")"
+input="$(cat)"
+head="$(printf '%s\n' "$input" | sed -n 's/^head: //p' | head -n 1)"
+printf '%s\n' "$PWD" > "$here/claude-cwd"
+printf '%s\n' "$HOME" > "$here/claude-home"
+ls -A "$PWD" > "$here/claude-cwd-listing"
+touch "$here/claude-called"
+case "$mode" in
+  findings)
+    printf 'One finding.\n\n```json\n{"head": "%s", "verdict": "findings", "findings": [{"path": "src/lib.rs", "line": 5, "summary": "two is untested"}]}\n```\n' "$head" ;;
+  no-findings)
+    printf 'Nothing to report.\n\n```json\n{"head": "%s", "verdict": "no-findings", "findings": []}\n```\n' "$head" ;;
+  empty) : ;;
+  unrelated) echo "I have finished the refactor you asked for earlier." ;;
+  wronghead)
+    printf '```json\n{"head": "%s", "verdict": "no-findings", "findings": []}\n```\n' "1111111111111111111111111111111111111111" ;;
+  findings-empty)
+    printf '```json\n{"head": "%s", "verdict": "findings", "findings": []}\n```\n' "$head" ;;
+  no-findings-listed)
+    printf '```json\n{"head": "%s", "verdict": "no-findings", "findings": [{"path": "src/lib.rs", "line": 1, "summary": "x"}]}\n```\n' "$head" ;;
+  badverdict)
+    printf '```json\n{"head": "%s", "verdict": "approve", "findings": []}\n```\n' "$head" ;;
+  outside)
+    printf '```json\n{"head": "%s", "verdict": "findings", "findings": [{"path": "README.md", "line": 1, "summary": "x"}]}\n```\n' "$head" ;;
+  transient)
+    echo 'API Error: 529 {"type":"error","error":{"type":"overloaded_error","message":"Overloaded"}}' >&2
+    exit 1 ;;
+  refusal)
+    echo 'API Error: 403 {"type":"error","error":{"type":"permission_error","message":"Your organization does not have access to Claude."}}' >&2
+    exit 1 ;;
+  refusal-and-transient)
+    echo 'API Error: 529 overloaded_error; also: your organization does not have access to Claude' >&2
+    exit 1 ;;
+  unclassified)
+    echo 'something went wrong' >&2
+    exit 1 ;;
+  *) echo "unknown stub mode $mode" >&2; exit 99 ;;
+esac
+"#;
+
+const GH: &str = r#"#!/usr/bin/env bash
+here="$STUB_STATE"
+printf '%s\n' "$*" >> "$here/gh-calls"
+case "$1 $2" in
+  "pr comment")
+    cat > /dev/null
+    exit "$(cat "$here/gh-comment-exit")" ;;
+  api\ repos/*/pulls/*)
+    cat "$here/gh-head" ;;
+  *) echo "gh stub: unsupported $*" >&2; exit 98 ;;
+esac
+"#;
+
+const NPM: &str = "#!/bin/sh\nhere=\"$STUB_STATE\"\necho \"$*\" >> \"$here/npm-calls\"\nexit \"$(cat \"$here/npm-exit\" 2>/dev/null || echo 0)\"\n";
+
+/// The stub programs, written once per test process: a freshly written
+/// executable can stall on its first exec on some hosts, so each case
+/// reuses these and keeps its own state in a directory named by
+/// `STUB_STATE`.
+fn stub_bin() -> &'static Path {
+    static DIR: std::sync::OnceLock<PathBuf> = std::sync::OnceLock::new();
+    DIR.get_or_init(|| {
+        let dir = tempfile::tempdir().unwrap().keep();
+        for (name, body) in [("claude", CLAUDE), ("gh", GH), ("npm", NPM)] {
+            statecraft_adapter::fixture::install_script(&dir.join(name), body, 0o755).unwrap();
+        }
+        dir
+    })
+}
+
+/// Run one step's `run:` scalar as a runner would: `bash -e`, in the
+/// checkout, with the step's `env:` resolved from `ctx` plus `extra`.
+fn run_step(
+    root: &Path,
+    run: &str,
+    env: &[(String, String)],
+    ctx: &BTreeMap<String, String>,
+    extra: &[(&str, &str)],
+    setup_stubs: impl Fn(&Path),
+) -> Ran {
+    let runner = tempfile::tempdir().unwrap();
+    let stubs_dir = runner.path().join("stub-state");
+    std::fs::create_dir_all(&stubs_dir).unwrap();
+    setup_stubs(&stubs_dir);
+    let temp = runner.path().join("temp");
+    std::fs::create_dir_all(&temp).unwrap();
+    let output = runner.path().join("output");
+    let summary = runner.path().join("summary");
+    std::fs::write(&output, "").unwrap();
+    let path = format!(
+        "{}:{}",
+        stub_bin().display(),
+        std::env::var("PATH").unwrap_or_default()
+    );
+    let mut cmd = Command::new("bash");
+    cmd.args(["-e", "-c", &resolve(run, ctx)])
+        .current_dir(root)
+        .env_remove("CLAUDE_CODE_OAUTH_TOKEN")
+        .env_remove("GH_TOKEN")
+        .env_remove("AI_REVIEW_TMP")
+        .env("PATH", path)
+        .env("STUB_STATE", &stubs_dir)
+        .env("RUNNER_TEMP", &temp)
+        .env("GITHUB_OUTPUT", &output)
+        .env("GITHUB_STEP_SUMMARY", &summary);
+    for (k, v) in env {
+        cmd.env(k, resolve(v, ctx));
+    }
+    for (k, v) in extra {
+        cmd.env(k, v);
+    }
+    let out = cmd.output().unwrap();
+    let outputs = std::fs::read_to_string(&output)
+        .unwrap()
+        .lines()
+        .filter_map(|l| l.split_once('='))
+        .map(|(k, v)| (k.to_string(), v.to_string()))
+        .collect();
+    Ran {
+        exit: out.status.code().unwrap_or(-1),
+        outputs,
+        text: format!(
+            "{}{}",
+            String::from_utf8_lossy(&out.stdout),
+            String::from_utf8_lossy(&out.stderr)
+        ),
+        stubs: stubs_dir,
+        runner,
+    }
+}
+
+// ---------------------------------------------------------------- ci-gate
+
+fn needs(entries: &[(&str, &str)], review: Option<&str>, rc: bool) -> String {
+    let mut map = serde_json::Map::new();
+    for (job, result) in entries {
+        let mut v = serde_json::json!({"result": result, "outputs": {}});
+        if *job == "ai-review" {
+            if let Some(r) = review {
+                v["outputs"]["result"] = serde_json::json!(r);
+            }
+            v["outputs"]["release_candidate"] = serde_json::json!(rc.to_string());
+        }
+        map.insert(job.to_string(), v);
+    }
+    serde_json::Value::Object(map).to_string()
+}
+
+fn gate_ctx(
+    repo: &Repo,
+    event: &str,
+    needs_json: &str,
+    head_ref: &str,
+) -> BTreeMap<String, String> {
+    let mut ctx = BTreeMap::new();
+    ctx.insert("toJSON(needs)".into(), needs_json.to_string());
+    ctx.insert("github.event_name".into(), event.to_string());
+    ctx.insert(
+        "github.event.pull_request.base.sha || github.event.before".into(),
+        repo.base.clone(),
+    );
+    ctx.insert(
+        "github.event.pull_request.head.sha || github.sha".into(),
+        repo.head.clone(),
+    );
+    ctx.insert("github.head_ref".into(), head_ref.to_string());
+    ctx
+}
+
+fn run_gate(repo: &Repo, event: &str, needs_json: &str, head_ref: &str) -> Ran {
+    let wf = workflow(repo.root(), "statecraft-ci.yml");
+    let (run, env) = step(&wf, "ci-gate", "Aggregate");
+    run_step(
+        repo.root(),
+        &run,
+        &env,
+        &gate_ctx(repo, event, needs_json, head_ref),
+        &[],
+        |_| {},
+    )
+}
+
+const ALL_OK: [(&str, &str); 4] = [
+    ("governance", "success"),
+    ("code", "success"),
+    ("ai-review", "success"),
+    ("review-exception", "skipped"),
+];
+
+fn with(result: (&str, &str)) -> Vec<(&'static str, String)> {
+    ALL_OK
+        .iter()
+        .map(|(j, r)| {
+            let r = if *j == result.0 { result.1 } else { r };
+            (*j, r.to_string())
+        })
+        .collect()
+}
+
+fn as_refs<'a>(v: &'a [(&'static str, String)]) -> Vec<(&'static str, &'a str)> {
+    v.iter().map(|(j, r)| (*j, r.as_str())).collect()
+}
+
+/// Every ci-gate case, with the exit it must have. Shared by the plain test
+/// and the mutation test.
+fn gate_cases() -> Vec<(&'static str, &'static str, String, &'static str, i32)> {
+    let mut cases = vec![
+        (
+            "pr, all required succeed, reviewed",
+            "pull_request",
+            needs(&ALL_OK, Some("no-findings"), false),
+            "topic",
+            0,
+        ),
+        (
+            "pr, findings do not block",
+            "pull_request",
+            needs(&ALL_OK, Some("findings"), false),
+            "topic",
+            0,
+        ),
+        (
+            "pr, a visible skip does not block (S-2)",
+            "pull_request",
+            needs(&ALL_OK, Some("skipped:oversized"), false),
+            "topic",
+            0,
+        ),
+    ];
+    for (job, result) in [
+        ("governance", "failure"),
+        ("code", "cancelled"),
+        ("ai-review", "failure"),
+        ("governance", "skipped"),
+        ("code", "skipped"),
+        ("ai-review", "skipped"),
+    ] {
+        let label: &'static str = Box::leak(format!("pr, {job} {result}").into_boxed_str());
+        cases.push((
+            label,
+            "pull_request",
+            needs(&as_refs(&with((job, result))), Some("no-findings"), false),
+            "topic",
+            1,
+        ));
+    }
+    for missing in ["governance", "code", "ai-review", "review-exception"] {
+        let label: &'static str = Box::leak(format!("pr, {missing} vanished").into_boxed_str());
+        let entries: Vec<(&str, &str)> = ALL_OK
+            .iter()
+            .copied()
+            .filter(|(j, _)| *j != missing)
+            .collect();
+        cases.push((
+            label,
+            "pull_request",
+            needs(&entries, Some("no-findings"), false),
+            "topic",
+            1,
+        ));
+    }
+    cases.extend([
+        (
+            "pr, success without a review result",
+            "pull_request",
+            needs(&ALL_OK, None, false),
+            "topic",
+            1,
+        ),
+        (
+            "pr, an unknown review result",
+            "pull_request",
+            needs(&ALL_OK, Some("approved"), false),
+            "topic",
+            1,
+        ),
+        (
+            "push, review and exception inapplicable",
+            "push",
+            needs(
+                &[
+                    ("governance", "success"),
+                    ("code", "success"),
+                    ("ai-review", "skipped"),
+                    ("review-exception", "skipped"),
+                ],
+                None,
+                false,
+            ),
+            "",
+            0,
+        ),
+        (
+            "push, an inapplicable review that ran",
+            "push",
+            needs(
+                &[
+                    ("governance", "success"),
+                    ("code", "success"),
+                    ("ai-review", "success"),
+                    ("review-exception", "skipped"),
+                ],
+                Some("no-findings"),
+                false,
+            ),
+            "",
+            1,
+        ),
+        (
+            "push, code failed",
+            "push",
+            needs(
+                &[
+                    ("governance", "success"),
+                    ("code", "failure"),
+                    ("ai-review", "skipped"),
+                    ("review-exception", "skipped"),
+                ],
+                None,
+                false,
+            ),
+            "",
+            1,
+        ),
+        (
+            "release candidate, review skipped, no exception (S-1)",
+            "pull_request",
+            needs(&ALL_OK, Some("skipped:oversized"), true),
+            "release/1.0",
+            1,
+        ),
+        (
+            "release candidate, review skipped, owner exception approved (S-1)",
+            "pull_request",
+            needs(
+                &as_refs(&with(("review-exception", "success"))),
+                Some("skipped:oversized"),
+                true,
+            ),
+            "release/1.0",
+            0,
+        ),
+        (
+            "release candidate, reviewed",
+            "pull_request",
+            needs(&ALL_OK, Some("no-findings"), true),
+            "release/1.0",
+            0,
+        ),
+        (
+            "an event the policy states no rule for",
+            "workflow_dispatch",
+            needs(&ALL_OK, Some("no-findings"), false),
+            "",
+            1,
+        ),
+    ]);
+    cases
+}
+
+const POLICY: &str = ".statecraft/setup/github-actions-rust.json";
+
+/// What a blocking case's report must say: a gate that blocks without
+/// saying why has lost the branch that was meant to block it.
+fn reason(label: &str) -> &'static str {
+    if label.ends_with("vanished") {
+        "vanished"
+    } else if label.ends_with("skipped") || label.contains("no exception") {
+        "an unexpected skip"
+    } else if label.contains("review result") {
+        "without a review result"
+    } else if label.contains("inapplicable review that ran") {
+        "must be skipped"
+    } else if label.contains("no rule") {
+        "states no rule"
+    } else {
+        "ended"
+    }
+}
+
+#[test]
+fn ci_gate_blocks_exactly_what_the_policy_says() {
+    let repo = Repo::new(&[POLICY, "scripts/statecraft/ci-gate.sh"], &[]);
+    for (label, event, needs_json, head_ref, want) in gate_cases() {
+        let ran = run_gate(&repo, event, &needs_json, head_ref);
+        assert_eq!(ran.exit, want, "{label}:\n{}", ran.text);
+        if want == 1 {
+            assert!(ran.text.contains(reason(label)), "{label}: {}", ran.text);
+        }
+        if want == 0 {
+            assert!(
+                ran.text.contains("policy: read at the base"),
+                "{label}: {}",
+                ran.text
+            );
+        }
+    }
+    // The rule that admitted an inapplicable skip is printed.
+    let ran = run_gate(
+        &repo,
+        "push",
+        &needs(
+            &[
+                ("governance", "success"),
+                ("code", "success"),
+                ("ai-review", "skipped"),
+                ("review-exception", "skipped"),
+            ],
+            None,
+            false,
+        ),
+        "",
+    );
+    assert!(
+        ran.text
+            .contains("ai-review skipped, admitted because it is inapplicable on push"),
+        "{}",
+        ran.text
+    );
+}
+
+#[test]
+fn a_candidate_cannot_drop_a_job_from_the_set_that_judges_it() {
+    // The candidate's policy no longer requires `code`, and its gate script
+    // no longer blocks anything. The base's copies judge it.
+    let base_policy = {
+        let tmp = tempfile::tempdir().unwrap();
+        write(tmp.path(), "spec-spine.toml", TOML);
+        render(tmp.path());
+        std::fs::read_to_string(tmp.path().join(POLICY)).unwrap()
+    };
+    let mut weakened: serde_json::Value = serde_json::from_str(&base_policy).unwrap();
+    weakened["jobs"].as_object_mut().unwrap().remove("code");
+    let repo = Repo::new(
+        &[POLICY, "scripts/statecraft/ci-gate.sh"],
+        &[
+            (POLICY, &serde_json::to_string_pretty(&weakened).unwrap()),
+            (
+                "scripts/statecraft/ci-gate.sh",
+                "#!/usr/bin/env bash\necho weakened\nexit 0\n",
+            ),
+        ],
+    );
+    let entries: Vec<(&str, &str)> = ALL_OK
+        .iter()
+        .copied()
+        .filter(|(j, _)| *j != "code")
+        .collect();
+    let ran = run_gate(
+        &repo,
+        "pull_request",
+        &needs(&entries, Some("no-findings"), false),
+        "topic",
+    );
+    assert_eq!(ran.exit, 1, "{}", ran.text);
+    assert!(
+        ran.text.contains("ci-gate.sh: read at the base"),
+        "{}",
+        ran.text
+    );
+    assert!(
+        ran.text.contains("'code' is not in the needs record"),
+        "{}",
+        ran.text
+    );
+    // And the change to the gate is reported as an authority change.
+    assert!(ran.text.contains("authority change"), "{}", ran.text);
+    assert!(ran.text.contains(POLICY), "{}", ran.text);
+}
+
+#[test]
+fn the_adoption_reads_the_candidate_and_says_so() {
+    let repo = Repo::new(&[], &[]);
+    let ran = run_gate(
+        &repo,
+        "pull_request",
+        &needs(&ALL_OK, Some("no-findings"), false),
+        "topic",
+    );
+    assert_eq!(ran.exit, 0, "{}", ran.text);
+    assert!(ran.text.contains("the base carries none"), "{}", ran.text);
+    assert!(ran.text.contains("authority change"), "{}", ran.text);
+}
+
+#[test]
+fn ci_gate_needs_every_job_the_policy_requires() {
+    // Mutation obligation 8, first half: removing a required job from
+    // ci-gate's `needs` makes this fail.
+    let tmp = tempfile::tempdir().unwrap();
+    write(tmp.path(), "spec-spine.toml", TOML);
+    render(tmp.path());
+    let wf = workflow(tmp.path(), "statecraft-ci.yml");
+    let mut needs: Vec<String> = wf["jobs"]["ci-gate"]["needs"]
+        .as_sequence()
+        .unwrap()
+        .iter()
+        .map(|v| v.as_str().unwrap().to_string())
+        .collect();
+    needs.sort();
+    let policy: serde_json::Value =
+        serde_json::from_str(&std::fs::read_to_string(tmp.path().join(POLICY)).unwrap()).unwrap();
+    let mut required: Vec<String> = policy["jobs"]
+        .as_object()
+        .unwrap()
+        .iter()
+        .filter(|(_, v)| v["required"] == true)
+        .map(|(k, _)| k.clone())
+        .collect();
+    required.sort();
+    assert_eq!(needs, required);
+    // Every other job is a job of the workflow, and ci-gate always runs.
+    for job in &required {
+        assert!(
+            !wf["jobs"][job.as_str()].is_null(),
+            "{job} is required and not defined"
+        );
+    }
+    assert_eq!(wf["jobs"]["ci-gate"]["if"].as_str(), Some("always()"));
+    assert!(wf["on"]["merge_group"].is_null(), "no merge_group trigger");
+    assert!(
+        wf["on"]["pull_request_target"].is_null(),
+        "never pull_request_target"
+    );
+}
+
+#[test]
+fn inverting_a_blocking_branch_of_ci_gate_is_noticed() {
+    let tmp = tempfile::tempdir().unwrap();
+    write(tmp.path(), "spec-spine.toml", TOML);
+    render(tmp.path());
+    let script = std::fs::read_to_string(tmp.path().join("scripts/statecraft/ci-gate.sh")).unwrap();
+    let lines: Vec<&str> = script.lines().collect();
+    let sites: Vec<usize> = lines
+        .iter()
+        .enumerate()
+        .filter(|(_, l)| {
+            let t = l.trim_start();
+            t.starts_with("block \"") || t.starts_with("stop \"")
+        })
+        .map(|(i, _)| i)
+        .collect();
+    assert!(
+        sites.len() >= 8,
+        "found only {} blocking branches",
+        sites.len()
+    );
+    let cases = gate_cases();
+    for site in sites {
+        let mutated: String = lines
+            .iter()
+            .enumerate()
+            .map(|(i, l)| {
+                if i == site {
+                    // The branch reports and does not block.
+                    format!(
+                        "{}\n",
+                        l.replacen("block \"", ": \"", 1)
+                            .replacen("stop \"", ": \"", 1)
+                    )
+                } else {
+                    format!("{l}\n")
+                }
+            })
+            .collect();
+        // The base carries the policy but not the script, so the mutated
+        // candidate copy is the one that runs.
+        let repo = Repo::new(&[POLICY], &[]);
+        std::fs::write(repo.root().join("scripts/statecraft/ci-gate.sh"), &mutated).unwrap();
+        // Noticed: a case ends differently, or a block no longer says why.
+        let differs = |ran: &Ran, want: i32, why: &str| {
+            ran.exit != want || (want == 1 && !ran.text.contains(why))
+        };
+        let noticed = cases
+            .iter()
+            .any(|(label, event, needs_json, head_ref, want)| {
+                differs(
+                    &run_gate(&repo, event, needs_json, head_ref),
+                    *want,
+                    reason(label),
+                )
+            });
+        // Two branches need a policy of their own: none at all, and one that
+        // names a rule the gate does not know.
+        let noticed = noticed || {
+            let bare = Repo::new(&[], &[]);
+            std::fs::remove_file(bare.root().join(POLICY)).unwrap();
+            std::fs::write(bare.root().join("scripts/statecraft/ci-gate.sh"), &mutated).unwrap();
+            differs(
+                &run_gate(
+                    &bare,
+                    "pull_request",
+                    &needs(&ALL_OK, Some("no-findings"), false),
+                    "topic",
+                ),
+                1,
+                "no policy",
+            )
+        };
+        let noticed = noticed || {
+            let odd = Repo::new(&[], &[]);
+            let mut policy: serde_json::Value =
+                serde_json::from_str(&std::fs::read_to_string(odd.root().join(POLICY)).unwrap())
+                    .unwrap();
+            policy["jobs"]["code"]["pull_request"] = serde_json::json!("sometimes");
+            std::fs::write(odd.root().join(POLICY), policy.to_string()).unwrap();
+            std::fs::write(odd.root().join("scripts/statecraft/ci-gate.sh"), &mutated).unwrap();
+            differs(
+                &run_gate(
+                    &odd,
+                    "pull_request",
+                    &needs(&ALL_OK, Some("no-findings"), false),
+                    "topic",
+                ),
+                1,
+                "unknown rule",
+            )
+        };
+        assert!(
+            noticed,
+            "inverting line {} went unnoticed: {}",
+            site + 1,
+            lines[site]
+        );
+    }
+}
+
+// -------------------------------------------------------------- ai-review
+
+struct Case {
+    label: &'static str,
+    mode: &'static str,
+    extra: Vec<(&'static str, String)>,
+    comment_exit: &'static str,
+    moved_head: bool,
+    unreadable_head: bool,
+    npm_exit: &'static str,
+    want_exit: i32,
+    want_result: &'static str,
+}
+
+fn review_cases() -> Vec<Case> {
+    let c = |label, mode, want_exit, want_result| Case {
+        label,
+        mode,
+        extra: vec![],
+        comment_exit: "0",
+        moved_head: false,
+        unreadable_head: false,
+        npm_exit: "0",
+        want_exit,
+        want_result,
+    };
+    let mut cases = vec![
+        c("a review with findings", "findings", 0, "findings"),
+        c("a review with none", "no-findings", 0, "no-findings"),
+        c("empty output", "empty", 1, ""),
+        c("unrelated output", "unrelated", 1, ""),
+        c("a verdict for another head", "wronghead", 1, ""),
+        c("a finding outside the diff", "outside", 1, ""),
+        c("a findings verdict listing none", "findings-empty", 1, ""),
+        c(
+            "a no-findings verdict listing some",
+            "no-findings-listed",
+            1,
+            "",
+        ),
+        c("a verdict that is neither", "badverdict", 1, ""),
+        c(
+            "a recognized transient failure",
+            "transient",
+            0,
+            "skipped:transient",
+        ),
+        c("an explicit refusal", "refusal", 1, ""),
+        c(
+            "a refusal outranks a transient signal",
+            "refusal-and-transient",
+            1,
+            "",
+        ),
+        c("an unclassified failure", "unclassified", 1, ""),
+    ];
+    let mut missing = c("a missing credential", "no-findings", 1, "");
+    missing
+        .extra
+        .push(("CLAUDE_CODE_OAUTH_TOKEN", String::new()));
+    cases.push(missing);
+    let mut fork = c("a fork", "no-findings", 0, "skipped:fork");
+    fork.extra.push(("HEAD_REPO", "someone/fork".into()));
+    fork.extra.push(("CLAUDE_CODE_OAUTH_TOKEN", String::new()));
+    cases.push(fork);
+    let mut draft = c("a draft", "no-findings", 0, "skipped:draft");
+    draft.extra.push(("IS_DRAFT", "true".into()));
+    cases.push(draft);
+    let mut bot = c("dependabot", "no-findings", 0, "skipped:dependabot");
+    bot.extra.push(("ACTOR", "dependabot[bot]".into()));
+    cases.push(bot);
+    let mut big = c("an oversized diff", "no-findings", 0, "skipped:oversized");
+    big.extra.push(("DIFF_CAP", "1".into()));
+    cases.push(big);
+    let mut stale = c("a stale subject", "no-findings", 1, "");
+    stale.moved_head = true;
+    cases.push(stale);
+    let mut unreadable = c("the current head cannot be read", "no-findings", 1, "");
+    unreadable.unreadable_head = true;
+    cases.push(unreadable);
+    let mut uninstalled = c("the reviewer cannot be installed", "no-findings", 1, "");
+    uninstalled.npm_exit = "1";
+    cases.push(uninstalled);
+    let mut unposted = c("a failed publication", "findings", 1, "");
+    unposted.comment_exit = "1";
+    cases.push(unposted);
+    let mut unposted_skip = c(
+        "a skip notice that could not be posted",
+        "no-findings",
+        1,
+        "",
+    );
+    unposted_skip.extra.push(("IS_DRAFT", "true".into()));
+    unposted_skip.comment_exit = "1";
+    cases.push(unposted_skip);
+    cases
+}
+
+/// What a blocking review case's report must say.
+fn review_reason(label: &str) -> &'static str {
+    match label {
+        "empty output" => "wrote nothing",
+        "unrelated output" => "carries no verdict block",
+        "a verdict for another head" => "not the subject",
+        "a finding outside the diff" => "which this diff does not change",
+        "a findings verdict listing none" => "a findings verdict with no findings",
+        "a no-findings verdict listing some" => "a no-findings verdict that lists findings",
+        "a verdict that is neither" => "is neither findings nor no-findings",
+        "an explicit refusal" | "a refusal outranks a transient signal" => "the provider refused",
+        "an unclassified failure" => "no recognized transient signal",
+        "a missing credential" => "is not set for this repository",
+        "a stale subject" => "stale subject",
+        "the current head cannot be read" => "the current head could not be read",
+        "the reviewer cannot be installed" => "could not be installed",
+        "a failed publication" => "the review could not be posted",
+        "a skip notice that could not be posted" => "the skip notice could not be posted",
+        other => panic!("no stated reason for `{other}`"),
+    }
+}
+
+fn review_ctx(repo: &Repo) -> BTreeMap<String, String> {
+    let mut ctx = BTreeMap::new();
+    for (k, v) in [
+        ("secrets.CLAUDE_CODE_OAUTH_TOKEN", "stub-credential-value"),
+        ("github.token", "stub-github-token"),
+        ("github.event.pull_request.number", "7"),
+        ("github.repository", "owner/fixture"),
+        (
+            "github.event.pull_request.head.repo.full_name",
+            "owner/fixture",
+        ),
+        ("github.head_ref", "topic"),
+        ("github.actor", "someone"),
+        ("github.event.pull_request.draft", "false"),
+    ] {
+        ctx.insert(k.to_string(), v.to_string());
+    }
+    ctx.insert(
+        "github.event.pull_request.base.sha".into(),
+        repo.base.clone(),
+    );
+    ctx.insert(
+        "github.event.pull_request.head.sha".into(),
+        repo.head.clone(),
+    );
+    ctx
+}
+
+fn run_review(repo: &Repo, case: &Case) -> Ran {
+    let wf = workflow(repo.root(), "statecraft-ai-review.yml");
+    let (run, env) = step(&wf, "review", "Review");
+    let extra: Vec<(&str, &str)> = case.extra.iter().map(|(k, v)| (*k, v.as_str())).collect();
+    let head = if case.moved_head {
+        "2222222222222222222222222222222222222222".to_string()
+    } else {
+        repo.head.clone()
+    };
+    run_step(
+        repo.root(),
+        &run,
+        &env,
+        &review_ctx(repo),
+        &extra,
+        |stubs| {
+            std::fs::write(stubs.join("claude-mode"), case.mode).unwrap();
+            std::fs::write(stubs.join("gh-comment-exit"), case.comment_exit).unwrap();
+            if !case.unreadable_head {
+                std::fs::write(stubs.join("gh-head"), format!("{head}\n")).unwrap();
+            }
+            std::fs::write(stubs.join("npm-exit"), case.npm_exit).unwrap();
+        },
+    )
+}
+
+#[test]
+fn ai_review_classifies_every_case() {
+    let repo = Repo::new(&["scripts/statecraft/ai-review.sh"], &[]);
+    for case in review_cases() {
+        let ran = run_review(&repo, &case);
+        assert_eq!(ran.exit, case.want_exit, "{}:\n{}", case.label, ran.text);
+        if case.want_exit == 1 {
+            assert!(
+                ran.text.contains(review_reason(case.label)),
+                "{}:\n{}",
+                case.label,
+                ran.text
+            );
+        }
+        assert_eq!(
+            ran.output("result"),
+            case.want_result,
+            "{}:\n{}",
+            case.label,
+            ran.text
+        );
+        assert_eq!(ran.output("release_candidate"), "false", "{}", case.label);
+        if case.want_exit == 0 {
+            // Evidence exists for a review and for a visible skip, so the
+            // upload step's `if:` holds and its failure fails the job.
+            let dir = ran.output("evidence");
+            assert!(!dir.is_empty(), "{}: no evidence output", case.label);
+            let record: serde_json::Value = serde_json::from_str(
+                &std::fs::read_to_string(Path::new(dir).join("ai-review-evidence.json")).unwrap(),
+            )
+            .unwrap();
+            assert_eq!(record["subject"]["head"], repo.head, "{}", case.label);
+            assert_eq!(record["subject"]["base"], repo.base, "{}", case.label);
+            assert_eq!(record["subject"]["pullRequest"], 7, "{}", case.label);
+            assert_eq!(record["result"], case.want_result, "{}", case.label);
+            assert_eq!(record["tool"]["version"], setup::REVIEW_TOOL_VERSION);
+        }
+        let called = ran.stub_file("claude-called").is_some();
+        let skipped_early = matches!(
+            case.want_result,
+            "skipped:fork" | "skipped:draft" | "skipped:dependabot" | "skipped:oversized"
+        ) || matches!(
+            case.label,
+            "a missing credential"
+                | "a skip notice that could not be posted"
+                | "the reviewer cannot be installed"
+        );
+        assert_eq!(
+            called, !skipped_early,
+            "{}: reviewer invoked: {called}",
+            case.label
+        );
+        if called {
+            // The reviewer ran from an empty directory with a temporary HOME.
+            let listing = ran.stub_file("claude-cwd-listing").unwrap();
+            assert!(
+                listing.trim().is_empty(),
+                "{}: cwd not empty: {listing}",
+                case.label
+            );
+            let home = ran.stub_file("claude-home").unwrap();
+            assert!(
+                home.trim().starts_with(ran.runner.path().to_str().unwrap())
+                    || home.contains("ai-review-home"),
+                "{}: {home}",
+                case.label
+            );
+        }
+        let comments = ran
+            .stub_file("gh-calls")
+            .unwrap_or_default()
+            .lines()
+            .filter(|l| l.starts_with("pr comment"))
+            .count();
+        let posted = matches!(
+            case.want_result,
+            "findings"
+                | "no-findings"
+                | "skipped:draft"
+                | "skipped:oversized"
+                | "skipped:transient"
+        );
+        if posted {
+            assert_eq!(comments, 1, "{}: comments {comments}", case.label);
+        }
+        if matches!(case.want_result, "skipped:fork" | "skipped:dependabot") {
+            assert_eq!(comments, 0, "{}: a read-only token cannot post", case.label);
+        }
+        // The credential value never appears in anything the step printed.
+        assert!(
+            !ran.text.contains("stub-credential-value"),
+            "{}",
+            case.label
+        );
+    }
+}
+
+#[test]
+fn contributor_text_is_never_spliced_into_a_run_scalar() {
+    let tmp = tempfile::tempdir().unwrap();
+    write(tmp.path(), "spec-spine.toml", TOML);
+    render(tmp.path());
+    for name in ["statecraft-ci.yml", "statecraft-ai-review.yml"] {
+        let wf = workflow(tmp.path(), name);
+        for (job, def) in wf["jobs"].as_mapping().unwrap() {
+            for s in def["steps"].as_sequence().into_iter().flatten() {
+                if let Some(run) = s["run"].as_str() {
+                    assert!(
+                        !run.contains("${{"),
+                        "{name} {job:?}: an expression in a run scalar: {run}"
+                    );
+                }
+                if let Some(uses) = s["uses"].as_str() {
+                    let pinned = uses.split_once('@').is_some_and(|(_, r)| {
+                        r.len() == 40 && r.bytes().all(|b| b.is_ascii_hexdigit())
+                    });
+                    assert!(pinned, "{name}: `{uses}` is not pinned by commit");
+                }
+            }
+        }
+        assert!(wf["on"]["pull_request_target"].is_null(), "{name}");
+    }
+    // The caller forwards exactly one secret, by name; never `inherit`.
+    let caller = workflow(tmp.path(), "statecraft-ci.yml");
+    let secrets = caller["jobs"]["ai-review"]["secrets"].as_mapping().unwrap();
+    assert_eq!(secrets.len(), 1);
+    assert!(secrets.contains_key(setup::CREDENTIAL));
+    // The workflow default is read-only; the review job adds only its comment.
+    let ci = workflow(tmp.path(), "statecraft-ci.yml");
+    assert_eq!(ci["permissions"]["contents"].as_str(), Some("read"));
+    let review = workflow(tmp.path(), "statecraft-ai-review.yml");
+    let perms = review["jobs"]["review"]["permissions"]
+        .as_mapping()
+        .unwrap();
+    assert_eq!(perms.len(), 2);
+    assert_eq!(
+        review["jobs"]["review"]["permissions"]["pull-requests"].as_str(),
+        Some("write")
+    );
+    // The upload step runs whenever evidence was made, and a missing file fails.
+    let steps = review["jobs"]["review"]["steps"].as_sequence().unwrap();
+    let upload = steps
+        .iter()
+        .find(|s| s["name"].as_str() == Some("Upload the evidence record"))
+        .unwrap();
+    assert_eq!(
+        upload["if"].as_str(),
+        Some("steps.review.outputs.evidence != ''")
+    );
+    assert_eq!(upload["with"]["if-no-files-found"].as_str(), Some("error"));
+    assert_eq!(
+        upload["with"]["name"].as_str(),
+        Some("statecraft-ai-review-${{ github.event.pull_request.head.sha }}")
+    );
+}
+
+#[test]
+fn inverting_a_blocking_branch_of_ai_review_is_noticed() {
+    let tmp = tempfile::tempdir().unwrap();
+    write(tmp.path(), "spec-spine.toml", TOML);
+    render(tmp.path());
+    let script =
+        std::fs::read_to_string(tmp.path().join("scripts/statecraft/ai-review.sh")).unwrap();
+    let lines: Vec<&str> = script.lines().collect();
+    let sites: Vec<usize> = lines
+        .iter()
+        .enumerate()
+        .filter(|(_, l)| {
+            let t = l.trim_start();
+            (t.contains("refuse \"") || t.contains("|| refuse")) && !t.starts_with("refuse()")
+        })
+        .map(|(i, _)| i)
+        .collect();
+    assert!(
+        sites.len() >= 12,
+        "found only {} blocking branches",
+        sites.len()
+    );
+    let cases = review_cases();
+    // One repository; the base does not carry the script, so the mutated
+    // candidate copy is the one the step runs.
+    let repo = Repo::new(&[], &[]);
+    let target = repo.root().join("scripts/statecraft/ai-review.sh");
+    for site in sites {
+        let mutated: String = lines
+            .iter()
+            .enumerate()
+            .map(|(i, l)| {
+                if i == site {
+                    format!(
+                        "{}\n",
+                        l.replacen("refuse \"", "true \"", 1)
+                            .replacen("|| refuse", "|| true", 1)
+                    )
+                } else {
+                    format!("{l}\n")
+                }
+            })
+            .collect();
+        std::fs::write(&target, &mutated).unwrap();
+        // Noticed: a case ends differently, or a block no longer says why.
+        let noticed = cases.iter().any(|case| {
+            let ran = run_review(&repo, case);
+            ran.exit != case.want_exit
+                || ran.output("result") != case.want_result
+                || (case.want_exit == 1 && !ran.text.contains(review_reason(case.label)))
+        });
+        assert!(
+            noticed,
+            "inverting line {} went unnoticed: {}",
+            site + 1,
+            lines[site]
+        );
+    }
+}

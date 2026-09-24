@@ -1,0 +1,104 @@
+# Rendered by Statecraft from profile github-actions-rust revision {{sc:profile.revision}}
+# (identity {{sc:profile.identity}}). A managed file and a member of this
+# repository's authority set: an edit here changes the gate that judges every
+# pull request, and `statecraft doctor` names it. The policy the aggregate gate
+# enforces is .statecraft/setup/github-actions-rust.json, read at the base.
+name: statecraft-ci
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+  push:
+    branches: [{{sc:default_branch}}]
+
+permissions:
+  contents: read
+
+jobs:
+  governance:
+    name: governance
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Install the pinned spec-spine
+        run: sh scripts/statecraft/install-spec-spine.sh
+      - name: Governance
+        run: sh scripts/statecraft/gate.sh governance
+      # A documented step-level inapplicability, not a job skip: coupling
+      # compares a pull request's two frozen endpoints, and a push has none.
+      - name: Coupling gate
+        if: github.event_name == 'pull_request'
+        env:
+          PR_BODY: ${{ github.event.pull_request.body }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: sh scripts/statecraft/gate.sh couple
+
+  code:
+    name: code
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
+      - name: Install the pinned spec-spine
+        run: sh scripts/statecraft/install-spec-spine.sh
+      - name: Build, test, clippy, fmt
+        run: sh scripts/statecraft/gate.sh code
+
+  ai-review:
+    name: ai-review
+    if: github.event_name == 'pull_request'
+    uses: ./.github/workflows/statecraft-ai-review.yml
+    permissions:
+      contents: read
+      pull-requests: write
+    secrets:
+      CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+
+  # A release candidate whose review was skipped needs an owner exception,
+  # recorded outside the candidate: an approval on this protected Environment,
+  # whose required reviewers the operator sets and the author cannot grant.
+  review-exception:
+    name: review-exception
+    needs: [ai-review]
+    if: always() && github.event_name == 'pull_request' && needs.ai-review.outputs.release_candidate == 'true' && startsWith(needs.ai-review.outputs.result, 'skipped:')
+    runs-on: ubuntu-latest
+    environment: statecraft-review-exception
+    steps:
+      - name: Record the owner exception
+        env:
+          RESULT: ${{ needs.ai-review.outputs.result }}
+        run: echo "owner exception approved for a release candidate whose review was ${RESULT}"
+
+  ci-gate:
+    name: ci-gate
+    if: always()
+    needs: [governance, code, ai-review, review-exception]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      # The gate script itself is read from the base, as its policy is; the
+      # candidate's copy runs only when the base has none (the adoption).
+      - name: Aggregate
+        env:
+          NEEDS_JSON: ${{ toJSON(needs) }}
+          EVENT_NAME: ${{ github.event_name }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+          HEAD_REF: ${{ github.head_ref }}
+        run: |
+          script="${RUNNER_TEMP}/statecraft-ci-gate.sh"
+          if git show "${BASE_SHA}:scripts/statecraft/ci-gate.sh" > "$script" 2>/dev/null; then
+            echo "ci-gate.sh: read at the base ${BASE_SHA}"
+          else
+            cp scripts/statecraft/ci-gate.sh "$script"
+            echo "ci-gate.sh: the base carries none; the candidate's copy runs (adoption)"
+          fi
+          bash "$script"

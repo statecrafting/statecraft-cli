@@ -149,6 +149,53 @@ pub fn settings_intent(args: &[String]) -> Option<Intent> {
     if seen > 1 { None } else { Some(intent) }
 }
 
+/// The setup-profile flags of `init plan|apply` (spec 002 section 5,
+/// 2026-09-24): `--profile <id>`, `--plan <identity>`, `--verify-local`.
+/// `Some(None)` is no flag at all; `None` is a usage error: an unrecognised
+/// flag, a repeated one, or a flag missing its value. `--verify-local` on a
+/// plan is accepted and does nothing, because a plan writes nothing to check.
+fn setup_request(args: &[String]) -> Option<Option<statecraft_home::flow::SetupRequest>> {
+    let mut request = statecraft_home::flow::SetupRequest::default();
+    let mut any = false;
+    let mut i = 0;
+    while i < args.len() {
+        let arg = args[i].as_str();
+        let value = |i: usize| -> Option<String> {
+            let v = args.get(i + 1)?;
+            (!v.starts_with("--")).then(|| v.clone())
+        };
+        match arg {
+            "--profile" if request.profile.is_none() => {
+                request.profile = Some(value(i)?);
+                i += 1;
+            }
+            "--plan" if request.plan.is_none() => {
+                request.plan = Some(value(i)?);
+                i += 1;
+            }
+            "--verify-local" if !request.verify_local => request.verify_local = true,
+            _ => {
+                if let Some(v) = arg.strip_prefix("--profile=") {
+                    if request.profile.is_some() {
+                        return None;
+                    }
+                    request.profile = Some(v.to_string());
+                } else if let Some(v) = arg.strip_prefix("--plan=") {
+                    if request.plan.is_some() {
+                        return None;
+                    }
+                    request.plan = Some(v.to_string());
+                } else {
+                    return None;
+                }
+            }
+        }
+        any = true;
+        i += 1;
+    }
+    Some(any.then_some(request))
+}
+
 /// Which operation a verb names, given what followed it.
 pub fn operation(
     verb: crate::commands::Verb,
@@ -163,8 +210,24 @@ pub fn operation(
         Verb::HomeApply => Operation::HomeApply {
             settings: settings_intent(rest)?,
         },
-        Verb::InitPlan => Operation::InitPlan { root: root()? },
-        Verb::InitApply => Operation::InitApply { root: root()? },
+        Verb::InitPlan | Verb::InitApply => {
+            let mode = if verb == Verb::InitPlan {
+                statecraft_home::flow::Mode::Plan
+            } else {
+                statecraft_home::flow::Mode::Apply
+            };
+            match setup_request(rest)? {
+                None if mode == statecraft_home::flow::Mode::Plan => {
+                    Operation::InitPlan { root: root()? }
+                }
+                None => Operation::InitApply { root: root()? },
+                Some(setup) => Operation::InitWithSetup {
+                    root: root()?,
+                    mode,
+                    setup,
+                },
+            }
+        }
         Verb::MigratePlan => Operation::MigratePlan { root: root()? },
         Verb::MigrateApply => Operation::MigrateApply { root: root()? },
         Verb::ProjectEnroll => Operation::Enroll {
@@ -269,6 +332,8 @@ pub fn usage(verb: crate::commands::Verb) -> &'static str {
              [--program <executable>] [--deadline <seconds>] [--synthetic]"
         }
         Verb::StartupQualify => " <path> <session-id> <capture-dir>",
+        Verb::InitPlan => " <path> [--profile <id>] [--plan <identity>]",
+        Verb::InitApply => " <path> [--profile <id>] [--plan <identity>] [--verify-local]",
         Verb::StartupShow => " <path> <run-id> [--attempt <n>]",
         Verb::StartupTrial => " <path> (--provider-session | --synthetic) [--deadline <seconds>]",
         _ => " <path>",
@@ -302,6 +367,7 @@ mod tests {
                 bridge: None,
                 delivery: vec![],
                 qualification: None,
+                setup: None,
                 outcome,
             }))
         };
