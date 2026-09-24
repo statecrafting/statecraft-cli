@@ -518,6 +518,7 @@ impl Answer {
                 flow::Outcome::Complete => Severity::Ok,
                 flow::Outcome::Partial => Severity::Finding,
                 flow::Outcome::Refused => Severity::Refused,
+                flow::Outcome::Failed => Severity::Failed,
             },
             Answer::Migrate(outcome) => match outcome.verdict {
                 derived::Verdict::Refused { .. } => Severity::Refused,

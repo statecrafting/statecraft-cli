@@ -4735,6 +4735,42 @@ identity, which remains the bundle proposal's. Whether `init` writes an
 explicit pin into a new project is a separate question, not decided here.
 
 This entry is the authority. The implementation is a separate change.
+**2026-09-24: initialization outcomes implemented (the entry above on what
+initialization reports).** `crates/statecraft-home/src/flow.rs` now runs a
+preflight shared by `init plan` and `init apply`, and `init apply` takes the
+manifest lock before it. Tested through the built binary in
+`crates/statecraft-cli/tests/init_outcome.rs`: each outcome, `init plan`'s
+unchanged disk, and T1 to T12 of the decision's test table, each comparing the
+report's `mutations` with a walk of the project root (outside `.git`) and the
+product home. Choices the entry left open, recorded here:
+
+- **A mutation is one operation.** A path written twice (the progress record,
+  after each step) appears twice, each with its own before and after; the
+  walk comparison composes them per path. `step` is the step's word, or
+  `lock` for what taking the manifest lock created.
+- **Names.** A project path is repository-relative and a home path is
+  absolute. `.statecraft/` itself is `project`; `.statecraft/state/` and
+  everything under it is `project-state`.
+- **The lock's failure is reported under step 1 (`home`)**, since the lock is
+  now taken before any step; a held lock is `refused` with `phase: preflight`,
+  and any other lock error is `failed`. It was reported under `reconcile`.
+- **Step 6's files are found by walking `.statecraft/derived/`** before and
+  after the corpus tool runs. `compile` and `index` are translated as `check`
+  is: exit 1 or 2 is a finding (`withheld`), any other end, a signal or a
+  spawn error is `failed`.
+- **A step 7 refusal** carries `phase: preflight` when the preflight had
+  already found the corpus tool unavailable, and `phase: late` otherwise.
+- **`writes` keeps its meaning** (what the plan writes) and is rendered only
+  for a plan; what `apply` changed is rendered from `mutations`.
+- **The declaration is rewritten on a re-run** under the lock, as before; it
+  is reported because it changed. No other project path outside
+  `.statecraft/state/` changes on a re-run (T12).
+- **An unreadable `.gitignore` or root `AGENTS.md`** is now `failed` in the
+  preflight. Both were read as absent, which would have let a write replace a
+  file that could not be read. A `.gitignore` write error is `failed`; it was
+  reported as the area being ignored.
+- T2 holds the lock from the test process, so it waits out the writer wait
+  (30 seconds). T4, T6 and T11 skip, saying so, when run as root.
 
 ## Verification
 

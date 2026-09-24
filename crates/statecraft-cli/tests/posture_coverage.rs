@@ -52,6 +52,7 @@ here="$(dirname "$0")"
 case "$*" in
   --version) echo 'spec-spine 0.23.0' ;;
   check|'check --help') exit 0 ;;
+  compile|index) exit 0 ;;
   'registry plan --json') echo '{"ready":[{"id":"fixture","title":"coverage fixture"}]}' ;;
   'registry list --json') echo '{"items":[{"id":"fixture","status":"approved","implementation":"pending"}]}' ;;
   'verify fixture --plan --json')
