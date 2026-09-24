@@ -36,6 +36,7 @@ use statecraft_environment::adapter::{Declaration, ManagedFile, StaticProbe};
 use statecraft_environment::claimant::{ForeignClaims, resolve};
 use statecraft_environment::digest::{digest_bytes, digest_file};
 use statecraft_environment::manifest::{Class, Entry, Manifest, Pins, Source, SourceKind};
+use statecraft_environment::plan::Withholding;
 use statecraft_environment::probe::{CheckAnswer, Unavailability, check_unavailable, run_check};
 use statecraft_environment::qualify::Qualification;
 use statecraft_environment::registry::Registry;
@@ -1182,14 +1183,32 @@ fn run(ctx: &Context<'_>, mode: Mode) -> Report {
             }
         }
     }
+    // Spec 002 section 5, 2026-09-24 (I-3): a path withheld for any reason
+    // but `adopted` leaves this step withheld, so the initialization is
+    // `partial` and never `complete`. An adopted path is reconcile's intended
+    // result and is reported under `adopted` instead.
+    let conflicts: Vec<&str> = computed
+        .withheld
+        .iter()
+        .filter(|held| !matches!(held.reason, Withholding::Adopted))
+        .map(|held| held.path.as_str())
+        .collect();
     report.steps.push(StepReport::new(
         Step::Governance,
-        if starter.conformance.conforming {
-            StepState::Done
-        } else {
+        if !starter.conformance.conforming {
             StepState::Withheld {
                 reason: starter.conformance.describe(),
             }
+        } else if !conflicts.is_empty() {
+            StepState::Withheld {
+                reason: format!(
+                    "{} path(s) withheld: {}",
+                    conflicts.len(),
+                    conflicts.join(", ")
+                ),
+            }
+        } else {
+            StepState::Done
         },
         format!(
             "{} write(s), {} withheld, {}",

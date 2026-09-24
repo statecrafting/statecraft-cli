@@ -6861,6 +6861,17 @@ open, recorded here:
 - The harness revision digest changes with the hook bytes; no committed file
   records it.
 
+**2026-09-24: implemented, the I-3 withheld-path rule above.** `flow.rs`'s
+governance step reports `withheld`, with a reason naming each path, when the
+plan withholds any path for a reason other than `adopted`; the outcome rule is
+unchanged and so yields `partial`, exit 1. Two tests in
+`crates/statecraft-cli/tests/init_outcome.rs` run the built binary on a real
+project with an isolated `HOME`: a hand-edited `spec-spine.toml` makes the
+re-run `partial`, exit 1, names the path with `drifted` and both digests in the
+JSON `withheld` list and in the human `withhold` line, leaves the file's bytes
+unchanged and lists no mutation for it; the unedited re-run stays `complete`,
+exit 0, with the governance step `done`.
+
 ## Verification
 
 `--fail-on-untraced` joined the corpus gate with this spec's first
