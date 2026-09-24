@@ -466,6 +466,73 @@ is a change to this spec's territory, so it is noted here. The component table
 names the new pin. The library row moved in its own, later change under spec
 `002`.
 
+**2026-09-24: PROPOSED, NOT ADOPTED. What 1.0 means: a readiness checklist,
+a stability policy, and a release pipeline (owner Addendum 2, items RD and Q).**
+For the owner's adoption. Nothing here lifts `F-02`: publication stays
+deferred until the owner lifts it separately, and no grade above *specified*
+is claimed for anything below.
+
+*Stability policy (proposed).* Before 1.0, any surface may change with a
+dated spec amendment. From 1.0, these are **stable**, and changing one
+incompatibly needs a major version and a migration note:
+
+1. **The command tree**: every verb in `Verb::all()` and its arguments
+   (spec `006` sections 3.1 and 3.11). Adding a verb or an optional flag is
+   compatible; removing or renaming one is not.
+2. **The exit and JSON contract**: the five exit codes of spec `006` section
+   3.3, and the family envelope once adopted (the 0.26.0 migration, the
+   `006` section 5 proposal for item X). Adding a field is compatible;
+   removing, retyping or renaming one is not (`006` section 3.4).
+3. **Documented formats**: the environment manifest, the run record and
+   journal, receipts and evidence, and bundle metadata, each with a
+   `schemaVersion` and a reader for every version it ever wrote.
+4. **Outcome words** (`partial`, `refused`, `withheld`, `drifted`, ...), as
+   the shared glossary defines them.
+
+Human output, log text and anything under `.statecraft/state/` are not
+stable.
+
+*Readiness checklist, with the evidence each item needs.*
+
+| Item | Done when | Evidence |
+|---|---|---|
+| Stable commands | every verb has help, argument docs and a binary test per usage error | `--help` output per verb; tests that a bad flag exits 3 (item P) |
+| Exit and JSON contract | the family envelope adopted; every verb's `--json` parses as it | a test over every verb; `exitCode` equals the process status |
+| Documented formats | each format has a schema document and a `schemaVersion`; strict within a version (item N) | schema files; a test reading every version's fixture |
+| Conformance tests | producer conformance, adapter conformance and the acceptance suites run in CI against the adopted pins | CI run ids; `make verify` for each spec |
+| Acceptance stability | the 002/003 intermittent failures diagnosed and fixed, never retried into green | the owner's item F record, before and after timings |
+| Security posture | `SECURITY.md` with private reporting enabled; spec `004`'s credential-fence residuals stated; a threat model per trust boundary | the files; the repository setting read back |
+| Supply chain | `cargo-deny` (advisories, licenses, bans, sources) and a declared-MSRV build in CI; pinned actions | CI job results (item Q) |
+| Release pipeline | the pipeline below, exercised once on a pre-release tag | the release run id; a fresh-consumer verification record |
+| Claims | README and specs state each behavior's grade with evidence (section 3.3) | the grade table, re-measured at the tag |
+
+*Release pipeline (proposed), to spec-spine's standard.* spec-spine's
+`release.yml` (its specs 019 and 119) is the reference: a tag-gated build of a
+per-target archive with a `.sha256` sidecar, a per-target CycloneDX SBOM that
+fails closed when empty, a SLSA build-provenance attestation per archive, a
+GitHub Release carrying those assets, and idempotent registry publication;
+its `determinism.yml` proves the build byte-identical. For this product:
+
+1. **Signed tags**: annotated tags signed with the owner's key, as spec-spine's
+   `v0.25.0` is (ED25519); the pipeline refuses an unsigned or unverified tag.
+2. **Archives and checksums** per supported target, with `.sha256` sidecars.
+3. **SBOM** per archive, CycloneDX JSON, failing closed when it lists no
+   components.
+4. **Build attestations** for each archive, verifiable with
+   `gh attestation verify`.
+5. **Fresh-consumer verification**: after publication, a job on a clean
+   runner downloads the published assets (not the build tree), verifies the
+   signature, checksum and attestation, installs, and runs a smoke suite
+   (`--help`, `doctor` on a scratch repository, `init plan`), recording the
+   result against the tag, as spec-spine's 119 judges what was built.
+
+*The crates.io blocker, stated.* `crates/statecraft-run` depends on
+`attest-ledger-core` by git revision (`a9c3595`). crates.io refuses a crate
+with a git dependency, so this product cannot be published there until
+`attest-ledger-core` is published to a registry or vendored under its
+license. Archive and GitHub Release distribution is not blocked by it.
+Workspace crates stay `publish = false` until `F-02` is lifted.
+
 ## Verification
 
 Each line below is one command. These assert the authored foundation, which

@@ -57,7 +57,7 @@
     "id": "001-boundaries-and-authority",
     "implementation": "n-a",
     "sectionDigests": {
-      "001-the-product-boundary-the-component-owners-and-the-separation-of-authority": "9fc063e5994fd0cfef76f8b575610b7657da3f0c94b78313465034c0a4abae7a",
+      "001-the-product-boundary-the-component-owners-and-the-separation-of-authority": "65feb2cde13271fb56a2e4b4b51d9c6c82a47e6253b48ba7b864f21f8a5a3548",
       "1-purpose": "8ab3d56bb3257f8f2adb9674a5b1623453ced0e9c5c3837c83b1bc2843082a33",
       "2-territory": "208c1150a18423a93f2b5c4d355a9b693ba2f7dbd1fd70c6fac461f8b37fbcc4",
       "3-1-what-this-product-owns": "d0eb1851f89bc87b31085c0167a44565ef13de5913cebf61a22ff5fb296701af",
@@ -74,7 +74,7 @@
       "3-9-what-the-archive-is-used-for-and-what-it-is-not": "48c4b222c05c0dacd28faf3d6f89904160d14c5940cf3ea734f7f93c47598db8",
       "3-behavior": "6becfd42abaa498b058d8d0db53ff1e49b64c73e5374f05e2be03fd524889161",
       "4-out-of-scope": "e33ba88a720843b7568908b34d1fc89019f9828350a00999786377e9d70b3d40",
-      "5-decisions-recorded-during-implementation": "daaf24a8d84062b5052f155991ba0c6fe730c5883afd2ac1515bc632dd2951f1",
+      "5-decisions-recorded-during-implementation": "bccca98845f5e6c1db86fe7dfd9244846aa701df236ddad7c3e23527431bac5a",
       "component-owners-and-what-this-product-s-relationship-actually-is": "59aeb762ab863f33c5b558c429e259b25e42a842c3ed973e442f15cbf97560da",
       "the-dispositions-stated-as-section-3-2-requires": "cb3da262b3a3b136435846257e53fd463f60b7a6edc287146d27d0836f5c174e",
       "the-slice-s-acceptance-stated-as-refusals": "ba8a0b74e833c45face609cc8b64ee13fd33de124a42e8b773304781392e7688",
@@ -111,6 +111,6 @@
     "summary": "What this product is, what it is not, and who owns each capability it depends on. Fixes the claim vocabulary (specified / implemented / tested / released), the two interaction modes and which one is built first, the rule that separates an authority change from an implementation change, and the reuse disposition for every shared component this repository would otherwise reimplement. Owns the product half of the constitution and the two founding records under docs/. It owns no code.\n",
     "title": "The product boundary, the component owners, and the separation of authority"
   },
-  "shardHash": "f3949a6617e4de0a939a3927dcf424192f30aa2722d4c26c0226ebc0e5db5858",
+  "shardHash": "735c56c34f6f6e23f452d9556b2b79fa437c570ceb1dbaacae29f3128428d660",
   "specVersion": "1.8.0"
 }
