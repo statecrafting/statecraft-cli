@@ -24,7 +24,7 @@
 # 078's governed scope is still inert while `[coverage] governed_scope` is
 # unset here. `make tools` installs this exact version into `.tooling/bin`,
 # so a binary elsewhere on PATH cannot answer for this repository.
-required_version = "=0.23.0"
+required_version = "=0.25.0"
 
 [manifest]
 # Drives the Cargo `[package.metadata.spec-spine].spec` and package.json `"spec-spine".spec` reads.
