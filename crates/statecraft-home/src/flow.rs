@@ -16,6 +16,14 @@
 //!
 //! `plan` and `apply` are one function with one flag. A preview computed by
 //! one code path and performed by another is not a preview.
+//!
+//! **Every precondition is decided before the first write** (spec 002 section
+//! 5, 2026-09-24). The preflight is shared by both, writes nothing, takes no
+//! lock and creates nothing; `plan` runs only the preflight. `apply` takes the
+//! manifest lock first, runs the preflight, then performs, and reports every
+//! change it made as read from disk. Four outcomes: `complete`, `partial`,
+//! `refused` (a precondition, nothing written but the lock) and `failed` (an
+//! execution error, whatever was written).
 
 use crate::bridge;
 use crate::delivery::{self, Delivery};
@@ -75,6 +83,29 @@ pub trait Corpus {
             Err(detail) => CheckAnswer::DoesNotValidate { detail },
         }
     }
+
+    /// `compile`'s answer, translated as `check`'s is. The default reads
+    /// [`Corpus::compile`]'s `Err` as a finding, which is what a stated double
+    /// means by it.
+    fn compile_answer(&self, root: &Path) -> Ran {
+        self.compile(root).map_or_else(Ran::Finding, |_| Ran::Done)
+    }
+
+    /// `index`'s answer, the same way.
+    fn index_answer(&self, root: &Path) -> Ran {
+        self.index(root).map_or_else(Ran::Finding, |_| Ran::Done)
+    }
+}
+
+/// How a writing verb of the corpus tool ended, in section 3.23's reading.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum Ran {
+    /// Exit 0.
+    Done,
+    /// Exit 1 or 2: a finding about the corpus.
+    Finding(String),
+    /// Any other end, a signal, or a spawn error: the verb did not perform.
+    NotPerformed(String),
 }
 
 /// The real one: the `spec-spine` binary, asked rather than reimplemented.
@@ -120,7 +151,37 @@ fn first_line(text: &str) -> String {
         .to_string()
 }
 
+impl SpecSpineCommand {
+    fn ran(&self, root: &Path, verb: &str) -> Ran {
+        let output = match std::process::Command::new(&self.program)
+            .arg(verb)
+            .current_dir(root)
+            .output()
+        {
+            Ok(o) => o,
+            Err(e) => return Ran::NotPerformed(format!("{} {verb}: {e}", self.program)),
+        };
+        let text = first_line(&format!(
+            "{}{}",
+            String::from_utf8_lossy(&output.stderr),
+            String::from_utf8_lossy(&output.stdout)
+        ));
+        match output.status.code() {
+            Some(0) => Ran::Done,
+            Some(1 | 2) => Ran::Finding(text),
+            Some(c) => Ran::NotPerformed(format!("exit {c}: {text}")),
+            None => Ran::NotPerformed(format!("signal: {text}")),
+        }
+    }
+}
+
 impl Corpus for SpecSpineCommand {
+    fn compile_answer(&self, root: &Path) -> Ran {
+        self.ran(root, "compile")
+    }
+    fn index_answer(&self, root: &Path) -> Ran {
+        self.ran(root, "index")
+    }
     fn compile(&self, root: &Path) -> Result<String, String> {
         self.run(root, &["compile"])
     }
@@ -271,6 +332,16 @@ impl StepState {
     }
 }
 
+/// When a step refusal was decided (spec 002 section 5, 2026-09-24, rule 4).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum Phase {
+    /// Before any mutation.
+    Preflight,
+    /// After mutations, although the preflight passed.
+    Late,
+}
+
 /// One step's report.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -281,6 +352,28 @@ pub struct StepReport {
     pub state: StepState,
     /// What it did, for a person.
     pub detail: String,
+    /// For a refusal, when it was decided.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub phase: Option<Phase>,
+}
+
+impl StepReport {
+    fn new(step: Step, state: StepState, detail: impl Into<String>) -> Self {
+        let phase = matches!(state, StepState::Refused { .. }).then_some(Phase::Preflight);
+        Self {
+            step,
+            state,
+            detail: detail.into(),
+            phase,
+        }
+    }
+
+    fn late(mut self) -> Self {
+        if self.phase.is_some() {
+            self.phase = Some(Phase::Late);
+        }
+        self
+    }
 }
 
 /// Whether this was a preview or a performance.
@@ -294,15 +387,21 @@ pub enum Mode {
 }
 
 /// How an initialization ended.
+///
+/// Spec 002 section 5, 2026-09-24: four outcomes, one exit each.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "kebab-case")]
 pub enum Outcome {
     /// Every step reported done.
     Complete,
-    /// Something was withheld or skipped. Never reported as complete.
+    /// Something was withheld, skipped or refused, and no step failed. Never
+    /// reported as complete.
     Partial,
-    /// A precondition stopped it before any write.
+    /// A precondition stopped it in the preflight. Nothing was written but
+    /// what taking the manifest lock created.
     Refused,
+    /// An execution error in some step, whether or not anything was written.
+    Failed,
 }
 
 impl Outcome {
@@ -312,8 +411,48 @@ impl Outcome {
             Outcome::Complete => "complete",
             Outcome::Partial => "partial",
             Outcome::Refused => "refused",
+            Outcome::Failed => "failed",
         }
     }
+}
+
+/// Which side of the boundary a change landed on.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum Category {
+    /// Under the project root, outside `.statecraft/state/`.
+    Project,
+    /// Under `.statecraft/state/`.
+    ProjectState,
+    /// The product home.
+    Home,
+}
+
+impl Category {
+    /// A one-word rendering.
+    pub fn word(self) -> &'static str {
+        match self {
+            Category::Project => "project",
+            Category::ProjectState => "project-state",
+            Category::Home => "home",
+        }
+    }
+}
+
+/// One change an initialization made, read from disk before and after.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Mutation {
+    /// Where.
+    pub category: Category,
+    /// Which step made it: a step's word, or `lock` for the manifest lock.
+    pub step: String,
+    /// Repository-relative under the project, absolute in the home.
+    pub path: String,
+    /// A SHA-256 digest, `absent`, `directory` or `unreadable`.
+    pub before: String,
+    /// A SHA-256 digest, `removed`, `directory` or `unreadable`.
+    pub after: String,
 }
 
 /// What an initialization did, or would do.
@@ -326,12 +465,15 @@ pub struct Report {
     pub root: String,
     /// One per step attempted, in order.
     pub steps: Vec<StepReport>,
-    /// Repository-relative paths written, or that would be.
+    /// Repository-relative paths the plan writes. What was actually changed is
+    /// [`Report::mutations`], never this list.
     pub writes: Vec<String>,
     /// Paths not written, each with its reason.
     pub withheld: Vec<String>,
     /// Paths already there and now depended on rather than rewritten.
     pub adopted: Vec<String>,
+    /// Every change made, observed on disk. Always empty for a plan.
+    pub mutations: Vec<Mutation>,
     /// What the producer returned, and whether it stayed in contract.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub conformance: Option<Conformance>,
@@ -362,8 +504,13 @@ impl Report {
     pub fn render(&self) -> String {
         let mut out = String::new();
         for step in &self.steps {
+            let phase = match step.phase {
+                Some(Phase::Preflight) => " (preflight)",
+                Some(Phase::Late) => " (late)",
+                None => "",
+            };
             out.push_str(&format!(
-                "{:<11} {:<9} {}\n",
+                "{:<11} {:<9} {}{phase}\n",
                 step.step.word(),
                 step.state.word(),
                 step.detail
@@ -372,16 +519,23 @@ impl Report {
         for path in &self.adopted {
             out.push_str(&format!("adopt      {path}\n"));
         }
-        for path in &self.writes {
-            let verb = if self.mode == Mode::Plan {
-                "would write"
-            } else {
-                "write     "
-            };
-            out.push_str(&format!("{verb} {path}\n"));
+        if self.mode == Mode::Plan {
+            for path in &self.writes {
+                out.push_str(&format!("would write {path}\n"));
+            }
         }
         for path in &self.withheld {
             out.push_str(&format!("withhold   {path}\n"));
+        }
+        for m in &self.mutations {
+            out.push_str(&format!(
+                "changed    {} {} ({}): {} -> {}\n",
+                m.category.word(),
+                m.path,
+                m.step,
+                short(&m.before),
+                short(&m.after)
+            ));
         }
         for d in &self.delivery {
             out.push_str(&format!(
@@ -394,33 +548,16 @@ impl Report {
         out
     }
 
-    fn finish(mut self) -> Self {
-        // Section 3.17: `refused` is a precondition that stopped the flow
-        // before any write. A step refused after the governance and project
-        // steps completed and wrote their files (section 3.23's translation
-        // of an absent producer at step 6, say) refused that step and nothing
-        // in it, and the initialization is `partial`: files are in place and
-        // a step did not run.
-        let completed = |step: Step| {
-            self.steps.iter().any(|s| {
-                s.step == step
-                    && !matches!(
-                        s.state,
-                        StepState::Refused { .. } | StepState::Failed { .. }
-                    )
-            })
-        };
-        let wrote =
-            self.mode == Mode::Apply && completed(Step::Governance) && completed(Step::Project);
+    /// Spec 002 section 5, 2026-09-24, rule 2. `stopped` is a precondition
+    /// that ended the preflight.
+    fn finish(mut self, stopped: bool) -> Self {
         let failed = self
             .steps
             .iter()
             .any(|s| matches!(s.state, StepState::Failed { .. }));
-        let refused = self
-            .steps
-            .iter()
-            .any(|s| matches!(s.state, StepState::Refused { .. }));
-        self.outcome = if failed || (refused && !wrote) {
+        self.outcome = if failed {
+            Outcome::Failed
+        } else if stopped {
             Outcome::Refused
         } else if self.steps.len() < Step::all().len() || self.steps.iter().any(|s| !s.state.done())
         {
@@ -429,6 +566,14 @@ impl Report {
             Outcome::Complete
         };
         self
+    }
+}
+
+fn short(state: &str) -> &str {
+    if state.len() == 64 && state.bytes().all(|b| b.is_ascii_hexdigit()) {
+        &state[..12]
+    } else {
+        state
     }
 }
 
@@ -485,67 +630,270 @@ pub struct Context<'a> {
     pub product_version: String,
 }
 
-/// Compute the initialization. Writes nothing.
+/// Compute the initialization: the preflight alone. Writes nothing, takes no
+/// lock and creates no file or directory.
 pub fn plan(ctx: &Context<'_>) -> Report {
     run(ctx, Mode::Plan)
 }
 
-/// Perform the initialization.
+/// Perform the initialization: the manifest lock, the preflight, then the
+/// steps.
 pub fn apply(ctx: &Context<'_>) -> Report {
     run(ctx, Mode::Apply)
 }
 
-fn run(ctx: &Context<'_>, mode: Mode) -> Report {
-    let writing = mode == Mode::Apply;
-    let now = rfc3339_utc(ctx.clock.now_unix());
-    let mut report = Report {
-        mode,
-        root: ctx.root.display().to_string(),
-        steps: Vec::new(),
-        writes: Vec::new(),
-        withheld: Vec::new(),
-        adopted: Vec::new(),
-        conformance: None,
-        bridge: None,
-        delivery: Vec::new(),
-        qualification: None,
-        outcome: Outcome::Partial,
+/// Observes changes on disk around each write.
+///
+/// Spec 002 section 5, 2026-09-24, rule 1: a mutation is read from disk before
+/// and after the operation, including one that failed part-way, and never
+/// computed from the plan.
+struct Recorder {
+    root: std::path::PathBuf,
+    list: Vec<Mutation>,
+}
+
+/// A path's state: a digest, `absent`, `directory` or `unreadable`.
+fn observe(path: &Path) -> String {
+    match std::fs::symlink_metadata(path) {
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => "absent".to_string(),
+        Err(_) => "unreadable".to_string(),
+        Ok(m) if m.is_dir() => "directory".to_string(),
+        Ok(_) => {
+            std::fs::read(path).map_or_else(|_| "unreadable".to_string(), |b| digest_bytes(&b))
+        }
+    }
+}
+
+/// `path` and each ancestor that does not exist yet, so a `create_dir_all`
+/// or a write that creates its parents is observed whole.
+fn chain(path: &Path) -> Vec<std::path::PathBuf> {
+    let mut out = vec![path.to_path_buf()];
+    let mut at = path.parent();
+    while let Some(dir) = at {
+        if dir.as_os_str().is_empty() || dir.exists() {
+            break;
+        }
+        out.push(dir.to_path_buf());
+        at = dir.parent();
+    }
+    out.reverse();
+    out
+}
+
+/// Every path under `dir`, and `dir`'s missing ancestors. Used where a program
+/// this product does not control writes (the corpus tool in step 6).
+fn tree(dir: &Path) -> Vec<std::path::PathBuf> {
+    let mut out = chain(dir);
+    let mut stack = vec![dir.to_path_buf()];
+    while let Some(d) = stack.pop() {
+        let Ok(entries) = std::fs::read_dir(&d) else {
+            continue;
+        };
+        for entry in entries.flatten() {
+            let path = entry.path();
+            if entry.file_type().is_ok_and(|t| t.is_dir()) {
+                stack.push(path.clone());
+            }
+            out.push(path);
+        }
+    }
+    out.sort();
+    out.dedup();
+    out
+}
+
+impl Recorder {
+    fn new(ctx: &Context<'_>) -> Self {
+        let absolute = |p: &Path| std::fs::canonicalize(p).unwrap_or_else(|_| p.to_path_buf());
+        Self {
+            root: absolute(ctx.root),
+            list: Vec::new(),
+        }
+    }
+
+    /// Where `path` belongs, and how it is named in the report.
+    fn classify(&self, path: &Path) -> (Category, String) {
+        let path = self.absolute(path);
+        if let Ok(rel) = path.strip_prefix(&self.root) {
+            let rel = rel.to_string_lossy().to_string();
+            let state = Path::new(project::STATE);
+            let category = if Path::new(&rel).starts_with(state) {
+                Category::ProjectState
+            } else {
+                Category::Project
+            };
+            return (category, rel);
+        }
+        (Category::Home, path.display().to_string())
+    }
+
+    /// `path` with its existing prefix resolved, so a project reached through
+    /// a link is still recognised as the project.
+    fn absolute(&self, path: &Path) -> std::path::PathBuf {
+        let mut existing = path.to_path_buf();
+        let mut rest = Vec::new();
+        while !existing.exists() {
+            match (existing.file_name(), existing.parent()) {
+                (Some(name), Some(parent)) => {
+                    rest.push(name.to_os_string());
+                    existing = parent.to_path_buf();
+                }
+                _ => return path.to_path_buf(),
+            }
+        }
+        let mut out = std::fs::canonicalize(&existing).unwrap_or(existing);
+        for name in rest.into_iter().rev() {
+            out.push(name);
+        }
+        out
+    }
+
+    /// Run `op`, observing `paths` on either side of it, and record each one
+    /// that changed.
+    fn around<T>(
+        &mut self,
+        step: &str,
+        paths: Vec<std::path::PathBuf>,
+        op: impl FnOnce() -> T,
+    ) -> T {
+        let before: Vec<(std::path::PathBuf, String)> = paths
+            .into_iter()
+            .map(|p| {
+                let state = observe(&p);
+                (p, state)
+            })
+            .collect();
+        let result = op();
+        for (path, was) in before {
+            let now = observe(&path);
+            if now == was {
+                continue;
+            }
+            let after = if now == "absent" {
+                "removed".to_string()
+            } else {
+                now
+            };
+            let (category, name) = self.classify(&path);
+            self.list.push(Mutation {
+                category,
+                step: step.to_string(),
+                path: name,
+                before: was,
+                after,
+            });
+        }
+        result
+    }
+
+    /// As [`Recorder::around`], over a whole directory tree read again after
+    /// `op`, so files `op` created are found.
+    fn around_tree<T>(&mut self, step: &str, dir: &Path, op: impl FnOnce() -> T) -> T {
+        let before: std::collections::BTreeMap<std::path::PathBuf, String> = tree(dir)
+            .into_iter()
+            .map(|p| (p.clone(), observe(&p)))
+            .collect();
+        let result = op();
+        let mut paths: Vec<std::path::PathBuf> = before.keys().cloned().collect();
+        paths.extend(tree(dir));
+        paths.sort();
+        paths.dedup();
+        for path in paths {
+            let was = before
+                .get(&path)
+                .cloned()
+                .unwrap_or_else(|| "absent".to_string());
+            let now = observe(&path);
+            if now == was {
+                continue;
+            }
+            let after = if now == "absent" {
+                "removed".to_string()
+            } else {
+                now
+            };
+            let (category, name) = self.classify(&path);
+            self.list.push(Mutation {
+                category,
+                step: step.to_string(),
+                path: name,
+                before: was,
+                after,
+            });
+        }
+        result
+    }
+}
+
+/// Everything the preflight established, and what performing it needs.
+struct Prepared {
+    personal: Option<Personal>,
+    tools: Tools,
+    starter: producer::Starter,
+    manifest: Manifest,
+    adopted: Vec<String>,
+    computed: statecraft_environment::plan::Plan,
+    ignore: IgnorePlan,
+    bridge: bridge::Plan,
+    corpus: Result<(), CheckAnswer>,
+}
+
+/// The `.gitignore` merge, decided in the preflight.
+struct IgnorePlan {
+    /// The bytes to write, when there is a change.
+    contents: Option<String>,
+    detail: String,
+}
+
+/// The preflight: every read and computation `init apply` depends on, and
+/// every precondition it can refuse on. Writes nothing.
+fn preflight(ctx: &Context<'_>, now: &str, report: &mut Report) -> Result<Prepared, StepReport> {
+    let failed = |step: Step, reason: String, detail: &str| {
+        StepReport::new(step, StepState::Failed { reason }, detail)
     };
 
-    // 1. home. The product's own home, never a native agent location: writing
-    //    into one of those is `home apply` and an explicit operator act.
-    let home_state = step_home(ctx, writing, &now);
-    let stop = !home_state.state.done();
-    report.steps.push(home_state);
-    if stop {
-        return report.finish();
+    // 1. home: what step 1 would write, from what the home holds now.
+    let personal = Personal::read(ctx.home).map_err(|e| {
+        failed(
+            Step::Home,
+            e.to_string(),
+            "the personal defaults could not be read",
+        )
+    })?;
+    let personal = (!ctx.home.personal_file().exists()).then_some(personal);
+    let mut tools = Tools::read(ctx.home).map_err(|e| {
+        failed(
+            Step::Home,
+            e.to_string(),
+            "the tools record could not be read",
+        )
+    })?;
+    tools.upsert(ToolRecord {
+        name: "spec-spine".to_string(),
+        requested: "any".to_string(),
+        resolved: ctx
+            .corpus
+            .version()
+            .unwrap_or_else(|| NOT_RECORDED.to_string()),
+        observed_from: "path".to_string(),
+        recorded_at: now.to_string(),
+    });
+    for revision in crate::harness::installed_revisions(ctx.home) {
+        tools.record_revision(&revision);
     }
 
     // 2. plan. The producer is asked once, here, and its answer carries every
     //    later step.
-    let starter = match producer::produce(ctx.producer) {
-        Ok(s) => s,
-        Err(e) => {
-            report.steps.push(StepReport {
-                step: Step::Plan,
-                state: StepState::Refused {
-                    reason: e.to_string(),
-                },
-                detail: "the governance producer did not answer".to_string(),
-            });
-            return report.finish();
-        }
-    };
+    let starter = producer::produce(ctx.producer).map_err(|e| {
+        StepReport::new(
+            Step::Plan,
+            StepState::Refused {
+                reason: e.to_string(),
+            },
+            "the governance producer did not answer",
+        )
+    })?;
     report.conformance = Some(starter.conformance.clone());
-    report.steps.push(StepReport {
-        step: Step::Plan,
-        state: StepState::Done,
-        detail: format!(
-            "{} governance file(s), {}",
-            starter.governance.len(),
-            starter.conformance.describe()
-        ),
-    });
 
     // The managed files this product places: the producer's in-contract set,
     // plus this product's own managed instructions.
@@ -559,37 +907,8 @@ fn run(ctx: &Context<'_>, mode: Mode) -> Report {
         project::managed_instructions(),
     ));
 
-    // Every write of the declaration below happens under the manifest lock,
-    // taken before the read, so a transfer or an `env apply` recorded in
-    // between cannot be erased by this run's write (spec 002 section 3.35).
-    let _manifest_lock = if writing {
-        match statecraft_environment::manifest::lock(
-            ctx.root,
-            statecraft_environment::manifest::WRITER_WAIT,
-        ) {
-            Ok(held) => Some(held),
-            Err(e) => {
-                // Another writer held it past the wait: nothing was written.
-                let busy = matches!(
-                    e,
-                    statecraft_environment::manifest::ManifestError::Busy { .. }
-                );
-                let reason = e.to_string();
-                report.steps.push(StepReport {
-                    step: Step::Reconcile,
-                    state: if busy {
-                        StepState::Refused { reason }
-                    } else {
-                        StepState::Failed { reason }
-                    },
-                    detail: "the declaration could not be locked for writing".to_string(),
-                });
-                return report.finish();
-            }
-        }
-    } else {
-        None
-    };
+    // 3. reconcile, in memory. A contract path already on disk is ADOPTED:
+    //    recorded with the digest observed, depended on, and never rewritten.
     let mut manifest = match Manifest::read(ctx.root) {
         Ok(Some(m)) => m,
         Ok(None) => Manifest::new(Pins {
@@ -601,66 +920,39 @@ fn run(ctx: &Context<'_>, mode: Mode) -> Report {
             adapters: Default::default(),
         }),
         Err(e) => {
-            report.steps.push(StepReport {
-                step: Step::Reconcile,
-                state: StepState::Failed {
-                    reason: e.to_string(),
-                },
-                detail: "the declaration could not be read".to_string(),
-            });
-            return report.finish();
+            return Err(failed(
+                Step::Reconcile,
+                e.to_string(),
+                "the declaration could not be read",
+            ));
         }
     };
-
-    // 3. reconcile. A contract path already on disk is ADOPTED: recorded with
-    //    the digest observed, depended on, and never rewritten. That is what
-    //    keeps an authored spec or a hand-tuned configuration from being
-    //    treated as a disposable template.
-    match step_reconcile(ctx, &managed, &mut manifest, &now) {
-        Ok(adopted) => {
-            report.adopted = adopted.clone();
-            report.steps.push(StepReport {
-                step: Step::Reconcile,
-                state: StepState::Done,
-                detail: format!("{} existing file(s) adopted, none rewritten", adopted.len()),
-            });
-        }
-        Err(e) => {
-            report.steps.push(StepReport {
-                step: Step::Reconcile,
-                state: StepState::Failed {
-                    reason: e.to_string(),
-                },
-                detail: "the project could not be read".to_string(),
-            });
-            return report.finish();
-        }
-    }
+    let adopted = step_reconcile(ctx, &managed, &mut manifest, now).map_err(|e| {
+        failed(
+            Step::Reconcile,
+            e.to_string(),
+            "the project could not be read",
+        )
+    })?;
 
     // 4. governance. Which paths are written and which are withheld is spec
     //    002's plan, asked rather than restated here.
     let declaration = governance_declaration(&managed);
     let probe = StaticProbe::new().with_harness(GOVERNANCE_SOURCE);
-    let computed = match statecraft_environment::plan::plan(
+    let computed = statecraft_environment::plan::plan(
         ctx.root,
         Some(&manifest),
         std::slice::from_ref(&declaration),
         &probe,
         &ForeignClaims::none(),
-    ) {
-        Ok(p) => p,
-        Err(e) => {
-            report.steps.push(StepReport {
-                step: Step::Governance,
-                state: StepState::Failed {
-                    reason: e.to_string(),
-                },
-                detail: "the project could not be planned".to_string(),
-            });
-            return report.finish();
-        }
-    };
-
+    )
+    .map_err(|e| {
+        failed(
+            Step::Governance,
+            e.to_string(),
+            "the project could not be planned",
+        )
+    })?;
     for write in &computed.writes {
         report.writes.push(write.path.clone());
     }
@@ -670,133 +962,356 @@ fn run(ctx: &Context<'_>, mode: Mode) -> Report {
             .push(format!("{}: {}", held.path, held.reason.describe()));
     }
 
-    if writing {
-        if let Err(e) = perform_writes(ctx.root, &computed, &mut manifest, ctx.producer, &now) {
-            report.steps.push(StepReport {
-                step: Step::Governance,
-                state: StepState::Failed {
-                    reason: e.to_string(),
-                },
-                detail: "a governance file could not be written".to_string(),
-            });
-            return report.finish();
-        }
-    }
-
-    // The ignore fragment is merged, never installed as a file.
-    let ignore_detail = match merge_ignore(ctx.root, starter.ignore_fragment.as_deref(), writing) {
-        Ok(detail) => detail,
-        Err(refusal) => {
-            report.steps.push(StepReport {
-                step: Step::Governance,
-                state: StepState::Refused {
+    // The ignore fragment is merged, never installed as a file, and its
+    // refusal is a precondition decided here, before anything is written.
+    let ignore =
+        plan_ignore(ctx.root, starter.ignore_fragment.as_deref()).map_err(|e| match e {
+            IgnoreStop::Refused(refusal) => StepReport::new(
+                Step::Governance,
+                StepState::Refused {
                     reason: refusal.describe(),
                 },
-                detail: "the ignore rules would take the project area out of version control"
-                    .to_string(),
-            });
-            return report.finish();
+                "the ignore rules would take the project area out of version control",
+            ),
+            IgnoreStop::Unreadable(reason) => failed(
+                Step::Governance,
+                reason,
+                "the ignore rules could not be read",
+            ),
+        })?;
+
+    // 5. project. The instruction bridge is a tracked modification of a file
+    //    this product does not own.
+    let known = known_generated(&starter);
+    let root_text = match std::fs::read_to_string(resolve(ctx.root, project::ROOT_INSTRUCTIONS)) {
+        Ok(text) => Some(text),
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => None,
+        Err(e) => {
+            return Err(failed(
+                Step::Project,
+                format!("{}: {e}", project::ROOT_INSTRUCTIONS),
+                "the root instructions could not be read",
+            ));
         }
     };
-    report.steps.push(StepReport {
-        step: Step::Governance,
-        state: if starter.conformance.conforming {
-            StepState::Done
-        } else {
-            StepState::Withheld {
-                reason: starter.conformance.describe(),
-            }
-        },
-        detail: format!(
-            "{} write(s), {} withheld, {ignore_detail}",
-            computed.writes.len(),
-            computed.withheld.len()
-        ),
-    });
-
-    // 5. project. The declaration and the instruction bridge. The bridge is a
-    //    tracked modification of a file this product does not own.
-    let known = known_generated(&starter);
-    let root_text = std::fs::read_to_string(resolve(ctx.root, project::ROOT_INSTRUCTIONS)).ok();
     let bridge_plan = bridge::plan(root_text.as_deref(), &known);
     if bridge_plan.action.changes_the_file() {
         report.writes.push(project::ROOT_INSTRUCTIONS.to_string());
     }
     report.bridge = Some(bridge_plan.clone());
 
-    let project_state = if writing {
-        match write_project(ctx.root, &bridge_plan, &mut manifest, &now) {
-            Ok(()) => StepState::Done,
-            Err(e) => StepState::Failed { reason: e },
+    // 6. corpus. Degradable: whether the tool is there and carries `check` is
+    //    decided now and reported, and it stops nothing but step 6.
+    let corpus = ctx.corpus.carries_check(ctx.root);
+
+    Ok(Prepared {
+        personal,
+        tools,
+        starter,
+        manifest,
+        adopted,
+        computed,
+        ignore,
+        bridge: bridge_plan,
+        corpus,
+    })
+}
+
+fn run(ctx: &Context<'_>, mode: Mode) -> Report {
+    let writing = mode == Mode::Apply;
+    let now = rfc3339_utc(ctx.clock.now_unix());
+    let mut report = Report {
+        mode,
+        root: ctx.root.display().to_string(),
+        steps: Vec::new(),
+        writes: Vec::new(),
+        withheld: Vec::new(),
+        adopted: Vec::new(),
+        mutations: Vec::new(),
+        conformance: None,
+        bridge: None,
+        delivery: Vec::new(),
+        qualification: None,
+        outcome: Outcome::Partial,
+    };
+    let mut rec = Recorder::new(ctx);
+
+    // The manifest lock, first and only when performing: every write of the
+    // declaration below happens under it, taken before the read, so a transfer
+    // or an `env apply` recorded in between cannot be erased by this run's
+    // write (spec 002 section 3.35). What taking it created is reported, also
+    // when it is where the initialization stops.
+    let _manifest_lock = if writing {
+        let lock_paths = chain(&ctx.root.join(statecraft_environment::manifest::LOCK_PATH));
+        let taken = rec.around("lock", lock_paths, || {
+            statecraft_environment::manifest::lock(
+                ctx.root,
+                statecraft_environment::manifest::WRITER_WAIT,
+            )
+        });
+        match taken {
+            Ok(held) => Some(held),
+            Err(e) => {
+                // Another writer held it past the wait: a precondition.
+                let busy = matches!(
+                    e,
+                    statecraft_environment::manifest::ManifestError::Busy { .. }
+                );
+                let reason = e.to_string();
+                report.steps.push(StepReport::new(
+                    Step::Home,
+                    if busy {
+                        StepState::Refused { reason }
+                    } else {
+                        StepState::Failed { reason }
+                    },
+                    "the declaration could not be locked for writing",
+                ));
+                report.mutations = rec.list;
+                return report.finish(busy);
+            }
         }
     } else {
-        StepState::Done
+        None
     };
-    let project_done = project_state.done();
-    report.steps.push(StepReport {
-        step: Step::Project,
-        state: project_state,
-        detail: format!(
+
+    let prepared = match preflight(ctx, &now, &mut report) {
+        Ok(p) => p,
+        Err(stop) => {
+            let refused = matches!(stop.state, StepState::Refused { .. });
+            report.steps.push(stop);
+            report.mutations = rec.list;
+            return report.finish(refused);
+        }
+    };
+    let Prepared {
+        personal,
+        tools,
+        starter,
+        mut manifest,
+        adopted,
+        computed,
+        ignore,
+        bridge: bridge_plan,
+        corpus: corpus_ready,
+    } = prepared;
+
+    macro_rules! stop_failed {
+        ($step:expr, $reason:expr, $detail:expr) => {{
+            report.steps.push(StepReport::new(
+                $step,
+                StepState::Failed { reason: $reason },
+                $detail,
+            ));
+            report.mutations = rec.list;
+            return report.finish(false);
+        }};
+    }
+
+    // 1. home. The product's own home, never a native agent location: writing
+    //    into one of those is `home apply` and an explicit operator act.
+    if writing {
+        if let Err(reason) = step_home(ctx, &mut rec, personal.as_ref(), &tools) {
+            stop_failed!(Step::Home, reason, "the product home could not be written");
+        }
+        if let Err(e) = progress(&mut rec, ctx.root, Step::Home, &now) {
+            stop_failed!(
+                Step::Home,
+                e,
+                "the initialization's progress could not be recorded"
+            );
+        }
+    }
+    let presence = crate::home::presence(ctx.home);
+    report.steps.push(StepReport::new(
+        Step::Home,
+        StepState::Done,
+        format!(
+            "{} ({} harness revision(s)); no account, login or token was consulted",
+            presence.root.display(),
+            crate::harness::installed_revisions(ctx.home).len()
+        ),
+    ));
+
+    // 2. plan.
+    report.steps.push(StepReport::new(
+        Step::Plan,
+        StepState::Done,
+        format!(
+            "{} governance file(s), {}",
+            starter.governance.len(),
+            starter.conformance.describe()
+        ),
+    ));
+
+    // 3. reconcile.
+    report.adopted = adopted.clone();
+    report.steps.push(StepReport::new(
+        Step::Reconcile,
+        StepState::Done,
+        format!("{} existing file(s) adopted, none rewritten", adopted.len()),
+    ));
+
+    // 4. governance.
+    if writing {
+        if let Err(e) = perform_writes(
+            ctx.root,
+            &mut rec,
+            &computed,
+            &mut manifest,
+            ctx.producer,
+            &now,
+        ) {
+            stop_failed!(
+                Step::Governance,
+                e.to_string(),
+                "a governance file could not be written"
+            );
+        }
+        if let Some(contents) = &ignore.contents {
+            let path = ctx.root.join(".gitignore");
+            let written = rec.around(Step::Governance.word(), chain(&path), || {
+                std::fs::write(&path, contents)
+            });
+            if let Err(e) = written {
+                stop_failed!(
+                    Step::Governance,
+                    format!(".gitignore: {e}"),
+                    "the ignore rules could not be written"
+                );
+            }
+        }
+    }
+    report.steps.push(StepReport::new(
+        Step::Governance,
+        if starter.conformance.conforming {
+            StepState::Done
+        } else {
+            StepState::Withheld {
+                reason: starter.conformance.describe(),
+            }
+        },
+        format!(
+            "{} write(s), {} withheld, {}",
+            computed.writes.len(),
+            computed.withheld.len(),
+            ignore.detail
+        ),
+    ));
+
+    // 5. project. The declaration and the instruction bridge.
+    if writing {
+        if let Err(e) = write_project(ctx.root, &mut rec, &bridge_plan, &mut manifest, &now) {
+            stop_failed!(
+                Step::Project,
+                e,
+                format!(
+                    "declaration and instructions; root bridge {}",
+                    bridge_plan.action.word()
+                )
+            );
+        }
+        if let Err(e) = progress(&mut rec, ctx.root, Step::Project, &now) {
+            stop_failed!(
+                Step::Project,
+                e,
+                "the initialization's progress could not be recorded"
+            );
+        }
+    }
+    report.steps.push(StepReport::new(
+        Step::Project,
+        StepState::Done,
+        format!(
             "declaration and instructions; root bridge {}",
             bridge_plan.action.word()
         ),
-    });
-    if !project_done {
-        return report.finish();
-    }
-    if writing {
-        let _ = Progress::write(ctx.root, Step::Project, &now);
-    }
+    ));
 
     // 6. corpus. Compile, index, then check. `check` last and never replaced by
     //    a writing verb: a read that repairs what it measures cannot measure it.
-    let corpus_state = if writing {
-        step_corpus(ctx)
-    } else {
-        StepState::Done
+    let corpus_refused_early = corpus_ready.is_err();
+    let corpus_report = match corpus_ready {
+        Err(answer) => StepReport::new(
+            Step::Corpus,
+            StepState::Refused {
+                reason: answer.describe(),
+            },
+            answer.describe(),
+        ),
+        Ok(()) if !writing => StepReport::new(
+            Step::Corpus,
+            StepState::Done,
+            "would compile, index and check",
+        ),
+        Ok(()) => {
+            let derived = ctx.root.join(project::DERIVED);
+            let state = rec.around_tree(Step::Corpus.word(), &derived, || step_corpus(ctx));
+            let late = matches!(state, StepState::Refused { .. });
+            let detail = match &state {
+                StepState::Done => "compiled, indexed and checked".to_string(),
+                StepState::Withheld { reason }
+                | StepState::Refused { reason }
+                | StepState::Failed { reason } => reason.clone(),
+            };
+            let r = StepReport::new(Step::Corpus, state, detail);
+            if late { r.late() } else { r }
+        }
     };
-    let corpus_detail = match &corpus_state {
-        StepState::Done if writing => "compiled, indexed and checked".to_string(),
-        StepState::Done => "would compile, index and check".to_string(),
-        StepState::Withheld { reason } | StepState::Refused { reason } => reason.clone(),
-        StepState::Failed { reason } => reason.clone(),
-    };
-    let corpus_done = corpus_state.done();
-    report.steps.push(StepReport {
-        step: Step::Corpus,
-        state: corpus_state,
-        detail: corpus_detail,
-    });
+    let corpus_done = corpus_report.state.done();
+    let corpus_failed = matches!(corpus_report.state, StepState::Failed { .. });
+    report.steps.push(corpus_report);
+    if corpus_failed {
+        report.mutations = rec.list;
+        return report.finish(false);
+    }
     if writing && corpus_done {
-        let _ = Progress::write(ctx.root, Step::Corpus, &now);
+        if let Err(e) = progress(&mut rec, ctx.root, Step::Corpus, &now) {
+            stop_failed!(
+                Step::Corpus,
+                e,
+                "the initialization's progress could not be recorded"
+            );
+        }
     }
 
     // 7. register. Registration and qualification, and then it stops: arming
     //    is a separate act and execution is another one again.
-    let register_state = match step_register(ctx, writing) {
+    let register_report = match step_register(ctx, &mut rec, writing) {
         Ok((qualification, detail)) => {
             report.qualification = Some(qualification);
-            StepReport {
-                step: Step::Register,
-                state: StepState::Done,
-                detail,
+            StepReport::new(Step::Register, StepState::Done, detail)
+        }
+        Err(RegisterFailure::Refused(reason)) => {
+            let r = StepReport::new(
+                Step::Register,
+                StepState::Refused { reason },
+                "the project was not registered",
+            );
+            // Decided in the preflight when step 6 already found the tool
+            // unavailable; otherwise a producer refused after mutations.
+            if corpus_refused_early || !writing {
+                r
+            } else {
+                r.late()
             }
         }
-        Err(RegisterFailure::Refused(reason)) => StepReport {
-            step: Step::Register,
-            state: StepState::Refused { reason },
-            detail: "the project was not registered".to_string(),
-        },
-        Err(RegisterFailure::Failed(reason)) => StepReport {
-            step: Step::Register,
-            state: StepState::Failed { reason },
-            detail: "the project could not be registered".to_string(),
-        },
+        Err(RegisterFailure::Failed(reason)) => StepReport::new(
+            Step::Register,
+            StepState::Failed { reason },
+            "the project could not be registered",
+        ),
     };
-    let registered = register_state.state.done();
-    report.steps.push(register_state);
+    let registered = register_report.state.done();
+    report.steps.push(register_report);
     if writing && registered {
-        let _ = Progress::write(ctx.root, Step::Register, &now);
+        if let Err(e) = progress(&mut rec, ctx.root, Step::Register, &now) {
+            stop_failed!(
+                Step::Register,
+                e,
+                "the initialization's progress could not be recorded"
+            );
+        }
     }
 
     // Delivery is evaluated after the files are in place, because the whole
@@ -812,92 +1327,40 @@ fn run(ctx: &Context<'_>, mode: Mode) -> Report {
     report.writes.dedup();
     report.withheld.sort();
     report.adopted.sort();
-    report.finish()
+    report.mutations = rec.list;
+    report.finish(false)
 }
 
-fn step_home(ctx: &Context<'_>, writing: bool, now: &str) -> StepReport {
-    if writing {
-        for dir in ctx.home.directories() {
-            if let Err(e) = std::fs::create_dir_all(&dir) {
-                return StepReport {
-                    step: Step::Home,
-                    state: StepState::Failed {
-                        reason: format!("{}: {e}", dir.display()),
-                    },
-                    detail: "the product home could not be created".to_string(),
-                };
-            }
-        }
-        let personal = match Personal::read(ctx.home) {
-            Ok(p) => p,
-            Err(e) => {
-                return StepReport {
-                    step: Step::Home,
-                    state: StepState::Failed {
-                        reason: e.to_string(),
-                    },
-                    detail: "the personal defaults could not be read".to_string(),
-                };
-            }
-        };
-        if !ctx.home.personal_file().exists() {
-            if let Err(e) = personal.write(ctx.home) {
-                return StepReport {
-                    step: Step::Home,
-                    state: StepState::Failed {
-                        reason: e.to_string(),
-                    },
-                    detail: "the personal defaults could not be written".to_string(),
-                };
-            }
-        }
-        let mut tools = match Tools::read(ctx.home) {
-            Ok(t) => t,
-            Err(e) => {
-                return StepReport {
-                    step: Step::Home,
-                    state: StepState::Failed {
-                        reason: e.to_string(),
-                    },
-                    detail: "the tools record could not be read".to_string(),
-                };
-            }
-        };
-        tools.upsert(ToolRecord {
-            name: "spec-spine".to_string(),
-            requested: "any".to_string(),
-            resolved: ctx
-                .corpus
-                .version()
-                .unwrap_or_else(|| NOT_RECORDED.to_string()),
-            observed_from: "path".to_string(),
-            recorded_at: now.to_string(),
-        });
-        for revision in crate::harness::installed_revisions(ctx.home) {
-            tools.record_revision(&revision);
-        }
-        if let Err(e) = tools.write(ctx.home) {
-            return StepReport {
-                step: Step::Home,
-                state: StepState::Failed {
-                    reason: e.to_string(),
-                },
-                detail: "the tools record could not be written".to_string(),
-            };
-        }
-        let _ = Progress::write(ctx.root, Step::Home, now);
-    }
+/// Record how far the flow got. A record that could not be written is an
+/// execution error: section 3.17's "the last completed step is recorded" is
+/// part of the contract.
+fn progress(rec: &mut Recorder, root: &Path, step: Step, now: &str) -> Result<(), String> {
+    let path = resolve(root, project::INIT_STATE);
+    rec.around(step.word(), chain(&path), || {
+        Progress::write(root, step, now)
+    })
+    .map_err(|e| format!("{}: {e}", project::INIT_STATE))
+}
 
-    let presence = crate::home::presence(ctx.home);
-    StepReport {
-        step: Step::Home,
-        state: StepState::Done,
-        detail: format!(
-            "{} ({} harness revision(s)); no account, login or token was consulted",
-            presence.root.display(),
-            crate::harness::installed_revisions(ctx.home).len()
-        ),
+fn step_home(
+    ctx: &Context<'_>,
+    rec: &mut Recorder,
+    personal: Option<&Personal>,
+    tools: &Tools,
+) -> Result<(), String> {
+    let step = Step::Home.word();
+    for dir in ctx.home.directories() {
+        rec.around(step, chain(&dir), || std::fs::create_dir_all(&dir))
+            .map_err(|e| format!("{}: {e}", dir.display()))?;
     }
+    if let Some(personal) = personal {
+        let path = ctx.home.personal_file();
+        rec.around(step, chain(&path), || personal.write(ctx.home))
+            .map_err(|e| e.to_string())?;
+    }
+    let path = ctx.home.tools_file();
+    rec.around(step, chain(&path), || tools.write(ctx.home))
+        .map_err(|e| e.to_string())
 }
 
 fn step_reconcile(
@@ -953,6 +1416,7 @@ fn governance_declaration(managed: &[(String, String)]) -> Declaration {
 /// product's templates and not an agent-harness adapter's.
 fn perform_writes(
     root: &Path,
+    rec: &mut Recorder,
     computed: &statecraft_environment::plan::Plan,
     manifest: &mut Manifest,
     producer: &dyn Producer,
@@ -961,10 +1425,12 @@ fn perform_writes(
     let identity = producer.identity().describe();
     for write in &computed.writes {
         let target = resolve(root, &write.path);
-        if let Some(parent) = target.parent() {
-            std::fs::create_dir_all(parent)?;
-        }
-        std::fs::write(&target, &write.contents)?;
+        rec.around(Step::Governance.word(), chain(&target), || {
+            if let Some(parent) = target.parent() {
+                std::fs::create_dir_all(parent)?;
+            }
+            std::fs::write(&target, &write.contents)
+        })?;
         manifest.upsert(Entry {
             path: write.path.clone(),
             class: Class::Managed,
@@ -985,29 +1451,38 @@ fn perform_writes(
     Ok(())
 }
 
-fn merge_ignore(
-    root: &Path,
-    fragment: Option<&str>,
-    writing: bool,
-) -> Result<String, ignore::Refusal> {
+/// Why the ignore merge stopped the preflight.
+enum IgnoreStop {
+    /// A precondition: the rules would ignore the project area.
+    Refused(ignore::Refusal),
+    /// `.gitignore` is there and could not be read.
+    Unreadable(String),
+}
+
+fn plan_ignore(root: &Path, fragment: Option<&str>) -> Result<IgnorePlan, IgnoreStop> {
     let Some(fragment) = fragment else {
-        return Ok("the producer returned no ignore fragment".to_string());
+        return Ok(IgnorePlan {
+            contents: None,
+            detail: "the producer returned no ignore fragment".to_string(),
+        });
     };
     let path = root.join(".gitignore");
-    let existing = std::fs::read_to_string(&path).ok();
-    let merged = ignore::merge(existing.as_deref(), fragment)?;
+    let existing = match std::fs::read_to_string(&path) {
+        Ok(text) => Some(text),
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => None,
+        Err(e) => return Err(IgnoreStop::Unreadable(format!(".gitignore: {e}"))),
+    };
+    let merged = ignore::merge(existing.as_deref(), fragment).map_err(IgnoreStop::Refused)?;
     if merged.unchanged {
-        return Ok("ignore rules already carry every pattern".to_string());
+        return Ok(IgnorePlan {
+            contents: None,
+            detail: "ignore rules already carry every pattern".to_string(),
+        });
     }
-    if writing {
-        std::fs::write(&path, &merged.contents_after).map_err(|_| {
-            ignore::Refusal::AreaIgnored {
-                line: ".gitignore".to_string(),
-                line_number: 0,
-            }
-        })?;
-    }
-    Ok(format!("{} ignore pattern(s) merged", merged.added.len()))
+    Ok(IgnorePlan {
+        detail: format!("{} ignore pattern(s) merged", merged.added.len()),
+        contents: Some(merged.contents_after),
+    })
 }
 
 /// The generated files this product can recognize by their exact bytes.
@@ -1028,15 +1503,17 @@ fn known_generated(starter: &producer::Starter) -> Vec<bridge::KnownGenerated> {
 
 fn write_project(
     root: &Path,
+    rec: &mut Recorder,
     bridge_plan: &bridge::Plan,
     manifest: &mut Manifest,
     now: &str,
 ) -> Result<(), String> {
+    let step = Step::Project.word();
     if bridge_plan.action.changes_the_file() {
-        std::fs::write(
-            resolve(root, project::ROOT_INSTRUCTIONS),
-            &bridge_plan.contents_after,
-        )
+        let path = resolve(root, project::ROOT_INSTRUCTIONS);
+        rec.around(step, chain(&path), || {
+            std::fs::write(&path, &bridge_plan.contents_after)
+        })
         .map_err(|e| format!("{}: {e}", project::ROOT_INSTRUCTIONS))?;
     }
     // Recorded only when this run inserted or moved the line, because the
@@ -1048,26 +1525,39 @@ fn write_project(
     if bridge_plan.action.changes_the_file() {
         manifest.upsert_modification(bridge::record(bridge_plan, now));
     }
-    manifest.write(root).map(|_| ()).map_err(|e| e.to_string())
+    let path = resolve(root, project::DECLARATION);
+    rec.around(step, chain(&path), || manifest.write(root))
+        .map(|_| ())
+        .map_err(|e| e.to_string())
 }
 
 fn step_corpus(ctx: &Context<'_>) -> StepState {
     // Spec 002 section 3.23, contract 5: the tool and its `check` are
-    // established before anything runs, so a binary that is absent or lacks
-    // the verb is a refusal and nothing in this step was done.
+    // established again before anything runs. The preflight found them; a
+    // tool gone since is a late refusal, and nothing in this step was done.
     if let Err(answer) = ctx.corpus.carries_check(ctx.root) {
         return StepState::Refused {
             reason: answer.describe(),
         };
     }
-    for (what, result) in [
-        ("compile", ctx.corpus.compile(ctx.root)),
-        ("index", ctx.corpus.index(ctx.root)),
+    // `compile` and `index` translated as `check` is: a finding about the
+    // corpus is withheld, a verb that did not perform is a failure.
+    for (what, ran) in [
+        ("compile", ctx.corpus.compile_answer(ctx.root)),
+        ("index", ctx.corpus.index_answer(ctx.root)),
     ] {
-        if let Err(reason) = result {
-            return StepState::Withheld {
-                reason: format!("{what}: {reason}"),
-            };
+        match ran {
+            Ran::Done => {}
+            Ran::Finding(reason) => {
+                return StepState::Withheld {
+                    reason: format!("{what}: {reason}"),
+                };
+            }
+            Ran::NotPerformed(reason) => {
+                return StepState::Failed {
+                    reason: format!("{what}: {reason}"),
+                };
+            }
         }
     }
     // `check`'s answer, translated rather than passed through: 1 and 2 are
@@ -1098,6 +1588,7 @@ enum RegisterFailure {
 
 fn step_register(
     ctx: &Context<'_>,
+    rec: &mut Recorder,
     writing: bool,
 ) -> Result<(Qualification, String), RegisterFailure> {
     let failed = |e: statecraft_environment::registry::RegistryError| match e {
@@ -1112,7 +1603,11 @@ fn step_register(
         .map_err(failed)?
         .clone();
     if writing {
-        registry.write(ctx.home.root()).map_err(failed)?;
+        let path = ctx.home.registry_file();
+        rec.around(Step::Register.word(), chain(&path), || {
+            registry.write(ctx.home.root())
+        })
+        .map_err(failed)?;
     }
     let detail = format!(
         "{}; armed: {}. Arming and execution are separate explicit acts.",

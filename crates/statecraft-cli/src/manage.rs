@@ -291,6 +291,7 @@ mod tests {
                 writes: vec![],
                 withheld: vec![],
                 adopted: vec![],
+                mutations: vec![],
                 conformance: None,
                 bridge: None,
                 delivery: vec![],
@@ -301,6 +302,7 @@ mod tests {
         assert_eq!(wrap(report(flow::Outcome::Complete)).exit, Exit::Ok);
         assert_eq!(wrap(report(flow::Outcome::Partial)).exit, Exit::Finding);
         assert_eq!(wrap(report(flow::Outcome::Refused)).exit, Exit::Refused);
+        assert_eq!(wrap(report(flow::Outcome::Failed)).exit, Exit::Failed);
     }
 
     #[test]

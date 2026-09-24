@@ -105,7 +105,7 @@ impl Fixture {
         f.git(&["commit", "--quiet", "-m", "base"]);
         executable(
             &f.bin().join("spec-spine"),
-            "#!/bin/sh\ncase \"$*\" in\n  --version) echo 'spec-spine 0.20.0' ;;\n  check|'check --help') exit 0 ;;\n  *) exit 3 ;;\nesac\n",
+            "#!/bin/sh\ncase \"$*\" in\n  --version) echo 'spec-spine 0.20.0' ;;\n  check|'check --help') exit 0 ;;\n  compile|index) exit 0 ;;\n  *) exit 3 ;;\nesac\n",
         );
         let recorded = Path::new(env!("CARGO_MANIFEST_DIR"))
             .join("../statecraft-adapter-claude-code/testdata/stream/success.jsonl");
