@@ -765,6 +765,40 @@ fn a_candidate_cannot_drop_a_job_from_the_set_that_judges_it() {
     assert!(ran.text.contains(POLICY), "{}", ran.text);
 }
 
+/// The authority-change report compares the candidate with its fork point,
+/// not with the base's tip: a base that moved on after the branch was cut,
+/// changing a file of the profile, is not reported as this candidate's change
+/// (the third live AI review of #138, finding 1).
+#[test]
+fn an_advanced_base_is_not_reported_as_the_candidates_authority_change() {
+    let mut repo = Repo::new(&[POLICY, "scripts/statecraft/ci-gate.sh"], &[]);
+    let root = repo.root().to_path_buf();
+    git(&root, &["checkout", "--quiet", "main"]);
+    let gate = std::fs::read_to_string(root.join("scripts/statecraft/ci-gate.sh")).unwrap();
+    write(
+        &root,
+        "scripts/statecraft/ci-gate.sh",
+        &format!("{gate}# a later change on the base\n"),
+    );
+    git(&root, &["add", "scripts/statecraft/ci-gate.sh"]);
+    git(&root, &["commit", "--quiet", "-m", "the base moves on"]);
+    repo.base = git(&root, &["rev-parse", "HEAD"]);
+    git(&root, &["checkout", "--quiet", "topic"]);
+    let ran = run_gate(
+        &repo,
+        "pull_request",
+        &needs(&ALL_OK, Some("no-findings"), false),
+        "topic",
+    );
+    assert_eq!(ran.exit, 0, "{}", ran.text);
+    assert!(
+        ran.text.contains("ci-gate.sh: read at the base"),
+        "{}",
+        ran.text
+    );
+    assert!(!ran.text.contains("authority change"), "{}", ran.text);
+}
+
 #[test]
 fn the_adoption_reads_the_candidate_and_says_so() {
     let repo = Repo::new(&[], &[]);
