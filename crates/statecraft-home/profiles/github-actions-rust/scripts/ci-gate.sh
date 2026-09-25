@@ -34,11 +34,20 @@
 # HEAD_REF (the pull request head ref; empty on push). On merge_group also
 # GROUP_HEAD_REF (the queue branch, `.../pr-<n>-<sha>`), REPO and GH_TOKEN,
 # which read the recorded review through the API.
-set -euo pipefail
+#
+# The family exit contract (revision 7): 0 passed, 1 blocked (a finding), 2
+# refused (a precondition the gate cannot judge past), 3 usage (an input is
+# missing), 4 failed. A command that fails outside a test is an operation
+# that broke: the ERR trap reports it as 4, whatever its own code was.
+set -eEuo pipefail
+trap 'echo "ci-gate: a command failed (exit $?) at line ${LINENO}; reported as failed (4)" >&2; exit 4' ERR
 
-: "${NEEDS_JSON:?ci-gate.sh needs NEEDS_JSON}"
-: "${EVENT_NAME:?ci-gate.sh needs EVENT_NAME}"
-: "${HEAD_SHA:?ci-gate.sh needs HEAD_SHA}"
+for input in NEEDS_JSON EVENT_NAME HEAD_SHA; do
+  if [ -z "${!input:-}" ]; then
+    echo "ci-gate.sh needs ${input}" >&2
+    exit 3
+  fi
+done
 BASE_SHA="${BASE_SHA:-}"
 HEAD_REF="${HEAD_REF:-}"
 
@@ -53,10 +62,10 @@ say() {
   fi
 }
 
-# A precondition the gate cannot judge past: say why, and block.
+# A precondition the gate cannot judge past: say why, and refuse (2).
 stop() {
   say "BLOCK: $*"
-  exit 1
+  exit 2
 }
 
 # The trusted policy: the base's copy. A base without one is the adoption
@@ -164,6 +173,11 @@ recorded_review() {
   say "recorded review: #${pr} at ${pr_head}, run ${run}: ${recorded_result} (exception: ${recorded_exception})"
 }
 
+# The required jobs and their rules, read into a file first: a read that
+# failed inside a process substitution would be an empty set, and an empty
+# set passes (revision 7).
+jq -r --arg e "$EVENT_NAME" '.jobs | to_entries[] | select(.value.required) | [.key, .value[$e]] | @tsv' "$work/policy.json" > "$work/required"
+
 while IFS=$'\t' read -r job rule; do
   result="$(printf '%s' "$NEEDS_JSON" | jq -r --arg j "$job" 'if has($j) then .[$j].result else "vanished" end')"
   if [ "$result" = vanished ]; then
@@ -261,7 +275,7 @@ while IFS=$'\t' read -r job rule; do
       block "the policy names an unknown rule '${rule}' for '${job}'"
       ;;
   esac
-done < <(jq -r --arg e "$EVENT_NAME" '.jobs | to_entries[] | select(.value.required) | [.key, .value[$e]] | @tsv' "$work/policy.json")
+done < "$work/required"
 
 if [ "$release_candidate" = yes ]; then
   say "release candidate: ${HEAD_REF} matches ${pattern}"
