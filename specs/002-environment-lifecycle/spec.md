@@ -7920,6 +7920,145 @@ reason it gave. Nothing checks the floor in CI, which is how 1.85 survived;
 adding such a check is a change to the check suite and is left to the owner.
 spec-spine 0.26.0 declares 1.90, so adopting it raises this floor again.
 
+**2026-09-25: profile revision 7, one exit contract for every rendered
+script, and declared extra required jobs (owner, 2026-09-25).** Two owner
+decisions, one revision; everything else in revision 6 is unchanged.
+
+1. **The family exit contract.** Every script the profile renders, and every
+   `run:` step of its workflows, exits in the vocabulary spec `006` section 3.3
+   fixes for this product: 0 ok, 1 a finding, 2 refused (a precondition the
+   operator supplies was not met, and nothing was judged), 3 usage, 4 failed
+   (an operation that was attempted broke). The three known defects are
+   corrected: a `gate.sh` usage error exits 3 (was 64); a missing
+   `.tooling/bin/spec-spine` exits 2 (was 3), because an absent binary is a
+   prerequisite the operator installs, which is how section 3.23's translation
+   table already reads it; an absent or non-executable declared
+   authored-content script exits 2 (was 1), the same reasoning.
+
+   Every exit was inventoried, including the implicit paths. What changed:
+
+   | Script | Condition | Was | Now |
+   |---|---|---|---|
+   | `gate.sh` | usage, unknown mode | 64 | 3 |
+   | `gate.sh` | an input unset (`${X:?}`, the shell's own 1 or 2) | 1 or 2 | 3 |
+   | `gate.sh` | spec-spine not installed | 3 | 2 |
+   | `gate.sh` | declared authored-content script absent or not executable (here or at the base) | 1 | 2 |
+   | `gate.sh` | base commit unreadable | 1 | 2 |
+   | `gate.sh` | queue ref names no pull request; `text` given another event | 1 | 3 |
+   | `gate.sh` | a spec-spine verb (passed through) | its own | the table below |
+   | `gate.sh` | the authored-content script (passed through) | its own | 1 on any non-zero |
+   | `gate.sh` | a cargo verb failed (passed through, 101 for tests) | cargo's | 1 |
+   | `gate.sh` | no cargo on `PATH` | 1 | 2 |
+   | `gate.sh` | `cargo metadata` failed | 1 | 4 |
+   | `gate.sh`, `install-spec-spine.sh` | any other command `set -e` stopped on (git, gh, mktemp, `cargo install`) | its own | 4 |
+   | `install-spec-spine.sh` | no cargo; install failed; the installed binary does not answer | 127, 101, its own | 2, 4, 4 |
+   | `ci-gate.sh` | no policy; the policy states no rule for the event (`stop`) | 1 | 2 |
+   | `ci-gate.sh` | an input unset | 1 | 3 |
+   | `ci-gate.sh`, `ai-review.sh` | any command `set -e` stopped on | its own | 4 |
+   | `ai-review.sh` | credential unset; the provider refused it; the head moved | 1 | 2 |
+   | `ai-review.sh` | the review was attempted and produced no review of this subject | 1 | 4 |
+   | workflow "Read the gate at the base" | base commit unreadable | 1 | 2 |
+
+   Unchanged: `ci-gate.sh` blocks with 1, a finding, as do a base that is not
+   the default branch, a refused commit in the walk and a violation the
+   authored-content script finds; `pin` and an absent or ranged pin in the
+   installer already refused with 2.
+
+   **Child codes are translated, never passed through.** Each deliberate
+   non-zero exit is a literal. The sh scripts carry an EXIT trap that reports
+   any other ending as 4, and every deliberate exit clears it first (`leave`);
+   the bash scripts run under `set -eEuo pipefail` with an ERR trap that exits
+   4. So a command that broke is 4 whatever its own code was, and no child's
+   code leaves a script untranslated. spec-spine's codes are translated by one
+   table in `gate.sh` (`spec_spine`), under the 0.25.0 pin: 0 is 0; 1 (a
+   validation failure, or coupling drift) is 1; 2 (stale) is 1, a finding; 3
+   (I/O, parse, schema, config or usage, which includes a pin the binary does
+   not satisfy) is 4, as section 3.23's table reads it; any other code is 4.
+   spec-spine 0.26.0 moves stale to 1 and a pin mismatch to 2 and adds 4
+   failed; its adoption rewrites those rows of that one table and nothing
+   else. cargo's codes do not separate a failing test from a failing tool (101
+   is both), so a cargo verb that ran and failed is a finding; the declared
+   authored-content script is the project's, with its own codes, so any
+   non-zero answer from it is a finding.
+
+   Two latent defects the inventory found are closed with it. `gate.sh
+   couple-group` piped `git diff` and `gh api` into `sort` in a shell without
+   `pipefail`, so a failed read was an empty path list, and an empty group
+   list honoured the pull request's waiver; each read is now its own command.
+   `ci-gate.sh` read its required jobs through a process substitution, whose
+   failure is not seen, and an empty set passes; the set is now read into a
+   file first.
+
+   **The hooks keep the hook protocol, and the conflict is recorded.** Claude
+   Code reads a hook's exit 2 as a block and any other non-zero as a
+   non-blocking error. The family contract would give an enforcing gate's
+   finding (a stale tree, a coupling failure) exit 1, which Claude Code does
+   not block on, so the operation the gate stands in front of would run: that
+   breaks section 3.23's contract 6. The protocol wins. The four shipped hooks
+   exit only 0 or 2, both codes the family also names, and are unchanged: the
+   pre-bash gates block with 2 on every refusal and every finding, and the
+   advisory hooks (session start, post-edit, stop) report every answer with 0,
+   which is the Stop policy. None runs under `set -e` and each ends on `true`,
+   so none can end on a command's own code.
+
+2. **Declared extra required jobs.** An adopter can have checks beyond the
+   profile's that must stay required. Rahi, measured read-only on 2026-09-25:
+   its `ci.yml` holds its `ci-gate` with `govern` (a reusable workflow call),
+   `cargo` and `deny` (cargo-deny); `live.yml`, `release.yml` and `image.yml`
+   are separate workflows it keeps outside its gate by its own decisions.
+   The rendered `statecraft-ci.yml` is managed, so a project cannot add a job
+   to it by hand, and `ci-gate` cannot `needs:` a job in another workflow file.
+   The parameter is therefore `ci.extra_required_jobs`, a list of
+   `{"job": <id>, "workflow": ".github/workflows/<file>.yml"}`: each entry is
+   rendered as a job of `statecraft-ci.yml` that calls the project's own
+   reusable workflow (`on: workflow_call`), `ci-gate` needs it, and the policy
+   requires it on every event with the `required` rule, so failed, cancelled,
+   skipped and vanished all block exactly as for the profile's own jobs. A job
+   id is GitHub's shape, unique, and none of the profile's own
+   (`governance`, `code`, `ai-review`, `review-exception`, `ci-gate`); a
+   workflow is a `.yml` or `.yaml` file directly under `.github/workflows/`
+   (GitHub calls nothing deeper), not one the profile renders, and must exist
+   when the plan is made. No secret is passed and the workflow's default
+   permissions (`contents: read`) apply; a job that needs more is a later
+   revision's parameter. The called workflow is under `.github/workflows/`,
+   so revision 6 already puts it in the authority set. What `ci-gate` judges
+   is the calling job's result as GitHub reports it: a condition the project
+   writes inside its called workflow is the project's, and a check that must
+   stay required should not skip itself there. With nothing declared,
+   `ci-gate` needs exactly revision 6's four jobs. For rahi,
+   `deny` fits as declared (moved into a reusable workflow); its `cargo` job is
+   what the profile's `code` job already runs. Adopting it there is rahi's
+   change and the owner's decision.
+
+3. **The exact-pin default for new projects is not in this revision.** It
+   waits for spec-spine 0.26.0's
+   `scaffold_init_opts_json(cfg, {"pinExactVersion": true})`, which is the
+   governance producer's scaffold (`producer.rs`), not a profile byte. A
+   profile revision is content-addressed, and leaving 7 open to change later
+   would give one revision two identities, so revision 7 is closed at this
+   identity. The pin default lands with the 0.26.0 adoption as a producer
+   change; if it turns out to need a profile byte, that is revision 8.
+
+Acceptance obligations, as tests. `setup_workflows.rs`:
+`every_exit_a_rendered_script_states_is_in_the_family_contract` parses every
+rendered script and workflow step for exit statements, requires each code in
+0 to 4, and requires the trap on each script and no `${X:?}` check;
+`the_rendered_gate_exits_in_the_family_contract` runs the rendered `gate.sh`
+for the three defects (3, 2, 2), every spec-spine translation row, cargo's
+three cases and a broken command (4);
+`the_rendered_installer_exits_in_the_family_contract`;
+`a_declared_extra_job_is_required_like_the_profiles_own` (rendering, policy,
+and failed, cancelled, skipped and vanished blocking);
+`inverting_a_required_job_branch_is_noticed_by_the_declared_job_cases`, the
+mutation obligation for declared jobs; the existing ci-gate and AI-review
+cases carry the new codes. `harness_hooks.rs`:
+`every_hook_exit_is_zero_or_the_protocols_block`. `setup_upgrade.rs`:
+`a_revision_six_project_upgrades_to_revision_seven`, from revision 6's
+`gate.sh` as shipped (#144), kept in
+`crates/statecraft-home/tests/support/profile-r6/`. `setup.rs`:
+`extra_required_jobs_are_validated`. The upgrade is one re-render and an
+authority change, so it waits for the owner's approval once.
+
 **2026-09-25: one environment variable selects the spec-spine binary (owner
 Addendum 2, item N; amends section 3.23 contract 2 rules 2 and 5). Proposed
 2026-09-24; adopted by the owner, 2026-09-25.** The owner's words: "#119 N

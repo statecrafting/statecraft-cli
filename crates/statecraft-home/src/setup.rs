@@ -35,7 +35,7 @@ use std::path::Path;
 /// The one registered profile.
 pub const PROFILE_ID: &str = "github-actions-rust";
 /// Its revision.
-pub const REVISION: u32 = 6;
+pub const REVISION: u32 = 7;
 /// Where the rendered policy document lives in the target.
 pub const POLICY_PATH: &str = ".statecraft/setup/github-actions-rust.json";
 /// The resume record, under the project's runtime state.
@@ -76,6 +76,18 @@ const AUTHORED_CONTENT_DECLARED_SINCE: u32 = 4;
 const DEFAULT_DIFF_CAP: u64 = 2000;
 const MAX_DIFF_CAP: u64 = 20000;
 const DEFAULT_RELEASE_PATTERN: &str = "release/*";
+/// Where a declared extra required job's reusable workflow lives (revision
+/// 7): GitHub calls a reusable workflow only from this directory, never from
+/// a subdirectory of it.
+const WORKFLOW_DIR: &str = ".github/workflows/";
+/// The job ids the profile renders, which a declared extra job may not reuse.
+const PROFILE_JOB_IDS: [&str; 5] = [
+    "governance",
+    "code",
+    "ai-review",
+    "review-exception",
+    "ci-gate",
+];
 
 /// A rendered file's role.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -320,6 +332,7 @@ pub fn remote_obligations() -> Vec<String> {
         format!("revision 5: a candidate never judges itself with its own gate. gate.sh, install-spec-spine.sh and the declared authored-content script run as they exist at the base, and a pull request that changes the authority set (the rendered workflows, scripts/statecraft/*, the policy, the declared authored-content script) blocks ci-gate until the owner approves the Environment {EXCEPTION_ENVIRONMENT} for that run. Every re-render of the profile, and every change to a file of the authority set, therefore needs the owner's approval once"),
         "the upgrade from revision 4 to 5 is one pull request judged by the base's revision-4 ci-gate, which reports the authority change and does not block it, so the owner's approval of that pull request is procedural: approve it before merging (revision 5)".to_string(),
         "revision 6: every file under .github/workflows/ is in the authority set, rendered or not, so adding, changing or removing any workflow needs the owner's approval once; a workflow the profile does not render could otherwise report a check named ci-gate".to_string(),
+        "revision 7: every rendered script exits in one family contract, 0 ok, 1 finding, 2 refused, 3 usage, 4 failed; a missing spec-spine or a missing declared authored-content script now refuses with 2, a usage error is 3, and a command that broke is 4. A job the project must keep required is declared in ci.extra_required_jobs as a reusable workflow under .github/workflows/ (on: workflow_call); ci-gate needs it and blocks on failed, cancelled and skipped exactly as for its own jobs".to_string(),
         "a repository that already runs these checks by hand keeps them by setting governance.enforce_coverage (index coverage --fail-on-untraced), governance.authored_content (the script's path; absent or not executable refuses), governance.authored_content_text (the title, the body and every commit message), governance.gate_each_commit (each commit's tree passes the gate and cargo fmt) and governance.require_signed_commits (each commit verified as signed by GitHub) (revision 4)".to_string(),
     ]
 }
@@ -355,6 +368,112 @@ pub struct Parameters {
     /// `governance.require_default_base`: a pull request whose base is not
     /// the default branch fails governance (rule 5).
     pub require_default_base: bool,
+    /// `ci.extra_required_jobs`: jobs beyond the profile's that ci-gate
+    /// requires, each a call of the project's own reusable workflow
+    /// (revision 7).
+    pub extra_required_jobs: Vec<ExtraJob>,
+}
+
+/// One declared extra required job (revision 7): a job id the rendered
+/// workflow defines as a call of the project's reusable workflow, which
+/// ci-gate needs and the policy requires on every event.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct ExtraJob {
+    /// The job id, in the rendered `statecraft-ci.yml`.
+    pub job: String,
+    /// The reusable workflow it calls, repository-relative, directly under
+    /// `.github/workflows/`.
+    pub workflow: String,
+}
+
+/// Validate `ci.extra_required_jobs`: a list of `{"job", "workflow"}`
+/// objects. A job id is GitHub's job-id shape, unique, and none of the
+/// profile's own; a workflow is an existing `.yml` or `.yaml` file directly
+/// under `.github/workflows/`, and not one the profile renders.
+fn extra_required_jobs(root: &Path, value: &serde_json::Value) -> Result<Vec<ExtraJob>, String> {
+    const KEY: &str = "ci.extra_required_jobs";
+    let list = value
+        .as_array()
+        .ok_or_else(|| format!("{KEY} must be a list of {{\"job\", \"workflow\"}} objects"))?;
+    let mut out: Vec<ExtraJob> = Vec::new();
+    for item in list {
+        let obj = item
+            .as_object()
+            .ok_or_else(|| format!("{KEY} entries must be {{\"job\", \"workflow\"}} objects"))?;
+        if let Some(other) = obj.keys().find(|k| *k != "job" && *k != "workflow") {
+            return Err(format!("{KEY}: unknown key `{other}`"));
+        }
+        let field = |name: &str| {
+            obj.get(name)
+                .and_then(|v| v.as_str())
+                .ok_or_else(|| format!("{KEY} entries need a string `{name}`"))
+        };
+        let (job, workflow) = (field("job")?, field("workflow")?);
+        let job_ok = job.len() <= 100
+            && job
+                .chars()
+                .next()
+                .is_some_and(|c| c.is_ascii_alphabetic() || c == '_')
+            && job
+                .chars()
+                .all(|c| c.is_ascii_alphanumeric() || matches!(c, '_' | '-'));
+        if !job_ok {
+            return Err(format!("{KEY}: `{job}` is not a GitHub job id"));
+        }
+        if PROFILE_JOB_IDS.contains(&job) {
+            return Err(format!("{KEY}: `{job}` is a job the profile renders"));
+        }
+        if out.iter().any(|e| e.job == job) {
+            return Err(format!("{KEY}: `{job}` is declared twice"));
+        }
+        let name = workflow.strip_prefix(WORKFLOW_DIR).unwrap_or("");
+        let wf_ok = safe_path_chars(workflow)
+            && !name.is_empty()
+            && !name.contains('/')
+            && !name.starts_with('.')
+            && (name.ends_with(".yml") || name.ends_with(".yaml"));
+        if !wf_ok {
+            return Err(format!(
+                "{KEY}: `{workflow}` is not a workflow file directly under {WORKFLOW_DIR}"
+            ));
+        }
+        if Profile::registered()
+            .templates
+            .iter()
+            .any(|t| t.path == workflow)
+        {
+            return Err(format!(
+                "{KEY}: `{workflow}` is a workflow the profile renders"
+            ));
+        }
+        if !root.join(workflow).is_file() {
+            return Err(format!(
+                "{KEY}: `{workflow}` does not exist; write the reusable workflow (on: workflow_call) first"
+            ));
+        }
+        out.push(ExtraJob {
+            job: job.to_string(),
+            workflow: workflow.to_string(),
+        });
+    }
+    Ok(out)
+}
+
+/// The rendered jobs and `needs` entries for the declared extra jobs: empty
+/// when none is declared, so a project without any renders what it did.
+fn extra_job_text(jobs: &[ExtraJob]) -> (String, String) {
+    let defs = jobs
+        .iter()
+        .map(|e| {
+            format!(
+                "\n  {job}:\n    name: {job}\n    uses: ./{wf}\n",
+                job = e.job,
+                wf = e.workflow
+            )
+        })
+        .collect();
+    let needs = jobs.iter().map(|e| format!(", {}", e.job)).collect();
+    (defs, needs)
 }
 
 impl Parameters {
@@ -371,6 +490,7 @@ impl Parameters {
             gate_each_commit: false,
             require_signed_commits: false,
             require_default_base: true,
+            extra_required_jobs: Vec::new(),
         }
     }
 }
@@ -406,6 +526,7 @@ pub fn parameters(
             "governance.gate_each_commit" => p.gate_each_commit = flag(key, value)?,
             "governance.require_signed_commits" => p.require_signed_commits = flag(key, value)?,
             "governance.require_default_base" => p.require_default_base = flag(key, value)?,
+            "ci.extra_required_jobs" => p.extra_required_jobs = extra_required_jobs(root, value)?,
             "governance.authored_content" => {
                 let v = value
                     .as_str()
@@ -1199,6 +1320,9 @@ pub fn plan(inputs: &Inputs<'_>) -> Result<Plan, String> {
         "governance.authored_content",
         params.authored_content.clone().unwrap_or_default(),
     );
+    let (extra_jobs, extra_needs) = extra_job_text(&params.extra_required_jobs);
+    values.insert("ci.extra_jobs", extra_jobs);
+    values.insert("ci.extra_needs", extra_needs);
     let owned_paths: Vec<&str> = profile
         .templates
         .iter()
@@ -1337,6 +1461,19 @@ pub fn plan(inputs: &Inputs<'_>) -> Result<Plan, String> {
     policy["review"]["release_branch_pattern"] = serde_json::json!(params.release_branch_pattern);
     let commands = commands_for(&params);
     policy["commands"] = commands.clone();
+    // Revision 7: a declared extra job is required on every event, by the
+    // same rule as the profile's own required jobs.
+    for e in &params.extra_required_jobs {
+        policy["jobs"][e.job.as_str()] = serde_json::json!({
+            "required": true,
+            "optional": false,
+            "declared": "ci.extra_required_jobs",
+            "workflow": e.workflow,
+            "pull_request": "required",
+            "push": "required",
+            "merge_group": "required",
+        });
+    }
     policy["files"] = serde_json::json!(
         files
             .iter()
@@ -2091,6 +2228,84 @@ mod tests {
             ])
         );
         assert_eq!(c["governance"][4], serde_json::json!(["scripts/check.sh"]));
+    }
+
+    #[test]
+    fn extra_required_jobs_are_validated() {
+        let dir = tempfile::tempdir().unwrap();
+        let wf = dir.path().join(".github/workflows");
+        std::fs::create_dir_all(&wf).unwrap();
+        std::fs::write(wf.join("deny.yml"), "on:\n  workflow_call:\n").unwrap();
+        let with = |v: serde_json::Value| {
+            let mut m = BTreeMap::new();
+            m.insert("ci.extra_required_jobs".to_string(), v);
+            parameters(dir.path(), &m, ".statecraft/derived")
+        };
+        let job = |j: &str, w: &str| serde_json::json!([{"job": j, "workflow": w}]);
+        let ok = with(job("deny", ".github/workflows/deny.yml")).unwrap();
+        assert_eq!(
+            ok.extra_required_jobs,
+            vec![ExtraJob {
+                job: "deny".into(),
+                workflow: ".github/workflows/deny.yml".into()
+            }]
+        );
+        assert!(
+            with(serde_json::json!([]))
+                .unwrap()
+                .extra_required_jobs
+                .is_empty()
+        );
+        for (bad, why) in [
+            (serde_json::json!("deny"), "must be a list"),
+            (serde_json::json!(["deny"]), "objects"),
+            (serde_json::json!([{"job": "deny"}]), "a string `workflow`"),
+            (
+                serde_json::json!([{"job": "deny", "workflow": ".github/workflows/deny.yml", "if": "x"}]),
+                "unknown key",
+            ),
+            (
+                job("1deny", ".github/workflows/deny.yml"),
+                "not a GitHub job id",
+            ),
+            (
+                job("de ny", ".github/workflows/deny.yml"),
+                "not a GitHub job id",
+            ),
+            (
+                job("ci-gate", ".github/workflows/deny.yml"),
+                "the profile renders",
+            ),
+            (
+                job("code", ".github/workflows/deny.yml"),
+                "the profile renders",
+            ),
+            (job("deny", "deny.yml"), "directly under"),
+            (
+                job("deny", ".github/workflows/sub/deny.yml"),
+                "directly under",
+            ),
+            (job("deny", ".github/workflows/../x.yml"), "directly under"),
+            (job("deny", ".github/workflows/deny.txt"), "directly under"),
+            (
+                job("deny", ".github/workflows/statecraft-ci.yml"),
+                "the profile renders",
+            ),
+            (
+                job("deny", ".github/workflows/absent.yml"),
+                "does not exist",
+            ),
+            (
+                serde_json::json!([
+                    {"job": "deny", "workflow": ".github/workflows/deny.yml"},
+                    {"job": "deny", "workflow": ".github/workflows/deny.yml"}
+                ]),
+                "declared twice",
+            ),
+        ] {
+            let err = with(bad.clone()).unwrap_err();
+            assert!(err.contains(why), "{bad}: {err}");
+        }
     }
 
     #[test]

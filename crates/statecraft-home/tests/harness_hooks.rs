@@ -2046,6 +2046,43 @@ fn pin_a_managed_session_without_the_supervisors_path_is_only_version_checked() 
     }
 }
 
+#[path = "support/exits.rs"]
+mod exits;
+
+/// Profile revision 7's family exit contract (0 ok, 1 finding, 2 refused, 3
+/// usage, 4 failed) meets the hook protocol here, and the protocol wins (spec
+/// 002 section 5, 2026-09-25). Claude Code reads a hook's exit 2 as a block
+/// and any other non-zero as a non-blocking error, so an enforcing gate's
+/// finding must exit 2, not 1, or the operation it stands in front of runs
+/// (contract 6); and an advisory hook reports every answer with 0 (the Stop
+/// policy). Every exit a shipped hook states is therefore 0 or 2, both of
+/// which the family contract also names, and no hook can end on a code of
+/// its own: none runs under `set -e`, and each ends on `true`.
+#[test]
+fn every_hook_exit_is_zero_or_the_protocols_block() {
+    let mut seen = 0;
+    for file in ALL {
+        let body = hook_body(file);
+        for e in exits::exit_statements(&body) {
+            seen += 1;
+            assert_eq!(e.verb, "exit", "{file}:{}", e.line);
+            assert!(
+                e.code == "0" || e.code == "2",
+                "{file}:{}: exit {} is neither 0 nor the protocol's block",
+                e.line,
+                e.code
+            );
+        }
+        assert!(
+            !body.lines().any(|l| l.trim_start().starts_with("set -e")),
+            "{file}: set -e would end the hook on a command's own code"
+        );
+        let last = body.lines().rev().find(|l| !l.trim().is_empty()).unwrap();
+        assert_eq!(last.trim(), "true", "{file}");
+    }
+    assert!(seen >= 20, "found only {seen} exit statements");
+}
+
 // ---------------------------------------------------------------------------
 // One variable selects the binary (spec 002 section 5, 2026-09-25).
 // ---------------------------------------------------------------------------
