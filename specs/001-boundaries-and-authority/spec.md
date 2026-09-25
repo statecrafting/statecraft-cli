@@ -778,7 +778,8 @@ delegation (#111) once this split is adopted.
 2. The 0.26.0 migration (adoption, the exit and JSON contract amendment of
    spec `006`, the one-identity rule) lands before any relocation, so the
    relocations do not race the code it changes.
-3. Relocation R1: `009` producer adoption (3.15 and its entries), the smallest
+3. (Held until spec-spine 0.27.0 is adopted, per the adoption note above.)
+   Relocation R1: `009` producer adoption (3.15 and its entries), the smallest
    seam, to prove the method.
 4. Relocation R2: `008` harness, hooks and skills.
 5. `007` is drafted from the bundle entry by relocation (the distribution
