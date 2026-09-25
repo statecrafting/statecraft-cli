@@ -1064,7 +1064,7 @@ completions.
 | Verb help | one generated list; per-verb help is a line, not argument docs | per-verb and per-flag help generated from the same definitions |
 | Error messages | consistent for an unknown verb; per-verb usage lines written by hand, 11 of them, and not all flags are named in them | uniform ("unexpected argument", "a value is required", suggestions for typos) |
 | Shell completions | none | `clap_complete` generates bash, zsh, fish, PowerShell |
-| Usage exit code | 3, section 3.3 | clap exits **2** on a usage error by default. Keeping 3 requires `try_parse` and mapping `clap::Error` to `Exit::Usage` ourselves, and `--help`/`--version` (clap's `DisplayHelp`) to 0 |
+| Usage exit code | 3, section 3.3 | clap exits **2** on a usage error by default. Keeping 3 requires `try_parse` and mapping `clap::Error` to `Exit::Usage` ourselves, and `--help` and `--version` (clap's `DisplayHelp` and `DisplayVersion` kinds) to 0 |
 | `--json` anywhere | explicit | a `global = true` flag; same behavior |
 | `run <spec-id>` beside `run list|show|reconcile` | reserved words stated in `Verb::parse` | expressible (`args_conflicts_with_subcommands`), but the reservation must be restated and tested |
 | JSON on usage errors | stderr text only | the same unless we render clap's error into the family envelope (see the family exit and JSON contract proposal, draft #118) |
