@@ -608,12 +608,13 @@ mod tests {
 
     // A script written and then exec'd by the same process can race `ETXTBSY`
     // on Linux; the stubs are written to a temporary name and renamed.
+    /// A stub written through the adapter's fixture, which copies it into
+    /// place in a child process: a file this process wrote and then renamed
+    /// can still be open for writing in a sibling test's forked child, and
+    /// executing it then fails with `ETXTBSY`, which `admits` reads as a read
+    /// not performed.
     fn install(at: &Path, script: &str) {
-        use std::os::unix::fs::PermissionsExt;
-        let staged = at.with_extension("staged");
-        std::fs::write(&staged, script).unwrap();
-        std::fs::set_permissions(&staged, std::fs::Permissions::from_mode(0o755)).unwrap();
-        std::fs::rename(&staged, at).unwrap();
+        statecraft_adapter::fixture::install_script(at, script, 0o755).unwrap();
     }
 
     fn pinned(root: &Path, pin: Option<&str>) {
