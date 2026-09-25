@@ -25,6 +25,12 @@ pub const HOME_ENV: &str = "STATECRAFT_HOME";
 pub const HOME_DIR: &str = ".statecraft";
 
 /// The schema version of the files this module owns.
+///
+/// Spec 002 section 5, 2026-09-25, on spec 006's JSON convention: `home.json`
+/// and `tools.json` are **strict within this version**. A member this build
+/// does not know is refused under version 1, naming the member; a file that
+/// declares another version is refused by that version before any member is
+/// read, so a newer file never reads as a malformed one.
 pub const HOME_VERSION: u32 = 1;
 
 /// Where the product home is for this process.
@@ -143,7 +149,7 @@ impl Layout {
 /// else. It is deliberately a flat map of strings, because a richer shape here
 /// would be a second settings engine.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct Personal {
     /// Schema version.
     pub version: u32,
@@ -171,7 +177,7 @@ impl Default for Personal {
 /// identity that actually resolved. Recording only the request is how a report
 /// says `=0.20.0` about a machine running something else.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct ToolRecord {
     /// The tool's name, for example `spec-spine`.
     pub name: String,
@@ -193,7 +199,7 @@ pub const NOT_RECORDED: &str = "not-recorded";
 
 /// Installed tools and the harness revisions present.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct Tools {
     /// Schema version.
     pub version: u32,
@@ -269,8 +275,20 @@ pub enum HomeError {
     },
 }
 
+/// Only the version member, read tolerantly, so the version is known before
+/// the strict reading of the rest.
+#[derive(Deserialize)]
+struct Declared {
+    version: u32,
+}
+
 /// Read a JSON document this module owns, defaulting when it is absent.
-fn read_versioned<T>(path: &Path, version_of: fn(&T) -> u32) -> Result<T, HomeError>
+///
+/// The version is read first and tolerantly: a file written by a newer build
+/// is refused as [`HomeError::UnknownVersion`], naming the version it
+/// declares, and never as [`HomeError::Malformed`] for a member that version
+/// added. Only a file that declares this build's version is read strictly.
+fn read_versioned<T>(path: &Path) -> Result<T, HomeError>
 where
     T: serde::de::DeserializeOwned + Default,
 {
@@ -284,18 +302,20 @@ where
             });
         }
     };
-    let value: T = serde_json::from_slice(&bytes).map_err(|source| HomeError::Malformed {
+    let malformed = |source| HomeError::Malformed {
         path: path.to_path_buf(),
         source,
-    })?;
-    let found = version_of(&value);
+    };
+    let found = serde_json::from_slice::<Declared>(&bytes)
+        .map_err(malformed)?
+        .version;
     if found != HOME_VERSION {
         return Err(HomeError::UnknownVersion {
             path: path.to_path_buf(),
             found,
         });
     }
-    Ok(value)
+    serde_json::from_slice(&bytes).map_err(malformed)
 }
 
 /// Write a JSON document this module owns, pretty and newline-terminated.
@@ -320,7 +340,7 @@ fn write_json<T: Serialize>(path: &Path, value: &T) -> Result<(), HomeError> {
 impl Personal {
     /// Read the personal defaults, or the empty set when there are none.
     pub fn read(layout: &Layout) -> Result<Self, HomeError> {
-        read_versioned(&layout.personal_file(), |p: &Personal| p.version)
+        read_versioned(&layout.personal_file())
     }
 
     /// Write the personal defaults.
@@ -332,7 +352,7 @@ impl Personal {
 impl Tools {
     /// Read the tools record, or the empty one when there is none.
     pub fn read(layout: &Layout) -> Result<Self, HomeError> {
-        read_versioned(&layout.tools_file(), |t: &Tools| t.version)
+        read_versioned(&layout.tools_file())
     }
 
     /// Write the tools record.
@@ -479,6 +499,68 @@ mod tests {
             Err(HomeError::UnknownVersion { found, .. }) => assert_eq!(found, 99),
             other => panic!("expected UnknownVersion, got {other:?}"),
         }
+    }
+
+    #[test]
+    fn an_unknown_member_under_the_current_version_is_refused_by_name() {
+        let dir = tempfile::tempdir().unwrap();
+        let layout = Layout::new(dir.path());
+        std::fs::write(
+            layout.personal_file(),
+            r#"{"version":1,"defaults":{},"theme":"dark"}"#,
+        )
+        .unwrap();
+        match Personal::read(&layout) {
+            Err(HomeError::Malformed { source, .. }) => {
+                assert!(source.to_string().contains("`theme`"), "{source}")
+            }
+            other => panic!("expected Malformed naming the member, got {other:?}"),
+        }
+        std::fs::write(
+            layout.tools_file(),
+            r#"{"version":1,"tools":[{"name":"a","requested":"1","resolved":"1","observedFrom":"x","recordedAt":"t","extra":1}],"harnessRevisions":[]}"#,
+        )
+        .unwrap();
+        match Tools::read(&layout) {
+            Err(HomeError::Malformed { source, .. }) => {
+                assert!(source.to_string().contains("`extra`"), "{source}")
+            }
+            other => panic!("expected Malformed naming the member, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn a_newer_version_is_refused_by_its_version_not_by_its_new_members() {
+        let dir = tempfile::tempdir().unwrap();
+        let layout = Layout::new(dir.path());
+        std::fs::write(
+            layout.tools_file(),
+            r#"{"version":2,"tools":[],"harnessRevisions":[],"addedInTwo":true}"#,
+        )
+        .unwrap();
+        match Tools::read(&layout) {
+            Err(e @ HomeError::UnknownVersion { found: 2, .. }) => {
+                assert!(e.to_string().contains("declares version 2"), "{e}")
+            }
+            other => panic!("expected UnknownVersion 2, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn what_this_build_writes_reads_back_strictly() {
+        let dir = tempfile::tempdir().unwrap();
+        let layout = Layout::new(dir.path());
+        let mut t = Tools::default();
+        t.upsert(ToolRecord {
+            name: "spec-spine".into(),
+            requested: "any".into(),
+            resolved: "0.25.0".into(),
+            observed_from: "path".into(),
+            recorded_at: "2026-09-25T00:00:00Z".into(),
+        });
+        t.record_revision("h-1");
+        t.write(&layout).unwrap();
+        assert_eq!(Tools::read(&layout).unwrap(), t);
     }
 
     #[test]

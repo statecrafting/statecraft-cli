@@ -1034,6 +1034,183 @@ dropped because an interrupted removal had already taken its line back. A note
 never changes the exit. Additive under section 3.4.
 `tests/env_remove_bridge.rs` spawns the binary.
 
+**2026-09-24, adopted (owner, 2026-09-25): a JSON naming convention, and
+input documents that refuse unknown fields (owner Addendum 2, item N).**
+Written as a proposal on 2026-09-24; the owner adopted it on 2026-09-25, and
+the change that records the adoption implements it (the paragraphs after this
+entry, dated 2026-09-25). The text below is the proposal as adopted.
+
+*What the source says today* (main `17dbdb6`; the scan and the key list are in
+the session evidence). Of the serialized types in `crates/*/src`, 116 structs
+carry `rename_all = "camelCase"`, 63 structs have only one-word fields (the
+case does not show), and **55 structs carry snake_case field names** because
+they have no `rename_all`. Enums are consistent: 61 plain and 46 tagged enums
+use `rename_all = "kebab-case"`; the exceptions are 2 camelCase-tagged, 1
+snake_case-tagged, 1 lowercase and 4 untagged. The binary tests read 245
+distinct keys: 53 camelCase, 14 snake_case (`spec_spine`, `plan_id`,
+`evaluated_against`, `declared_by`, `manifest_digest`, `num_turns`,
+`permission_denials`, ...), the rest one word. So one document can mix both:
+`init apply --json` reports `observedSpecSpine` beside a manifest whose pins
+say `spec_spine`.
+
+Where the snake_case structs are: the environment manifest
+(`statecraft-environment/src/manifest.rs`: `Entry`, `Pins`, `Project`,
+`Transfer`, `Modification`, `Written`) and transfer records; the run record and
+journal (`statecraft-run`: `record::Entry`, `Attempt`, `Workspace`, `Policy`,
+`WorkItem`, `WorkList`); acceptance and evidence (`statecraft-acceptance`:
+`Receipt`, `SuiteEntry`, `ReviewableOutcome`, `VerifierRecord`;
+`statecraft-envelope`: `Dimensions`, `Root`, `RootSet`, `EvidenceVerdict`,
+`Reference`); and the provider mirror (`statecraft-adapter-claude-code/src/stream.rs`),
+whose names are the provider's.
+
+*Proposed convention.* Keys this product authors are **camelCase**; string
+enum values are **kebab-case**; a type whose names are someone else's (the
+provider's stream, the producer's report mirror in `producer.rs`) keeps that
+owner's names and says so in a comment. The persisted snake_case documents
+above are **grandfathered**, not renamed in place: renaming a key in a
+committed manifest or a hash-chained run record is a schema change for every
+existing file, so each moves only with a `schemaVersion` bump and a reader
+for the old version, as its owning spec decides.
+
+*Enforcing test (design, not implemented).* In `statecraft-cli`'s tests, one
+helper walks any `--json` value and asserts every object key matches
+`^[a-z][a-zA-Z0-9]*$` except under a named, shrinking exemption list (the
+grandfathered types' paths, the provider mirror); every binary test that
+parses `--json` output calls it, so the convention is checked on real output
+rather than on declarations. A second, source-level test lists every
+`Serialize` type without `rename_all` and fails when one appears outside the
+same exemption list, which catches a new type before any test prints it.
+
+*Refusing unknown fields in input documents: what it would break.* Today four
+types use `deny_unknown_fields` (`statecraft-run/src/overrides.rs`,
+`statecraft-adapter/src/coverage.rs`, two in the provider stream). Making the
+documents this product reads refuse unknown fields would:
+
+1. **Environment manifest** (`.statecraft/environment.json`): an older binary
+   reading a declaration written by a newer one would refuse instead of
+   ignoring the field. This week alone added `role`, `pins.producer`,
+   `project.setup` and transfer records, all additive and all read today by
+   older builds. Needs a `schemaVersion` check first, so the refusal says
+   "written by a newer version" rather than naming a field.
+2. **Run records and the journal**: the same, across every recorded run;
+   and a record is never rewritten, so an old binary could not read a run a
+   newer one wrote.
+3. **Evidence and receipts**: section 3.4 calls adding a field compatible;
+   refusing unknown fields in a portable receipt makes every additive field a
+   breaking one for verifiers. Strictness here is a spec `005` decision.
+4. **Producer report mirror** (`producer.rs`): deliberately tolerant, so the
+   producer can add a field without breaking this consumer; stays tolerant.
+5. **Bundle metadata**: not implemented yet; can be strict from its first
+   version at no cost.
+6. **Home settings, the registry, adapter manifests**: the same forward
+   incompatibility as 1, smaller in scope.
+
+Recommended: strict **within** a `schemaVersion`, with an unknown field under
+the current version refused and a newer version refused by name; items 4 kept
+tolerant; item 5 strict from birth; items 1 to 3 changed only with their
+owning spec's schema bump.
+
+**2026-09-25: the convention, implemented.** What the adopted entry above
+designed, and every choice it left open, decided here.
+
+*The walker.* `crates/statecraft-cli/tests/support/json_naming.rs` holds one
+helper that walks a parsed value and fails on any object key outside
+`^[a-z][a-zA-Z0-9]*$`, and **the one exemption list**, `GRANDFATHERED`, which
+names each grandfathered document, why it does not move now, its types and its
+keys. Every binary test that parses `--json` output parses it through that
+helper (`from_output` or `from_text`); a record read from disk is not `--json`
+output and is not walked. The first full run flagged 54 distinct keys; every
+one is either renamed below or named in the list.
+
+*The source scan.* `crates/statecraft-cli/tests/json_naming.rs` reads
+`crates/*/src/**/*.rs`, finds each item that derives `Serialize`, and computes
+the name serde writes for each field, variant and struct-variant field from
+`rename_all`, `rename_all_fields` and a member's own `rename`. A field must meet
+the key rule and a variant's name the value rule (kebab-case, one word
+included). This is the entry's "every `Serialize` type without `rename_all`",
+made exact: a type without `rename_all` whose fields are all one word writes
+conforming names and is not listed, and a struct variant's fields, which
+`rename_all` on an enum does not reach, are checked too (that is how
+`unrun_checks` and `session_id` were found). A second test refuses a list
+entry whose type no longer needs it, so the list only shrinks. A hand-written
+`Serialize` or a `json!` literal is invisible to the scan; the walker is what
+sees those.
+
+*The exemption list*, in full:
+
+1. The environment manifest and its transfer journal (spec `002`): committed
+   in every adopter, including the `project.setup` parameters.
+2. The transfer plan's `plan_id` (spec `002`, and this section's entry on
+   `transfer`): both specs name the field. The rest of the plan is renamed.
+3. The project register's qualification reasons that carry data
+   (`corpus-does-not-compile` and two siblings): persisted in `projects.json`,
+   written with the kebab-case variant name as the key.
+4. The setup profile's six results (`files-installed` and five more): spec
+   `002`'s results table names them as kebab-case identifiers.
+5. The startup and trial records (spec `002`): recorded and read back;
+   `session_id`, `hook_name` and `exit_code` copy the provider's hook-event
+   names, and `rel_path` names a required file.
+6. The run record and journal (spec `003`), with the work list the adopted entry
+   classed beside it.
+7. The adapter protocol, the posture recorded with every attempt, and the
+   qualification records in `qualifications.json` (spec `004`).
+8. The provider stream mirror (spec `004`).
+9. Acceptance and portable evidence (spec `005`), including the
+   `incomplete-evidence` key an admission refusal carries.
+
+The producer report mirror needs no entry: it is `Deserialize` only, prints
+nothing, and spec-spine's names are already camelCase.
+
+*Keys renamed*, because each is `--json` output only, is persisted nowhere
+(each type derives `Serialize` and not `Deserialize`, or is never written),
+and no other repository reads it. Under section 3.4 a rename removes a field,
+so this entry is the change to this spec that makes it:
+
+- `transfer plan`: `manifest_digest`, `recorded_without_journal`,
+  `journal_disagreements`, and in `current`, `recorded_digest`,
+  `matches_record`, `declared_by`, become `manifestDigest`,
+  `recordedWithoutJournal`, `journalDisagreements`, `recordedDigest`,
+  `matchesRecord`, `declaredBy`. `plan_id` stays.
+- The initialization report: `conformance.out_of_contract` becomes
+  `outOfContract`.
+- The settings answers: `supplied_by` and `constrained_by` in a resolved or
+  refused key, `digest_before` and `digest_after` in a removal, and
+  `content_token` and `target_digest` in a stale consent become camelCase;
+  `line_number` in an ignore-merge refusal becomes `lineNumber`.
+- Spec `004`'s `Negotiation` (`missing_required`), adapter `Manifest`
+  (`requires_commands`) and the Claude Code `Invocation` (`tool_restriction`,
+  `settings_document`) become camelCase. None is written to disk or printed
+  today; the source scan found them.
+
+The owning specs record their halves: spec `002` and spec `004` section 5,
+2026-09-25.
+
+*What was made strict.* `home.json` and `tools.json` in the product home, the
+only input documents in scope that carry a schema version: strict within
+version 1, a newer version refused by its number before any member is read
+(spec `002` section 5, 2026-09-25, with tests). Neither document has ever lost
+a member, so no file this product wrote is refused.
+
+*Not made strict, and why.*
+
+- **Bundle metadata:** does not exist. No crate reads or writes one, so there
+  is nothing to make strict; the adopted recommendation (strict from its first
+  version) binds whoever introduces it.
+- **The environment manifest, run records and the journal, evidence and
+  receipts** (items 1 to 3): changed only with their owning spec's schema bump,
+  as adopted.
+- **The producer report mirror** (item 4): stays tolerant, as adopted.
+- **The project register, `projects.json`:** carries no schema version, so an
+  unknown member could only be refused by naming it, which is the forward
+  incompatibility item 1 describes. It needs a version first; spec `002`'s.
+- **Qualification records, `qualifications.json`:** no schema version; the same
+  reason, spec `004`'s.
+- **Adapter manifests:** carry no schema version (their `version` is the
+  adapter binary's), and no adapter manifest is read from a file: each is
+  constructed in code. Nothing to refuse.
+- **`delivery.json` and `modifications.json` in the product home:** bare
+  arrays with no version, the same reason as the register.
+
 ## Verification
 
 Each line is one command. §3.7's rows are integration tests that **spawn the

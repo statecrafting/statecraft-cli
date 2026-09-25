@@ -7900,6 +7900,36 @@ before it merges, as revision 5's implementation entry says. From the next
 pull request on, a change to any authority-set file here blocks without that
 approval.
 
+**2026-09-25: spec `006`'s JSON naming convention, this spec's half (adopted by
+the owner on 2026-09-25; spec `006` section 5 of that date).** Two changes to
+this spec's crates, and what stays.
+
+*Renamed to camelCase*, each a `--json` answer only, written nowhere and read by
+no other repository: `transfer::Plan` and `transfer::Standing`
+(`manifestDigest`, `recordedWithoutJournal`, `journalDisagreements`,
+`recordedDigest`, `matchesRecord`, `declaredBy`), with **`plan_id` kept** by
+an explicit rename because this spec and spec `006` name it;
+`producer::Conformance` (`outOfContract`); and the struct-variant fields of
+`authority::Answer`, `ignore::Refusal`, `settings::Removal` and
+`settings::SettingsOutcome` (`rename_all_fields = "camelCase"`).
+
+*Strict within a version.* `home.json` and `tools.json` (`home::Personal`,
+`home::Tools`, `home::ToolRecord`) refuse an unknown member under version 1,
+naming it, and a file that declares another version is refused by that number
+before any member is read, so a file from a newer build never reads as a
+malformed one. Neither document has lost a member since it was introduced, so
+no file this product wrote is refused. Tests: `home::tests::an_unknown_member_under_the_current_version_is_refused_by_name`,
+`a_newer_version_is_refused_by_its_version_not_by_its_new_members` and
+`what_this_build_writes_reads_back_strictly`.
+
+*Grandfathered, not renamed:* the environment manifest and transfer journal
+(including `project.setup`'s parameters), the setup profile's six result names
+(this spec's results table names them in kebab-case), the register's
+data-carrying qualification reasons, and the startup and trial records.
+*Not made strict:* `projects.json`, `delivery.json` and `modifications.json`
+carry no schema version, so a refusal could only name a field; each needs a
+version first.
+
 ## Verification
 
 `--fail-on-untraced` joined the corpus gate with this spec's first

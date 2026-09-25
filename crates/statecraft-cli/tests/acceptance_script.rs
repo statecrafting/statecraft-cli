@@ -14,6 +14,9 @@
 
 #![cfg(unix)]
 
+#[path = "support/json_naming.rs"]
+mod json_naming;
+
 use std::path::{Path, PathBuf};
 use std::process::{Command, Output};
 
@@ -320,7 +323,7 @@ fn the_preflight_runs_the_run_path_and_reads_its_startup_evidence_back() {
     let read = |name: &str| std::fs::read_to_string(steps.join(name)).unwrap();
     assert_eq!(read("09-run.status"), "exit 0\n");
     assert_eq!(read("09-startup-show.status"), "exit 1\n");
-    let shown: serde_json::Value = serde_json::from_str(&read("09-startup-show.out")).unwrap();
+    let shown: serde_json::Value = json_naming::from_text(&read("09-startup-show.out")).unwrap();
     let v = &shown["value"]["value"];
     assert_eq!(v["verdict"], "unverified");
     let required = v["intent"]["requiredHarness"].as_str().unwrap();
