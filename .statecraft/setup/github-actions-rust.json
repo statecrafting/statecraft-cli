@@ -78,38 +78,38 @@
   },
   "files": [
     {
-      "digest": "c2fd19542d950352bfeb2adc6be3a527b2aede2d089e7c18e895fd1d775f36e9",
+      "digest": "945d16e4a1f0ffdb653c557becabd134891ac2bdc687b54f927179521ee16ea4",
       "path": ".github/workflows/statecraft-ci.yml",
       "role": "workflow"
     },
     {
-      "digest": "4fa41adee52551c51fccd9d2d5d4be176e433b8bfcb554c9ec91df39e27a80d3",
+      "digest": "c6edb0e19d2d4741e3cbcc9311670fc83a7dcec5799ab99dad8dc7111e219ead",
       "path": ".github/workflows/statecraft-ai-review.yml",
       "role": "workflow"
     },
     {
-      "digest": "34875ae336cc68cb73fedfd68d0b2ed30b090e1055b5ddf084200cb30daf0455",
+      "digest": "884508b615d4d94981f37f18e1970837b124cca60a08420dae6711aa99408888",
       "path": "scripts/statecraft/install-spec-spine.sh",
       "role": "script"
     },
     {
-      "digest": "8245d61879a3b6cc809fd9518cb86c1471d4420fe1f15ebef81b5e042002a3da",
+      "digest": "08447cb76b2cabf816b65efe8e305c0ea638f470a369d9102b111ba49127964d",
       "path": "scripts/statecraft/gate.sh",
       "role": "script"
     },
     {
-      "digest": "b5547b56f0f46524f12b2ef108a56e0e39971f4e7fdd0bcbd68a28d3b084f083",
+      "digest": "7d58f90a5820d23d1ca74f24d5ae9ad07f3712d47b6f73d0b84eb9eea7762171",
       "path": "scripts/statecraft/ci-gate.sh",
       "role": "script"
     },
     {
-      "digest": "d6f966ea51d6a32639adf79ec461ef90c48f08109b617dff6d1e4bb32d86a6a4",
+      "digest": "947269aaf37fc2510a01017b9edd20f4d81a04ad5013bed2cd1d9cfe41d63628",
       "path": "scripts/statecraft/ai-review.sh",
       "role": "script"
     }
   ],
   "id": "github-actions-rust",
-  "identity": "8ea41428995187dbd49555e5cddec56dd80beeda5f0f2213216d47b511f79f65",
+  "identity": "14a4be033a3797f2cfb0a585b43415398a171a81b897b8c9104f6dcdbec5baee",
   "jobs": {
     "ai-review": {
       "merge_group": "recorded-review",
@@ -168,7 +168,7 @@
   },
   "remote": [
     "Settings, Actions: Actions enabled; the workflow token read-only by default",
-    "the secret CLAUDE_CODE_OAUTH_TOKEN set by the operator (gh secret set CLAUDE_CODE_OAUTH_TOKEN); its value is never in a log, a file or a message",
+    "the secret ANTHROPIC_API_KEY or CLAUDE_CODE_OAUTH_TOKEN visible to the repository, set by the operator (gh secret set CLAUDE_CODE_OAUTH_TOKEN, or gh secret set ANTHROPIC_API_KEY); the review uses ANTHROPIC_API_KEY when it is set and CLAUDE_CODE_OAUTH_TOKEN otherwise (revision 8), and neither value is ever in a log, a file or a message",
     "branch protection on the default branch: require the status check ci-gate from GitHub Actions (app id 15368), and branches up to date",
     "branch protection on the default branch: required approvals 0, and require code-owner review, so ci-gate with the AI review approves ordinary changes and a change to the profile's files needs a review its author cannot give (S-3, R2-2)",
     "the Environment statecraft-review-exception with the owner as a required reviewer, for owner exceptions: a release candidate whose review was skipped (S-1), a pull request whose review returned findings (R2-1), and a pull request that changes the authority set (revision 5)",
@@ -202,5 +202,5 @@
     "tool": "claude-code",
     "tool_version": "2.1.116"
   },
-  "revision": 7
+  "revision": 8
 }
