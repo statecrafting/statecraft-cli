@@ -87,29 +87,26 @@ pub fn runs(chain: &Chain) -> Vec<Run> {
             // Spec 003 section 3.6.1 rule 4. Only a reconciliation written
             // under that section counts; an older shape releases nothing.
             Kind::Reconciliation => {
-                if let Some(r) = crate::reconcile::read(&entry) {
-                    if let Some(a) = run.attempts.iter_mut().find(|a| a.number == entry.attempt) {
-                        if a.outcome.is_none() {
-                            if r.conclusive() {
-                                a.outcome = Some(Outcome::Interrupted);
-                            }
-                            a.reconciliation = Some(r);
-                        }
+                if let Some(r) = crate::reconcile::read(&entry)
+                    && let Some(a) = run.attempts.iter_mut().find(|a| a.number == entry.attempt)
+                    && a.outcome.is_none()
+                {
+                    if r.conclusive() {
+                        a.outcome = Some(Outcome::Interrupted);
                     }
+                    a.reconciliation = Some(r);
                 }
             }
             Kind::Outcome if entry.subject == OUTCOME_SUBJECT => {
-                if let Some(word) = entry.detail.get("outcome").and_then(|v| v.as_str()) {
-                    if let Some(outcome) = outcome_from_word(word) {
-                        if let Some(a) = run.attempts.iter_mut().find(|a| a.number == entry.attempt)
-                        {
-                            // Written once. A second outcome record for a
-                            // concluded attempt is ignored rather than allowed
-                            // to rewrite one.
-                            if a.outcome.is_none() {
-                                a.outcome = Some(outcome);
-                            }
-                        }
+                if let Some(word) = entry.detail.get("outcome").and_then(|v| v.as_str())
+                    && let Some(outcome) = outcome_from_word(word)
+                    && let Some(a) = run.attempts.iter_mut().find(|a| a.number == entry.attempt)
+                {
+                    // Written once. A second outcome record for a
+                    // concluded attempt is ignored rather than allowed
+                    // to rewrite one.
+                    if a.outcome.is_none() {
+                        a.outcome = Some(outcome);
                     }
                 }
             }

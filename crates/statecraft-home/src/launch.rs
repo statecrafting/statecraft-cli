@@ -2613,10 +2613,10 @@ fn judge(r: &ReadBack<'_>) -> (Verdict, Vec<String>) {
             intent.attempt.run_id, intent.attempt.attempt
         ));
     }
-    if let Some(l) = r.launched {
-        if l.attempt != *r.identity || l.intent_digest != intent_digest {
-            unbound.push("the spawn confirmation is not this intent's".to_string());
-        }
+    if let Some(l) = r.launched
+        && (l.attempt != *r.identity || l.intent_digest != intent_digest)
+    {
+        unbound.push("the spawn confirmation is not this intent's".to_string());
     }
     if let Some(a) = r.admission {
         if a.attempt != *r.identity || a.intent_digest != intent_digest {
@@ -2713,10 +2713,10 @@ fn judge(r: &ReadBack<'_>) -> (Verdict, Vec<String>) {
     if standing_resolved != record.resolved_harness {
         unbound.push("the standing was evaluated against another resolution".to_string());
     }
-    if let HarnessObservation::Correlated { nonce, .. } = &launch.harness {
-        if *nonce != intent.nonce {
-            unbound.push("the acknowledgment's nonce is not this attempt's".to_string());
-        }
+    if let HarnessObservation::Correlated { nonce, .. } = &launch.harness
+        && *nonce != intent.nonce
+    {
+        unbound.push("the acknowledgment's nonce is not this attempt's".to_string());
     }
     if record.observation.observed() {
         unbound.push(format!(
@@ -2822,18 +2822,18 @@ fn judge(r: &ReadBack<'_>) -> (Verdict, Vec<String>) {
         return (Verdict::Interrupted, reasons);
     }
     // A version 2 record: no decision, and a mismatch refused after the fact.
-    if launch.admission.is_none() {
-        if let Standing::Mismatched { .. } = record.standing {
-            return (
-                Verdict::Mismatched,
-                vec![
-                    record.standing.refusal().unwrap_or_default(),
-                    "written before section 3.32: the refusal came after the session ended, and \
+    if launch.admission.is_none()
+        && let Standing::Mismatched { .. } = record.standing
+    {
+        return (
+            Verdict::Mismatched,
+            vec![
+                record.standing.refusal().unwrap_or_default(),
+                "written before section 3.32: the refusal came after the session ended, and \
                      nothing gated its work"
-                        .to_string(),
-                ],
-            );
-        }
+                    .to_string(),
+            ],
+        );
     }
     if record.qualifies() {
         return (Verdict::Qualified, Vec::new());
