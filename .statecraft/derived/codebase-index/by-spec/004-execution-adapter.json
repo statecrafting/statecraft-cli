@@ -119,6 +119,6 @@
     "specId": "004-execution-adapter",
     "specStatus": "approved"
   },
-  "schemaVersion": "1.1.0",
-  "shardHash": "abb9fab1b102c6eec1ecf677062c446abd980d803c8cb31829aa950bd123f222"
+  "schemaVersion": "1.2.0",
+  "shardHash": "093f082dca2183c398957c9ee306937f14a202db9634bf2d3a23529720652c13"
 }

@@ -5,6 +5,6 @@
     "path": "crates/statecraft-envelope",
     "specRef": "005-acceptance-and-evidence"
   },
-  "schemaVersion": "1.1.0",
-  "shardHash": "832a1e24e99ae6d1dce393672035ae66d023db5c3c3b8f76339ea804fdf685f3"
+  "schemaVersion": "1.2.0",
+  "shardHash": "fbd579687b975d0a4b9b53054c051588322606260ac17e4d05c6ad54c83062d1"
 }

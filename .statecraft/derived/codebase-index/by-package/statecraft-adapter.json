@@ -4,6 +4,6 @@
     "name": "statecraft-adapter",
     "path": "crates/statecraft-adapter"
   },
-  "schemaVersion": "1.1.0",
-  "shardHash": "f268e57e316b40b4f7e027861efb4134c656fcc6702f13884f849b354d82fc07"
+  "schemaVersion": "1.2.0",
+  "shardHash": "cd5a3b8121b414035f3ca11a1e6cf1103a21b8d7c1c23a9411303929aadc7b52"
 }

@@ -4,6 +4,6 @@
     "name": "statecraft-acceptance",
     "path": "crates/statecraft-acceptance"
   },
-  "schemaVersion": "1.1.0",
-  "shardHash": "bd000ace37ecc2639400236115853f291c566db1e819eef260a384845146e141"
+  "schemaVersion": "1.2.0",
+  "shardHash": "2a9c05c6acdfdbd502015de6c3d6a70aec43b3dae11ae4e966e036560173ba88"
 }

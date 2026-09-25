@@ -494,6 +494,31 @@ mod tests {
             interpret(Some(4), b"", b"spec-spine: internal error: x"),
             Resolution::Unreadable { .. }
         ));
+        // Recorded 2026-09-25 from the published 0.26.0 and 0.27.0: invalid
+        // configuration is 2 with `config error:` under both, and 0.27.0
+        // refuses a link leaving the repository and a layout root that is not
+        // a plain relative path (spec-spine's 144). None is stale.
+        for refusal in [
+            &b"spec-spine: config error: TOML parse error at line 134, column 2"[..],
+            b"spec-spine: config error: layout.specs_dir 'C:specs' must name a directory inside the repository",
+            b"spec-spine: refused: refused to read the repository: 'docs-outside' is a link to /tmp/o, outside it (spec 144).",
+        ] {
+            assert!(
+                matches!(interpret(Some(2), b"", refusal), Resolution::Unreadable { .. }),
+                "{}",
+                String::from_utf8_lossy(refusal)
+            );
+        }
+        // 0.27.0's guarded readers call an unresolved claim `validation
+        // failed` at 1 (spec-spine's 145): never stale.
+        assert!(matches!(
+            interpret(
+                Some(1),
+                b"",
+                b"spec-spine: validation failed: 1 violation(s)\n  I-004 [x] unresolved claim, not staleness"
+            ),
+            Resolution::Unresolved { .. }
+        ));
         assert!(matches!(
             interpret(None, b"", b""),
             Resolution::Unreadable { .. }

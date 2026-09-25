@@ -4,6 +4,6 @@
     "name": "statecraft-run",
     "path": "crates/statecraft-run"
   },
-  "schemaVersion": "1.1.0",
-  "shardHash": "af4c4a051194c59e55b92dfcbe5d39d48c8ce367b79ee0e9c2a8a0b271c36c8a"
+  "schemaVersion": "1.2.0",
+  "shardHash": "b8fa86f7f5fa154978c98a1d54cc4a34bbe67bb62d6713c3606afa784db74f35"
 }

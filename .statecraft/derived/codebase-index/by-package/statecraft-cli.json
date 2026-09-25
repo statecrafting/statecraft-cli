@@ -4,6 +4,6 @@
     "name": "statecraft-cli",
     "path": "crates/statecraft-cli"
   },
-  "schemaVersion": "1.1.0",
-  "shardHash": "187e010a54cd898fa84e37dd772f74fe47ef3fd2fd00e3ada49aefcdf687667a"
+  "schemaVersion": "1.2.0",
+  "shardHash": "aacacfd2a778ccbd61148925319888b900a311a7b5b607708fd31a232346b827"
 }

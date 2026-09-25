@@ -8340,6 +8340,55 @@ at the enforcing gate (contract 6). Tested in
 `contract_4_a_configuration_or_containment_refusal_is_never_stale`, which
 fails against the previous bodies.
 
+**2026-09-25: `config error` is a refusal, and `validation failed` is never
+stale (owner, 2026-09-25: adopt 0.27.0).** Measured the same day against the
+published 0.26.0 and 0.27.0 on clones of this repository. Invalid
+configuration exits 2 under both and says `spec-spine: config error:`, not
+`refused:`; the "both exit tables" entry above read only `refused:` and a pin
+not met as a refusal, so `probe::read_check` read a malformed `spec-spine.toml`
+under 0.26.0 as a stale tree and sent the operator to regenerate. 0.27.0 adds
+two more exit-2 answers (its spec 144): a link leaving the repository says
+`refused:`, and a layout root that is not a plain relative path (`C:specs`,
+`out/nul`) says `config error:`. `names_refusal` now also recognises
+`spec-spine: config error:`, which below 0.26.0 was spent on exit 3, a read not
+performed either way. 0.27.0's guarded readers (`couple`, `index coverage`,
+`index owner`, `scope`, `delta`) report an unresolved claim at
+`implementation: complete` as `validation failed` at exit 1 (its spec 145),
+where 0.26.0 said "index is stale"; `names_stale_only` excludes it by name. No
+reader here runs a guarded reader for freshness: `check` is unchanged and still
+prints `UNRESOLVED CLAIM`, and `check --json`, whose index half still says
+`"fresh": false` for an unresolved claim (spec-spine plans to change that in
+0.28.0), is read by nothing in this product. Tested in
+`a_configuration_or_containment_refusal_is_never_stale`,
+`an_unresolved_claim_at_a_guarded_reader_is_neither_stale_nor_a_refusal`, and
+`a_repository_with_a_link_leaving_it_is_a_read_not_performed`, which builds a
+real repository with a real link leaving it and answers it with a labelled
+stand-in printing 0.27.0's recorded words; the published binary's own answer is
+asserted when the pin moves. The delivered hooks are an authority change of
+their own and follow in a separate change.
+
+**2026-09-25: the pin probe's tests write their stubs race-free.**
+`spec_spine::tests::a_range_pin_refusal_is_read_under_both_exit_tables` failed
+once in CI (run `36196944219`, exit 3 read as `NotPerformed` rather than `No`)
+and passes locally. Its stub was written, made executable and renamed into
+place by the test process, so a sibling test thread forking at that moment
+could hold the file open for writing in its child, and executing the stub then
+fails with `ETXTBSY`; `Pin::admits` reads a spawn that failed as a read not
+performed, which is correct for the product and wrong for the test. The test
+module's `install` now uses `statecraft_adapter::fixture::install_script`,
+which copies the file into place in a child process for exactly this race.
+Test-only; no requirement changes.
+
+**2026-09-25: the pinned spec-spine's own answer over a link leaving the
+repository (owner, 2026-09-25: adopt 0.27.0).** With the pin at 0.27.0,
+`the_real_spec_spine_refuses_a_link_leaving_the_repository` initializes a
+sandbox project with the real pinned binary, reads it fresh, adds a link to a
+directory outside it, and asserts that `probe::run_check` reports a read not
+performed at exit 2 naming the link, never stale and never fresh. It is the
+assertion the "config error is a refusal" entry above deferred to the pin
+move, because 0.26.0 follows such a link. The adoption itself is recorded in
+`docs/adoption/spec-spine.md` (`D-06`).
+
 ## Verification
 
 `--fail-on-untraced` joined the corpus gate with this spec's first

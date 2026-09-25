@@ -66,6 +66,6 @@
     "specId": "006-command-surface",
     "specStatus": "approved"
   },
-  "schemaVersion": "1.1.0",
-  "shardHash": "1c30ecbe7c3f871c76a54c84182faf3977bfd34d9fd0fb2fb8998db47f344017"
+  "schemaVersion": "1.2.0",
+  "shardHash": "e22eeaa09d82c8ee2a8e0775f2d503b065472755fa4aeac34525d37c55ae532e"
 }
