@@ -297,8 +297,9 @@ pub enum ReadError {
     },
     /// The report's schema is not the one this build reads.
     #[error(
-        "spec-spine {version} reported delta schema {found}; this build reads 0.1.z and 0.2.z \
-         and does not deserialize a contract it was not written against"
+        "spec-spine {version} reported delta schema {found}; this build reads {} \
+         and does not deserialize a contract it was not written against",
+        read_lines()
     )]
     SchemaNotRead {
         /// The schema the report declared.
@@ -414,6 +415,15 @@ impl SpecSpineDeltaReport {
             .find(|p| !self.report.changes.iter().any(|c| &&c.path == p))
             .cloned()
     }
+}
+
+/// The schema lines this build reads, as a refusal names them: `0.1.z, 0.2.z`.
+fn read_lines() -> String {
+    READS_DELTA_SCHEMAS
+        .iter()
+        .map(|line| format!("{line}.z"))
+        .collect::<Vec<_>>()
+        .join(", ")
 }
 
 /// Whether a report's schema version is one this build reads.
@@ -682,6 +692,14 @@ mod tests {
             SpecSpineDeltaReport::from_envelope(e),
             Err(ReadError::SchemaNotRead { .. })
         ));
+        let mut e = report_with(vec![], BTreeMap::new());
+        e.report.schema_version = "0.3.0".into();
+        let said = SpecSpineDeltaReport::from_envelope(e)
+            .unwrap_err()
+            .to_string();
+        for line in READS_DELTA_SCHEMAS {
+            assert!(said.contains(&format!("{line}.z")), "{said}");
+        }
         // `0.20.0` is not the `0.2` line.
         let mut e = report_with(vec![], BTreeMap::new());
         e.report.schema_version = "0.20.0".into();
