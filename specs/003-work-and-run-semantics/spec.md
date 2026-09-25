@@ -1351,6 +1351,21 @@ versions of it. Spec `002`'s entry was adopted as its Part 9 step 1 on
 2026-09-24; that adoption does not reach this spec, whose part (Part 9 step
 4, H-5) is still not adopted here.
 
+**2026-09-25: attest-ledger is the crates.io release `=0.1.0`, not the git
+revision (owner, 2026-09-25).** `attest-ledger-core` and `attest-ledger-types`
+0.1.0 are published on crates.io, so the move the 2026-09-16 entry left as its
+own change is made. Diffed before switching: both published crates record
+their source commit as `23803ab` (`.cargo_vcs_info.json`), the parent of the
+pinned `a9c3595`. Every file of `crates/core` and `crates/types` at `a9c3595`
+is byte-identical to the published package (each crate's `Cargo.toml.orig`
+included), except that the package adds the workspace `README.md`. The whole of
+`23803ab..a9c3595` is metadata: the workspace `repository` and `homepage` move
+from `stagecraft-ing` to `statecrafting`, one line each in `README.md`,
+`CHANGELOG.md` and the bootstrap spec, and editor files. So the published
+crates carry the old organisation in their `repository` field, and the code this
+crate links is unchanged. The pin is exact (`=0.1.0`) because the record hash
+is this crate's persisted format; the lock records the registry checksums.
+
 ## Verification
 
 Each line is one command. §3.8's twenty-two rows are integration tests named after
