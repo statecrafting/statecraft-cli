@@ -544,6 +544,17 @@ fn revision_four_keeps_the_policy_and_names_the_new_refusal() {
 /// parameters carry forward unchanged.
 #[test]
 fn a_revision_four_project_upgrades_to_revision_five() {
+    upgrade_from_revision_four(&revision_five(), 5);
+}
+
+/// The same upgrade to the registered revision (6), one plan and apply from
+/// revision 4.
+#[test]
+fn a_revision_four_project_upgrades_to_the_registered_revision() {
+    upgrade_from_revision_four(&Profile::registered(), setup::REVISION);
+}
+
+fn upgrade_from_revision_four(target: &Profile, want: u32) {
     let dir = project();
     let root = dir.path();
     std::fs::create_dir_all(root.join("scripts")).unwrap();
@@ -578,10 +589,10 @@ fn a_revision_four_project_upgrades_to_revision_five() {
         "{before}"
     );
 
-    let r5 = Profile::registered();
+    let r5 = target;
     assert_ne!(r5.identity(), r4.identity());
     let recorded = manifest.project.setup.as_ref().unwrap().parameters.clone();
-    let upgrade = plan_and_apply_with(root, &r5, &mut manifest, &recorded);
+    let upgrade = plan_and_apply_with(root, r5, &mut manifest, &recorded);
     let file = |rel: &str| upgrade.files.iter().find(|f| f.path == rel).unwrap();
     for rel in [
         wf,
@@ -611,12 +622,12 @@ fn a_revision_four_project_upgrades_to_revision_five() {
     assert!(ci_gate.contains("authority=yes"), "{ci_gate}");
 
     let selection = manifest.project.setup.as_ref().unwrap();
-    assert_eq!(selection.revision, setup::REVISION);
+    assert_eq!(selection.revision, want);
     assert_eq!(selection.parameters, recorded);
     let policy: serde_json::Value =
         serde_json::from_str(&std::fs::read_to_string(root.join(setup::POLICY_PATH)).unwrap())
             .unwrap();
-    assert_eq!(policy["revision"], setup::REVISION);
+    assert_eq!(policy["revision"], want);
     assert_eq!(
         policy["parameters"]["authored_content"],
         setup::AUTHORED_CONTENT_SCRIPT
