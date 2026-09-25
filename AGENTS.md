@@ -179,7 +179,7 @@ evaluated, so a `Spec-Drift-Waiver:` in the body would have covered all 15.
 ## Continuous integration
 
 This repository's CI is **rendered from Statecraft's own setup profile**,
-`github-actions-rust` revision 7 (S-5, owner decision of 2026-09-24): the
+`github-actions-rust` revision 8 (S-5, owner decision of 2026-09-24): the
 product governs itself with what it gives adopters. The rendered files are
 managed, and their ownership is recorded in `.statecraft/environment.json`:
 `.github/workflows/statecraft-ci.yml`, `.github/workflows/statecraft-ai-review.yml`,
@@ -193,8 +193,13 @@ The parameters this repository sets keep every check the hand-written
 `govern.yml` had: coverage enforced, `scripts/check-authored-content.sh`
 required and applied to titles, bodies and commit messages, every commit gated
 and signed, and a base other than `main` refused. What the profile adds is the
-**AI review** on every pull request, which uses the provider through the
-`CLAUDE_CODE_OAUTH_TOKEN` secret the owner sets. A `findings` verdict blocks
+**AI review** on every pull request. From revision 8 it uses the
+`ANTHROPIC_API_KEY` secret when the repository can see one (Console credits)
+and the `CLAUDE_CODE_OAUTH_TOKEN` secret otherwise (the subscription). Both are
+organization secrets with selected visibility, so the owner switches billing
+by changing which repositories see the key; a repository-level secret of the
+same name takes precedence. The job log and the evidence record name the
+class used (`api-key` or `oauth`), never the value. A `findings` verdict blocks
 `ci-gate` unless the owner approves the `statecraft-review-exception`
 Environment for that run. In the merge queue the review is not re-run: `ci-gate`
 reads the verdict recorded for the entry's pull-request head.
