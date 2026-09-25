@@ -584,7 +584,7 @@ publication stays deferred until the owner
 lifts it separately, and no grade above *specified* is claimed for anything
 below.
 
-*Stability policy (proposed).* Before 1.0, any surface may change with a
+*Stability policy (adopted as the direction, 2026-09-25).* Before 1.0, any surface may change with a
 dated spec amendment. From 1.0, these are **stable**, and changing one
 incompatibly needs a major version and a migration note:
 
@@ -592,10 +592,10 @@ incompatibly needs a major version and a migration note:
    (spec `006` sections 3.1 and 3.11). Adding a verb or an optional flag is
    compatible; removing or renaming one is not.
 2. **The exit and JSON contract**: the five exit codes of spec `006` section
-   3.3, and the family envelope once adopted (the 0.26.0 migration, the
-   family exit and JSON contract that
-   draft #118 proposes for spec `006`, adopted by the owner on 2026-09-25;
-   item X is its provenance label). Adding a field is compatible;
+   3.3, and the family envelope: the family exit and JSON contract that
+   draft #118 proposes for spec `006` (item X), adopted by the owner on
+   2026-09-25 and landing with the spec-spine 0.26.0 migration. Adding a
+   field is compatible;
    removing, retyping or renaming one is not (`006` section 3.4).
 3. **Documented formats**: the environment manifest, the run record and
    journal, receipts and evidence, and bundle metadata, each with a
@@ -606,7 +606,7 @@ incompatibly needs a major version and a migration note:
 Human output, log text and anything under `.statecraft/state/` are not
 stable.
 
-*Readiness checklist, with the evidence each item needs.*
+*Readiness checklist (adopted as the direction, 2026-09-25), with the evidence each item needs.*
 
 | Item | Done when | Evidence |
 |---|---|---|
