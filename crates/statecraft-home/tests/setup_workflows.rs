@@ -26,7 +26,7 @@ use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
-const TOML: &str = "[meta]\nrequired_version = \"=0.25.0\"\n";
+const TOML: &str = "[meta]\nrequired_version = \"=0.26.0\"\n";
 
 fn git(dir: &Path, args: &[&str]) -> String {
     let out = Command::new("git")
@@ -1758,7 +1758,7 @@ const EM: &str = "\u{2014}";
 const SPEC_SPINE: &str = r#"#!/bin/sh
 printf '%s | %s\n' "$PWD" "$*" >> "$STUB_STATE/spec-spine-calls"
 case "$*" in
-  --version) echo "spec-spine 0.25.0" ;;
+  --version) echo "spec-spine 0.26.0" ;;
   "index coverage"*)
     if [ -f src/untraced.rs ]; then
       echo "untraced: src/untraced.rs"
@@ -2540,7 +2540,7 @@ fn revision_four_adds_steps_not_jobs_and_keeps_the_gate_read_only() {
         |_| {},
     );
     assert_eq!(ran.exit, 0, "{}", ran.text);
-    assert_eq!(ran.output("version"), "0.25.0");
+    assert_eq!(ran.output("version"), "0.26.0");
     // The defaults keep a revision-3 project's behaviour, except the base.
     let gate = std::fs::read_to_string(tmp.path().join("scripts/statecraft/gate.sh")).unwrap();
     for line in [
@@ -3176,7 +3176,50 @@ fn the_rendered_gate_exits_in_the_family_contract() {
         assert_eq!(code, 3, "{args:?}: {text}");
     }
 
-    // The translation table, spec-spine 0.25.0's codes.
+    // The translation table under the fixture's pin, 0.26.0: spec-spine's 132
+    // table. Stale is already 1, a pin not met refuses with 2, a usage error
+    // from the gate's own invocation is the gate failing, and 4 is failed.
+    for (file, ss_code, want, said) in [
+        ("ss-check", "1", 1, "or a stale committed tree"),
+        ("ss-check", "2", 2, "a pin not met"),
+        ("ss-check", "3", 4, "usage error"),
+        ("ss-check", "4", 4, "could not do its work"),
+        ("ss-lint", "7", 4, "does not know"),
+        ("ss-index-coverage", "1", 1, "or a stale committed tree"),
+        ("ss-index-check", "1", 1, "or a stale committed tree"),
+    ] {
+        let (code, text) = gate_sh(root, &["governance"], &[], &[(file, ss_code)]);
+        assert_eq!(code, want, "0.26.0 {file}={ss_code}: {text}");
+        assert!(text.contains(said), "0.26.0 {file}={ss_code}: {text}");
+        assert!(
+            text.contains(&format!("spec-spine exit {ss_code}, gate exit {want}")),
+            "{text}"
+        );
+    }
+    // The same rendering under a 0.25.0 pin reads that release's codes.
+    let toml = root.join("spec-spine.toml");
+    let pinned_26 = std::fs::read_to_string(&toml).unwrap();
+    let pinned_25 = pinned_26
+        .lines()
+        .map(|l| {
+            if l.trim_start().starts_with("required_version") {
+                "required_version = \"=0.25.0\"".to_string()
+            } else {
+                l.to_string()
+            }
+        })
+        .collect::<Vec<_>>()
+        .join("\n");
+    assert_ne!(pinned_25, pinned_26, "the fixture states a pin");
+    // Restores the 0.26.0 pin even when an assertion below panics.
+    struct Restore<'a>(&'a Path, String);
+    impl Drop for Restore<'_> {
+        fn drop(&mut self) {
+            let _ = std::fs::write(self.0, &self.1);
+        }
+    }
+    let restore = Restore(&toml, pinned_26);
+    std::fs::write(&toml, pinned_25).unwrap();
     for (file, ss_code, want, said) in [
         ("ss-check", "1", 1, "does not pass"),
         ("ss-check", "2", 1, "stale"),
@@ -3186,50 +3229,8 @@ fn the_rendered_gate_exits_in_the_family_contract() {
         ("ss-index-check", "2", 1, "stale"),
     ] {
         let (code, text) = gate_sh(root, &["governance"], &[], &[(file, ss_code)]);
-        assert_eq!(code, want, "{file}={ss_code}: {text}");
-        assert!(text.contains(said), "{file}={ss_code}: {text}");
-        assert!(
-            text.contains(&format!("spec-spine exit {ss_code}, gate exit {want}")),
-            "{text}"
-        );
-    }
-    // The same rendering under a 0.26.0 pin reads spec-spine's 132 table:
-    // stale is already 1, a pin not met refuses with 2, a usage error from
-    // the gate's own invocation is the gate failing, and 4 is failed.
-    let toml = root.join("spec-spine.toml");
-    let pinned_25 = std::fs::read_to_string(&toml).unwrap();
-    let pinned_26 = pinned_25
-        .lines()
-        .map(|l| {
-            if l.trim_start().starts_with("required_version") {
-                "required_version = \"=0.26.0\"".to_string()
-            } else {
-                l.to_string()
-            }
-        })
-        .collect::<Vec<_>>()
-        .join("\n");
-    assert_ne!(pinned_25, pinned_26, "the fixture states a pin");
-    // Restores the 0.25.0 pin even when an assertion below panics.
-    struct Restore<'a>(&'a Path, String);
-    impl Drop for Restore<'_> {
-        fn drop(&mut self) {
-            let _ = std::fs::write(self.0, &self.1);
-        }
-    }
-    let restore = Restore(&toml, pinned_25);
-    std::fs::write(&toml, pinned_26).unwrap();
-    for (file, ss_code, want, said) in [
-        ("ss-check", "1", 1, "or a stale committed tree"),
-        ("ss-check", "2", 2, "a pin not met"),
-        ("ss-check", "3", 4, "usage error"),
-        ("ss-check", "4", 4, "could not do its work"),
-        ("ss-lint", "7", 4, "does not know"),
-        ("ss-index-check", "1", 1, "or a stale committed tree"),
-    ] {
-        let (code, text) = gate_sh(root, &["governance"], &[], &[(file, ss_code)]);
-        assert_eq!(code, want, "0.26.0 {file}={ss_code}: {text}");
-        assert!(text.contains(said), "0.26.0 {file}={ss_code}: {text}");
+        assert_eq!(code, want, "0.25.0 {file}={ss_code}: {text}");
+        assert!(text.contains(said), "0.25.0 {file}={ss_code}: {text}");
         assert!(
             text.contains(&format!("spec-spine exit {ss_code}, gate exit {want}")),
             "{text}"
@@ -3343,13 +3344,13 @@ fn the_rendered_installer_exits_in_the_family_contract() {
     let (code, text) = run(&[("cargo-install", "101")]);
     assert_eq!(code, 4, "{text}");
     assert!(
-        text.contains("cargo install of spec-spine 0.25.0 failed"),
+        text.contains("cargo install of spec-spine 0.26.0 failed"),
         "{text}"
     );
     write(
         root,
         "spec-spine.toml",
-        "[meta]\nrequired_version = \"0.25\"\n",
+        "[meta]\nrequired_version = \"0.26\"\n",
     );
     let (code, text) = run(&[]);
     assert_eq!(code, 2, "{text}");

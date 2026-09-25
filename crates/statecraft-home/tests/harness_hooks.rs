@@ -841,8 +841,10 @@ fn contract_4_an_unresolved_claim_is_distinguished_from_staleness() {
 // unresolved-claim flag. Spec 002 section 5, obligations 1 to 5.
 // ---------------------------------------------------------------------------
 
-/// What spec-spine 0.25.0 prints for a draft's unresolved claim under the
-/// flag, measured (`session10/H4/measure-draft-claim-ahead.txt`).
+/// What spec-spine prints for a draft's unresolved claim under the flag:
+/// measured under 0.25.0 (`session10/H4/measure-draft-claim-ahead.txt`), and
+/// byte-identical under 0.26.0 (measured 2026-09-25 for its adoption; both
+/// exit 1).
 const REFUSED_UNRESOLVED: &str = "spec-registry: fresh\ncodebase-index: fresh, but REFUSED: 1 unresolved unit diagnostic(s) (--fail-on-unresolved)";
 
 /// Obligation 1: every hook that runs `check` passes the flag, and passing it
