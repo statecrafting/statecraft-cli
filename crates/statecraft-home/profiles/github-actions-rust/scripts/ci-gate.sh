@@ -228,7 +228,10 @@ fi
 if [ "$trusted" = yes ]; then
   jq -r '.files[].path' "$work/policy.json" | sort -u > "$work/profile-paths"
   echo "$POLICY" >> "$work/profile-paths"
-  git diff --name-only "${BASE_SHA}" "${HEAD_SHA}" | sort -u > "$work/changed"
+  # Three dots: the candidate's own changes since its fork point, as coupling
+  # reads them. Two would also list what the base changed after the branch
+  # was cut, which is not this candidate's authority change.
+  git diff --name-only "${BASE_SHA}...${HEAD_SHA}" | sort -u > "$work/changed"
   touched="$(sort -u "$work/profile-paths" | comm -12 - "$work/changed")"
   if [ -n "$touched" ]; then
     say "authority change: this candidate changes the gate that judges it:"
