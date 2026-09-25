@@ -19,6 +19,11 @@
 # meaningful with no code at all; `code` judges the workspace and is inert until
 # a crate exists. CI runs both as separate jobs and requires both through
 # `ci-gate`, which is why neither is nested inside the other.
+#
+# Since S-5 (2026-09-24) `gate` and `code` run scripts/statecraft/gate.sh, the
+# script the rendered CI runs, so the local and CI definitions are one. That
+# script uses only .tooling/bin/spec-spine; SPEC_SPINE still selects the binary
+# for the other targets here.
 
 # The pinned version, read from the single place it is authored. Nothing here
 # repeats the number: a second spelling is how a pin and its installer drift.
@@ -72,20 +77,18 @@ tools:
 	$(SPEC_SPINE_LOCAL) --version
 
 gate:
-	@echo "governing with: $(SPEC_SPINE) (pin =$(SPEC_SPINE_VERSION))"
-	$(SPEC_SPINE) check --fail-on-warn
-	$(SPEC_SPINE) lint --fail-on-warn
-	$(SPEC_SPINE) index coverage --fail-on-untraced
-	$(SPEC_SPINE) index check --fail-on-unresolved
-	scripts/check-authored-content.sh
+	@echo "governing with: .tooling/bin/spec-spine (pin =$(SPEC_SPINE_VERSION)), through the rendered gate"
+	sh scripts/statecraft/gate.sh governance
 
-## The Rust half of the check surface, in the order that fails fastest.
+## The Rust half of the check surface, as CI runs it. The four verbs below
+## remain for running one at a time.
 ##
-## The guard is one shell per recipe LINE, so it has to be one `if` rather than
-## a `test ... || exit 0` followed by the command: the early exit would end only
-## its own line and make would run the next one anyway. That bug is why the
+## Their guard is one shell per recipe LINE, so it has to be one `if` rather
+## than a `test ... || exit 0` followed by the command: the early exit would end
+## only its own line and make would run the next one anyway. That bug is why the
 ## first draft of these targets ran cargo against a workspace with no members.
-code: build test clippy fmt
+code:
+	sh scripts/statecraft/gate.sh code
 
 build:
 	@if [ -z "$(CRATE_MANIFESTS)" ]; then echo "$(SKIP_NOTE)"; else set -x; cargo build --workspace --locked; fi
