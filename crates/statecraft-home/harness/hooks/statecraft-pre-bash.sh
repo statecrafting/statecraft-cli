@@ -286,7 +286,7 @@ case "$cec" in
   4) # spec-spine 0.26.0's table: the read failed.
      { echo "[pr-gate] BLOCKED: the freshness read failed in $root (spec-spine check exit 4: I/O, git or internal): $(printf '%s\n' "$cout" | head -1)"
        echo '[pr-gate] The tree has NOT been judged and is not known to be stale; regenerating repairs nothing here.'
-    echo "[pr-gate] $judge"; } >&2
+       echo "[pr-gate] $judge"; } >&2
      exit 2 ;;
   *) { echo "[pr-gate] BLOCKED: spec-spine check exited $cec in $root, which this gate does not recognise; it is not reported as fresh."
     echo "[pr-gate] $judge"; } >&2
