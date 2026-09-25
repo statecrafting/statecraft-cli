@@ -7734,6 +7734,24 @@ before matching, and a failed `cargo metadata` stops the gate. Tests:
 `a_rerun_does_not_repeat_a_skip_notice`, and the guard's test now feeds spaced
 JSON; both observed failing against the previous scripts.
 
+**2026-09-24: S-5, this repository's CI is rendered from the profile
+(revision 4; owner decision of 2026-09-24).** `init apply` with
+`--profile github-actions-rust` was run on this repository, and the
+`project.setup` block of `.statecraft/environment.json` sets
+`governance.enforce_coverage`, `governance.authored_content`
+(`scripts/check-authored-content.sh`), `governance.authored_content_text`,
+`governance.gate_each_commit`, `governance.require_signed_commits` and
+`review.code_owners`; `governance.require_default_base` keeps its default.
+Every property `.github/workflows/govern.yml` had is kept, so that file is
+removed in the same change: both would report `ci-gate`. `make gate` and
+`make code` now run `scripts/statecraft/gate.sh`, one definition for local and
+CI. The AI review and the `statecraft-review-exception` Environment are what
+S-5 adds; the owner sets `CLAUDE_CODE_OAUTH_TOKEN` and the Environment's
+required reviewers. The adoption pull request is judged by the candidate's own
+`ci-gate.sh`, because the base carries none (revision 1's adoption rule). The
+measurement tables above that name `govern.yml` record what was true when they
+were written and are not rewritten.
+
 ## Verification
 
 `--fail-on-untraced` joined the corpus gate with this spec's first

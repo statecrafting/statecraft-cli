@@ -1,3 +1,5 @@
+@.statecraft/AGENTS.md
+
 # AGENTS.md
 
 The cross-agent authority for this repository, read by Claude Code, Codex CLI and
@@ -95,7 +97,9 @@ suggestion, not a work order. Do not open an implementation branch for a
 Two surfaces, not one. `make gate` judges the **corpus** and is meaningful with
 no code at all. `make code` judges the **workspace**, which is eight crates
 today. CI runs them as separate jobs and requires both through `ci-gate`, the
-single status context branch protection names.
+single status context branch protection names. Both targets run
+`scripts/statecraft/gate.sh`, the same script CI runs, so the local and the CI
+definition cannot drift (see "Continuous integration" below).
 
 ```sh
 make gate
@@ -171,6 +175,29 @@ diff, so its merge base is derived from the two endpoints it is handed:
 The second form is not merely noisy. A waiver is scoped to the diff the gate
 evaluated, so a `Spec-Drift-Waiver:` in the body would have covered all 15.
 
+## Continuous integration
+
+This repository's CI is **rendered from Statecraft's own setup profile**,
+`github-actions-rust` revision 4 (S-5, owner decision of 2026-09-24): the
+product governs itself with what it gives adopters. The rendered files are
+managed, and their ownership is recorded in `.statecraft/environment.json`:
+`.github/workflows/statecraft-ci.yml`, `.github/workflows/statecraft-ai-review.yml`,
+`scripts/statecraft/*.sh` and the policy `.statecraft/setup/github-actions-rust.json`.
+**Do not edit them by hand**: change a parameter in the `project.setup` block of
+`.statecraft/environment.json` and re-render with `statecraft-cli init plan`
+then `init apply --plan <identity>`, or change the profile itself under spec
+`002`. A hand edit is drift that `doctor` reports.
+
+The parameters this repository sets keep every check the hand-written
+`govern.yml` had: coverage enforced, `scripts/check-authored-content.sh`
+required and applied to titles, bodies and commit messages, every commit gated
+and signed, and a base other than `main` refused. What the profile adds is the
+**AI review** on every pull request, which uses the provider through the
+`CLAUDE_CODE_OAUTH_TOKEN` secret the owner sets. A `findings` verdict blocks
+`ci-gate` unless the owner approves the `statecraft-review-exception`
+Environment for that run. In the merge queue the review is not re-run: `ci-gate`
+reads the verdict recorded for the entry's pull-request head.
+
 ## The merge queue
 
 The queue is enabled on `main` (2026-09-24, merge method: merge commit, up to
@@ -179,7 +206,7 @@ because the three properties it needs were made true in the same authority
 change that documented them:
 
 1. **Coupling is evaluated against the queued integration candidate.** On a
-   `merge_group` event the `govern` job runs `spec-spine couple` over the
+   `merge_group` event the `governance` job runs `spec-spine couple` over the
    group's `base_sha...head_sha`, which is the entry's change applied on the
    speculative base it will land on, not only the pull request in isolation.
 2. **A waiver is bound to its change and to the authority that approved it.**
@@ -221,13 +248,13 @@ nothing merge commits do not already give.
 
 Every commit that reaches `main` is signed and passes `make gate`; with merge
 commits the branch's commits land too, so this binds each one, not only the
-head. CI enforces it: on `pull_request` and `merge_group` the `govern` job gates
-every commit in the change at its own tree (`make gate` and `cargo fmt --check`,
-with the pin that commit names), refuses one GitHub does not verify as signed,
+head. CI enforces it: on `pull_request` and `merge_group` the `governance` job
+gates every commit in the change at its own tree (`gate.sh governance` and
+`cargo fmt --check`, with the pin that commit names), refuses one GitHub does not verify as signed,
 and applies the authored-content rules to each commit message and to the pull
 request's title and body. A branch with a red or unsigned commit is therefore
 rebuilt before review, not squashed at merge, so squash is left for branches
-nobody cites. **A pull request whose base is not `main` fails `govern`**: stack
+nobody cites. **A pull request whose base is not `main` fails `governance`**: stack
 by opening each branch off `main` with a depends-on note, or wait for GitHub to
 retarget the upper one when the lower one merges. The merge commit's message is
 the pull-request title and body, so the authored-content rules bind the body as
