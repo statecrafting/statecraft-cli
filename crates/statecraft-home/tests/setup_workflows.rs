@@ -8,6 +8,10 @@
 //! the table does not carry **panics**, so a workflow edit that introduces a
 //! new expression cannot pass by being silently substituted with nothing.
 //!
+//! Revision 4's governance steps run the same way, with a stubbed
+//! `spec-spine` (at the fixture's `.tooling/bin`) and a stubbed `cargo`, and
+//! the real `scripts/check-authored-content.sh` as the declared script.
+//!
 //! The mutation tests edit one blocking branch at a time in the rendered
 //! `ci-gate.sh` and `ai-review.sh` and require the case suite to notice: a
 //! suite that still passes with a branch inverted does not test that branch.
@@ -47,6 +51,11 @@ fn write(root: &Path, rel: &str, text: &str) {
 /// Render the registered profile into `root` through the library's own plan
 /// and apply, so every test below runs the bytes a project receives.
 fn render(root: &Path) {
+    render_with(root, &[]);
+}
+
+/// As [`render`], with parameters added to the declared block.
+fn render_with(root: &Path, extra: &[(&str, serde_json::Value)]) {
     // The local prerequisites, so the profile is not withheld.
     for (rel, text) in [
         ("rust-toolchain.toml", "[toolchain]\nchannel = \"1.96.0\"\n"),
@@ -66,6 +75,9 @@ fn render(root: &Path) {
     });
     let mut block = BTreeMap::new();
     block.insert("default_branch".to_string(), serde_json::json!("main"));
+    for (k, v) in extra {
+        block.insert(k.to_string(), v.clone());
+    }
     let plan = setup::plan(&Inputs {
         root,
         profile: &profile,
@@ -266,6 +278,10 @@ case "$1 $2" in
     cat "$here/gh-jobs" 2> /dev/null || echo '{"jobs": []}' ;;
   api\ repos/*/actions/runs*)
     cat "$here/gh-runs" 2> /dev/null || echo '{"workflow_runs": []}' ;;
+  api\ repos/*/commits/*)
+    # Revision 4: GitHub's verification of one commit, as `--jq` reads it.
+    sha="${2##*/}"
+    if grep -qx "$sha" "$here/gh-unsigned" 2> /dev/null; then echo false; else echo true; fi ;;
   api\ repos/*/pulls/*)
     if [ -f "$here/gh-pull-fails" ]; then echo "HTTP 404: Not Found" >&2; exit 1; fi
     cat "$here/gh-head" ;;
@@ -1552,4 +1568,601 @@ fn inverting_a_blocking_branch_of_ai_review_is_noticed() {
             lines[site]
         );
     }
+}
+
+// ------------------------------------------------- governance (revision 4)
+
+/// The authored-content script a project declares: this repository's own,
+/// whose `--text` mode is spec 001 section 3.6's contract.
+const CHECK_AUTHORED: &str = include_str!("../../../scripts/check-authored-content.sh");
+const DECLARED: &str = "scripts/check-authored-content.sh";
+/// U+2014, spelled as an escape so this file stays clean.
+const EM: &str = "\u{2014}";
+
+/// A stubbed spec-spine: every verb passes except `index coverage`, which
+/// finds `src/untraced.rs` untraced and refuses it only under
+/// `--fail-on-untraced`, as the real flag does.
+const SPEC_SPINE: &str = r#"#!/bin/sh
+printf '%s | %s\n' "$PWD" "$*" >> "$STUB_STATE/spec-spine-calls"
+case "$*" in
+  --version) echo "spec-spine 0.25.0" ;;
+  "index coverage"*)
+    if [ -f src/untraced.rs ]; then
+      echo "untraced: src/untraced.rs"
+      case "$*" in *--fail-on-untraced*) exit 1 ;; esac
+    else
+      echo "every file is traced"
+    fi ;;
+esac
+exit 0
+"#;
+
+/// A stubbed cargo: `fmt --all --check` fails on a tree carrying
+/// `src/unformatted.rs`; every call is recorded with its directory.
+const CARGO: &str = r#"#!/bin/sh
+printf '%s | %s\n' "$PWD" "$*" >> "$STUB_STATE/cargo-calls"
+if [ "$1" = fmt ] && [ -f src/unformatted.rs ]; then
+  echo "Diff in src/unformatted.rs"
+  exit 1
+fi
+exit 0
+"#;
+
+fn gov_bin() -> &'static Path {
+    static DIR: std::sync::OnceLock<PathBuf> = std::sync::OnceLock::new();
+    DIR.get_or_init(|| {
+        let dir = tempfile::tempdir().unwrap().keep();
+        for (name, body) in [("spec-spine", SPEC_SPINE), ("cargo", CARGO)] {
+            statecraft_adapter::fixture::install_script(&dir.join(name), body, 0o755).unwrap();
+        }
+        dir
+    })
+}
+
+/// A rendered project with the declared script committed at its base, on a
+/// topic branch.
+struct Gov {
+    dir: tempfile::TempDir,
+    base: String,
+}
+
+impl Gov {
+    fn new(params: &[(&str, serde_json::Value)]) -> Gov {
+        let dir = tempfile::tempdir().unwrap();
+        let root = dir.path();
+        for args in [
+            vec!["init", "--quiet", "--initial-branch=main"],
+            vec!["config", "user.email", "fixture@example.invalid"],
+            vec!["config", "user.name", "fixture"],
+            vec!["config", "commit.gpgsign", "false"],
+        ] {
+            git(root, &args);
+        }
+        write(root, "src/lib.rs", "pub fn one() -> u32 {\n    1\n}\n");
+        write(root, "README.md", "# fixture\n");
+        write(root, "spec-spine.toml", TOML);
+        write(root, ".gitignore", ".tooling/\n");
+        std::fs::create_dir_all(root.join("scripts")).unwrap();
+        statecraft_adapter::fixture::install_script(&root.join(DECLARED), CHECK_AUTHORED, 0o755)
+            .unwrap();
+        render_with(root, params);
+        std::fs::create_dir_all(root.join(".tooling/bin")).unwrap();
+        std::os::unix::fs::symlink(
+            gov_bin().join("spec-spine"),
+            root.join(".tooling/bin/spec-spine"),
+        )
+        .unwrap();
+        git(root, &["add", "-A"]);
+        git(root, &["commit", "--quiet", "-m", "base"]);
+        let base = git(root, &["rev-parse", "HEAD"]);
+        git(root, &["checkout", "--quiet", "-b", "topic"]);
+        Gov { dir, base }
+    }
+
+    fn root(&self) -> &Path {
+        self.dir.path()
+    }
+
+    /// Commit `edits` (`None` deletes) with `message`; the new head.
+    fn commit(&self, edits: &[(&str, Option<&str>)], message: &str) -> String {
+        for (rel, text) in edits {
+            match text {
+                Some(t) => write(self.root(), rel, t),
+                None => std::fs::remove_file(self.root().join(rel)).unwrap(),
+            }
+            git(self.root(), &["add", "-A", rel]);
+        }
+        git(
+            self.root(),
+            &["commit", "--quiet", "--allow-empty", "-m", message],
+        );
+        git(self.root(), &["rev-parse", "HEAD"])
+    }
+
+    fn short(&self, sha: &str) -> String {
+        git(self.root(), &["rev-parse", "--short", sha])
+    }
+}
+
+struct Event<'a> {
+    name: &'a str,
+    base_ref: &'a str,
+    title: &'a str,
+    body: &'a str,
+    group_ref: &'a str,
+    head: &'a str,
+}
+
+fn event<'a>(name: &'a str, head: &'a str) -> Event<'a> {
+    Event {
+        name,
+        base_ref: "main",
+        title: "a clean title",
+        body: "a clean body",
+        group_ref: if name == "merge_group" { QUEUE_REF } else { "" },
+        head,
+    }
+}
+
+/// Run one step of the rendered governance job, as a runner would.
+fn run_gov(gov: &Gov, name: &str, ev: &Event<'_>, stubs: impl Fn(&Path)) -> Ran {
+    let wf = workflow(gov.root(), "statecraft-ci.yml");
+    let (run, env) = step(&wf, "governance", name);
+    let mut ctx = BTreeMap::new();
+    for (k, v) in [
+        ("github.event_name", ev.name),
+        ("github.event.pull_request.base.ref", ev.base_ref),
+        ("github.event.pull_request.title", ev.title),
+        ("github.event.pull_request.body", ev.body),
+        ("github.event.merge_group.head_ref", ev.group_ref),
+        (
+            "github.event.pull_request.base.sha || github.event.merge_group.base_sha",
+            gov.base.as_str(),
+        ),
+        (
+            "github.event.pull_request.head.sha || github.event.merge_group.head_sha",
+            ev.head,
+        ),
+        ("github.repository", "owner/fixture"),
+        ("github.token", "fixture-token"),
+    ] {
+        ctx.insert(k.to_string(), v.to_string());
+    }
+    let path = format!(
+        "{}:{}:{}",
+        gov_bin().display(),
+        stub_bin().display(),
+        std::env::var("PATH").unwrap_or_default()
+    );
+    run_step(gov.root(), &run, &env, &ctx, &[("PATH", &path)], stubs)
+}
+
+/// Rule 1: `governance.enforce_coverage` makes coverage a refusal; its
+/// default reports.
+#[test]
+fn coverage_enforced_refuses_an_untraced_file_and_reported_does_not() {
+    for enforce in [true, false] {
+        let gov = Gov::new(&[("governance.enforce_coverage", serde_json::json!(enforce))]);
+        write(gov.root(), "src/untraced.rs", "pub fn three() {}\n");
+        let head = git(gov.root(), &["rev-parse", "HEAD"]);
+        let ran = run_gov(&gov, "Governance", &event("push", &head), |_| {});
+        let calls = ran.stub_file("spec-spine-calls").unwrap_or_default();
+        assert!(
+            ran.text.contains("untraced: src/untraced.rs"),
+            "{}",
+            ran.text
+        );
+        if enforce {
+            assert_eq!(ran.exit, 1, "{}", ran.text);
+            assert!(
+                calls.contains("index coverage --fail-on-untraced"),
+                "{calls}"
+            );
+        } else {
+            assert_eq!(ran.exit, 0, "{}", ran.text);
+            assert!(!calls.contains("--fail-on-untraced"), "{calls}");
+            assert!(calls.contains("index coverage"), "{calls}");
+        }
+    }
+}
+
+/// Rule 2: a declared authored-content script is required, and runs; an
+/// undeclared one runs nothing, and the gate says so.
+#[test]
+fn a_declared_authored_content_script_is_required_and_an_undeclared_one_runs_nothing() {
+    let declared = [("governance.authored_content", serde_json::json!(DECLARED))];
+    let head = |gov: &Gov| git(gov.root(), &["rev-parse", "HEAD"]);
+
+    // Declared and clean: it runs and passes.
+    let gov = Gov::new(&declared);
+    let ran = run_gov(&gov, "Governance", &event("push", &head(&gov)), |_| {});
+    assert_eq!(ran.exit, 0, "{}", ran.text);
+    assert!(ran.text.contains("authored file(s) clean"), "{}", ran.text);
+
+    // Declared, and the tree breaks its rule: it runs and refuses.
+    write(gov.root(), "README.md", &format!("# fixture {EM} x\n"));
+    let ran = run_gov(&gov, "Governance", &event("push", &head(&gov)), |_| {});
+    assert_eq!(ran.exit, 1, "{}", ran.text);
+    assert!(ran.text.contains("U+2014"), "{}", ran.text);
+
+    // Declared and absent: refused, never a silent pass.
+    let gov = Gov::new(&declared);
+    std::fs::remove_file(gov.root().join(DECLARED)).unwrap();
+    let ran = run_gov(&gov, "Governance", &event("push", &head(&gov)), |_| {});
+    assert_eq!(ran.exit, 1, "{}", ran.text);
+    assert!(ran.text.contains("which is absent"), "{}", ran.text);
+
+    // Declared and not executable: refused.
+    let gov = Gov::new(&declared);
+    use std::os::unix::fs::PermissionsExt;
+    std::fs::set_permissions(
+        gov.root().join(DECLARED),
+        std::fs::Permissions::from_mode(0o644),
+    )
+    .unwrap();
+    let ran = run_gov(&gov, "Governance", &event("push", &head(&gov)), |_| {});
+    assert_eq!(ran.exit, 1, "{}", ran.text);
+    assert!(ran.text.contains("which is not executable"), "{}", ran.text);
+
+    // Undeclared: the script is present and would refuse, and nothing runs it.
+    let gov = Gov::new(&[]);
+    write(gov.root(), "README.md", &format!("# fixture {EM} x\n"));
+    let ran = run_gov(&gov, "Governance", &event("push", &head(&gov)), |_| {});
+    assert_eq!(ran.exit, 0, "{}", ran.text);
+    assert!(
+        ran.text
+            .contains("no authored-content script is declared (governance.authored_content)"),
+        "{}",
+        ran.text
+    );
+    assert!(!ran.text.contains("U+2014"), "{}", ran.text);
+}
+
+/// Rule 3: the declared script's `--text` mode judges the pull request's
+/// title and body (from the event, and through the API in the queue) and
+/// every commit message in the change.
+#[test]
+fn the_text_mode_refuses_a_u2014_in_a_title_a_body_and_a_commit_message() {
+    let gov = Gov::new(&[
+        ("governance.authored_content", serde_json::json!(DECLARED)),
+        ("governance.authored_content_text", serde_json::json!(true)),
+    ]);
+    let clean = gov.commit(&[("src/two.rs", Some("pub fn two() {}\n"))], "add two");
+    let step = "Authored-content rules (title and body)";
+    let dirty = format!("a title {EM} with a dash");
+    let dirty_body = format!("a body {EM} with a dash");
+
+    let ran = run_gov(&gov, step, &event("pull_request", &clean), |_| {});
+    assert_eq!(ran.exit, 0, "{}", ran.text);
+    let ran = run_gov(
+        &gov,
+        step,
+        &Event {
+            title: &dirty,
+            ..event("pull_request", &clean)
+        },
+        |_| {},
+    );
+    assert_eq!(ran.exit, 1, "title: {}", ran.text);
+    assert!(ran.text.contains("U+2014"), "{}", ran.text);
+    let ran = run_gov(
+        &gov,
+        step,
+        &Event {
+            body: &dirty_body,
+            ..event("pull_request", &clean)
+        },
+        |_| {},
+    );
+    assert_eq!(ran.exit, 1, "body: {}", ran.text);
+
+    // In the queue the event carries neither; the entry's pull request is
+    // read through the API.
+    for (answer, want) in [
+        ("a clean title\na clean body\n".to_string(), 0),
+        (format!("a clean title\n{dirty_body}\n"), 1),
+    ] {
+        let ran = run_gov(&gov, step, &event("merge_group", &clean), |state| {
+            std::fs::write(state.join("gh-head"), &answer).unwrap();
+        });
+        assert_eq!(ran.exit, want, "{answer}: {}", ran.text);
+        let calls = ran.stub_file("gh-calls").unwrap_or_default();
+        assert!(calls.contains("api repos/owner/fixture/pulls/7"), "{calls}");
+    }
+
+    // Every commit message in base..head, not only the head's.
+    let walk = "Every commit in the change";
+    let ran = run_gov(&gov, walk, &event("pull_request", &clean), |_| {});
+    assert_eq!(ran.exit, 0, "{}", ran.text);
+    let bad = gov.commit(&[], &format!("a message {EM} with a dash"));
+    let head = gov.commit(
+        &[("src/three.rs", Some("pub fn three() {}\n"))],
+        "add three",
+    );
+    let ran = run_gov(&gov, walk, &event("pull_request", &head), |_| {});
+    assert_eq!(ran.exit, 1, "{}", ran.text);
+    assert!(
+        ran.text.contains(&format!(
+            "{}'s message breaks the authored-content rules",
+            gov.short(&bad)
+        )),
+        "{}",
+        ran.text
+    );
+
+    // Not enabled: the title is not judged.
+    let off = Gov::new(&[("governance.authored_content", serde_json::json!(DECLARED))]);
+    let head = off.commit(&[], "empty");
+    let ran = run_gov(
+        &off,
+        step,
+        &Event {
+            title: &dirty,
+            ..event("pull_request", &head)
+        },
+        |_| {},
+    );
+    assert_eq!(ran.exit, 0, "{}", ran.text);
+    assert!(ran.text.contains("not judged"), "{}", ran.text);
+}
+
+/// Rule 4: the walk refuses an unsigned commit, and a commit whose own tree
+/// fails the gate or the format check while the head passes.
+#[test]
+fn the_commit_walk_refuses_an_unsigned_commit_and_a_red_intermediate_tree() {
+    let gov = Gov::new(&[
+        ("governance.authored_content", serde_json::json!(DECLARED)),
+        ("governance.gate_each_commit", serde_json::json!(true)),
+        ("governance.require_signed_commits", serde_json::json!(true)),
+    ]);
+    let dashed = gov.commit(
+        &[("README.md", Some(&format!("# fixture {EM} x\n")))],
+        "a dash",
+    );
+    let fixed = gov.commit(&[("README.md", Some("# fixture\n"))], "no dash");
+    let unformatted = gov.commit(
+        &[("src/unformatted.rs", Some("fn  x(){}\n"))],
+        "unformatted",
+    );
+    let head = gov.commit(&[("src/unformatted.rs", None)], "formatted");
+    let walk = "Every commit in the change";
+
+    // The head passes the gate on its own.
+    let ran = run_gov(&gov, "Governance", &event("pull_request", &head), |_| {});
+    assert_eq!(ran.exit, 0, "{}", ran.text);
+
+    let ran = run_gov(&gov, walk, &event("pull_request", &head), |_| {});
+    assert_eq!(ran.exit, 1, "{}", ran.text);
+    for red in [&dashed, &unformatted] {
+        assert!(
+            ran.text.contains(&format!(
+                "{} fails the gate or the format check at its own tree",
+                gov.short(red)
+            )),
+            "{}",
+            ran.text
+        );
+    }
+    for green in [&fixed, &head] {
+        assert!(
+            ran.text.contains(&format!(
+                "{}: the gate and the format check pass at its own tree",
+                gov.short(green)
+            )),
+            "{}",
+            ran.text
+        );
+    }
+    // Each commit whose gate passed ran the format check at its own tree (the
+    // dashed one stopped at the gate), and GitHub was asked about each
+    // commit's signature.
+    let cargo = ran.stub_file("cargo-calls").unwrap_or_default();
+    assert_eq!(cargo.matches("fmt --all --check").count(), 3, "{cargo}");
+    for c in [&fixed, &unformatted, &head] {
+        assert!(
+            cargo.contains(&format!(
+                "statecraft-commit-{} | fmt --all --check",
+                gov.short(c)
+            )),
+            "{cargo}"
+        );
+    }
+    let calls = ran.stub_file("gh-calls").unwrap_or_default();
+    for c in [&dashed, &fixed, &unformatted, &head] {
+        assert!(
+            calls.contains(&format!("api repos/owner/fixture/commits/{c}")),
+            "{calls}"
+        );
+    }
+    assert!(!ran.text.contains("is not signed"), "{}", ran.text);
+    // The worktrees are removed.
+    assert_eq!(
+        git(gov.root(), &["worktree", "list", "--porcelain"])
+            .matches("worktree ")
+            .count(),
+        1
+    );
+
+    // Signatures alone: every commit green, one unverified.
+    let signed = Gov::new(&[("governance.require_signed_commits", serde_json::json!(true))]);
+    let one = signed.commit(&[("src/two.rs", Some("pub fn two() {}\n"))], "two");
+    let two = signed.commit(&[("src/three.rs", Some("pub fn three() {}\n"))], "three");
+    let ran = run_gov(&signed, walk, &event("merge_group", &two), |_| {});
+    assert_eq!(ran.exit, 0, "{}", ran.text);
+    let ran = run_gov(&signed, walk, &event("merge_group", &two), |state| {
+        std::fs::write(state.join("gh-unsigned"), format!("{one}\n")).unwrap();
+    });
+    assert_eq!(ran.exit, 1, "{}", ran.text);
+    assert!(
+        ran.text.contains(&format!(
+            "{} is not signed with a key GitHub verifies",
+            signed.short(&one)
+        )),
+        "{}",
+        ran.text
+    );
+    assert!(
+        !ran.text
+            .contains(&format!("{} is not signed", signed.short(&two)))
+    );
+
+    // Nothing enabled: the walk judges nothing and says so.
+    let off = Gov::new(&[]);
+    let head = off.commit(&[], "empty");
+    let ran = run_gov(&off, walk, &event("pull_request", &head), |state| {
+        std::fs::write(state.join("gh-unsigned"), format!("{head}\n")).unwrap();
+    });
+    assert_eq!(ran.exit, 0, "{}", ran.text);
+    assert!(
+        ran.text.contains("no per-commit check is enabled"),
+        "{}",
+        ran.text
+    );
+}
+
+/// Rule 5: a pull request whose base is not the default branch fails
+/// governance, by default; the default branch passes.
+#[test]
+fn a_base_other_than_the_default_branch_refuses() {
+    let step = "The base is the default branch";
+    let gov = Gov::new(&[]);
+    let head = gov.commit(&[], "empty");
+    let ran = run_gov(&gov, step, &event("pull_request", &head), |_| {});
+    assert_eq!(ran.exit, 0, "{}", ran.text);
+    let stacked = Event {
+        base_ref: "feature/below",
+        ..event("pull_request", &head)
+    };
+    let ran = run_gov(&gov, step, &stacked, |_| {});
+    assert_eq!(ran.exit, 1, "{}", ran.text);
+    assert!(
+        ran.text
+            .contains("base is 'feature/below', not the default branch main"),
+        "{}",
+        ran.text
+    );
+    let off = Gov::new(&[("governance.require_default_base", serde_json::json!(false))]);
+    let head = off.commit(&[], "empty");
+    let ran = run_gov(
+        &off,
+        step,
+        &Event {
+            base_ref: "feature/below",
+            ..event("pull_request", &head)
+        },
+        |_| {},
+    );
+    assert_eq!(ran.exit, 0, "{}", ran.text);
+}
+
+/// Rules 4, 6 and 7 in the rendered workflow: the new checks are steps of the
+/// governance job (never jobs that can be skipped), every job that holds them
+/// only reads, the gate job stays read-only, and the caches decide nothing.
+#[test]
+fn revision_four_adds_steps_not_jobs_and_keeps_the_gate_read_only() {
+    let tmp = tempfile::tempdir().unwrap();
+    write(tmp.path(), "spec-spine.toml", TOML);
+    render(tmp.path());
+    let wf = workflow(tmp.path(), "statecraft-ci.yml");
+    let jobs: Vec<&str> = wf["jobs"]
+        .as_mapping()
+        .unwrap()
+        .keys()
+        .map(|k| k.as_str().unwrap())
+        .collect();
+    assert_eq!(
+        jobs,
+        [
+            "governance",
+            "code",
+            "ai-review",
+            "review-exception",
+            "ci-gate"
+        ]
+    );
+    for (job, def) in [("governance", "governance"), ("ci-gate", "ci-gate")] {
+        for (k, v) in wf["jobs"][def]["permissions"].as_mapping().unwrap() {
+            assert_eq!(v.as_str(), Some("read"), "{job} may only read: {k:?}");
+        }
+    }
+    let steps = wf["jobs"]["governance"]["steps"].as_sequence().unwrap();
+    let named = |name: &str| {
+        steps
+            .iter()
+            .find(|s| s["name"].as_str() == Some(name))
+            .unwrap_or_else(|| panic!("no step {name}"))
+    };
+    let queue_or_pr = "github.event_name == 'pull_request' || github.event_name == 'merge_group'";
+    assert_eq!(
+        named("Every commit in the change")["if"].as_str(),
+        Some(queue_or_pr)
+    );
+    assert_eq!(
+        named("Authored-content rules (title and body)")["if"].as_str(),
+        Some(queue_or_pr)
+    );
+    assert_eq!(
+        named("The base is the default branch")["if"].as_str(),
+        Some("github.event_name == 'pull_request'")
+    );
+    assert!(named("Governance")["if"].is_null());
+    // The caches: the binary keyed on the pin, cargo on the lockfile and the
+    // toolchain. The install step always runs, so a restored binary is still
+    // checked against the pin.
+    for job in ["governance", "code"] {
+        let steps = wf["jobs"][job]["steps"].as_sequence().unwrap();
+        let find = |name: &str| steps.iter().find(|s| s["name"].as_str() == Some(name));
+        let cache = find("Cache spec-spine").unwrap_or_else(|| panic!("{job}: no cache"));
+        assert!(
+            cache["uses"]
+                .as_str()
+                .unwrap()
+                .starts_with("actions/cache@")
+        );
+        assert_eq!(
+            cache["with"]["path"].as_str(),
+            Some(".tooling/bin/spec-spine")
+        );
+        assert!(
+            cache["with"]["key"]
+                .as_str()
+                .unwrap()
+                .contains("steps.pin.outputs.version"),
+            "{job}"
+        );
+        assert!(find("Install the pinned spec-spine").unwrap()["if"].is_null());
+    }
+    let code = wf["jobs"]["code"]["steps"].as_sequence().unwrap();
+    let cargo = code
+        .iter()
+        .find(|s| s["name"].as_str() == Some("Cache cargo registry, git and target"))
+        .unwrap();
+    assert!(
+        cargo["with"]["key"]
+            .as_str()
+            .unwrap()
+            .contains("hashFiles('Cargo.lock', 'rust-toolchain.toml')")
+    );
+    for path in ["~/.cargo/registry", "~/.cargo/git", "target"] {
+        assert!(cargo["with"]["path"].as_str().unwrap().contains(path));
+    }
+    // The pin step answers the key from the pin itself.
+    let (run, _) = step(&wf, "governance", "Read the spec-spine pin");
+    let ran = run_step(tmp.path(), &run, &[], &BTreeMap::new(), &[], |_| {});
+    assert_eq!(ran.exit, 0, "{}", ran.text);
+    assert_eq!(ran.output("version"), "0.25.0");
+    // The defaults keep a revision-3 project's behaviour, except the base.
+    let gate = std::fs::read_to_string(tmp.path().join("scripts/statecraft/gate.sh")).unwrap();
+    for line in [
+        "ENFORCE_COVERAGE=false",
+        "AUTHORED_CONTENT=''",
+        "AUTHORED_CONTENT_TEXT=false",
+        "GATE_EACH_COMMIT=false",
+        "REQUIRE_SIGNED_COMMITS=false",
+        "REQUIRE_DEFAULT_BASE=true",
+        "DEFAULT_BRANCH='main'",
+    ] {
+        assert!(gate.contains(line), "{line}");
+    }
+    assert!(!gate.contains("if [ -x scripts/check-authored-content.sh ]"));
 }

@@ -8,8 +8,19 @@ set -eu
 
 SS=.tooling/bin/spec-spine
 
+# The project's governance parameters (revision 4), rendered from its setup
+# block. Each default keeps a revision-3 project's behaviour except the base
+# rule, which is a new refusal.
+DEFAULT_BRANCH='{{sc:default_branch}}'
+ENFORCE_COVERAGE={{sc:governance.enforce_coverage}}
+AUTHORED_CONTENT='{{sc:governance.authored_content}}'
+AUTHORED_CONTENT_TEXT={{sc:governance.authored_content_text}}
+GATE_EACH_COMMIT={{sc:governance.gate_each_commit}}
+REQUIRE_SIGNED_COMMITS={{sc:governance.require_signed_commits}}
+REQUIRE_DEFAULT_BASE={{sc:governance.require_default_base}}
+
 usage() {
-  echo "usage: gate.sh governance|code|couple|couple-group" >&2
+  echo "usage: gate.sh governance|code|couple|couple-group|base|text|commits|pin" >&2
   exit 64
 }
 
@@ -22,18 +33,52 @@ need_spec_spine() {
   fi
 }
 
+# A declared authored-content script is required: deleting it, or dropping
+# its executable bit, refuses rather than passing silently.
+need_authored_content() {
+  if [ ! -f "$AUTHORED_CONTENT" ]; then
+    echo "gate.sh: governance.authored_content names $AUTHORED_CONTENT, which is absent" >&2
+    exit 1
+  fi
+  if [ ! -x "$AUTHORED_CONTENT" ]; then
+    echo "gate.sh: governance.authored_content names $AUTHORED_CONTENT, which is not executable" >&2
+    exit 1
+  fi
+}
+
+# The exact pin a spec-spine.toml states, read as install-spec-spine.sh reads
+# it; empty when there is none.
+pin_of() {
+  awk '
+    /^[[:space:]]*\[/ { section = $0; gsub(/[[:space:]]/, "", section); next }
+    section == "[meta]" && /^[[:space:]]*required_version[[:space:]]*=/ { print; exit }
+  ' "$1" 2>/dev/null | sed -n 's/^[^=]*=[[:space:]]*"=\([0-9][0-9]*\.[0-9][0-9]*\.[0-9][0-9]*\)"[[:space:]]*$/\1/p'
+}
+
+# The pull request a merge-queue entry was built from, by its group ref.
+queue_pr() {
+  printf '%s' "$1" | sed -n 's|.*/pr-\([0-9][0-9]*\)-[0-9a-f]*$|\1|p'
+}
+
 case "$1" in
   governance)
     need_spec_spine
     "$SS" check --fail-on-warn
     "$SS" lint --fail-on-warn
-    # Coverage is reported, not enforced: a new project's own sources are
-    # unclaimed until it writes the specs that claim them. A project adds
-    # --fail-on-untraced when its coverage debt is retired.
-    "$SS" index coverage
+    if [ "$ENFORCE_COVERAGE" = true ]; then
+      "$SS" index coverage --fail-on-untraced
+    else
+      # Reported, not enforced (governance.enforce_coverage is false): a new
+      # project's own sources are unclaimed until it writes the specs that
+      # claim them.
+      "$SS" index coverage
+    fi
     "$SS" index check --fail-on-unresolved
-    if [ -x scripts/check-authored-content.sh ]; then
-      scripts/check-authored-content.sh
+    if [ -n "$AUTHORED_CONTENT" ]; then
+      need_authored_content
+      "./$AUTHORED_CONTENT"
+    else
+      echo "gate.sh: no authored-content script is declared (governance.authored_content), so none runs"
     fi
     ;;
   code)
@@ -41,6 +86,142 @@ case "$1" in
     cargo test --workspace --locked
     cargo clippy --workspace --all-targets --locked -- -D warnings
     cargo fmt --all --check
+    ;;
+  pin)
+    # For the CI caches: the pin as a step output.
+    version=$(pin_of spec-spine.toml)
+    if [ -z "$version" ]; then
+      echo "gate.sh: spec-spine.toml [meta] states no exact required_version (=X.Y.Z)" >&2
+      exit 2
+    fi
+    echo "version=$version"
+    ;;
+  base)
+    # A stacked pull request merges into another branch and is never judged
+    # against the default branch (revision 4, rule 5).
+    if [ "$REQUIRE_DEFAULT_BASE" != true ]; then
+      echo "gate.sh: governance.require_default_base is false; the base is not judged"
+      exit 0
+    fi
+    : "${BASE_REF:?gate.sh base needs BASE_REF}"
+    if [ "$BASE_REF" != "$DEFAULT_BRANCH" ]; then
+      echo "gate.sh: this pull request's base is '$BASE_REF', not the default branch $DEFAULT_BRANCH: open it off $DEFAULT_BRANCH, or merge the one below it first" >&2
+      exit 1
+    fi
+    echo "the base is the default branch $DEFAULT_BRANCH"
+    ;;
+  text)
+    # The pull request's title and body, which become the merge commit's
+    # message: from the event on pull_request, through the API on
+    # merge_group, whose event carries neither (revision 4, rule 3).
+    if [ "$AUTHORED_CONTENT_TEXT" != true ]; then
+      echo "gate.sh: governance.authored_content_text is false; the title and body are not judged"
+      exit 0
+    fi
+    need_authored_content
+    tmp="${RUNNER_TEMP:-${TMPDIR:-/tmp}}"
+    text="$tmp/statecraft-pr-text.txt"
+    case "${EVENT_NAME:-}" in
+      pull_request)
+        printf '%s\n%s\n' "${PR_TITLE:-}" "${PR_BODY:-}" > "$text"
+        ;;
+      merge_group)
+        : "${GROUP_HEAD_REF:?gate.sh text needs GROUP_HEAD_REF}"
+        : "${REPO:?gate.sh text needs REPO}"
+        pr=$(queue_pr "$GROUP_HEAD_REF")
+        if [ -z "$pr" ]; then
+          echo "gate.sh: cannot read the pull request number from $GROUP_HEAD_REF" >&2
+          exit 1
+        fi
+        gh api "repos/$REPO/pulls/$pr" --jq '.title, (.body // "")' > "$text"
+        ;;
+      *)
+        echo "gate.sh: text judges a pull_request or merge_group event, not '${EVENT_NAME:-}'" >&2
+        exit 1
+        ;;
+    esac
+    "./$AUTHORED_CONTENT" --text "$text"
+    ;;
+  commits)
+    # Every commit in the change's base..head, not only its head (revision 4,
+    # rules 3 and 4): under merge commits each one lands on the default
+    # branch. A step of the governance job, never a job of its own, so it
+    # cannot be skipped into a green gate.
+    if [ "$GATE_EACH_COMMIT" != true ] && [ "$REQUIRE_SIGNED_COMMITS" != true ] && [ "$AUTHORED_CONTENT_TEXT" != true ]; then
+      echo "gate.sh: no per-commit check is enabled (governance.gate_each_commit, governance.require_signed_commits, governance.authored_content_text)"
+      exit 0
+    fi
+    : "${BASE_SHA:?gate.sh commits needs BASE_SHA}"
+    : "${HEAD_SHA:?gate.sh commits needs HEAD_SHA}"
+    if [ "$REQUIRE_SIGNED_COMMITS" = true ]; then
+      : "${REPO:?gate.sh commits needs REPO}"
+    fi
+    if [ "$AUTHORED_CONTENT_TEXT" = true ]; then
+      need_authored_content
+    fi
+    tmp="${RUNNER_TEMP:-${TMPDIR:-/tmp}}"
+    here=$(pwd)
+    head_pin=$(pin_of spec-spine.toml)
+    commits=$(git rev-list --reverse "$BASE_SHA..$HEAD_SHA")
+    echo "judging $(printf '%s\n' "$commits" | grep -c . || true) commit(s) in $BASE_SHA..$HEAD_SHA"
+    fail=0
+    for c in $commits; do
+      short=$(git rev-parse --short "$c")
+      if [ "$REQUIRE_SIGNED_COMMITS" = true ]; then
+        # GitHub's verification, the one branch protection's signed-commits
+        # rule reads.
+        verified=$(gh api "repos/$REPO/commits/$c" --jq '.commit.verification.verified' 2>/dev/null) || verified=unreadable
+        if [ "$verified" != true ]; then
+          echo "gate.sh: $short is not signed with a key GitHub verifies ($verified)" >&2
+          fail=1
+        fi
+      fi
+      if [ "$AUTHORED_CONTENT_TEXT" = true ]; then
+        msg="$tmp/statecraft-msg-$short.txt"
+        git log -1 --format=%B "$c" > "$msg"
+        if ! "./$AUTHORED_CONTENT" --text "$msg"; then
+          echo "gate.sh: $short's message breaks the authored-content rules" >&2
+          fail=1
+        fi
+      fi
+      if [ "$GATE_EACH_COMMIT" = true ]; then
+        # The commit's own tree, its own gate.sh, and the spec-spine release
+        # its own spec-spine.toml pins.
+        wt="$tmp/statecraft-commit-$short"
+        git worktree add -q --detach "$wt" "$c"
+        pin=$(pin_of "$wt/spec-spine.toml")
+        bin=""
+        if [ -z "$pin" ]; then
+          echo "gate.sh: $short's spec-spine.toml states no exact pin" >&2
+        elif [ "$pin" = "$head_pin" ] && [ -x "$SS" ]; then
+          bin="$here/$SS"
+        else
+          root="$tmp/statecraft-spec-spine-$pin"
+          [ -x "$root/bin/spec-spine" ] || cargo install spec-spine-cli --version "=$pin" --locked --root "$root"
+          bin="$root/bin/spec-spine"
+        fi
+        script="$wt/scripts/statecraft/gate.sh"
+        if [ ! -f "$script" ]; then
+          echo "$short carries no scripts/statecraft/gate.sh; the running copy judges it"
+          script="$here/scripts/statecraft/gate.sh"
+        fi
+        log="$tmp/statecraft-gate-$short.log"
+        if [ -n "$bin" ] && mkdir -p "$wt/.tooling/bin" && ln -sf "$bin" "$wt/.tooling/bin/spec-spine" \
+          && (cd "$wt" && sh "$script" governance && cargo fmt --all --check) > "$log" 2>&1; then
+          echo "$short: the gate and the format check pass at its own tree"
+        else
+          echo "gate.sh: $short fails the gate or the format check at its own tree" >&2
+          cat "$log" 2>/dev/null || true
+          fail=1
+        fi
+        git worktree remove --force "$wt"
+      fi
+    done
+    if [ "$fail" -ne 0 ]; then
+      echo "gate.sh: a commit in $BASE_SHA..$HEAD_SHA was refused; rebuild the branch" >&2
+      exit 1
+    fi
+    echo "every commit in $BASE_SHA..$HEAD_SHA passes"
     ;;
   couple)
     # Pull requests only, with the event's two frozen endpoints: a three-dot
@@ -65,7 +246,7 @@ case "$1" in
     : "${GROUP_HEAD_REF:?gate.sh couple-group needs GROUP_HEAD_REF}"
     : "${REPO:?gate.sh couple-group needs REPO}"
     tmp="${RUNNER_TEMP:-${TMPDIR:-/tmp}}"
-    pr=$(printf '%s' "$GROUP_HEAD_REF" | sed -n 's|.*/pr-\([0-9][0-9]*\)-[0-9a-f]*$|\1|p')
+    pr=$(queue_pr "$GROUP_HEAD_REF")
     if [ -z "$pr" ]; then
       echo "gate.sh: cannot read the pull request number from $GROUP_HEAD_REF" >&2
       exit 1

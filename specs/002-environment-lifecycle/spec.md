@@ -7664,6 +7664,49 @@ workflow keeps the gate job read-only; a revision-3 project upgrades to
 revision 4 with `governance.authored_content` set when the script exists and
 unset when it does not.
 
+**2026-09-24: profile revision 4 implemented (the entry above on the checks
+S-5 found missing).** `setup.rs` registers revision 4 (identity
+`998c0d7eb8f2890a3d1558b3c9b2a73ff199722d01d6a6e149b8f52237ab4d7b`) and
+validates the six `governance.*` parameters: five booleans, the path
+(repository-relative, no `..`, no leading `/` or `-`), and
+`authored_content_text` refused without the path. `gate.sh` carries them as
+rendered values. `governance` passes `--fail-on-untraced` when coverage is
+enforced, and runs a declared script as `./<path>`, exiting 1 when it is absent
+or not executable; with none declared it says that none runs. Revision 3's
+`if [ -x ... ]` is gone. New subcommands: `base` (rule 5), `text` (the title
+and body, from the event or through the API), `commits` (the walk:
+`commit.verification.verified` through `gh api`, each message through
+`--text`, and each commit's own `gate.sh governance` and `cargo fmt --all
+--check` in a detached worktree using the release its own `spec-spine.toml`
+pins, falling back to the running `gate.sh` when the commit has none), and
+`pin` (the cache key). The rendered workflow keeps the same five jobs and
+calls each subcommand as a step of `governance`. It caches
+`.tooling/bin/spec-spine` on the pin in both jobs, and the cargo registry, git
+and `target/` on `Cargo.lock` and `rust-toolchain.toml` in `code`, using
+`actions/cache` pinned by commit; the install step always runs and still checks
+the version. The policy's `commands` follow the parameters, and `ci-gate`'s
+jobs and rules are unchanged. The upgrade declares
+`scripts/check-authored-content.sh` for any recorded revision below 4 when
+the file exists. Revisions 1 and 2 ran the same `if -x` check, so this keeps
+the check they ran too (an agent's choice, recorded here). `doctor --remote`
+names the authored-content step in its `local-checks` detail, and `init plan`
+names it in its rendering. Tests: `setup_workflows.rs` runs the rendered
+steps with a stubbed `spec-spine`, a stubbed `cargo`, the `gh` stub and this
+repository's `scripts/check-authored-content.sh`, one test per obligation:
+coverage enforced and reported; a declared script missing, not executable or
+refusing, and an undeclared one running nothing; U+2014 in a title, a body
+(event and queue) and a commit message; an unsigned commit, and red
+intermediate trees (gate and fmt) under a green head; a stacked base refused
+and the default branch passing. A structural test asserts steps rather than
+jobs, read-only `governance` and `ci-gate`, and the caches.
+`setup_upgrade.rs` rebuilds revision 3 from revision 4 and upgrades it with
+and without the script, and asserts the unchanged policy and the operator
+steps. `setup_profile.rs` asserts the `doctor --remote` note. Not exercised
+locally: the real spec-spine behind these steps (its flags are this
+repository's own gate), and the walk's install of a different pinned release
+for an older commit (it needs the network); the first live run is their
+evidence.
+
 ## Verification
 
 `--fail-on-untraced` joined the corpus gate with this spec's first

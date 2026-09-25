@@ -22,8 +22,9 @@ jobs:
   governance:
     name: governance
     runs-on: ubuntu-latest
-    # `pull-requests: read` is for the merge-queue coupling step, which reads
-    # the queued pull request's changed files and body. Nothing here writes.
+    # `pull-requests: read` is for the merge-queue steps, which read the
+    # queued pull request's changed files, title and body. Nothing here
+    # writes; the commit walk reads each commit's verification.
     permissions:
       contents: read
       pull-requests: read
@@ -32,10 +33,49 @@ jobs:
         with:
           fetch-depth: 0
           persist-credentials: false
+      # Revision 4, rule 6: a cache, never a check. The key is the pin, so a
+      # pin bump is a miss; the install step still verifies the version.
+      - name: Read the spec-spine pin
+        id: pin
+        run: sh scripts/statecraft/gate.sh pin >> "$GITHUB_OUTPUT"
+      - name: Cache spec-spine
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: .tooling/bin/spec-spine
+          key: spec-spine-${{ steps.pin.outputs.version }}-${{ runner.os }}-${{ runner.arch }}
       - name: Install the pinned spec-spine
         run: sh scripts/statecraft/install-spec-spine.sh
+      # Revision 4, rule 5: a stacked pull request is never judged against
+      # the default branch, so it fails here (governance.require_default_base).
+      - name: The base is the default branch
+        if: github.event_name == 'pull_request'
+        env:
+          BASE_REF: ${{ github.event.pull_request.base.ref }}
+        run: sh scripts/statecraft/gate.sh base
       - name: Governance
         run: sh scripts/statecraft/gate.sh governance
+      # Revision 4, rule 3: the title and body become the merge commit's
+      # message (governance.authored_content_text).
+      - name: Authored-content rules (title and body)
+        if: github.event_name == 'pull_request' || github.event_name == 'merge_group'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          EVENT_NAME: ${{ github.event_name }}
+          PR_TITLE: ${{ github.event.pull_request.title }}
+          PR_BODY: ${{ github.event.pull_request.body }}
+          GROUP_HEAD_REF: ${{ github.event.merge_group.head_ref }}
+        run: sh scripts/statecraft/gate.sh text
+      # Revision 4, rules 3 and 4: every commit in the change, a step of this
+      # job so it cannot be skipped into a green gate.
+      - name: Every commit in the change
+        if: github.event_name == 'pull_request' || github.event_name == 'merge_group'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.merge_group.base_sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha || github.event.merge_group.head_sha }}
+        run: sh scripts/statecraft/gate.sh commits
       # A documented step-level inapplicability, not a job skip: coupling
       # compares a pull request's two frozen endpoints, and a push has none.
       - name: Coupling gate
@@ -64,8 +104,28 @@ jobs:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
           persist-credentials: false
+      - name: Read the spec-spine pin
+        id: pin
+        run: sh scripts/statecraft/gate.sh pin >> "$GITHUB_OUTPUT"
+      - name: Cache spec-spine
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: .tooling/bin/spec-spine
+          key: spec-spine-${{ steps.pin.outputs.version }}-${{ runner.os }}-${{ runner.arch }}
       - name: Install the pinned spec-spine
         run: sh scripts/statecraft/install-spec-spine.sh
+      # The two inputs that invalidate a build; a source edit hits the cache
+      # and recompiles only this workspace's crates.
+      - name: Cache cargo registry, git and target
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: cargo-${{ runner.os }}-${{ hashFiles('Cargo.lock', 'rust-toolchain.toml') }}
+          restore-keys: |
+            cargo-${{ runner.os }}-
       - name: Build, test, clippy, fmt
         run: sh scripts/statecraft/gate.sh code
 

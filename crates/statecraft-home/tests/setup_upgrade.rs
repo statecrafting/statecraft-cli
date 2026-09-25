@@ -28,11 +28,20 @@ fn project() -> tempfile::TempDir {
 }
 
 fn plan_and_apply(root: &Path, profile: &Profile, manifest: &mut Manifest) -> setup::Plan {
-    let block = BTreeMap::new();
+    plan_and_apply_with(root, profile, manifest, &BTreeMap::new())
+}
+
+/// As the flow plans: `block` is the parameters the declaration records.
+fn plan_and_apply_with(
+    root: &Path,
+    profile: &Profile,
+    manifest: &mut Manifest,
+    block: &BTreeMap<String, serde_json::Value>,
+) -> setup::Plan {
     let plan = setup::plan(&Inputs {
         root,
         profile,
-        block: &block,
+        block,
         manifest,
         spec_spine_toml: Some(TOML),
         derived_dir: ".statecraft/derived",
@@ -135,6 +144,30 @@ fn an_unmodified_file_is_replaced_and_a_customized_one_is_kept_with_three_digest
     );
 }
 
+/// Revision 3 of the registered profile, rebuilt from revision 4 by undoing
+/// revision 4's marks in the two templates a managed upgrade compares: the
+/// gate script's per-commit walk and the workflow's step that runs it. Only
+/// the templates matter to a managed upgrade.
+fn revision_three() -> Profile {
+    let mut r3 = Profile::registered();
+    assert_eq!(r3.revision, 4, "the registered profile is revision 4");
+    r3.revision = 3;
+    for t in &mut r3.templates {
+        if t.path == ".github/workflows/statecraft-ci.yml" {
+            assert!(
+                t.body.contains("gate.sh commits"),
+                "revision 4's commit walk step"
+            );
+            t.body = t.body.replace("gate.sh commits", "gate.sh commits-r3");
+        }
+        if t.path == "scripts/statecraft/gate.sh" {
+            assert!(t.body.contains("  commits)"), "revision 4's commit walk");
+            t.body = t.body.replace("  commits)", "  commits-r3)");
+        }
+    }
+    r3
+}
+
 const R3_TRIGGER: &str = "  # Revision 3: a required merge queue judges each queued entry here. The\n  # review is not re-run for it; ci-gate reads the verdict recorded for the\n  # entry's pull request.\n  merge_group:\n";
 
 /// Revision 2 of the registered profile, rebuilt from revision 3 by undoing
@@ -142,8 +175,11 @@ const R3_TRIGGER: &str = "  # Revision 3: a required merge queue judges each que
 /// `merge_group` trigger and the gate's `recorded-review` rule. Only the
 /// templates matter to a managed upgrade.
 fn revision_two() -> Profile {
-    let mut r2 = Profile::registered();
-    assert_eq!(r2.revision, 3, "the registered profile is revision 3");
+    let mut r2 = revision_three();
+    assert_eq!(
+        r2.revision, 3,
+        "revision 3 is rebuilt from the registered one"
+    );
     r2.revision = 2;
     for t in &mut r2.templates {
         if t.path == ".github/workflows/statecraft-ci.yml" {
@@ -271,7 +307,7 @@ fn a_revision_two_project_upgrades_to_revision_three() {
     customized.push_str("# a local addition\n");
     std::fs::write(root.join(wf), &customized).unwrap();
 
-    let r3 = Profile::registered();
+    let r3 = revision_three();
     assert_ne!(r3.identity(), r2.identity());
     let upgrade = plan_and_apply(root, &r3, &mut manifest);
     let file = |rel: &str| upgrade.files.iter().find(|f| f.path == rel).unwrap();
@@ -317,4 +353,134 @@ fn revision_three_states_a_rule_for_the_queue_and_the_upgrade_order() {
     let steps = setup::remote_obligations().join("\n");
     assert!(steps.contains("upgrade to revision 3 first"), "{steps}");
     assert!(steps.contains("never by a second review"), "{steps}");
+}
+
+fn applied_revision_three(with_script: bool) -> (tempfile::TempDir, Manifest) {
+    let dir = project();
+    let root = dir.path();
+    if with_script {
+        std::fs::create_dir_all(root.join("scripts")).unwrap();
+        std::fs::write(
+            root.join(setup::AUTHORED_CONTENT_SCRIPT),
+            "#!/bin/sh\nexit 0\n",
+        )
+        .unwrap();
+    }
+    let mut manifest = Manifest::new(Pins {
+        product: "0.0.0".into(),
+        spec_spine: "unpinned".into(),
+        adapters: Default::default(),
+        producer: None,
+    });
+    assert!(plan_and_apply(root, &revision_three(), &mut manifest).whole());
+    let selection = manifest.project.setup.as_ref().unwrap();
+    assert_eq!(selection.revision, 3);
+    // Revision 3 recorded no governance parameter: its gate ran the script
+    // whenever it was executable.
+    assert!(
+        !selection
+            .parameters
+            .contains_key("governance.authored_content")
+    );
+    (dir, manifest)
+}
+
+/// Revision 4, rule 2 and item 7: the upgrade from revision 3 declares the
+/// authored-content script when it exists, so the check a revision-3 project
+/// ran is kept, and declares nothing when it does not.
+#[test]
+fn a_revision_three_project_upgrades_to_revision_four() {
+    for with_script in [true, false] {
+        let (dir, mut manifest) = applied_revision_three(with_script);
+        let root = dir.path();
+        let r3 = revision_three();
+        let r4 = Profile::registered();
+        assert_ne!(r4.identity(), r3.identity());
+        let upgrade = plan_and_apply(root, &r4, &mut manifest);
+        let file = |rel: &str| upgrade.files.iter().find(|f| f.path == rel).unwrap();
+
+        // Unchanged since written: rewritten with revision 4's gate.
+        assert_eq!(file("scripts/statecraft/gate.sh").action, Action::Replace);
+        assert_eq!(
+            file(".github/workflows/statecraft-ci.yml").action,
+            Action::Replace
+        );
+        let gate = std::fs::read_to_string(root.join("scripts/statecraft/gate.sh")).unwrap();
+        assert!(gate.contains("  commits)"), "{gate}");
+        assert!(upgrade.whole());
+
+        let selection = manifest.project.setup.as_ref().unwrap();
+        assert_eq!(selection.revision, 4);
+        let declared = selection.parameters.get("governance.authored_content");
+        if with_script {
+            assert_eq!(
+                upgrade.parameters.authored_content.as_deref(),
+                Some(setup::AUTHORED_CONTENT_SCRIPT)
+            );
+            assert_eq!(
+                declared,
+                Some(&serde_json::json!(setup::AUTHORED_CONTENT_SCRIPT))
+            );
+            assert!(
+                gate.contains("AUTHORED_CONTENT='scripts/check-authored-content.sh'"),
+                "{gate}"
+            );
+            let policy: serde_json::Value = serde_json::from_str(
+                &std::fs::read_to_string(root.join(setup::POLICY_PATH)).unwrap(),
+            )
+            .unwrap();
+            assert_eq!(
+                policy["parameters"]["authored_content"],
+                setup::AUTHORED_CONTENT_SCRIPT
+            );
+        } else {
+            assert_eq!(upgrade.parameters.authored_content, None);
+            assert_eq!(declared, None);
+            assert!(gate.contains("AUTHORED_CONTENT=''"), "{gate}");
+        }
+        assert!(upgrade.render().contains(if with_script {
+            "authored content: scripts/check-authored-content.sh"
+        } else {
+            "authored content: none declared"
+        }));
+
+        // A re-plan at revision 4, with the parameters the declaration now
+        // records (as the flow plans), is stable: it neither adds nor drops
+        // the declaration, and writes nothing.
+        let recorded = manifest.project.setup.as_ref().unwrap().parameters.clone();
+        let again = plan_and_apply_with(root, &r4, &mut manifest, &recorded);
+        assert!(again.files.iter().all(|f| !f.action.writes()));
+        assert_eq!(
+            again.parameters.authored_content,
+            upgrade.parameters.authored_content
+        );
+    }
+}
+
+/// Revision 4, item 7: `ci-gate`'s policy is unchanged, and the operator
+/// steps name the new refusal and the parameters that keep checks run by
+/// hand.
+#[test]
+fn revision_four_keeps_the_policy_and_names_the_new_refusal() {
+    let policy = setup::jobs();
+    assert_eq!(policy["governance"]["pull_request"], "required");
+    assert_eq!(policy["governance"]["merge_group"], "required");
+    assert_eq!(policy["code"]["merge_group"], "required");
+    assert_eq!(policy["ai-review"]["merge_group"], "recorded-review");
+    assert_eq!(policy.as_object().unwrap().len(), 4);
+    let steps = setup::remote_obligations().join("\n");
+    assert!(
+        steps.contains("a pull request whose base is not the default branch fails governance"),
+        "{steps}"
+    );
+    for parameter in [
+        "governance.require_default_base",
+        "governance.enforce_coverage",
+        "governance.authored_content",
+        "governance.authored_content_text",
+        "governance.gate_each_commit",
+        "governance.require_signed_commits",
+    ] {
+        assert!(steps.contains(parameter), "{parameter}: {steps}");
+    }
 }
