@@ -7563,6 +7563,33 @@ skip on `merge_group` is admitted only with a recorded verdict; the rendered
 workflow triggers on `merge_group` and grants the gate job only read
 permissions; a revision-2 project upgrades to revision 3.
 
+**2026-09-24: profile revision 3 implemented (the entry above on the merge
+queue).** `setup.rs` registers revision 3 (identity
+`5e30836810d88d294027788376354495bc73333363607002ea968b7153fefb12`); the
+policy states a `merge_group` rule for every required job (`required` for
+governance and code, `recorded-review` for `ai-review`, `inapplicable` for the
+exception job), and the operator steps state the upgrade order. The rendered
+workflow triggers on `merge_group`; governance gains a read-only
+`pull-requests` permission and a merge-queue coupling step
+(`gate.sh couple-group`, the waiver rule of statecraft-cli's #130); `ci-gate`
+gains read-only `actions` and `pull-requests` permissions and the queue's
+endpoints. `ci-gate.sh`'s `recorded-review` rule requires the review job to be
+skipped, then reads the entry's pull request, its latest completed
+`statecraft-ci` pull-request run at that head, the uploaded evidence record
+(whose subject must name the same pull request and head) and that run's
+exception job; it admits `no-findings`, `findings` with an approved exception,
+and a visible skip (a release candidate's only with the exception), and blocks
+every other case with a reason. Tests: `setup_workflows.rs` adds seventeen
+queue cases through the rendered step with a stubbed `gh` (three admitted,
+fourteen blocked, none calling the reviewer or posting), includes them in the
+mutation test over every blocking branch, and asserts the trigger, the
+gate's read-only permissions and the pull-request-only review;
+`setup_upgrade.rs` rebuilds revision 2 from revision 3 and upgrades it (the
+unchanged gate script is rewritten, a customized workflow is withheld), and
+asserts the queue rules and the upgrade order. The merge-queue coupling step is
+not exercised by a local test (it needs the pinned spec-spine and the API);
+its first live queue run is its evidence.
+
 ## Verification
 
 `--fail-on-untraced` joined the corpus gate with this spec's first

@@ -262,8 +262,22 @@ case "$1 $2" in
   "pr comment")
     cat > /dev/null
     exit "$(cat "$here/gh-comment-exit")" ;;
+  api\ repos/*/actions/runs/*/jobs*)
+    cat "$here/gh-jobs" 2> /dev/null || echo '{"jobs": []}' ;;
+  api\ repos/*/actions/runs*)
+    cat "$here/gh-runs" 2> /dev/null || echo '{"workflow_runs": []}' ;;
   api\ repos/*/pulls/*)
+    if [ -f "$here/gh-pull-fails" ]; then echo "HTTP 404: Not Found" >&2; exit 1; fi
     cat "$here/gh-head" ;;
+  "run download")
+    dir=""; prev=""
+    for a in "$@"; do
+      if [ "$prev" = "--dir" ]; then dir="$a"; fi
+      prev="$a"
+    done
+    [ -f "$here/gh-record" ] || { echo "no artifact" >&2; exit 1; }
+    mkdir -p "$dir"
+    cp "$here/gh-record" "$dir/ai-review-evidence.json" ;;
   *) echo "gh stub: unsupported $*" >&2; exit 98 ;;
 esac
 "#;
@@ -373,14 +387,20 @@ fn gate_ctx(
     ctx.insert("toJSON(needs)".into(), needs_json.to_string());
     ctx.insert("github.event_name".into(), event.to_string());
     ctx.insert(
-        "github.event.pull_request.base.sha || github.event.before".into(),
+        "github.event.pull_request.base.sha || github.event.merge_group.base_sha || github.event.before".into(),
         repo.base.clone(),
     );
     ctx.insert(
-        "github.event.pull_request.head.sha || github.sha".into(),
+        "github.event.pull_request.head.sha || github.event.merge_group.head_sha || github.sha"
+            .into(),
         repo.head.clone(),
     );
+    // On pull_request and push the queue ref is empty; a merge-queue case
+    // replaces it (`run_queue`).
     ctx.insert("github.head_ref".into(), head_ref.to_string());
+    ctx.insert("github.event.merge_group.head_ref".into(), String::new());
+    ctx.insert("github.repository".into(), "owner/fixture".into());
+    ctx.insert("github.token".into(), "fixture-token".into());
     ctx
 }
 
@@ -605,6 +625,9 @@ const POLICY: &str = ".statecraft/setup/github-actions-rust.json";
 /// What a blocking case's report must say: a gate that blocks without
 /// saying why has lost the branch that was meant to block it.
 fn reason(label: &str) -> &'static str {
+    if let Some(why) = queue_reason(label) {
+        return why;
+    }
     if label.contains("findings, no owner exception") || label.contains("exception rejected") {
         "returned findings"
     } else if label.ends_with("vanished") {
@@ -775,7 +798,26 @@ fn ci_gate_needs_every_job_the_policy_requires() {
         wf["jobs"]["review-exception"]["environment"].as_str(),
         Some("statecraft-review-exception")
     );
-    assert!(wf["on"]["merge_group"].is_null(), "no merge_group trigger");
+    // Revision 3: the queue is judged, and the gate job only reads.
+    // `merge_group:` has no value, so the key's presence is the trigger.
+    assert!(
+        wf["on"]
+            .as_mapping()
+            .unwrap()
+            .contains_key(serde_yaml::Value::from("merge_group")),
+        "a merge_group trigger"
+    );
+    let perms = &wf["jobs"]["ci-gate"]["permissions"];
+    for (k, v) in perms.as_mapping().unwrap() {
+        assert_eq!(v.as_str(), Some("read"), "ci-gate may only read: {k:?}");
+    }
+    assert!(
+        wf["jobs"]["ai-review"]["if"]
+            .as_str()
+            .unwrap()
+            .contains("github.event_name == 'pull_request'"),
+        "the review is never re-run in the queue"
+    );
     assert!(
         wf["on"]["pull_request_target"].is_null(),
         "never pull_request_target"
@@ -837,7 +879,10 @@ fn inverting_a_blocking_branch_of_ci_gate_is_noticed() {
                     *want,
                     reason(label),
                 )
-            });
+            })
+            || queue_cases()
+                .iter()
+                .any(|q| differs(&run_queue(&repo, q), q.want, reason(q.label)));
         // Two branches need a policy of their own: none at all, and one that
         // names a rule the gate does not know.
         let noticed = noticed || {
@@ -880,6 +925,242 @@ fn inverting_a_blocking_branch_of_ci_gate_is_noticed() {
             site + 1,
             lines[site]
         );
+    }
+}
+
+// ------------------------------------------------------------ merge queue
+
+/// The pull request a queue entry was built from, in the fixtures.
+const PR_HEAD: &str = "abcdefabcdefabcdefabcdefabcdefabcdefabcd";
+const QUEUE_REF: &str = "gh-readonly-queue/main/pr-7-0123456789abcdef0123456789abcdef01234567";
+
+/// One merge-queue case: what the API answers about the entry's pull
+/// request, its runs, their jobs and the evidence record.
+struct Queue {
+    label: &'static str,
+    needs_json: String,
+    group_ref: &'static str,
+    pull_fails: bool,
+    pr_ref: &'static str,
+    run: bool,
+    record: Option<serde_json::Value>,
+    exception: &'static str,
+    want: i32,
+}
+
+fn record(result: &str, pr: u64, head: &str) -> serde_json::Value {
+    serde_json::json!({
+        "subject": {"repository": "owner/fixture", "pullRequest": pr, "head": head},
+        "result": result,
+        "findings": [],
+    })
+}
+
+const QUEUE_OK: [(&str, &str); 4] = [
+    ("governance", "success"),
+    ("code", "success"),
+    ("ai-review", "skipped"),
+    ("review-exception", "skipped"),
+];
+
+fn queue_needs(over: Option<(&str, &str)>) -> String {
+    let entries: Vec<(&str, &str)> = QUEUE_OK
+        .iter()
+        .map(|(j, r)| match over {
+            Some((oj, or)) if oj == *j => (*j, or),
+            _ => (*j, *r),
+        })
+        .collect();
+    needs(&entries, None, false)
+}
+
+fn queue(label: &'static str, want: i32) -> Queue {
+    Queue {
+        label,
+        needs_json: queue_needs(None),
+        group_ref: QUEUE_REF,
+        pull_fails: false,
+        pr_ref: "topic",
+        run: true,
+        record: Some(record("no-findings", 7, PR_HEAD)),
+        exception: "skipped",
+        want,
+    }
+}
+
+/// Every merge-queue case (revision 3), shared by the plain test and the
+/// mutation test.
+fn queue_cases() -> Vec<Queue> {
+    vec![
+        queue("queue, recorded no-findings", 0),
+        Queue {
+            record: Some(record("findings", 7, PR_HEAD)),
+            exception: "success",
+            ..queue("queue, recorded findings, owner exception approved", 0)
+        },
+        Queue {
+            record: Some(record("skipped:oversized", 7, PR_HEAD)),
+            ..queue("queue, recorded skip, not a release candidate", 0)
+        },
+        Queue {
+            group_ref: "gh-readonly-queue/main/not-a-queue-entry",
+            ..queue("queue, unreadable queue ref", 1)
+        },
+        Queue {
+            pull_fails: true,
+            ..queue("queue, pull request unreadable", 1)
+        },
+        Queue {
+            run: false,
+            ..queue("queue, no recorded run", 1)
+        },
+        Queue {
+            record: None,
+            ..queue("queue, no evidence record", 1)
+        },
+        Queue {
+            record: Some(record(
+                "no-findings",
+                7,
+                "1111111111111111111111111111111111111111",
+            )),
+            ..queue("queue, record for another head", 1)
+        },
+        Queue {
+            record: Some(record("no-findings", 8, PR_HEAD)),
+            ..queue("queue, record for another pull request", 1)
+        },
+        Queue {
+            needs_json: queue_needs(Some(("ai-review", "success"))),
+            ..queue("queue, the review ran in the queue", 1)
+        },
+        Queue {
+            record: Some(record("findings", 7, PR_HEAD)),
+            ..queue("queue, recorded findings, no owner exception", 1)
+        },
+        Queue {
+            record: Some(record("findings", 7, PR_HEAD)),
+            exception: "failure",
+            ..queue("queue, recorded findings, owner exception rejected", 1)
+        },
+        Queue {
+            record: Some(record("skipped:oversized", 7, PR_HEAD)),
+            pr_ref: "release/1.0",
+            ..queue("queue, recorded skip, release candidate, no exception", 1)
+        },
+        Queue {
+            record: Some(record("", 7, PR_HEAD)),
+            ..queue("queue, record without a result", 1)
+        },
+        Queue {
+            needs_json: queue_needs(Some(("code", "failure"))),
+            ..queue("queue, code failed", 1)
+        },
+        Queue {
+            needs_json: queue_needs(Some(("governance", "skipped"))),
+            ..queue("queue, governance skipped", 1)
+        },
+        Queue {
+            needs_json: queue_needs(Some(("review-exception", "success"))),
+            ..queue("queue, an exception job that ran", 1)
+        },
+    ]
+}
+
+/// What a blocking queue case's report must say.
+fn queue_reason(label: &str) -> Option<&'static str> {
+    if !label.starts_with("queue, ") {
+        return None;
+    }
+    Some(if label.contains("unreadable queue ref") {
+        "cannot read the queued pull request's number"
+    } else if label.contains("pull request unreadable") {
+        "cannot read pull request #7"
+    } else if label.contains("no recorded run") {
+        "no completed statecraft-ci run"
+    } else if label.contains("no evidence record") {
+        "carries no evidence record"
+    } else if label.contains("another") {
+        "names another pull request or head"
+    } else if label.contains("ran in the queue") {
+        "not re-run in the merge queue"
+    } else if label.contains("release candidate") {
+        "release candidate #7"
+    } else if label.contains("recorded findings") {
+        "returned findings and its owner exception was not approved"
+    } else if label.contains("without a result") {
+        "carries no review result"
+    } else if label.contains("skipped") {
+        "an unexpected skip"
+    } else if label.contains("exception job that ran") {
+        "must be skipped"
+    } else {
+        "ended"
+    })
+}
+
+fn run_queue(repo: &Repo, q: &Queue) -> Ran {
+    let wf = workflow(repo.root(), "statecraft-ci.yml");
+    let (run, env) = step(&wf, "ci-gate", "Aggregate");
+    let mut ctx = gate_ctx(repo, "merge_group", &q.needs_json, "");
+    ctx.insert(
+        "github.event.merge_group.head_ref".into(),
+        q.group_ref.to_string(),
+    );
+    run_step(repo.root(), &run, &env, &ctx, &[], |state| {
+        let pull = serde_json::json!({"number": 7, "head": {"sha": PR_HEAD, "ref": q.pr_ref}});
+        std::fs::write(state.join("gh-head"), pull.to_string()).unwrap();
+        if q.pull_fails {
+            std::fs::write(state.join("gh-pull-fails"), "").unwrap();
+        }
+        let runs = if q.run {
+            serde_json::json!({"workflow_runs": [
+                {"id": 41, "name": "statecraft-ci", "event": "pull_request", "head_sha": PR_HEAD, "status": "completed"},
+                {"id": 42, "name": "statecraft-ci", "event": "pull_request", "head_sha": PR_HEAD, "status": "completed"},
+                {"id": 43, "name": "something-else", "event": "pull_request", "head_sha": PR_HEAD, "status": "completed"}
+            ]})
+        } else {
+            serde_json::json!({"workflow_runs": []})
+        };
+        std::fs::write(state.join("gh-runs"), runs.to_string()).unwrap();
+        let jobs = serde_json::json!({"jobs": [
+            {"name": "ai-review / review", "conclusion": "success"},
+            {"name": "review-exception", "conclusion": q.exception}
+        ]});
+        std::fs::write(state.join("gh-jobs"), jobs.to_string()).unwrap();
+        if let Some(r) = &q.record {
+            std::fs::write(state.join("gh-record"), r.to_string()).unwrap();
+        }
+    })
+}
+
+#[test]
+fn a_queue_entry_is_judged_by_the_review_recorded_for_its_pull_request() {
+    let repo = Repo::new(&[POLICY, "scripts/statecraft/ci-gate.sh"], &[]);
+    for q in queue_cases() {
+        let ran = run_queue(&repo, &q);
+        assert_eq!(ran.exit, q.want, "{}:\n{}", q.label, ran.text);
+        if q.want == 1 {
+            assert!(
+                ran.text.contains(reason(q.label)),
+                "{}: {}",
+                q.label,
+                ran.text
+            );
+        } else {
+            assert!(
+                ran.text.contains("admitted by the review recorded for #7"),
+                "{}: {}",
+                q.label,
+                ran.text
+            );
+            // The latest completed statecraft-ci run is the one read.
+            assert!(ran.text.contains("run 42"), "{}: {}", q.label, ran.text);
+        }
+        // Never a second review: the gate only reads.
+        assert!(ran.stub_file("claude-called").is_none(), "{}", q.label);
+        let calls = ran.stub_file("gh-calls").unwrap_or_default();
+        assert!(!calls.contains("pr comment"), "{}: {calls}", q.label);
     }
 }
 
