@@ -4,6 +4,9 @@
 
 #![cfg(unix)]
 
+#[path = "support/json_naming.rs"]
+mod json_naming;
+
 use serde_json::Value;
 use statecraft_adapter_claude_code::qualification::{PairedRecord, record};
 use std::path::Path;
@@ -101,7 +104,7 @@ if [ "$1" = --version ]; then /bin/cat "$(dirname "$0")/version"; exit 0; fi
     assert_eq!(armed.status.code(), Some(0), "{armed:?}");
     let output = run(&["run", root, "fixture", "--json"]);
     assert_eq!(output.status.code(), Some(0), "{output:?}");
-    let answer: Value = serde_json::from_slice(&output.stdout).unwrap();
+    let answer: Value = json_naming::from_output(&output.stdout).unwrap();
     assert_eq!(answer["value"]["outcome"], "completed");
     assert_eq!(
         answer["value"]["posture"]["value"]["qualification"], expected,
@@ -157,7 +160,7 @@ if [ "$1" = --version ]; then /bin/cat "$(dirname "$0")/version"; exit 0; fi
     std::fs::remove_file(bin.path().join("spec-spine")).unwrap();
     let shown = run(&["run", "show", root, "fixture", "--json"]);
     assert_eq!(shown.status.code(), Some(0), "{shown:?}");
-    let shown: Value = serde_json::from_slice(&shown.stdout).unwrap();
+    let shown: Value = json_naming::from_output(&shown.stdout).unwrap();
     assert_eq!(shown["value"]["posture"]["value"], *posture);
     assert_eq!(
         shown["value"]["posture"]["from_record"],

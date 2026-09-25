@@ -11,6 +11,9 @@
 
 #![cfg(unix)]
 
+#[path = "support/json_naming.rs"]
+mod json_naming;
+
 use std::collections::BTreeMap;
 use std::os::unix::fs::PermissionsExt;
 use std::path::{Path, PathBuf};
@@ -193,7 +196,7 @@ impl Fixture {
             String::from_utf8_lossy(&out.stderr)
         );
         let answer: serde_json::Value =
-            serde_json::from_slice(&out.stdout).unwrap_or_else(|e| panic!("{e}: {text}"));
+            json_naming::from_output(&out.stdout).unwrap_or_else(|e| panic!("{e}: {text}"));
         let report = answer["value"]["value"].clone();
         (out.status.code().unwrap(), report, text)
     }
@@ -694,7 +697,7 @@ fn doctor_remote(f: &Fixture, mode: &str) -> (serde_json::Value, String, String)
         String::from_utf8_lossy(&out.stderr)
     );
     let answer: serde_json::Value =
-        serde_json::from_slice(&out.stdout).unwrap_or_else(|e| panic!("{e}: {text}"));
+        json_naming::from_output(&out.stdout).unwrap_or_else(|e| panic!("{e}: {text}"));
     let calls = std::fs::read_to_string(bin.join("gh-calls")).unwrap_or_default();
     (answer["value"]["setup"].clone(), calls, text)
 }

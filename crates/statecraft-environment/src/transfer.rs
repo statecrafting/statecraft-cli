@@ -313,6 +313,7 @@ pub struct Act<'a> {
 
 /// What the manifest and the file say about a path now.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct Standing {
     /// The class the manifest records (`user` when it records none).
     pub class: Ownership,
@@ -361,6 +362,7 @@ impl ResultingEntry {
 
 /// What `transfer plan` reports (rule 4). Nothing is written to compute it.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct Plan {
     /// The path.
     pub path: String,
@@ -386,6 +388,11 @@ pub struct Plan {
     /// What `transfer apply` must be given: the identity, carried in a token
     /// beside a short digest of each input, so a stale plan can be refused
     /// naming which input changed.
+    ///
+    /// The wire spelling stays `plan_id`: spec 002 and spec 006 section 5
+    /// name it, so it is grandfathered in spec 006's JSON naming convention
+    /// while the rest of this report is camelCase.
+    #[serde(rename = "plan_id")]
     pub plan_id: String,
     /// Entries carrying a `transfer` with no journal record: read as before,
     /// reported, and never rewritten (the compatibility paragraph).

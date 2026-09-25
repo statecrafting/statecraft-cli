@@ -13,6 +13,7 @@ use serde::{Deserialize, Serialize};
 
 /// An adapter's declaration.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct Manifest {
     /// The adapter's name. Not a provider's name: see this crate's own test.
     pub adapter: String,

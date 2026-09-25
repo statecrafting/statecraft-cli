@@ -18,6 +18,9 @@
 
 #![cfg(unix)]
 
+#[path = "support/json_naming.rs"]
+mod json_naming;
+
 use std::path::{Path, PathBuf};
 use std::process::{Command, Output};
 
@@ -40,7 +43,7 @@ fn text(out: &Output) -> String {
 }
 
 fn json(out: &Output) -> serde_json::Value {
-    serde_json::from_slice(&out.stdout).unwrap_or_else(|e| panic!("{e}: {}", text(out)))
+    json_naming::from_output(&out.stdout).unwrap_or_else(|e| panic!("{e}: {}", text(out)))
 }
 
 struct Fixture {

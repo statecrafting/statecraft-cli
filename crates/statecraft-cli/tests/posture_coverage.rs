@@ -17,6 +17,9 @@
 
 #![cfg(unix)]
 
+#[path = "support/json_naming.rs"]
+mod json_naming;
+
 use serde_json::{Value, json};
 use std::path::{Path, PathBuf};
 use std::process::{Command, Output};
@@ -42,7 +45,7 @@ fn text(out: &Output) -> String {
 }
 
 fn json_of(out: &Output) -> Value {
-    serde_json::from_slice(&out.stdout).unwrap_or_else(|e| panic!("{e}: {}", text(out)))
+    json_naming::from_output(&out.stdout).unwrap_or_else(|e| panic!("{e}: {}", text(out)))
 }
 
 /// The fake spec-spine. `verify fixture --plan --json` reads the suite from
