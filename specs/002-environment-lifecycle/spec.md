@@ -7734,8 +7734,8 @@ before matching, and a failed `cargo metadata` stops the gate. Tests:
 `a_rerun_does_not_repeat_a_skip_notice`, and the guard's test now feeds spaced
 JSON; both observed failing against the previous scripts.
 
-**2026-09-24: PROPOSED, not adopted: profile revision 5, a candidate never
-judges itself with its own gate.** Found by the third live AI review of #138
+**2026-09-24: profile revision 5, a candidate never judges itself with its own
+gate (ratified by the owner on 2026-09-24).** Found by the third live AI review of #138
 and confirmed by reading the profile: only `ci-gate.sh` and the policy are read
 at the base. The `governance` job, the commit walk and the declared
 authored-content script run the candidate's own copies, and on `pull_request`
@@ -7744,7 +7744,7 @@ weaken the check that judges it. The authority-change report names the change
 but does not block it, and the code-owner review the profile relies on
 (S-3) does not separate an agent from the owner when agents act under the
 owner's account. The hand-written `govern.yml` had the same property, so
-revision 4 is no weaker than what it replaced; revision 5 would close it.
+revision 4 is no weaker than what it replaced; revision 5 closes it.
 
 1. **The gate's scripts are read at the base.** The `governance` job, the
    commit walk and the `code` job run `scripts/statecraft/gate.sh`, and the
@@ -7767,7 +7767,7 @@ revision 4 is no weaker than what it replaced; revision 5 would close it.
 4. **Upgrade.** The revision becomes 5, a new identity. Revision 4 projects
    upgrade through one pull request that the owner approves under rule 2.
 
-Acceptance obligations would be: a candidate that weakens `gate.sh` is judged
+Acceptance obligations, as tests in `crates/statecraft-home/tests/`: a candidate that weakens `gate.sh` is judged
 by the base's copy and fails; the adoption runs the candidate's copy and says
 so; a candidate that changes any authority-set file blocks without the
 exception and passes with it; a candidate that changes no such file is
