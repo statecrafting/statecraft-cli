@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Rendered by Statecraft from profile github-actions-rust revision 4.
+# Rendered by Statecraft from profile github-actions-rust revision 6.
 # The aggregate gate. It passes only when every job the TRUSTED policy names
 # as required ended the way its event requires:
 #
@@ -19,6 +19,15 @@
 # A required job missing from the needs record has vanished, and blocks. The
 # required set is read from the policy at the base commit, never from the
 # candidate, so a candidate cannot drop a job from the set that judges it.
+#
+# An authority change blocks unless the owner approves it (revision 5, rule 2):
+# when the candidate's own changes (BASE...HEAD) touch the authority set the
+# base's policy defines (its files, the policy itself, scripts/statecraft/*
+# and the declared authored-content script), the owner exception must have
+# succeeded for this run, or, in the merge queue, for the run recorded for the
+# entry's pull request. The gate computes this itself and reads no job's
+# claim about it, so a candidate workflow that skips the exception fails
+# closed. On push it is reported: the change was approved on its pull request.
 #
 # Inputs, all from the environment: NEEDS_JSON (toJSON(needs)), EVENT_NAME,
 # HEAD_SHA, BASE_SHA (the pull request base, or the push's previous head),
@@ -87,7 +96,31 @@ fi
 
 review_result="$(printf '%s' "$NEEDS_JSON" | jq -r '.["ai-review"].outputs.result // ""')"
 
+# The authority set is the base's, and the candidate's changes are read from
+# its fork point: three dots, as coupling reads them. Two would also list
+# what the base changed after the branch was cut, which is not this
+# candidate's authority change.
+authority=no
+if [ "$trusted" = yes ]; then
+  {
+    jq -r '.files[].path, (.parameters.authored_content // empty)' "$work/policy.json"
+    echo "$POLICY"
+  } | sort -u > "$work/authority-set"
+  git diff --name-only "${BASE_SHA}...${HEAD_SHA}" | sort -u > "$work/changed"
+  {
+    comm -12 "$work/authority-set" "$work/changed"
+    grep '^scripts/statecraft/' "$work/changed" || true
+    # Revision 6: every workflow file, rendered or not. A workflow the
+    # profile does not render could otherwise report a check named ci-gate.
+    grep '^\.github/workflows/' "$work/changed" || true
+  } | sort -u > "$work/touched"
+  if [ -s "$work/touched" ]; then
+    authority=yes
+  fi
+fi
+
 blocked=0
+recorded=no
 block() {
   say "BLOCK: $*"
   blocked=1
@@ -152,6 +185,15 @@ while IFS=$'\t' read -r job rule; do
       block "the AI review returned findings and the owner exception '${job}' was not approved for this run (it ended '${result}')"
       continue
     fi
+    # Revision 5, rule 2: a change to the gate is the owner's, so the
+    # exception is required whatever the review said.
+    if [ "$authority" = yes ] && [ "$EVENT_NAME" = pull_request ]; then
+      if [ "$result" != success ]; then
+        block "this candidate changes the authority set and the owner exception '${job}' was not approved for this run (it ended '${result}')"
+        continue
+      fi
+      rule=required
+    fi
   fi
   case "$rule" in
     required | required-review)
@@ -181,8 +223,10 @@ while IFS=$'\t' read -r job rule; do
         continue
       fi
       if ! recorded_review; then
+        recorded=failed
         continue
       fi
+      recorded=yes
       entry_rc=no
       if [ -n "$pattern" ] && [ -n "$pr_ref" ]; then
         # shellcheck disable=SC2053
@@ -223,20 +267,37 @@ if [ "$release_candidate" = yes ]; then
   say "release candidate: ${HEAD_REF} matches ${pattern}"
 fi
 
-# An authority change is reported, never silently accepted: the candidate
-# changes a file of the profile or its policy.
-if [ "$trusted" = yes ]; then
-  jq -r '.files[].path' "$work/policy.json" | sort -u > "$work/profile-paths"
-  echo "$POLICY" >> "$work/profile-paths"
-  # Three dots: the candidate's own changes since its fork point, as coupling
-  # reads them. Two would also list what the base changed after the branch
-  # was cut, which is not this candidate's authority change.
-  git diff --name-only "${BASE_SHA}...${HEAD_SHA}" | sort -u > "$work/changed"
-  touched="$(sort -u "$work/profile-paths" | comm -12 - "$work/changed")"
-  if [ -n "$touched" ]; then
-    say "authority change: this candidate changes the gate that judges it:"
-    say "$touched"
-  fi
+# An authority change is never silently accepted: it is named, and on a pull
+# request or a queue entry it needs the owner's exception (revision 5, rule 2).
+if [ "$authority" = yes ]; then
+  say "authority change: this candidate changes the gate that judges it:"
+  say "$(cat "$work/touched")"
+  case "$EVENT_NAME" in
+    pull_request)
+      say "authority change: the owner exception is required for this run" ;;
+    merge_group)
+      # The review job is skipped in the queue, so the exception that counts
+      # is the one recorded for the entry's pull request at its head.
+      if [ "$recorded" = no ] && recorded_review; then
+        recorded=yes
+      fi
+      if [ "$recorded" = yes ]; then
+        if [ "$recorded_exception" = success ]; then
+          say "authority change: admitted by the owner exception recorded for #${pr} at ${pr_head}"
+        else
+          block "the queued group changes the authority set and the owner exception recorded for #${pr} was not approved (it ended '${recorded_exception}')"
+        fi
+      fi
+      # Otherwise the record could not be read, and recorded_review has
+      # already blocked with its reason on every path that returns 1: an
+      # unread record never admits an authority change. A second block here
+      # would be dead, and the mutation test refuses dead blocks.
+      ;;
+    *)
+      say "authority change: reported on ${EVENT_NAME}; it was approved on its pull request" ;;
+  esac
+elif [ "$trusted" = no ]; then
+  say "authority change: this candidate adopts the gate; the base carries no policy, so it is reported"
 fi
 
 if [ "$blocked" -ne 0 ]; then

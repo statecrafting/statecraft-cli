@@ -1,5 +1,5 @@
 #!/bin/sh
-# Rendered by Statecraft from profile github-actions-rust revision 4.
+# Rendered by Statecraft from profile github-actions-rust revision 6.
 # A managed file: `statecraft doctor` names an edit to it. Installs the exact
 # spec-spine release this repository pins into .tooling/bin, and refuses a
 # range or an absent pin rather than resolving one.

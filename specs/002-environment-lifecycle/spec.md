@@ -7892,6 +7892,14 @@ the profile does not render blocks without the owner exception and passes
 with it; a candidate that changes no workflow and no other authority file is
 unaffected; a revision-5 project upgrades to revision 6.
 
+**2026-09-25: this repository's CI upgraded from revision 4 to revision 6
+(S-5).** One re-render with the recorded parameters unchanged; six managed
+files and the policy are replaced. The base's revision-4 `ci-gate` reports
+this authority change without blocking it, so the owner approves the run
+before it merges, as revision 5's implementation entry says. From the next
+pull request on, a change to any authority-set file here blocks without that
+approval.
+
 ## Verification
 
 `--fail-on-untraced` joined the corpus gate with this spec's first

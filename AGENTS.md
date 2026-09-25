@@ -178,7 +178,7 @@ evaluated, so a `Spec-Drift-Waiver:` in the body would have covered all 15.
 ## Continuous integration
 
 This repository's CI is **rendered from Statecraft's own setup profile**,
-`github-actions-rust` revision 4 (S-5, owner decision of 2026-09-24): the
+`github-actions-rust` revision 6 (S-5, owner decision of 2026-09-24): the
 product governs itself with what it gives adopters. The rendered files are
 managed, and their ownership is recorded in `.statecraft/environment.json`:
 `.github/workflows/statecraft-ci.yml`, `.github/workflows/statecraft-ai-review.yml`,
@@ -197,6 +197,14 @@ and signed, and a base other than `main` refused. What the profile adds is the
 `ci-gate` unless the owner approves the `statecraft-review-exception`
 Environment for that run. In the merge queue the review is not re-run: `ci-gate`
 reads the verdict recorded for the entry's pull-request head.
+
+**A pull request never judges itself with its own gate** (revisions 5 and 6):
+`gate.sh`, `install-spec-spine.sh`, `ci-gate.sh` and the authored-content
+script run as they exist on `main`. **Any change to the CI's own files (every
+file under `.github/workflows/`, `scripts/statecraft/*`, the policy,
+`scripts/check-authored-content.sh`) blocks `ci-gate` until the owner approves
+that run's `statecraft-review-exception` Environment.** A re-render is such a
+change, so plan it as a pull request that waits for the owner.
 
 ## The merge queue
 
