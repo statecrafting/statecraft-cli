@@ -19,6 +19,9 @@
 //! These spawn the built binary, for the reason `negative_cases.rs` gives: an
 //! exit code is a property of a process.
 
+#[path = "support/json_naming.rs"]
+mod json_naming;
+
 use std::path::{Path, PathBuf};
 use std::process::{Command, Output};
 
@@ -149,7 +152,7 @@ fn work_list_against_a_real_corpus_names_the_report_each_field_came_from() {
     if code(&out) != 0 {
         return;
     }
-    let parsed: serde_json::Value = serde_json::from_str(&stdout(&out)).expect("valid json");
+    let parsed: serde_json::Value = json_naming::from_text(&stdout(&out)).expect("valid json");
     let rows = parsed["value"]["eligible"].as_array().unwrap();
     let excluded = parsed["value"]["excluded"].as_array().unwrap();
     assert!(
@@ -287,7 +290,7 @@ fn accept_on_a_refused_attempt_is_not_attempted_with_the_count_and_no_receipt() 
         "a finding, never a silent zero: {}",
         stdout(&out)
     );
-    let parsed: serde_json::Value = serde_json::from_str(&stdout(&out)).expect("valid json");
+    let parsed: serde_json::Value = json_naming::from_text(&stdout(&out)).expect("valid json");
     // The wire shape here is spec 005's own `Acceptance`, which that crate
     // derives and that spec fixed; see spec 006 section 5.
     assert_eq!(parsed["value"]["acceptance"], "not-attempted");
@@ -370,7 +373,7 @@ fn every_new_verb_refuses_an_unregistered_target_and_renders_the_same_value_eith
         let j = run_in(home.path(), &json);
         assert_eq!(code(&h), 2, "{args:?}: {}", stdout(&h));
         assert_eq!(code(&h), code(&j), "{args:?}: the same exit either way");
-        let parsed: serde_json::Value = serde_json::from_str(&stdout(&j)).expect("valid json");
+        let parsed: serde_json::Value = json_naming::from_text(&stdout(&j)).expect("valid json");
         assert!(
             parsed["value"]
                 .as_str()

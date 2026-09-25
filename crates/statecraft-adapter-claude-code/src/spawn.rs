@@ -25,6 +25,7 @@ pub const BASE_ARGS: [&str; 4] = ["--print", "--output-format", "stream-json", "
 
 /// One spawn, as a value.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct Invocation {
     /// The program, resolved from the constructed environment's `PATH`.
     pub program: String,

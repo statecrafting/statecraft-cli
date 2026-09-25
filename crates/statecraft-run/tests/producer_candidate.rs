@@ -7,7 +7,7 @@
 //! from:
 //!
 //! ```sh
-//! STATECRAFT_PRODUCER_BIN=/abs/path/spec-spine \
+//! STATECRAFT_SPEC_SPINE=/abs/path/spec-spine \
 //! STATECRAFT_PRODUCER_REV=<commit it was built from> \
 //! cargo test -p statecraft-run --test producer_candidate -- --ignored --nocapture
 //! ```
@@ -44,8 +44,8 @@ fn run(program: &Path, args: &[&str], dir: &Path) -> std::process::Output {
 /// the pinned one.
 fn named_producer() -> (PathBuf, String, String, tempfile::TempDir, PathBuf) {
     let binary =
-        PathBuf::from(std::env::var("STATECRAFT_PRODUCER_BIN").expect(
-            "STATECRAFT_PRODUCER_BIN must name the producer binary; nothing is found on PATH",
+        PathBuf::from(std::env::var("STATECRAFT_SPEC_SPINE").expect(
+            "STATECRAFT_SPEC_SPINE must name the producer binary; nothing is found on PATH",
         ));
     let revision = std::env::var("STATECRAFT_PRODUCER_REV")
         .expect("STATECRAFT_PRODUCER_REV must name the commit the binary was built from");
@@ -109,7 +109,7 @@ fn sha256(path: &Path) -> String {
 }
 
 #[test]
-#[ignore = "needs STATECRAFT_PRODUCER_BIN and STATECRAFT_PRODUCER_REV naming an exact producer build"]
+#[ignore = "needs STATECRAFT_SPEC_SPINE and STATECRAFT_PRODUCER_REV naming an exact producer build"]
 fn the_named_producer_build_reads_as_one_state_through_the_consumer() {
     let (binary, revision, version, _scratch, corpus) = named_producer();
     let report = SpecSpineCli {
@@ -140,7 +140,7 @@ fn the_named_producer_build_reads_as_one_state_through_the_consumer() {
 /// digest (the purity spec 005 section 3.18 compares on); a producer that
 /// does not is `unsupported`, naming its version.
 #[test]
-#[ignore = "needs STATECRAFT_PRODUCER_BIN and STATECRAFT_PRODUCER_REV naming an exact producer build"]
+#[ignore = "needs STATECRAFT_SPEC_SPINE and STATECRAFT_PRODUCER_REV naming an exact producer build"]
 fn the_named_producer_build_binds_a_contract_or_says_it_cannot() {
     let (binary, revision, version, _scratch, corpus) = named_producer();
     let cli = SpecSpineCli {
@@ -196,10 +196,10 @@ fn the_named_producer_build_binds_a_contract_or_says_it_cannot() {
 /// revision as the binary, `STATECRAFT_PRODUCER_FIXTURES=<checkout>/crates/
 /// spec-spine-core/fixtures/verifier`.
 #[test]
-#[ignore = "needs STATECRAFT_PRODUCER_BIN and STATECRAFT_PRODUCER_FIXTURES from one producer revision"]
+#[ignore = "needs STATECRAFT_SPEC_SPINE and STATECRAFT_PRODUCER_FIXTURES from one producer revision"]
 fn the_named_producer_build_reproduces_its_portable_verifier_fixtures() {
     let binary =
-        PathBuf::from(std::env::var("STATECRAFT_PRODUCER_BIN").expect("STATECRAFT_PRODUCER_BIN"));
+        PathBuf::from(std::env::var("STATECRAFT_SPEC_SPINE").expect("STATECRAFT_SPEC_SPINE"));
     let fixtures = PathBuf::from(std::env::var("STATECRAFT_PRODUCER_FIXTURES").expect(
         "STATECRAFT_PRODUCER_FIXTURES must name fixtures/verifier from the binary's revision",
     ));

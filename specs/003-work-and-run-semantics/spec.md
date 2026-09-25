@@ -1382,6 +1382,16 @@ Measured on 2026-09-25: no difference except the added `README.md`. The
 `.cargo_vcs_info.json` commit is corroborating, not the evidence; the evidence
 is the file comparison against the pinned revision itself.
 
+**2026-09-25: the candidate test names its binary with
+`STATECRAFT_SPEC_SPINE`.** Spec `002` section 5's entry of the same day,
+adopted by the owner, makes `STATECRAFT_SPEC_SPINE` the one variable that
+selects a spec-spine binary and retires the others. The ignored
+`tests/producer_candidate.rs` read its binary from `STATECRAFT_PRODUCER_BIN`
+and now reads it from `STATECRAFT_SPEC_SPINE`; `STATECRAFT_PRODUCER_REV` and
+`STATECRAFT_PRODUCER_FIXTURES` stay, because they name a revision and a
+fixture directory, not a binary. What the test checks, and that it is ignored
+by default, are unchanged.
+
 ## Verification
 
 Each line is one command. §3.8's twenty-two rows are integration tests named after

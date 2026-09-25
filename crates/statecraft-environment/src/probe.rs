@@ -99,6 +99,10 @@ pub enum Unavailability {
     Absent,
     /// The binary runs and does not carry `check` (contract 5).
     LacksVerb,
+    /// Candidates exist and none may judge: an override the repository does
+    /// not admit or that names no executable, or no compatible convention
+    /// candidate (contract 2 as amended; spec 002 section 5, 2026-09-25).
+    NotSelected,
 }
 
 /// What `spec-spine check` answered, in spec-spine's vocabulary.
@@ -185,6 +189,10 @@ impl CheckAnswer {
                 Unavailability::LacksVerb => {
                     format!("spec-spine does not carry `check`, so nothing was checked: {detail}")
                 }
+                Unavailability::NotSelected => format!(
+                    "no spec-spine the repository admits was selected, so nothing was checked: \
+                     {detail}"
+                ),
             },
         }
     }

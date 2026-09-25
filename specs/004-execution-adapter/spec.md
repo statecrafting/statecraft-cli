@@ -1855,6 +1855,19 @@ because switching global configuration off also drops an operator's own
 during `checkout-index`: that file is the operator's, not committed content,
 and spec `004` section 3.18 rule 3 keeps it out of the child's writable roots.
 
+**2026-09-25: spec `006`'s JSON naming convention, this spec's half (adopted by
+the owner on 2026-09-25; spec `006` section 5 of that date).** `Negotiation`
+(`missingRequired`), the adapter `Manifest` (`requiresCommands`) and the Claude
+Code `Invocation` (`toolRestriction`, `settingsDocument`) now serialize in
+camelCase. None of the three is written to disk, printed by a verb, or read by
+another repository today; spec `006`'s source scan found them. The protocol
+(`Request`, `AttemptIdentity`, `AdapterResult`), the posture recorded with every
+attempt, the qualification records in `qualifications.json` and the provider
+stream mirror are grandfathered: the first is a wire contract, the next two are
+persisted, the last is the provider's own spelling. An adapter manifest is not
+made strict: it has no schema version (its `version` is the binary's) and is
+never read from a file; `qualifications.json` has no schema version either.
+
 ## Verification
 
 Each line is one command. §3.5's suite is eight tests named `suite_1` to

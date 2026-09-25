@@ -629,7 +629,11 @@ pub fn write_atomically(path: &Path, contents: &str) -> std::io::Result<()> {
 
 /// What removal did, or would do.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
-#[serde(rename_all = "kebab-case", tag = "outcome")]
+#[serde(
+    rename_all = "kebab-case",
+    rename_all_fields = "camelCase",
+    tag = "outcome"
+)]
 pub enum Removal {
     /// The region was present and intact, and is taken back out.
     Removed {
@@ -717,7 +721,11 @@ pub enum Intent {
 
 /// What the settings modification did, or would do.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
-#[serde(rename_all = "kebab-case", tag = "state")]
+#[serde(
+    rename_all = "kebab-case",
+    rename_all_fields = "camelCase",
+    tag = "state"
+)]
 pub enum SettingsOutcome {
     /// This harness has no settings file to modify here.
     NotApplicable {

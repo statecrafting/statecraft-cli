@@ -9,6 +9,9 @@
 //! Every run gets a temporary `STATECRAFT_HOME`, `STATECRAFT_NATIVE_ROOT` and
 //! `HOME`, so nothing here reads or writes the operator's own home.
 
+#[path = "support/json_naming.rs"]
+mod json_naming;
+
 use statecraft_environment::digest::digest_bytes;
 use statecraft_environment::manifest::{
     Class, Entry, Manifest, Modification, ModificationKind, Pins, Source, SourceKind,
@@ -124,7 +127,7 @@ fn code(o: &Output) -> i32 {
 }
 
 fn json(o: &Output) -> serde_json::Value {
-    serde_json::from_slice(&o.stdout).unwrap_or_else(|e| panic!("{e}: {o:?}"))
+    json_naming::from_output(&o.stdout).unwrap_or_else(|e| panic!("{e}: {o:?}"))
 }
 
 fn withheld_reasons(o: &Output) -> Vec<String> {

@@ -178,7 +178,7 @@ evaluated, so a `Spec-Drift-Waiver:` in the body would have covered all 15.
 ## Continuous integration
 
 This repository's CI is **rendered from Statecraft's own setup profile**,
-`github-actions-rust` revision 6 (S-5, owner decision of 2026-09-24): the
+`github-actions-rust` revision 7 (S-5, owner decision of 2026-09-24): the
 product governs itself with what it gives adopters. The rendered files are
 managed, and their ownership is recorded in `.statecraft/environment.json`:
 `.github/workflows/statecraft-ci.yml`, `.github/workflows/statecraft-ai-review.yml`,
@@ -205,6 +205,11 @@ file under `.github/workflows/`, `scripts/statecraft/*`, the policy,
 `scripts/check-authored-content.sh`) blocks `ci-gate` until the owner approves
 that run's `statecraft-review-exception` Environment.** A re-render is such a
 change, so plan it as a pull request that waits for the owner.
+
+Every rendered script exits in one contract (revision 7): 0 ok, 1 finding,
+2 refused, 3 usage, 4 failed. A missing spec-spine exits 2, and a stale
+tree exits 1 from `gate.sh` under either spec-spine table: `gate.sh` reads
+spec-spine's codes by the release `spec-spine.toml` pins.
 
 ## The merge queue
 

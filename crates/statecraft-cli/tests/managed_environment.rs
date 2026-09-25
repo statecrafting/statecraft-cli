@@ -10,6 +10,9 @@
 //! `STATECRAFT_NATIVE_ROOT`, so nothing here reads or writes the operator's own
 //! home.
 
+#[path = "support/json_naming.rs"]
+mod json_naming;
+
 use std::path::{Path, PathBuf};
 use std::process::{Command, Output};
 
@@ -168,7 +171,7 @@ fn the_json_rendering_carries_the_same_facts_as_the_human_one() {
     assert_eq!(code(&human), code(&json), "one value, two renderings");
 
     let parsed: serde_json::Value =
-        serde_json::from_str(&stdout(&json)).expect("--json is parseable");
+        json_naming::from_text(&stdout(&json)).expect("--json is parseable");
     assert!(parsed.get("value").is_some());
     assert!(parsed.get("exit").is_some());
     assert_eq!(
