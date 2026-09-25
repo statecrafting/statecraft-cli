@@ -574,8 +574,8 @@ checklist, a stability policy, and a release pipeline (owner Addendum 2, items
 RD and Q).** **The owner adopted the stability policy and the readiness
 checklist as the direction on 2026-09-25.** The release pipeline stays
 proposed: it waited on the attest-ledger item, and that blocker is removed by
-the change that takes `attest-ledger-core` from crates.io at `=0.1.0` (spec
-`003` section 5, 2026-09-25), so the pipeline is the next proposal to bring
+the change that takes `attest-ledger-core` from crates.io at `=0.1.0` (pull
+request #148, whose section 5 entry in spec `003` records the diff), so the pipeline is the next proposal to bring
 back. Two labels in the checklist below are this entry's provenance: *item P*
 is the parser entry of spec `006` section 5 (clap for per-verb arguments,
 adopted 2026-09-25) and *item N* is the JSON naming and strict-input entry of
@@ -593,7 +593,9 @@ incompatibly needs a major version and a migration note:
    compatible; removing or renaming one is not.
 2. **The exit and JSON contract**: the five exit codes of spec `006` section
    3.3, and the family envelope once adopted (the 0.26.0 migration, the
-   `006` section 5 proposal for item X). Adding a field is compatible;
+   family exit and JSON contract that
+   draft #118 proposes for spec `006`, adopted by the owner on 2026-09-25;
+   item X is its provenance label). Adding a field is compatible;
    removing, retyping or renaming one is not (`006` section 3.4).
 3. **Documented formats**: the environment manifest, the run record and
    journal, receipts and evidence, and bundle metadata, each with a

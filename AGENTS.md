@@ -340,7 +340,9 @@ still the route that clears `C-001` for a change that alters no requirement.
 It is no longer a place to change a requirement. Entries adopted before
 2026-09-25 that state requirements stay where they are until they are folded
 into section 3 by their own pull requests; the split of spec `002` that
-precedes the fold waits for spec-spine 0.27.0.
+precedes the fold waits for spec-spine 0.27.0. The adoption of this rule is
+itself recorded as a spec `001` section 5 entry because the rule binds from
+that adoption, not before it; it is the last requirement recorded that way.
 
 ## Source ownership
 
