@@ -882,6 +882,13 @@ producer to resolve the same request only where the binding is `bound`, and
 compares. `NoAcceptance::ContractMoved` carries the comparison. The receipt is
 untouched, as rule 4 requires.
 
+**2026-09-25: let chains collapsed with the measured rust-version floor.**
+The workspace floor moved from 1.85, which never built, to 1.88 (evidence in
+spec `002` section 5, same date). Clippy's `collapsible_if` then applies let
+chains, and the nested `if` blocks it named in this spec's crates were
+collapsed mechanically by `cargo clippy --fix` and `cargo fmt`. No behavior
+changed.
+
 ## Verification
 
 Each line is one command. §3.10's twenty-two rows are integration tests named
