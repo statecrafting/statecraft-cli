@@ -5,8 +5,9 @@
 Prepared 2026-09-16, at the founding of this repository. Owned by spec
 `001-boundaries-and-authority`.
 
-**Adoption status as of 2026-09-19: `D-03` is adopted in full, and `D-01` and
-`D-02` are adopted for language and layout only. Every other row of section 3 is
+**Adoption status as of 2026-09-24: `D-03` is adopted in full, `D-01` and
+`D-02` are adopted for language and layout only, and `D-06` carries an amendment
+adopted on 2026-09-24. Every other row of section 3 is
 still a recommendation.** Section 5 carries each adoption with its date and is
 the only place a row becomes binding; the line you are reading is a summary of
 it and never a substitute. This record exists so the three kinds of statement
@@ -55,8 +56,8 @@ date and the command that established it. Nothing else in this section moved.
 
 | ID | Constraint | How it was established |
 |---|---|---|
-| C-01 | **2026-09-24:** the binary is **0.25.0**, at the same repository-local path, adopted under `D-06`'s entry of that date. **2026-09-23:** the binary is **0.23.0**, at the same repository-local path, adopted under `D-06`'s entry of that date; the rest of this row is unchanged. **2026-09-17:** the binary this corpus is compiled, linted and pinned against is **0.20.0**, installed at the repository-local `.tooling/bin/spec-spine`. The shared `~/.cargo/bin/spec-spine` is no longer this repository's binary and is not consulted by `make`. Until 2026-09-16 the row read 0.18.0 at the shared path. | `.tooling/bin/spec-spine --version`; `make tools` installs it from `required_version`. |
-| C-02 | **2026-09-24:** 0.24.0 and 0.25.0 are released and 0.25.0 is adopted (`D-06`); 0.24.0 never was. **2026-09-23:** 0.21.0 and 0.23.0 are released and 0.23.0 is adopted (`D-06`); 0.21.0 never was, and 0.22.0 was prepared but never tagged or published (crates.io lists 0.21.0 then 0.23.0). The rule below still holds: unreleased producer work is never described here as available. **2026-09-17:** 0.19.0 and 0.20.0 are both released and 0.20.0 is adopted (`D-06`). The development checkout at `~/DevWork/spec-spine` is ahead of both and sits on an unmerged branch; **no feature of that tree may be described here as available**, which is the part of this row that did not change. The rule is about unreleased work, not about 0.19.0 in particular. | `git tag --sort=-creatordate` and `git branch --show-current` in that checkout; `cargo search spec-spine-cli` reports 0.20.0. |
+| C-01 | The binary this corpus is compiled, linted and pinned against is the release `required_version` in `spec-spine.toml` names, installed at the repository-local `.tooling/bin/spec-spine`. The shared `~/.cargo/bin/spec-spine` is not this repository's binary and is not consulted by `make`. Which release that is, and since when, is recorded in `docs/adoption/spec-spine.md`, which also keeps this row's dated history (restated 2026-09-24 under `D-06` as amended). | `.tooling/bin/spec-spine --version`; `make tools` installs it from `required_version`. |
+| C-02 | Unreleased producer work is never described here as available. The development checkout at `~/DevWork/spec-spine` may be ahead of every release; **no feature of an unreleased tree may be described here as available**. Which releases exist and which one is adopted is recorded in `docs/adoption/spec-spine.md`, which also keeps this row's dated history (restated 2026-09-24 under `D-06` as amended). | `git tag --sort=-creatordate` in that checkout; `cargo search spec-spine-cli`. |
 | C-03 | spec-spine 0.18.0's lifecycle is `status` in {draft, approved, superseded, retired} and `implementation` in {pending, in-progress, complete, n-a, deferred} or absent. `approved` plus `pending` is a work order; `draft` is never a claim about code; `approved` with an absent `implementation` makes an unresolved unit an **error**. | `standards/spec/contract.md`, scaffolded by the installed binary. |
 | C-04 | A corpus with no code is a supported steady state. `index coverage --fail-on-untraced` **refuses** on a code-free tree rather than passing vacuously, so it must not be in this repository's gate yet. | `~/DevWork/spec-spine/docs/specify-first.md`. |
 | C-05 | `compile --check` compares the corpus against the **committed** shard trees. Running it immediately after a plain `compile` in the same job passes unconditionally and proves nothing. | Same source, and the adoption guide's CI note. |
@@ -158,7 +159,7 @@ one that has lapsed.
 | `D-03` | **Superseded.** Every spec in the corpus is now `approved` | Section 5, and `registry list` |
 | `D-04` | **Superseded.** The kit transition contract is withdrawn with the installer that motivated it | Spec `002` sections 3.7 and 3.21 |
 | `D-05` | Mode B is built; exposing Mode A over the same verbs is **open** (`F-04`) | Spec `001` section 3.4 |
-| `D-06` | **Open as standing policy.** The pin is exact and the binary is repository-local | `spec-spine.toml`, and `AGENTS.md` |
+| `D-06` | **Open as standing policy**, amended 2026-09-24: the pin is exact and repository-local, stated once, and each adoption is recorded in the adoption ledger | `spec-spine.toml`, the root `Cargo.toml`, `docs/adoption/spec-spine.md`; section 5, 2026-09-24 |
 | `D-07` | Carried into spec `005` as written, recorded as inherited and not re-decided | Spec `005` section 2 |
 | `D-08` | **Open.** The executable is `statecraft-cli` until this is decided | Spec `006` section 3.5 |
 | `D-09` | Adopted in practice by the pointer model | Spec `002` sections 3.8 and 3.13 |
@@ -268,209 +269,30 @@ adopted and cannot tell. So the binary is installed at `.tooling/bin`,
 gitignored, by `make tools`, which reads the version from `required_version` so
 the number is authored once. `make` prefers the local copy; CI uses only it.
 
-**2026-09-17: the pin moves to `=0.20.0`.** The floor was reviewed before the pin
-moved, because this row is the reason to review it.
+**Amended 2026-09-24 (owner decision A-1, adopted in section 5).** Three
+rules, so that adopting a release is its own change and needs no waiver:
 
-- `DEFAULT_BYPASS_PREFIXES` is **byte-identical** between `v0.18.0` and
-  `v0.20.0`: the same thirteen entries in the same order.
-- `spec-spine config show`, which prints the merged and attributed floor the gate
-  actually matches on, differs between the two versions only by the pin line
-  itself and a new, empty `[coverage] governed_scope` block.
-- The one coupling change that widens what the gate asks about is spec 078's
-  governed scope, and it is **inert while `governed_scope` is empty**, which it
-  is here. The code takes the empty-scope path, which is the 0.18.0 behaviour.
-- Spec 092 makes the gate **stricter**, not looser: diff membership is completed
-  from `git diff --name-status`, so a mode-only or binary change is judged rather
-  than silently dropped. A floor review is about paths escaping judgement; this
-  is a path that stops escaping.
-- Measured, not only read: `couple` over four merged ranges of this repository
-  returns the same verdict and the same checked-path count under both versions.
+1. **One stated source for each pin.** `required_version` in
+   `spec-spine.toml` is the only place the CLI pin is stated; the linked
+   library's exact version is stated once, in `[workspace.dependencies]` of
+   the root `Cargo.toml`. Root documents, specs and this record refer to those
+   files and do not restate the number. A report that must name the version
+   derives it from the build.
+2. **Each application of this decision is recorded in the adoption ledger,**
+   `docs/adoption/spec-spine.md`, which no spec claims. This row keeps only the
+   decision. The dated entries that stood here (2026-09-17, 2026-09-23 and
+   2026-09-24) were relocated there verbatim.
+3. **The CLI and the linked library are one producer identity** (owner
+   Addendum 2 of 2026-09-24, bundle decision H-3 (a): equality, replacing the
+   earlier two-field choice). Both are the same spec-spine release, they move
+   in the same change, and the ledger entry records one identity: the release
+   (tag and target revision) with each artifact's checksum and install digest
+   under it. Two pins naming different releases are a defect, refused by a
+   test, not a combination to qualify.
 
-The re-index the pin change requires is small and worth stating exactly, because
-it is the shape a future pin move will take too. Eight spec-registry shards moved
-one field, `specVersion` 1.2.0 to 1.3.0, and their `shardHash` did not move at
-all: the compiled content is identical and only the schema label advanced.
-Fourteen codebase-index shards moved one field, `shardHash`, because
-`spec-spine.toml` and the root documents are in the global-inputs hash and this
-change edits both. No shard said anything different about the corpus. That
-containment is a consequence of reading `.derived/` only through `spec-spine`
-subcommands: a schema label a consumer never parses cannot break the consumer.
-
-**2026-09-23: the pin moves to `=0.23.0`.** Owner-directed, as the scoped
-adoption of spec-spine's published expansion line. It moves the CLI pin only.
-The library dependency `spec-spine-core` moves in its own implementation
-change, because `D-02` gives that crate an owning spec and this pin has none.
-0.21.0 and 0.22.0 were never adopted here.
-
-*What was adopted, by identity.* `spec-spine-cli`, `spec-spine-core` and
-`spec-spine-types` 0.23.0 were published to crates.io at about 08:40Z on
-2026-09-23 by the producer's owner account. Each downloaded `.crate` matches
-the registry checksum:
-
-| Crate | Checksum |
-|---|---|
-| `spec-spine-cli` | `6b0e7800…ca91` |
-| `spec-spine-core` | `3dca8f68…e492` |
-| `spec-spine-types` | `dcd35073…9dc4` |
-
-Each records Git revision `d2bb4763`, the target of tag `v0.23.0`, in
-`.cargo_vcs_info.json`, and each unpacked source equals that revision's tree
-with no differing path. Between the candidate `97f82ee5` that the producer's
-preparation record measured and `d2bb4763`, nothing under `crates/` changed:
-the release adds only the ratification of its specs and documentation. A build
-is identified by version and source revision, not by digest. The same
-`cargo install --locked` gave `599d724d…f23a` under an empty `CARGO_HOME` and
-`365d87ab…02c0` under `make tools`.
-
-*The floor.*
-
-- `DEFAULT_BYPASS_PREFIXES` is byte-identical between `v0.20.0` and `v0.23.0`:
-  the same declaration, the same thirteen entries.
-- `config show` differs only by the pin line and one built-in floor entry,
-  `.statecraft/derived/`. From 0.23.0 the configured derived directory joins
-  the floor the gate applies, not only the default `.derived/`.
-- That is the one place the gate asks about fewer paths. It is compiler output
-  that no spec authors, and `check` judges its freshness on every gate run.
-  Spec `001` section 3.1 already forbids reading it except through the
-  producer.
-- The other coupling changes since 0.20.0 are narrower or stricter, not looser:
-  - a deleted path is judged where it lived (its spec 100);
-  - citations the renumber could not see (098);
-  - a waiver's lifecycle lines, inert without them (113).
-- Measured, not only read: `couple` over six merged ranges of this repository
-  gives `OK` under both versions: `01df484..4d6a9d5`, `4d6a9d5..ea2076b`,
-  `ea2076b..f49ac76`, `f49ac76..323ac62`, `1739131..50a5269` and
-  `1739131..01df484`. (A first draft of this entry listed the fifth range
-  backwards, which is an empty diff and proves nothing; it was re-measured.)
-
-The checked-path counts differ by exactly the derived paths in each range:
-
-| Range | 0.20.0 | 0.23.0 | Derived paths |
-|---|---|---|---|
-| `01df484..4d6a9d5` | 16 | 1 | 15 |
-| `4d6a9d5..ea2076b` | 6 | 4 | 2 |
-| `ea2076b..f49ac76` | 14 | 8 | 6 |
-| `f49ac76..323ac62` | 10 | 6 | 4 |
-| `1739131..50a5269` | 3 | 1 | 2 |
-| `1739131..01df484` | 35 | 17 | 18 |
-
-- One behavior is new and matters here. 0.23.0's `couple` refuses with exit 2
-  when the working tree's ledger is stale, before judging. That is stricter,
-  and it is why a pin move must be committed with its re-index.
-
-*The re-index.* The move regenerates 22 shards:
-
-- Seven spec-registry shards: registry `specVersion` 1.3.0 to 1.6.0, with each
-  record gaining `sectionDigests`, spec-spine's 106.
-- Fifteen codebase-index shards: `shardHash` only, because the tool version,
-  `spec-spine.toml` and the root documents are global inputs.
-
-Read through the CLI, `registry plan --json` is read schema 0.7.0 and each
-ready row carries `status`, and `registry closure` resolves: for
-`002-environment-lifecycle` alone it is one member, digest `419cc963…8dbd`. No
-shard says anything different about the corpus's specs, and the ready set is
-unchanged: `002`, `approved`.
-
-*What this does not do.* It does not move `spec-spine-core`, invert the
-producer-conformance tests, record new producer fixtures, or change any code.
-It adopts no new producer capability as a runtime feature. Work scopes,
-impacts, interface references and waiver lifecycles are available and not
-consumed, because no requirement here calls for them.
-
-**Consequence if rejected.** The pin returns to `=0.18.0` and `make tools`
-installs that instead, since the version is read from the pin. The rows corrected
-under C-16 would have to go back to naming those seven specs unreleased, which
-would then be false: their release is a fact about spec-spine, not about this
-pin.
-
-**2026-09-24: the pin moves to `=0.25.0`.** Owner-directed on 2026-09-24:
-qualify the published 0.25.0 carrying spec-spine's 126 to 129, after the
-producer's registry-backed consumer check. It moves the CLI pin only;
-`spec-spine-core` moves in its own implementation change, as in the 0.23.0
-entry above. 0.24.0 was never adopted here: nothing needed a 0.24.0 capability,
-and 0.24.0 carried the defect below.
-
-*Why this release.* Measured on 2026-09-24 in a disposable clone: a spec `id`
-naming a path outside the repository (`../../../../../outside/victim`) made
-`compile` overwrite a file outside the repository under both 0.23.0 and
-published 0.24.0, while exiting 1. 126 (a derived file stays in its
-directory), 127 (a derived file is where its path says), 128 (a derived tree
-stays in its repository) and 129 (a configuration passed as JSON obeys the
-loader's rules) are the producer's fixes. The installed 0.25.0 refuses that
-case with exit 3, and the outside file's digest is unchanged.
-
-*What was adopted, by identity.* Tag `v0.25.0` is an annotated tag with a good
-signature (ED25519, the producer owner's key), and it targets `25d46b9f`,
-which is on spec-spine `main` and contains `f6afdc61` (126), `212995fe` (127),
-`8446e773` (128) and `34d0d0df` (129). Its release run succeeded. The three
-crates were published to crates.io at about 10:42Z on 2026-09-24 by the
-producer's owner account, none yanked. Each downloaded `.crate` matches the
-registry checksum:
-
-| Crate | Checksum |
-|---|---|
-| `spec-spine-cli` | `1e7e7eda…8688` |
-| `spec-spine-core` | `d96d89fb…3b2c` |
-| `spec-spine-types` | `a941756c…5495` |
-
-Each records Git revision `25d46b9f` in `.cargo_vcs_info.json`, with no
-`dirty` flag, and each unpacked source equals that revision's
-`crates/<crate>` with no differing path (the normalized `Cargo.toml` differs
-as Cargo writes it; `Cargo.toml.orig` equals the tree's). `cargo install
---locked` with rustc 1.96.0 gave `35e5cc20…69dd`, and `make tools` gave
-`fb29901f…8d14`; as before, a build is identified by version and source
-revision, not by digest.
-
-*The floor.* The five source files that name `DEFAULT_BYPASS_PREFIXES` are
-byte-identical between `v0.23.0` and `v0.25.0`, and `config show` differs only
-by the pin line.
-
-*Coupling.* `couple` gives the same verdict and the same checked-path count
-under both versions over fourteen merged ranges: the six in the 0.23.0 entry
-above (1, 4, 8, 6, 1 and 17 paths, as recorded) and `6d02de4..bad7136`,
-`bad7136..411234c`, `411234c..96e9f2d`, `96e9f2d..fa000c6`,
-`fa000c6..fee508a`, `fee508a..2b15987`, `2b15987..fa8229d` and
-`fa8229d..b2d80c9`. Four synthetic commits agree as well: a
-`docs/decisions`-only change, a `src`-only change and a deleted file each
-exit 1 with `C-001` naming the same owner, and a derived-only change exits 0
-with no path checked. Against shards a 0.23.0 wrote, 0.25.0 refuses every
-range with exit 2, "index is stale": the ledger refusal 0.23.0 already has,
-and the reason this move is committed with its re-index.
-
-*Exit codes and the text the hooks read.* `check`, `lint --fail-on-warn`,
-`index check --fail-on-unresolved`, `index coverage --fail-on-untraced` and
-`compile --check` give the same code under both versions on a fresh, a stale,
-an invalid and a mismatched-pin tree and on an unknown verb. The report lines
-the shipped hooks match (`spec-registry:` and `codebase-index:`) are
-byte-identical, and the pin refusal differs only by its two version numbers,
-so section 3.23 contract 2's probe still reads it.
-
-*The re-index.* The move regenerates 22 shards, one line each:
-
-- Seven spec-registry shards: `specVersion` 1.6.0 to 1.8.0, with every
-  `shardHash` unchanged.
-- Fifteen codebase-index shards: `shardHash` only.
-
-Read through the CLI, `registry plan --json` is read schema 0.8.0 with the
-same keys, the ready set is unchanged (`002`, `approved`), and every
-`registry closure` digest and member count is unchanged. No shard says
-anything different about the corpus.
-
-*Evidence kinds, kept apart.* The producer's candidate testing (local archives
-at `e6c5186c`) and its registry-backed consumer check (the five tests of its
-0.25.0 handoff, all passing, including `statecraft-home`'s suite against the
-published core in a scratch clone) are the producer's evidence. The identity,
-floor, coupling, exit, hook-text and re-index measurements above are this
-repository's published-package qualification of the CLI. Neither qualifies a
-bundle, which is not adopted.
-
-*What this does not do.* It does not move `spec-spine-core` or
-`PRODUCER_VERSION`, change any code, or adopt a new producer capability as a
-runtime feature.
-
-**Consequence if rejected.** The pin returns to `=0.23.0`, `make tools`
-installs that, and the 22 shards are regenerated back. The crafted-id defect
-stays in the governing binary.
+**Consequence if rejected.** The pin stays exact and repository-local, but each
+adoption edits this record, which spec `001` claims, and so needs either an
+authoring edit to spec `001` or an owner waiver, as 0.25.0 did.
 
 ### D-07: The inherited evidence vocabulary
 
@@ -791,6 +613,30 @@ is recorded in its own spec's section 5.
 **What is not adopted here.** No other `D-` row moves, no deferral is lifted,
 and nothing is released. `D-01`'s distribution half and `D-08` stay open, and
 `F-02` holds.
+
+
+### 2026-09-24: D-06 amended so that an adoption needs no waiver
+
+The repository owner decided this in the session request of 2026-09-24 (item
+A-1: "I adopt this direction"), and ratifies it by merging the change that
+carries this entry. `D-06`'s recommendation and reason are unchanged. Its three
+added rules are in the row itself: one stated source for each pin
+(`spec-spine.toml` for the CLI, the root `Cargo.toml` for the linked library),
+per-release entries in `docs/adoption/spec-spine.md`, and one producer
+identity: the CLI and the library are the same release and move together
+(H-3 (a), owner Addendum 2 of 2026-09-24).
+
+**Why.** The 0.25.0 adoption (#102) edited this record, which spec `001`
+claims, so the coupling gate raised `C-001` and the change merged only under a
+waiver the owner granted for that pull request alone. Recording each adoption
+in a file no spec claims, and stating the pin once in files no spec claims,
+removes that cause without weakening the gate: nothing claimed moves, and the
+record's decisions still change only with an authoring edit to spec `001`.
+
+**What moved, and how.** The three dated entries under `D-06` (2026-09-17,
+2026-09-23, 2026-09-24) and the dated history of rows `C-01` and `C-02` were
+relocated verbatim to the ledger. `C-01` and `C-02` are restated as rules that
+name no release. No requirement text changed in the relocation.
 
 Publication, merges, releases and deployments are not covered by adopting any row
 here. F-02 holds until it is separately lifted.

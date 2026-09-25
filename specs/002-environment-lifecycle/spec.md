@@ -7502,6 +7502,18 @@ rewritten, a customized workflow is withheld) and checks the operator steps;
 `setup_profile.rs`'s `gh` stub now reports a bound `ci-gate` for the satisfied
 case and adds an unbound mode that must read not satisfied.
 
+**2026-09-24: the linked producer's version is stated once (spec `001`
+section 3.13, `D-06` as amended).** `crates/statecraft-home` takes
+`spec-spine-core.workspace = true`, so the root `Cargo.toml`'s
+`[workspace.dependencies]` is the only statement of the version and features.
+`PRODUCER_VERSION` was already derived from `Cargo.lock` by `build.rs` (the
+provenance entry above). The manifest test now reads the root manifest and
+asserts the member inherits it, and a new test asserts `spec-spine.toml`'s
+`required_version` names the same release (one producer identity, H-3 (a)):
+pinning the CLI to another release fails it. The two ownership-transfer
+assertions derive the expected `spec-spine-core@<version>` from the constant.
+`Cargo.lock` does not change.
+
 **2026-09-24: profile revision 3, the merge queue (adopted by the owner on
 2026-09-24; amends the setup-profile entries and revision 2).** Revisions 1 and
 2 render CI that triggers on `pull_request` and `push` only. A repository that
