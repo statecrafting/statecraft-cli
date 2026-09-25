@@ -537,9 +537,9 @@ one digest format and one ledger format across the family.
 read as a spec-spine diagnostic (owner Addendum 2, item N).** Proposed
 2026-09-24; **adopted by the owner on 2026-09-25** as written below. Nothing is
 renamed by this entry: the scheme binds new identifiers and new labels from
-adoption, and the existing references are renamed by the relocation-only pull
-requests that the amendment-model entry below sequences, which wait for
-spec-spine 0.27.0.
+adoption, and the existing references are renamed by rename-only pull
+requests that follow the relocation-only pull requests the amendment-model
+entry below sequences, which wait for spec-spine 0.27.0.
 
 *The collision.* The decision record's identifiers are a letter, a dash and two
 digits: `C-01` to `C-18`, `D-01` to `D-10`, `I-01` to `I-10`, `F-01` onward,
@@ -580,9 +580,15 @@ and stays.
 
 *How the map would be applied.* Not by a sweep in this entry. Renaming 281
 decision-record references and roughly 230 label references is a
-relocation-only change of the kind the owner's spec-structure item (S) already
-sequences, so it rides with those relocation PRs, each demonstrating that no
-requirement text changed except the identifier.
+mechanical change like the relocations the owner's spec-structure item (S)
+already sequences, but it cannot ride inside them: Part 3 below admits no edit
+inside a moved section, and spec-spine 0.27.0's relocation proof (its spec 142)
+ignores only heading numbers and levels, trailing whitespace and blank-line
+runs, so a renamed identifier inside a moved section would fail it. The renames
+therefore follow the relocations, in rename-only PRs, each demonstrating that
+the only change to requirement text is the identifier. (Corrected 2026-09-25
+on an AI-review finding: the entry as first written said the renames ride
+with the relocation PRs.)
 
 **2026-09-24, direction adopted 2026-09-25: what 1.0 means: a readiness
 checklist, a stability policy, and a release pipeline (owner Addendum 2, items
