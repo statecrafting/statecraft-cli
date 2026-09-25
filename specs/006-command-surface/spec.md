@@ -1043,9 +1043,9 @@ proposes for this section (provenance: item X), which the owner adopted
 the same day and which lands in the spec-spine 0.26.0 migration; the parser
 change waits for that entry to be on `main`. Every clap error maps to exit 3 and is tested for each verb, and
 the implementing change measures release binary size and clean build time
-itself, before and after, on one machine; the 5.28 MB figure in the table
-below is an unrebuilt observation, not that baseline. Nothing is implemented by this entry. The assessment below
-is as prepared.
+itself, before and after, on one machine. Nothing is implemented by this
+entry. The assessment below is as prepared, except that its binary-size row
+no longer quotes an unrebuilt figure.
 
 *What exists* (main `17dbdb6`). `commands.rs` (546 lines) resolves the verb
 from the first two words by one closed `match` over `Verb::all()` (42
