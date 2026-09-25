@@ -1042,7 +1042,8 @@ implements nothing. Its conditions bind the change that will implement it:
 that change lands only after the family exit and JSON contract (proposed for
 this section in draft #118, adopted by the owner on 2026-09-25, landing with
 the spec-spine 0.26.0 migration) is on `main`; it maps every clap error to exit
-3 with a test for each verb; and it measures release binary size and clean
+3 with a test for each verb, except clap's `DisplayHelp` and `DisplayVersion`
+kinds (`--help`, `--version`), which exit 0 and are tested too; and it measures release binary size and clean
 build time on one machine before and after. The assessment below is as
 prepared, except that its binary-size row no longer quotes an unrebuilt
 figure.
