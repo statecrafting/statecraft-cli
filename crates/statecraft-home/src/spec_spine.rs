@@ -531,11 +531,21 @@ pub struct NotSelected {
 impl NotSelected {
     fn from(why: &Unselected, selection: &Selection) -> Self {
         match why {
-            Unselected::Absent => Self {
-                why: Unavailability::Absent,
-                detail: "no spec-spine was found in the repository's target/release or on PATH"
-                    .to_string(),
-            },
+            Unselected::Absent => {
+                // The notices come too: an operator who set the retired name
+                // and has no binary learns which name to set instead.
+                let mut detail =
+                    "no spec-spine was found in the repository's target/release or on PATH"
+                        .to_string();
+                for remark in selection.remarks() {
+                    detail.push_str("; ");
+                    detail.push_str(&remark);
+                }
+                Self {
+                    why: Unavailability::Absent,
+                    detail,
+                }
+            }
             Unselected::Refused(sentence) => {
                 let mut detail = selection.remarks().join("; ");
                 if !detail.is_empty() {
@@ -637,6 +647,25 @@ mod tests {
         assert_eq!(s.notices.len(), 1, "{s:?}");
         assert!(s.notices[0].contains(&format!("ignored {RETIRED}={named_s}")));
         assert!(s.notices[0].contains(ENV));
+    }
+
+    #[test]
+    fn with_no_binary_the_retired_name_notice_still_reaches_the_operator() {
+        let dir = tempfile::tempdir().unwrap();
+        let root = dir.path().join("repo");
+        std::fs::create_dir_all(&root).unwrap();
+        pinned(&root, Some("=0.23.0"));
+        let empty = dir.path().join("empty");
+        std::fs::create_dir_all(&empty).unwrap();
+        let empty_s = empty.display().to_string();
+        let s = select(
+            &root,
+            &env(&[(RETIRED, "/nowhere/spec-spine"), ("PATH", &empty_s)]),
+        );
+        assert_eq!(s.outcome, Err(Unselected::Absent), "{s:?}");
+        let detail = NotSelected::from(&Unselected::Absent, &s).detail;
+        assert!(detail.starts_with("no spec-spine was found"), "{detail}");
+        assert!(detail.contains(RETIRED) && detail.contains(ENV), "{detail}");
     }
 
     #[test]
