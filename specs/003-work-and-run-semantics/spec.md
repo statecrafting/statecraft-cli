@@ -1408,6 +1408,20 @@ refusal is `unreadable` in the binding and `ProducerRefused` in the report.
 recorded lines of both releases in `each_exit_code_is_its_own_answer` and
 `a_check_refusal_is_read_under_both_exit_tables`.
 
+**2026-09-25: a configuration or containment refusal is not a stale ledger
+(owner, 2026-09-25: adopt 0.27.0).** The entry above reads a refusal by
+`refused:` or a pin not met. Measured the same day, invalid configuration exits
+2 under both 0.26.0 and 0.27.0 with `spec-spine: config error:`, and 0.27.0 adds
+a link leaving the repository (`refused:`) and a layout root that is not a plain
+relative path (`config error:`), both 2 (spec-spine's 144). Both readers took
+such a 2 as a stale ledger. They now share spec `002`'s widened
+`names_refusal`, so each is `unreadable` in the binding and `ProducerRefused`
+in the report; and `validation failed` at 1, 0.27.0's word for an unresolved
+claim at a guarded reader (spec-spine's 145), is never stale. Each state keeps
+its meaning. Tested with the recorded lines in
+`each_exit_code_is_its_own_answer` and
+`a_check_refusal_is_read_under_both_exit_tables`.
+
 ## Verification
 
 Each line is one command. §3.8's twenty-two rows are integration tests named after

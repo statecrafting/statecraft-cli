@@ -41,13 +41,17 @@ use serde::{Deserialize, Serialize};
 
 use crate::authority::{CorpusAnswer, DeltaReport};
 
-/// The `DELTA_SCHEMA_VERSION` line this build reads.
+/// The `DELTA_SCHEMA_VERSION` lines this build reads.
 ///
 /// Spec 071 section 3.6 starts the report's schema at `0.1.0` on its own axis.
 /// On a `0.x` line the MINOR is the breaking position, so this build reads
-/// `0.1.z` and refuses anything else rather than deserializing a contract it
-/// was not written against.
-pub const READS_DELTA_SCHEMA: &str = "0.1";
+/// each listed `0.m.z` and refuses anything else rather than deserializing a
+/// contract it was not written against. `0.2` is spec-spine 0.27.0's (its
+/// spec 142): the class `relocation` and a `relocations` list, both additive.
+/// The list is not read, and `relocation` is outside the eleven classes of
+/// spec 005 section 3.3.2, so a report that uses it is an absence (section
+/// 3.3.3 case 3) until that table places it (spec 005 section 5, 2026-09-25).
+pub const READS_DELTA_SCHEMAS: [&str; 2] = ["0.1", "0.2"];
 
 /// The verb whose envelope this is.
 pub const DELTA_VERB: &str = "delta";
@@ -293,7 +297,7 @@ pub enum ReadError {
     },
     /// The report's schema is not the one this build reads.
     #[error(
-        "spec-spine {version} reported delta schema {found}; this build reads {READS_DELTA_SCHEMA}.z \
+        "spec-spine {version} reported delta schema {found}; this build reads 0.1.z and 0.2.z \
          and does not deserialize a contract it was not written against"
     )]
     SchemaNotRead {
@@ -414,10 +418,12 @@ impl SpecSpineDeltaReport {
 
 /// Whether a report's schema version is one this build reads.
 fn schema_is_read(schema_version: &str) -> bool {
-    schema_version == READS_DELTA_SCHEMA
-        || schema_version
-            .strip_prefix(READS_DELTA_SCHEMA)
-            .is_some_and(|rest| rest.starts_with('.'))
+    READS_DELTA_SCHEMAS.iter().any(|line| {
+        schema_version == *line
+            || schema_version
+                .strip_prefix(line)
+                .is_some_and(|rest| rest.starts_with('.'))
+    })
 }
 
 impl DeltaReport for SpecSpineDeltaReport {
@@ -671,11 +677,15 @@ mod tests {
     #[test]
     fn a_schema_this_build_does_not_read_is_refused() {
         let mut e = report_with(vec![], BTreeMap::new());
-        e.report.schema_version = "0.2.0".into();
+        e.report.schema_version = "0.3.0".into();
         assert!(matches!(
             SpecSpineDeltaReport::from_envelope(e),
             Err(ReadError::SchemaNotRead { .. })
         ));
+        // `0.20.0` is not the `0.2` line.
+        let mut e = report_with(vec![], BTreeMap::new());
+        e.report.schema_version = "0.20.0".into();
+        assert!(SpecSpineDeltaReport::from_envelope(e).is_err());
     }
 
     #[test]
