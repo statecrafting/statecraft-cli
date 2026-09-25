@@ -7707,6 +7707,21 @@ repository's own gate), and the walk's install of a different pinned release
 for an older commit (it needs the network); the first live run is their
 evidence.
 
+**2026-09-24: two defects in revision 4's `gate.sh`, found by the first live
+AI review (statecraft-cli #138).** Both are corrections inside the adopted
+revision, so the revision stays 4 and only the profile identity changes.
+(1) `gate.sh code` had lost the guard the hand-written CI had: in a workspace
+with no member crates, every `cargo --workspace` verb refuses the virtual
+manifest. It now asks `cargo metadata --no-deps` first and, with no workspace
+members, says that build, test, clippy and fmt judge nothing and passes; with
+a member it runs all four as before. (2) In the commit walk, a commit whose
+`spec-spine.toml` states no exact pin was refused with an empty log, because
+the reason went only to stderr before the log existed. The reason is now also
+written to the log that the refusal prints. Tests:
+`the_code_gate_judges_nothing_without_member_crates_and_says_so` and
+`a_commit_without_an_exact_pin_is_refused_and_says_why` in
+`setup_workflows.rs`, each observed failing against the previous `gate.sh`.
+
 **2026-09-24: S-5, this repository's CI is rendered from the profile
 (revision 4; owner decision of 2026-09-24).** `init apply` with
 `--profile github-actions-rust` was run on this repository, and the
