@@ -3185,6 +3185,7 @@ fn the_rendered_gate_exits_in_the_family_contract() {
         ("ss-check", "3", 4, "usage error"),
         ("ss-check", "4", 4, "could not do its work"),
         ("ss-lint", "7", 4, "does not know"),
+        ("ss-index-coverage", "1", 1, "or a stale committed tree"),
         ("ss-index-check", "1", 1, "or a stale committed tree"),
     ] {
         let (code, text) = gate_sh(root, &["governance"], &[], &[(file, ss_code)]);
