@@ -1083,7 +1083,7 @@ and the help-before-resolution rule, mapping every clap error to exit 3, with
 a test per verb that a bad flag exits 3 and names the flag; completions via
 `clap_complete`. (b) Adopt clap for the whole tree. (c) Keep the hand-written
 parser and add a small declarative flag table per verb that the usage lines
-and a completion script are generated from. *Recommended: (a)*, after the
+and a completion script are generated from. *Recommended, and adopted by the owner on 2026-09-25: (a)*, after the
 family exit contract lands (item X), so the usage-error envelope is decided
 once. Measure binary size and clean-build time before and after as the
 change's evidence.
