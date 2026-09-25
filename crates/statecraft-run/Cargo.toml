@@ -17,12 +17,12 @@ publish.workspace = true
 
 [dependencies]
 # The record envelope, reused rather than reimplemented (spec 001 section 3.2).
-# A git dependency pinned to a revision: attest-ledger is public and unpublished,
-# and vendoring a copy of a hash-linked ledger into the product that depends on
-# it would defeat the reuse. `publish = false` already holds for this workspace,
-# so the usual objection to a git dependency does not apply yet. Un-pinning it,
-# or moving to a released version, is its own change.
-attest-ledger-core = { git = "https://github.com/statecrafting/attest-ledger", rev = "a9c3595" }
+# The crates.io release, pinned exactly: attest-ledger-core and
+# attest-ledger-types 0.1.0 are the same source as the git revision `a9c3595`
+# this crate pinned before, differing only in repository metadata (spec 003
+# section 5, 2026-09-25). An exact pin because the record hash is this crate's
+# persisted format; moving to a later release is its own change.
+attest-ledger-core = "=0.1.0"
 serde = { version = "1.0.229", features = ["derive"] }
 serde_json = "1.0.151"
 thiserror = "2.0.20"
