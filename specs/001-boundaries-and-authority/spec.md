@@ -795,7 +795,10 @@ delegation (#111) once this split is adopted.
 
 1. This proposal, adopted or amended by the owner (one authority PR changing
    this entry to adopted, the `D-02` choice, and `AGENTS.md` for the
-   amendment model).
+   amendment model). As adopted on 2026-09-25, that PR adopts Part 1 and
+   `AGENTS.md` only; the `D-02` choice (S-B in the table below) stays open
+   with Part 2, as the adoption note above says. (Noted 2026-09-25 on an
+   AI-review finding.)
 2. The 0.26.0 migration (adoption, the exit and JSON contract amendment of
    spec `006`, the one-identity rule) lands before any relocation, so the
    relocations do not race the code it changes.
