@@ -220,9 +220,11 @@ cout=$("$sc" --repo "$root" check --fail-on-unresolved 2>&1); cec=$?
 # spec-spine has two exit tables (spec 002 section 5, 2026-09-25, "both exit
 # tables"). From 0.26.0 a stale tree exits 1 and 2 is a refusal to judge, which
 # names itself; below it stale is 2 and a refusal 3. A refusal is read first,
-# by its words, so a 0.26.0 refusal is never sent to regenerate.
+# by its words, so a 0.26.0 refusal is never sent to regenerate. Invalid
+# configuration says `config error:` rather than `refused:` at the same 2
+# (0.26.0 and 0.27.0), as does 0.27.0's refusal of a layout root.
 if [ "$cec" != 0 ]; then
-  case "$cout" in *'spec-spine: refused:'*|*'requires spec-spine'*)
+  case "$cout" in *'spec-spine: refused:'*|*'spec-spine: config error:'*|*'requires spec-spine'*)
     { echo "[pr-gate] BLOCKED: spec-spine refused to judge the tree in $root (check exit $cec): $(printf '%s\n' "$cout" | head -1)"
       echo '[pr-gate] The tree has NOT been judged and is not known to be stale; regenerating repairs nothing here.'
       echo "[pr-gate] $judge"; } >&2
