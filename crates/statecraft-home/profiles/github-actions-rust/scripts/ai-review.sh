@@ -11,18 +11,29 @@
 # Outputs (GITHUB_OUTPUT): result (findings | no-findings | skipped:<class>),
 # release_candidate (true | false), evidence (a directory, when one was made).
 # Exit 0 is a review or a visible skip; anything else blocks.
-set -euo pipefail
+#
+# The family exit contract (revision 7): 0 a review or a visible skip, 2
+# refused (a precondition the operator supplies: the credential, the
+# provider's acceptance of it, a head that has not moved), 3 usage (an input
+# is missing), 4 failed (the review was attempted and did not produce a
+# review of this subject). A findings verdict is a review, exit 0; ci-gate
+# reads it. A command that fails outside a test is reported as 4 by the ERR
+# trap, whatever its own code was.
+set -eEuo pipefail
+trap 'echo "ai-review: a command failed (exit $?) at line ${LINENO}; reported as failed (4)" >&2; exit 4' ERR
 
-: "${BASE_SHA:?}" "${HEAD_SHA:?}" "${PR_NUMBER:?}" "${REPO:?}"
+for input in BASE_SHA HEAD_SHA PR_NUMBER REPO DIFF_CAP CLAUDE_CLI_VERSION PROFILE_IDENTITY; do
+  if [ -z "${!input:-}" ]; then
+    echo "ai-review.sh needs ${input}" >&2
+    exit 3
+  fi
+done
 HEAD_REPO="${HEAD_REPO:-$REPO}"
 ACTOR="${ACTOR:-}"
 IS_DRAFT="${IS_DRAFT:-false}"
 HEAD_REF="${HEAD_REF:-}"
-DIFF_CAP="${DIFF_CAP:?}"
 EXCLUDE="${EXCLUDE:-}"
 RELEASE_PATTERN="${RELEASE_PATTERN:-}"
-CLAUDE_CLI_VERSION="${CLAUDE_CLI_VERSION:?}"
-PROFILE_IDENTITY="${PROFILE_IDENTITY:?}"
 TMPD="${AI_REVIEW_TMP:-${RUNNER_TEMP:-/tmp}}"
 EVIDENCE_DIR="${EVIDENCE_DIR:-$TMPD/statecraft-evidence}"
 GITHUB_OUTPUT="${GITHUB_OUTPUT:-/dev/null}"
@@ -33,10 +44,13 @@ note() {
   printf '%s\n' "$*"
   if [ -n "${GITHUB_STEP_SUMMARY:-}" ]; then printf '%s\n\n' "$*" >> "$GITHUB_STEP_SUMMARY"; fi
 }
+# Block with a reason. The second argument is the exit code: 4 (failed) unless
+# the call names 2 (refused).
 refuse() {
-  echo "::error::ai-review: $*" >&2
-  note "AI review BLOCKS: $*"
-  exit 1
+  echo "::error::ai-review: $1" >&2
+  note "AI review BLOCKS: $1"
+  if [ "${2:-4}" = 2 ]; then exit 2; fi
+  exit 4
 }
 
 release_candidate=false
@@ -107,7 +121,7 @@ if [ "$ACTOR" = "dependabot[bot]" ]; then skip dependabot "Dependabot runs witho
 
 # A same-repository pull request without the credential is not a skip.
 if [ -z "${CLAUDE_CODE_OAUTH_TOKEN:-}" ]; then
-  refuse "the CLAUDE_CODE_OAUTH_TOKEN secret is not set for this repository; set it with: gh secret set CLAUDE_CODE_OAUTH_TOKEN"
+  refuse "the CLAUDE_CODE_OAUTH_TOKEN secret is not set for this repository; set it with: gh secret set CLAUDE_CODE_OAUTH_TOKEN" 2
 fi
 
 # The subject: the exact three-dot diff, minus the excluded prefixes.
@@ -182,7 +196,7 @@ if [ "$rc" -ne 0 ]; then
   NET_CONTEXT_RE="fetch failed|socket hang up|request to|api\.anthropic\.com"
   # A refusal outranks a transient signal.
   if printf '%s\n' "$err" | grep -qiE "$REFUSAL_RE"; then
-    refuse "the provider refused the review (exit ${rc})"
+    refuse "the provider refused the review (exit ${rc})" 2
   fi
   if printf '%s\n' "$err" | grep -qiE "$TRANSIENT_RE" \
     || printf '%s\n' "$err" | grep -iE "$NET_ERRNO_RE" | grep -qiE "$NET_CONTEXT_RE"; then
@@ -227,7 +241,7 @@ done < <(jq -r '(.findings // [])[].path' "$TMPD/verdict.json")
 # counted as a review of the pull request as it now stands.
 current="$(gh api "repos/${REPO}/pulls/${PR_NUMBER}" --jq .head.sha)" || refuse "the current head could not be read"
 if [ "$current" != "$HEAD_SHA" ]; then
-  refuse "stale subject: the head moved to ${current} before publication"
+  refuse "stale subject: the head moved to ${current} before publication" 2
 fi
 
 evidence "$verdict" "$(jq -c '.findings // []' "$TMPD/verdict.json")" "$diff_digest"

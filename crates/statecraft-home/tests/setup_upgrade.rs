@@ -144,6 +144,7 @@ fn an_unmodified_file_is_replaced_and_a_customized_one_is_kept_with_three_digest
     );
 }
 
+const R6_GATE: &str = include_str!("support/profile-r6/gate.sh");
 const R5_CI: &str = include_str!("support/profile-r5/statecraft-ci.yml");
 const R5_CI_GATE: &str = include_str!("support/profile-r5/ci-gate.sh");
 const R4_CI: &str = include_str!("support/profile-r4/statecraft-ci.yml");
@@ -156,11 +157,30 @@ const R4_CI_GATE: &str = include_str!("support/profile-r4/ci-gate.sh");
 /// authority change, the commit walk runs each commit's own gate, and
 /// `ci-gate.sh` only reports an authority change. Only the templates matter
 /// to a managed upgrade.
+/// Revision 6 of the registered profile: the gate script as revision 6
+/// shipped it (#144), the template whose revision-7 change a managed upgrade
+/// is asserted on. The other templates revision 7 changed are the registered
+/// ones here, as the earlier simulations carry later templates: only the
+/// revision and the compared template matter to a managed upgrade.
+fn revision_six() -> Profile {
+    let mut r6 = Profile::registered();
+    assert_eq!(r6.revision, 7, "the registered profile is revision 7");
+    r6.revision = 6;
+    for t in &mut r6.templates {
+        let body = match t.path.as_str() {
+            "scripts/statecraft/gate.sh" => R6_GATE,
+            _ => continue,
+        };
+        assert_ne!(t.body, body, "{}: revision 7 changed it", t.path);
+        t.body = body.to_string();
+    }
+    r6
+}
+
 /// Revision 5 of the registered profile: the two templates revision 6 changed,
-/// exactly as revision 5 shipped them (#143).
+/// exactly as revision 5 shipped them (#143), on revision 6.
 fn revision_five() -> Profile {
-    let mut r5 = Profile::registered();
-    assert_eq!(r5.revision, 6, "the registered profile is revision 6");
+    let mut r5 = revision_six();
     r5.revision = 5;
     for t in &mut r5.templates {
         let body = match t.path.as_str() {
@@ -175,8 +195,7 @@ fn revision_five() -> Profile {
 }
 
 fn revision_four() -> Profile {
-    let mut r4 = Profile::registered();
-    assert_eq!(r4.revision, 6, "the registered profile is revision 6");
+    let mut r4 = revision_six();
     r4.revision = 4;
     // The three templates revision 5 changed, exactly as revision 4 shipped
     // them (main at 2c82d9a, before #143), so the simulation is revision 4
@@ -683,7 +702,7 @@ fn a_revision_five_project_upgrades_to_revision_six() {
     let before = std::fs::read_to_string(root.join(gate)).unwrap();
     assert!(!before.contains("^\\.github/workflows/"), "{before}");
 
-    let r6 = Profile::registered();
+    let r6 = revision_six();
     assert_ne!(r6.identity(), r5.identity());
     let recorded = manifest.project.setup.as_ref().unwrap().parameters.clone();
     let upgrade = plan_and_apply_with(root, &r6, &mut manifest, &recorded);
@@ -697,6 +716,76 @@ fn a_revision_five_project_upgrades_to_revision_six() {
     let steps = setup::remote_obligations().join("\n");
     assert!(
         steps.contains("every file under .github/workflows/ is in the authority set"),
+        "{steps}"
+    );
+}
+
+/// Revision 7: a revision-6 project upgrades through one plan and apply,
+/// declaring an extra required job as it does. The gate script is rewritten
+/// in the family exit contract (a usage error is 3, not 64), the workflow
+/// calls the declared job's reusable workflow and ci-gate needs it, and the
+/// policy requires it on every event.
+#[test]
+fn a_revision_six_project_upgrades_to_revision_seven() {
+    let dir = project();
+    let root = dir.path();
+    let mut manifest = Manifest::new(Pins {
+        product: "0.0.0".into(),
+        spec_spine: "unpinned".into(),
+        adapters: Default::default(),
+        producer: None,
+    });
+    let r6 = revision_six();
+    assert!(plan_and_apply_with(root, &r6, &mut manifest, &BTreeMap::new()).whole());
+    assert_eq!(manifest.project.setup.as_ref().unwrap().revision, 6);
+    let gate = "scripts/statecraft/gate.sh";
+    let wf = ".github/workflows/statecraft-ci.yml";
+    let before = std::fs::read_to_string(root.join(gate)).unwrap();
+    assert!(before.contains("exit 64"), "{before}");
+
+    std::fs::write(
+        root.join(".github/workflows/deny.yml"),
+        "on:\n  workflow_call:\njobs:\n  deny:\n    runs-on: ubuntu-latest\n    steps:\n      - run: true\n",
+    )
+    .unwrap();
+    let r7 = Profile::registered();
+    assert_ne!(r7.identity(), r6.identity());
+    let mut block = manifest.project.setup.as_ref().unwrap().parameters.clone();
+    block.insert(
+        "ci.extra_required_jobs".to_string(),
+        serde_json::json!([{"job": "deny", "workflow": ".github/workflows/deny.yml"}]),
+    );
+    let upgrade = plan_and_apply_with(root, &r7, &mut manifest, &block);
+    for rel in [wf, gate] {
+        let file = upgrade.files.iter().find(|f| f.path == rel).unwrap();
+        assert_eq!(file.action, Action::Replace, "{rel}");
+    }
+    let after = std::fs::read_to_string(root.join(gate)).unwrap();
+    assert!(!after.contains("exit 64"), "{after}");
+    assert!(after.contains("leave 3"), "{after}");
+    let ci = std::fs::read_to_string(root.join(wf)).unwrap();
+    assert!(
+        ci.contains("  deny:\n    name: deny\n    uses: ./.github/workflows/deny.yml\n"),
+        "{ci}"
+    );
+    assert!(
+        ci.contains("needs: [governance, code, ai-review, review-exception, deny]"),
+        "{ci}"
+    );
+    let policy: serde_json::Value =
+        serde_json::from_str(&std::fs::read_to_string(root.join(setup::POLICY_PATH)).unwrap())
+            .unwrap();
+    for event in ["pull_request", "push", "merge_group"] {
+        assert_eq!(policy["jobs"]["deny"][event], "required", "{event}");
+    }
+    assert_eq!(policy["jobs"]["deny"]["required"], true);
+    let selection = manifest.project.setup.as_ref().unwrap();
+    assert_eq!(selection.revision, 7);
+    assert_eq!(selection.parameters, block);
+    let steps = setup::remote_obligations().join("\n");
+    assert!(steps.contains("ci.extra_required_jobs"), "{steps}");
+    assert!(
+        steps.contains("0 ok, 1 finding, 2 refused, 3 usage, 4 failed"),
         "{steps}"
     );
 }
