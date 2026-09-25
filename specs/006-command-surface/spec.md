@@ -1038,9 +1038,10 @@ never changes the exit. Additive under section 3.4.
 against clap (owner Addendum 2, item P).** **The owner adopted the
 recommendation on 2026-09-25**: clap for per-verb arguments only, while verb
 resolution (`Verb::parse`) and help before resolution stay as they are. It is
-implemented after the family exit and JSON contract (the item X entry of this
-section, adopted the same day, which lands in the spec-spine 0.26.0
-migration). Every clap error maps to exit 3 and is tested for each verb, and
+implemented after the family exit and JSON contract: the entry draft #118
+proposes for this section (provenance label item X), which the owner adopted
+the same day and which lands in the spec-spine 0.26.0 migration; the parser
+change waits for that entry to be on `main`. Every clap error maps to exit 3 and is tested for each verb, and
 the implementing change records release binary size and clean build time
 before and after. Nothing is implemented by this entry. The assessment below
 is as prepared.
