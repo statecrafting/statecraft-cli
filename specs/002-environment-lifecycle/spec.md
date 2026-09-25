@@ -8284,6 +8284,27 @@ every non-zero code still refuses at the enforcing gate (contract 6).
 `pin_a_refusal_under_the_0_26_0_table_is_decided_by_the_probe` run the shipped
 bodies against the recorded 0.26.0 lines; the 0.25.0 rows are unchanged.
 
+**2026-09-25: the delivered hooks read `config error` as a refusal (owner,
+2026-09-25: adopt 0.27.0).** Measured the same day against the published
+0.26.0 and 0.27.0: invalid configuration exits 2 under both and says
+`spec-spine: config error:`, not `refused:`, and 0.27.0 adds two more exit-2
+refusals (its spec 144): a link leaving the repository (`refused:`) and a
+layout root that is not a plain relative path (`config error:`). The hooks
+changed on this date for "both exit tables" read only `refused:` and a pin not
+met as a refusal. So `pre-bash.sh` blocked a malformed `spec-spine.toml` as "a
+committed shard tree is stale" and told the operator to regenerate, and
+`session-start.sh` and `stop.sh` reported it as an unrecognised answer. All
+three now read `spec-spine: config error:` as a refusal to judge, beside
+`refused:` and a pin not met. `post-edit.sh` prints `check`'s own report and
+reads no code. No hook runs a guarded reader, so spec-spine's 145 (an
+unresolved claim at `couple`, `index coverage`, `index owner`, `scope` or
+`delta` is `validation failed`) reaches none of them; `check --fail-on-unresolved`
+prints the same bytes for an unresolved claim under 0.25.0, 0.26.0 and
+0.27.0. Contracts 1 to 7 are unchanged, and every non-zero code still refuses
+at the enforcing gate (contract 6). Tested in
+`contract_4_a_configuration_or_containment_refusal_is_never_stale`, which
+fails against the previous bodies.
+
 ## Verification
 
 `--fail-on-untraced` joined the corpus gate with this spec's first
