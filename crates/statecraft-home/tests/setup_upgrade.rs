@@ -144,6 +144,8 @@ fn an_unmodified_file_is_replaced_and_a_customized_one_is_kept_with_three_digest
     );
 }
 
+const R5_CI: &str = include_str!("support/profile-r5/statecraft-ci.yml");
+const R5_CI_GATE: &str = include_str!("support/profile-r5/ci-gate.sh");
 const R4_CI: &str = include_str!("support/profile-r4/statecraft-ci.yml");
 const R4_GATE: &str = include_str!("support/profile-r4/gate.sh");
 const R4_CI_GATE: &str = include_str!("support/profile-r4/ci-gate.sh");
@@ -154,9 +156,27 @@ const R4_CI_GATE: &str = include_str!("support/profile-r4/ci-gate.sh");
 /// authority change, the commit walk runs each commit's own gate, and
 /// `ci-gate.sh` only reports an authority change. Only the templates matter
 /// to a managed upgrade.
+/// Revision 5 of the registered profile: the two templates revision 6 changed,
+/// exactly as revision 5 shipped them (#143).
+fn revision_five() -> Profile {
+    let mut r5 = Profile::registered();
+    assert_eq!(r5.revision, 6, "the registered profile is revision 6");
+    r5.revision = 5;
+    for t in &mut r5.templates {
+        let body = match t.path.as_str() {
+            ".github/workflows/statecraft-ci.yml" => R5_CI,
+            "scripts/statecraft/ci-gate.sh" => R5_CI_GATE,
+            _ => continue,
+        };
+        assert_ne!(t.body, body, "{}: revision 6 changed it", t.path);
+        t.body = body.to_string();
+    }
+    r5
+}
+
 fn revision_four() -> Profile {
     let mut r4 = Profile::registered();
-    assert_eq!(r4.revision, 5, "the registered profile is revision 5");
+    assert_eq!(r4.revision, 6, "the registered profile is revision 6");
     r4.revision = 4;
     // The three templates revision 5 changed, exactly as revision 4 shipped
     // them (main at 2c82d9a, before #143), so the simulation is revision 4
@@ -168,7 +188,7 @@ fn revision_four() -> Profile {
             "scripts/statecraft/ci-gate.sh" => R4_CI_GATE,
             _ => continue,
         };
-        assert_ne!(t.body, body, "{}: revision 5 changed it", t.path);
+        assert_ne!(t.body, body, "{}: a later revision changed it", t.path);
         t.body = body.to_string();
     }
     r4
@@ -591,12 +611,12 @@ fn a_revision_four_project_upgrades_to_revision_five() {
     assert!(ci_gate.contains("authority=yes"), "{ci_gate}");
 
     let selection = manifest.project.setup.as_ref().unwrap();
-    assert_eq!(selection.revision, 5);
+    assert_eq!(selection.revision, setup::REVISION);
     assert_eq!(selection.parameters, recorded);
     let policy: serde_json::Value =
         serde_json::from_str(&std::fs::read_to_string(root.join(setup::POLICY_PATH)).unwrap())
             .unwrap();
-    assert_eq!(policy["revision"], 5);
+    assert_eq!(policy["revision"], setup::REVISION);
     assert_eq!(
         policy["parameters"]["authored_content"],
         setup::AUTHORED_CONTENT_SCRIPT
@@ -630,4 +650,42 @@ fn revision_five_names_the_owner_approval_in_its_operator_steps() {
     assert_eq!(policy["review-exception"]["merge_group"], "inapplicable");
     let rule = setup::authority_rule();
     assert_eq!(rule["exception_environment"], setup::EXCEPTION_ENVIRONMENT);
+}
+
+/// Revision 6: a revision-5 project upgrades through one plan and apply; the
+/// workflow and the gate are rewritten with every workflow file in the
+/// authority set, and the operator steps say so.
+#[test]
+fn a_revision_five_project_upgrades_to_revision_six() {
+    let dir = project();
+    let root = dir.path();
+    let mut manifest = Manifest::new(Pins {
+        product: "0.0.0".into(),
+        spec_spine: "unpinned".into(),
+        adapters: Default::default(),
+        producer: None,
+    });
+    let r5 = revision_five();
+    assert!(plan_and_apply_with(root, &r5, &mut manifest, &BTreeMap::new()).whole());
+    assert_eq!(manifest.project.setup.as_ref().unwrap().revision, 5);
+    let gate = "scripts/statecraft/ci-gate.sh";
+    let before = std::fs::read_to_string(root.join(gate)).unwrap();
+    assert!(!before.contains("^\\.github/workflows/"), "{before}");
+
+    let r6 = Profile::registered();
+    assert_ne!(r6.identity(), r5.identity());
+    let recorded = manifest.project.setup.as_ref().unwrap().parameters.clone();
+    let upgrade = plan_and_apply_with(root, &r6, &mut manifest, &recorded);
+    for rel in [".github/workflows/statecraft-ci.yml", gate] {
+        let file = upgrade.files.iter().find(|f| f.path == rel).unwrap();
+        assert_eq!(file.action, Action::Replace, "{rel}");
+    }
+    let after = std::fs::read_to_string(root.join(gate)).unwrap();
+    assert!(after.contains("^\\.github/workflows/"), "{after}");
+    assert_eq!(manifest.project.setup.as_ref().unwrap().revision, 6);
+    let steps = setup::remote_obligations().join("\n");
+    assert!(
+        steps.contains("every file under .github/workflows/ is in the authority set"),
+        "{steps}"
+    );
 }

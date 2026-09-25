@@ -2716,8 +2716,10 @@ fn the_adoption_runs_the_candidates_gate_and_says_so() {
 /// Every file of the authority set, as a candidate changes it: the rendered
 /// workflows, `scripts/statecraft/*` (a new file too), the policy and the
 /// declared authored-content script.
-const AUTHORITY_SET: [&str; 7] = [
+const AUTHORITY_SET: [&str; 8] = [
     ".github/workflows/statecraft-ci.yml",
+    // Revision 6: a workflow the profile does not render.
+    ".github/workflows/impostor.yml",
     ".github/workflows/statecraft-ai-review.yml",
     "scripts/statecraft/gate.sh",
     "scripts/statecraft/install-spec-spine.sh",
@@ -2975,7 +2977,7 @@ fn revision_five_reads_the_gate_at_the_base_in_every_job_that_runs_it() {
     // The policy states the rule the gate enforces and the workflow reads.
     let policy: serde_json::Value =
         serde_json::from_str(&std::fs::read_to_string(tmp.path().join(POLICY)).unwrap()).unwrap();
-    assert_eq!(policy["revision"], 5);
+    assert_eq!(policy["revision"], 6);
     assert_eq!(
         policy["authority_rule"]["exception_environment"],
         "statecraft-review-exception"

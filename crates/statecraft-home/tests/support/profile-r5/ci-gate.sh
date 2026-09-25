@@ -110,9 +110,6 @@ if [ "$trusted" = yes ]; then
   {
     comm -12 "$work/authority-set" "$work/changed"
     grep '^scripts/statecraft/' "$work/changed" || true
-    # Revision 6: every workflow file, rendered or not. A workflow the
-    # profile does not render could otherwise report a check named ci-gate.
-    grep '^\.github/workflows/' "$work/changed" || true
   } | sort -u > "$work/touched"
   if [ -s "$work/touched" ]; then
     authority=yes
