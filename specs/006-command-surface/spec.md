@@ -1081,7 +1081,7 @@ collide with section 3.3's "refused", so any adoption must route every clap
 error through `Exit::Usage` and test it for each verb.
 
 *Options.* (a) Adopt clap for per-verb arguments only, keeping `Verb::parse`
-and the help-before-resolution rule, mapping every clap error to exit 3, with
+and the help-before-resolution rule, mapping every clap error to exit 3 (the help and version displays exit 0), with
 a test per verb that a bad flag exits 3 and names the flag; completions via
 `clap_complete`. (b) Adopt clap for the whole tree. (c) Keep the hand-written
 parser and add a small declarative flag table per verb that the usage lines
