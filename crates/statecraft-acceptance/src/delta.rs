@@ -688,15 +688,9 @@ mod tests {
     fn a_schema_this_build_does_not_read_is_refused() {
         let mut e = report_with(vec![], BTreeMap::new());
         e.report.schema_version = "0.3.0".into();
-        assert!(matches!(
-            SpecSpineDeltaReport::from_envelope(e),
-            Err(ReadError::SchemaNotRead { .. })
-        ));
-        let mut e = report_with(vec![], BTreeMap::new());
-        e.report.schema_version = "0.3.0".into();
-        let said = SpecSpineDeltaReport::from_envelope(e)
-            .unwrap_err()
-            .to_string();
+        let err = SpecSpineDeltaReport::from_envelope(e).unwrap_err();
+        assert!(matches!(err, ReadError::SchemaNotRead { .. }));
+        let said = err.to_string();
         for line in READS_DELTA_SCHEMAS {
             assert!(said.contains(&format!("{line}.z")), "{said}");
         }
