@@ -661,8 +661,10 @@ findings); then 0.27.0 is adopted under `D-06` and the split is done through
 relocation-only pull requests. Creating `007`, the distribution seam, is not
 held with Part 2: it moves no section out of `002` (step 5 below drafts it from
 the bundle entry), so it follows the spec-spine 0.26.0 migration with
-`planned: true` claims, as the owner decided the same day. Decisions S-B to S-F in the table at the end
-stay open until then. The text below is the proposal as prepared.
+`planned: true` claims, as the owner decided the same day. The open decisions in the table at the end (code
+ownership during the split, section numbers on relocation, a fifth seam, the
+relocation proof, and who merges fold PRs) stay open until then; their
+labels there are the proposal's own and are not cited elsewhere. The text below is the proposal as prepared.
 Prepared at the owner's request of 2026-09-24 for the owner's ratification
 decisions; nothing below binds until the owner adopts it, and each decision is
 in the table at the end. It is recorded here because spec `001` owns the
