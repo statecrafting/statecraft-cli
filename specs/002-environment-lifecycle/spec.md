@@ -7734,6 +7734,19 @@ before matching, and a failed `cargo metadata` stops the gate. Tests:
 `a_rerun_does_not_repeat_a_skip_notice`, and the guard's test now feeds spaced
 JSON; both observed failing against the previous scripts.
 
+**2026-09-24: the authority-change report compares with the fork point (a
+correction inside revision 4, from the third live AI review of #138).**
+`ci-gate.sh` listed the candidate's changed paths with a two-dot diff, so on a
+pull request whose base moved on after the branch was cut it reported the
+base's later changes to the profile's files as this candidate's authority
+change. It now uses `BASE...HEAD`, the candidate's own changes, as coupling
+does. The report stays informational. Test:
+`an_advanced_base_is_not_reported_as_the_candidates_authority_change`,
+observed failing against the previous script. The same review's second
+finding, that the governance job and the commit walk run the candidate's own
+`gate.sh`, is a property of the profile since revision 1 and is proposed as
+revision 5 in its own change.
+
 ## Verification
 
 `--fail-on-untraced` joined the corpus gate with this spec's first
