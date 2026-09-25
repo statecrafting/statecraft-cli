@@ -1372,6 +1372,15 @@ from `stagecraft-ing` to `statecrafting`, one line each in `README.md`,
 crates carry the old organisation in their `repository` field, and the code this
 crate links is unchanged. The pin is exact (`=0.1.0`) because the record hash
 is this crate's persisted format; the lock records the registry checksums.
+The comparison is reproducible without trusting the published metadata: fetch
+`https://crates.io/api/v1/crates/<crate>/0.1.0/download` for both crates and
+unpack them, `git archive a9c3595` from `statecrafting/attest-ledger`, then
+`diff -r` each of `crates/core` and `crates/types` against its package,
+excluding only the files `cargo package` generates (`Cargo.toml`,
+`Cargo.toml.orig` compared separately, `.cargo_vcs_info.json`, `Cargo.lock`).
+Measured on 2026-09-25: no difference except the added `README.md`. The
+`.cargo_vcs_info.json` commit is corroborating, not the evidence; the evidence
+is the file comparison against the pinned revision itself.
 
 ## Verification
 
