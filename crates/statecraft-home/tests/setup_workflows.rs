@@ -429,10 +429,35 @@ fn gate_cases() -> Vec<(&'static str, &'static str, String, &'static str, i32)> 
             "topic",
             0,
         ),
+        // Revision 2 (R2-1): the AI review is the final approver, so a
+        // findings verdict blocks unless the owner's exception was approved.
+        // Revision 1 asserted "pr, findings do not block" (exit 0) here.
         (
-            "pr, findings do not block",
+            "pr, findings, no owner exception (R2-1)",
             "pull_request",
             needs(&ALL_OK, Some("findings"), false),
+            "topic",
+            1,
+        ),
+        (
+            "pr, findings, owner exception rejected (R2-1)",
+            "pull_request",
+            needs(
+                &as_refs(&with(("review-exception", "failure"))),
+                Some("findings"),
+                false,
+            ),
+            "topic",
+            1,
+        ),
+        (
+            "pr, findings, owner exception approved (R2-1)",
+            "pull_request",
+            needs(
+                &as_refs(&with(("review-exception", "success"))),
+                Some("findings"),
+                false,
+            ),
             "topic",
             0,
         ),
@@ -580,7 +605,9 @@ const POLICY: &str = ".statecraft/setup/github-actions-rust.json";
 /// What a blocking case's report must say: a gate that blocks without
 /// saying why has lost the branch that was meant to block it.
 fn reason(label: &str) -> &'static str {
-    if label.ends_with("vanished") {
+    if label.contains("findings, no owner exception") || label.contains("exception rejected") {
+        "returned findings"
+    } else if label.ends_with("vanished") {
         "vanished"
     } else if label.ends_with("skipped") || label.contains("no exception") {
         "an unexpected skip"
@@ -733,6 +760,21 @@ fn ci_gate_needs_every_job_the_policy_requires() {
         );
     }
     assert_eq!(wf["jobs"]["ci-gate"]["if"].as_str(), Some("always()"));
+    // Revision 2 (R2-1): the owner exception also runs for a findings verdict,
+    // and keeps revision 1's release-candidate case.
+    let exception_if = wf["jobs"]["review-exception"]["if"].as_str().unwrap();
+    assert!(
+        exception_if.contains("needs.ai-review.outputs.result == 'findings'"),
+        "{exception_if}"
+    );
+    assert!(
+        exception_if.contains("needs.ai-review.outputs.release_candidate == 'true'"),
+        "{exception_if}"
+    );
+    assert_eq!(
+        wf["jobs"]["review-exception"]["environment"].as_str(),
+        Some("statecraft-review-exception")
+    );
     assert!(wf["on"]["merge_group"].is_null(), "no merge_group trigger");
     assert!(
         wf["on"]["pull_request_target"].is_null(),

@@ -7480,6 +7480,28 @@ approver and no human approval for ordinary changes.
    carry items 2 and 3; tests in `crates/statecraft-home/tests/` extend the
    revision-1 suites.
 
+**2026-09-24: profile revision 2 implemented (the entry above on revision 2,
+R2-1 and R2-2).** `setup.rs` registers revision 2 (identity
+`bfe420c0f7694d55eca0ab5ae396b7bf5819222ecf1295dd76ad66bb8fb4aa6f`). The
+policy names the `review-exception` job's pull-request rule `owner-exception`:
+`ci-gate.sh` makes it required for a `findings` result and for a release
+candidate whose review was skipped, and blocks a `findings` head whose
+exception did not succeed with a message naming the verdict and the
+exception. The script keeps revision 1's `rc-exception` rule, because a
+revision-1 base's policy is what judges the pull request that upgrades it. The
+rendered workflow runs the exception job for a `findings` result as well as for
+revision 1's case. The operator steps state required approvals 0 with
+code-owner review required and `ci-gate` required from GitHub Actions (app id
+15368, the constant `GATE_APP_ID`); `doctor --remote` reports a `ci-gate` with
+no app or another app as not satisfied and names the binding. Tests:
+`setup_workflows.rs` replaces revision 1's case "pr, findings do not block"
+(exit 0) with three cases (no exception, rejected, approved; the mutation test
+covers them) and asserts the exception job's condition; `setup_upgrade.rs`
+upgrades a revision-1 project to revision 2 (the unchanged gate script is
+rewritten, a customized workflow is withheld) and checks the operator steps;
+`setup_profile.rs`'s `gh` stub now reports a bound `ci-gate` for the satisfied
+case and adds an unbound mode that must read not satisfied.
+
 ## Verification
 
 `--fail-on-untraced` joined the corpus gate with this spec's first
