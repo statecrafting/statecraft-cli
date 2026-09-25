@@ -19,6 +19,9 @@
 
 #![cfg(unix)]
 
+#[path = "support/json_naming.rs"]
+mod json_naming;
+
 use serde_json::Value;
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
@@ -124,7 +127,7 @@ impl Sandbox {
         let mut args = args.to_vec();
         args.push("--json");
         let out = self.run(&args);
-        let value = serde_json::from_slice(&out.stdout)
+        let value = json_naming::from_output(&out.stdout)
             .unwrap_or_else(|e| panic!("{args:?}: {e}: {}", stdout(&out)));
         (code(&out), value)
     }
@@ -298,7 +301,7 @@ fn user_to_adopted_and_back_through_the_binary() {
     let record = &applied["value"]["record"];
     assert_eq!(record["operator"], "bart");
     assert_eq!(record["reason"], "moving it");
-    assert_eq!(record["manifest_before"], v["manifest_digest"]);
+    assert_eq!(record["manifest_before"], v["manifestDigest"]);
     assert_eq!(s.entry("docs/policy.md").unwrap()["class"], "adopted");
     assert_eq!(s.manifest()["transfers"].as_array().unwrap().len(), 1);
     assert_eq!(s.read("docs/policy.md"), b"the user's policy\n");
@@ -339,7 +342,7 @@ fn a_withheld_adapter_path_moved_to_managed_is_written_then_withheld_after_rever
     }
 
     let plan = s.plan(OWNED, "user", "managed");
-    assert_eq!(plan["value"]["current"]["declared_by"], "claude-code");
+    assert_eq!(plan["value"]["current"]["declaredBy"], "claude-code");
     let id = s.transfer(OWNED, "user", "managed");
     let entry = s.entry(OWNED).unwrap();
     assert_eq!(entry["class"], "managed");
@@ -711,7 +714,7 @@ fn a_journal_that_disagrees_is_listed_by_plan_and_refused_by_apply_and_revert() 
     );
 
     let plan = s.plan("other.md", "user", "adopted");
-    let listed = plan["value"]["journal_disagreements"].as_array().unwrap();
+    let listed = plan["value"]["journalDisagreements"].as_array().unwrap();
     assert_eq!(listed.len(), 1, "{plan}");
     assert!(listed[0].as_str().unwrap().contains("notes.md"));
     let human = s.run(&["transfer", "plan", &root, "other.md", "user", "adopted"]);
@@ -775,7 +778,7 @@ fn a_file_restored_after_env_remove_does_not_block_transfers() {
     s.write("notes.md", b"one\n");
     let plan = s.plan("notes.md", "user", "adopted");
     assert!(
-        plan["value"]["journal_disagreements"]
+        plan["value"]["journalDisagreements"]
             .as_array()
             .unwrap()
             .is_empty(),

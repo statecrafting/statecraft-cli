@@ -5,6 +5,9 @@
 //! called a function and inspected a returned enum would be checking the mapping
 //! without ever checking that the binary uses it.
 
+#[path = "support/json_naming.rs"]
+mod json_naming;
+
 use std::path::{Path, PathBuf};
 use std::process::{Command, Output};
 
@@ -187,7 +190,7 @@ fn env_plan_writes_nothing_and_names_the_configured_adapter() {
     assert!(!target.path().join(".claude").exists());
     assert!(!target.path().join("CLAUDE.md").exists());
 
-    let parsed: serde_json::Value = serde_json::from_str(&stdout(&out)).expect("valid json");
+    let parsed: serde_json::Value = json_naming::from_text(&stdout(&out)).expect("valid json");
     let adapters = parsed["value"]["adapters"]
         .as_array()
         .expect("the plan reports every configured adapter");
@@ -226,7 +229,7 @@ fn json_and_human_renderings_carry_the_same_facts_from_the_same_value() {
     assert_eq!(code(&human), code(&json), "the same exit either way");
 
     let parsed: serde_json::Value =
-        serde_json::from_str(&stdout(&json)).expect("--json emits JSON");
+        json_naming::from_text(&stdout(&json)).expect("--json emits JSON");
     assert_eq!(parsed["value"]["verdict"], "ungoverned");
     assert_eq!(parsed["exit"], "finding");
 
@@ -293,7 +296,7 @@ fn arming_is_a_separate_invocation_and_the_register_persists_between_them() {
     run_in(home.path(), &["project", "register", &path]);
 
     let listed = run_in(home.path(), &["project", "list", "--json"]);
-    let parsed: serde_json::Value = serde_json::from_str(&stdout(&listed)).unwrap();
+    let parsed: serde_json::Value = json_naming::from_text(&stdout(&listed)).unwrap();
     assert_eq!(
         parsed["value"][0]["armed"], false,
         "registered is not armed"
@@ -303,7 +306,7 @@ fn arming_is_a_separate_invocation_and_the_register_persists_between_them() {
     let armed = run_in(home.path(), &["project", "arm", &path]);
     assert_eq!(code(&armed), 0);
 
-    let after: serde_json::Value = serde_json::from_str(&stdout(&run_in(
+    let after: serde_json::Value = json_naming::from_text(&stdout(&run_in(
         home.path(),
         &["project", "list", "--json"],
     )))

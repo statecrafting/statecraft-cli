@@ -77,6 +77,7 @@ outcome. It works on one machine, on one repository, with no account.
 | Application knowledge, recall, coordination semantics | aicortex | No dependency in the first slice. `005` places the interface out of scope; the narrow, optional, one-way boundary it would be is described in section 3.12, and implemented by neither side. |
 | Service chassis, identity, persistent cell enforcement | Rahi | Not a required local daemon, not a process sandbox, not a desktop framework. A future hosted backend consumes explicit contracts from this product. |
 | Ordered pure checks and decision composition | action-gate | Adapted at the boundary: this product supplies the required checks and the deny-by-default ceiling, because the library's own fallthrough is allow. |
+| Making, evaluating and recording decisions over partially trusted information, as an embeddable engine | rustev | An optional neighbour, as this product is to it: no dependency in either direction. Its per-decision evidence records overlap with this product's run evidence and with `attest-ledger`'s records, so a shared format is a decision to take across the three, not a reason for either side to depend on the other. |
 | Hash-linked records, signing, verification | attest-ledger | Reused for the record envelope. Durability, crash recovery, and independently supplied issuer trust stay here. |
 | Canonical JSON serialization | canonical-keysort-json | Reused. Key sorting is not strict portable-input validation; see `005`. |
 | Outcome scoring | trust-window | Deferred, with no consumer. A score never overrides authorization. |
@@ -219,6 +220,7 @@ proposes and neither side has built.
 | `attest-ledger` 0.1.0 | Implemented, Apache-2.0 | Record envelope, chain hashing, verification | **actual dependency** as of 2026-09-19: `attest-ledger-core` in `crates/statecraft-run`, pinned to git `a9c3595` until 2026-09-25 and to the crates.io release `=0.1.0`, the same source, since (spec `003` section 5). The disposition it was adopted under is the **reuse** row below. |
 | `canonical-keysort-json` 0.1.0 | Implemented, Apache-2.0, Rust only | Canonical serialization at the hashing boundary | **proposed reuse** |
 | `action-gate` 0.1.0 | Implemented, Apache-2.0 | Check composition only, with required checks and the deny ceiling supplied here | **proposed adaptation at the boundary** |
+| rustev | Implemented in increments, Apache-2.0, not released | None. It produces proposals, never grants, and names this product as an optional neighbour | **no dependency** either way; its evidence records overlap with run evidence and `attest-ledger`, recorded here so the overlap is decided once |
 | Rahi | Implemented locally, not released | None. Not a local daemon, not a sandbox, not a UI framework | **no dependency**; a future hosted backend consumes contracts this product publishes |
 | aicortex | Design plus a local bootstrap; no coordination runtime | None in the first slice | **proposed interface**, built by neither side |
 | `trust-window` 0.1.0 | Implemented, Apache-2.0 | None | **deferred**, no consumer (F-05) |
@@ -517,6 +519,19 @@ CI uses it on the pull request's title and body and on every commit message in
 the change (`.github/workflows/govern.yml`, the owner's request of 2026-09-24).
 Nothing required changes: the rules are the ones section 3.6 already states,
 applied to text they already govern.
+
+**2026-09-25: rustev is recorded as an optional neighbour (owner,
+2026-09-25).** The owner asked for rustev in the boundary tables of sections
+3.2 and 3.8, as a spec change for the owner's ratification: an embeddable
+decision engine, an optional neighbour, no dependency either way, whose
+evidence records overlap with this product's run evidence and with
+`attest-ledger`. The two rows above are that change. Measured at rustev
+(`https://github.com/statecrafting/rustev`, public) `origin/main` `ed5ff48`
+(`ed5ff4878cc6692799f6b31038e4b21e78d18464`): its README names this product among the optional
+neighbours it is usable without, and no manifest in either repository depends
+on the other. The overlap is the subject of the shared-primitives inventory
+kept with the 2026-09-25 session evidence, which proposes one canonical JSON,
+one digest format and one ledger format across the family.
 
 **2026-09-24, adopted 2026-09-25: decision identifiers that cannot be
 read as a spec-spine diagnostic (owner Addendum 2, item N).** Proposed

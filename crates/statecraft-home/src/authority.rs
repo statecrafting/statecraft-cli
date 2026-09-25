@@ -127,7 +127,11 @@ impl RunChoices {
 
 /// One key's answer.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
-#[serde(rename_all = "kebab-case", tag = "state")]
+#[serde(
+    rename_all = "kebab-case",
+    rename_all_fields = "camelCase",
+    tag = "state"
+)]
 pub enum Answer {
     /// A value, and where it came from.
     Resolved {

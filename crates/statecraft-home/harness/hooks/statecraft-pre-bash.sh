@@ -85,10 +85,13 @@ esac
 case "$cmd" in 'gh pr create'*|*'&& gh pr create'*|*'; gh pr create'*) ;; *) exit 0 ;; esac
 # Spec 002 section 3.23 contract 2, as amended on 2026-09-24 (section 5):
 # resolve the binary, then establish that the repository admits it. The same
-# resolver is in all four hooks. A managed session's supervisor path
-# (STATECRAFT_SPEC_SPINE) is the only candidate when it is set. Otherwise an
-# explicit $SPEC_SPINE_BIN is the only candidate, and a broken or incompatible
-# one refuses rather than falling back. Otherwise the repository's own
+# resolver is in all four hooks. One variable selects the binary (section 5,
+# 2026-09-25): STATECRAFT_SPEC_SPINE. In a managed session (STATECRAFT_RUN_ID
+# set) it is the supervisor's resolved path and the only candidate. Outside
+# one, a non-empty value is the operator's override and the only candidate,
+# and a broken or incompatible one refuses rather than falling back. The
+# retired SPEC_SPINE_BIN is reported as ignored and never selects. Otherwise
+# the repository's own
 # target/release/spec-spine, then PATH, and the first one compatible with the
 # repository's pin ([meta] required_version) judges; each one passed over is
 # named. An unpinned repository takes the first candidate and says it is
@@ -104,7 +107,8 @@ spec_spine_pin() {
     }' "$1/spec-spine.toml" 2>/dev/null
 }
 spec_spine_version() {
-  "$1" --version 2>/dev/null | head -1 | awk '{print $NF}'
+  sv_out=$("$1" --version 2>/dev/null) || return 0
+  printf '%s\n' "$sv_out" | head -1 | awk '{print $NF}'
 }
 # 0 compatible, 1 incompatible, 2 not performed. An exact pin is compared with
 # the reported version; any other requirement is put to the binary itself,
@@ -121,33 +125,38 @@ spec_spine_admits() {
   esac
   probe=$("$1" --repo "$2" config show 2>&1); prc=$?
   [ "$prc" = 0 ] && return 0
-  if [ "$prc" = 3 ]; then case "$probe" in *'requires spec-spine'*) return 1 ;; esac; fi
+  # A pin not met is exit 3 below spec-spine 0.26.0 and exit 2 from it, worded
+  # the same under both (spec 002 section 5, 2026-09-25, "both exit tables").
+  case "$prc" in 2|3) case "$probe" in *'requires spec-spine'*) return 1 ;; esac ;; esac
   return 2
 }
 spec_spine_resolve() {
-  sc=''; sc_rule=''; sc_ver=''; sc_passed=''; sc_why=''
+  sc=''; sc_rule=''; sc_ver=''; sc_passed=''; sc_why=''; sc_notice=''
   sc_pin=$(spec_spine_pin "$1")
   if [ -n "$sc_pin" ]; then sc_pinned="pin $sc_pin from $1/spec-spine.toml [meta] required_version"; else sc_pinned='unpinned'; fi
-  if [ -n "${STATECRAFT_SPEC_SPINE:-}" ]; then
+  if [ -n "${SPEC_SPINE_BIN:-}" ] && [ -z "${STATECRAFT_SPEC_SPINE:-}" ]; then
+    sc_notice="ignored SPEC_SPINE_BIN=$(printf '%s' "$SPEC_SPINE_BIN" | tr '\n\r' '  '): that name is retired and selects nothing; set STATECRAFT_SPEC_SPINE to choose the binary"
+  fi
+  if [ -n "${STATECRAFT_SPEC_SPINE:-}" ] && [ -n "${STATECRAFT_RUN_ID:-}" ]; then
     if [ -f "$STATECRAFT_SPEC_SPINE" ] && [ -x "$STATECRAFT_SPEC_SPINE" ]; then
       sc=$STATECRAFT_SPEC_SPINE; sc_rule=supervisor; sc_ver=$(spec_spine_version "$sc"); return 0
     fi
     sc_why="the supervisor's binary STATECRAFT_SPEC_SPINE=$STATECRAFT_SPEC_SPINE is not an executable, and no other binary is consulted in a managed session"
     return 1
   fi
-  if [ -n "${SPEC_SPINE_BIN:-}" ]; then
-    remedy="Unset SPEC_SPINE_BIN, or point it at a binary that satisfies the pin; the pin itself moves only as a D-06 change"
-    if [ ! -f "$SPEC_SPINE_BIN" ] || [ ! -x "$SPEC_SPINE_BIN" ]; then
-      sc_why="the override SPEC_SPINE_BIN=$SPEC_SPINE_BIN names no executable ($sc_pinned). $remedy"
+  if [ -n "${STATECRAFT_SPEC_SPINE:-}" ]; then
+    remedy="Unset STATECRAFT_SPEC_SPINE, or point it at a binary that satisfies the pin; the pin itself moves only as a D-06 change"
+    if [ ! -f "$STATECRAFT_SPEC_SPINE" ] || [ ! -x "$STATECRAFT_SPEC_SPINE" ]; then
+      sc_why="the override STATECRAFT_SPEC_SPINE=$STATECRAFT_SPEC_SPINE names no executable ($sc_pinned). $remedy"
       return 1
     fi
-    v=$(spec_spine_version "$SPEC_SPINE_BIN")
-    if [ -z "$sc_pin" ]; then sc=$SPEC_SPINE_BIN; sc_rule=override; sc_ver=$v; return 0; fi
-    spec_spine_admits "$SPEC_SPINE_BIN" "$1" "$sc_pin" "$v"
+    v=$(spec_spine_version "$STATECRAFT_SPEC_SPINE")
+    if [ -z "$sc_pin" ]; then sc=$STATECRAFT_SPEC_SPINE; sc_rule=override; sc_ver=$v; return 0; fi
+    spec_spine_admits "$STATECRAFT_SPEC_SPINE" "$1" "$sc_pin" "$v"
     case $? in
-      0) sc=$SPEC_SPINE_BIN; sc_rule=override; sc_ver=$v; return 0 ;;
-      1) sc_why="the override SPEC_SPINE_BIN=$SPEC_SPINE_BIN reports ${v:-no version}, which does not satisfy $sc_pinned. $remedy" ;;
-      *) sc_why="the override SPEC_SPINE_BIN=$SPEC_SPINE_BIN (reports ${v:-no version}) could not be checked against $sc_pinned: its configuration probe failed. $remedy" ;;
+      0) sc=$STATECRAFT_SPEC_SPINE; sc_rule=override; sc_ver=$v; return 0 ;;
+      1) sc_why="the override STATECRAFT_SPEC_SPINE=$STATECRAFT_SPEC_SPINE reports ${v:-no version}, which does not satisfy $sc_pinned. $remedy" ;;
+      *) sc_why="the override STATECRAFT_SPEC_SPINE=$STATECRAFT_SPEC_SPINE (reports ${v:-no version}) could not be checked against $sc_pinned: its configuration probe failed. $remedy" ;;
     esac
     return 1
   fi
@@ -182,6 +191,7 @@ spec_spine_judge() {
   printf '%s)' "$j"
 }
 spec_spine_resolve "$root"; rrc=$?
+[ -n "$sc_notice" ] && printf '%s\n' "$sc_notice" | sed 's/^/[pr-gate] /' >&2
 [ -n "$sc_passed" ] && printf '%s' "$sc_passed" | sed 's/^/[pr-gate] /' >&2
 [ "$rrc" = 2 ] && { echo '[pr-gate] spec-spine absent, coupling gate skipped (run /setup)'; exit 0; }
 # Contract 2 rules 2 and 3 with contract 6: a binary the repository does not
@@ -207,6 +217,18 @@ judge=$(spec_spine_judge)
 # refuses what the merge gate refuses. Exit 1 then carries two readings and
 # the report text says which; exit 2 is stale and nothing else.
 cout=$("$sc" --repo "$root" check --fail-on-unresolved 2>&1); cec=$?
+# spec-spine has two exit tables (spec 002 section 5, 2026-09-25, "both exit
+# tables"). From 0.26.0 a stale tree exits 1 and 2 is a refusal to judge, which
+# names itself; below it stale is 2 and a refusal 3. A refusal is read first,
+# by its words, so a 0.26.0 refusal is never sent to regenerate.
+if [ "$cec" != 0 ]; then
+  case "$cout" in *'spec-spine: refused:'*|*'requires spec-spine'*)
+    { echo "[pr-gate] BLOCKED: spec-spine refused to judge the tree in $root (check exit $cec): $(printf '%s\n' "$cout" | head -1)"
+      echo '[pr-gate] The tree has NOT been judged and is not known to be stale; regenerating repairs nothing here.'
+      echo "[pr-gate] $judge"; } >&2
+    exit 2 ;;
+  esac
+fi
 case "$cec" in
   0) ;;
   2) # Spec 093 3.1, on spec 093's rule: exit 2 is the ONE ambiguous code. This
@@ -243,8 +265,14 @@ case "$cec" in
        [ "$named" = 1 ] && echo '[pr-gate] The same report also names a stale shard tree: spec-spine compile and index clear that part only; commit the shards with the fix.' >&2 ;;
      esac
      if [ "$named" = 0 ]; then
-       { echo "[pr-gate] BLOCKED: the corpus in $root does not validate (spec-spine check exit 1)."
-         echo '[pr-gate] Run: spec-spine check, fix the violations it names, and retry. The tree is not stale; staleness is not meaningful against a corpus that does not compile.'; } >&2
+       case "$cout" in *'spec-registry: STALE'*|*'codebase-index: STALE'*)
+         # spec-spine 0.26.0's table: stale alone is exit 1.
+         { echo "[pr-gate] BLOCKED: a committed shard tree is stale in $root."
+           echo '[pr-gate] Run: spec-spine compile and index, whichever tree it named, then commit the shards, push, and retry.'; } >&2 ;;
+       *)
+         { echo "[pr-gate] BLOCKED: the corpus in $root does not validate (spec-spine check exit 1)."
+           echo '[pr-gate] Run: spec-spine check, fix the violations it names, and retry. The tree is not stale; staleness is not meaningful against a corpus that does not compile.'; } >&2 ;;
+       esac
      fi
      echo "[pr-gate] $judge" >&2
      exit 2 ;;
@@ -254,6 +282,11 @@ case "$cec" in
      { echo "[pr-gate] BLOCKED: the freshness read was not performed in $root (spec-spine check exit 3)."
        echo "[pr-gate] The binary is $sc, which answers: ${ver:-(nothing)}. The check verb needs spec-spine 0.18.0 or later; below that the binary is too old to have read the tree, and the tree itself has not been judged. Run /setup to install the floor, or read spec-spine check directly for an I/O, parse or config error."
     echo "[pr-gate] $judge"; } >&2
+     exit 2 ;;
+  4) # spec-spine 0.26.0's table: the read failed.
+     { echo "[pr-gate] BLOCKED: the freshness read failed in $root (spec-spine check exit 4: I/O, git or internal): $(printf '%s\n' "$cout" | head -1)"
+       echo '[pr-gate] The tree has NOT been judged and is not known to be stale; regenerating repairs nothing here.'
+       echo "[pr-gate] $judge"; } >&2
      exit 2 ;;
   *) { echo "[pr-gate] BLOCKED: spec-spine check exited $cec in $root, which this gate does not recognise; it is not reported as fresh."
     echo "[pr-gate] $judge"; } >&2

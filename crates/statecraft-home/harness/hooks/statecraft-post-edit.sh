@@ -11,10 +11,13 @@ root=$(git -C "$(dirname "$fp")" rev-parse --show-toplevel 2>/dev/null) || exit 
 [ -f "$root/.statecraft/environment.json" ] || exit 0
 # Spec 002 section 3.23 contract 2, as amended on 2026-09-24 (section 5):
 # resolve the binary, then establish that the repository admits it. The same
-# resolver is in all four hooks. A managed session's supervisor path
-# (STATECRAFT_SPEC_SPINE) is the only candidate when it is set. Otherwise an
-# explicit $SPEC_SPINE_BIN is the only candidate, and a broken or incompatible
-# one refuses rather than falling back. Otherwise the repository's own
+# resolver is in all four hooks. One variable selects the binary (section 5,
+# 2026-09-25): STATECRAFT_SPEC_SPINE. In a managed session (STATECRAFT_RUN_ID
+# set) it is the supervisor's resolved path and the only candidate. Outside
+# one, a non-empty value is the operator's override and the only candidate,
+# and a broken or incompatible one refuses rather than falling back. The
+# retired SPEC_SPINE_BIN is reported as ignored and never selects. Otherwise
+# the repository's own
 # target/release/spec-spine, then PATH, and the first one compatible with the
 # repository's pin ([meta] required_version) judges; each one passed over is
 # named. An unpinned repository takes the first candidate and says it is
@@ -30,7 +33,8 @@ spec_spine_pin() {
     }' "$1/spec-spine.toml" 2>/dev/null
 }
 spec_spine_version() {
-  "$1" --version 2>/dev/null | head -1 | awk '{print $NF}'
+  sv_out=$("$1" --version 2>/dev/null) || return 0
+  printf '%s\n' "$sv_out" | head -1 | awk '{print $NF}'
 }
 # 0 compatible, 1 incompatible, 2 not performed. An exact pin is compared with
 # the reported version; any other requirement is put to the binary itself,
@@ -47,33 +51,38 @@ spec_spine_admits() {
   esac
   probe=$("$1" --repo "$2" config show 2>&1); prc=$?
   [ "$prc" = 0 ] && return 0
-  if [ "$prc" = 3 ]; then case "$probe" in *'requires spec-spine'*) return 1 ;; esac; fi
+  # A pin not met is exit 3 below spec-spine 0.26.0 and exit 2 from it, worded
+  # the same under both (spec 002 section 5, 2026-09-25, "both exit tables").
+  case "$prc" in 2|3) case "$probe" in *'requires spec-spine'*) return 1 ;; esac ;; esac
   return 2
 }
 spec_spine_resolve() {
-  sc=''; sc_rule=''; sc_ver=''; sc_passed=''; sc_why=''
+  sc=''; sc_rule=''; sc_ver=''; sc_passed=''; sc_why=''; sc_notice=''
   sc_pin=$(spec_spine_pin "$1")
   if [ -n "$sc_pin" ]; then sc_pinned="pin $sc_pin from $1/spec-spine.toml [meta] required_version"; else sc_pinned='unpinned'; fi
-  if [ -n "${STATECRAFT_SPEC_SPINE:-}" ]; then
+  if [ -n "${SPEC_SPINE_BIN:-}" ] && [ -z "${STATECRAFT_SPEC_SPINE:-}" ]; then
+    sc_notice="ignored SPEC_SPINE_BIN=$(printf '%s' "$SPEC_SPINE_BIN" | tr '\n\r' '  '): that name is retired and selects nothing; set STATECRAFT_SPEC_SPINE to choose the binary"
+  fi
+  if [ -n "${STATECRAFT_SPEC_SPINE:-}" ] && [ -n "${STATECRAFT_RUN_ID:-}" ]; then
     if [ -f "$STATECRAFT_SPEC_SPINE" ] && [ -x "$STATECRAFT_SPEC_SPINE" ]; then
       sc=$STATECRAFT_SPEC_SPINE; sc_rule=supervisor; sc_ver=$(spec_spine_version "$sc"); return 0
     fi
     sc_why="the supervisor's binary STATECRAFT_SPEC_SPINE=$STATECRAFT_SPEC_SPINE is not an executable, and no other binary is consulted in a managed session"
     return 1
   fi
-  if [ -n "${SPEC_SPINE_BIN:-}" ]; then
-    remedy="Unset SPEC_SPINE_BIN, or point it at a binary that satisfies the pin; the pin itself moves only as a D-06 change"
-    if [ ! -f "$SPEC_SPINE_BIN" ] || [ ! -x "$SPEC_SPINE_BIN" ]; then
-      sc_why="the override SPEC_SPINE_BIN=$SPEC_SPINE_BIN names no executable ($sc_pinned). $remedy"
+  if [ -n "${STATECRAFT_SPEC_SPINE:-}" ]; then
+    remedy="Unset STATECRAFT_SPEC_SPINE, or point it at a binary that satisfies the pin; the pin itself moves only as a D-06 change"
+    if [ ! -f "$STATECRAFT_SPEC_SPINE" ] || [ ! -x "$STATECRAFT_SPEC_SPINE" ]; then
+      sc_why="the override STATECRAFT_SPEC_SPINE=$STATECRAFT_SPEC_SPINE names no executable ($sc_pinned). $remedy"
       return 1
     fi
-    v=$(spec_spine_version "$SPEC_SPINE_BIN")
-    if [ -z "$sc_pin" ]; then sc=$SPEC_SPINE_BIN; sc_rule=override; sc_ver=$v; return 0; fi
-    spec_spine_admits "$SPEC_SPINE_BIN" "$1" "$sc_pin" "$v"
+    v=$(spec_spine_version "$STATECRAFT_SPEC_SPINE")
+    if [ -z "$sc_pin" ]; then sc=$STATECRAFT_SPEC_SPINE; sc_rule=override; sc_ver=$v; return 0; fi
+    spec_spine_admits "$STATECRAFT_SPEC_SPINE" "$1" "$sc_pin" "$v"
     case $? in
-      0) sc=$SPEC_SPINE_BIN; sc_rule=override; sc_ver=$v; return 0 ;;
-      1) sc_why="the override SPEC_SPINE_BIN=$SPEC_SPINE_BIN reports ${v:-no version}, which does not satisfy $sc_pinned. $remedy" ;;
-      *) sc_why="the override SPEC_SPINE_BIN=$SPEC_SPINE_BIN (reports ${v:-no version}) could not be checked against $sc_pinned: its configuration probe failed. $remedy" ;;
+      0) sc=$STATECRAFT_SPEC_SPINE; sc_rule=override; sc_ver=$v; return 0 ;;
+      1) sc_why="the override STATECRAFT_SPEC_SPINE=$STATECRAFT_SPEC_SPINE reports ${v:-no version}, which does not satisfy $sc_pinned. $remedy" ;;
+      *) sc_why="the override STATECRAFT_SPEC_SPINE=$STATECRAFT_SPEC_SPINE (reports ${v:-no version}) could not be checked against $sc_pinned: its configuration probe failed. $remedy" ;;
     esac
     return 1
   fi
@@ -108,6 +117,7 @@ spec_spine_judge() {
   printf '%s)' "$j"
 }
 spec_spine_resolve "$root"; rrc=$?
+[ -n "$sc_notice" ] && printf '%s\n' "$sc_notice" | sed 's/^/[hook] /'
 [ -n "$sc_passed" ] && printf '%s' "$sc_passed" | sed 's/^/[hook] /'
 [ "$rrc" = 2 ] && { echo '[hook] spec-spine absent, staleness check skipped (run /setup)'; exit 0; }
 [ "$rrc" = 0 ] || { echo "[hook] staleness check NOT PERFORMED: $sc_why"; exit 0; }

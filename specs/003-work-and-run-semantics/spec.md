@@ -1382,6 +1382,32 @@ Measured on 2026-09-25: no difference except the added `README.md`. The
 `.cargo_vcs_info.json` commit is corroborating, not the evidence; the evidence
 is the file comparison against the pinned revision itself.
 
+**2026-09-25: the candidate test names its binary with
+`STATECRAFT_SPEC_SPINE`.** Spec `002` section 5's entry of the same day,
+adopted by the owner, makes `STATECRAFT_SPEC_SPINE` the one variable that
+selects a spec-spine binary and retires the others. The ignored
+`tests/producer_candidate.rs` read its binary from `STATECRAFT_PRODUCER_BIN`
+and now reads it from `STATECRAFT_SPEC_SPINE`; `STATECRAFT_PRODUCER_REV` and
+`STATECRAFT_PRODUCER_FIXTURES` stay, because they name a revision and a
+fixture directory, not a binary. What the test checks, and that it is ignored
+by default, are unchanged.
+
+**2026-09-25: the contract binding and the report read both of spec-spine's
+exit tables (owner, 2026-09-25: adopt 0.26.0).** Section 3.1.3's `stale` row
+and the report's reading of a `check` that did not pass name the producer's codes as every release
+below 0.26.0 spends them: stale 2, a pin not met 3. From spec-spine 0.26.0
+(its spec 132) stale is 1, beside a member that does not resolve, and a refusal
+to judge is 2; measured the same day against both published releases. A target
+may pin either, and the code alone cannot say which table answered, so the
+producer's words decide, as spec `002` section 5 records for `check` on this
+date: "index is stale" or a `STALE` report line with nothing else is stale,
+`refused:` or a pin not met is a refusal. Each state keeps its meaning: `stale`
+is still a stale ledger, `unresolved` a member that does not resolve, and a
+refusal is `unreadable` in the binding and `ProducerRefused` in the report.
+`contract::interpret` and `report::check_refusal` carry it, tested against the
+recorded lines of both releases in `each_exit_code_is_its_own_answer` and
+`a_check_refusal_is_read_under_both_exit_tables`.
+
 ## Verification
 
 Each line is one command. §3.8's twenty-two rows are integration tests named after

@@ -77,11 +77,13 @@ impl TargetProbe for CommandProbe {
     }
 }
 
-/// Which of the two readings spec-spine's exit 2 carries.
+/// Which of the two readings spec-spine's staleness answer carries.
 ///
 /// Contract 4 of spec 002 section 3.23 gives exit 2 two readings, stale or an
 /// unresolved claim, and the translation keeps them apart in the text rather
 /// than in the code. The producer's own words are the only place they differ.
+/// From spec-spine 0.26.0 a stale tree exits 1 (spec 002 section 5,
+/// 2026-09-25, "both exit tables"), and the same words say so.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum StaleReading {
     /// The committed shards are behind the tree; regenerating cures it.
@@ -99,6 +101,10 @@ pub enum Unavailability {
     Absent,
     /// The binary runs and does not carry `check` (contract 5).
     LacksVerb,
+    /// Candidates exist and none may judge: an override the repository does
+    /// not admit or that names no executable, or no compatible convention
+    /// candidate (contract 2 as amended; spec 002 section 5, 2026-09-25).
+    NotSelected,
 }
 
 /// What `spec-spine check` answered, in spec-spine's vocabulary.
@@ -185,6 +191,10 @@ impl CheckAnswer {
                 Unavailability::LacksVerb => {
                     format!("spec-spine does not carry `check`, so nothing was checked: {detail}")
                 }
+                Unavailability::NotSelected => format!(
+                    "no spec-spine the repository admits was selected, so nothing was checked: \
+                     {detail}"
+                ),
             },
         }
     }
@@ -217,15 +227,33 @@ pub fn run_check(program: &str, dir: &Path) -> CheckAnswer {
         String::from_utf8_lossy(&output.stderr),
         String::from_utf8_lossy(&output.stdout)
     );
+    read_check(output.status.code(), &status_word(&output.status), &text)
+}
+
+/// Read one `check` answer by its exit code and the producer's words, under
+/// either of spec-spine's exit tables (see [`names_stale_only`]).
+pub fn read_check(code: Option<i32>, status: &str, text: &str) -> CheckAnswer {
     let detail = text
         .lines()
         .map(str::trim)
         .find(|l| !l.is_empty())
         .unwrap_or("no output")
         .to_string();
-    match output.status.code() {
+    match code {
         Some(0) => CheckAnswer::Fresh,
+        // Under spec-spine 0.26.0's table a stale tree is 1, beside a corpus
+        // that does not validate, and the report lines say which.
+        Some(1) if names_stale_only(text) => CheckAnswer::Stale {
+            reading: StaleReading::Stale,
+            detail,
+        },
         Some(1) => CheckAnswer::DoesNotValidate { detail },
+        // Under 0.26.0's table 2 is a refusal to judge, a pin not met among
+        // them; under 0.25.0's it is stale. The refusal names itself.
+        Some(2) if names_refusal(text) => CheckAnswer::NotPerformed {
+            status: status.to_string(),
+            detail,
+        },
         Some(2) => {
             let lower = text.to_lowercase();
             let reading = if lower.contains("unresolved") {
@@ -238,7 +266,7 @@ pub fn run_check(program: &str, dir: &Path) -> CheckAnswer {
             CheckAnswer::Stale { reading, detail }
         }
         _ => CheckAnswer::NotPerformed {
-            status: status_word(&output.status),
+            status: status.to_string(),
             detail,
         },
     }
@@ -262,6 +290,37 @@ pub fn check_unavailable(program: &str, dir: &Path) -> Option<CheckAnswer> {
         }),
         Ok(_) => None,
     }
+}
+
+/// Whether spec-spine's words report a stale tree and nothing else.
+///
+/// Spec-spine has two exit tables among the releases a repository may pin
+/// (spec 002 section 5, 2026-09-25, "both exit tables"): below 0.26.0 stale is
+/// exit 2, and from 0.26.0 it is exit 1, beside a corpus that does not
+/// validate. The code alone cannot say which table answered, so an answer is
+/// read by the producer's own report lines, which name each half: `STALE` on
+/// `check`, "is stale" on a registry query. A report that also names an
+/// invalid corpus or an unresolved claim is not stale only, because
+/// regenerating would not cure it.
+pub fn names_stale_only(text: &str) -> bool {
+    (text.contains(": STALE") || text.contains("is stale"))
+        && !text.contains("INVALID")
+        && !text.contains("UNRESOLVED CLAIM")
+        && !text.contains("but REFUSED")
+}
+
+/// Whether spec-spine's words report a refusal to judge at all: a pin the
+/// running version does not satisfy, invalid configuration, or a containment
+/// refusal. From 0.26.0 each exits 2 and says `refused:`; below it they exited
+/// 3, and a pin not met is worded the same under both.
+pub fn names_refusal(text: &str) -> bool {
+    text.contains("spec-spine: refused:") || names_pin_refusal(text)
+}
+
+/// Whether spec-spine's words report a version pin the running binary does not
+/// satisfy (0.25.0: exit 3 "config error"; 0.26.0: exit 2 "refused").
+pub fn names_pin_refusal(text: &str) -> bool {
+    text.contains("requires spec-spine")
 }
 
 fn status_word(status: &std::process::ExitStatus) -> String {
@@ -417,6 +476,60 @@ mod tests {
         for (answer, code) in rows {
             assert_eq!(answer.exit_code(), code, "{answer:?}");
         }
+    }
+
+    // Recorded 2026-09-25 from the published 0.25.0 and 0.26.0 on a clone of
+    // this repository: one appended line in a spec.md, and a pin of =0.1.0.
+    const STALE_025_026: &str = "spec-registry: STALE\n1 stale shard(s):\n  modified \
+        003-work-and-run-semantics.json\ncodebase-index: STALE (run `spec-spine index`)\n";
+    const PIN_025: &str = "spec-spine: config error: this repository requires spec-spine =0.1.0 \
+        (spec-spine.toml [meta] required_version); running 0.25.0.";
+    const PIN_026: &str = "spec-spine: refused: this repository requires spec-spine =0.1.0 \
+        (spec-spine.toml [meta] required_version); running 0.26.0.";
+
+    #[test]
+    fn both_exit_tables_read_to_the_same_answers() {
+        let stale = |a: &CheckAnswer| {
+            matches!(
+                a,
+                CheckAnswer::Stale {
+                    reading: StaleReading::Stale,
+                    ..
+                }
+            )
+        };
+        let not_performed = |a: &CheckAnswer| matches!(a, CheckAnswer::NotPerformed { .. });
+        // Stale: 2 under 0.25.0, 1 under 0.26.0, the same words.
+        assert!(stale(&read_check(Some(2), "exit 2", STALE_025_026)));
+        assert!(stale(&read_check(Some(1), "exit 1", STALE_025_026)));
+        // A pin not met: 3 under 0.25.0, 2 under 0.26.0; never stale.
+        assert!(not_performed(&read_check(Some(3), "exit 3", PIN_025)));
+        assert!(not_performed(&read_check(Some(2), "exit 2", PIN_026)));
+        // 0.26.0's failed (4) and usage (3) are reads not performed.
+        assert!(not_performed(&read_check(
+            Some(4),
+            "exit 4",
+            "internal error"
+        )));
+        // Exit 1 that names an invalid corpus, even beside a stale half, is not
+        // stale only: regenerating would not cure it.
+        let invalid = "spec-registry: INVALID\ncodebase-index: STALE\n";
+        assert!(matches!(
+            read_check(Some(1), "exit 1", invalid),
+            CheckAnswer::DoesNotValidate { .. }
+        ));
+        assert!(matches!(
+            read_check(Some(1), "exit 1", "spec-spine: validation failed"),
+            CheckAnswer::DoesNotValidate { .. }
+        ));
+        // 0.25.0's unresolved reading of 2 is unchanged.
+        assert!(matches!(
+            read_check(Some(2), "exit 2", "codebase-index: UNRESOLVED CLAIM"),
+            CheckAnswer::Stale {
+                reading: StaleReading::UnresolvedClaim,
+                ..
+            }
+        ));
     }
 
     #[test]

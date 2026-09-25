@@ -100,6 +100,7 @@ impl Requested {
 
 /// How a request and a manifest line up.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct Negotiation {
     /// Required tokens the manifest lacks. Non-empty means refuse before spawn.
     pub missing_required: Vec<Capability>,

@@ -4,6 +4,9 @@
 
 #![cfg(unix)]
 
+#[path = "support/json_naming.rs"]
+mod json_naming;
+
 use std::path::Path;
 use std::process::{Command, Output};
 
@@ -131,7 +134,7 @@ esac
         Some(if expected == "completed" { 0 } else { 1 }),
         "{output:?}"
     );
-    let answer: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
+    let answer: serde_json::Value = json_naming::from_output(&output.stdout).unwrap();
     assert_eq!(answer["value"]["outcome"], expected);
     assert_eq!(answer["value"]["adapterClaimed"], claim);
     assert_eq!(answer["value"]["refusals"], refusals);
@@ -245,7 +248,7 @@ esac
     if expected != "completed" {
         let accepted = run(&["accept", root, "replay", "--json"]);
         assert_eq!(accepted.status.code(), Some(1), "{accepted:?}");
-        let answer: serde_json::Value = serde_json::from_slice(&accepted.stdout).unwrap();
+        let answer: serde_json::Value = json_naming::from_output(&accepted.stdout).unwrap();
         assert_eq!(answer["value"]["reason"], format!("attempt-{expected}"));
     }
 }
