@@ -451,25 +451,23 @@ fn answer_for(
             return deferred_to_team(key, team, project, run);
         }
         constrained_by.push(Layer::ProjectRequirement);
-        if let Some(offered) = chosen {
-            if offered != required {
-                return Answer::Refused {
-                    attempted: offered.clone(),
-                    constrained_by: Layer::ProjectRequirement,
-                    reason: format!("the project requires `{required}` for {key}"),
-                };
-            }
+        if let Some(offered) = chosen
+            && offered != required
+        {
+            return Answer::Refused {
+                attempted: offered.clone(),
+                constrained_by: Layer::ProjectRequirement,
+                reason: format!("the project requires `{required}` for {key}"),
+            };
         }
-        if let Some(over) = project.overrides.get(key) {
-            if over != required {
-                return Answer::Refused {
-                    attempted: over.clone(),
-                    constrained_by: Layer::ProjectRequirement,
-                    reason: format!(
-                        "the declaration sets {key} to `{over}` and requires `{required}`"
-                    ),
-                };
-            }
+        if let Some(over) = project.overrides.get(key)
+            && over != required
+        {
+            return Answer::Refused {
+                attempted: over.clone(),
+                constrained_by: Layer::ProjectRequirement,
+                reason: format!("the declaration sets {key} to `{over}` and requires `{required}`"),
+            };
         }
         return within_team(
             key,

@@ -159,11 +159,11 @@ pub fn arguments(
     args.push("--allowedTools".to_string());
     args.push(format!("{GOVERNED_TOOL}({refused})"));
     args.push(format!("{GOVERNED_TOOL}({allowed})"));
-    if control.carries_the_payload() {
-        if let Some(path) = settings {
-            args.push(crate::session::SETTINGS_ARGUMENT.to_string());
-            args.push(path.to_string());
-        }
+    if control.carries_the_payload()
+        && let Some(path) = settings
+    {
+        args.push(crate::session::SETTINGS_ARGUMENT.to_string());
+        args.push(path.to_string());
     }
     args
 }
@@ -1620,15 +1620,15 @@ pub fn admitted(evidence: &Evidence) -> Result<Vec<(Control, Trailer)>, NotAdmit
             });
         }
         let (la, lb) = (a.launch.as_ref(), b.launch.as_ref());
-        if let (Some(la), Some(lb)) = (la, lb) {
-            if la.capture_id == lb.capture_id {
-                return Err(NotAdmitted::SharedIdentity {
-                    first: first.word(),
-                    second: second.word(),
-                    what: "the capture identity",
-                    value: la.capture_id.clone(),
-                });
-            }
+        if let (Some(la), Some(lb)) = (la, lb)
+            && la.capture_id == lb.capture_id
+        {
+            return Err(NotAdmitted::SharedIdentity {
+                first: first.word(),
+                second: second.word(),
+                what: "the capture identity",
+                value: la.capture_id.clone(),
+            });
         }
         if a.invocation.working_directory != b.invocation.working_directory {
             return Err(NotAdmitted::DifferentWorkingDirectories {

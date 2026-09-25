@@ -125,13 +125,13 @@ pub fn select(root: &Path, var: &dyn Fn(&str) -> Option<String>) -> Selection {
     let set = |name: &str| var(name).filter(|v| !v.is_empty());
     let mut notices = Vec::new();
     let chosen = set(ENV);
-    if let Some(old) = set(RETIRED) {
-        if chosen.is_none() {
-            notices.push(format!(
-                "ignored {RETIRED}={old}: that name is retired and selects nothing; set {ENV} \
-                 to choose the binary"
-            ));
-        }
+    if let Some(old) = set(RETIRED)
+        && chosen.is_none()
+    {
+        notices.push(format!(
+            "ignored {RETIRED}={old}: that name is retired and selects nothing; set {ENV} to \
+             choose the binary"
+        ));
     }
     let pin = Pin::of(root);
     if let Some(value) = chosen {

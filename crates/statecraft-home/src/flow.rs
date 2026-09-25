@@ -1191,13 +1191,13 @@ fn plan_setup(
         derived_dir: project::DERIVED,
     })
     .map_err(refused)?;
-    if let Some(approved) = &ctx.setup.plan {
-        if *approved != plan.plan_identity {
-            return Err(refused(format!(
-                "the approved setup plan {approved} is not the plan now, {}: an input changed after it was planned",
-                plan.plan_identity
-            )));
-        }
+    if let Some(approved) = &ctx.setup.plan
+        && *approved != plan.plan_identity
+    {
+        return Err(refused(format!(
+            "the approved setup plan {approved} is not the plan now, {}: an input changed after it was planned",
+            plan.plan_identity
+        )));
     }
     Ok(Some(plan))
 }
@@ -1525,14 +1525,15 @@ fn run(ctx: &Context<'_>, mode: Mode) -> Report {
         report.mutations = rec.list;
         return report.finish(false);
     }
-    if writing && corpus_done {
-        if let Err(e) = progress(&mut rec, ctx.root, Step::Corpus, &now) {
-            stop_failed!(
-                Step::Corpus,
-                e,
-                "the initialization's progress could not be recorded"
-            );
-        }
+    if writing
+        && corpus_done
+        && let Err(e) = progress(&mut rec, ctx.root, Step::Corpus, &now)
+    {
+        stop_failed!(
+            Step::Corpus,
+            e,
+            "the initialization's progress could not be recorded"
+        );
     }
 
     // 7. register. Registration and qualification, and then it stops: arming
@@ -1564,14 +1565,15 @@ fn run(ctx: &Context<'_>, mode: Mode) -> Report {
     };
     let registered = register_report.state.done();
     report.steps.push(register_report);
-    if writing && registered {
-        if let Err(e) = progress(&mut rec, ctx.root, Step::Register, &now) {
-            stop_failed!(
-                Step::Register,
-                e,
-                "the initialization's progress could not be recorded"
-            );
-        }
+    if writing
+        && registered
+        && let Err(e) = progress(&mut rec, ctx.root, Step::Register, &now)
+    {
+        stop_failed!(
+            Step::Register,
+            e,
+            "the initialization's progress could not be recorded"
+        );
     }
 
     // Delivery is evaluated after the files are in place, because the whole
