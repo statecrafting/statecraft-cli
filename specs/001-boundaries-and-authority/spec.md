@@ -526,7 +526,8 @@ applied to text they already govern.
 decision engine, an optional neighbour, no dependency either way, whose
 evidence records overlap with this product's run evidence and with
 `attest-ledger`. The two rows above are that change. Measured at rustev
-`origin/main` `ed5ff48`: its README names this product among the optional
+(`https://github.com/statecrafting/rustev`, public) `origin/main` `ed5ff48`
+(`ed5ff4878cc6692799f6b31038e4b21e78d18464`): its README names this product among the optional
 neighbours it is usable without, and no manifest in either repository depends
 on the other. The overlap is the subject of the shared-primitives inventory
 kept with the 2026-09-25 session evidence, which proposes one canonical JSON,
