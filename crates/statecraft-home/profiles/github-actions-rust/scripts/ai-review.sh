@@ -80,7 +80,19 @@ skip() {
   # Posted first: a skip nobody can see is not a visible skip, and its
   # result is claimed only once the notice stands.
   if [ "$class" != fork ] && [ "$class" != dependabot ]; then
-    gh pr comment "$PR_NUMBER" --repo "$REPO" --body-file "$body" || refuse "the skip notice could not be posted"
+    # One notice per class and head: a re-run of this job (a transient skip is
+    # the likely one) finds the notice it already posted and does not repeat
+    # it. A thread that cannot be read gets the notice again: a duplicate is
+    # better than an invisible skip.
+    local marker="<!-- statecraft-ai-review-skip ${class} ${HEAD_SHA} -->"
+    echo "$marker" >> "$body"
+    local thread=""
+    thread="$(gh api --paginate "repos/${REPO}/issues/${PR_NUMBER}/comments" --jq '.[].body' 2> /dev/null)" || thread=""
+    if [ -n "$thread" ] && printf '%s\n' "$thread" | grep -F -- "$marker" > /dev/null; then
+      note "the ${class} skip notice for this head is already posted"
+    else
+      gh pr comment "$PR_NUMBER" --repo "$REPO" --body-file "$body" || refuse "the skip notice could not be posted"
+    fi
   fi
   evidence "skipped:${class}" '[]' "$digest"
   out result "skipped:${class}"
