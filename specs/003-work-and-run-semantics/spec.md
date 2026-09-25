@@ -1351,6 +1351,13 @@ versions of it. Spec `002`'s entry was adopted as its Part 9 step 1 on
 2026-09-24; that adoption does not reach this spec, whose part (Part 9 step
 4, H-5) is still not adopted here.
 
+**2026-09-25: let chains collapsed with the measured rust-version floor.**
+The workspace floor moved from 1.85, which never built, to 1.88 (evidence in
+spec `002` section 5, same date). Clippy's `collapsible_if` then applies let
+chains, and the nested `if` blocks it named in this spec's crates were
+collapsed mechanically by `cargo clippy --fix` and `cargo fmt`. No behavior
+changed.
+
 **2026-09-25: attest-ledger is the crates.io release `=0.1.0`, not the git
 revision (owner, 2026-09-25).** `attest-ledger-core` and `attest-ledger-types`
 0.1.0 are published on crates.io, so the move the 2026-09-16 entry left as its

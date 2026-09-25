@@ -126,11 +126,11 @@ pub fn probe_reporting_version(
     let mut probe =
         provider::ConstructedEnvironmentProbe::from_child_environment(&environment.variables);
     let mut observed = None;
-    if let Some(executable) = probe.resolved_executable() {
-        if let Some(version) = provider::observe_provider_version(&executable) {
-            probe = probe.observing_provider_version(&version);
-            observed = Some(version);
-        }
+    if let Some(executable) = probe.resolved_executable()
+        && let Some(version) = provider::observe_provider_version(&executable)
+    {
+        probe = probe.observing_provider_version(&version);
+        observed = Some(version);
     }
     (probe.with_records(records(home)), observed)
 }

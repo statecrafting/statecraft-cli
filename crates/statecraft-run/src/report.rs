@@ -372,15 +372,14 @@ pub fn join(
         if let (Some(plan), Some(list)) = (
             row.status.as_deref(),
             lifecycle.iter().find(|l| l.id == row.id),
-        ) {
-            if plan != list.status {
-                return Err(ReportError::Disagreement {
-                    id: row.id.clone(),
-                    plan: plan.to_string(),
-                    list: list.status.clone(),
-                    version: version.to_string(),
-                });
-            }
+        ) && plan != list.status
+        {
+            return Err(ReportError::Disagreement {
+                id: row.id.clone(),
+                plan: plan.to_string(),
+                list: list.status.clone(),
+                version: version.to_string(),
+            });
         }
     }
     Ok(CorpusReport {
