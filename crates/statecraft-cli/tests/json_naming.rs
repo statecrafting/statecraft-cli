@@ -465,9 +465,10 @@ fn every_grandfathered_key_is_still_written_somewhere() {
                         .unwrap_or_default()
                 })
                 .collect();
-            !details.iter().any(|d| d.ends_with(&quoted))
-                && !text.contains(&quoted)
-                && !(k.contains('-') && text.contains(&variant))
+            let live = details.iter().any(|d| d.ends_with(&quoted))
+                || text.contains(&quoted)
+                || (k.contains('-') && text.contains(&variant));
+            !live
         })
         .collect();
     assert!(
