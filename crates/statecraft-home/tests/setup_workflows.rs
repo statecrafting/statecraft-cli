@@ -1601,6 +1601,14 @@ exit 0
 /// `src/unformatted.rs`; every call is recorded with its directory.
 const CARGO: &str = r#"#!/bin/sh
 printf '%s | %s\n' "$PWD" "$*" >> "$STUB_STATE/cargo-calls"
+if [ "$1" = metadata ]; then
+  if [ -f "$STUB_STATE/no-members" ]; then
+    echo '{"packages":[],"workspace_members":[],"version":1}'
+  else
+    echo '{"packages":[],"workspace_members":["fixture 0.1.0 (path+file:///fixture)"],"version":1}'
+  fi
+  exit 0
+fi
 if [ "$1" = fmt ] && [ -f src/unformatted.rs ]; then
   echo "Diff in src/unformatted.rs"
   exit 1
@@ -2018,6 +2026,85 @@ fn the_commit_walk_refuses_an_unsigned_commit_and_a_red_intermediate_tree() {
         "{}",
         ran.text
     );
+}
+
+/// The code job's gate judges nothing in a workspace with no member crates
+/// yet, and says so, instead of failing on the virtual manifest; with a member
+/// it runs all four verbs (the review of #138, finding 1).
+#[test]
+fn the_code_gate_judges_nothing_without_member_crates_and_says_so() {
+    let gov = Gov::new(&[]);
+    let wf = workflow(gov.root(), "statecraft-ci.yml");
+    let (run, env) = step(&wf, "code", "Build, test, clippy, fmt");
+    let path = format!(
+        "{}:{}",
+        gov_bin().display(),
+        std::env::var("PATH").unwrap_or_default()
+    );
+    for empty in [true, false] {
+        let ran = run_step(
+            gov.root(),
+            &run,
+            &env,
+            &BTreeMap::new(),
+            &[("PATH", &path)],
+            |state| {
+                if empty {
+                    std::fs::write(state.join("no-members"), "").unwrap();
+                }
+            },
+        );
+        assert_eq!(ran.exit, 0, "{}", ran.text);
+        let calls = ran.stub_file("cargo-calls").unwrap_or_default();
+        let verbs = [
+            "build --workspace",
+            "test --workspace",
+            "clippy --workspace",
+            "fmt --all",
+        ];
+        if empty {
+            assert!(
+                ran.text.contains("the workspace has no member crates yet"),
+                "{}",
+                ran.text
+            );
+            for verb in verbs {
+                assert!(!calls.contains(verb), "{calls}");
+            }
+        } else {
+            for verb in verbs {
+                assert!(calls.contains(verb), "{calls}");
+            }
+        }
+    }
+}
+
+/// A commit whose `spec-spine.toml` states no exact pin is refused, and the
+/// refusal prints why: the reason is in the log the refusal shows, not only
+/// on another stream (the review of #138, finding 2).
+#[test]
+fn a_commit_without_an_exact_pin_is_refused_and_says_why() {
+    let gov = Gov::new(&[("governance.gate_each_commit", serde_json::json!(true))]);
+    let unpinned = gov.commit(&[("spec-spine.toml", Some("[meta]\n"))], "unpinned");
+    let head = gov.commit(&[("spec-spine.toml", Some(TOML))], "pinned again");
+    let ran = run_gov(
+        &gov,
+        "Every commit in the change",
+        &event("pull_request", &head),
+        |_| {},
+    );
+    assert_eq!(ran.exit, 1, "{}", ran.text);
+    let short = gov.short(&unpinned);
+    assert!(
+        ran.text.contains(&format!(
+            "{short} fails the gate or the format check at its own tree"
+        )),
+        "{}",
+        ran.text
+    );
+    // Once on stderr and once from the log the refusal prints.
+    let reason = format!("{short}'s spec-spine.toml states no exact pin, so no gate can judge it");
+    assert_eq!(ran.text.matches(&reason).count(), 2, "{}", ran.text);
 }
 
 /// Rule 5: a pull request whose base is not the default branch fails
