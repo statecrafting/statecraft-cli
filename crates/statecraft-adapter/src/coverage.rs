@@ -257,8 +257,8 @@ pub fn parse_plan(bytes: &[u8]) -> Result<SuitePlan, PlanError> {
     let answered = envelope.ok == Some(true) || envelope.outcome.as_deref() == Some("ok");
     if !answered || envelope.exit_code != 0 {
         let said = match (&envelope.outcome, envelope.ok) {
-            (Some(o), _) => format!("outcome {o}"),
-            (None, Some(ok)) => format!("ok {ok}"),
+            (Some(o), _) => format!("outcome={o}"),
+            (None, Some(ok)) => format!("ok={ok}"),
             (None, None) => "neither ok nor outcome".to_string(),
         };
         return Err(PlanError::Unreadable(format!(
