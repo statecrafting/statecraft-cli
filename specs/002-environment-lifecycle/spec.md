@@ -7765,6 +7765,45 @@ finding, that the governance job and the commit walk run the candidate's own
 `gate.sh`, is a property of the profile since revision 1 and is proposed as
 revision 5 in its own change.
 
+**2026-09-24: profile revision 5, a candidate never judges itself with its own
+gate (ratified by the owner on 2026-09-24).** Found by the third live AI review of #138
+and confirmed by reading the profile: only `ci-gate.sh` and the policy are read
+at the base. The `governance` job, the commit walk and the declared
+authored-content script run the candidate's own copies, and on `pull_request`
+GitHub runs the candidate's own workflow file. A pull request can therefore
+weaken the check that judges it. The authority-change report names the change
+but does not block it, and the code-owner review the profile relies on
+(S-3) does not separate an agent from the owner when agents act under the
+owner's account. The hand-written `govern.yml` had the same property, so
+revision 4 is no weaker than what it replaced; revision 5 closes it.
+
+1. **The gate's scripts are read at the base.** The `governance` job, the
+   commit walk and the `code` job run `scripts/statecraft/gate.sh`, and the
+   declared authored-content script, as they exist at the base commit, exactly
+   as `ci-gate.sh` is read today. The adoption, where the base carries none,
+   runs the candidate's copy and says so. A change to these scripts takes
+   effect for the pull requests after it.
+2. **An authority change blocks unless the owner approves it.** When the
+   candidate changes any file of the authority set (the rendered workflows,
+   `scripts/statecraft/*`, the policy, the declared authored-content script),
+   `ci-gate` blocks unless that run's `statecraft-review-exception` job
+   succeeded, the owner's approval on the protected Environment. Today this
+   is only reported. This also covers an edited workflow file, which rule 1
+   cannot: GitHub runs the candidate's workflow on `pull_request`, but
+   `ci-gate.sh` and its policy are the base's, and they refuse.
+3. **Consequence.** Every re-render of the profile in an adopting repository,
+   including this repository's own, needs the owner's approval once. That is
+   intended: a change to the gate is reserved to the owner (AGENTS.md, "Owner
+   delegation").
+4. **Upgrade.** The revision becomes 5, a new identity. Revision 4 projects
+   upgrade through one pull request that the owner approves under rule 2.
+
+Acceptance obligations, as tests in `crates/statecraft-home/tests/`: a candidate that weakens `gate.sh` is judged
+by the base's copy and fails; the adoption runs the candidate's copy and says
+so; a candidate that changes any authority-set file blocks without the
+exception and passes with it; a candidate that changes no such file is
+unaffected; a revision-4 project upgrades.
+
 ## Verification
 
 `--fail-on-untraced` joined the corpus gate with this spec's first
