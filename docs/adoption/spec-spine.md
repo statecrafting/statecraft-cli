@@ -257,3 +257,98 @@ runtime feature.
 **Consequence if rejected.** The pin returns to `=0.23.0`, `make tools`
 installs that, and the 22 shards are regenerated back. The crafted-id defect
 stays in the governing binary.
+
+### 2026-09-25: 0.26.0
+
+The owner decided on 2026-09-25 to adopt 0.26.0 in its own change. The CLI pin
+in `spec-spine.toml` and the linked `spec-spine-core` in the root `Cargo.toml`
+move together, as one producer identity.
+
+*Identity.* Tag `v0.26.0` is annotated and signed. `git tag -v` reports a good
+ED25519 signature from the producer owner's key. The tag targets
+`8f2a8f75000af8f8c7348d87928891306b8d65a6`, which is contained in the
+producer's `origin/main`, and the release workflow run for the tag succeeded.
+
+| Crate | Registry checksum (= downloaded `.crate`, = `Cargo.lock`) |
+|---|---|
+| `spec-spine-cli` | `fd3a9901…ba5c` |
+| `spec-spine-core` | `d98103ff…ae0a` |
+| `spec-spine-types` | `89c4f7e9…29aa` |
+
+Each crate records `8f2a8f75` in `.cargo_vcs_info.json`, with no `dirty` flag,
+and each unpacked source equals `git archive v0.26.0`'s `crates/<crate>`, with
+`Cargo.toml.orig` equal to the tree's. Those two were measured on the morning
+of 2026-09-25 when the release was published. The signature, the checksums in
+`Cargo.lock` and the install digest were re-checked for this entry.
+`cargo install --locked` with rustc 1.96.0 gave `4d2742f7…` in both
+installs. As before, a build is identified by
+version and source revision, not by digest.
+
+*The floor.* No `DEFAULT_BYPASS_PREFIXES` line changed between `v0.25.0` and
+`v0.26.0`. Four of the five files that name it changed for other reasons. In
+spec-spine's 132, a pin not met becomes `Error::Refused`. In `couple.rs`, a
+doc comment changed and nested `if let` became a let chain with the same
+logic. `config show` differs only by the pin line.
+
+*Coupling.* `couple` gives the same exit code, the same checked-path count and
+the same text (apart from the version) under both versions over eleven merged
+ranges on the first-parent history: `cfe6b70..c248f16`, `c248f16..bcba1f4`,
+`bcba1f4..38d30b9`, `38d30b9..29005a3`, `29005a3..3f4826b`, `3f4826b..dc62abc`,
+`dc62abc..bde4991`, `bde4991..d5633d6`, `d5633d6..cf7d9d6`, `cf7d9d6..e61b191`
+and `e61b191..9bb6188` (10, 8, 8, 22, 3, 12, 18, 3, 36, 8 and 1 paths). Each
+was run in its own clone, with shards written by that version.
+
+Three synthetic commits agree as well. A re-indexed `docs/decisions` change
+exits 1 under both, with byte-identical `C-001` output naming spec `001`. A
+`src` change and a deleted file each exit 1 with `C-001`. An unindexed
+`docs/decisions` change, and a hand-edited shard, each refuse as "index is
+stale", which is 2 under 0.25.0 and 1 under 0.26.0. That is spec-spine's 132
+and the only difference.
+
+*Exit codes and the text the hooks read.* This is the one break (spec-spine's
+132): stale moves from 2 to 1, a pin not met from 3 to 2, and 4 is new for a
+failed read. An invalid corpus stays 1 and an unknown verb stays 3. Measured
+on `check`, `lint --fail-on-warn`, `index check --fail-on-unresolved`,
+`index coverage --fail-on-untraced`, `compile --check`, `registry closure` and
+`config show`, on a fresh, a stale, an invalid, an unresolved and a
+mismatched-pin tree. The report lines the shipped hooks match are
+byte-identical under both versions: `spec-registry:` and `codebase-index:`
+(fresh, `STALE`, `INVALID`, and `fresh, but REFUSED` for an unresolved
+claim). The pin refusal still says "requires spec-spine"; 0.26.0 prefixes it
+with `refused:` where 0.25.0 said `config error:`. The `--json` envelope is
+1.0.0: `ok` is gone and `outcome` carries the verdict.
+
+Every reader in this repository was changed to read both tables before this
+move. The Rust readers changed in #156 (spec `002`, `003`, `004` and `005`
+section 5). The delivered hooks changed in #157 (spec `002` section 5), as an
+authority change of its own. The rendered `gate.sh` already chose its table
+by the pinned release (#155).
+
+*The re-index.* The move regenerates 15 shards, one line each: the
+codebase-index `shardHash` only. No spec-registry shard changes (`specVersion`
+stays 1.8.0). Read through the CLI, `registry plan --json` is read schema
+0.8.0 with the same keys. The ready set is unchanged (`002`, `approved`), and
+every `registry closure` digest and member count is unchanged for all seven
+specs.
+
+*The declared toolchain floor.* `spec-spine-core` and `spec-spine-types`
+0.26.0 declare `rust-version = "1.90"`. The workspace floor moves from 1.88 to
+1.90: `cargo +1.90.0 build --workspace --locked` succeeds, and 1.89.0 is
+refused by Cargo naming those two crates.
+
+*Evidence kinds, kept apart.* The producer's evidence is its release record
+and its handoff (`statecraft-handoff-0.26.0.md`, which lists the consumer tests
+it ran). This repository's published-package qualification of the CLI and the
+library is the identity, floor, coupling, exit, hook-text, re-index and
+toolchain measurements above. Neither qualifies a bundle, which is not
+adopted.
+
+*What this does not do.* It changes no runtime behavior. The readers that
+depend on the exit table already read both. It does not adopt #118's family
+exit contract for statecraft's own verbs, the exact-pin scaffold (spec-spine's
+131), or planned claims (063, bounded by 130) as features. Each is its own
+change.
+
+**Consequence if rejected.** Both pins return to `=0.25.0`, the floor returns to
+1.88, `make tools` installs 0.25.0, and the 15 shards are regenerated back.
+The readers from #156 and #157 stay, because they read both tables.

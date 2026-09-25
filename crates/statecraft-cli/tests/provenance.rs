@@ -220,7 +220,8 @@ fn a_fresh_initialization_records_roles_the_linked_producer_and_the_declared_pin
 /// authored input.
 #[test]
 fn edited_authored_inputs_are_customized_information_and_an_edited_template_is_drifted() {
-    let f = Fixture::new("0.25.0");
+    // The executable matches the linked producer, whichever release is adopted.
+    let f = Fixture::new(statecraft_home::producer::PRODUCER_VERSION);
     assert_eq!(f.init().0, 0);
     let (before_exit, before) = f.doctor();
     assert_eq!(state_of(&before, CONFIG), "seeded", "{before}");
