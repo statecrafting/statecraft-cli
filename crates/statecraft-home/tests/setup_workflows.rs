@@ -273,7 +273,21 @@ printf '%s\n' "$*" >> "$here/gh-calls"
 case "$1 $2" in
   "pr comment")
     cat > /dev/null
-    exit "$(cat "$here/gh-comment-exit")" ;;
+    code="$(cat "$here/gh-comment-exit")"
+    if [ "$code" = 0 ]; then
+      # The thread the next read sees: each posted body, in order.
+      prev=""
+      for a in "$@"; do
+        if [ "$prev" = "--body-file" ]; then cat "$a" >> "$here/gh-comments"; fi
+        prev="$a"
+      done
+    fi
+    exit "$code" ;;
+  "api --paginate")
+    case "$3" in
+      repos/*/issues/*/comments) cat "$here/gh-comments" 2> /dev/null || true ;;
+      *) echo "gh stub: unsupported $*" >&2; exit 98 ;;
+    esac ;;
   api\ repos/*/actions/runs/*/jobs*)
     cat "$here/gh-jobs" 2> /dev/null || echo '{"jobs": []}' ;;
   api\ repos/*/actions/runs*)
@@ -1603,7 +1617,7 @@ const CARGO: &str = r#"#!/bin/sh
 printf '%s | %s\n' "$PWD" "$*" >> "$STUB_STATE/cargo-calls"
 if [ "$1" = metadata ]; then
   if [ -f "$STUB_STATE/no-members" ]; then
-    echo '{"packages":[],"workspace_members":[],"version":1}'
+    echo '{"packages": [], "workspace_members": [ ], "version": 1}'
   else
     echo '{"packages":[],"workspace_members":["fixture 0.1.0 (path+file:///fixture)"],"version":1}'
   fi
@@ -2077,6 +2091,57 @@ fn the_code_gate_judges_nothing_without_member_crates_and_says_so() {
             }
         }
     }
+}
+
+/// A skip notice is posted once per class and head: a re-run of the review
+/// job finds the notice it already posted and does not repeat it, and still
+/// records the skip (the second review of #138, finding 1).
+#[test]
+fn a_rerun_does_not_repeat_a_skip_notice() {
+    let repo = Repo::new(&["scripts/statecraft/ai-review.sh"], &[]);
+    let mut draft = review_cases()
+        .into_iter()
+        .find(|c| c.label == "a draft")
+        .expect("the draft case");
+    draft.comment_exit = "0";
+    let first = run_review(&repo, &draft);
+    assert_eq!(first.exit, 0, "{}", first.text);
+    assert_eq!(first.output("result"), "skipped:draft");
+    let posted = first.stub_file("gh-comments").unwrap_or_default();
+    assert!(
+        posted.contains(&format!(
+            "<!-- statecraft-ai-review-skip draft {} -->",
+            repo.head
+        )),
+        "{posted}"
+    );
+
+    // The re-run sees the thread the first run left.
+    let wf = workflow(repo.root(), "statecraft-ai-review.yml");
+    let (run, env) = step(&wf, "review", "Review");
+    let extra: Vec<(&str, &str)> = draft.extra.iter().map(|(k, v)| (*k, v.as_str())).collect();
+    let again = run_step(
+        repo.root(),
+        &run,
+        &env,
+        &review_ctx(&repo),
+        &extra,
+        |stubs| {
+            std::fs::write(stubs.join("claude-mode"), draft.mode).unwrap();
+            std::fs::write(stubs.join("gh-comment-exit"), "0").unwrap();
+            std::fs::write(stubs.join("gh-head"), format!("{}\n", repo.head)).unwrap();
+            std::fs::write(stubs.join("npm-exit"), "0").unwrap();
+            std::fs::write(stubs.join("gh-comments"), &posted).unwrap();
+        },
+    );
+    assert_eq!(again.exit, 0, "{}", again.text);
+    assert_eq!(again.output("result"), "skipped:draft");
+    let calls = again.stub_file("gh-calls").unwrap_or_default();
+    assert!(
+        !calls.lines().any(|l| l.starts_with("pr comment")),
+        "{calls}"
+    );
+    assert!(again.text.contains("already posted"), "{}", again.text);
 }
 
 /// A commit whose `spec-spine.toml` states no exact pin is refused, and the

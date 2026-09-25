@@ -86,7 +86,10 @@ case "$1" in
     # guard the hand-written CI this profile replaced had: every
     # `cargo --workspace` verb refuses a virtual manifest with no members.
     # `metadata --no-deps` resolves nothing, so it answers on such a manifest.
-    meta=$(cargo metadata --no-deps --format-version 1)
+    # Whitespace is removed before matching, so the test does not depend on
+    # how cargo's serializer spaces its JSON; a failed read stops the gate.
+    meta=$(cargo metadata --no-deps --format-version 1) || exit 1
+    meta=$(printf '%s' "$meta" | tr -d ' \t\r\n')
     case "$meta" in
       *'"workspace_members":[]'*)
         echo "gate.sh: the workspace has no member crates yet; build, test, clippy and fmt judge nothing"
