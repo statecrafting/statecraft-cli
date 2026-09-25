@@ -1211,6 +1211,52 @@ fn launch_attempt(
         );
     };
 
+    // Spec 002 section 5, 2026-09-25: the supervisor selects the spec-spine
+    // binary a managed session's hooks use, by the convention candidates
+    // alone on the child's PATH, and places it in the constructed environment
+    // below over any value already there. Neither selection variable is read
+    // from the operator's environment, so a shell value cannot reach a managed
+    // hook. Candidates that exist with none the project admits refuse the
+    // attempt before its intent is written; no candidate at all leaves the
+    // hooks their absent-binary behavior.
+    let supervised_spec_spine = match &project_manifest {
+        None => None,
+        Some(_) => {
+            let selection = statecraft_home::spec_spine::for_supervisor(
+                root,
+                std::env::var("PATH").ok().as_deref(),
+            );
+            match selection.outcome {
+                Ok(selected) => Some(selected.program),
+                Err(statecraft_home::spec_spine::Unselected::Absent) => None,
+                Err(statecraft_home::spec_spine::Unselected::Refused(why)) => {
+                    let mut detail = selection.passed_over.join("; ");
+                    if !detail.is_empty() {
+                        detail.push_str("; ");
+                    }
+                    detail.push_str(&why);
+                    let mut accounting = statecraft_run::refusal::Accounting::default();
+                    accounting.observe(statecraft_run::refusal::RefusalEvent {
+                        guard: statecraft_home::spec_spine::SELECTION_GUARD.to_string(),
+                        detail: detail.clone(),
+                    });
+                    return conclude_and_emit(
+                        &mut chain,
+                        &places,
+                        &session,
+                        statecraft_run::attempt::Outcome::Refused,
+                        &accounting,
+                        serde_json::json!({ "preflightRefusal": detail, "posture": posture }),
+                        unlaunched(true, None),
+                        &contract,
+                        trial,
+                        format,
+                    );
+                }
+            }
+        }
+    };
+
     // Spec 002 section 3.31 rules 13 to 15: every preflight has passed, so the
     // intent is written now, before the process exists. If it cannot be,
     // nothing is launched and the attempt is refused under its own guard. A
@@ -1265,7 +1311,15 @@ fn launch_attempt(
         }
     };
     let environment = match &prepared {
-        Some(p) => adapters::child_environment_with(&p.intent.environment(), covered.as_ref().ok()),
+        Some(p) => {
+            let binding = match &supervised_spec_spine {
+                Some(program) => {
+                    statecraft_home::spec_spine::managed_binding(&p.intent.environment(), program)
+                }
+                None => p.intent.environment(),
+            };
+            adapters::child_environment_with(&binding, covered.as_ref().ok())
+        }
         None => environment,
     };
 

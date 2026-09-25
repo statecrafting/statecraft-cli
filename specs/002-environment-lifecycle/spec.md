@@ -7900,6 +7900,115 @@ before it merges, as revision 5's implementation entry says. From the next
 pull request on, a change to any authority-set file here blocks without that
 approval.
 
+**2026-09-25: one environment variable selects the spec-spine binary (owner
+Addendum 2, item N; amends section 3.23 contract 2 rules 2 and 5). Proposed
+2026-09-24; adopted by the owner, 2026-09-25.** The owner's words: "#119 N
+(one spec-spine selection variable): adopted; land it now." This change
+implements it; the implementation choices follow the adopted text.
+
+*Today three names do one job.* Measured at main `17dbdb6`:
+
+| Variable | Read by | Meaning today |
+|---|---|---|
+| `SPEC_SPINE_BIN` | the four delivered hooks (`crates/statecraft-home/harness/hooks/statecraft-{session-start,pre-bash,post-edit,stop}.sh`), 16 lines each; `harness_hooks.rs`; this section's contract 2 rule 2 | operator override, unmanaged use; the only candidate when set |
+| `STATECRAFT_SPEC_SPINE` | the same four hooks; contract 2 rule 5; the bundle entry (P2.1, H-13) | the supervisor's resolved executable in a managed session; no Rust source sets it yet |
+| `STATECRAFT_PRODUCER_BIN` | `crates/statecraft-run/tests/producer_candidate.rs` only (three `#[ignore]` tests, with `STATECRAFT_PRODUCER_REV` and `STATECRAFT_PRODUCER_FIXTURES`) | the exact producer build an operator-run candidate test judges |
+
+This repository's `Makefile` variable `SPEC_SPINE` is a fourth spelling, but
+it is the check surface's own, unclaimed, and not read by the product; aligning
+it is a separate authority change and not proposed here.
+
+*Adopted: `STATECRAFT_SPEC_SPINE` is the one variable*, namespaced as this
+product's, with this precedence:
+
+1. **In a managed session** (the launch named a run in `STATECRAFT_RUN_ID`),
+   the supervisor always sets `STATECRAFT_SPEC_SPINE` in the constructed
+   environment, overwriting any inherited value, so an operator's shell value
+   cannot reach a managed hook. It is the only candidate (rule 5 unchanged in
+   substance).
+2. **Outside a managed session**, a non-empty `STATECRAFT_SPEC_SPINE` is the
+   operator override of rule 2: the only candidate, no fallback, named with its
+   path, version, the pin and the two remedies.
+3. **Otherwise** the convention candidates of rule 3, then rule 4 for an
+   unpinned repository, unchanged.
+4. **The retired names are reported, never read.** A hook that finds
+   `SPEC_SPINE_BIN` set and `STATECRAFT_SPEC_SPINE` unset says the old name
+   was ignored and names the new one; it never selects by it. The candidate
+   tests read `STATECRAFT_SPEC_SPINE` (the revision and fixtures variables
+   stay, since they name different things).
+
+*Cost, stated.* An operator or script that sets `SPEC_SPINE_BIN` for
+Statecraft's hooks loses the override silently in behavior, loudly in output
+(rule 4). Rahi's own copied hooks read `SPEC_SPINE_BIN` and are untouched:
+this changes only what Statecraft delivers, and the migration order (Statecraft
+delivers, the adopter confirms loop and hooks live, then copies are removed)
+is unchanged. The one-variable rule is what lets rule 1's overwrite be the
+whole isolation argument, instead of two variables whose precedence a reader
+must remember.
+
+*Acceptance at implementation.* `harness_hooks.rs`: with only
+`SPEC_SPINE_BIN` set, no hook selects it and each names it as ignored; with
+`STATECRAFT_SPEC_SPINE` set outside a managed session, the override rules of
+contract 2 rule 2 hold unchanged; in a managed session an inherited value is
+replaced by the supervisor's. `producer_candidate.rs` reads the new name.
+
+*Implemented.* The four hooks carry the new resolver, the same block in each.
+`harness_hooks.rs` renames the override in the existing contract 2 tests and
+adds three: the retired name alone is never invoked and is reported as
+ignored; with both names set outside a managed session the new one judges as
+`override` and the old one is not mentioned; and the same incompatible binary
+is refused as an operator's override but used as the supervisor's inside a
+managed session. The selection rule is also a library function,
+`crates/statecraft-home/src/spec_spine.rs`, with unit tests, so a verb this
+product runs and a hook it delivers choose from the same inputs by the same
+rule. `run_startup.rs` asserts the value a managed session receives and that
+an operator's value under either name neither reaches it nor is invoked;
+`provenance.rs` covers initialization. Choices the entry left open, recorded
+here:
+
+- **The supervisor's selection is rule 3, then rule 4, and nothing else.** It
+  reads neither name from the operator's environment and searches the `PATH`
+  the child is given, so rule 1's overwrite holds by construction: the
+  constructed environment never carried an inherited value, and the
+  supervisor's is placed over any value already in the binding. A
+  digest-verified identity is still the bundle proposal's; nothing here
+  verifies one, and the hooks read the supervisor's path as rule 5 says.
+- **Candidates that exist with none the project admits refuse the attempt**
+  before its intent is written, under the guard `spec-spine-selection`,
+  naming each candidate passed over. **No candidate at all sets no value**, so
+  the hooks keep the absent-binary behavior rule 3 leaves unchanged; "always
+  sets" is read as always whenever there is a binary to hand.
+- **Initialization follows the same rule.** `init plan` and `init apply`
+  selected nothing: they ran a bare `spec-spine` from `PATH` for the corpus
+  step and the qualification probe (F2's first two rows). They now select by
+  rules 1 to 4 for the project being initialized; a selection that finds
+  candidates and admits none makes the corpus step refused and the
+  qualification unavailable, with a new unavailability, `not-selected`,
+  translated as a refusal like an absent binary. An initialization under a
+  pin the `PATH` binary does not satisfy is therefore `partial`, exit 1, where
+  it was `complete`. The other rows of F2 are unchanged and remain the bundle
+  proposal's.
+- **`observedSpecSpine` names the rule.** Its `program` is the selected path
+  and its `foundBy` is the rule's word (`supervisor`, `override`,
+  `repository-build`, `path`), where the 2026-09-24 provenance entry said
+  `path` for a bare name. A caller that names a program directly keeps that
+  entry's words.
+- **Initialization does not withhold its compile in an unpinned project.**
+  Rule 4's withheld compile is contract 1's exception, which is a hook's;
+  initialization's compile is its own step 6, and a new project is unpinned by
+  the producer's scaffold, so applying it there would withhold every first
+  compile.
+- **The notice is one line**, "ignored SPEC_SPINE_BIN=<value>: that name is
+  retired and selects nothing; set STATECRAFT_SPEC_SPINE to choose the
+  binary", printed with the lines naming candidates passed over, which for the
+  pull-request gate is standard error.
+- **A managed session without the supervisor's path** keeps rule 5's
+  fallback to rules 1 to 4 and its "version-checked, identity not verified"
+  report; a value outside a managed session is an override and is put to the
+  pin.
+- Entries above that name `$SPEC_SPINE_BIN` record what was true when they
+  were written and are not rewritten.
+
 ## Verification
 
 `--fail-on-untraced` joined the corpus gate with this spec's first

@@ -1351,6 +1351,16 @@ versions of it. Spec `002`'s entry was adopted as its Part 9 step 1 on
 2026-09-24; that adoption does not reach this spec, whose part (Part 9 step
 4, H-5) is still not adopted here.
 
+**2026-09-25: the candidate test names its binary with
+`STATECRAFT_SPEC_SPINE`.** Spec `002` section 5's entry of the same day,
+adopted by the owner, makes `STATECRAFT_SPEC_SPINE` the one variable that
+selects a spec-spine binary and retires the others. The ignored
+`tests/producer_candidate.rs` read its binary from `STATECRAFT_PRODUCER_BIN`
+and now reads it from `STATECRAFT_SPEC_SPINE`; `STATECRAFT_PRODUCER_REV` and
+`STATECRAFT_PRODUCER_FIXTURES` stay, because they name a revision and a
+fixture directory, not a binary. What the test checks, and that it is ignored
+by default, are unchanged.
+
 ## Verification
 
 Each line is one command. §3.8's twenty-two rows are integration tests named after
