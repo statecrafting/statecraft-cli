@@ -168,7 +168,19 @@ fn scan(file: &Path, label: &str, findings: &mut Vec<Finding>) {
         let mut j = i;
         while j > 0 {
             let t = lines[j - 1].trim();
-            if t.is_empty() || t.ends_with('}') || t.ends_with(';') || t.ends_with('{') {
+            if t.is_empty() {
+                // A blank line may separate an attribute from its item, which
+                // Rust allows: keep going only when an attribute ends above it.
+                let above = lines[..j - 1].iter().rposition(|l| !l.trim().is_empty());
+                match above {
+                    Some(k) if lines[k].trim().ends_with(']') => {
+                        j = k + 1;
+                        continue;
+                    }
+                    _ => break,
+                }
+            }
+            if t.ends_with('}') || t.ends_with(';') || t.ends_with('{') {
                 break;
             }
             j -= 1;
@@ -462,6 +474,9 @@ fn the_walker_flags_a_snake_case_key_at_any_depth_and_excuses_only_the_list() {
         "Upper": { "alsoFine": true },
     });
     // Sorted, so the assertion does not depend on the map's iteration order.
+    // The order below is byte order: '.' (0x2E) sorts before ':' (0x3A), so
+    // "$.fineKey[]..." precedes "$: ..."; a change to the path format that
+    // moves either byte reorders these two and fails here visibly.
     let mut found = json_naming::violations(&value);
     found.sort();
     assert_eq!(
@@ -497,4 +512,24 @@ fn a_rename_spelled_skip_is_not_read_as_the_skip_marker() {
         .map(|m| (m.ident.as_str(), m.rename.as_deref()))
         .collect();
     assert_eq!(names, [("odd_one", Some("skip"))]);
+}
+
+#[test]
+fn a_blank_line_between_the_derive_and_the_item_does_not_hide_it() {
+    let dir = tempfile::tempdir().unwrap();
+    let file = dir.path().join("sample.rs");
+    std::fs::write(
+        &file,
+        "use serde::Serialize;\n\n#[derive(Serialize)]\n\npub struct Spaced {\n    pub snake_field: u8,\n}\n",
+    )
+    .unwrap();
+    let mut found = Vec::new();
+    scan(&file, "sample", &mut found);
+    assert_eq!(
+        found.len(),
+        1,
+        "{:?}",
+        found.iter().map(|f| &f.detail).collect::<Vec<_>>()
+    );
+    assert_eq!(found[0].item, "sample::Spaced");
 }
