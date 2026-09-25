@@ -8174,6 +8174,25 @@ here:
 - Entries above that name `$SPEC_SPINE_BIN` record what was true when they
   were written and are not rewritten.
 
+**2026-09-25: revision 7's `gate.sh` reads spec-spine's exit table by the
+pinned release (owner, 2026-09-25: adopters render once, at revision 7, with
+`=0.26.0`).** Revision 7 as merged translated spec-spine's codes with one
+table, 0.25.0's. Measured the same day against the published 0.26.0 in a
+disposable clone of `main`: stale moves from 2 to 1, a pin not met from 3 to
+2, and an invalid corpus stays 1, on `check --fail-on-warn`, `lint
+--fail-on-warn`, `index check --fail-on-unresolved`, `index coverage
+--fail-on-untraced` and `compile --check`; an unknown verb stays 3. Under the
+single table a 0.26.0 pin mismatch would have read as a finding, not a
+refusal, and adopting 0.26.0 would have needed a second rendering. The table
+is now chosen by the release `spec-spine.toml` pins (the binary's `--version`
+when no pin is readable): below 0.26.0 the old rows, from 0.26.0 spec-spine's
+132 contract, which is this family's, with a usage error from the gate's own
+fixed invocation read as the gate failing (4) under both. This stays
+revision 7: no repository had merged a revision-7 rendering (this
+repository's re-render was still open), so no recorded digest names the
+earlier text. `the_rendered_gate_exits_in_the_family_contract` asserts both
+tables on the rendered script.
+
 ## Verification
 
 `--fail-on-untraced` joined the corpus gate with this spec's first
