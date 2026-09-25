@@ -171,28 +171,53 @@ diff, so its merge base is derived from the two endpoints it is handed:
 The second form is not merely noisy. A waiver is scoped to the diff the gate
 evaluated, so a `Spec-Drift-Waiver:` in the body would have covered all 15.
 
-## Before enabling a merge queue
+## The merge queue
 
-A queue is an optimization for when concurrent work causes repeated
-update-and-retest cycles. It must preserve the same guarantees, and today it
-would not. Three things it needs first:
+The queue is enabled on `main` (2026-09-24, merge method: merge commit, up to
+five entries built, all green required). It preserves the invariant above
+because the three properties it needs were made true in the same authority
+change that documented them:
 
-1. **Coupling evaluated against the queued integration candidate**, not only
-   against the pull request in isolation. The queue's whole value is testing the
-   speculative merged tree, and a coupling verdict from PR time does not cover
-   it.
-2. **Waivers bound to the specific changes and to the authority that approved
-   them.** A `merge_group` event carries no pull-request body, which is where a
-   waiver lives today. That gap needs a deliberate waiver contract: something
-   the queue can read, scoped to the change it was granted for. It is not solved
-   by skipping coupling in the queue, and not by refusing every waived change.
-3. **`ci-gate` refusing success when a required governance check was skipped.**
-   It currently treats a skipped job as a pass, which is correct while the only
-   event-gated check is one that cannot apply. Under a queue that rule would let
-   an absent coupling verdict read as a green one.
+1. **Coupling is evaluated against the queued integration candidate.** On a
+   `merge_group` event the `govern` job runs `spec-spine couple` over the
+   group's `base_sha...head_sha`, which is the entry's change applied on the
+   speculative base it will land on, not only the pull request in isolation.
+2. **A waiver is bound to its change and to the authority that approved it.**
+   A `merge_group` event carries no body, so the step reads the entry's own
+   pull-request body through the API, and honours a `Spec-Drift-Waiver:` only
+   when the group changes no path that pull request does not change. A group
+   that folds in other changes is judged with no waiver: it fails closed
+   rather than widening the scope the owner granted.
+3. **`ci-gate` refuses success when a required job did not succeed**, on every
+   event: failed, cancelled and **skipped** all fail it. An event-gated check
+   lives inside a job as a step (both coupling steps do), never as a job that
+   can be skipped into a green gate.
 
-Until those hold, an up-to-date branch is the mechanism, and it is sufficient
-for sequential merges.
+Two consequences worth knowing. Two pull requests that each regenerate shards
+can each be fresh alone and stale together; the queue's `check` refuses the
+second one with exit 2, and the fix is the usual rebase and `make refresh`.
+And a waived pull request queued behind another that touches the same paths is
+judged without its waiver, by construction; queue it alone.
+
+## How a pull request is merged
+
+Three methods are allowed; the choice is not arbitrary.
+
+- **Merge commit, the default**, and always when a record cites a branch SHA
+  (a waiver's head, "tested on X", an evidence commit) or the pull request is
+  stacked on another. The judged heads stay in `main`'s history, and
+  `git branch --merged` answers correctly.
+- **Squash** only when the branch carries fixup or red intermediate commits and
+  no record cites their SHAs.
+- **Rebase** only for a branch whose every commit is signed, passes the gate,
+  and is cited by nothing: it rewrites SHAs.
+
+Every commit that reaches `main` is signed and passes `make gate`; with merge
+commits the branch's commits land too, so this binds each one, not only the
+head. The merge commit's message is the pull-request title and body, so the
+authored-content rules bind the body as history. Read history first-parent
+(`git log --first-parent`, `git bisect --first-parent`): the first-parent chain
+is the sequence of integration candidates the gate judged.
 
 `spec-spine couple` is **CI-only, and deliberately not in `make gate`**. It
 compares two commits, so it cannot see a change being staged and is useless as a
