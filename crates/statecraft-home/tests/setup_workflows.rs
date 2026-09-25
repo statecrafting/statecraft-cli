@@ -266,6 +266,10 @@ input="$(cat)"
 head="$(printf '%s\n' "$input" | sed -n 's/^head: //p' | head -n 1)"
 printf '%s\n' "$PWD" > "$here/claude-cwd"
 printf '%s\n' "$HOME" > "$here/claude-home"
+# Which credential arrived, and that the others did not (revision 8).
+for v in ANTHROPIC_API_KEY CLAUDE_CODE_OAUTH_TOKEN ANTHROPIC_AUTH_TOKEN; do
+  if [ -n "${!v+x}" ]; then printf '%s=%s\n' "$v" "${!v}"; else printf '%s absent\n' "$v"; fi
+done > "$here/claude-env"
 ls -A "$PWD" > "$here/claude-cwd-listing"
 touch "$here/claude-called"
 case "$mode" in
@@ -417,6 +421,8 @@ fn run_steps(
         cmd.args(["-e", "-c", &resolve(run, ctx)])
             .current_dir(root)
             .env_remove("CLAUDE_CODE_OAUTH_TOKEN")
+            .env_remove("ANTHROPIC_API_KEY")
+            .env_remove("ANTHROPIC_AUTH_TOKEN")
             .env_remove("GH_TOKEN")
             .env_remove("AI_REVIEW_TMP")
             .env_remove("STATECRAFT_GATE")
@@ -1463,7 +1469,9 @@ fn review_reason(label: &str) -> &'static str {
         "a verdict that is neither" => "is neither findings nor no-findings",
         "an explicit refusal" | "a refusal outranks a transient signal" => "the provider refused",
         "an unclassified failure" => "no recognized transient signal",
-        "a missing credential" => "is not set for this repository",
+        "a missing credential" => {
+            "neither ANTHROPIC_API_KEY nor CLAUDE_CODE_OAUTH_TOKEN is set for this repository"
+        }
         "a stale subject" => "stale subject",
         "the current head cannot be read" => "the current head could not be read",
         "the reviewer cannot be installed" => "could not be installed",
@@ -1477,6 +1485,9 @@ fn review_ctx(repo: &Repo) -> BTreeMap<String, String> {
     let mut ctx = BTreeMap::new();
     for (k, v) in [
         ("secrets.CLAUDE_CODE_OAUTH_TOKEN", "stub-credential-value"),
+        // Revision 8: unset unless a case sets it, as the repository's
+        // secrets decide.
+        ("secrets.ANTHROPIC_API_KEY", ""),
         ("github.token", "stub-github-token"),
         ("github.event.pull_request.number", "7"),
         ("github.repository", "owner/fixture"),
@@ -1525,6 +1536,78 @@ fn run_review(repo: &Repo, case: &Case) -> Ran {
             std::fs::write(stubs.join("npm-exit"), case.npm_exit).unwrap();
         },
     )
+}
+
+/// Revision 8: the API key when it is set, else the OAuth token, else a
+/// refusal naming both. The stub records which variable reached it: the one
+/// not chosen is absent, and a stray `ANTHROPIC_AUTH_TOKEN` never arrives.
+#[test]
+fn ai_review_prefers_the_api_key_and_falls_back_to_the_oauth_token() {
+    let repo = Repo::new(&["scripts/statecraft/ai-review.sh"], &[]);
+    for (label, key, token, want_exit, class) in [
+        ("both set", "stub-api-key", "stub-oauth", 0, "api-key"),
+        ("only the key", "stub-api-key", "", 0, "api-key"),
+        ("only the token", "", "stub-oauth", 0, "oauth"),
+        ("neither", "", "", 2, "none"),
+    ] {
+        let mut case = review_cases()
+            .into_iter()
+            .find(|c| c.label == "a review with none")
+            .expect("the no-findings case");
+        case.extra.push(("ANTHROPIC_API_KEY", key.into()));
+        case.extra.push(("CLAUDE_CODE_OAUTH_TOKEN", token.into()));
+        case.extra
+            .push(("ANTHROPIC_AUTH_TOKEN", "stray-token".into()));
+        let ran = run_review(&repo, &case);
+        assert_eq!(ran.exit, want_exit, "{label}:\n{}", ran.text);
+        if want_exit != 0 {
+            assert!(ran.stub_file("claude-called").is_none(), "{label}");
+            for named in [
+                "ANTHROPIC_API_KEY",
+                "CLAUDE_CODE_OAUTH_TOKEN",
+                "gh secret set ANTHROPIC_API_KEY",
+                "gh secret set CLAUDE_CODE_OAUTH_TOKEN",
+            ] {
+                assert!(ran.text.contains(named), "{label}: {named}:\n{}", ran.text);
+            }
+            continue;
+        }
+        let env = ran.stub_file("claude-env").expect("the reviewer ran");
+        let (want_key, want_token) = if class == "api-key" {
+            (
+                format!("ANTHROPIC_API_KEY={key}"),
+                "CLAUDE_CODE_OAUTH_TOKEN absent".to_string(),
+            )
+        } else {
+            (
+                "ANTHROPIC_API_KEY absent".to_string(),
+                format!("CLAUDE_CODE_OAUTH_TOKEN={token}"),
+            )
+        };
+        assert!(env.lines().any(|l| l == want_key), "{label}: {env}");
+        assert!(env.lines().any(|l| l == want_token), "{label}: {env}");
+        assert!(
+            env.lines().any(|l| l == "ANTHROPIC_AUTH_TOKEN absent"),
+            "{label}: {env}"
+        );
+        // The class, never the value, in the log and the evidence record.
+        assert!(
+            ran.text.contains(&format!("AI review credential: {class}")),
+            "{label}:\n{}",
+            ran.text
+        );
+        for value in ["stub-api-key", "stub-oauth", "stray-token"] {
+            assert!(!ran.text.contains(value), "{label}: a value in the log");
+        }
+        let dir = ran.output("evidence");
+        let record =
+            std::fs::read_to_string(Path::new(dir).join("ai-review-evidence.json")).unwrap();
+        let parsed: serde_json::Value = serde_json::from_str(&record).unwrap();
+        assert_eq!(parsed["tool"]["credential"], class, "{label}");
+        for value in ["stub-api-key", "stub-oauth", "stray-token"] {
+            assert!(!record.contains(value), "{label}: a value in the record");
+        }
+    }
 }
 
 #[test]
@@ -1649,11 +1732,26 @@ fn contributor_text_is_never_spliced_into_a_run_scalar() {
         }
         assert!(wf["on"]["pull_request_target"].is_null(), "{name}");
     }
-    // The caller forwards exactly one secret, by name; never `inherit`.
+    // The caller forwards exactly the two credentials, by name; never
+    // `inherit` (revision 8).
     let caller = workflow(tmp.path(), "statecraft-ci.yml");
     let secrets = caller["jobs"]["ai-review"]["secrets"].as_mapping().unwrap();
-    assert_eq!(secrets.len(), 1);
+    assert_eq!(secrets.len(), 2);
     assert!(secrets.contains_key(setup::CREDENTIAL));
+    assert!(secrets.contains_key(setup::PREFERRED_CREDENTIAL));
+    let declared = workflow(tmp.path(), "statecraft-ai-review.yml");
+    let declared = declared["on"]["workflow_call"]["secrets"]
+        .as_mapping()
+        .unwrap()
+        .clone();
+    assert_eq!(declared.len(), 2);
+    for name in [setup::CREDENTIAL, setup::PREFERRED_CREDENTIAL] {
+        assert_eq!(
+            declared[name]["required"].as_bool(),
+            Some(false),
+            "{name} is optional"
+        );
+    }
     // The workflow default is read-only; the review job adds only its comment.
     let ci = workflow(tmp.path(), "statecraft-ci.yml");
     assert_eq!(ci["permissions"]["contents"].as_str(), Some("read"));

@@ -144,6 +144,9 @@ fn an_unmodified_file_is_replaced_and_a_customized_one_is_kept_with_three_digest
     );
 }
 
+const R7_AI_REVIEW: &str = include_str!("support/profile-r7/ai-review.sh");
+const R7_AI_REVIEW_WF: &str = include_str!("support/profile-r7/statecraft-ai-review.yml");
+const R7_CI: &str = include_str!("support/profile-r7/statecraft-ci.yml");
 const R6_GATE: &str = include_str!("support/profile-r6/gate.sh");
 const R5_CI: &str = include_str!("support/profile-r5/statecraft-ci.yml");
 const R5_CI_GATE: &str = include_str!("support/profile-r5/ci-gate.sh");
@@ -157,14 +160,32 @@ const R4_CI_GATE: &str = include_str!("support/profile-r4/ci-gate.sh");
 /// authority change, the commit walk runs each commit's own gate, and
 /// `ci-gate.sh` only reports an authority change. Only the templates matter
 /// to a managed upgrade.
+/// Revision 7 of the registered profile: the three templates revision 8
+/// changed, exactly as revision 7 shipped them (main at 7293c03).
+fn revision_seven() -> Profile {
+    let mut r7 = Profile::registered();
+    assert_eq!(r7.revision, 8, "the registered profile is revision 8");
+    r7.revision = 7;
+    for t in &mut r7.templates {
+        let body = match t.path.as_str() {
+            "scripts/statecraft/ai-review.sh" => R7_AI_REVIEW,
+            ".github/workflows/statecraft-ai-review.yml" => R7_AI_REVIEW_WF,
+            ".github/workflows/statecraft-ci.yml" => R7_CI,
+            _ => continue,
+        };
+        assert_ne!(t.body, body, "{}: revision 8 changed it", t.path);
+        t.body = body.to_string();
+    }
+    r7
+}
+
 /// Revision 6 of the registered profile: the gate script as revision 6
 /// shipped it (#144), the template whose revision-7 change a managed upgrade
 /// is asserted on. The other templates revision 7 changed are the registered
 /// ones here, as the earlier simulations carry later templates: only the
 /// revision and the compared template matter to a managed upgrade.
 fn revision_six() -> Profile {
-    let mut r6 = Profile::registered();
-    assert_eq!(r6.revision, 7, "the registered profile is revision 7");
+    let mut r6 = revision_seven();
     r6.revision = 6;
     for t in &mut r6.templates {
         let body = match t.path.as_str() {
@@ -748,7 +769,7 @@ fn a_revision_six_project_upgrades_to_revision_seven() {
         "on:\n  workflow_call:\njobs:\n  deny:\n    runs-on: ubuntu-latest\n    steps:\n      - run: true\n",
     )
     .unwrap();
-    let r7 = Profile::registered();
+    let r7 = revision_seven();
     assert_ne!(r7.identity(), r6.identity());
     let mut block = manifest.project.setup.as_ref().unwrap().parameters.clone();
     block.insert(
@@ -788,4 +809,58 @@ fn a_revision_six_project_upgrades_to_revision_seven() {
         steps.contains("0 ok, 1 finding, 2 refused, 3 usage, 4 failed"),
         "{steps}"
     );
+}
+
+/// Revision 8: a revision-7 project upgrades through one plan and apply. The
+/// review script prefers the API key and falls back to the OAuth token, the
+/// reusable workflow declares and binds both, and the caller passes both by
+/// name.
+#[test]
+fn a_revision_seven_project_upgrades_to_revision_eight() {
+    let dir = project();
+    let root = dir.path();
+    let mut manifest = Manifest::new(Pins {
+        product: "0.0.0".into(),
+        spec_spine: "unpinned".into(),
+        adapters: Default::default(),
+        producer: None,
+    });
+    let r7 = revision_seven();
+    assert!(plan_and_apply_with(root, &r7, &mut manifest, &BTreeMap::new()).whole());
+    assert_eq!(manifest.project.setup.as_ref().unwrap().revision, 7);
+    let script = "scripts/statecraft/ai-review.sh";
+    let review = ".github/workflows/statecraft-ai-review.yml";
+    let wf = ".github/workflows/statecraft-ci.yml";
+    let before = std::fs::read_to_string(root.join(script)).unwrap();
+    assert!(!before.contains("ANTHROPIC_API_KEY"), "{before}");
+
+    let r8 = Profile::registered();
+    assert_ne!(r8.identity(), r7.identity());
+    let block = manifest.project.setup.as_ref().unwrap().parameters.clone();
+    let upgrade = plan_and_apply_with(root, &r8, &mut manifest, &block);
+    for rel in [script, review, wf] {
+        let file = upgrade.files.iter().find(|f| f.path == rel).unwrap();
+        assert_eq!(file.action, Action::Replace, "{rel}");
+    }
+    let after = std::fs::read_to_string(root.join(script)).unwrap();
+    assert!(after.contains("credential_class=api-key"), "{after}");
+    assert!(after.contains("credential_class=oauth"), "{after}");
+    let called = std::fs::read_to_string(root.join(review)).unwrap();
+    assert!(
+        called.contains("      ANTHROPIC_API_KEY:\n        required: false\n"),
+        "{called}"
+    );
+    assert!(
+        called.contains("ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}"),
+        "{called}"
+    );
+    let ci = std::fs::read_to_string(root.join(wf)).unwrap();
+    assert!(
+        ci.contains("ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}"),
+        "{ci}"
+    );
+    assert!(!ci.contains("secrets: inherit"), "{ci}");
+    assert_eq!(manifest.project.setup.as_ref().unwrap().revision, 8);
+    let steps = setup::remote_obligations().join("\n");
+    assert!(steps.contains("ANTHROPIC_API_KEY"), "{steps}");
 }
