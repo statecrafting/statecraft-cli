@@ -32,10 +32,10 @@ pub const NATIVE_ROOT_ENV: &str = "STATECRAFT_NATIVE_ROOT";
 
 /// The parent directory native agent homes live under.
 pub fn native_parent() -> PathBuf {
-    if let Ok(explicit) = std::env::var(NATIVE_ROOT_ENV) {
-        if !explicit.is_empty() {
-            return PathBuf::from(explicit);
-        }
+    if let Ok(explicit) = std::env::var(NATIVE_ROOT_ENV)
+        && !explicit.is_empty()
+    {
+        return PathBuf::from(explicit);
     }
     PathBuf::from(std::env::var("HOME").unwrap_or_else(|_| ".".to_string()))
 }
