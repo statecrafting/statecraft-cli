@@ -903,6 +903,27 @@ spec `003` section 5 records on this date. Tested against a verbatim 0.26.0
 delta (`testdata/delta/spec-spine-0.26.0-pin-move.json`) and in
 `both_envelopes_are_read_and_one_that_says_neither_is_refused`.
 
+**2026-09-25: the delta report reads schema 0.2 (owner, 2026-09-25: adopt
+0.27.0).** spec-spine 0.27.0 moves the delta report to schema 0.2.0 (its spec
+142): a twelfth class, `relocation`, for a section moved between specs with a
+proven `relocates` edge, and a `relocations` list. Both are additive, but on a
+`0.x` line the minor is the breaking position, so this build read only `0.1.z`
+and every 0.27.0 report would have been an absence under section 3.3.3 case 2.
+`READS_DELTA_SCHEMAS` is now `0.1` and `0.2`. The `relocations` list is not
+read. `relocation` is not in section 3.3.2's table, and this entry does not add
+it: the table is a membership answer and is ratified text. A report that uses
+it is therefore an absence under case 3, which is the refusal the section
+already prescribes for a class this build cannot place. Placing it (a
+relocation moves requirement text that `delta` has proven unchanged, so reading
+it as `requirement`, no member, is the proposal) is the owner's decision. An
+unresolved claim at the merge base is a `validation` error envelope with no
+report under 0.27.0 (spec-spine's 145), where 0.26.0 gave a `stale` one; either
+way it is not a report and the answer is an absence. Tested against a verbatim
+0.27.0 delta (`testdata/delta/spec-spine-0.27.0-readme-edit.json`) in
+`the_delta_report_reads_the_0_27_0_schema`,
+`a_relocation_class_is_an_absence_until_the_table_places_it` and
+`a_validation_error_envelope_is_not_a_report`.
+
 ## Verification
 
 Each line is one command. §3.10's twenty-two rows are integration tests named

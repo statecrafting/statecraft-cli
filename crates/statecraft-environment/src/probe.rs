@@ -301,20 +301,28 @@ pub fn check_unavailable(program: &str, dir: &Path) -> Option<CheckAnswer> {
 /// read by the producer's own report lines, which name each half: `STALE` on
 /// `check`, "is stale" on a registry query. A report that also names an
 /// invalid corpus or an unresolved claim is not stale only, because
-/// regenerating would not cure it.
+/// regenerating would not cure it. From 0.27.0 the guarded readers report an
+/// unresolved claim as `validation failed` at exit 1 (spec-spine's 145), which
+/// is named here so that no later wording beside it reads as stale.
 pub fn names_stale_only(text: &str) -> bool {
     (text.contains(": STALE") || text.contains("is stale"))
         && !text.contains("INVALID")
         && !text.contains("UNRESOLVED CLAIM")
         && !text.contains("but REFUSED")
+        && !text.contains("validation failed")
 }
 
 /// Whether spec-spine's words report a refusal to judge at all: a pin the
 /// running version does not satisfy, invalid configuration, or a containment
-/// refusal. From 0.26.0 each exits 2 and says `refused:`; below it they exited
-/// 3, and a pin not met is worded the same under both.
+/// refusal. From 0.26.0 each exits 2; a pin not met and a containment refusal
+/// say `refused:`, and invalid configuration says `config error:` (measured
+/// under 0.26.0 and 0.27.0, spec 002 section 5, 2026-09-25, "config error is
+/// a refusal"). Below 0.26.0 they exited 3, and a pin not met is worded the
+/// same under both.
 pub fn names_refusal(text: &str) -> bool {
-    text.contains("spec-spine: refused:") || names_pin_refusal(text)
+    text.contains("spec-spine: refused:")
+        || text.contains("spec-spine: config error:")
+        || names_pin_refusal(text)
 }
 
 /// Whether spec-spine's words report a version pin the running binary does not
@@ -486,6 +494,90 @@ mod tests {
         (spec-spine.toml [meta] required_version); running 0.25.0.";
     const PIN_026: &str = "spec-spine: refused: this repository requires spec-spine =0.1.0 \
         (spec-spine.toml [meta] required_version); running 0.26.0.";
+    // Recorded 2026-09-25 from the published 0.26.0 and 0.27.0 on clones of
+    // this repository: an unknown table in spec-spine.toml (both, exit 2), a
+    // link leaving the repository, and `specs_dir = "C:specs"` (0.27.0, exit 2;
+    // spec-spine's 144), and an unresolved claim at a guarded reader (0.27.0,
+    // exit 1; spec-spine's 145).
+    const CONFIG_026_027: &str = "spec-spine: config error: TOML parse error at line 134, \
+        column 2\n    |\n134 | [nonsense]\n    |  ^^^^^^^^\n";
+    const LINK_027: &str = "spec-spine: refused: refused to read the repository: \
+        'docs-outside' is a link to /tmp/outside, outside it (spec 144). A governed read \
+        through it would judge content the repository does not hold; remove the link or \
+        point it inside the repository";
+    const LAYOUT_027: &str = "spec-spine: config error: layout.specs_dir 'C:specs' must name \
+        a directory inside the repository, and it contains a ':', a drive, drive-relative or \
+        stream form on Windows (spec 144). Use a relative path of plain segments";
+    const UNRESOLVED_027: &str = "spec-spine: validation failed: 1 violation(s)\n  I-004 \
+        [crates/statecraft-acceptance/src/missing.rs] unresolved claim, not staleness: spec \
+        '005-acceptance-and-evidence' file unit 'crates/statecraft-acceptance/src/missing.rs' \
+        does not exist; regenerating the index does not clear it, because the claim is \
+        recomputed from the corpus on every run\n";
+
+    #[test]
+    fn a_configuration_or_containment_refusal_is_never_stale() {
+        for (code, words) in [
+            (2, CONFIG_026_027),
+            (2, LINK_027),
+            (2, LAYOUT_027),
+            // 0.25.0 spent 3 on the same configuration error.
+            (3, CONFIG_026_027),
+        ] {
+            assert!(names_refusal(words), "{words}");
+            assert!(!names_stale_only(words), "{words}");
+            assert!(
+                matches!(
+                    read_check(Some(code), &format!("exit {code}"), words),
+                    CheckAnswer::NotPerformed { .. }
+                ),
+                "exit {code}: {words}"
+            );
+        }
+    }
+
+    #[test]
+    fn an_unresolved_claim_at_a_guarded_reader_is_neither_stale_nor_a_refusal() {
+        assert!(!names_stale_only(UNRESOLVED_027));
+        assert!(!names_refusal(UNRESOLVED_027));
+        assert!(matches!(
+            read_check(Some(1), "exit 1", UNRESOLVED_027),
+            CheckAnswer::DoesNotValidate { .. }
+        ));
+        // Beside a stale line it is still not stale only.
+        let both = format!("codebase-index: STALE (run `spec-spine index`)\n{UNRESOLVED_027}");
+        assert!(!names_stale_only(&both));
+    }
+
+    /// A real repository with a real link leaving it, answered by a stand-in
+    /// that prints what the published 0.27.0 printed for that tree. The
+    /// stand-in is labelled as one: the published binary's own answer over a
+    /// link is asserted in `statecraft-home`'s negative cases once the pin is
+    /// 0.27.0, because 0.26.0 follows the link.
+    #[cfg(unix)]
+    #[test]
+    fn a_repository_with_a_link_leaving_it_is_a_read_not_performed() {
+        use std::os::unix::fs::{PermissionsExt, symlink};
+        let outside = tempfile::tempdir().unwrap();
+        let repo = tempfile::tempdir().unwrap();
+        symlink(outside.path(), repo.path().join("docs-outside")).unwrap();
+        let bin = repo.path().join("spec-spine-0.27.0-stand-in");
+        std::fs::write(
+            &bin,
+            "#!/bin/sh\ncase \"$*\" in\n  'check --help') exit 0 ;;\n  check) \
+             printf '%s\\n' \"spec-spine: refused: refused to read the repository: \
+             'docs-outside' is a link to $(readlink docs-outside), outside it (spec 144).\" >&2; \
+             exit 2 ;;\nesac\nexit 3\n",
+        )
+        .unwrap();
+        std::fs::set_permissions(&bin, std::fs::Permissions::from_mode(0o755)).unwrap();
+        match run_check(bin.to_str().unwrap(), repo.path()) {
+            CheckAnswer::NotPerformed { status, detail } => {
+                assert_eq!(status, "exit 2");
+                assert!(detail.contains("outside it"), "{detail}");
+            }
+            other => panic!("a link leaving the repository read as {other:?}"),
+        }
+    }
 
     #[test]
     fn both_exit_tables_read_to_the_same_answers() {
