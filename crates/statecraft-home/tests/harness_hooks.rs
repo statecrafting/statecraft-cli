@@ -811,6 +811,77 @@ fn contract_4_each_verdict_is_read_as_itself() {
     }
 }
 
+/// Contract 4 under spec-spine 0.26.0's exit table (spec 002 section 5,
+/// 2026-09-25, "both exit tables"): stale is 1, a refusal to judge is 2 and
+/// names itself, and 4 is a read that failed. Recorded from the published
+/// 0.26.0 the same day.
+#[test]
+fn contract_4_the_0_26_0_table_is_read_as_itself() {
+    let refused = "spec-spine: refused: this repository requires spec-spine =0.1.0 (spec-spine.toml [meta] required_version); running 0.26.0. Install the required version, or change the pin.";
+    let rows: [(i32, &str, &str, bool); 3] = [
+        (
+            1,
+            "spec-registry: STALE\n1 stale shard(s):\n  modified 003-x.json\ncodebase-index: STALE (run `spec-spine index`)",
+            "STALE",
+            true,
+        ),
+        (2, refused, "NOT READ", false),
+        (4, "spec-spine: internal error: x", "NOT READ", false),
+    ];
+    for file in [SESSION_START, STOP] {
+        for (code, says, expect, may_advise_regenerating) in rows {
+            let fixture = Fixture::new();
+            fixture.stub_saying(
+                &fixture.path_dir.join("spec-spine"),
+                "path",
+                code,
+                true,
+                says,
+            );
+            let seen = text(&fixture.run_project(file, &[]));
+            assert!(
+                seen.contains(expect),
+                "{file} did not report exit {code} as {expect}: {seen}"
+            );
+            assert!(
+                !seen.contains("INVALID"),
+                "{file} read exit {code} as an invalid corpus: {seen}"
+            );
+            if !may_advise_regenerating {
+                assert!(
+                    !seen.contains("STALE") && !seen.contains("run `spec-spine compile`"),
+                    "{file} read exit {code} as stale: {seen}"
+                );
+            }
+        }
+    }
+    // The enforcing gate refuses all three, each named as itself.
+    for (code, says, expect) in [
+        (
+            1,
+            "codebase-index: STALE (run `spec-spine index`)",
+            "is stale",
+        ),
+        (2, refused, "refused to judge"),
+        (4, "spec-spine: internal error: x", "read failed"),
+    ] {
+        let fixture = Fixture::new();
+        fixture.stub_saying(
+            &fixture.root.join("target/release/spec-spine"),
+            "repo",
+            code,
+            true,
+            says,
+        );
+        let payload = bash_payload("gh pr create --title x --body y", &fixture.root);
+        let out = fixture.run_payload(PRE_BASH, &payload, &[]);
+        let seen = text(&out);
+        assert!(!out.status.success(), "exit {code} allowed: {seen}");
+        assert!(seen.contains(expect), "exit {code} not named: {seen}");
+        assert!(!seen.contains("does not validate"), "exit {code}: {seen}");
+    }
+}
+
 /// An unresolved claim is not staleness, and the hook says so.
 #[test]
 fn contract_4_an_unresolved_claim_is_distinguished_from_staleness() {
@@ -1630,6 +1701,9 @@ enum Probe {
     RefusesThePin,
     /// Exit 3 for another reason: not a compatibility verdict.
     OtherFailure,
+    /// spec-spine 0.26.0's refusal at configuration load: exit 2, the same
+    /// words (spec 002 section 5, 2026-09-25, "both exit tables").
+    RefusesThePinFrom026,
 }
 
 impl Fixture {
@@ -1643,6 +1717,7 @@ impl Fixture {
             Probe::Admits => "exit 0".to_string(),
             Probe::RefusesThePin => "echo 'config error: this repository requires spec-spine >=0.23, <0.24 (spec-spine.toml [meta] required_version)' >&2; exit 3".to_string(),
             Probe::OtherFailure => "echo 'config error: spec-spine.toml: parse error' >&2; exit 3".to_string(),
+            Probe::RefusesThePinFrom026 => "echo 'spec-spine: refused: this repository requires spec-spine >=0.23, <0.24 (spec-spine.toml [meta] required_version); running 0.24.0.' >&2; exit 2".to_string(),
         };
         let body = format!(
             "#!/bin/sh\nprintf '%s %s\\n' '{label}' \"$*\" >> '{calls}'\n\
@@ -1923,6 +1998,39 @@ fn pin_a_non_exact_requirement_is_decided_by_the_probe() {
         let out = fixture.run_any(file, &[]);
         assert!(out.status.success(), "{file}: {}", text(&out));
         assert!(fixture.invoked("repo", "config"), "{file}: no probe ran");
+        assert!(
+            fixture.invoked("path", "check"),
+            "{file}: {}",
+            fixture.calls()
+        );
+        assert!(
+            !fixture.invoked("repo", "check"),
+            "{file}: {}",
+            fixture.calls()
+        );
+        assert!(
+            norm(&text(&out)).contains("passed over"),
+            "{file}: {}",
+            text(&out)
+        );
+    }
+}
+
+/// The same probe under spec-spine 0.26.0's exit table, where a pin not met
+/// is exit 2 (it was 3), worded the same.
+#[test]
+fn pin_a_refusal_under_the_0_26_0_table_is_decided_by_the_probe() {
+    for file in ALL {
+        let fixture = pinned_fixture(Some(">=0.23, <0.24"));
+        fixture.versioned(
+            &fixture.repo_build(),
+            "repo",
+            "0.24.0",
+            Probe::RefusesThePinFrom026,
+        );
+        fixture.versioned(&fixture.on_path(), "path", "0.23.5", Probe::Admits);
+        let out = fixture.run_any(file, &[]);
+        assert!(out.status.success(), "{file}: {}", text(&out));
         assert!(
             fixture.invoked("path", "check"),
             "{file}: {}",

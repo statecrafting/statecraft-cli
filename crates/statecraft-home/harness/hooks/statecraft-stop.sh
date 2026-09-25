@@ -47,7 +47,9 @@ spec_spine_admits() {
   esac
   probe=$("$1" --repo "$2" config show 2>&1); prc=$?
   [ "$prc" = 0 ] && return 0
-  if [ "$prc" = 3 ]; then case "$probe" in *'requires spec-spine'*) return 1 ;; esac; fi
+  # A pin not met is exit 3 below spec-spine 0.26.0 and exit 2 from it, worded
+  # the same under both (spec 002 section 5, 2026-09-25, "both exit tables").
+  case "$prc" in 2|3) case "$probe" in *'requires spec-spine'*) return 1 ;; esac ;; esac
   return 2
 }
 spec_spine_resolve() {
@@ -144,6 +146,15 @@ fi
 # unresolved claim whose diagnostic is recomputed from the corpus every run.
 out=$("$sc" check --fail-on-unresolved 2>&1); c=$?
 [ "$c" = 0 ] && exit 0
+# spec-spine has two exit tables (spec 002 section 5, 2026-09-25, "both exit
+# tables"). From 0.26.0 a stale tree exits 1 and 2 is a refusal to judge, which
+# names itself; below it stale is 2 and a refusal 3. The report lines are the
+# same under both, so they decide, and a refusal is read before the code.
+case "$out" in *'spec-spine: refused:'*|*'requires spec-spine'*)
+  ver=$("$sc" --version 2>/dev/null)
+  say "[freshness] NOT READ: spec-spine refused to judge the tree (check exit $c). The binary at $sc answers: ${ver:-(nothing)}. $(printf '%s\n' "$out" | head -1). Regenerating repairs nothing here."
+  exit 0 ;;
+esac
 case "$c" in
   2)
     named=0
@@ -174,7 +185,14 @@ case "$c" in
       named=1 ;;
     esac
     case "$out" in *'spec-registry: STALE'*|*'codebase-index: STALE'*)
-      [ "$named" = 1 ] && say '[freshness] STALE as well: `spec-spine compile` and `index` clear that part only; commit the regenerated shards with the fix.' ;;
+      if [ "$named" = 1 ]; then
+        say '[freshness] STALE as well: `spec-spine compile` and `index` clear that part only; commit the regenerated shards with the fix.'
+      else
+        # spec-spine 0.26.0's table: stale alone is exit 1.
+        say '[freshness] STALE: run `spec-spine compile` and `index` and commit the regenerated shards with the change that made them stale.'
+        echo '[freshness] Not regenerated here: a write at session end leaves .statecraft/derived/ uncommitted, and the next run refuses a dirty tree.'
+        named=1
+      fi ;;
     esac
     [ "$named" = 1 ] || say '[freshness] INVALID: the corpus does not validate, which is not staleness and regenerating does not clear it. Run `spec-spine check` and fix the violations it names.' ;;
   3)
@@ -182,6 +200,11 @@ case "$c" in
     # here and never on the happy path.
     ver=$("$sc" --version 2>/dev/null)
     say "[freshness] NOT READ: the freshness read was not performed (exit 3: I/O, parse, schema or config). The binary at $sc answers: ${ver:-(nothing)}. Read the error from spec-spine check directly; regenerating repairs nothing here." ;;
+  4)
+    # spec-spine 0.26.0's table: the read failed (I/O, git, an unreadable
+    # shard directory, an internal error).
+    ver=$("$sc" --version 2>/dev/null)
+    say "[freshness] NOT READ: the freshness read failed (exit 4: I/O, git or internal). The binary at $sc answers: ${ver:-(nothing)}. Read the error from spec-spine check directly; regenerating repairs nothing here." ;;
   *)
     say "[freshness] UNRECOGNISED: spec-spine check exited $c, which this hook does not know how to report; it is not reported as fresh." ;;
 esac

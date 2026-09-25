@@ -8230,6 +8230,24 @@ policy, including the gate that reads spec-spine's exit table by the pinned
 release (the entry above). It changes the authority set, so the base's revision-6 `ci-gate`
 blocks it until the owner approves that run's `statecraft-review-exception`.
 
+**2026-09-25: the delivered hooks read both of spec-spine's exit tables
+(owner, 2026-09-25: adopt 0.26.0; a hook change is an authority change, so it
+is its own change).** The four hooks of section 3.23 read `check` and the pin
+probe by 0.25.0's table. Measured the same day against the published 0.26.0,
+three readings were wrong: `stop.sh` reported a stale-only tree (now exit 1)
+as INVALID; `pre-bash.sh` refused it as a corpus that "does not validate" and
+"is not stale", and refused a pin not met (now exit 2) as stale; and every
+hook's pin probe read a range-pin refusal only under exit 3, so a 0.26.0
+candidate that does not satisfy the pin was "not performed" instead of passed
+over. Each hook now reads the producer's words, as contract 4 already does for
+its two readings of 2: a report naming `refused:` or a pin not met is a read
+not performed, whatever the code; an exit 1 whose report names only a stale
+tree is stale; 4 is a read that failed. Contracts 1 to 7 are unchanged, and
+every non-zero code still refuses at the enforcing gate (contract 6).
+`contract_4_the_0_26_0_table_is_read_as_itself` and
+`pin_a_refusal_under_the_0_26_0_table_is_decided_by_the_probe` run the shipped
+bodies against the recorded 0.26.0 lines; the 0.25.0 rows are unchanged.
+
 ## Verification
 
 `--fail-on-untraced` joined the corpus gate with this spec's first

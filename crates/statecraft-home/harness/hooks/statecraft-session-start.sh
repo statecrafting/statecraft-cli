@@ -55,7 +55,9 @@ spec_spine_admits() {
   esac
   probe=$("$1" --repo "$2" config show 2>&1); prc=$?
   [ "$prc" = 0 ] && return 0
-  if [ "$prc" = 3 ]; then case "$probe" in *'requires spec-spine'*) return 1 ;; esac; fi
+  # A pin not met is exit 3 below spec-spine 0.26.0 and exit 2 from it, worded
+  # the same under both (spec 002 section 5, 2026-09-25, "both exit tables").
+  case "$prc" in 2|3) case "$probe" in *'requires spec-spine'*) return 1 ;; esac ;; esac
   return 2
 }
 spec_spine_resolve() {
@@ -124,13 +126,20 @@ spec_spine_judge() {
 # spec 093; this is the same sentence at the other end of the session. Spec 093
 # 3.3's `unknown (check exit N)` fallback stays for every code neither hook
 # recognises, which is what it is for.
+# spec-spine 0.26.0's table adds 2 for a refusal to judge, which names itself
+# (a pin not met among them; it was 3 below 0.26.0), and 4 for a read that
+# failed (spec 002 section 5, 2026-09-25, "both exit tables").
 spec_spine_unknown_half() {
-  if [ "$1" = 3 ]; then
-    v=$("$2" --version 2>/dev/null)
-    echo "NOT READ (check exit 3: I/O, parse, schema or config). The binary at $2 answers: ${v:-(nothing)}. Read spec-spine check directly; regenerating repairs nothing here"
-  else
-    echo "unknown (check exit $1)"
-  fi
+  v=$("$2" --version 2>/dev/null)
+  case "$3" in *'spec-spine: refused:'*|*'requires spec-spine'*)
+    echo "NOT READ (check exit $1: spec-spine refused to judge the tree). The binary at $2 answers: ${v:-(nothing)}. Read spec-spine check directly; regenerating repairs nothing here"
+    return ;;
+  esac
+  case "$1" in
+    3) echo "NOT READ (check exit 3: I/O, parse, schema or config). The binary at $2 answers: ${v:-(nothing)}. Read spec-spine check directly; regenerating repairs nothing here" ;;
+    4) echo "NOT READ (check exit 4: I/O, git or internal). The binary at $2 answers: ${v:-(nothing)}. Read spec-spine check directly; regenerating repairs nothing here" ;;
+    *) echo "unknown (check exit $1)" ;;
+  esac
 }
 spec_spine_resolve "${CLAUDE_PROJECT_DIR:-.}"; rrc=$?
 [ -n "$sc_notice" ] && printf '%s\n' "$sc_notice" | sed 's/^/[session-freshness] /'
@@ -161,7 +170,7 @@ if [ "$rrc" = 0 ]; then
   case "$out" in *'spec-registry: fresh'*) reg='fresh' ;;
     *'spec-registry: STALE'*) reg='STALE, run spec-spine compile and commit the shards' ;;
     *'spec-registry: INVALID'*) reg='INVALID, the corpus fails validation, which regenerating does not clear (run spec-spine check for the violations)' ;;
-    *) reg="$(spec_spine_unknown_half "$c" "$sc")" ;;
+    *) reg="$(spec_spine_unknown_half "$c" "$sc" "$out")" ;;
   esac
   # Spec 093 3.3: since spec 079 exit 2 carries three distinguishable refusals
   # and the composed code cannot say which. Matching STALE alone reported the
@@ -176,7 +185,7 @@ if [ "$rrc" = 0 ]; then
         *) idx='STALE, run spec-spine index' ;;
       esac ;;
     *'codebase-index: UNRESOLVED CLAIM'*) idx='UNRESOLVED CLAIM: a spec claims a unit that does not resolve, which regenerating does not clear (run spec-spine index diagnostics for the list)' ;;
-    *) idx="$(spec_spine_unknown_half "$c" "$sc")" ;;
+    *) idx="$(spec_spine_unknown_half "$c" "$sc" "$out")" ;;
   esac
   fi
 elif [ "$rrc" = 1 ]; then

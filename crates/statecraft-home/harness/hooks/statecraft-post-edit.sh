@@ -51,7 +51,9 @@ spec_spine_admits() {
   esac
   probe=$("$1" --repo "$2" config show 2>&1); prc=$?
   [ "$prc" = 0 ] && return 0
-  if [ "$prc" = 3 ]; then case "$probe" in *'requires spec-spine'*) return 1 ;; esac; fi
+  # A pin not met is exit 3 below spec-spine 0.26.0 and exit 2 from it, worded
+  # the same under both (spec 002 section 5, 2026-09-25, "both exit tables").
+  case "$prc" in 2|3) case "$probe" in *'requires spec-spine'*) return 1 ;; esac ;; esac
   return 2
 }
 spec_spine_resolve() {
