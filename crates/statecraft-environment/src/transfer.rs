@@ -313,6 +313,7 @@ pub struct Act<'a> {
 
 /// What the manifest and the file say about a path now.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct Standing {
     /// The class the manifest records (`user` when it records none).
     pub class: Ownership,
@@ -361,6 +362,7 @@ impl ResultingEntry {
 
 /// What `transfer plan` reports (rule 4). Nothing is written to compute it.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct Plan {
     /// The path.
     pub path: String,
@@ -386,6 +388,11 @@ pub struct Plan {
     /// What `transfer apply` must be given: the identity, carried in a token
     /// beside a short digest of each input, so a stale plan can be refused
     /// naming which input changed.
+    ///
+    /// The wire spelling stays `plan_id`: spec 002 and spec 006 section 5
+    /// name it, so it is grandfathered in spec 006's JSON naming convention
+    /// while the rest of this report is camelCase.
+    #[serde(rename = "plan_id")]
     pub plan_id: String,
     /// Entries carrying a `transfer` with no journal record: read as before,
     /// reported, and never rewritten (the compatibility paragraph).
@@ -1001,13 +1008,13 @@ pub fn disagreements(manifest: &Manifest) -> Vec<String> {
         if seen_ids.contains(&r.id.as_str()) {
             out.push(format!("the journal records identity {} twice", r.id));
         }
-        if let Some(reverted) = &r.reverts {
-            if !seen_ids.contains(&reverted.as_str()) {
-                out.push(format!(
-                    "record {} reverses {reverted}, which the journal does not record before it",
-                    r.id
-                ));
-            }
+        if let Some(reverted) = &r.reverts
+            && !seen_ids.contains(&reverted.as_str())
+        {
+            out.push(format!(
+                "record {} reverses {reverted}, which the journal does not record before it",
+                r.id
+            ));
         }
         seen_ids.push(&r.id);
     }
@@ -1291,14 +1298,16 @@ pub fn apply(
     let (_held, manifest, manifest_digest) = locked_manifest(ctx.root)?;
     refuse_disagreement(&manifest)?;
 
-    if let Some(last) = latest(&manifest, path) {
-        if last.from == from && last.to == to && Ownership::of(&manifest, path) == to {
-            let now = open_regular(ctx.root, path)?;
-            if expected_digest(&manifest, last).as_deref() == Some(now.digest.as_str()) {
-                return Ok(Outcome::AlreadySatisfied {
-                    record: last.clone(),
-                });
-            }
+    if let Some(last) = latest(&manifest, path)
+        && last.from == from
+        && last.to == to
+        && Ownership::of(&manifest, path) == to
+    {
+        let now = open_regular(ctx.root, path)?;
+        if expected_digest(&manifest, last).as_deref() == Some(now.digest.as_str()) {
+            return Ok(Outcome::AlreadySatisfied {
+                record: last.clone(),
+            });
         }
     }
 

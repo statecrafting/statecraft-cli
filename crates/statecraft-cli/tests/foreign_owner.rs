@@ -13,6 +13,9 @@
 
 #![cfg(unix)]
 
+#[path = "support/json_naming.rs"]
+mod json_naming;
+
 use std::path::PathBuf;
 use std::process::{Command, Output};
 
@@ -81,7 +84,7 @@ impl Fixture {
         args.push("--json");
         let out = self.cli(&args);
         let value =
-            serde_json::from_slice(&out.stdout).unwrap_or_else(|e| panic!("{e}: {}", text(&out)));
+            json_naming::from_output(&out.stdout).unwrap_or_else(|e| panic!("{e}: {}", text(&out)));
         (code(&out), value)
     }
 }

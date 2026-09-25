@@ -22,6 +22,9 @@
 
 #![cfg(unix)]
 
+#[path = "support/json_naming.rs"]
+mod json_naming;
+
 use std::path::{Path, PathBuf};
 use std::process::{Command, Output};
 
@@ -46,7 +49,7 @@ fn text(out: &Output) -> String {
 }
 
 fn json(out: &Output) -> serde_json::Value {
-    serde_json::from_slice(&out.stdout).unwrap_or_else(|e| panic!("{e}: {}", text(out)))
+    json_naming::from_output(&out.stdout).unwrap_or_else(|e| panic!("{e}: {}", text(out)))
 }
 
 struct Fixture {
@@ -77,6 +80,11 @@ impl Fixture {
     }
 
     fn cli(&self, args: &[&str]) -> Output {
+        self.cli_with(args, &[])
+    }
+
+    /// [`Fixture::cli`] with more names in the operator's environment.
+    fn cli_with(&self, args: &[&str], extra: &[(&str, &str)]) -> Output {
         Command::new(env!("CARGO_BIN_EXE_statecraft-cli"))
             .args(args)
             .env_clear()
@@ -85,6 +93,7 @@ impl Fixture {
             .env("HOME", self.dir.path())
             .env("PATH", format!("{}:/usr/bin:/bin", self.bin().display()))
             .env("USER", "fixture-operator")
+            .envs(extra.iter().copied())
             .output()
             .unwrap()
     }
@@ -462,6 +471,10 @@ fn a_managed_run_supplies_its_startup_hook_and_gate_and_releases_work_on_admissi
             intent["nonce"].as_str().unwrap().to_string(),
         ),
         ("STATECRAFT_HARNESS_SELECTED", required.to_string()),
+        (
+            "STATECRAFT_SPEC_SPINE",
+            f.bin().join("spec-spine").display().to_string(),
+        ),
     ] {
         assert!(
             env.lines().any(|l| l == format!("{name}={want}")),
@@ -1427,7 +1440,7 @@ fn a_concluded_attempt_an_unknown_attempt_number_and_an_empty_reason_are_refused
         "--json",
     ]);
     assert_eq!(code(&out), 2, "{}", text(&out));
-    let answer: serde_json::Value = serde_json::from_slice(&out.stdout).unwrap();
+    let answer: serde_json::Value = json_naming::from_output(&out.stdout).unwrap();
     assert!(answer["value"]["refused"].is_string(), "{answer}");
 
     // An empty reason or operator, against a live attempt.
@@ -1656,4 +1669,45 @@ fn reconciliation_reads_an_attempt_recorded_inside_the_target() {
             "{observed}"
         );
     }
+}
+
+/// Spec 002 section 5, 2026-09-25: one variable selects the spec-spine binary.
+/// The supervisor sets `STATECRAFT_SPEC_SPINE` in the constructed environment
+/// from its own selection, and a value in the operator's environment, under
+/// either name, neither reaches the session nor changes what is selected.
+#[test]
+fn a_managed_run_replaces_an_inherited_spec_spine_selection_with_the_supervisors() {
+    let f = Fixture::new();
+    let inherited = f.dir.path().join("inherited-spec-spine");
+    executable(
+        &inherited,
+        "#!/bin/sh\necho inherited >> \"$0.calls\"\nexit 3\n",
+    );
+    let inherited_s = inherited.display().to_string();
+    let out = f.cli_with(
+        &["run", &f.root(), RUN, "--json"],
+        &[
+            ("STATECRAFT_SPEC_SPINE", inherited_s.as_str()),
+            ("SPEC_SPINE_BIN", inherited_s.as_str()),
+        ],
+    );
+    assert_eq!(code(&out), 0, "{}", text(&out));
+    let env = String::from_utf8(f.received("received-env")).unwrap();
+    let values: Vec<&str> = env
+        .lines()
+        .filter_map(|l| l.strip_prefix("STATECRAFT_SPEC_SPINE="))
+        .collect();
+    assert_eq!(
+        values,
+        [f.bin().join("spec-spine").display().to_string()],
+        "{env}"
+    );
+    assert!(
+        !env.lines().any(|l| l.starts_with("SPEC_SPINE_BIN=")),
+        "the retired name reached the session: {env}"
+    );
+    assert!(
+        !f.dir.path().join("inherited-spec-spine.calls").exists(),
+        "the operator's binary was invoked"
+    );
 }

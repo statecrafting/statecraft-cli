@@ -1351,6 +1351,47 @@ versions of it. Spec `002`'s entry was adopted as its Part 9 step 1 on
 2026-09-24; that adoption does not reach this spec, whose part (Part 9 step
 4, H-5) is still not adopted here.
 
+**2026-09-25: let chains collapsed with the measured rust-version floor.**
+The workspace floor moved from 1.85, which never built, to 1.88 (evidence in
+spec `002` section 5, same date). Clippy's `collapsible_if` then applies let
+chains, and the nested `if` blocks it named in this spec's crates were
+collapsed mechanically by `cargo clippy --fix` and `cargo fmt`. No behavior
+changed.
+
+**2026-09-25: attest-ledger is the crates.io release `=0.1.0`, not the git
+revision (owner, 2026-09-25).** `attest-ledger-core` and `attest-ledger-types`
+0.1.0 are published on crates.io, so the move the 2026-09-16 entry left as its
+own change is made. Diffed before switching: both published crates record
+their source commit as `23803ab` (`.cargo_vcs_info.json`), the parent of the
+pinned `a9c3595`. Every file of `crates/core` and `crates/types` at `a9c3595`
+is byte-identical to the published package (each crate's `Cargo.toml.orig`
+included), except that the package adds the workspace `README.md`. The whole of
+`23803ab..a9c3595` is metadata: the workspace `repository` and `homepage` move
+from `stagecraft-ing` to `statecrafting`, one line each in `README.md`,
+`CHANGELOG.md` and the bootstrap spec, and editor files. So the published
+crates carry the old organisation in their `repository` field, and the code this
+crate links is unchanged. The pin is exact (`=0.1.0`) because the record hash
+is this crate's persisted format; the lock records the registry checksums.
+The comparison is reproducible without trusting the published metadata: fetch
+`https://crates.io/api/v1/crates/<crate>/0.1.0/download` for both crates and
+unpack them, `git archive a9c3595` from `statecrafting/attest-ledger`, then
+`diff -r` each of `crates/core` and `crates/types` against its package,
+excluding only the files `cargo package` generates (`Cargo.toml`,
+`Cargo.toml.orig` compared separately, `.cargo_vcs_info.json`, `Cargo.lock`).
+Measured on 2026-09-25: no difference except the added `README.md`. The
+`.cargo_vcs_info.json` commit is corroborating, not the evidence; the evidence
+is the file comparison against the pinned revision itself.
+
+**2026-09-25: the candidate test names its binary with
+`STATECRAFT_SPEC_SPINE`.** Spec `002` section 5's entry of the same day,
+adopted by the owner, makes `STATECRAFT_SPEC_SPINE` the one variable that
+selects a spec-spine binary and retires the others. The ignored
+`tests/producer_candidate.rs` read its binary from `STATECRAFT_PRODUCER_BIN`
+and now reads it from `STATECRAFT_SPEC_SPINE`; `STATECRAFT_PRODUCER_REV` and
+`STATECRAFT_PRODUCER_FIXTURES` stay, because they name a revision and a
+fixture directory, not a binary. What the test checks, and that it is ignored
+by default, are unchanged.
+
 ## Verification
 
 Each line is one command. §3.8's twenty-two rows are integration tests named after

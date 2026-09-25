@@ -572,9 +572,11 @@ fn contract_1_the_sanctioned_compile_is_guarded_on_a_spec_edit() {
 // Contract 2: resolve the binary in order.
 // ---------------------------------------------------------------------------
 
-/// `$SPEC_SPINE_BIN` wins over everything.
+/// Outside a managed session, `$STATECRAFT_SPEC_SPINE` is the operator's
+/// override and wins over everything (section 5, 2026-09-25: one variable
+/// selects the binary).
 #[test]
-fn contract_2_spec_spine_bin_is_preferred() {
+fn contract_2_the_override_is_preferred() {
     for file in [SESSION_START, STOP] {
         let fixture = Fixture::new();
         let named = fixture.root.join("named-spec-spine");
@@ -587,7 +589,10 @@ fn contract_2_spec_spine_bin_is_preferred() {
         );
         fixture.stub(&fixture.path_dir.join("spec-spine"), "path", 0, true);
 
-        fixture.run_project(file, &[("SPEC_SPINE_BIN", &named.display().to_string())]);
+        fixture.run_project(
+            file,
+            &[("STATECRAFT_SPEC_SPINE", &named.display().to_string())],
+        );
         fixture.assert_only_ran("named");
     }
 }
@@ -1781,7 +1786,7 @@ fn pin_an_incompatible_override_refuses_without_fallback() {
         fixture.versioned(&named, "named", "0.24.0", Probe::Admits);
         fixture.versioned(&fixture.on_path(), "path", "0.23.0", Probe::Admits);
         let named_s = named.display().to_string();
-        let out = fixture.run_any(file, &[("SPEC_SPINE_BIN", &named_s)]);
+        let out = fixture.run_any(file, &[("STATECRAFT_SPEC_SPINE", &named_s)]);
         assert_not_performed(file, &out);
         assert!(
             fixture.never_invoked("path"),
@@ -1791,10 +1796,10 @@ fn pin_an_incompatible_override_refuses_without_fallback() {
         assert!(!fixture.invoked("named", "check"));
         let seen = norm(&text(&out));
         for needle in [
-            &format!("SPEC_SPINE_BIN={}", norm(&named_s)) as &str,
+            &format!("STATECRAFT_SPEC_SPINE={}", norm(&named_s)) as &str,
             "reports 0.24.0",
             "=0.23.0",
-            "Unset SPEC_SPINE_BIN",
+            "Unset STATECRAFT_SPEC_SPINE",
             "point it at a binary that satisfies the pin",
         ] {
             assert!(seen.contains(needle), "{file} omits {needle:?}: {seen}");
@@ -1814,7 +1819,7 @@ fn pin_an_override_naming_no_executable_refuses() {
             .join("no-such-spec-spine")
             .display()
             .to_string();
-        let out = fixture.run_any(file, &[("SPEC_SPINE_BIN", &missing)]);
+        let out = fixture.run_any(file, &[("STATECRAFT_SPEC_SPINE", &missing)]);
         assert_not_performed(file, &out);
         assert!(fixture.never_invoked("path"), "{file}: {}", fixture.calls());
         assert!(
@@ -2006,7 +2011,13 @@ fn pin_the_supervisors_binary_is_the_only_candidate() {
         let fixture = pinned_fixture(Some("=0.23.0"));
         fixture.versioned(&fixture.on_path(), "path", "0.23.0", Probe::Admits);
         let gone = fixture.root.join("gone").display().to_string();
-        let out = fixture.run_any(file, &[("STATECRAFT_SPEC_SPINE", gone.as_str())]);
+        let out = fixture.run_any(
+            file,
+            &[
+                ("STATECRAFT_SPEC_SPINE", gone.as_str()),
+                ("STATECRAFT_RUN_ID", "003-x"),
+            ],
+        );
         assert_not_performed(file, &out);
         assert!(fixture.never_invoked("path"), "{file}: {}", fixture.calls());
         assert!(
@@ -2031,6 +2042,208 @@ fn pin_a_managed_session_without_the_supervisors_path_is_only_version_checked() 
             norm(&text(&out)).contains("version-checked, identity not verified"),
             "{file}: {}",
             text(&out)
+        );
+    }
+}
+
+#[path = "support/exits.rs"]
+mod exits;
+
+/// Profile revision 7's family exit contract (0 ok, 1 finding, 2 refused, 3
+/// usage, 4 failed) meets the hook protocol here, and the protocol wins (spec
+/// 002 section 5, 2026-09-25). Claude Code reads a hook's exit 2 as a block
+/// and any other non-zero as a non-blocking error, so an enforcing gate's
+/// finding must exit 2, not 1, or the operation it stands in front of runs
+/// (contract 6); and an advisory hook reports every answer with 0 (the Stop
+/// policy). Every exit a shipped hook states is therefore 0 or 2, both of
+/// which the family contract also names, and no hook can end on a code of
+/// its own: none runs under `set -e`, and each ends on `true`.
+#[test]
+fn every_hook_exit_is_zero_or_the_protocols_block() {
+    let mut seen = 0;
+    for file in ALL {
+        let body = hook_body(file);
+        for e in exits::exit_statements(&body) {
+            seen += 1;
+            assert_eq!(e.verb, "exit", "{file}:{}", e.line);
+            assert!(
+                e.code == "0" || e.code == "2",
+                "{file}:{}: exit {} is neither 0 nor the protocol's block",
+                e.line,
+                e.code
+            );
+        }
+        assert!(
+            !body.lines().any(|l| l.trim_start().starts_with("set -e")),
+            "{file}: set -e would end the hook on a command's own code"
+        );
+        let last = body.lines().rev().find(|l| !l.trim().is_empty()).unwrap();
+        assert_eq!(last.trim(), "true", "{file}");
+    }
+    assert!(seen >= 20, "found only {seen} exit statements");
+}
+
+// ---------------------------------------------------------------------------
+// One variable selects the binary (spec 002 section 5, 2026-09-25).
+// ---------------------------------------------------------------------------
+
+/// The retired name selects nothing: with only `SPEC_SPINE_BIN` set, no hook
+/// invokes the binary it names, the convention candidate judges, and each hook
+/// says the old name was ignored and names the new one.
+#[test]
+fn one_variable_the_retired_name_is_reported_and_never_selects() {
+    for file in ALL {
+        let fixture = pinned_fixture(Some("=0.23.0"));
+        let named = fixture.root.join("named-spec-spine");
+        fixture.versioned(&named, "named", "0.23.0", Probe::Admits);
+        fixture.versioned(&fixture.on_path(), "path", "0.23.0", Probe::Admits);
+        let named_s = named.display().to_string();
+        let out = fixture.run_any(file, &[("SPEC_SPINE_BIN", &named_s)]);
+        assert!(out.status.success(), "{file}: {}", text(&out));
+        assert!(
+            fixture.never_invoked("named"),
+            "{file} selected by the retired name: {}",
+            fixture.calls()
+        );
+        assert!(
+            fixture.invoked("path", "check"),
+            "{file}: {}",
+            fixture.calls()
+        );
+        let seen = norm(&text(&out));
+        assert!(
+            seen.contains(&format!("ignored SPEC_SPINE_BIN={}", norm(&named_s)))
+                && seen.contains("set STATECRAFT_SPEC_SPINE"),
+            "{file} did not report the retired name as ignored: {seen}"
+        );
+        // One complete line, once, and no empty prefixed line after it.
+        let notices: Vec<&str> = seen
+            .lines()
+            .filter(|l| l.contains("ignored SPEC_SPINE_BIN="))
+            .collect();
+        assert_eq!(notices.len(), 1, "{file}: {seen}");
+        assert!(
+            notices[0].ends_with("set STATECRAFT_SPEC_SPINE to choose the binary"),
+            "{file}: {seen}"
+        );
+        assert!(
+            !seen
+                .lines()
+                .any(|l| l.starts_with('[') && l.trim_end().ends_with(']')),
+            "{file} printed an empty prefixed line: {seen}"
+        );
+    }
+}
+
+/// With both names set outside a managed session, the new one is the override
+/// and the old one is neither selected nor reported.
+#[test]
+fn one_variable_the_new_name_overrides_and_the_old_one_is_silent() {
+    for file in ALL {
+        let fixture = pinned_fixture(Some("=0.23.0"));
+        let chosen = fixture.root.join("chosen-spec-spine");
+        let named = fixture.root.join("named-spec-spine");
+        fixture.versioned(&chosen, "chosen", "0.23.0", Probe::Admits);
+        fixture.versioned(&named, "named", "0.23.0", Probe::Admits);
+        fixture.versioned(&fixture.on_path(), "path", "0.23.0", Probe::Admits);
+        let chosen_s = chosen.display().to_string();
+        let named_s = named.display().to_string();
+        let out = fixture.run_any(
+            file,
+            &[
+                ("STATECRAFT_SPEC_SPINE", chosen_s.as_str()),
+                ("SPEC_SPINE_BIN", named_s.as_str()),
+            ],
+        );
+        assert!(out.status.success(), "{file}: {}", text(&out));
+        assert!(
+            fixture.invoked("chosen", "check"),
+            "{file}: {}",
+            fixture.calls()
+        );
+        for other in ["named", "path"] {
+            assert!(
+                fixture.never_invoked(other),
+                "{file} invoked {other}: {}",
+                fixture.calls()
+            );
+        }
+        let seen = norm(&text(&out));
+        assert!(
+            seen.contains(&format!(
+                "judged by {} (0.23.0, override; pin =0.23.0",
+                norm(&chosen_s)
+            )),
+            "{file}: {seen}"
+        );
+        assert!(!seen.contains("ignored SPEC_SPINE_BIN"), "{file}: {seen}");
+    }
+}
+
+/// Outside a managed session the override is put to the pin, which the
+/// supervisor's path is not: the same incompatible binary that a managed
+/// session uses as the supervisor's is refused as an operator's override.
+#[test]
+fn one_variable_outside_a_managed_session_the_value_is_an_override() {
+    for file in ALL {
+        let fixture = pinned_fixture(Some("=0.23.0"));
+        let named = fixture.root.join("named-spec-spine");
+        fixture.versioned(&named, "named", "0.24.0", Probe::Admits);
+        fixture.versioned(&fixture.on_path(), "path", "0.23.0", Probe::Admits);
+        let named_s = named.display().to_string();
+
+        let out = fixture.run_any(file, &[("STATECRAFT_SPEC_SPINE", &named_s)]);
+        assert_not_performed(file, &out);
+        assert!(fixture.never_invoked("path"), "{file}: {}", fixture.calls());
+        assert!(
+            norm(&text(&out)).contains("the override STATECRAFT_SPEC_SPINE="),
+            "{file}: {}",
+            text(&out)
+        );
+
+        let fixture = pinned_fixture(Some("=0.23.0"));
+        let named = fixture.root.join("named-spec-spine");
+        fixture.versioned(&named, "named", "0.24.0", Probe::Admits);
+        fixture.versioned(&fixture.on_path(), "path", "0.23.0", Probe::Admits);
+        let named_s = named.display().to_string();
+        let out = fixture.run_any(
+            file,
+            &[
+                ("STATECRAFT_SPEC_SPINE", named_s.as_str()),
+                ("STATECRAFT_RUN_ID", "003-x"),
+            ],
+        );
+        assert!(out.status.success(), "{file}: {}", text(&out));
+        assert!(
+            fixture.invoked("named", "check"),
+            "{file}: {}",
+            fixture.calls()
+        );
+        assert!(fixture.never_invoked("path"), "{file}: {}", fixture.calls());
+        assert!(
+            norm(&text(&out)).contains("supervisor;"),
+            "{file}: {}",
+            text(&out)
+        );
+    }
+}
+
+/// The retired name's value is quoted on one line: a value carrying a newline
+/// does not inject a line of its own into a hook's output.
+#[test]
+fn one_variable_the_retired_names_value_cannot_inject_a_line() {
+    for file in ALL {
+        let fixture = pinned_fixture(Some("=0.23.0"));
+        fixture.versioned(&fixture.on_path(), "path", "0.23.0", Probe::Admits);
+        let out = fixture.run_any(file, &[("SPEC_SPINE_BIN", "/x\nINJECTED line")]);
+        let seen = text(&out);
+        assert!(
+            !seen.lines().any(|l| l.starts_with("INJECTED")),
+            "{file}: {seen}"
+        );
+        assert!(
+            seen.contains("ignored SPEC_SPINE_BIN=/x INJECTED line: that name is retired"),
+            "{file}: {seen}"
         );
     }
 }

@@ -71,6 +71,13 @@ pub trait Corpus {
         None
     }
 
+    /// How [`Corpus::program`] was found, when a selection found it: the rule
+    /// word of [`crate::spec_spine::Rule`]. `None` leaves the report to say
+    /// `path` for a bare name and `explicit` for a path.
+    fn found_by(&self) -> Option<String> {
+        None
+    }
+
     /// Whether the tool is there and carries `check`, asked before anything is
     /// run (spec 002 section 3.23, contract 5). `Err` carries the answer that
     /// says why not.
@@ -120,12 +127,16 @@ pub enum Ran {
 pub struct SpecSpineCommand {
     /// The binary to run.
     pub program: String,
+    /// The rule that selected it (spec 002 section 5, 2026-09-25), when a
+    /// selection did; `None` for a program named directly.
+    pub found_by: Option<String>,
 }
 
 impl Default for SpecSpineCommand {
     fn default() -> Self {
         Self {
             program: "spec-spine".to_string(),
+            found_by: None,
         }
     }
 }
@@ -209,6 +220,9 @@ impl Corpus for SpecSpineCommand {
     }
     fn program(&self) -> Option<String> {
         Some(self.program.clone())
+    }
+    fn found_by(&self) -> Option<String> {
+        self.found_by.clone()
     }
     fn version(&self) -> Option<String> {
         let output = std::process::Command::new(&self.program)
@@ -521,23 +535,29 @@ pub struct ObservedExecutable {
     pub program: String,
     /// The version it answered to `--version`, or `not-recorded`.
     pub version: String,
-    /// `path` when the program is a bare name resolved through `PATH`,
-    /// `explicit` when it names a file, `not-recorded` otherwise.
+    /// The selection rule that found it (`supervisor`, `override`,
+    /// `repository-build` or `path`; spec 002 section 5, 2026-09-25) when a
+    /// selection did. Otherwise `path` when the program is a bare name
+    /// resolved through `PATH`, `explicit` when it names a file, and
+    /// `not-recorded` when none was named.
     pub found_by: String,
 }
 
 impl ObservedExecutable {
     fn of(corpus: &dyn Corpus) -> Self {
         let program = corpus.program();
-        let found_by = match &program {
-            Some(p) if p.contains('/') => "explicit",
-            Some(_) => "path",
-            None => NOT_RECORDED,
-        };
+        let found_by = corpus.found_by().unwrap_or_else(|| {
+            match &program {
+                Some(p) if p.contains('/') => "explicit",
+                Some(_) => "path",
+                None => NOT_RECORDED,
+            }
+            .to_string()
+        });
         Self {
             program: program.unwrap_or_else(|| NOT_RECORDED.to_string()),
             version: corpus.version().unwrap_or_else(|| NOT_RECORDED.to_string()),
-            found_by: found_by.to_string(),
+            found_by,
         }
     }
 }
@@ -1171,13 +1191,13 @@ fn plan_setup(
         derived_dir: project::DERIVED,
     })
     .map_err(refused)?;
-    if let Some(approved) = &ctx.setup.plan {
-        if *approved != plan.plan_identity {
-            return Err(refused(format!(
-                "the approved setup plan {approved} is not the plan now, {}: an input changed after it was planned",
-                plan.plan_identity
-            )));
-        }
+    if let Some(approved) = &ctx.setup.plan
+        && *approved != plan.plan_identity
+    {
+        return Err(refused(format!(
+            "the approved setup plan {approved} is not the plan now, {}: an input changed after it was planned",
+            plan.plan_identity
+        )));
     }
     Ok(Some(plan))
 }
@@ -1505,14 +1525,15 @@ fn run(ctx: &Context<'_>, mode: Mode) -> Report {
         report.mutations = rec.list;
         return report.finish(false);
     }
-    if writing && corpus_done {
-        if let Err(e) = progress(&mut rec, ctx.root, Step::Corpus, &now) {
-            stop_failed!(
-                Step::Corpus,
-                e,
-                "the initialization's progress could not be recorded"
-            );
-        }
+    if writing
+        && corpus_done
+        && let Err(e) = progress(&mut rec, ctx.root, Step::Corpus, &now)
+    {
+        stop_failed!(
+            Step::Corpus,
+            e,
+            "the initialization's progress could not be recorded"
+        );
     }
 
     // 7. register. Registration and qualification, and then it stops: arming
@@ -1544,14 +1565,15 @@ fn run(ctx: &Context<'_>, mode: Mode) -> Report {
     };
     let registered = register_report.state.done();
     report.steps.push(register_report);
-    if writing && registered {
-        if let Err(e) = progress(&mut rec, ctx.root, Step::Register, &now) {
-            stop_failed!(
-                Step::Register,
-                e,
-                "the initialization's progress could not be recorded"
-            );
-        }
+    if writing
+        && registered
+        && let Err(e) = progress(&mut rec, ctx.root, Step::Register, &now)
+    {
+        stop_failed!(
+            Step::Register,
+            e,
+            "the initialization's progress could not be recorded"
+        );
     }
 
     // Delivery is evaluated after the files are in place, because the whole

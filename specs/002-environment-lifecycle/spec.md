@@ -7900,6 +7900,329 @@ before it merges, as revision 5's implementation entry says. From the next
 pull request on, a change to any authority-set file here blocks without that
 approval.
 
+**2026-09-25: the declared `rust-version` is 1.88, the measured floor, and
+the let chains it permits are applied (owner, 2026-09-25, "check this
+repository's declared rust-version and fix it with evidence").** The root
+`Cargo.toml` declared 1.85, and it never built: under 1.87.0,
+`cargo check --workspace --all-targets --locked --keep-going` fails in two
+dependencies, `spec-spine-core` 0.25.0 (18 errors) and `attest-ledger-core`
+(1 error), each `E0658` on a let chain, which stabilised in 1.88; both
+dependencies declare 1.85 themselves. Under 1.88.0, 1.89.0 and 1.90.0 the
+same check passes, and `cargo +1.88.0 build --workspace --all-targets
+--locked` finishes. The pinned toolchain in `rust-toolchain.toml` (1.96.0) is
+unchanged and is still not the floor. Raising the floor makes clippy's
+`collapsible_if` suggest let chains, so the nested `if` blocks it names across
+`statecraft-adapter`, `statecraft-cli`, `statecraft-envelope`,
+`statecraft-environment`, `statecraft-home` and `statecraft-run` were
+collapsed by `cargo clippy --fix` and `cargo fmt`, with no other edit; the one
+comment explaining why a let chain was avoided (`plan.rs`) is removed with the
+reason it gave. Nothing checks the floor in CI, which is how 1.85 survived;
+adding such a check is a change to the check suite and is left to the owner.
+spec-spine 0.26.0 declares 1.90, so adopting it raises this floor again.
+
+**2026-09-25: profile revision 7, one exit contract for every rendered
+script, and declared extra required jobs (owner, 2026-09-25).** Two owner
+decisions, one revision; everything else in revision 6 is unchanged.
+
+1. **The family exit contract.** Every script the profile renders, and every
+   `run:` step of its workflows, exits in the vocabulary spec `006` section 3.3
+   fixes for this product: 0 ok, 1 a finding, 2 refused (a precondition the
+   operator supplies was not met, and nothing was judged), 3 usage, 4 failed
+   (an operation that was attempted broke). The three known defects are
+   corrected: a `gate.sh` usage error exits 3 (was 64); a missing
+   `.tooling/bin/spec-spine` exits 2 (was 3), because an absent binary is a
+   prerequisite the operator installs, which is how section 3.23's translation
+   table already reads it; an absent or non-executable declared
+   authored-content script exits 2 (was 1), the same reasoning.
+
+   Every exit was inventoried, including the implicit paths. What changed:
+
+   | Script | Condition | Was | Now |
+   |---|---|---|---|
+   | `gate.sh` | usage, unknown mode | 64 | 3 |
+   | `gate.sh` | an input unset (`${X:?}`, the shell's own 1 or 2) | 1 or 2 | 3 |
+   | `gate.sh` | spec-spine not installed | 3 | 2 |
+   | `gate.sh` | declared authored-content script absent or not executable (here or at the base) | 1 | 2 |
+   | `gate.sh` | base commit unreadable | 1 | 2 |
+   | `gate.sh` | queue ref names no pull request; `text` given another event | 1 | 3 |
+   | `gate.sh` | a spec-spine verb (passed through) | its own | the table below |
+   | `gate.sh` | the authored-content script (passed through) | its own | 1 on any non-zero |
+   | `gate.sh` | a cargo verb failed (passed through, 101 for tests) | cargo's | 1 |
+   | `gate.sh` | no cargo on `PATH` | 1 | 2 |
+   | `gate.sh` | `cargo metadata` failed | 1 | 4 |
+   | `gate.sh`, `install-spec-spine.sh` | any other command `set -e` stopped on (git, gh, mktemp, `cargo install`) | its own | 4 |
+   | `install-spec-spine.sh` | no cargo; install failed; the installed binary does not answer | 127, 101, its own | 2, 4, 4 |
+   | `ci-gate.sh` | no policy; the policy states no rule for the event (`stop`) | 1 | 2 |
+   | `ci-gate.sh` | an input unset | 1 | 3 |
+   | `ci-gate.sh`, `ai-review.sh` | any command `set -e` stopped on | its own | 4 |
+   | `ai-review.sh` | credential unset; the provider refused it; the head moved | 1 | 2 |
+   | `ai-review.sh` | the review was attempted and produced no review of this subject | 1 | 4 |
+   | workflow "Read the gate at the base" | base commit unreadable | 1 | 2 |
+
+   Unchanged: `ci-gate.sh` blocks with 1, a finding, as do a base that is not
+   the default branch, a refused commit in the walk and a violation the
+   authored-content script finds; `pin` and an absent or ranged pin in the
+   installer already refused with 2.
+
+   **Child codes are translated, never passed through.** Each deliberate
+   non-zero exit is a literal. The sh scripts carry an EXIT trap that reports
+   any other ending as 4, and every deliberate exit clears it first (`leave`);
+   the bash scripts run under `set -eEuo pipefail` with an ERR trap that exits
+   4. So a command that broke is 4 whatever its own code was, and no child's
+   code leaves a script untranslated. spec-spine's codes are translated by one
+   table in `gate.sh` (`spec_spine`), under the 0.25.0 pin: 0 is 0; 1 (a
+   validation failure, or coupling drift) is 1; 2 (stale) is 1, a finding; 3
+   (I/O, parse, schema, config or usage, which includes a pin the binary does
+   not satisfy) is 4, as section 3.23's table reads it; any other code is 4.
+   spec-spine 0.26.0 moves stale to 1 and a pin mismatch to 2 and adds 4
+   failed; its adoption rewrites those rows of that one table and nothing
+   else. cargo's codes do not separate a failing test from a failing tool (101
+   is both), so a cargo verb that ran and failed is a finding; the declared
+   authored-content script is the project's, with its own codes, so any
+   non-zero answer from it is a finding.
+
+   Two latent defects the inventory found are closed with it. `gate.sh
+   couple-group` piped `git diff` and `gh api` into `sort` in a shell without
+   `pipefail`, so a failed read was an empty path list, and an empty group
+   list honoured the pull request's waiver; each read is now its own command.
+   `ci-gate.sh` read its required jobs through a process substitution, whose
+   failure is not seen, and an empty set passes; the set is now read into a
+   file first.
+
+   **The hooks keep the hook protocol, and the conflict is recorded.** Claude
+   Code reads a hook's exit 2 as a block and any other non-zero as a
+   non-blocking error. The family contract would give an enforcing gate's
+   finding (a stale tree, a coupling failure) exit 1, which Claude Code does
+   not block on, so the operation the gate stands in front of would run: that
+   breaks section 3.23's contract 6. The protocol wins. The four shipped hooks
+   exit only 0 or 2, both codes the family also names, and are unchanged: the
+   pre-bash gates block with 2 on every refusal and every finding, and the
+   advisory hooks (session start, post-edit, stop) report every answer with 0,
+   which is the Stop policy. None runs under `set -e` and each ends on `true`,
+   so none can end on a command's own code.
+
+2. **Declared extra required jobs.** An adopter can have checks beyond the
+   profile's that must stay required. Rahi, measured read-only on 2026-09-25:
+   its `ci.yml` holds its `ci-gate` with `govern` (a reusable workflow call),
+   `cargo` and `deny` (cargo-deny); `live.yml`, `release.yml` and `image.yml`
+   are separate workflows it keeps outside its gate by its own decisions.
+   The rendered `statecraft-ci.yml` is managed, so a project cannot add a job
+   to it by hand, and `ci-gate` cannot `needs:` a job in another workflow file.
+   The parameter is therefore `ci.extra_required_jobs`, a list of
+   `{"job": <id>, "workflow": ".github/workflows/<file>.yml"}`: each entry is
+   rendered as a job of `statecraft-ci.yml` that calls the project's own
+   reusable workflow (`on: workflow_call`), `ci-gate` needs it, and the policy
+   requires it on every event with the `required` rule, so failed, cancelled,
+   skipped and vanished all block exactly as for the profile's own jobs. A job
+   id is GitHub's shape, unique, and none of the profile's own
+   (`governance`, `code`, `ai-review`, `review-exception`, `ci-gate`); a
+   workflow is a `.yml` or `.yaml` file directly under `.github/workflows/`
+   (GitHub calls nothing deeper), not one the profile renders, and must exist
+   when the plan is made. No secret is passed and the workflow's default
+   permissions (`contents: read`) apply; a job that needs more is a later
+   revision's parameter. The called workflow is under `.github/workflows/`,
+   so revision 6 already puts it in the authority set. What `ci-gate` judges
+   is the calling job's result as GitHub reports it: a condition the project
+   writes inside its called workflow is the project's, and a check that must
+   stay required should not skip itself there. With nothing declared,
+   `ci-gate` needs exactly revision 6's four jobs. For rahi,
+   `deny` fits as declared (moved into a reusable workflow); its `cargo` job is
+   what the profile's `code` job already runs. Adopting it there is rahi's
+   change and the owner's decision.
+
+3. **The exact-pin default for new projects is not in this revision.** It
+   waits for spec-spine 0.26.0's
+   `scaffold_init_opts_json(cfg, {"pinExactVersion": true})`, which is the
+   governance producer's scaffold (`producer.rs`), not a profile byte. A
+   profile revision is content-addressed, and leaving 7 open to change later
+   would give one revision two identities, so revision 7 is closed at this
+   identity. The pin default lands with the 0.26.0 adoption as a producer
+   change; if it turns out to need a profile byte, that is revision 8.
+
+Acceptance obligations, as tests. `setup_workflows.rs`:
+`every_exit_a_rendered_script_states_is_in_the_family_contract` parses every
+rendered script and workflow step for exit statements, requires each code in
+0 to 4, and requires the trap on each script and no `${X:?}` check;
+`the_rendered_gate_exits_in_the_family_contract` runs the rendered `gate.sh`
+for the three defects (3, 2, 2), every spec-spine translation row, cargo's
+three cases and a broken command (4);
+`the_rendered_installer_exits_in_the_family_contract`;
+`a_declared_extra_job_is_required_like_the_profiles_own` (rendering, policy,
+and failed, cancelled, skipped and vanished blocking);
+`inverting_a_required_job_branch_is_noticed_by_the_declared_job_cases`, the
+mutation obligation for declared jobs; the existing ci-gate and AI-review
+cases carry the new codes. `harness_hooks.rs`:
+`every_hook_exit_is_zero_or_the_protocols_block`. `setup_upgrade.rs`:
+`a_revision_six_project_upgrades_to_revision_seven`, from revision 6's
+`gate.sh` as shipped (#144), kept in
+`crates/statecraft-home/tests/support/profile-r6/`. `setup.rs`:
+`extra_required_jobs_are_validated`. The upgrade is one re-render and an
+authority change, so it waits for the owner's approval once.
+
+**2026-09-25: one environment variable selects the spec-spine binary (owner
+Addendum 2, item N; amends section 3.23 contract 2 rules 2 and 5). Proposed
+2026-09-24; adopted by the owner, 2026-09-25.** The owner's words: "#119 N
+(one spec-spine selection variable): adopted; land it now." This change
+implements it; the implementation choices follow the adopted text.
+
+*Today three names do one job.* Measured at main `17dbdb6`:
+
+| Variable | Read by | Meaning today |
+|---|---|---|
+| `SPEC_SPINE_BIN` | the four delivered hooks (`crates/statecraft-home/harness/hooks/statecraft-{session-start,pre-bash,post-edit,stop}.sh`), 16 lines each; `harness_hooks.rs`; this section's contract 2 rule 2 | operator override, unmanaged use; the only candidate when set |
+| `STATECRAFT_SPEC_SPINE` | the same four hooks; contract 2 rule 5; the bundle entry (P2.1, H-13) | the supervisor's resolved executable in a managed session; no Rust source sets it yet |
+| `STATECRAFT_PRODUCER_BIN` | `crates/statecraft-run/tests/producer_candidate.rs` only (three `#[ignore]` tests, with `STATECRAFT_PRODUCER_REV` and `STATECRAFT_PRODUCER_FIXTURES`) | the exact producer build an operator-run candidate test judges |
+
+This repository's `Makefile` variable `SPEC_SPINE` is a fourth spelling, but
+it is the check surface's own, unclaimed, and not read by the product; aligning
+it is a separate authority change and not proposed here.
+
+*Adopted: `STATECRAFT_SPEC_SPINE` is the one variable*, namespaced as this
+product's, with this precedence:
+
+1. **In a managed session** (the launch named a run in `STATECRAFT_RUN_ID`),
+   the supervisor always sets `STATECRAFT_SPEC_SPINE` in the constructed
+   environment, overwriting any inherited value, so an operator's shell value
+   cannot reach a managed hook. It is the only candidate (rule 5 unchanged in
+   substance).
+2. **Outside a managed session**, a non-empty `STATECRAFT_SPEC_SPINE` is the
+   operator override of rule 2: the only candidate, no fallback, named with its
+   path, version, the pin and the two remedies.
+3. **Otherwise** the convention candidates of rule 3, then rule 4 for an
+   unpinned repository, unchanged.
+4. **The retired names are reported, never read.** A hook that finds
+   `SPEC_SPINE_BIN` set and `STATECRAFT_SPEC_SPINE` unset says the old name
+   was ignored and names the new one; it never selects by it. The candidate
+   tests read `STATECRAFT_SPEC_SPINE` (the revision and fixtures variables
+   stay, since they name different things).
+
+*Cost, stated.* An operator or script that sets `SPEC_SPINE_BIN` for
+Statecraft's hooks loses the override silently in behavior, loudly in output
+(rule 4). Rahi's own copied hooks read `SPEC_SPINE_BIN` and are untouched:
+this changes only what Statecraft delivers, and the migration order (Statecraft
+delivers, the adopter confirms loop and hooks live, then copies are removed)
+is unchanged. The one-variable rule is what lets rule 1's overwrite be the
+whole isolation argument, instead of two variables whose precedence a reader
+must remember.
+
+*Acceptance at implementation.* `harness_hooks.rs`: with only
+`SPEC_SPINE_BIN` set, no hook selects it and each names it as ignored; with
+`STATECRAFT_SPEC_SPINE` set outside a managed session, the override rules of
+contract 2 rule 2 hold unchanged; in a managed session an inherited value is
+replaced by the supervisor's. `producer_candidate.rs` reads the new name.
+
+*Implemented.* The four hooks carry the new resolver, the same block in each.
+`harness_hooks.rs` renames the override in the existing contract 2 tests and
+adds three: the retired name alone is never invoked and is reported as
+ignored; with both names set outside a managed session the new one judges as
+`override` and the old one is not mentioned; and the same incompatible binary
+is refused as an operator's override but used as the supervisor's inside a
+managed session. The selection rule is also a library function,
+`crates/statecraft-home/src/spec_spine.rs`, with unit tests, so a verb this
+product runs and a hook it delivers choose from the same inputs by the same
+rule. `run_startup.rs` asserts the value a managed session receives and that
+an operator's value under either name neither reaches it nor is invoked;
+`provenance.rs` covers initialization. Choices the entry left open, recorded
+here:
+
+- **The supervisor's selection is rule 3, then rule 4, and nothing else.** It
+  reads neither name from the operator's environment and searches the `PATH`
+  the child is given, so rule 1's overwrite holds by construction: the
+  constructed environment never carried an inherited value, and both names
+  are removed from the binding before the supervisor's value is added, or
+  before nothing is added when no candidate exists. A
+  digest-verified identity is still the bundle proposal's; nothing here
+  verifies one, and the hooks read the supervisor's path as rule 5 says.
+- **Candidates that exist with none the project admits refuse the attempt**
+  before its intent is written, under the guard `spec-spine-selection`,
+  naming each candidate passed over. **No candidate at all sets no value**, so
+  the hooks keep the absent-binary behavior rule 3 leaves unchanged; "always
+  sets" is read as always whenever there is a binary to hand.
+- **Initialization follows the same rule.** `init plan` and `init apply`
+  selected nothing: they ran a bare `spec-spine` from `PATH` for the corpus
+  step and the qualification probe (F2's first two rows). They now select by
+  rules 1 to 4 for the project being initialized; a selection that finds
+  candidates and admits none makes the corpus step refused and the
+  qualification unavailable, with a new unavailability, `not-selected`,
+  translated as a refusal like an absent binary. An initialization under a
+  pin the `PATH` binary does not satisfy is therefore `partial`, exit 1, where
+  it was `complete`. The other rows of F2 are unchanged and remain the bundle
+  proposal's.
+- **`observedSpecSpine` names the rule.** Its `program` is the selected path
+  and its `foundBy` is the rule's word (`supervisor`, `override`,
+  `repository-build`, `path`), where the 2026-09-24 provenance entry said
+  `path` for a bare name. A caller that names a program directly keeps that
+  entry's words.
+- **Initialization does not withhold its compile in an unpinned project.**
+  Rule 4's withheld compile is contract 1's exception, which is a hook's;
+  initialization's compile is its own step 6, and a new project is unpinned by
+  the producer's scaffold, so applying it there would withhold every first
+  compile.
+- **The notice is one line**, "ignored SPEC_SPINE_BIN=<value>: that name is
+  retired and selects nothing; set STATECRAFT_SPEC_SPINE to choose the
+  binary", printed with the lines naming candidates passed over, which for the
+  pull-request gate is standard error. A newline or carriage return in the
+  value is printed as a space, so the value cannot add a line of its own.
+- **A version is read only from a `--version` call that exits 0**, in the
+  hooks and in the library alike; a binary whose version call fails reports
+  no version, which an exact pin reads as "not performed". The hooks read the
+  first line whatever the exit status before this entry.
+- **A managed session without the supervisor's path** keeps rule 5's
+  fallback to rules 1 to 4 and its "version-checked, identity not verified"
+  report; a value outside a managed session is an override and is put to the
+  pin.
+- Entries above that name `$SPEC_SPINE_BIN` record what was true when they
+  were written and are not rewritten.
+
+**2026-09-25: revision 7's `gate.sh` reads spec-spine's exit table by the
+pinned release (owner, 2026-09-25: adopters render once, at revision 7, with
+`=0.26.0`).** Revision 7 as merged translated spec-spine's codes with one
+table, 0.25.0's. Measured the same day against the published 0.26.0 in a
+disposable clone of `main`: stale moves from 2 to 1, a pin not met from 3 to
+2, and an invalid corpus stays 1, on `check --fail-on-warn`, `lint
+--fail-on-warn`, `index check --fail-on-unresolved`, `index coverage
+--fail-on-untraced` and `compile --check`; an unknown verb stays 3. Under the
+single table a 0.26.0 pin mismatch would have read as a finding, not a
+refusal, and adopting 0.26.0 would have needed a second rendering. The table
+is now chosen by the release `spec-spine.toml` pins (the binary's `--version`
+when no pin is readable): below 0.26.0 the old rows, from 0.26.0 spec-spine's
+132 contract, which is this family's, with a usage error from the gate's own
+fixed invocation read as the gate failing (4) under both. This stays
+revision 7: no repository had merged a revision-7 rendering (this
+repository's re-render was still open), so no recorded digest names the
+earlier text. `the_rendered_gate_exits_in_the_family_contract` asserts both
+tables on the rendered script.
+
+**2026-09-25: spec `006`'s JSON naming convention, this spec's half (adopted by
+the owner on 2026-09-25; spec `006` section 5 of that date).** Two changes to
+this spec's crates, and what stays.
+
+*Renamed to camelCase*, each a `--json` answer only, written nowhere and read by
+no other repository: `transfer::Plan` and `transfer::Standing`
+(`manifestDigest`, `recordedWithoutJournal`, `journalDisagreements`,
+`recordedDigest`, `matchesRecord`, `declaredBy`), with **`plan_id` kept** by
+an explicit rename because this spec and spec `006` name it;
+`producer::Conformance` (`outOfContract`); and the struct-variant fields of
+`authority::Answer`, `ignore::Refusal`, `settings::Removal` and
+`settings::SettingsOutcome` (`rename_all_fields = "camelCase"`).
+
+*Strict within a version.* `home.json` and `tools.json` (`home::Personal`,
+`home::Tools`, `home::ToolRecord`) refuse an unknown member under version 1,
+naming it, and a file that declares another version is refused by that number
+before any member is read, so a file from a newer build never reads as a
+malformed one. Neither document has lost a member since it was introduced, so
+no file this product wrote is refused. Tests: `home::tests::an_unknown_member_under_the_current_version_is_refused_by_name`,
+`a_newer_version_is_refused_by_its_version_not_by_its_new_members` and
+`what_this_build_writes_reads_back_strictly`.
+
+*Grandfathered, not renamed:* the environment manifest and transfer journal
+(including `project.setup`'s parameters), the setup profile's six result names
+(this spec's results table names them in kebab-case), the register's
+data-carrying qualification reasons, and the startup and trial records.
+*Not made strict:* `projects.json`, `delivery.json` and `modifications.json`
+carry no schema version, so a refusal could only name a field; each needs a
+version first.
+
 ## Verification
 
 `--fail-on-untraced` joined the corpus gate with this spec's first

@@ -197,6 +197,7 @@ impl Identity {
 
 /// Whether the producer stayed inside the contract set.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct Conformance {
     /// Who answered.
     pub producer: Identity,

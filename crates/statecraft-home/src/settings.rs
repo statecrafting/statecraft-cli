@@ -629,7 +629,11 @@ pub fn write_atomically(path: &Path, contents: &str) -> std::io::Result<()> {
 
 /// What removal did, or would do.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
-#[serde(rename_all = "kebab-case", tag = "outcome")]
+#[serde(
+    rename_all = "kebab-case",
+    rename_all_fields = "camelCase",
+    tag = "outcome"
+)]
 pub enum Removal {
     /// The region was present and intact, and is taken back out.
     Removed {
@@ -717,7 +721,11 @@ pub enum Intent {
 
 /// What the settings modification did, or would do.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
-#[serde(rename_all = "kebab-case", tag = "state")]
+#[serde(
+    rename_all = "kebab-case",
+    rename_all_fields = "camelCase",
+    tag = "state"
+)]
 pub enum SettingsOutcome {
     /// This harness has no settings file to modify here.
     NotApplicable {
@@ -1930,43 +1938,42 @@ fn unsplice(
         // A container this product filled and that the removal emptied comes
         // out with the region rather than being left as residue.
         let root = root_span(&out)?;
-        if let Some(span) = locate(&out, root, &["hooks", &hook.event]) {
-            if array_elements(&out, span).is_empty() {
-                out = remove_member(&out, root_span(&out)?, &["hooks", &hook.event]);
-                emptied.push(format!("hooks.{}", hook.event));
-            }
+        if let Some(span) = locate(&out, root, &["hooks", &hook.event])
+            && array_elements(&out, span).is_empty()
+        {
+            out = remove_member(&out, root_span(&out)?, &["hooks", &hook.event]);
+            emptied.push(format!("hooks.{}", hook.event));
         }
         let root = root_span(&out)?;
-        if let Some(span) = locate(&out, root, &["hooks"]) {
-            if object_members(&out, span).is_empty() {
-                out = remove_member(&out, root_span(&out)?, &["hooks"]);
-                emptied.push("hooks".into());
-            }
+        if let Some(span) = locate(&out, root, &["hooks"])
+            && object_members(&out, span).is_empty()
+        {
+            out = remove_member(&out, root_span(&out)?, &["hooks"]);
+            emptied.push("hooks".into());
         }
     }
 
-    if let Some(run) = deny_run {
-        if !run.is_empty() {
+    if let Some(run) = deny_run
+        && !run.is_empty()
+    {
+        let root = root_span(&out)?;
+        if let Some(span) = locate(&out, root, &["permissions", "deny"]) {
+            for _ in run.clone() {
+                let span = locate(&out, root_span(&out)?, &["permissions", "deny"]).unwrap_or(span);
+                out = remove_from_array(&out, span, run.start);
+            }
             let root = root_span(&out)?;
-            if let Some(span) = locate(&out, root, &["permissions", "deny"]) {
-                for _ in run.clone() {
-                    let span =
-                        locate(&out, root_span(&out)?, &["permissions", "deny"]).unwrap_or(span);
-                    out = remove_from_array(&out, span, run.start);
-                }
+            if let Some(span) = locate(&out, root, &["permissions", "deny"])
+                && array_elements(&out, span).is_empty()
+            {
+                out = remove_member(&out, root_span(&out)?, &["permissions", "deny"]);
+                emptied.push("permissions.deny".into());
                 let root = root_span(&out)?;
-                if let Some(span) = locate(&out, root, &["permissions", "deny"]) {
-                    if array_elements(&out, span).is_empty() {
-                        out = remove_member(&out, root_span(&out)?, &["permissions", "deny"]);
-                        emptied.push("permissions.deny".into());
-                        let root = root_span(&out)?;
-                        if let Some(span) = locate(&out, root, &["permissions"]) {
-                            if object_members(&out, span).is_empty() {
-                                out = remove_member(&out, root_span(&out)?, &["permissions"]);
-                                emptied.push("permissions".into());
-                            }
-                        }
-                    }
+                if let Some(span) = locate(&out, root, &["permissions"])
+                    && object_members(&out, span).is_empty()
+                {
+                    out = remove_member(&out, root_span(&out)?, &["permissions"]);
+                    emptied.push("permissions".into());
                 }
             }
         }

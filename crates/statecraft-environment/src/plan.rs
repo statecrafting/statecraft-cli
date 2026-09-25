@@ -304,19 +304,15 @@ pub fn plan(
 
                 // Section 3.7.1: a path another installer owns is never written
                 // unless the manifest records an explicit transfer for it.
-                // Written without a let-chain deliberately: those need Rust
-                // 1.88 and this workspace declares an MSRV of 1.85.
-                if !transferred {
-                    if let Some(claimant) = foreign.claimant_of(&file.path) {
-                        out.withheld.push(WithheldWrite {
-                            path: file.path.clone(),
-                            adapter: declaration.name.clone(),
-                            reason: Withholding::Foreign {
-                                claimant: claimant.clone(),
-                            },
-                        });
-                        continue;
-                    }
+                if !transferred && let Some(claimant) = foreign.claimant_of(&file.path) {
+                    out.withheld.push(WithheldWrite {
+                        path: file.path.clone(),
+                        adapter: declaration.name.clone(),
+                        reason: Withholding::Foreign {
+                            claimant: claimant.clone(),
+                        },
+                    });
+                    continue;
                 }
 
                 match (recorded, on_disk) {
