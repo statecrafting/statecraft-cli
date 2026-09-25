@@ -144,8 +144,9 @@ fn an_unmodified_file_is_replaced_and_a_customized_one_is_kept_with_three_digest
     );
 }
 
-const R5_EXCEPTION: &str = "    needs: [governance, ai-review]\n    # The owner exception (S-1): a release candidate whose review was skipped,\n    # (revision 2, R2-1) any pull request whose review returned findings, and\n    # (revision 5, rule 2) any pull request that changes the authority set.\n    if: always() && github.event_name == 'pull_request' && (needs.governance.outputs.authority_change == 'true' || (needs.ai-review.outputs.release_candidate == 'true' && startsWith(needs.ai-review.outputs.result, 'skipped:')) || needs.ai-review.outputs.result == 'findings')";
-const R4_EXCEPTION: &str = "    needs: [ai-review]\n    # The owner exception (S-1): a release candidate whose review was skipped,\n    # and (revision 2, R2-1) any pull request whose review returned findings.\n    if: always() && github.event_name == 'pull_request' && ((needs.ai-review.outputs.release_candidate == 'true' && startsWith(needs.ai-review.outputs.result, 'skipped:')) || needs.ai-review.outputs.result == 'findings')";
+const R4_CI: &str = include_str!("support/profile-r4/statecraft-ci.yml");
+const R4_GATE: &str = include_str!("support/profile-r4/gate.sh");
+const R4_CI_GATE: &str = include_str!("support/profile-r4/ci-gate.sh");
 
 /// Revision 4 of the registered profile, rebuilt from revision 5 by undoing
 /// revision 5's marks in the three templates a managed upgrade compares: the
@@ -157,36 +158,18 @@ fn revision_four() -> Profile {
     let mut r4 = Profile::registered();
     assert_eq!(r4.revision, 5, "the registered profile is revision 5");
     r4.revision = 4;
+    // The three templates revision 5 changed, exactly as revision 4 shipped
+    // them (main at 2c82d9a, before #143), so the simulation is revision 4
+    // itself rather than revision 5 with its marks patched out.
     for t in &mut r4.templates {
-        if t.path == ".github/workflows/statecraft-ci.yml" {
-            assert!(t.body.contains(R5_EXCEPTION), "revision 5's exception job");
-            t.body = t.body.replace(R5_EXCEPTION, R4_EXCEPTION);
-            assert!(
-                t.body.contains("sh \"${STATECRAFT_GATE:?}\" "),
-                "revision 5's gate read at the base"
-            );
-            t.body = t.body.replace(
-                "sh \"${STATECRAFT_GATE:?}\" ",
-                "sh scripts/statecraft/gate.sh ",
-            );
-        }
-        if t.path == "scripts/statecraft/gate.sh" {
-            assert!(
-                t.body.contains("script=\"$SELF\""),
-                "revision 5's walk judges with the running gate"
-            );
-            t.body = t.body.replace(
-                "script=\"$SELF\"",
-                "script=\"$wt/scripts/statecraft/gate.sh\"",
-            );
-        }
-        if t.path == "scripts/statecraft/ci-gate.sh" {
-            assert!(
-                t.body.contains("authority=yes"),
-                "revision 5's authority rule"
-            );
-            t.body = t.body.replace("authority=yes", "authority=reported-r4");
-        }
+        let body = match t.path.as_str() {
+            ".github/workflows/statecraft-ci.yml" => R4_CI,
+            "scripts/statecraft/gate.sh" => R4_GATE,
+            "scripts/statecraft/ci-gate.sh" => R4_CI_GATE,
+            _ => continue,
+        };
+        assert_ne!(t.body, body, "{}: revision 5 changed it", t.path);
+        t.body = body.to_string();
     }
     r4
 }

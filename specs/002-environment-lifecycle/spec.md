@@ -7863,6 +7863,18 @@ GitHub runs a candidate's new workflow, which could report a check named
 here. The real `GITHUB_ENV` hand-off between steps is simulated by the test
 harness; the first live run is its evidence.
 
+**2026-09-24: revision 5's review corrections (the first live AI review of
+#143).** (1) In the merge queue an authority change whose recorded review
+could not be read was already blocked, by `recorded_review`'s own refusal, but
+the rule 2 branch said nothing. A second, explicit block there was tried and
+refused by the mutation test as dead code, which confirms the first; the
+branch now says in a comment where the block happens, and a queue case with
+an unreadable pull request proves the authority change is refused. (2) The
+upgrade tests simulated revision 4 by patching revision 5's marks out of its
+templates, which left revision 5's new steps in place. They now use the three
+templates revision 5 changed exactly as revision 4 shipped them (main at
+`2c82d9a`), kept in `crates/statecraft-home/tests/support/profile-r4/`.
+
 ## Verification
 
 `--fail-on-untraced` joined the corpus gate with this spec's first

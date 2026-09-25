@@ -2839,6 +2839,23 @@ fn an_authority_change_blocks_without_the_owner_exception_and_passes_with_it() {
             "{rel}: {}",
             ran.text
         );
+        // A record that cannot be read never admits an authority change:
+        // recorded_review blocks with its reason (the review of #143,
+        // finding 1).
+        let ran = run_queue(
+            &repo,
+            &Queue {
+                pull_fails: true,
+                exception: "success",
+                ..queue("queue, authority change, record unreadable", 1)
+            },
+        );
+        assert_eq!(ran.exit, 1, "{rel}: {}", ran.text);
+        assert!(
+            ran.text.contains("cannot read pull request #7"),
+            "{rel}: {}",
+            ran.text
+        );
         let ran = run_queue(
             &repo,
             &Queue {
