@@ -8284,6 +8284,41 @@ every non-zero code still refuses at the enforcing gate (contract 6).
 `pin_a_refusal_under_the_0_26_0_table_is_decided_by_the_probe` run the shipped
 bodies against the recorded 0.26.0 lines; the 0.25.0 rows are unchanged.
 
+**2026-09-25: profile revision 8, the AI review prefers an API key (owner,
+2026-09-25).** The owner decided that the review bills to Anthropic Console
+credits while that is wanted, and to the subscription otherwise, with no code
+change between the two. `github-actions-rust` revision 8: the reusable review
+workflow declares `ANTHROPIC_API_KEY` beside `CLAUDE_CODE_OAUTH_TOKEN`, both
+optional `workflow_call` secrets, and binds both in the Review step's
+environment; `statecraft-ci.yml` passes both by name and never
+`secrets: inherit`. `ai-review.sh` chooses once, after the visible skips: a
+non-empty `ANTHROPIC_API_KEY` is used and `CLAUDE_CODE_OAUTH_TOKEN` is unset;
+otherwise a non-empty `CLAUDE_CODE_OAUTH_TOKEN` is used and `ANTHROPIC_API_KEY`
+is unset; otherwise the script refuses with 2, naming both secrets and the
+`gh secret set` command for each. `ANTHROPIC_AUTH_TOKEN`, which no workflow
+binds, is unset as well, and the reviewer still runs from an empty directory
+with a temporary `HOME`, so no stored login or settings file supplies another
+credential. The class chosen (`api-key` or `oauth`, never the value) is in the
+job log and in the evidence record as `tool.credential` (`none` on a visible
+skip); ci-gate reads the record's subject and result only, so the field is
+additive. **The choice is made by which secrets a repository can see.** Both
+are organization secrets on `statecrafting` with selected visibility, so the
+owner decides per repository, and removing `ANTHROPIC_API_KEY` from a
+repository's visibility restores subscription billing. A repository-level
+secret of the same name takes precedence over the organization's. The pull
+request that introduces revision 8 into a repository is reviewed by the
+script at its base, which is revision 7 and uses the OAuth token; revision 8
+takes effect from the next pull request. Not changed here: `doctor --remote`
+still asks for a repository-level `CLAUDE_CODE_OAUTH_TOKEN`
+(`repos/{slug}/actions/secrets/...`), which does not see an organization
+secret; that is a separate change. Tested in
+`ai_review_prefers_the_api_key_and_falls_back_to_the_oauth_token` (all four
+cases, with a stub reviewer that records which variable reached it and that
+the others are absent), the caller and declaration assertions of
+`contributor_text_is_never_spliced_into_a_run_scalar`, and
+`a_revision_seven_project_upgrades_to_revision_eight`, against revision 7's
+templates as shipped (`tests/support/profile-r7/`).
+
 **2026-09-25: the delivered hooks read `config error` as a refusal (owner,
 2026-09-25: adopt 0.27.0).** Measured the same day against the published
 0.26.0 and 0.27.0: invalid configuration exits 2 under both and says
