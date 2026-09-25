@@ -229,9 +229,7 @@ jobs:
     permissions:
       contents: read
       pull-requests: write
-    # Revision 8: both credentials, by name; the review prefers the API key.
     secrets:
-      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
       CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
 
   # A release candidate whose review was skipped needs an owner exception,

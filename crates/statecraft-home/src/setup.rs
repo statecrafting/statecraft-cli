@@ -35,15 +35,18 @@ use std::path::Path;
 /// The one registered profile.
 pub const PROFILE_ID: &str = "github-actions-rust";
 /// Its revision.
-pub const REVISION: u32 = 7;
+pub const REVISION: u32 = 8;
 /// Where the rendered policy document lives in the target.
 pub const POLICY_PATH: &str = ".statecraft/setup/github-actions-rust.json";
 /// The resume record, under the project's runtime state.
 pub const RESUME_PATH: &str = ".statecraft/state/setup/apply.json";
 /// Where a customized file's intended bytes are left for a manual merge.
 pub const INTENDED_DIR: &str = ".statecraft/state/setup";
-/// The credential the reviewer needs, by name. Its value is never read here.
+/// The credential the reviewer falls back to, by name. Its value is never read
+/// here.
 pub const CREDENTIAL: &str = "CLAUDE_CODE_OAUTH_TOKEN";
+/// The credential the reviewer prefers when it is set (revision 8), by name.
+pub const PREFERRED_CREDENTIAL: &str = "ANTHROPIC_API_KEY";
 /// The command an operator runs to set it.
 pub const CREDENTIAL_COMMAND: &str = "gh secret set CLAUDE_CODE_OAUTH_TOKEN";
 /// The protected Environment an owner exception is approved on (decision S-1;
@@ -323,7 +326,7 @@ pub fn authority_rule() -> serde_json::Value {
 pub fn remote_obligations() -> Vec<String> {
     vec![
         "Settings, Actions: Actions enabled; the workflow token read-only by default".to_string(),
-        format!("the secret {CREDENTIAL} set by the operator ({CREDENTIAL_COMMAND}); its value is never in a log, a file or a message"),
+        format!("the secret {PREFERRED_CREDENTIAL} or {CREDENTIAL} visible to the repository, set by the operator ({CREDENTIAL_COMMAND}, or gh secret set {PREFERRED_CREDENTIAL}); the review uses {PREFERRED_CREDENTIAL} when it is set and {CREDENTIAL} otherwise (revision 8), and neither value is ever in a log, a file or a message"),
         format!("branch protection on the default branch: require the status check ci-gate from GitHub Actions (app id {GATE_APP_ID}), and branches up to date"),
         "branch protection on the default branch: required approvals 0, and require code-owner review, so ci-gate with the AI review approves ordinary changes and a change to the profile's files needs a review its author cannot give (S-3, R2-2)".to_string(),
         format!("the Environment {EXCEPTION_ENVIRONMENT} with the owner as a required reviewer, for owner exceptions: a release candidate whose review was skipped (S-1), a pull request whose review returned findings (R2-1), and a pull request that changes the authority set (revision 5)"),

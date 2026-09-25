@@ -811,6 +811,49 @@ fn contract_4_each_verdict_is_read_as_itself() {
     }
 }
 
+/// A configuration or containment refusal is exit 2 and never stale (spec 002
+/// section 5, 2026-09-25, "config error is a refusal"). Recorded the same day:
+/// invalid configuration under 0.26.0 and 0.27.0, and 0.27.0's refusals of a
+/// link leaving the repository and of a layout root that is not a plain
+/// relative path (spec-spine's 144).
+#[test]
+fn contract_4_a_configuration_or_containment_refusal_is_never_stale() {
+    let refusals = [
+        "spec-spine: config error: TOML parse error at line 134, column 2\n    |\n134 | [nonsense]\n    |  ^^^^^^^^",
+        "spec-spine: config error: layout.specs_dir 'C:specs' must name a directory inside the repository, and it contains a ':', a drive, drive-relative or stream form on Windows (spec 144). Use a relative path of plain segments",
+        "spec-spine: refused: refused to read the repository: 'docs-outside' is a link to /tmp/outside, outside it (spec 144). A governed read through it would judge content the repository does not hold; remove the link or point it inside the repository",
+    ];
+    for says in refusals {
+        for file in [SESSION_START, STOP] {
+            let fixture = Fixture::new();
+            fixture.stub_saying(&fixture.path_dir.join("spec-spine"), "path", 2, true, says);
+            let seen = text(&fixture.run_project(file, &[]));
+            assert!(seen.contains("NOT READ"), "{file}: {seen}");
+            assert!(
+                !seen.contains("STALE") && !seen.contains("run spec-spine compile"),
+                "{file} read a refusal as stale: {seen}"
+            );
+        }
+        let fixture = Fixture::new();
+        fixture.stub_saying(
+            &fixture.root.join("target/release/spec-spine"),
+            "repo",
+            2,
+            true,
+            says,
+        );
+        let payload = bash_payload("gh pr create --title x --body y", &fixture.root);
+        let out = fixture.run_payload(PRE_BASH, &payload, &[]);
+        let seen = text(&out);
+        assert!(!out.status.success(), "a refusal allowed: {seen}");
+        assert!(seen.contains("refused to judge"), "{seen}");
+        assert!(
+            !seen.contains("is stale"),
+            "the gate read a refusal as stale: {seen}"
+        );
+    }
+}
+
 /// Contract 4 under spec-spine 0.26.0's exit table (spec 002 section 5,
 /// 2026-09-25, "both exit tables"): stale is 1, a refusal to judge is 2 and
 /// names itself, and 4 is a read that failed. Recorded from the published
@@ -914,8 +957,11 @@ fn contract_4_an_unresolved_claim_is_distinguished_from_staleness() {
 
 /// What spec-spine prints for a draft's unresolved claim under the flag:
 /// measured under 0.25.0 (`session10/H4/measure-draft-claim-ahead.txt`), and
-/// byte-identical under 0.26.0 (measured 2026-09-25 for its adoption; both
-/// exit 1).
+/// byte-identical under 0.26.0 and 0.27.0 (measured 2026-09-25 for each
+/// adoption on a clone of this repository, `implementation: in-progress`; all
+/// exit 1). spec-spine's 145 changes only the guarded readers (`couple`,
+/// `index coverage`, `index owner`, `scope`, `delta`), which no hook runs;
+/// `check` still says `UNRESOLVED CLAIM` for a complete spec's claim.
 const REFUSED_UNRESOLVED: &str = "spec-registry: fresh\ncodebase-index: fresh, but REFUSED: 1 unresolved unit diagnostic(s) (--fail-on-unresolved)";
 
 /// Obligation 1: every hook that runs `check` passes the flag, and passing it
