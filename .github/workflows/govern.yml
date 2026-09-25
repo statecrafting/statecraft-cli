@@ -7,13 +7,11 @@ on:
   # GitHub merge queue, the same wiring spec-spine carries. Each queued pull
   # request is checked against the speculative merged tree, so a green branch
   # cannot be silently invalidated by the one ahead of it (two branches adding
-  # the same spec id is the case this repository will hit first). INERT until a
-  # repository admin enables the queue in branch protection.
+  # the same spec id is the case this repository will hit first).
   #
-  # The coupling gate stays `pull_request`-only even here: it reads the
-  # `Spec-Drift-Waiver:` line out of the pull-request body, which a merge_group
-  # event does not carry, so a legitimately waived change would resurface as a
-  # false drift refusal inside the queue.
+  # Enabled on 2026-09-24 (merge method: merge commit). The queue has its own
+  # coupling step, which reads the waiver from the queued pull request through
+  # the API because a merge_group event carries no body; see that step.
   merge_group:
 
 permissions:
@@ -23,6 +21,11 @@ jobs:
   govern:
     name: govern (check · lint · authored content · couple)
     runs-on: ubuntu-latest
+    # `pull-requests: read` is for the merge-queue coupling step, which reads
+    # the queued pull request's changed files and body. Nothing here writes.
+    permissions:
+      contents: read
+      pull-requests: read
     # Every governed read in this job goes through the repository-local binary,
     # so a `spec-spine` that happened to be on the runner's PATH cannot answer
     # for this repository. The same resolution the Makefile does, spelled once.
@@ -139,6 +142,46 @@ jobs:
             --head "$HEAD_SHA" \
             --pr-body "${RUNNER_TEMP}/pr-body.txt"
 
+      # The coupling gate in the merge queue (AGENTS.md, "The merge queue").
+      # The queued candidate is judged, not only the pull request in
+      # isolation: `base_sha...head_sha` of the merge group is this entry's
+      # changes applied on the speculative base it will land on.
+      #
+      # A waiver is read from the entry's own pull request, and honoured only
+      # when the group changes no path that pull request does not change: a
+      # waiver is scoped to the diff the owner granted it for, so a group that
+      # folds in other changes is judged with no waiver at all (it fails
+      # closed rather than widening the waiver). Both path sets are printed so
+      # the log shows which case applied.
+      - name: Coupling gate (merge queue)
+        if: github.event_name == 'merge_group'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          BASE_SHA: ${{ github.event.merge_group.base_sha }}
+          HEAD_SHA: ${{ github.event.merge_group.head_sha }}
+          HEAD_REF: ${{ github.event.merge_group.head_ref }}
+        run: |
+          set -euo pipefail
+          echo "coupling base: $BASE_SHA -> head: $HEAD_SHA ($HEAD_REF)"
+          pr=$(printf '%s' "$HEAD_REF" | sed -n 's|.*/pr-\([0-9][0-9]*\)-[0-9a-f]*$|\1|p')
+          test -n "$pr" || { echo "cannot read the pull request number from $HEAD_REF"; exit 1; }
+          git diff --name-only "$BASE_SHA" "$HEAD_SHA" | sort -u > "$RUNNER_TEMP/group-paths"
+          gh api --paginate "repos/$REPO/pulls/$pr/files" \
+            --jq '.[] | .filename, (.previous_filename // empty)' | sort -u > "$RUNNER_TEMP/pr-paths"
+          echo "group paths: $(wc -l < "$RUNNER_TEMP/group-paths"); pull request #$pr paths: $(wc -l < "$RUNNER_TEMP/pr-paths")"
+          extra=$(comm -23 "$RUNNER_TEMP/group-paths" "$RUNNER_TEMP/pr-paths")
+          body="$RUNNER_TEMP/pr-body.txt"
+          if [ -z "$extra" ]; then
+            gh api "repos/$REPO/pulls/$pr" --jq '.body // ""' > "$body"
+            echo "the group changes only #$pr's paths: its body's waiver, if any, applies"
+          else
+            : > "$body"
+            echo "the group changes paths #$pr does not, so no waiver applies:"
+            printf '%s\n' "$extra"
+          fi
+          "$SS" couple --base "$BASE_SHA" --head "$HEAD_SHA" --pr-body "$body"
+
   # The workspace half of the check surface, as its own job so a clippy failure
   # names clippy in the job list rather than hiding inside the governance job.
   # It runs `make code`, which is the same definition a local run uses: two
@@ -229,20 +272,22 @@ jobs:
   # job a change to CI alone rather than a change to CI and to the protection
   # configuration a human has to remember.
   #
-  # `always()` is what makes it report at all when a dependency failed. A
-  # skipped job counts as a pass (the coupling step is event-gated inside
-  # `govern`, and a future event-gated job would be too); a failed or cancelled
-  # one fails the gate.
+  # `always()` is what makes it report at all when a dependency failed. Every
+  # job it needs must have SUCCEEDED, on every event: a skipped job is not a
+  # pass (AGENTS.md, "The merge queue"). Before the queue was enabled a skip
+  # counted as a pass, which would have let an absent verdict read as a green
+  # one inside the queue. An event-gated check belongs inside a job as a
+  # step, as both coupling steps are, never as a job that can be skipped.
   ci-gate:
     name: ci-gate
     if: ${{ always() }}
     needs: [govern, code]
     runs-on: ubuntu-latest
     steps:
-      - name: Require every job to have passed
-        if: ${{ contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled') }}
+      - name: Require every job to have succeeded
+        if: ${{ needs.govern.result != 'success' || needs.code.result != 'success' }}
         run: |
-          echo "A required job failed or was cancelled:"
+          echo "A required job did not succeed (failed, cancelled or skipped):"
           echo "  govern=${{ needs.govern.result }}  code=${{ needs.code.result }}"
           exit 1
       # A block scalar, not a plain one. `run: echo "ci-gate passed: govern..."`
@@ -251,4 +296,4 @@ jobs:
       # pull request shows no checks at all, which reads as "CI has not started".
       - name: All required jobs passed
         run: |
-          echo "ci-gate passed: govern and code are green or skipped"
+          echo "ci-gate passed: govern and code both succeeded"
