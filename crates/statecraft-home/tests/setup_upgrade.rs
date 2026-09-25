@@ -135,12 +135,36 @@ fn an_unmodified_file_is_replaced_and_a_customized_one_is_kept_with_three_digest
     );
 }
 
-/// Revision 1 of the registered profile, rebuilt from revision 2 by undoing
-/// revision 2's two template changes (the owner exception for a findings
-/// verdict, R2-1). Only the templates matter to a managed upgrade.
+const R3_TRIGGER: &str = "  # Revision 3: a required merge queue judges each queued entry here. The\n  # review is not re-run for it; ci-gate reads the verdict recorded for the\n  # entry's pull request.\n  merge_group:\n";
+
+/// Revision 2 of the registered profile, rebuilt from revision 3 by undoing
+/// revision 3's marks in the two templates a managed upgrade compares: the
+/// `merge_group` trigger and the gate's `recorded-review` rule. Only the
+/// templates matter to a managed upgrade.
+fn revision_two() -> Profile {
+    let mut r2 = Profile::registered();
+    assert_eq!(r2.revision, 3, "the registered profile is revision 3");
+    r2.revision = 2;
+    for t in &mut r2.templates {
+        if t.path == ".github/workflows/statecraft-ci.yml" {
+            assert!(
+                t.body.contains(R3_TRIGGER),
+                "revision 3's merge_group trigger"
+            );
+            t.body = t.body.replace(R3_TRIGGER, "");
+        }
+        if t.path == "scripts/statecraft/ci-gate.sh" {
+            assert!(t.body.contains("recorded-review"), "revision 3's gate rule");
+            t.body = t.body.replace("recorded-review", "recorded-review-r2");
+        }
+    }
+    r2
+}
+
+/// Revision 1, rebuilt from revision 2 by undoing revision 2's two template
+/// changes (the owner exception for a findings verdict, R2-1).
 fn revision_one() -> Profile {
-    let mut r1 = Profile::registered();
-    assert_eq!(r1.revision, 2, "the registered profile is revision 2");
+    let mut r1 = revision_two();
     r1.revision = 1;
     for t in &mut r1.templates {
         if t.path == ".github/workflows/statecraft-ci.yml" {
@@ -179,7 +203,7 @@ fn a_revision_one_project_upgrades_to_revision_two() {
     customized.push_str("# a local addition\n");
     std::fs::write(root.join(wf), &customized).unwrap();
 
-    let r2 = Profile::registered();
+    let r2 = revision_two();
     assert_ne!(r2.identity(), r1.identity());
     let upgrade = plan_and_apply(root, &r2, &mut manifest);
     let file = |rel: &str| upgrade.files.iter().find(|f| f.path == rel).unwrap();
@@ -225,4 +249,72 @@ fn revision_two_states_the_approver_model_in_its_operator_steps() {
         policy["review-exception"]["pull_request"],
         "owner-exception"
     );
+}
+
+#[test]
+fn a_revision_two_project_upgrades_to_revision_three() {
+    let dir = project();
+    let root = dir.path();
+    let mut manifest = Manifest::new(Pins {
+        product: "0.0.0".into(),
+        spec_spine: "unpinned".into(),
+        adapters: Default::default(),
+        producer: None,
+    });
+    let r2 = revision_two();
+    assert!(plan_and_apply(root, &r2, &mut manifest).whole());
+    assert_eq!(manifest.project.setup.as_ref().unwrap().revision, 2);
+
+    // The operator customized the workflow; the gate script is as written.
+    let wf = ".github/workflows/statecraft-ci.yml";
+    let mut customized = std::fs::read_to_string(root.join(wf)).unwrap();
+    customized.push_str("# a local addition\n");
+    std::fs::write(root.join(wf), &customized).unwrap();
+
+    let r3 = Profile::registered();
+    assert_ne!(r3.identity(), r2.identity());
+    let upgrade = plan_and_apply(root, &r3, &mut manifest);
+    let file = |rel: &str| upgrade.files.iter().find(|f| f.path == rel).unwrap();
+
+    // Unchanged since written: rewritten with revision 3's gate.
+    assert_eq!(
+        file("scripts/statecraft/ci-gate.sh").action,
+        Action::Replace
+    );
+    let gate = std::fs::read_to_string(root.join("scripts/statecraft/ci-gate.sh")).unwrap();
+    assert!(gate.contains("recorded-review)"), "{gate}");
+
+    // Customized: withheld, bytes intact; the operator merges the trigger in.
+    assert_eq!(
+        file(wf).action,
+        Action::Conflict {
+            kind: ConflictKind::Customized
+        }
+    );
+    assert_eq!(std::fs::read_to_string(root.join(wf)).unwrap(), customized);
+    assert!(!upgrade.whole());
+    assert_eq!(manifest.project.setup.as_ref().unwrap().revision, 3);
+}
+
+/// Revision 3's merge-queue rules: every event the rendered CI triggers on has
+/// a rule for every required job, and the operator steps state the upgrade
+/// order a base-read gate imposes.
+#[test]
+fn revision_three_states_a_rule_for_the_queue_and_the_upgrade_order() {
+    let policy = setup::jobs();
+    for job in ["governance", "code", "ai-review", "review-exception"] {
+        for event in ["pull_request", "push", "merge_group"] {
+            assert!(
+                policy[job][event].is_string(),
+                "{job} has no rule for {event}"
+            );
+        }
+    }
+    assert_eq!(policy["governance"]["merge_group"], "required");
+    assert_eq!(policy["code"]["merge_group"], "required");
+    assert_eq!(policy["ai-review"]["merge_group"], "recorded-review");
+    assert_eq!(policy["review-exception"]["merge_group"], "inapplicable");
+    let steps = setup::remote_obligations().join("\n");
+    assert!(steps.contains("upgrade to revision 3 first"), "{steps}");
+    assert!(steps.contains("never by a second review"), "{steps}");
 }
