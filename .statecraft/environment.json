@@ -18,9 +18,9 @@
         "kind": "template",
         "identity": "statecraft-setup:github-actions-rust@4"
       },
-      "digest": "ffd44c9d66e403d3457f35a5e4519247c656bbcf4aa2543e9cc52f810b42a8dc",
+      "digest": "df9600f668ac965d9a70df84a3350c2b5c4f01fe45fe94e3440424015f9b00cf",
       "bytes": 3035,
-      "written_at": "2026-09-25T04:24:00Z"
+      "written_at": "2026-09-25T05:06:51Z"
     },
     {
       "path": ".github/workflows/statecraft-ci.yml",
@@ -29,9 +29,9 @@
         "kind": "template",
         "identity": "statecraft-setup:github-actions-rust@4"
       },
-      "digest": "b9626418fe18ac3e9c03b42ae73fc1321a229a1b06c334be1f3756f041744b5a",
+      "digest": "94eeba3a5990f45568325362787a2734a06ebde0155ad89557d93faf3d5d20f8",
       "bytes": 8837,
-      "written_at": "2026-09-25T04:24:00Z"
+      "written_at": "2026-09-25T05:06:51Z"
     },
     {
       "path": ".statecraft/AGENTS.md",
@@ -51,9 +51,9 @@
         "kind": "template",
         "identity": "statecraft-setup:github-actions-rust@4"
       },
-      "digest": "2ee44c62937166806169ece0f55834a1df2a77e91241addb027b9c5f199ca6e4",
+      "digest": "2c5242be3934e15aba16a65e28eece1878b70939b40b5cae1dfd54d5e284031e",
       "bytes": 6121,
-      "written_at": "2026-09-25T04:24:00Z"
+      "written_at": "2026-09-25T05:06:51Z"
     },
     {
       "path": "scripts/statecraft/ai-review.sh",
@@ -62,9 +62,9 @@
         "kind": "template",
         "identity": "statecraft-setup:github-actions-rust@4"
       },
-      "digest": "9cd545ecedf978bc7656fba3dbb71988b85d4ef21602e6adc534fd7f7492b4b3",
-      "bytes": 11114,
-      "written_at": "2026-09-25T03:47:30Z"
+      "digest": "88fadb4c6ce82a999bae15b8de8b212b7c6c81013135ee3b03b4c7c8ea4141d8",
+      "bytes": 11810,
+      "written_at": "2026-09-25T05:06:51Z"
     },
     {
       "path": "scripts/statecraft/ci-gate.sh",
@@ -84,9 +84,9 @@
         "kind": "template",
         "identity": "statecraft-setup:github-actions-rust@4"
       },
-      "digest": "3733d3a7a1375a4c3696fa17ed8d9a9076ee5bc63c46d83b051b387dcbc7570b",
-      "bytes": 11655,
-      "written_at": "2026-09-25T04:24:00Z"
+      "digest": "b087e75e83155fb17f5491490494a7e79586f3a44502cb4a9ab99482bbd2f42f",
+      "bytes": 11867,
+      "written_at": "2026-09-25T05:06:51Z"
     },
     {
       "path": "scripts/statecraft/install-spec-spine.sh",
@@ -186,7 +186,7 @@
     "setup": {
       "profile": "github-actions-rust",
       "revision": 4,
-      "identity": "06bf394882f0510dc874aa3d75f26944db24b771aec4e3575164ce80a86a29d2",
+      "identity": "6304f26384e939ca04a4044c9de38b9b4e067d719c12b2c489c1cb588bb420ec",
       "parameters": {
         "governance.authored_content": "scripts/check-authored-content.sh",
         "governance.authored_content_text": true,
