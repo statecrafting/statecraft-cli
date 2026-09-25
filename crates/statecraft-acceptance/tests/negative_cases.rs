@@ -5,8 +5,8 @@
 
 use statecraft_acceptance::absence::{Absence, Recorded, Statement};
 use statecraft_acceptance::authority::{
-    CorpusVerdict, Declared, DeltaReport, ENVIRONMENT_MANIFEST, NoDeltaReport, StaticDeltaReport,
-    evaluate,
+    CorpusAnswer, CorpusVerdict, Declared, DeltaReport, ENVIRONMENT_MANIFEST, NoDeltaReport,
+    StaticDeltaReport, evaluate,
 };
 use statecraft_acceptance::delta::SpecSpineDeltaReport;
 use statecraft_acceptance::dimensions::{
@@ -246,6 +246,56 @@ fn the_delta_report_reads_the_0_26_0_envelope() {
     assert!(r.classes_used().contains(&"derived".to_string()));
 }
 
+// spec-spine 0.27.0's delta schema is 0.2.0 (its spec 142): `relocation` joins
+// the counts. Captured verbatim on 2026-09-25 from the published 0.27.0 over a
+// clone of this repository, one README line after a re-index, which is also
+// spec-spine's 141: the governance edit rewrote `inputs.json` alone.
+const REPORT_027: &[u8] = include_bytes!("../testdata/delta/spec-spine-0.27.0-readme-edit.json");
+
+#[test]
+fn the_delta_report_reads_the_0_27_0_schema() {
+    let r = SpecSpineDeltaReport::from_envelope_json(REPORT_027).expect("0.27.0's own output");
+    assert_eq!(r.version(), "spec-spine 0.27.0");
+    assert_eq!(r.report().schema_version, "0.2.0");
+    assert_eq!(
+        paths_of(&r),
+        vec![
+            ".statecraft/derived/codebase-index/inputs.json",
+            "README.md"
+        ]
+    );
+    // A hashed input classed `policy` is still no member (section 3.3.2).
+    match r.corpus_answer(&["README.md".into()]) {
+        CorpusAnswer::Answered { members, .. } => assert!(members.is_empty(), "{members:?}"),
+        other => panic!("the 0.27.0 report was not read: {other:?}"),
+    }
+}
+
+// A `relocation` class is outside section 3.3.2's table, so it is an absence
+// and never a guess, whatever path carries it.
+#[test]
+fn a_relocation_class_is_an_absence_until_the_table_places_it() {
+    let bytes = String::from_utf8(REPORT_027.to_vec()).unwrap().replacen(
+        r#""policy""#,
+        r#""relocation""#,
+        1,
+    );
+    let r = report_from(&bytes);
+    match r.corpus_answer(&["README.md".into()]) {
+        CorpusAnswer::Unavailable { reason } => assert!(reason.contains("relocation"), "{reason}"),
+        other => panic!("a relocation class was placed: {other:?}"),
+    }
+}
+
+// 0.27.0's guarded readers answer an unresolved claim with a `validation`
+// error envelope and no report (spec-spine's 145): not a report, and never
+// read as one.
+#[test]
+fn a_validation_error_envelope_is_not_a_report() {
+    let bytes = br#"{"error":{"kind":"validation","message":"validation failed: 1 violation(s)","violations":[{"code":"I-004","message":"unresolved claim, not staleness","path":"src/missing.rs","severity":"error"}]},"exitCode":1,"outcome":"finding","schemaVersion":"1.0.0","summary":"validation failed: 1 violation(s)","tool":"spec-spine","verb":"delta"}"#;
+    assert!(SpecSpineDeltaReport::from_envelope_json(bytes).is_err());
+}
+
 #[test]
 fn the_delta_report_reads_the_bytes_the_pinned_binary_writes() {
     let r = real_report();
@@ -447,13 +497,13 @@ fn no_recorded_absence_reason_claims_anything_about_what_a_release_carries() {
 #[test]
 fn an_envelope_this_build_does_not_read_is_refused_and_says_why() {
     let wrong_schema =
-        envelope("", "", false).replace(r#""schemaVersion":"0.1.0""#, r#""schemaVersion":"0.2.0""#);
+        envelope("", "", false).replace(r#""schemaVersion":"0.1.0""#, r#""schemaVersion":"0.3.0""#);
     let wrong_side = envelope("", "", false)
         .replace(r#""classifiedUnder":"base""#, r#""classifiedUnder":"head""#);
     let wrong_verb = envelope("", "", false).replace(r#""verb":"delta""#, r#""verb":"couple""#);
 
     for (bytes, expected) in [
-        (wrong_schema, "0.2.0"),
+        (wrong_schema, "0.3.0"),
         (wrong_side, "head"),
         (wrong_verb, "couple"),
     ] {
