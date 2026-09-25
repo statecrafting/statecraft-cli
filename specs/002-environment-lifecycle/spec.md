@@ -7875,6 +7875,23 @@ templates, which left revision 5's new steps in place. They now use the three
 templates revision 5 changed exactly as revision 4 shipped them (main at
 `2c82d9a`), kept in `crates/statecraft-home/tests/support/profile-r4/`.
 
+**2026-09-25: profile revision 6, every workflow file is in the authority
+set (decided by the owner on 2026-09-25, option (a); amends revision 5, rule
+2).** Revision 5's authority set named the profile's rendered files, the policy
+and the declared authored-content script. A workflow file the profile does not
+render was outside it, and on `pull_request` GitHub runs a candidate's new
+workflow, which could report a check named `ci-gate` from GitHub Actions and
+satisfy branch protection. Revision 6 adds every path under
+`.github/workflows/` to the authority set, in `ci-gate.sh` (read at the base)
+and in the `governance` job's `authority_change` output that decides whether
+the exception job runs. Adding, changing or removing any workflow therefore
+needs the owner's approval once, like any other change to the gate. The
+revision becomes 6, a new identity; everything else in revision 5 is
+unchanged. Acceptance obligations, as tests: a candidate that adds a workflow
+the profile does not render blocks without the owner exception and passes
+with it; a candidate that changes no workflow and no other authority file is
+unaffected; a revision-5 project upgrades to revision 6.
+
 ## Verification
 
 `--fail-on-untraced` joined the corpus gate with this spec's first
