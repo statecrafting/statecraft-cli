@@ -10,6 +10,10 @@
 #                     returned findings, and for a release candidate whose
 #                     review was skipped; otherwise inapplicable (revision 2)
 #   rc-exception      revision 1's rule: the release-candidate case only
+#   recorded-review   a merge-queue entry (revision 3): the review is not
+#                     re-run, so the job must be `skipped`, and the verdict
+#                     recorded for the entry's pull request at its head is
+#                     what admits it, with the owner exception for findings
 #   inapplicable      must be `skipped`, and the rule that admitted it is printed
 #
 # A required job missing from the needs record has vanished, and blocks. The
@@ -18,7 +22,9 @@
 #
 # Inputs, all from the environment: NEEDS_JSON (toJSON(needs)), EVENT_NAME,
 # HEAD_SHA, BASE_SHA (the pull request base, or the push's previous head),
-# HEAD_REF (the pull request head ref; empty on push).
+# HEAD_REF (the pull request head ref; empty on push). On merge_group also
+# GROUP_HEAD_REF (the queue branch, `.../pr-<n>-<sha>`), REPO and GH_TOKEN,
+# which read the recorded review through the API.
 set -euo pipefail
 
 : "${NEEDS_JSON:?ci-gate.sh needs NEEDS_JSON}"
@@ -87,6 +93,44 @@ block() {
   blocked=1
 }
 
+# Revision 3: the review recorded for a merge-queue entry's pull request.
+# Sets pr, pr_head, pr_ref, recorded_result and recorded_exception, or blocks
+# with the reason and returns 1. Nothing here writes.
+recorded_review() {
+  pr="$(printf '%s' "${GROUP_HEAD_REF:-}" | sed -n 's|.*/pr-\([0-9][0-9]*\)-[0-9a-f]*$|\1|p')"
+  if [ -z "$pr" ]; then
+    block "cannot read the queued pull request's number from '${GROUP_HEAD_REF:-}'"
+    return 1
+  fi
+  if ! gh api "repos/${REPO}/pulls/${pr}" > "$work/pr.json" 2> "$work/pr.err"; then
+    block "cannot read pull request #${pr}: $(cat "$work/pr.err")"
+    return 1
+  fi
+  pr_head="$(jq -r '.head.sha // ""' "$work/pr.json")"
+  pr_ref="$(jq -r '.head.ref // ""' "$work/pr.json")"
+  local run
+  run="$(gh api "repos/${REPO}/actions/runs?event=pull_request&head_sha=${pr_head}&status=completed&per_page=100" 2> /dev/null \
+    | jq -r --arg h "$pr_head" '[.workflow_runs[]? | select(.name == "statecraft-ci" and .event == "pull_request" and .head_sha == $h and .status == "completed")] | max_by(.id) | .id // empty' 2> /dev/null || true)"
+  if [ -z "$run" ]; then
+    block "no recorded review: pull request #${pr} has no completed statecraft-ci run at its head ${pr_head}"
+    return 1
+  fi
+  mkdir -p "$work/record"
+  if ! gh run download "$run" --repo "$REPO" --name "statecraft-ai-review-${pr_head}" --dir "$work/record" > /dev/null 2>&1 \
+    || [ ! -s "$work/record/ai-review-evidence.json" ]; then
+    block "no recorded review: run ${run} of pull request #${pr} carries no evidence record for ${pr_head}"
+    return 1
+  fi
+  if ! jq -e --argjson n "$pr" --arg h "$pr_head" '.subject.pullRequest == $n and .subject.head == $h' "$work/record/ai-review-evidence.json" > /dev/null 2>&1; then
+    block "the recorded review names another pull request or head than #${pr} at ${pr_head}"
+    return 1
+  fi
+  recorded_result="$(jq -r '.result // ""' "$work/record/ai-review-evidence.json")"
+  recorded_exception="$(gh api "repos/${REPO}/actions/runs/${run}/jobs?per_page=100" 2> /dev/null \
+    | jq -r '[.jobs[]? | select(.name == "review-exception")][0].conclusion // "absent"' 2> /dev/null || echo absent)"
+  say "recorded review: #${pr} at ${pr_head}, run ${run}: ${recorded_result} (exception: ${recorded_exception})"
+}
+
 while IFS=$'\t' read -r job rule; do
   result="$(printf '%s' "$NEEDS_JSON" | jq -r --arg j "$job" 'if has($j) then .[$j].result else "vanished" end')"
   if [ "$result" = vanished ]; then
@@ -130,6 +174,37 @@ while IFS=$'\t' read -r job rule; do
         esac
       fi
       say "ok: ${job} ${result}"
+      ;;
+    recorded-review)
+      if [ "$result" != skipped ]; then
+        block "job '${job}' is not re-run in the merge queue and must be skipped, but ended '${result}'"
+        continue
+      fi
+      if ! recorded_review; then
+        continue
+      fi
+      entry_rc=no
+      if [ -n "$pattern" ] && [ -n "$pr_ref" ]; then
+        # shellcheck disable=SC2053
+        if [[ "$pr_ref" == $pattern ]]; then entry_rc=yes; fi
+      fi
+      case "$recorded_result" in
+        no-findings) ;;
+        findings)
+          if [ "$recorded_exception" != success ]; then
+            block "the review recorded for #${pr} returned findings and its owner exception was not approved (it ended '${recorded_exception}')"
+            continue
+          fi ;;
+        skipped:draft | skipped:fork | skipped:dependabot | skipped:oversized | skipped:transient)
+          if [ "$entry_rc" = yes ] && [ "$recorded_exception" != success ]; then
+            block "the review recorded for release candidate #${pr} was ${recorded_result} and its owner exception was not approved"
+            continue
+          fi ;;
+        *)
+          block "the review recorded for #${pr} carries no review result (got '${recorded_result}')"
+          continue ;;
+      esac
+      say "ok: ${job} skipped in the merge queue, admitted by the review recorded for #${pr} at ${pr_head}: ${recorded_result}"
       ;;
     inapplicable)
       if [ "$result" = skipped ]; then
