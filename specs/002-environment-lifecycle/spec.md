@@ -8193,6 +8193,13 @@ repository's re-render was still open), so no recorded digest names the
 earlier text. `the_rendered_gate_exits_in_the_family_contract` asserts both
 tables on the rendered script.
 
+**2026-09-25: this repository's CI upgraded from revision 6 to revision 7
+(S-5).** One re-render, with the recorded parameters unchanged and no
+`ci.extra_required_jobs` declared, replaces the six managed files and the
+policy, including the gate that reads spec-spine's exit table by the pinned
+release (the entry above). It changes the authority set, so the base's revision-6 `ci-gate`
+blocks it until the owner approves that run's `statecraft-review-exception`.
+
 ## Verification
 
 `--fail-on-untraced` joined the corpus gate with this spec's first
