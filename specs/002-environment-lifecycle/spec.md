@@ -8284,6 +8284,16 @@ every non-zero code still refuses at the enforcing gate (contract 6).
 `pin_a_refusal_under_the_0_26_0_table_is_decided_by_the_probe` run the shipped
 bodies against the recorded 0.26.0 lines; the 0.25.0 rows are unchanged.
 
+**2026-09-25: the pinned spec-spine's own answer over a link leaving the
+repository (owner, 2026-09-25: adopt 0.27.0).** With the pin at 0.27.0,
+`the_real_spec_spine_refuses_a_link_leaving_the_repository` initializes a
+sandbox project with the real pinned binary, reads it fresh, adds a link to a
+directory outside it, and asserts that `probe::run_check` reports a read not
+performed at exit 2 naming the link, never stale and never fresh. It is the
+assertion the "config error is a refusal" entry above deferred to the pin
+move, because 0.26.0 follows such a link. The adoption itself is recorded in
+`docs/adoption/spec-spine.md` (`D-06`).
+
 ## Verification
 
 `--fail-on-untraced` joined the corpus gate with this spec's first

@@ -38,4 +38,4 @@ publish = false
 # test refuses a difference. Changing it is an
 # authority change (AGENTS.md, Source ownership).
 [workspace.dependencies]
-spec-spine-core = { version = "=0.26.0", default-features = false }
+spec-spine-core = { version = "=0.27.0", default-features = false }
