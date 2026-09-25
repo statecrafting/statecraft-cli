@@ -35,7 +35,7 @@ use std::path::Path;
 /// The one registered profile.
 pub const PROFILE_ID: &str = "github-actions-rust";
 /// Its revision.
-pub const REVISION: u32 = 3;
+pub const REVISION: u32 = 4;
 /// Where the rendered policy document lives in the target.
 pub const POLICY_PATH: &str = ".statecraft/setup/github-actions-rust.json";
 /// The resume record, under the project's runtime state.
@@ -66,6 +66,12 @@ pub const SKIP_CLASSES: [&str; 5] = ["draft", "fork", "dependabot", "oversized",
 /// The places a CODEOWNERS file is read from; one existing anywhere is the
 /// user's and none is rendered.
 pub const CODEOWNERS_LOCATIONS: [&str; 3] = [".github/CODEOWNERS", "CODEOWNERS", "docs/CODEOWNERS"];
+
+/// The authored-content script a revision-3 project ran when it was
+/// executable; the upgrade to revision 4 declares it when it exists.
+pub const AUTHORED_CONTENT_SCRIPT: &str = "scripts/check-authored-content.sh";
+/// The revision that made the authored-content script a declared parameter.
+const AUTHORED_CONTENT_DECLARED_SINCE: u32 = 4;
 
 const DEFAULT_DIFF_CAP: u64 = 2000;
 const MAX_DIFF_CAP: u64 = 20000;
@@ -233,15 +239,35 @@ fn static_policy() -> serde_json::Value {
     })
 }
 
-/// The command selections: fixed argument vectors, never a guess.
+/// The command selections at the default parameters: fixed argument
+/// vectors, never a guess.
 pub fn commands() -> serde_json::Value {
+    commands_for(&Parameters::defaults("main".to_string(), Vec::new()))
+}
+
+/// The command selections a project's parameters make (revision 4): coverage
+/// enforced or reported, and the declared authored-content script, if any.
+pub fn commands_for(p: &Parameters) -> serde_json::Value {
+    let mut coverage = vec![".tooling/bin/spec-spine", "index", "coverage"];
+    if p.enforce_coverage {
+        coverage.push("--fail-on-untraced");
+    }
+    let mut governance = vec![
+        serde_json::json!([".tooling/bin/spec-spine", "check", "--fail-on-warn"]),
+        serde_json::json!([".tooling/bin/spec-spine", "lint", "--fail-on-warn"]),
+        serde_json::json!(coverage),
+        serde_json::json!([
+            ".tooling/bin/spec-spine",
+            "index",
+            "check",
+            "--fail-on-unresolved"
+        ]),
+    ];
+    if let Some(script) = &p.authored_content {
+        governance.push(serde_json::json!([script]));
+    }
     serde_json::json!({
-        "governance": [
-            [".tooling/bin/spec-spine", "check", "--fail-on-warn"],
-            [".tooling/bin/spec-spine", "lint", "--fail-on-warn"],
-            [".tooling/bin/spec-spine", "index", "coverage"],
-            [".tooling/bin/spec-spine", "index", "check", "--fail-on-unresolved"],
-        ],
+        "governance": governance,
         "code": [
             ["cargo", "build", "--workspace", "--locked"],
             ["cargo", "test", "--workspace", "--locked"],
@@ -270,6 +296,8 @@ pub fn remote_obligations() -> Vec<String> {
         "branch protection on the default branch: required approvals 0, and require code-owner review, so ci-gate with the AI review approves ordinary changes and a change to the profile's files needs a review its author cannot give (S-3, R2-2)".to_string(),
         format!("the Environment {EXCEPTION_ENVIRONMENT} with the owner as a required reviewer, for owner exceptions: a release candidate whose review was skipped (S-1) and a pull request whose review returned findings (R2-1)"),
         "a merge queue, if the default branch requires one: upgrade to revision 3 first, or merge the upgrade while no queue is required, because ci-gate reads its policy at the base and revision 2 states no merge_group rule; a queue entry is judged by the review recorded for its pull request, never by a second review (revision 3)".to_string(),
+        "a new refusal (revision 4): a pull request whose base is not the default branch fails governance, because a stacked pull request merges into another branch and is never judged against the default branch; open each branch off the default branch, or set governance.require_default_base to false".to_string(),
+        "a repository that already runs these checks by hand keeps them by setting governance.enforce_coverage (index coverage --fail-on-untraced), governance.authored_content (the script's path; absent or not executable refuses), governance.authored_content_text (the title, the body and every commit message), governance.gate_each_commit (each commit's tree passes the gate and cargo fmt) and governance.require_signed_commits (each commit verified as signed by GitHub) (revision 4)".to_string(),
     ]
 }
 
@@ -286,6 +314,42 @@ pub struct Parameters {
     pub release_branch_pattern: String,
     /// The owners a rendered CODEOWNERS names (empty: none is rendered).
     pub code_owners: Vec<String>,
+    /// `governance.enforce_coverage`: coverage refuses an untraced file
+    /// rather than reporting it (revision 4, rule 1).
+    pub enforce_coverage: bool,
+    /// `governance.authored_content`: the authored-content script, required
+    /// when declared; unset, no authored-content step runs (rule 2).
+    pub authored_content: Option<String>,
+    /// `governance.authored_content_text`: the declared script also judges
+    /// the pull request's title and body and every commit message (rule 3).
+    pub authored_content_text: bool,
+    /// `governance.gate_each_commit`: each commit's tree passes the gate and
+    /// the format check (rule 4).
+    pub gate_each_commit: bool,
+    /// `governance.require_signed_commits`: each commit is verified as signed
+    /// by GitHub (rule 4).
+    pub require_signed_commits: bool,
+    /// `governance.require_default_base`: a pull request whose base is not
+    /// the default branch fails governance (rule 5).
+    pub require_default_base: bool,
+}
+
+impl Parameters {
+    fn defaults(default_branch: String, exclude: Vec<String>) -> Parameters {
+        Parameters {
+            default_branch,
+            diff_cap: DEFAULT_DIFF_CAP,
+            exclude,
+            release_branch_pattern: DEFAULT_RELEASE_PATTERN.to_string(),
+            code_owners: Vec::new(),
+            enforce_coverage: false,
+            authored_content: None,
+            authored_content_text: false,
+            gate_each_commit: false,
+            require_signed_commits: false,
+            require_default_base: true,
+        }
+    }
 }
 
 fn safe_path_chars(s: &str) -> bool {
@@ -302,16 +366,39 @@ pub fn parameters(
     block: &BTreeMap<String, serde_json::Value>,
     derived_dir: &str,
 ) -> Result<Parameters, String> {
-    let mut p = Parameters {
-        default_branch: remote_head(root).unwrap_or_else(|| "main".to_string()),
-        diff_cap: DEFAULT_DIFF_CAP,
-        exclude: vec![derived_dir.trim_end_matches('/').to_string()],
-        release_branch_pattern: DEFAULT_RELEASE_PATTERN.to_string(),
-        code_owners: Vec::new(),
-    };
+    let mut p = Parameters::defaults(
+        remote_head(root).unwrap_or_else(|| "main".to_string()),
+        vec![derived_dir.trim_end_matches('/').to_string()],
+    );
     let jobs = jobs();
+    let flag = |key: &str, value: &serde_json::Value| {
+        value
+            .as_bool()
+            .ok_or_else(|| format!("{key} must be true or false"))
+    };
     for (key, value) in block {
         match key.as_str() {
+            "governance.enforce_coverage" => p.enforce_coverage = flag(key, value)?,
+            "governance.authored_content_text" => p.authored_content_text = flag(key, value)?,
+            "governance.gate_each_commit" => p.gate_each_commit = flag(key, value)?,
+            "governance.require_signed_commits" => p.require_signed_commits = flag(key, value)?,
+            "governance.require_default_base" => p.require_default_base = flag(key, value)?,
+            "governance.authored_content" => {
+                let v = value
+                    .as_str()
+                    .ok_or("governance.authored_content must be a repository-relative path")?;
+                if !safe_path_chars(v)
+                    || v.contains("..")
+                    || v.starts_with('/')
+                    || v.starts_with('-')
+                    || v.ends_with('/')
+                {
+                    return Err(format!(
+                        "governance.authored_content `{v}` is not a repository-relative path"
+                    ));
+                }
+                p.authored_content = Some(v.to_string());
+            }
             "default_branch" => {
                 let v = value.as_str().ok_or("default_branch must be a string")?;
                 if !safe_path_chars(v)
@@ -401,7 +488,62 @@ pub fn parameters(
             }
         }
     }
+    if p.authored_content_text && p.authored_content.is_none() {
+        return Err(
+            "governance.authored_content_text needs governance.authored_content: the text is judged by the declared script".to_string(),
+        );
+    }
     Ok(p)
+}
+
+/// The parameters a plan uses: the declared block, plus what an upgrade from
+/// before revision 4 carries forward. A revision-3 gate ran
+/// `scripts/check-authored-content.sh` whenever it was executable; revision 4
+/// runs only a declared script, so the upgrade declares it when it exists and
+/// the check a project already ran is kept (revision 4, rule 2).
+fn effective_block(
+    root: &Path,
+    profile: &Profile,
+    manifest: &Manifest,
+    block: &BTreeMap<String, serde_json::Value>,
+) -> BTreeMap<String, serde_json::Value> {
+    let mut block = block.clone();
+    let upgrading =
+        manifest.project.setup.as_ref().is_some_and(|s| {
+            s.profile == profile.id && s.revision < AUTHORED_CONTENT_DECLARED_SINCE
+        });
+    if upgrading
+        && profile.revision >= AUTHORED_CONTENT_DECLARED_SINCE
+        && !block.contains_key("governance.authored_content")
+        && root.join(AUTHORED_CONTENT_SCRIPT).is_file()
+    {
+        block.insert(
+            "governance.authored_content".to_string(),
+            serde_json::json!(AUTHORED_CONTENT_SCRIPT),
+        );
+    }
+    block
+}
+
+/// What `doctor` says about the authored-content step of a recorded
+/// selection (revision 4, rule 2): which script runs, or that none does.
+pub fn authored_content_note(selection: &SetupSelection) -> Option<String> {
+    if selection.revision < AUTHORED_CONTENT_DECLARED_SINCE {
+        return None;
+    }
+    Some(
+        match selection
+            .parameters
+            .get("governance.authored_content")
+            .and_then(|v| v.as_str())
+        {
+            Some(path) => format!(
+                "governance.authored_content is {path}; the gate refuses when it is absent or not executable"
+            ),
+            None => "governance.authored_content is not declared, so no authored-content step runs"
+                .to_string(),
+        },
+    )
 }
 
 /// The remote's own `HEAD`, when the repository records one.
@@ -798,6 +940,17 @@ impl Plan {
             }
         }
         out.push_str(&format!(
+            "setup      authored content: {}\n",
+            match &self.parameters.authored_content {
+                Some(path) => format!(
+                    "{path} (governance.authored_content; absent or not executable refuses)"
+                ),
+                None =>
+                    "none declared (governance.authored_content), so no authored-content step runs"
+                        .to_string(),
+            }
+        ));
+        out.push_str(&format!(
             "setup      credential {} (by name only; set it with `{}`)\n",
             self.credential, self.credential_command
         ));
@@ -936,7 +1089,8 @@ pub struct Inputs<'a> {
 pub fn plan(inputs: &Inputs<'_>) -> Result<Plan, String> {
     let root = inputs.root;
     let profile = inputs.profile;
-    let params = parameters(root, inputs.block, inputs.derived_dir)?;
+    let block = effective_block(root, profile, inputs.manifest, inputs.block);
+    let params = parameters(root, &block, inputs.derived_dir)?;
     let identity = profile.identity();
     let source = profile.source_identity();
 
@@ -1000,6 +1154,28 @@ pub fn plan(inputs: &Inputs<'_>) -> Result<Plan, String> {
         params.release_branch_pattern.clone(),
     );
     values.insert("review.tool_version", REVIEW_TOOL_VERSION.to_string());
+    for (name, on) in [
+        ("governance.enforce_coverage", params.enforce_coverage),
+        (
+            "governance.authored_content_text",
+            params.authored_content_text,
+        ),
+        ("governance.gate_each_commit", params.gate_each_commit),
+        (
+            "governance.require_signed_commits",
+            params.require_signed_commits,
+        ),
+        (
+            "governance.require_default_base",
+            params.require_default_base,
+        ),
+    ] {
+        values.insert(name, on.to_string());
+    }
+    values.insert(
+        "governance.authored_content",
+        params.authored_content.clone().unwrap_or_default(),
+    );
     let owned_paths: Vec<&str> = profile
         .templates
         .iter()
@@ -1136,6 +1312,8 @@ pub fn plan(inputs: &Inputs<'_>) -> Result<Plan, String> {
     policy["identity"] = serde_json::json!(identity);
     policy["parameters"] = serde_json::to_value(&params).expect("serializable");
     policy["review"]["release_branch_pattern"] = serde_json::json!(params.release_branch_pattern);
+    let commands = commands_for(&params);
+    policy["commands"] = commands.clone();
     policy["files"] = serde_json::json!(
         files
             .iter()
@@ -1172,7 +1350,7 @@ pub fn plan(inputs: &Inputs<'_>) -> Result<Plan, String> {
     let mut id_text = format!("profile {identity}\nsource {source}\n");
     id_text.push_str(&format!(
         "block {}\n",
-        serde_json::to_string(inputs.block).expect("serializable")
+        serde_json::to_string(&block).expect("serializable")
     ));
     id_text.push_str(&format!(
         "parameters {}\n",
@@ -1222,7 +1400,7 @@ pub fn plan(inputs: &Inputs<'_>) -> Result<Plan, String> {
         files,
         prerequisites,
         withheld,
-        commands: commands(),
+        commands,
         credential: CREDENTIAL.to_string(),
         credential_command: CREDENTIAL_COMMAND.to_string(),
         remote: remote_obligations(),
@@ -1232,7 +1410,7 @@ pub fn plan(inputs: &Inputs<'_>) -> Result<Plan, String> {
             profile: profile.id.clone(),
             revision: profile.revision,
             identity,
-            parameters: inputs.block.clone(),
+            parameters: block,
         }),
         before,
     })
@@ -1503,7 +1681,15 @@ pub fn remote_results(
     let files = installed_from_manifest(root, manifest);
     let local = Outcome::new(
         ResultState::NotRun,
-        "`doctor --remote` does not run the local gate",
+        match manifest
+            .project
+            .setup
+            .as_ref()
+            .and_then(authored_content_note)
+        {
+            Some(note) => format!("`doctor --remote` does not run the local gate; {note}"),
+            None => "`doctor --remote` does not run the local gate".to_string(),
+        },
     );
     let Some(slug) = repository_slug(root) else {
         let why = "the origin remote is not a GitHub repository this product can name";
@@ -1820,6 +2006,93 @@ mod tests {
                 .unwrap()
                 .diff_cap,
             150
+        );
+    }
+
+    #[test]
+    fn revision_four_parameters_are_validated_and_default_to_revision_three() {
+        let dir = tempfile::tempdir().unwrap();
+        let with = |pairs: &[(&str, serde_json::Value)]| {
+            let m: BTreeMap<String, serde_json::Value> = pairs
+                .iter()
+                .map(|(k, v)| (k.to_string(), v.clone()))
+                .collect();
+            parameters(dir.path(), &m, ".statecraft/derived")
+        };
+        let d = with(&[]).unwrap();
+        assert!(!d.enforce_coverage && !d.authored_content_text);
+        assert!(!d.gate_each_commit && !d.require_signed_commits);
+        assert!(
+            d.require_default_base,
+            "the one new refusal is on by default"
+        );
+        assert_eq!(d.authored_content, None);
+        assert_eq!(commands(), commands_for(&d));
+
+        for key in [
+            "governance.enforce_coverage",
+            "governance.authored_content_text",
+            "governance.gate_each_commit",
+            "governance.require_signed_commits",
+            "governance.require_default_base",
+        ] {
+            assert!(with(&[(key, serde_json::json!("yes"))]).is_err(), "{key}");
+        }
+        for bad in ["../x.sh", "/abs.sh", "-x.sh", "a b.sh", "dir/", ""] {
+            assert!(
+                with(&[("governance.authored_content", serde_json::json!(bad))]).is_err(),
+                "{bad}"
+            );
+        }
+        // The text mode is the declared script's, so it needs one.
+        let err =
+            with(&[("governance.authored_content_text", serde_json::json!(true))]).unwrap_err();
+        assert!(err.contains("needs governance.authored_content"), "{err}");
+        let p = with(&[
+            (
+                "governance.authored_content",
+                serde_json::json!("scripts/check.sh"),
+            ),
+            ("governance.authored_content_text", serde_json::json!(true)),
+            ("governance.enforce_coverage", serde_json::json!(true)),
+        ])
+        .unwrap();
+        let c = commands_for(&p);
+        assert_eq!(
+            c["governance"][2],
+            serde_json::json!([
+                ".tooling/bin/spec-spine",
+                "index",
+                "coverage",
+                "--fail-on-untraced"
+            ])
+        );
+        assert_eq!(c["governance"][4], serde_json::json!(["scripts/check.sh"]));
+    }
+
+    #[test]
+    fn doctor_names_the_authored_content_step() {
+        let mut s = SetupSelection {
+            profile: PROFILE_ID.into(),
+            revision: 3,
+            identity: String::new(),
+            parameters: BTreeMap::new(),
+        };
+        assert_eq!(authored_content_note(&s), None);
+        s.revision = REVISION;
+        assert!(
+            authored_content_note(&s)
+                .unwrap()
+                .contains("not declared, so no authored-content step runs")
+        );
+        s.parameters.insert(
+            "governance.authored_content".into(),
+            serde_json::json!(AUTHORED_CONTENT_SCRIPT),
+        );
+        assert!(
+            authored_content_note(&s)
+                .unwrap()
+                .contains("refuses when it is absent or not executable")
         );
     }
 }

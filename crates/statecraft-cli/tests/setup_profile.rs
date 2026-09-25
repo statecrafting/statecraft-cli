@@ -722,6 +722,13 @@ fn doctor_remote_reads_the_six_results_and_writes_nothing() {
     let (setup, calls, text) = doctor_remote(&f, "full");
     assert_eq!(setup["files-installed"]["state"], "satisfied", "{text}");
     assert_eq!(setup["local-checks"]["state"], "not-run", "{text}");
+    // Revision 4, rule 2: with no script declared, doctor says none runs.
+    assert!(
+        setup["local-checks"]["detail"].as_str().unwrap().contains(
+            "governance.authored_content is not declared, so no authored-content step runs"
+        ),
+        "{text}"
+    );
     for name in [
         "remote-prerequisites",
         "required-checks",
