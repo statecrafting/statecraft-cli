@@ -1312,12 +1312,10 @@ fn launch_attempt(
     };
     let environment = match &prepared {
         Some(p) => {
-            let binding = match &supervised_spec_spine {
-                Some(program) => {
-                    statecraft_home::spec_spine::managed_binding(&p.intent.environment(), program)
-                }
-                None => p.intent.environment(),
-            };
+            let binding = statecraft_home::spec_spine::managed_binding(
+                &p.intent.environment(),
+                supervised_spec_spine.as_deref(),
+            );
             adapters::child_environment_with(&binding, covered.as_ref().ok())
         }
         None => environment,

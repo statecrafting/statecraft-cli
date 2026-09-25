@@ -175,16 +175,23 @@ pub fn for_supervisor(root: &Path, path: Option<&str>) -> Selection {
     conventions(root, &Pin::of(root), path)
 }
 
-/// The constructed environment's binding with the supervisor's path in it:
-/// any [`ENV`] already in `binding` is removed first, so the supervisor's
-/// value is the only one the session can see.
-pub fn managed_binding(binding: &[(String, String)], selected: &Path) -> Vec<(String, String)> {
+/// The constructed environment's binding with the supervisor's path in it.
+/// Both selection names already in `binding` are removed first, so the
+/// supervisor's value is the only one the session can see; with no selected
+/// path (no candidate at all) neither name reaches the session, and the hooks
+/// keep their absent-binary behavior.
+pub fn managed_binding(
+    binding: &[(String, String)],
+    selected: Option<&Path>,
+) -> Vec<(String, String)> {
     let mut out: Vec<(String, String)> = binding
         .iter()
-        .filter(|(name, _)| name != ENV)
+        .filter(|(name, _)| name != ENV && name != RETIRED)
         .cloned()
         .collect();
-    out.push((ENV.to_string(), selected.display().to_string()));
+    if let Some(selected) = selected {
+        out.push((ENV.to_string(), selected.display().to_string()));
+    }
     out
 }
 
@@ -720,8 +727,9 @@ mod tests {
         let binding = vec![
             (MANAGED.to_string(), "003-x".to_string()),
             (ENV.to_string(), "/inherited/spec-spine".to_string()),
+            (RETIRED.to_string(), "/inherited/spec-spine".to_string()),
         ];
-        let out = managed_binding(&binding, &selected.program);
+        let out = managed_binding(&binding, Some(&selected.program));
         let values: Vec<&str> = out
             .iter()
             .filter(|(n, _)| n == ENV)
@@ -729,6 +737,15 @@ mod tests {
             .collect();
         assert_eq!(values, [bin.join(PROGRAM).display().to_string()]);
         assert!(out.contains(&(MANAGED.to_string(), "003-x".to_string())));
+        assert!(!out.iter().any(|(n, _)| n == RETIRED), "{out:?}");
+
+        // No candidate at all: neither name reaches the session.
+        let out = managed_binding(&binding, None);
+        assert!(
+            !out.iter().any(|(n, _)| n == ENV || n == RETIRED),
+            "{out:?}"
+        );
+        assert_eq!(out, [(MANAGED.to_string(), "003-x".to_string())]);
     }
 
     #[test]

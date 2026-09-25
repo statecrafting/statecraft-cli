@@ -7989,8 +7989,9 @@ here:
 - **The supervisor's selection is rule 3, then rule 4, and nothing else.** It
   reads neither name from the operator's environment and searches the `PATH`
   the child is given, so rule 1's overwrite holds by construction: the
-  constructed environment never carried an inherited value, and the
-  supervisor's is placed over any value already in the binding. A
+  constructed environment never carried an inherited value, and both names
+  are removed from the binding before the supervisor's value is added, or
+  before nothing is added when no candidate exists. A
   digest-verified identity is still the bundle proposal's; nothing here
   verifies one, and the hooks read the supervisor's path as rule 5 says.
 - **Candidates that exist with none the project admits refuse the attempt**
