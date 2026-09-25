@@ -129,8 +129,9 @@ pub fn select(root: &Path, var: &dyn Fn(&str) -> Option<String>) -> Selection {
         && chosen.is_none()
     {
         notices.push(format!(
-            "ignored {RETIRED}={old}: that name is retired and selects nothing; set {ENV} to \
-             choose the binary"
+            "ignored {RETIRED}={}: that name is retired and selects nothing; set {ENV} to \
+             choose the binary",
+            old.replace(['\n', '\r'], " ")
         ));
     }
     let pin = Pin::of(root);
@@ -331,6 +332,9 @@ fn absolute(path: &Path) -> PathBuf {
 
 fn version_of(program: &Path) -> Option<String> {
     let output = Command::new(program).arg("--version").output().ok()?;
+    if !output.status.success() {
+        return None;
+    }
     String::from_utf8_lossy(&output.stdout)
         .lines()
         .next()
@@ -770,6 +774,16 @@ mod tests {
     }
 
     #[test]
+    fn a_version_from_a_failed_version_call_is_no_version() {
+        let dir = tempfile::tempdir().unwrap();
+        let bin = dir.path().join(PROGRAM);
+        install(&bin, "#!/bin/sh\necho 'spec-spine 0.23.0'\nexit 1\n");
+        assert_eq!(version_of(&bin), None);
+        stub(&bin, "0.23.0");
+        assert_eq!(version_of(&bin).as_deref(), Some("0.23.0"));
+    }
+
+    #[test]
     fn the_pin_is_read_as_the_hooks_read_it() {
         assert_eq!(
             required_version("[meta]\nrequired_version = \"=0.23.0\"\n").as_deref(),
@@ -783,6 +797,18 @@ mod tests {
             required_version("[index]\nrequired_version = \"=1.0.0\"\n[meta]\n"),
             None
         );
+        // An inline comment after the value, and one after the table header,
+        // as the hooks' awk reads them.
+        assert_eq!(
+            required_version("[meta] # the pin\nrequired_version = \"=0.23.0\" # note\n")
+                .as_deref(),
+            Some("=0.23.0")
+        );
+        assert_eq!(
+            required_version("[meta]\n  required_version=\">=0.23, <0.24\"\n").as_deref(),
+            Some(">=0.23, <0.24")
+        );
+        assert_eq!(required_version("[meta]\nrequired_version = 0.23\n"), None);
         assert_eq!(exact("=0.23.0"), Some("0.23.0"));
         assert_eq!(exact("=0.23"), None);
         assert_eq!(exact(">=0.23, <0.24"), None);

@@ -29,7 +29,8 @@ spec_spine_pin() {
     }' "$1/spec-spine.toml" 2>/dev/null
 }
 spec_spine_version() {
-  "$1" --version 2>/dev/null | head -1 | awk '{print $NF}'
+  sv_out=$("$1" --version 2>/dev/null) || return 0
+  printf '%s\n' "$sv_out" | head -1 | awk '{print $NF}'
 }
 # 0 compatible, 1 incompatible, 2 not performed. An exact pin is compared with
 # the reported version; any other requirement is put to the binary itself,
@@ -54,7 +55,7 @@ spec_spine_resolve() {
   sc_pin=$(spec_spine_pin "$1")
   if [ -n "$sc_pin" ]; then sc_pinned="pin $sc_pin from $1/spec-spine.toml [meta] required_version"; else sc_pinned='unpinned'; fi
   if [ -n "${SPEC_SPINE_BIN:-}" ] && [ -z "${STATECRAFT_SPEC_SPINE:-}" ]; then
-    sc_notice="ignored SPEC_SPINE_BIN=$SPEC_SPINE_BIN: that name is retired and selects nothing; set STATECRAFT_SPEC_SPINE to choose the binary"
+    sc_notice="ignored SPEC_SPINE_BIN=$(printf '%s' "$SPEC_SPINE_BIN" | tr '\n\r' '  '): that name is retired and selects nothing; set STATECRAFT_SPEC_SPINE to choose the binary"
   fi
   if [ -n "${STATECRAFT_SPEC_SPINE:-}" ] && [ -n "${STATECRAFT_RUN_ID:-}" ]; then
     if [ -f "$STATECRAFT_SPEC_SPINE" ] && [ -x "$STATECRAFT_SPEC_SPINE" ]; then

@@ -8022,7 +8022,12 @@ here:
 - **The notice is one line**, "ignored SPEC_SPINE_BIN=<value>: that name is
   retired and selects nothing; set STATECRAFT_SPEC_SPINE to choose the
   binary", printed with the lines naming candidates passed over, which for the
-  pull-request gate is standard error.
+  pull-request gate is standard error. A newline or carriage return in the
+  value is printed as a space, so the value cannot add a line of its own.
+- **A version is read only from a `--version` call that exits 0**, in the
+  hooks and in the library alike; a binary whose version call fails reports
+  no version, which an exact pin reads as "not performed". The hooks read the
+  first line whatever the exit status before this entry.
 - **A managed session without the supervisor's path** keeps rule 5's
   fallback to rules 1 to 4 and its "version-checked, identity not verified"
   report; a value outside a managed session is an override and is put to the

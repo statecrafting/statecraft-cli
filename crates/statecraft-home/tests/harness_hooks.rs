@@ -2190,3 +2190,23 @@ fn one_variable_outside_a_managed_session_the_value_is_an_override() {
         );
     }
 }
+
+/// The retired name's value is quoted on one line: a value carrying a newline
+/// does not inject a line of its own into a hook's output.
+#[test]
+fn one_variable_the_retired_names_value_cannot_inject_a_line() {
+    for file in ALL {
+        let fixture = pinned_fixture(Some("=0.23.0"));
+        fixture.versioned(&fixture.on_path(), "path", "0.23.0", Probe::Admits);
+        let out = fixture.run_any(file, &[("SPEC_SPINE_BIN", "/x\nINJECTED line")]);
+        let seen = text(&out);
+        assert!(
+            !seen.lines().any(|l| l.starts_with("INJECTED")),
+            "{file}: {seen}"
+        );
+        assert!(
+            seen.contains("ignored SPEC_SPINE_BIN=/x INJECTED line: that name is retired"),
+            "{file}: {seen}"
+        );
+    }
+}
