@@ -1270,6 +1270,15 @@ family exit and JSON contract of draft #118 lands, so the usage-error envelope i
 once. Measure binary size and clean-build time before and after as the
 change's evidence.
 
+**2026-09-25: the provenance fixture follows the adopted producer.** With
+spec-spine 0.26.0 adopted (`docs/adoption/spec-spine.md`),
+`edited_authored_inputs_are_customized_information_and_an_edited_template_is_drifted`
+failed. Its stub executable still reported 0.25.0 while the project it
+initializes is pinned to the linked producer. The test is about an executable
+that satisfies that pin, so the stub now reports
+`statecraft_home::producer::PRODUCER_VERSION` and follows each adoption. The
+fixtures that state an older executable on purpose keep their versions.
+
 ## Verification
 
 Each line is one command. §3.7's rows are integration tests that **spawn the

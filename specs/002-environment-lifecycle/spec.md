@@ -8253,6 +8253,19 @@ against the recorded lines in `both_exit_tables_read_to_the_same_answers` and
 the same codes and change in their own pull request, because a hook change is
 an authority change (AGENTS.md).
 
+**2026-09-25: this repository adopts spec-spine 0.26.0, and the declared
+toolchain floor is 1.90 (owner, 2026-09-25).** The adoption is recorded in
+`docs/adoption/spec-spine.md` (`D-06`). Two parts of it reach this spec's
+territory. First, the setup fixtures that stand in for the adopted release now
+state it: the rendered-gate tests pin `=0.26.0` and read spec-spine's 132
+table by default, with the 0.25.0 table as the override. The hook fixture's
+unresolved-claim text is recorded as byte-identical under both releases. No
+assertion was weakened; each table is still asserted in full. Second,
+`spec-spine-core` and `spec-spine-types` 0.26.0 declare `rust-version = "1.90"`.
+The workspace's declared floor moves from 1.88 (this section, 2026-09-25) to
+1.90, measured: 1.90.0 builds the workspace, and Cargo refuses 1.89.0 naming
+those two crates.
+
 ## Verification
 
 `--fail-on-untraced` joined the corpus gate with this spec's first
