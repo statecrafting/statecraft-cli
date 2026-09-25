@@ -73,22 +73,44 @@ need_spec_spine() {
   fi
 }
 
-# spec-spine's own exit codes, translated into the family contract. This
-# table is the one place a spec-spine adoption changes. It reads the pinned
-# release's codes (0.25.0: 0 ok, 1 a validation failure or coupling drift, 2
-# stale, 3 an I/O, parse, schema, config or usage error, which includes a pin
-# this binary does not satisfy). spec-spine 0.26.0 moves stale to 1 and a pin
-# mismatch to 2, and adds 4 failed; its adoption rewrites these rows.
+# spec-spine's own exit codes, translated into the family contract. The
+# table is chosen by the release the repository pins, so one rendering serves
+# both sides of the 0.26.0 adoption. Before 0.26.0: 0 ok, 1 a validation
+# failure or coupling drift, 2 stale, 3 an I/O, parse, schema, config or usage
+# error, which includes a pin this binary does not satisfy. From 0.26.0
+# (spec-spine's 132), the family contract itself: 0 ok, 1 finding (stale
+# included), 2 refused (a pin not met, a containment refusal), 3 usage, 4
+# failed. A usage error from the gate's own fixed invocation is the gate
+# failing, so 3 reads as 4 under both tables.
+ss_family() {
+  ss_pin=$(pin_of spec-spine.toml)
+  [ -n "$ss_pin" ] || ss_pin=$("$SS" --version 2>/dev/null | sed -n 's/^spec-spine \([0-9][0-9.]*\).*/\1/p')
+  ss_major=$(printf '%s' "$ss_pin" | cut -d. -f1)
+  ss_minor=$(printf '%s' "$ss_pin" | cut -d. -f2)
+  [ "${ss_major:-0}" -gt 0 ] 2>/dev/null && return 0
+  [ "${ss_minor:-0}" -ge 26 ] 2>/dev/null
+}
 spec_spine() {
   ss_rc=0
   "$SS" "$@" || ss_rc=$?
-  case "$ss_rc" in
-    0) return 0 ;;
-    1) ss_to=1; ss_why="found the corpus does not pass" ;;
-    2) ss_to=1; ss_why="found a stale committed tree" ;;
-    3) ss_to=4; ss_why="did not perform the read (I/O, parse, schema, config or usage)" ;;
-    *) ss_to=4; ss_why="answered a code this gate does not know" ;;
-  esac
+  if ss_family; then
+    case "$ss_rc" in
+      0) return 0 ;;
+      1) ss_to=1; ss_why="found the corpus does not pass, or a stale committed tree" ;;
+      2) ss_to=2; ss_why="refused (a pin not met, or a containment refusal)" ;;
+      3) ss_to=4; ss_why="refused the gate's own invocation as a usage error" ;;
+      4) ss_to=4; ss_why="could not do its work (I/O, internal, schema)" ;;
+      *) ss_to=4; ss_why="answered a code this gate does not know" ;;
+    esac
+  else
+    case "$ss_rc" in
+      0) return 0 ;;
+      1) ss_to=1; ss_why="found the corpus does not pass" ;;
+      2) ss_to=1; ss_why="found a stale committed tree" ;;
+      3) ss_to=4; ss_why="did not perform the read (I/O, parse, schema, config or usage)" ;;
+      *) ss_to=4; ss_why="answered a code this gate does not know" ;;
+    esac
+  fi
   echo "gate.sh: spec-spine $* $ss_why (spec-spine exit $ss_rc, gate exit $ss_to)" >&2
   leave "$ss_to"
 }
