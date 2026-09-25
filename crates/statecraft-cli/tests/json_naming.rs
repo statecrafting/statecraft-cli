@@ -336,6 +336,14 @@ fn members(body: &[&str], kind: &str) -> Vec<Member> {
                 }
                 // A struct variant written on one line: `V { a: T, b: U },`.
                 if let (Some(open), Some(close)) = (code.find('{'), code.rfind('}')) {
+                    // An attribute inside such a line (a field's `rename`) is
+                    // not read here, so it refuses loudly instead of letting
+                    // the field pass unjudged: write the variant on several
+                    // lines, where the attribute scan reads it.
+                    assert!(
+                        !code[open + 1..close.max(open + 1)].contains("#["),
+                        "an attribute inside a one-line struct variant is not read: {t}"
+                    );
                     for part in code[open + 1..close.max(open + 1)].split(',') {
                         if let Some((name, _)) = part.split_once(':') {
                             let name = name.trim().trim_start_matches("r#");
@@ -426,6 +434,45 @@ fn every_grandfathered_type_still_needs_its_exemption() {
     assert!(
         stale.is_empty(),
         "grandfathered types that no longer need it; remove them: {stale:?}"
+    );
+}
+
+#[test]
+fn every_grandfathered_key_is_still_written_somewhere() {
+    // The same shrink rule for keys: a key is live while the source scan
+    // still finds it on a grandfathered type, or a product source still
+    // spells it as a string literal (a key built with `json!` or a map).
+    let details: Vec<String> = findings().into_iter().map(|f| f.detail).collect();
+    let mut files = Vec::new();
+    sources(&crates_dir(), &mut files);
+    let text: String = files
+        .iter()
+        .filter(|f| f.components().any(|c| c.as_os_str() == "src"))
+        .map(|f| std::fs::read_to_string(f).unwrap())
+        .collect();
+    let stale: Vec<&str> = GRANDFATHERED
+        .iter()
+        .flat_map(|g| g.keys.iter().copied())
+        .filter(|k| {
+            let quoted = format!("\"{k}\"");
+            // A kebab-case key written from an enum variant's name.
+            let variant: String = k
+                .split('-')
+                .map(|w| {
+                    let mut c = w.chars();
+                    c.next()
+                        .map(|f| f.to_uppercase().chain(c).collect::<String>())
+                        .unwrap_or_default()
+                })
+                .collect();
+            !details.iter().any(|d| d.ends_with(&quoted))
+                && !text.contains(&quoted)
+                && !(k.contains('-') && text.contains(&variant))
+        })
+        .collect();
+    assert!(
+        stale.is_empty(),
+        "grandfathered keys nothing writes any more; remove them: {stale:?}"
     );
 }
 

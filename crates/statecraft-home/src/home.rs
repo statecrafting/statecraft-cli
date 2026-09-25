@@ -302,12 +302,14 @@ where
             });
         }
     };
+    // Taken by reference at each use, so neither use depends on the closure
+    // being `Copy`.
     let malformed = |source| HomeError::Malformed {
         path: path.to_path_buf(),
         source,
     };
     let found = serde_json::from_slice::<Declared>(&bytes)
-        .map_err(malformed)?
+        .map_err(&malformed)?
         .version;
     if found != HOME_VERSION {
         return Err(HomeError::UnknownVersion {
@@ -315,7 +317,7 @@ where
             found,
         });
     }
-    serde_json::from_slice(&bytes).map_err(malformed)
+    serde_json::from_slice(&bytes).map_err(&malformed)
 }
 
 /// Write a JSON document this module owns, pretty and newline-terminated.
