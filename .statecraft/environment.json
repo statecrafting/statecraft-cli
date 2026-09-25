@@ -2,12 +2,12 @@
   "version": 2,
   "pins": {
     "product": "0.0.0",
-    "spec_spine": "0.26.0",
+    "spec_spine": "0.27.0",
     "adapters": {},
     "producer": {
       "name": "spec-spine-core",
-      "version": "0.26.0",
-      "checksum": "d98103ffdc172640b7be65dce28f2917394bada1baae7f89327635a00f7cae0a"
+      "version": "0.27.0",
+      "checksum": "04c0165ed03496a5c0622ef5f7fab6ecb54d5ec404921f5ee3b3155d2602d9b5"
     }
   },
   "entries": [
