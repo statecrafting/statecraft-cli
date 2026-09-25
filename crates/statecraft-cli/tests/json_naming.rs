@@ -286,7 +286,9 @@ fn members(body: &[&str], kind: &str) -> Vec<Member> {
             pending.push(' ');
             pending_code.push_str(&code_of(raw));
             pending_code.push(' ');
-            in_attr = !t.ends_with(']');
+            // Judged on the code, so a trailing comment does not hide the
+            // attribute's closing bracket.
+            in_attr = !code.trim_end().ends_with(']');
             continue;
         }
         if t.starts_with("//") || t.is_empty() {
@@ -532,4 +534,18 @@ fn a_blank_line_between_the_derive_and_the_item_does_not_hide_it() {
         found.iter().map(|f| &f.detail).collect::<Vec<_>>()
     );
     assert_eq!(found[0].item, "sample::Spaced");
+}
+
+#[test]
+fn a_trailing_comment_on_an_attribute_does_not_swallow_the_next_member() {
+    let body = [
+        "pub struct S {",
+        "    #[serde(default)] // a note",
+        "    pub first_field: u8,",
+        "    pub second_field: u8,",
+        "}",
+    ];
+    let m = members(&body, "struct");
+    let idents: Vec<_> = m.iter().map(|m| m.ident.as_str()).collect();
+    assert_eq!(idents, ["first_field", "second_field"]);
 }
