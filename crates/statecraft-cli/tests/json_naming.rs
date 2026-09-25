@@ -251,6 +251,9 @@ fn members(body: &[&str], kind: &str) -> Vec<Member> {
     let mut out = Vec::new();
     let mut depth = 0i32;
     let mut pending = String::new();
+    // The same attributes with string literals removed, so a `rename = "skip"`
+    // is not read as the `skip` marker.
+    let mut pending_code = String::new();
     let mut in_attr = false;
     let mut variant: Option<String> = None;
     for (n, raw) in body.iter().enumerate() {
@@ -269,6 +272,8 @@ fn members(body: &[&str], kind: &str) -> Vec<Member> {
         if in_attr || t.starts_with("#[") {
             pending.push_str(raw);
             pending.push(' ');
+            pending_code.push_str(&code_of(raw));
+            pending_code.push(' ');
             in_attr = !t.ends_with(']');
             continue;
         }
@@ -283,9 +288,9 @@ fn members(body: &[&str], kind: &str) -> Vec<Member> {
             .chars()
             .take_while(|c| c.is_alphanumeric() || *c == '_')
             .collect();
-        let skipped = has_word(&pending, "skip")
-            || has_word(&pending, "flatten")
-            || has_word(&pending, "skip_serializing");
+        let skipped = has_word(&pending_code, "skip")
+            || has_word(&pending_code, "flatten")
+            || has_word(&pending_code, "skip_serializing");
         let rename = if pending.contains("serde(") {
             attr_value(&pending, "rename")
         } else {
@@ -341,6 +346,7 @@ fn members(body: &[&str], kind: &str) -> Vec<Member> {
             }
         }
         pending.clear();
+        pending_code.clear();
         depth += code.matches('{').count() as i32 - code.matches('}').count() as i32;
         if depth <= 0 {
             break;
@@ -455,12 +461,14 @@ fn the_walker_flags_a_snake_case_key_at_any_depth_and_excuses_only_the_list() {
         "spec_spine": "grandfathered",
         "Upper": { "alsoFine": true },
     });
-    let found = json_naming::violations(&value);
+    // Sorted, so the assertion does not depend on the map's iteration order.
+    let mut found = json_naming::violations(&value);
+    found.sort();
     assert_eq!(
         found,
         [
-            "$: \"Upper\"".to_string(),
             "$.fineKey[]: \"nested_key\"".to_string(),
+            "$: \"Upper\"".to_string(),
         ]
     );
 }
@@ -471,4 +479,22 @@ fn the_rules_read_as_the_convention_says() {
     assert!(!is_key("spec_spine") && !is_key("Root") && !is_key("files-installed"));
     assert!(is_value("not-recorded") && is_value("qualified") && is_value("h1"));
     assert!(!is_value("NotRecorded") && !is_value("not_recorded") && !is_value(""));
+}
+
+#[test]
+fn a_rename_spelled_skip_is_not_read_as_the_skip_marker() {
+    let body = [
+        "pub struct S {",
+        "    #[serde(rename = \"skip\")]",
+        "    odd_one: u8,",
+        "    #[serde(skip)]",
+        "    gone_one: u8,",
+        "}",
+    ];
+    let m = members(&body, "struct");
+    let names: Vec<_> = m
+        .iter()
+        .map(|m| (m.ident.as_str(), m.rename.as_deref()))
+        .collect();
+    assert_eq!(names, [("odd_one", Some("skip"))]);
 }
