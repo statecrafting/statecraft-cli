@@ -35,7 +35,7 @@ use std::path::Path;
 /// The one registered profile.
 pub const PROFILE_ID: &str = "github-actions-rust";
 /// Its revision.
-pub const REVISION: u32 = 4;
+pub const REVISION: u32 = 5;
 /// Where the rendered policy document lives in the target.
 pub const POLICY_PATH: &str = ".statecraft/setup/github-actions-rust.json";
 /// The resume record, under the project's runtime state.
@@ -232,6 +232,7 @@ fn static_policy() -> serde_json::Value {
             },
             "never_an_approval": true,
         },
+        "authority_rule": authority_rule(),
         "prerequisites": {
             "local": ["an exact spec-spine pin", "rust-toolchain.toml", "Cargo.lock", "a git work tree"],
         },
@@ -287,6 +288,25 @@ pub fn jobs() -> serde_json::Value {
     })
 }
 
+/// Revision 5, rule 2: a candidate that changes the authority set needs the
+/// owner's exception for its run. The rendered workflow runs the exception
+/// job when the base's policy carries this rule, and `ci-gate.sh` enforces it
+/// from the base's policy whatever any job reports.
+pub fn authority_rule() -> serde_json::Value {
+    serde_json::json!({
+        "set": [
+            "every path in files",
+            POLICY_PATH,
+            "scripts/statecraft/*",
+            "the declared governance.authored_content script",
+        ],
+        "compared": "the candidate's own changes, base...head",
+        "requires": "the owner exception approved for the run; in the merge queue, for the run recorded for the entry's pull request",
+        "exception_environment": EXCEPTION_ENVIRONMENT,
+        "read_at_the_base": ["gate.sh", "install-spec-spine.sh", "ci-gate.sh", "ai-review.sh", "the declared authored-content script"],
+    })
+}
+
 /// What the product states and never performs.
 pub fn remote_obligations() -> Vec<String> {
     vec![
@@ -294,9 +314,11 @@ pub fn remote_obligations() -> Vec<String> {
         format!("the secret {CREDENTIAL} set by the operator ({CREDENTIAL_COMMAND}); its value is never in a log, a file or a message"),
         format!("branch protection on the default branch: require the status check ci-gate from GitHub Actions (app id {GATE_APP_ID}), and branches up to date"),
         "branch protection on the default branch: required approvals 0, and require code-owner review, so ci-gate with the AI review approves ordinary changes and a change to the profile's files needs a review its author cannot give (S-3, R2-2)".to_string(),
-        format!("the Environment {EXCEPTION_ENVIRONMENT} with the owner as a required reviewer, for owner exceptions: a release candidate whose review was skipped (S-1) and a pull request whose review returned findings (R2-1)"),
+        format!("the Environment {EXCEPTION_ENVIRONMENT} with the owner as a required reviewer, for owner exceptions: a release candidate whose review was skipped (S-1), a pull request whose review returned findings (R2-1), and a pull request that changes the authority set (revision 5)"),
         "a merge queue, if the default branch requires one: upgrade to revision 3 first, or merge the upgrade while no queue is required, because ci-gate reads its policy at the base and revision 2 states no merge_group rule; a queue entry is judged by the review recorded for its pull request, never by a second review (revision 3)".to_string(),
         "a new refusal (revision 4): a pull request whose base is not the default branch fails governance, because a stacked pull request merges into another branch and is never judged against the default branch; open each branch off the default branch, or set governance.require_default_base to false".to_string(),
+        format!("revision 5: a candidate never judges itself with its own gate. gate.sh, install-spec-spine.sh and the declared authored-content script run as they exist at the base, and a pull request that changes the authority set (the rendered workflows, scripts/statecraft/*, the policy, the declared authored-content script) blocks ci-gate until the owner approves the Environment {EXCEPTION_ENVIRONMENT} for that run. Every re-render of the profile, and every change to a file of the authority set, therefore needs the owner's approval once"),
+        "the upgrade from revision 4 to 5 is one pull request judged by the base's revision-4 ci-gate, which reports the authority change and does not block it, so the owner's approval of that pull request is procedural: approve it before merging (revision 5)".to_string(),
         "a repository that already runs these checks by hand keeps them by setting governance.enforce_coverage (index coverage --fail-on-untraced), governance.authored_content (the script's path; absent or not executable refuses), governance.authored_content_text (the title, the body and every commit message), governance.gate_each_commit (each commit's tree passes the gate and cargo fmt) and governance.require_signed_commits (each commit verified as signed by GitHub) (revision 4)".to_string(),
     ]
 }

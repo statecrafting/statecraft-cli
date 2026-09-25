@@ -115,6 +115,16 @@ struct Repo {
 
 impl Repo {
     fn new(at_base: &[&str], head_edits: &[(&str, &str)]) -> Repo {
+        Repo::new_with(&[], at_base, head_edits)
+    }
+
+    /// As [`Repo::new`], rendered with `params`; a declared authored-content
+    /// script is written (executable) before the render.
+    fn new_with(
+        params: &[(&str, serde_json::Value)],
+        at_base: &[&str],
+        head_edits: &[(&str, &str)],
+    ) -> Repo {
         let dir = tempfile::tempdir().unwrap();
         let root = dir.path();
         for args in [
@@ -128,7 +138,15 @@ impl Repo {
         write(root, "src/lib.rs", "pub fn one() -> u32 {\n    1\n}\n");
         write(root, "README.md", "# fixture\n");
         write(root, "spec-spine.toml", TOML);
-        render(root);
+        for (k, v) in params {
+            if *k == "governance.authored_content" {
+                let rel = v.as_str().unwrap();
+                std::fs::create_dir_all(root.join(rel).parent().unwrap()).unwrap();
+                statecraft_adapter::fixture::install_script(&root.join(rel), CHECK_AUTHORED, 0o755)
+                    .unwrap();
+            }
+        }
+        render_with(root, params);
         git(root, &["add", "src", "README.md", "spec-spine.toml"]);
         for rel in at_base {
             git(root, &["add", rel]);
@@ -153,6 +171,14 @@ impl Repo {
 
     fn root(&self) -> &Path {
         self.dir.path()
+    }
+
+    /// Commit `text` at `rel` on the topic branch; it becomes the head.
+    fn commit(&mut self, rel: &str, text: &str) {
+        write(self.root(), rel, text);
+        git(self.root(), &["add", rel]);
+        git(self.root(), &["commit", "--quiet", "-m", "edit"]);
+        self.head = git(self.root(), &["rev-parse", "HEAD"]);
     }
 }
 
@@ -339,55 +365,123 @@ fn run_step(
     extra: &[(&str, &str)],
     setup_stubs: impl Fn(&Path),
 ) -> Ran {
+    run_steps(
+        root,
+        &[(run.to_string(), env.to_vec())],
+        ctx,
+        extra,
+        setup_stubs,
+    )
+}
+
+/// Run several steps of one job in order, as a runner would: one
+/// `RUNNER_TEMP`, and what a step appends to `GITHUB_ENV` is in the
+/// environment of every later step. The first step that fails ends the job;
+/// the text is every step's, in order, and the outputs are the last step's.
+fn run_steps(
+    root: &Path,
+    steps: &[(String, Vec<(String, String)>)],
+    ctx: &BTreeMap<String, String>,
+    extra: &[(&str, &str)],
+    setup_stubs: impl Fn(&Path),
+) -> Ran {
     let runner = tempfile::tempdir().unwrap();
     let stubs_dir = runner.path().join("stub-state");
     std::fs::create_dir_all(&stubs_dir).unwrap();
     setup_stubs(&stubs_dir);
     let temp = runner.path().join("temp");
     std::fs::create_dir_all(&temp).unwrap();
-    let output = runner.path().join("output");
+    let github_env = runner.path().join("env");
+    std::fs::write(&github_env, "").unwrap();
     let summary = runner.path().join("summary");
-    std::fs::write(&output, "").unwrap();
     let path = format!(
         "{}:{}",
         stub_bin().display(),
         std::env::var("PATH").unwrap_or_default()
     );
-    let mut cmd = Command::new("bash");
-    cmd.args(["-e", "-c", &resolve(run, ctx)])
-        .current_dir(root)
-        .env_remove("CLAUDE_CODE_OAUTH_TOKEN")
-        .env_remove("GH_TOKEN")
-        .env_remove("AI_REVIEW_TMP")
-        .env("PATH", path)
-        .env("STUB_STATE", &stubs_dir)
-        .env("RUNNER_TEMP", &temp)
-        .env("GITHUB_OUTPUT", &output)
-        .env("GITHUB_STEP_SUMMARY", &summary);
-    for (k, v) in env {
-        cmd.env(k, resolve(v, ctx));
+    let mut text = String::new();
+    let mut exit = 0;
+    let mut outputs = BTreeMap::new();
+    for (run, env) in steps {
+        let output = runner.path().join("output");
+        std::fs::write(&output, "").unwrap();
+        let mut cmd = Command::new("bash");
+        cmd.args(["-e", "-c", &resolve(run, ctx)])
+            .current_dir(root)
+            .env_remove("CLAUDE_CODE_OAUTH_TOKEN")
+            .env_remove("GH_TOKEN")
+            .env_remove("AI_REVIEW_TMP")
+            .env_remove("STATECRAFT_GATE")
+            .env_remove("STATECRAFT_INSTALL")
+            .env_remove("BASE_SHA")
+            .env("PATH", &path)
+            .env("STUB_STATE", &stubs_dir)
+            .env("RUNNER_TEMP", &temp)
+            .env("GITHUB_ENV", &github_env)
+            .env("GITHUB_OUTPUT", &output)
+            .env("GITHUB_STEP_SUMMARY", &summary);
+        for (k, v) in std::fs::read_to_string(&github_env)
+            .unwrap()
+            .lines()
+            .filter_map(|l| l.split_once('='))
+        {
+            cmd.env(k, v);
+        }
+        for (k, v) in env {
+            cmd.env(k, resolve(v, ctx));
+        }
+        for (k, v) in extra {
+            cmd.env(k, v);
+        }
+        let out = cmd.output().unwrap();
+        outputs = std::fs::read_to_string(&output)
+            .unwrap()
+            .lines()
+            .filter_map(|l| l.split_once('='))
+            .map(|(k, v)| (k.to_string(), v.to_string()))
+            .collect();
+        text.push_str(&String::from_utf8_lossy(&out.stdout));
+        text.push_str(&String::from_utf8_lossy(&out.stderr));
+        exit = out.status.code().unwrap_or(-1);
+        if exit != 0 {
+            break;
+        }
     }
-    for (k, v) in extra {
-        cmd.env(k, v);
-    }
-    let out = cmd.output().unwrap();
-    let outputs = std::fs::read_to_string(&output)
-        .unwrap()
-        .lines()
-        .filter_map(|l| l.split_once('='))
-        .map(|(k, v)| (k.to_string(), v.to_string()))
-        .collect();
     Ran {
-        exit: out.status.code().unwrap_or(-1),
+        exit,
         outputs,
-        text: format!(
-            "{}{}",
-            String::from_utf8_lossy(&out.stdout),
-            String::from_utf8_lossy(&out.stderr)
-        ),
+        text,
         stubs: stubs_dir,
         runner,
     }
+}
+
+/// The step that reads the gate at the base (revision 5, rule 1).
+const READ_GATE: &str = "Read the gate at the base";
+
+/// Run a named step of a job as the job runs it: after the job's step that
+/// reads the gate at the base, when the job has one, so the named step runs
+/// the copy that step chose.
+fn run_job_step(
+    root: &Path,
+    job: &str,
+    name: &str,
+    ctx: &BTreeMap<String, String>,
+    extra: &[(&str, &str)],
+    setup_stubs: impl Fn(&Path),
+) -> Ran {
+    let wf = workflow(root, "statecraft-ci.yml");
+    let has_read = wf["jobs"][job]["steps"]
+        .as_sequence()
+        .unwrap()
+        .iter()
+        .any(|s| s["name"].as_str() == Some(READ_GATE));
+    let mut steps = Vec::new();
+    if has_read && name != READ_GATE {
+        steps.push(step(&wf, job, READ_GATE));
+    }
+    steps.push(step(&wf, job, name));
+    run_steps(root, &steps, ctx, extra, setup_stubs)
 }
 
 // ---------------------------------------------------------------- ci-gate
@@ -962,6 +1056,28 @@ fn inverting_a_blocking_branch_of_ci_gate_is_noticed() {
                 ),
                 1,
                 "no policy",
+            )
+        };
+        // Revision 5, rule 2: two branches need an authority change, on a
+        // pull request and in the queue. The base carries the policy but not
+        // the script, so the mutated copy runs.
+        let noticed = noticed || {
+            let mut auth = Repo::new(&[POLICY], &[]);
+            auth.commit("scripts/statecraft/helper.sh", "#!/bin/sh\n");
+            std::fs::write(auth.root().join("scripts/statecraft/ci-gate.sh"), &mutated).unwrap();
+            differs(
+                &run_gate(
+                    &auth,
+                    "pull_request",
+                    &needs(&ALL_OK, Some("no-findings"), false),
+                    "topic",
+                ),
+                1,
+                "changes the authority set and the owner exception",
+            ) || differs(
+                &run_queue(&auth, &queue("queue, authority change", 1)),
+                1,
+                "the queued group changes the authority set",
             )
         };
         let noticed = noticed || {
@@ -1719,6 +1835,25 @@ impl Gov {
         self.dir.path()
     }
 
+    /// The adoption (revision 5, rule 1): a base that carries none of the
+    /// profile, and a topic commit that adds it and the declared script.
+    fn adoption(params: &[(&str, serde_json::Value)]) -> Gov {
+        let gov = Gov::new(params);
+        let root = gov.root();
+        git(root, &["checkout", "--quiet", "--orphan", "bare"]);
+        git(root, &["rm", "-r", "--cached", "--quiet", "."]);
+        git(
+            root,
+            &["add", "src", "README.md", "spec-spine.toml", ".gitignore"],
+        );
+        git(root, &["commit", "--quiet", "-m", "a base with no gate"]);
+        let base = git(root, &["rev-parse", "HEAD"]);
+        git(root, &["checkout", "--quiet", "-B", "topic"]);
+        git(root, &["add", "-A"]);
+        git(root, &["commit", "--quiet", "-m", "adopt the gate"]);
+        Gov { base, ..gov }
+    }
+
     /// Commit `edits` (`None` deletes) with `message`; the new head.
     fn commit(&self, edits: &[(&str, Option<&str>)], message: &str) -> String {
         for (rel, text) in edits {
@@ -1762,8 +1897,11 @@ fn event<'a>(name: &'a str, head: &'a str) -> Event<'a> {
 
 /// Run one step of the rendered governance job, as a runner would.
 fn run_gov(gov: &Gov, name: &str, ev: &Event<'_>, stubs: impl Fn(&Path)) -> Ran {
-    let wf = workflow(gov.root(), "statecraft-ci.yml");
-    let (run, env) = step(&wf, "governance", name);
+    run_gov_job(gov, "governance", name, ev, stubs)
+}
+
+/// The expressions the governance and code jobs use, for one event.
+fn gov_ctx(gov: &Gov, ev: &Event<'_>) -> BTreeMap<String, String> {
     let mut ctx = BTreeMap::new();
     for (k, v) in [
         ("github.event_name", ev.name),
@@ -1779,18 +1917,40 @@ fn run_gov(gov: &Gov, name: &str, ev: &Event<'_>, stubs: impl Fn(&Path)) -> Ran 
             "github.event.pull_request.head.sha || github.event.merge_group.head_sha",
             ev.head,
         ),
+        // Revision 5: the base the gate is read at, on every event (on push
+        // it is the event's `before`), and the pull request's endpoints the
+        // authority change is computed from.
+        (
+            "github.event.pull_request.base.sha || github.event.merge_group.base_sha || github.event.before",
+            gov.base.as_str(),
+        ),
+        ("github.event.pull_request.base.sha", gov.base.as_str()),
+        ("github.event.pull_request.head.sha", ev.head),
         ("github.repository", "owner/fixture"),
         ("github.token", "fixture-token"),
     ] {
         ctx.insert(k.to_string(), v.to_string());
     }
+    ctx
+}
+
+/// Run one step of a rendered job that runs the gate, after the job's step
+/// that reads the gate at the base.
+fn run_gov_job(gov: &Gov, job: &str, name: &str, ev: &Event<'_>, stubs: impl Fn(&Path)) -> Ran {
     let path = format!(
         "{}:{}:{}",
         gov_bin().display(),
         stub_bin().display(),
         std::env::var("PATH").unwrap_or_default()
     );
-    run_step(gov.root(), &run, &env, &ctx, &[("PATH", &path)], stubs)
+    run_job_step(
+        gov.root(),
+        job,
+        name,
+        &gov_ctx(gov, ev),
+        &[("PATH", &path)],
+        stubs,
+    )
 }
 
 /// Rule 1: `governance.enforce_coverage` makes coverage a refusal; its
@@ -1841,24 +2001,52 @@ fn a_declared_authored_content_script_is_required_and_an_undeclared_one_runs_not
     assert_eq!(ran.exit, 1, "{}", ran.text);
     assert!(ran.text.contains("U+2014"), "{}", ran.text);
 
-    // Declared and absent: refused, never a silent pass.
-    let gov = Gov::new(&declared);
-    std::fs::remove_file(gov.root().join(DECLARED)).unwrap();
+    // Declared and absent: refused, never a silent pass. Revision 5 reads
+    // the script at the base, so "absent" is absent there and in the
+    // candidate: the base carries none, the candidate's copy is looked for,
+    // and there is none.
+    let mut gov = Gov::new(&declared);
+    gov.base = gov.commit(&[(DECLARED, None)], "remove the script");
     let ran = run_gov(&gov, "Governance", &event("push", &head(&gov)), |_| {});
     assert_eq!(ran.exit, 1, "{}", ran.text);
     assert!(ran.text.contains("which is absent"), "{}", ran.text);
+    assert!(
+        ran.text.contains(&format!(
+            "the base carries no {DECLARED}; the candidate's copy runs (adoption)"
+        )),
+        "{}",
+        ran.text
+    );
 
-    // Declared and not executable: refused.
-    let gov = Gov::new(&declared);
+    // Declared and not executable at the base: refused.
+    let mut gov = Gov::new(&declared);
     use std::os::unix::fs::PermissionsExt;
     std::fs::set_permissions(
         gov.root().join(DECLARED),
         std::fs::Permissions::from_mode(0o644),
     )
     .unwrap();
+    gov.base = gov.commit(
+        &[(DECLARED, Some(CHECK_AUTHORED))],
+        "drop the executable bit",
+    );
     let ran = run_gov(&gov, "Governance", &event("push", &head(&gov)), |_| {});
     assert_eq!(ran.exit, 1, "{}", ran.text);
     assert!(ran.text.contains("which is not executable"), "{}", ran.text);
+
+    // Revision 5: absent or not executable only in the candidate, the base's
+    // copy still runs. The candidate's change is an authority change, which
+    // ci-gate blocks without the owner's exception (tested below).
+    let gov = Gov::new(&declared);
+    std::fs::remove_file(gov.root().join(DECLARED)).unwrap();
+    let ran = run_gov(&gov, "Governance", &event("push", &head(&gov)), |_| {});
+    assert_eq!(ran.exit, 0, "{}", ran.text);
+    assert!(
+        ran.text
+            .contains(&format!("{DECLARED} read at the base {}", gov.base)),
+        "{}",
+        ran.text
+    );
 
     // Undeclared: the script is present and would refuse, and nothing runs it.
     let gov = Gov::new(&[]);
@@ -2082,20 +2270,14 @@ fn the_commit_walk_refuses_an_unsigned_commit_and_a_red_intermediate_tree() {
 #[test]
 fn the_code_gate_judges_nothing_without_member_crates_and_says_so() {
     let gov = Gov::new(&[]);
-    let wf = workflow(gov.root(), "statecraft-ci.yml");
-    let (run, env) = step(&wf, "code", "Build, test, clippy, fmt");
-    let path = format!(
-        "{}:{}",
-        gov_bin().display(),
-        std::env::var("PATH").unwrap_or_default()
-    );
+    let head = git(gov.root(), &["rev-parse", "HEAD"]);
     for empty in [true, false] {
-        let ran = run_step(
-            gov.root(),
-            &run,
-            &env,
-            &BTreeMap::new(),
-            &[("PATH", &path)],
+        // Revision 5: the step runs after the job reads the gate at the base.
+        let ran = run_gov_job(
+            &gov,
+            "code",
+            "Build, test, clippy, fmt",
+            &event("push", &head),
             |state| {
                 if empty {
                     std::fs::write(state.join("no-members"), "").unwrap();
@@ -2332,9 +2514,21 @@ fn revision_four_adds_steps_not_jobs_and_keeps_the_gate_read_only() {
     for path in ["~/.cargo/registry", "~/.cargo/git", "target"] {
         assert!(cargo["with"]["path"].as_str().unwrap().contains(path));
     }
-    // The pin step answers the key from the pin itself.
-    let (run, _) = step(&wf, "governance", "Read the spec-spine pin");
-    let ran = run_step(tmp.path(), &run, &[], &BTreeMap::new(), &[], |_| {});
+    // The pin step answers the key from the pin itself. Revision 5: it runs
+    // the gate the job read; with no base named, the candidate's copy.
+    let mut ctx = BTreeMap::new();
+    ctx.insert(
+        "github.event.pull_request.base.sha || github.event.merge_group.base_sha || github.event.before".to_string(),
+        String::new(),
+    );
+    let ran = run_job_step(
+        tmp.path(),
+        "governance",
+        "Read the spec-spine pin",
+        &ctx,
+        &[],
+        |_| {},
+    );
     assert_eq!(ran.exit, 0, "{}", ran.text);
     assert_eq!(ran.output("version"), "0.25.0");
     // The defaults keep a revision-3 project's behaviour, except the base.
@@ -2351,4 +2545,422 @@ fn revision_four_adds_steps_not_jobs_and_keeps_the_gate_read_only() {
         assert!(gate.contains(line), "{line}");
     }
     assert!(!gate.contains("if [ -x scripts/check-authored-content.sh ]"));
+}
+
+// ------------------------------------------------------------- revision 5
+
+/// Rule 1: a candidate that weakens `gate.sh`, and the declared
+/// authored-content script, is judged by the base's copies and fails: in the
+/// governance step, the title and body, the commit walk (every commit judged
+/// by the base's gate, never its own) and the code job.
+#[test]
+fn a_candidate_that_weakens_the_gate_is_judged_by_the_base_copy_and_fails() {
+    let gov = Gov::new(&[
+        ("governance.authored_content", serde_json::json!(DECLARED)),
+        ("governance.authored_content_text", serde_json::json!(true)),
+        ("governance.gate_each_commit", serde_json::json!(true)),
+    ]);
+    let weakened = gov.commit(
+        &[
+            (
+                "scripts/statecraft/gate.sh",
+                Some("#!/bin/sh\necho weakened gate\nexit 0\n"),
+            ),
+            (
+                DECLARED,
+                Some("#!/usr/bin/env bash\necho weakened check\nexit 0\n"),
+            ),
+            ("README.md", Some(&format!("# fixture {EM} x\n"))),
+            ("src/unformatted.rs", Some("fn  x(){}\n")),
+        ],
+        "weaken the gate",
+    );
+    let at_base = |ran: &Ran| {
+        assert!(
+            ran.text
+                .contains(&format!("gate.sh: read at the base {}", gov.base)),
+            "{}",
+            ran.text
+        );
+        assert!(!ran.text.contains("weakened gate"), "{}", ran.text);
+        assert!(!ran.text.contains("weakened check"), "{}", ran.text);
+    };
+
+    // The governance step: the base's script finds the dash.
+    let ran = run_gov(
+        &gov,
+        "Governance",
+        &event("pull_request", &weakened),
+        |_| {},
+    );
+    assert_eq!(ran.exit, 1, "{}", ran.text);
+    at_base(&ran);
+    assert!(
+        ran.text
+            .contains(&format!("{DECLARED} read at the base {}", gov.base)),
+        "{}",
+        ran.text
+    );
+    assert!(ran.text.contains("U+2014"), "{}", ran.text);
+
+    // The title: the base's script judges it.
+    let title = format!("a title {EM} with a dash");
+    let ran = run_gov(
+        &gov,
+        "Authored-content rules (title and body)",
+        &Event {
+            title: &title,
+            ..event("pull_request", &weakened)
+        },
+        |_| {},
+    );
+    assert_eq!(ran.exit, 1, "{}", ran.text);
+    at_base(&ran);
+
+    // The walk: the commit that weakens the gate is judged by the base's.
+    let ran = run_gov(
+        &gov,
+        "Every commit in the change",
+        &event("pull_request", &weakened),
+        |_| {},
+    );
+    assert_eq!(ran.exit, 1, "{}", ran.text);
+    at_base(&ran);
+    assert!(
+        ran.text.contains("never by the commit's own copy"),
+        "{}",
+        ran.text
+    );
+    assert!(
+        ran.text.contains(&format!(
+            "{} fails the gate or the format check at its own tree",
+            gov.short(&weakened)
+        )),
+        "{}",
+        ran.text
+    );
+
+    // The code job: the base's gate runs the format check, which fails.
+    let ran = run_gov_job(
+        &gov,
+        "code",
+        "Build, test, clippy, fmt",
+        &event("pull_request", &weakened),
+        |_| {},
+    );
+    assert_eq!(ran.exit, 1, "{}", ran.text);
+    at_base(&ran);
+    let cargo = ran.stub_file("cargo-calls").unwrap_or_default();
+    assert!(cargo.contains("fmt --all --check"), "{cargo}");
+}
+
+/// Rule 1, the adoption: a base that carries no gate runs the candidate's
+/// copies and says so; a base commit that cannot be read stops the job
+/// rather than falling back to the candidate.
+#[test]
+fn the_adoption_runs_the_candidates_gate_and_says_so() {
+    let mut gov = Gov::adoption(&[("governance.authored_content", serde_json::json!(DECLARED))]);
+    let head = git(gov.root(), &["rev-parse", "HEAD"]);
+    let ran = run_gov(&gov, "Governance", &event("pull_request", &head), |_| {});
+    assert_eq!(ran.exit, 0, "{}", ran.text);
+    for said in [
+        "gate.sh: the base carries none; the candidate's copy runs (adoption)",
+        "install-spec-spine.sh: the base carries none; the candidate's copy runs (adoption)",
+        "the base carries no scripts/check-authored-content.sh; the candidate's copy runs (adoption)",
+        "authored file(s) clean",
+    ] {
+        assert!(ran.text.contains(said), "{said}: {}", ran.text);
+    }
+    let ran = run_gov_job(
+        &gov,
+        "code",
+        "Build, test, clippy, fmt",
+        &event("pull_request", &head),
+        |_| {},
+    );
+    assert_eq!(ran.exit, 0, "{}", ran.text);
+    assert!(
+        ran.text
+            .contains("gate.sh: the base carries none; the candidate's copy runs (adoption)"),
+        "{}",
+        ran.text
+    );
+    // The exception job is not asked for: the base carries no policy, and
+    // ci-gate reports the adoption (the_adoption_reads_the_candidate_and_says_so).
+    let ran = run_gov(
+        &gov,
+        "Authority change",
+        &event("pull_request", &head),
+        |_| {},
+    );
+    assert_eq!(ran.exit, 0, "{}", ran.text);
+    assert_eq!(ran.output("authority_change"), "false");
+    assert!(
+        ran.text.contains("the base carries no policy"),
+        "{}",
+        ran.text
+    );
+
+    // An unreadable base is never the adoption.
+    gov.base = "1111111111111111111111111111111111111111".to_string();
+    let ran = run_gov(&gov, "Governance", &event("pull_request", &head), |_| {});
+    assert_eq!(ran.exit, 1, "{}", ran.text);
+    assert!(
+        ran.text.contains("cannot read the base commit"),
+        "{}",
+        ran.text
+    );
+    assert!(!ran.text.contains("(adoption)"), "{}", ran.text);
+}
+
+/// Every file of the authority set, as a candidate changes it: the rendered
+/// workflows, `scripts/statecraft/*` (a new file too), the policy and the
+/// declared authored-content script.
+const AUTHORITY_SET: [&str; 7] = [
+    ".github/workflows/statecraft-ci.yml",
+    ".github/workflows/statecraft-ai-review.yml",
+    "scripts/statecraft/gate.sh",
+    "scripts/statecraft/install-spec-spine.sh",
+    "scripts/statecraft/helper.sh",
+    POLICY,
+    DECLARED,
+];
+
+/// Every rendered file at the base, with the declared script; the candidate
+/// changes `rel` (or `README.md` and a script outside the set, for `None`).
+fn authority_repo(rel: Option<&str>) -> Repo {
+    let mut repo = Repo::new_with(
+        &[("governance.authored_content", serde_json::json!(DECLARED))],
+        &[
+            ".github/workflows/statecraft-ci.yml",
+            ".github/workflows/statecraft-ai-review.yml",
+            "scripts/statecraft",
+            POLICY,
+            DECLARED,
+        ],
+        &[],
+    );
+    match rel {
+        Some(rel) if rel == POLICY => {
+            let mut policy: serde_json::Value =
+                serde_json::from_str(&std::fs::read_to_string(repo.root().join(rel)).unwrap())
+                    .unwrap();
+            policy["jobs"]["review-exception"]["pull_request"] = serde_json::json!("inapplicable");
+            repo.commit(rel, &serde_json::to_string_pretty(&policy).unwrap());
+        }
+        Some(rel) => {
+            let before = std::fs::read_to_string(repo.root().join(rel)).unwrap_or_default();
+            repo.commit(rel, &format!("{before}# a candidate's edit\n"));
+        }
+        None => {
+            repo.commit("README.md", "# fixture, edited\n");
+            repo.commit("scripts/other.sh", "#!/bin/sh\necho outside the set\n");
+        }
+    }
+    repo
+}
+
+/// The workflow's own computation, in the governance job, of whether the
+/// exception job must run.
+fn authority_output(repo: &Repo) -> Ran {
+    let wf = workflow(repo.root(), "statecraft-ci.yml");
+    let (run, env) = step(&wf, "governance", "Authority change");
+    let mut ctx = BTreeMap::new();
+    ctx.insert(
+        "github.event.pull_request.base.sha".to_string(),
+        repo.base.clone(),
+    );
+    ctx.insert(
+        "github.event.pull_request.head.sha".to_string(),
+        repo.head.clone(),
+    );
+    run_step(repo.root(), &run, &env, &ctx, &[], |_| {})
+}
+
+/// Rule 2: a candidate that changes any file of the authority set blocks
+/// `ci-gate` without the owner's exception for its run and passes with it; a
+/// candidate workflow that skips the exception job fails closed, because the
+/// gate recomputes the change at the base. In the merge queue the exception
+/// recorded for the entry's pull request counts. On push it is reported.
+#[test]
+fn an_authority_change_blocks_without_the_owner_exception_and_passes_with_it() {
+    for rel in AUTHORITY_SET {
+        let repo = authority_repo(Some(rel));
+        let ok = |exception: &str, review: &str| {
+            needs(
+                &as_refs(&with(("review-exception", exception))),
+                Some(review),
+                false,
+            )
+        };
+        for (exception, review, want) in [
+            ("skipped", "no-findings", 1),
+            ("failure", "no-findings", 1),
+            ("cancelled", "no-findings", 1),
+            ("success", "no-findings", 0),
+            ("success", "findings", 0),
+            ("skipped", "findings", 1),
+        ] {
+            let ran = run_gate(&repo, "pull_request", &ok(exception, review), "topic");
+            assert_eq!(ran.exit, want, "{rel}, {exception}, {review}: {}", ran.text);
+            assert!(ran.text.contains("authority change"), "{rel}: {}", ran.text);
+            assert!(ran.text.contains(rel), "{rel}: {}", ran.text);
+            if want == 1 && review == "no-findings" {
+                assert!(
+                    ran.text
+                        .contains("changes the authority set and the owner exception"),
+                    "{rel}: {}",
+                    ran.text
+                );
+            }
+        }
+        // The workflow asks for the exception job.
+        let ran = authority_output(&repo);
+        assert_eq!(ran.exit, 0, "{rel}: {}", ran.text);
+        assert_eq!(
+            ran.output("authority_change"),
+            "true",
+            "{rel}: {}",
+            ran.text
+        );
+
+        // The queue: the exception recorded for the entry's pull request.
+        let ran = run_queue(
+            &repo,
+            &Queue {
+                exception: "skipped",
+                ..queue("queue, authority change", 1)
+            },
+        );
+        assert_eq!(ran.exit, 1, "{rel}: {}", ran.text);
+        assert!(
+            ran.text
+                .contains("the queued group changes the authority set"),
+            "{rel}: {}",
+            ran.text
+        );
+        let ran = run_queue(
+            &repo,
+            &Queue {
+                exception: "success",
+                ..queue("queue, authority change approved", 0)
+            },
+        );
+        assert_eq!(ran.exit, 0, "{rel}: {}", ran.text);
+        assert!(
+            ran.text
+                .contains("admitted by the owner exception recorded for #7"),
+            "{rel}: {}",
+            ran.text
+        );
+
+        // Push: the change was approved on its pull request; it is named.
+        let ran = run_gate(
+            &repo,
+            "push",
+            &needs(
+                &[
+                    ("governance", "success"),
+                    ("code", "success"),
+                    ("ai-review", "skipped"),
+                    ("review-exception", "skipped"),
+                ],
+                None,
+                false,
+            ),
+            "",
+        );
+        assert_eq!(ran.exit, 0, "{rel}: {}", ran.text);
+        assert!(ran.text.contains("reported on push"), "{rel}: {}", ran.text);
+    }
+}
+
+/// Rule 2's other side: a candidate that changes no file of the authority
+/// set is judged as before, needs no exception, and the workflow does not
+/// ask for one.
+#[test]
+fn a_candidate_that_changes_no_authority_file_is_unaffected() {
+    let repo = authority_repo(None);
+    let ran = run_gate(
+        &repo,
+        "pull_request",
+        &needs(&ALL_OK, Some("no-findings"), false),
+        "topic",
+    );
+    assert_eq!(ran.exit, 0, "{}", ran.text);
+    assert!(!ran.text.contains("authority change"), "{}", ran.text);
+    let ran = run_queue(&repo, &queue("queue, recorded no-findings", 0));
+    assert_eq!(ran.exit, 0, "{}", ran.text);
+    assert!(!ran.text.contains("authority change"), "{}", ran.text);
+    let ran = authority_output(&repo);
+    assert_eq!(ran.exit, 0, "{}", ran.text);
+    assert_eq!(ran.output("authority_change"), "false", "{}", ran.text);
+    assert!(ran.text.contains("no authority change"), "{}", ran.text);
+}
+
+/// Rules 1 and 2 in the rendered workflow: every job that runs the gate reads
+/// it at the base first, with the whole history; no later step runs a
+/// candidate's script; and the exception job runs for an authority change.
+#[test]
+fn revision_five_reads_the_gate_at_the_base_in_every_job_that_runs_it() {
+    let tmp = tempfile::tempdir().unwrap();
+    write(tmp.path(), "spec-spine.toml", TOML);
+    render(tmp.path());
+    let wf = workflow(tmp.path(), "statecraft-ci.yml");
+    for job in ["governance", "code"] {
+        let steps = wf["jobs"][job]["steps"].as_sequence().unwrap();
+        assert!(
+            steps[0]["uses"]
+                .as_str()
+                .unwrap()
+                .starts_with("actions/checkout@"),
+            "{job}"
+        );
+        assert_eq!(steps[0]["with"]["fetch-depth"].as_u64(), Some(0), "{job}");
+        assert_eq!(steps[1]["name"].as_str(), Some(READ_GATE), "{job}");
+        assert!(steps[1]["if"].is_null(), "{job}");
+        for s in &steps[2..] {
+            if let Some(run) = s["run"].as_str() {
+                for runs in ["sh scripts/statecraft/", "bash scripts/statecraft/"] {
+                    assert!(
+                        !run.contains(runs),
+                        "{job}: a step runs the candidate's script: {run}"
+                    );
+                }
+            }
+        }
+        let (_, env) = step(&wf, job, READ_GATE);
+        assert!(
+            env.iter().any(|(k, v)| k == "BASE_SHA"
+                && v.contains("github.event.before")
+                && v.contains("github.event.merge_group.base_sha")),
+            "{job}: {env:?}"
+        );
+    }
+    assert_eq!(
+        wf["jobs"]["governance"]["outputs"]["authority_change"].as_str(),
+        Some("${{ steps.authority.outputs.authority_change }}")
+    );
+    let exception = &wf["jobs"]["review-exception"];
+    let needs: Vec<&str> = exception["needs"]
+        .as_sequence()
+        .unwrap()
+        .iter()
+        .map(|v| v.as_str().unwrap())
+        .collect();
+    assert!(needs.contains(&"governance"), "{needs:?}");
+    assert!(
+        exception["if"]
+            .as_str()
+            .unwrap()
+            .contains("needs.governance.outputs.authority_change == 'true'")
+    );
+    // The policy states the rule the gate enforces and the workflow reads.
+    let policy: serde_json::Value =
+        serde_json::from_str(&std::fs::read_to_string(tmp.path().join(POLICY)).unwrap()).unwrap();
+    assert_eq!(policy["revision"], 5);
+    assert_eq!(
+        policy["authority_rule"]["exception_environment"],
+        "statecraft-review-exception"
+    );
 }
