@@ -576,10 +576,9 @@ checklist as the direction on 2026-09-25.** The release pipeline stays
 proposed: it waited on the attest-ledger item, and that blocker is removed by
 the change that takes `attest-ledger-core` from crates.io at `=0.1.0` (pull
 request #148, whose section 5 entry in spec `003` records the diff), so the pipeline is the next proposal to bring
-back. Two labels in the checklist below are this entry's provenance: *item P*
-is the parser entry of spec `006` section 5 (clap for per-verb arguments,
-adopted 2026-09-25) and *item N* is the JSON naming and strict-input entry of
-spec `006` section 5 (adopted 2026-09-25). Nothing here lifts `F-02`:
+back. The checklist below cites two spec `006` section 5 entries, both adopted
+2026-09-25, by their provenance labels in parentheses: the parser entry (clap
+for per-verb arguments) and the JSON naming and strict-input entry. Nothing here lifts `F-02`:
 publication stays deferred until the owner
 lifts it separately, and no grade above *specified* is claimed for anything
 below.
