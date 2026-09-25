@@ -1069,7 +1069,7 @@ completions.
 | `run <spec-id>` beside `run list|show|reconcile` | reserved words stated in `Verb::parse` | expressible (`args_conflicts_with_subcommands`), but the reservation must be restated and tested |
 | JSON on usage errors | stderr text only | the same unless we render clap's error into the family envelope (see the family exit and JSON contract proposal, draft #118) |
 | Dependencies | none added | about 12 crates (`clap`, `clap_builder`, `clap_lex`, `clap_derive`, `heck`, `anstream`, `anstyle*`, `colorchoice`, `strsim`, ...) plus `clap_complete`; `syn`, `quote` and `proc-macro2` are already in the lock via `serde_derive` |
-| Binary size | the current release binary is 5.28 MB (5,283,824 bytes, an existing `target/release` build, not rebuilt for this entry) | commonly several hundred KB more with derive and help; to be measured, not assumed |
+| Binary size | not measured for this entry; the implementing change measures the release binary before its change | measured by the same change after it, on the same machine |
 | Build time | none added | `clap_derive` adds a proc-macro compile to a clean build |
 
 *Assessment.* The verb layer is small, closed and already consistent; clap's
