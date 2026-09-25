@@ -1,15 +1,12 @@
 # Rendered by Statecraft from profile github-actions-rust revision {{sc:profile.revision}}
 # (identity {{sc:profile.identity}}). A managed file and a member of this
 # repository's authority set. Called by statecraft-ci.yml only; it declares
-# the two credentials it may use by name (revision 8: the API key when set,
-# else the OAuth token) and is never given `secrets: inherit`.
+# the one credential it needs by name and is never given `secrets: inherit`.
 name: statecraft-ai-review
 
 on:
   workflow_call:
     secrets:
-      ANTHROPIC_API_KEY:
-        required: false
       CLAUDE_CODE_OAUTH_TOKEN:
         required: false
     outputs:
@@ -44,7 +41,6 @@ jobs:
       - name: Review
         id: review
         env:
-          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           GH_TOKEN: ${{ github.token }}
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
