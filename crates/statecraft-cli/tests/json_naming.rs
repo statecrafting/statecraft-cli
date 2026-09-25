@@ -74,6 +74,20 @@ fn code_of(line: &str) -> String {
             in_str = true;
             continue;
         }
+        // A char literal ('"', '\'', '\\') is skipped whole, so its quote does
+        // not open a string; a lifetime ('a) has no closing quote and stays.
+        if c == '\'' {
+            let mut ahead = chars.clone();
+            let lit = match ahead.next() {
+                Some('\\') => ahead.next().is_some() && ahead.next() == Some('\''),
+                Some(_) => ahead.next() == Some('\''),
+                None => false,
+            };
+            if lit {
+                chars = ahead;
+                continue;
+            }
+        }
         if c == '/' && chars.peek() == Some(&'/') {
             break;
         }
@@ -596,4 +610,14 @@ fn a_trailing_comment_on_an_attribute_does_not_swallow_the_next_member() {
     let m = members(&body, "struct");
     let idents: Vec<_> = m.iter().map(|m| m.ident.as_str()).collect();
     assert_eq!(idents, ["first_field", "second_field"]);
+}
+
+#[test]
+fn a_char_literal_quote_does_not_open_a_string() {
+    assert_eq!(code_of("let q = '\"'; // note"), "let q = ; ");
+    assert_eq!(code_of("let e = '\\''; x"), "let e = ; x");
+    assert_eq!(
+        code_of("fn f<'a>(s: &'a str) {}"),
+        "fn f<'a>(s: &'a str) {}"
+    );
 }
