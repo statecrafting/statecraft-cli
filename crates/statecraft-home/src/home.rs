@@ -39,10 +39,10 @@ pub const HOME_VERSION: u32 = 1;
 /// either, `./.statecraft`, which keeps a process in a stripped environment
 /// answering rather than panicking.
 pub fn resolve() -> PathBuf {
-    if let Ok(explicit) = std::env::var(HOME_ENV) {
-        if !explicit.is_empty() {
-            return PathBuf::from(explicit);
-        }
+    if let Ok(explicit) = std::env::var(HOME_ENV)
+        && !explicit.is_empty()
+    {
+        return PathBuf::from(explicit);
     }
     let base = std::env::var("HOME").unwrap_or_else(|_| ".".to_string());
     Path::new(&base).join(HOME_DIR)

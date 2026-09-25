@@ -420,14 +420,14 @@ pub fn doctor(
         });
     }
 
-    if let Some(found) = &observed.product {
-        if *found != manifest.pins.product {
-            report.findings.push(Finding::PinMismatch {
-                pin: "product".into(),
-                recorded: manifest.pins.product.clone(),
-                found: found.clone(),
-            });
-        }
+    if let Some(found) = &observed.product
+        && *found != manifest.pins.product
+    {
+        report.findings.push(Finding::PinMismatch {
+            pin: "product".into(),
+            recorded: manifest.pins.product.clone(),
+            found: found.clone(),
+        });
     }
     // Spec 002 section 5, 2026-09-24, provenance item 4. The declared pin is
     // compared twice, and each disagreement is its own line naming both
@@ -441,22 +441,22 @@ pub fn doctor(
             "spec-spine unpinned: the project declares no exact required_version".to_string(),
         );
     } else {
-        if let Some(producer) = &manifest.pins.producer {
-            if producer.version != *declared {
-                report.notes.push(format!(
-                    "pin spec-spine: declared {declared}, producer identity {}@{}",
-                    producer.name, producer.version
-                ));
-            }
+        if let Some(producer) = &manifest.pins.producer
+            && producer.version != *declared
+        {
+            report.notes.push(format!(
+                "pin spec-spine: declared {declared}, producer identity {}@{}",
+                producer.name, producer.version
+            ));
         }
-        if let Some(found) = &observed.spec_spine {
-            if found != declared {
-                report.findings.push(Finding::PinMismatch {
-                    pin: "spec-spine".into(),
-                    recorded: declared.clone(),
-                    found: found.clone(),
-                });
-            }
+        if let Some(found) = &observed.spec_spine
+            && found != declared
+        {
+            report.findings.push(Finding::PinMismatch {
+                pin: "spec-spine".into(),
+                recorded: declared.clone(),
+                found: found.clone(),
+            });
         }
     }
     if manifest.pins.producer.is_none() {
@@ -476,14 +476,14 @@ pub fn doctor(
         );
     }
     for d in declarations {
-        if let Some(recorded) = manifest.pins.adapters.get(&d.name) {
-            if *recorded != d.version {
-                report.findings.push(Finding::PinMismatch {
-                    pin: format!("adapter {}", d.name),
-                    recorded: recorded.clone(),
-                    found: d.version.clone(),
-                });
-            }
+        if let Some(recorded) = manifest.pins.adapters.get(&d.name)
+            && *recorded != d.version
+        {
+            report.findings.push(Finding::PinMismatch {
+                pin: format!("adapter {}", d.name),
+                recorded: recorded.clone(),
+                found: d.version.clone(),
+            });
         }
     }
 

@@ -1008,13 +1008,13 @@ pub fn disagreements(manifest: &Manifest) -> Vec<String> {
         if seen_ids.contains(&r.id.as_str()) {
             out.push(format!("the journal records identity {} twice", r.id));
         }
-        if let Some(reverted) = &r.reverts {
-            if !seen_ids.contains(&reverted.as_str()) {
-                out.push(format!(
-                    "record {} reverses {reverted}, which the journal does not record before it",
-                    r.id
-                ));
-            }
+        if let Some(reverted) = &r.reverts
+            && !seen_ids.contains(&reverted.as_str())
+        {
+            out.push(format!(
+                "record {} reverses {reverted}, which the journal does not record before it",
+                r.id
+            ));
         }
         seen_ids.push(&r.id);
     }
@@ -1298,14 +1298,16 @@ pub fn apply(
     let (_held, manifest, manifest_digest) = locked_manifest(ctx.root)?;
     refuse_disagreement(&manifest)?;
 
-    if let Some(last) = latest(&manifest, path) {
-        if last.from == from && last.to == to && Ownership::of(&manifest, path) == to {
-            let now = open_regular(ctx.root, path)?;
-            if expected_digest(&manifest, last).as_deref() == Some(now.digest.as_str()) {
-                return Ok(Outcome::AlreadySatisfied {
-                    record: last.clone(),
-                });
-            }
+    if let Some(last) = latest(&manifest, path)
+        && last.from == from
+        && last.to == to
+        && Ownership::of(&manifest, path) == to
+    {
+        let now = open_regular(ctx.root, path)?;
+        if expected_digest(&manifest, last).as_deref() == Some(now.digest.as_str()) {
+            return Ok(Outcome::AlreadySatisfied {
+                record: last.clone(),
+            });
         }
     }
 

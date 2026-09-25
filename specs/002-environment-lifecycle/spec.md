@@ -7900,6 +7900,26 @@ before it merges, as revision 5's implementation entry says. From the next
 pull request on, a change to any authority-set file here blocks without that
 approval.
 
+**2026-09-25: the declared `rust-version` is 1.88, the measured floor, and
+the let chains it permits are applied (owner, 2026-09-25, "check this
+repository's declared rust-version and fix it with evidence").** The root
+`Cargo.toml` declared 1.85, and it never built: under 1.87.0,
+`cargo check --workspace --all-targets --locked --keep-going` fails in two
+dependencies, `spec-spine-core` 0.25.0 (18 errors) and `attest-ledger-core`
+(1 error), each `E0658` on a let chain, which stabilised in 1.88; both
+dependencies declare 1.85 themselves. Under 1.88.0, 1.89.0 and 1.90.0 the
+same check passes, and `cargo +1.88.0 build --workspace --all-targets
+--locked` finishes. The pinned toolchain in `rust-toolchain.toml` (1.96.0) is
+unchanged and is still not the floor. Raising the floor makes clippy's
+`collapsible_if` suggest let chains, so the nested `if` blocks it names across
+`statecraft-adapter`, `statecraft-cli`, `statecraft-envelope`,
+`statecraft-environment`, `statecraft-home` and `statecraft-run` were
+collapsed by `cargo clippy --fix` and `cargo fmt`, with no other edit; the one
+comment explaining why a let chain was avoided (`plan.rs`) is removed with the
+reason it gave. Nothing checks the floor in CI, which is how 1.85 survived;
+adding such a check is a change to the check suite and is left to the owner.
+spec-spine 0.26.0 declares 1.90, so adopting it raises this floor again.
+
 **2026-09-25: spec `006`'s JSON naming convention, this spec's half (adopted by
 the owner on 2026-09-25; spec `006` section 5 of that date).** Two changes to
 this spec's crates, and what stays.

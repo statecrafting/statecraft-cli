@@ -1109,12 +1109,10 @@ fn harness_upgrade(ports: &Ports<'_>, root: &Path) -> Answer {
         };
     let changed = upgrade.from.as_deref() != Some(upgrade.to.as_str());
     crate::required::apply_upgrade(&mut manifest, &upgrade);
-    if changed {
-        if let Err(e) = manifest.write(root) {
-            return Answer::Failed {
-                reason: e.to_string(),
-            };
-        }
+    if changed && let Err(e) = manifest.write(root) {
+        return Answer::Failed {
+            reason: e.to_string(),
+        };
     }
     // The standing is read back from what was written, not from what was
     // intended: the two differ exactly when something went wrong quietly.
@@ -1306,20 +1304,20 @@ fn home_change(ports: &Ports<'_>, mode: flow::Mode, intent: settings::Intent) ->
                 reason: e.to_string(),
             };
         }
-        if !ports.home.personal_file().exists() {
-            if let Err(e) = Personal::default().write(ports.home) {
+        if !ports.home.personal_file().exists()
+            && let Err(e) = Personal::default().write(ports.home)
+        {
+            return Answer::Failed {
+                reason: e.to_string(),
+            };
+        }
+        for file in [ports.home.delivery_file(), ports.home.modifications_file()] {
+            if !file.exists()
+                && let Err(e) = std::fs::write(&file, "[]\n")
+            {
                 return Answer::Failed {
                     reason: e.to_string(),
                 };
-            }
-        }
-        for file in [ports.home.delivery_file(), ports.home.modifications_file()] {
-            if !file.exists() {
-                if let Err(e) = std::fs::write(&file, "[]\n") {
-                    return Answer::Failed {
-                        reason: e.to_string(),
-                    };
-                }
             }
         }
     }
@@ -1461,12 +1459,10 @@ fn enrollment(ports: &Ports<'_>, root: &Path, next: Enrollment) -> Answer {
     let changed = manifest.project.enrollment != next;
     manifest.project.enrollment = next.clone();
     let _ = ports;
-    if changed {
-        if let Err(e) = manifest.write(root) {
-            return Answer::Failed {
-                reason: e.to_string(),
-            };
-        }
+    if changed && let Err(e) = manifest.write(root) {
+        return Answer::Failed {
+            reason: e.to_string(),
+        };
     }
     Answer::Enrollment(Box::new(EnrollmentChange {
         root: root.display().to_string(),
