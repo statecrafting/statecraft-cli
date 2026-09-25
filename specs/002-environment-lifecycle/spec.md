@@ -7722,6 +7722,18 @@ written to the log that the refusal prints. Tests:
 `a_commit_without_an_exact_pin_is_refused_and_says_why` in
 `setup_workflows.rs`, each observed failing against the previous `gate.sh`.
 
+**2026-09-24: two more corrections to revision 4, from the second live AI
+review of #138.** (1) `ai-review.sh` posted a skip notice on every run, so a
+re-run of the job (a transient skip is the likely case) repeated it. The
+notice now carries a marker naming its class and head, and a run that finds
+that marker in the pull request's thread does not post again; a thread that
+cannot be read gets the notice anyway, because a duplicate is better than an
+invisible skip. The skip is recorded either way. (2) The empty-workspace guard
+added above matched cargo's JSON text as serialized; whitespace is now removed
+before matching, and a failed `cargo metadata` stops the gate. Tests:
+`a_rerun_does_not_repeat_a_skip_notice`, and the guard's test now feeds spaced
+JSON; both observed failing against the previous scripts.
+
 ## Verification
 
 `--fail-on-untraced` joined the corpus gate with this spec's first
