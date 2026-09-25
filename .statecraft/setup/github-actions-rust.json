@@ -1,4 +1,22 @@
 {
+  "authority_rule": {
+    "compared": "the candidate's own changes, base...head",
+    "exception_environment": "statecraft-review-exception",
+    "read_at_the_base": [
+      "gate.sh",
+      "install-spec-spine.sh",
+      "ci-gate.sh",
+      "ai-review.sh",
+      "the declared authored-content script"
+    ],
+    "requires": "the owner exception approved for the run; in the merge queue, for the run recorded for the entry's pull request",
+    "set": [
+      "every path in files",
+      ".statecraft/setup/github-actions-rust.json",
+      "scripts/statecraft/*",
+      "the declared governance.authored_content script"
+    ]
+  },
   "commands": {
     "code": [
       [
@@ -60,38 +78,38 @@
   },
   "files": [
     {
-      "digest": "64dd265fe3c68ff8e2949983c73d1126382ccfb372eac5c151442ab34a634652",
+      "digest": "b1c6de4069da60c4e56a5ae50c672bd0d6d055d8b75bf1cac50697f33f5045a6",
       "path": ".github/workflows/statecraft-ci.yml",
       "role": "workflow"
     },
     {
-      "digest": "b78c05ee6bf03abf4cf8b4a7b11ad122158541d935de3a5f1178e8d88c8fd897",
+      "digest": "8a12c49fc7416d66a3916bea571fecc2532605c06953e89e545e5ed419e857e2",
       "path": ".github/workflows/statecraft-ai-review.yml",
       "role": "workflow"
     },
     {
-      "digest": "68597f3c65a88529c1dd42efb95bba7d1013d5586c4742d0cb5616732764e822",
+      "digest": "66e984bf269e77541328a7bf7e5109db7106c18964f63fcd4ec3f27efe1972ec",
       "path": "scripts/statecraft/install-spec-spine.sh",
       "role": "script"
     },
     {
-      "digest": "b087e75e83155fb17f5491490494a7e79586f3a44502cb4a9ab99482bbd2f42f",
+      "digest": "8c470c74e580a275c473b7e307de1a0a19eb8aa32e47cb85da6b1f8ccfd1f3e2",
       "path": "scripts/statecraft/gate.sh",
       "role": "script"
     },
     {
-      "digest": "01c82eb19af170b97ece19e3afc158692c9229827aa0f5b4143a0fc5747dcc1a",
+      "digest": "a4b64d18d17439e5487ff9b7981cdb7354b0dc1dfd00e06ff9e323e2a496c373",
       "path": "scripts/statecraft/ci-gate.sh",
       "role": "script"
     },
     {
-      "digest": "88fadb4c6ce82a999bae15b8de8b212b7c6c81013135ee3b03b4c7c8ea4141d8",
+      "digest": "a1728ba52546a2b13afadb781867b0ad5ab8b5f35b7e12502e6110b82b4c576a",
       "path": "scripts/statecraft/ai-review.sh",
       "role": "script"
     }
   ],
   "id": "github-actions-rust",
-  "identity": "b44e0a0506e322824ea9870b331d4b3a757ddfd92aaae4489f9d36938339897c",
+  "identity": "2e10116fb4187045a8e6d64f5a2bb5bd84a4389f439412a12b1765a06b5e5897",
   "jobs": {
     "ai-review": {
       "merge_group": "recorded-review",
@@ -152,9 +170,12 @@
     "the secret CLAUDE_CODE_OAUTH_TOKEN set by the operator (gh secret set CLAUDE_CODE_OAUTH_TOKEN); its value is never in a log, a file or a message",
     "branch protection on the default branch: require the status check ci-gate from GitHub Actions (app id 15368), and branches up to date",
     "branch protection on the default branch: required approvals 0, and require code-owner review, so ci-gate with the AI review approves ordinary changes and a change to the profile's files needs a review its author cannot give (S-3, R2-2)",
-    "the Environment statecraft-review-exception with the owner as a required reviewer, for owner exceptions: a release candidate whose review was skipped (S-1) and a pull request whose review returned findings (R2-1)",
+    "the Environment statecraft-review-exception with the owner as a required reviewer, for owner exceptions: a release candidate whose review was skipped (S-1), a pull request whose review returned findings (R2-1), and a pull request that changes the authority set (revision 5)",
     "a merge queue, if the default branch requires one: upgrade to revision 3 first, or merge the upgrade while no queue is required, because ci-gate reads its policy at the base and revision 2 states no merge_group rule; a queue entry is judged by the review recorded for its pull request, never by a second review (revision 3)",
     "a new refusal (revision 4): a pull request whose base is not the default branch fails governance, because a stacked pull request merges into another branch and is never judged against the default branch; open each branch off the default branch, or set governance.require_default_base to false",
+    "revision 5: a candidate never judges itself with its own gate. gate.sh, install-spec-spine.sh and the declared authored-content script run as they exist at the base, and a pull request that changes the authority set (the rendered workflows, scripts/statecraft/*, the policy, the declared authored-content script) blocks ci-gate until the owner approves the Environment statecraft-review-exception for that run. Every re-render of the profile, and every change to a file of the authority set, therefore needs the owner's approval once",
+    "the upgrade from revision 4 to 5 is one pull request judged by the base's revision-4 ci-gate, which reports the authority change and does not block it, so the owner's approval of that pull request is procedural: approve it before merging (revision 5)",
+    "revision 6: every file under .github/workflows/ is in the authority set, rendered or not, so adding, changing or removing any workflow needs the owner's approval once; a workflow the profile does not render could otherwise report a check named ci-gate",
     "a repository that already runs these checks by hand keeps them by setting governance.enforce_coverage (index coverage --fail-on-untraced), governance.authored_content (the script's path; absent or not executable refuses), governance.authored_content_text (the title, the body and every commit message), governance.gate_each_commit (each commit's tree passes the gate and cargo fmt) and governance.require_signed_commits (each commit verified as signed by GitHub) (revision 4)"
   ],
   "review": {
@@ -179,5 +200,5 @@
     "tool": "claude-code",
     "tool_version": "2.1.116"
   },
-  "revision": 4
+  "revision": 6
 }

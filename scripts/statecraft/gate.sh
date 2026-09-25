@@ -1,12 +1,23 @@
 #!/bin/sh
-# Rendered by Statecraft from profile github-actions-rust revision 4.
+# Rendered by Statecraft from profile github-actions-rust revision 6.
 # The one definition of this repository's gate: `make gate` and `make code`
 # run it locally, and CI runs the same script, so the two cannot drift. Only
 # the repository-local .tooling/bin/spec-spine is used; a spec-spine elsewhere
 # on PATH never answers for this repository.
+#
+# In CI this script is read at the base commit and run against the candidate's
+# tree (revision 5, rule 1), so a candidate never judges itself with its own
+# gate. BASE_SHA, when set, names that base: the declared authored-content
+# script is read there too, and the commit walk judges every commit with this
+# copy. A local run names no base and runs the working tree's copies.
 set -eu
 
 SS=.tooling/bin/spec-spine
+BASE_SHA="${BASE_SHA:-}"
+case "$BASE_SHA" in 0000000000000000000000000000000000000000) BASE_SHA="" ;; esac
+# This script's own path, for the commit walk, which judges each commit with
+# the copy that is running (the base's in CI), never the commit's own.
+SELF="$(cd "$(dirname "$0")" && pwd)/$(basename "$0")"
 
 # The project's governance parameters (revision 4), rendered from its setup
 # block. Each default keeps a revision-3 project's behaviour except the base
@@ -46,6 +57,38 @@ need_authored_content() {
   fi
 }
 
+# The declared authored-content script, as it exists at the base (revision 5,
+# rule 1): the candidate's copy cannot weaken the check that judges it. Sets AC
+# to the path to run. With no base named (a local run) the working tree's copy
+# runs; a base that carries no such file is the adoption, where the
+# candidate's copy runs, and it is said.
+authored_content() {
+  if [ -n "$BASE_SHA" ]; then
+    if ! git cat-file -e "${BASE_SHA}^{commit}" 2>/dev/null; then
+      echo "gate.sh: cannot read the base commit $BASE_SHA" >&2
+      exit 1
+    fi
+    entry=$(git ls-tree "$BASE_SHA" -- "$AUTHORED_CONTENT")
+    if [ -n "$entry" ]; then
+      case "$entry" in
+        100755\ *) ;;
+        *)
+          echo "gate.sh: governance.authored_content names $AUTHORED_CONTENT, which is not executable at the base $BASE_SHA" >&2
+          exit 1
+          ;;
+      esac
+      AC=$(mktemp "${RUNNER_TEMP:-${TMPDIR:-/tmp}}/statecraft-authored-content.XXXXXX")
+      git show "$BASE_SHA:$AUTHORED_CONTENT" > "$AC"
+      chmod 755 "$AC"
+      echo "gate.sh: $AUTHORED_CONTENT read at the base $BASE_SHA"
+      return 0
+    fi
+    echo "gate.sh: the base carries no $AUTHORED_CONTENT; the candidate's copy runs (adoption)"
+  fi
+  need_authored_content
+  AC="$(pwd)/$AUTHORED_CONTENT"
+}
+
 # The exact pin a spec-spine.toml states, read as install-spec-spine.sh reads
 # it; empty when there is none.
 pin_of() {
@@ -75,8 +118,8 @@ case "$1" in
     fi
     "$SS" index check --fail-on-unresolved
     if [ -n "$AUTHORED_CONTENT" ]; then
-      need_authored_content
-      "./$AUTHORED_CONTENT"
+      authored_content
+      "$AC"
     else
       echo "gate.sh: no authored-content script is declared (governance.authored_content), so none runs"
     fi
@@ -132,7 +175,7 @@ case "$1" in
       echo "gate.sh: governance.authored_content_text is false; the title and body are not judged"
       exit 0
     fi
-    need_authored_content
+    authored_content
     tmp="${RUNNER_TEMP:-${TMPDIR:-/tmp}}"
     text="$tmp/statecraft-pr-text.txt"
     case "${EVENT_NAME:-}" in
@@ -154,7 +197,7 @@ case "$1" in
         exit 1
         ;;
     esac
-    "./$AUTHORED_CONTENT" --text "$text"
+    "$AC" --text "$text"
     ;;
   commits)
     # Every commit in the change's base..head, not only its head (revision 4,
@@ -171,13 +214,16 @@ case "$1" in
       : "${REPO:?gate.sh commits needs REPO}"
     fi
     if [ "$AUTHORED_CONTENT_TEXT" = true ]; then
-      need_authored_content
+      authored_content
     fi
     tmp="${RUNNER_TEMP:-${TMPDIR:-/tmp}}"
     here=$(pwd)
     head_pin=$(pin_of spec-spine.toml)
     commits=$(git rev-list --reverse "$BASE_SHA..$HEAD_SHA")
     echo "judging $(printf '%s\n' "$commits" | grep -c . || true) commit(s) in $BASE_SHA..$HEAD_SHA"
+    if [ "$GATE_EACH_COMMIT" = true ]; then
+      echo "each commit's tree is judged by the running gate.sh ($SELF), never by the commit's own copy"
+    fi
     fail=0
     for c in $commits; do
       short=$(git rev-parse --short "$c")
@@ -193,14 +239,15 @@ case "$1" in
       if [ "$AUTHORED_CONTENT_TEXT" = true ]; then
         msg="$tmp/statecraft-msg-$short.txt"
         git log -1 --format=%B "$c" > "$msg"
-        if ! "./$AUTHORED_CONTENT" --text "$msg"; then
+        if ! "$AC" --text "$msg"; then
           echo "gate.sh: $short's message breaks the authored-content rules" >&2
           fail=1
         fi
       fi
       if [ "$GATE_EACH_COMMIT" = true ]; then
-        # The commit's own tree, its own gate.sh, and the spec-spine release
-        # its own spec-spine.toml pins.
+        # The commit's own tree and the spec-spine release its own
+        # spec-spine.toml pins, judged by the running gate.sh: the base's in
+        # CI, never the commit's own (revision 5, rule 1).
         wt="$tmp/statecraft-commit-$short"
         git worktree add -q --detach "$wt" "$c"
         pin=$(pin_of "$wt/spec-spine.toml")
@@ -218,11 +265,7 @@ case "$1" in
           [ -x "$root/bin/spec-spine" ] || cargo install spec-spine-cli --version "=$pin" --locked --root "$root"
           bin="$root/bin/spec-spine"
         fi
-        script="$wt/scripts/statecraft/gate.sh"
-        if [ ! -f "$script" ]; then
-          echo "$short carries no scripts/statecraft/gate.sh; the running copy judges it"
-          script="$here/scripts/statecraft/gate.sh"
-        fi
+        script="$SELF"
         if [ -n "$bin" ] && mkdir -p "$wt/.tooling/bin" && ln -sf "$bin" "$wt/.tooling/bin/spec-spine" \
           && (cd "$wt" && sh "$script" governance && cargo fmt --all --check) > "$log" 2>&1; then
           echo "$short: the gate and the format check pass at its own tree"
