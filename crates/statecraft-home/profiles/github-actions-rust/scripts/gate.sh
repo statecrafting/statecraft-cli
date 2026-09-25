@@ -82,13 +82,21 @@ need_spec_spine() {
 # included), 2 refused (a pin not met, a containment refusal), 3 usage, 4
 # failed. A usage error from the gate's own fixed invocation is the gate
 # failing, so 3 reads as 4 under both tables.
+# Decided once, the first time spec-spine answers, into SS_TABLE (026 or 025);
+# POSIX sh has no local variables, so the working name is removed after use.
+SS_TABLE=""
 ss_family() {
-  ss_pin=$(pin_of spec-spine.toml)
-  [ -n "$ss_pin" ] || ss_pin=$("$SS" --version 2>/dev/null | sed -n 's/^spec-spine \([0-9][0-9.]*\).*/\1/p')
-  ss_major=$(printf '%s' "$ss_pin" | cut -d. -f1)
-  ss_minor=$(printf '%s' "$ss_pin" | cut -d. -f2)
-  [ "${ss_major:-0}" -gt 0 ] 2>/dev/null && return 0
-  [ "${ss_minor:-0}" -ge 26 ] 2>/dev/null
+  if [ -z "$SS_TABLE" ]; then
+    SS_PIN_READ=$(pin_of spec-spine.toml)
+    [ -n "$SS_PIN_READ" ] || SS_PIN_READ=$("$SS" --version 2>/dev/null | sed -n 's/^spec-spine \([0-9][0-9.]*\).*/\1/p')
+    SS_TABLE=025
+    case "$SS_PIN_READ" in
+      0.[0-9].*|0.1[0-9].*|0.2[0-5].*|"") ;;
+      *) SS_TABLE=026 ;;
+    esac
+    unset SS_PIN_READ
+  fi
+  [ "$SS_TABLE" = 026 ]
 }
 spec_spine() {
   ss_rc=0

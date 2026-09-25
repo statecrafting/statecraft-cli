@@ -3210,6 +3210,14 @@ fn the_rendered_gate_exits_in_the_family_contract() {
         .collect::<Vec<_>>()
         .join("\n");
     assert_ne!(pinned_25, pinned_26, "the fixture states a pin");
+    // Restores the 0.25.0 pin even when an assertion below panics.
+    struct Restore<'a>(&'a Path, String);
+    impl Drop for Restore<'_> {
+        fn drop(&mut self) {
+            let _ = std::fs::write(self.0, &self.1);
+        }
+    }
+    let restore = Restore(&toml, pinned_25);
     std::fs::write(&toml, pinned_26).unwrap();
     for (file, ss_code, want, said) in [
         ("ss-check", "1", 1, "or a stale committed tree"),
@@ -3227,7 +3235,7 @@ fn the_rendered_gate_exits_in_the_family_contract() {
             "{text}"
         );
     }
-    std::fs::write(&toml, pinned_25).unwrap();
+    drop(restore);
 
     let head = git(root, &["rev-parse", "HEAD"]);
     let ends = [("BASE_SHA", gov.base.as_str()), ("HEAD_SHA", head.as_str())];
