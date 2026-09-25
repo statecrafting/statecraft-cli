@@ -14,13 +14,15 @@
 use crate::exit::Exit;
 use crate::render::Answer;
 use statecraft_environment::probe::CommandProbe;
+use statecraft_environment::qualify::TargetProbe;
 use statecraft_environment::time::SystemClock;
 use statecraft_home::authority::{GitRevision, RunChoices};
-use statecraft_home::flow::SpecSpineCommand;
+use statecraft_home::flow::{Corpus, SpecSpineCommand};
 use statecraft_home::home::Layout;
 use statecraft_home::producer::Library;
 use statecraft_home::service::{self, Operation, Severity};
 use statecraft_home::settings::Intent;
+use statecraft_home::spec_spine;
 use statecraft_home::team::Unreachable;
 use std::path::Path;
 
@@ -38,19 +40,37 @@ pub const DEFAULT_BASE_REVISION: &str = "HEAD";
 /// as the corpus tool, git as the revision reader, and the coordination
 /// authority that reaches nothing, because this build implements no platform
 /// client and saying so is the honest answer.
+///
+/// For an initialization the `spec-spine` binary is **selected** for the
+/// project by spec 002 section 5's rule of 2026-09-25, the one the delivered
+/// hooks apply: `STATECRAFT_SPEC_SPINE`, then the project's own
+/// `target/release/spec-spine`, then `PATH`, each put to the project's pin.
+/// The rule is the library's; this only chooses to apply it.
 pub fn execute(home: &Path, operation: Operation) -> Answer<service::Answer> {
     let layout = Layout::new(home);
     let producer = Library;
-    let corpus = SpecSpineCommand::default();
-    let probe = CommandProbe::default();
+    let (corpus, probe): (Box<dyn Corpus>, Box<dyn TargetProbe>) =
+        match operation.initialized_root() {
+            Some(root) => {
+                let selection = spec_spine::select_here(root);
+                (
+                    spec_spine::corpus_for(&selection),
+                    Box::new(spec_spine::probe_for(&selection)),
+                )
+            }
+            None => (
+                Box::new(SpecSpineCommand::default()),
+                Box::new(CommandProbe::default()),
+            ),
+        };
     let authority = Unreachable::default();
     let revisions = GitRevision;
     let clock = SystemClock;
     let ports = service::Ports {
         home: &layout,
         producer: &producer,
-        corpus: &corpus,
-        target_probe: &probe,
+        corpus: corpus.as_ref(),
+        target_probe: probe.as_ref(),
         authority: &authority,
         revisions: &revisions,
         clock: &clock,
