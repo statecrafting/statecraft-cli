@@ -7590,6 +7590,80 @@ asserts the queue rules and the upgrade order. The merge-queue coupling step is
 not exercised by a local test (it needs the pinned spec-spine and the API);
 its first live queue run is its evidence.
 
+**2026-09-24: profile revision 4, the checks S-5 found missing (adopted by the
+owner on 2026-09-24; amends the setup-profile entries and revisions 2 and 3).**
+S-5 renders this repository's own CI from the setup profile. The render of
+revision 3 into a scratch copy of `main` (profile identity `5e30836810d8`;
+evidence repository commit `a6b0bb8`, `2026-09-24/session11/S5`) passes every
+governance check and matches `.github/workflows/govern.yml` on the pin,
+`check`, `lint`, `index check`, coupling on both events, `make code` and the
+`ci-gate` binding, and is stronger on `ci-gate`. It is weaker in five places
+and has no parameter for any of them, so adopting it would weaken the check
+suite. Revision 4 adds the parameters; each default keeps a revision-3
+project's behaviour except rule 5, which is a new refusal.
+
+1. **`governance.enforce_coverage`** (boolean, default `false`). When `true`,
+   `gate.sh governance` runs `index coverage --fail-on-untraced`, a refusal
+   rather than a report.
+2. **`governance.authored_content`** (a repository-relative path, default
+   unset). When set, `gate.sh governance` runs that script and **refuses (exit
+   1) when it is absent or not executable**; revision 3's "run it if it is
+   executable" is removed, so deleting the script can no longer pass silently.
+   When unset, no authored-content step runs and `doctor` says so. The upgrade
+   from revision 3 sets it to `scripts/check-authored-content.sh` when that
+   file exists, which keeps the check a revision-3 project already ran.
+3. **`governance.authored_content_text`** (boolean, default `false`; requires
+   rule 2's path). When `true`, the declared script is also run as
+   `<script> --text FILE...` on the pull request's title and body, from the
+   event on `pull_request` and through the API on `merge_group`, and on every
+   commit message in the change. The script's `--text` contract is spec `001`
+   section 3.6's: the same rules, exit 0 clean, 1 findings, 3 usage.
+4. **`governance.gate_each_commit`** and **`governance.require_signed_commits`**
+   (booleans, default `false`). On `pull_request` and `merge_group` the
+   `governance` job walks every commit in the change's `base..head`. With
+   `gate_each_commit`, each commit's tree must pass `gate.sh governance` and
+   `cargo fmt --all --check`, using the spec-spine pin that commit's own
+   `spec-spine.toml` names. With `require_signed_commits`, each commit must be
+   verified as signed by GitHub (`commit.verification.verified` through the
+   API, the verification branch protection reads). The walk is a step in the
+   `governance` job, never a job of its own, so it cannot be skipped into a
+   green gate.
+5. **`governance.require_default_base`** (boolean, default `true`). A pull
+   request whose base is not `default_branch` fails `governance`: a stacked
+   pull request merges into another branch and is never judged against the
+   default branch.
+6. **Caches, not a check.** The rendered CI caches the installed spec-spine
+   binary keyed on the pin, and the cargo registry, git and `target/` keyed on
+   `Cargo.lock` and `rust-toolchain.toml`. A cache never decides a verdict.
+7. **Upgrade.** The revision becomes 4, a new identity. `ci-gate`'s policy is
+   unchanged: every addition is a step inside a job the policy already
+   requires. The operator steps name rule 5 as a new refusal and the
+   parameters to set for a repository that already runs these checks by hand.
+
+The local `make gate` and `make code` delegating to `gate.sh` is S-5's
+adoption concern, not the profile's. The render's corpus step also ran a bare
+`spec-spine` from `PATH` (0.24.0 on this machine) and exited 4 until the pinned
+binary came first; it fails closed, and the single selection variable proposed
+in #119 is where that belongs.
+
+S-5, next: render revision 4 with rules 1 to 5 enabled, keep every property
+`govern.yml` has, and add the AI review job and the protected
+`statecraft-review-exception` Environment (owner, 2026-09-24: the review is
+what S-5 adds over `govern.yml`). Before that pull request can pass, the owner
+sets `CLAUDE_CODE_OAUTH_TOKEN` and the Environment's required reviewers; the
+review then uses the provider on every pull request.
+
+Acceptance obligations, as tests in `crates/statecraft-home/tests/`: coverage
+enforced refuses an untraced file and reported does not; a declared
+authored-content script that is missing or not executable refuses, and an
+undeclared one runs nothing; the text mode refuses a U+2014 in a title, a body
+and a commit message; the commit walk refuses an unsigned commit (a `gh` stub)
+and a commit whose own tree fails the gate while the head passes; a base other
+than the default branch refuses and the default branch passes; the rendered
+workflow keeps the gate job read-only; a revision-3 project upgrades to
+revision 4 with `governance.authored_content` set when the script exists and
+unset when it does not.
+
 ## Verification
 
 `--fail-on-untraced` joined the corpus gate with this spec's first
