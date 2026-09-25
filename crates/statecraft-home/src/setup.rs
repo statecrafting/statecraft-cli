@@ -35,7 +35,7 @@ use std::path::Path;
 /// The one registered profile.
 pub const PROFILE_ID: &str = "github-actions-rust";
 /// Its revision.
-pub const REVISION: u32 = 2;
+pub const REVISION: u32 = 3;
 /// Where the rendered policy document lives in the target.
 pub const POLICY_PATH: &str = ".statecraft/setup/github-actions-rust.json";
 /// The resume record, under the project's runtime state.
@@ -254,10 +254,10 @@ pub fn commands() -> serde_json::Value {
 /// Each CI job, whether it is required, and its rule per event.
 pub fn jobs() -> serde_json::Value {
     serde_json::json!({
-        "governance": {"required": true, "optional": false, "pull_request": "required", "push": "required"},
-        "code": {"required": true, "optional": false, "pull_request": "required", "push": "required"},
-        "ai-review": {"required": true, "optional": false, "pull_request": "required-review", "push": "inapplicable"},
-        "review-exception": {"required": true, "optional": false, "pull_request": "owner-exception", "push": "inapplicable"},
+        "governance": {"required": true, "optional": false, "pull_request": "required", "push": "required", "merge_group": "required"},
+        "code": {"required": true, "optional": false, "pull_request": "required", "push": "required", "merge_group": "required"},
+        "ai-review": {"required": true, "optional": false, "pull_request": "required-review", "push": "inapplicable", "merge_group": "recorded-review"},
+        "review-exception": {"required": true, "optional": false, "pull_request": "owner-exception", "push": "inapplicable", "merge_group": "inapplicable"},
     })
 }
 
@@ -269,6 +269,7 @@ pub fn remote_obligations() -> Vec<String> {
         format!("branch protection on the default branch: require the status check ci-gate from GitHub Actions (app id {GATE_APP_ID}), and branches up to date"),
         "branch protection on the default branch: required approvals 0, and require code-owner review, so ci-gate with the AI review approves ordinary changes and a change to the profile's files needs a review its author cannot give (S-3, R2-2)".to_string(),
         format!("the Environment {EXCEPTION_ENVIRONMENT} with the owner as a required reviewer, for owner exceptions: a release candidate whose review was skipped (S-1) and a pull request whose review returned findings (R2-1)"),
+        "a merge queue, if the default branch requires one: upgrade to revision 3 first, or merge the upgrade while no queue is required, because ci-gate reads its policy at the base and revision 2 states no merge_group rule; a queue entry is judged by the review recorded for its pull request, never by a second review (revision 3)".to_string(),
     ]
 }
 

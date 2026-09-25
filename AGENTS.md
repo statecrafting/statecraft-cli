@@ -195,7 +195,14 @@ change that documented them:
 
 Two consequences worth knowing. Two pull requests that each regenerate shards
 can each be fresh alone and stale together; the queue's `check` refuses the
-second one with exit 2, and the fix is the usual rebase and `make refresh`.
+second one with exit 2. The fix is to merge `main` into the branch, resolve any
+conflict in authored text by hand, and then run
+`scripts/resolve-shard-conflicts.sh`: it takes the incoming copy of each
+conflicted shard, runs `make refresh`, stages the result, and exits 1 if a
+conflict marker remains or if the branch's own authored change (the lines it
+adds and removes per file) differs after the merge. It never resolves an
+authored conflict; a mechanical "take theirs" once deleted 2,700 lines of spec
+`002`.
 And a waived pull request queued behind another that touches the same paths is
 judged without its waiver, by construction; queue it alone.
 

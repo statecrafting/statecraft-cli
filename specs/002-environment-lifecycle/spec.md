@@ -7514,6 +7514,82 @@ pinning the CLI to another release fails it. The two ownership-transfer
 assertions derive the expected `spec-spine-core@<version>` from the constant.
 `Cargo.lock` does not change.
 
+**2026-09-24: profile revision 3, the merge queue (adopted by the owner on
+2026-09-24; amends the setup-profile entries and revision 2).** Revisions 1 and
+2 render CI that triggers on `pull_request` and `push` only. A repository that
+requires a merge queue, as statecraft-cli did on 2026-09-24, never gets
+`ci-gate` reported for a queued entry, so its queue stalls. Revision 3 makes
+the rendered CI judge a queue entry without spending a second review.
+
+1. **The rendered CI triggers on `merge_group`.** Governance and code run on
+   the queued candidate as on any other event, and are required there.
+2. **The review is not re-run in the queue.** The `ai-review` job stays
+   pull-request only, so a queue entry spends no provider review. Its skip on
+   `merge_group` is admitted only through rule 3, never as an ordinary
+   inapplicable skip.
+3. **`ci-gate` requires the verdict already recorded for the entry's pull
+   request.** On `merge_group` it reads the pull-request number from the
+   group's `head_ref` (`.../pr-<n>-<sha>`) and that pull request's head
+   through the API. It then finds the latest completed pull-request run of the
+   rendered CI for exactly that head, and reads the review evidence record the
+   run uploaded (`statecraft-ai-review-<head>`), whose subject must name the
+   same pull request and head. Admitted: `no-findings`; `findings` only when
+   that run's `review-exception` job succeeded (R2-1); a visible
+   `skipped:<class>` as in revision 1, and for a release candidate only with
+   the exception (S-1). Refused: no recorded run, no record, a record for
+   another pull request or head, or an unreadable record. The job reading the
+   record needs `actions: read` and `pull-requests: read`, and nothing that
+   writes.
+4. **Coupling on `merge_group`.** Governance couples the group's
+   `base_sha...head_sha` and reads a waiver from the entry's pull-request body
+   through the API, honouring it only when the group changes no path that pull
+   request does not change; otherwise it couples with no waiver and fails
+   closed. This is the rule statecraft-cli's own CI adopts in its #130.
+5. **A skipped required job never passes.** The policy states a rule for every
+   event it triggers on (`push`, `pull_request`, `merge_group`); a required
+   job's skip is admitted only by a rule that names why, as in revision 1.
+6. **Upgrade order.** The gate reads its script and policy at the base, so a
+   pull request upgrading to revision 3 is judged by the base's revision-2
+   policy, which states no `merge_group` rule. Upgrade to revision 3 before
+   requiring a merge queue, or merge the upgrade while the queue is not
+   required; the operator steps say so. The revision becomes 3, a new
+   identity.
+
+Acceptance obligations, as tests in `crates/statecraft-home/tests/`: a queue
+entry with a recorded `no-findings` verdict for its pull request's head passes;
+no recorded verdict blocks; `findings` without a successful exception blocks
+and with one passes; a record naming another head blocks; the review job's
+skip on `merge_group` is admitted only with a recorded verdict; the rendered
+workflow triggers on `merge_group` and grants the gate job only read
+permissions; a revision-2 project upgrades to revision 3.
+
+**2026-09-24: profile revision 3 implemented (the entry above on the merge
+queue).** `setup.rs` registers revision 3 (identity
+`5e30836810d88d294027788376354495bc73333363607002ea968b7153fefb12`); the
+policy states a `merge_group` rule for every required job (`required` for
+governance and code, `recorded-review` for `ai-review`, `inapplicable` for the
+exception job), and the operator steps state the upgrade order. The rendered
+workflow triggers on `merge_group`; governance gains a read-only
+`pull-requests` permission and a merge-queue coupling step
+(`gate.sh couple-group`, the waiver rule of statecraft-cli's #130); `ci-gate`
+gains read-only `actions` and `pull-requests` permissions and the queue's
+endpoints. `ci-gate.sh`'s `recorded-review` rule requires the review job to be
+skipped, then reads the entry's pull request, its latest completed
+`statecraft-ci` pull-request run at that head, the uploaded evidence record
+(whose subject must name the same pull request and head) and that run's
+exception job; it admits `no-findings`, `findings` with an approved exception,
+and a visible skip (a release candidate's only with the exception), and blocks
+every other case with a reason. Tests: `setup_workflows.rs` adds seventeen
+queue cases through the rendered step with a stubbed `gh` (three admitted,
+fourteen blocked, none calling the reviewer or posting), includes them in the
+mutation test over every blocking branch, and asserts the trigger, the
+gate's read-only permissions and the pull-request-only review;
+`setup_upgrade.rs` rebuilds revision 2 from revision 3 and upgrades it (the
+unchanged gate script is rewritten, a customized workflow is withheld), and
+asserts the queue rules and the upgrade order. The merge-queue coupling step is
+not exercised by a local test (it needs the pinned spec-spine and the API);
+its first live queue run is its evidence.
+
 ## Verification
 
 `--fail-on-untraced` joined the corpus gate with this spec's first
