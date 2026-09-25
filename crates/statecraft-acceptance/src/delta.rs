@@ -232,10 +232,33 @@ pub struct Envelope {
     pub verb: String,
     /// Its exit code.
     pub exit_code: i32,
-    /// Whether the verb considers its own answer well formed.
-    pub ok: bool,
+    /// Whether the verb considers its own answer well formed: the envelope
+    /// below spec-spine 0.26.0, which has no `outcome`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub ok: Option<bool>,
+    /// The verb's outcome: the envelope from spec-spine 0.26.0 (verdict schema
+    /// 1.0.0), which has no `ok`. An answer is `ok`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub outcome: Option<String>,
     /// The report.
     pub report: Report,
+}
+
+impl Envelope {
+    /// Whether the verb answered: exit 0, and whichever of the two envelopes
+    /// it is says so. An envelope that says neither did not answer.
+    pub fn answered(&self) -> bool {
+        self.exit_code == 0 && (self.ok == Some(true) || self.outcome.as_deref() == Some("ok"))
+    }
+
+    /// What the envelope said about its own answer, in its own words.
+    fn said(&self) -> String {
+        match (&self.outcome, self.ok) {
+            (Some(o), _) => format!("outcome={o}"),
+            (None, Some(ok)) => format!("ok={ok}"),
+            (None, None) => "neither ok nor outcome".to_string(),
+        }
+    }
 }
 
 /// Why a report could not be read.
@@ -259,12 +282,12 @@ pub enum ReadError {
         found: String,
     },
     /// The verb did not produce a usable answer.
-    #[error("spec-spine {version} produced no usable delta report: exit {exit_code}, ok={ok}")]
+    #[error("spec-spine {version} produced no usable delta report: exit {exit_code}, {said}")]
     VerbDidNotAnswer {
         /// The exit code it reported.
         exit_code: i32,
-        /// What it said about its own answer.
-        ok: bool,
+        /// What it said about its own answer: `ok=` or `outcome=`.
+        said: String,
         /// The version that answered.
         version: String,
     },
@@ -317,10 +340,10 @@ impl SpecSpineDeltaReport {
             });
         }
         let version = envelope.report.tool.version.clone();
-        if !envelope.ok || envelope.exit_code != 0 {
+        if !envelope.answered() {
             return Err(ReadError::VerbDidNotAnswer {
                 exit_code: envelope.exit_code,
-                ok: envelope.ok,
+                said: envelope.said(),
                 version,
             });
         }
@@ -449,7 +472,8 @@ mod tests {
         Envelope {
             verb: DELTA_VERB.into(),
             exit_code: 0,
-            ok: true,
+            ok: Some(true),
+            outcome: None,
             report: Report {
                 schema_version: "0.1.0".into(),
                 tool: Tool {
@@ -667,12 +691,34 @@ mod tests {
     #[test]
     fn a_verb_that_did_not_answer_is_refused_and_names_its_exit_code() {
         let mut e = report_with(vec![], BTreeMap::new());
-        e.ok = false;
+        e.ok = Some(false);
         e.exit_code = 3;
         match SpecSpineDeltaReport::from_envelope(e) {
             Err(ReadError::VerbDidNotAnswer { exit_code, .. }) => assert_eq!(exit_code, 3),
             other => panic!("expected a refusal, got {other:?}"),
         }
+    }
+
+    // spec-spine 0.26.0's envelope (verdict schema 1.0.0) has `outcome` and no
+    // `ok`; an envelope that says neither did not answer.
+    #[test]
+    fn both_envelopes_are_read_and_one_that_says_neither_is_refused() {
+        let mut e = report_with(vec![], BTreeMap::new());
+        e.ok = None;
+        e.outcome = Some("ok".into());
+        assert!(SpecSpineDeltaReport::from_envelope(e.clone()).is_ok());
+        e.outcome = Some("finding".into());
+        e.exit_code = 1;
+        match SpecSpineDeltaReport::from_envelope(e.clone()) {
+            Err(ReadError::VerbDidNotAnswer { said, .. }) => assert_eq!(said, "outcome=finding"),
+            other => panic!("expected a refusal, got {other:?}"),
+        }
+        e.outcome = None;
+        e.exit_code = 0;
+        assert!(matches!(
+            SpecSpineDeltaReport::from_envelope(e),
+            Err(ReadError::VerbDidNotAnswer { .. })
+        ));
     }
 
     #[test]
