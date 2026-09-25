@@ -3193,6 +3193,50 @@ fn the_rendered_gate_exits_in_the_family_contract() {
             "{text}"
         );
     }
+    // The same rendering under a 0.26.0 pin reads spec-spine's 132 table:
+    // stale is already 1, a pin not met refuses with 2, a usage error from
+    // the gate's own invocation is the gate failing, and 4 is failed.
+    let toml = root.join("spec-spine.toml");
+    let pinned_25 = std::fs::read_to_string(&toml).unwrap();
+    let pinned_26 = pinned_25
+        .lines()
+        .map(|l| {
+            if l.trim_start().starts_with("required_version") {
+                "required_version = \"=0.26.0\"".to_string()
+            } else {
+                l.to_string()
+            }
+        })
+        .collect::<Vec<_>>()
+        .join("\n");
+    assert_ne!(pinned_25, pinned_26, "the fixture states a pin");
+    // Restores the 0.25.0 pin even when an assertion below panics.
+    struct Restore<'a>(&'a Path, String);
+    impl Drop for Restore<'_> {
+        fn drop(&mut self) {
+            let _ = std::fs::write(self.0, &self.1);
+        }
+    }
+    let restore = Restore(&toml, pinned_25);
+    std::fs::write(&toml, pinned_26).unwrap();
+    for (file, ss_code, want, said) in [
+        ("ss-check", "1", 1, "or a stale committed tree"),
+        ("ss-check", "2", 2, "a pin not met"),
+        ("ss-check", "3", 4, "usage error"),
+        ("ss-check", "4", 4, "could not do its work"),
+        ("ss-lint", "7", 4, "does not know"),
+        ("ss-index-check", "1", 1, "or a stale committed tree"),
+    ] {
+        let (code, text) = gate_sh(root, &["governance"], &[], &[(file, ss_code)]);
+        assert_eq!(code, want, "0.26.0 {file}={ss_code}: {text}");
+        assert!(text.contains(said), "0.26.0 {file}={ss_code}: {text}");
+        assert!(
+            text.contains(&format!("spec-spine exit {ss_code}, gate exit {want}")),
+            "{text}"
+        );
+    }
+    drop(restore);
+
     let head = git(root, &["rev-parse", "HEAD"]);
     let ends = [("BASE_SHA", gov.base.as_str()), ("HEAD_SHA", head.as_str())];
     let (code, text) = gate_sh(root, &["couple"], &ends, &[("ss-couple", "1")]);
