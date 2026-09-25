@@ -8367,6 +8367,18 @@ stand-in printing 0.27.0's recorded words; the published binary's own answer is
 asserted when the pin moves. The delivered hooks are an authority change of
 their own and follow in a separate change.
 
+**2026-09-25: the pin probe's tests write their stubs race-free.**
+`spec_spine::tests::a_range_pin_refusal_is_read_under_both_exit_tables` failed
+once in CI (run `36196944219`, exit 3 read as `NotPerformed` rather than `No`)
+and passes locally. Its stub was written, made executable and renamed into
+place by the test process, so a sibling test thread forking at that moment
+could hold the file open for writing in its child, and executing the stub then
+fails with `ETXTBSY`; `Pin::admits` reads a spawn that failed as a read not
+performed, which is correct for the product and wrong for the test. The test
+module's `install` now uses `statecraft_adapter::fixture::install_script`,
+which copies the file into place in a child process for exactly this race.
+Test-only; no requirement changes.
+
 **2026-09-25: the pinned spec-spine's own answer over a link leaving the
 repository (owner, 2026-09-25: adopt 0.27.0).** With the pin at 0.27.0,
 `the_real_spec_spine_refuses_a_link_leaving_the_repository` initializes a
