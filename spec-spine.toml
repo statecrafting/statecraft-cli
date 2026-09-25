@@ -19,7 +19,7 @@
 # is an entry in docs/adoption/spec-spine.md, not a comment here. `make tools`
 # installs this exact version into `.tooling/bin`, so a binary elsewhere on
 # PATH cannot answer for this repository.
-required_version = "=0.26.0"
+required_version = "=0.27.0"
 
 [manifest]
 # Drives the Cargo `[package.metadata.spec-spine].spec` and package.json `"spec-spine".spec` reads.
@@ -58,8 +58,8 @@ npm_workspaces = ["package.json", "pnpm-workspace.yaml"]
 # standalone_npm_packages    = ["npm"]
 
 [index]
-# Extra files folded into the global-inputs hash, so a change to one
-# stales every shard.
+# Extra files recorded in the index's inputs record
+# (codebase-index/inputs.json), so a change to one rewrites that file.
 #
 # WATCH THE GLOB FORM. `dir/**` matches DIRECTORIES and therefore no
 # files; you want `dir/**/*`, which is what the default below has.

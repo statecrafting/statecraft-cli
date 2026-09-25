@@ -155,6 +155,6 @@
     "specId": "002-environment-lifecycle",
     "specStatus": "approved"
   },
-  "schemaVersion": "1.1.0",
-  "shardHash": "5b81f592371c79362b883b86f844d8bb6c28d5f5bf404db54ff43591e7ed7c14"
+  "schemaVersion": "1.2.0",
+  "shardHash": "74690453226ce99a6b791ddecfdffb180b16be094ab25c2756316c36029844f6"
 }

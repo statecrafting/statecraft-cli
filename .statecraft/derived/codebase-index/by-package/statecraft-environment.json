@@ -4,6 +4,6 @@
     "name": "statecraft-environment",
     "path": "crates/statecraft-environment"
   },
-  "schemaVersion": "1.1.0",
-  "shardHash": "b2fbe382dea473c28aca2140f5ef359d461fb503a5b1e3ad48ab78926d923dad"
+  "schemaVersion": "1.2.0",
+  "shardHash": "79d3dd7fbc36509467b52bcfc1a4e18b551bc6ddace5cc4219da138d86b6ee39"
 }
