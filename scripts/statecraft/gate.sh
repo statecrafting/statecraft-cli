@@ -82,6 +82,17 @@ case "$1" in
     fi
     ;;
   code)
+    # A workspace with no member crates yet judges nothing and says so, the
+    # guard the hand-written CI this profile replaced had: every
+    # `cargo --workspace` verb refuses a virtual manifest with no members.
+    # `metadata --no-deps` resolves nothing, so it answers on such a manifest.
+    meta=$(cargo metadata --no-deps --format-version 1)
+    case "$meta" in
+      *'"workspace_members":[]'*)
+        echo "gate.sh: the workspace has no member crates yet; build, test, clippy and fmt judge nothing"
+        exit 0
+        ;;
+    esac
     cargo build --workspace --locked
     cargo test --workspace --locked
     cargo clippy --workspace --all-targets --locked -- -D warnings
@@ -191,8 +202,12 @@ case "$1" in
         git worktree add -q --detach "$wt" "$c"
         pin=$(pin_of "$wt/spec-spine.toml")
         bin=""
+        log="$tmp/statecraft-gate-$short.log"
+        : > "$log"
         if [ -z "$pin" ]; then
-          echo "gate.sh: $short's spec-spine.toml states no exact pin" >&2
+          # Written to the log too, which the refusal below prints: the gate
+          # never ran for this commit, and the log must say why.
+          echo "gate.sh: $short's spec-spine.toml states no exact pin, so no gate can judge it" | tee "$log" >&2
         elif [ "$pin" = "$head_pin" ] && [ -x "$SS" ]; then
           bin="$here/$SS"
         else
@@ -205,7 +220,6 @@ case "$1" in
           echo "$short carries no scripts/statecraft/gate.sh; the running copy judges it"
           script="$here/scripts/statecraft/gate.sh"
         fi
-        log="$tmp/statecraft-gate-$short.log"
         if [ -n "$bin" ] && mkdir -p "$wt/.tooling/bin" && ln -sf "$bin" "$wt/.tooling/bin/spec-spine" \
           && (cd "$wt" && sh "$script" governance && cargo fmt --all --check) > "$log" 2>&1; then
           echo "$short: the gate and the format check pass at its own tree"

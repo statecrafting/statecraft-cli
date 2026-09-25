@@ -60,12 +60,12 @@
   },
   "files": [
     {
-      "digest": "8b3d56af21d890f447ada74ec8081148205a41e9b762a556120494bfba0168c1",
+      "digest": "b9626418fe18ac3e9c03b42ae73fc1321a229a1b06c334be1f3756f041744b5a",
       "path": ".github/workflows/statecraft-ci.yml",
       "role": "workflow"
     },
     {
-      "digest": "c00622993a03af2e4c2c295c884eebfda94382886b4035f7c4c86af30c959a42",
+      "digest": "ffd44c9d66e403d3457f35a5e4519247c656bbcf4aa2543e9cc52f810b42a8dc",
       "path": ".github/workflows/statecraft-ai-review.yml",
       "role": "workflow"
     },
@@ -75,7 +75,7 @@
       "role": "script"
     },
     {
-      "digest": "ea446f7d6bc6b9406100aa8801f065860a5a0dfdae50d6a9303e1277b655f0f1",
+      "digest": "3733d3a7a1375a4c3696fa17ed8d9a9076ee5bc63c46d83b051b387dcbc7570b",
       "path": "scripts/statecraft/gate.sh",
       "role": "script"
     },
@@ -91,7 +91,7 @@
     }
   ],
   "id": "github-actions-rust",
-  "identity": "998c0d7eb8f2890a3d1558b3c9b2a73ff199722d01d6a6e149b8f52237ab4d7b",
+  "identity": "06bf394882f0510dc874aa3d75f26944db24b771aec4e3575164ce80a86a29d2",
   "jobs": {
     "ai-review": {
       "merge_group": "recorded-review",
