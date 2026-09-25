@@ -323,6 +323,25 @@ One spec per pull request, then stop.
    with no `## Verification` block declares none, which is honest for an
    unimplemented spec and is not a passing acceptance.
 
+## Amending an approved spec
+
+Adopted by the owner on 2026-09-25 (spec `001` section 5, the amendment-model
+entry, Part 1). **A change to what an approved spec requires is a new spec**
+with an `amends` edge to the spec it changes. The amended `spec.md` is not
+edited to record the amendment; `registry relationships <id>` reports it. An
+amendment that changes behavior in code also declares `extends` on each unit
+it changes, in the same change, because `amends` does not make the amending
+spec an owner of the amended spec's code. An amendment that replaces
+acceptance says so with `amends_verification`.
+
+Section 5 of a spec keeps **implementation decisions only**: a choice section 3
+was silent on, with its reason. It is still the right place for that, and
+still the route that clears `C-001` for a change that alters no requirement.
+It is no longer a place to change a requirement. Entries adopted before
+2026-09-25 that state requirements stay where they are until they are folded
+into section 3 by their own pull requests; the split of spec `002` that
+precedes the fold waits for spec-spine 0.27.0.
+
 ## Source ownership
 
 | Path | Owner | Rule |
