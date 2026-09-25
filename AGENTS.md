@@ -208,7 +208,9 @@ judged without its waiver, by construction; queue it alone.
 
 ## How a pull request is merged
 
-Three methods are allowed; the choice is not arbitrary.
+Two methods are allowed; the choice is not arbitrary. Rebase merging is disabled
+in the repository settings (owner, 2026-09-24): it rewrites SHAs and adds
+nothing merge commits do not already give.
 
 - **Merge commit, the default**, and always when a record cites a branch SHA
   (a waiver's head, "tested on X", an evidence commit) or the pull request is
@@ -216,24 +218,22 @@ Three methods are allowed; the choice is not arbitrary.
   `git branch --merged` answers correctly.
 - **Squash** only when the branch carries fixup or red intermediate commits and
   no record cites their SHAs.
-- **Rebase** only for a branch whose every commit is signed, passes the gate,
-  and is cited by nothing: it rewrites SHAs.
 
 Every commit that reaches `main` is signed and passes `make gate`; with merge
 commits the branch's commits land too, so this binds each one, not only the
-head. CI enforces it: on `pull_request` and `merge_group` the `govern` job
-gates every commit in the change at its own tree (`make gate` and
-`cargo fmt --check`, with the pin that commit names), refuses one GitHub does
-not verify as signed, and applies the authored-content rules to each commit
-message and to the pull request's title and body. A branch with a red or
-unsigned commit is therefore rebuilt before review, not squashed at merge, so
-squash is left for branches nobody cites, and rebase adds nothing merge
-commits do not already give. **A pull request whose base is not `main` fails
-`govern`**: stack by opening each branch off `main` with a depends-on note, or
-wait for GitHub to retarget the upper one when the lower one merges. The merge commit's message is the pull-request title and body, so the
-authored-content rules bind the body as history. Read history first-parent
-(`git log --first-parent`, `git bisect --first-parent`): the first-parent chain
-is the sequence of integration candidates the gate judged.
+head. CI enforces it: on `pull_request` and `merge_group` the `govern` job gates
+every commit in the change at its own tree (`make gate` and `cargo fmt --check`,
+with the pin that commit names), refuses one GitHub does not verify as signed,
+and applies the authored-content rules to each commit message and to the pull
+request's title and body. A branch with a red or unsigned commit is therefore
+rebuilt before review, not squashed at merge, so squash is left for branches
+nobody cites. **A pull request whose base is not `main` fails `govern`**: stack
+by opening each branch off `main` with a depends-on note, or wait for GitHub to
+retarget the upper one when the lower one merges. The merge commit's message is
+the pull-request title and body, so the authored-content rules bind the body as
+history. Read history first-parent (`git log --first-parent`, `git bisect
+--first-parent`): the first-parent chain is the sequence of integration
+candidates the gate judged.
 
 `spec-spine couple` is **CI-only, and deliberately not in `make gate`**. It
 compares two commits, so it cannot see a change being staged and is useless as a
