@@ -65,10 +65,11 @@ fn front_matter(text: &str) -> Vec<(String, String)> {
         return out;
     };
     for line in rest[..end].lines() {
-        if let Some((k, v)) = line.split_once(':') {
-            if !k.starts_with(char::is_whitespace) && !k.trim().is_empty() {
-                out.push((k.trim().to_string(), v.trim().to_string()));
-            }
+        if let Some((k, v)) = line.split_once(':')
+            && !k.starts_with(char::is_whitespace)
+            && !k.trim().is_empty()
+        {
+            out.push((k.trim().to_string(), v.trim().to_string()));
         }
     }
     out

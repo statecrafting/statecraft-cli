@@ -120,15 +120,15 @@ impl RootSet {
     }
 
     fn window(r: &Root, at: Hlc) -> KeyValidity {
-        if let Some(nb) = r.not_before {
-            if at < nb {
-                return KeyValidity::Refused("key-not-yet-effective");
-            }
+        if let Some(nb) = r.not_before
+            && at < nb
+        {
+            return KeyValidity::Refused("key-not-yet-effective");
         }
-        if let Some(na) = r.not_after {
-            if at > na {
-                return KeyValidity::Refused("key-expired");
-            }
+        if let Some(na) = r.not_after
+            && at > na
+        {
+            return KeyValidity::Refused("key-expired");
         }
         KeyValidity::Valid
     }
