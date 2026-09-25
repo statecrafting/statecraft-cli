@@ -328,13 +328,13 @@ fn the_managed_instructions_exist_before_the_bridge_points_at_them() {
     // A bridge written first would name a path that resolves to nothing for
     // as long as the flow takes to reach the next step, and an interrupted
     // run would leave exactly that.
-    if let Ok(root_text) = std::fs::read_to_string(s.project().join("AGENTS.md")) {
-        if root_text.contains(".statecraft/AGENTS.md") {
-            assert!(
-                managed.is_file(),
-                "the root bridge names a managed file that does not exist"
-            );
-        }
+    if let Ok(root_text) = std::fs::read_to_string(s.project().join("AGENTS.md"))
+        && root_text.contains(".statecraft/AGENTS.md")
+    {
+        assert!(
+            managed.is_file(),
+            "the root bridge names a managed file that does not exist"
+        );
     }
 }
 

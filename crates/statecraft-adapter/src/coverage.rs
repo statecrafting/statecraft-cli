@@ -654,10 +654,10 @@ impl Coverage {
     pub fn required_programs(&self) -> Vec<String> {
         let mut out: Vec<String> = Vec::new();
         for c in &self.commands {
-            if let Reading::Program { program } = &c.reading {
-                if !out.contains(program) {
-                    out.push(program.clone());
-                }
+            if let Reading::Program { program } = &c.reading
+                && !out.contains(program)
+            {
+                out.push(program.clone());
             }
         }
         out
