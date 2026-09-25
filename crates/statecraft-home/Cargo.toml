@@ -56,15 +56,13 @@ statecraft-run = { path = "../statecraft-run" }
 libc = "0.2.189"
 
 # The governance producer (spec 002 section 3.15), as an exact, reproducible
-# crates.io dependency rather than a path to a sibling checkout. `=` is
-# deliberate: the contract this product consumes is the shape one release
-# emits, and a caret range on a 0.x line would admit a different one.
-#
-# `default-features = false` drops spec-spine's `symbol-resolution` feature and
-# its pinned tree-sitter grammars with it. The scaffolder is a pure function of
-# the configuration and needs none of them, and a `links = "tree-sitter"` clash
-# with some future dependency of this workspace is a cost with no benefit here.
-spec-spine-core = { version = "=0.25.0", default-features = false }
+# crates.io dependency rather than a path to a sibling checkout. Its version and
+# features are stated once, in the root Cargo.toml's [workspace.dependencies]
+# (`D-06` as amended 2026-09-24, spec 001 section 3.13): exact, because the
+# contract this product consumes is the shape one release emits, and without
+# default features, because the scaffolder needs none of spec-spine's
+# tree-sitter grammars. build.rs reads what the lock resolved.
+spec-spine-core.workspace = true
 
 [dev-dependencies]
 tempfile = "3.27.0"

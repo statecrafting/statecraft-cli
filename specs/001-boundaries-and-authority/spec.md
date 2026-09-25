@@ -54,7 +54,9 @@ Constitution principles VI to XIII; `docs/decisions/00-founding-decisions.md`;
 sections 3.8 to 3.12;
 `scripts/check-authored-content.sh`.
 
-Not this spec's territory: the corpus contract (`000`), the environment
+Not this spec's territory: the adoption ledger `docs/adoption/spec-spine.md`,
+which no spec claims and `D-06` governs (section 3.13); the corpus contract
+(`000`), the environment
 lifecycle (`002`), run semantics (`003`), the execution adapter (`004`),
 acceptance and evidence (`005`).
 
@@ -212,8 +214,8 @@ proposes and neither side has built.
 
 | Component | State today | This product's relationship | Kind |
 |---|---|---|---|
-| spec-spine 0.23.0 (CLI; `=0.20.0` until 2026-09-23) | Implemented, released, installed locally at `.tooling/bin` | Invokes its supported commands, parses its structured reports | **actual dependency**, on a released binary |
-| `spec-spine-core` 0.23.0 | Implemented, released on crates.io | `scaffold_init_json`, the governance starter set `002` section 3.15 consumes | **actual dependency**, a library pinned `=0.23.0` in `crates/statecraft-home` since 2026-09-23 (`=0.21.0` before, non-conforming), moved independently of the CLI pin; conforming (`002` section 5) |
+| spec-spine (CLI), at the exact release `required_version` in `spec-spine.toml` names | Implemented, released, installed locally at `.tooling/bin` | Invokes its supported commands, parses its structured reports | **actual dependency**, on a released binary; which release, and since when, is in `docs/adoption/spec-spine.md` (section 3.13) |
+| `spec-spine-core`, at the exact version the root `Cargo.toml` states in `[workspace.dependencies]` | Implemented, released on crates.io | `scaffold_init_json`, the governance starter set `002` section 3.15 consumes | **actual dependency**, a library linked by `crates/statecraft-home`; conformance is `002`'s, and each move is recorded in `docs/adoption/spec-spine.md` (section 3.13) |
 | `attest-ledger` 0.1.0 | Implemented, Apache-2.0 | Record envelope, chain hashing, verification | **actual dependency** as of 2026-09-19: `attest-ledger-core`, pinned to `a9c3595` in `crates/statecraft-run`. The disposition it was adopted under is the **reuse** row below. |
 | `canonical-keysort-json` 0.1.0 | Implemented, Apache-2.0, Rust only | Canonical serialization at the hashing boundary | **proposed reuse** |
 | `action-gate` 0.1.0 | Implemented, Apache-2.0 | Check composition only, with required checks and the deny ceiling supplied here | **proposed adaptation at the boundary** |
@@ -377,6 +379,44 @@ Named so a future consumer has something to consume, and implemented by nothing.
   signature, issuer trust and subject binding. A verifier never executes what the
   evidence carries and never takes the evidence's own anchor as a trust root.
 
+### 3.13 The producer pin is stated once, and each adoption is a ledger entry
+
+`D-06` as amended on 2026-09-24 is the decision; this section is what the
+corpus requires of it.
+
+1. **One stated source per pin.** The CLI pin is stated only as
+   `required_version` in `spec-spine.toml`. The linked library's exact version
+   is stated only in `[workspace.dependencies]` of the root `Cargo.toml`. A
+   spec, a root document or the decision record refers to those files and does
+   not restate the number. A report or test that must name the version derives
+   it from the build, never from a second literal.
+2. **The decision and its applications are separate files.** The decision
+   record keeps `D-06` as a stable decision. Each adopted release is an entry
+   in `docs/adoption/spec-spine.md`, which no spec claims and which `D-06`
+   governs. An entry follows the ledger's own entry format: identity, the
+   bypass-floor and coupling review, exit codes, hook-read text, the re-index,
+   evidence kinds kept apart, and what the adoption does not do.
+3. **One producer identity.** The CLI pin and the linked library name the
+   same spec-spine release and move in the same change; the ledger entry
+   records that release as one identity with each artifact's evidence under
+   it (bundle decision H-3 (a), owner Addendum 2 of 2026-09-24). A test
+   refuses two pins that name different releases.
+4. **The consequence this buys.** An adoption that changes no behavior edits
+   only files no spec claims (`spec-spine.toml`, the root `Cargo.toml`,
+   `Cargo.lock`, the ledger and the regenerated shards), so it couples with no
+   spec edit and no waiver. A release that changes behavior this product
+   depends on is not only an adoption: the code or requirement it changes
+   carries its owning spec's authoring edit as usual, and never a waiver in
+   its place.
+
+Negative cases. A root document or a spec that states the *current* pin by
+number is a defect to correct, not a second source to keep in step; a dated
+record of what was measured under a named release is history, not a
+restatement. An adoption entry written into
+the decision record instead of the ledger is a defect: it re-creates the `C-001`
+the ledger exists to avoid. A CLI pin and a library version naming different
+releases do not satisfy rule 3, however each was qualified.
+
 ## 4. Out of scope
 
 Hosted platform selection; publication, release and distribution; adaptive
@@ -481,4 +521,6 @@ grep -qiF 'specified' standards/spec/constitution.md
 grep -qF 'Frozen by spec 000 as `independent-acceptance`' standards/spec/constitution.md
 grep -qF 'D-01' docs/decisions/00-founding-decisions.md
 grep -qF 'D-05' docs/decisions/00-founding-decisions.md
+test -f docs/adoption/spec-spine.md
+grep -qF 'required_version' spec-spine.toml
 ```

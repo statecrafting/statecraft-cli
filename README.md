@@ -220,8 +220,9 @@ and a test keeps the set closed.
 
 ## Governance
 
-Governed by [spec-spine](https://github.com/statecrafting/spec-spine), pinned to
-**0.25.0** exactly in `spec-spine.toml`. Specs are the source of truth; the
+Governed by [spec-spine](https://github.com/statecrafting/spec-spine), pinned
+exactly by `required_version` in `spec-spine.toml`, the only place the pin is
+stated; each adoption is recorded in `docs/adoption/spec-spine.md`. Specs are the source of truth; the
 derived shards under `.statecraft/derived/` are compiler output, committed, and read only
 through `spec-spine` subcommands.
 
