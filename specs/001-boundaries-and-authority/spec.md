@@ -650,7 +650,8 @@ Workspace crates stay `publish = false` until `F-02` is lifted.
 **2026-09-24, Part 1 adopted 2026-09-25: the corpus moves to spec-spine's
 amendment model, and `002` is split along its seams by relocation only (owner
 item S).** **The owner adopted Part 1, the amendment model, on 2026-09-25**:
-from that date a new behavioral amendment is a new spec with an `amends` edge
+from that date a new behavioral amendment to an approved spec is a new spec
+with an `amends` edge (a `draft` is still amended in place)
 (and `extends` on each unit whose code it changes), and section 5 keeps real
 implementation decisions only; a section 5 entry stays the route that clears
 `C-001` for a change that alters no requirement, as it was before. **Part 2, the split of `002`, is held** until
