@@ -49,7 +49,7 @@ jobs:
           case "$BASE_SHA" in 0000000000000000000000000000000000000000) BASE_SHA="" ;; esac
           if [ -n "$BASE_SHA" ] && ! git cat-file -e "${BASE_SHA}^{commit}" 2>/dev/null; then
             echo "cannot read the base commit ${BASE_SHA}; the gate is never taken from the candidate in its place" >&2
-            exit 1
+            exit 2
           fi
           for f in gate.sh install-spec-spine.sh; do
             if [ -n "$BASE_SHA" ] && git show "${BASE_SHA}:scripts/statecraft/${f}" > "${dir}/${f}" 2>/dev/null; then
@@ -185,7 +185,7 @@ jobs:
           case "$BASE_SHA" in 0000000000000000000000000000000000000000) BASE_SHA="" ;; esac
           if [ -n "$BASE_SHA" ] && ! git cat-file -e "${BASE_SHA}^{commit}" 2>/dev/null; then
             echo "cannot read the base commit ${BASE_SHA}; the gate is never taken from the candidate in its place" >&2
-            exit 1
+            exit 2
           fi
           for f in gate.sh install-spec-spine.sh; do
             if [ -n "$BASE_SHA" ] && git show "${BASE_SHA}:scripts/statecraft/${f}" > "${dir}/${f}" 2>/dev/null; then
@@ -250,11 +250,14 @@ jobs:
           RESULT: ${{ needs.ai-review.outputs.result }}
           AUTHORITY_CHANGE: ${{ needs.governance.outputs.authority_change }}
         run: echo "owner exception approved for a pull request whose review was ${RESULT} (authority change ${AUTHORITY_CHANGE})"
-
+{{sc:ci.extra_jobs}}
+  # Revision 7: every job the project declares in ci.extra_required_jobs is a
+  # call of its own reusable workflow, needed here and required by the policy
+  # exactly as the profile's jobs are: failed, cancelled and skipped all block.
   ci-gate:
     name: ci-gate
     if: always()
-    needs: [governance, code, ai-review, review-exception]
+    needs: [governance, code, ai-review, review-exception{{sc:ci.extra_needs}}]
     runs-on: ubuntu-latest
     # Read-only: on merge_group the gate reads the recorded review (the
     # entry's pull request, its runs, their jobs and the evidence artifact).
