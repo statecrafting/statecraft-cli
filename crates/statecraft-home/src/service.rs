@@ -195,6 +195,22 @@ pub enum Operation {
     },
 }
 
+impl Operation {
+    /// The project an initialization operates on, which is the only
+    /// operation that runs the corpus tool and the target probe. The caller
+    /// selects the `spec-spine` binary for it (spec 002 section 5,
+    /// 2026-09-25) and for nothing else, since selecting asks each candidate
+    /// its version.
+    pub fn initialized_root(&self) -> Option<&Path> {
+        match self {
+            Operation::InitPlan { root }
+            | Operation::InitApply { root }
+            | Operation::InitWithSetup { root, .. } => Some(root),
+            _ => None,
+        }
+    }
+}
+
 /// How an outcome should end a process.
 ///
 /// The command surface maps these onto spec 006 section 3.3's closed
