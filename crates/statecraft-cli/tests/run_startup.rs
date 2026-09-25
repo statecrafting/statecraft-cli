@@ -22,6 +22,9 @@
 
 #![cfg(unix)]
 
+#[path = "support/json_naming.rs"]
+mod json_naming;
+
 use std::path::{Path, PathBuf};
 use std::process::{Command, Output};
 
@@ -46,7 +49,7 @@ fn text(out: &Output) -> String {
 }
 
 fn json(out: &Output) -> serde_json::Value {
-    serde_json::from_slice(&out.stdout).unwrap_or_else(|e| panic!("{e}: {}", text(out)))
+    json_naming::from_output(&out.stdout).unwrap_or_else(|e| panic!("{e}: {}", text(out)))
 }
 
 struct Fixture {
@@ -1437,7 +1440,7 @@ fn a_concluded_attempt_an_unknown_attempt_number_and_an_empty_reason_are_refused
         "--json",
     ]);
     assert_eq!(code(&out), 2, "{}", text(&out));
-    let answer: serde_json::Value = serde_json::from_slice(&out.stdout).unwrap();
+    let answer: serde_json::Value = json_naming::from_output(&out.stdout).unwrap();
     assert!(answer["value"]["refused"].is_string(), "{answer}");
 
     // An empty reason or operator, against a live attempt.

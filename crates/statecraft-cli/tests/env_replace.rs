@@ -20,6 +20,9 @@
 
 #![cfg(unix)]
 
+#[path = "support/json_naming.rs"]
+mod json_naming;
+
 use std::path::{Path, PathBuf};
 use std::process::{Command, Output};
 
@@ -164,7 +167,7 @@ fn code(o: &Output) -> i32 {
 }
 
 fn json(o: &Output) -> serde_json::Value {
-    serde_json::from_slice(&o.stdout).unwrap_or_else(|e| panic!("{e}: {o:?}"))
+    json_naming::from_output(&o.stdout).unwrap_or_else(|e| panic!("{e}: {o:?}"))
 }
 
 fn snapshot(dir: &Path) -> std::collections::BTreeMap<String, Vec<u8>> {

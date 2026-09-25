@@ -25,7 +25,11 @@ pub const BLOCK_NOTE: &str = "# Managed by Statecraft. Entries above and below t
 
 /// Why a merge will not happen.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
-#[serde(rename_all = "kebab-case", tag = "kind")]
+#[serde(
+    rename_all = "kebab-case",
+    rename_all_fields = "camelCase",
+    tag = "kind"
+)]
 pub enum Refusal {
     /// A line ignores the whole project area.
     AreaIgnored {

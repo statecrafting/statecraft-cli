@@ -14,6 +14,9 @@
 //! hand-built captures are the shared synthetic fixture. Nothing below claims a
 //! live qualification, and the records it produces say synthetic.
 
+#[path = "support/json_naming.rs"]
+mod json_naming;
+
 use std::path::{Path, PathBuf};
 use std::process::{Command, Output};
 
@@ -211,7 +214,7 @@ fn session_payload_prints_the_bytes_and_their_identity() {
     let sandbox = Sandbox::new();
     let out = sandbox.run(&["session", "payload", "--json"]);
     assert_eq!(code(&out), 0, "{}", stdout(&out));
-    let value: serde_json::Value = serde_json::from_str(&stdout(&out)).expect("json");
+    let value: serde_json::Value = json_naming::from_text(&stdout(&out)).expect("json");
     let payload = &value["value"]["value"]["payload"];
     assert_eq!(
         payload,
@@ -234,7 +237,7 @@ fn session_payload_prints_the_bytes_and_their_identity() {
     let human = sandbox.run(&["session", "payload"]);
     assert_eq!(code(&human), 0);
     assert_eq!(stdout(&human), statecraft_home::session::payload_json());
-    let reparsed: serde_json::Value = serde_json::from_str(&stdout(&human))
+    let reparsed: serde_json::Value = json_naming::from_text(&stdout(&human))
         .expect("the human rendering is the settings document itself");
     assert!(reparsed["permissions"]["deny"].is_array());
 
@@ -255,7 +258,7 @@ fn harness_show_activates_nothing() {
     let out = sandbox.run(&["harness", "show", &sandbox.project_arg(), "--json"]);
     // No requirement is committed yet, which is a diagnostic state: a finding.
     assert_eq!(code(&out), 1, "{}", stdout(&out));
-    let value: serde_json::Value = serde_json::from_str(&stdout(&out)).expect("json");
+    let value: serde_json::Value = json_naming::from_text(&stdout(&out)).expect("json");
     assert_eq!(
         value["value"]["value"]["activatedAnything"],
         serde_json::json!(false)
@@ -433,7 +436,7 @@ fn a_capture_renders_its_record_in_the_json_envelope() {
     let sandbox = upgraded();
     let out = sandbox.capture("allowed-command", "faithful", &["--json"]);
     assert_eq!(code(&out), 0, "{}", stdout(&out));
-    let value: serde_json::Value = serde_json::from_str(&stdout(&out)).expect("json");
+    let value: serde_json::Value = json_naming::from_text(&stdout(&out)).expect("json");
     let captured = &value["value"];
     assert_eq!(captured["operation"], serde_json::json!("captured"));
     assert_eq!(captured["value"]["complete"], serde_json::json!(true));
@@ -779,7 +782,7 @@ fn unreadable_captures_are_a_failure_and_not_a_refused_claim() {
         &dir.display().to_string(),
         "--json",
     ]);
-    let value: serde_json::Value = serde_json::from_str(&stdout(&out)).expect("json");
+    let value: serde_json::Value = json_naming::from_text(&stdout(&out)).expect("json");
     assert_eq!(value["value"]["value"]["kind"], serde_json::json!("unread"));
 }
 
@@ -800,7 +803,7 @@ fn a_second_record_for_a_session_is_refused_before_the_evidence_is_read() {
         "--json",
     ]);
     assert_eq!(code(&out), 2, "{}", stdout(&out));
-    let value: serde_json::Value = serde_json::from_str(&stdout(&out)).expect("json");
+    let value: serde_json::Value = json_naming::from_text(&stdout(&out)).expect("json");
     assert_eq!(value["value"]["operation"], serde_json::json!("refused"));
 }
 

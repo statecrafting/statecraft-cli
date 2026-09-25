@@ -12,6 +12,9 @@
 
 #![cfg(unix)]
 
+#[path = "support/json_naming.rs"]
+mod json_naming;
+
 use std::collections::{BTreeMap, BTreeSet};
 use std::os::unix::fs::PermissionsExt;
 use std::path::{Path, PathBuf};
@@ -129,7 +132,7 @@ impl Fixture {
         let out = self.cli(verb);
         let after = self.walk();
         let answer: serde_json::Value =
-            serde_json::from_slice(&out.stdout).unwrap_or_else(|e| panic!("{e}: {}", text(&out)));
+            json_naming::from_output(&out.stdout).unwrap_or_else(|e| panic!("{e}: {}", text(&out)));
         let report = answer["value"]["value"].clone();
         assert!(report.is_object(), "{answer}");
         let mut seen = BTreeSet::new();
