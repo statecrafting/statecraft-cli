@@ -1139,7 +1139,10 @@ sees those.
 *The exemption list*, in full:
 
 1. The environment manifest and its transfer journal (spec `002`): committed
-   in every adopter, including the `project.setup` parameters.
+   in every adopter, including the `project.setup` parameters. Profile
+   revision 7's `ci.extra_required_jobs` joined that document while this
+   change was open, so its key is listed with the others; a new key in an
+   already grandfathered document is the same schema, not a new exemption.
 2. The transfer plan's `plan_id` (spec `002`, and this section's entry on
    `transfer`): both specs name the field. The rest of the plan is renamed.
 3. The project register's qualification reasons that carry data

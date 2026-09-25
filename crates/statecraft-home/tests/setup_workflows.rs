@@ -103,6 +103,9 @@ fn render_with(root: &Path, extra: &[(&str, serde_json::Value)]) {
     setup::finish(root).unwrap();
 }
 
+/// A reusable workflow a declared extra required job calls (revision 7).
+const REUSABLE: &str = "on:\n  workflow_call:\njobs:\n  check:\n    runs-on: ubuntu-latest\n    steps:\n      - run: true\n";
+
 /// A repository with a base commit and a head commit. `at_base` names the
 /// profile paths committed at the base (the rest of the rendered profile is
 /// in the work tree only, which is the adoption case the workflows fall back
@@ -144,6 +147,11 @@ impl Repo {
                 std::fs::create_dir_all(root.join(rel).parent().unwrap()).unwrap();
                 statecraft_adapter::fixture::install_script(&root.join(rel), CHECK_AUTHORED, 0o755)
                     .unwrap();
+            }
+            if *k == "ci.extra_required_jobs" {
+                for e in v.as_array().unwrap() {
+                    write(root, e["workflow"].as_str().unwrap(), REUSABLE);
+                }
             }
         }
         render_with(root, params);
@@ -733,12 +741,13 @@ fn gate_cases() -> Vec<(&'static str, &'static str, String, &'static str, i32)> 
             "release/1.0",
             0,
         ),
+        // Revision 7: a precondition the gate cannot judge past refuses (2).
         (
             "an event the policy states no rule for",
             "workflow_dispatch",
             needs(&ALL_OK, Some("no-findings"), false),
             "",
-            1,
+            2,
         ),
     ]);
     cases
@@ -775,7 +784,7 @@ fn ci_gate_blocks_exactly_what_the_policy_says() {
     for (label, event, needs_json, head_ref, want) in gate_cases() {
         let ran = run_gate(&repo, event, &needs_json, head_ref);
         assert_eq!(ran.exit, want, "{label}:\n{}", ran.text);
-        if want == 1 {
+        if want != 0 {
             assert!(ran.text.contains(reason(label)), "{label}: {}", ran.text);
         }
         if want == 0 {
@@ -1027,7 +1036,7 @@ fn inverting_a_blocking_branch_of_ci_gate_is_noticed() {
         std::fs::write(repo.root().join("scripts/statecraft/ci-gate.sh"), &mutated).unwrap();
         // Noticed: a case ends differently, or a block no longer says why.
         let differs = |ran: &Ran, want: i32, why: &str| {
-            ran.exit != want || (want == 1 && !ran.text.contains(why))
+            ran.exit != want || (want != 0 && !ran.text.contains(why))
         };
         let noticed = cases
             .iter()
@@ -1054,7 +1063,7 @@ fn inverting_a_blocking_branch_of_ci_gate_is_noticed() {
                     &needs(&ALL_OK, Some("no-findings"), false),
                     "topic",
                 ),
-                1,
+                2,
                 "no policy",
             )
         };
@@ -1373,34 +1382,34 @@ fn review_cases() -> Vec<Case> {
     let mut cases = vec![
         c("a review with findings", "findings", 0, "findings"),
         c("a review with none", "no-findings", 0, "no-findings"),
-        c("empty output", "empty", 1, ""),
-        c("unrelated output", "unrelated", 1, ""),
-        c("a verdict for another head", "wronghead", 1, ""),
-        c("a finding outside the diff", "outside", 1, ""),
-        c("a findings verdict listing none", "findings-empty", 1, ""),
+        c("empty output", "empty", 4, ""),
+        c("unrelated output", "unrelated", 4, ""),
+        c("a verdict for another head", "wronghead", 4, ""),
+        c("a finding outside the diff", "outside", 4, ""),
+        c("a findings verdict listing none", "findings-empty", 4, ""),
         c(
             "a no-findings verdict listing some",
             "no-findings-listed",
-            1,
+            4,
             "",
         ),
-        c("a verdict that is neither", "badverdict", 1, ""),
+        c("a verdict that is neither", "badverdict", 4, ""),
         c(
             "a recognized transient failure",
             "transient",
             0,
             "skipped:transient",
         ),
-        c("an explicit refusal", "refusal", 1, ""),
+        c("an explicit refusal", "refusal", 2, ""),
         c(
             "a refusal outranks a transient signal",
             "refusal-and-transient",
-            1,
+            2,
             "",
         ),
-        c("an unclassified failure", "unclassified", 1, ""),
+        c("an unclassified failure", "unclassified", 4, ""),
     ];
-    let mut missing = c("a missing credential", "no-findings", 1, "");
+    let mut missing = c("a missing credential", "no-findings", 2, "");
     missing
         .extra
         .push(("CLAUDE_CODE_OAUTH_TOKEN", String::new()));
@@ -1418,22 +1427,22 @@ fn review_cases() -> Vec<Case> {
     let mut big = c("an oversized diff", "no-findings", 0, "skipped:oversized");
     big.extra.push(("DIFF_CAP", "1".into()));
     cases.push(big);
-    let mut stale = c("a stale subject", "no-findings", 1, "");
+    let mut stale = c("a stale subject", "no-findings", 2, "");
     stale.moved_head = true;
     cases.push(stale);
-    let mut unreadable = c("the current head cannot be read", "no-findings", 1, "");
+    let mut unreadable = c("the current head cannot be read", "no-findings", 4, "");
     unreadable.unreadable_head = true;
     cases.push(unreadable);
-    let mut uninstalled = c("the reviewer cannot be installed", "no-findings", 1, "");
+    let mut uninstalled = c("the reviewer cannot be installed", "no-findings", 4, "");
     uninstalled.npm_exit = "1";
     cases.push(uninstalled);
-    let mut unposted = c("a failed publication", "findings", 1, "");
+    let mut unposted = c("a failed publication", "findings", 4, "");
     unposted.comment_exit = "1";
     cases.push(unposted);
     let mut unposted_skip = c(
         "a skip notice that could not be posted",
         "no-findings",
-        1,
+        4,
         "",
     );
     unposted_skip.extra.push(("IS_DRAFT", "true".into()));
@@ -1524,7 +1533,7 @@ fn ai_review_classifies_every_case() {
     for case in review_cases() {
         let ran = run_review(&repo, &case);
         assert_eq!(ran.exit, case.want_exit, "{}:\n{}", case.label, ran.text);
-        if case.want_exit == 1 {
+        if case.want_exit != 0 {
             assert!(
                 ran.text.contains(review_reason(case.label)),
                 "{}:\n{}",
@@ -1723,7 +1732,7 @@ fn inverting_a_blocking_branch_of_ai_review_is_noticed() {
             let ran = run_review(&repo, case);
             ran.exit != case.want_exit
                 || ran.output("result") != case.want_result
-                || (case.want_exit == 1 && !ran.text.contains(review_reason(case.label)))
+                || (case.want_exit != 0 && !ran.text.contains(review_reason(case.label)))
         });
         assert!(
             noticed,
@@ -2008,7 +2017,8 @@ fn a_declared_authored_content_script_is_required_and_an_undeclared_one_runs_not
     let mut gov = Gov::new(&declared);
     gov.base = gov.commit(&[(DECLARED, None)], "remove the script");
     let ran = run_gov(&gov, "Governance", &event("push", &head(&gov)), |_| {});
-    assert_eq!(ran.exit, 1, "{}", ran.text);
+    // Revision 7: refused (2), a precondition the operator supplies.
+    assert_eq!(ran.exit, 2, "{}", ran.text);
     assert!(ran.text.contains("which is absent"), "{}", ran.text);
     assert!(
         ran.text.contains(&format!(
@@ -2031,7 +2041,7 @@ fn a_declared_authored_content_script_is_required_and_an_undeclared_one_runs_not
         "drop the executable bit",
     );
     let ran = run_gov(&gov, "Governance", &event("push", &head(&gov)), |_| {});
-    assert_eq!(ran.exit, 1, "{}", ran.text);
+    assert_eq!(ran.exit, 2, "{}", ran.text);
     assert!(ran.text.contains("which is not executable"), "{}", ran.text);
 
     // Revision 5: absent or not executable only in the candidate, the base's
@@ -2701,10 +2711,11 @@ fn the_adoption_runs_the_candidates_gate_and_says_so() {
         ran.text
     );
 
-    // An unreadable base is never the adoption.
+    // An unreadable base is never the adoption. Revision 7: refused (2), the
+    // same code gate.sh gives the same condition.
     gov.base = "1111111111111111111111111111111111111111".to_string();
     let ran = run_gov(&gov, "Governance", &event("pull_request", &head), |_| {});
-    assert_eq!(ran.exit, 1, "{}", ran.text);
+    assert_eq!(ran.exit, 2, "{}", ran.text);
     assert!(
         ran.text.contains("cannot read the base commit"),
         "{}",
@@ -2977,9 +2988,517 @@ fn revision_five_reads_the_gate_at_the_base_in_every_job_that_runs_it() {
     // The policy states the rule the gate enforces and the workflow reads.
     let policy: serde_json::Value =
         serde_json::from_str(&std::fs::read_to_string(tmp.path().join(POLICY)).unwrap()).unwrap();
-    assert_eq!(policy["revision"], 6);
+    assert_eq!(policy["revision"], setup::REVISION);
     assert_eq!(
         policy["authority_rule"]["exception_environment"],
         "statecraft-review-exception"
     );
+}
+
+// ------------------------------------------- the family exit contract (revision 7)
+
+#[path = "support/exits.rs"]
+mod exits;
+
+/// The family exit contract: 0 ok, 1 finding, 2 refused, 3 usage, 4 failed.
+const CONTRACT: [&str; 5] = ["0", "1", "2", "3", "4"];
+
+/// Revision 7: every exit statement a rendered script or a rendered workflow
+/// step states is in the family contract, and every implicit exit path is
+/// closed. A deliberate non-zero exit is a literal code (or the one
+/// translated variable whose every assignment is a literal); a command that
+/// stops a script under `set -e` is reported as 4 by its trap; an unset
+/// input is never the shell's own `${X:?}` code.
+#[test]
+fn every_exit_a_rendered_script_states_is_in_the_family_contract() {
+    let tmp = tempfile::tempdir().unwrap();
+    write(tmp.path(), "spec-spine.toml", TOML);
+    render(tmp.path());
+    let mut bodies: Vec<(String, String)> = Vec::new();
+    for name in [
+        "gate.sh",
+        "install-spec-spine.sh",
+        "ci-gate.sh",
+        "ai-review.sh",
+    ] {
+        let rel = format!("scripts/statecraft/{name}");
+        let text = std::fs::read_to_string(tmp.path().join(&rel)).unwrap();
+        // The implicit paths: each script carries the net that turns a
+        // command that broke into 4, and no input check of the shell's own.
+        if text.starts_with("#!/bin/sh") {
+            assert!(text.contains("\nset -eu\n"), "{rel}");
+            let trap = text
+                .lines()
+                .find(|l| l.starts_with("trap ") && l.ends_with(" EXIT"))
+                .unwrap_or_else(|| panic!("{rel}: no EXIT trap"));
+            assert!(trap.contains("exit 4"), "{rel}: {trap}");
+        } else {
+            assert!(text.contains("\nset -eEuo pipefail\n"), "{rel}");
+            let trap = text
+                .lines()
+                .find(|l| l.starts_with("trap ") && l.ends_with(" ERR"))
+                .unwrap_or_else(|| panic!("{rel}: no ERR trap"));
+            assert!(trap.contains("exit 4"), "{rel}: {trap}");
+        }
+        assert!(
+            !text.contains(":?"),
+            "{rel}: an input checked by `${{X:?}}`"
+        );
+        bodies.push((rel, text));
+    }
+    for name in ["statecraft-ci.yml", "statecraft-ai-review.yml"] {
+        let wf = workflow(tmp.path(), name);
+        for (job, def) in wf["jobs"].as_mapping().unwrap() {
+            for s in def["steps"].as_sequence().into_iter().flatten() {
+                if let Some(run) = s["run"].as_str() {
+                    bodies.push((format!("{name} {job:?}"), run.to_string()));
+                }
+            }
+        }
+    }
+    let mut seen = 0;
+    for (rel, text) in &bodies {
+        let lines: Vec<&str> = text.lines().collect();
+        for e in exits::exit_statements(text) {
+            seen += 1;
+            let at = format!("{rel}:{}: {}", e.line, lines[e.line - 1].trim());
+            if CONTRACT.contains(&e.code.as_str()) {
+                continue;
+            }
+            match (e.verb, e.code.as_str()) {
+                // `leave`'s own body, which clears the trap and exits with
+                // the literal its caller named.
+                ("exit", "\"$1\"") => assert_eq!(lines[e.line - 2].trim(), "trap - EXIT", "{at}"),
+                // The spec-spine translation table's one variable.
+                ("leave", "\"$ss_to\"") => {
+                    for l in lines.iter().filter(|l| l.contains("ss_to=")) {
+                        let v = l.split("ss_to=").nth(1).unwrap();
+                        let v = &v[..1];
+                        assert!(CONTRACT.contains(&v), "{rel}: {l}");
+                    }
+                }
+                _ => panic!("an exit outside the family contract: {at}"),
+            }
+        }
+    }
+    assert!(seen >= 40, "found only {seen} exit statements");
+}
+
+/// Stubs whose exit codes a case sets through `STUB_STATE`: `spec-spine`
+/// answers `ss-<verb>` (`ss-index-<sub>` for `index`), and `cargo` answers
+/// `cargo-<verb>`; either is 0 when the file is absent.
+fn exit_bin() -> &'static Path {
+    static DIR: std::sync::OnceLock<PathBuf> = std::sync::OnceLock::new();
+    DIR.get_or_init(|| {
+        let dir = tempfile::tempdir().unwrap().keep();
+        let spec_spine = "#!/bin/sh\nverb=\"$1\"\n[ \"$verb\" = index ] && verb=\"index-$2\"\nf=\"$STUB_STATE/ss-$verb\"\nif [ -f \"$f\" ]; then exit \"$(cat \"$f\")\"; fi\nexit 0\n";
+        let cargo = "#!/bin/sh\nf=\"$STUB_STATE/cargo-$1\"\nif [ -f \"$f\" ]; then exit \"$(cat \"$f\")\"; fi\nif [ \"$1\" = metadata ]; then echo '{\"workspace_members\":[\"fixture\"]}'; fi\nexit 0\n";
+        for (name, body) in [("spec-spine", spec_spine), ("cargo", cargo)] {
+            statecraft_adapter::fixture::install_script(&dir.join(name), body, 0o755).unwrap();
+        }
+        // A PATH with no cargo: only what gate.sh needs before it asks.
+        let bare = dir.join("bare");
+        std::fs::create_dir_all(&bare).unwrap();
+        for tool in ["dirname", "basename"] {
+            let found = ["/usr/bin", "/bin"]
+                .iter()
+                .map(|d| Path::new(d).join(tool))
+                .find(|p| p.exists())
+                .unwrap();
+            std::os::unix::fs::symlink(found, bare.join(tool)).unwrap();
+        }
+        dir
+    })
+}
+
+/// Run the rendered `gate.sh` with `args`, as `make gate` does: `sh`, from
+/// the checkout, with the case's stub codes in `state`.
+fn gate_sh(
+    root: &Path,
+    args: &[&str],
+    env: &[(&str, &str)],
+    state: &[(&str, &str)],
+) -> (i32, String) {
+    let stub_state = tempfile::tempdir().unwrap();
+    for (name, code) in state {
+        std::fs::write(stub_state.path().join(name), code).unwrap();
+    }
+    let path = format!(
+        "{}:{}",
+        exit_bin().display(),
+        std::env::var("PATH").unwrap_or_default()
+    );
+    let mut cmd = Command::new("/bin/sh");
+    cmd.arg("scripts/statecraft/gate.sh")
+        .args(args)
+        .current_dir(root)
+        .env_remove("BASE_SHA")
+        .env_remove("HEAD_SHA")
+        .env_remove("BASE_REF")
+        .env("PATH", &path)
+        .env("STUB_STATE", stub_state.path());
+    for (k, v) in env {
+        cmd.env(k, v);
+    }
+    let out = cmd.output().unwrap();
+    let text = format!(
+        "{}{}",
+        String::from_utf8_lossy(&out.stdout),
+        String::from_utf8_lossy(&out.stderr)
+    );
+    (out.status.code().unwrap_or(-1), text)
+}
+
+/// Revision 7, the three known defects and the translations, observed by
+/// running the rendered `gate.sh`: a usage error is 3 (was 64), a missing
+/// spec-spine refuses with 2 (was 3), and an absent or non-executable
+/// declared authored-content script refuses with 2 (was 1). spec-spine's
+/// own codes and cargo's are translated, and a command that broke is 4.
+#[test]
+fn the_rendered_gate_exits_in_the_family_contract() {
+    let declared = [("governance.authored_content", serde_json::json!(DECLARED))];
+    let gov = Gov::new(&declared);
+    let root = gov.root();
+    let ss = root.join(".tooling/bin/spec-spine");
+    std::fs::remove_file(&ss).unwrap();
+    std::os::unix::fs::symlink(exit_bin().join("spec-spine"), &ss).unwrap();
+
+    // Usage: no mode, an unknown mode, two modes, a mode missing its input.
+    let usage: [&[&str]; 5] = [
+        &[],
+        &["nonsense"],
+        &["governance", "code"],
+        &["base"],
+        &["couple"],
+    ];
+    for args in usage {
+        let (code, text) = gate_sh(root, args, &[], &[]);
+        assert_eq!(code, 3, "{args:?}: {text}");
+    }
+
+    // The translation table, spec-spine 0.25.0's codes.
+    for (file, ss_code, want, said) in [
+        ("ss-check", "1", 1, "does not pass"),
+        ("ss-check", "2", 1, "stale"),
+        ("ss-check", "3", 4, "did not perform the read"),
+        ("ss-lint", "7", 4, "does not know"),
+        ("ss-index-coverage", "1", 1, "does not pass"),
+        ("ss-index-check", "2", 1, "stale"),
+    ] {
+        let (code, text) = gate_sh(root, &["governance"], &[], &[(file, ss_code)]);
+        assert_eq!(code, want, "{file}={ss_code}: {text}");
+        assert!(text.contains(said), "{file}={ss_code}: {text}");
+        assert!(
+            text.contains(&format!("spec-spine exit {ss_code}, gate exit {want}")),
+            "{text}"
+        );
+    }
+    let head = git(root, &["rev-parse", "HEAD"]);
+    let ends = [("BASE_SHA", gov.base.as_str()), ("HEAD_SHA", head.as_str())];
+    let (code, text) = gate_sh(root, &["couple"], &ends, &[("ss-couple", "1")]);
+    assert_eq!(code, 1, "drift is a finding: {text}");
+    let (code, text) = gate_sh(root, &["couple"], &ends, &[]);
+    assert_eq!(code, 0, "{text}");
+
+    // cargo: a verb that ran and failed is a finding, a metadata read that
+    // failed is a failure, and no cargo at all refuses.
+    let (code, text) = gate_sh(root, &["code"], &[], &[("cargo-test", "101")]);
+    assert_eq!(code, 1, "{text}");
+    assert!(
+        text.contains("cargo test did not pass (cargo exit 101, gate exit 1)"),
+        "{text}"
+    );
+    let (code, text) = gate_sh(root, &["code"], &[], &[("cargo-metadata", "101")]);
+    assert_eq!(code, 4, "{text}");
+    let (code, text) = gate_sh(root, &["code"], &[], &[]);
+    assert_eq!(code, 0, "{text}");
+    let bare = exit_bin().join("bare");
+    let (code, text) = gate_sh(root, &["code"], &[("PATH", bare.to_str().unwrap())], &[]);
+    assert_eq!(code, 2, "{text}");
+    assert!(text.contains("cargo is not on PATH"), "{text}");
+
+    // The declared authored-content script: a violation is a finding; absent
+    // or not executable refuses.
+    let (code, text) = gate_sh(root, &["governance"], &[], &[]);
+    assert_eq!(code, 0, "{text}");
+    write(root, "README.md", &format!("# fixture {EM} x\n"));
+    let (code, text) = gate_sh(root, &["governance"], &[], &[]);
+    assert_eq!(code, 1, "{text}");
+    assert!(text.contains("found a violation"), "{text}");
+    write(root, "README.md", "# fixture\n");
+    use std::os::unix::fs::PermissionsExt;
+    std::fs::set_permissions(root.join(DECLARED), std::fs::Permissions::from_mode(0o644)).unwrap();
+    let (code, text) = gate_sh(root, &["governance"], &[], &[]);
+    assert_eq!(code, 2, "{text}");
+    assert!(text.contains("which is not executable"), "{text}");
+    std::fs::remove_file(root.join(DECLARED)).unwrap();
+    let (code, text) = gate_sh(root, &["governance"], &[], &[]);
+    assert_eq!(code, 2, "{text}");
+    assert!(text.contains("which is absent"), "{text}");
+
+    // A missing spec-spine refuses, in every mode that needs it.
+    std::fs::remove_file(&ss).unwrap();
+    for (mode, env) in [("governance", &[][..]), ("couple", &ends[..])] {
+        let (code, text) = gate_sh(root, &[mode], env, &[]);
+        assert_eq!(code, 2, "{mode}: {text}");
+        assert!(text.contains("is not installed"), "{mode}: {text}");
+    }
+
+    // A command that broke is a failure, whatever its own code: the commit
+    // walk over a base git cannot read.
+    let walk = Gov::new(&[("governance.gate_each_commit", serde_json::json!(true))]);
+    let head = git(walk.root(), &["rev-parse", "HEAD"]);
+    let (code, text) = gate_sh(
+        walk.root(),
+        &["commits"],
+        &[
+            ("BASE_SHA", "1111111111111111111111111111111111111111"),
+            ("HEAD_SHA", head.as_str()),
+        ],
+        &[],
+    );
+    assert_eq!(code, 4, "{text}");
+    assert!(text.contains("reported as failed (4)"), "{text}");
+}
+
+/// Revision 7: the install script refuses an absent pin with 2 and reports a
+/// failed install as 4, never as cargo's own code.
+#[test]
+fn the_rendered_installer_exits_in_the_family_contract() {
+    let gov = Gov::new(&[]);
+    let root = gov.root();
+    std::fs::remove_file(root.join(".tooling/bin/spec-spine")).unwrap();
+    let run = |state: &[(&str, &str)]| {
+        let stub_state = tempfile::tempdir().unwrap();
+        for (name, code) in state {
+            std::fs::write(stub_state.path().join(name), code).unwrap();
+        }
+        let out = Command::new("sh")
+            .arg("scripts/statecraft/install-spec-spine.sh")
+            .current_dir(root)
+            .env(
+                "PATH",
+                format!(
+                    "{}:{}",
+                    exit_bin().display(),
+                    std::env::var("PATH").unwrap_or_default()
+                ),
+            )
+            .env("STUB_STATE", stub_state.path())
+            .output()
+            .unwrap();
+        (
+            out.status.code().unwrap_or(-1),
+            format!(
+                "{}{}",
+                String::from_utf8_lossy(&out.stdout),
+                String::from_utf8_lossy(&out.stderr)
+            ),
+        )
+    };
+    let (code, text) = run(&[("cargo-install", "101")]);
+    assert_eq!(code, 4, "{text}");
+    assert!(
+        text.contains("cargo install of spec-spine 0.25.0 failed"),
+        "{text}"
+    );
+    write(
+        root,
+        "spec-spine.toml",
+        "[meta]\nrequired_version = \"0.25\"\n",
+    );
+    let (code, text) = run(&[]);
+    assert_eq!(code, 2, "{text}");
+    write(root, "spec-spine.toml", "[meta]\n");
+    let (code, text) = run(&[]);
+    assert_eq!(code, 2, "{text}");
+}
+
+// ------------------------------------- declared extra required jobs (revision 7)
+
+const EXTRA: &str = "deny";
+
+fn extra_params() -> Vec<(&'static str, serde_json::Value)> {
+    vec![(
+        "ci.extra_required_jobs",
+        serde_json::json!([{"job": EXTRA, "workflow": ".github/workflows/deny.yml"}]),
+    )]
+}
+
+/// The ci-gate cases for a declared extra job: each ends as the profile's
+/// own required jobs do.
+fn extra_cases() -> Vec<(&'static str, &'static str, String, i32)> {
+    let mut all_ok: Vec<(&str, &str)> = ALL_OK.to_vec();
+    all_ok.push((EXTRA, "success"));
+    let over = |result: &'static str| -> Vec<(&'static str, &'static str)> {
+        all_ok
+            .iter()
+            .map(|(j, r)| (*j, if *j == EXTRA { result } else { *r }))
+            .collect()
+    };
+    let push = |entries: &[(&str, &str)]| -> String {
+        let e: Vec<(&str, &str)> = entries
+            .iter()
+            .map(|(j, r)| match *j {
+                "ai-review" | "review-exception" => (*j, "skipped"),
+                _ => (*j, *r),
+            })
+            .collect();
+        needs(&e, None, false)
+    };
+    let pr = |entries: &[(&str, &str)]| needs(entries, Some("no-findings"), false);
+    let vanished: Vec<(&str, &str)> = ALL_OK.to_vec();
+    vec![
+        ("extra job succeeds", "pull_request", pr(&all_ok), 0),
+        ("extra job succeeds on push", "push", push(&all_ok), 0),
+        ("extra job failed", "pull_request", pr(&over("failure")), 1),
+        (
+            "extra job cancelled",
+            "pull_request",
+            pr(&over("cancelled")),
+            1,
+        ),
+        ("extra job skipped", "pull_request", pr(&over("skipped")), 1),
+        (
+            "extra job skipped on push",
+            "push",
+            push(&over("skipped")),
+            1,
+        ),
+        ("extra job vanished", "pull_request", pr(&vanished), 1),
+    ]
+}
+
+fn extra_reason(label: &str) -> &'static str {
+    if label.contains("skipped") {
+        "'deny' was skipped where it applies"
+    } else if label.contains("vanished") {
+        "'deny' is not in the needs record"
+    } else {
+        "'deny' ended"
+    }
+}
+
+fn run_extra_cases(repo: &Repo) -> Vec<(&'static str, i32, String)> {
+    extra_cases()
+        .into_iter()
+        .map(|(label, event, needs_json, _)| {
+            let head_ref = if event == "push" { "" } else { "topic" };
+            let ran = run_gate(repo, event, &needs_json, head_ref);
+            (label, ran.exit, ran.text)
+        })
+        .collect()
+}
+
+/// Revision 7: a job declared in `ci.extra_required_jobs` is rendered as a
+/// call of the project's reusable workflow, ci-gate needs it, the policy
+/// requires it on every event, and failed, cancelled, skipped and vanished
+/// all block, exactly as for the profile's own jobs.
+#[test]
+fn a_declared_extra_job_is_required_like_the_profiles_own() {
+    let repo = Repo::new_with(
+        &extra_params(),
+        &[POLICY, "scripts/statecraft/ci-gate.sh"],
+        &[],
+    );
+    let wf = workflow(repo.root(), "statecraft-ci.yml");
+    assert_eq!(
+        wf["jobs"][EXTRA]["uses"].as_str(),
+        Some("./.github/workflows/deny.yml")
+    );
+    assert!(
+        wf["jobs"][EXTRA]["secrets"].is_null(),
+        "no secret is passed"
+    );
+    let needs_list: Vec<&str> = wf["jobs"]["ci-gate"]["needs"]
+        .as_sequence()
+        .unwrap()
+        .iter()
+        .map(|v| v.as_str().unwrap())
+        .collect();
+    assert_eq!(
+        needs_list,
+        ["governance", "code", "ai-review", "review-exception", EXTRA]
+    );
+    let policy: serde_json::Value =
+        serde_json::from_str(&std::fs::read_to_string(repo.root().join(POLICY)).unwrap()).unwrap();
+    let mut required: Vec<&str> = policy["jobs"]
+        .as_object()
+        .unwrap()
+        .iter()
+        .filter(|(_, v)| v["required"] == true)
+        .map(|(k, _)| k.as_str())
+        .collect();
+    required.sort_unstable();
+    let mut sorted = needs_list.clone();
+    sorted.sort_unstable();
+    assert_eq!(sorted, required);
+    for event in ["pull_request", "push", "merge_group"] {
+        assert_eq!(policy["jobs"][EXTRA][event], "required", "{event}");
+    }
+    for ((label, exit, text), (_, _, _, want)) in
+        run_extra_cases(&repo).into_iter().zip(extra_cases())
+    {
+        assert_eq!(exit, want, "{label}: {text}");
+        if want != 0 {
+            assert!(text.contains(extra_reason(label)), "{label}: {text}");
+        }
+    }
+
+    // Without a declaration, the rendered workflow is the profile's alone.
+    let plain = tempfile::tempdir().unwrap();
+    write(plain.path(), "spec-spine.toml", TOML);
+    render(plain.path());
+    let text =
+        std::fs::read_to_string(plain.path().join(".github/workflows/statecraft-ci.yml")).unwrap();
+    assert!(
+        text.contains("needs: [governance, code, ai-review, review-exception]\n"),
+        "{text}"
+    );
+}
+
+/// Revision 7, the mutation obligation for declared jobs: each blocking
+/// branch of ci-gate a required job reaches (failed or cancelled, skipped,
+/// vanished), inverted, is noticed by the declared job's cases alone.
+#[test]
+fn inverting_a_required_job_branch_is_noticed_by_the_declared_job_cases() {
+    let repo = Repo::new_with(&extra_params(), &[POLICY], &[]);
+    let target = repo.root().join("scripts/statecraft/ci-gate.sh");
+    let script = std::fs::read_to_string(&target).unwrap();
+    let lines: Vec<&str> = script.lines().collect();
+    let sites: Vec<usize> = lines
+        .iter()
+        .enumerate()
+        .filter(|(_, l)| {
+            let t = l.trim_start();
+            t.starts_with("block \"required job '${job}'")
+        })
+        .map(|(i, _)| i)
+        .collect();
+    assert_eq!(sites.len(), 3, "the three required-job branches");
+    for site in sites {
+        let mutated: String = lines
+            .iter()
+            .enumerate()
+            .map(|(i, l)| {
+                if i == site {
+                    format!("{}\n", l.replacen("block \"", ": \"", 1))
+                } else {
+                    format!("{l}\n")
+                }
+            })
+            .collect();
+        std::fs::write(&target, &mutated).unwrap();
+        let noticed = run_extra_cases(&repo).into_iter().zip(extra_cases()).any(
+            |((label, exit, text), (_, _, _, want))| {
+                exit != want || (want != 0 && !text.contains(extra_reason(label)))
+            },
+        );
+        assert!(
+            noticed,
+            "inverting line {} went unnoticed by the declared job's cases: {}",
+            site + 1,
+            lines[site]
+        );
+    }
 }

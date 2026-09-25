@@ -58,6 +58,7 @@ pub const GRANDFATHERED: &[Grandfathered] = &[
             "diff_cap",
             "release_branch_pattern",
             "code_owners",
+            "extra_required_jobs",
             "enforce_coverage",
             "authored_content",
             "authored_content_text",
