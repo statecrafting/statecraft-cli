@@ -506,6 +506,18 @@ is a change to this spec's territory, so it is noted here. The component table
 names the new pin. The library row moved in its own, later change under spec
 `002`.
 
+**2026-09-24: the authored-content rules also read text that is not a file
+(section 3.6; proposed for the owner's merge, which changes the check
+suite).** Under merge commits a pull request's title and body become the merge
+commit's message, and each branch commit lands on `main` with its own message,
+so both are history the rules in section 3.6 govern. `scripts/check-authored-content.sh`
+gains a `--text FILE...` mode that applies the same two rules, with the same
+patterns and exit codes, to the files it is given; the tree mode is unchanged.
+CI uses it on the pull request's title and body and on every commit message in
+the change (`.github/workflows/govern.yml`, the owner's request of 2026-09-24).
+Nothing required changes: the rules are the ones section 3.6 already states,
+applied to text they already govern.
+
 ## Verification
 
 Each line below is one command. These assert the authored foundation, which

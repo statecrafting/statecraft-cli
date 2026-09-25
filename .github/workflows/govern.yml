@@ -105,6 +105,106 @@ jobs:
       - name: Authored-content rules
         run: scripts/check-authored-content.sh
 
+      # A stacked pull request (its base is another branch) merges into that
+      # branch, not into main, and so is never judged against main at all: #112
+      # merged into #104's branch that way. Refused until GitHub retargets it
+      # to main, which it does when the pull request below it merges.
+      - name: The base is main
+        if: github.event_name == 'pull_request'
+        env:
+          BASE_REF: ${{ github.event.pull_request.base.ref }}
+        run: |
+          test "$BASE_REF" = main || {
+            echo "this pull request's base is '$BASE_REF', not main: merge the one below it first"
+            exit 1
+          }
+
+      # Under merge commits the pull request's title and body become the merge
+      # commit's message, so the authored-content rules bind them as history.
+      # A merge_group event carries neither, so they are read through the API,
+      # as the queue's coupling step reads the body.
+      - name: Authored-content rules (title and body)
+        if: github.event_name == 'pull_request' || github.event_name == 'merge_group'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          EVENT: ${{ github.event_name }}
+          PR_TITLE: ${{ github.event.pull_request.title }}
+          PR_BODY: ${{ github.event.pull_request.body }}
+          HEAD_REF: ${{ github.event.merge_group.head_ref }}
+        run: |
+          set -euo pipefail
+          text="$RUNNER_TEMP/pr-text.txt"
+          if [ "$EVENT" = merge_group ]; then
+            pr=$(printf '%s' "$HEAD_REF" | sed -n 's|.*/pr-\([0-9][0-9]*\)-[0-9a-f]*$|\1|p')
+            test -n "$pr" || { echo "cannot read the pull request number from $HEAD_REF"; exit 1; }
+            gh api "repos/$REPO/pulls/$pr" --jq '.title, (.body // "")' > "$text"
+          else
+            printf '%s\n%s\n' "$PR_TITLE" "${PR_BODY:-}" > "$text"
+          fi
+          scripts/check-authored-content.sh --text "$text"
+
+      # Every commit in the change, not only its head (AGENTS.md, "How a pull
+      # request is merged"). Under merge commits the branch's commits land on
+      # main too, so each must be signed, carry a message the authored-content
+      # rules admit, and pass the gate and the format check at its own tree. A
+      # red or unsigned intermediate commit fails the change. The head is gated
+      # here as well: on pull_request the steps above judge the merge ref, which
+      # is not the head's own tree.
+      #
+      # The signature is GitHub's verification, the one branch protection's
+      # "signed commits" rule reads. Each commit is gated with the pinned binary
+      # its own spec-spine.toml names, so a branch whose last commit moves the
+      # pin does not judge its earlier commits with a version they refuse.
+      - name: Every commit is signed and passes the gate
+        if: github.event_name == 'pull_request' || github.event_name == 'merge_group'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          EVENT: ${{ github.event_name }}
+          PR_BASE: ${{ github.event.pull_request.base.sha }}
+          PR_HEAD: ${{ github.event.pull_request.head.sha }}
+          MG_BASE: ${{ github.event.merge_group.base_sha }}
+          MG_HEAD: ${{ github.event.merge_group.head_sha }}
+        run: |
+          set -euo pipefail
+          if [ "$EVENT" = merge_group ]; then base=$MG_BASE head=$MG_HEAD; else base=$PR_BASE head=$PR_HEAD; fi
+          commits=$(git rev-list --reverse "$base..$head")
+          n=$(printf '%s\n' "$commits" | grep -c . || true)
+          echo "judging $n commit(s) in $base..$head"
+          head_pin=$SPEC_SPINE_VERSION
+          fail=0
+          for c in $commits; do
+            short=$(git rev-parse --short "$c")
+            verified=$(gh api "repos/$REPO/commits/$c" --jq '.commit.verification.verified')
+            if [ "$verified" != true ]; then
+              echo "::error::$short is not signed with a key GitHub verifies"
+              fail=1
+            fi
+            git log -1 --format=%B "$c" > "$RUNNER_TEMP/msg.txt"
+            scripts/check-authored-content.sh --text "$RUNNER_TEMP/msg.txt" > /dev/null \
+              || { echo "::error::$short's message breaks the authored-content rules"; scripts/check-authored-content.sh --text "$RUNNER_TEMP/msg.txt" || true; fail=1; }
+            wt="$RUNNER_TEMP/commit-$short"
+            git worktree add -q --detach "$wt" "$c"
+            pin=$(sed -n 's/^required_version = "=\(.*\)"/\1/p' "$wt/spec-spine.toml")
+            bin="$PWD/$SS"
+            if [ "$pin" != "$head_pin" ]; then
+              root="$RUNNER_TEMP/spec-spine-$pin"
+              [ -x "$root/bin/spec-spine" ] || cargo install spec-spine-cli --version "$pin" --locked --root "$root"
+              bin="$root/bin/spec-spine"
+            fi
+            if ! (cd "$wt" && make gate SPEC_SPINE="$bin" > "$RUNNER_TEMP/gate-$short.log" 2>&1 && cargo fmt --all --check >> "$RUNNER_TEMP/gate-$short.log" 2>&1); then
+              echo "::error::$short fails the gate or the format check at its own tree"
+              cat "$RUNNER_TEMP/gate-$short.log"
+              fail=1
+            else
+              echo "$short: signed, gate and fmt pass"
+            fi
+            git worktree remove --force "$wt"
+          done
+          test "$fail" -eq 0
+          echo "Every commit in this change is signed and passes the gate: merge it with a merge commit (AGENTS.md, \"How a pull request is merged\")." >> "$GITHUB_STEP_SUMMARY"
+
       # The coupling gate against the pull request's real merge base. On a tree
       # with no code it has nothing to refuse; it is wired now so the first crate
       # is governed from its first commit rather than from a later remembering.

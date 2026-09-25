@@ -12,17 +12,29 @@
 # patterns it searches for). Findings are reported per rule, so one does not
 # mask the other, and every finding names its file and line.
 #
+# `--text FILE...` applies the same two rules to text that is not a tracked
+# file: a pull request's title and body, or a commit message, which become
+# history under merge commits (AGENTS.md, "How a pull request is merged"). No
+# file is exempt in that mode.
+#
 # Exit 0 clean, 1 findings, 3 usage/environment.
 
 set -uo pipefail
 
-cd "$(git rev-parse --show-toplevel 2>/dev/null)" || {
-  echo "check-authored-content: not inside a git work tree" >&2
-  exit 3
-}
-
 SELF="scripts/check-authored-content.sh"
 status=0
+mode=tree
+if [ "${1:-}" = "--text" ]; then
+  mode=text
+  shift
+  [ "$#" -gt 0 ] || { echo "check-authored-content: --text needs at least one file" >&2; exit 3; }
+  SELF=""
+else
+  cd "$(git rev-parse --show-toplevel 2>/dev/null)" || {
+    echo "check-authored-content: not inside a git work tree" >&2
+    exit 3
+  }
+fi
 
 # Bash 3.2 is the floor (macOS system bash). Refuse anything older loudly rather
 # than reporting a clean tree we never actually read.
@@ -38,13 +50,20 @@ fi
 # macOS ships /bin/bash 3.2, so a contributor whose PATH resolves to it would
 # otherwise get an empty file list and a vacuous pass. This form runs on 3.2.
 files=()
-while IFS= read -r -d '' f; do
-  case "$f" in
-    .statecraft/derived/*|*.png|*.jpg|*.jpeg|*.gif|*.ico|*.pdf|*.node) continue ;;
-  esac
-  [ -f "$f" ] || continue
-  files+=("$f")
-done < <(git ls-files -z --cached --others --exclude-standard)
+if [ "$mode" = text ]; then
+  for f in "$@"; do
+    [ -f "$f" ] || { echo "check-authored-content: no such file: $f" >&2; exit 3; }
+    files+=("$f")
+  done
+else
+  while IFS= read -r -d '' f; do
+    case "$f" in
+      .statecraft/derived/*|*.png|*.jpg|*.jpeg|*.gif|*.ico|*.pdf|*.node) continue ;;
+    esac
+    [ -f "$f" ] || continue
+    files+=("$f")
+  done < <(git ls-files -z --cached --others --exclude-standard)
+fi
 
 if [ "${#files[@]}" -eq 0 ]; then
   echo "check-authored-content: no authored files found" >&2
@@ -89,6 +108,6 @@ if [ "${#scan[@]}" -gt 0 ]; then
 fi
 
 if [ "$status" -eq 0 ]; then
-  echo "check-authored-content: ${#files[@]} authored file(s) clean (U+2014, session links)"
+  echo "check-authored-content: ${#files[@]} authored $([ "$mode" = text ] && echo text || echo file)(s) clean (U+2014, session links)"
 fi
 exit "$status"
