@@ -596,7 +596,8 @@ incompatibly needs a major version and a migration note:
    draft #118 proposes for spec `006` (item X), adopted by the owner on
    2026-09-25 and landing with the spec-spine 0.26.0 migration. Adding a
    field is compatible;
-   removing, retyping or renaming one is not (`006` section 3.4).
+   removing, retyping or renaming one is not (`006` section 3.4, "Two
+   renderings of one value", which already calls an added field compatible).
 3. **Documented formats**: the environment manifest, the run record and
    journal, receipts and evidence, and bundle metadata, each with a
    `schemaVersion` and a reader for every version it ever wrote.

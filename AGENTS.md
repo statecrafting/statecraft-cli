@@ -337,7 +337,7 @@ acceptance says so with `amends_verification`.
 Section 5 of a spec keeps **implementation decisions only**: a choice section 3
 was silent on, with its reason. It is still the right place for that, and
 still the route that clears `C-001` for a change that alters no requirement.
-It is no longer a place to change a requirement. Entries adopted before
+It is no longer a place to change a requirement. Entries adopted on or before
 2026-09-25 that state requirements stay where they are until they are folded
 into section 3 by their own pull requests; the split of spec `002` that
 precedes the fold waits for spec-spine 0.27.0. The adoption of this rule is
