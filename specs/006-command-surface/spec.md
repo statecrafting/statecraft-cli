@@ -1214,6 +1214,71 @@ a member, so no file this product wrote is refused.
 - **`delivery.json` and `modifications.json` in the product home:** bare
   arrays with no version, the same reason as the register.
 
+**2026-09-24, option (a) adopted 2026-09-25: the hand-written parser
+against clap (owner Addendum 2, item P).** The owner adopted option (a) of the
+assessment below: clap for per-verb arguments only, while verb resolution
+(`Verb::parse`) and help before resolution stay as they are. This entry
+implements nothing. Its conditions bind the change that will implement it:
+that change lands only after the family exit and JSON contract (proposed for
+this section in draft #118, adopted by the owner on 2026-09-25, landing with
+the spec-spine 0.26.0 migration) is on `main`; it maps every clap error to exit
+3 with a test for each verb, except clap's `DisplayHelp` and `DisplayVersion`
+kinds (`--help`, `--version`), which exit 0 and are tested too; and it measures release binary size and clean
+build time on one machine before and after. The assessment below is as
+prepared, except that its binary-size row no longer quotes an unrebuilt
+figure.
+
+*What exists* (main `17dbdb6`). `commands.rs` (546 lines) resolves the verb
+from the first two words by one closed `match` over `Verb::all()` (42
+operations in 15 groups), accepts `--json` anywhere after the verb, answers
+`--help`/`-h` before verb resolution so a group (`work --help`) has help, and
+renders help from `Verb::all()` so a new verb cannot be missing from it. Each
+verb's own arguments are then parsed by hand in `main.rs`, `manage.rs`,
+`bind.rs` and `accept.rs`: 24 `Exit::Usage` returns and 11 separate
+`eprintln!("usage: ...")` lines, with about 20 flags (`--plan`, `--profile`,
+`--remote`, `--head`, `--attempt`, `--evidence`, `--deadline`,
+`--verify-local`, `--replace`, `--force`, ...). There are no shell
+completions.
+
+| Property | Hand-written today | clap 4 (derive) |
+|---|---|---|
+| Verb help | one generated list; per-verb help is a line, not argument docs | per-verb and per-flag help generated from the same definitions |
+| Error messages | consistent for an unknown verb; per-verb usage lines written by hand, 11 of them, and not all flags are named in them | uniform ("unexpected argument", "a value is required", suggestions for typos) |
+| Shell completions | none | `clap_complete` generates bash, zsh, fish, PowerShell |
+| Usage exit code | 3, section 3.3 | clap exits **2** on a usage error by default. Keeping 3 requires `try_parse` and mapping `clap::Error` to `Exit::Usage` ourselves, and `--help` and `--version` (clap's `DisplayHelp` and `DisplayVersion` kinds) to 0 |
+| `--json` anywhere | explicit | a `global = true` flag; same behavior |
+| `run <spec-id>` beside `run list|show|reconcile` | reserved words stated in `Verb::parse` | expressible (`args_conflicts_with_subcommands`), but the reservation must be restated and tested |
+| JSON on usage errors | stderr text only | the same unless we render clap's error into the family envelope (see the family exit and JSON contract proposal, draft #118) |
+| Dependencies | none added | about 12 crates (`clap`, `clap_builder`, `clap_lex`, `clap_derive`, `heck`, `anstream`, `anstyle*`, `colorchoice`, `strsim`, ...) plus `clap_complete`; `syn`, `quote` and `proc-macro2` are already in the lock via `serde_derive` |
+| Binary size | not measured for this entry; the implementing change measures the release binary before its change | measured by the same change after it, on the same machine |
+| Build time | none added | `clap_derive` adds a proc-macro compile to a clean build |
+
+*Assessment.* The verb layer is small, closed and already consistent; clap's
+gain there is modest. The gain is in the **per-verb arguments**, where the 11
+hand-written usage lines drift from what is parsed, and in completions. The
+cost that matters is not size but the exit contract: clap's own exit (2) would
+collide with section 3.3's "refused", so any adoption must route every clap
+error through `Exit::Usage` and test it for each verb.
+
+*Options.* (a) Adopt clap for per-verb arguments only, keeping `Verb::parse`
+and the help-before-resolution rule, mapping every clap error to exit 3 (the help and version displays exit 0), with
+a test per verb that a bad flag exits 3 and names the flag; completions via
+`clap_complete`. (b) Adopt clap for the whole tree. (c) Keep the hand-written
+parser and add a small declarative flag table per verb that the usage lines
+and a completion script are generated from. *Recommended, and adopted by the owner on 2026-09-25: (a)*, after the
+family exit and JSON contract of draft #118 lands, so the usage-error envelope is decided
+once. Measure binary size and clean-build time before and after as the
+change's evidence.
+
+**2026-09-25: the provenance fixture follows the adopted producer.** With
+spec-spine 0.26.0 adopted (`docs/adoption/spec-spine.md`),
+`edited_authored_inputs_are_customized_information_and_an_edited_template_is_drifted`
+failed. Its stub executable still reported 0.25.0 while the project it
+initializes is pinned to the linked producer. The test is about an executable
+that satisfies that pin, so the stub now reports
+`statecraft_home::producer::PRODUCER_VERSION` and follows each adoption. The
+fixtures that state an older executable on purpose keep their versions.
+
 ## Verification
 
 Each line is one command. §3.7's rows are integration tests that **spawn the

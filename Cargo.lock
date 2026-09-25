@@ -610,9 +610,9 @@ checksum = "28d567dcbaf0049cb8ac2608a76cd95ff9e4412e1899d389ee400918ca7537f5"
 
 [[package]]
 name = "spec-spine-core"
-version = "0.25.0"
+version = "0.26.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d96d89fb5e00a1c88f3f3eef47ab7091c7af8bfb6467856bc0d30edd9f143b2c"
+checksum = "d98103ffdc172640b7be65dce28f2917394bada1baae7f89327635a00f7cae0a"
 dependencies = [
  "glob",
  "serde",
@@ -626,9 +626,9 @@ dependencies = [
 
 [[package]]
 name = "spec-spine-types"
-version = "0.25.0"
+version = "0.26.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a941756ce70950f17847f99213eb1064b4b15e2ebfac5281638895adecf65495"
+checksum = "89c4f7e98bfa70047de410b3778f4d1f0d89a7161eba11d2b2039fa9e94329aa"
 dependencies = [
  "serde",
  "serde_json",

@@ -12,7 +12,7 @@ use statecraft_home::setup::{self, Action, ConflictKind, Inputs, Profile};
 use std::collections::BTreeMap;
 use std::path::Path;
 
-const TOML: &str = "[meta]\nrequired_version = \"=0.25.0\"\n";
+const TOML: &str = "[meta]\nrequired_version = \"=0.26.0\"\n";
 
 fn project() -> tempfile::TempDir {
     let dir = tempfile::tempdir().unwrap();

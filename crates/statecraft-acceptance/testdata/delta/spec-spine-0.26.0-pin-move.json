@@ -1,0 +1,152 @@
+{
+  "exitCode": 0,
+  "outcome": "ok",
+  "report": {
+    "base": "e61b1917c8ef3f3d036c61b3760c6d4b89897d72",
+    "changes": [
+      {
+        "change": "modified",
+        "classes": [
+          "derived"
+        ],
+        "path": ".statecraft/derived/codebase-index/by-package/statecraft-acceptance.json"
+      },
+      {
+        "change": "modified",
+        "classes": [
+          "derived"
+        ],
+        "path": ".statecraft/derived/codebase-index/by-package/statecraft-adapter-claude-code.json"
+      },
+      {
+        "change": "modified",
+        "classes": [
+          "derived"
+        ],
+        "path": ".statecraft/derived/codebase-index/by-package/statecraft-adapter.json"
+      },
+      {
+        "change": "modified",
+        "classes": [
+          "derived"
+        ],
+        "path": ".statecraft/derived/codebase-index/by-package/statecraft-cli.json"
+      },
+      {
+        "change": "modified",
+        "classes": [
+          "derived"
+        ],
+        "path": ".statecraft/derived/codebase-index/by-package/statecraft-envelope.json"
+      },
+      {
+        "change": "modified",
+        "classes": [
+          "derived"
+        ],
+        "path": ".statecraft/derived/codebase-index/by-package/statecraft-environment.json"
+      },
+      {
+        "change": "modified",
+        "classes": [
+          "derived"
+        ],
+        "path": ".statecraft/derived/codebase-index/by-package/statecraft-home.json"
+      },
+      {
+        "change": "modified",
+        "classes": [
+          "derived"
+        ],
+        "path": ".statecraft/derived/codebase-index/by-package/statecraft-run.json"
+      },
+      {
+        "change": "modified",
+        "classes": [
+          "derived"
+        ],
+        "path": ".statecraft/derived/codebase-index/by-spec/000-bootstrap.json"
+      },
+      {
+        "change": "modified",
+        "classes": [
+          "derived"
+        ],
+        "path": ".statecraft/derived/codebase-index/by-spec/001-boundaries-and-authority.json"
+      },
+      {
+        "change": "modified",
+        "classes": [
+          "derived"
+        ],
+        "path": ".statecraft/derived/codebase-index/by-spec/002-environment-lifecycle.json"
+      },
+      {
+        "change": "modified",
+        "classes": [
+          "derived"
+        ],
+        "path": ".statecraft/derived/codebase-index/by-spec/003-work-and-run-semantics.json"
+      },
+      {
+        "change": "modified",
+        "classes": [
+          "derived"
+        ],
+        "path": ".statecraft/derived/codebase-index/by-spec/004-execution-adapter.json"
+      },
+      {
+        "change": "modified",
+        "classes": [
+          "derived"
+        ],
+        "path": ".statecraft/derived/codebase-index/by-spec/005-acceptance-and-evidence.json"
+      },
+      {
+        "change": "modified",
+        "classes": [
+          "derived"
+        ],
+        "path": ".statecraft/derived/codebase-index/by-spec/006-command-surface.json"
+      },
+      {
+        "change": "modified",
+        "classes": [
+          "policy"
+        ],
+        "path": "spec-spine.toml"
+      }
+    ],
+    "classifiedUnder": "base",
+    "counts": {
+      "authority": 0,
+      "bypassed": 0,
+      "constitutional": 0,
+      "derived": 15,
+      "implementation": 0,
+      "lifecycle": 0,
+      "policy": 1,
+      "requirement": 0,
+      "unknown": 0,
+      "unowned": 0,
+      "verification": 0
+    },
+    "head": "356d37953f6178cf26166aad0525001d37ac4ff7",
+    "mergeBase": "e61b1917c8ef3f3d036c61b3760c6d4b89897d72",
+    "priorPolicy": {
+      "classes": [
+        "policy"
+      ],
+      "required": true
+    },
+    "schemaVersion": "0.1.0",
+    "tool": {
+      "name": "spec-spine",
+      "version": "0.26.0"
+    }
+  },
+  "schemaVersion": "1.0.0",
+  "summary": "delta: ok",
+  "tool": "spec-spine",
+  "verb": "delta"
+}

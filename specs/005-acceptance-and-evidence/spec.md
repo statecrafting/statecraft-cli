@@ -889,6 +889,20 @@ chains, and the nested `if` blocks it named in this spec's crates were
 collapsed mechanically by `cargo clippy --fix` and `cargo fmt`. No behavior
 changed.
 
+**2026-09-25: the delta report reads both `--json` envelopes (owner,
+2026-09-25: adopt 0.26.0).** spec-spine 0.26.0's verdict envelope (schema
+1.0.0, its spec 132) removes `ok` and carries `outcome`; the delta report
+inside it is unchanged at schema 0.1.0. `Envelope` required `ok`, so every
+0.26.0 delta would have read as not an envelope. `Envelope::ok` and the new
+`Envelope::outcome` are both optional, and a verb answered only when it exits
+0 and its envelope says so in either form; one that says neither did not
+answer. `VerbDidNotAnswer` names what the envelope said (`ok=` or `outcome=`)
+in place of a boolean. Section 3.18's comparison table names the producer's
+stale code as 2, which is 0.25.0's; from 0.26.0 a stale ledger is 1, read by its words as
+spec `003` section 5 records on this date. Tested against a verbatim 0.26.0
+delta (`testdata/delta/spec-spine-0.26.0-pin-move.json`) and in
+`both_envelopes_are_read_and_one_that_says_neither_is_refused`.
+
 ## Verification
 
 Each line is one command. §3.10's twenty-two rows are integration tests named

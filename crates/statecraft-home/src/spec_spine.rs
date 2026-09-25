@@ -28,7 +28,7 @@
 //! result in the constructed environment over any value already there.
 
 use crate::flow::{Corpus, SpecSpineCommand};
-use statecraft_environment::probe::{CheckAnswer, CommandProbe, Unavailability};
+use statecraft_environment::probe::{CheckAnswer, CommandProbe, Unavailability, names_pin_refusal};
 use statecraft_environment::qualify::{CorpusState, TargetProbe};
 use std::path::{Path, PathBuf};
 use std::process::Command;
@@ -342,6 +342,7 @@ fn version_of(program: &Path) -> Option<String> {
         .map(str::to_string)
 }
 
+#[derive(Debug, PartialEq, Eq)]
 enum Admits {
     Yes,
     No,
@@ -402,13 +403,16 @@ impl Pin {
         };
         match output.status.code() {
             Some(0) => Admits::Yes,
-            Some(3) => {
+            // A pin not met is 3 below spec-spine 0.26.0 and 2 from it, worded
+            // the same under both (spec 002 section 5, 2026-09-25, "both exit
+            // tables").
+            Some(2 | 3) => {
                 let text = format!(
                     "{}{}",
                     String::from_utf8_lossy(&output.stdout),
                     String::from_utf8_lossy(&output.stderr)
                 );
-                if text.contains("requires spec-spine") {
+                if names_pin_refusal(&text) {
                     Admits::No
                 } else {
                     Admits::NotPerformed
@@ -626,6 +630,40 @@ mod tests {
             .map(|(k, v)| ((*k).to_string(), (*v).to_string()))
             .collect();
         move |name: &str| map.get(name).cloned()
+    }
+
+    // A range pin is put to the binary. Its refusal is 3 below spec-spine
+    // 0.26.0 and 2 from it, worded the same (recorded 2026-09-25).
+    #[test]
+    fn a_range_pin_refusal_is_read_under_both_exit_tables() {
+        let dir = tempfile::tempdir().unwrap();
+        let root = dir.path().join("repo");
+        std::fs::create_dir_all(&root).unwrap();
+        pinned(&root, Some(">=0.1, <0.2"));
+        let pin = Pin::of(&root);
+        for (code, words) in [
+            (
+                3,
+                "spec-spine: config error: this repository requires spec-spine >=0.1, <0.2",
+            ),
+            (
+                2,
+                "spec-spine: refused: this repository requires spec-spine >=0.1, <0.2",
+            ),
+        ] {
+            let at = dir.path().join(format!("t{code}/spec-spine"));
+            std::fs::create_dir_all(at.parent().unwrap()).unwrap();
+            install(
+                &at,
+                &format!("#!/bin/sh\necho '{words}' >&2\nexit {code}\n"),
+            );
+            assert_eq!(pin.admits(&at, &root, None), Admits::No, "exit {code}");
+        }
+        // A 2 that names no pin (0.25.0's stale) establishes nothing.
+        let at = dir.path().join("stale/spec-spine");
+        std::fs::create_dir_all(at.parent().unwrap()).unwrap();
+        install(&at, "#!/bin/sh\necho 'index is stale' >&2\nexit 2\n");
+        assert_eq!(pin.admits(&at, &root, None), Admits::NotPerformed);
     }
 
     #[test]

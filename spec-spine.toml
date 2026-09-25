@@ -19,7 +19,7 @@
 # is an entry in docs/adoption/spec-spine.md, not a comment here. `make tools`
 # installs this exact version into `.tooling/bin`, so a binary elsewhere on
 # PATH cannot answer for this repository.
-required_version = "=0.25.0"
+required_version = "=0.26.0"
 
 [manifest]
 # Drives the Cargo `[package.metadata.spec-spine].spec` and package.json `"spec-spine".spec` reads.

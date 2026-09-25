@@ -49,19 +49,20 @@ Run `spec-spine` through `make`, or as `.tooling/bin/spec-spine`. A bare
 this machine replaces, and this repository has been governed by the wrong
 version that way more than once. `make` prefers the local binary automatically.
 
-**Exit 2 means stale, and only stale, under every pin since 0.20.0** (the
-measurements are in `docs/adoption/spec-spine.md`). A claim that
-cannot be resolved exits **1**, the validation code, because it is a corpus that
-does not describe its tree rather than a ledger that has fallen behind:
-re-indexing cannot cure it, and `refresh` against it produces shards that say the
-same thing. spec-spine's specs 079 and 080 separate the two readings; 0.20.0
-carries both (`C-16`), and each later adoption re-measured an unresolved claim
-exiting 1. Under the previous 0.18.0 pin both conditions exited 2 and
-the message was the only way to tell them apart.
+**From release 0.26.0, spec-spine exits in the family contract** (its spec
+132; the measurements are in `docs/adoption/spec-spine.md`): 0 ok, 1 a
+finding, 2 refused, 3 usage, 4 failed. **A stale tree is exit 1**, beside a
+corpus that does not validate and a claim that cannot be resolved; exit 2 is a
+refusal to judge at all, a pin not met among them. Under every release from
+0.20.0 to 0.25.0, exit 2 meant stale and only stale. An unresolved claim has exited
+1 under every pin since 0.20.0: it is a corpus that does not describe its tree
+rather than a ledger that has fallen behind, so re-indexing cannot cure it,
+and `refresh` against it produces shards that say the same thing.
 
-Read the message anyway. The codes are now distinct, so exit 1 from `check` sends
-you to the spec and exit 2 sends you to `make refresh`, but neither code says
-which spec or which shard.
+Read the message, because the code no longer says which. `check` names each
+half: `STALE` sends you to `make refresh`; `INVALID`, `UNRESOLVED CLAIM` or
+`fresh, but REFUSED` sends you to the spec. Neither says which spec or which
+shard, so read the lines that follow.
 
 A genuinely stale tree is reported and then fixed as committed work. Do **not**
 substitute a writing `compile` or `index` for a check: a read that repairs the
