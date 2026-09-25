@@ -8230,6 +8230,29 @@ policy, including the gate that reads spec-spine's exit table by the pinned
 release (the entry above). It changes the authority set, so the base's revision-6 `ci-gate`
 blocks it until the owner approves that run's `statecraft-review-exception`.
 
+**2026-09-25: `check` and the pin probe read both of spec-spine's exit
+tables (owner, 2026-09-25: adopt 0.26.0).** Section 3.23's contract 4 and
+contract 2's pin probe state spec-spine's codes as every release below 0.26.0
+spends them. spec-spine 0.26.0 (its spec 132) spends them differently, and a
+target repository may pin either line. Measured the same day against the
+published 0.25.0 and 0.26.0 on a disposable clone of `main`: stale moves from 2
+to 1 with the same report lines (`spec-registry: STALE`, "index is stale"), a
+pin not met moves from 3 to 2 and still says "requires spec-spine", and 0.26.0
+adds 4 for a read that failed. The code alone cannot say which table answered,
+so, as contract 4 already does for its two readings of 2, the producer's words
+decide: an exit 1 whose report names a stale tree and nothing that regenerating
+would not cure is stale; an exit 2 that names a refusal (`refused:`, or a pin
+not met) is a read not performed; every other code keeps its reading. The
+requirement is unchanged, and so is the translation into spec `006`'s codes:
+stale and invalid are 1, a read not performed is 4. `probe::read_check`,
+`names_stale_only`, `names_refusal` and `names_pin_refusal` in
+`statecraft-environment` carry it, and `statecraft-home`'s pin probe
+(`Pin::admits`) reads a range-pin refusal under 2 or 3 by its words. Tested
+against the recorded lines in `both_exit_tables_read_to_the_same_answers` and
+`a_range_pin_refusal_is_read_under_both_exit_tables`. The delivered hooks read
+the same codes and change in their own pull request, because a hook change is
+an authority change (AGENTS.md).
+
 **2026-09-25: the delivered hooks read both of spec-spine's exit tables
 (owner, 2026-09-25: adopt 0.26.0; a hook change is an authority change, so it
 is its own change).** The four hooks of section 3.23 read `check` and the pin

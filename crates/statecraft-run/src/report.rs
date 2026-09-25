@@ -10,6 +10,7 @@
 //! An upstream gap is reported upstream; it is not patched here.
 
 use serde::{Deserialize, Serialize};
+use statecraft_environment::probe::{names_refusal, names_stale_only};
 use std::path::Path;
 use std::process::Command;
 
@@ -141,12 +142,12 @@ pub enum ReportError {
         /// The first line of the producer's complaint.
         detail: String,
     },
-    /// spec-spine ran and refused the target before judging its corpus:
-    /// `check` exited with neither 0, 1 nor 2.
+    /// spec-spine ran and refused the target before judging its corpus.
     ///
     /// Measured on 2026-09-23: a spec-spine that does not satisfy the target's
-    /// `required_version` refuses with exit 3. That is not the corpus failing
-    /// to compile, so it is not reported as one.
+    /// `required_version` refuses with exit 3; from spec-spine 0.26.0 with exit
+    /// 2 (measured 2026-09-25). That is not the corpus failing to compile, so
+    /// it is not reported as one.
     #[error("spec-spine {version} refused to judge the corpus in {path} ({status}): {detail}")]
     ProducerRefused {
         /// The target.
@@ -272,9 +273,11 @@ impl ReportSource for SpecSpineCli {
         // be reading a tree the compiler has just said is stale.
         //
         // `check`'s own exit status says which of three things it found, and
-        // each is reported as itself: 1 is a corpus that does not compile, 2 a
-        // stale ledger, and anything else a refusal to judge at all (a pin the
-        // running version does not satisfy exits 3).
+        // each is reported as itself: a corpus that does not compile, a stale
+        // ledger, and a refusal to judge at all. Below spec-spine 0.26.0 they
+        // are 1, 2 and anything else (a pin not met exits 3); from 0.26.0 a
+        // stale ledger is 1 and a refusal 2, and the producer's words say
+        // which (spec 003 section 5, 2026-09-25).
         let check = self.run(target, &["check"])?;
         if !check.status.success() {
             let text = format!(
@@ -289,20 +292,13 @@ impl ReportSource for SpecSpineCli {
                 .find(|l| !l.is_empty())
                 .unwrap_or("no detail")
                 .to_string();
-            return Err(match check.status.code() {
-                Some(1) => ReportError::CorpusDoesNotCompile { path, detail },
-                Some(2) => ReportError::LedgerStale {
-                    path,
-                    version,
-                    detail,
-                },
-                code => ReportError::ProducerRefused {
-                    path,
-                    version,
-                    status: code.map_or_else(|| "signal".to_string(), |c| format!("exit {c}")),
-                    detail,
-                },
-            });
+            return Err(check_refusal(
+                check.status.code(),
+                path,
+                version,
+                &text,
+                detail,
+            ));
         }
 
         // Section 3.1.2 rule 3: `list`, `plan`, `list`, so a disagreement is
@@ -311,6 +307,36 @@ impl ReportSource for SpecSpineCli {
         let plan = self.run(target, &["registry", "plan", "--json"])?;
         let second = self.run(target, &["registry", "list", "--json"])?;
         join(&version, &plan.stdout, &first.stdout, &second.stdout)
+    }
+}
+
+/// What a `check` that did not pass reports, read under either of
+/// spec-spine's exit tables (spec 003 section 5, 2026-09-25).
+fn check_refusal(
+    code: Option<i32>,
+    path: String,
+    version: String,
+    text: &str,
+    detail: String,
+) -> ReportError {
+    let stale = match code {
+        Some(1) => names_stale_only(text),
+        Some(2) => !names_refusal(text),
+        _ => false,
+    };
+    match code {
+        _ if stale => ReportError::LedgerStale {
+            path,
+            version,
+            detail,
+        },
+        Some(1) => ReportError::CorpusDoesNotCompile { path, detail },
+        code => ReportError::ProducerRefused {
+            path,
+            version,
+            status: code.map_or_else(|| "signal".to_string(), |c| format!("exit {c}")),
+            detail,
+        },
     }
 }
 
@@ -442,6 +468,39 @@ pub fn parse_lifecycle(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    // Recorded 2026-09-25 from the published 0.25.0 and 0.26.0.
+    #[test]
+    fn a_check_refusal_is_read_under_both_exit_tables() {
+        let read =
+            |code, text: &str| check_refusal(Some(code), "p".into(), "v".into(), text, "d".into());
+        let stale = "spec-registry: STALE\n1 stale shard(s):\ncodebase-index: STALE (run `spec-spine index`)";
+        assert!(matches!(read(2, stale), ReportError::LedgerStale { .. }));
+        assert!(matches!(read(1, stale), ReportError::LedgerStale { .. }));
+        assert!(matches!(
+            read(1, "spec-registry: INVALID"),
+            ReportError::CorpusDoesNotCompile { .. }
+        ));
+        for (code, pin) in [
+            (
+                3,
+                "spec-spine: config error: this repository requires spec-spine =0.1.0",
+            ),
+            (
+                2,
+                "spec-spine: refused: this repository requires spec-spine =0.1.0",
+            ),
+        ] {
+            assert!(
+                matches!(read(code, pin), ReportError::ProducerRefused { .. }),
+                "exit {code}"
+            );
+        }
+        assert!(matches!(
+            read(4, "spec-spine: internal error: x"),
+            ReportError::ProducerRefused { .. }
+        ));
+    }
 
     #[test]
     fn a_list_row_without_status_refuses_naming_the_field_and_the_version() {

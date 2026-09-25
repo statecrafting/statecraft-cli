@@ -233,6 +233,19 @@ fn envelope(changes: &str, counts: &str, required: bool) -> String {
     )
 }
 
+// spec-spine 0.26.0's envelope (verdict schema 1.0.0) carries `outcome` and no
+// `ok`. Captured verbatim on 2026-09-25 from the published 0.26.0 over a commit
+// that moves this repository's pin and regenerates its shards.
+const REPORT_026: &[u8] = include_bytes!("../testdata/delta/spec-spine-0.26.0-pin-move.json");
+
+#[test]
+fn the_delta_report_reads_the_0_26_0_envelope() {
+    let r = SpecSpineDeltaReport::from_envelope_json(REPORT_026).expect("0.26.0's own output");
+    assert_eq!(r.version(), "spec-spine 0.26.0");
+    assert_eq!(r.report().classified_under, "base");
+    assert!(r.classes_used().contains(&"derived".to_string()));
+}
+
 #[test]
 fn the_delta_report_reads_the_bytes_the_pinned_binary_writes() {
     let r = real_report();

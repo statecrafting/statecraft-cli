@@ -228,17 +228,23 @@ pub enum PlanError {
 #[serde(rename_all = "camelCase")]
 struct PlanEnvelope {
     verb: String,
-    ok: bool,
+    /// Below spec-spine 0.26.0.
+    #[serde(default)]
+    ok: Option<bool>,
+    /// From spec-spine 0.26.0 (verdict schema 1.0.0), which has no `ok`.
+    #[serde(default)]
+    outcome: Option<String>,
     exit_code: i64,
     report: SuitePlan,
 }
 
 /// Parse `verify --plan --json`'s answer.
 ///
-/// Strict where it matters: the envelope must name the `verify` verb, say
-/// `ok`, carry exit code 0, and carry a report with `specId`, `commands` and
-/// `skipped`. A missing `commands` is not an empty plan; an empty plan is only
-/// one that says it is empty.
+/// Strict where it matters: the envelope must name the `verify` verb, say it
+/// answered (`ok` below spec-spine 0.26.0, `outcome` `ok` from it; spec 004
+/// section 5, 2026-09-25), carry exit code 0, and carry a report with
+/// `specId`, `commands` and `skipped`. A missing `commands` is not an empty
+/// plan; an empty plan is only one that says it is empty.
 pub fn parse_plan(bytes: &[u8]) -> Result<SuitePlan, PlanError> {
     let envelope: PlanEnvelope =
         serde_json::from_slice(bytes).map_err(|e| PlanError::Unreadable(e.to_string()))?;
@@ -248,10 +254,16 @@ pub fn parse_plan(bytes: &[u8]) -> Result<SuitePlan, PlanError> {
             envelope.verb
         )));
     }
-    if !envelope.ok || envelope.exit_code != 0 {
+    let answered = envelope.ok == Some(true) || envelope.outcome.as_deref() == Some("ok");
+    if !answered || envelope.exit_code != 0 {
+        let said = match (&envelope.outcome, envelope.ok) {
+            (Some(o), _) => format!("outcome={o}"),
+            (None, Some(ok)) => format!("ok={ok}"),
+            (None, None) => "neither ok nor outcome".to_string(),
+        };
         return Err(PlanError::Unreadable(format!(
-            "the envelope says ok {} with exit code {}",
-            envelope.ok, envelope.exit_code
+            "the envelope says {said} with exit code {}",
+            envelope.exit_code
         )));
     }
     Ok(envelope.report)
@@ -1048,8 +1060,13 @@ mod tests {
         let p = parse_plan(good).unwrap();
         assert_eq!(p.commands, ["cargo test"]);
         assert_eq!(p.skipped[0].count, 2);
+        // spec-spine 0.26.0's envelope: `outcome`, no `ok`.
+        let v026 = br#"{"exitCode":0,"outcome":"ok","report":{"commands":["cargo test"],"skipped":[],"specId":"007-x"},"schemaVersion":"1.0.0","summary":"verify: ok","tool":"spec-spine","verb":"verify"}"#;
+        assert_eq!(parse_plan(v026).unwrap().commands, ["cargo test"]);
         for bad in [
             &b"not json"[..],
+            br#"{"exitCode":1,"outcome":"finding","report":{"commands":[],"skipped":[],"specId":"x"},"verb":"verify"}"#,
+            br#"{"exitCode":0,"report":{"commands":[],"skipped":[],"specId":"x"},"verb":"verify"}"#,
             br#"{"exitCode":0,"ok":true,"report":{"skipped":[],"specId":"x"},"verb":"verify"}"#,
             br#"{"exitCode":1,"ok":false,"report":{"commands":[],"skipped":[],"specId":"x"},"verb":"verify"}"#,
             br#"{"exitCode":0,"ok":true,"report":{"commands":[],"skipped":[],"specId":"x"},"verb":"check"}"#,

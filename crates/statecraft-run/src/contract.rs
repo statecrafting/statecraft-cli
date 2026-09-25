@@ -12,6 +12,7 @@
 
 use crate::report::{SpecLifecycle, SpecSpineCli};
 use serde::{Deserialize, Serialize};
+use statecraft_environment::probe::{names_refusal, names_stale_only};
 use std::io::Write;
 use std::path::Path;
 use std::process::{Command, Stdio};
@@ -172,8 +173,20 @@ impl ContractSource for SpecSpineCli {
 }
 
 /// Read one `registry closure` answer by its exit code and bytes.
+///
+/// Under either of spec-spine's exit tables (spec 003 section 5, 2026-09-25):
+/// below 0.26.0 a stale ledger is 2 and a pin not met 3; from 0.26.0 a stale
+/// ledger is 1, beside a member that does not resolve, and a refusal to judge
+/// is 2. The producer's words say which.
 pub fn interpret(code: Option<i32>, stdout: &[u8], stderr: &[u8]) -> Resolution {
+    let words = String::from_utf8_lossy(stderr);
     match code {
+        Some(1) if names_stale_only(&words) => Resolution::Stale {
+            detail: first_line(stderr),
+        },
+        Some(2) if names_refusal(&words) => Resolution::Unreadable {
+            detail: format!("`{COMMAND}` exited 2: {}", first_line(stderr)),
+        },
         Some(0) => {
             #[derive(Deserialize)]
             struct Answer {
@@ -448,6 +461,37 @@ mod tests {
         ));
         assert!(matches!(
             interpret(Some(3), b"", b"usage"),
+            Resolution::Unreadable { .. }
+        ));
+        // spec-spine 0.26.0's table, recorded 2026-09-25: stale is 1 with the
+        // same words, not found stays 1, a pin not met is 2.
+        let stale = b"spec-spine: index is stale: expected content-hash 7 shard(s) matching the corpus, got 1 stale shard(s):";
+        assert!(matches!(
+            interpret(Some(1), b"", stale),
+            Resolution::Stale { .. }
+        ));
+        assert!(matches!(
+            interpret(Some(2), b"", stale),
+            Resolution::Stale { .. }
+        ));
+        assert!(matches!(
+            interpret(
+                Some(1),
+                b"",
+                b"spec-spine: not found: closure references that do not resolve: spec '099-x'"
+            ),
+            Resolution::Unresolved { .. }
+        ));
+        assert!(matches!(
+            interpret(
+                Some(2),
+                b"",
+                b"spec-spine: refused: this repository requires spec-spine =0.1.0"
+            ),
+            Resolution::Unreadable { .. }
+        ));
+        assert!(matches!(
+            interpret(Some(4), b"", b"spec-spine: internal error: x"),
             Resolution::Unreadable { .. }
         ));
         assert!(matches!(

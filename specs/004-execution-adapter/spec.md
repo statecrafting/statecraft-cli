@@ -1868,6 +1868,15 @@ persisted, the last is the provider's own spelling. An adapter manifest is not
 made strict: it has no schema version (its `version` is the binary's) and is
 never read from a file; `qualifications.json` has no schema version either.
 
+**2026-09-25: the suite plan reads both `--json` envelopes (owner,
+2026-09-25: adopt 0.26.0).** spec-spine 0.26.0's verdict envelope (schema
+1.0.0, its spec 132) removes `ok` and carries `outcome`. `parse_plan` required
+`ok`, so it would have refused every plan a 0.26.0 binary answered. It now
+reads either envelope and stays as strict: exit 0 and `ok` true, or exit 0 and
+`outcome` `ok`; an envelope that says neither is unreadable, never an empty
+plan. `the_plan_parses_strictly` carries the 0.26.0 shape as measured on this
+repository the same day.
+
 ## Verification
 
 Each line is one command. §3.5's suite is eight tests named `suite_1` to
