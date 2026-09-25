@@ -574,11 +574,11 @@ checklist, a stability policy, and a release pipeline (owner Addendum 2, items
 RD and Q).** **The owner adopted the stability policy and the readiness
 checklist as the direction on 2026-09-25.** The release pipeline stays
 proposed: it waited on the attest-ledger item, and that blocker is removed by
-the change that takes `attest-ledger-core` from crates.io at `=0.1.0` (pull
-request #148, whose section 5 entry in spec `003` records the diff), so the pipeline is the next proposal to bring
-back. The checklist below cites two spec `006` section 5 entries, both adopted
-2026-09-25, by their provenance labels in parentheses: the parser entry (clap
-for per-verb arguments) and the JSON naming and strict-input entry. Nothing here lifts `F-02`:
+the change that takes `attest-ledger-core` from crates.io at `=0.1.0` (spec
+`003` section 5, 2026-09-25, which records the diff), so the pipeline is the next proposal to bring
+back. The checklist below cites two spec `006` section 5 entries adopted
+2026-09-25: the parser entry (clap for per-verb arguments) and the JSON naming
+and strict-input entry. Nothing here lifts `F-02`:
 publication stays deferred until the owner
 lifts it separately, and no grade above *specified* is claimed for anything
 below.
@@ -592,7 +592,7 @@ incompatibly needs a major version and a migration note:
    compatible; removing or renaming one is not.
 2. **The exit and JSON contract**: the five exit codes of spec `006` section
    3.3, and the family envelope: the family exit and JSON contract that
-   draft #118 proposes for spec `006` (item X), adopted by the owner on
+   draft #118 proposes for spec `006`, adopted by the owner on
    2026-09-25 and landing with the spec-spine 0.26.0 migration. Adding a
    field is compatible;
    removing, retyping or renaming one is not (`006` section 3.4, "Two
@@ -610,13 +610,13 @@ stable.
 
 | Item | Done when | Evidence |
 |---|---|---|
-| Stable commands | every verb has help, argument docs and a binary test per usage error | `--help` output per verb; tests that a bad flag exits 3 (item P) |
+| Stable commands | every verb has help, argument docs and a binary test per usage error | `--help` output per verb; tests that a bad flag exits 3 (the spec `006` parser entry) |
 | Exit and JSON contract | the family envelope adopted; every verb's `--json` parses as it | a test over every verb; `exitCode` equals the process status |
-| Documented formats | each format has a schema document and a `schemaVersion`; strict within a version (item N) | schema files; a test reading every version's fixture |
+| Documented formats | each format has a schema document and a `schemaVersion`; strict within a version (the spec `006` JSON naming entry) | schema files; a test reading every version's fixture |
 | Conformance tests | producer conformance, adapter conformance and the acceptance suites run in CI against the adopted pins | CI run ids; `make verify` for each spec |
-| Acceptance stability | the 002/003 intermittent failures diagnosed and fixed, never retried into green | the acceptance diagnostic recorded in spec `002` section 5 (the fresh-executable first-exec stall; item F), with before and after timings |
+| Acceptance stability | the 002/003 intermittent failures diagnosed and fixed, never retried into green | the acceptance diagnostic recorded in spec `002` section 5 (the fresh-executable first-exec stall), with before and after timings |
 | Security posture | `SECURITY.md` with private reporting enabled; spec `004`'s credential-fence residuals stated; a threat model per trust boundary | the files; the repository setting read back |
-| Supply chain | `cargo-deny` (advisories, licenses, bans, sources) and a declared-MSRV build in CI; pinned actions | CI job results (item Q) |
+| Supply chain | `cargo-deny` (advisories, licenses, bans, sources) and a declared-MSRV build in CI; pinned actions | CI job results |
 | Release pipeline | the pipeline below, exercised once on a pre-release tag | the release run id; a fresh-consumer verification record |
 | Claims | README and specs state each behavior's grade with evidence (section 3.3) | the grade table, re-measured at the tag |
 
