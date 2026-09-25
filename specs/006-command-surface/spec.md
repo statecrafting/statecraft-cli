@@ -1035,17 +1035,17 @@ never changes the exit. Additive under section 3.4.
 `tests/env_remove_bridge.rs` spawns the binary.
 
 **2026-09-24, option (a) adopted 2026-09-25: the hand-written parser
-against clap (owner Addendum 2, item P).** **The owner chose option (a)**:
-clap for per-verb arguments only, while verb
-resolution (`Verb::parse`) and help before resolution stay as they are. It is
-implemented after the family exit and JSON contract: the entry draft #118
-proposes for this section, which the owner adopted
-the same day and which lands in the spec-spine 0.26.0 migration; the parser
-change waits for that entry to be on `main`. Every clap error maps to exit 3 and is tested for each verb, and
-the implementing change measures release binary size and clean build time
-itself, before and after, on one machine. Nothing is implemented by this
-entry. The assessment below is as prepared, except that its binary-size row
-no longer quotes an unrebuilt figure.
+against clap (owner Addendum 2, item P).** The owner adopted option (a) of the
+assessment below: clap for per-verb arguments only, while verb resolution
+(`Verb::parse`) and help before resolution stay as they are. This entry
+implements nothing. Its conditions bind the change that will implement it:
+that change lands only after the family exit and JSON contract (proposed for
+this section in draft #118, adopted by the owner on 2026-09-25, landing with
+the spec-spine 0.26.0 migration) is on `main`; it maps every clap error to exit
+3 with a test for each verb; and it measures release binary size and clean
+build time on one machine before and after. The assessment below is as
+prepared, except that its binary-size row no longer quotes an unrebuilt
+figure.
 
 *What exists* (main `17dbdb6`). `commands.rs` (546 lines) resolves the verb
 from the first two words by one closed `match` over `Verb::all()` (42
