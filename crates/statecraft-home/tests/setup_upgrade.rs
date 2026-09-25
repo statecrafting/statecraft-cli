@@ -134,3 +134,95 @@ fn an_unmodified_file_is_replaced_and_a_customized_one_is_kept_with_three_digest
         next.revision
     );
 }
+
+/// Revision 1 of the registered profile, rebuilt from revision 2 by undoing
+/// revision 2's two template changes (the owner exception for a findings
+/// verdict, R2-1). Only the templates matter to a managed upgrade.
+fn revision_one() -> Profile {
+    let mut r1 = Profile::registered();
+    assert_eq!(r1.revision, 2, "the registered profile is revision 2");
+    r1.revision = 1;
+    for t in &mut r1.templates {
+        if t.path == ".github/workflows/statecraft-ci.yml" {
+            let from = "    # The owner exception (S-1): a release candidate whose review was skipped,\n    # and (revision 2, R2-1) any pull request whose review returned findings.\n    if: always() && github.event_name == 'pull_request' && ((needs.ai-review.outputs.release_candidate == 'true' && startsWith(needs.ai-review.outputs.result, 'skipped:')) || needs.ai-review.outputs.result == 'findings')";
+            assert!(t.body.contains(from), "revision 2's exception condition");
+            t.body = t.body.replace(
+                from,
+                "    if: always() && github.event_name == 'pull_request' && needs.ai-review.outputs.release_candidate == 'true' && startsWith(needs.ai-review.outputs.result, 'skipped:')",
+            );
+        }
+        if t.path == "scripts/statecraft/ci-gate.sh" {
+            assert!(t.body.contains("owner-exception"), "revision 2's gate rule");
+            t.body = t.body.replace("owner-exception", "rc-exception-r1");
+        }
+    }
+    r1
+}
+
+#[test]
+fn a_revision_one_project_upgrades_to_revision_two() {
+    let dir = project();
+    let root = dir.path();
+    let mut manifest = Manifest::new(Pins {
+        product: "0.0.0".into(),
+        spec_spine: "unpinned".into(),
+        adapters: Default::default(),
+        producer: None,
+    });
+    let r1 = revision_one();
+    assert!(plan_and_apply(root, &r1, &mut manifest).whole());
+    assert_eq!(manifest.project.setup.as_ref().unwrap().revision, 1);
+
+    // The operator customized the workflow; the gate script is as written.
+    let wf = ".github/workflows/statecraft-ci.yml";
+    let mut customized = std::fs::read_to_string(root.join(wf)).unwrap();
+    customized.push_str("# a local addition\n");
+    std::fs::write(root.join(wf), &customized).unwrap();
+
+    let r2 = Profile::registered();
+    assert_ne!(r2.identity(), r1.identity());
+    let upgrade = plan_and_apply(root, &r2, &mut manifest);
+    let file = |rel: &str| upgrade.files.iter().find(|f| f.path == rel).unwrap();
+
+    // Unchanged since written: rewritten with revision 2's gate.
+    assert_eq!(
+        file("scripts/statecraft/ci-gate.sh").action,
+        Action::Replace
+    );
+    let gate = std::fs::read_to_string(root.join("scripts/statecraft/ci-gate.sh")).unwrap();
+    assert!(gate.contains("owner-exception"), "{gate}");
+
+    // Customized: withheld, bytes intact, revision 2's copy left beside it.
+    assert_eq!(
+        file(wf).action,
+        Action::Conflict {
+            kind: ConflictKind::Customized
+        }
+    );
+    assert_eq!(std::fs::read_to_string(root.join(wf)).unwrap(), customized);
+    assert!(!upgrade.whole());
+    assert_eq!(manifest.project.setup.as_ref().unwrap().revision, 2);
+}
+
+/// Revision 2's operator steps: no human approval for ordinary changes,
+/// code-owner review for the profile's files (R2-2), `ci-gate` bound to
+/// GitHub Actions, and the exception Environment for a findings verdict.
+#[test]
+fn revision_two_states_the_approver_model_in_its_operator_steps() {
+    let steps = setup::remote_obligations().join("\n");
+    assert!(steps.contains("required approvals 0"), "{steps}");
+    assert!(steps.contains("require code-owner review"), "{steps}");
+    assert!(
+        steps.contains("ci-gate from GitHub Actions (app id 15368)"),
+        "{steps}"
+    );
+    assert!(
+        steps.contains("a pull request whose review returned findings"),
+        "{steps}"
+    );
+    let policy = setup::jobs();
+    assert_eq!(
+        policy["review-exception"]["pull_request"],
+        "owner-exception"
+    );
+}

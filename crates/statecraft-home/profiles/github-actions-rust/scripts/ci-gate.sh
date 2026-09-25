@@ -6,8 +6,10 @@
 #   required          must be `success`; `skipped` is an unexpected skip
 #   required-review   `success` carrying a review result (findings,
 #                     no-findings, or a visible skipped:<class>)
-#   rc-exception      required (success) for a release candidate whose review
-#                     was skipped; otherwise inapplicable
+#   owner-exception   required (success) for a pull request whose review
+#                     returned findings, and for a release candidate whose
+#                     review was skipped; otherwise inapplicable (revision 2)
+#   rc-exception      revision 1's rule: the release-candidate case only
 #   inapplicable      must be `skipped`, and the rule that admitted it is printed
 #
 # A required job missing from the needs record has vanished, and blocks. The
@@ -91,12 +93,21 @@ while IFS=$'\t' read -r job rule; do
     block "required job '${job}' is not in the needs record: it vanished"
     continue
   fi
-  if [ "$rule" = rc-exception ]; then
+  if [ "$rule" = rc-exception ] || [ "$rule" = owner-exception ]; then
+    exception_rule="$rule"
     case "$review_result" in
       skipped:*)
         if [ "$release_candidate" = yes ]; then rule=required; else rule=inapplicable; fi ;;
+      findings)
+        if [ "$exception_rule" = owner-exception ]; then rule=required; else rule=inapplicable; fi ;;
       *) rule=inapplicable ;;
     esac
+    # A findings verdict is the final approver's refusal: only the owner's
+    # exception, approved for this run, lets the head through.
+    if [ "$exception_rule" = owner-exception ] && [ "$review_result" = findings ] && [ "$result" != success ]; then
+      block "the AI review returned findings and the owner exception '${job}' was not approved for this run (it ended '${result}')"
+      continue
+    fi
   fi
   case "$rule" in
     required | required-review)

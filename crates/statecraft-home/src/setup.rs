@@ -35,7 +35,7 @@ use std::path::Path;
 /// The one registered profile.
 pub const PROFILE_ID: &str = "github-actions-rust";
 /// Its revision.
-pub const REVISION: u32 = 1;
+pub const REVISION: u32 = 2;
 /// Where the rendered policy document lives in the target.
 pub const POLICY_PATH: &str = ".statecraft/setup/github-actions-rust.json";
 /// The resume record, under the project's runtime state.
@@ -46,9 +46,12 @@ pub const INTENDED_DIR: &str = ".statecraft/state/setup";
 pub const CREDENTIAL: &str = "CLAUDE_CODE_OAUTH_TOKEN";
 /// The command an operator runs to set it.
 pub const CREDENTIAL_COMMAND: &str = "gh secret set CLAUDE_CODE_OAUTH_TOKEN";
-/// The protected Environment a release-candidate exception is approved on
-/// (decision S-1).
+/// The protected Environment an owner exception is approved on (decision S-1;
+/// from revision 2 also for a pull request whose review returned `findings`).
 pub const EXCEPTION_ENVIRONMENT: &str = "statecraft-review-exception";
+/// The GitHub App that must report `ci-gate` (GitHub Actions), so a status any
+/// token posts does not satisfy the required check (revision 2, item 3).
+pub const GATE_APP_ID: u64 = 15368;
 /// The reviewer CLI, pinned by exact version.
 pub const REVIEW_TOOL: &str = "claude-code";
 /// Its version.
@@ -217,6 +220,10 @@ fn static_policy() -> serde_json::Value {
                 "requires": "a review (findings or no-findings), or an owner exception",
                 "exception_environment": EXCEPTION_ENVIRONMENT,
             },
+            "findings_rule": {
+                "requires": "a no-findings review, or an owner exception approved for the run",
+                "exception_environment": EXCEPTION_ENVIRONMENT,
+            },
             "never_an_approval": true,
         },
         "prerequisites": {
@@ -250,7 +257,7 @@ pub fn jobs() -> serde_json::Value {
         "governance": {"required": true, "optional": false, "pull_request": "required", "push": "required"},
         "code": {"required": true, "optional": false, "pull_request": "required", "push": "required"},
         "ai-review": {"required": true, "optional": false, "pull_request": "required-review", "push": "inapplicable"},
-        "review-exception": {"required": true, "optional": false, "pull_request": "rc-exception", "push": "inapplicable"},
+        "review-exception": {"required": true, "optional": false, "pull_request": "owner-exception", "push": "inapplicable"},
     })
 }
 
@@ -259,9 +266,9 @@ pub fn remote_obligations() -> Vec<String> {
     vec![
         "Settings, Actions: Actions enabled; the workflow token read-only by default".to_string(),
         format!("the secret {CREDENTIAL} set by the operator ({CREDENTIAL_COMMAND}); its value is never in a log, a file or a message"),
-        "branch protection on the default branch: require the status check ci-gate, and branches up to date".to_string(),
-        "branch protection on the default branch: require code-owner review, so a change to the profile's files needs a review its author cannot give (S-3)".to_string(),
-        format!("the Environment {EXCEPTION_ENVIRONMENT} with the owner as a required reviewer, for release-candidate exceptions (S-1)"),
+        format!("branch protection on the default branch: require the status check ci-gate from GitHub Actions (app id {GATE_APP_ID}), and branches up to date"),
+        "branch protection on the default branch: required approvals 0, and require code-owner review, so ci-gate with the AI review approves ordinary changes and a change to the profile's files needs a review its author cannot give (S-3, R2-2)".to_string(),
+        format!("the Environment {EXCEPTION_ENVIRONMENT} with the owner as a required reviewer, for owner exceptions: a release candidate whose review was skipped (S-1) and a pull request whose review returned findings (R2-1)"),
     ]
 }
 
@@ -1600,17 +1607,27 @@ pub fn remote_results(
                 )
                 .collect();
             let gate = contexts.iter().any(|c| c == "ci-gate");
+            // Revision 2, item 3: the required check names its source. A
+            // context without an app, or with another app, is satisfied by a
+            // status any token with write access can post.
+            let bound = v["required_status_checks"]["checks"]
+                .as_array()
+                .into_iter()
+                .flatten()
+                .any(|c| {
+                    c["context"] == "ci-gate" && c["app_id"] == serde_json::json!(GATE_APP_ID)
+                });
             let owners = v["required_pull_request_reviews"]["require_code_owner_reviews"]
                 == serde_json::json!(true);
-            match (gate, owners) {
-                (true, true) => Outcome::new(
+            match (gate, bound, owners) {
+                (true, true, true) => Outcome::new(
                     ResultState::Satisfied,
-                    format!("{branch} requires ci-gate and code-owner review"),
+                    format!("{branch} requires ci-gate from GitHub Actions and code-owner review"),
                 ),
                 _ => Outcome::new(
                     ResultState::NotSatisfied,
                     format!(
-                        "{branch}: ci-gate required: {gate}; code-owner review required: {owners}"
+                        "{branch}: ci-gate required: {gate}; ci-gate bound to GitHub Actions (app id {GATE_APP_ID}): {bound}; code-owner review required: {owners}"
                     ),
                 ),
             }

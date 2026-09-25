@@ -65,14 +65,16 @@ jobs:
   review-exception:
     name: review-exception
     needs: [ai-review]
-    if: always() && github.event_name == 'pull_request' && needs.ai-review.outputs.release_candidate == 'true' && startsWith(needs.ai-review.outputs.result, 'skipped:')
+    # The owner exception (S-1): a release candidate whose review was skipped,
+    # and (revision 2, R2-1) any pull request whose review returned findings.
+    if: always() && github.event_name == 'pull_request' && ((needs.ai-review.outputs.release_candidate == 'true' && startsWith(needs.ai-review.outputs.result, 'skipped:')) || needs.ai-review.outputs.result == 'findings')
     runs-on: ubuntu-latest
     environment: statecraft-review-exception
     steps:
       - name: Record the owner exception
         env:
           RESULT: ${{ needs.ai-review.outputs.result }}
-        run: echo "owner exception approved for a release candidate whose review was ${RESULT}"
+        run: echo "owner exception approved for a pull request whose review was ${RESULT}"
 
   ci-gate:
     name: ci-gate

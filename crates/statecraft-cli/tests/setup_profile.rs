@@ -666,7 +666,11 @@ case "$path" in
     echo '{"name":"statecraft-review-exception","protection_rules":[{"type":"required_reviewers"}]}' ;;
   */branches/main/protection)
     if [ "$mode" = partial ]; then echo "gh: Branch not protected (HTTP 404)" >&2; exit 1; fi
-    echo '{"required_status_checks":{"strict":true,"contexts":["ci-gate"]},"required_pull_request_reviews":{"require_code_owner_reviews":true}}' ;;
+    if [ "$mode" = unbound ]; then
+      echo '{"required_status_checks":{"strict":true,"contexts":["ci-gate"],"checks":[{"context":"ci-gate","app_id":null}]},"required_pull_request_reviews":{"require_code_owner_reviews":true,"required_approving_review_count":0}}'
+      exit 0
+    fi
+    echo '{"required_status_checks":{"strict":true,"contexts":["ci-gate"],"checks":[{"context":"ci-gate","app_id":15368}]},"required_pull_request_reviews":{"require_code_owner_reviews":true,"required_approving_review_count":0}}' ;;
   */check-runs?check_name=ci-gate) echo '{"total_count":1,"check_runs":[{"name":"ci-gate","status":"completed","conclusion":"success"}]}' ;;
   */actions/artifacts?name=statecraft-ai-review-*) echo '{"total_count":1,"artifacts":[{"id":42,"name":"x"}]}' ;;
   *) echo "gh stub: unexpected $path" >&2; exit 96 ;;
@@ -745,6 +749,19 @@ fn doctor_remote_reads_the_six_results_and_writes_nothing() {
             .contains("CLAUDE_CODE_OAUTH_TOKEN is not set")
     );
     assert_eq!(setup["required-checks"]["state"], "not-satisfied", "{text}");
+
+    // Revision 2, item 3: a ci-gate any token could report is not the
+    // required check the profile asks for.
+    let (setup, _, text) = doctor_remote(&f, "unbound");
+    let required = &setup["required-checks"];
+    assert_eq!(required["state"], "not-satisfied", "{text}");
+    assert!(
+        required["detail"]
+            .as_str()
+            .unwrap()
+            .contains("ci-gate bound to GitHub Actions (app id 15368): false"),
+        "{text}"
+    );
 
     // No host to ask: unverified, never success.
     let (setup, _, text) = doctor_remote(&f, "down");
