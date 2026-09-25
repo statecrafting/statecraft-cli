@@ -615,7 +615,7 @@ stable.
 | Exit and JSON contract | the family envelope adopted; every verb's `--json` parses as it | a test over every verb; `exitCode` equals the process status |
 | Documented formats | each format has a schema document and a `schemaVersion`; strict within a version (item N) | schema files; a test reading every version's fixture |
 | Conformance tests | producer conformance, adapter conformance and the acceptance suites run in CI against the adopted pins | CI run ids; `make verify` for each spec |
-| Acceptance stability | the 002/003 intermittent failures diagnosed and fixed, never retried into green | the owner's item F record, before and after timings |
+| Acceptance stability | the 002/003 intermittent failures diagnosed and fixed, never retried into green | the acceptance diagnostic recorded in spec `002` section 5 (the fresh-executable first-exec stall; item F), with before and after timings |
 | Security posture | `SECURITY.md` with private reporting enabled; spec `004`'s credential-fence residuals stated; a threat model per trust boundary | the files; the repository setting read back |
 | Supply chain | `cargo-deny` (advisories, licenses, bans, sources) and a declared-MSRV build in CI; pinned actions | CI job results (item Q) |
 | Release pipeline | the pipeline below, exercised once on a pre-release tag | the release run id; a fresh-consumer verification record |
@@ -813,7 +813,7 @@ planned claims are to change for `007`. None of these blocks the split; (1),
 
 | Item | Options | Recommended default | Consequence of the default |
 |---|---|---|---|
-| S-A: amendment model | adopt as Part 1 / keep section 5 amendments | adopt, with the `extends` rule | Every later behavioral change is a new spec; section 5 stops growing with requirements |
+| S-A: amendment model | **decided 2026-09-25: adopted as Part 1** | (decided) | Every later behavioral change is a new spec; section 5 stops growing with requirements |
 | S-B: code ownership during the split | (a) new specs own no code / (b) sub-crate units, amending `D-02` / (c) split crates later | (a) | `D-02` unchanged; harness and producer code still couple through `002` or the seam spec |
 | S-C: section numbers on relocation | keep numbers / renumber | keep numbers | Outside citations change only their spec number; no in-spec reference breaks |
 | S-D: fifth seam for admission and launch (3.29 to 3.34, 3.37) | with `008` / own spec | with `008` | `008` is large; a later split of it is another relocation |
