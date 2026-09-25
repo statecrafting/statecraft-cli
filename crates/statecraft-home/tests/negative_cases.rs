@@ -532,6 +532,54 @@ fn the_real_spec_spine_commands_work_at_the_new_derived_path() {
     );
 }
 
+// Row: the pinned spec-spine refuses a repository holding a link that leaves
+// it (spec-spine's 144, from 0.27.0), and the freshness read reports a read
+// not performed, never stale and never fresh (spec 002 section 5,
+// 2026-09-25).
+#[cfg(unix)]
+#[test]
+fn the_real_spec_spine_refuses_a_link_leaving_the_repository() {
+    let sandbox = Sandbox::new();
+    let producer = conforming_producer();
+    let corpus = support::corpus_tool();
+    let probe = statecraft_environment::probe::CommandProbe {
+        git: "git".into(),
+        spec_spine: support::spec_spine_program(),
+    };
+    let authority = Unreachable::default();
+    let revisions = StaticRevision::default();
+    let h = harness!(sandbox, &producer, &corpus, &probe, &authority, &revisions);
+    let answer = h.execute(Operation::InitApply {
+        root: sandbox.project(),
+    });
+    let report = init_report(&answer);
+    assert!(
+        report
+            .steps
+            .iter()
+            .find(|s| s.step == Step::Corpus)
+            .expect("the corpus step ran")
+            .state
+            .done(),
+        "the real tool did not set the corpus up"
+    );
+    let program = support::spec_spine_program();
+    assert!(matches!(
+        statecraft_environment::probe::run_check(&program, &sandbox.project()),
+        statecraft_environment::probe::CheckAnswer::Fresh
+    ));
+
+    let outside = tempfile::tempdir().unwrap();
+    std::os::unix::fs::symlink(outside.path(), sandbox.project().join("docs-outside")).unwrap();
+    match statecraft_environment::probe::run_check(&program, &sandbox.project()) {
+        statecraft_environment::probe::CheckAnswer::NotPerformed { status, detail } => {
+            assert_eq!(status, "exit 2", "{detail}");
+            assert!(detail.contains("outside it"), "{detail}");
+        }
+        other => panic!("a link leaving the repository read as {other:?}"),
+    }
+}
+
 // Row: a `.gitignore` that would ignore all of `.statecraft/`.
 #[test]
 fn a_gitignore_that_would_ignore_the_whole_area_is_refused_with_the_line_named() {

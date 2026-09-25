@@ -5,6 +5,6 @@
     "path": "crates/statecraft-adapter-claude-code",
     "specRef": "004-execution-adapter"
   },
-  "schemaVersion": "1.1.0",
-  "shardHash": "6a5cc7c1c22f68e7fc8a2bc0d4363ae1d3070f705a72cf7d5647af73f6d94e68"
+  "schemaVersion": "1.2.0",
+  "shardHash": "ffc75e303f7673ba6cb6e89c21cae29705491dda796aeae86b747239940e8f87"
 }

@@ -307,9 +307,10 @@ One spec per pull request, then stop.
    every commit. The codebase index hashes the authored tree, not only the specs:
    editing a root document such as this one or `README.md` turns `check` stale
    with no structural change, and the fix is the same refresh in the same commit.
-   The shards do change, and visibly: each one's `shardHash` moves, because that
-   hash covers the global inputs. What does not change is what the shard says
-   about the corpus.
+   From spec-spine 0.27.0 (its spec 141) that refresh rewrites one file,
+   `.statecraft/derived/codebase-index/inputs.json`, which records every hashed
+   input; no other shard moves, and what the shards say about the corpus does
+   not change.
    **`make couple` before committing proves nothing.** The gate compares two
    commits, so with `HEAD` still at `BASE` it judges an empty diff and reports
    "0 path(s) checked, no drift", which reads exactly like a pass. Commit, then

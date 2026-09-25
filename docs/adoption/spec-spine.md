@@ -352,3 +352,130 @@ change.
 **Consequence if rejected.** Both pins return to `=0.25.0`, the floor returns to
 1.88, `make tools` installs 0.25.0, and the 15 shards are regenerated back.
 The readers from #156 and #157 stay, because they read both tables.
+
+### 2026-09-25: 0.27.0
+
+The owner decided on 2026-09-25 to adopt 0.27.0 in its own change, after the
+readers and the hooks that read it. The CLI pin in `spec-spine.toml` and the
+linked `spec-spine-core` in the root `Cargo.toml` move together, as one
+producer identity. The producer's handoff is
+`statecraft-handoff-0.27.0.md` (evidence commit `2b71c97`).
+
+*Identity.* Tag `v0.27.0` is annotated and signed. `git tag -v` reports a good
+ED25519 signature from the producer owner's key (`SHA256:h51+SsiQ…jEg`). The
+tag targets `d78fb09a3cde1e7862c901ce731f29dd5d6073a0`, which is contained in
+the producer's `origin/main`.
+
+| Crate | Registry checksum (= downloaded `.crate`, = `Cargo.lock`, = handoff) |
+|---|---|
+| `spec-spine-cli` | `2ad9d110…8ded2` |
+| `spec-spine-core` | `04c0165e…d9b5` |
+| `spec-spine-types` | `e42b6c94…610e` |
+
+Each crate from the crates.io index records `d78fb09a` in
+`.cargo_vcs_info.json`, with no `dirty` flag, and each unpacked source equals
+`git archive v0.27.0`'s `crates/<crate>`, with `Cargo.toml.orig` equal to the
+tree's. (This host's Cargo home also holds 0.27.0 extractions from local
+registries naming other revisions, left by the producer's pre-release
+rehearsals; this build resolves the crates.io index only, which `Cargo.lock`
+records.) `cargo install --locked` with rustc 1.96.0 gave `f92ff556…`.
+
+*The floor.* The `DEFAULT_BYPASS_PREFIXES` definition is byte-identical at
+`v0.26.0` and `v0.27.0`. Of the files that name it, four changed for other
+reasons: `couple.rs` replaces its freshness check with the guard of
+spec-spine's 145, `lib.rs` exports the new items, `config.rs` validates
+`specs_dir` and `standards_dir` as paths inside the repository (144), and
+spec-spine's own `spec-spine.toml` moves its pin.
+
+*Coupling.* `couple` gives the same exit code, the same checked-path count and
+the same text (apart from the version) under 0.26.0 and 0.27.0 over the
+eleven merged ranges of the 0.26.0 entry. Each was run in its own clone with
+shards written by that version, in a commit that also unpins
+`spec-spine.toml`, so every count is one higher than the 0.26.0 entry's (11,
+9, 9, 23, 4, 13, 19, 4, 37, 9 and 2 paths).
+
+Seven synthetic commits, each against a clone of `main`:
+
+- A re-indexed `docs/decisions` change, a `src` change and a deleted file each
+  exit 1 with `C-001` under both. The one text difference is the `C-001`
+  footer, which gains "An `amends` edge does not do this: it changes what the
+  amended spec requires, never who owns its code (spec 142)."
+- A hand-edited shard is stale, exit 1, byte-identical.
+- An unindexed `docs/decisions` change is stale, exit 1, under both. 0.26.0
+  names 15 stale shards; 0.27.0 names one, `inputs.json` (spec-spine's 141).
+- An unresolved claim at `implementation: complete` is exit 1 under both. It
+  is "index is stale" under 0.26.0 and "validation failed" with the `I-004`
+  claim under 0.27.0 (145).
+- A link leaving the repository couples clean under 0.26.0 (exit 0). 0.27.0
+  refuses to read the repository, exit 2 (144).
+
+*Exit codes and the text the hooks read.* The exit table is 0.26.0's. On
+`check` and `check --fail-on-unresolved`, over a fresh, a stale, an invalid,
+an unresolved (at `complete`, and at `in-progress` under the flag) and a
+mismatched-pin tree, the exit codes and every line the shipped hooks match
+(`spec-registry:`, `codebase-index:`, the pin refusal) are byte-identical
+under both versions apart from the version string. What 0.27.0 adds and the
+readers had to meet was measured on the same day:
+
+- a link leaving the repository is `refused:`, exit 2, at every reading verb;
+- `specs_dir = "C:specs"` and `derived_dir = "out/nul"` are `config error:`,
+  exit 2, where 0.26.0 failed later with exit 4;
+- the guarded readers call an unresolved claim `validation failed`, exit 1;
+- `check --json` still reports the index half of an unresolved claim as
+  `"fresh": false` (spec-spine plans to change that in 0.28.0), and nothing
+  in this product reads `check --json`;
+- the delta report is schema 0.2.0, with a `relocation` class and a
+  `relocations` list.
+
+Invalid configuration already said `config error:` at exit 2 under 0.26.0,
+which the readers from #156 and #157 read as stale. #159 (the Rust readers,
+specs `002`, `003` and `005` section 5) and #161 (the delivered hooks, spec
+`002` section 5) fixed that and met the rest before this move.
+
+*The re-index.* The move regenerates 22 shards and writes one new file. The
+15 codebase-index shards each change `schemaVersion` (1.1.0 to 1.2.0) and
+`shardHash`, and the 7 spec-registry shards each change `specVersion` (1.8.0
+to 1.9.0). The new file is `.statecraft/derived/codebase-index/inputs.json`,
+the inputs record of spec-spine's 141, which a later governance edit rewrites
+alone. Measured on a clone after the move: one `README.md` line and one
+`index` changed `inputs.json` and nothing else. Read through the CLI,
+`registry plan --json` has the same keys, the ready set is unchanged (`002`),
+and every `registry closure` digest and member count is unchanged for all
+seven specs. The `[index]` comment in `spec-spine.toml` now mirrors 0.27.0's
+scaffold: "Extra files recorded in the index's inputs record
+(codebase-index/inputs.json), so a change to one rewrites that file."
+`AGENTS.md`'s refresh paragraph says the same.
+
+*The library.* This product links `spec-spine-core` for `scaffold_init_json`
+only. `DeltaClass::Relocation`, the five new public fields and the `Verdict`
+change reach no match or struct literal here: the workspace builds and every
+test passes against 0.27.0 unchanged, before this change's own additions. The
+declared toolchain floor stays 1.90, which `spec-spine-core` and
+`spec-spine-types` 0.27.0 declare: `cargo +1.90.0 build --workspace --locked`
+succeeds.
+
+*No impact, stated.* 136 to 140 and 146 are the producer's own acceptance
+coverage and change no behavior this product reads. 143 (a CRLF checkout of
+the derived tree reads fresh) needs nothing here: this repository has no
+`.gitattributes` workaround to remove and no Windows CI job. 142's `L-017` and
+`L-018` do not fire on this corpus: `lint --fail-on-warn` under 0.27.0 reports
+0 warnings. 130 and 131 were adopted with 0.26.0's table and are unchanged.
+
+*Evidence kinds, kept apart.* The producer's evidence is its release record
+and its handoff, which lists the consumer tests it ran. This repository's
+qualification of the CLI and the library is the identity, floor, coupling,
+exit, hook-text, re-index and toolchain measurements above, plus
+`the_real_spec_spine_refuses_a_link_leaving_the_repository` against the pinned
+binary. Neither qualifies a bundle, which is not adopted.
+
+*What this does not do.* It changes no runtime behavior beyond the readers
+already merged. It does not adopt #118's family exit contract for
+statecraft's own verbs, `relocates` or partial `supersedes` for the `002`
+split (Part 2 of spec `001`'s amendment-model entry, still held), or a
+placement of the `relocation` class in spec `005` section 3.3.2. Each is its
+own change.
+
+**Consequence if rejected.** Both pins return to `=0.26.0`, `make tools`
+installs 0.26.0, the 22 shards are regenerated back, and `inputs.json` is
+removed. The readers from #159 and #161 stay, because they read both
+releases.

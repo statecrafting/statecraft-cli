@@ -4,6 +4,6 @@
     "name": "statecraft-home",
     "path": "crates/statecraft-home"
   },
-  "schemaVersion": "1.1.0",
-  "shardHash": "2a45218a42e13111ef022b14e13180fc02e9b67a566e02e759ba5ff9453539e4"
+  "schemaVersion": "1.2.0",
+  "shardHash": "74e7592d04608875baeee8ef3ec9d6458e08fa8eeb686b9991204206f8c95b77"
 }
