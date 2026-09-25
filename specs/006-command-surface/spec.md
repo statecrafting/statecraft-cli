@@ -1039,7 +1039,7 @@ against clap (owner Addendum 2, item P).** **The owner adopted the
 recommendation on 2026-09-25**: clap for per-verb arguments only, while verb
 resolution (`Verb::parse`) and help before resolution stay as they are. It is
 implemented after the family exit and JSON contract: the entry draft #118
-proposes for this section (provenance label item X), which the owner adopted
+proposes for this section (provenance: item X), which the owner adopted
 the same day and which lands in the spec-spine 0.26.0 migration; the parser
 change waits for that entry to be on `main`. Every clap error maps to exit 3 and is tested for each verb, and
 the implementing change records release binary size and clean build time
@@ -1066,7 +1066,7 @@ completions.
 | Usage exit code | 3, section 3.3 | clap exits **2** on a usage error by default. Keeping 3 requires `try_parse` and mapping `clap::Error` to `Exit::Usage` ourselves, and `--help`/`--version` (clap's `DisplayHelp`) to 0 |
 | `--json` anywhere | explicit | a `global = true` flag; same behavior |
 | `run <spec-id>` beside `run list|show|reconcile` | reserved words stated in `Verb::parse` | expressible (`args_conflicts_with_subcommands`), but the reservation must be restated and tested |
-| JSON on usage errors | stderr text only | the same unless we render clap's error into the family envelope (see the family-contract proposal, item X) |
+| JSON on usage errors | stderr text only | the same unless we render clap's error into the family envelope (see the family exit and JSON contract proposal, draft #118) |
 | Dependencies | none added | about 12 crates (`clap`, `clap_builder`, `clap_lex`, `clap_derive`, `heck`, `anstream`, `anstyle*`, `colorchoice`, `strsim`, ...) plus `clap_complete`; `syn`, `quote` and `proc-macro2` are already in the lock via `serde_derive` |
 | Binary size | the current release binary is 5.28 MB (5,283,824 bytes, an existing `target/release` build, not rebuilt for this entry) | commonly several hundred KB more with derive and help; to be measured, not assumed |
 | Build time | none added | `clap_derive` adds a proc-macro compile to a clean build |
@@ -1084,7 +1084,7 @@ a test per verb that a bad flag exits 3 and names the flag; completions via
 `clap_complete`. (b) Adopt clap for the whole tree. (c) Keep the hand-written
 parser and add a small declarative flag table per verb that the usage lines
 and a completion script are generated from. *Recommended, and adopted by the owner on 2026-09-25: (a)*, after the
-family exit contract lands (item X), so the usage-error envelope is decided
+family exit and JSON contract of draft #118 lands, so the usage-error envelope is decided
 once. Measure binary size and clean-build time before and after as the
 change's evidence.
 
