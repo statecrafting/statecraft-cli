@@ -83,6 +83,11 @@ impl Fixture {
     }
 
     fn cli(&self, args: &[&str]) -> Output {
+        self.cli_with(args, &[])
+    }
+
+    /// [`Fixture::cli`] with more names in the operator's environment.
+    fn cli_with(&self, args: &[&str], extra: &[(&str, &str)]) -> Output {
         Command::new(env!("CARGO_BIN_EXE_statecraft-cli"))
             .args(args)
             .env_clear()
@@ -91,6 +96,7 @@ impl Fixture {
             .env("HOME", self.dir.path())
             .env("PATH", format!("{}:/usr/bin:/bin", self.bin().display()))
             .env("USER", "fixture-operator")
+            .envs(extra.iter().copied())
             .output()
             .unwrap()
     }
@@ -174,8 +180,13 @@ fn a_fresh_initialization_records_roles_the_linked_producer_and_the_declared_pin
     // The observation is reported, and named as one.
     let observed = &report["observedSpecSpine"];
     assert_eq!(observed["version"], "0.23.0", "{report}");
+    // Selected by spec 002 section 5's rule of 2026-09-25 and run by its
+    // path, so the program is the file that answered.
     assert_eq!(observed["foundBy"], "path");
-    assert_eq!(observed["program"], "spec-spine");
+    assert_eq!(
+        observed["program"],
+        f.bin().join("spec-spine").display().to_string()
+    );
 
     let d = f.declaration();
     // The producer's scaffold writes the pin commented out, so the project
@@ -288,7 +299,18 @@ fn a_declared_pin_the_producer_and_the_executable_disagreeing_are_distinct_repor
     f.edit(CONFIG, |t| {
         format!("{t}\n[meta]\nrequired_version = \"=0.24.0\"\n")
     });
-    assert_eq!(f.init().0, 0);
+    // The executable on PATH does not satisfy the pin, so initialization does
+    // not run it (spec 002 section 5, 2026-09-25, the rule the delivered
+    // hooks apply): the corpus step is refused, naming it, and the run is
+    // partial. The pin is recorded all the same.
+    let (exit, rerun) = f.init();
+    assert_eq!(exit, 1, "{rerun}");
+    assert_eq!(rerun["outcome"], "partial", "{rerun}");
+    let rendered = rerun.to_string();
+    assert!(
+        rendered.contains("(PATH, reports 0.23.0): it does not satisfy pin =0.24.0"),
+        "{rerun}"
+    );
     assert_eq!(f.declaration()["pins"]["spec_spine"], "0.24.0");
 
     let (exit, report) = f.doctor();
@@ -359,4 +381,55 @@ fn a_declaration_recorded_before_provenance_is_read_without_guessed_values() {
     std::fs::write(f.at("notes.md"), "edited").unwrap();
     let (_, report) = f.doctor();
     assert_eq!(state_of(&report, "notes.md"), "drifted", "{report}");
+}
+
+/// A second `spec-spine`, off `PATH`, that records every invocation.
+fn alternative(f: &Fixture) -> PathBuf {
+    let alt = f.dir.path().join("alt/spec-spine");
+    std::fs::create_dir_all(alt.parent().unwrap()).unwrap();
+    std::fs::write(alt.parent().unwrap().join("version"), "0.23.0").unwrap();
+    let script = STUB.replace(
+        "here=\"$(dirname \"$0\")\"\n",
+        "here=\"$(dirname \"$0\")\"\necho \"$*\" >> \"$here/calls\"\n",
+    );
+    statecraft_adapter::fixture::install_script(&alt, &script, 0o755).unwrap();
+    alt
+}
+
+/// Spec 002 section 5, 2026-09-25: initialization selects its `spec-spine` by
+/// the one variable. `STATECRAFT_SPEC_SPINE` outside a managed session is the
+/// operator's override and judges; the retired `SPEC_SPINE_BIN` selects
+/// nothing, and `PATH` judges.
+#[test]
+fn initialization_selects_spec_spine_by_the_one_variable() {
+    let f = Fixture::new("0.23.0");
+    let alt = alternative(&f);
+    let alt_s = alt.display().to_string();
+    let calls = alt.parent().unwrap().join("calls");
+
+    // The retired name: never invoked, PATH answers.
+    let out = f.cli_with(
+        &["init", "apply", &f.root(), "--json"],
+        &[("SPEC_SPINE_BIN", &alt_s)],
+    );
+    let v: serde_json::Value = serde_json::from_slice(&out.stdout).unwrap();
+    let observed = &v["value"]["value"]["observedSpecSpine"];
+    assert_eq!(observed["foundBy"], "path", "{v}");
+    assert_eq!(
+        observed["program"],
+        f.bin().join("spec-spine").display().to_string()
+    );
+    assert!(!calls.exists(), "the retired name selected a binary");
+
+    // The one variable: the override judges, and is named as one.
+    let out = f.cli_with(
+        &["init", "apply", &f.root(), "--json"],
+        &[("STATECRAFT_SPEC_SPINE", &alt_s)],
+    );
+    let v: serde_json::Value = serde_json::from_slice(&out.stdout).unwrap();
+    let observed = &v["value"]["value"]["observedSpecSpine"];
+    assert_eq!(observed["foundBy"], "override", "{v}");
+    assert_eq!(observed["program"], alt_s);
+    let seen = std::fs::read_to_string(&calls).unwrap_or_default();
+    assert!(seen.lines().any(|l| l == "check"), "{seen}");
 }
