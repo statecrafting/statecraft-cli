@@ -576,7 +576,11 @@ checklist as the direction on 2026-09-25.** The release pipeline stays
 proposed: it waited on the attest-ledger item, and that blocker is removed by
 the change that takes `attest-ledger-core` from crates.io at `=0.1.0` (spec
 `003` section 5, 2026-09-25), so the pipeline is the next proposal to bring
-back. Nothing here lifts `F-02`: publication stays deferred until the owner
+back. Two labels in the checklist below are this entry's provenance: *item P*
+is the parser entry of spec `006` section 5 (clap for per-verb arguments,
+adopted 2026-09-25) and *item N* is the JSON naming and strict-input entry of
+spec `006` section 5 (adopted 2026-09-25). Nothing here lifts `F-02`:
+publication stays deferred until the owner
 lifts it separately, and no grade above *specified* is claimed for anything
 below.
 
@@ -646,11 +650,15 @@ amendment model, and `002` is split along its seams by relocation only (owner
 item S).** **The owner adopted Part 1, the amendment model, on 2026-09-25**:
 from that date a new behavioral amendment is a new spec with an `amends` edge
 (and `extends` on each unit whose code it changes), and section 5 keeps real
-implementation decisions only. **Part 2, the split of `002`, is held** until
+implementation decisions only; a section 5 entry stays the route that clears
+`C-001` for a change that alters no requirement, as it was before. **Part 2, the split of `002`, is held** until
 spec-spine 0.27.0 provides an exclusive claim transfer and a provable
 relocation (friction items 1 and 3 below, sent to spec-spine as its item C
 findings); then 0.27.0 is adopted under `D-06` and the split is done through
-relocation-only pull requests. Decisions S-B to S-F in the table at the end
+relocation-only pull requests. Creating `007`, the distribution seam, is not
+held with Part 2: it moves no section out of `002` (step 5 below drafts it from
+the bundle entry), so it follows the spec-spine 0.26.0 migration with
+`planned: true` claims, as the owner decided the same day. Decisions S-B to S-F in the table at the end
 stay open until then. The text below is the proposal as prepared.
 Prepared at the owner's request of 2026-09-24 for the owner's ratification
 decisions; nothing below binds until the owner adopts it, and each decision is
