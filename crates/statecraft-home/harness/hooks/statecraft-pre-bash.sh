@@ -125,7 +125,9 @@ spec_spine_admits() {
   esac
   probe=$("$1" --repo "$2" config show 2>&1); prc=$?
   [ "$prc" = 0 ] && return 0
-  if [ "$prc" = 3 ]; then case "$probe" in *'requires spec-spine'*) return 1 ;; esac; fi
+  # A pin not met is exit 3 below spec-spine 0.26.0 and exit 2 from it, worded
+  # the same under both (spec 002 section 5, 2026-09-25, "both exit tables").
+  case "$prc" in 2|3) case "$probe" in *'requires spec-spine'*) return 1 ;; esac ;; esac
   return 2
 }
 spec_spine_resolve() {
@@ -215,6 +217,18 @@ judge=$(spec_spine_judge)
 # refuses what the merge gate refuses. Exit 1 then carries two readings and
 # the report text says which; exit 2 is stale and nothing else.
 cout=$("$sc" --repo "$root" check --fail-on-unresolved 2>&1); cec=$?
+# spec-spine has two exit tables (spec 002 section 5, 2026-09-25, "both exit
+# tables"). From 0.26.0 a stale tree exits 1 and 2 is a refusal to judge, which
+# names itself; below it stale is 2 and a refusal 3. A refusal is read first,
+# by its words, so a 0.26.0 refusal is never sent to regenerate.
+if [ "$cec" != 0 ]; then
+  case "$cout" in *'spec-spine: refused:'*|*'requires spec-spine'*)
+    { echo "[pr-gate] BLOCKED: spec-spine refused to judge the tree in $root (check exit $cec): $(printf '%s\n' "$cout" | head -1)"
+      echo '[pr-gate] The tree has NOT been judged and is not known to be stale; regenerating repairs nothing here.'
+      echo "[pr-gate] $judge"; } >&2
+    exit 2 ;;
+  esac
+fi
 case "$cec" in
   0) ;;
   2) # Spec 093 3.1, on spec 093's rule: exit 2 is the ONE ambiguous code. This
@@ -251,8 +265,14 @@ case "$cec" in
        [ "$named" = 1 ] && echo '[pr-gate] The same report also names a stale shard tree: spec-spine compile and index clear that part only; commit the shards with the fix.' >&2 ;;
      esac
      if [ "$named" = 0 ]; then
-       { echo "[pr-gate] BLOCKED: the corpus in $root does not validate (spec-spine check exit 1)."
-         echo '[pr-gate] Run: spec-spine check, fix the violations it names, and retry. The tree is not stale; staleness is not meaningful against a corpus that does not compile.'; } >&2
+       case "$cout" in *'spec-registry: STALE'*|*'codebase-index: STALE'*)
+         # spec-spine 0.26.0's table: stale alone is exit 1.
+         { echo "[pr-gate] BLOCKED: a committed shard tree is stale in $root."
+           echo '[pr-gate] Run: spec-spine compile and index, whichever tree it named, then commit the shards, push, and retry.'; } >&2 ;;
+       *)
+         { echo "[pr-gate] BLOCKED: the corpus in $root does not validate (spec-spine check exit 1)."
+           echo '[pr-gate] Run: spec-spine check, fix the violations it names, and retry. The tree is not stale; staleness is not meaningful against a corpus that does not compile.'; } >&2 ;;
+       esac
      fi
      echo "[pr-gate] $judge" >&2
      exit 2 ;;
@@ -262,6 +282,11 @@ case "$cec" in
      { echo "[pr-gate] BLOCKED: the freshness read was not performed in $root (spec-spine check exit 3)."
        echo "[pr-gate] The binary is $sc, which answers: ${ver:-(nothing)}. The check verb needs spec-spine 0.18.0 or later; below that the binary is too old to have read the tree, and the tree itself has not been judged. Run /setup to install the floor, or read spec-spine check directly for an I/O, parse or config error."
     echo "[pr-gate] $judge"; } >&2
+     exit 2 ;;
+  4) # spec-spine 0.26.0's table: the read failed.
+     { echo "[pr-gate] BLOCKED: the freshness read failed in $root (spec-spine check exit 4: I/O, git or internal): $(printf '%s\n' "$cout" | head -1)"
+       echo '[pr-gate] The tree has NOT been judged and is not known to be stale; regenerating repairs nothing here.'
+       echo "[pr-gate] $judge"; } >&2
      exit 2 ;;
   *) { echo "[pr-gate] BLOCKED: spec-spine check exited $cec in $root, which this gate does not recognise; it is not reported as fresh."
     echo "[pr-gate] $judge"; } >&2
