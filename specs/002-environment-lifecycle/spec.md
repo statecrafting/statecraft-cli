@@ -7563,6 +7563,39 @@ skip on `merge_group` is admitted only with a recorded verdict; the rendered
 workflow triggers on `merge_group` and grants the gate job only read
 permissions; a revision-2 project upgrades to revision 3.
 
+**2026-09-24: PROPOSED, not adopted: profile revision 4, what S-5 found
+missing.** S-5 renders this repository's own CI from the setup profile. The
+render of revision 3 into a scratch copy of `main` (profile identity
+`5e30836810d8`; evidence repository commit `a6b0bb8`, `2026-09-24/session11/S5`)
+passes every governance check, and it matches `.github/workflows/govern.yml` on
+the pin, `check`, `lint`, `index check`, coupling on both events, `make code`
+and the `ci-gate` binding. It is stronger on `ci-gate` (policy read at the
+base, a vanished job blocks). It is weaker in five places, and revision 3 has
+no parameter for any of them, so S-5 is not adopted: adopting it would weaken
+this repository's check suite. Revision 4 would add:
+
+1. **Enforced coverage.** A parameter (for example `governance.enforce_coverage`)
+   that runs `index coverage --fail-on-untraced` as a refusal, not a report.
+2. **A required authored-content step.** Revision 3 runs the project's script
+   only when it is executable, so deleting it passes silently; a declared
+   script that is absent must refuse.
+3. **Every commit signed and gated.** The per-commit check this repository adds
+   in #134, as an opt-in parameter.
+4. **Title, body and commit messages under the authored-content rules**, as in
+   #134.
+5. **A pull request whose base is not the default branch fails.**
+
+Two further items are not weakenings: the rendered CI caches neither the
+spec-spine binary nor the cargo build (speed only), and the local `make gate`
+and `make code` stay hand-written beside the rendered `gate.sh`, two definitions
+of one surface. Separately, the render's corpus step ran a bare `spec-spine`
+from `PATH` (0.24.0 on this machine) and refused with exit 4 until the pinned
+binary was first on `PATH`: it fails closed, and the single selection variable
+proposed in #119 is where the fix belongs. Adopting revision 4 is the owner's
+decision; so is S-5's review job, which needs `CLAUDE_CODE_OAUTH_TOKEN`, a
+protected `statecraft-review-exception` Environment and provider use on every
+pull request.
+
 ## Verification
 
 `--fail-on-untraced` joined the corpus gate with this spec's first
