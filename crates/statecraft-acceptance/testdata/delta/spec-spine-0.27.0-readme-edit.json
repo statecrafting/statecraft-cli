@@ -1,0 +1,55 @@
+{
+  "exitCode": 0,
+  "outcome": "ok",
+  "report": {
+    "base": "ec1e3096de45009069d9ac4c8ed717f8a7416862",
+    "changes": [
+      {
+        "change": "modified",
+        "classes": [
+          "derived"
+        ],
+        "path": ".statecraft/derived/codebase-index/inputs.json"
+      },
+      {
+        "change": "modified",
+        "classes": [
+          "policy"
+        ],
+        "path": "README.md"
+      }
+    ],
+    "classifiedUnder": "base",
+    "counts": {
+      "authority": 0,
+      "bypassed": 0,
+      "constitutional": 0,
+      "derived": 1,
+      "implementation": 0,
+      "lifecycle": 0,
+      "policy": 1,
+      "relocation": 0,
+      "requirement": 0,
+      "unknown": 0,
+      "unowned": 0,
+      "verification": 0
+    },
+    "head": "a23024ea400ce45f01b65dd5f60ed31ee619e014",
+    "mergeBase": "ec1e3096de45009069d9ac4c8ed717f8a7416862",
+    "priorPolicy": {
+      "classes": [
+        "policy"
+      ],
+      "required": true
+    },
+    "schemaVersion": "0.2.0",
+    "tool": {
+      "name": "spec-spine",
+      "version": "0.27.0"
+    }
+  },
+  "schemaVersion": "1.0.0",
+  "summary": "delta: ok",
+  "tool": "spec-spine",
+  "verb": "delta"
+}

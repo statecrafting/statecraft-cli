@@ -500,6 +500,20 @@ mod tests {
             read(4, "spec-spine: internal error: x"),
             ReportError::ProducerRefused { .. }
         ));
+        // Recorded 2026-09-25 from the published 0.26.0 and 0.27.0: invalid
+        // configuration (both), a link leaving the repository and a layout root
+        // that is not a plain relative path (0.27.0, spec-spine's 144). Each
+        // is 2 and none is a stale ledger.
+        for refusal in [
+            "spec-spine: config error: TOML parse error at line 134, column 2",
+            "spec-spine: config error: layout.derived_dir 'out/nul' must name a directory inside the repository",
+            "spec-spine: refused: refused to read the repository: 'docs-outside' is a link to /tmp/o, outside it (spec 144).",
+        ] {
+            assert!(
+                matches!(read(2, refusal), ReportError::ProducerRefused { .. }),
+                "{refusal}"
+            );
+        }
     }
 
     #[test]

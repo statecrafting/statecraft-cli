@@ -131,7 +131,7 @@ spec_spine_judge() {
 # failed (spec 002 section 5, 2026-09-25, "both exit tables").
 spec_spine_unknown_half() {
   v=$("$2" --version 2>/dev/null)
-  case "$3" in *'spec-spine: refused:'*|*'requires spec-spine'*)
+  case "$3" in *'spec-spine: refused:'*|*'spec-spine: config error:'*|*'requires spec-spine'*)
     echo "NOT READ (check exit $1: spec-spine refused to judge the tree). The binary at $2 answers: ${v:-(nothing)}. Read spec-spine check directly; regenerating repairs nothing here"
     return ;;
   esac

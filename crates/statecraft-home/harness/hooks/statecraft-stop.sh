@@ -150,7 +150,7 @@ out=$("$sc" check --fail-on-unresolved 2>&1); c=$?
 # tables"). From 0.26.0 a stale tree exits 1 and 2 is a refusal to judge, which
 # names itself; below it stale is 2 and a refusal 3. The report lines are the
 # same under both, so they decide, and a refusal is read before the code.
-case "$out" in *'spec-spine: refused:'*|*'requires spec-spine'*)
+case "$out" in *'spec-spine: refused:'*|*'spec-spine: config error:'*|*'requires spec-spine'*)
   ver=$("$sc" --version 2>/dev/null)
   say "[freshness] NOT READ: spec-spine refused to judge the tree (check exit $c). The binary at $sc answers: ${ver:-(nothing)}. $(printf '%s\n' "$out" | head -1). Regenerating repairs nothing here."
   exit 0 ;;

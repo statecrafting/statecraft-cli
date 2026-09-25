@@ -12,13 +12,6 @@
 # release_candidate (true | false), evidence (a directory, when one was made).
 # Exit 0 is a review or a visible skip; anything else blocks.
 #
-# The credential (revision 8): ANTHROPIC_API_KEY when it is non-empty, else
-# CLAUDE_CODE_OAUTH_TOKEN; the one not chosen is unset before the reviewer
-# runs, and the class chosen (api-key or oauth, never the value) is in the job
-# log and the evidence record. Which one a repository gets is decided by the
-# secrets it can see: organization secrets with selected visibility, where a
-# repository-level secret of the same name takes precedence.
-#
 # The family exit contract (revision 7): 0 a review or a visible skip, 2
 # refused (a precondition the operator supplies: the credential, the
 # provider's acceptance of it, a head that has not moved), 3 usage (an input
@@ -45,7 +38,6 @@ TMPD="${AI_REVIEW_TMP:-${RUNNER_TEMP:-/tmp}}"
 EVIDENCE_DIR="${EVIDENCE_DIR:-$TMPD/statecraft-evidence}"
 GITHUB_OUTPUT="${GITHUB_OUTPUT:-/dev/null}"
 started="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
-credential_class=none
 
 out() { printf '%s=%s\n' "$1" "$2" >> "$GITHUB_OUTPUT"; }
 note() {
@@ -80,9 +72,8 @@ evidence() {
     --arg digest "$diff_digest" --arg result "$result" \
     --argjson findings "$findings" \
     --arg started "$started" --arg finished "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
-    --arg credential "$credential_class" \
     '{profile: {id: "github-actions-rust", identity: $identity},
-      tool: {name: "claude-code", version: $version, credential: $credential},
+      tool: {name: "claude-code", version: $version},
       subject: {repository: $repo, pullRequest: ($pr | tonumber), base: $base, head: $head, diffDigest: $digest},
       result: $result, findings: $findings, startedAt: $started, finishedAt: $finished}' \
     > "$EVIDENCE_DIR/ai-review-evidence.json"
@@ -128,25 +119,10 @@ if [ "$IS_DRAFT" = true ]; then skip draft "The pull request is a draft."; fi
 if [ "$HEAD_REPO" != "$REPO" ]; then skip fork "The head is in a fork (${HEAD_REPO}), which receives no secret."; fi
 if [ "$ACTOR" = "dependabot[bot]" ]; then skip dependabot "Dependabot runs without this repository's Actions secrets."; fi
 
-# A same-repository pull request without a credential is not a skip. The API
-# key is preferred; the one not chosen is removed from the environment, so the
-# reviewer receives exactly one. ANTHROPIC_AUTH_TOKEN is never bound by the
-# workflow and is removed as well, and the temporary HOME below keeps any
-# stored login out of reach.
-unset ANTHROPIC_AUTH_TOKEN
-if [ -n "${ANTHROPIC_API_KEY:-}" ]; then
-  unset CLAUDE_CODE_OAUTH_TOKEN
-  export ANTHROPIC_API_KEY
-  credential_class=api-key
-elif [ -n "${CLAUDE_CODE_OAUTH_TOKEN:-}" ]; then
-  unset ANTHROPIC_API_KEY
-  export CLAUDE_CODE_OAUTH_TOKEN
-  credential_class=oauth
-else
-  unset ANTHROPIC_API_KEY CLAUDE_CODE_OAUTH_TOKEN
-  refuse "neither ANTHROPIC_API_KEY nor CLAUDE_CODE_OAUTH_TOKEN is set for this repository; set one with: gh secret set ANTHROPIC_API_KEY (preferred), or: gh secret set CLAUDE_CODE_OAUTH_TOKEN" 2
+# A same-repository pull request without the credential is not a skip.
+if [ -z "${CLAUDE_CODE_OAUTH_TOKEN:-}" ]; then
+  refuse "the CLAUDE_CODE_OAUTH_TOKEN secret is not set for this repository; set it with: gh secret set CLAUDE_CODE_OAUTH_TOKEN" 2
 fi
-note "AI review credential: ${credential_class}"
 
 # The subject: the exact three-dot diff, minus the excluded prefixes.
 # EXCLUDE is space-separated repository-relative prefixes, validated by
