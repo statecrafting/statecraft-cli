@@ -58,8 +58,7 @@ spec_spine_resolve() {
   sc_pin=$(spec_spine_pin "$1")
   if [ -n "$sc_pin" ]; then sc_pinned="pin $sc_pin from $1/spec-spine.toml [meta] required_version"; else sc_pinned='unpinned'; fi
   if [ -n "${SPEC_SPINE_BIN:-}" ] && [ -z "${STATECRAFT_SPEC_SPINE:-}" ]; then
-    sc_notice="ignored SPEC_SPINE_BIN=$SPEC_SPINE_BIN: that name is retired and selects nothing; set STATECRAFT_SPEC_SPINE to choose the binary
-"
+    sc_notice="ignored SPEC_SPINE_BIN=$SPEC_SPINE_BIN: that name is retired and selects nothing; set STATECRAFT_SPEC_SPINE to choose the binary"
   fi
   if [ -n "${STATECRAFT_SPEC_SPINE:-}" ] && [ -n "${STATECRAFT_RUN_ID:-}" ]; then
     if [ -f "$STATECRAFT_SPEC_SPINE" ] && [ -x "$STATECRAFT_SPEC_SPINE" ]; then
@@ -115,7 +114,7 @@ spec_spine_judge() {
   printf '%s)' "$j"
 }
 spec_spine_resolve "$root"; rrc=$?
-[ -n "$sc_notice" ] && printf '%s' "$sc_notice" | sed 's/^/[hook] /'
+[ -n "$sc_notice" ] && printf '%s\n' "$sc_notice" | sed 's/^/[hook] /'
 [ -n "$sc_passed" ] && printf '%s' "$sc_passed" | sed 's/^/[hook] /'
 [ "$rrc" = 2 ] && { echo '[hook] spec-spine absent, staleness check skipped (run /setup)'; exit 0; }
 [ "$rrc" = 0 ] || { echo "[hook] staleness check NOT PERFORMED: $sc_why"; exit 0; }

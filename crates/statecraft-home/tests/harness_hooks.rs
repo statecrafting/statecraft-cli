@@ -2079,6 +2079,22 @@ fn one_variable_the_retired_name_is_reported_and_never_selects() {
                 && seen.contains("set STATECRAFT_SPEC_SPINE"),
             "{file} did not report the retired name as ignored: {seen}"
         );
+        // One complete line, once, and no empty prefixed line after it.
+        let notices: Vec<&str> = seen
+            .lines()
+            .filter(|l| l.contains("ignored SPEC_SPINE_BIN="))
+            .collect();
+        assert_eq!(notices.len(), 1, "{file}: {seen}");
+        assert!(
+            notices[0].ends_with("set STATECRAFT_SPEC_SPINE to choose the binary"),
+            "{file}: {seen}"
+        );
+        assert!(
+            !seen
+                .lines()
+                .any(|l| l.starts_with('[') && l.trim_end().ends_with(']')),
+            "{file} printed an empty prefixed line: {seen}"
+        );
     }
 }
 
