@@ -7804,6 +7804,77 @@ so; a candidate that changes any authority-set file blocks without the
 exception and passes with it; a candidate that changes no such file is
 unaffected; a revision-4 project upgrades.
 
+**2026-09-24: profile revision 5 implemented (the entry above on a candidate
+never judging itself with its own gate).** `setup.rs` registers revision 5
+(identity `38935d7738639190dc0f5830e00ebe83ac4fe1bad5a63046326d709ecea5185e`).
+Rule 1: the `governance` and `code` jobs check out the whole history and begin
+with a step that reads `scripts/statecraft/gate.sh` and
+`install-spec-spine.sh` at the base (the pull request's base, the queue's
+`base_sha`, or the push's `before`) into the runner's temporary directory;
+every later step runs those copies. `install-spec-spine.sh` is read there too
+because it chooses the binary the gate runs (an agent's choice, recorded
+here). A base commit that cannot be read stops the job; a base that carries no
+copy is the adoption, and the step says the candidate's copy runs. `gate.sh`
+reads the declared authored-content script at `BASE_SHA`, refuses one that is
+not executable there, falls back to the candidate's copy only when the base
+carries none and says so; a local run names no base and runs the working
+tree's copy. The commit walk judges every commit with the running `gate.sh`,
+the base's in CI; revision 4's per-commit `gate.sh` is gone, and each commit
+is still judged with the spec-spine release its own `spec-spine.toml` pins.
+Rule 2: `ci-gate.sh` computes the authority set from the base's policy (every
+path in `files`, the policy, any path under `scripts/statecraft/`, and
+`parameters.authored_content`) and compares `BASE...HEAD`. On `pull_request`
+a change blocks unless that run's `review-exception` job succeeded; on
+`merge_group` it blocks unless the run recorded for the entry's pull request
+has a successful exception; on `push` it is reported, having been approved on
+its pull request. The adoption, whose base carries no policy, is reported and
+not blocked, because the candidate's own `ci-gate.sh` judges it (an agent's
+choice, recorded here). The `governance` job gains an `Authority change` step
+and an `authority_change` output, and `review-exception` needs `governance`
+and also runs when that output is `true`; `ci-gate.sh` never reads it. The
+step asks for the exception only when the base's policy carries the new static
+`authority_rule` field, so on the upgrade from revision 4 the exception job
+does not run: revision 4's `ci-gate.sh` would refuse it as an inapplicable job
+that ran. That upgrade pull request is therefore judged by the base's
+revision-4 `ci-gate`, which reports the authority change and does not block
+it, and the owner's approval of it is procedural; the operator steps say so,
+and that every re-render or authority-set change after it needs the owner's
+approval once. `ci-gate`'s jobs and rules are unchanged. Tests, each observed
+failing against the previous scripts (or the previous `setup.rs` for the
+operator steps): in `setup_workflows.rs`,
+`a_candidate_that_weakens_the_gate_is_judged_by_the_base_copy_and_fails`
+(the governance step, the title, the commit walk and the code job),
+`the_adoption_runs_the_candidates_gate_and_says_so` (and an unreadable base
+refuses), `an_authority_change_blocks_without_the_owner_exception_and_passes_with_it`
+(seven authority-set paths, on a pull request, in the queue and on push),
+`a_candidate_that_changes_no_authority_file_is_unaffected` and
+`revision_five_reads_the_gate_at_the_base_in_every_job_that_runs_it`; the
+mutation test covers the two new blocking branches. In `setup_upgrade.rs`,
+`a_revision_four_project_upgrades_to_revision_five` and
+`revision_five_names_the_owner_approval_in_its_operator_steps`; revision 4 is
+rebuilt from revision 5 and the older rebuilds from it. Existing tests changed
+to the ratified behaviour: the declared-script test now makes a script absent
+or not executable at the base (a candidate that only deletes it is judged by
+the base's copy), and the code-job and pin-step tests run after the step that
+reads the gate. Not closed by revision 5 as written: a workflow file the
+profile does not render is not in the authority set, and on `pull_request`
+GitHub runs a candidate's new workflow, which could report a check named
+`ci-gate` from GitHub Actions; this is recorded for the owner, not decided
+here. The real `GITHUB_ENV` hand-off between steps is simulated by the test
+harness; the first live run is its evidence.
+
+**2026-09-24: revision 5's review corrections (the first live AI review of
+#143).** (1) In the merge queue an authority change whose recorded review
+could not be read was already blocked, by `recorded_review`'s own refusal, but
+the rule 2 branch said nothing. A second, explicit block there was tried and
+refused by the mutation test as dead code, which confirms the first; the
+branch now says in a comment where the block happens, and a queue case with
+an unreadable pull request proves the authority change is refused. (2) The
+upgrade tests simulated revision 4 by patching revision 5's marks out of its
+templates, which left revision 5's new steps in place. They now use the three
+templates revision 5 changed exactly as revision 4 shipped them (main at
+`2c82d9a`), kept in `crates/statecraft-home/tests/support/profile-r4/`.
+
 ## Verification
 
 `--fail-on-untraced` joined the corpus gate with this spec's first

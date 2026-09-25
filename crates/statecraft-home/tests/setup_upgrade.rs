@@ -144,13 +144,46 @@ fn an_unmodified_file_is_replaced_and_a_customized_one_is_kept_with_three_digest
     );
 }
 
+const R4_CI: &str = include_str!("support/profile-r4/statecraft-ci.yml");
+const R4_GATE: &str = include_str!("support/profile-r4/gate.sh");
+const R4_CI_GATE: &str = include_str!("support/profile-r4/ci-gate.sh");
+
+/// Revision 4 of the registered profile, rebuilt from revision 5 by undoing
+/// revision 5's marks in the three templates a managed upgrade compares: the
+/// workflow runs the candidate's gate and runs the exception job for no
+/// authority change, the commit walk runs each commit's own gate, and
+/// `ci-gate.sh` only reports an authority change. Only the templates matter
+/// to a managed upgrade.
+fn revision_four() -> Profile {
+    let mut r4 = Profile::registered();
+    assert_eq!(r4.revision, 5, "the registered profile is revision 5");
+    r4.revision = 4;
+    // The three templates revision 5 changed, exactly as revision 4 shipped
+    // them (main at 2c82d9a, before #143), so the simulation is revision 4
+    // itself rather than revision 5 with its marks patched out.
+    for t in &mut r4.templates {
+        let body = match t.path.as_str() {
+            ".github/workflows/statecraft-ci.yml" => R4_CI,
+            "scripts/statecraft/gate.sh" => R4_GATE,
+            "scripts/statecraft/ci-gate.sh" => R4_CI_GATE,
+            _ => continue,
+        };
+        assert_ne!(t.body, body, "{}: revision 5 changed it", t.path);
+        t.body = body.to_string();
+    }
+    r4
+}
+
 /// Revision 3 of the registered profile, rebuilt from revision 4 by undoing
 /// revision 4's marks in the two templates a managed upgrade compares: the
 /// gate script's per-commit walk and the workflow's step that runs it. Only
 /// the templates matter to a managed upgrade.
 fn revision_three() -> Profile {
-    let mut r3 = Profile::registered();
-    assert_eq!(r3.revision, 4, "the registered profile is revision 4");
+    let mut r3 = revision_four();
+    assert_eq!(
+        r3.revision, 4,
+        "revision 4 is rebuilt from the registered one"
+    );
     r3.revision = 3;
     for t in &mut r3.templates {
         if t.path == ".github/workflows/statecraft-ci.yml" {
@@ -394,7 +427,7 @@ fn a_revision_three_project_upgrades_to_revision_four() {
         let (dir, mut manifest) = applied_revision_three(with_script);
         let root = dir.path();
         let r3 = revision_three();
-        let r4 = Profile::registered();
+        let r4 = revision_four();
         assert_ne!(r4.identity(), r3.identity());
         let upgrade = plan_and_apply(root, &r4, &mut manifest);
         let file = |rel: &str| upgrade.files.iter().find(|f| f.path == rel).unwrap();
@@ -483,4 +516,118 @@ fn revision_four_keeps_the_policy_and_names_the_new_refusal() {
     ] {
         assert!(steps.contains(parameter), "{parameter}: {steps}");
     }
+}
+
+/// Revision 5, item 4: a revision-4 project upgrades through one plan and
+/// apply. The unchanged workflow and scripts are rewritten with revision 5's
+/// reading of the gate at the base and its authority rule, and the declared
+/// parameters carry forward unchanged.
+#[test]
+fn a_revision_four_project_upgrades_to_revision_five() {
+    let dir = project();
+    let root = dir.path();
+    std::fs::create_dir_all(root.join("scripts")).unwrap();
+    std::fs::write(
+        root.join(setup::AUTHORED_CONTENT_SCRIPT),
+        "#!/bin/sh\nexit 0\n",
+    )
+    .unwrap();
+    let mut manifest = Manifest::new(Pins {
+        product: "0.0.0".into(),
+        spec_spine: "unpinned".into(),
+        adapters: Default::default(),
+        producer: None,
+    });
+    let mut block = BTreeMap::new();
+    for (k, v) in [
+        (
+            "governance.authored_content",
+            serde_json::json!(setup::AUTHORED_CONTENT_SCRIPT),
+        ),
+        ("governance.gate_each_commit", serde_json::json!(true)),
+    ] {
+        block.insert(k.to_string(), v);
+    }
+    let r4 = revision_four();
+    assert!(plan_and_apply_with(root, &r4, &mut manifest, &block).whole());
+    assert_eq!(manifest.project.setup.as_ref().unwrap().revision, 4);
+    let wf = ".github/workflows/statecraft-ci.yml";
+    let before = std::fs::read_to_string(root.join(wf)).unwrap();
+    assert!(
+        before.contains("sh scripts/statecraft/gate.sh governance"),
+        "{before}"
+    );
+
+    let r5 = Profile::registered();
+    assert_ne!(r5.identity(), r4.identity());
+    let recorded = manifest.project.setup.as_ref().unwrap().parameters.clone();
+    let upgrade = plan_and_apply_with(root, &r5, &mut manifest, &recorded);
+    let file = |rel: &str| upgrade.files.iter().find(|f| f.path == rel).unwrap();
+    for rel in [
+        wf,
+        "scripts/statecraft/gate.sh",
+        "scripts/statecraft/ci-gate.sh",
+    ] {
+        assert_eq!(file(rel).action, Action::Replace, "{rel}");
+    }
+    assert!(upgrade.whole());
+    let workflow = std::fs::read_to_string(root.join(wf)).unwrap();
+    assert!(
+        workflow.contains("sh \"${STATECRAFT_GATE:?}\" governance"),
+        "{workflow}"
+    );
+    assert!(
+        workflow.contains("needs.governance.outputs.authority_change == 'true'"),
+        "{workflow}"
+    );
+    let gate = std::fs::read_to_string(root.join("scripts/statecraft/gate.sh")).unwrap();
+    assert!(gate.contains("script=\"$SELF\""), "{gate}");
+    assert!(
+        gate.contains("AUTHORED_CONTENT='scripts/check-authored-content.sh'"),
+        "{gate}"
+    );
+    assert!(gate.contains("GATE_EACH_COMMIT=true"), "{gate}");
+    let ci_gate = std::fs::read_to_string(root.join("scripts/statecraft/ci-gate.sh")).unwrap();
+    assert!(ci_gate.contains("authority=yes"), "{ci_gate}");
+
+    let selection = manifest.project.setup.as_ref().unwrap();
+    assert_eq!(selection.revision, 5);
+    assert_eq!(selection.parameters, recorded);
+    let policy: serde_json::Value =
+        serde_json::from_str(&std::fs::read_to_string(root.join(setup::POLICY_PATH)).unwrap())
+            .unwrap();
+    assert_eq!(policy["revision"], 5);
+    assert_eq!(
+        policy["parameters"]["authored_content"],
+        setup::AUTHORED_CONTENT_SCRIPT
+    );
+    assert!(policy["authority_rule"].is_object(), "{policy}");
+}
+
+/// Revision 5, items 3 and 4: the operator steps say that every re-render or
+/// authority-set change needs the owner's approval once, and that the upgrade
+/// from revision 4 is judged by the base's revision-4 gate, which only
+/// reports it; `ci-gate`'s jobs and rules are unchanged.
+#[test]
+fn revision_five_names_the_owner_approval_in_its_operator_steps() {
+    let steps = setup::remote_obligations().join("\n");
+    for said in [
+        "a candidate never judges itself with its own gate",
+        "run as they exist at the base",
+        "Every re-render of the profile, and every change to a file of the authority set, therefore needs the owner's approval once",
+        "judged by the base's revision-4 ci-gate, which reports the authority change and does not block it",
+        "procedural",
+        "a pull request that changes the authority set (revision 5)",
+    ] {
+        assert!(steps.contains(said), "{said}: {steps}");
+    }
+    let policy = setup::jobs();
+    assert_eq!(policy.as_object().unwrap().len(), 4);
+    assert_eq!(
+        policy["review-exception"]["pull_request"],
+        "owner-exception"
+    );
+    assert_eq!(policy["review-exception"]["merge_group"], "inapplicable");
+    let rule = setup::authority_rule();
+    assert_eq!(rule["exception_environment"], setup::EXCEPTION_ENVIRONMENT);
 }
