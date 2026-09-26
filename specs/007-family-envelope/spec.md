@@ -148,6 +148,12 @@ which now also asserts section 3.1 on each answer (the header, `outcome` and
 `exitCode` agreeing, exactly one of `report` and `error`, a kind from the
 set). `tests/family_envelope.rs` adds the one test that runs all 42 operations.
 
+**2026-09-26: a usage error with no operation words names `unknown`.** Section
+3.3 names the words as typed when they do not name an operation, but `--json`
+alone has no operation word to copy. The stable non-empty name is `unknown`.
+It claims no operation and keeps the envelope valid; a test exercises both
+that JSON invocation and the unchanged no-argument human invocation.
+
 ## Verification
 
 Each line is one command. The binary tests spawn the built executable, because
@@ -157,5 +163,5 @@ property of a process.
 ```verify:cli
 cargo test -p statecraft-cli --lib render::
 cargo test -p statecraft-cli --test family_envelope
-cargo test -p statecraft-cli --test json_naming
+cargo test -p statecraft-cli --tests
 ```

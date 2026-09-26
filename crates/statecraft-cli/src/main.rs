@@ -44,7 +44,12 @@ fn run(args: &[String]) -> i32 {
                     .take(2)
                     .map(String::as_str)
                     .collect();
-                print!("{}", usage_envelope(&typed.join("."), &e.describe()));
+                let verb = if typed.is_empty() {
+                    "unknown".to_string()
+                } else {
+                    typed.join(".")
+                };
+                print!("{}", usage_envelope(&verb, &e.describe()));
             } else {
                 eprint!("{}", e.describe());
             }

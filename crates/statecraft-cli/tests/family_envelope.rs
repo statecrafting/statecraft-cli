@@ -83,8 +83,17 @@ fn a_usage_error_under_json_is_an_envelope_on_stdout_and_text_without_it() {
     assert_eq!(v["verb"], "frob.nicate");
     assert_eq!(v["outcome"], "usage");
 
+    // With no operation words there is no spelling to copy. The stable name
+    // is `unknown`, never an empty member that violates the envelope.
+    let absent = run_in(dir.path(), &["--json"]);
+    assert_eq!(code(&absent), 3);
+    assert!(absent.stderr.is_empty());
+    let v = json_naming::from_output(&absent.stdout).unwrap();
+    assert_eq!(v["verb"], "unknown");
+    assert_eq!(v["error"]["kind"], "usage");
+
     // Without --json nothing changes: text on stderr, stdout empty.
-    for args in [&["run", "list"][..], &["frob", "nicate"][..]] {
+    for args in [&["run", "list"][..], &["frob", "nicate"][..], &[][..]] {
         let human = run_in(dir.path(), args);
         assert_eq!(code(&human), 3);
         assert!(human.stdout.is_empty(), "{args:?}");

@@ -21,7 +21,7 @@
     "id": "007-family-envelope",
     "implementation": "in-progress",
     "sectionDigests": {
-      "007-the-family-envelope": "bd88118ce8ae917fc7e4c6c7ef5bdd07d610355dc7a3ca9ac09dd5b2ba78a1c3",
+      "007-the-family-envelope": "99f859d717bf6ea863001c7080fb6236732677823c0d3a27a041f806f3b3eed6",
       "1-purpose": "25ce849e05ad8d70773d2c2ad81a6eb453d262d6bda2f93b1875e03b40174469",
       "2-territory": "3d2c1e8f2d618f24fd9983eda189f296e1728ac19dbcffc0f9b559c56c090371",
       "3-1-the-envelope": "a3d7487e9ec8ed8312518b0069c9f67b503d838fee46a2cc82f6c848e18f22ab",
@@ -30,8 +30,8 @@
       "3-4-what-does-not-change": "2767b32e501e0d537c96022cdc8f909faf6c240ad330d97c395ca8c85d5af045",
       "3-behavior": "78caa5f928f050f457baaeb2c4355c4a9760dc6b9ce17a804fceb319dec81cc5",
       "4-out-of-scope": "94d737fab1c790836b9b452415ee407ed858a6cdc09dcae36f5ef3814da2282a",
-      "5-decisions-recorded-during-implementation": "1a8ba044584e21f9f82420b3585838e296bb888fb4536dcb18cf4ac38784a669",
-      "verification": "76e875dff00b006fa24f843270e77f2f61ecb167890a4d5e769171f933e89991"
+      "5-decisions-recorded-during-implementation": "7099ac72902ce3fe457daa8f98060b4a13d7fd4e8250ffb0ba5a3327fcb20463",
+      "verification": "5d8b795e3efdf5bf7a8e3436e21f21d3e35217d55f2278c9b9660181a8ab3a8e"
     },
     "sectionHeadings": [
       "007: The family envelope",
@@ -51,6 +51,6 @@
     "summary": "Amends 006 sections 3.3 and 3.4. Every --json answer this product writes becomes the envelope spec-spine has written since 0.26.0 (its spec 132 section 3.4): schemaVersion, tool, verb, outcome, exitCode, summary, then report for exit 0 or 1 and error for 2, 3 or 4, where error.kind is one of the family's ten tokens. No exit number moves. A usage error under --json is an envelope on stdout. The replacement of 002 section 3.23's check translation, which #118 proposed for the same change, is left to the spec-spine 0.28.0 adoption, which changes the producer answer it would read. Replaces the section 5 proposal of #118, which the amendment model adopted on 2026-09-25 (001 section 5) no longer admits.\n",
     "title": "The family envelope: every --json answer in the exit and JSON contract spec-spine speaks"
   },
-  "shardHash": "c0693feb78f4238c41e3c94e95cef89bcc14b932a0cb023465282a2456f6347c",
+  "shardHash": "648d82b9aaf37e13ffb01a340d7977b8cd9e746b81e8961689b67232f5fef3d7",
   "specVersion": "1.9.0"
 }
