@@ -99,6 +99,58 @@ pub fn is_authored_input(rel_path: &str) -> bool {
         || rel_path == format!("{STANDARDS_DIR}/contract.md")
 }
 
+/// The bootstrap spec the producer returns: the one contract path that is a
+/// spec.
+pub fn bootstrap_path() -> String {
+    format!("{SPECS_DIR}/000-bootstrap/spec.md")
+}
+
+/// Another spec that already holds the ordinal `000` (spec 011 section 3.1):
+/// a directory `<specs_dir>/000-*` other than
+/// `000-bootstrap` that carries a `spec.md`. The first such path by name, or
+/// none. A second `000` spec would collide (spec-spine `V-004`), so the
+/// bootstrap spec is not scaffolded beside it.
+pub fn other_zero_spec(root: &std::path::Path) -> Option<String> {
+    let mut found: Vec<String> = std::fs::read_dir(root.join(SPECS_DIR))
+        .ok()?
+        .filter_map(|e| e.ok())
+        .filter_map(|e| e.file_name().into_string().ok())
+        .filter(|name| name.starts_with("000-") && name != "000-bootstrap")
+        .filter(|name| root.join(SPECS_DIR).join(name).join("spec.md").is_file())
+        .map(|name| format!("{SPECS_DIR}/{name}/spec.md"))
+        .collect();
+    found.sort();
+    found.into_iter().next()
+}
+
+/// The bootstrap spec as this product writes it (spec 011 section 3.2): the
+/// producer's bytes with the frontmatter's `status` set to `draft`, because a
+/// tool never ratifies a spec. A comment above the line says so. Bytes with
+/// no frontmatter `status`, or already `draft`, are returned unchanged.
+pub fn as_draft(contents: &str) -> String {
+    let mut out = String::with_capacity(contents.len() + 128);
+    let mut fences = 0;
+    for line in contents.split_inclusive('\n') {
+        if line.trim_end() == "---" {
+            fences += 1;
+        }
+        let in_frontmatter = fences == 1;
+        if in_frontmatter
+            && let Some(value) = line.strip_prefix("status:")
+            && value.split('#').next().unwrap_or("").trim() != "draft"
+        {
+            out.push_str(
+                "# Written as a draft by statecraft-cli init: ratifying a spec, setting\n\
+                 # its status to approved, is the owner's act and never a tool's.\n\
+                 status: draft\n",
+            );
+            continue;
+        }
+        out.push_str(line);
+    }
+    out
+}
+
 /// Build directories no project's resolver should walk.
 pub const BUILD_DIRS: [&str; 5] = ["target", "node_modules", "dist", "build", ".next"];
 /// The repository-local tool directory (`make tools` installs into it).
@@ -385,6 +437,53 @@ mod tests {
         assert_eq!(
             (p.name.as_str(), p.version.as_str(), p.checksum.as_str()),
             (PRODUCER_NAME, PRODUCER_VERSION, PRODUCER_CHECKSUM)
+        );
+    }
+
+    /// Spec 011 section 3.2: only the frontmatter's `status` changes.
+    #[test]
+    fn as_draft_changes_only_the_frontmatter_status() {
+        let approved = "---\nid: \"000-bootstrap\"\nstatus: approved\nimplementation: n-a\n---\n\nstatus: approved in the body stays\n";
+        let draft = as_draft(approved);
+        assert_eq!(
+            draft,
+            "---\nid: \"000-bootstrap\"\n# Written as a draft by statecraft-cli init: ratifying a spec, setting\n# its status to approved, is the owner's act and never a tool's.\nstatus: draft\nimplementation: n-a\n---\n\nstatus: approved in the body stays\n"
+        );
+        assert_eq!(as_draft(&draft), draft, "idempotent");
+        let commented = "---\nstatus: approved   # a comment\n---\n";
+        assert!(as_draft(commented).contains("\nstatus: draft\n"));
+        for unchanged in [
+            "---\nstatus: draft\n---\n",
+            "---\nstatus: draft # already\n---\n",
+            "no frontmatter\nstatus: approved\n",
+            "",
+        ] {
+            assert_eq!(as_draft(unchanged), unchanged);
+        }
+    }
+
+    #[test]
+    fn other_zero_spec_names_a_colliding_000_spec_only() {
+        let dir = tempfile::tempdir().unwrap();
+        let root = dir.path();
+        assert_eq!(other_zero_spec(root), None, "no specs directory");
+        let spec = |name: &str| {
+            std::fs::create_dir_all(root.join("specs").join(name)).unwrap();
+            std::fs::write(root.join("specs").join(name).join("spec.md"), "x").unwrap();
+        };
+        spec("000-bootstrap");
+        spec("001-first");
+        std::fs::create_dir_all(root.join("specs/000-empty")).unwrap();
+        assert_eq!(
+            other_zero_spec(root),
+            None,
+            "the bootstrap itself, a 001, an empty dir"
+        );
+        spec("000-zeta");
+        spec("000-alpha");
+        assert_eq!(
+            other_zero_spec(root).as_deref(),
+            Some("specs/000-alpha/spec.md")
         );
     }
 

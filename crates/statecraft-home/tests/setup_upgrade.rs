@@ -144,6 +144,7 @@ fn an_unmodified_file_is_replaced_and_a_customized_one_is_kept_with_three_digest
     );
 }
 
+const R8_GATE: &str = include_str!("support/profile-r8/gate.sh");
 const R7_AI_REVIEW: &str = include_str!("support/profile-r7/ai-review.sh");
 const R7_AI_REVIEW_WF: &str = include_str!("support/profile-r7/statecraft-ai-review.yml");
 const R7_CI: &str = include_str!("support/profile-r7/statecraft-ci.yml");
@@ -160,11 +161,25 @@ const R4_CI_GATE: &str = include_str!("support/profile-r4/ci-gate.sh");
 /// authority change, the commit walk runs each commit's own gate, and
 /// `ci-gate.sh` only reports an authority change. Only the templates matter
 /// to a managed upgrade.
+/// Revision 8 of the registered profile: the gate script as revision 8
+/// shipped it (main at 69b8b20), the one template revision 9 changed.
+fn revision_eight() -> Profile {
+    let mut r8 = Profile::registered();
+    assert_eq!(r8.revision, 9, "the registered profile is revision 9");
+    r8.revision = 8;
+    for t in &mut r8.templates {
+        if t.path == "scripts/statecraft/gate.sh" {
+            assert_ne!(t.body, R8_GATE, "{}: revision 9 changed it", t.path);
+            t.body = R8_GATE.to_string();
+        }
+    }
+    r8
+}
+
 /// Revision 7 of the registered profile: the three templates revision 8
 /// changed, exactly as revision 7 shipped them (main at 7293c03).
 fn revision_seven() -> Profile {
-    let mut r7 = Profile::registered();
-    assert_eq!(r7.revision, 8, "the registered profile is revision 8");
+    let mut r7 = revision_eight();
     r7.revision = 7;
     for t in &mut r7.templates {
         let body = match t.path.as_str() {
@@ -834,7 +849,7 @@ fn a_revision_seven_project_upgrades_to_revision_eight() {
     let before = std::fs::read_to_string(root.join(script)).unwrap();
     assert!(!before.contains("ANTHROPIC_API_KEY"), "{before}");
 
-    let r8 = Profile::registered();
+    let r8 = revision_eight();
     assert_ne!(r8.identity(), r7.identity());
     let block = manifest.project.setup.as_ref().unwrap().parameters.clone();
     let upgrade = plan_and_apply_with(root, &r8, &mut manifest, &block);
@@ -863,4 +878,71 @@ fn a_revision_seven_project_upgrades_to_revision_eight() {
     assert_eq!(manifest.project.setup.as_ref().unwrap().revision, 8);
     let steps = setup::remote_obligations().join("\n");
     assert!(steps.contains("ANTHROPIC_API_KEY"), "{steps}");
+}
+
+/// Spec 010: revision 9 adds `governance.fail_on_unresolved`. A revision-8
+/// project upgrading with its recorded block keeps the refusal (the default
+/// is `true`); a project that sets `false` renders `index check` without the
+/// flag; and a second apply of the same parameters writes nothing.
+#[test]
+fn a_revision_eight_project_upgrades_to_revision_nine() {
+    let gate = "scripts/statecraft/gate.sh";
+    for value in [None, Some(false)] {
+        let dir = project();
+        let root = dir.path();
+        let mut manifest = Manifest::new(Pins {
+            product: "0.0.0".into(),
+            spec_spine: "unpinned".into(),
+            adapters: Default::default(),
+            producer: None,
+        });
+        let r8 = revision_eight();
+        assert!(plan_and_apply_with(root, &r8, &mut manifest, &BTreeMap::new()).whole());
+        assert_eq!(manifest.project.setup.as_ref().unwrap().revision, 8);
+        let before = std::fs::read_to_string(root.join(gate)).unwrap();
+        assert!(!before.contains("FAIL_ON_UNRESOLVED"), "{before}");
+
+        let r9 = Profile::registered();
+        assert_ne!(r9.identity(), r8.identity());
+        let mut block = manifest.project.setup.as_ref().unwrap().parameters.clone();
+        if let Some(v) = value {
+            block.insert("governance.fail_on_unresolved".into(), serde_json::json!(v));
+        }
+        let upgrade = plan_and_apply_with(root, &r9, &mut manifest, &block);
+        assert!(upgrade.whole());
+        let file = upgrade.files.iter().find(|f| f.path == gate).unwrap();
+        assert_eq!(file.action, Action::Replace);
+        let after = std::fs::read_to_string(root.join(gate)).unwrap();
+        let on = value.unwrap_or(true);
+        assert!(
+            after.contains(&format!("\nFAIL_ON_UNRESOLVED={on}\n")),
+            "{after}"
+        );
+        // The rendered policy states the selection, and it differs by value:
+        // the gate script carries both branches of its runtime test, so the
+        // script's text alone cannot show which one a project selected.
+        let policy: serde_json::Value =
+            serde_json::from_str(&std::fs::read_to_string(root.join(setup::POLICY_PATH)).unwrap())
+                .unwrap();
+        let mut index_check = serde_json::json!([".tooling/bin/spec-spine", "index", "check"]);
+        if on {
+            index_check
+                .as_array_mut()
+                .unwrap()
+                .push(serde_json::json!("--fail-on-unresolved"));
+        }
+        assert_eq!(policy["commands"]["governance"][3], index_check, "{policy}");
+        assert_eq!(manifest.project.setup.as_ref().unwrap().revision, 9);
+
+        let again = plan_and_apply_with(root, &r9, &mut manifest, &block);
+        for f in &again.files {
+            assert!(
+                matches!(f.action, Action::Unchanged | Action::LeftAlone { .. }),
+                "{}: {:?}",
+                f.path,
+                f.action
+            );
+        }
+        assert_eq!(std::fs::read_to_string(root.join(gate)).unwrap(), after);
+    }
 }
