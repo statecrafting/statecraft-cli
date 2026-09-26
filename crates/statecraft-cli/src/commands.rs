@@ -365,10 +365,20 @@ pub fn usage_verb(args: &[String]) -> String {
     };
     if Verb::GROUPS.contains(first)
         && let Some(second) = words.get(1)
+        && operation_word(second)
     {
         return format!("{first}.{second}");
     }
     (*first).to_string()
+}
+
+/// Whether a token has the command tree's word shape rather than a path or
+/// another operand's shape.
+fn operation_word(word: &str) -> bool {
+    word.as_bytes().first().is_some_and(u8::is_ascii_lowercase)
+        && word
+            .bytes()
+            .all(|byte| byte.is_ascii_lowercase() || byte.is_ascii_digit() || byte == b'-')
 }
 
 /// What the caller asked for.
@@ -521,6 +531,9 @@ mod tests {
             usage_verb(&argv("env publish /tmp/project --json")),
             "env.publish"
         );
+        assert_eq!(usage_verb(&argv("project /tmp/project --json")), "project");
+        assert_eq!(usage_verb(&argv("project ./project --json")), "project");
+        assert_eq!(usage_verb(&argv("project tmp/project --json")), "project");
         assert_eq!(usage_verb(&argv("--json")), "unknown");
     }
 

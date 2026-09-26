@@ -222,10 +222,32 @@ fn envelope(verb: &str, exit: Exit, summary: &str, body: Body) -> Value {
 /// Canonical JSON: sorted keys (serde_json's map is ordered), two-space
 /// pretty-print and one trailing newline, as spec-spine writes its envelope.
 fn canonical(value: &Value) -> String {
-    let mut s = serde_json::to_string_pretty(value)
+    let mut s = serde_json::to_string_pretty(&sorted(value))
         .unwrap_or_else(|e| format!("{{\"error\":\"could not serialize the answer: {e}\"}}"));
     s.push('\n');
     s
+}
+
+/// Rebuild every object in lexical key order before rendering.
+///
+/// This is explicit rather than relying on `serde_json::Map`'s backing map:
+/// enabling serde_json's `preserve_order` feature must not change the family
+/// envelope's canonical bytes.
+fn sorted(value: &Value) -> Value {
+    match value {
+        Value::Object(map) => {
+            let mut entries: Vec<_> = map.iter().collect();
+            entries.sort_by_key(|(key, _)| *key);
+            Value::Object(
+                entries
+                    .into_iter()
+                    .map(|(key, value)| (key.clone(), sorted(value)))
+                    .collect(),
+            )
+        }
+        Value::Array(items) => Value::Array(items.iter().map(sorted).collect()),
+        value => value.clone(),
+    }
 }
 
 /// A usage error under `--json` (spec 007 section 3.3): the envelope on stdout,

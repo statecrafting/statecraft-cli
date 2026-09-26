@@ -90,6 +90,12 @@ fn a_usage_error_under_json_is_an_envelope_on_stdout_and_text_without_it() {
     let v = json_naming::from_output(&unknown.stdout).unwrap();
     assert_eq!(v["verb"], "env.publish");
 
+    // A missing subcommand does not turn the path operand into a verb word.
+    let unknown = run_in(dir.path(), &["project", "/tmp/project", "--json"]);
+    assert_eq!(code(&unknown), 3);
+    let v = json_naming::from_output(&unknown.stdout).unwrap();
+    assert_eq!(v["verb"], "project");
+
     // With no operation words there is no spelling to copy. The stable name
     // is `unknown`, never an empty member that violates the envelope.
     let absent = run_in(dir.path(), &["--json"]);
