@@ -240,6 +240,7 @@ fn session_payload_prints_the_bytes_and_their_identity() {
     // The bytes, not an envelope: held to the naming rule only.
     let reparsed: serde_json::Value = serde_json::from_str(&stdout(&human))
         .expect("the human rendering is the settings document itself");
+    json_naming::assert_conforms(&reparsed);
     assert!(reparsed["permissions"]["deny"].is_array());
 
     // It needs no target, which is the point of it taking no path.
