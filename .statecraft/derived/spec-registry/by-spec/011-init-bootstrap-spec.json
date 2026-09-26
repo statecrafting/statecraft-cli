@@ -1,0 +1,57 @@
+{
+  "record": {
+    "amends": [
+      "002-environment-lifecycle"
+    ],
+    "created": "2026-09-25",
+    "dependsOn": [
+      "000-bootstrap",
+      "001-boundaries-and-authority",
+      "002-environment-lifecycle"
+    ],
+    "extends": [
+      {
+        "nature": "corrective",
+        "spec": "002-environment-lifecycle",
+        "unit": {
+          "kind": "directory",
+          "path": "crates/statecraft-home/"
+        }
+      }
+    ],
+    "id": "011-init-bootstrap-spec",
+    "implementation": "in-progress",
+    "sectionDigests": {
+      "011-initialization-never-scaffolds-a-second-000-spec-and-never-writes-an-approved-one": "b899e84abdfca685159c74199a6687b1b8f48cc8aa1d032f12c4f69de8ccc74e",
+      "1-purpose": "318ee27022cb263f09494013c80a8f653bc7f3c411d977a09ffcd40da38e33fe",
+      "2-territory": "e99378eea96d806e5ef52c1b4d100c130e98420dcd2d90f8ee6501a728d5f9b6",
+      "3-1-no-second-000-spec": "df51f69fa9ffd4f7b056ad0c3cf21523161cb9e846af829da212d7a049ecb5d6",
+      "3-2-a-bootstrap-spec-this-product-writes-is-a-draft": "86243a1eee930e98a86961ee45c2cf6068032f40acc2f9c143c8371e205c48b3",
+      "3-3-a-stale-record-is-dropped": "8320a36aa743547c4d703da800fdab65be1242f0ea04ac7d4d01d62a1e0d20ef",
+      "3-4-observable-negative-cases": "f5386e32b0a44261ca958d6db230cc068f6141fef0c8e82f3c3e451938f40f0b",
+      "3-behavior": "66e294a4f4c7cb4ff01181adf223a56084e9a5c3997154d75142dc1baccbfff1",
+      "4-out-of-scope": "1412f582af694d908d08f55fe8e572d09cec6d69157ec4e7582bbaa1d3d40c78",
+      "5-decisions-recorded-during-implementation": "227325dcd8cfc9bf5852134564675f91ecc4957db1f4ce01f4c92999e26ff729",
+      "verification": "6a0f5d5745d622151345b202aec2631adc66ce9fdc773ca5f82557c1fd0a2251"
+    },
+    "sectionHeadings": [
+      "011: Initialization never scaffolds a second 000 spec and never writes an approved one",
+      "1. Purpose",
+      "2. Territory",
+      "3. Behavior",
+      "3.1 No second `000` spec",
+      "3.2 A bootstrap spec this product writes is a draft",
+      "3.3 A stale record is dropped",
+      "3.4 Observable negative cases",
+      "4. Out of scope",
+      "5. Decisions recorded during implementation",
+      "Verification"
+    ],
+    "specPath": "specs/011-init-bootstrap-spec/spec.md",
+    "status": "draft",
+    "summary": "Amends 002 section 3.15's reconciliation of the contract path <specs_dir>/000-bootstrap/spec.md. When the corpus already has another spec holding the ordinal 000, init does not scaffold the bootstrap spec and drops a stale managed record of one that is not on disk. When init does write the bootstrap spec, it writes it with status draft, because ratification is the owner's act and never a tool's. An existing 000-bootstrap spec is adopted and never rewritten, as before. A defect found by the travel-memory program in hiqlite #47 and rahi #90.\n",
+    "title": "Initialization never scaffolds a second 000 spec and never writes an approved one"
+  },
+  "shardHash": "7c48f7c9d0834f9bb83900a71de54b0f18e6e487597b46561f13a0918960fca8",
+  "specVersion": "1.9.0"
+}

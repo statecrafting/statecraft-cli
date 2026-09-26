@@ -1001,6 +1001,20 @@ fn preflight(ctx: &Context<'_>, now: &str, report: &mut Report) -> Result<Prepar
         project::managed_instructions(),
     ));
 
+    // Spec 011: the bootstrap spec is never scaffolded beside another `000`
+    // spec, and a bootstrap spec this product writes is a draft.
+    let bootstrap = producer::bootstrap_path();
+    let other_zero = producer::other_zero_spec(ctx.root);
+    if other_zero.is_some() {
+        managed.retain(|(path, _)| *path != bootstrap);
+    } else {
+        for (path, contents) in managed.iter_mut() {
+            if *path == bootstrap {
+                *contents = producer::as_draft(contents);
+            }
+        }
+    }
+
     // 3. reconcile, in memory. A contract path already on disk is ADOPTED:
     //    recorded with the digest observed, depended on, and never rewritten.
     let mut manifest = match Manifest::read(ctx.root) {
@@ -1021,6 +1035,26 @@ fn preflight(ctx: &Context<'_>, now: &str, report: &mut Report) -> Result<Prepar
             ));
         }
     };
+    // A record of a bootstrap spec an earlier initialization placed beside
+    // another `000` spec, and that is not on disk, is dropped: the path is no
+    // longer declared, and a record of an absent file would read as partial
+    // on every later apply.
+    let mut bootstrap_notes = Vec::new();
+    if let Some(existing) = &other_zero {
+        let stale = manifest
+            .entry(&bootstrap)
+            .is_some_and(|e| e.class == Class::Managed)
+            && !resolve(ctx.root, &bootstrap).exists();
+        if stale {
+            manifest.remove(&bootstrap);
+            bootstrap_notes.push(format!(
+                "{bootstrap}: its managed record is removed, the file is absent and {existing} is this corpus's 000 spec"
+            ));
+        }
+        bootstrap_notes.push(format!(
+            "{bootstrap}: not scaffolded, {existing} already holds the ordinal 000 and a second 000 spec would collide"
+        ));
+    }
     let adopted = step_reconcile(ctx, &managed, &mut manifest, now).map_err(|e| {
         failed(
             Step::Reconcile,
@@ -1053,6 +1087,7 @@ fn preflight(ctx: &Context<'_>, now: &str, report: &mut Report) -> Result<Prepar
     for kept in &computed.kept {
         report.kept.push(kept.describe());
     }
+    report.kept.extend(bootstrap_notes);
     for held in &computed.withheld {
         report
             .withheld
