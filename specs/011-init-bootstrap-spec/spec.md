@@ -144,6 +144,17 @@ governs them, not by a stub. `a_scaffolded_bootstrap_spec_is_a_draft` also
 asserts that the linked producer still answers `approved`, so it fails when
 section 3.2 stops having anything to do.
 
+**2026-09-26: a present bootstrap spec beside another `000` spec (the
+AI review of #167).** Sections 3.1 and 3.3 leave one combination implicit:
+another `000` spec exists and `000-bootstrap/spec.md` is on disk. The path is
+not declared (3.1), and a present file is never removed (3.3), so the file is
+neither rewritten nor removed and whatever record the declaration already
+holds for it is kept; an unrecorded one is not adopted. The apply is then not
+`complete`, but only because the compiler refuses the two `000` specs
+(`V-004`) in the corpus step, which names them for the operator.
+`a_present_bootstrap_spec_beside_another_000_spec_is_left_alone` holds each
+of these.
+
 **2026-09-25: the number `011`.** `007` is the draft in #165, `008` and `009`
 are named by spec `001` section 5's proposal for the split of `002`, and
 `010` is the draft in #166.

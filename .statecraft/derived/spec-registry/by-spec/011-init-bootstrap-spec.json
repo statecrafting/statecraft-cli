@@ -22,7 +22,7 @@
     "id": "011-init-bootstrap-spec",
     "implementation": "complete",
     "sectionDigests": {
-      "011-initialization-never-scaffolds-a-second-000-spec-and-never-writes-an-approved-one": "b899e84abdfca685159c74199a6687b1b8f48cc8aa1d032f12c4f69de8ccc74e",
+      "011-initialization-never-scaffolds-a-second-000-spec-and-never-writes-an-approved-one": "8afb91f5be2937e0ca5a8a9eaefaefe206a59230027ba23a6a70be625f0121d4",
       "1-purpose": "318ee27022cb263f09494013c80a8f653bc7f3c411d977a09ffcd40da38e33fe",
       "2-territory": "e99378eea96d806e5ef52c1b4d100c130e98420dcd2d90f8ee6501a728d5f9b6",
       "3-1-no-second-000-spec": "df51f69fa9ffd4f7b056ad0c3cf21523161cb9e846af829da212d7a049ecb5d6",
@@ -31,7 +31,7 @@
       "3-4-observable-negative-cases": "f5386e32b0a44261ca958d6db230cc068f6141fef0c8e82f3c3e451938f40f0b",
       "3-behavior": "66e294a4f4c7cb4ff01181adf223a56084e9a5c3997154d75142dc1baccbfff1",
       "4-out-of-scope": "1412f582af694d908d08f55fe8e572d09cec6d69157ec4e7582bbaa1d3d40c78",
-      "5-decisions-recorded-during-implementation": "227325dcd8cfc9bf5852134564675f91ecc4957db1f4ce01f4c92999e26ff729",
+      "5-decisions-recorded-during-implementation": "d205f1f2cc62ae3d00e0bb37280ae967ddd32d30e9b6ddc9abfae0ef22a6262d",
       "verification": "6a0f5d5745d622151345b202aec2631adc66ce9fdc773ca5f82557c1fd0a2251"
     },
     "sectionHeadings": [
@@ -52,6 +52,6 @@
     "summary": "Amends 002 section 3.15's reconciliation of the contract path <specs_dir>/000-bootstrap/spec.md. When the corpus already has another spec holding the ordinal 000, init does not scaffold the bootstrap spec and drops a stale managed record of one that is not on disk. When init does write the bootstrap spec, it writes it with status draft, because ratification is the owner's act and never a tool's. An existing 000-bootstrap spec is adopted and never rewritten, as before. A defect found by the travel-memory program in hiqlite #47 and rahi #90.\n",
     "title": "Initialization never scaffolds a second 000 spec and never writes an approved one"
   },
-  "shardHash": "1eaedea6983b31c966043ae4bc898064f796543229c93399558993ba97d73096",
+  "shardHash": "9412d153ee9c5902d537cf4360b64899db4e146532333011dc260dd4a56bed9b",
   "specVersion": "1.9.0"
 }

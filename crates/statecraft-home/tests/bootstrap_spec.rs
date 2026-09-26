@@ -88,7 +88,12 @@ fn a_scaffolded_bootstrap_spec_is_a_draft() {
     // Only the status line and the comment above it differ.
     let rest = |t: &str| {
         t.lines()
-            .filter(|l| !l.starts_with("status:") && !l.starts_with("# "))
+            .filter(|l| {
+                !l.starts_with("status:")
+                    && *l
+                        != "# Written as a draft by statecraft-cli init: ratifying a spec, setting"
+                    && *l != "# its status to approved, is the owner's act and never a tool's."
+            })
             .map(str::to_string)
             .collect::<Vec<_>>()
     };
@@ -183,4 +188,60 @@ fn an_existing_bootstrap_spec_is_adopted_and_never_rewritten() {
         report.adopted
     );
     assert_eq!(sandbox.read(BOOTSTRAP).unwrap(), mine);
+}
+
+/// Sections 3.1 and 3.3 together: a bootstrap spec already on disk beside
+/// another `000` spec is not declared, not rewritten and not removed, and its
+/// existing record is kept. The two `000` specs are the operator's to
+/// resolve; the apply is not partial because of them.
+#[test]
+fn a_present_bootstrap_spec_beside_another_000_spec_is_left_alone() {
+    let sandbox = Sandbox::new();
+    let (first, _) = apply(&sandbox);
+    assert_eq!(first.outcome, Outcome::Complete, "{:#?}", first.steps);
+    let written = sandbox.read(BOOTSTRAP).unwrap();
+    let recorded = Manifest::read(&sandbox.project())
+        .unwrap()
+        .unwrap()
+        .entry(BOOTSTRAP)
+        .cloned()
+        .expect("recorded by the first apply");
+
+    sandbox.write(OTHER, OTHER_TEXT);
+    let (report, _) = apply(&sandbox);
+    assert_eq!(sandbox.read(BOOTSTRAP).unwrap(), written, "never rewritten");
+    assert!(
+        !report.writes.contains(&BOOTSTRAP.to_string()),
+        "{:?}",
+        report.writes
+    );
+    assert!(
+        !report.withheld.iter().any(|w| w.starts_with(BOOTSTRAP)),
+        "{:?}",
+        report.withheld
+    );
+    assert!(
+        !report
+            .kept
+            .iter()
+            .any(|k| k.contains("managed record is removed")),
+        "a present file's record is kept: {:?}",
+        report.kept
+    );
+    let manifest = Manifest::read(&sandbox.project()).unwrap().unwrap();
+    assert_eq!(
+        manifest.entry(BOOTSTRAP),
+        Some(&recorded),
+        "the record is kept"
+    );
+    // The compiler, not this product, names the two 000 specs.
+    assert_ne!(report.outcome, Outcome::Complete, "{:#?}", report.steps);
+    assert!(
+        report
+            .steps
+            .iter()
+            .any(|s| format!("{:?}", s.state).contains("V-004")),
+        "{:#?}",
+        report.steps
+    );
 }
