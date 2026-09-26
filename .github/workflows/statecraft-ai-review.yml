@@ -1,12 +1,15 @@
-# Rendered by Statecraft from profile github-actions-rust revision 7
-# (identity 8ea41428995187dbd49555e5cddec56dd80beeda5f0f2213216d47b511f79f65). A managed file and a member of this
+# Rendered by Statecraft from profile github-actions-rust revision 8
+# (identity 14a4be033a3797f2cfb0a585b43415398a171a81b897b8c9104f6dcdbec5baee). A managed file and a member of this
 # repository's authority set. Called by statecraft-ci.yml only; it declares
-# the one credential it needs by name and is never given `secrets: inherit`.
+# the two credentials it may use by name (revision 8: the API key when set,
+# else the OAuth token) and is never given `secrets: inherit`.
 name: statecraft-ai-review
 
 on:
   workflow_call:
     secrets:
+      ANTHROPIC_API_KEY:
+        required: false
       CLAUDE_CODE_OAUTH_TOKEN:
         required: false
     outputs:
@@ -41,6 +44,7 @@ jobs:
       - name: Review
         id: review
         env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           GH_TOKEN: ${{ github.token }}
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
@@ -55,7 +59,7 @@ jobs:
           EXCLUDE: '.statecraft/derived'
           RELEASE_PATTERN: 'release/*'
           CLAUDE_CLI_VERSION: '2.1.116'
-          PROFILE_IDENTITY: '8ea41428995187dbd49555e5cddec56dd80beeda5f0f2213216d47b511f79f65'
+          PROFILE_IDENTITY: '14a4be033a3797f2cfb0a585b43415398a171a81b897b8c9104f6dcdbec5baee'
         run: |
           script="${RUNNER_TEMP}/statecraft-ai-review.sh"
           if git show "${BASE_SHA}:scripts/statecraft/ai-review.sh" > "$script" 2>/dev/null; then

@@ -1,5 +1,5 @@
-# Rendered by Statecraft from profile github-actions-rust revision 7
-# (identity 8ea41428995187dbd49555e5cddec56dd80beeda5f0f2213216d47b511f79f65). A managed file and a member of this
+# Rendered by Statecraft from profile github-actions-rust revision 8
+# (identity 14a4be033a3797f2cfb0a585b43415398a171a81b897b8c9104f6dcdbec5baee). A managed file and a member of this
 # repository's authority set: an edit here changes the gate that judges every
 # pull request, and `statecraft doctor` names it. The policy the aggregate gate
 # enforces is .statecraft/setup/github-actions-rust.json, read at the base.
@@ -229,7 +229,9 @@ jobs:
     permissions:
       contents: read
       pull-requests: write
+    # Revision 8: both credentials, by name; the review prefers the API key.
     secrets:
+      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
       CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
 
   # A release candidate whose review was skipped needs an owner exception,
