@@ -28,7 +28,7 @@
       }
     ],
     "id": "010-profile-unresolved-claims",
-    "implementation": "in-progress",
+    "implementation": "complete",
     "sectionDigests": {
       "010-a-project-decides-whether-governance-refuses-an-unresolved-claim": "ffe579deddc3aef66e2397d04e7e606636230bb3c79dfe8516229fa740c9efdb",
       "1-purpose": "1bc02c05db18e1064047761411872a417ce0a609c7c92b995ce42ee63b37d5bf",
@@ -60,6 +60,6 @@
     "summary": "Amends 002's setup profile (section 5, the setup-profile entry and the revision 4 entry). github-actions-rust revision 9 adds one boolean parameter, governance.fail_on_unresolved, default true. True renders what revision 8 renders: gate.sh governance runs index check with --fail-on-unresolved. False omits only that flag: index check still runs, names each unresolved claim and fails a stale or invalid index, and every other governance step is unchanged. It exists for a corpus that approves a spec before building it, where an approved spec's unbuilt claim is unresolved by design. Owner decision of 2026-09-25 (\"statecraft-cli switch\"), requested by the travel-memory program for Rahi.\n",
     "title": "Setup profile revision 9: a project decides whether governance refuses an unresolved claim"
   },
-  "shardHash": "5fdb7bb9bd013aa49a93f74eec69164f4aa371c19fa2f1f1ec33d2a7cdfa530d",
+  "shardHash": "66849837e9d2dd5d2a1225e8ddd66633233bd32594c381acb3b0b55b38ddb960",
   "specVersion": "1.9.0"
 }

@@ -2,7 +2,7 @@
 id: "010-profile-unresolved-claims"
 title: "Setup profile revision 9: a project decides whether governance refuses an unresolved claim"
 status: approved
-implementation: in-progress
+implementation: complete
 created: "2026-09-25"
 summary: >
   Amends 002's setup profile (section 5, the setup-profile entry and the
