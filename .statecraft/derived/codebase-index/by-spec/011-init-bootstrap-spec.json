@@ -30,8 +30,8 @@
       }
     ],
     "specId": "011-init-bootstrap-spec",
-    "specStatus": "draft"
+    "specStatus": "approved"
   },
   "schemaVersion": "1.2.0",
-  "shardHash": "7c48f7c9d0834f9bb83900a71de54b0f18e6e487597b46561f13a0918960fca8"
+  "shardHash": "2249ff8a8aa109501ba86f477830a4a48403f6859af6fe918cf22f87fdc0ca15"
 }

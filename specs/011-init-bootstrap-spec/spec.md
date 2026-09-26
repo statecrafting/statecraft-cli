@@ -1,7 +1,7 @@
 ---
 id: "011-init-bootstrap-spec"
 title: "Initialization never scaffolds a second 000 spec and never writes an approved one"
-status: draft
+status: approved
 implementation: in-progress
 created: "2026-09-25"
 summary: >
