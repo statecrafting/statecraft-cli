@@ -20,7 +20,7 @@
       }
     ],
     "id": "011-init-bootstrap-spec",
-    "implementation": "in-progress",
+    "implementation": "complete",
     "sectionDigests": {
       "011-initialization-never-scaffolds-a-second-000-spec-and-never-writes-an-approved-one": "b899e84abdfca685159c74199a6687b1b8f48cc8aa1d032f12c4f69de8ccc74e",
       "1-purpose": "318ee27022cb263f09494013c80a8f653bc7f3c411d977a09ffcd40da38e33fe",
@@ -52,6 +52,6 @@
     "summary": "Amends 002 section 3.15's reconciliation of the contract path <specs_dir>/000-bootstrap/spec.md. When the corpus already has another spec holding the ordinal 000, init does not scaffold the bootstrap spec and drops a stale managed record of one that is not on disk. When init does write the bootstrap spec, it writes it with status draft, because ratification is the owner's act and never a tool's. An existing 000-bootstrap spec is adopted and never rewritten, as before. A defect found by the travel-memory program in hiqlite #47 and rahi #90.\n",
     "title": "Initialization never scaffolds a second 000 spec and never writes an approved one"
   },
-  "shardHash": "2249ff8a8aa109501ba86f477830a4a48403f6859af6fe918cf22f87fdc0ca15",
+  "shardHash": "1eaedea6983b31c966043ae4bc898064f796543229c93399558993ba97d73096",
   "specVersion": "1.9.0"
 }

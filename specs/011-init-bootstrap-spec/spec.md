@@ -2,7 +2,7 @@
 id: "011-init-bootstrap-spec"
 title: "Initialization never scaffolds a second 000 spec and never writes an approved one"
 status: approved
-implementation: in-progress
+implementation: complete
 created: "2026-09-25"
 summary: >
   Amends 002 section 3.15's reconciliation of the contract path
