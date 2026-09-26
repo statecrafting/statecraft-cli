@@ -918,10 +918,20 @@ fn a_revision_eight_project_upgrades_to_revision_nine() {
             after.contains(&format!("\nFAIL_ON_UNRESOLVED={on}\n")),
             "{after}"
         );
-        assert!(
-            after.contains("spec_spine index check --fail-on-unresolved"),
-            "{after}"
-        );
+        // The rendered policy states the selection, and it differs by value:
+        // the gate script carries both branches of its runtime test, so the
+        // script's text alone cannot show which one a project selected.
+        let policy: serde_json::Value =
+            serde_json::from_str(&std::fs::read_to_string(root.join(setup::POLICY_PATH)).unwrap())
+                .unwrap();
+        let mut index_check = serde_json::json!([".tooling/bin/spec-spine", "index", "check"]);
+        if on {
+            index_check
+                .as_array_mut()
+                .unwrap()
+                .push(serde_json::json!("--fail-on-unresolved"));
+        }
+        assert_eq!(policy["commands"]["governance"][3], index_check, "{policy}");
         assert_eq!(manifest.project.setup.as_ref().unwrap().revision, 9);
 
         let again = plan_and_apply_with(root, &r9, &mut manifest, &block);

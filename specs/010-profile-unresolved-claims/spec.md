@@ -140,6 +140,15 @@ tests' spec-spine stub answers `index check` the same way.
 `governance.fail_on_unresolved` is the name the owner's request proposed, and
 it follows `governance.enforce_coverage`'s pattern of one boolean per refusal.
 
+**2026-09-26: the upgrade test reads the rendered policy, not the script
+(the AI review of #166).** The rendered `gate.sh` carries both branches of its
+runtime test whatever the value, so asserting that its text contains the
+flagged command was true for `false` as well and proved nothing.
+`a_revision_eight_project_upgrades_to_revision_nine` now asserts the rendered
+policy's `commands.governance[3]`, which differs by value; with `commands_for`
+forced to add the flag, the test fails. The rendered governance run itself is
+held by `fail_on_unresolved_false_omits_only_that_flag`.
+
 **2026-09-25: the number `010`.** `007` is taken by the draft in
 statecrafting/statecraft-cli#165, and `008` and `009` are named by spec `001`
 section 5's proposal for the split of `002`, so this spec takes the next free
