@@ -65,6 +65,7 @@ pub const GRANDFATHERED: &[Grandfathered] = &[
             "gate_each_commit",
             "require_signed_commits",
             "require_default_base",
+            "fail_on_unresolved",
         ],
     },
     Grandfathered {

@@ -32,9 +32,9 @@ case "$BASE_SHA" in 0000000000000000000000000000000000000000) BASE_SHA="" ;; esa
 # the copy that is running (the base's in CI), never the commit's own.
 SELF="$(cd "$(dirname "$0")" && pwd)/$(basename "$0")"
 
-# The project's governance parameters (revision 4, and FAIL_ON_UNRESOLVED from
-# revision 9, spec 010), rendered from its setup block. Each default keeps a
-# revision-3 project's behaviour except the base rule, which is a new refusal.
+# The project's governance parameters (revision 4), rendered from its setup
+# block. Each default keeps a revision-3 project's behaviour except the base
+# rule, which is a new refusal.
 DEFAULT_BRANCH='{{sc:default_branch}}'
 ENFORCE_COVERAGE={{sc:governance.enforce_coverage}}
 AUTHORED_CONTENT='{{sc:governance.authored_content}}'
@@ -42,7 +42,6 @@ AUTHORED_CONTENT_TEXT={{sc:governance.authored_content_text}}
 GATE_EACH_COMMIT={{sc:governance.gate_each_commit}}
 REQUIRE_SIGNED_COMMITS={{sc:governance.require_signed_commits}}
 REQUIRE_DEFAULT_BASE={{sc:governance.require_default_base}}
-FAIL_ON_UNRESOLVED={{sc:governance.fail_on_unresolved}}
 
 usage() {
   echo "usage: gate.sh governance|code|couple|couple-group|base|text|commits|pin" >&2
@@ -219,15 +218,7 @@ case "$MODE" in
       # claim them.
       spec_spine index coverage
     fi
-    if [ "$FAIL_ON_UNRESOLVED" = true ]; then
-      spec_spine index check --fail-on-unresolved
-    else
-      # Reported, not refused (governance.fail_on_unresolved is false, spec
-      # 010): a corpus that approves a spec before building it has an
-      # unresolved claim by design. `index check` still runs, so a stale or
-      # invalid index still fails, and each unresolved claim is named.
-      spec_spine index check
-    fi
+    spec_spine index check --fail-on-unresolved
     if [ -n "$AUTHORED_CONTENT" ]; then
       authored_content
       run_authored
