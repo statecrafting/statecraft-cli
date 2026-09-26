@@ -361,6 +361,7 @@ pub fn assert_envelope(v: &Value) {
     let code = v["exitCode"]
         .as_u64()
         .unwrap_or_else(|| panic!("no exitCode: {v}")) as usize;
+    assert!(code < words.len(), "exitCode outside the family table: {v}");
     assert_eq!(
         v["outcome"], words[code],
         "outcome and exitCode disagree: {v}"
@@ -402,7 +403,10 @@ pub fn assert_envelope(v: &Value) {
 pub fn payload(v: &Value) -> &Value {
     match v.get("report") {
         Some(report) => report,
-        None => &v["error"]["details"],
+        None => v
+            .get("error")
+            .and_then(|error| error.get("details"))
+            .unwrap_or_else(|| panic!("envelope has no report or error.details: {v}")),
     }
 }
 
