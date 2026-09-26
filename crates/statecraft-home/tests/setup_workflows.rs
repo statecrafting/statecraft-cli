@@ -1864,6 +1864,23 @@ case "$*" in
     else
       echo "every file is traced"
     fi ;;
+  "index check"*)
+    # As spec-spine 0.26.0 and 0.27.0 answer (spec 010 section 5): an
+    # unresolved claim is a W-001 warning that only the flag refuses; a
+    # stale index fails with or without it.
+    if [ -f STALE ]; then
+      echo "index is STALE"
+      exit 1
+    elif [ -f UNRESOLVED ]; then
+      case "$*" in
+        *--fail-on-unresolved*)
+          echo "index is fresh; --fail-on-unresolved refuses (1 warning(s), 0 error(s): 1 W-001)"
+          exit 1 ;;
+        *) echo "index is fresh (1 warning(s), 0 error(s): 1 W-001)" ;;
+      esac
+    else
+      echo "index is fresh"
+    fi ;;
 esac
 exit 0
 "#;
@@ -2087,6 +2104,92 @@ fn coverage_enforced_refuses_an_untraced_file_and_reported_does_not() {
             assert!(calls.contains("index coverage"), "{calls}");
         }
     }
+}
+
+/// Spec 010: `governance.fail_on_unresolved` decides only whether `index
+/// check` carries `--fail-on-unresolved`. Its default refuses an unresolved
+/// claim; `false` reports it, runs every other governance step exactly as the
+/// default does, and still fails a stale index.
+#[test]
+fn fail_on_unresolved_false_omits_only_that_flag() {
+    let declared = ("governance.authored_content", serde_json::json!(DECLARED));
+    let steps = |params: &[(&str, serde_json::Value)], marker: &str| {
+        let gov = Gov::new(params);
+        write(gov.root(), marker, "");
+        let head = git(gov.root(), &["rev-parse", "HEAD"]);
+        let ran = run_gov(&gov, "Governance", &event("push", &head), |_| {});
+        let calls: Vec<String> = ran
+            .stub_file("spec-spine-calls")
+            .unwrap_or_default()
+            .lines()
+            .filter_map(|l| l.split_once(" | ").map(|(_, args)| args.to_string()))
+            .filter(|args| args != "--version")
+            .collect();
+        (ran, calls)
+    };
+
+    let (default, by_default) = steps(std::slice::from_ref(&declared), "UNRESOLVED");
+    assert_eq!(default.exit, 1, "{}", default.text);
+    assert!(
+        default.text.contains("--fail-on-unresolved refuses"),
+        "{}",
+        default.text
+    );
+    let (on, with_true) = steps(
+        &[
+            declared.clone(),
+            ("governance.fail_on_unresolved", serde_json::json!(true)),
+        ],
+        "UNRESOLVED",
+    );
+    assert_eq!(on.exit, 1, "{}", on.text);
+    assert_eq!(with_true, by_default, "true is the default");
+    assert!(
+        with_true
+            .iter()
+            .any(|c| c == "index check --fail-on-unresolved"),
+        "{with_true:?}"
+    );
+
+    let off = [
+        declared.clone(),
+        ("governance.fail_on_unresolved", serde_json::json!(false)),
+    ];
+    let (ran, with_false) = steps(&off, "UNRESOLVED");
+    assert_eq!(ran.exit, 0, "{}", ran.text);
+    assert!(
+        ran.text.contains("1 W-001"),
+        "the claim is still reported: {}",
+        ran.text
+    );
+    assert!(ran.text.contains("authored file(s) clean"), "{}", ran.text);
+    assert!(
+        !with_false
+            .iter()
+            .any(|c| c.contains("--fail-on-unresolved")),
+        "{with_false:?}"
+    );
+    let expected: Vec<String> = with_true
+        .iter()
+        .map(|c| c.replace(" --fail-on-unresolved", ""))
+        .collect();
+    assert_eq!(with_false, expected, "every other step is unchanged");
+    for step in [
+        "check --fail-on-warn",
+        "lint --fail-on-warn",
+        "index coverage",
+        "index check",
+    ] {
+        assert!(
+            with_false.iter().any(|c| c == step),
+            "{step}: {with_false:?}"
+        );
+    }
+
+    // A stale index still fails with the flag off: `index check` still runs.
+    let (stale, _) = steps(&off, "STALE");
+    assert_eq!(stale.exit, 1, "{}", stale.text);
+    assert!(stale.text.contains("index is STALE"), "{}", stale.text);
 }
 
 /// Rule 2: a declared authored-content script is required, and runs; an

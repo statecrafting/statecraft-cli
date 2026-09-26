@@ -1,0 +1,65 @@
+{
+  "record": {
+    "amends": [
+      "002-environment-lifecycle"
+    ],
+    "created": "2026-09-25",
+    "dependsOn": [
+      "001-boundaries-and-authority",
+      "002-environment-lifecycle",
+      "006-command-surface"
+    ],
+    "extends": [
+      {
+        "nature": "additive",
+        "spec": "002-environment-lifecycle",
+        "unit": {
+          "kind": "directory",
+          "path": "crates/statecraft-home/"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "006-command-surface",
+        "unit": {
+          "kind": "directory",
+          "path": "crates/statecraft-cli/"
+        }
+      }
+    ],
+    "id": "010-profile-unresolved-claims",
+    "implementation": "complete",
+    "sectionDigests": {
+      "010-a-project-decides-whether-governance-refuses-an-unresolved-claim": "5ba16f7ddb1e816976534d0a1b1bf236f6313f0d2b2d31a56baa86bb4f2756f2",
+      "1-purpose": "1bc02c05db18e1064047761411872a417ce0a609c7c92b995ce42ee63b37d5bf",
+      "2-territory": "548de78e44a3b1667302c0cc7943186099a0181dfb098d642b89f3d83de4262b",
+      "3-1-the-parameter": "882519d0958eac8ce310648047f8fe36729e8510205c8edebec3c672c712ef66",
+      "3-2-what-it-selects": "677393166bff5b853445c3b4c8762fc3dcabb04c1190bd8b396156c4d333eb95",
+      "3-3-the-revision": "a861e04c1dea874d1eb1d2d221fc97209b487b8b7fee820a386cb0b96d6fddb0",
+      "3-4-observable-negative-cases": "4f18e6f981f0e2bdc55184054367b182260614dd34dc9b65d7fb8ee74934bcfe",
+      "3-behavior": "88ed37c7f396a760b95f60e8146f891cc843298e003379723a647f55a1c3b80e",
+      "4-out-of-scope": "28567e74a68ea99ce039ccdcd4f1fcedd7cca0b21eb3f767e0efff9e1a544417",
+      "5-decisions-recorded-during-implementation": "6aff80c54c079cd7bfc63634bb6ae328c22d63419b5012d030bd007f90fab93f",
+      "verification": "f1c5820dc57261a61688b80d15e10dfeabd52105df46e65ae41647169499067b"
+    },
+    "sectionHeadings": [
+      "010: A project decides whether governance refuses an unresolved claim",
+      "1. Purpose",
+      "2. Territory",
+      "3. Behavior",
+      "3.1 The parameter",
+      "3.2 What it selects",
+      "3.3 The revision",
+      "3.4 Observable negative cases",
+      "4. Out of scope",
+      "5. Decisions recorded during implementation",
+      "Verification"
+    ],
+    "specPath": "specs/010-profile-unresolved-claims/spec.md",
+    "status": "approved",
+    "summary": "Amends 002's setup profile (section 5, the setup-profile entry and the revision 4 entry). github-actions-rust revision 9 adds one boolean parameter, governance.fail_on_unresolved, default true. True renders what revision 8 renders: gate.sh governance runs index check with --fail-on-unresolved. False omits only that flag: index check still runs, names each unresolved claim and fails a stale or invalid index, and every other governance step is unchanged. It exists for a corpus that approves a spec before building it, where an approved spec's unbuilt claim is unresolved by design. Owner decision of 2026-09-25 (\"statecraft-cli switch\"), requested by the travel-memory program for Rahi.\n",
+    "title": "Setup profile revision 9: a project decides whether governance refuses an unresolved claim"
+  },
+  "shardHash": "c2c61894c1f4a2641fee9345944eab8fa1d3fc81feca6cd69baf6c0390f5c619",
+  "specVersion": "1.9.0"
+}

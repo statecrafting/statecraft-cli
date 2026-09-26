@@ -35,7 +35,7 @@ use std::path::Path;
 /// The one registered profile.
 pub const PROFILE_ID: &str = "github-actions-rust";
 /// Its revision.
-pub const REVISION: u32 = 8;
+pub const REVISION: u32 = 9;
 /// Where the rendered policy document lives in the target.
 pub const POLICY_PATH: &str = ".statecraft/setup/github-actions-rust.json";
 /// The resume record, under the project's runtime state.
@@ -262,22 +262,22 @@ pub fn commands() -> serde_json::Value {
 }
 
 /// The command selections a project's parameters make (revision 4): coverage
-/// enforced or reported, and the declared authored-content script, if any.
+/// enforced or reported, an unresolved claim refused or reported (revision 9,
+/// spec 010), and the declared authored-content script, if any.
 pub fn commands_for(p: &Parameters) -> serde_json::Value {
     let mut coverage = vec![".tooling/bin/spec-spine", "index", "coverage"];
     if p.enforce_coverage {
         coverage.push("--fail-on-untraced");
     }
+    let mut index_check = vec![".tooling/bin/spec-spine", "index", "check"];
+    if p.fail_on_unresolved {
+        index_check.push("--fail-on-unresolved");
+    }
     let mut governance = vec![
         serde_json::json!([".tooling/bin/spec-spine", "check", "--fail-on-warn"]),
         serde_json::json!([".tooling/bin/spec-spine", "lint", "--fail-on-warn"]),
         serde_json::json!(coverage),
-        serde_json::json!([
-            ".tooling/bin/spec-spine",
-            "index",
-            "check",
-            "--fail-on-unresolved"
-        ]),
+        serde_json::json!(index_check),
     ];
     if let Some(script) = &p.authored_content {
         governance.push(serde_json::json!([script]));
@@ -336,6 +336,7 @@ pub fn remote_obligations() -> Vec<String> {
         "the upgrade from revision 4 to 5 is one pull request judged by the base's revision-4 ci-gate, which reports the authority change and does not block it, so the owner's approval of that pull request is procedural: approve it before merging (revision 5)".to_string(),
         "revision 6: every file under .github/workflows/ is in the authority set, rendered or not, so adding, changing or removing any workflow needs the owner's approval once; a workflow the profile does not render could otherwise report a check named ci-gate".to_string(),
         "revision 7: every rendered script exits in one family contract, 0 ok, 1 finding, 2 refused, 3 usage, 4 failed; a missing spec-spine or a missing declared authored-content script now refuses with 2, a usage error is 3, and a command that broke is 4. A job the project must keep required is declared in ci.extra_required_jobs as a reusable workflow under .github/workflows/ (on: workflow_call); ci-gate needs it and blocks on failed, cancelled and skipped exactly as for its own jobs".to_string(),
+        "revision 9: governance.fail_on_unresolved (default true) decides whether gate.sh governance runs index check with --fail-on-unresolved; set it to false only in a corpus that approves specs before it builds them, where an approved spec's unbuilt claim is unresolved by design: index check still runs and reports each such claim, and every other governance check is unchanged (spec 010)".to_string(),
         "a repository that already runs these checks by hand keeps them by setting governance.enforce_coverage (index coverage --fail-on-untraced), governance.authored_content (the script's path; absent or not executable refuses), governance.authored_content_text (the title, the body and every commit message), governance.gate_each_commit (each commit's tree passes the gate and cargo fmt) and governance.require_signed_commits (each commit verified as signed by GitHub) (revision 4)".to_string(),
     ]
 }
@@ -371,6 +372,9 @@ pub struct Parameters {
     /// `governance.require_default_base`: a pull request whose base is not
     /// the default branch fails governance (rule 5).
     pub require_default_base: bool,
+    /// `governance.fail_on_unresolved`: `index check` refuses an unresolved
+    /// claim rather than reporting it (revision 9, spec 010).
+    pub fail_on_unresolved: bool,
     /// `ci.extra_required_jobs`: jobs beyond the profile's that ci-gate
     /// requires, each a call of the project's own reusable workflow
     /// (revision 7).
@@ -493,6 +497,7 @@ impl Parameters {
             gate_each_commit: false,
             require_signed_commits: false,
             require_default_base: true,
+            fail_on_unresolved: true,
             extra_required_jobs: Vec::new(),
         }
     }
@@ -529,6 +534,7 @@ pub fn parameters(
             "governance.gate_each_commit" => p.gate_each_commit = flag(key, value)?,
             "governance.require_signed_commits" => p.require_signed_commits = flag(key, value)?,
             "governance.require_default_base" => p.require_default_base = flag(key, value)?,
+            "governance.fail_on_unresolved" => p.fail_on_unresolved = flag(key, value)?,
             "ci.extra_required_jobs" => p.extra_required_jobs = extra_required_jobs(root, value)?,
             "governance.authored_content" => {
                 let v = value
@@ -1316,6 +1322,7 @@ pub fn plan(inputs: &Inputs<'_>) -> Result<Plan, String> {
             "governance.require_default_base",
             params.require_default_base,
         ),
+        ("governance.fail_on_unresolved", params.fail_on_unresolved),
     ] {
         values.insert(name, on.to_string());
     }
@@ -2198,6 +2205,7 @@ mod tests {
             "governance.gate_each_commit",
             "governance.require_signed_commits",
             "governance.require_default_base",
+            "governance.fail_on_unresolved",
         ] {
             assert!(with(&[(key, serde_json::json!("yes"))]).is_err(), "{key}");
         }
@@ -2231,6 +2239,50 @@ mod tests {
             ])
         );
         assert_eq!(c["governance"][4], serde_json::json!(["scripts/check.sh"]));
+    }
+
+    /// Spec 010: `governance.fail_on_unresolved` defaults to `true`, and
+    /// `false` drops only `--fail-on-unresolved` from the policy's commands.
+    #[test]
+    fn fail_on_unresolved_is_a_boolean_that_defaults_to_true() {
+        let dir = tempfile::tempdir().unwrap();
+        let with = |value: Option<serde_json::Value>| {
+            let m: BTreeMap<String, serde_json::Value> = value
+                .map(|v| ("governance.fail_on_unresolved".to_string(), v))
+                .into_iter()
+                .collect();
+            parameters(dir.path(), &m, ".statecraft/derived")
+        };
+        let d = with(None).unwrap();
+        assert!(d.fail_on_unresolved);
+        assert_eq!(with(Some(serde_json::json!(true))).unwrap(), d);
+        for bad in [
+            serde_json::json!("false"),
+            serde_json::json!(0),
+            serde_json::Value::Null,
+        ] {
+            let err = with(Some(bad)).unwrap_err();
+            assert!(err.contains("must be true or false"), "{err}");
+        }
+        let off = with(Some(serde_json::json!(false))).unwrap();
+        assert!(!off.fail_on_unresolved);
+        let (on, off) = (commands_for(&d), commands_for(&off));
+        assert_eq!(
+            on["governance"][3],
+            serde_json::json!([
+                ".tooling/bin/spec-spine",
+                "index",
+                "check",
+                "--fail-on-unresolved"
+            ])
+        );
+        assert_eq!(
+            off["governance"][3],
+            serde_json::json!([".tooling/bin/spec-spine", "index", "check"])
+        );
+        let mut rest = on.clone();
+        rest["governance"][3] = off["governance"][3].clone();
+        assert_eq!(rest, off, "nothing else in the selections moves");
     }
 
     #[test]
