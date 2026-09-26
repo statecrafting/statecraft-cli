@@ -32,6 +32,25 @@ use std::path::Path;
 /// paragraph assumes one can).
 pub const TRANSFER_SOURCE: &str = "operator-transfer";
 
+/// The exact template source written by Statecraft governance initialization.
+///
+/// Rule 5 uses this identity for the one fresh-write exception after an
+/// explicitly released governance path was deleted. No other template source
+/// receives that exception.
+pub const GOVERNANCE_SOURCE: &str = "statecraft-governance";
+
+/// Whether `path` is one of the closed governance-template paths spec 002
+/// section 3.15 says this product can write as a file.
+fn governance_contract_path(path: &str) -> bool {
+    matches!(
+        path,
+        "spec-spine.toml"
+            | "standards/spec/constitution.md"
+            | "standards/spec/contract.md"
+            | "specs/000-bootstrap/spec.md"
+    ) || path.starts_with("standards/spec/templates/")
+}
+
 /// The word every record carries beside the operator's name: supplied, never
 /// authenticated (rule 4).
 pub const OPERATOR_PROVENANCE: &str = "operator-supplied";
@@ -998,7 +1017,8 @@ pub fn latest<'m>(manifest: &'m Manifest, path: &str) -> Option<&'m TransferReco
 /// change to ownership: a move to `managed` whose entry `env remove` then
 /// removed (whether or not a file is at the path again since), and a move to
 /// `user` whose file was deleted and which `env apply` then wrote afresh (a
-/// `managed` entry from an adapter, carrying no `transfer`). Beyond the
+/// `managed` entry from an adapter, carrying no `transfer`), or the same exact
+/// fresh-write shape for a Statecraft governance template. Beyond the
 /// classes, a journal whose identities repeat, or whose reversal names a
 /// record not before it, is itself malformed.
 pub fn disagreements(manifest: &Manifest) -> Vec<String> {
@@ -1034,7 +1054,9 @@ pub fn disagreements(manifest: &Manifest) -> Vec<String> {
             && entry.is_some_and(|e| {
                 e.class == Class::Managed
                     && e.transfer.is_none()
-                    && e.source.kind == SourceKind::Adapter
+                    && (e.source.kind == SourceKind::Adapter
+                        || (e.source.kind == SourceKind::Template
+                            && e.source.identity == GOVERNANCE_SOURCE))
             });
         if removed_by_env_remove || rewritten_by_env_apply {
             continue;
@@ -1092,6 +1114,24 @@ fn resulting_entry(
             transfer: None,
         }),
         Ownership::Managed => {
+            if governance_contract_path(path) {
+                return Ok(Some(ResultingEntry {
+                    class: Class::Managed,
+                    source: Source {
+                        kind: SourceKind::Template,
+                        identity: GOVERNANCE_SOURCE.to_string(),
+                    },
+                    digest: digest.to_string(),
+                    bytes,
+                    transfer: Some(crate::manifest::Transfer {
+                        from: Claimant::Path {
+                            path: path.to_string(),
+                        },
+                        digest_at_transfer: digest.to_string(),
+                        evaluated_against: Some(ctx.producer.to_string()),
+                    }),
+                }));
+            }
             let Some(adapter) = ctx.adapter_for(path) else {
                 return refuse(
                     RefusalKind::NoSource,

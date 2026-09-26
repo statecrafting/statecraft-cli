@@ -49,7 +49,7 @@ use std::path::Path;
 /// this product's own templates. The name exists so spec 002's plan, which is
 /// where every withholding rule lives, can be reused without restating one of
 /// them here.
-pub const GOVERNANCE_SOURCE: &str = "statecraft-governance";
+pub const GOVERNANCE_SOURCE: &str = statecraft_environment::transfer::GOVERNANCE_SOURCE;
 
 /// How `spec-spine` is asked about a corpus.
 ///
@@ -592,6 +592,9 @@ impl Report {
         for path in &self.adopted {
             out.push_str(&format!("adopt      {path}\n"));
         }
+        for kept in &self.kept {
+            out.push_str(&format!("keep       {kept}\n"));
+        }
         if self.mode == Mode::Plan {
             for path in &self.writes {
                 out.push_str(&format!("would write {path}\n"));
@@ -925,6 +928,8 @@ struct Prepared {
     starter: producer::Starter,
     manifest: Manifest,
     adopted: Vec<String>,
+    preserved_user: Vec<String>,
+    recovered: Vec<String>,
     computed: statecraft_environment::plan::Plan,
     ignore: IgnorePlan,
     bridge: bridge::Plan,
@@ -1055,12 +1060,17 @@ fn preflight(ctx: &Context<'_>, now: &str, report: &mut Report) -> Result<Prepar
             "{bootstrap}: not scaffolded, {existing} already holds the ordinal 000 and a second 000 spec would collide"
         ));
     }
-    let adopted = step_reconcile(ctx, &managed, &mut manifest, now).map_err(|e| {
-        failed(
+    let reconciled = step_reconcile(ctx, &managed, &mut manifest, now).map_err(|e| match e {
+        ReconcileStop::Read(e) => failed(
             Step::Reconcile,
             e.to_string(),
             "the project could not be read",
-        )
+        ),
+        ReconcileStop::Journal(reason) => StepReport::new(
+            Step::Reconcile,
+            StepState::Refused { reason },
+            "the transfer journal disagrees with the declaration",
+        ),
     })?;
 
     // 4. governance. Which paths are written and which are withheld is spec
@@ -1089,10 +1099,25 @@ fn preflight(ctx: &Context<'_>, now: &str, report: &mut Report) -> Result<Prepar
     }
     report.kept.extend(bootstrap_notes);
     for held in &computed.withheld {
+        if reconciled.released(&held.path) {
+            continue;
+        }
         report
             .withheld
             .push(format!("{}: {}", held.path, held.reason.describe()));
     }
+    report.kept.extend(
+        reconciled
+            .preserved_user
+            .iter()
+            .map(|path| format!("{path}: user-transfer-preserved")),
+    );
+    report.kept.extend(
+        reconciled
+            .recovered
+            .iter()
+            .map(|path| format!("{path}: inferred-adoption-recovered")),
+    );
 
     // The setup profile, planned beside the governance plan and from the
     // same reconciliation. A parameter it refuses, or an approved plan that
@@ -1163,7 +1188,9 @@ fn preflight(ctx: &Context<'_>, now: &str, report: &mut Report) -> Result<Prepar
         tools,
         starter,
         manifest,
-        adopted,
+        adopted: reconciled.adopted,
+        preserved_user: reconciled.preserved_user,
+        recovered: reconciled.recovered,
         computed,
         ignore,
         bridge: bridge_plan,
@@ -1313,6 +1340,8 @@ fn run(ctx: &Context<'_>, mode: Mode) -> Report {
         starter,
         mut manifest,
         adopted,
+        preserved_user,
+        recovered,
         computed,
         ignore,
         bridge: bridge_plan,
@@ -1373,7 +1402,12 @@ fn run(ctx: &Context<'_>, mode: Mode) -> Report {
     report.steps.push(StepReport::new(
         Step::Reconcile,
         StepState::Done,
-        format!("{} existing file(s) adopted, none rewritten", adopted.len()),
+        format!(
+            "{} existing file(s) adopted, {} explicit user transfer(s) preserved, {} inferred adoption(s) recovered; no file rewritten",
+            adopted.len(),
+            preserved_user.len(),
+            recovered.len()
+        ),
     ));
 
     // 4. governance.
@@ -1433,6 +1467,7 @@ fn run(ctx: &Context<'_>, mode: Mode) -> Report {
     let conflicts: Vec<&str> = computed
         .withheld
         .iter()
+        .filter(|held| !preserved_user.contains(&held.path) && !recovered.contains(&held.path))
         .filter(|held| !matches!(held.reason, Withholding::Adopted))
         .map(|held| held.path.as_str())
         .collect();
@@ -1670,14 +1705,63 @@ fn step_home(
         .map_err(|e| e.to_string())
 }
 
+#[derive(Debug, Default)]
+struct Reconciled {
+    adopted: Vec<String>,
+    preserved_user: Vec<String>,
+    recovered: Vec<String>,
+}
+
+impl Reconciled {
+    fn released(&self, path: &str) -> bool {
+        self.preserved_user.iter().any(|p| p == path) || self.recovered.iter().any(|p| p == path)
+    }
+}
+
+#[derive(Debug)]
+enum ReconcileStop {
+    Read(std::io::Error),
+    Journal(String),
+}
+
+impl From<std::io::Error> for ReconcileStop {
+    fn from(value: std::io::Error) -> Self {
+        Self::Read(value)
+    }
+}
+
 fn step_reconcile(
     ctx: &Context<'_>,
     managed: &[(String, String)],
     manifest: &mut Manifest,
     now: &str,
-) -> std::io::Result<Vec<String>> {
-    let mut adopted = Vec::new();
+) -> Result<Reconciled, ReconcileStop> {
+    let mut out = Reconciled::default();
     for (path, _) in managed {
+        if statecraft_environment::transfer::latest(manifest, path)
+            .is_some_and(|record| record.to == statecraft_environment::transfer::Ownership::User)
+        {
+            let exact_legacy = manifest.entry(path).is_some_and(|entry| {
+                entry.class == Class::Adopted
+                    && entry.source.kind == SourceKind::Template
+                    && entry.source.identity == GOVERNANCE_SOURCE
+                    && entry.transfer.is_none()
+            });
+            if exact_legacy {
+                manifest.remove(path);
+                out.recovered.push(path.clone());
+            }
+            if !resolve(ctx.root, path).exists() {
+                continue;
+            }
+            if manifest.records(path) {
+                continue;
+            }
+            if !exact_legacy {
+                out.preserved_user.push(path.clone());
+            }
+            continue;
+        }
         if manifest.records(path) {
             continue;
         }
@@ -1697,9 +1781,13 @@ fn step_reconcile(
             transfer: None,
             role: Default::default(),
         });
-        adopted.push(path.clone());
+        out.adopted.push(path.clone());
     }
-    Ok(adopted)
+    let disagreements = statecraft_environment::transfer::disagreements(manifest);
+    if !disagreements.is_empty() {
+        return Err(ReconcileStop::Journal(disagreements.join("; ")));
+    }
+    Ok(out)
 }
 
 fn governance_declaration(managed: &[(String, String)]) -> Declaration {
@@ -1739,12 +1827,14 @@ fn perform_writes(
     let identity = producer.identity().describe();
     for write in &computed.writes {
         let target = resolve(root, &write.path);
+        let released_rewrite = statecraft_environment::transfer::latest(manifest, &write.path)
+            .is_some_and(|record| record.to == statecraft_environment::transfer::Ownership::User);
         let entry = Entry {
             path: write.path.clone(),
             class: Class::Managed,
             source: Source {
                 kind: SourceKind::Template,
-                identity: if write.path == project::INSTRUCTIONS {
+                identity: if write.path == project::INSTRUCTIONS || released_rewrite {
                     GOVERNANCE_SOURCE.to_string()
                 } else {
                     identity.clone()
