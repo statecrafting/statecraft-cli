@@ -105,17 +105,17 @@ if [ "$1" = --version ]; then /bin/cat "$(dirname "$0")/version"; exit 0; fi
     let output = run(&["run", root, "fixture", "--json"]);
     assert_eq!(output.status.code(), Some(0), "{output:?}");
     let answer: Value = json_naming::from_output(&output.stdout).unwrap();
-    assert_eq!(answer["value"]["outcome"], "completed");
+    assert_eq!(answer["report"]["outcome"], "completed");
     assert_eq!(
-        answer["value"]["posture"]["value"]["qualification"], expected,
+        answer["report"]["posture"]["value"]["qualification"], expected,
         "missing or incorrect adapter qualification in successful run: {answer}"
     );
     assert_eq!(
-        answer["value"]["posture"]["from_record"],
+        answer["report"]["posture"]["from_record"],
         "attempt#fixture/1"
     );
     let manifest = statecraft_adapter_claude_code::manifest();
-    let posture = &answer["value"]["posture"]["value"];
+    let posture = &answer["report"]["posture"]["value"];
     assert_eq!(posture["adapter"], manifest.adapter);
     assert_eq!(posture["adapter_version"], manifest.version);
     assert_eq!(
@@ -161,9 +161,9 @@ if [ "$1" = --version ]; then /bin/cat "$(dirname "$0")/version"; exit 0; fi
     let shown = run(&["run", "show", root, "fixture", "--json"]);
     assert_eq!(shown.status.code(), Some(0), "{shown:?}");
     let shown: Value = json_naming::from_output(&shown.stdout).unwrap();
-    assert_eq!(shown["value"]["posture"]["value"], *posture);
+    assert_eq!(shown["report"]["posture"]["value"], *posture);
     assert_eq!(
-        shown["value"]["posture"]["from_record"],
+        shown["report"]["posture"]["from_record"],
         "attempt#fixture/2"
     );
     let shown = run(&["run", "show", root, "fixture"]);

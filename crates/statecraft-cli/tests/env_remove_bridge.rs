@@ -131,7 +131,7 @@ fn json(o: &Output) -> serde_json::Value {
 }
 
 fn withheld_reasons(o: &Output) -> Vec<String> {
-    json(o)["value"]["withheld"]
+    json(o)["report"]["withheld"]
         .as_array()
         .map(|a| {
             a.iter()
@@ -176,7 +176,7 @@ fn env_remove_takes_back_the_bridge_init_apply_recorded_and_keeps_the_users_file
     let out = sandbox.remove();
 
     assert!(
-        !serde_json::to_string(&json(&out)["value"]["withheld"])
+        !serde_json::to_string(&json(&out)["report"]["withheld"])
             .unwrap()
             .contains("AGENTS.md"),
         "{out:?}"
@@ -188,7 +188,7 @@ fn env_remove_takes_back_the_bridge_init_apply_recorded_and_keeps_the_users_file
     );
     assert!(sandbox.manifest().unwrap().modifications.is_empty());
     assert!(
-        json(&out)["value"]["written"]
+        json(&out)["report"]["written"]
             .as_array()
             .unwrap()
             .iter()
@@ -291,7 +291,7 @@ fn env_remove_leaves_a_bridge_it_has_no_record_of_and_notes_it() {
 
     assert_eq!(code(&out), 0, "a note is not a finding: {out:?}");
     assert!(
-        json(&out)["value"]["notes"][0]
+        json(&out)["report"]["notes"][0]
             .as_str()
             .unwrap()
             .contains("records no bridge"),
@@ -353,7 +353,7 @@ fn env_remove_never_takes_a_line_init_found_already_first() {
 
     assert_eq!(sandbox.agents(), Some(user), "{out:?}");
     assert!(
-        json(&out)["value"]["notes"][0]
+        json(&out)["report"]["notes"][0]
             .as_str()
             .unwrap()
             .contains("records no bridge"),
@@ -485,7 +485,7 @@ fn env_remove_withholds_a_drifted_managed_path_removes_the_rest_and_writes_the_m
     let out = sandbox.remove();
 
     assert_eq!(code(&out), 1, "{out:?}");
-    let value = &json(&out)["value"];
+    let value = &json(&out)["report"];
     assert_eq!(value["outcome"], "partial");
     assert_eq!(value["written"], serde_json::json!(["clean.md"]));
     assert_eq!(value["withheld"][0]["path"], "dirty.md");

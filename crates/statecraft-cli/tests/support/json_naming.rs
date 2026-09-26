@@ -329,12 +329,86 @@ pub fn assert_conforms(value: &Value) {
 pub fn from_output(bytes: &[u8]) -> serde_json::Result<Value> {
     let v: Value = serde_json::from_slice(bytes)?;
     assert_conforms(&v);
+    assert_envelope(&v);
     Ok(v)
+}
+
+/// The family `error.kind` tokens (spec 007 section 3.2), spelled out here
+/// rather than read from the crate, so a token the crate adds fails a test.
+pub const ERROR_KINDS: [&str; 10] = [
+    "validation",
+    "stale",
+    "not-found",
+    "drift",
+    "refused",
+    "config",
+    "io",
+    "schema",
+    "usage",
+    "internal",
+];
+
+/// Spec 007 section 3.1, held on every answer a binary test parses: the
+/// header, `outcome` and `exitCode` naming one exit, and exactly one of
+/// `report` (0 or 1) and `error` (2, 3 or 4) with a kind from the closed set.
+pub fn assert_envelope(v: &Value) {
+    let words = ["ok", "finding", "refused", "usage", "failed"];
+    assert_eq!(v["schemaVersion"], "1.0.0", "not the family envelope: {v}");
+    assert_eq!(v["tool"], "statecraft-cli", "{v}");
+    assert!(v["verb"].as_str().is_some_and(|s| !s.is_empty()), "{v}");
+    assert!(v["summary"].is_string(), "{v}");
+    let code = v["exitCode"]
+        .as_u64()
+        .unwrap_or_else(|| panic!("no exitCode: {v}")) as usize;
+    assert_eq!(
+        v["outcome"], words[code],
+        "outcome and exitCode disagree: {v}"
+    );
+    let keys: Vec<&str> = v.as_object().unwrap().keys().map(String::as_str).collect();
+    for k in &keys {
+        assert!(
+            [
+                "schemaVersion",
+                "tool",
+                "verb",
+                "outcome",
+                "exitCode",
+                "summary",
+                "report",
+                "error"
+            ]
+            .contains(k),
+            "a member outside the envelope, {k}: {v}"
+        );
+    }
+    if code <= 1 {
+        assert!(v.get("report").is_some() && v.get("error").is_none(), "{v}");
+    } else {
+        assert!(v.get("report").is_none(), "{v}");
+        let kind = v["error"]["kind"]
+            .as_str()
+            .unwrap_or_else(|| panic!("no error.kind: {v}"));
+        assert!(
+            ERROR_KINDS.contains(&kind),
+            "error.kind outside the set: {v}"
+        );
+        assert!(v["error"]["message"].is_string(), "{v}");
+    }
+}
+
+/// What the answer carries beside its header: `report` for 0 and 1, and
+/// `error.details` for 2, 3 and 4, for a helper that serves both.
+pub fn payload(v: &Value) -> &Value {
+    match v.get("report") {
+        Some(report) => report,
+        None => &v["error"]["details"],
+    }
 }
 
 /// Parse `--json` output from text, and hold it to the convention.
 pub fn from_text(text: &str) -> serde_json::Result<Value> {
     let v: Value = serde_json::from_str(text)?;
     assert_conforms(&v);
+    assert_envelope(&v);
     Ok(v)
 }

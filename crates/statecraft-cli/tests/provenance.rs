@@ -117,12 +117,12 @@ impl Fixture {
 
     fn init(&self) -> (i32, serde_json::Value) {
         let (exit, v) = self.json(&["init", "apply", &self.root()]);
-        (exit, v["value"]["value"].clone())
+        (exit, v["report"]["value"].clone())
     }
 
     fn doctor(&self) -> (i32, serde_json::Value) {
         let (exit, v) = self.json(&["doctor", &self.root()]);
-        (exit, v["value"].clone())
+        (exit, v["report"].clone())
     }
 
     fn declaration(&self) -> serde_json::Value {
@@ -414,7 +414,7 @@ fn initialization_selects_spec_spine_by_the_one_variable() {
         &[("SPEC_SPINE_BIN", &alt_s)],
     );
     let v: serde_json::Value = serde_json::from_slice(&out.stdout).unwrap();
-    let observed = &v["value"]["value"]["observedSpecSpine"];
+    let observed = &v["report"]["value"]["observedSpecSpine"];
     assert_eq!(observed["foundBy"], "path", "{v}");
     assert_eq!(
         observed["program"],
@@ -428,7 +428,7 @@ fn initialization_selects_spec_spine_by_the_one_variable() {
         &[("STATECRAFT_SPEC_SPINE", &alt_s)],
     );
     let v: serde_json::Value = serde_json::from_slice(&out.stdout).unwrap();
-    let observed = &v["value"]["value"]["observedSpecSpine"];
+    let observed = &v["report"]["value"]["observedSpecSpine"];
     assert_eq!(observed["foundBy"], "override", "{v}");
     assert_eq!(observed["program"], alt_s);
     let seen = std::fs::read_to_string(&calls).unwrap_or_default();

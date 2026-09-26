@@ -146,7 +146,7 @@ impl Sandbox {
     fn plan_id(&self, path: &str) -> String {
         let out = self.plan(&[path]);
         let value = json(&out);
-        value["value"]["named"]
+        json_naming::payload(&value)["named"]
             .as_array()
             .unwrap()
             .iter()
@@ -198,7 +198,7 @@ fn a_replacement_for_an_adapter_that_does_not_claim_is_refused_and_writes_nothin
     let planned = sandbox.plan(&[".claude/statecraft/instructions.md"]);
     assert_eq!(code(&planned), 2, "{planned:?}");
     assert!(
-        json(&planned)["value"]["refusals"][0]
+        json_naming::payload(&json(&planned))["refusals"][0]
             .as_str()
             .unwrap()
             .contains("does not claim its paths"),
@@ -292,7 +292,13 @@ mod claiming {
         let out = sandbox.run(&["env", "upgrade", &sandbox.root(), "--json"]);
 
         assert_eq!(code(&out), 1, "{out:?}");
-        assert_eq!(json(&out)["value"]["withheld"].as_array().unwrap().len(), 2);
+        assert_eq!(
+            json_naming::payload(&json(&out))["withheld"]
+                .as_array()
+                .unwrap()
+                .len(),
+            2
+        );
         assert_eq!(sandbox.snapshot(), before, "nothing replaced implicitly");
     }
 
@@ -303,7 +309,8 @@ mod claiming {
 
         let out = sandbox.plan(&[INSTRUCTIONS]);
 
-        let named = &json(&out)["value"]["named"][0];
+        let answer = json(&out);
+        let named = &json_naming::payload(&answer)["named"][0];
         assert_eq!(named["state"], "replace", "{out:?}");
         assert_eq!(
             named["found"],
@@ -337,7 +344,10 @@ mod claiming {
             recorded_digest(&sandbox, INSTRUCTIONS),
             statecraft_environment::digest::digest_bytes(&declared(INSTRUCTIONS))
         );
-        assert_eq!(json(&out)["value"]["named"][0]["state"], "replace");
+        assert_eq!(
+            json_naming::payload(&json(&out))["named"][0]["state"],
+            "replace"
+        );
     }
 
     #[test]
@@ -364,7 +374,7 @@ mod claiming {
 
         assert_eq!(code(&out), 2, "{out:?}");
         assert!(
-            json(&out)["value"]["reasons"][0]
+            json_naming::payload(&json(&out))["reasons"][0]
                 .as_str()
                 .unwrap()
                 .contains("stale plan"),
@@ -438,7 +448,7 @@ mod claiming {
         let again = sandbox.apply("apply", &[(INSTRUCTIONS, &a), (POINTER, &b)]);
 
         assert_eq!(code(&again), 0, "{again:?}");
-        let named = json(&again)["value"]["named"].clone();
+        let named = json_naming::payload(&json(&again))["named"].clone();
         assert_eq!(named[0]["state"], "already-satisfied", "{again:?}");
         assert_eq!(named[1]["state"], "already-satisfied", "{again:?}");
         assert_eq!(sandbox.read(INSTRUCTIONS), files);
@@ -482,7 +492,7 @@ mod claiming {
 
         assert!(code(&out) <= 1, "{out:?}");
         assert_eq!(
-            json(&out)["value"]["named"][0]["state"],
+            json_naming::payload(&json(&out))["named"][0]["state"],
             "already-satisfied"
         );
         assert_eq!(
@@ -525,7 +535,7 @@ mod claiming {
 
         assert_eq!(code(&out), 1, "{out:?}");
         assert_eq!(
-            json(&out)["value"]["swept"],
+            json_naming::payload(&json(&out))["swept"],
             serde_json::json!([".statecraft/state/replace/12345-0.tmp"])
         );
         assert!(

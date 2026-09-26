@@ -13,7 +13,7 @@
 //! owning crate's internal type is not it.
 
 use crate::exit::Exit;
-use crate::render::Answer;
+use crate::render::{Answer, ErrorKind};
 use serde::Serialize;
 use statecraft_acceptance::judged::NoAcceptance;
 use statecraft_acceptance::outcome::{
@@ -191,7 +191,15 @@ pub fn report_error_answer(e: &ReportError) -> Answer<String> {
         // from one state, which is a precondition, and nothing was done.
         ReportError::Disagreement { .. } | ReportError::Moved { .. } => Exit::Refused,
     };
-    Answer::new(e.to_string(), exit, e.to_string())
+    // Spec 007 section 3.2: the producer's own class, passed through. A stale
+    // ledger is `stale`, a report that does not have the shape read is
+    // `schema`; every other refusal is `refused`.
+    let kind = match e {
+        ReportError::LedgerStale { .. } => ErrorKind::Stale,
+        ReportError::MissingField { .. } | ReportError::Unreadable { .. } => ErrorKind::Schema,
+        _ => ErrorKind::Refused,
+    };
+    Answer::new(e.to_string(), exit, e.to_string()).with_kind(kind)
 }
 
 /// A concluded attempt, as the JSON contract carries it.

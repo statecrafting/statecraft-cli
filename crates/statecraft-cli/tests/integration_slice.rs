@@ -153,10 +153,14 @@ fn work_list_against_a_real_corpus_names_the_report_each_field_came_from() {
         return;
     }
     let parsed: serde_json::Value = json_naming::from_text(&stdout(&out)).expect("valid json");
-    let rows = parsed["value"]["eligible"].as_array().unwrap();
-    let excluded = parsed["value"]["excluded"].as_array().unwrap();
+    let rows = json_naming::payload(&parsed)["eligible"]
+        .as_array()
+        .unwrap();
+    let excluded = json_naming::payload(&parsed)["excluded"]
+        .as_array()
+        .unwrap();
     assert!(
-        !parsed["value"]["specSpineVersion"]
+        !json_naming::payload(&parsed)["specSpineVersion"]
             .as_str()
             .unwrap_or_default()
             .is_empty(),
@@ -293,10 +297,13 @@ fn accept_on_a_refused_attempt_is_not_attempted_with_the_count_and_no_receipt() 
     let parsed: serde_json::Value = json_naming::from_text(&stdout(&out)).expect("valid json");
     // The wire shape here is spec 005's own `Acceptance`, which that crate
     // derives and that spec fixed; see spec 006 section 5.
-    assert_eq!(parsed["value"]["acceptance"], "not-attempted");
-    assert_eq!(parsed["value"]["reason"], "attempt-refused");
-    assert_eq!(parsed["value"]["refusal_count"], 1);
-    assert!(parsed["value"].get("receipt").is_none(), "no receipt");
+    assert_eq!(json_naming::payload(&parsed)["acceptance"], "not-attempted");
+    assert_eq!(json_naming::payload(&parsed)["reason"], "attempt-refused");
+    assert_eq!(json_naming::payload(&parsed)["refusal_count"], 1);
+    assert!(
+        json_naming::payload(&parsed).get("receipt").is_none(),
+        "no receipt"
+    );
 }
 
 // Row 8: the agent claims success and the suite fails.
@@ -375,7 +382,7 @@ fn every_new_verb_refuses_an_unregistered_target_and_renders_the_same_value_eith
         assert_eq!(code(&h), code(&j), "{args:?}: the same exit either way");
         let parsed: serde_json::Value = json_naming::from_text(&stdout(&j)).expect("valid json");
         assert!(
-            parsed["value"]
+            parsed["error"]["message"]
                 .as_str()
                 .unwrap_or_default()
                 .contains("not registered"),

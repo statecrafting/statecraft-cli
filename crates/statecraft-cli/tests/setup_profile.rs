@@ -197,7 +197,7 @@ impl Fixture {
         );
         let answer: serde_json::Value =
             json_naming::from_output(&out.stdout).unwrap_or_else(|e| panic!("{e}: {text}"));
-        let report = answer["value"]["value"].clone();
+        let report = json_naming::payload(&answer)["value"].clone();
         (out.status.code().unwrap(), report, text)
     }
 
@@ -699,7 +699,7 @@ fn doctor_remote(f: &Fixture, mode: &str) -> (serde_json::Value, String, String)
     let answer: serde_json::Value =
         json_naming::from_output(&out.stdout).unwrap_or_else(|e| panic!("{e}: {text}"));
     let calls = std::fs::read_to_string(bin.join("gh-calls")).unwrap_or_default();
-    (answer["value"]["setup"].clone(), calls, text)
+    (json_naming::payload(&answer)["setup"].clone(), calls, text)
 }
 
 fn applied_with_remote() -> Fixture {

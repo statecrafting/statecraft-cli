@@ -324,7 +324,7 @@ fn the_preflight_runs_the_run_path_and_reads_its_startup_evidence_back() {
     assert_eq!(read("09-run.status"), "exit 0\n");
     assert_eq!(read("09-startup-show.status"), "exit 1\n");
     let shown: serde_json::Value = json_naming::from_text(&read("09-startup-show.out")).unwrap();
-    let v = &shown["value"]["value"];
+    let v = &shown["report"]["value"];
     assert_eq!(v["verdict"], "unverified");
     let required = v["intent"]["requiredHarness"].as_str().unwrap();
     assert_eq!(v["intent"]["selected"]["digest"], required);

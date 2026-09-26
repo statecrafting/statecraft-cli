@@ -135,30 +135,30 @@ esac
         "{output:?}"
     );
     let answer: serde_json::Value = json_naming::from_output(&output.stdout).unwrap();
-    assert_eq!(answer["value"]["outcome"], expected);
-    assert_eq!(answer["value"]["adapterClaimed"], claim);
-    assert_eq!(answer["value"]["refusals"], refusals);
+    assert_eq!(answer["report"]["outcome"], expected);
+    assert_eq!(answer["report"]["adapterClaimed"], claim);
+    assert_eq!(answer["report"]["refusals"], refusals);
     // Spec 006 section 3.4 permits additive fields. The original seven stay,
     // the run exposes its recorded posture alongside them, and section 3.11.3
     // adds its startup evidence, and spec 003 section 3.1.3 the contract the
     // attempt was bound to (this stub producer has no closures, so
     // `unsupported`).
-    assert_eq!(answer["value"].as_object().unwrap().len(), 10);
-    assert_eq!(answer["value"]["contract"]["state"], "unsupported");
+    assert_eq!(answer["report"].as_object().unwrap().len(), 10);
+    assert_eq!(answer["report"]["contract"]["state"], "unsupported");
     // This fixture holds no manifest, so it is not a managed session and
     // records no startup evidence, and the answer says so rather than
     // claiming a record (spec 002 section 3.31).
-    assert_eq!(answer["value"]["startup"]["managed"], false);
+    assert_eq!(answer["report"]["startup"]["managed"], false);
     assert_eq!(
-        answer["value"]["startup"]["record"],
+        answer["report"]["startup"]["record"],
         serde_json::Value::Null
     );
     assert_eq!(
-        answer["value"]["posture"]["value"]["qualification"],
+        answer["report"]["posture"]["value"]["qualification"],
         "unqualified"
     );
 
-    let workspace = Path::new(answer["value"]["workspaceRetained"].as_str().unwrap());
+    let workspace = Path::new(answer["report"]["workspaceRetained"].as_str().unwrap());
     let cwd = std::fs::read_to_string(workspace.join("child-cwd")).unwrap();
     assert_eq!(
         Path::new(cwd.trim()).canonicalize().unwrap(),
@@ -198,7 +198,7 @@ esac
     );
     assert_eq!(outcome.detail["harnessStanding"], "unrequired");
     let posture = &outcome.detail["posture"];
-    assert_eq!(*posture, answer["value"]["posture"]["value"]);
+    assert_eq!(*posture, answer["report"]["posture"]["value"]);
     assert_eq!(posture["qualification"], "unqualified");
     assert_eq!(posture["applied"], outcome.detail["applied"]);
     let evidence = &outcome.detail["execution"];
@@ -249,7 +249,7 @@ esac
         let accepted = run(&["accept", root, "replay", "--json"]);
         assert_eq!(accepted.status.code(), Some(1), "{accepted:?}");
         let answer: serde_json::Value = json_naming::from_output(&accepted.stdout).unwrap();
-        assert_eq!(answer["value"]["reason"], format!("attempt-{expected}"));
+        assert_eq!(answer["report"]["reason"], format!("attempt-{expected}"));
     }
 }
 

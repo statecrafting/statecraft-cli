@@ -10,7 +10,7 @@
 //! error nobody asked for is a failure (4).
 
 use crate::exit::Exit;
-use crate::render::Answer;
+use crate::render::{Answer, ErrorKind};
 use serde::Serialize;
 use statecraft_environment::adapter::Readiness;
 use statecraft_environment::apply::{ApplyError, Outcome};
@@ -159,7 +159,8 @@ pub fn project_set_armed(
         }
         // The target is not registered: a precondition, so a refusal.
         Err(e @ RegistryError::NotRegistered(_)) => {
-            Err(Answer::new(e.to_string(), Exit::Refused, e.to_string()))
+            Err(Answer::new(e.to_string(), Exit::Refused, e.to_string())
+                .with_kind(ErrorKind::NotFound))
         }
         Err(e) => Err(Answer::new(e.to_string(), Exit::Failed, e.to_string())),
     }
@@ -719,7 +720,7 @@ pub fn unregistered_answer(path: &Path) -> Answer<String> {
         path.display(),
         path.display()
     );
-    Answer::new(detail.clone(), Exit::Refused, detail)
+    Answer::new(detail.clone(), Exit::Refused, detail).with_kind(ErrorKind::NotFound)
 }
 
 /// The refusal a path gets when two registrations name its directory.

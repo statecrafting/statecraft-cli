@@ -273,8 +273,8 @@ impl Fixture {}
 fn assert_refused_at_planning(f: &Fixture, out: &Output) -> Value {
     assert_eq!(code(out), 2, "{}", text(out));
     let v = json_of(out);
-    assert_eq!(v["value"]["guard"], "posture-coverage", "{v}");
-    assert_eq!(v["value"]["phase"], "planning", "{v}");
+    assert_eq!(v["error"]["details"]["guard"], "posture-coverage", "{v}");
+    assert_eq!(v["error"]["details"]["phase"], "planning", "{v}");
     assert!(f.entries().is_empty(), "an attempt was appended");
     assert_eq!(f.launches(), 0, "a provider was launched");
     v
@@ -307,7 +307,7 @@ fn an_undeclared_program_the_suite_names_is_refused_at_planning_naming_it() {
     let f = Fixture::new(&["cargo test --workspace --locked", "git status"], None);
     let out = f.run();
     let v = assert_refused_at_planning(&f, &out);
-    let coverage = &v["value"]["coverage"];
+    let coverage = &json_naming::payload(&v)["coverage"];
     assert_eq!(coverage["verdict"], "refused", "{coverage}");
     assert_eq!(coverage["missing"][0]["program"], "cargo");
     assert_eq!(
@@ -315,7 +315,7 @@ fn an_undeclared_program_the_suite_names_is_refused_at_planning_naming_it() {
         json!(["cargo test --workspace --locked"])
     );
     assert_eq!(coverage["declaration"]["state"], "absent");
-    let reason = v["value"]["reason"].as_str().unwrap();
+    let reason = json_naming::payload(&v)["reason"].as_str().unwrap();
     assert!(reason.contains("`cargo`"), "{reason}");
     assert!(reason.contains("project.commands"), "{reason}");
     assert!(!reason.contains("`git`"), "{reason}");
@@ -343,7 +343,7 @@ fn a_declared_program_covers_the_suite_and_run_show_renders_the_record() {
     let out = f.run();
     assert_eq!(code(&out), 0, "{}", text(&out));
     let v = json_of(&out);
-    let coverage = &v["value"]["posture"]["value"]["coverage"];
+    let coverage = &json_naming::payload(&v)["posture"]["value"]["coverage"];
     assert_eq!(coverage["verdict"], "direct", "{coverage}");
     assert_eq!(coverage["spec"], RUN);
     assert_eq!(coverage["baseCommit"], f.head());
@@ -389,7 +389,7 @@ fn a_declared_program_covers_the_suite_and_run_show_renders_the_record() {
     let shown = f.cli(&["run", "show", &f.root(), RUN, "--json"]);
     assert_eq!(code(&shown), 0, "{}", text(&shown));
     assert_eq!(
-        json_of(&shown)["value"]["posture"]["value"]["coverage"],
+        json_naming::payload(&json_of(&shown))["posture"]["value"]["coverage"],
         *coverage
     );
     let human = f.cli(&["run", "show", &f.root(), RUN]);
@@ -411,7 +411,7 @@ fn a_piped_command_is_unparsed_and_the_verdict_is_partial() {
     let f = Fixture::new(&["git log --oneline | head -1", "git status"], None);
     let out = f.run();
     assert_eq!(code(&out), 0, "{}", text(&out));
-    let coverage = json_of(&out)["value"]["posture"]["value"]["coverage"].clone();
+    let coverage = json_naming::payload(&json_of(&out))["posture"]["value"]["coverage"].clone();
     assert_eq!(coverage["verdict"], "partial", "{coverage}");
     assert_eq!(
         coverage["commands"][0]["reading"],
@@ -443,7 +443,7 @@ fn wrapped_path_qualified_and_unparsable_commands_are_read_as_the_rules_say() {
     );
     let out = f.run();
     assert_eq!(code(&out), 0, "{}", text(&out));
-    let coverage = json_of(&out)["value"]["posture"]["value"]["coverage"].clone();
+    let coverage = json_naming::payload(&json_of(&out))["posture"]["value"]["coverage"].clone();
     let readings: Vec<Value> = coverage["commands"]
         .as_array()
         .unwrap()
@@ -468,7 +468,7 @@ fn wrapped_path_qualified_and_unparsable_commands_are_read_as_the_rules_say() {
     let out = g.run();
     assert_eq!(code(&out), 0, "{}", text(&out));
     assert_eq!(
-        json_of(&out)["value"]["posture"]["value"]["coverage"]["verdict"],
+        json_naming::payload(&json_of(&out))["posture"]["value"]["coverage"]["verdict"],
         "direct"
     );
 }
@@ -486,7 +486,7 @@ fn a_malformed_declared_entry_refuses_and_is_named() {
         let f = Fixture::new(&["git status"], Some(declared.clone()));
         let out = f.run();
         let v = assert_refused_at_planning(&f, &out);
-        let reason = v["value"]["reason"].as_str().unwrap();
+        let reason = json_naming::payload(&v)["reason"].as_str().unwrap();
         assert!(reason.contains(named), "{declared}: {reason}");
         assert!(reason.contains("project.commands"), "{reason}");
     }
@@ -503,9 +503,9 @@ fn an_allowance_declared_only_in_the_working_tree_is_refused_at_launch() {
     let out = f.run();
     assert_eq!(code(&out), 1, "{}", text(&out));
     let v = json_of(&out);
-    assert_eq!(v["value"]["outcome"], "refused", "{v}");
+    assert_eq!(json_naming::payload(&v)["outcome"], "refused", "{v}");
     assert_eq!(f.launches(), 0, "nothing is spawned after a launch refusal");
-    let coverage = &v["value"]["posture"]["value"]["coverage"];
+    let coverage = &json_naming::payload(&v)["posture"]["value"]["coverage"];
     assert_eq!(coverage["drift"], json!(["allowance"]), "{coverage}");
     assert_eq!(coverage["declaration"]["state"], "absent");
     assert_eq!(coverage["verdict"], "refused");
@@ -543,8 +543,8 @@ fn a_suite_plan_that_differs_at_the_base_is_refused_and_the_base_is_recorded() {
     let out = f.run();
     assert_eq!(code(&out), 1, "{}", text(&out));
     let v = json_of(&out);
-    assert_eq!(v["value"]["outcome"], "refused");
-    let coverage = &v["value"]["posture"]["value"]["coverage"];
+    assert_eq!(json_naming::payload(&v)["outcome"], "refused");
+    let coverage = &json_naming::payload(&v)["posture"]["value"]["coverage"];
     assert_eq!(coverage["drift"], json!(["suite plan"]), "{coverage}");
     assert_eq!(coverage["verdict"], "refused");
     assert_eq!(coverage["missing"][0]["program"], "cargo");
@@ -580,10 +580,10 @@ fn an_unreadable_malformed_or_absent_plan_refuses() {
     let f = Fixture::new(&["git status"], None);
     std::fs::write(f.bin().join("plan-exit"), "1").unwrap();
     let v = assert_refused_at_planning(&f, &f.run());
-    let reason = v["value"]["reason"].as_str().unwrap();
+    let reason = json_naming::payload(&v)["reason"].as_str().unwrap();
     assert!(reason.contains("could not be read"), "{reason}");
     assert!(reason.contains("exit 1"), "{reason}");
-    assert!(v["value"]["coverage"].is_null());
+    assert!(json_naming::payload(&v)["coverage"].is_null());
     std::fs::remove_file(f.bin().join("plan-exit")).unwrap();
 
     for (body, named) in [
@@ -599,14 +599,17 @@ fn an_unreadable_malformed_or_absent_plan_refuses() {
     ] {
         std::fs::write(f.project().join("suite-plan.json"), body).unwrap();
         let v = assert_refused_at_planning(&f, &f.run());
-        let reason = v["value"]["reason"].as_str().unwrap();
+        let reason = json_naming::payload(&v)["reason"].as_str().unwrap();
         assert!(reason.contains(named), "{body}: {reason}");
     }
 
     std::fs::remove_file(f.project().join("suite-plan.json")).unwrap();
     let v = assert_refused_at_planning(&f, &f.run());
     assert!(
-        v["value"]["reason"].as_str().unwrap().contains("exit 3"),
+        json_naming::payload(&v)["reason"]
+            .as_str()
+            .unwrap()
+            .contains("exit 3"),
         "{v}"
     );
 }
@@ -617,7 +620,7 @@ fn a_plan_that_says_it_is_empty_is_direct() {
     let f = Fixture::new(&[], None);
     let out = f.run();
     assert_eq!(code(&out), 0, "{}", text(&out));
-    let coverage = json_of(&out)["value"]["posture"]["value"]["coverage"].clone();
+    let coverage = json_naming::payload(&json_of(&out))["posture"]["value"]["coverage"].clone();
     assert_eq!(coverage["verdict"], "direct", "{coverage}");
     assert_eq!(coverage["commands"], json!([]));
 }
@@ -629,11 +632,11 @@ fn a_plan_that_says_it_is_empty_is_direct() {
 /// existing reading of spec 003 section 3.8 and is not this section's.
 fn assert_launched_past_coverage(f: &Fixture, out: &Output, launches: usize) -> Value {
     let v = json_of(out);
-    assert_ne!(v["value"]["outcome"], "refused", "{v}");
+    assert_ne!(json_naming::payload(&v)["outcome"], "refused", "{v}");
     assert_eq!(f.launches(), launches, "{v}");
     let (outcome, _) = attempt_details(f);
     assert!(outcome.get("postureCoverageRefusal").is_none(), "{outcome}");
-    v["value"]["posture"]["value"]["coverage"].clone()
+    json_naming::payload(&v)["posture"]["value"]["coverage"].clone()
 }
 
 /// A second attempt after a committed change to the suite and to the
@@ -713,7 +716,7 @@ fn an_export_ignore_attribute_does_not_change_the_plan_read_at_the_base() {
     f.git(&["commit", "--quiet", "-m", "hide the suite from an archive"]);
     let out = f.run();
     assert_eq!(code(&out), 0, "{}", text(&out));
-    let coverage = json_of(&out)["value"]["posture"]["value"]["coverage"].clone();
+    let coverage = json_naming::payload(&json_of(&out))["posture"]["value"]["coverage"].clone();
     assert_eq!(coverage["verdict"], "direct", "{coverage}");
     assert_eq!(coverage["commands"][0]["command"], "git status");
     assert!(coverage.get("drift").is_none(), "{coverage}");
@@ -729,8 +732,8 @@ fn a_launch_reading_that_fails_is_refused_and_run_show_says_why() {
     let out = f.run();
     assert_eq!(code(&out), 1, "{}", text(&out));
     let v = json_of(&out);
-    assert_eq!(v["value"]["outcome"], "refused", "{v}");
-    let unread = v["value"]["posture"]["value"]["coverage"]["unread"]
+    assert_eq!(json_naming::payload(&v)["outcome"], "refused", "{v}");
+    let unread = json_naming::payload(&v)["posture"]["value"]["coverage"]["unread"]
         .as_str()
         .unwrap_or_else(|| panic!("{v}"))
         .to_string();

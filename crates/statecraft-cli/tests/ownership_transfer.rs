@@ -162,7 +162,7 @@ impl Sandbox {
     }
 
     fn plan_id(&self, file: &str, from: &str, to: &str) -> String {
-        self.plan(file, from, to)["value"]["plan_id"]
+        json_naming::payload(&self.plan(file, from, to))["plan_id"]
             .as_str()
             .unwrap()
             .to_string()
@@ -188,8 +188,11 @@ impl Sandbox {
         let id = self.plan_id(file, from, to);
         let (c, v) = self.apply_with(file, from, to, &id);
         assert_eq!(c, 0, "{v}");
-        assert_eq!(v["value"]["result"], "applied", "{v}");
-        v["value"]["record"]["id"].as_str().unwrap().to_string()
+        assert_eq!(json_naming::payload(&v)["result"], "applied", "{v}");
+        json_naming::payload(&v)["record"]["id"]
+            .as_str()
+            .unwrap()
+            .to_string()
     }
 
     fn revert(&self, id: &str) -> (i32, Value) {
@@ -214,7 +217,10 @@ impl Sandbox {
         let before = self.snapshot();
         let (c, v) = self.json(args);
         assert_eq!(c, 2, "{args:?}: {v}");
-        assert_eq!(v["value"]["refused"]["kind"], kind, "{args:?}: {v}");
+        assert_eq!(
+            v["error"]["details"]["refused"]["kind"], kind,
+            "{args:?}: {v}"
+        );
         assert_eq!(self.snapshot(), before, "{args:?} changed a byte");
         // The human rendering says the same, from the same value.
         let human = self.run(args);
@@ -268,7 +274,7 @@ fn user_to_adopted_and_back_through_the_binary() {
 
     let plan = s.plan("docs/policy.md", "user", "adopted");
     assert_eq!(s.snapshot(), before, "plan writes nothing");
-    let v = &plan["value"];
+    let v = &json_naming::payload(&plan);
     assert_eq!(v["current"]["class"], "user");
     assert_eq!(v["resulting"]["class"], "adopted");
     assert_eq!(v["bytes"], 18);
@@ -297,8 +303,8 @@ fn user_to_adopted_and_back_through_the_binary() {
         v["plan_id"].as_str().unwrap(),
     );
     assert_eq!(c, 0, "{applied}");
-    assert_eq!(applied["value"]["result"], "applied");
-    let record = &applied["value"]["record"];
+    assert_eq!(json_naming::payload(&applied)["result"], "applied");
+    let record = &json_naming::payload(&applied)["record"];
     assert_eq!(record["operator"], "bart");
     assert_eq!(record["reason"], "moving it");
     assert_eq!(record["manifest_before"], v["manifestDigest"]);
@@ -308,8 +314,11 @@ fn user_to_adopted_and_back_through_the_binary() {
 
     let (c, reverted) = s.revert(record["id"].as_str().unwrap());
     assert_eq!(c, 0, "{reverted}");
-    assert_eq!(reverted["value"]["result"], "reverted");
-    assert_eq!(reverted["value"]["record"]["reverts"], record["id"]);
+    assert_eq!(json_naming::payload(&reverted)["result"], "reverted");
+    assert_eq!(
+        json_naming::payload(&reverted)["record"]["reverts"],
+        record["id"]
+    );
     assert!(s.entry("docs/policy.md").is_none());
     assert_eq!(s.manifest()["transfers"].as_array().unwrap().len(), 2);
     assert_eq!(s.read("docs/policy.md"), b"the user's policy\n");
@@ -342,7 +351,10 @@ fn a_withheld_adapter_path_moved_to_managed_is_written_then_withheld_after_rever
     }
 
     let plan = s.plan(OWNED, "user", "managed");
-    assert_eq!(plan["value"]["current"]["declaredBy"], "claude-code");
+    assert_eq!(
+        json_naming::payload(&plan)["current"]["declaredBy"],
+        "claude-code"
+    );
     let id = s.transfer(OWNED, "user", "managed");
     let entry = s.entry(OWNED).unwrap();
     assert_eq!(entry["class"], "managed");
@@ -419,7 +431,7 @@ fn a_stale_plan_is_refused_naming_what_changed() {
         s.refused("stale-plan", &args);
         let (_, v) = s.json(&args);
         assert_eq!(
-            v["value"]["refused"]["changed"],
+            json_naming::payload(&v)["refused"]["changed"],
             serde_json::json!(changed),
             "{v}"
         );
@@ -542,7 +554,7 @@ fn a_reversal_with_nothing_changed_since_is_applied() {
     let id = s.transfer("notes.md", "user", "adopted");
     let (c, v) = s.revert(&id);
     assert_eq!(c, 0, "{v}");
-    assert_eq!(v["value"]["result"], "reverted");
+    assert_eq!(json_naming::payload(&v)["result"], "reverted");
 }
 
 // Negative: a repeated request is `already-satisfied`, exit 0, nothing written.
@@ -557,8 +569,11 @@ fn a_repeated_request_is_already_satisfied_and_writes_nothing() {
     for given in [id.as_str(), "some-other-plan"] {
         let (c, v) = s.apply_with("notes.md", "user", "adopted", given);
         assert_eq!(c, 0, "{v}");
-        assert_eq!(v["value"]["result"], "already-satisfied");
-        assert_eq!(v["value"]["record"]["id"], first["value"]["record"]["id"]);
+        assert_eq!(json_naming::payload(&v)["result"], "already-satisfied");
+        assert_eq!(
+            json_naming::payload(&v)["record"]["id"],
+            json_naming::payload(&first)["record"]["id"]
+        );
         assert_eq!(s.snapshot(), before, "nothing written");
     }
 }
@@ -645,7 +660,7 @@ fn an_unreadable_or_unwritable_manifest_is_a_failure_and_leaves_every_byte() {
         std::fs::remove_file(area.join(".probe")).unwrap();
     } else {
         assert_eq!(c, 4, "{v}");
-        assert!(v["value"]["failed"].is_string(), "{v}");
+        assert!(json_naming::payload(&v)["failed"].is_string(), "{v}");
         assert_eq!(s.snapshot(), before, "the old manifest, and no temporary");
     }
 
@@ -714,7 +729,9 @@ fn a_journal_that_disagrees_is_listed_by_plan_and_refused_by_apply_and_revert() 
     );
 
     let plan = s.plan("other.md", "user", "adopted");
-    let listed = plan["value"]["journalDisagreements"].as_array().unwrap();
+    let listed = json_naming::payload(&plan)["journalDisagreements"]
+        .as_array()
+        .unwrap();
     assert_eq!(listed.len(), 1, "{plan}");
     assert!(listed[0].as_str().unwrap().contains("notes.md"));
     let human = s.run(&["transfer", "plan", &root, "other.md", "user", "adopted"]);
@@ -725,7 +742,10 @@ fn a_journal_that_disagrees_is_listed_by_plan_and_refused_by_apply_and_revert() 
         stdout(&human)
     );
 
-    let token = plan["value"]["plan_id"].as_str().unwrap().to_string();
+    let token = json_naming::payload(&plan)["plan_id"]
+        .as_str()
+        .unwrap()
+        .to_string();
     s.refused(
         "journal-disagrees",
         &[
@@ -778,13 +798,16 @@ fn a_file_restored_after_env_remove_does_not_block_transfers() {
     s.write("notes.md", b"one\n");
     let plan = s.plan("notes.md", "user", "adopted");
     assert!(
-        plan["value"]["journalDisagreements"]
+        json_naming::payload(&plan)["journalDisagreements"]
             .as_array()
             .unwrap()
             .is_empty(),
         "{plan}"
     );
-    let token = plan["value"]["plan_id"].as_str().unwrap().to_string();
+    let token = json_naming::payload(&plan)["plan_id"]
+        .as_str()
+        .unwrap()
+        .to_string();
     let (c, v) = s.apply_with("notes.md", "user", "adopted", &token);
     assert_eq!(c, 0, "{v}");
 }
@@ -812,9 +835,12 @@ fn the_bare_plan_identity_is_accepted_by_the_binary() {
     let s = Sandbox::new();
     s.write("notes.md", b"one\n");
     let plan = s.plan("notes.md", "user", "adopted");
-    let bare = plan["value"]["identity"].as_str().unwrap().to_string();
+    let bare = json_naming::payload(&plan)["identity"]
+        .as_str()
+        .unwrap()
+        .to_string();
     assert_eq!(bare.len(), 64);
     let (c, v) = s.apply_with("notes.md", "user", "adopted", &bare);
     assert_eq!(c, 0, "{v}");
-    assert_eq!(v["value"]["result"], "applied");
+    assert_eq!(json_naming::payload(&v)["result"], "applied");
 }

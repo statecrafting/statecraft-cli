@@ -237,7 +237,7 @@ esac
 "#;
 
 fn trial_of(out: &Output) -> serde_json::Value {
-    json(out)["value"]["startup"]["trial"].clone()
+    json(out)["report"]["startup"]["trial"].clone()
 }
 
 /// A faithful fake: the hook is correlated before the decision, the gate is

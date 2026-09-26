@@ -109,6 +109,16 @@ pub enum Verb {
 }
 
 impl Verb {
+    /// The stable dotted name the `--json` envelope carries as `verb` (spec 007
+    /// section 3.1): the spelling with its words joined by `.`, as spec-spine
+    /// names `index.check`. Help is `help`.
+    pub fn dotted(self) -> String {
+        match self {
+            Verb::Help => "help".to_string(),
+            v => v.spelling().replace(' ', "."),
+        }
+    }
+
     /// How the verb is written on a command line.
     pub fn spelling(self) -> &'static str {
         match self {
