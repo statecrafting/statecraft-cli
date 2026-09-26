@@ -14,6 +14,7 @@ use serde::{Deserialize, Serialize};
 
 /// A verb this binary has.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[repr(u8)]
 #[serde(rename_all = "kebab-case")]
 pub enum Verb {
     /// `project register <path>`
@@ -109,6 +110,16 @@ pub enum Verb {
 }
 
 impl Verb {
+    /// The stable dotted name the `--json` envelope carries as `verb` (spec 007
+    /// section 3.1): the spelling with its words joined by `.`, as spec-spine
+    /// names `index.check`. Help is `help`.
+    pub fn dotted(self) -> String {
+        match self {
+            Verb::Help => "help".to_string(),
+            v => v.spelling().replace(' ', "."),
+        }
+    }
+
     /// How the verb is written on a command line.
     pub fn spelling(self) -> &'static str {
         match self {
@@ -230,7 +241,7 @@ impl Verb {
     ///
     /// [`Verb::Help`] is deliberately absent: it is not an operation, and a
     /// usage error listing it would offer help as a thing to do.
-    pub fn all() -> [Verb; 42] {
+    pub fn all() -> [Verb; Verb::Help as usize] {
         [
             Verb::ProjectRegister,
             Verb::ProjectList,
@@ -336,6 +347,38 @@ impl Verb {
             _ => None,
         }
     }
+}
+
+/// The stable name for a command line that did not resolve to a verb.
+///
+/// A known group and its following word name a two-word attempted verb. An
+/// unknown first word stands alone, so a following path or operand cannot be
+/// mistaken for part of the operation name.
+pub fn usage_verb(args: &[String]) -> String {
+    let words: Vec<&str> = args
+        .iter()
+        .filter(|arg| !arg.starts_with('-'))
+        .map(String::as_str)
+        .collect();
+    let Some(first) = words.first() else {
+        return "unknown".to_string();
+    };
+    if Verb::GROUPS.contains(first)
+        && let Some(second) = words.get(1)
+        && operation_word(second)
+    {
+        return format!("{first}.{second}");
+    }
+    (*first).to_string()
+}
+
+/// Whether a token has the command tree's word shape rather than a path or
+/// another operand's shape.
+fn operation_word(word: &str) -> bool {
+    word.as_bytes().first().is_some_and(u8::is_ascii_lowercase)
+        && word
+            .bytes()
+            .all(|byte| byte.is_ascii_lowercase() || byte.is_ascii_digit() || byte == b'-')
 }
 
 /// What the caller asked for.
@@ -470,11 +513,28 @@ mod tests {
 
     #[test]
     fn every_verb_parses_from_its_own_spelling() {
-        for v in Verb::all() {
+        for (index, v) in Verb::all().into_iter().enumerate() {
+            assert_eq!(v as usize, index, "Verb::all is incomplete or reordered");
             let parsed = parse(&argv(v.spelling()))
                 .unwrap_or_else(|_| panic!("{} did not parse", v.spelling()));
             assert_eq!(parsed.verb, v);
         }
+    }
+
+    #[test]
+    fn an_unknown_usage_name_never_absorbs_an_operand() {
+        assert_eq!(
+            usage_verb(&argv("frobnicate /tmp/project --json")),
+            "frobnicate"
+        );
+        assert_eq!(
+            usage_verb(&argv("env publish /tmp/project --json")),
+            "env.publish"
+        );
+        assert_eq!(usage_verb(&argv("project /tmp/project --json")), "project");
+        assert_eq!(usage_verb(&argv("project ./project --json")), "project");
+        assert_eq!(usage_verb(&argv("project tmp/project --json")), "project");
+        assert_eq!(usage_verb(&argv("--json")), "unknown");
     }
 
     #[test]

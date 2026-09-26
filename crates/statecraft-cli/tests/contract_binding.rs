@@ -173,7 +173,7 @@ fn run_binds_the_spec_and_every_declared_obligation_before_any_effect() {
     let f = Fixture::new(EXPANSION);
     let (code, v) = f.run();
     assert_eq!(code, 0, "{v}");
-    let contract = &v["value"]["contract"];
+    let contract = &json_naming::payload(&v)["contract"];
     assert_eq!(contract["state"], "bound", "{v}");
     assert_eq!(contract["digest"], "d1");
     assert_eq!(contract["producer"], "0.22.0");
@@ -202,10 +202,15 @@ fn an_unchanged_contract_is_current_and_changes_nothing_about_the_acceptance() {
     let f = Fixture::new(EXPANSION);
     assert_eq!(f.run().0, 0);
     let (_, v) = f.accept();
-    assert_eq!(v["value"]["contract"]["word"], "current", "{v}");
-    assert_eq!(v["value"]["contract"]["boundDigest"], "d1");
     assert_eq!(
-        v["value"]["reason"]["reason"], "policy-digest-uncomputable",
+        json_naming::payload(&v)["contract"]["word"],
+        "current",
+        "{v}"
+    );
+    assert_eq!(json_naming::payload(&v)["contract"]["boundDigest"], "d1");
+    assert_eq!(
+        json_naming::payload(&v)["reason"]["reason"],
+        "policy-digest-uncomputable",
         "{v}"
     );
 }
@@ -219,9 +224,12 @@ fn a_changed_obligation_is_no_acceptance_naming_it() {
     f.closure(&answer("d2", "t, amended", true), 0, "");
     let (code, v) = f.accept();
     assert_eq!(code, 1, "{v}");
-    assert_eq!(v["value"]["acceptance"], "none");
-    assert_eq!(v["value"]["reason"]["reason"], "contract-moved");
-    let c = &v["value"]["contract"];
+    assert_eq!(json_naming::payload(&v)["acceptance"], "none");
+    assert_eq!(
+        json_naming::payload(&v)["reason"]["reason"],
+        "contract-moved"
+    );
+    let c = &json_naming::payload(&v)["contract"];
     assert_eq!(c["word"], "changed");
     assert_eq!(c["boundDigest"], "d1");
     assert_eq!(c["nowDigest"], "d2");
@@ -251,10 +259,13 @@ fn an_obligation_withdrawn_since_binding_is_no_acceptance() {
     f.closure(&now.to_string(), 0, "");
     let (code, v) = f.accept();
     assert_eq!(code, 1, "{v}");
-    assert_eq!(v["value"]["reason"]["reason"], "contract-moved");
-    assert_eq!(v["value"]["contract"]["word"], "withdrawn");
     assert_eq!(
-        v["value"]["contract"]["withdrawn"],
+        json_naming::payload(&v)["reason"]["reason"],
+        "contract-moved"
+    );
+    assert_eq!(json_naming::payload(&v)["contract"]["word"], "withdrawn");
+    assert_eq!(
+        json_naming::payload(&v)["contract"]["withdrawn"],
         serde_json::json!(["obligation:107-x#R-1"])
     );
 }
@@ -268,9 +279,9 @@ fn a_missing_member_is_no_acceptance_and_a_stale_ledger_is_refused() {
     f.closure("", 1, "not found: obligation '107-x#R-1'");
     let (code, v) = f.accept();
     assert_eq!(code, 1, "{v}");
-    assert_eq!(v["value"]["contract"]["word"], "missing");
+    assert_eq!(json_naming::payload(&v)["contract"]["word"], "missing");
     assert!(
-        v["value"]["contract"]["reason"]
+        json_naming::payload(&v)["contract"]["reason"]
             .as_str()
             .unwrap()
             .contains("107-x#R-1")
@@ -278,7 +289,7 @@ fn a_missing_member_is_no_acceptance_and_a_stale_ledger_is_refused() {
     f.closure("", 2, "registry is stale");
     let (code, v) = f.accept();
     assert_eq!(code, 2, "{v}");
-    assert_eq!(v["value"]["word"], "stale");
+    assert_eq!(json_naming::payload(&v)["word"], "stale");
 }
 
 /// The pinned producer has no closure verb: `run` records `unsupported`,
@@ -289,15 +300,20 @@ fn a_producer_without_closures_binds_unsupported_and_accept_reads_not_recorded()
     let f = Fixture::new(RELEASED);
     let (code, v) = f.run();
     assert_eq!(code, 0, "{v}");
-    let contract = &v["value"]["contract"];
+    let contract = &json_naming::payload(&v)["contract"];
     assert_eq!(contract["state"], "unsupported", "{v}");
     let detail = contract["detail"].as_str().unwrap();
     assert!(detail.contains("spec-spine 0.20.0 was asked"), "{detail}");
     assert!(!detail.contains("release"), "{detail}");
     let (_, v) = f.accept();
-    assert_eq!(v["value"]["contract"]["word"], "not-recorded", "{v}");
     assert_eq!(
-        v["value"]["reason"]["reason"], "policy-digest-uncomputable",
+        json_naming::payload(&v)["contract"]["word"],
+        "not-recorded",
+        "{v}"
+    );
+    assert_eq!(
+        json_naming::payload(&v)["reason"]["reason"],
+        "policy-digest-uncomputable",
         "{v}"
     );
 }

@@ -102,7 +102,7 @@ fn text(out: &Output) -> String {
 }
 
 fn findings(value: &serde_json::Value) -> Vec<String> {
-    value["value"]["findings"]
+    value["report"]["findings"]
         .as_array()
         .unwrap_or_else(|| panic!("{value}"))
         .iter()
@@ -181,10 +181,10 @@ fn env_plan_and_apply_name_the_owner_of_every_path_they_withhold() {
     let (exit, plan) = f.json(&["env", "plan", &f.root()]);
     assert_eq!(exit, 1, "a withheld path is a finding: {plan}");
     assert_eq!(
-        plan["value"]["adapters"][0]["readiness"], "degraded",
+        plan["report"]["adapters"][0]["readiness"], "degraded",
         "{plan}"
     );
-    let withheld = plan["value"]["withheld"].as_array().unwrap();
+    let withheld = plan["report"]["withheld"].as_array().unwrap();
     assert_eq!(withheld.len(), 1, "{plan}");
     assert_eq!(withheld[0]["path"], POINTER);
     assert_eq!(withheld[0]["owner"], "user");
@@ -202,7 +202,7 @@ fn env_plan_and_apply_name_the_owner_of_every_path_they_withhold() {
 
     let (exit, applied) = f.json(&["env", "apply", &f.root()]);
     assert_eq!(exit, 1, "partial: {applied}");
-    let withheld = applied["value"]["withheld"].as_array().unwrap();
+    let withheld = applied["report"]["withheld"].as_array().unwrap();
     assert_eq!(withheld[0]["path"], POINTER);
     assert_eq!(withheld[0]["owner"], "user");
     assert_eq!(
@@ -220,7 +220,7 @@ fn env_plan_and_apply_name_the_owner_of_every_path_they_withhold() {
     std::fs::write(&at, USER_BYTES).unwrap();
     let (exit, applied) = g.json(&["env", "apply", &g.root()]);
     assert_eq!(exit, 1, "partial: {applied}");
-    let withheld = applied["value"]["withheld"].as_array().unwrap();
+    let withheld = applied["report"]["withheld"].as_array().unwrap();
     let entry = withheld
         .iter()
         .find(|w| w["path"] == owned)

@@ -171,7 +171,7 @@ esac
     fn required_revision(&self) -> PathBuf {
         let out = self.cli(&["harness", "show", &self.root(), "--json"]);
         let v = json(&out);
-        let display = v["value"]["value"]["inspection"]["requiredDisplay"]
+        let display = json_naming::payload(&v)["value"]["inspection"]["requiredDisplay"]
             .as_str()
             .unwrap_or_else(|| panic!("{v}"))
             .to_string();
@@ -350,7 +350,7 @@ tool sentinel-after
 "#;
 
 fn value(out: &Output) -> serde_json::Value {
-    json(out)["value"]["value"].clone()
+    json_naming::payload(&json(out))["value"].clone()
 }
 
 fn position(order: &[String], line: &str) -> usize {
@@ -373,7 +373,7 @@ fn a_managed_run_supplies_its_startup_hook_and_gate_and_releases_work_on_admissi
     // Completed. Says nothing about acceptance and nothing about qualification.
     assert_eq!(code(&out), 0, "{}", text(&out));
     let answer = json(&out);
-    let startup = &answer["value"]["startup"];
+    let startup = &json_naming::payload(&answer)["startup"];
     assert_eq!(startup["managed"], true, "{answer}");
     assert_eq!(startup["launched"], true);
     assert_eq!(startup["verdict"], "unverified");
@@ -459,7 +459,9 @@ fn a_managed_run_supplies_its_startup_hook_and_gate_and_releases_work_on_admissi
     let digest = intent["payload"]["digest"].as_str().unwrap();
     assert_eq!(launch["settingsWritten"]["digest"], digest);
     let floor = json(&f.cli(&["session", "payload", "--json"]));
-    let floor = floor["value"]["value"]["digest"].as_str().unwrap();
+    let floor = json_naming::payload(&floor)["value"]["digest"]
+        .as_str()
+        .unwrap();
     assert_eq!(intent["payload"]["floorDigest"], floor);
     assert_ne!(digest, floor, "a run's document is not the floor's bytes");
     let env = String::from_utf8(f.received("received-env")).unwrap();
@@ -584,9 +586,16 @@ fn a_mismatched_revision_is_refused_before_its_tool_calls_run() {
     let out = f.run();
     assert_eq!(code(&out), 1, "{}", text(&out));
     let answer = json(&out);
-    assert_eq!(answer["value"]["attempt"], 2);
-    assert_eq!(answer["value"]["outcome"], "refused", "{answer}");
-    assert_eq!(answer["value"]["startup"]["verdict"], "mismatched");
+    assert_eq!(json_naming::payload(&answer)["attempt"], 2);
+    assert_eq!(
+        json_naming::payload(&answer)["outcome"],
+        "refused",
+        "{answer}"
+    );
+    assert_eq!(
+        json_naming::payload(&answer)["startup"]["verdict"],
+        "mismatched"
+    );
 
     // The boundary, not the label: a tool call was waiting before the
     // decision, and neither it nor any later one produced its effect.
@@ -664,7 +673,7 @@ fn a_global_upgrade_after_a_run_resolved_changes_nothing_about_that_run() {
     // The run's next attempt.
     let out = f.run();
     assert_eq!(code(&out), 0, "{}", text(&out));
-    assert_eq!(json(&out)["value"]["attempt"], 2);
+    assert_eq!(json_naming::payload(&json(&out))["attempt"], 2);
     let second = value(&f.show(Some(2)));
     assert_eq!(second["intent"]["requiredHarness"], required.as_str());
     assert_eq!(second["intent"]["selected"]["digest"], required.as_str());
@@ -711,7 +720,7 @@ fn a_provider_that_ignores_the_registration_is_refused_after_the_fact_and_says_s
     f.mode("ignores-hooks");
     let out = f.run();
     assert_eq!(code(&out), 1, "{}", text(&out));
-    assert_eq!(json(&out)["value"]["outcome"], "refused");
+    assert_eq!(json_naming::payload(&json(&out))["outcome"], "refused");
     assert!(f.workspace().join("sentinel-before-decision").exists());
     let v = value(&f.show(None));
     assert_eq!(v["verdict"], "not-admitted");
@@ -847,7 +856,7 @@ fn a_launcher_killed_mid_session_leaves_the_outcome_unknown_and_nothing_is_repla
 
     let again = f.run();
     assert_eq!(code(&again), 2, "{}", text(&again));
-    let refusal = json(&again)["value"].clone();
+    let refusal = json_naming::payload(&json(&again)).clone();
     assert_eq!(refusal["launchState"], "outcome-unknown");
     assert!(refusal["next"].as_str().unwrap().contains("startup show"));
     assert!(refusal["next"].as_str().unwrap().contains(&pid));
@@ -873,10 +882,10 @@ fn an_intent_that_cannot_be_written_refuses_the_attempt_and_launches_nothing() {
     let out = f.run();
     assert_eq!(code(&out), 1, "{}", text(&out));
     let answer = json(&out);
-    assert_eq!(answer["value"]["outcome"], "refused");
-    assert_eq!(answer["value"]["startup"]["launched"], false);
+    assert_eq!(json_naming::payload(&answer)["outcome"], "refused");
+    assert_eq!(json_naming::payload(&answer)["startup"]["launched"], false);
     assert!(
-        answer["value"]["startup"]["error"]
+        json_naming::payload(&answer)["startup"]["error"]
             .as_str()
             .unwrap()
             .contains("could not be recorded"),
@@ -902,12 +911,16 @@ fn a_record_that_cannot_be_stored_fails_the_run_and_reads_back_as_unreadable() {
     let out = f.run();
     assert_eq!(code(&out), 4, "{}", text(&out));
     let answer = json(&out);
-    assert_eq!(answer["value"]["startup"]["launched"], true);
+    assert_eq!(json_naming::payload(&answer)["startup"]["launched"], true);
     assert_eq!(
-        answer["value"]["startup"]["record"],
+        json_naming::payload(&answer)["startup"]["record"],
         serde_json::Value::Null
     );
-    assert!(answer["value"]["startup"]["error"].as_str().is_some());
+    assert!(
+        json_naming::payload(&answer)["startup"]["error"]
+            .as_str()
+            .is_some()
+    );
     assert!(f.attempt_dir(1).join("intent.json").is_file());
     // The path the record belongs at holds something that is not a record,
     // and reading it back is a failure to read, not an absence.
@@ -1095,7 +1108,7 @@ fn an_unknown_attempt_stays_live_until_an_operator_reconciles_it_and_nothing_is_
     // `run`'s refusal names the attempt and its `unknown` reconciliation.
     let refused = f.run();
     assert_eq!(code(&refused), 2, "{}", text(&refused));
-    let v = json(&refused)["value"].clone();
+    let v = json_naming::payload(&json(&refused)).clone();
     assert_eq!(v["attempt"], 1, "{v}");
     assert_eq!(v["reconciliation"]["verdict"], "unknown", "{v}");
     assert_eq!(v["reconciliation"]["operator"], "alice", "{v}");
@@ -1108,7 +1121,7 @@ fn an_unknown_attempt_stays_live_until_an_operator_reconciles_it_and_nothing_is_
     );
     // `run list` shows the live attempt with its `unknown` beside it.
     let listed = f.cli(&["run", "list", &f.root(), "--json"]);
-    let row = json(&listed)["value"]["runs"][0]["attempts"][0].clone();
+    let row = json_naming::payload(&json(&listed))["runs"][0]["attempts"][0].clone();
     assert_eq!(row["outcome"], serde_json::Value::Null, "{row}");
     assert_eq!(row["reconciliation"]["verdict"], "unknown", "{row}");
 
@@ -1124,7 +1137,7 @@ fn an_unknown_attempt_stays_live_until_an_operator_reconciles_it_and_nothing_is_
         &["--evidence", &ev, "--json"],
     );
     assert_eq!(code(&out), 0, "{}", text(&out));
-    let r = json(&out)["value"].clone();
+    let r = json_naming::payload(&json(&out)).clone();
     assert_eq!(r["verdict"], "absent");
     assert_eq!(r["basis"], "operator-declared");
     assert_eq!(r["corroborated"], false);
@@ -1147,7 +1160,7 @@ fn an_unknown_attempt_stays_live_until_an_operator_reconciles_it_and_nothing_is_
     // observed launch state, and the second names the one it replaced.
     let shown = f.cli(&["run", "show", &f.root(), RUN, "--json"]);
     assert_eq!(code(&shown), 0, "{}", text(&shown));
-    let recs = json(&shown)["value"]["reconciliations"].clone();
+    let recs = json_naming::payload(&json(&shown))["reconciliations"].clone();
     assert_eq!(recs.as_array().map(Vec::len), Some(2), "{recs}");
     assert_eq!(recs[0]["verdict"], "unknown");
     assert_eq!(recs[1]["verdict"], "absent");
@@ -1207,7 +1220,7 @@ fn absent_is_refused_when_the_gate_released_a_tool_call_and_confirmed_is_recorde
     let out = reconcile(&f, "confirmed", "outcome-unknown", &["--json"]);
     assert_eq!(code(&out), 0, "{}", text(&out));
     assert_eq!(
-        json(&out)["value"]["observed"]["gateReleasedToolCall"],
+        json_naming::payload(&json(&out))["observed"]["gateReleasedToolCall"],
         true
     );
     release(&f, &pid);
@@ -1242,7 +1255,7 @@ fn absent_against_an_attempt_that_never_launched_is_corroborated() {
     .unwrap();
     let out = reconcile(&f, "absent", "not-launched", &["--json"]);
     assert_eq!(code(&out), 0, "{}", text(&out));
-    assert_eq!(json(&out)["value"]["corroborated"], true);
+    assert_eq!(json_naming::payload(&json(&out))["corroborated"], true);
     assert_eq!(f.launches(), 0);
 }
 
@@ -1311,7 +1324,7 @@ fn a_reconciliation_while_a_real_run_is_blocked_is_refused_and_writes_nothing() 
     let status = launcher.wait().unwrap();
     assert!(status.code().is_some_and(|c| c <= 1), "{status:?}");
     let listed = f.cli(&["run", "list", &f.root(), "--json"]);
-    let row = json(&listed)["value"]["runs"][0]["attempts"][0].clone();
+    let row = json_naming::payload(&json(&listed))["runs"][0]["attempts"][0].clone();
     assert_eq!(row["outcome"], "completed", "{row}");
     assert_eq!(row["reconciliation"], serde_json::Value::Null, "{row}");
 }
@@ -1331,7 +1344,7 @@ fn absent_against_launch_unknown_is_declared_only_and_releases_the_attempt() {
 
     let out = reconcile(&f, "absent", "launch-unknown", &["--json"]);
     assert_eq!(code(&out), 0, "{}", text(&out));
-    let r = json(&out)["value"].clone();
+    let r = json_naming::payload(&json(&out)).clone();
     assert_eq!(r["corroborated"], false, "{r}");
     assert_eq!(r["observed"]["launchState"], "launch-unknown");
     assert_eq!(r["observed"]["confirmedPid"], serde_json::Value::Null);
@@ -1344,7 +1357,7 @@ fn absent_against_launch_unknown_is_declared_only_and_releases_the_attempt() {
         "{r}"
     );
     let listed = f.cli(&["run", "list", &f.root(), "--json"]);
-    let row = json(&listed)["value"]["runs"][0]["attempts"][0].clone();
+    let row = json_naming::payload(&json(&listed))["runs"][0]["attempts"][0].clone();
     assert_eq!(row["outcome"], "interrupted", "{row}");
     assert_eq!(row["reconciliation"]["verdict"], "absent", "{row}");
     assert_eq!(
@@ -1361,11 +1374,11 @@ fn confirmed_releases_the_attempt_and_the_next_intent_follows_it() {
     release(&f, &pid);
     let out = reconcile(&f, "confirmed", "outcome-unknown", &["--json"]);
     assert_eq!(code(&out), 0, "{}", text(&out));
-    assert_eq!(json(&out)["value"]["retryAllowed"], true);
+    assert_eq!(json_naming::payload(&json(&out))["retryAllowed"], true);
     assert!(text(&out).contains("confirmed"), "{}", text(&out));
 
     let shown = f.cli(&["run", "show", &f.root(), RUN, "--json"]);
-    let recs = json(&shown)["value"]["reconciliations"].clone();
+    let recs = json_naming::payload(&json(&shown))["reconciliations"].clone();
     assert_eq!(recs[0]["verdict"], "confirmed", "{recs}");
     assert_eq!(recs[0]["corroborated"], false);
 
@@ -1441,7 +1454,10 @@ fn a_concluded_attempt_an_unknown_attempt_number_and_an_empty_reason_are_refused
     ]);
     assert_eq!(code(&out), 2, "{}", text(&out));
     let answer: serde_json::Value = json_naming::from_output(&out.stdout).unwrap();
-    assert!(answer["value"]["refused"].is_string(), "{answer}");
+    assert!(
+        json_naming::payload(&answer)["refused"].is_string(),
+        "{answer}"
+    );
 
     // An empty reason or operator, against a live attempt.
     let g = Fixture::new();
@@ -1470,7 +1486,7 @@ fn a_released_tool_call_refuses_absent_even_with_no_manifest() {
 
     let out = reconcile(&f, "unknown", "unrecorded", &["--json"]);
     assert_eq!(code(&out), 0, "{}", text(&out));
-    let observed = json(&out)["value"]["observed"].clone();
+    let observed = json_naming::payload(&json(&out))["observed"].clone();
     assert_eq!(observed["launchState"], "unrecorded");
     assert_eq!(observed["gateReleasedToolCall"], true, "{observed}");
     assert!(
@@ -1528,7 +1544,11 @@ fn a_decision_the_child_planted_before_the_supervisors_is_not_the_decision() {
     let out = f.run();
     assert_eq!(code(&out), 1, "{}", text(&out));
     let answer = json(&out);
-    assert_eq!(answer["value"]["outcome"], "refused", "{answer}");
+    assert_eq!(
+        json_naming::payload(&answer)["outcome"],
+        "refused",
+        "{answer}"
+    );
     assert!(f.order().iter().any(|l| l == "planted"), "{:?}", f.order());
     // The plant is gone, and the records say what the supervisor decided.
     assert!(!f.exchange_dir(1).join("admission.json").exists());
@@ -1660,7 +1680,7 @@ fn reconciliation_reads_an_attempt_recorded_inside_the_target() {
     assert!(text(&out).contains("conflicting"), "{}", text(&out));
     let out = reconcile(&f, "confirmed", "outcome-unknown", &["--json"]);
     assert_eq!(code(&out), 0, "{}", text(&out));
-    let observed = json(&out)["value"]["observed"].clone();
+    let observed = json_naming::payload(&json(&out))["observed"].clone();
     assert_eq!(observed["gateReleasedToolCall"], true, "{observed}");
     assert_eq!(observed["confirmedPid"].to_string(), pid);
     for file in observed["files"].as_array().unwrap() {

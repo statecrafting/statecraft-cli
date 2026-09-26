@@ -215,17 +215,17 @@ fn session_payload_prints_the_bytes_and_their_identity() {
     let out = sandbox.run(&["session", "payload", "--json"]);
     assert_eq!(code(&out), 0, "{}", stdout(&out));
     let value: serde_json::Value = json_naming::from_text(&stdout(&out)).expect("json");
-    let payload = &value["value"]["value"]["payload"];
+    let payload = &json_naming::payload(&value)["value"]["payload"];
     assert_eq!(
         payload,
         &serde_json::json!(statecraft_home::session::payload_json())
     );
     assert_eq!(
-        value["value"]["value"]["digest"],
+        json_naming::payload(&value)["value"]["digest"],
         serde_json::json!(statecraft_home::startup::payload_identity())
     );
     assert_eq!(
-        value["value"]["value"]["delivered"],
+        json_naming::payload(&value)["value"]["delivered"],
         serde_json::json!(false)
     );
 
@@ -237,8 +237,10 @@ fn session_payload_prints_the_bytes_and_their_identity() {
     let human = sandbox.run(&["session", "payload"]);
     assert_eq!(code(&human), 0);
     assert_eq!(stdout(&human), statecraft_home::session::payload_json());
-    let reparsed: serde_json::Value = json_naming::from_text(&stdout(&human))
+    // The bytes, not an envelope: held to the naming rule only.
+    let reparsed: serde_json::Value = serde_json::from_str(&stdout(&human))
         .expect("the human rendering is the settings document itself");
+    json_naming::assert_conforms(&reparsed);
     assert!(reparsed["permissions"]["deny"].is_array());
 
     // It needs no target, which is the point of it taking no path.
@@ -260,11 +262,11 @@ fn harness_show_activates_nothing() {
     assert_eq!(code(&out), 1, "{}", stdout(&out));
     let value: serde_json::Value = json_naming::from_text(&stdout(&out)).expect("json");
     assert_eq!(
-        value["value"]["value"]["activatedAnything"],
+        json_naming::payload(&value)["value"]["activatedAnything"],
         serde_json::json!(false)
     );
     assert_eq!(
-        value["value"]["value"]["availableUpgrade"]["availability"],
+        json_naming::payload(&value)["value"]["availableUpgrade"]["availability"],
         serde_json::json!("available")
     );
 
@@ -437,7 +439,7 @@ fn a_capture_renders_its_record_in_the_json_envelope() {
     let out = sandbox.capture("allowed-command", "faithful", &["--json"]);
     assert_eq!(code(&out), 0, "{}", stdout(&out));
     let value: serde_json::Value = json_naming::from_text(&stdout(&out)).expect("json");
-    let captured = &value["value"];
+    let captured = &json_naming::payload(&value);
     assert_eq!(captured["operation"], serde_json::json!("captured"));
     assert_eq!(captured["value"]["complete"], serde_json::json!(true));
     let on_disk: serde_json::Value = serde_json::from_slice(
@@ -783,7 +785,10 @@ fn unreadable_captures_are_a_failure_and_not_a_refused_claim() {
         "--json",
     ]);
     let value: serde_json::Value = json_naming::from_text(&stdout(&out)).expect("json");
-    assert_eq!(value["value"]["value"]["kind"], serde_json::json!("unread"));
+    assert_eq!(
+        json_naming::payload(&value)["value"]["kind"],
+        serde_json::json!("unread")
+    );
 }
 
 /// A session that already has a record is refused before any evidence is read.
@@ -804,7 +809,10 @@ fn a_second_record_for_a_session_is_refused_before_the_evidence_is_read() {
     ]);
     assert_eq!(code(&out), 2, "{}", stdout(&out));
     let value: serde_json::Value = json_naming::from_text(&stdout(&out)).expect("json");
-    assert_eq!(value["value"]["operation"], serde_json::json!("refused"));
+    assert_eq!(
+        json_naming::payload(&value)["operation"],
+        serde_json::json!("refused")
+    );
 }
 
 /// Spec 002 section 3.34, through the binary: a capture ending with the one

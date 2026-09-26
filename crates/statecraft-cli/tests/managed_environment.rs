@@ -172,13 +172,13 @@ fn the_json_rendering_carries_the_same_facts_as_the_human_one() {
 
     let parsed: serde_json::Value =
         json_naming::from_text(&stdout(&json)).expect("--json is parseable");
-    assert!(parsed.get("value").is_some());
-    assert!(parsed.get("exit").is_some());
+    assert!(parsed.get("report").is_some());
+    assert!(parsed.get("outcome").is_some());
     assert_eq!(
-        parsed["value"]["operation"], "home",
+        parsed["report"]["operation"], "home",
         "the operation names itself"
     );
-    assert_eq!(parsed["value"]["value"]["platformConsulted"], false);
+    assert_eq!(parsed["report"]["value"]["platformConsulted"], false);
 }
 
 #[test]

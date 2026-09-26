@@ -188,7 +188,7 @@ fn a_draft_is_refused_by_default_admitted_by_an_override_and_refused_again_after
     let shown = f.cli(&["override", "show", &root, "--json"]);
     assert_eq!(code(&shown), 0);
     let v: serde_json::Value = json_naming::from_output(&shown.stdout).unwrap();
-    let in_force = &v["value"]["inForce"];
+    let in_force = &v["report"]["inForce"];
     assert_eq!(in_force.as_array().unwrap().len(), 1, "{v}");
     assert_eq!(in_force[0]["specId"], DRAFT);
     assert_eq!(in_force[0]["reason"], "reviewing the draft");
@@ -201,7 +201,7 @@ fn a_draft_is_refused_by_default_admitted_by_an_override_and_refused_again_after
     assert!(code(&out) <= 1, "{}", text(&out));
     let listed = f.cli(&["run", "list", &root, "--json"]);
     let v: serde_json::Value = json_naming::from_output(&listed.stdout).unwrap();
-    let admission = &v["value"]["runs"][0]["attempts"][0]["admission"];
+    let admission = &v["report"]["runs"][0]["attempts"][0]["admission"];
     assert_eq!(admission["by"], "override", "{v}");
     assert_eq!(admission["operator"], "alice");
     assert_eq!(admission["operator_provenance"], "operator-supplied");
@@ -214,7 +214,7 @@ fn a_draft_is_refused_by_default_admitted_by_an_override_and_refused_again_after
     );
     // The spec's status is what the corpus says; the override ratified
     // nothing.
-    assert_eq!(v["value"]["runs"][0]["id"], DRAFT);
+    assert_eq!(v["report"]["runs"][0]["id"], DRAFT);
 
     // Revocation restores the default refusal, and the earlier attempt keeps
     // the override it recorded.
@@ -225,11 +225,11 @@ fn a_draft_is_refused_by_default_admitted_by_an_override_and_refused_again_after
     let listed = f.cli(&["run", "list", &root, "--json"]);
     let v: serde_json::Value = json_naming::from_output(&listed.stdout).unwrap();
     assert_eq!(
-        v["value"]["runs"][0]["attempts"].as_array().unwrap().len(),
+        v["report"]["runs"][0]["attempts"].as_array().unwrap().len(),
         1
     );
     assert_eq!(
-        v["value"]["runs"][0]["attempts"][0]["admission"]["by"],
+        v["report"]["runs"][0]["attempts"][0]["admission"]["by"],
         "override"
     );
 }
@@ -355,7 +355,7 @@ fn an_intent_written_before_the_section_reads_as_not_recorded() {
     .unwrap();
     let out = f.cli(&["run", "show", &root, "old", "--json"]);
     let v: serde_json::Value = json_naming::from_output(&out.stdout).unwrap();
-    assert!(v["value"]["admissions"][0]["admission"].is_null(), "{v}");
+    assert!(v["report"]["admissions"][0]["admission"].is_null(), "{v}");
     let out = f.cli(&["run", "show", &root, "old"]);
     assert!(
         text(&out).contains("admission not recorded"),
@@ -443,9 +443,9 @@ fn every_spelling_of_a_registered_root_keys_one_lock_one_chain_and_one_journal()
     for spelling in [&root, &slash, &dot] {
         let listed = f.cli(&["run", "list", spelling, "--json"]);
         let v: serde_json::Value = json_naming::from_output(&listed.stdout).unwrap();
-        assert_eq!(v["value"]["runs"][0]["id"], DRAFT, "{spelling}: {v}");
+        assert_eq!(v["report"]["runs"][0]["id"], DRAFT, "{spelling}: {v}");
         assert_eq!(
-            v["value"]["runs"][0]["attempts"].as_array().unwrap().len(),
+            v["report"]["runs"][0]["attempts"].as_array().unwrap().len(),
             1,
             "{spelling}: {v}"
         );
@@ -455,7 +455,7 @@ fn every_spelling_of_a_registered_root_keys_one_lock_one_chain_and_one_journal()
     let listed = f.cli(&["run", "list", &root, "--json"]);
     let v: serde_json::Value = json_naming::from_output(&listed.stdout).unwrap();
     assert_eq!(
-        v["value"]["runs"][0]["attempts"].as_array().unwrap().len(),
+        v["report"]["runs"][0]["attempts"].as_array().unwrap().len(),
         2,
         "a retry through another spelling appends to the same run: {v}"
     );
@@ -542,7 +542,7 @@ fn a_second_run_through_another_spelling_while_one_is_live_is_refused() {
     let listed = f.cli(&["run", "list", &format!("{root}/"), "--json"]);
     let v: serde_json::Value = json_naming::from_output(&listed.stdout).unwrap();
     assert_eq!(
-        v["value"]["runs"][0]["attempts"].as_array().unwrap().len(),
+        v["report"]["runs"][0]["attempts"].as_array().unwrap().len(),
         1,
         "{v}"
     );
@@ -614,7 +614,7 @@ fn a_root_stored_with_a_trailing_separator_keys_every_spelling() {
         assert!(text(&out).contains(DRAFT), "{spelling}: {}", text(&out));
         let listed = f.cli(&["run", "list", spelling, "--json"]);
         let v: serde_json::Value = json_naming::from_output(&listed.stdout).unwrap();
-        assert_eq!(v["value"]["runs"][0]["id"], DRAFT, "{spelling}: {v}");
+        assert_eq!(v["report"]["runs"][0]["id"], DRAFT, "{spelling}: {v}");
     }
     assert_eq!(records_ending(&f, ".jsonl"), 1);
     assert_eq!(records_ending(&f, ".overrides.jsonl"), 1);
@@ -730,7 +730,7 @@ fn a_spelling_the_previous_build_re_stored_is_recovered_by_registering_the_old_o
     let listed = f.cli(&["run", "list", &slash, "--json"]);
     assert_eq!(code(&listed), 0, "{}", text(&listed));
     let v: serde_json::Value = json_naming::from_output(&listed.stdout).unwrap();
-    assert_eq!(v["value"]["runs"][0]["id"], DRAFT, "{v}");
+    assert_eq!(v["report"]["runs"][0]["id"], DRAFT, "{v}");
     // Registering again under the other spelling now changes nothing: the
     // stored spelling has records.
     let out = f.cli(&["project", "register", &slash]);

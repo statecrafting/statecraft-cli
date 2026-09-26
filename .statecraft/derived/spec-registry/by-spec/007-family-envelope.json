@@ -1,0 +1,56 @@
+{
+  "record": {
+    "amends": [
+      "006-command-surface"
+    ],
+    "created": "2026-09-25",
+    "dependsOn": [
+      "001-boundaries-and-authority",
+      "006-command-surface"
+    ],
+    "extends": [
+      {
+        "nature": "corrective",
+        "spec": "006-command-surface",
+        "unit": {
+          "kind": "directory",
+          "path": "crates/statecraft-cli/"
+        }
+      }
+    ],
+    "id": "007-family-envelope",
+    "implementation": "in-progress",
+    "sectionDigests": {
+      "007-the-family-envelope": "99f859d717bf6ea863001c7080fb6236732677823c0d3a27a041f806f3b3eed6",
+      "1-purpose": "25ce849e05ad8d70773d2c2ad81a6eb453d262d6bda2f93b1875e03b40174469",
+      "2-territory": "3d2c1e8f2d618f24fd9983eda189f296e1728ac19dbcffc0f9b559c56c090371",
+      "3-1-the-envelope": "a3d7487e9ec8ed8312518b0069c9f67b503d838fee46a2cc82f6c848e18f22ab",
+      "3-2-error-kinds": "065e7346c8f7999c927b34eb1508a855f8965a1cb5a36d3912160f2180a3e302",
+      "3-3-usage-errors": "14c4da8700d08665f3f9f0d98e6d9f19c2790206835d6a368e38db2c48726425",
+      "3-4-what-does-not-change": "2767b32e501e0d537c96022cdc8f909faf6c240ad330d97c395ca8c85d5af045",
+      "3-behavior": "78caa5f928f050f457baaeb2c4355c4a9760dc6b9ce17a804fceb319dec81cc5",
+      "4-out-of-scope": "94d737fab1c790836b9b452415ee407ed858a6cdc09dcae36f5ef3814da2282a",
+      "5-decisions-recorded-during-implementation": "7099ac72902ce3fe457daa8f98060b4a13d7fd4e8250ffb0ba5a3327fcb20463",
+      "verification": "5d8b795e3efdf5bf7a8e3436e21f21d3e35217d55f2278c9b9660181a8ab3a8e"
+    },
+    "sectionHeadings": [
+      "007: The family envelope",
+      "1. Purpose",
+      "2. Territory",
+      "3. Behavior",
+      "3.1 The envelope",
+      "3.2 Error kinds",
+      "3.3 Usage errors",
+      "3.4 What does not change",
+      "4. Out of scope",
+      "5. Decisions recorded during implementation",
+      "Verification"
+    ],
+    "specPath": "specs/007-family-envelope/spec.md",
+    "status": "draft",
+    "summary": "Amends 006 sections 3.3 and 3.4. Every --json answer this product writes becomes the envelope spec-spine has written since 0.26.0 (its spec 132 section 3.4): schemaVersion, tool, verb, outcome, exitCode, summary, then report for exit 0 or 1 and error for 2, 3 or 4, where error.kind is one of the family's ten tokens. No exit number moves. A usage error under --json is an envelope on stdout. The replacement of 002 section 3.23's check translation, which #118 proposed for the same change, is left to the spec-spine 0.28.0 adoption, which changes the producer answer it would read. Replaces the section 5 proposal of #118, which the amendment model adopted on 2026-09-25 (001 section 5) no longer admits.\n",
+    "title": "The family envelope: every --json answer in the exit and JSON contract spec-spine speaks"
+  },
+  "shardHash": "648d82b9aaf37e13ffb01a340d7977b8cd9e746b81e8961689b67232f5fef3d7",
+  "specVersion": "1.9.0"
+}

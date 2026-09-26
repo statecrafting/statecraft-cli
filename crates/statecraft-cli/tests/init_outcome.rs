@@ -133,7 +133,7 @@ impl Fixture {
         let after = self.walk();
         let answer: serde_json::Value =
             json_naming::from_output(&out.stdout).unwrap_or_else(|e| panic!("{e}: {}", text(&out)));
-        let report = answer["value"]["value"].clone();
+        let report = json_naming::payload(&answer)["value"].clone();
         assert!(report.is_object(), "{answer}");
         let mut seen = BTreeSet::new();
         for path in before.keys().chain(after.keys()) {

@@ -190,7 +190,7 @@ fn run_is_refused_until_the_target_is_armed_and_again_once_it_is_disarmed() {
     // turns on, rather than an assumption about it.
     let listed = f.run(&["project", "list", "--json"]);
     let parsed: Value = json_naming::from_output(&listed.stdout).unwrap();
-    assert_eq!(parsed["value"][0]["armed"], false, "{listed:?}");
+    assert_eq!(parsed["report"][0]["armed"], false, "{listed:?}");
 
     // And the unit of work is schedulable while the target is unarmed, so a
     // refusal from `run` cannot be the policy declining this spec. `work show`
@@ -231,7 +231,7 @@ fn run_is_refused_until_the_target_is_armed_and_again_once_it_is_disarmed() {
     let ran = f.run(&["run", root, "fixture", "--json"]);
     assert_eq!(code(&ran), 0, "{ran:?}");
     let answer: Value = json_naming::from_output(&ran.stdout).unwrap();
-    assert_eq!(answer["value"]["outcome"], "completed", "{answer}");
+    assert_eq!(answer["report"]["outcome"], "completed", "{answer}");
     assert!(f.spawned(), "the provider was reached");
     assert!(f.workspaces(), "a workspace was prepared");
     assert_eq!(f.attempts(), 1, "one attempt was appended");
@@ -275,7 +275,7 @@ fn discovery_and_inspection_are_not_gated_on_consent() {
     let listed = f.run(&["work", "list", root, "--json"]);
     assert_eq!(code(&listed), 0, "{listed:?}");
     let answer: Value = json_naming::from_output(&listed.stdout).unwrap();
-    assert_eq!(answer["value"]["eligible"][0]["id"], "fixture", "{answer}");
+    assert_eq!(answer["report"]["eligible"][0]["id"], "fixture", "{answer}");
 
     // `run list` on a target with no runs is an empty answer, not a refusal.
     let runs = f.run(&["run", "list", root]);

@@ -621,3 +621,31 @@ fn a_char_literal_quote_does_not_open_a_string() {
         "fn f<'a>(s: &'a str) {}"
     );
 }
+
+#[test]
+#[should_panic(expected = "exitCode outside the family table")]
+fn an_exit_outside_the_family_table_fails_with_its_own_diagnostic() {
+    json_naming::assert_envelope(&serde_json::json!({
+        "schemaVersion": "1.0.0",
+        "tool": "statecraft-cli",
+        "verb": "doctor",
+        "outcome": "unknown",
+        "exitCode": 5,
+        "summary": "outside the table",
+        "error": {"kind": "internal", "message": "outside the table"}
+    }));
+}
+
+#[test]
+#[should_panic(expected = "envelope has no report or error.details")]
+fn asking_for_an_omitted_error_payload_fails_with_its_own_diagnostic() {
+    json_naming::payload(&serde_json::json!({
+        "schemaVersion": "1.0.0",
+        "tool": "statecraft-cli",
+        "verb": "work.list",
+        "outcome": "refused",
+        "exitCode": 2,
+        "summary": "not registered",
+        "error": {"kind": "not-found", "message": "not registered"}
+    }));
+}

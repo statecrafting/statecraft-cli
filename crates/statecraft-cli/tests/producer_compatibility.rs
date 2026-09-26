@@ -120,7 +120,7 @@ fn a_ready_entry_carrying_an_agreeing_status_is_accepted_and_the_join_still_deci
     let out = work_list(target.path(), home.path(), bin.path());
     assert_eq!(out.status.code(), Some(0), "{out:?}");
     let v: serde_json::Value = json_naming::from_output(&out.stdout).unwrap();
-    let value = &v["value"];
+    let value = &v["report"];
     // The draft is offered as ready, and the policy, not the plan, excludes it.
     let excluded: Vec<&str> = value["excluded"]
         .as_array()

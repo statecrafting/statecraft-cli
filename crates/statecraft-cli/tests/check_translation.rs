@@ -118,7 +118,7 @@ impl Fixture {
         let out = self.cli(&["init", "apply", &self.root(), "--json"]);
         let answer: serde_json::Value =
             json_naming::from_output(&out.stdout).unwrap_or_else(|e| panic!("{e}: {}", text(&out)));
-        let steps = answer["value"]["value"]["steps"]
+        let steps = json_naming::payload(&answer)["value"]["steps"]
             .as_array()
             .unwrap_or_else(|| panic!("{answer}"))
             .clone();
@@ -257,11 +257,11 @@ fn an_absent_binary_is_a_refusal() {
     let g = Fixture::without_spec_spine();
     let (exit, corpus, register, answer) = g.init();
     assert_eq!(exit, 1, "{answer}");
-    assert_eq!(answer["value"]["value"]["outcome"], "partial", "{answer}");
+    assert_eq!(answer["report"]["value"]["outcome"], "partial", "{answer}");
     assert_eq!(corpus["state"]["state"], "refused", "{answer}");
     assert_eq!(register["state"]["state"], "refused", "{answer}");
     assert!(
-        answer["value"]["value"]["writes"]
+        answer["report"]["value"]["writes"]
             .as_array()
             .is_some_and(|w| !w.is_empty()),
         "{answer}"
@@ -288,7 +288,7 @@ fn a_binary_lacking_the_verb_is_a_refusal_whatever_check_would_have_answered() {
         let g = Fixture::new(help, check, "error: unrecognized subcommand 'check'\n");
         let (exit, corpus, _, answer) = g.init();
         assert_eq!(exit, 1, "help {help}, check {check}: {answer}");
-        assert_eq!(answer["value"]["value"]["outcome"], "partial", "{answer}");
+        assert_eq!(answer["report"]["value"]["outcome"], "partial", "{answer}");
         assert_eq!(corpus["state"]["state"], "refused", "{answer}");
         // Refused before anything ran: no compile, no index.
         assert!(

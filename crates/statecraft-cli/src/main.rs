@@ -8,10 +8,10 @@
 
 use statecraft_cli::adapters;
 use statecraft_cli::bind;
-use statecraft_cli::commands::{Verb, parse};
+use statecraft_cli::commands::{Verb, parse, usage_verb};
 use statecraft_cli::exit::Exit;
 use statecraft_cli::product_home;
-use statecraft_cli::render::{Answer, Format};
+use statecraft_cli::render::{Answer, Format, usage_envelope};
 use statecraft_cli::slice;
 use statecraft_environment::claimant::{ForeignClaims, UnobservedShadows};
 use statecraft_environment::manifest::Manifest;
@@ -34,13 +34,20 @@ fn run(args: &[String]) -> i32 {
         Ok(i) => i,
         Err(e) => {
             // Usage errors go to stderr: a caller piping `--json` into a parser
-            // should not have to filter a help text out of its input.
-            eprint!("{}", e.describe());
+            // should not have to filter a help text out of its input. Under
+            // `--json` the envelope goes to stdout instead (spec 007 section
+            // 3.3), naming the attempted operation without its operands.
+            if args.iter().any(|a| a == "--json") {
+                let verb = usage_verb(args);
+                print!("{}", usage_envelope(&verb, &e.describe()));
+            } else {
+                eprint!("{}", e.describe());
+            }
             return Exit::Usage.code();
         }
     };
     let format = if invocation.json {
-        Format::Json
+        Format::Json(invocation.verb)
     } else {
         Format::Human
     };
@@ -54,8 +61,7 @@ fn run(args: &[String]) -> i32 {
     match invocation.verb {
         Verb::ProjectRegister => {
             let Some(path) = invocation.rest.first() else {
-                eprintln!("usage: project register <path>");
-                return Exit::Usage.code();
+                return usage(format, "usage: project register <path>".to_string());
             };
             let path = absolute(path);
             // Spec 003 section 5 (2026-09-23): a re-registration keeps the
@@ -112,8 +118,10 @@ fn run(args: &[String]) -> i32 {
         Verb::ProjectList => emit(&bind::project_list(&registry), format),
         Verb::ProjectArm | Verb::ProjectDisarm => {
             let Some(path) = invocation.rest.first() else {
-                eprintln!("usage: {} <path>", invocation.verb.spelling());
-                return Exit::Usage.code();
+                return usage(
+                    format,
+                    format!("usage: {} <path>", invocation.verb.spelling()),
+                );
             };
             let armed = invocation.verb == Verb::ProjectArm;
             match bind::project_set_armed(&mut registry, &absolute(path), armed) {
@@ -133,8 +141,10 @@ fn run(args: &[String]) -> i32 {
         // in the same change.
         Verb::EnvPlan | Verb::EnvApply | Verb::EnvUpgrade | Verb::EnvRemove | Verb::Doctor => {
             let Some(path) = invocation.rest.first() else {
-                eprintln!("usage: {} <path>", invocation.verb.spelling());
-                return Exit::Usage.code();
+                return usage(
+                    format,
+                    format!("usage: {} <path>", invocation.verb.spelling()),
+                );
             };
             let root = absolute(path);
             // Every environment verb needs a registered target. A precondition,
@@ -153,8 +163,7 @@ fn run(args: &[String]) -> i32 {
                 match bind::remote_arguments(&invocation.rest[1..]) {
                     Ok(split) => split,
                     Err(detail) => {
-                        eprintln!("usage: {detail}");
-                        return Exit::Usage.code();
+                        return usage(format, format!("usage: {detail}"));
                     }
                 }
             } else {
@@ -163,16 +172,17 @@ fn run(args: &[String]) -> i32 {
             let named = match bind::replace_arguments(consenting, &rest) {
                 Ok(named) => named,
                 Err(detail) => {
-                    eprintln!("usage: {detail}");
-                    return Exit::Usage.code();
+                    return usage(format, format!("usage: {detail}"));
                 }
             };
             if !named.is_empty() && matches!(invocation.verb, Verb::EnvRemove | Verb::Doctor) {
-                eprintln!(
-                    "usage: {} does not take --replace; name a path to `env plan`, then consent to it with `env apply`",
-                    invocation.verb.spelling()
+                return usage(
+                    format,
+                    format!(
+                        "usage: {} does not take --replace; name a path to `env plan`, then consent to it with `env apply`",
+                        invocation.verb.spelling()
+                    ),
                 );
-                return Exit::Usage.code();
             }
             environment_verb(invocation.verb, &root, &home, &named, remote, format)
         }
@@ -186,12 +196,14 @@ fn run(args: &[String]) -> i32 {
         | Verb::RunShow
         | Verb::Accept => {
             let Some(path) = invocation.rest.first() else {
-                eprintln!(
-                    "usage: {} <path>{}",
-                    invocation.verb.spelling(),
-                    argument_hint(invocation.verb)
+                return usage(
+                    format,
+                    format!(
+                        "usage: {} <path>{}",
+                        invocation.verb.spelling(),
+                        argument_hint(invocation.verb)
+                    ),
                 );
-                return Exit::Usage.code();
             };
             let root = match registered(&registry, &absolute(path)) {
                 Ok(root) => root,
@@ -244,12 +256,14 @@ fn run(args: &[String]) -> i32 {
         | Verb::StartupCapture
         | Verb::StartupQualify => {
             let Some(path) = invocation.rest.first() else {
-                eprintln!(
-                    "usage: {}{}",
-                    invocation.verb.spelling(),
-                    statecraft_cli::manage::usage(invocation.verb)
+                return usage(
+                    format,
+                    format!(
+                        "usage: {}{}",
+                        invocation.verb.spelling(),
+                        statecraft_cli::manage::usage(invocation.verb)
+                    ),
                 );
-                return Exit::Usage.code();
             };
             let root = absolute(path);
             manage_verb(
@@ -264,11 +278,13 @@ fn run(args: &[String]) -> i32 {
         // `run`'s preconditions: a registered and armed target.
         Verb::StartupTrial => {
             let Some(path) = invocation.rest.first() else {
-                eprintln!(
-                    "usage: startup trial{}",
-                    statecraft_cli::manage::usage(invocation.verb)
+                return usage(
+                    format,
+                    format!(
+                        "usage: startup trial{}",
+                        statecraft_cli::manage::usage(invocation.verb)
+                    ),
                 );
-                return Exit::Usage.code();
             };
             let root = match registered(&registry, &absolute(path)) {
                 Ok(root) => root,
@@ -287,24 +303,30 @@ fn run(args: &[String]) -> i32 {
         Verb::StartupShow => {
             let (Some(path), Some(run_id)) = (invocation.rest.first(), invocation.rest.get(1))
             else {
-                eprintln!(
-                    "usage: startup show{}",
-                    statecraft_cli::manage::usage(invocation.verb)
+                return usage(
+                    format,
+                    format!(
+                        "usage: startup show{}",
+                        statecraft_cli::manage::usage(invocation.verb)
+                    ),
                 );
-                return Exit::Usage.code();
             };
             let attempt = match invocation.rest.get(2..).unwrap_or_default() {
                 [] => None,
                 [flag, n] if flag == "--attempt" => match n.parse::<u32>() {
                     Ok(n) if n > 0 => Some(n),
                     _ => {
-                        eprintln!("usage: startup show <path> <run-id> [--attempt <n>]");
-                        return Exit::Usage.code();
+                        return usage(
+                            format,
+                            "usage: startup show <path> <run-id> [--attempt <n>]".to_string(),
+                        );
                     }
                 },
                 _ => {
-                    eprintln!("usage: startup show <path> <run-id> [--attempt <n>]");
-                    return Exit::Usage.code();
+                    return usage(
+                        format,
+                        "usage: startup show <path> <run-id> [--attempt <n>]".to_string(),
+                    );
                 }
             };
             // Not a registration precondition, as above; but where the path
@@ -346,20 +368,22 @@ fn run(args: &[String]) -> i32 {
         // 3.1.4. A registered target, as for the work verbs; the journal is
         // the product's own state, so arming is not required to change it.
         Verb::OverrideGrant | Verb::OverrideRevoke | Verb::OverrideShow => {
-            let usage = || {
-                eprintln!(
-                    "usage: {} <path>{}",
-                    invocation.verb.spelling(),
-                    if invocation.verb == Verb::OverrideShow {
-                        ""
-                    } else {
-                        " <spec-id> <operator> <reason...>"
-                    }
-                );
-                Exit::Usage.code()
+            let show_usage = || {
+                usage(
+                    format,
+                    format!(
+                        "usage: {} <path>{}",
+                        invocation.verb.spelling(),
+                        if invocation.verb == Verb::OverrideShow {
+                            ""
+                        } else {
+                            " <spec-id> <operator> <reason...>"
+                        }
+                    ),
+                )
             };
             let Some(path) = invocation.rest.first() else {
-                return usage();
+                return show_usage();
             };
             let root = match registered(&registry, &absolute(path)) {
                 Ok(root) => root,
@@ -367,7 +391,7 @@ fn run(args: &[String]) -> i32 {
             };
             if invocation.verb == Verb::OverrideShow {
                 if invocation.rest.len() != 1 {
-                    return usage();
+                    return show_usage();
                 }
                 return match statecraft_run::overrides::read(&home, &root) {
                     Ok(journal) => emit(
@@ -379,7 +403,7 @@ fn run(args: &[String]) -> i32 {
             }
             let (Some(spec_id), Some(operator)) = (invocation.rest.get(1), invocation.rest.get(2))
             else {
-                return usage();
+                return show_usage();
             };
             let reason = invocation.rest.get(3..).unwrap_or_default().join(" ");
             let at = statecraft_environment::time::rfc3339_utc(
@@ -428,8 +452,7 @@ fn run(args: &[String]) -> i32 {
                 }) {
                     Ok(r) => r,
                     Err(why) => {
-                        eprintln!("{why}");
-                        return Exit::Usage.code();
+                        return usage(format, why.to_string());
                     }
                 };
             if registry.get(request.root()).is_none() {
@@ -459,12 +482,14 @@ fn manage_verb(
     format: Format,
 ) -> i32 {
     let Some(operation) = statecraft_cli::manage::operation(verb, rest, root) else {
-        eprintln!(
-            "usage: {}{}",
-            verb.spelling(),
-            statecraft_cli::manage::usage(verb)
+        return usage(
+            format,
+            format!(
+                "usage: {}{}",
+                verb.spelling(),
+                statecraft_cli::manage::usage(verb)
+            ),
         );
-        return Exit::Usage.code();
     };
     emit(&statecraft_cli::manage::execute(home, operation), format)
 }
@@ -525,8 +550,7 @@ fn slice_verb(
         Verb::WorkList => emit(&slice::work_list_answer(work.expect("read above")), format),
         Verb::WorkShow => {
             let Some(id) = rest.first() else {
-                eprintln!("usage: work show <path> <spec-id>");
-                return Exit::Usage.code();
+                return usage(format, "usage: work show <path> <spec-id>".to_string());
             };
             emit(
                 &slice::work_show_answer(work.expect("read above").eligibility_of(id)),
@@ -535,8 +559,7 @@ fn slice_verb(
         }
         Verb::Run => {
             let Some(id) = rest.first() else {
-                eprintln!("usage: run <path> <spec-id>");
-                return Exit::Usage.code();
+                return usage(format, "usage: run <path> <spec-id>".to_string());
             };
             run_verb(
                 root,
@@ -556,8 +579,7 @@ fn slice_verb(
         },
         Verb::RunShow => {
             let Some(run_id) = rest.first() else {
-                eprintln!("usage: run show <path> <run-id>");
-                return Exit::Usage.code();
+                return usage(format, "usage: run show <path> <run-id>".to_string());
             };
             match Chain::open(home, root) {
                 Ok((chain, _)) => {
@@ -581,8 +603,7 @@ fn slice_verb(
         }
         Verb::Accept => {
             let Some(run_id) = rest.first() else {
-                eprintln!("usage: accept <path> <run-id>");
-                return Exit::Usage.code();
+                return usage(format, "usage: accept <path> <run-id>".to_string());
             };
             accept_verb(root, home, run_id, format)
         }
@@ -604,11 +625,12 @@ fn reconcile_verb(
     use statecraft_run::reconcile::{EvidenceFile, LaunchState, Observation, Request};
     use statecraft_run::recovery::Verdict;
     let usage = || {
-        eprintln!(
+        usage(
+            format,
             "usage: run reconcile <path> <run-id> <attempt> <confirmed|absent|unknown> \
              <launch-state> <operator> <reason...> [--evidence <file>]..."
-        );
-        Exit::Usage.code()
+                .to_string(),
+        )
     };
     let mut positional: Vec<&String> = Vec::new();
     let mut evidence_paths: Vec<&String> = Vec::new();
@@ -1561,11 +1583,13 @@ fn trial_verb(
 ) -> i32 {
     use statecraft_home::trial;
     let usage = || {
-        eprintln!(
-            "usage: startup trial{}",
-            statecraft_cli::manage::usage(Verb::StartupTrial)
-        );
-        Exit::Usage.code()
+        usage(
+            format,
+            format!(
+                "usage: startup trial{}",
+                statecraft_cli::manage::usage(Verb::StartupTrial)
+            ),
+        )
     };
     let mut stated = Vec::new();
     let mut deadline = trial::DEFAULT_DEADLINE_SECONDS;
@@ -2174,10 +2198,23 @@ fn emit<T: serde::Serialize>(answer: &Answer<T>, format: Format) -> i32 {
     answer.exit.code()
 }
 
+/// A failure no request asked for: a product store (registry, journal, lock,
+/// record) that could not be read or written. Its kind is the exit's default,
+/// `io` (spec 007 section 3.2).
 fn fail(detail: &str, format: Format) -> i32 {
     let answer = Answer::new(detail.to_string(), Exit::Failed, detail);
     print!("{}", answer.render(format));
     Exit::Failed.code()
+}
+
+/// A usage error: text on stderr, or under `--json` the envelope on stdout
+/// with `error.kind` `usage` (spec 007 section 3.3). Exit 3 either way.
+fn usage(format: Format, message: String) -> i32 {
+    match format {
+        Format::Human => eprintln!("{message}"),
+        Format::Json(verb) => print!("{}", usage_envelope(&verb.dotted(), &message)),
+    }
+    Exit::Usage.code()
 }
 
 /// The registration a typed path names, as the root it was stored under.

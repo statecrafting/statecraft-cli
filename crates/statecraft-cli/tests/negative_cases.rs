@@ -191,7 +191,7 @@ fn env_plan_writes_nothing_and_names_the_configured_adapter() {
     assert!(!target.path().join("CLAUDE.md").exists());
 
     let parsed: serde_json::Value = json_naming::from_text(&stdout(&out)).expect("valid json");
-    let adapters = parsed["value"]["adapters"]
+    let adapters = parsed["report"]["adapters"]
         .as_array()
         .expect("the plan reports every configured adapter");
     assert_eq!(adapters.len(), 1, "one ratified adapter");
@@ -213,7 +213,7 @@ fn env_plan_writes_nothing_and_names_the_configured_adapter() {
             .expect("stated rather than dropped")
             .is_empty()
     );
-    assert!(parsed["value"]["writes"].as_array().unwrap().is_empty());
+    assert!(parsed["report"]["writes"].as_array().unwrap().is_empty());
 }
 
 // Row 7: a command given `--json`.
@@ -230,12 +230,12 @@ fn json_and_human_renderings_carry_the_same_facts_from_the_same_value() {
 
     let parsed: serde_json::Value =
         json_naming::from_text(&stdout(&json)).expect("--json emits JSON");
-    assert_eq!(parsed["value"]["verdict"], "ungoverned");
-    assert_eq!(parsed["exit"], "finding");
+    assert_eq!(parsed["report"]["verdict"], "ungoverned");
+    assert_eq!(parsed["outcome"], "finding");
 
     // The same fact, in both renderings, because there is one value behind them.
     assert!(stdout(&human).contains("ungoverned"));
-    let reasons = parsed["value"]["reasons"].as_array().unwrap();
+    let reasons = parsed["report"]["reasons"].as_array().unwrap();
     let first = reasons[0].as_str().unwrap();
     assert!(
         stdout(&human).contains(first),
@@ -298,7 +298,7 @@ fn arming_is_a_separate_invocation_and_the_register_persists_between_them() {
     let listed = run_in(home.path(), &["project", "list", "--json"]);
     let parsed: serde_json::Value = json_naming::from_text(&stdout(&listed)).unwrap();
     assert_eq!(
-        parsed["value"][0]["armed"], false,
+        parsed["report"][0]["armed"], false,
         "registered is not armed"
     );
     assert_eq!(code(&listed), 0, "listing is never a finding");
@@ -311,9 +311,9 @@ fn arming_is_a_separate_invocation_and_the_register_persists_between_them() {
         &["project", "list", "--json"],
     )))
     .unwrap();
-    assert_eq!(after["value"][0]["armed"], true);
+    assert_eq!(after["report"][0]["armed"], true);
     assert_eq!(
-        after["value"][0]["eligible"], false,
+        after["report"][0]["eligible"], false,
         "armed but not qualified is still not eligible"
     );
 }
