@@ -47,8 +47,8 @@
       }
     ],
     "specId": "010-profile-unresolved-claims",
-    "specStatus": "draft"
+    "specStatus": "approved"
   },
   "schemaVersion": "1.2.0",
-  "shardHash": "8f62775d545aa3747b591e8182d505e7d89c1225bd3b51ff890d36470d01d342"
+  "shardHash": "5fdb7bb9bd013aa49a93f74eec69164f4aa371c19fa2f1f1ec33d2a7cdfa530d"
 }
