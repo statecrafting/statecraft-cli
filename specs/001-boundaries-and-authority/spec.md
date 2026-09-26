@@ -520,6 +520,24 @@ the change (`.github/workflows/govern.yml`, the owner's request of 2026-09-24).
 Nothing required changes: the rules are the ones section 3.6 already states,
 applied to text they already govern.
 
+**2026-09-25: the session-link patterns cover every historical form
+(section 3.6.2; a correction, which changes the check suite and so waits for
+the owner's exception).** `scripts/check-authored-content.sh` matched a Claude
+session link only in its UUID form, `claude.ai/(chat|code)/` followed by eight
+hexadecimal characters or hyphens, so the `claude.ai/code/session_...` form
+that cloud sessions append to pull-request bodies passed the title and body
+check, and a Codex cloud task link (`chatgpt.com/codex/tasks/task_...`) passed
+everywhere. Found by the travel-memory program while five repositories adopted
+setup profile revision 7. Two patterns are added, `claude\.ai/(chat|code)/session_`
+and `chatgpt\.com/codex/tasks/task_`, each followed by at least eight
+identifier characters, so a bare product page (`claude.ai/code`,
+`chatgpt.com/codex`) still passes. The script gains `--self-test`, which runs
+its own `--text` mode over built samples: each link form and trailer refused,
+each near-miss clean. Run against the previous patterns it fails on exactly the
+two `session_` samples and the Codex sample. Nothing required changes: section
+3.6.2 already refuses every agent-session URL, and this makes the check do what
+the rule says. The tree mode found no such link in this repository.
+
 **2026-09-25: rustev is recorded as an optional neighbour (owner,
 2026-09-25).** The owner asked for rustev in the boundary tables of sections
 3.2 and 3.8, as a spec change for the owner's ratification: an embeddable
@@ -855,6 +873,7 @@ implemented.
 test -f docs/decisions/00-founding-decisions.md
 test -x scripts/check-authored-content.sh
 scripts/check-authored-content.sh
+scripts/check-authored-content.sh --self-test
 grep -qF 'XII. Public claims are graded' standards/spec/constitution.md
 grep -qiF 'specified' standards/spec/constitution.md
 grep -qF 'Frozen by spec 000 as `independent-acceptance`' standards/spec/constitution.md

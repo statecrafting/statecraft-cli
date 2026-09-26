@@ -40,7 +40,7 @@
       "contentHash": "cdb5906ba0d57084c0092d3fca981f5b5674ab2498116bea410f11553eba575a"
     },
     "scripts/check-authored-content.sh": {
-      "contentHash": "0435cc51ba69cdbfb6711690b2fa798ba15c5b6d29b8130e80880cc1dc9ff33c"
+      "contentHash": "0846ecb44bf0fb1ff372089e925350ad3d877d47b1656b57304119db2b54fe70"
     },
     "scripts/resolve-shard-conflicts.sh": {
       "contentHash": "50138ae38377c0ff14f4f37ecdeed3cfd6500b50f91e5f7019232a11883ffdc3"

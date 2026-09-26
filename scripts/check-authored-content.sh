@@ -17,6 +17,11 @@
 # history under merge commits (AGENTS.md, "How a pull request is merged"). No
 # file is exempt in that mode.
 #
+# `--self-test` runs this script's `--text` mode over built samples: every
+# agent-session link form and trailer below must be refused, and each
+# near-miss beside it must pass. It exits 0 when all do, and 1 naming each
+# sample that did not.
+#
 # Exit 0 clean, 1 findings, 3 usage/environment.
 
 set -uo pipefail
@@ -24,6 +29,49 @@ set -uo pipefail
 SELF="scripts/check-authored-content.sh"
 status=0
 mode=tree
+
+if [ "${1:-}" = "--self-test" ]; then
+  [ "$#" -eq 1 ] || { echo "check-authored-content: --self-test takes no arguments" >&2; exit 3; }
+  me="$0"
+  tmp=$(mktemp -d "${TMPDIR:-/tmp}/authored-self-test.XXXXXX") || exit 3
+  trap 'rm -rf "$tmp"' EXIT
+  failed=0
+  n=0
+  # expect: 1 refused, 0 clean. One sample per line: "<expect> <text>".
+  while IFS= read -r line; do
+    [ -n "$line" ] || continue
+    expect=${line%% *}
+    text=${line#* }
+    n=$((n + 1))
+    printf '%s\n' "$text" > "$tmp/sample"
+    "$me" --text "$tmp/sample" > /dev/null 2>&1
+    got=$?
+    if [ "$got" -ne "$expect" ]; then
+      echo "self-test: expected exit $expect, got $got: $text"
+      failed=1
+    fi
+  done <<'SAMPLES'
+1 see https://claude.ai/chat/0123abcd-4567-89ef-0123-456789abcdef
+1 see https://claude.ai/code/0123abcd-4567-89ef-0123-456789abcdef
+1 see https://claude.ai/code/session_01AbCdEfGhIjKlMnOpQrStUv
+1 see https://claude.ai/code/session_011CUz9vQ8x
+1 see https://chatgpt.com/codex/tasks/task_e_68d4c0ffee0123456789abcdef
+1 Co-Authored-By: Claude <noreply@anthropic.com>
+1 Generated with [Claude Code](https://example.invalid)
+1 Session-Id: 0123456789abcdef
+0 claude.ai/code is the product page
+0 https://claude.ai/code/docs
+0 claude.ai/code/session_ with no identifier
+0 https://chatgpt.com/codex
+0 a plain sentence
+SAMPLES
+  if [ "$failed" -ne 0 ]; then
+    exit 1
+  fi
+  echo "check-authored-content: self-test passed ($n samples)"
+  exit 0
+fi
+
 if [ "${1:-}" = "--text" ]; then
   mode=text
   shift
@@ -90,8 +138,13 @@ done
 
 # One pattern per line, extended regex. Each is a link or trailer that ties
 # repository content to an agent session; spec 001 section 3.6.2 refuses all of
-# them, and refuses substituting another tracking link.
+# them, and refuses substituting another tracking link. A Claude session link
+# has two historical forms, a UUID path and the `session_` path cloud sessions
+# append to pull-request bodies; a Codex cloud task link is the third (spec 001
+# section 5, 2026-09-25).
 patterns='claude\.ai/(chat|code)/[0-9a-f-]{8}
+claude\.ai/(chat|code)/session_[0-9A-Za-z]{8}
+chatgpt\.com/codex/tasks/task_[0-9A-Za-z_]{8}
 Co-[Aa]uthored-[Bb]y:.*(Claude|Codex|Copilot|Gemini|noreply@anthropic)
 Generated with \[?(Claude Code|Codex)
 (Session|Agent-Session|Run)-(Id|URL): *[0-9a-zA-Z_-]{8}
