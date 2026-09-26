@@ -40,8 +40,7 @@ pub enum Format {
 
 /// The closed set of `error.kind` tokens (spec 007 section 3.2): the family's,
 /// spelled as spec-spine spells them, and never extended locally.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
-#[serde(rename_all = "kebab-case")]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ErrorKind {
     /// Authored content that does not validate.
     Validation,
@@ -366,9 +365,6 @@ mod tests {
                 "internal"
             ]
         );
-        for k in ErrorKind::all() {
-            assert_eq!(serde_json::to_value(k).unwrap(), k.word());
-        }
     }
 
     #[test]

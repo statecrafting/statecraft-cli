@@ -8,7 +8,7 @@
 
 use statecraft_cli::adapters;
 use statecraft_cli::bind;
-use statecraft_cli::commands::{Verb, parse};
+use statecraft_cli::commands::{Verb, parse, usage_verb};
 use statecraft_cli::exit::Exit;
 use statecraft_cli::product_home;
 use statecraft_cli::render::{Answer, Format, usage_envelope};
@@ -36,19 +36,9 @@ fn run(args: &[String]) -> i32 {
             // Usage errors go to stderr: a caller piping `--json` into a parser
             // should not have to filter a help text out of its input. Under
             // `--json` the envelope goes to stdout instead (spec 007 section
-            // 3.3), naming the words as typed, since they name no verb.
+            // 3.3), naming the attempted operation without its operands.
             if args.iter().any(|a| a == "--json") {
-                let typed: Vec<&str> = args
-                    .iter()
-                    .filter(|a| !a.starts_with('-'))
-                    .take(2)
-                    .map(String::as_str)
-                    .collect();
-                let verb = if typed.is_empty() {
-                    "unknown".to_string()
-                } else {
-                    typed.join(".")
-                };
+                let verb = usage_verb(args);
                 print!("{}", usage_envelope(&verb, &e.describe()));
             } else {
                 eprint!("{}", e.describe());

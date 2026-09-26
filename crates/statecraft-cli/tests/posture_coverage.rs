@@ -273,8 +273,9 @@ impl Fixture {}
 fn assert_refused_at_planning(f: &Fixture, out: &Output) -> Value {
     assert_eq!(code(out), 2, "{}", text(out));
     let v = json_of(out);
-    assert_eq!(v["error"]["details"]["guard"], "posture-coverage", "{v}");
-    assert_eq!(v["error"]["details"]["phase"], "planning", "{v}");
+    let details = json_naming::payload(&v);
+    assert_eq!(details["guard"], "posture-coverage", "{v}");
+    assert_eq!(details["phase"], "planning", "{v}");
     assert!(f.entries().is_empty(), "an attempt was appended");
     assert_eq!(f.launches(), 0, "a provider was launched");
     v

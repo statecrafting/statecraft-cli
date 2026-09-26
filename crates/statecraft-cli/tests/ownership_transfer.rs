@@ -217,10 +217,8 @@ impl Sandbox {
         let before = self.snapshot();
         let (c, v) = self.json(args);
         assert_eq!(c, 2, "{args:?}: {v}");
-        assert_eq!(
-            v["error"]["details"]["refused"]["kind"], kind,
-            "{args:?}: {v}"
-        );
+        let details = json_naming::payload(&v);
+        assert_eq!(details["refused"]["kind"], kind, "{args:?}: {v}");
         assert_eq!(self.snapshot(), before, "{args:?} changed a byte");
         // The human rendering says the same, from the same value.
         let human = self.run(args);

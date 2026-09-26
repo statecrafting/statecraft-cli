@@ -76,12 +76,19 @@ fn a_usage_error_under_json_is_an_envelope_on_stdout_and_text_without_it() {
     assert_eq!(v["error"]["kind"], "usage");
     assert!(v["error"]["message"].as_str().unwrap().contains("usage:"));
 
-    // Words that name no verb are named as typed.
-    let unknown = run_in(dir.path(), &["frob", "nicate", "--json"]);
+    // An unknown operation names its command word, not a following operand.
+    let unknown = run_in(dir.path(), &["frobnicate", "/tmp/project", "--json"]);
     assert_eq!(code(&unknown), 3);
     let v = json_naming::from_output(&unknown.stdout).unwrap();
-    assert_eq!(v["verb"], "frob.nicate");
+    assert_eq!(v["verb"], "frobnicate");
     assert_eq!(v["outcome"], "usage");
+
+    // A known command group and its unknown subcommand remain a dotted name;
+    // the path after them is still only an operand.
+    let unknown = run_in(dir.path(), &["env", "publish", "/tmp/project", "--json"]);
+    assert_eq!(code(&unknown), 3);
+    let v = json_naming::from_output(&unknown.stdout).unwrap();
+    assert_eq!(v["verb"], "env.publish");
 
     // With no operation words there is no spelling to copy. The stable name
     // is `unknown`, never an empty member that violates the envelope.
