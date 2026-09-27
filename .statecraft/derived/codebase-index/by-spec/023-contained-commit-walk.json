@@ -1,0 +1,37 @@
+{
+  "mapping": {
+    "amends": [
+      "002-environment-lifecycle"
+    ],
+    "dependsOn": [
+      "001-boundaries-and-authority",
+      "002-environment-lifecycle",
+      "017-ai-review-diff-cap"
+    ],
+    "implementingPaths": [
+      {
+        "path": "crates/statecraft-home/",
+        "source": "spec-edge"
+      }
+    ],
+    "resolvedUnits": [
+      {
+        "locations": [
+          {
+            "file": "crates/statecraft-home/"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "directory",
+          "path": "crates/statecraft-home/"
+        }
+      }
+    ],
+    "specId": "023-contained-commit-walk",
+    "specStatus": "approved"
+  },
+  "schemaVersion": "1.2.0",
+  "shardHash": "acd3b0edc58ad368b4f279fd31e07deb88ff7fff86622e18f5170e8ae597183d"
+}

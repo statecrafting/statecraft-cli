@@ -1,0 +1,55 @@
+{
+  "record": {
+    "amends": [
+      "002-environment-lifecycle"
+    ],
+    "created": "2026-09-27",
+    "dependsOn": [
+      "001-boundaries-and-authority",
+      "002-environment-lifecycle",
+      "017-ai-review-diff-cap"
+    ],
+    "extends": [
+      {
+        "nature": "additive",
+        "spec": "002-environment-lifecycle",
+        "unit": {
+          "kind": "directory",
+          "path": "crates/statecraft-home/"
+        }
+      }
+    ],
+    "id": "023-contained-commit-walk",
+    "implementation": "complete",
+    "sectionDigests": {
+      "023-the-commit-walk-runs-a-contained-spec-spine": "5f1891de1a98a0f05a9c19a957d54446f0bd12384e63614e85f4a6b72295aae4",
+      "1-purpose": "687515ad397b1d9d53b42d3031794cea9bd8226e58682a049f683645405e93ca",
+      "2-territory": "b1e9fc695ab4e283bef0449f872c480c71f26f99accc6f2f6fa62a44a338fd79",
+      "3-1-each-worktree-holds-its-own-binary": "2705b66beace1725bf57601679de2cf7d6997bf366d722a05ae76c76e8fb1cd1",
+      "3-2-nothing-else-about-the-walk-changes": "30d92938608f7e749f659e679cf4f7939146cfb5196bfc56291bc559c5ad9a2b",
+      "3-3-upgrade-behavior": "469465e28e49d81be3dae03711a56825aa1d510b6b7a86036b651367636170b3",
+      "3-behavior": "538231bc4628d1a18261a6f94d2384f233504793fb21542cda44d07f145083d1",
+      "4-out-of-scope": "ffca4a1299bc6d52f261b587909c1866d0de43bc45f51d2f96d2201dcec2a6c2",
+      "5-resolved-decisions": "e54efd1c5a049b7b890201ef249a6702759ed08c3fee25a099e6d26c445d52d5",
+      "verification": "4fea0dd473dbafc71bcc5d10436e24ab1df7d20d7900c16bdceaee5510c9c539"
+    },
+    "sectionHeadings": [
+      "023: The commit walk runs a contained spec-spine",
+      "1. Purpose",
+      "2. Territory",
+      "3. Behavior",
+      "3.1 Each worktree holds its own binary",
+      "3.2 Nothing else about the walk changes",
+      "3.3 Upgrade behavior",
+      "4. Out of scope",
+      "5. Resolved decisions",
+      "Verification"
+    ],
+    "specPath": "specs/023-contained-commit-walk/spec.md",
+    "status": "approved",
+    "summary": "Amends spec 002's setup profile. github-actions-rust revision 11 copies the spec-spine binary into each temporary commit worktree as a regular file instead of linking it from outside, so spec-spine's containment rule can read every commit's tree. The walk's verdicts are otherwise unchanged.\n",
+    "title": "Setup profile revision 11: the commit walk runs a contained spec-spine"
+  },
+  "shardHash": "acd3b0edc58ad368b4f279fd31e07deb88ff7fff86622e18f5170e8ae597183d",
+  "specVersion": "1.9.0"
+}

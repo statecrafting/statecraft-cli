@@ -1,5 +1,5 @@
 #!/bin/sh
-# Rendered by Statecraft from profile github-actions-rust revision 10.
+# Rendered by Statecraft from profile github-actions-rust revision 11.
 # The one definition of this repository's gate: `make gate` and `make code`
 # run it locally, and CI runs the same script, so the two cannot drift. Only
 # the repository-local .tooling/bin/spec-spine is used; a spec-spine elsewhere
@@ -380,7 +380,15 @@ case "$MODE" in
           bin="$root/bin/spec-spine"
         fi
         script="$SELF"
-        if [ -n "$bin" ] && mkdir -p "$wt/.tooling/bin" && ln -sf "$bin" "$wt/.tooling/bin/spec-spine" \
+        # The binary is copied into the commit's own tree, never linked
+        # (revision 11, spec 023): a link from the worktree resolves outside
+        # it, and spec-spine refuses to read a repository through a link that
+        # leaves it (its spec 144, from 0.28.0). The copy is a regular file
+        # inside the worktree, and it goes when the worktree does.
+        contained="$wt/.tooling/bin/spec-spine"
+        if [ -n "$bin" ] && mkdir -p "$wt/.tooling/bin" && rm -f "$contained" \
+          && cp "$bin" "$contained" && chmod 755 "$contained" \
+          && [ -f "$contained" ] && [ ! -L "$contained" ] \
           && (cd "$wt" && sh "$script" governance && cargo fmt --all --check) > "$log" 2>&1; then
           echo "$short: the gate and the format check pass at its own tree"
         else
