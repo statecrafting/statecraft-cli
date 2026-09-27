@@ -1,7 +1,7 @@
 ---
 id: "018-governed-bootstrap-inputs"
 title: "Governed inputs for a complete first bootstrap"
-status: draft
+status: approved
 implementation: pending
 created: "2026-09-27"
 summary: >

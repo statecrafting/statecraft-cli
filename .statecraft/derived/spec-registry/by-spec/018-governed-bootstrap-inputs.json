@@ -89,10 +89,10 @@
       "Verification"
     ],
     "specPath": "specs/018-governed-bootstrap-inputs/spec.md",
-    "status": "draft",
+    "status": "approved",
     "summary": "Amends 002's initialization contract and 009's producer call so a fresh repository can supply setup-profile parameters through one explicit, plan-bound input document, receives the exact governance-producer pin from the producer itself, and remains honestly partial when project-owned prerequisites are absent.\n",
     "title": "Governed inputs for a complete first bootstrap"
   },
-  "shardHash": "fe2f5a7c8e01d74520dc166ad71bf4d02f0b323b2b8d02477e7faa69a1f7fe45",
+  "shardHash": "1f9744ce7056758f12a227a7414a08a50f39c82044fd98494b66178137d1ec91",
   "specVersion": "1.9.0"
 }
