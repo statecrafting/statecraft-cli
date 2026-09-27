@@ -30,8 +30,8 @@
       }
     ],
     "specId": "023-contained-commit-walk",
-    "specStatus": "draft"
+    "specStatus": "approved"
   },
   "schemaVersion": "1.2.0",
-  "shardHash": "451100fff06baaa24b0e4eb0dbb92ad8b1d3af8fe4f00c2048d7944e33d5d620"
+  "shardHash": "acd3b0edc58ad368b4f279fd31e07deb88ff7fff86622e18f5170e8ae597183d"
 }

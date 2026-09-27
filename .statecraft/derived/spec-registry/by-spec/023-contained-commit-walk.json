@@ -46,10 +46,10 @@
       "Verification"
     ],
     "specPath": "specs/023-contained-commit-walk/spec.md",
-    "status": "draft",
+    "status": "approved",
     "summary": "Amends spec 002's setup profile. github-actions-rust revision 11 copies the spec-spine binary into each temporary commit worktree as a regular file instead of linking it from outside, so spec-spine's containment rule can read every commit's tree. The walk's verdicts are otherwise unchanged.\n",
     "title": "Setup profile revision 11: the commit walk runs a contained spec-spine"
   },
-  "shardHash": "451100fff06baaa24b0e4eb0dbb92ad8b1d3af8fe4f00c2048d7944e33d5d620",
+  "shardHash": "acd3b0edc58ad368b4f279fd31e07deb88ff7fff86622e18f5170e8ae597183d",
   "specVersion": "1.9.0"
 }

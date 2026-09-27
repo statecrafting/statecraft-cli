@@ -1,7 +1,7 @@
 ---
 id: "023-contained-commit-walk"
 title: "Setup profile revision 11: the commit walk runs a contained spec-spine"
-status: draft
+status: approved
 implementation: complete
 created: "2026-09-27"
 summary: >
