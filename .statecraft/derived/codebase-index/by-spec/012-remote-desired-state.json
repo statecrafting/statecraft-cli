@@ -81,8 +81,8 @@
       }
     ],
     "specId": "012-remote-desired-state",
-    "specStatus": "draft"
+    "specStatus": "approved"
   },
   "schemaVersion": "1.2.0",
-  "shardHash": "48aed86f6184cd0224447217e0119739431654529edda37d676ac94d968ab707"
+  "shardHash": "a0ba87109dfa821d2070b00ae86ab772c0c749422a6519721c1111e97483334f"
 }

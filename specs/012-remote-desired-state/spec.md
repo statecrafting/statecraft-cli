@@ -1,7 +1,7 @@
 ---
 id: "012-remote-desired-state"
 title: "A setup profile declares remote desired state and doctor compares it without writing"
-status: draft
+status: approved
 implementation: pending
 created: "2026-09-26"
 summary: >

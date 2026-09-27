@@ -76,10 +76,10 @@
       "Verification"
     ],
     "specPath": "specs/012-remote-desired-state/spec.md",
-    "status": "draft",
+    "status": "approved",
     "summary": "Amends 002's setup-profile and remote-doctor contract. A profile renders a versioned desired remote-state document covering required checks, extra jobs, code-owner review, merge queue, the review-exception environment and its reviewers, workflow-token defaults, secret names, repository custom properties, and profile identity. doctor --remote compares every field independently and never writes remote state or reads a secret value.\n",
     "title": "A setup profile declares remote desired state and doctor compares it without writing"
   },
-  "shardHash": "48aed86f6184cd0224447217e0119739431654529edda37d676ac94d968ab707",
+  "shardHash": "a0ba87109dfa821d2070b00ae86ab772c0c749422a6519721c1111e97483334f",
   "specVersion": "1.9.0"
 }
