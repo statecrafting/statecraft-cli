@@ -56,6 +56,11 @@ fn render(root: &Path) {
 
 /// As [`render`], with parameters added to the declared block.
 fn render_with(root: &Path, extra: &[(&str, serde_json::Value)]) {
+    render_profile(root, &Profile::registered(), extra);
+}
+
+/// Render `profile` into `root` with the project parameters `extra`.
+fn render_profile(root: &Path, profile: &Profile, extra: &[(&str, serde_json::Value)]) {
     // The local prerequisites, so the profile is not withheld.
     for (rel, text) in [
         ("rust-toolchain.toml", "[toolchain]\nchannel = \"1.96.0\"\n"),
@@ -66,7 +71,6 @@ fn render_with(root: &Path, extra: &[(&str, serde_json::Value)]) {
         }
     }
     std::fs::create_dir_all(root.join(".git")).unwrap();
-    let profile = Profile::registered();
     let manifest = Manifest::new(Pins {
         product: "0.0.0".into(),
         spec_spine: "unpinned".into(),
@@ -80,7 +84,7 @@ fn render_with(root: &Path, extra: &[(&str, serde_json::Value)]) {
     }
     let plan = setup::plan(&Inputs {
         root,
-        profile: &profile,
+        profile,
         block: &block,
         manifest: &manifest,
         spec_spine_toml: Some(TOML),
@@ -1855,6 +1859,25 @@ const EM: &str = "\u{2014}";
 /// `--fail-on-untraced`, as the real flag does.
 const SPEC_SPINE: &str = r#"#!/bin/sh
 printf '%s | %s\n' "$PWD" "$*" >> "$STUB_STATE/spec-spine-calls"
+# spec-spine's containment rule (its spec 144, from 0.28.0): a repository is
+# never read through a .tooling/bin/spec-spine link that leaves it. Every
+# answer records whether the binary it ran as was contained.
+ss=.tooling/bin/spec-spine
+if [ -L "$ss" ]; then
+  to=$(readlink "$ss")
+  case "$to" in /*) ;; *) to=".tooling/bin/$to" ;; esac
+  at=$(cd "$(dirname "$to")" 2>/dev/null && pwd -P) || at=/nonexistent
+  case "$at/" in
+    "$(pwd -P)"/*) ;;
+    *)
+      printf '%s | outside\n' "$PWD" >> "$STUB_STATE/spec-spine-containment"
+      echo "spec-spine: refused: refused to read the repository: '$ss' is a link to $to, outside it (spec 144)" >&2
+      exit 2 ;;
+  esac
+fi
+if [ -f "$ss" ]; then
+  printf '%s | contained\n' "$PWD" >> "$STUB_STATE/spec-spine-containment"
+fi
 case "$*" in
   --version) echo "spec-spine 0.26.0" ;;
   "index coverage"*)
@@ -1889,6 +1912,12 @@ exit 0
 /// `src/unformatted.rs`; every call is recorded with its directory.
 const CARGO: &str = r#"#!/bin/sh
 printf '%s | %s\n' "$PWD" "$*" >> "$STUB_STATE/cargo-calls"
+if [ "$1" = install ]; then
+  root=$(printf '%s\n' "$@" | sed -n '/^--root$/{n;p;}')
+  mkdir -p "$root/bin"
+  cp "$(dirname "$0")/spec-spine" "$root/bin/spec-spine"
+  exit 0
+fi
 if [ "$1" = metadata ]; then
   if [ -f "$STUB_STATE/no-members" ]; then
     echo '{"packages": [], "workspace_members": [ ], "version": 1}'
@@ -1924,6 +1953,10 @@ struct Gov {
 
 impl Gov {
     fn new(params: &[(&str, serde_json::Value)]) -> Gov {
+        Gov::with_profile(&Profile::registered(), params)
+    }
+
+    fn with_profile(profile: &Profile, params: &[(&str, serde_json::Value)]) -> Gov {
         let dir = tempfile::tempdir().unwrap();
         let root = dir.path();
         for args in [
@@ -1941,11 +1974,14 @@ impl Gov {
         std::fs::create_dir_all(root.join("scripts")).unwrap();
         statecraft_adapter::fixture::install_script(&root.join(DECLARED), CHECK_AUTHORED, 0o755)
             .unwrap();
-        render_with(root, params);
+        render_profile(root, profile, params);
+        // A regular file, as install-spec-spine.sh leaves it: the stub
+        // refuses a link that leaves the repository, as spec-spine does.
         std::fs::create_dir_all(root.join(".tooling/bin")).unwrap();
-        std::os::unix::fs::symlink(
-            gov_bin().join("spec-spine"),
-            root.join(".tooling/bin/spec-spine"),
+        statecraft_adapter::fixture::install_script(
+            &root.join(".tooling/bin/spec-spine"),
+            SPEC_SPINE,
+            0o755,
         )
         .unwrap();
         git(root, &["add", "-A"]);
@@ -2569,6 +2605,98 @@ fn a_rerun_does_not_repeat_a_skip_notice() {
         "{calls}"
     );
     assert!(again.text.contains("already posted"), "{}", again.text);
+}
+
+/// Revision 10's gate script, the one template revision 11 changed.
+const R10_GATE: &str = include_str!("support/profile-r10/gate.sh");
+
+/// Spec 023: every temporary worktree the commit walk makes runs a spec-spine
+/// that is a regular file inside that worktree, whether the commit pins the
+/// head's release (the checkout's binary, copied in) or another one (a binary
+/// installed for that pin, copied in). Revision 10 linked the binary from
+/// outside the worktree, which spec-spine's containment rule refuses; the
+/// same walk under revision 10's gate is refused for exactly that reason.
+#[test]
+fn the_commit_walk_runs_a_contained_spec_spine_in_every_worktree() {
+    let params = [("governance.gate_each_commit", serde_json::json!(true))];
+    let walk = "Every commit in the change";
+    let commits = |gov: &Gov| {
+        let other = gov.commit(
+            &[(
+                "spec-spine.toml",
+                Some("[meta]\nrequired_version = \"=0.25.0\"\n"),
+            )],
+            "another pin",
+        );
+        let head = gov.commit(&[("spec-spine.toml", Some(TOML))], "the head's pin");
+        [other, head]
+    };
+
+    let gov = Gov::new(&params);
+    let walked = commits(&gov);
+    let ran = run_gov(&gov, walk, &event("pull_request", &walked[1]), |_| {});
+    assert_eq!(ran.exit, 0, "{}", ran.text);
+    let seen = ran.stub_file("spec-spine-containment").unwrap_or_default();
+    assert!(!seen.contains("outside"), "{seen}");
+    for c in &walked {
+        let short = gov.short(c);
+        assert!(
+            ran.text.contains(&format!(
+                "{short}: the gate and the format check pass at its own tree"
+            )),
+            "{}",
+            ran.text
+        );
+        assert!(
+            seen.lines()
+                .any(|l| l.contains(&format!("statecraft-commit-{short}"))
+                    && l.ends_with("| contained")),
+            "{seen}"
+        );
+    }
+    // The other pin was installed on its own, then copied in like the head's.
+    let cargo = ran.stub_file("cargo-calls").unwrap_or_default();
+    assert!(
+        cargo.contains("install spec-spine-cli --version =0.25.0 --locked --root"),
+        "{cargo}"
+    );
+    assert_eq!(
+        git(gov.root(), &["worktree", "list", "--porcelain"])
+            .matches("worktree ")
+            .count(),
+        1
+    );
+
+    // Revision 10: the same walk, refused by the containment rule.
+    let mut r10 = Profile::registered();
+    r10.revision = 10;
+    for t in &mut r10.templates {
+        if t.path == "scripts/statecraft/gate.sh" {
+            t.body = R10_GATE.to_string();
+        }
+    }
+    let old = Gov::with_profile(&r10, &params);
+    let walked = commits(&old);
+    let ran = run_gov(&old, walk, &event("pull_request", &walked[1]), |_| {});
+    assert_eq!(ran.exit, 1, "{}", ran.text);
+    assert!(ran.text.contains("outside it (spec 144)"), "{}", ran.text);
+    let seen = ran.stub_file("spec-spine-containment").unwrap_or_default();
+    for c in &walked {
+        let short = old.short(c);
+        assert!(
+            ran.text.contains(&format!(
+                "{short} fails the gate or the format check at its own tree"
+            )),
+            "{}",
+            ran.text
+        );
+        assert!(
+            seen.lines()
+                .any(|l| l.contains(&format!("statecraft-commit-{short}"))
+                    && l.ends_with("| outside")),
+            "{seen}"
+        );
+    }
 }
 
 /// A commit whose `spec-spine.toml` states no exact pin is refused, and the

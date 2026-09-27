@@ -380,15 +380,7 @@ case "$MODE" in
           bin="$root/bin/spec-spine"
         fi
         script="$SELF"
-        # The binary is copied into the commit's own tree, never linked
-        # (revision 11, spec 023): a link from the worktree resolves outside
-        # it, and spec-spine refuses to read a repository through a link that
-        # leaves it (its spec 144, from 0.28.0). The copy is a regular file
-        # inside the worktree, and it goes when the worktree does.
-        contained="$wt/.tooling/bin/spec-spine"
-        if [ -n "$bin" ] && mkdir -p "$wt/.tooling/bin" && rm -f "$contained" \
-          && cp "$bin" "$contained" && chmod 755 "$contained" \
-          && [ -f "$contained" ] && [ ! -L "$contained" ] \
+        if [ -n "$bin" ] && mkdir -p "$wt/.tooling/bin" && ln -sf "$bin" "$wt/.tooling/bin/spec-spine" \
           && (cd "$wt" && sh "$script" governance && cargo fmt --all --check) > "$log" 2>&1; then
           echo "$short: the gate and the format check pass at its own tree"
         else

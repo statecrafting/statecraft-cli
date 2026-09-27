@@ -144,6 +144,7 @@ fn an_unmodified_file_is_replaced_and_a_customized_one_is_kept_with_three_digest
     );
 }
 
+const R10_GATE: &str = include_str!("support/profile-r10/gate.sh");
 const R8_GATE: &str = include_str!("support/profile-r8/gate.sh");
 const R7_AI_REVIEW: &str = include_str!("support/profile-r7/ai-review.sh");
 const R7_AI_REVIEW_WF: &str = include_str!("support/profile-r7/statecraft-ai-review.yml");
@@ -166,10 +167,24 @@ const R4_CI_GATE: &str = include_str!("support/profile-r4/ci-gate.sh");
 /// differs here. Rendering interpolates that revision into each managed-file
 /// header, producing revision-9 bytes from this value.
 fn revision_nine() -> Profile {
-    let mut r9 = Profile::registered();
-    assert_eq!(r9.revision, 10, "the registered profile is revision 10");
+    let mut r9 = revision_ten();
     r9.revision = 9;
     r9
+}
+
+/// Revision 10 of the registered profile: the gate script as revision 10
+/// shipped it (main at c95b7ee), the one template revision 11 changed.
+fn revision_ten() -> Profile {
+    let mut r10 = Profile::registered();
+    assert_eq!(r10.revision, 11, "the registered profile is revision 11");
+    r10.revision = 10;
+    for t in &mut r10.templates {
+        if t.path == "scripts/statecraft/gate.sh" {
+            assert_ne!(t.body, R10_GATE, "{}: revision 11 changed it", t.path);
+            t.body = R10_GATE.to_string();
+        }
+    }
+    r10
 }
 
 /// Revision 8 of the registered profile: the gate script as revision 8
@@ -993,7 +1008,7 @@ fn a_revision_nine_project_upgrades_to_revision_ten() {
         }
 
         let block = manifest.project.setup.as_ref().unwrap().parameters.clone();
-        let r10 = Profile::registered();
+        let r10 = revision_ten();
         assert_ne!(r10.identity(), r9.identity());
         let upgrade = plan_and_apply_with(root, &r10, &mut manifest, &block);
         assert!(upgrade.whole());
@@ -1016,4 +1031,60 @@ fn a_revision_nine_project_upgrades_to_revision_ten() {
             explicit.then_some(&serde_json::json!(2000))
         );
     }
+}
+
+/// Spec 023: revision 11 changes only the commit walk in `gate.sh`, which
+/// copies the spec-spine binary into each commit's worktree instead of linking
+/// it. A revision-10 project upgrades through the ordinary plan and apply, the
+/// other managed files keep their bytes apart from the revision header, and a
+/// second plan writes nothing.
+#[test]
+fn a_revision_ten_project_upgrades_to_revision_eleven() {
+    let gate = "scripts/statecraft/gate.sh";
+    let dir = project();
+    let root = dir.path();
+    let mut manifest = Manifest::new(Pins {
+        product: "0.0.0".into(),
+        spec_spine: "unpinned".into(),
+        adapters: Default::default(),
+        producer: None,
+    });
+    let r10 = revision_ten();
+    let block = BTreeMap::new();
+    assert!(plan_and_apply_with(root, &r10, &mut manifest, &block).whole());
+    let before = std::fs::read_to_string(root.join(gate)).unwrap();
+    assert!(before.contains("profile github-actions-rust revision 10"));
+    assert!(
+        before.contains(r#"ln -sf "$bin" "$wt/.tooling/bin/spec-spine""#),
+        "{before}"
+    );
+
+    let r11 = Profile::registered();
+    assert_ne!(r11.identity(), r10.identity());
+    let block = manifest.project.setup.as_ref().unwrap().parameters.clone();
+    let upgrade = plan_and_apply_with(root, &r11, &mut manifest, &block);
+    assert!(upgrade.whole());
+    let after = std::fs::read_to_string(root.join(gate)).unwrap();
+    assert!(after.contains("profile github-actions-rust revision 11"));
+    assert!(!after.contains("ln -s"), "{after}");
+    assert!(after.contains(r#"cp "$bin" "$contained""#), "{after}");
+    assert!(after.contains(r#"[ ! -L "$contained" ]"#), "{after}");
+    assert_eq!(manifest.project.setup.as_ref().unwrap().revision, 11);
+
+    // Converged: a second plan of the same selection writes nothing.
+    let again = plan_and_apply_with(root, &r11, &mut manifest, &block);
+    assert!(again.whole());
+    assert!(
+        again
+            .files
+            .iter()
+            .all(|f| matches!(f.action, Action::Unchanged | Action::LeftAlone { .. })),
+        "{:?}",
+        again
+            .files
+            .iter()
+            .map(|f| (&f.path, &f.action))
+            .collect::<Vec<_>>()
+    );
+    assert_eq!(std::fs::read_to_string(root.join(gate)).unwrap(), after);
 }
