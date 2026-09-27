@@ -1,0 +1,118 @@
+{
+  "record": {
+    "created": "2026-09-26",
+    "dependsOn": [
+      "001-boundaries-and-authority",
+      "002-environment-lifecycle"
+    ],
+    "extends": [
+      {
+        "nature": "additive",
+        "spec": "002-environment-lifecycle",
+        "unit": {
+          "kind": "directory",
+          "path": "crates/statecraft-environment/"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "002-environment-lifecycle",
+        "unit": {
+          "kind": "directory",
+          "path": "crates/statecraft-home/"
+        }
+      }
+    ],
+    "id": "008-harness-delivery",
+    "implementation": "complete",
+    "relocates": [
+      {
+        "from": "3-9-adapters",
+        "spec": "002-environment-lifecycle",
+        "to": "3-9-adapters"
+      },
+      {
+        "from": "3-14-one-global-harness-delivered-by-adapters-copied-into-no-repository",
+        "spec": "002-environment-lifecycle",
+        "to": "3-14-one-global-harness-delivered-by-adapters-copied-into-no-repository"
+      },
+      {
+        "from": "3-22-the-counterparty-s-state-and-the-order-the-last-of-its-harness-moves-in",
+        "spec": "002-environment-lifecycle",
+        "to": "3-22-the-counterparty-s-state-and-the-order-the-last-of-its-harness-moves-in"
+      },
+      {
+        "from": "3-23-what-delivered-harness-content-must-satisfy",
+        "spec": "002-environment-lifecycle",
+        "to": "3-23-what-delivered-harness-content-must-satisfy"
+      },
+      {
+        "from": "3-24-the-consented-settings-modification",
+        "spec": "002-environment-lifecycle",
+        "to": "3-24-the-consented-settings-modification"
+      },
+      {
+        "from": "3-25-the-required-harness-identity-and-the-resolved-one",
+        "spec": "002-environment-lifecycle",
+        "to": "3-25-the-required-harness-identity-and-the-resolved-one"
+      },
+      {
+        "from": "3-26-startup-delivery-evidence",
+        "spec": "002-environment-lifecycle",
+        "to": "3-26-startup-delivery-evidence"
+      },
+      {
+        "from": "3-27-global-adapter-registration-is-not-managed-session-permission-delivery",
+        "spec": "002-environment-lifecycle",
+        "to": "3-27-global-adapter-registration-is-not-managed-session-permission-delivery"
+      },
+      {
+        "from": "3-28-an-unmarked-registration-is-the-user-s-and-resemblance-is-not-ownership",
+        "spec": "002-environment-lifecycle",
+        "to": "3-28-an-unmarked-registration-is-the-user-s-and-resemblance-is-not-ownership"
+      }
+    ],
+    "sectionDigests": {
+      "008-harness-delivery-hooks-and-skills": "ffa7e55b925cbae3985945bc6271e979b9b07ea5a1456e0eec97774afd2be4b4",
+      "1-purpose": "49a0b363ae796b5b3a2bc17bb203c92808c759422ce74db3e58013aae42c317f",
+      "2-territory": "60a08d794d3881e8a7785b1e2b8e75b1daca9a9f19d71e5b578f75156a3b7621",
+      "3-14-one-global-harness-delivered-by-adapters-copied-into-no-repository": "4918ad78ec3844d7df7e689802329a8aa6b79e229cb8d34e2d9a9a024eaa705c",
+      "3-22-the-counterparty-s-state-and-the-order-the-last-of-its-harness-moves-in": "7beeb87fcfdbd5d81f712fc6751bd83c36a06f398e65469240f5db5ac80af945",
+      "3-23-what-delivered-harness-content-must-satisfy": "b97c6b7c28bf054a224676567ee09a9caf360504177946b7c5f4ac38ce34a46d",
+      "3-24-the-consented-settings-modification": "653dcc6ace982ce0273b5f3fe9cab491a2483e28a26d0da62b7664377bd02c1e",
+      "3-25-the-required-harness-identity-and-the-resolved-one": "3b68a1d08ac7b0b5e13e1b6ee4411560d3d06ce82a26807eeece2a34b36ee188",
+      "3-26-startup-delivery-evidence": "8dbe5ad7eb0c8481aba01545a4832a5d42c9fb25680351b9420168dbbe1c3d40",
+      "3-27-global-adapter-registration-is-not-managed-session-permission-delivery": "76d3aaaa10c24595da288582c0a65f264d8d37799624ec5c909230aa7614c743",
+      "3-28-an-unmarked-registration-is-the-user-s-and-resemblance-is-not-ownership": "059940cc51142b2948f03b21c2f005d9da276bbfe28b83e25248dcdda056dfa8",
+      "3-9-adapters": "d804ad9e05a2832c1365c66c66eeb09e0b153e38ae3757c4c72a031ad25a2afe",
+      "3-behavior": "98f81264644ec5564b4bc63bdd2ea652dd678a3b88bde11cb482085e748b1512",
+      "4-out-of-scope": "1a71d9bb88022e7e041fa23e7328b9df0c5b7cc6b09f71136d9a2949c6877521",
+      "5-resolved-decisions": "20a87f1999c912fe3878c16560c672de82c6400082afb96cba6f1839f1399712",
+      "verification": "f6626bbd8ca7ae935c20844d1a8979bc6004738d5c318494177d2f82a3ff9b41"
+    },
+    "sectionHeadings": [
+      "008: Harness delivery, hooks, and skills",
+      "1. Purpose",
+      "2. Territory",
+      "3. Behavior",
+      "3.9 Adapters",
+      "3.14 One global harness, delivered by adapters, copied into no repository",
+      "3.22 The counterparty's state, and the order the last of its harness moves in",
+      "3.23 What delivered harness content must satisfy",
+      "3.24 The consented settings modification",
+      "3.25 The required harness identity and the resolved one",
+      "3.26 Startup delivery evidence",
+      "3.27 Global adapter registration is not managed-session permission delivery",
+      "3.28 An unmarked registration is the user's, and resemblance is not ownership",
+      "4. Out of scope",
+      "5. Resolved decisions",
+      "Verification"
+    ],
+    "specPath": "specs/008-harness-delivery/spec.md",
+    "status": "approved",
+    "summary": "Carries the environment adapter, delivered harness, consented settings, required identity, and startup-delivery requirements relocated from spec 002. It keeps repository initialization separate from the harness that a registered adapter delivers.\n",
+    "title": "Harness delivery, hooks, and skills"
+  },
+  "shardHash": "3cdb1833b6e28cfe9f8dfad3321c3a6630ec99aca4d264636dd7d5659f11046d",
+  "specVersion": "1.9.0"
+}

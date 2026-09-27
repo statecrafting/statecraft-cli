@@ -20,8 +20,8 @@ amends:
 extends:
   # The initialization flow and the producer boundary are code in 002's crate
   # (src/flow.rs, src/producer.rs). `amends` does not make this spec an owner
-  # of that code (001 section 5, the amendment model, Part 1 item 1), so the
-  # edge is declared here, in the same change.
+  # of that code (001 section 5), so the edge is declared here, in the same
+  # change.
   - { spec: "002-environment-lifecycle", unit: { kind: directory, path: "crates/statecraft-home/" }, nature: corrective }
 depends_on:
   - "000-bootstrap"
@@ -116,16 +116,17 @@ operator's to resolve, and the compiler already names them.
 
 - The producer's own bytes. spec-spine's `scaffold_init_json` still returns
   `status: approved`; asking it to return a draft is a request to that corpus,
-  not a requirement here. The test in section 5 fails the day it stops, so
-  this spec is revisited then.
+  not a requirement here. The acceptance suite fails the day it stops, so this
+  spec is revisited then.
 - Other placeholders in the bootstrap spec (`created: "REPLACE-WITH-DATE"`),
-  which `002` section 5 (F3) already records.
+  whose historical rationale is preserved in
+  `docs/decisions/archive/002-environment-lifecycle-implementation-journal.md`.
 - A `specs_dir` other than the one this product declares (`specs`), which the
   producer is always asked for.
 - Consumer repositories. hiqlite and Rahi re-render with a build carrying this
   change; that is their change.
 
-## 5. Decisions recorded during implementation
+## 5. Resolved decisions
 
 **2026-09-25: "another `000` spec" is read from the directory name.**
 spec-spine requires a spec's directory to equal its `id`, and the ordinal is
@@ -155,9 +156,8 @@ holds for it is kept; an unrecorded one is not adopted. The apply is then not
 `a_present_bootstrap_spec_beside_another_000_spec_is_left_alone` holds each
 of these.
 
-**2026-09-25: the number `011`.** `007` is the draft in #165, `008` and `009`
-are named by spec `001` section 5's proposal for the split of `002`, and
-`010` is the draft in #166.
+**2026-09-25: the number `011`.** Ordinals `007` through `010` were already
+reserved when this spec was written, so it took the next free number.
 
 ## Verification
 

@@ -5,18 +5,13 @@
 Prepared 2026-09-16, at the founding of this repository. Owned by spec
 `001-boundaries-and-authority`.
 
-**Adoption status as of 2026-09-24: `D-03` is adopted in full, `D-01` and
-`D-02` are adopted for language and layout only, and `D-06` carries an amendment
-adopted on 2026-09-24. Every other row of section 3 is
-still a recommendation.** Section 5 carries each adoption with its date and is
-the only place a row becomes binding; the line you are reading is a summary of
-it and never a substitute. This record exists so the three kinds of statement
-below are never confused with each other. Section 1 is the repository owner's
-stated intent, recorded as given. Section 2 is inherited technical constraint:
-facts about tools, licenses and a predecessor, each verified in the session that
-wrote this file. Section 3 is a set of engineering recommendations that need the
-owner's decision before anything is built on them. Section 5 is what has been
-decided since, and is the only place a row becomes binding.
+This is a historical, nonnormative record. It preserves the repository's
+founding intent, inherited constraints, proposals, and the dated decisions that
+followed them. Current authority lives in the active specs, not in this file.
+Where this record and a current spec differ, the spec governs. Section 1 records
+the owner's stated intent; section 2 records constraints measured at the time;
+section 3 records recommendations; section 5 preserves their historical
+disposition.
 
 As of 2026-09-16, every spec in the corpus is `approved` except
 `006-command-surface`, which is a proposal written the same day. The

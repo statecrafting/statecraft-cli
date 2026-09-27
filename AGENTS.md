@@ -6,7 +6,7 @@ The cross-agent authority for this repository, read by Claude Code, Codex CLI an
 any other agent through the `AGENTS.md` convention. Edit this file to evolve the
 protocol.
 
-This repository holds seven specs, eight crates and one binary. **A crate has
+This repository holds fourteen specs, eight crates and one binary. **A crate has
 exactly one owning spec, and a spec may own more than one crate**: that is `D-02`
 as amended on 2026-09-21, when four pairs of specs were consolidated and no crate
 was merged. Do not add code, a crate or a test runner without a spec that claims
@@ -22,9 +22,9 @@ it, and the coverage gate refuses an unclaimed source file.
 3. `standards/spec/contract.md`: the normative summary, including the lifecycle
    table that decides what is schedulable.
 4. `specs/NNN-slug/spec.md`: ordinary specs.
-5. `docs/decisions/00-founding-decisions.md`: what is intent, what is inherited,
-   what is proposed. A row of its section 3 binds only once its section 5
-   records the adoption; its opening paragraph says which have been.
+5. `docs/decisions/00-founding-decisions.md`: the historical founding record.
+   Current authority lives in the active specs. Archived journals and handoffs
+   under `docs/decisions/archive/` are explicitly nonnormative.
 
 `.statecraft/derived/` is compiler output. Never hand-edit it, and never parse
 it with `jq`, `sed` or `awk`: read it through `spec-spine` subcommands, which
@@ -81,12 +81,11 @@ carrying `implementation`, so the join stays. What `draft` withholds is
 *ratification*, which is why an unratified spec's unresolved units warn instead
 of refusing.
 
-All seven specs, `000` to `006`, are ratified, so what `plan` offers is a real
-work order. Measured 2026-09-23 with `make status`: 7 specs, 1 ready, 0 blocked.
-The ready one is `002`, `approved` with `implementation: in-progress`, because
-its live permission experiment has no admitted result, which no local
-implementation work can supply (spec `002` section 5, 2026-09-23). The next `draft` written here will be offered as ready
-anyway; check the `status` field, not the plan output.
+Thirteen of the fourteen active specs are ratified. Spec `007` remains a draft,
+so a plan row for it is a reading suggestion rather than a work order. Spec
+`015` is approved with `implementation: in-progress` because its live
+permission experiment has no admitted result, which no local implementation
+work can supply. Check the `status` field, not the plan output.
 
 spec-spine does not enforce the difference, so this repository does. Until the
 owner ratifies a spec (see Approval semantics), `plan` naming it is a reading
@@ -179,7 +178,7 @@ evaluated, so a `Spec-Drift-Waiver:` in the body would have covered all 15.
 ## Continuous integration
 
 This repository's CI is **rendered from Statecraft's own setup profile**,
-`github-actions-rust` revision 8 (S-5, owner decision of 2026-09-24): the
+`github-actions-rust` revision 9 (spec `010`, applied 2026-09-26): the
 product governs itself with what it gives adopters. The rendered files are
 managed, and their ownership is recorded in `.statecraft/environment.json`:
 `.github/workflows/statecraft-ci.yml`, `.github/workflows/statecraft-ai-review.yml`,
@@ -337,8 +336,8 @@ One spec per pull request, then stop.
 
 ## Amending an approved spec
 
-Adopted by the owner on 2026-09-25 (spec `001` section 5, the amendment-model
-entry, Part 1). **A change to what an approved spec requires is a new spec**
+Adopted by the owner on 2026-09-25 (spec `001` section 5). **A change to what
+an approved spec requires is a new spec**
 with an `amends` edge to the spec it changes; a `draft` is still amended in
 place, as Approval semantics allows. The amended `spec.md` is not
 edited to record the amendment; `registry relationships <id>` reports it. An
@@ -347,16 +346,12 @@ it changes, in the same change, because `amends` does not make the amending
 spec an owner of the amended spec's code. An amendment that replaces
 acceptance says so with `amends_verification`.
 
-Section 5 of a spec keeps **implementation decisions only**: a choice section 3
-was silent on, with its reason. It is still the right place for that, and
-still the route that clears `C-001` for a change that alters no requirement.
-It is no longer a place to change a requirement. Entries adopted on or before
-2026-09-25 that state requirements stay where they are until they are folded
-into section 3 by their own pull requests; the split of spec `002` that
-precedes the fold waits for spec-spine 0.27.0. The adoption of this rule is
-itself recorded as a spec `001` section 5 entry because the rule binds from
-that adoption, not before it; it and the other entries adopted in the same
-change are the last requirements recorded that way.
+Section 5 is `Resolved decisions`: concise rationale still needed to interpret
+the current direction. It is not a work log, evidence journal, review transcript,
+proposal queue, or alternative history. A choice that changes an approved
+requirement is a new amending spec. Historical material worth retaining goes to
+`docs/decisions/archive/` with a nonnormative label. Spec `016` and
+`scripts/check-spec-corpus.sh` enforce the active-corpus boundary and budgets.
 
 ## Source ownership
 
@@ -364,8 +359,8 @@ change are the last requirements recorded that way.
 |---|---|---|
 | `specs/**/spec.md` | authored | The source of truth. One directory per spec, name equal to the frontmatter `id`. |
 | `standards/spec/**` | authored | Constitution, contract, templates. The constitution is changed by an `approved` spec claiming the affected heading as a section unit. |
-| `docs/decisions/**` | authored, claimed by spec `001` | Editing it is a change to spec `001`'s territory. **There is no `docs/design/`, and a design or handoff note does not get one.** It is folded into the spec it informs: the founding record is spec `001` sections 3.8 to 3.12, and the 2026-09 spec-spine harness handoff is spec `002` sections 3.22 and 3.23. A note filed beside the corpus is a second place for a requirement to live, and the first place people stop reading. |
-| `scripts/**` | authored, claimed by the spec that adds it | `check-authored-content.sh` is spec `001`'s. |
+| `docs/decisions/**` | authored, claimed by spec `001` | Current requirements do not live here. `00-founding-decisions.md` is the historical founding record. `docs/decisions/archive/**` preserves explicitly nonnormative journals and handoffs removed from active specs. A current decision changes the applicable spec; an archive entry never substitutes for that change. |
+| `scripts/**` | authored, claimed by the spec that adds it | `check-authored-content.sh` is spec `001`'s; `check-spec-corpus.sh` is spec `016`'s. |
 | `.statecraft/derived/**` | **compiler** | Regenerated by `make refresh` only. Committed. Never hand-edited. `build-meta.json` is the one gitignored file. Moved from `.derived/` by spec `002` section 3.19. |
 | `.statecraft/state/**` | runtime | Declared as `state_dir`: ungoverned, gitignored, and never claimed by a spec. |
 | `spec-spine.toml` | authored | The layout, and the **single stated source of the CLI pin** (`required_version`); no other document restates the number. Changing the pin is its own change with its own re-index and its own ledger entry (`D-06`). |
@@ -410,8 +405,10 @@ wins.
 - repository and worktree hygiene;
 - unambiguous corrections of internal inconsistencies.
 
-Each such decision is recorded where it takes effect (a dated section 5 entry,
-a commit message, a pull-request body) and named in the next handoff.
+Each such decision is recorded where it takes effect (a concise resolved
+decision when interpretive rationale is needed, a commit message, or a
+pull-request body) and named in the next handoff. Chronological work history is
+not appended to an active spec.
 
 **Reserved to the owner:**
 

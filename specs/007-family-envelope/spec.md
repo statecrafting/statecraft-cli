@@ -13,8 +13,8 @@ summary: >
   an envelope on stdout. The replacement of 002 section 3.23's check
   translation, which #118 proposed for the same change, is left to the
   spec-spine 0.28.0 adoption, which changes the producer answer it would read.
-  Replaces the section 5 proposal of #118, which the amendment model adopted
-  on 2026-09-25 (001 section 5) no longer admits.
+  Replaces the historical proposal from #118 with the amendment that the
+  current model requires (001 section 5).
 amends:
   # Section 3.4's rendering ({value, exit, summary}) is replaced and 3.3's
   # vocabulary gains a JSON spelling. 006 is not edited to record it.
@@ -22,8 +22,8 @@ amends:
 extends:
   # Section 3.1 changes the rendering in crates/statecraft-cli/src/render.rs and
   # every binding that constructs a refusal or failure. `amends` does not make
-  # this spec an owner of 006's code (001 section 5, the amendment model, Part 1
-  # item 1), so the edge is declared here, in the same change.
+  # this spec an owner of 006's code (001 section 5), so the edge is declared
+  # here, in the same change.
   - { spec: "006-command-surface", unit: { kind: directory, path: "crates/statecraft-cli/" }, nature: corrective }
 depends_on:
   - "001-boundaries-and-authority"
@@ -43,9 +43,9 @@ same five exit numbers (006 section 3.3) but writes its JSON as
 shapes and learns a refusal's class from prose.
 
 This spec makes the product's `--json` the family envelope, and moves nothing
-else. It was proposed as a dated 006 section 5 entry in #118 (2026-09-24),
-before the amendment model; under that model a change to what an approved spec
-requires is a new spec with an `amends` edge, and this is it.
+else. An earlier proposal appeared in #118. Under the current amendment model,
+a change to what an approved spec requires is a new spec with an `amends` edge,
+and this is it.
 
 ## 2. Territory
 
@@ -127,7 +127,7 @@ give.
 - Any document other than a verb's answer: the manifest, run records and
   captures keep their own schemas.
 
-## 5. Decisions recorded during implementation
+## 5. Resolved decisions
 
 **2026-09-25: exit 4 defaults to `io`, not `internal`.** #118 assigned `fail()`
 in `main.rs` `io` and left the other failure sites unassigned. Every one of
