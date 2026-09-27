@@ -144,6 +144,11 @@ fn an_unmodified_file_is_replaced_and_a_customized_one_is_kept_with_three_digest
     );
 }
 
+const R11_GATE: &str = include_str!("support/profile-r11/gate.sh");
+const R11_CI_GATE: &str = include_str!("support/profile-r11/ci-gate.sh");
+const R11_AI_REVIEW: &str = include_str!("support/profile-r11/ai-review.sh");
+const R11_AI_REVIEW_WF: &str = include_str!("support/profile-r11/statecraft-ai-review.yml");
+const R11_CI: &str = include_str!("support/profile-r11/statecraft-ci.yml");
 const R10_GATE: &str = include_str!("support/profile-r10/gate.sh");
 const R8_GATE: &str = include_str!("support/profile-r8/gate.sh");
 const R7_AI_REVIEW: &str = include_str!("support/profile-r7/ai-review.sh");
@@ -172,11 +177,32 @@ fn revision_nine() -> Profile {
     r9
 }
 
+/// Revision 11 of the registered profile: the five templates revision 12
+/// changed (spec 024), as revision 11 shipped them (spec 023's branch at
+/// c6185b5).
+fn revision_eleven() -> Profile {
+    let mut r11 = Profile::registered();
+    assert_eq!(r11.revision, 12, "the registered profile is revision 12");
+    r11.revision = 11;
+    for t in &mut r11.templates {
+        let old = match t.path.as_str() {
+            "scripts/statecraft/gate.sh" => R11_GATE,
+            "scripts/statecraft/ci-gate.sh" => R11_CI_GATE,
+            "scripts/statecraft/ai-review.sh" => R11_AI_REVIEW,
+            ".github/workflows/statecraft-ai-review.yml" => R11_AI_REVIEW_WF,
+            ".github/workflows/statecraft-ci.yml" => R11_CI,
+            _ => continue,
+        };
+        assert_ne!(t.body, old, "{}: revision 12 changed it", t.path);
+        t.body = old.to_string();
+    }
+    r11
+}
+
 /// Revision 10 of the registered profile: the gate script as revision 10
 /// shipped it (main at c95b7ee), the one template revision 11 changed.
 fn revision_ten() -> Profile {
-    let mut r10 = Profile::registered();
-    assert_eq!(r10.revision, 11, "the registered profile is revision 11");
+    let mut r10 = revision_eleven();
     r10.revision = 10;
     for t in &mut r10.templates {
         if t.path == "scripts/statecraft/gate.sh" {
@@ -972,9 +998,11 @@ fn a_revision_eight_project_upgrades_to_revision_nine() {
     }
 }
 
-/// Spec 017: revision 10 raises only the inherited review cap. A revision-9
-/// selection with no declared cap moves from 2000 to 3000; an operator's
-/// explicit 2000 remains 2000.
+/// Spec 017: revision 10 raises only the inherited review cap, and an
+/// operator's explicit 2000 remains 2000. Spec 024 holds this acceptance now:
+/// parameters are not versioned by revision, so a selection with no declared
+/// cap renders the current default, revision 12's added-line backstop of
+/// 20000, where revision 10 rendered 3000.
 #[test]
 fn a_revision_nine_project_upgrades_to_revision_ten() {
     let workflow = ".github/workflows/statecraft-ai-review.yml";
@@ -1013,7 +1041,7 @@ fn a_revision_nine_project_upgrades_to_revision_ten() {
         let upgrade = plan_and_apply_with(root, &r10, &mut manifest, &block);
         assert!(upgrade.whole());
         let rendered = std::fs::read_to_string(root.join(workflow)).unwrap();
-        let wanted = if explicit { 2000 } else { 3000 };
+        let wanted = if explicit { 2000 } else { 20000 };
         assert!(rendered.contains("profile github-actions-rust revision 10"));
         assert!(
             rendered.contains(&format!("DIFF_CAP: '{wanted}'")),
@@ -1059,7 +1087,7 @@ fn a_revision_ten_project_upgrades_to_revision_eleven() {
         "{before}"
     );
 
-    let r11 = Profile::registered();
+    let r11 = revision_eleven();
     assert_ne!(r11.identity(), r10.identity());
     let block = manifest.project.setup.as_ref().unwrap().parameters.clone();
     let upgrade = plan_and_apply_with(root, &r11, &mut manifest, &block);
@@ -1087,4 +1115,85 @@ fn a_revision_ten_project_upgrades_to_revision_eleven() {
             .collect::<Vec<_>>()
     );
     assert_eq!(std::fs::read_to_string(root.join(gate)).unwrap(), after);
+}
+
+/// Spec 024: a revision-11 project upgrades to revision 12 through the
+/// ordinary plan and apply. The review reads its token budget and the gate
+/// its ratification rule, an explicit `review.diff_cap` survives, and a
+/// second plan of the same selection writes nothing.
+#[test]
+fn a_revision_eleven_project_upgrades_to_revision_twelve() {
+    let review = ".github/workflows/statecraft-ai-review.yml";
+    for explicit in [false, true] {
+        let dir = project();
+        let root = dir.path();
+        let mut manifest = Manifest::new(Pins {
+            product: "0.0.0".into(),
+            spec_spine: "unpinned".into(),
+            adapters: Default::default(),
+            producer: None,
+        });
+        let r11 = revision_eleven();
+        let block = if explicit {
+            BTreeMap::from([("review.diff_cap".to_string(), serde_json::json!(2000))])
+        } else {
+            BTreeMap::new()
+        };
+        assert!(plan_and_apply_with(root, &r11, &mut manifest, &block).whole());
+        let before = std::fs::read_to_string(root.join(review)).unwrap();
+        assert!(before.contains("profile github-actions-rust revision 11"));
+        assert!(!before.contains("CONTEXT_TOKENS"), "{before}");
+
+        let r12 = Profile::registered();
+        assert_ne!(r12.identity(), r11.identity());
+        let block = manifest.project.setup.as_ref().unwrap().parameters.clone();
+        assert!(plan_and_apply_with(root, &r12, &mut manifest, &block).whole());
+        let after = std::fs::read_to_string(root.join(review)).unwrap();
+        assert!(after.contains("profile github-actions-rust revision 12"));
+        let cap = if explicit { 2000 } else { 20000 };
+        for want in [
+            format!("DIFF_CAP: '{cap}'"),
+            "CONTEXT_TOKENS: '200000'".to_string(),
+            "MAX_CALLS: '4'".to_string(),
+            "DELETION_CAP: '20000'".to_string(),
+        ] {
+            assert!(after.contains(&want), "{want}: {after}");
+        }
+        let gate = std::fs::read_to_string(root.join("scripts/statecraft/gate.sh")).unwrap();
+        assert!(gate.contains("REQUIRE_RATIFIED=true"), "{gate}");
+        let ci_gate = std::fs::read_to_string(root.join("scripts/statecraft/ci-gate.sh")).unwrap();
+        assert!(
+            ci_gate.contains("this candidate ratifies a spec"),
+            "{ci_gate}"
+        );
+        let policy: serde_json::Value =
+            serde_json::from_str(&std::fs::read_to_string(root.join(setup::POLICY_PATH)).unwrap())
+                .unwrap();
+        assert_eq!(policy["revision"], 12);
+        assert_eq!(policy["parameters"]["diff_cap"], cap);
+        assert_eq!(policy["parameters"]["require_ratified"], true);
+        let setup = manifest.project.setup.as_ref().unwrap();
+        assert_eq!(setup.revision, 12);
+        assert_eq!(
+            setup.parameters.get("review.diff_cap"),
+            explicit.then_some(&serde_json::json!(2000))
+        );
+
+        // Converged: a second plan of the same selection writes nothing.
+        let again = plan_and_apply_with(root, &r12, &mut manifest, &block);
+        assert!(again.whole());
+        assert!(
+            again
+                .files
+                .iter()
+                .all(|f| matches!(f.action, Action::Unchanged | Action::LeftAlone { .. })),
+            "{:?}",
+            again
+                .files
+                .iter()
+                .map(|f| (&f.path, &f.action))
+                .collect::<Vec<_>>()
+        );
+        assert_eq!(std::fs::read_to_string(root.join(review)).unwrap(), after);
+    }
 }

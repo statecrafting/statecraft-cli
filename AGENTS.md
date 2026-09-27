@@ -6,7 +6,7 @@ The cross-agent authority for this repository, read by Claude Code, Codex CLI an
 any other agent through the `AGENTS.md` convention. Edit this file to evolve the
 protocol.
 
-This repository holds sixteen specs, eight crates and one binary. **A crate has
+This repository holds seventeen specs, eight crates and one binary. **A crate has
 exactly one owning spec, and a spec may own more than one crate**: that is `D-02`
 as amended on 2026-09-21, when four pairs of specs were consolidated and no crate
 was merged. Do not add code, a crate or a test runner without a spec that claims
@@ -81,13 +81,16 @@ carrying `implementation`, so the join stays. What `draft` withholds is
 *ratification*, which is why an unratified spec's unresolved units warn instead
 of refusing.
 
-Fourteen of the sixteen active specs are ratified. Specs `007` and `023` remain
+Fifteen of the seventeen active specs are ratified. Specs `007` and `024` remain
 drafts, so a plan row for either is a reading suggestion rather than a work order. Spec
 `015` is approved with `implementation: in-progress` because its live
 permission experiment has no admitted result, which no local implementation
 work can supply. Check the `status` field, not the plan output.
 
-spec-spine does not enforce the difference, so this repository does. Until the
+spec-spine does not enforce the difference, so this repository does, and from
+setup profile revision 12 (spec `024`) its CI does too: a pull request that
+changes a path a `draft` spec owns fails the coupling step unless it moves that
+spec to `approved`, and a pull request that does so needs the owner exception. Until the
 owner ratifies a spec (see Approval semantics), `plan` naming it is a reading
 suggestion, not a work order. Do not open an implementation branch for a
 `draft` without the owner saying so in the request at hand.
@@ -178,7 +181,7 @@ evaluated, so a `Spec-Drift-Waiver:` in the body would have covered all 15.
 ## Continuous integration
 
 This repository's CI is **rendered from Statecraft's own setup profile**,
-`github-actions-rust` revision 11 (spec `023`, applied 2026-09-27): the
+`github-actions-rust` revision 12 (spec `024`, applied 2026-09-27): the
 product governs itself with what it gives adopters. The rendered files are
 managed, and their ownership is recorded in `.statecraft/environment.json`:
 `.github/workflows/statecraft-ci.yml`, `.github/workflows/statecraft-ai-review.yml`,

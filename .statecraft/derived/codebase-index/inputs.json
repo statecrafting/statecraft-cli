@@ -10,16 +10,16 @@
       "contentHash": "5e39637ab19f54b29c19154a13161c94da5511ad696b8ff1626950da68412e29"
     },
     ".github/workflows/statecraft-ai-review.yml": {
-      "contentHash": "a9510fe128b34675329a767339f9bda66b57d70c1e196cdcdd2e378a601fb07c"
+      "contentHash": "daa0cd0400d1aab5195440c0ac9a3df13f11fe110263f504d8310f3ba9878d5c"
     },
     ".github/workflows/statecraft-ci.yml": {
-      "contentHash": "8c75800ca3b32489776f4e21fe785c9debb1027fe9fd6bc0ca4f802bc9616f9c"
+      "contentHash": "a9c72fbedc93a55befd16764bd46a0ab1d9605aed4525d7340a11eb7294a0ec6"
     },
     ".gitignore": {
       "contentHash": "9c3d64929b662cdc2f3623473dcc4bb5c1c2832ae9e5fb52e28b66b486db886a"
     },
     "AGENTS.md": {
-      "contentHash": "a5afa907ae97fc2e109395bc5de487f56041f7322b3cb03dfaa4eb40cd947921"
+      "contentHash": "5c7db1d6c9cb79689e6d2ff0e155261296b3e318f7550a5da5f540e398a969f7"
     },
     "CLAUDE.md": {
       "contentHash": "01e63121f953e076fde60b67abaa33a23b697ea2aade6c48c5c1ea5c4f27797b"
@@ -73,16 +73,16 @@
       "contentHash": "50138ae38377c0ff14f4f37ecdeed3cfd6500b50f91e5f7019232a11883ffdc3"
     },
     "scripts/statecraft/ai-review.sh": {
-      "contentHash": "392378241e2113f4e9bbd7b855c89cf345fa362d919e8c4157f8a8d6ef6fbc1a"
+      "contentHash": "61b40005936cc577d39e98e681610a181b17d68c90e62229d8b5b86624e228e1"
     },
     "scripts/statecraft/ci-gate.sh": {
-      "contentHash": "35664c24203338a919cc04a267c3ab3403f5b69d4824167c81d723366e0a046d"
+      "contentHash": "4d14904f8d004320feb3b824789ff2e61fa8ecc6123c75b427954d0aa8ae25fd"
     },
     "scripts/statecraft/gate.sh": {
-      "contentHash": "3b68bea42d7642ca18ee00d1515ed93cbf6cff4f03d4b274703ac96c742be7a7"
+      "contentHash": "c2cafc35661d7c8181052f720957ca239e9b131fdca33f5d47d54f411ad5933a"
     },
     "scripts/statecraft/install-spec-spine.sh": {
-      "contentHash": "9219d2cb1ed4a2dfc756bc01cd870bb38f96433a4eac54c8f57347deaf85ee6e"
+      "contentHash": "670a5a04a7c3dd79e9fba400f4c54d01ee7f7602a3f5eaa90299cdbf268edc36"
     },
     "spec-spine.toml": {
       "contentHash": "3022e4de8e478d47697c441247dc4da4fc5fa8a24e00366892654b508204f299"
