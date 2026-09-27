@@ -1,16 +1,12 @@
 {
   "mapping": {
-    "amends": [
-      "002-environment-lifecycle"
-    ],
     "dependsOn": [
       "001-boundaries-and-authority",
-      "002-environment-lifecycle",
-      "006-command-surface"
+      "002-environment-lifecycle"
     ],
     "implementingPaths": [
       {
-        "path": "crates/statecraft-cli/",
+        "path": "crates/statecraft-environment/",
         "source": "spec-edge"
       },
       {
@@ -22,14 +18,14 @@
       {
         "locations": [
           {
-            "file": "crates/statecraft-cli/"
+            "file": "crates/statecraft-environment/"
           }
         ],
         "ownership": true,
         "sourceField": "extends",
         "unit": {
           "kind": "directory",
-          "path": "crates/statecraft-cli/"
+          "path": "crates/statecraft-environment/"
         }
       },
       {
@@ -46,9 +42,9 @@
         }
       }
     ],
-    "specId": "010-profile-unresolved-claims",
+    "specId": "008-harness-delivery",
     "specStatus": "approved"
   },
   "schemaVersion": "1.2.0",
-  "shardHash": "86cd929d18ca4c56efde47690141da379af17a10ca24bfa486536ec8b286288f"
+  "shardHash": "3cdb1833b6e28cfe9f8dfad3321c3a6630ec99aca4d264636dd7d5659f11046d"
 }

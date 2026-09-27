@@ -1,15 +1,12 @@
 {
   "mapping": {
-    "amends": [
-      "006-command-surface"
-    ],
     "dependsOn": [
       "001-boundaries-and-authority",
-      "006-command-surface"
+      "002-environment-lifecycle"
     ],
     "implementingPaths": [
       {
-        "path": "crates/statecraft-cli/",
+        "path": "crates/statecraft-home/",
         "source": "spec-edge"
       }
     ],
@@ -17,20 +14,20 @@
       {
         "locations": [
           {
-            "file": "crates/statecraft-cli/"
+            "file": "crates/statecraft-home/"
           }
         ],
         "ownership": true,
         "sourceField": "extends",
         "unit": {
           "kind": "directory",
-          "path": "crates/statecraft-cli/"
+          "path": "crates/statecraft-home/"
         }
       }
     ],
-    "specId": "007-family-envelope",
-    "specStatus": "draft"
+    "specId": "009-governance-producer",
+    "specStatus": "approved"
   },
   "schemaVersion": "1.2.0",
-  "shardHash": "8477673610e587145d969a1886fd4870071cbae505dd85626ed649cb42573911"
+  "shardHash": "a05c127018f9d3c7e6e6ff806ef55005970d4aaeac38325436db600631674269"
 }

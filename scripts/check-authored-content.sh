@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # Spec: specs/001-boundaries-and-authority/spec.md
 #
-# The two authored-content rules of spec 001 section 3.6, made mechanical.
+# The authored-content rules of spec 001 section 3.6, plus spec 016's active
+# corpus boundary, made mechanical.
 #
 #   1. No authored file contains U+2014 (EM DASH).
 #   2. No authored file carries an agent-session URL or a session-tracking
@@ -160,7 +161,17 @@ if [ "${#scan[@]}" -gt 0 ]; then
   fi
 fi
 
+if [ "$mode" = tree ] && [ -d specs ] \
+  && [ -n "$(find specs -mindepth 2 -name spec.md -type f -print -quit)" ]; then
+  if [ ! -x scripts/check-spec-corpus.sh ]; then
+    echo "active specs exist but scripts/check-spec-corpus.sh is absent or not executable"
+    status=1
+  else
+    scripts/check-spec-corpus.sh || status=1
+  fi
+fi
+
 if [ "$status" -eq 0 ]; then
-  echo "check-authored-content: ${#files[@]} authored $([ "$mode" = text ] && echo text || echo file)(s) clean (U+2014, session links)"
+  echo "check-authored-content: ${#files[@]} authored $([ "$mode" = text ] && echo text || echo file)(s) clean"
 fi
 exit "$status"

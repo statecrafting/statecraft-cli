@@ -1,5 +1,5 @@
 #!/bin/sh
-# Rendered by Statecraft from profile github-actions-rust revision 8.
+# Rendered by Statecraft from profile github-actions-rust revision 9.
 # The one definition of this repository's gate: `make gate` and `make code`
 # run it locally, and CI runs the same script, so the two cannot drift. Only
 # the repository-local .tooling/bin/spec-spine is used; a spec-spine elsewhere
@@ -32,9 +32,9 @@ case "$BASE_SHA" in 0000000000000000000000000000000000000000) BASE_SHA="" ;; esa
 # the copy that is running (the base's in CI), never the commit's own.
 SELF="$(cd "$(dirname "$0")" && pwd)/$(basename "$0")"
 
-# The project's governance parameters (revision 4), rendered from its setup
-# block. Each default keeps a revision-3 project's behaviour except the base
-# rule, which is a new refusal.
+# The project's governance parameters (revision 4, and FAIL_ON_UNRESOLVED from
+# revision 9, spec 010), rendered from its setup block. Each default keeps a
+# revision-3 project's behaviour except the base rule, which is a new refusal.
 DEFAULT_BRANCH='main'
 ENFORCE_COVERAGE=true
 AUTHORED_CONTENT='scripts/check-authored-content.sh'
@@ -42,6 +42,7 @@ AUTHORED_CONTENT_TEXT=true
 GATE_EACH_COMMIT=true
 REQUIRE_SIGNED_COMMITS=true
 REQUIRE_DEFAULT_BASE=true
+FAIL_ON_UNRESOLVED=true
 
 usage() {
   echo "usage: gate.sh governance|code|couple|couple-group|base|text|commits|pin" >&2
@@ -218,7 +219,15 @@ case "$MODE" in
       # claim them.
       spec_spine index coverage
     fi
-    spec_spine index check --fail-on-unresolved
+    if [ "$FAIL_ON_UNRESOLVED" = true ]; then
+      spec_spine index check --fail-on-unresolved
+    else
+      # Reported, not refused (governance.fail_on_unresolved is false, spec
+      # 010): a corpus that approves a spec before building it has an
+      # unresolved claim by design. `index check` still runs, so a stale or
+      # invalid index still fails, and each unresolved claim is named.
+      spec_spine index check
+    fi
     if [ -n "$AUTHORED_CONTENT" ]; then
       authored_content
       run_authored

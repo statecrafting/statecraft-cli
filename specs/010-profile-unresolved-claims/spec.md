@@ -5,8 +5,7 @@ status: approved
 implementation: complete
 created: "2026-09-25"
 summary: >
-  Amends 002's setup profile (section 5, the setup-profile entry and the
-  revision 4 entry). github-actions-rust revision 9 adds one boolean
+  Amends 002's setup profile. github-actions-rust revision 9 adds one boolean
   parameter, governance.fail_on_unresolved, default true. True renders what
   revision 8 renders: gate.sh governance runs index check with
   --fail-on-unresolved. False omits only that flag: index check still runs,
@@ -22,8 +21,7 @@ amends:
 extends:
   # The profile is code in 002's crate (src/setup.rs and the gate.sh
   # template). `amends` does not make this spec an owner of that code (001
-  # section 5, the amendment model, Part 1 item 1), so the edge is declared
-  # here, in the same change.
+  # section 5), so the edge is declared here, in the same change.
   - { spec: "002-environment-lifecycle", unit: { kind: directory, path: "crates/statecraft-home/" }, nature: additive }
   # `Parameters` is a grandfathered snake_case document in 006's JSON naming
   # guard, so the new key is named there.
@@ -125,7 +123,7 @@ parameters writes nothing. A re-render is an authority-set change (revision
   change, not this one.
 - The delivered harness hooks (section 3.2 item 3).
 
-## 5. Decisions recorded during implementation
+## 5. Resolved decisions
 
 **2026-09-25: the measurement the table in section 3.2 rests on.** spec-spine
 0.26.0 (Rahi's pin) and 0.27.0 (this repository's), each run at Rahi main
@@ -149,10 +147,8 @@ policy's `commands.governance[3]`, which differs by value; with `commands_for`
 forced to add the flag, the test fails. The rendered governance run itself is
 held by `fail_on_unresolved_false_omits_only_that_flag`.
 
-**2026-09-25: the number `010`.** `007` is taken by the draft in
-statecrafting/statecraft-cli#165, and `008` and `009` are named by spec `001`
-section 5's proposal for the split of `002`, so this spec takes the next free
-number rather than one a pending proposal names.
+**2026-09-25: the number `010`.** `007`, `008`, and `009` were already reserved
+when this spec was written, so it took the next free number.
 
 ## Verification
 

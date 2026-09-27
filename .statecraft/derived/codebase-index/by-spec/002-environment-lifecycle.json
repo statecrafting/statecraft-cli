@@ -35,10 +35,6 @@
       {
         "path": "scripts/check-authored-content.sh",
         "source": "spec-edge"
-      },
-      {
-        "path": "specs/002-environment-lifecycle/handoff-2026-09-21.md",
-        "source": "spec-edge"
       }
     ],
     "resolvedUnits": [
@@ -79,24 +75,6 @@
         "unit": {
           "kind": "file",
           "path": "scripts/acceptance/managed-session.sh"
-        }
-      },
-      {
-        "locations": [
-          {
-            "file": "specs/002-environment-lifecycle/handoff-2026-09-21.md",
-            "span": {
-              "endLine": 614,
-              "startLine": 564
-            }
-          }
-        ],
-        "ownership": true,
-        "sourceField": "establishes",
-        "unit": {
-          "anchor": "7-truthful-implementation-state-of-spec-002",
-          "file": "specs/002-environment-lifecycle/handoff-2026-09-21.md",
-          "kind": "section"
         }
       },
       {
@@ -156,5 +134,5 @@
     "specStatus": "approved"
   },
   "schemaVersion": "1.2.0",
-  "shardHash": "74690453226ce99a6b791ddecfdffb180b16be094ab25c2756316c36029844f6"
+  "shardHash": "18870d91aa415e45e6ffcfb7d41dce085d73bfada49ba5017498022296d7cd0c"
 }

@@ -16,22 +16,22 @@
       "class": "managed",
       "source": {
         "kind": "template",
-        "identity": "statecraft-setup:github-actions-rust@8"
+        "identity": "statecraft-setup:github-actions-rust@9"
       },
-      "digest": "c6edb0e19d2d4741e3cbcc9311670fc83a7dcec5799ab99dad8dc7111e219ead",
+      "digest": "1d04a28c3256dd5fe6eadd1516cc6a86785335a6907d9394b72b167594ca61b6",
       "bytes": 3208,
-      "written_at": "2026-09-25T19:16:48Z"
+      "written_at": "2026-09-27T03:25:41Z"
     },
     {
       "path": ".github/workflows/statecraft-ci.yml",
       "class": "managed",
       "source": {
         "kind": "template",
-        "identity": "statecraft-setup:github-actions-rust@8"
+        "identity": "statecraft-setup:github-actions-rust@9"
       },
-      "digest": "945d16e4a1f0ffdb653c557becabd134891ac2bdc687b54f927179521ee16ea4",
+      "digest": "fd58a9bad4b89197e3279da51aa8680f967f31ba3394ab7f5291c2bbe6b0c1d0",
       "bytes": 14891,
-      "written_at": "2026-09-25T19:16:48Z"
+      "written_at": "2026-09-27T03:25:41Z"
     },
     {
       "path": ".statecraft/AGENTS.md",
@@ -49,55 +49,55 @@
       "class": "managed",
       "source": {
         "kind": "template",
-        "identity": "statecraft-setup:github-actions-rust@8"
+        "identity": "statecraft-setup:github-actions-rust@9"
       },
-      "digest": "ba09c75ca251e848d38c58f8574295c787c0f70a72cd8cb824080c3de3fead8b",
-      "bytes": 8584,
-      "written_at": "2026-09-25T19:16:48Z"
+      "digest": "06c616626aaa186dbb566f205eec1a6ba283ef349724b3030f81318e218c8d38",
+      "bytes": 9008,
+      "written_at": "2026-09-27T03:25:41Z"
     },
     {
       "path": "scripts/statecraft/ai-review.sh",
       "class": "managed",
       "source": {
         "kind": "template",
-        "identity": "statecraft-setup:github-actions-rust@8"
+        "identity": "statecraft-setup:github-actions-rust@9"
       },
-      "digest": "947269aaf37fc2510a01017b9edd20f4d81a04ad5013bed2cd1d9cfe41d63628",
+      "digest": "fd083d713f9af117474c0342ae25f13985eac593c522cc6b3004093970d9e0e7",
       "bytes": 13782,
-      "written_at": "2026-09-25T19:16:48Z"
+      "written_at": "2026-09-27T03:25:41Z"
     },
     {
       "path": "scripts/statecraft/ci-gate.sh",
       "class": "managed",
       "source": {
         "kind": "template",
-        "identity": "statecraft-setup:github-actions-rust@8"
+        "identity": "statecraft-setup:github-actions-rust@9"
       },
-      "digest": "7d58f90a5820d23d1ca74f24d5ae9ad07f3712d47b6f73d0b84eb9eea7762171",
+      "digest": "a73ca9a31dbd436a01ddbc1f0ca9ff48b70fb819ad484e53b74d663edec10979",
       "bytes": 14011,
-      "written_at": "2026-09-25T19:16:48Z"
+      "written_at": "2026-09-27T03:25:41Z"
     },
     {
       "path": "scripts/statecraft/gate.sh",
       "class": "managed",
       "source": {
         "kind": "template",
-        "identity": "statecraft-setup:github-actions-rust@8"
+        "identity": "statecraft-setup:github-actions-rust@9"
       },
-      "digest": "08447cb76b2cabf816b65efe8e305c0ea638f470a369d9102b111ba49127964d",
-      "bytes": 18018,
-      "written_at": "2026-09-25T19:16:48Z"
+      "digest": "15f1c8259770ce4d59f29d7e844ea11ea4b0c57cdcf265e4b16e4c9fa6c5118b",
+      "bytes": 18478,
+      "written_at": "2026-09-27T03:25:41Z"
     },
     {
       "path": "scripts/statecraft/install-spec-spine.sh",
       "class": "managed",
       "source": {
         "kind": "template",
-        "identity": "statecraft-setup:github-actions-rust@8"
+        "identity": "statecraft-setup:github-actions-rust@9"
       },
-      "digest": "884508b615d4d94981f37f18e1970837b124cca60a08420dae6711aa99408888",
+      "digest": "eea387a5462e29bfae2973e770e5ecdc73b1066db4b8891c65ae11814c2717d4",
       "bytes": 2056,
-      "written_at": "2026-09-25T19:16:48Z"
+      "written_at": "2026-09-27T03:25:41Z"
     },
     {
       "path": "spec-spine.toml",
@@ -185,8 +185,8 @@
     },
     "setup": {
       "profile": "github-actions-rust",
-      "revision": 8,
-      "identity": "14a4be033a3797f2cfb0a585b43415398a171a81b897b8c9104f6dcdbec5baee",
+      "revision": 9,
+      "identity": "426b82624c84e14172e96d82ed0e03ac4cfc7a925529f593a51fc182aa1a453f",
       "parameters": {
         "governance.authored_content": "scripts/check-authored-content.sh",
         "governance.authored_content_text": true,

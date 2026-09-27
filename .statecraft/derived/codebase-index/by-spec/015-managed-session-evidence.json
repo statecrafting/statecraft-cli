@@ -1,16 +1,12 @@
 {
   "mapping": {
-    "amends": [
-      "002-environment-lifecycle"
-    ],
     "dependsOn": [
       "001-boundaries-and-authority",
-      "002-environment-lifecycle",
-      "006-command-surface"
+      "002-environment-lifecycle"
     ],
     "implementingPaths": [
       {
-        "path": "crates/statecraft-cli/",
+        "path": "crates/statecraft-adapter-claude-code/",
         "source": "spec-edge"
       },
       {
@@ -22,14 +18,14 @@
       {
         "locations": [
           {
-            "file": "crates/statecraft-cli/"
+            "file": "crates/statecraft-adapter-claude-code/"
           }
         ],
         "ownership": true,
         "sourceField": "extends",
         "unit": {
           "kind": "directory",
-          "path": "crates/statecraft-cli/"
+          "path": "crates/statecraft-adapter-claude-code/"
         }
       },
       {
@@ -46,9 +42,9 @@
         }
       }
     ],
-    "specId": "010-profile-unresolved-claims",
+    "specId": "015-managed-session-evidence",
     "specStatus": "approved"
   },
   "schemaVersion": "1.2.0",
-  "shardHash": "86cd929d18ca4c56efde47690141da379af17a10ca24bfa486536ec8b286288f"
+  "shardHash": "ba7ec4fa40d3effc43b59c114dba462e7056e31e71f257428b84ea02ea30e63f"
 }

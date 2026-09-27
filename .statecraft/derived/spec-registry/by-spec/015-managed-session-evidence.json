@@ -1,0 +1,104 @@
+{
+  "record": {
+    "created": "2026-09-26",
+    "dependsOn": [
+      "001-boundaries-and-authority",
+      "002-environment-lifecycle"
+    ],
+    "extends": [
+      {
+        "nature": "additive",
+        "spec": "002-environment-lifecycle",
+        "unit": {
+          "kind": "directory",
+          "path": "crates/statecraft-home/"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "004-execution-adapter",
+        "unit": {
+          "kind": "directory",
+          "path": "crates/statecraft-adapter-claude-code/"
+        }
+      }
+    ],
+    "id": "015-managed-session-evidence",
+    "implementation": "in-progress",
+    "relocates": [
+      {
+        "from": "3-29-what-admits-a-live-observation",
+        "spec": "002-environment-lifecycle",
+        "to": "3-29-what-admits-a-live-observation"
+      },
+      {
+        "from": "3-30-what-each-control-must-demonstrate-and-what-binds-a-capture-to-its-launch",
+        "spec": "002-environment-lifecycle",
+        "to": "3-30-what-each-control-must-demonstrate-and-what-binds-a-capture-to-its-launch"
+      },
+      {
+        "from": "3-31-the-startup-record-a-run-writes-and-the-harness-revision-that-answered",
+        "spec": "002-environment-lifecycle",
+        "to": "3-31-the-startup-record-a-run-writes-and-the-harness-revision-that-answered"
+      },
+      {
+        "from": "3-32-launch-states-the-correlated-acknowledgment-per-invocation-startup-delivery-and-when-governed-work-is-released",
+        "spec": "002-environment-lifecycle",
+        "to": "3-32-launch-states-the-correlated-acknowledgment-per-invocation-startup-delivery-and-when-governed-work-is-released"
+      },
+      {
+        "from": "3-33-the-managed-startup-trial-and-why-it-is-not-the-permission-experiment",
+        "spec": "002-environment-lifecycle",
+        "to": "3-33-the-managed-startup-trial-and-why-it-is-not-the-permission-experiment"
+      },
+      {
+        "from": "3-34-one-allowlisted-event-after-the-terminal-event",
+        "spec": "002-environment-lifecycle",
+        "to": "3-34-one-allowlisted-event-after-the-terminal-event"
+      },
+      {
+        "from": "3-37-where-an-attempt-s-launch-records-live-and-what-the-child-is-given",
+        "spec": "002-environment-lifecycle",
+        "to": "3-37-where-an-attempt-s-launch-records-live-and-what-the-child-is-given"
+      }
+    ],
+    "sectionDigests": {
+      "015-managed-session-evidence-and-admission": "128ece2ce5871bbece49fc8cbcb82f2aa0b4c5c2886b04965b617656f1ee0dfe",
+      "1-purpose": "1c25d090154dbf3f9c71bd1de7e101c81d50a8412e90f54aee549ba802df95af",
+      "2-territory": "bfe929d8ac266ce7924fa570802619c93815b5fb8dab0eea999de7cdf83b6749",
+      "3-29-what-admits-a-live-observation": "e01517b191b8308a2d67ae3736fe0d50d089c76f44fbb1538645836e9cefccb9",
+      "3-30-what-each-control-must-demonstrate-and-what-binds-a-capture-to-its-launch": "bb3d7ed3fed562deb486c87bff8059d8851b76633a9977e6f5c0b5b398f40d21",
+      "3-31-the-startup-record-a-run-writes-and-the-harness-revision-that-answered": "fc8bad29b2d5220bd2234f1a207397e529860c30560889d6a36228a2a58529a1",
+      "3-32-launch-states-the-correlated-acknowledgment-per-invocation-startup-delivery-and-when-governed-work-is-released": "3daaa9b076e72934d102588087a7f5cd13509e85b468750bc9c34310e2f42e72",
+      "3-33-the-managed-startup-trial-and-why-it-is-not-the-permission-experiment": "1262357dc5de5ac18ba8329b0ce4ac4ff18350a358883da8c493c03e39cd4237",
+      "3-34-one-allowlisted-event-after-the-terminal-event": "fa15eda01e7cfcef8395a0b27ec111b257ba99e0e9226a0f86a7f1a04e97b1b6",
+      "3-37-where-an-attempt-s-launch-records-live-and-what-the-child-is-given": "5dc14191d3b4333ae8cda8b80c20c72cafaf3e2f0ff0576013d97e11d17860d5",
+      "3-behavior": "a1a4913381ba550bba250110d0d95809e7dfe3507231717b25ec563e9f2a1ab4",
+      "4-out-of-scope": "269299b6bbb38d88bda45b7f49577f2626c896e2b29d3450a665e107213ce47d",
+      "5-resolved-decisions": "3ee097de6066c2ab5095d4cb4e5e8356aecb9c5a222c201227dacb1bf60daae3",
+      "verification": "0f718c0dae024d4c9943f05a1dce4a16a12ef6f9895f258a843b0b68cc9a905b"
+    },
+    "sectionHeadings": [
+      "015: Managed-session evidence and admission",
+      "1. Purpose",
+      "2. Territory",
+      "3. Behavior",
+      "3.29 What admits a live observation",
+      "3.30 What each control must demonstrate, and what binds a capture to its launch",
+      "3.31 The startup record a run writes, and the harness revision that answered",
+      "3.32 Launch states, the correlated acknowledgment, per-invocation startup delivery, and when governed work is released",
+      "3.33 The managed-startup trial, and why it is not the permission experiment",
+      "3.34 One allowlisted event after the terminal event",
+      "3.37 Where an attempt's launch records live, and what the child is given",
+      "4. Out of scope",
+      "5. Resolved decisions",
+      "Verification"
+    ],
+    "specPath": "specs/015-managed-session-evidence/spec.md",
+    "status": "approved",
+    "summary": "Carries the live-observation, control, startup-record, launch-state, managed-trial, trailer, and confinement requirements relocated from spec 002. It separates runtime evidence from installation and harness delivery.\n",
+    "title": "Managed-session evidence and admission"
+  },
+  "shardHash": "ba7ec4fa40d3effc43b59c114dba462e7056e31e71f257428b84ea02ea30e63f",
+  "specVersion": "1.9.0"
+}

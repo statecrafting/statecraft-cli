@@ -1,0 +1,54 @@
+{
+  "record": {
+    "created": "2026-09-26",
+    "dependsOn": [
+      "001-boundaries-and-authority",
+      "002-environment-lifecycle"
+    ],
+    "extends": [
+      {
+        "nature": "additive",
+        "spec": "002-environment-lifecycle",
+        "unit": {
+          "kind": "directory",
+          "path": "crates/statecraft-home/"
+        }
+      }
+    ],
+    "id": "009-governance-producer",
+    "implementation": "complete",
+    "relocates": [
+      {
+        "from": "3-15-the-governance-producer-boundary",
+        "spec": "002-environment-lifecycle",
+        "to": "3-15-the-governance-producer-boundary"
+      }
+    ],
+    "sectionDigests": {
+      "009-governance-producer-adoption": "511879307160e477f585aa8fdd29306535e9e1f8a4aba8383a22da57fa96e17c",
+      "1-purpose": "07be368795e17e30b3c90ba2733c2a0ee8778cf30ffdf7f7a1ec198818969716",
+      "2-territory": "52c54cbe806cf12e9bb16bfafc9718496921adae55f114a610cfc912067ff61e",
+      "3-15-the-governance-producer-boundary": "80abe9f421c01cc4a1d0b9e6d13e6d17bb0f2c6a2a4abaddee63c37515e533be",
+      "3-behavior": "203302b387480d89318cc21ce7028ec3fb4eb663c5d070ff4a5a94800c564d6f",
+      "4-out-of-scope": "fe693857de24c01395a6fae2a8f2ecd7b835c0cc9e86159b7b6b62b4e1a68cce",
+      "5-resolved-decisions": "c4a115c7b57ab5b0cd1da723d8be1ee3a6252f76c01fff2890517f17235002be",
+      "verification": "426b7e1396b015eaba4f9cb76c2dbebb2b03daed726741728b86c3553ca9adda"
+    },
+    "sectionHeadings": [
+      "009: Governance producer adoption",
+      "1. Purpose",
+      "2. Territory",
+      "3. Behavior",
+      "3.15 The governance producer boundary",
+      "4. Out of scope",
+      "5. Resolved decisions",
+      "Verification"
+    ],
+    "specPath": "specs/009-governance-producer/spec.md",
+    "status": "approved",
+    "summary": "Carries the governance producer boundary relocated from spec 002: exact released identity, supported APIs, and the rule that Statecraft consumes spec-spine without becoming a second compiler.\n",
+    "title": "Governance producer adoption"
+  },
+  "shardHash": "a05c127018f9d3c7e6e6ff806ef55005970d4aaeac38325436db600631674269",
+  "specVersion": "1.9.0"
+}

@@ -1,0 +1,64 @@
+{
+  "record": {
+    "amends": [
+      "001-boundaries-and-authority"
+    ],
+    "amendsSections": [
+      "5"
+    ],
+    "created": "2026-09-26",
+    "dependsOn": [
+      "001-boundaries-and-authority"
+    ],
+    "establishes": [
+      {
+        "kind": "file",
+        "path": "scripts/check-spec-corpus.sh"
+      }
+    ],
+    "extends": [
+      {
+        "nature": "additive",
+        "spec": "001-boundaries-and-authority",
+        "unit": {
+          "kind": "file",
+          "path": "scripts/check-authored-content.sh"
+        }
+      }
+    ],
+    "id": "016-bounded-active-specs",
+    "implementation": "complete",
+    "sectionDigests": {
+      "016-active-specifications-stay-bounded": "436b6e8694877cbdff9862850e2b6fa54e7c08bb45a5fd0ea64b2940eaf348ad",
+      "1-purpose": "8b97dbd0f015e07a6f40f2c220f6d07631f7e3eb8a20c450d4d456fa1133fa51",
+      "2-territory": "a352c66e948d5467df77ae98ce0d39f21ae770778a62bb77050b842ca6989a73",
+      "3-1-active-content-and-historical-content-are-different-records": "8a2a9b4cf62e6a13b724bec4b35f4e7d07fc3acf9b853818effb195004cf457b",
+      "3-2-one-active-file-per-spec-directory": "18442a86d2720ec166b414b698c7498dc0ba90ea5b8e6721217591ab6af4901c",
+      "3-3-mechanical-budgets": "3f68dde59b2245bbf394c653d099eb9394105d99a57f3e3e9326be2fcb49ee8f",
+      "3-4-the-normal-governance-gate-runs-the-check": "d0a9d3983c3b2110400e2f36243e0fd2373f5a8a5c95de36b5c8dbfda6b9bfaa",
+      "3-behavior": "939b72069d7b5cb9623b8c175485c8fba9c4404ee1abd831249a6ff325de2f60",
+      "4-out-of-scope": "082c15827edf16771a62f1a22d0f779d5334e83016a848c299556ff3148b66b9",
+      "5-resolved-decisions": "69596052564d1c166d818b65066ec50d8ce873fbf6dbbc313897df7555439207",
+      "verification": "e501d99403dbcbd764ac94d31b586f35ea211a7d8d11a16f25326cc50c981be5"
+    },
+    "sectionHeadings": [
+      "016: Active specifications stay bounded",
+      "1. Purpose",
+      "2. Territory",
+      "3. Behavior",
+      "3.1 Active content and historical content are different records",
+      "3.2 One active file per spec directory",
+      "3.3 Mechanical budgets",
+      "3.4 The normal governance gate runs the check",
+      "4. Out of scope",
+      "5. Resolved decisions",
+      "Verification"
+    ],
+    "specPath": "specs/016-bounded-active-specs/spec.md",
+    "status": "approved",
+    "summary": "Amends spec 001's authoring model so an active spec carries current requirements and concise resolved rationale, never an append-only work log. A mechanical gate bounds active files and moves historical journals and handoffs to a nonnormative archive outside the compiler input.\n",
+    "title": "Active specifications stay bounded and historical journals stay outside the corpus"
+  },
+  "shardHash": "b667a06bc44730ffd5a8aecfe01b7842b427a8b0ccbc90817b88cf695598754f",
+  "specVersion": "1.9.0"
+}
