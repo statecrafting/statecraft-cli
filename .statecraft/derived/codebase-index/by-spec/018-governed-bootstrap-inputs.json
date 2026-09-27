@@ -1,0 +1,57 @@
+{
+  "mapping": {
+    "amends": [
+      "002-environment-lifecycle",
+      "009-governance-producer"
+    ],
+    "dependsOn": [
+      "002-environment-lifecycle",
+      "006-command-surface",
+      "009-governance-producer",
+      "010-profile-unresolved-claims",
+      "011-init-bootstrap-spec"
+    ],
+    "implementingPaths": [
+      {
+        "path": "crates/statecraft-cli/",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/statecraft-home/",
+        "source": "spec-edge"
+      }
+    ],
+    "resolvedUnits": [
+      {
+        "locations": [
+          {
+            "file": "crates/statecraft-cli/"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "directory",
+          "path": "crates/statecraft-cli/"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "crates/statecraft-home/"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "directory",
+          "path": "crates/statecraft-home/"
+        }
+      }
+    ],
+    "specId": "018-governed-bootstrap-inputs",
+    "specStatus": "draft"
+  },
+  "schemaVersion": "1.2.0",
+  "shardHash": "fe2f5a7c8e01d74520dc166ad71bf4d02f0b323b2b8d02477e7faa69a1f7fe45"
+}
