@@ -67,10 +67,10 @@
       "Verification"
     ],
     "specPath": "specs/024-review-budget-and-ratification/spec.md",
-    "status": "draft",
+    "status": "approved",
     "summary": "Amends spec 002's setup profile and spec 017's review cap. github-actions-rust revision 12 leaves a managed file out of the AI review only when its bytes match the digest its policy records, sends deletions as a list under their own cap, measures the reviewable change in estimated tokens, and reviews a change larger than one call in file groups whose verdicts are merged. It also refuses a merge that changes a path a draft spec owns, unless that pull request ratifies the spec with the owner's exception. An unreadable base now refuses instead of letting the candidate's policy and scripts judge it.\n",
     "title": "Setup profile revision 12: a token-budgeted AI review and ratification as a merge condition"
   },
-  "shardHash": "480b94038fe857b8501bc1ca6dbadb2f69f8d8a7eef3c217c9de9b74536ef894",
+  "shardHash": "f50840c05837b98d1dd23c2f04e5ac3589479e33856568ae7387fc8fdeb65eba",
   "specVersion": "1.9.0"
 }

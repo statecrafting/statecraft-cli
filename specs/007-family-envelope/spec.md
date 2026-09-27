@@ -1,7 +1,7 @@
 ---
 id: "007-family-envelope"
 title: "The family envelope: every --json answer in the exit and JSON contract spec-spine speaks"
-status: draft
+status: approved
 implementation: in-progress
 created: "2026-09-25"
 summary: >
