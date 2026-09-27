@@ -301,7 +301,7 @@ group_input() {
   echo "changed paths:"
   cat "$TMPD/changed-paths"
   if [ "$calls" -gt 1 ]; then
-    echo "this call reviews group ${g} of ${calls}; the other groups are reviewed separately:"
+    echo "this call reviews group ${g} of ${calls}, the files below; every other changed path is reviewed in another call:"
     awk -F '\t' -v g="$g" '$1 == g { print $3 }' "$TMPD/groups"
   fi
   echo "===== END SUBJECT ====="

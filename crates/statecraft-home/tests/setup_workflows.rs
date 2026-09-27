@@ -4134,11 +4134,17 @@ fn a_change_larger_than_one_call_is_reviewed_in_groups() {
     assert_eq!(ran.output("result"), "findings", "{}", ran.text);
     assert_eq!(ran.stub_file("claude-calls").unwrap().lines().count(), 3);
     let input = ran.stub_file("claude-input").unwrap();
-    for g in 1..=3 {
-        assert!(
-            input.contains(&format!("this call reviews group {g} of 3")),
-            "{input}"
+    // Each call names its own files, and only them (the AI review of #177).
+    for (g, files) in [
+        (1, "src/a.rs\n"),
+        (2, "src/b.rs\n"),
+        (3, "src/c.rs\nsrc/lib.rs\n"),
+    ] {
+        let header = format!(
+            "this call reviews group {g} of 3, the files below; every other changed path is reviewed in another call:\n"
         );
+        let want = format!("{header}{files}===== END SUBJECT =====");
+        assert!(input.contains(&want), "{want}\n---\n{input}");
     }
     let record = review_record(&ran);
     assert_eq!(record["review"]["calls"], 3);

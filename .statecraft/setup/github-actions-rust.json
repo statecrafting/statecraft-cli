@@ -78,12 +78,12 @@
   },
   "files": [
     {
-      "digest": "60988cc83582bdad7f3887b221c91bb54c8d15e004c89b3974540e247247d392",
+      "digest": "e0418f70e8937bcf6b8c2fe3e36844aec498573e66ef62c647717076e10b1d84",
       "path": ".github/workflows/statecraft-ci.yml",
       "role": "workflow"
     },
     {
-      "digest": "ff86a17d2a1b1ebb90a60e925e592305862b0a0f39ef3efe42467bb54f8e5e76",
+      "digest": "4d23f5f7542e60039e04cb747d832ed03de98609e260a9ed885e28d37b9864cd",
       "path": ".github/workflows/statecraft-ai-review.yml",
       "role": "workflow"
     },
@@ -103,13 +103,13 @@
       "role": "script"
     },
     {
-      "digest": "a999ac61d846d602338ad737469949f9acbc4cc3277535f5fcff90fee91e5596",
+      "digest": "ecb3028a04aec09819a4fc6504504f9c15fa4f9acdc4f4055dff9da557daea75",
       "path": "scripts/statecraft/ai-review.sh",
       "role": "script"
     }
   ],
   "id": "github-actions-rust",
-  "identity": "eddf224d80b586e5a03c0e958bf2661dbc7f92df7ed6240b297b4a8e49f5eff6",
+  "identity": "62a6bc6010e0b6677c4df517373a44adb97c7c8cdf8d6fbd7b58d6cbe596f083",
   "jobs": {
     "ai-review": {
       "merge_group": "recorded-review",
