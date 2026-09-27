@@ -1,0 +1,155 @@
+{
+  "record": {
+    "amends": [
+      "003-work-and-run-semantics",
+      "004-execution-adapter",
+      "005-acceptance-and-evidence",
+      "006-command-surface",
+      "009-governance-producer"
+    ],
+    "created": "2026-09-27",
+    "dependsOn": [
+      "002-environment-lifecycle",
+      "003-work-and-run-semantics",
+      "004-execution-adapter",
+      "005-acceptance-and-evidence",
+      "006-command-surface",
+      "009-governance-producer"
+    ],
+    "extends": [
+      {
+        "nature": "additive",
+        "spec": "002-environment-lifecycle",
+        "unit": {
+          "kind": "directory",
+          "path": "crates/statecraft-home/"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "003-work-and-run-semantics",
+        "unit": {
+          "kind": "directory",
+          "path": "crates/statecraft-run/"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "004-execution-adapter",
+        "unit": {
+          "kind": "directory",
+          "path": "crates/statecraft-adapter/"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "005-acceptance-and-evidence",
+        "unit": {
+          "kind": "directory",
+          "path": "crates/statecraft-acceptance/"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "006-command-surface",
+        "unit": {
+          "kind": "directory",
+          "path": "crates/statecraft-cli/"
+        }
+      }
+    ],
+    "id": "019-context-packet-consumption",
+    "implementation": "pending",
+    "obligations": [
+      {
+        "anchor": "3-2-one-packet-one-snapshot-no-distributed-transaction",
+        "id": "I-1",
+        "kind": "invariant",
+        "text": "Each repository packet remains bound to its own immutable snapshot, and their composition never claims one atomic cross-repository Git state."
+      },
+      {
+        "anchor": "3-3-the-producer-boundary",
+        "id": "I-2",
+        "kind": "invariant",
+        "text": "Statecraft consumes producer-reported selector, closure, continuation, and digest facts without reconstructing their algorithms."
+      },
+      {
+        "anchor": "3-5-intended-and-provider-visible-delivery",
+        "id": "R-1",
+        "kind": "requirement",
+        "text": "An attempt records one immutable multi-repository task manifest before execution and separately records intended delivery and provider-visible delivery."
+      },
+      {
+        "anchor": "3-7-five-independent-acceptance-checks",
+        "id": "R-2",
+        "kind": "requirement",
+        "text": "Acceptance reports packet integrity, closure, freshness, citation resolution, and evidence admission as independent checks whose unknown or failed states never become success."
+      },
+      {
+        "anchor": "verification",
+        "id": "V-1",
+        "inputs": [
+          "crates/statecraft-run/tests/context_manifest.rs",
+          "crates/statecraft-adapter/tests/context_delivery.rs",
+          "crates/statecraft-acceptance/tests/context_packet_acceptance.rs"
+        ],
+        "kind": "verification",
+        "text": "Portable fixtures prove snapshot separation, immutable manifest identity, delivery separation, producer-owned resolution, and independent acceptance outcomes without live provider activity."
+      }
+    ],
+    "sectionDigests": {
+      "019-immutable-context-packet-consumption-across-repository-snapshots": "d7ad97e309b7927bc8f18f43e49131111e6b93a46d75401255f1aefdb9c64aeb",
+      "1-purpose": "2fc4cba21f5d09b6d9121ffb69d97f3bbaa23e9db2eda21bfe66a69e9dd968ab",
+      "2-territory-and-producer-prerequisite": "66c314faa80043fa82ed82bf537890f93fc1d9641fd4f25d356229d7b1d8e0fe",
+      "3-1-the-multi-repository-task-manifest": "ce11b32d583023889717449bfb20a3dfee06d3981f3d7a7d87a6bcb8af4b398e",
+      "3-10-observable-negative-cases": "9f97ca9fea08edfb1fdfd0e181826591b756da65f213a96bd40ce71467eaf6ce",
+      "3-2-one-packet-one-snapshot-no-distributed-transaction": "0652125bb847c123fe61baa6b39f733468e5abd9cb233193f24c61e0a672ef38",
+      "3-3-the-producer-boundary": "8d194d4bb045f47cfd31ee2a342ca8c6c6bc7f6a322ac1f0f5568c27270c3dbe",
+      "3-4-immutable-custody-and-bounded-handling": "7943f1b6ceb8ed5be6bd28b95f9ec50cd6c86613cc4dce41a7e73c7077bbf889",
+      "3-5-intended-and-provider-visible-delivery": "7bae8fe7f694a04e133d5dc0cdc2740041ccd9f2424f81fef955180a0617c9b9",
+      "3-6-durable-attempt-binding-and-retry": "04b2dbfd948d14976290673320e8ef7426bb6b405ba7c165c8bbdfbd8861c09c",
+      "3-7-1-packet-integrity": "eb5354a773881d946e4fe4084c45be155cbf0e6d655853f5e4226ae50184a56a",
+      "3-7-2-closure": "ac795818ae971bbe290080e6571679e9f82d340a03900ffe47b519914d26f269",
+      "3-7-3-freshness": "d76d7c4e69cc9f979d6776424c347ee5481d0c911a8c767717ebbd36e3c9b10d",
+      "3-7-4-citations": "4a3b25372687085036fa05aa4b305b0f28c67bfccdee283fbdbc5b9275adc1bc",
+      "3-7-5-evidence": "5911bea3446a78e22a730520896157c4e72c8e20b945ea7b1f42bb3dbe93f146",
+      "3-7-five-independent-acceptance-checks": "b41fb037fe8cb17d2449413b146c06f7b1e9f5923077f0e0c4840303039cb0b2",
+      "3-8-acceptance-eligibility-and-disposition": "553bc782dee310161aa1e442a37978d39b28ad00d503d65943cecf5cca9fc9f8",
+      "3-9-command-projections": "6918f2b00a41fedbdc546808d31f21eea55a19d5d0f13cc0398d94bd2babc106",
+      "3-behavior": "1dc5ba0014e0d33276cf845297c105f51d7a9535c476655b63f25bc4f1c44ab2",
+      "4-out-of-scope": "069a7b0c76d2226904d02b0fcf283b384223ee6351a298722b52e4d0d063063d",
+      "5-resolved-decisions": "9c5c926ea791d2af42d4451748ab441627dcac324e8eeb605764533a3dcf2ef0",
+      "verification": "5f4521b5b36abc608274c7dc34970f98f916c5ebe97104e4fe37233ea5c52658"
+    },
+    "sectionHeadings": [
+      "019: Immutable context-packet consumption across repository snapshots",
+      "1. Purpose",
+      "2. Territory and producer prerequisite",
+      "3. Behavior",
+      "3.1 The multi-repository task manifest",
+      "3.2 One packet, one snapshot, no distributed transaction",
+      "3.3 The producer boundary",
+      "3.4 Immutable custody and bounded handling",
+      "3.5 Intended and provider-visible delivery",
+      "3.6 Durable attempt binding and retry",
+      "3.7 Five independent acceptance checks",
+      "3.7.1 Packet integrity",
+      "3.7.2 Closure",
+      "3.7.3 Freshness",
+      "3.7.4 Citations",
+      "3.7.5 Evidence",
+      "3.8 Acceptance eligibility and disposition",
+      "3.9 Command projections",
+      "3.10 Observable negative cases",
+      "4. Out of scope",
+      "5. Resolved decisions",
+      "Verification"
+    ],
+    "specPath": "specs/019-context-packet-consumption/spec.md",
+    "status": "draft",
+    "summary": "Amends Statecraft's run, adapter, acceptance, command, and governance-producer contracts so one task may bind immutable spec-spine context packets from several independently identified repository snapshots, record intended and provider-visible delivery separately, and judge packet integrity, closure, freshness, citations, and evidence without reimplementing producer-owned selectors, closures, or digests.\n",
+    "title": "Immutable context-packet consumption across repository snapshots"
+  },
+  "shardHash": "f10225c5847ec960203c64de90b601228c513011fcec91c13699b94f708951d7",
+  "specVersion": "1.9.0"
+}
