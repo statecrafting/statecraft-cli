@@ -1,5 +1,5 @@
 #!/bin/sh
-# Rendered by Statecraft from profile github-actions-rust revision 12.
+# Rendered by Statecraft from profile github-actions-rust revision {{sc:profile.revision}}.
 # The one definition of this repository's gate: `make gate` and `make code`
 # run it locally, and CI runs the same script, so the two cannot drift. Only
 # the repository-local .tooling/bin/spec-spine is used; a spec-spine elsewhere
@@ -35,15 +35,14 @@ SELF="$(cd "$(dirname "$0")" && pwd)/$(basename "$0")"
 # The project's governance parameters (revision 4, and FAIL_ON_UNRESOLVED from
 # revision 9, spec 010), rendered from its setup block. Each default keeps a
 # revision-3 project's behaviour except the base rule, which is a new refusal.
-DEFAULT_BRANCH='main'
-ENFORCE_COVERAGE=true
-AUTHORED_CONTENT='scripts/check-authored-content.sh'
-AUTHORED_CONTENT_TEXT=true
-GATE_EACH_COMMIT=true
-REQUIRE_SIGNED_COMMITS=true
-REQUIRE_DEFAULT_BASE=true
-FAIL_ON_UNRESOLVED=true
-REQUIRE_RATIFIED=true
+DEFAULT_BRANCH='{{sc:default_branch}}'
+ENFORCE_COVERAGE={{sc:governance.enforce_coverage}}
+AUTHORED_CONTENT='{{sc:governance.authored_content}}'
+AUTHORED_CONTENT_TEXT={{sc:governance.authored_content_text}}
+GATE_EACH_COMMIT={{sc:governance.gate_each_commit}}
+REQUIRE_SIGNED_COMMITS={{sc:governance.require_signed_commits}}
+REQUIRE_DEFAULT_BASE={{sc:governance.require_default_base}}
+FAIL_ON_UNRESOLVED={{sc:governance.fail_on_unresolved}}
 
 usage() {
   echo "usage: gate.sh governance|code|couple|couple-group|base|text|commits|pin" >&2
@@ -200,44 +199,6 @@ pin_of() {
     /^[[:space:]]*\[/ { section = $0; gsub(/[[:space:]]/, "", section); next }
     section == "[meta]" && /^[[:space:]]*required_version[[:space:]]*=/ { print; exit }
   ' "$1" 2>/dev/null | sed -n 's/^[^=]*=[[:space:]]*"=\([0-9][0-9]*\.[0-9][0-9]*\.[0-9][0-9]*\)"[[:space:]]*$/\1/p'
-}
-
-# Revision 12 (spec 024): ratification is a merge condition. Every path in
-# the file $1 names is looked up with the pinned spec-spine at the
-# candidate's tree (`index owner`, the coupling gate's own derivation), and a
-# path a `draft` spec owns is a finding (1). The pull request that moves the
-# spec to approved passes here; ci-gate requires the owner's exception for it.
-ratified() {
-  if [ "$REQUIRE_RATIFIED" != true ]; then
-    echo "gate.sh: governance.require_ratified is false; a path a draft spec owns is not refused"
-    return 0
-  fi
-  if ! command -v jq > /dev/null 2>&1; then
-    echo "gate.sh: jq is not on PATH; the ratification check reads spec-spine's JSON with it" >&2
-    leave 2
-  fi
-  rt="${RUNNER_TEMP:-${TMPDIR:-/tmp}}"
-  spec_spine registry list --json > "$rt/statecraft-registry.json"
-  jq -r '(.items // [])[] | select(.status == "draft") | .id' "$rt/statecraft-registry.json" > "$rt/statecraft-drafts"
-  if [ ! -s "$rt/statecraft-drafts" ]; then
-    echo "no spec is draft: every changed path's owner is ratified"
-    return 0
-  fi
-  unratified=0
-  while IFS= read -r path; do
-    [ -n "$path" ] || continue
-    spec_spine index owner "$path" --json > "$rt/statecraft-owner.json"
-    for id in $(jq -r '(.owners // [])[].specId' "$rt/statecraft-owner.json" | sort -u); do
-      if grep -qxF -- "$id" "$rt/statecraft-drafts"; then
-        echo "gate.sh: $path is owned by $id, which is draft: the owner ratifies it (status: approved) in this pull request, with the owner exception, before this change merges" >&2
-        unratified=1
-      fi
-    done
-  done < "$1"
-  if [ "$unratified" -ne 0 ]; then
-    leave 1
-  fi
-  echo "every changed path's owning specs are ratified"
 }
 
 # The pull request a merge-queue entry was built from, by its group ref.
@@ -452,8 +413,6 @@ case "$MODE" in
     body="${RUNNER_TEMP:-${TMPDIR:-/tmp}}/statecraft-pr-body.txt"
     printf '%s' "${PR_BODY:-}" > "$body"
     spec_spine couple --base "$BASE_SHA" --head "$HEAD_SHA" --pr-body "$body"
-    git -c core.quotePath=false diff --name-only "$BASE_SHA...$HEAD_SHA" > "${RUNNER_TEMP:-${TMPDIR:-/tmp}}/statecraft-pr-changed"
-    ratified "${RUNNER_TEMP:-${TMPDIR:-/tmp}}/statecraft-pr-changed"
     ;;
   couple-group)
     # A merge-queue entry (revision 3): the group's own endpoints, which are
@@ -489,7 +448,6 @@ case "$MODE" in
       printf '%s\n' "$extra"
     fi
     spec_spine couple --base "$BASE_SHA" --head "$HEAD_SHA" --pr-body "$body"
-    ratified "$tmp/statecraft-group-paths"
     ;;
   *)
     usage

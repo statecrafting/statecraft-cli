@@ -35,7 +35,7 @@ use std::path::Path;
 /// The one registered profile.
 pub const PROFILE_ID: &str = "github-actions-rust";
 /// Its revision.
-pub const REVISION: u32 = 11;
+pub const REVISION: u32 = 12;
 /// Where the rendered policy document lives in the target.
 pub const POLICY_PATH: &str = ".statecraft/setup/github-actions-rust.json";
 /// The resume record, under the project's runtime state.
@@ -76,8 +76,20 @@ pub const AUTHORED_CONTENT_SCRIPT: &str = "scripts/check-authored-content.sh";
 /// The revision that made the authored-content script a declared parameter.
 const AUTHORED_CONTENT_DECLARED_SINCE: u32 = 4;
 
-const DEFAULT_DIFF_CAP: u64 = 3000;
+/// Revision 12 (spec 024): the added-line backstop an absent
+/// `review.diff_cap` renders, the maximum; the token budget below is the cap.
+const DEFAULT_DIFF_CAP: u64 = MAX_DIFF_CAP;
 const MAX_DIFF_CAP: u64 = 20000;
+/// Revision 12 (spec 024): the reviewer model's context window, in estimated
+/// tokens; half of it is one call's diff budget.
+const DEFAULT_CONTEXT_TOKENS: u64 = 200_000;
+const CONTEXT_TOKENS_RANGE: (u64, u64) = (16_000, 2_000_000);
+/// The cost budget, as the most reviewer calls one pull request may take.
+const DEFAULT_MAX_CALLS: u64 = 4;
+const MAX_CALLS_RANGE: (u64, u64) = (1, 16);
+/// The estimated tokens the deletion list may take before it is truncated.
+const DEFAULT_DELETION_CAP: u64 = 20_000;
+const DELETION_CAP_RANGE: (u64, u64) = (1_000, 200_000);
 const DEFAULT_RELEASE_PATTERN: &str = "release/*";
 /// Where a declared extra required job's reusable workflow lives (revision
 /// 7): GitHub calls a reusable workflow only from this directory, never from
@@ -329,7 +341,7 @@ pub fn remote_obligations() -> Vec<String> {
         format!("the secret {PREFERRED_CREDENTIAL} or {CREDENTIAL} visible to the repository, set by the operator ({CREDENTIAL_COMMAND}, or gh secret set {PREFERRED_CREDENTIAL}); the review uses {PREFERRED_CREDENTIAL} when it is set and {CREDENTIAL} otherwise (revision 8), and neither value is ever in a log, a file or a message"),
         format!("branch protection on the default branch: require the status check ci-gate from GitHub Actions (app id {GATE_APP_ID}), and branches up to date"),
         "branch protection on the default branch: required approvals 0, and require code-owner review, so ci-gate with the AI review approves ordinary changes and a change to the profile's files needs a review its author cannot give (S-3, R2-2)".to_string(),
-        format!("the Environment {EXCEPTION_ENVIRONMENT} with the owner as a required reviewer, for owner exceptions: a release candidate whose review was skipped (S-1), a pull request whose review returned findings (R2-1), and a pull request that changes the authority set (revision 5)"),
+        format!("the Environment {EXCEPTION_ENVIRONMENT} with the owner as a required reviewer, for owner exceptions: a release candidate whose review was skipped (S-1), a pull request whose review returned findings (R2-1), a pull request that changes the authority set (revision 5), and a pull request that ratifies a spec (revision 12)"),
         "a merge queue, if the default branch requires one: upgrade to revision 3 first, or merge the upgrade while no queue is required, because ci-gate reads its policy at the base and revision 2 states no merge_group rule; a queue entry is judged by the review recorded for its pull request, never by a second review (revision 3)".to_string(),
         "a new refusal (revision 4): a pull request whose base is not the default branch fails governance, because a stacked pull request merges into another branch and is never judged against the default branch; open each branch off the default branch, or set governance.require_default_base to false".to_string(),
         format!("revision 5: a candidate never judges itself with its own gate. gate.sh, install-spec-spine.sh and the declared authored-content script run as they exist at the base, and a pull request that changes the authority set (the rendered workflows, scripts/statecraft/*, the policy, the declared authored-content script) blocks ci-gate until the owner approves the Environment {EXCEPTION_ENVIRONMENT} for that run. Every re-render of the profile, and every change to a file of the authority set, therefore needs the owner's approval once"),
@@ -339,6 +351,7 @@ pub fn remote_obligations() -> Vec<String> {
         "revision 9: governance.fail_on_unresolved (default true) decides whether gate.sh governance runs index check with --fail-on-unresolved; set it to false only in a corpus that approves specs before it builds them, where an approved spec's unbuilt claim is unresolved by design: index check still runs and reports each such claim, and every other governance check is unchanged (spec 010)".to_string(),
         "revision 10: review.diff_cap defaults to 3000 changed lines; an explicit value from 1 through 20000 remains an operator choice and is preserved on upgrade (spec 017)".to_string(),
         "revision 11: the commit walk copies the spec-spine binary into each commit's temporary worktree as a regular file instead of linking to a binary outside it, so spec-spine's containment rule (its spec 144, from 0.28.0) can read every commit's tree; the walk's verdicts are otherwise unchanged (spec 023)".to_string(),
+        "revision 12: the AI review leaves a managed file out only when its bytes match the digest the policy records, sends a file that only removes lines as a list under review.deletion_cap, measures the change in estimated tokens (bytes / 3) against a call budget of half review.context_tokens and a ceiling of review.max_calls calls, and reviews a larger change in file groups whose verdicts are merged; review.diff_cap is an added-line backstop, 20000 unless declared. With governance.require_ratified (default true) the coupling steps refuse a changed path a draft spec owns, and a pull request that moves a spec to approved needs the owner exception (spec 024)".to_string(),
         "a repository that already runs these checks by hand keeps them by setting governance.enforce_coverage (index coverage --fail-on-untraced), governance.authored_content (the script's path; absent or not executable refuses), governance.authored_content_text (the title, the body and every commit message), governance.gate_each_commit (each commit's tree passes the gate and cargo fmt) and governance.require_signed_commits (each commit verified as signed by GitHub) (revision 4)".to_string(),
     ]
 }
@@ -348,8 +361,17 @@ pub fn remote_obligations() -> Vec<String> {
 pub struct Parameters {
     /// The branch a push is gated on.
     pub default_branch: String,
-    /// The largest reviewable diff, in changed lines.
+    /// The added-line backstop (revision 12, spec 024; changed lines before).
     pub diff_cap: u64,
+    /// `review.context_tokens`: the reviewer's context window, in estimated
+    /// tokens; one call carries at most half of it as diff (revision 12).
+    pub context_tokens: u64,
+    /// `review.max_calls`: the most reviewer calls one pull request may take
+    /// (revision 12).
+    pub max_calls: u64,
+    /// `review.deletion_cap`: the estimated tokens the deletion list may take
+    /// before it is truncated (revision 12).
+    pub deletion_cap: u64,
     /// Repository-relative prefixes excluded from the review diff.
     pub exclude: Vec<String>,
     /// The glob over head refs that makes a pull request a release candidate.
@@ -377,6 +399,9 @@ pub struct Parameters {
     /// `governance.fail_on_unresolved`: `index check` refuses an unresolved
     /// claim rather than reporting it (revision 9, spec 010).
     pub fail_on_unresolved: bool,
+    /// `governance.require_ratified`: the coupling steps refuse a changed
+    /// path a `draft` spec owns (revision 12, spec 024).
+    pub require_ratified: bool,
     /// `ci.extra_required_jobs`: jobs beyond the profile's that ci-gate
     /// requires, each a call of the project's own reusable workflow
     /// (revision 7).
@@ -490,6 +515,9 @@ impl Parameters {
         Parameters {
             default_branch,
             diff_cap: DEFAULT_DIFF_CAP,
+            context_tokens: DEFAULT_CONTEXT_TOKENS,
+            max_calls: DEFAULT_MAX_CALLS,
+            deletion_cap: DEFAULT_DELETION_CAP,
             exclude,
             release_branch_pattern: DEFAULT_RELEASE_PATTERN.to_string(),
             code_owners: Vec::new(),
@@ -500,6 +528,7 @@ impl Parameters {
             require_signed_commits: false,
             require_default_base: true,
             fail_on_unresolved: true,
+            require_ratified: true,
             extra_required_jobs: Vec::new(),
         }
     }
@@ -529,6 +558,15 @@ pub fn parameters(
             .as_bool()
             .ok_or_else(|| format!("{key} must be true or false"))
     };
+    let bounded = |key: &str, value: &serde_json::Value, (lo, hi): (u64, u64)| {
+        let v = value
+            .as_u64()
+            .ok_or_else(|| format!("{key} must be a positive integer"))?;
+        if v < lo || v > hi {
+            return Err(format!("{key} {v} is outside {lo}..={hi}"));
+        }
+        Ok::<u64, String>(v)
+    };
     for (key, value) in block {
         match key.as_str() {
             "governance.enforce_coverage" => p.enforce_coverage = flag(key, value)?,
@@ -537,6 +575,12 @@ pub fn parameters(
             "governance.require_signed_commits" => p.require_signed_commits = flag(key, value)?,
             "governance.require_default_base" => p.require_default_base = flag(key, value)?,
             "governance.fail_on_unresolved" => p.fail_on_unresolved = flag(key, value)?,
+            "governance.require_ratified" => p.require_ratified = flag(key, value)?,
+            "review.context_tokens" => {
+                p.context_tokens = bounded(key, value, CONTEXT_TOKENS_RANGE)?
+            }
+            "review.max_calls" => p.max_calls = bounded(key, value, MAX_CALLS_RANGE)?,
+            "review.deletion_cap" => p.deletion_cap = bounded(key, value, DELETION_CAP_RANGE)?,
             "ci.extra_required_jobs" => p.extra_required_jobs = extra_required_jobs(root, value)?,
             "governance.authored_content" => {
                 let v = value
@@ -1303,6 +1347,9 @@ pub fn plan(inputs: &Inputs<'_>) -> Result<Plan, String> {
     values.insert("profile.identity", identity.clone());
     values.insert("default_branch", params.default_branch.clone());
     values.insert("review.diff_cap", params.diff_cap.to_string());
+    values.insert("review.context_tokens", params.context_tokens.to_string());
+    values.insert("review.max_calls", params.max_calls.to_string());
+    values.insert("review.deletion_cap", params.deletion_cap.to_string());
     values.insert("review.exclude", params.exclude.join(" "));
     values.insert(
         "release.branch_pattern",
@@ -1325,6 +1372,7 @@ pub fn plan(inputs: &Inputs<'_>) -> Result<Plan, String> {
             params.require_default_base,
         ),
         ("governance.fail_on_unresolved", params.fail_on_unresolved),
+        ("governance.require_ratified", params.require_ratified),
     ] {
         values.insert(name, on.to_string());
     }
@@ -2184,14 +2232,47 @@ mod tests {
     /// Spec 017: 3000 is the inherited review limit, while an explicit value
     /// remains an operator choice.
     #[test]
-    fn diff_cap_defaults_to_three_thousand() {
+    fn review_budget_parameters_are_validated_and_defaulted() {
         let dir = tempfile::tempdir().unwrap();
+        let one = |k: &str, v: serde_json::Value| {
+            parameters(
+                dir.path(),
+                &BTreeMap::from([(k.to_string(), v)]),
+                ".statecraft/derived",
+            )
+        };
+        // Revision 12 (spec 024): the token budget is the cap, and an absent
+        // review.diff_cap renders the added-line backstop, the maximum.
         let defaults = parameters(dir.path(), &BTreeMap::new(), ".statecraft/derived").unwrap();
-        assert_eq!(defaults.diff_cap, 3000);
-
-        let block = BTreeMap::from([("review.diff_cap".to_string(), serde_json::json!(2000))]);
-        let explicit = parameters(dir.path(), &block, ".statecraft/derived").unwrap();
-        assert_eq!(explicit.diff_cap, 2000);
+        assert_eq!(defaults.diff_cap, 20000);
+        assert_eq!(defaults.context_tokens, 200_000);
+        assert_eq!(defaults.max_calls, 4);
+        assert_eq!(defaults.deletion_cap, 20_000);
+        assert!(defaults.require_ratified);
+        // An explicit cap is the operator's and is kept (spec 017 3.2).
+        assert_eq!(
+            one("review.diff_cap", serde_json::json!(2000))
+                .unwrap()
+                .diff_cap,
+            2000
+        );
+        for (k, lo, hi) in [
+            ("review.context_tokens", 16_000, 2_000_000),
+            ("review.max_calls", 1, 16),
+            ("review.deletion_cap", 1_000, 200_000),
+        ] {
+            assert!(one(k, serde_json::json!(lo)).is_ok(), "{k} {lo}");
+            assert!(one(k, serde_json::json!(hi)).is_ok(), "{k} {hi}");
+            assert!(one(k, serde_json::json!(lo - 1)).is_err(), "{k} below");
+            assert!(one(k, serde_json::json!(hi + 1)).is_err(), "{k} above");
+            assert!(one(k, serde_json::json!("4")).is_err(), "{k} a string");
+        }
+        assert!(
+            !one("governance.require_ratified", serde_json::json!(false))
+                .unwrap()
+                .require_ratified
+        );
+        assert!(one("governance.require_ratified", serde_json::json!("no")).is_err());
     }
 
     #[test]

@@ -66,6 +66,10 @@ pub const GRANDFATHERED: &[Grandfathered] = &[
             "require_signed_commits",
             "require_default_base",
             "fail_on_unresolved",
+            "context_tokens",
+            "max_calls",
+            "deletion_cap",
+            "require_ratified",
         ],
     },
     Grandfathered {

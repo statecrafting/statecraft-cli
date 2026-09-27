@@ -1,0 +1,76 @@
+{
+  "record": {
+    "amends": [
+      "002-environment-lifecycle",
+      "017-ai-review-diff-cap"
+    ],
+    "amendsVerification": [
+      "017-ai-review-diff-cap"
+    ],
+    "created": "2026-09-27",
+    "dependsOn": [
+      "001-boundaries-and-authority",
+      "002-environment-lifecycle",
+      "017-ai-review-diff-cap",
+      "023-contained-commit-walk"
+    ],
+    "extends": [
+      {
+        "nature": "additive",
+        "spec": "002-environment-lifecycle",
+        "unit": {
+          "kind": "directory",
+          "path": "crates/statecraft-home/"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "006-command-surface",
+        "unit": {
+          "kind": "directory",
+          "path": "crates/statecraft-cli/"
+        }
+      }
+    ],
+    "id": "024-review-budget-and-ratification",
+    "implementation": "in-progress",
+    "sectionDigests": {
+      "024-a-token-budgeted-ai-review-and-ratification-as-a-merge-condition": "66f25fdc608dc72bf3086566cdee4edb7dcccf84ba013521dde5c33adbee3e3a",
+      "1-purpose": "391fb4c3d45556d59b94d5245d278fdc55a3d61985ec2132d8ba2532011f3d7a",
+      "2-territory": "4052a7dbcc8de3ac9caf23f028ed51c9235d50141375dfe4d35369d8f0d05fa9",
+      "3-1-a-managed-file-leaves-the-review-only-by-digest": "9f02eeb6966383be86446e4a505a6e35e1a49afaae6eec30b767a1461b3ca3fd",
+      "3-2-deletions-are-a-list-with-their-own-cap": "e210049b074e06fc9b29050ef539df0181bd5296a308a9671a76516b12b86025",
+      "3-3-the-cap-is-in-estimated-tokens": "ca011abdb06d395f74cf24d7edea8a30f491048f7c0a267c28fdacf5388849ee",
+      "3-4-a-change-larger-than-one-call-is-reviewed-in-groups": "7c93ab921ad0ff5887a9291d345b37ffca99ce19d98e363b4b78d26c08007e3a",
+      "3-5-ratification-is-a-merge-condition": "676fbbfeca772d4359f7eb1800f80c6151dcbc5297362bd1295d7997f979299a",
+      "3-6-an-unreadable-base-refuses": "48fcae6a025b65f0214ed868cf3e92498316545327db2f4bb9be268cd6293a10",
+      "3-7-upgrade-behavior": "2567684b8e7d957077b7e90af693a03b47f13d9a6c7afa4758765f221e975900",
+      "3-behavior": "0b2c900788649f548bad95e6e6f3ac1faff42416ce66182d9dc9faec441e3866",
+      "4-out-of-scope": "2c637da441fe7a49227cd00e6e4b1de37482e50852b9697452189d2aeb4970c0",
+      "5-resolved-decisions": "b5c3b6f7e8b09610e96f2f7720a1cbb90a30ea32b2e42ecd1113dab1f630e7cb",
+      "verification": "32ce38f939d63a249735ba9a3a1ba2e66a0f6d2b3f2be735f8276e6cfc9b1cf4"
+    },
+    "sectionHeadings": [
+      "024: A token-budgeted AI review and ratification as a merge condition",
+      "1. Purpose",
+      "2. Territory",
+      "3. Behavior",
+      "3.1 A managed file leaves the review only by digest",
+      "3.2 Deletions are a list with their own cap",
+      "3.3 The cap is in estimated tokens",
+      "3.4 A change larger than one call is reviewed in groups",
+      "3.5 Ratification is a merge condition",
+      "3.6 An unreadable base refuses",
+      "3.7 Upgrade behavior",
+      "4. Out of scope",
+      "5. Resolved decisions",
+      "Verification"
+    ],
+    "specPath": "specs/024-review-budget-and-ratification/spec.md",
+    "status": "draft",
+    "summary": "Amends spec 002's setup profile and spec 017's review cap. github-actions-rust revision 12 leaves a managed file out of the AI review only when its bytes match the digest its policy records, sends deletions as a list under their own cap, measures the reviewable change in estimated tokens, and reviews a change larger than one call in file groups whose verdicts are merged. It also refuses a merge that changes a path a draft spec owns, unless that pull request ratifies the spec with the owner's exception. An unreadable base now refuses instead of letting the candidate's policy and scripts judge it.\n",
+    "title": "Setup profile revision 12: a token-budgeted AI review and ratification as a merge condition"
+  },
+  "shardHash": "480b94038fe857b8501bc1ca6dbadb2f69f8d8a7eef3c217c9de9b74536ef894",
+  "specVersion": "1.9.0"
+}

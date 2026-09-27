@@ -56,21 +56,12 @@ jobs:
           ACTOR: ${{ github.actor }}
           IS_DRAFT: ${{ github.event.pull_request.draft }}
           DIFF_CAP: '{{sc:review.diff_cap}}'
-          CONTEXT_TOKENS: '{{sc:review.context_tokens}}'
-          MAX_CALLS: '{{sc:review.max_calls}}'
-          DELETION_CAP: '{{sc:review.deletion_cap}}'
           EXCLUDE: '{{sc:review.exclude}}'
           RELEASE_PATTERN: '{{sc:release.branch_pattern}}'
           CLAUDE_CLI_VERSION: '{{sc:review.tool_version}}'
           PROFILE_IDENTITY: '{{sc:profile.identity}}'
         run: |
           script="${RUNNER_TEMP}/statecraft-ai-review.sh"
-          # Revision 12: only a readable base without the script is the
-          # adoption; an unreadable base stops before the candidate is read.
-          if ! git cat-file -e "${BASE_SHA}^{commit}" 2>/dev/null; then
-            echo "cannot read the base commit ${BASE_SHA}; ai-review.sh is never taken from the candidate in its place" >&2
-            exit 2
-          fi
           if git show "${BASE_SHA}:scripts/statecraft/ai-review.sh" > "$script" 2>/dev/null; then
             echo "ai-review.sh: read at the base ${BASE_SHA}"
           else

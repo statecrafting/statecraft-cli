@@ -276,6 +276,13 @@ for v in ANTHROPIC_API_KEY CLAUDE_CODE_OAUTH_TOKEN ANTHROPIC_AUTH_TOKEN; do
 done > "$here/claude-env"
 ls -A "$PWD" > "$here/claude-cwd-listing"
 touch "$here/claude-called"
+# Revision 12: every call's input, in order, and the call count.
+printf '%s\n' "$input" >> "$here/claude-input"
+echo call >> "$here/claude-calls"
+calls="$(wc -l < "$here/claude-calls" | tr -d ' ')"
+if [ "$mode" = first-findings ]; then
+  if [ "$calls" = 1 ]; then mode=findings; else mode=no-findings; fi
+fi
 case "$mode" in
   findings)
     printf 'One finding.\n\n```json\n{"head": "%s", "verdict": "findings", "findings": [{"path": "src/lib.rs", "line": 5, "summary": "two is untested"}]}\n```\n' "$head" ;;
@@ -328,6 +335,8 @@ case "$1 $2" in
   "api --paginate")
     case "$3" in
       repos/*/issues/*/comments) cat "$here/gh-comments" 2> /dev/null || true ;;
+      # As `--jq` leaves it: one filename per line.
+      repos/*/pulls/*/files) cat "$here/gh-pr-files" 2> /dev/null || true ;;
       *) echo "gh stub: unsupported $*" >&2; exit 98 ;;
     esac ;;
   api\ repos/*/actions/runs/*/jobs*)
@@ -1098,6 +1107,51 @@ fn inverting_a_blocking_branch_of_ci_gate_is_noticed() {
                 1,
                 "the queued group changes the authority set",
             )
+        };
+        // Revision 12: two branches need a ratification, on a pull request
+        // and in the queue; the base does not carry the script.
+        let noticed = noticed || {
+            let mut ratify = spec_repo_at(&[POLICY], DRAFT_SPEC);
+            ratify.commit("specs/007-x/spec.md", APPROVED_SPEC);
+            std::fs::write(
+                ratify.root().join("scripts/statecraft/ci-gate.sh"),
+                &mutated,
+            )
+            .unwrap();
+            differs(
+                &run_gate(
+                    &ratify,
+                    "pull_request",
+                    &needs(&ALL_OK, Some("no-findings"), false),
+                    "topic",
+                ),
+                1,
+                "this candidate ratifies a spec and the owner exception",
+            ) || differs(
+                &run_queue(&ratify, &queue("queue, ratification", 1)),
+                1,
+                "the queued group ratifies a spec",
+            )
+        };
+        // Revision 12: a base that is not a commit in the clone refuses.
+        let noticed = noticed || {
+            // The workflow step refuses this base first, so the mutated
+            // script is run as the step would run it.
+            let gone = Repo::new(&[POLICY], &[]);
+            let out = Command::new("bash")
+                .arg("-c")
+                .arg(&mutated)
+                .current_dir(gone.root())
+                .env("NEEDS_JSON", needs(&ALL_OK, Some("no-findings"), false))
+                .env("EVENT_NAME", "pull_request")
+                .env("HEAD_SHA", &gone.head)
+                .env("BASE_SHA", ABSENT)
+                .env_remove("GITHUB_STEP_SUMMARY")
+                .output()
+                .unwrap();
+            let text = String::from_utf8_lossy(&out.stdout).to_string()
+                + &String::from_utf8_lossy(&out.stderr);
+            out.status.code() != Some(2) || !text.contains("cannot read the base commit")
         };
         let noticed = noticed || {
             let odd = Repo::new(&[], &[]);
@@ -1880,6 +1934,24 @@ if [ -f "$ss" ]; then
 fi
 case "$*" in
   --version) echo "spec-spine 0.26.0" ;;
+  # Revision 12: the draft ids in $STUB_STATE/ss-drafts, and each path's
+  # owners from the `path<TAB>spec` lines of $STUB_STATE/ss-owners.
+  "registry list"*)
+    printf '{"items": ['
+    sep=""
+    if [ -f "$STUB_STATE/ss-drafts" ]; then
+      while IFS= read -r id; do
+        printf '%s{"id": "%s", "status": "draft"}' "$sep" "$id"
+        sep=", "
+      done < "$STUB_STATE/ss-drafts"
+    fi
+    printf ']}\n' ;;
+  "index owner"*)
+    printf '{"owners": ['
+    if [ -f "$STUB_STATE/ss-owners" ]; then
+      awk -F '\t' -v p="$3" '$1 == p { printf "%s{\"specId\": \"%s\", \"kind\": \"unit\"}", sep, $2; sep = ", " }' "$STUB_STATE/ss-owners"
+    fi
+    printf '], "path": "%s"}\n' "$3" ;;
   "index coverage"*)
     if [ -f src/untraced.rs ]; then
       echo "untraced: src/untraced.rs"
@@ -2086,6 +2158,9 @@ fn gov_ctx(gov: &Gov, ev: &Event<'_>) -> BTreeMap<String, String> {
         ),
         ("github.event.pull_request.base.sha", gov.base.as_str()),
         ("github.event.pull_request.head.sha", ev.head),
+        // The merge-queue coupling step's own endpoints (revision 3).
+        ("github.event.merge_group.base_sha", gov.base.as_str()),
+        ("github.event.merge_group.head_sha", ev.head),
         ("github.repository", "owner/fixture"),
         ("github.token", "fixture-token"),
     ] {
@@ -3875,4 +3950,515 @@ fn inverting_a_required_job_branch_is_noticed_by_the_declared_job_cases() {
             lines[site]
         );
     }
+}
+
+// ------------------------------------------ revision 12 (spec 024): review
+
+/// A review case for the revision-12 tests: `mode` answers, and `extra`
+/// overrides the rendered budget.
+fn budget_case(mode: &'static str, extra: &[(&'static str, &str)]) -> Case {
+    Case {
+        label: "revision 12",
+        mode,
+        extra: extra.iter().map(|(k, v)| (*k, v.to_string())).collect(),
+        comment_exit: "0",
+        moved_head: false,
+        unreadable_head: false,
+        npm_exit: "0",
+        want_exit: 0,
+        want_result: "",
+    }
+}
+
+fn review_record(ran: &Ran) -> serde_json::Value {
+    let dir = ran.output("evidence");
+    assert!(!dir.is_empty(), "no evidence output:\n{}", ran.text);
+    serde_json::from_str(
+        &std::fs::read_to_string(Path::new(dir).join("ai-review-evidence.json")).unwrap(),
+    )
+    .unwrap()
+}
+
+/// 3.1: a managed file whose bytes are the digest the head's policy records
+/// leaves the review and is named; a hand edit to another managed file is
+/// reviewed like any path.
+#[test]
+fn a_managed_file_leaves_the_review_only_by_digest() {
+    let mut repo = Repo::new(&["scripts/statecraft/ai-review.sh"], &[]);
+    let root = repo.root().to_path_buf();
+    let read = |rel: &str| std::fs::read_to_string(root.join(rel)).unwrap();
+    let (policy, ci_gate, gate) = (
+        read(POLICY),
+        read("scripts/statecraft/ci-gate.sh"),
+        read("scripts/statecraft/gate.sh"),
+    );
+    repo.commit(POLICY, &policy);
+    repo.commit("scripts/statecraft/ci-gate.sh", &ci_gate);
+    repo.commit(
+        "scripts/statecraft/gate.sh",
+        &format!("{gate}# a hand edit\n"),
+    );
+    let ran = run_review(&repo, &budget_case("no-findings", &[]));
+    assert_eq!(ran.exit, 0, "{}", ran.text);
+    assert_eq!(ran.output("result"), "no-findings", "{}", ran.text);
+    let input = ran.stub_file("claude-input").unwrap();
+    let (head, diff) = input.split_once("===== PR DIFF").unwrap();
+    assert!(
+        head.contains(
+            "===== MANAGED (digest-verified, not reviewed; trusted) =====\nscripts/statecraft/ci-gate.sh\n===== END MANAGED ====="
+        ),
+        "{head}"
+    );
+    // Named as a changed path, and absent from the diff.
+    assert!(head.contains("changed paths:"), "{head}");
+    assert!(
+        !diff.contains("diff --git a/scripts/statecraft/ci-gate.sh"),
+        "{diff}"
+    );
+    for reviewed in ["scripts/statecraft/gate.sh", "src/lib.rs", POLICY] {
+        assert!(
+            diff.contains(&format!("diff --git a/{reviewed}")),
+            "{reviewed}: {diff}"
+        );
+    }
+    let record = review_record(&ran);
+    assert_eq!(
+        record["review"]["managed"],
+        serde_json::json!(["scripts/statecraft/ci-gate.sh"])
+    );
+    assert_eq!(record["review"]["calls"], 1);
+}
+
+/// 3.2: a file that only removes lines is listed, not sent, and does not
+/// count against the cap; the list truncates at its own cap and keeps the
+/// totals.
+#[test]
+fn deletions_are_a_list_under_their_own_cap() {
+    let mut repo = Repo::new(&["scripts/statecraft/ai-review.sh"], &[]);
+    let root = repo.root().to_path_buf();
+    git(&root, &["checkout", "--quiet", "main"]);
+    let big: String = (0..100).map(|i| format!("line {i}\n")).collect();
+    write(&root, "big.txt", &big);
+    write(&root, "part.txt", "one\ntwo\nthree\n");
+    let long = "a-deliberately-long-directory-entry-name-for-the-deletion-list";
+    for i in 0..40 {
+        write(&root, &format!("gone/{long}-{i:02}.txt"), "x\n");
+    }
+    git(&root, &["add", "big.txt", "part.txt", "gone"]);
+    git(&root, &["commit", "--quiet", "-m", "files to delete"]);
+    repo.base = git(&root, &["rev-parse", "HEAD"]);
+    git(&root, &["checkout", "--quiet", "topic"]);
+    git(&root, &["merge", "--quiet", "--no-edit", "main"]);
+    git(&root, &["rm", "-r", "--quiet", "big.txt", "gone"]);
+    repo.commit("part.txt", "one\n");
+
+    // The change adds 4 lines and removes 142: under a 10-line backstop it
+    // is reviewed, where a changed-line cap would have skipped it.
+    let ran = run_review(&repo, &budget_case("no-findings", &[("DIFF_CAP", "10")]));
+    assert_eq!(ran.exit, 0, "{}", ran.text);
+    assert_eq!(ran.output("result"), "no-findings", "{}", ran.text);
+    let input = ran.stub_file("claude-input").unwrap();
+    let (head, diff) = input.split_once("===== PR DIFF").unwrap();
+    assert!(
+        head.contains("===== DELETIONS (summary, not reviewed as text; trusted) ====="),
+        "{head}"
+    );
+    assert!(
+        head.contains("big.txt: 100 line(s) removed (file deleted)"),
+        "{head}"
+    );
+    assert!(
+        head.contains("part.txt: 2 line(s) removed (lines removed)"),
+        "{head}"
+    );
+    assert!(
+        head.contains("total: 42 file(s), 142 line(s) removed"),
+        "{head}"
+    );
+    assert!(
+        !diff.contains("big.txt") && !diff.contains("part.txt"),
+        "{diff}"
+    );
+    let record = review_record(&ran);
+    assert_eq!(
+        record["review"]["deletions"],
+        serde_json::json!({"files": 42, "lines": 142, "truncated": false})
+    );
+
+    let ran = run_review(
+        &repo,
+        &budget_case("no-findings", &[("DELETION_CAP", "1000")]),
+    );
+    assert_eq!(ran.exit, 0, "{}", ran.text);
+    let input = ran.stub_file("claude-input").unwrap();
+    assert!(
+        input.contains("... TRUNCATED at 1000 estimated tokens; this list is INCOMPLETE."),
+        "{input}"
+    );
+    assert!(
+        input.contains("total: 42 file(s), 142 line(s) removed"),
+        "{input}"
+    );
+    assert_eq!(
+        review_record(&ran)["review"]["deletions"]["truncated"],
+        true
+    );
+}
+
+/// 3.3 and 3.4: past one call's budget the change is reviewed in groups whose
+/// verdicts merge; past the ceiling, one file over a call, or more groups
+/// than the budget allows, it is a visible `oversized` skip.
+#[test]
+fn a_change_larger_than_one_call_is_reviewed_in_groups() {
+    let body: String = (0..20)
+        .map(|i| format!("// line {i:02} of text\n"))
+        .collect();
+    let repo = Repo::new(
+        &["scripts/statecraft/ai-review.sh"],
+        &[
+            ("src/a.rs", &body),
+            ("src/b.rs", &body),
+            ("src/c.rs", &body),
+        ],
+    );
+    // A budget of 250 tokens a call: a, b and c each take one, and lib.rs
+    // joins c.
+    let ran = run_review(
+        &repo,
+        &budget_case(
+            "first-findings",
+            &[("CONTEXT_TOKENS", "500"), ("MAX_CALLS", "4")],
+        ),
+    );
+    assert_eq!(ran.exit, 0, "{}", ran.text);
+    assert_eq!(ran.output("result"), "findings", "{}", ran.text);
+    assert_eq!(ran.stub_file("claude-calls").unwrap().lines().count(), 3);
+    let input = ran.stub_file("claude-input").unwrap();
+    for g in 1..=3 {
+        assert!(
+            input.contains(&format!("this call reviews group {g} of 3")),
+            "{input}"
+        );
+    }
+    let record = review_record(&ran);
+    assert_eq!(record["review"]["calls"], 3);
+    assert_eq!(record["review"]["callBudget"], 250);
+    assert_eq!(record["review"]["ceiling"], 1000);
+    assert_eq!(record["findings"].as_array().unwrap().len(), 1);
+    let comment = ran.stub_file("gh-comments").unwrap();
+    assert!(comment.contains("## AI review (findings)"), "{comment}");
+    for g in 1..=3 {
+        assert!(
+            comment.contains(&format!("### Group {g} of 3")),
+            "{comment}"
+        );
+    }
+
+    for (extra, why) in [
+        (
+            [("CONTEXT_TOKENS", "500"), ("MAX_CALLS", "1")],
+            "over the ceiling of 250",
+        ),
+        (
+            [("CONTEXT_TOKENS", "200"), ("MAX_CALLS", "16")],
+            "cannot be split",
+        ),
+        (
+            [("CONTEXT_TOKENS", "500"), ("MAX_CALLS", "2")],
+            "needs 3 calls of 250 tokens",
+        ),
+    ] {
+        let ran = run_review(&repo, &budget_case("no-findings", &extra));
+        assert_eq!(ran.exit, 0, "{why}: {}", ran.text);
+        assert_eq!(
+            ran.output("result"),
+            "skipped:oversized",
+            "{why}: {}",
+            ran.text
+        );
+        assert!(ran.text.contains(why), "{why}: {}", ran.text);
+        assert!(ran.stub_file("claude-called").is_none(), "{why}");
+        assert_eq!(review_record(&ran)["result"], "skipped:oversized");
+    }
+}
+
+// ------------------------------------ revision 12 (spec 024): ratification
+
+const DRAFT_SPEC: &str = "---\nid: \"007-x\"\nstatus: draft\n---\n\n# 007\n";
+const APPROVED_SPEC: &str = "---\nid: \"007-x\"\nstatus: approved\n---\n\n# 007\n";
+
+/// A ci-gate repository whose base carries `specs/007-x/spec.md` as `text`:
+/// the topic merges it, so the three-dot diff is the topic's own change.
+fn spec_repo(text: &str) -> Repo {
+    spec_repo_at(&[POLICY, "scripts/statecraft/ci-gate.sh"], text)
+}
+
+/// As [`spec_repo`], with `at_base` the profile paths the base carries.
+fn spec_repo_at(at_base: &[&str], text: &str) -> Repo {
+    let mut repo = Repo::new(at_base, &[]);
+    let root = repo.root().to_path_buf();
+    git(&root, &["checkout", "--quiet", "main"]);
+    write(&root, "specs/007-x/spec.md", text);
+    git(&root, &["add", "specs"]);
+    git(&root, &["commit", "--quiet", "-m", "a spec"]);
+    repo.base = git(&root, &["rev-parse", "HEAD"]);
+    git(&root, &["checkout", "--quiet", "topic"]);
+    git(&root, &["merge", "--quiet", "--no-edit", "main"]);
+    repo.head = git(&root, &["rev-parse", "HEAD"]);
+    repo
+}
+
+/// 3.5: a changed path a draft spec owns fails the coupling steps; the pull
+/// request that moves the spec to approved passes them, and ci-gate and the
+/// workflow then require the owner exception for it.
+#[test]
+fn a_draft_owner_refuses_and_a_ratification_needs_the_owner_exception() {
+    // The coupling steps, on a pull request and in the queue.
+    let owned = |drafts: &'static str| {
+        move |state: &Path| {
+            std::fs::write(state.join("ss-drafts"), drafts).unwrap();
+            std::fs::write(state.join("ss-owners"), "src/lib.rs\t007-x\n").unwrap();
+            std::fs::write(state.join("gh-pr-files"), "src/lib.rs\n").unwrap();
+            std::fs::write(state.join("gh-head"), "{\"body\": \"\"}\n").unwrap();
+        }
+    };
+    for params in [
+        vec![],
+        vec![("governance.require_ratified", serde_json::json!(false))],
+    ] {
+        let enforced = params.is_empty();
+        let gov = Gov::new(&params);
+        let head = gov.commit(
+            &[("src/lib.rs", Some("pub fn one() -> u32 {\n    2\n}\n"))],
+            "change",
+        );
+        for (step, name) in [
+            ("Coupling gate", "pull_request"),
+            ("Coupling gate (merge queue)", "merge_group"),
+        ] {
+            let ev = event(name, &head);
+            let ran = run_gov(&gov, step, &ev, owned("007-x\n"));
+            if enforced {
+                assert_eq!(ran.exit, 1, "{step}: {}", ran.text);
+                assert!(
+                    ran.text
+                        .contains("gate.sh: src/lib.rs is owned by 007-x, which is draft"),
+                    "{step}: {}",
+                    ran.text
+                );
+            } else {
+                assert_eq!(ran.exit, 0, "{step}: {}", ran.text);
+                assert!(
+                    ran.text.contains("governance.require_ratified is false"),
+                    "{step}: {}",
+                    ran.text
+                );
+            }
+            let ran = run_gov(&gov, step, &ev, owned(""));
+            assert_eq!(ran.exit, 0, "{step}: {}", ran.text);
+            let ran = run_gov(&gov, step, &ev, owned("008-y\n"));
+            assert_eq!(ran.exit, 0, "{step}: {}", ran.text);
+            if enforced {
+                assert!(
+                    ran.text
+                        .contains("every changed path's owning specs are ratified"),
+                    "{step}: {}",
+                    ran.text
+                );
+            }
+        }
+    }
+
+    // ci-gate: a ratification needs the exception on a pull request and in
+    // the queue, and is reported on push.
+    let mut ratify = spec_repo(DRAFT_SPEC);
+    ratify.commit("specs/007-x/spec.md", APPROVED_SPEC);
+    let ran = run_gate(
+        &ratify,
+        "pull_request",
+        &needs(&ALL_OK, Some("no-findings"), false),
+        "topic",
+    );
+    assert_eq!(ran.exit, 1, "{}", ran.text);
+    assert!(
+        ran.text
+            .contains("this candidate ratifies a spec and the owner exception"),
+        "{}",
+        ran.text
+    );
+    assert!(
+        ran.text.contains("specs/007-x/spec.md (draft -> approved)"),
+        "{}",
+        ran.text
+    );
+    let approved = with(("review-exception", "success"));
+    let ran = run_gate(
+        &ratify,
+        "pull_request",
+        &needs(&as_refs(&approved), Some("no-findings"), false),
+        "topic",
+    );
+    assert_eq!(ran.exit, 0, "{}", ran.text);
+    assert!(
+        ran.text
+            .contains("ratification: the owner exception is required for this run"),
+        "{}",
+        ran.text
+    );
+    let ran = run_queue(&ratify, &queue("queue, ratification, no exception", 1));
+    assert_eq!(ran.exit, 1, "{}", ran.text);
+    assert!(
+        ran.text.contains("the queued group ratifies a spec"),
+        "{}",
+        ran.text
+    );
+    let ran = run_queue(
+        &ratify,
+        &Queue {
+            exception: "success",
+            ..queue("queue, ratification, exception approved", 0)
+        },
+    );
+    assert_eq!(ran.exit, 0, "{}", ran.text);
+    assert!(
+        ran.text
+            .contains("ratification: admitted by the owner exception"),
+        "{}",
+        ran.text
+    );
+
+    // On push the ratification is reported.
+    let push_ok = needs(
+        &[
+            ("governance", "success"),
+            ("code", "success"),
+            ("ai-review", "skipped"),
+            ("review-exception", "skipped"),
+        ],
+        None,
+        false,
+    );
+    let ran = run_gate(&ratify, "push", &push_ok, "");
+    assert_eq!(ran.exit, 0, "{}", ran.text);
+    assert!(
+        ran.text
+            .contains("ratification: reported on push; it was approved on its pull request"),
+        "{}",
+        ran.text
+    );
+
+    // Not a ratification: an approved spec edited, and a draft that stays
+    // draft.
+    for (base, head) in [
+        (
+            APPROVED_SPEC,
+            "---\nid: \"007-x\"\nstatus: approved\n---\n\n# 007, edited\n",
+        ),
+        (
+            DRAFT_SPEC,
+            "---\nid: \"007-x\"\nstatus: draft\n---\n\n# 007, edited\n",
+        ),
+    ] {
+        let mut repo = spec_repo(base);
+        repo.commit("specs/007-x/spec.md", head);
+        let ran = run_gate(
+            &repo,
+            "pull_request",
+            &needs(&ALL_OK, Some("no-findings"), false),
+            "topic",
+        );
+        assert_eq!(ran.exit, 0, "{}", ran.text);
+        assert!(!ran.text.contains("ratification"), "{}", ran.text);
+    }
+
+    // The workflow runs the exception job for a ratification: the governance
+    // job's step says so in its output.
+    let gov = Gov::new(&[]);
+    let root = gov.root().to_path_buf();
+    git(&root, &["checkout", "--quiet", "main"]);
+    write(&root, "specs/007-x/spec.md", DRAFT_SPEC);
+    git(&root, &["add", "specs"]);
+    git(&root, &["commit", "--quiet", "-m", "a spec"]);
+    let base = git(&root, &["rev-parse", "HEAD"]);
+    git(&root, &["checkout", "--quiet", "topic"]);
+    git(&root, &["merge", "--quiet", "--no-edit", "main"]);
+    let gov = Gov { base, ..gov };
+    let head = gov.commit(&[("specs/007-x/spec.md", Some(APPROVED_SPEC))], "ratify");
+    let ran = run_gov(
+        &gov,
+        "Authority change",
+        &event("pull_request", &head),
+        |_| {},
+    );
+    assert_eq!(ran.exit, 0, "{}", ran.text);
+    assert_eq!(ran.output("ratification"), "true", "{}", ran.text);
+    assert_eq!(ran.output("authority_change"), "false", "{}", ran.text);
+    let wf = workflow(gov.root(), "statecraft-ci.yml");
+    let exception_if = wf["jobs"]["review-exception"]["if"].as_str().unwrap();
+    assert!(
+        exception_if.contains("needs.governance.outputs.ratification == 'true'"),
+        "{exception_if}"
+    );
+}
+
+/// A well-formed commit id no fixture clone carries.
+const ABSENT: &str = "1234567890123456789012345678901234567890";
+
+/// 3.6 (spec-spine's review of its #403): only a readable base without the
+/// file is the adoption. A base that is not a commit in the clone refuses
+/// with 2 before the candidate's policy, ci-gate.sh or ai-review.sh is read.
+#[test]
+fn an_unreadable_base_refuses_and_never_reads_the_candidate() {
+    for event in ["pull_request", "merge_group", "push"] {
+        let mut repo = Repo::new(&[POLICY, "scripts/statecraft/ci-gate.sh"], &[]);
+        repo.base = ABSENT.to_string();
+        let ran = run_gate(
+            &repo,
+            event,
+            &needs(&ALL_OK, Some("no-findings"), false),
+            "topic",
+        );
+        assert_eq!(ran.exit, 2, "{event}: {}", ran.text);
+        assert!(
+            ran.text.contains(&format!(
+                "cannot read the base commit {ABSENT}; ci-gate.sh is never taken from the candidate"
+            )),
+            "{event}: {}",
+            ran.text
+        );
+        assert!(!ran.text.contains("adoption"), "{event}: {}", ran.text);
+    }
+    // The script itself, with the candidate's copy run directly: the policy
+    // read refuses the same base.
+    let repo = Repo::new(&[], &[]);
+    let out = Command::new("bash")
+        .arg(repo.root().join("scripts/statecraft/ci-gate.sh"))
+        .current_dir(repo.root())
+        .env("NEEDS_JSON", needs(&ALL_OK, Some("no-findings"), false))
+        .env("EVENT_NAME", "pull_request")
+        .env("HEAD_SHA", &repo.head)
+        .env("BASE_SHA", ABSENT)
+        .env_remove("GITHUB_STEP_SUMMARY")
+        .output()
+        .unwrap();
+    let text =
+        String::from_utf8_lossy(&out.stdout).to_string() + &String::from_utf8_lossy(&out.stderr);
+    assert_eq!(out.status.code(), Some(2), "{text}");
+    assert!(
+        text.contains("the policy is never taken from the candidate in its place"),
+        "{text}"
+    );
+    assert!(!text.contains("adopts the gate"), "{text}");
+    // The review reads its script at the base by the same rule.
+    let mut repo = Repo::new(&["scripts/statecraft/ai-review.sh"], &[]);
+    repo.base = ABSENT.to_string();
+    let ran = run_review(&repo, &budget_case("no-findings", &[]));
+    assert_eq!(ran.exit, 2, "{}", ran.text);
+    assert!(
+        ran.text
+            .contains("ai-review.sh is never taken from the candidate in its place"),
+        "{}",
+        ran.text
+    );
+    assert!(ran.stub_file("claude-called").is_none());
 }
