@@ -161,11 +161,21 @@ const R4_CI_GATE: &str = include_str!("support/profile-r4/ci-gate.sh");
 /// authority change, the commit walk runs each commit's own gate, and
 /// `ci-gate.sh` only reports an authority change. Only the templates matter
 /// to a managed upgrade.
+/// Revision 9 of the registered profile. Revision 10 changes the inherited
+/// diff-cap default, not a template source body, so only the profile revision
+/// differs here. Rendering interpolates that revision into each managed-file
+/// header, producing revision-9 bytes from this value.
+fn revision_nine() -> Profile {
+    let mut r9 = Profile::registered();
+    assert_eq!(r9.revision, 10, "the registered profile is revision 10");
+    r9.revision = 9;
+    r9
+}
+
 /// Revision 8 of the registered profile: the gate script as revision 8
 /// shipped it (main at 69b8b20), the one template revision 9 changed.
 fn revision_eight() -> Profile {
-    let mut r8 = Profile::registered();
-    assert_eq!(r8.revision, 9, "the registered profile is revision 9");
+    let mut r8 = revision_nine();
     r8.revision = 8;
     for t in &mut r8.templates {
         if t.path == "scripts/statecraft/gate.sh" {
@@ -902,7 +912,7 @@ fn a_revision_eight_project_upgrades_to_revision_nine() {
         let before = std::fs::read_to_string(root.join(gate)).unwrap();
         assert!(!before.contains("FAIL_ON_UNRESOLVED"), "{before}");
 
-        let r9 = Profile::registered();
+        let r9 = revision_nine();
         assert_ne!(r9.identity(), r8.identity());
         let mut block = manifest.project.setup.as_ref().unwrap().parameters.clone();
         if let Some(v) = value {
@@ -944,5 +954,66 @@ fn a_revision_eight_project_upgrades_to_revision_nine() {
             );
         }
         assert_eq!(std::fs::read_to_string(root.join(gate)).unwrap(), after);
+    }
+}
+
+/// Spec 017: revision 10 raises only the inherited review cap. A revision-9
+/// selection with no declared cap moves from 2000 to 3000; an operator's
+/// explicit 2000 remains 2000.
+#[test]
+fn a_revision_nine_project_upgrades_to_revision_ten() {
+    let workflow = ".github/workflows/statecraft-ai-review.yml";
+    for explicit in [false, true] {
+        let dir = project();
+        let root = dir.path();
+        let mut manifest = Manifest::new(Pins {
+            product: "0.0.0".into(),
+            spec_spine: "unpinned".into(),
+            adapters: Default::default(),
+            producer: None,
+        });
+        let r9 = revision_nine();
+
+        // Build the exact revision-9 bytes. The explicit value is removed
+        // from the recorded selection below when it represents the old
+        // inherited default.
+        let old_block = BTreeMap::from([("review.diff_cap".to_string(), serde_json::json!(2000))]);
+        assert!(plan_and_apply_with(root, &r9, &mut manifest, &old_block).whole());
+        let rendered_r9 = std::fs::read_to_string(root.join(workflow)).unwrap();
+        assert!(rendered_r9.contains("profile github-actions-rust revision 9"));
+        assert!(rendered_r9.contains("DIFF_CAP: '2000'"));
+        if !explicit {
+            manifest
+                .project
+                .setup
+                .as_mut()
+                .unwrap()
+                .parameters
+                .remove("review.diff_cap");
+        }
+
+        let block = manifest.project.setup.as_ref().unwrap().parameters.clone();
+        let r10 = Profile::registered();
+        assert_ne!(r10.identity(), r9.identity());
+        let upgrade = plan_and_apply_with(root, &r10, &mut manifest, &block);
+        assert!(upgrade.whole());
+        let rendered = std::fs::read_to_string(root.join(workflow)).unwrap();
+        let wanted = if explicit { 2000 } else { 3000 };
+        assert!(rendered.contains("profile github-actions-rust revision 10"));
+        assert!(
+            rendered.contains(&format!("DIFF_CAP: '{wanted}'")),
+            "{rendered}"
+        );
+        assert_eq!(manifest.project.setup.as_ref().unwrap().revision, 10);
+        assert_eq!(
+            manifest
+                .project
+                .setup
+                .as_ref()
+                .unwrap()
+                .parameters
+                .get("review.diff_cap"),
+            explicit.then_some(&serde_json::json!(2000))
+        );
     }
 }

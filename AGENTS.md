@@ -6,7 +6,7 @@ The cross-agent authority for this repository, read by Claude Code, Codex CLI an
 any other agent through the `AGENTS.md` convention. Edit this file to evolve the
 protocol.
 
-This repository holds fourteen specs, eight crates and one binary. **A crate has
+This repository holds fifteen specs, eight crates and one binary. **A crate has
 exactly one owning spec, and a spec may own more than one crate**: that is `D-02`
 as amended on 2026-09-21, when four pairs of specs were consolidated and no crate
 was merged. Do not add code, a crate or a test runner without a spec that claims
@@ -81,7 +81,7 @@ carrying `implementation`, so the join stays. What `draft` withholds is
 *ratification*, which is why an unratified spec's unresolved units warn instead
 of refusing.
 
-Thirteen of the fourteen active specs are ratified. Spec `007` remains a draft,
+Fourteen of the fifteen active specs are ratified. Spec `007` remains a draft,
 so a plan row for it is a reading suggestion rather than a work order. Spec
 `015` is approved with `implementation: in-progress` because its live
 permission experiment has no admitted result, which no local implementation
@@ -178,7 +178,7 @@ evaluated, so a `Spec-Drift-Waiver:` in the body would have covered all 15.
 ## Continuous integration
 
 This repository's CI is **rendered from Statecraft's own setup profile**,
-`github-actions-rust` revision 9 (spec `010`, applied 2026-09-26): the
+`github-actions-rust` revision 10 (spec `017`, applied 2026-09-27): the
 product governs itself with what it gives adopters. The rendered files are
 managed, and their ownership is recorded in `.statecraft/environment.json`:
 `.github/workflows/statecraft-ci.yml`, `.github/workflows/statecraft-ai-review.yml`,

@@ -1,0 +1,54 @@
+{
+  "record": {
+    "amends": [
+      "002-environment-lifecycle"
+    ],
+    "created": "2026-09-27",
+    "dependsOn": [
+      "001-boundaries-and-authority",
+      "002-environment-lifecycle"
+    ],
+    "extends": [
+      {
+        "nature": "additive",
+        "spec": "002-environment-lifecycle",
+        "unit": {
+          "kind": "directory",
+          "path": "crates/statecraft-home/"
+        }
+      }
+    ],
+    "id": "017-ai-review-diff-cap",
+    "implementation": "complete",
+    "sectionDigests": {
+      "017-ai-review-defaults-to-a-3000-line-diff-cap": "f30ada66b0e3ae72f229e0bc30030431aa8ee29fed35dce29c627a9b8d002895",
+      "1-purpose": "e14b50580574fa1c662243eeced464b85e7cab3431636b3df2018deb1ff98565",
+      "2-territory": "e974c1ce3dc587e44a5ea0ed9e7bfc8e63ef7aa9cac6ca5d4671a24411a10ead",
+      "3-1-default-and-explicit-values": "e9fb86450a008d33647819bc50eb4c4e69792b28839c524ed4368d54d4a3ce16",
+      "3-2-upgrade-behavior": "1607675968ad0020aae691706388cebd9fba76cf7d8fb6031e0e022c5c5aefe0",
+      "3-3-review-semantics-do-not-change": "ee2183568f942b7eb9e1a0986a9b90186e36f276cf188050c284c512af522ce2",
+      "3-behavior": "f93f5e4db16eb96c52800299dd16385a7cfefcf439a9a44ca517b493a6fd2a7f",
+      "4-out-of-scope": "076225dc289d4712505cbb3c8417c0b8f7e4baf63ebdf7921dd2953bc2fef33b",
+      "5-resolved-decisions": "2aa7b79f12f74bf9efbe03e81ecdea433ddacb09be4f886463809da557242b9e",
+      "verification": "9eeb706881befe7b79c925d3b846bbc1c7b8befad52bc9fcf603ede0359b93d9"
+    },
+    "sectionHeadings": [
+      "017: AI review defaults to a 3000-line diff cap",
+      "1. Purpose",
+      "2. Territory",
+      "3. Behavior",
+      "3.1 Default and explicit values",
+      "3.2 Upgrade behavior",
+      "3.3 Review semantics do not change",
+      "4. Out of scope",
+      "5. Resolved decisions",
+      "Verification"
+    ],
+    "specPath": "specs/017-ai-review-diff-cap/spec.md",
+    "status": "approved",
+    "summary": "Amends spec 002's setup profile. github-actions-rust revision 10 raises the inherited AI review diff cap from 2000 to 3000 changed lines so ordinary substantial pull requests remain reviewable. Explicit operator selections remain authoritative and are preserved on upgrade.\n",
+    "title": "Setup profile revision 10: AI review defaults to a 3000-line diff cap"
+  },
+  "shardHash": "180e382e9fbda6c2720bca24f18ede42901bece812e3ad529cb8f0f19586ba08",
+  "specVersion": "1.9.0"
+}
