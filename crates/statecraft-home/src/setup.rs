@@ -35,7 +35,7 @@ use std::path::Path;
 /// The one registered profile.
 pub const PROFILE_ID: &str = "github-actions-rust";
 /// Its revision.
-pub const REVISION: u32 = 9;
+pub const REVISION: u32 = 10;
 /// Where the rendered policy document lives in the target.
 pub const POLICY_PATH: &str = ".statecraft/setup/github-actions-rust.json";
 /// The resume record, under the project's runtime state.
@@ -76,7 +76,7 @@ pub const AUTHORED_CONTENT_SCRIPT: &str = "scripts/check-authored-content.sh";
 /// The revision that made the authored-content script a declared parameter.
 const AUTHORED_CONTENT_DECLARED_SINCE: u32 = 4;
 
-const DEFAULT_DIFF_CAP: u64 = 2000;
+const DEFAULT_DIFF_CAP: u64 = 3000;
 const MAX_DIFF_CAP: u64 = 20000;
 const DEFAULT_RELEASE_PATTERN: &str = "release/*";
 /// Where a declared extra required job's reusable workflow lives (revision
@@ -337,6 +337,7 @@ pub fn remote_obligations() -> Vec<String> {
         "revision 6: every file under .github/workflows/ is in the authority set, rendered or not, so adding, changing or removing any workflow needs the owner's approval once; a workflow the profile does not render could otherwise report a check named ci-gate".to_string(),
         "revision 7: every rendered script exits in one family contract, 0 ok, 1 finding, 2 refused, 3 usage, 4 failed; a missing spec-spine or a missing declared authored-content script now refuses with 2, a usage error is 3, and a command that broke is 4. A job the project must keep required is declared in ci.extra_required_jobs as a reusable workflow under .github/workflows/ (on: workflow_call); ci-gate needs it and blocks on failed, cancelled and skipped exactly as for its own jobs".to_string(),
         "revision 9: governance.fail_on_unresolved (default true) decides whether gate.sh governance runs index check with --fail-on-unresolved; set it to false only in a corpus that approves specs before it builds them, where an approved spec's unbuilt claim is unresolved by design: index check still runs and reports each such claim, and every other governance check is unchanged (spec 010)".to_string(),
+        "revision 10: review.diff_cap defaults to 3000 changed lines; an explicit value from 1 through 20000 remains an operator choice and is preserved on upgrade (spec 017)".to_string(),
         "a repository that already runs these checks by hand keeps them by setting governance.enforce_coverage (index coverage --fail-on-untraced), governance.authored_content (the script's path; absent or not executable refuses), governance.authored_content_text (the title, the body and every commit message), governance.gate_each_commit (each commit's tree passes the gate and cargo fmt) and governance.require_signed_commits (each commit verified as signed by GitHub) (revision 4)".to_string(),
     ]
 }
@@ -2177,6 +2178,19 @@ mod tests {
                 .diff_cap,
             150
         );
+    }
+
+    /// Spec 017: 3000 is the inherited review limit, while an explicit value
+    /// remains an operator choice.
+    #[test]
+    fn diff_cap_defaults_to_three_thousand() {
+        let dir = tempfile::tempdir().unwrap();
+        let defaults = parameters(dir.path(), &BTreeMap::new(), ".statecraft/derived").unwrap();
+        assert_eq!(defaults.diff_cap, 3000);
+
+        let block = BTreeMap::from([("review.diff_cap".to_string(), serde_json::json!(2000))]);
+        let explicit = parameters(dir.path(), &block, ".statecraft/derived").unwrap();
+        assert_eq!(explicit.diff_cap, 2000);
     }
 
     #[test]

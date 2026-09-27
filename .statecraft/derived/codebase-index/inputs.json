@@ -10,7 +10,7 @@
       "contentHash": "5e39637ab19f54b29c19154a13161c94da5511ad696b8ff1626950da68412e29"
     },
     ".github/workflows/statecraft-ai-review.yml": {
-      "contentHash": "96e19435974b332a6527c7444bafec0fb3ce5015ccd62eb80594f4274ae5f581"
+      "contentHash": "6edc805285b12f8ac9b5c70ff1de5b5ac26539db569320093b0324245daf776a"
     },
     ".github/workflows/statecraft-ci.yml": {
       "contentHash": "8c75800ca3b32489776f4e21fe785c9debb1027fe9fd6bc0ca4f802bc9616f9c"
@@ -19,7 +19,7 @@
       "contentHash": "9c3d64929b662cdc2f3623473dcc4bb5c1c2832ae9e5fb52e28b66b486db886a"
     },
     "AGENTS.md": {
-      "contentHash": "2681a08180064a635b7ca873be42621bfb02d5ca5524ca884fd54048689c7634"
+      "contentHash": "21070f5d22a6530487a21c9b434ebad15145a8af8d7e0ca990cca372309fdf69"
     },
     "CLAUDE.md": {
       "contentHash": "01e63121f953e076fde60b67abaa33a23b697ea2aade6c48c5c1ea5c4f27797b"
@@ -73,16 +73,16 @@
       "contentHash": "50138ae38377c0ff14f4f37ecdeed3cfd6500b50f91e5f7019232a11883ffdc3"
     },
     "scripts/statecraft/ai-review.sh": {
-      "contentHash": "eaf3f3e1847517793b734adb476050fbc6f7e6723212b53e23ad3faa727b9deb"
+      "contentHash": "436fd1d8ffa413e27788ad908c5746aa218e045d6dc97ea4b45b33b014f7033b"
     },
     "scripts/statecraft/ci-gate.sh": {
-      "contentHash": "bb771397ac8ef20942977ab42cbea2b792362383477f585004eb7b4ee55c679a"
+      "contentHash": "d7e2f7280ec7071a681dee2f821b64b97276f1995acb43c842e19c4902f904fa"
     },
     "scripts/statecraft/gate.sh": {
-      "contentHash": "728ac3428b3cef612126e7022380afe08f500ee53882db03a04a26fc39bbc35f"
+      "contentHash": "93184ecc4a384cab2fce881df0d6556a877c91922f927b249a2f83c4391efc49"
     },
     "scripts/statecraft/install-spec-spine.sh": {
-      "contentHash": "123db77f4ba5416b4d7ed5cfec6b7136641a536218057ee9f8c31f9c98116f44"
+      "contentHash": "bad4135f44e9676d8af56bba05e8e22fcc0bf669a7e206aaa18821c52c80240f"
     },
     "spec-spine.toml": {
       "contentHash": "3022e4de8e478d47697c441247dc4da4fc5fa8a24e00366892654b508204f299"
