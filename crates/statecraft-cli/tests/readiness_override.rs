@@ -799,3 +799,388 @@ fn two_histories_are_never_re_stored_or_merged() {
     assert_eq!(code(&out), 4, "{}", text(&out));
     assert!(text(&out).contains("move the other"), "{}", text(&out));
 }
+
+// Spec 003 section 3.1.5 and spec 006 section 3.11.8: the journal's state
+// authority, the write protocol's interruptions, and `override recover`.
+
+fn files(f: &Fixture, root: &str) -> (Option<Vec<u8>>, Option<Vec<u8>>) {
+    let read = |p: PathBuf| std::fs::read(p).ok();
+    (
+        read(statecraft_run::overrides::journal_path(
+            &f.home(),
+            Path::new(root),
+        )),
+        read(statecraft_run::overrides::authority_path(
+            &f.home(),
+            Path::new(root),
+        )),
+    )
+}
+
+fn recover_report(f: &Fixture, root: &str) -> (i32, serde_json::Value) {
+    let out = f.cli(&["override", "recover", root, "--json"]);
+    let v: serde_json::Value = json_naming::from_output(&out.stdout).unwrap();
+    (code(&out), json_naming::payload(&v).clone())
+}
+
+fn recover_with(f: &Fixture, root: &str, choice: &str) -> Output {
+    let (_, r) = recover_report(f, root);
+    f.cli(&[
+        "override",
+        "recover",
+        root,
+        choice,
+        r["journal"]["sha256"].as_str().unwrap(),
+        r["authority"]["sha256"].as_str().unwrap(),
+        "carol",
+        "settling",
+        "it",
+    ])
+}
+
+fn fault_request<'a>(
+    f: &'a Fixture,
+    home: &'a Path,
+    root: &'a str,
+) -> statecraft_run::overrides::Request<'a> {
+    let _ = f;
+    statecraft_run::overrides::Request {
+        home,
+        target: Path::new(root),
+        spec_id: DRAFT,
+        operator: "alice",
+        reason: "interrupted",
+        at: "2026-09-28T00:00:00Z",
+    }
+}
+
+/// Every rollback shape rule 3 names refuses `run`, `work list`, `override
+/// show` and `override grant` with exit 4, reads nothing as in force and
+/// writes nothing; `override recover` reports it as a finding.
+#[test]
+fn every_disagreement_with_the_state_authority_refuses_and_writes_nothing() {
+    type Tamper = fn(&Path, &Path, &[u8], &[u8]);
+    let shapes: [(&str, Tamper); 8] = [
+        ("the last line edited", |j, _, _, _| {
+            let t = std::fs::read_to_string(j).unwrap();
+            let last = t.lines().last().unwrap().to_string();
+            std::fs::write(j, t.replace(&last, &last.replacen("done", "undone", 1))).unwrap();
+        }),
+        ("the final revocation deleted", |j, _, _, _| {
+            let t = std::fs::read_to_string(j).unwrap();
+            let kept: Vec<&str> = t.lines().take(2).collect();
+            std::fs::write(j, format!("{}\n", kept.join("\n"))).unwrap();
+        }),
+        ("several lines removed from the end", |j, _, _, _| {
+            let t = std::fs::read_to_string(j).unwrap();
+            std::fs::write(j, format!("{}\n", t.lines().next().unwrap())).unwrap();
+        }),
+        (
+            "an older journal restored without its authority",
+            |j, _, older, _| {
+                std::fs::write(j, older).unwrap();
+            },
+        ),
+        (
+            "the journal deleted, the authority remaining",
+            |j, _, _, _| {
+                std::fs::remove_file(j).unwrap();
+            },
+        ),
+        (
+            "the authority deleted, the journal remaining",
+            |_, a, _, _| {
+                std::fs::remove_file(a).unwrap();
+            },
+        ),
+        (
+            "a line appended by hand past the authority",
+            |j, _, older, _| {
+                let mut t = std::fs::read(j).unwrap();
+                t.extend_from_slice(older);
+                std::fs::write(j, t).unwrap();
+            },
+        ),
+        ("a journal written before section 3.1.5", |_, a, _, _| {
+            std::fs::remove_file(a).unwrap();
+        }),
+    ];
+    for (shape, tamper) in shapes {
+        let f = Fixture::new();
+        let root = f.repository("a");
+        for args in [
+            vec!["override", "grant", &root, DRAFT, "alice", "why"],
+            vec!["override", "grant", &root, "010-unready", "bob", "why"],
+        ] {
+            assert_eq!(code(&f.cli(&args)), 0);
+        }
+        let (older, older_authority) = files(&f, &root);
+        assert_eq!(
+            code(&f.cli(&["override", "revoke", &root, DRAFT, "alice", "done"])),
+            0
+        );
+        let journal = statecraft_run::overrides::journal_path(&f.home(), Path::new(&root));
+        let authority = statecraft_run::overrides::authority_path(&f.home(), Path::new(&root));
+        tamper(
+            &journal,
+            &authority,
+            &older.clone().unwrap(),
+            &older_authority.clone().unwrap(),
+        );
+        let before = files(&f, &root);
+        for args in [
+            vec!["work", "list", &root],
+            vec!["run", &root, DRAFT],
+            vec!["override", "show", &root],
+            vec!["override", "grant", &root, DRAFT, "eve", "why"],
+            vec!["override", "revoke", &root, "010-unready", "eve", "why"],
+        ] {
+            let out = f.cli(&args);
+            assert_eq!(code(&out), 4, "{shape}: {args:?}: {}", text(&out));
+            assert!(text(&out).contains("override"), "{shape}: {}", text(&out));
+        }
+        assert_eq!(files(&f, &root), before, "{shape}: something was written");
+        assert!(
+            text(&f.cli(&["run", "list", &root])).contains("no runs recorded"),
+            "{shape}"
+        );
+        let (exit, report) = recover_report(&f, &root);
+        assert_eq!(exit, 1, "{shape}: {report}");
+        assert!(!report["allowed"].as_array().unwrap().is_empty(), "{shape}");
+        assert_eq!(files(&f, &root), before, "{shape}: the report wrote");
+    }
+}
+
+/// A fault injected at each boundary of rule 4 leaves the state its table
+/// names, which is never in force; each choice that state allows is recorded,
+/// and a choice it does not allow is refused.
+#[test]
+fn each_interrupted_write_leaves_the_state_rule_4_names_and_is_recovered_by_choice() {
+    use statecraft_run::overrides::Fault;
+    let cases: [(Fault, &str, &[&str]); 4] = [
+        (Fault::AfterStep1, "none", &[]),
+        (
+            Fault::AfterStep2,
+            "intended-without-line",
+            &["discard-pending"],
+        ),
+        (Fault::DuringStep3, "intended-torn", &["discard-pending"]),
+        (
+            Fault::BetweenStep3And4,
+            "pending",
+            &["complete-pending", "discard-pending"],
+        ),
+    ];
+    for (fault, word, allowed) in cases {
+        let choices: Vec<Option<&str>> = if allowed.is_empty() {
+            vec![None]
+        } else {
+            allowed.iter().copied().map(Some).collect()
+        };
+        for choice in choices {
+            let f = Fixture::new();
+            let root = f.repository("a");
+            let home = f.home();
+            assert!(
+                statecraft_run::overrides::change_with_fault(
+                    &fault_request(&f, &home, &root),
+                    statecraft_run::overrides::Action::Grant,
+                    fault,
+                )
+                .is_err()
+            );
+            let (exit, report) = recover_report(&f, &root);
+            assert_eq!(report["state"], word, "{fault:?}: {report}");
+            let listed: Vec<&str> = report["allowed"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .map(|c| c.as_str().unwrap())
+                .collect();
+            assert_eq!(listed, allowed, "{fault:?}");
+            assert_eq!(exit, if allowed.is_empty() { 0 } else { 1 });
+
+            // Never in force: the draft stays refused, or, for a pending
+            // line, `run` refuses naming the recovery.
+            let out = f.cli(&["run", &root, DRAFT]);
+            if word == "pending" {
+                assert_eq!(code(&out), 2, "{}", text(&out));
+                assert!(text(&out).contains("override recover"), "{}", text(&out));
+                let out = f.cli(&["override", "grant", &root, "010-unready", "bob", "why"]);
+                assert_eq!(code(&out), 2, "{}", text(&out));
+            } else {
+                assert!(text(&out).contains("excluded"), "{fault:?}: {}", text(&out));
+            }
+
+            // A choice the state does not allow, and a stale report, are
+            // refused and write nothing.
+            let before = files(&f, &root);
+            let out = recover_with(&f, &root, "adopt-empty");
+            assert_eq!(code(&out), 2, "{}", text(&out));
+            let out = f.cli(&[
+                "override",
+                "recover",
+                &root,
+                choice.unwrap_or("discard-pending"),
+                "0000",
+                "0000",
+                "carol",
+                "stale",
+            ]);
+            assert_eq!(code(&out), 2, "{}", text(&out));
+            assert_eq!(files(&f, &root), before);
+
+            let Some(choice) = choice else {
+                continue;
+            };
+            let out = recover_with(&f, &root, choice);
+            assert_eq!(code(&out), 0, "{fault:?} {choice}: {}", text(&out));
+            let (exit, report) = recover_report(&f, &root);
+            assert_eq!((exit, report["state"].as_str()), (0, Some("agree")));
+            let shown = f.cli(&["override", "show", &root, "--json"]);
+            let v: serde_json::Value = json_naming::from_output(&shown.stdout).unwrap();
+            let in_force = v["report"]["inForce"].as_array().unwrap().len();
+            assert_eq!(
+                in_force,
+                usize::from(choice == "complete-pending"),
+                "{choice}"
+            );
+            // The recovery line records what it found and chose.
+            let journal = std::fs::read_to_string(statecraft_run::overrides::journal_path(
+                &f.home(),
+                Path::new(&root),
+            ))
+            .unwrap();
+            let last: serde_json::Value =
+                serde_json::from_str(journal.lines().last().unwrap()).unwrap();
+            assert_eq!(last["recovery"]["choice"], choice);
+            assert_eq!(last["recovery"]["found"]["state"], word);
+            assert_eq!(last["operator"], "carol");
+            if choice == "complete-pending" {
+                let out = f.cli(&["run", &root, DRAFT]);
+                assert!(code(&out) <= 1, "{}", text(&out));
+                let listed = f.cli(&["run", "list", &root, "--json"]);
+                let v: serde_json::Value = json_naming::from_output(&listed.stdout).unwrap();
+                let admission = &v["report"]["runs"][0]["attempts"][0]["admission"];
+                assert_eq!(admission["verification"], "verified", "{v}");
+                assert_eq!(admission["authority"].as_str().unwrap().len(), 64);
+            }
+        }
+    }
+}
+
+/// An adopted baseline is operator-adopted, not verified, in `override show`
+/// and in the intent of every attempt it admits.
+#[test]
+fn an_adopted_baseline_is_labelled_operator_adopted_where_it_is_shown_and_recorded() {
+    let f = Fixture::new();
+    let root = f.repository("a");
+    assert_eq!(
+        code(&f.cli(&["override", "grant", &root, DRAFT, "alice", "why"])),
+        0
+    );
+    std::fs::remove_file(statecraft_run::overrides::authority_path(
+        &f.home(),
+        Path::new(&root),
+    ))
+    .unwrap();
+    let out = recover_with(&f, &root, "adopt-as-read");
+    assert_eq!(code(&out), 0, "{}", text(&out));
+    assert!(
+        text(&out).contains("operator-adopted, not verified"),
+        "{}",
+        text(&out)
+    );
+    let shown = f.cli(&["override", "show", &root]);
+    assert!(
+        text(&shown).contains("operator-adopted, not verified"),
+        "{}",
+        text(&shown)
+    );
+    let out = f.cli(&["run", &root, DRAFT]);
+    assert!(code(&out) <= 1, "{}", text(&out));
+    let listed = f.cli(&["run", "list", &root, "--json"]);
+    let v: serde_json::Value = json_naming::from_output(&listed.stdout).unwrap();
+    let admission = &v["report"]["runs"][0]["attempts"][0]["admission"];
+    assert_eq!(admission["verification"], "operator-adopted, not verified");
+    let shown = f.cli(&["run", "show", &root, DRAFT]);
+    assert!(
+        text(&shown).contains("operator-adopted, not verified"),
+        "{}",
+        text(&shown)
+    );
+}
+
+/// A reader that finds an interrupted write while another process holds the
+/// repository lock reports it in progress, never as pending, and refuses.
+#[test]
+fn a_reader_during_a_write_reports_in_progress() {
+    let f = Fixture::new();
+    let root = f.repository("a");
+    let home = f.home();
+    let _ = statecraft_run::overrides::change_with_fault(
+        &fault_request(&f, &home, &root),
+        statecraft_run::overrides::Action::Grant,
+        statecraft_run::overrides::Fault::BetweenStep3And4,
+    );
+    let held = statecraft_run::lock::try_acquire(&f.home(), Path::new(&root)).unwrap();
+    let before = files(&f, &root);
+    for args in [vec!["work", "list", &root], vec!["override", "show", &root]] {
+        let out = f.cli(&args);
+        assert_eq!(code(&out), 2, "{args:?}: {}", text(&out));
+        assert!(text(&out).contains("in progress"), "{}", text(&out));
+    }
+    let (exit, report) = recover_report(&f, &root);
+    assert_eq!(exit, 2, "{report}");
+    assert_eq!(report["inProgress"], true);
+    let out = recover_with(&f, &root, "discard-pending");
+    assert_eq!(code(&out), 2, "{}", text(&out));
+    assert_eq!(files(&f, &root), before);
+    drop(held);
+    let out = f.cli(&["override", "show", &root]);
+    assert_eq!(code(&out), 2, "{}", text(&out));
+    assert!(text(&out).contains("pending"), "{}", text(&out));
+}
+
+#[test]
+fn recover_usage_and_refusals() {
+    let f = Fixture::new();
+    let root = f.repository("a");
+    for args in [
+        vec!["override", "recover"],
+        vec![
+            "override",
+            "recover",
+            &root,
+            "adopt-everything",
+            "a",
+            "b",
+            "c",
+            "d",
+        ],
+        vec!["override", "recover", &root, "adopt-as-read", "a", "b"],
+    ] {
+        assert_eq!(code(&f.cli(&args)), 3, "{args:?}");
+    }
+    // Nothing to recover where no journal was ever written.
+    let (exit, report) = recover_report(&f, &root);
+    assert_eq!((exit, report["state"].as_str()), (0, Some("none")));
+    let out = recover_with(&f, &root, "adopt-empty");
+    assert_eq!(code(&out), 2, "{}", text(&out));
+    // An empty reason is refused.
+    let out = f.cli(&[
+        "override",
+        "recover",
+        &root,
+        "adopt-empty",
+        "absent",
+        "absent",
+        "carol",
+    ]);
+    assert_eq!(code(&out), 2, "{}", text(&out));
+    // An unregistered repository.
+    let other = f.git_repository("b");
+    let out = f.cli(&["override", "recover", &other]);
+    assert_eq!(code(&out), 2, "{}", text(&out));
+    assert!(files(&f, &root) == (None, None));
+}

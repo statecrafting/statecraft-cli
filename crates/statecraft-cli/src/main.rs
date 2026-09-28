@@ -398,7 +398,7 @@ fn run(args: &[String]) -> i32 {
                         &slice::override_show_answer(&root.display().to_string(), &journal),
                         format,
                     ),
-                    Err(e) => fail(&e.to_string(), format),
+                    Err(e) => emit(&slice::journal_error_answer(&e), format),
                 };
             }
             let (Some(spec_id), Some(operator)) = (invocation.rest.get(1), invocation.rest.get(2))
@@ -440,6 +440,8 @@ fn run(args: &[String]) -> i32 {
                 format,
             )
         }
+        // Spec 006 section 3.11.8: the recovery of 003 section 3.1.5.
+        Verb::OverrideRecover => recover_verb(&invocation.rest, &registry, &home, format),
         // Spec 006 section 3.11.6: the reconciliation of 003 section 3.6.1.
         Verb::RunReconcile => reconcile_verb(&invocation.rest, &registry, &home, format),
         // Spec 006 section 3.11.7: the transfer verbs of 002 section 3.35. A
@@ -519,16 +521,36 @@ fn slice_verb(
     // Discovery is the join spec 003 section 3.1.1 prescribes, performed by the
     // crate that owns it. Both halves come from spec-spine's structured output.
     let needs_report = matches!(verb, Verb::WorkList | Verb::WorkShow | Verb::Run);
+    // Spec 003 section 3.1.5 rule 8: `run` reads the journal and its authority
+    // once, under the repository lock, and holds that lock through its attempt,
+    // so no grant, revocation or recovery lands between the read and the
+    // intent.
+    let mut held = None;
+    if verb == Verb::Run {
+        held = Some(match statecraft_run::lock::try_acquire(home, root) {
+            Ok(held) => held,
+            Err(e @ statecraft_run::lock::LockError::Busy { .. }) => {
+                return emit(&slice::lock_busy_answer(&e.to_string()), format);
+            }
+            Err(e) => return fail(&e.to_string(), format),
+        });
+    }
     let (work, report) = if needs_report {
         match SpecSpineCli::default().corpus_report(root) {
             Ok(report) => {
                 let (policy, disagreement) =
                     statecraft_run::policy::resolve(root, &NoDeclarationFiled, None);
-                // Spec 003 section 3.1.4 rule 3: a journal that does not read
-                // or verify is a failure, never an empty set of overrides.
-                let overrides = match statecraft_run::overrides::read(home, root) {
+                // Spec 003 section 3.1.4 rule 3 and 3.1.5 rule 3: a journal
+                // that does not read or verify, or disagrees with its state
+                // authority, is a failure, never an empty set of overrides; a
+                // pending line or a write in progress is a refusal.
+                let read = match &held {
+                    Some(held) => statecraft_run::overrides::read_held(home, root, held),
+                    None => statecraft_run::overrides::read(home, root),
+                };
+                let overrides = match read {
                     Ok(journal) => journal.overrides(),
-                    Err(e) => return fail(&e.to_string(), format),
+                    Err(e) => return emit(&slice::journal_error_answer(&e), format),
                 };
                 (
                     Some(statecraft_run::work::select(
@@ -567,6 +589,7 @@ fn slice_verb(
                 id,
                 work.expect("read above"),
                 report.as_ref().expect("read above"),
+                held.expect("taken above"),
                 format,
             )
         }
@@ -609,6 +632,79 @@ fn slice_verb(
         }
         _ => Exit::Usage.code(),
     }
+}
+
+/// `override recover <path> [<choice> <journal-digest> <authority-digest> <operator> <reason...>]`
+///
+/// Spec 006 section 3.11.8 and spec 003 section 3.1.5 rule 5. Without a
+/// choice it reports both files and writes nothing; with one it records that
+/// choice against the state the digests name, and never picks one itself.
+fn recover_verb(
+    rest: &[String],
+    registry: &statecraft_environment::registry::Registry,
+    home: &std::path::Path,
+    format: Format,
+) -> i32 {
+    use statecraft_run::overrides::Choice;
+    let show_usage = || {
+        usage(
+            format,
+            "usage: override recover <path> [<complete-pending|discard-pending|adopt-as-read|\
+             adopt-prefix|adopt-empty> <journal-digest|absent> <authority-digest|absent> \
+             <operator> <reason...>]"
+                .to_string(),
+        )
+    };
+    let Some(path) = rest.first() else {
+        return show_usage();
+    };
+    let choice = match rest.get(1) {
+        None => None,
+        Some(word) => match Choice::parse(word) {
+            Some(c) if rest.len() >= 5 => Some(c),
+            _ => return show_usage(),
+        },
+    };
+    let root = match registered(registry, &absolute(path)) {
+        Ok(root) => root,
+        Err(answer) => return emit(&answer, format),
+    };
+    let Some(choice) = choice else {
+        // The report takes the lock when it is free, so what it shows is not
+        // a write caught half way; while another process holds it, an
+        // interrupted state is a write in progress.
+        let held = match statecraft_run::lock::try_acquire(home, &root) {
+            Ok(held) => Some(held),
+            Err(statecraft_run::lock::LockError::Busy { .. }) => None,
+            Err(e) => return fail(&e.to_string(), format),
+        };
+        return match statecraft_run::overrides::inspect(home, &root) {
+            Ok(found) => emit(
+                &slice::recover_report_answer(&root.display().to_string(), &found, held.is_none()),
+                format,
+            ),
+            Err(e) => emit(&slice::journal_error_answer(&e), format),
+        };
+    };
+    let reason = rest.get(5..).unwrap_or_default().join(" ");
+    let at = statecraft_environment::time::rfc3339_utc(
+        statecraft_environment::time::Clock::now_unix(&SystemClock),
+    );
+    emit(
+        &slice::recover_answer(statecraft_run::overrides::recover(
+            &statecraft_run::overrides::RecoverRequest {
+                home,
+                target: &root,
+                choice,
+                journal: &rest[2],
+                authority: &rest[3],
+                operator: &rest[4],
+                reason: &reason,
+                at: &at,
+            },
+        )),
+        format,
+    )
 }
 
 /// `run reconcile <path> <run-id> <attempt> <finding> <launch-state> <operator> <reason...>`
@@ -861,6 +957,7 @@ fn run_verb(
     spec_id: &str,
     work: statecraft_run::work::WorkList,
     report: &statecraft_run::report::CorpusReport,
+    held: statecraft_run::lock::Held,
     format: Format,
 ) -> i32 {
     // A unit of work the policy did not admit is never run, and the reason is
@@ -904,7 +1001,7 @@ fn run_verb(
         root,
         home,
         spec_id,
-        AttemptPlan::work_order(spec_id, admission, planned),
+        AttemptPlan::work_order(spec_id, admission, planned, held),
         contract,
         None,
         format,
@@ -925,6 +1022,9 @@ struct AttemptPlan {
     /// rule 4). The trial has no spec, so none, and its coverage is
     /// `not-applicable`.
     planned: Option<statecraft_adapter::coverage::Coverage>,
+    /// The repository lock `run` took before it read the override journal
+    /// (spec 003 section 3.1.5 rule 8). The trial takes its own.
+    held: Option<statecraft_run::lock::Held>,
 }
 
 impl AttemptPlan {
@@ -932,6 +1032,7 @@ impl AttemptPlan {
         spec_id: &str,
         admission: statecraft_run::work::Admission,
         planned: statecraft_adapter::coverage::Coverage,
+        held: statecraft_run::lock::Held,
     ) -> Self {
         Self {
             prompt: format!("Implement {spec_id} in this workspace.").into_bytes(),
@@ -939,6 +1040,7 @@ impl AttemptPlan {
             deadline_seconds: 900,
             admission: Some(admission),
             planned: Some(planned),
+            held: Some(held),
         }
     }
 
@@ -949,6 +1051,7 @@ impl AttemptPlan {
             deadline_seconds,
             admission: None,
             planned: None,
+            held: None,
         }
     }
 }
@@ -998,13 +1101,17 @@ fn launch_attempt(
 
     // Spec 003 section 3.1.4 rule 7: the repository lock, held from before
     // the intent until the outcome is durable, released by the operating
-    // system when this process ends however it ends.
-    let _held = match statecraft_run::lock::try_acquire(home, root) {
-        Ok(held) => held,
-        Err(e @ statecraft_run::lock::LockError::Busy { .. }) => {
-            return emit(&slice::lock_busy_answer(&e.to_string()), format);
-        }
-        Err(e) => return fail(&e.to_string(), format),
+    // system when this process ends however it ends. `run` took it before it
+    // read the override journal (3.1.5 rule 8).
+    let _held = match plan.held {
+        Some(held) => held,
+        None => match statecraft_run::lock::try_acquire(home, root) {
+            Ok(held) => held,
+            Err(e @ statecraft_run::lock::LockError::Busy { .. }) => {
+                return emit(&slice::lock_busy_answer(&e.to_string()), format);
+            }
+            Err(e) => return fail(&e.to_string(), format),
+        },
     };
     let (mut chain, _) = match Chain::open(home, root) {
         Ok(c) => c,

@@ -61,7 +61,7 @@ impl Admission {
                 format!("admitted by the {source} policy ({})", statuses.join(", "))
             }
             Admission::Override(o) => format!(
-                "admitted by override: {} ({}), because {}{}",
+                "admitted by override: {} ({}), because {}{}{}",
                 o.operator,
                 o.operator_provenance
                     .as_deref()
@@ -70,6 +70,12 @@ impl Admission {
                 o.granted_at
                     .as_deref()
                     .map(|t| format!(", granted {t}"))
+                    .unwrap_or_default(),
+                // Spec 003 section 3.1.5 rule 7. An intent written before it
+                // records neither, and reads as not recorded.
+                o.verification
+                    .as_deref()
+                    .map(|v| format!(", {v}"))
                     .unwrap_or_default()
             ),
         }
@@ -137,7 +143,7 @@ impl WorkList {
 #[serde(rename_all = "kebab-case", tag = "eligibility")]
 pub enum Eligibility {
     /// The policy admits it, and here is the row.
-    Eligible(WorkItem),
+    Eligible(Box<WorkItem>),
     /// It was offered as ready and the policy did not admit it.
     ///
     /// A finding rather than a refusal: the reason **is** the answer.
@@ -179,7 +185,7 @@ impl WorkList {
     /// What this list says about one spec id.
     pub fn eligibility_of(&self, id: &str) -> Eligibility {
         if let Some(item) = self.eligible.iter().find(|i| i.id == id) {
-            return Eligibility::Eligible(item.clone());
+            return Eligibility::Eligible(Box::new(item.clone()));
         }
         if let Some(e) = self.excluded.iter().find(|e| e.id == id) {
             return Eligibility::Excluded(e.clone());

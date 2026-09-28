@@ -117,7 +117,7 @@ pub struct Elsewhere {
 /// When they are implemented they must be named by [`key`] and be listed here,
 /// so the check below finds them filed under another spelling and
 /// [`respell_allowed`] counts them as records under the stored key.
-pub const HISTORY_SUFFIXES: &[&str] = &[".jsonl", ".overrides.jsonl"];
+pub const HISTORY_SUFFIXES: &[&str] = &[".jsonl", ".overrides.jsonl", ".overrides.authority.json"];
 
 /// Whether a record file carries history.
 ///
