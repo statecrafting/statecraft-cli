@@ -362,6 +362,69 @@ unverified assumption.
 repository hosts the TypeScript half and who maintains it. `005` section 4 points
 here either way, so the obligation is visible rather than lost.
 
+### D-11: The durable product roadmap
+
+**Recommendation, proposed and not adopted.** Keep the roadmap below as the
+ordered contract inventory. A row reserves a stable governed unit; it is not a
+filed spec, a work order, implementation authority, or a release claim. Filed
+drafts remain governed by their own frontmatter. `Owner` means the product that
+authors the contract, not permission to mutate a consumer.
+
+Common fields for every row: lifecycle is `proposed` unless a filed spec is
+named; implementation is `pending` unless current evidence says otherwise;
+evidence is the exact spec, commit, report, or live read named in the row;
+missing evidence includes local acceptance, CI, merge, release, and adoption
+unless named; release requires an independently reviewed, exact qualified
+artifact; adoption requires a consumer to pin that artifact and prove its own
+acceptance; security preserves constitution VII to XI; provider activity is
+forbidden unless separately authorized; the non-goal is any authority or grade
+not expressly named; completion requires the contract, implementation,
+acceptance, release, and named adoption evidence; reopening occurs when the
+listed dependency or consumer exists. These common fields are part of every
+row and the final column records the next governed action.
+
+| Track | Problem and consumer | Owner and stable unit | Dependencies | Lifecycle and implementation | Evidence and missing evidence | Owner decision, release and adoption condition, non-goal and reopening | Next action |
+|---|---|---|---|---|---|---|---|
+| A | Current lifecycle prose, spec 007, and PR 118 disagree; repository operators consume it. | Statecraft, `R-001-lifecycle-repair` | Current main and owner disposition | Analysis only; no filed unit | Main `d77e011e`, draft 007 merged provisionally, PR 118 open and superseded; owner dispositions missing | Owner decides 007 and PR 118; no ratification or closure here; reopen on that decision | Prepare one factual documentation correction after decisions. |
+| B | Adopt spec-spine 0.28 without confusing availability with use; Statecraft consumes it. | Statecraft, `020-spec-spine-028-adoption` | Owner adoption decision, exact registry artifacts | Proposed, pending | 0.27 pin and adoption ledger; 0.28 qualification missing | Owner decides adoption; no pin move or self-profile render; reopen after exact producer qualification | Draft the adoption and any required 002 amendment. |
+| C | Select revision-pinned context without duplicating selectors; task authors consume it. | Statecraft, `016-context-packet-consumption` | Released spec-spine packet facts | Filed draft planned, pending | Prompt 19 and producer contracts; consumer acceptance missing | No local selector semantics; reopen when producer identities are exact | File spec 016. |
+| D | Record intended and provider-visible packet delivery separately; acceptance consumes it. | Statecraft, `016-context-packet-consumption` | C, adapter identity | Filed draft planned, pending | Existing attempt records; delivery evidence missing | No claim of provider receipt; release with C | File spec 016. |
+| E | A documentation task needs bounded objective, authority, cost, review, and publication prohibition. | Statecraft, `017-documentation-task-and-result` | C and D | Filed draft planned, pending | Prompt 19; schema and implementation missing | Owner retains spend and publication; no provider invocation | File spec 017. |
+| F | Provider output needs claims, citations, grades, gaps, and binding. | Statecraft, `017-documentation-task-and-result` | E | Filed draft planned, pending | Existing envelope vocabulary; result schema missing | Provider cannot upgrade lifecycle; no acceptance by declaration | File spec 017. |
+| G | Claims and citations need independent resolution. | Statecraft, `018-documentation-acceptance` | C, D, E, F | Filed draft planned, pending | Acceptance crate patterns; documentation fixtures missing | No inference from fluent prose; reopen after filed inputs | File spec 018. |
+| H | Documentation acceptance must separate transport, schema, review, and judgment. | Statecraft, `018-documentation-acceptance` | G and optional Z | Filed draft planned, pending | Constitution VI and X; workflow acceptance missing | Witness is optional unless policy requires it; no provider authority | File spec 018. |
+| I | First provider path needs an offline fixed export baseline. | Statecraft, `019-fixed-export-documentation` | C through H | Filed draft planned, pending | doc-manus historical artifacts as untrusted evidence; pilot missing | Owner decides later provider use; no MCP, witness, or publication dependency | File spec 019. |
+| J | Manus needs versioned skills and a bounded input contract. | Statecraft, `021-manus-skill-integration` | I and governed doc-manus bootstrap | Proposed, pending | doc-manus report; supported bootstrap missing | Consumer mutation stays separate; no Manus invocation | Reopen after spec 015 and consumer recovery. |
+| K | Manus structured output needs an exact schema. | Statecraft, `022-manus-structured-output` | E, F, J | Proposed, pending | Historical output as untrusted input; qualification missing | No result acceptance by schema alone | Draft after J. |
+| L | A later read-only MCP needs a narrow authenticated surface. | Statecraft, `023-read-only-mcp` | C through H, provider capability evidence | Proposed, pending | Prompt 19 operation list; security qualification missing | No write, shell, Git, test, PR, secret, or publication tools | Reopen after fixed-export acceptance. |
+| M | Provider capabilities require separate qualification. | Statecraft, `024-provider-qualification` | I or L, authorized provider run | Proposed, pending | Adapter declarations only; live evidence absent | Owner decides provider and spend; no aggregate qualification shortcut | Reopen on explicit live authority. |
+| N | Incremental sessions need explicit resume and new effect identity. | Statecraft, `025-incremental-sessions` | C through H, M | Proposed, pending | Prompt 19; provider-state behavior absent | Hidden provider memory is not authority | Draft after one accepted full-packet run. |
+| O | Packet diffs need producer facts, not local reimplementation. | Statecraft, `025-incremental-sessions` | C and released producer diff | Proposed, pending | Producer roadmap; consumable identity missing | No local diff semantics | Reopen when producer release exists. |
+| P | Changed inputs must invalidate affected evidence. | Statecraft, `025-incremental-sessions` | G, H, O | Proposed, pending | Existing evidence dimensions; invalidation fixtures missing | No blanket reuse of prior acceptance | Draft with N and O. |
+| Q | Edit plans need digest revalidation and supervised application. | Statecraft, `026-digest-guarded-edit-application` | Released producer plan, accepted work loop | Proposed, pending | Existing workspace and recovery contracts; producer plan missing | No generated-file edits or authority expansion | Reopen on exact producer interface. |
+| R | Accepted documentation needs a separate publication handoff. | Statecraft, `027-publication-handoff` | H and accepted artifact | Proposed, pending | F-02 and review records; publication authority missing | Publication remains owner-only | Draft only when a named destination exists. |
+| S | Profiles do not declare exact remote desired state. | Statecraft, `012-remote-desired-state` | Specs 001, 002, 006 | Filed draft in this unit, pending | Current six-result doctor and official GitHub limits; implementation missing | Owner chooses external applier; no remote write | Review draft 012. |
+| T | Remote verification collapses fields and failure causes. | Statecraft, `012-remote-desired-state` | S | Filed draft in this unit, pending | Existing read-only `gh api` path; independent field states missing | No repair by doctor | Review draft 012. |
+| U | Applying remote state needs an external owner-operated boundary. | External owner, contract in `012-remote-desired-state` | S and owner mechanism choice | Proposed option, no implementation | Terraform and `gh api` analysis; location, credentials, and state choice missing | Owner chooses mechanism and location; Statecraft never invokes it | Decide only after draft review. |
+| V | wire-witness needed a governed bootstrap. | wire-witness, its specs 000 through 006 | Statecraft repair for consumer recovery | Ratified by owner, mechanical lifecycle and implementation blocked | Report `15-wire-witness-correction-001`; supported recovery not consumer-qualified | Wire-witness owns its repository; no duplicate bootstrap | Resume through a separate recovery claim. |
+| W | Statecraft needs immutable linked-producer adoption, not plugins. | Statecraft, `013-supervised-wire-witness` | wire-witness spec 005 exact draft and future release | Filed draft planned, pending | Ratified producer prose; released identity missing | Owner decides versioning and release coupling | File spec 013. |
+| X | One sidecar needs confinement and bracketed effects. | Statecraft, `013-supervised-wire-witness` | W, specs 003 and 004 | Filed draft planned, pending | Existing confinement and recovery; OS qualification missing | Owner decides Linux residual posture; no general sidecar mechanism | File spec 013. |
+| Y | Attempts need exact run, attempt, and effect binding. | Statecraft, `013-supervised-wire-witness` | W and X | Filed draft planned, pending | wire-witness spec 005; integration evidence missing | No timestamp, PID, header, ordering, or proximity binding | File spec 013. |
+| Z | Wire testimony needs envelope admission and exact attempt binding. | Statecraft, `014-wire-evidence-admission` | W through Y, specs 005 and 006 | Filed draft planned, pending | `statecraft/wire-exchange/v1` draft; admission tests missing | Owner decides witness-required policy and retention; testimony is not acceptance | File spec 014. |
+| AA | Documentation acceptance may compare witnessed delivery when present. | Statecraft, `018-documentation-acceptance` | D, H, Z | Filed draft planned, pending | Prompt 19 comparison states; privacy analysis missing | Metadata-only default; absence does not invalidate an unwitnessed contract | File spec 018. |
+| AB | Cost and quota need policy based on measured inputs. | Statecraft, `028-cost-and-quota-policy` | Z and an authorized measured run | Proposed, deferred by F-06 | No admitted live measurement | Owner sets spend ceiling; observation never authorizes spend | Reopen on a metered run with authority. |
+| AC | Intended and observed provider delivery need comparison. | Statecraft, `018-documentation-acceptance` | D and Z | Filed draft planned, pending | Intended record and witness schema drafts; observed pilot absent | No claim of provider comprehension | File spec 018. |
+| AD | A second provider tests adapter breadth. | Statecraft, `029-second-provider` | M and owner provider choice | Proposed, deferred by F-07 | One adapter exists; second provider absent | Owner authorizes provider and spend; no lowest-common-denominator weakening | Reopen on a named second provider. |
+| AE | Open-weights portability needs a named gateway and comparison. | Statecraft, `030-open-weights-portability` | M, AB, AD | Proposed, pending | No selected gateway or model | Owner chooses infrastructure and spend; no hosted control-plane commitment | Reopen on named deployment. |
+| AF | Prompt injection needs a qualification corpus across all untrusted inputs. | Statecraft, `031-prompt-injection-qualification` | E through M | Proposed, pending | Existing authority rules; fixtures and live qualification missing | Delimiters are not a security boundary | Draft fixtures before provider qualification. |
+| AG | Distribution and release need names, installers, signatures, and consumer proof. | Statecraft, `032-distribution-and-release` | Accepted product slice and owner decisions D-01, D-08, F-02, F-03 | Proposed, deferred | No release exists | Owner decides binary name, trust, and publication; no release from green CI alone | Reopen after accepted slice. |
+| AH | Existing deferred features must remain visible. | Statecraft, `F-01` through `F-11` | Each row's reopening condition | Deferred, not implementation authority | Section 4 below | Owner decides each reopening; no availability-driven activation | Review only when a concrete consumer meets the row. |
+
+The roadmap's current recommendation is to review filed drafts 012 through 019
+as one coherent contract batch, then ratify or revise each personally. It does
+not recommend starting implementation, adopting spec-spine 0.28, re-rendering
+this repository, closing PR 118, contacting a provider, or publishing.
+
 ## 4. Deliberate deferrals
 
 Deferred means: not in the first slice, named so it cannot be mistaken for an
