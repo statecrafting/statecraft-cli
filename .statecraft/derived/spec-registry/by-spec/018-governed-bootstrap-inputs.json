@@ -1,0 +1,98 @@
+{
+  "record": {
+    "amends": [
+      "002-environment-lifecycle",
+      "009-governance-producer"
+    ],
+    "created": "2026-09-27",
+    "dependsOn": [
+      "002-environment-lifecycle",
+      "006-command-surface",
+      "009-governance-producer",
+      "010-profile-unresolved-claims",
+      "011-init-bootstrap-spec"
+    ],
+    "extends": [
+      {
+        "nature": "additive",
+        "spec": "002-environment-lifecycle",
+        "unit": {
+          "kind": "directory",
+          "path": "crates/statecraft-home/"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "006-command-surface",
+        "unit": {
+          "kind": "directory",
+          "path": "crates/statecraft-cli/"
+        }
+      }
+    ],
+    "id": "018-governed-bootstrap-inputs",
+    "implementation": "pending",
+    "obligations": [
+      {
+        "anchor": "3-5-plan-identity-application-and-convergence",
+        "id": "I-1",
+        "kind": "invariant",
+        "text": "Planning and application resolve the same setup input bytes, effective parameters, producer identity, and project prerequisites, all bound by the plan identity."
+      },
+      {
+        "anchor": "3-4-project-owned-prerequisites",
+        "id": "I-2",
+        "kind": "invariant",
+        "text": "Statecraft never invents, copies, or silently weakens a project-owned prerequisite to make setup appear complete."
+      },
+      {
+        "anchor": "3-1-the-bootstrap-input-document",
+        "id": "R-1",
+        "kind": "requirement",
+        "text": "A fresh repository may supply a closed setup-profile parameter document before any project declaration exists."
+      },
+      {
+        "anchor": "3-3-the-governance-pin",
+        "id": "R-2",
+        "kind": "requirement",
+        "text": "A newly scaffolded spec-spine.toml carries the exact version of the linked governance producer through its supported pinned-scaffold option."
+      }
+    ],
+    "sectionDigests": {
+      "018-governed-inputs-for-a-complete-first-bootstrap": "89c50e27ce9a7a2471a19284ec000927807e0bb84fee9727ae607d38016ded07",
+      "1-purpose": "2ee72eb1acebd5b3eeadc3cef5b25dc0ed08e4b0c37e5a9455a332b5f024891a",
+      "2-territory-and-measured-gap": "0a5287f4429bf56a7cce074534260dfd2d1b90501c7654e8d61f37e486885cee",
+      "3-1-the-bootstrap-input-document": "91f6fde574fbca2e93de676386b9def06a4ea5267afb6e464079cedb7b87eae9",
+      "3-2-effective-parameters-are-visible-before-writing": "e604eb03dea6dc47c5e9371b6321640eed4fc213259cdc50b2678b5748151a1b",
+      "3-3-the-governance-pin": "aeb9af81fcb201fafc25f960b1690814d750faef1a376e39bd1e4e34ba319e8c",
+      "3-4-project-owned-prerequisites": "910f4cea542a0fdd952d786039e5c3311afa6ca6e18d86e29ccc35033bad5f3c",
+      "3-5-plan-identity-application-and-convergence": "7b2b830e279f3d82f5e9d385e6eba937353358fd217a04bbd45ffbd34216f52e",
+      "3-6-observable-negative-cases": "bac9549fb9b30c0605fcfcfba13b82e8f8c31ffccf4f8b3b2cb06ef5f058180a",
+      "3-behavior": "3ed81fa662e4350acf7fd6c1defbd9d9c86d35ef9bce6808d994a9a036b89396",
+      "4-out-of-scope": "9f2ddb63b6d5dcb67137a14a855fe5e0c8f6b767a6b97ca7c59187d2d3702bea",
+      "5-resolved-decisions": "411e102ca8cc7a702bea5f08d7108d59f340c5da2b6f4043b867ed615faec5ba",
+      "verification": "6a849ebcaf9620dc08482ee1788b70c5dfc2b2699440e51b89d152d5d794f57a"
+    },
+    "sectionHeadings": [
+      "018: Governed inputs for a complete first bootstrap",
+      "1. Purpose",
+      "2. Territory and measured gap",
+      "3. Behavior",
+      "3.1 The bootstrap input document",
+      "3.2 Effective parameters are visible before writing",
+      "3.3 The governance pin",
+      "3.4 Project-owned prerequisites",
+      "3.5 Plan identity, application, and convergence",
+      "3.6 Observable negative cases",
+      "4. Out of scope",
+      "5. Resolved decisions",
+      "Verification"
+    ],
+    "specPath": "specs/018-governed-bootstrap-inputs/spec.md",
+    "status": "approved",
+    "summary": "Amends 002's initialization contract and 009's producer call so a fresh repository can supply setup-profile parameters through one explicit, plan-bound input document, receives the exact governance-producer pin from the producer itself, and remains honestly partial when project-owned prerequisites are absent.\n",
+    "title": "Governed inputs for a complete first bootstrap"
+  },
+  "shardHash": "1f9744ce7056758f12a227a7414a08a50f39c82044fd98494b66178137d1ec91",
+  "specVersion": "1.9.0"
+}
