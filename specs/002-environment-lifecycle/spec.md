@@ -720,7 +720,7 @@ append-only journal. The implementation choices they left open are these.
   still be reversed without inventing an adapter.
 
 Tests compose initialization, transfer, plan, apply, reversal, exact legacy
-repair, deleted-path rewrite, unrelated disagreement refusal, revision-9
+repair, deleted-path rewrite, unrelated disagreement refusal, current-revision
 profile rendering, repeated planning and repeated apply. Existing interruption
 and resume cases exercise the same shared preflight and manifest-last write
 order.

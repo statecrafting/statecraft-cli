@@ -497,7 +497,7 @@ fn a_repeat_apply_changes_no_project_file() {
 }
 
 #[test]
-fn revision_nine_applies_and_converges_while_a_governance_path_stays_user() {
+fn the_current_revision_applies_and_converges_while_a_governance_path_stays_user() {
     let f = Fixture::new();
     let (exit, _, text) = f.init("apply", &[]);
     assert_eq!(exit, 0, "{text}");
@@ -519,7 +519,7 @@ fn revision_nine_applies_and_converges_while_a_governance_path_stays_user() {
             .iter()
             .any(|item| item == "spec-spine.toml: user-transfer-preserved")
     );
-    assert_eq!(plan["setup"]["revision"], 9);
+    assert_eq!(plan["setup"]["revision"], statecraft_home::setup::REVISION);
     let identity = plan["setup"]["planIdentity"].as_str().unwrap().to_string();
 
     let (exit, applied, text) = f.init("apply", &["--profile", PROFILE, "--plan", &identity]);
@@ -537,7 +537,10 @@ fn revision_nine_applies_and_converges_while_a_governance_path_stays_user() {
         serde_json::from_slice(&std::fs::read(f.at(".statecraft/environment.json")).unwrap())
             .unwrap();
     assert_eq!(serde_json::to_vec(&manifest["transfers"]).unwrap(), journal);
-    assert_eq!(manifest["project"]["setup"]["revision"], 9);
+    assert_eq!(
+        manifest["project"]["setup"]["revision"],
+        statecraft_home::setup::REVISION
+    );
 
     let converged = f.walk();
     let (exit, second_plan, text) = f.init("plan", &[]);
