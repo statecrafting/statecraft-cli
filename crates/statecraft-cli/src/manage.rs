@@ -225,6 +225,7 @@ fn setup_request(args: &[String]) -> Option<Option<statecraft_home::flow::SetupR
                 }
             }
         }
+        // Every recognised flag, `--setup-input` included, counts here.
         any = true;
         i += 1;
     }
@@ -412,6 +413,20 @@ mod tests {
     use super::*;
     use crate::commands::Verb;
     use statecraft_home::flow;
+
+    #[test]
+    fn a_setup_input_alone_is_a_request_and_apply_without_a_plan_is_a_usage_error() {
+        let args = |v: &[&str]| v.iter().map(|s| s.to_string()).collect::<Vec<_>>();
+        for form in [
+            args(&["--setup-input", "in.json"]),
+            args(&["--setup-input=in.json"]),
+        ] {
+            assert!(matches!(setup_request(&form), Some(Some(_))), "{form:?}");
+            let refusal = setup_usage(Verb::InitApply, &form).expect("a usage refusal");
+            assert!(refusal.contains("--setup-input needs --plan"), "{refusal}");
+            assert_eq!(setup_usage(Verb::InitPlan, &form), None, "{form:?}");
+        }
+    }
 
     #[test]
     fn a_complete_initialization_exits_zero_and_a_partial_one_is_a_finding() {
