@@ -223,9 +223,12 @@ subscriptions are deferred by name in section 4.
 ### 3.5 A proposal's identity is its cause, not its moment
 
 A proposal's identity is the canonical digest of: the subscription id, the
-proposal kind, the spec id, and the projection row that justified it (for
+proposal kind, the scope, and the projection row that justified it (for
 `run`: the eligibility row and its closure digest; for a `notice`: the two
-values the transition compared). The observation id, the commit id and the
+values the transition compared). The scope is tagged: `spec` with the spec id
+for a keyed projection, or `repository` for `corpus-state`, which is keyed by
+nothing, so a `corpus-refusal` notice has a defined identity and no spec id
+can collide with it. The observation id, the commit id and the
 time are **not** in the identity.
 
 Consequences, each intended:
@@ -295,7 +298,7 @@ Entry kinds, closed:
 | Kind | Carries |
 |---|---|
 | `observed` | observation id, input identity (section 3.1), the ref as named and the commit it resolved to, `answered` or `refused`, projection digests, and the transitions |
-| `proposed` | proposal id, kind, spec id, subscription, justifying row, observation id, ref |
+| `proposed` | proposal id, kind, scope (section 3.5), subscription, justifying row, observation id, ref |
 | `recurred` | proposal id, observation id, ref (section 3.5 rule 1) |
 | `admitting` | proposal id, fresh observation id, operator, reason |
 | `released` | proposal id, the `admitting` entry it ends, and one of `run-refused` (section 3.6) or `admission-interrupted` (crash analysis below); the proposal is `open` again, and it is not a disposition |
@@ -355,6 +358,13 @@ product); `proposal admit` exits as `run` would when admitted, 1 when the
 disposition is `stale`, and 2 when spec 003 refuses; a verb that finds the
 observation lock held is refused, exit 2, and writes nothing; a verb whose
 write to the chain fails exits 4.
+
+Exit 2 is spec 006's one refusal outcome, not one condition, and it is
+never read alone. The two refusals `proposal admit` can meet are told apart
+the way spec 007 tells every refusal apart: a held observation lock is class
+`refused`, names the lock, and writes nothing; a spec 003 refusal carries the
+class spec 003 gives it, names spec 003's reason, and writes `released` with
+reason `run-refused` (section 3.6).
 
 There is no verb that observes repeatedly, admits automatically, or admits more
 than one proposal. `proposal admit` is the operator naming one unit of work,
@@ -474,6 +484,13 @@ decisions about the work; a proposal made `stale` or `superseded` by the
 repository's movement is `open` again when its identity recurs. A held
 observation lock is exit 2, as section 3.11 states, and exit 4 is kept for a
 write that failed.
+
+**2026-09-29: a repository-wide notice has a scope, not a spec id, and exit 2
+is told apart by class.** `corpus-state` is keyed by nothing, so proposal
+identity digests a tagged scope instead of a spec id. Exit 2 stays spec
+006's single refusal outcome; which refusal it was is the envelope's class
+and message and whether a `released` entry was written, as spec 007 intends,
+rather than a new exit code.
 
 ## Verification
 
