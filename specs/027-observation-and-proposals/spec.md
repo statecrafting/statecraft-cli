@@ -210,8 +210,8 @@ of this spec, not of any repository:
 `reason-changed` and `corpus-changed` back to `answered` are recorded as
 transitions and propose nothing.
 
-A `notice` has no effect to admit; it is acknowledged or dismissed. Only a
-`run` proposal can be admitted.
+A `notice` has no effect to admit; it is closed only by `proposal acknowledge`.
+Only a `run` proposal can be admitted or dismissed.
 
 **A subscription is not configuration.** A target cannot add, remove or
 reshape one. The target already controls what becomes eligible, through the
@@ -394,6 +394,7 @@ contract there.
 | `proposal admit` after the contract moved | `stale`, naming both digests; exit 1; no run. |
 | `proposal admit` while an attempt is live | spec 003's refusal, exit 2; the admission writes `released`, reason `run-refused`, and the proposal is `open`. |
 | `proposal admit` on a `notice`, or on a disposed proposal | Refused, exit 2, naming its kind or disposition. |
+| `proposal dismiss` on a `notice`, or `proposal acknowledge` on a `run` proposal | Refused, exit 2, naming its kind and the verb that closes it. |
 | The process dies after `admitting` and before the attempt intent | Recovery writes `released`, reason `admission-interrupted`; the proposal is `open` again; no run is replayed. |
 | The process dies after the attempt intent and before `disposed` | Recovery disposes `admitted`, naming the run found by the intent's proposal member. |
 | Two `observe` invocations on one repository at once | The second is refused, exit 2, naming the held observation lock. |
