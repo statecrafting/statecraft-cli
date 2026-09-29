@@ -1125,7 +1125,7 @@ fn resulting_entry(
                     digest: digest.to_string(),
                     bytes,
                     transfer: Some(crate::manifest::Transfer {
-                        from: Claimant::Path {
+                        from: Claimant::User {
                             path: path.to_string(),
                         },
                         digest_at_transfer: digest.to_string(),

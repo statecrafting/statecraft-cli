@@ -201,6 +201,14 @@ fn initialization_preserves_an_explicit_user_transfer_and_reversal_still_succeed
     )
     .unwrap();
     assert_eq!(reverted.word(), "reverted");
+    let manifest = Manifest::read(&sandbox.project()).unwrap().unwrap();
+    assert!(matches!(
+        manifest.entry("spec-spine.toml").unwrap().transfer.as_ref(),
+        Some(statecraft_environment::manifest::Transfer {
+            from: statecraft_environment::claimant::Claimant::User { path },
+            ..
+        }) if path == "spec-spine.toml"
+    ));
 }
 
 #[test]
