@@ -213,7 +213,10 @@ began from work that became eligible while it was being observed.
 ### 3.4 Subscriptions are built in and closed
 
 A subscription maps one transition kind to one proposal kind. The set is part
-of this spec, not of any repository:
+of this spec, not of any repository. Subscriptions are matched once, after
+all three projections and every transition of the observation are computed,
+so a condition on another projection (such as "with a `contract-identity`
+digest") reads that projection's value in the current observation. The set:
 
 | Subscription | Transition | Proposal kind |
 |---|---|---|
@@ -263,7 +266,9 @@ Consequences, each intended:
    recorded as `recurred` and the proposal stays `open`, so its latest ref is
    the one admission re-observes (section 3.6). If it was `admitted` or
    `dismissed`, the earlier disposition stands and nothing new is proposed:
-   the same work under the same contract was already decided. An
+   the same work under the same contract was already decided. The recurrence
+   is still recorded as `recurred`, so the observation that caused it stays
+   readable, and the proposal stays disposed. An
    `acknowledged` `notice` is different: acknowledging records that the
    operator saw one occurrence, not a decision about later ones, and a notice
    recurs only when its transition happens again, so the recurrence is
@@ -462,7 +467,7 @@ contract there.
 | The operator's checkout has uncommitted edits to a spec | Not observed. The observation is of the commit, and nothing is recorded about the working tree. |
 | A refused observation between two answered ones | The transition spans the refusal; no spec is reported as having exited and re-entered. |
 | The same eligibility reached by two commits | One proposal; the second observation writes `recurred`. |
-| A spec re-enters eligibility under the same contract after its proposal was dismissed | No new proposal; the dismissal stands and is named. |
+| A spec re-enters eligibility under the same contract after its proposal was dismissed | No new proposal; the dismissal stands and is named. The chain records `recurred`; the proposal stays `dismissed`. |
 | A spec re-enters under a different contract | A new proposal; any open one for that spec is `superseded`. |
 | `proposal admit` after the spec left eligibility | `stale`, naming the exclusion reason; exit 1; no run. |
 | `proposal admit` after the contract moved | `stale`, naming both digests; exit 1; no run. |
