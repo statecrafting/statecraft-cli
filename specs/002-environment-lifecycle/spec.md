@@ -689,6 +689,42 @@ and provenance records the exact managed or adopted source used for each write.
 The repository keeps `governance.fail_on_unresolved` at its default `true`, so
 the rendered governance gate continues to refuse unresolved claims.
 
+**2026-09-26: initialization reconciles the transfer journal before adopting
+a governance path, and repairs only its own inferred legacy adoption.**
+Sections 3.2, 3.15, 3.17 and 3.35 already require initialization to preserve
+user ownership, never infer a transfer, and keep entries consistent with the
+append-only journal. The implementation choices they left open are these.
+
+- A present, unrecorded governance path whose latest transfer ends in `user`
+  stays user. Reconciliation records no entry, changes no file or journal
+  byte, and reports `user-transfer-preserved` under `kept`, separately from
+  ordinary `adopted` paths.
+- The exact state this implementation previously inferred is recognized by
+  all of: latest transfer to `user`; current entry `adopted`; source kind
+  `template`; source identity `statecraft-governance`; and no entry-level
+  transfer. Reconciliation removes only that in-memory entry and reports the
+  path as `inferred-adoption-recovered` under `kept`. Plan mode writes nothing.
+  Apply performs the same
+  change while holding the manifest lock already taken by initialization,
+  then persists it through the ordinary manifest write. The file and journal
+  are left byte-identical.
+- A released governance path that is absent is still eligible for section
+  3.15's fresh write. The new entry is `managed`, uses template identity
+  `statecraft-governance`, and carries no entry-level transfer. Rule 5's
+  consistency check recognizes exactly that product rewrite, beside the
+  existing adapter rewrite case. A present released file never qualifies.
+- Every other journal disagreement refuses reconciliation before project or
+  home writes. `transfer apply` and `transfer revert` keep their existing
+  fail-closed ordering. Reversal to `managed` recognizes the closed governance
+  contract set as a real template source, so a valid governance release can
+  still be reversed without inventing an adapter.
+
+Tests compose initialization, transfer, plan, apply, reversal, exact legacy
+repair, deleted-path rewrite, unrelated disagreement refusal, current-revision
+profile rendering, repeated planning and repeated apply. Existing interruption
+and resume cases exercise the same shared preflight and manifest-last write
+order.
+
 ## Verification
 
 `--fail-on-untraced` joined the corpus gate with this spec's first
