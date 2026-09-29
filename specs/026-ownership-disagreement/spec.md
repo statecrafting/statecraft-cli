@@ -8,12 +8,13 @@ summary: >
   Amends spec 002 section 3.5 with one additive, read-only doctor finding,
   ownership-disagreement. For each path, doctor compares three facts: the
   manifest entry's class, the latest transfer-journal record for the path, and
-  the class the current selection's rendering would give it. Any pair that
-  disagrees is reported with both sources named. doctor repairs nothing,
-  transfers nothing and never treats a rendering it could not compute as
-  agreement. Backlog SC-006.
+  the class the current selection's rendering would give it. Each hazardous
+  mismatch defined below is reported with both sources named. doctor repairs
+  nothing, transfers nothing and never treats a rendering it could not compute
+  as agreement. Backlog SC-006.
 amends:
-  # Section 3.5, the doctor states and findings. 002 is not edited to record it.
+  # Section 3.5, the doctor states and findings. Under the approved-spec
+  # amendment rule, 002 stays unedited; registry relationships reports the edge.
   - "002-environment-lifecycle"
 extends:
   - { spec: "002-environment-lifecycle", unit: { kind: directory, path: "crates/statecraft-environment/" }, nature: additive }
@@ -25,7 +26,7 @@ depends_on:
 obligations:
   - id: "R-1"
     kind: requirement
-    text: "doctor reports ownership-disagreement for every path where the manifest class, the latest transfer-journal record and the current rendering's class do not agree, naming each source and its value."
+    text: "doctor reports ownership-disagreement for every path satisfying a disagreement row, naming each source and its value."
     anchor: "3-2-the-finding"
   - id: "I-1"
     kind: invariant
@@ -44,11 +45,16 @@ obligations:
 
 ## 1. Purpose
 
-Spec 002 section 3.35 makes ownership transfer per path, explicit and
-journaled, and rule 5 says a manifest whose journal disagrees with its entries
-is reported by `transfer plan` and refused by `transfer apply` and `transfer
-revert`. `doctor`, the diagnostic surface of section 3.5, does not report it.
-An operator learns of the disagreement only by asking to transfer the path.
+Spec 002 section 3.35, "Per-path ownership transfer, as an operator's act,"
+makes ownership transfer per path, explicit and journaled. Its rule 5 says a
+manifest whose journal disagrees with its entries is reported by `transfer
+plan` and refused by `transfer apply` and `transfer revert`. `doctor`, the
+diagnostic surface of section 3.5, does not report it. An operator learns of
+the disagreement only by asking to transfer the path.
+
+This spec amends that approved section 3.5 without editing spec 002. The
+amendment edge is the navigable record: `spec-spine registry relationships
+002-environment-lifecycle` reports spec 026 as an amendment.
 
 The disagreement is not hypothetical. On 2026-09-26 initialization was found to
 re-adopt a governance path the operator had transferred to `user`, because a
@@ -90,12 +96,17 @@ For each path that appears in any of the three sources below, doctor reads:
 |---|---|
 | recorded, journaled | `journaled` is not `none` and differs from `recorded`. |
 | journaled, rendered | `journaled` is `user` and `rendered` is `managed`: the next apply would write a file the operator released. |
+| recorded, rendered | `recorded` is `adopted` and `rendered` is `managed`: the selection asks to write a path the manifest says is never rewritten. |
 | recorded, rendered | `recorded` is `managed` and the rendering does not name the path: the entry has no source to rewrite it with, yet `env remove` would delete it. |
 | recorded, rendered | `recorded` is `user`, `journaled` is `none`, `rendered` is `managed`, and the file exists: the path would be written over bytes the product never recorded. |
 
-The last row overlaps `foreign` where a claimant is named; when `foreign`
-already reports the path, the row is not repeated. A `read-only` rendering never
-disagrees with any class, because reading is not ownership.
+The last row overlaps `foreign` where a claimant is named. In the final finding
+set, a path that satisfies `foreign` has only that finding; the overlapping
+`ownership-disagreement` row is omitted regardless of evaluation order. A
+`read-only` rendering never disagrees with any class, because reading is not
+ownership. An `adopted` recording is covered by the first row and by its
+`managed` rendering row; a `read-only` or absent rendering cannot rewrite or
+delete an adopted path and is not a disagreement.
 
 Each finding names the path, the pair, and both values with their sources: the
 manifest entry, the journal record's identity, or the selection and producer
@@ -111,10 +122,11 @@ selection does not resolve, or the pin mismatches), doctor reports
 `ownership-rendering-unavailable` once, with the reason, and compares only
 recorded and journaled. It never assumes the rendering agrees.
 
-A manifest written before section 3.35 has no journal and reads as having no
-transfers (002 section 3.35, Compatibility). An entry carrying a `transfer`
-with no journal record is reported as it is by `transfer plan`, recorded
-without a journal, and is not an `ownership-disagreement` on that ground alone.
+A manifest written before spec 002 section 3.35, "Per-path ownership transfer,
+as an operator's act," has no journal and reads as having no transfers (that
+section's Compatibility paragraph). An entry carrying a `transfer` with no
+journal record is reported as it is by `transfer plan`, recorded without a
+journal, and is not an `ownership-disagreement` on that ground alone.
 
 ### 3.4 Read-only and deterministic
 
