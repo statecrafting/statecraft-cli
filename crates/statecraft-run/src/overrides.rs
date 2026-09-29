@@ -689,11 +689,11 @@ pub fn inspect(home: &Path, target: &Path) -> Result<Found, JournalError> {
     // Records filed under another spelling of this path are this repository's;
     // an absent file here beside them is not "no override".
     if let Some(records) = path.parent() {
-        for suffix in [JOURNAL_SUFFIX, AUTHORITY_SUFFIX] {
+        for (suffix, source) in [(JOURNAL_SUFFIX, &path), (AUTHORITY_SUFFIX, &apath)] {
             let found = crate::repository::elsewhere(records, target, suffix);
             if !found.is_empty() {
                 return Err(failed(
-                    &path,
+                    source,
                     crate::repository::elsewhere_detail(records, target, &found),
                 ));
             }
@@ -793,6 +793,15 @@ fn classify(
             "the journal ends in a torn line its authority records no intended write for".into(),
         ),
         None => State::Agree,
+        // A discard of a pending line prepares its recovery after the whole
+        // unacknowledged tail while retaining the old authority baseline.
+        // That keeps every line in the tail out of force until step 4
+        // acknowledges the pending line and its voiding recovery together.
+        Some(i) if n > c && i.position == n + 1 && scan.torn.is_some() => State::IntentTorn,
+        Some(i) if n > c && i.position == n + 1 => State::IntentWithoutLine,
+        Some(i) if n > c && i.position == n && scan.torn.is_none() && at(n) == Some(&i.digest) => {
+            State::Pending
+        }
         Some(i) if i.position != c + 1 => State::Disagreement(format!(
             "the authority records an intended line at position {} after {c} line(s)",
             i.position
@@ -960,6 +969,36 @@ fn commit(
     line: &Line,
     fault: Option<Fault>,
 ) -> Result<String, JournalError> {
+    commit_from_authority(
+        home,
+        target,
+        step1,
+        lines,
+        last.clone(),
+        lines,
+        last,
+        base,
+        line,
+        fault,
+    )
+}
+
+/// Rule 4 with an authority baseline older than the journal baseline. This is
+/// the safe transition for voiding a pending tail: no line in that tail is
+/// covered until the recovery line that voids it is durable too.
+#[allow(clippy::too_many_arguments)]
+fn commit_from_authority(
+    home: &Path,
+    target: &Path,
+    step1: bool,
+    lines: u64,
+    last: Option<String>,
+    authority_lines: u64,
+    authority_last: Option<String>,
+    base: Base,
+    line: &Line,
+    fault: Option<Fault>,
+) -> Result<String, JournalError> {
     let path = journal_path(home, target);
     let raw = serde_json::to_string(line).map_err(|e| failed(&path, e.to_string()))?;
     let digest = digest_bytes(raw.as_bytes());
@@ -974,7 +1013,14 @@ fn commit(
         position: lines + 1,
         digest: digest.clone(),
     };
-    write_authority(home, target, lines, last, Some(intended), at)?;
+    write_authority(
+        home,
+        target,
+        authority_lines,
+        authority_last,
+        Some(intended),
+        at,
+    )?;
     injected(fault, Fault::AfterStep2, &path)?;
     // Step 3: the line.
     let bytes = format!("{raw}\n").into_bytes();
@@ -1205,6 +1251,23 @@ pub struct Recovered {
 /// Bring a journal and its authority back into agreement by the operator's
 /// named choice (3.1.5 rule 5). Never picks a choice by itself.
 pub fn recover(request: &RecoverRequest<'_>) -> Result<Recovered, JournalError> {
+    recover_inner(request, None)
+}
+
+/// [`recover`], stopped at a point of rule 4's protocol. For the acceptance
+/// of 3.1.5 only.
+#[doc(hidden)]
+pub fn recover_with_fault(
+    request: &RecoverRequest<'_>,
+    fault: Fault,
+) -> Result<Recovered, JournalError> {
+    recover_inner(request, Some(fault))
+}
+
+fn recover_inner(
+    request: &RecoverRequest<'_>,
+    fault: Option<Fault>,
+) -> Result<Recovered, JournalError> {
     let operator = required("operator", request.operator)?;
     let reason = required("reason", request.reason)?;
     let (home, target) = (request.home, request.target);
@@ -1242,13 +1305,29 @@ pub fn recover(request: &RecoverRequest<'_>) -> Result<Recovered, JournalError> 
     let mut voids = None;
     let mut preserved = None;
     let mut cleared_now = None;
+    let mut authority_baseline = None;
     // The baseline the recovery line follows, and how the journal is prepared.
     let (lines, last, base) = match request.choice {
         Choice::CompletePending => (verified, last_verified, Base::Append { cut_to: None }),
         Choice::DiscardPending => {
-            if found.state == State::Pending {
-                voids = last_verified.clone();
-                (verified, last_verified, Base::Append { cut_to: None })
+            let authority = found.parsed.as_ref();
+            let has_pending_tail = authority.is_some_and(|a| verified > a.lines);
+            if has_pending_tail {
+                let authority = authority.expect("a pending tail has an authority");
+                let pending = scan
+                    .and_then(|s| s.lines.get(authority.lines as usize))
+                    .map(|(_, digest)| digest.clone())
+                    .ok_or_else(|| {
+                        failed(
+                            &path,
+                            "could not identify the first unacknowledged line to void".into(),
+                        )
+                    })?;
+                voids = Some(pending);
+                cleared_now = cleared(&found);
+                authority_baseline = Some((authority.lines, authority.last.clone()));
+                let cut_to = found.torn_bytes().map(|_| complete_len);
+                (verified, last_verified, Base::Append { cut_to })
             } else {
                 cleared_now = cleared(&found);
                 let (lines, last) = baseline(&found);
@@ -1308,7 +1387,22 @@ pub fn recover(request: &RecoverRequest<'_>) -> Result<Recovered, JournalError> 
         (request.choice, &found.parsed),
         (Choice::DiscardPending, Some(_)) if found.state != State::Pending
     );
-    let digest = commit(home, target, step1, lines, last, base, &line, None)?;
+    let digest = if let Some((authority_lines, authority_last)) = authority_baseline {
+        commit_from_authority(
+            home,
+            target,
+            false,
+            lines,
+            last,
+            authority_lines,
+            authority_last,
+            base,
+            &line,
+            fault,
+        )?
+    } else {
+        commit(home, target, step1, lines, last, base, &line, fault)?
+    };
     let after = journal_of(&inspect(home, target)?, false)?;
     drop(held);
     Ok(Recovered {
@@ -1428,6 +1522,22 @@ mod tests {
             read(home.path(), target),
             Err(JournalError::Failed { .. })
         ));
+    }
+
+    #[test]
+    fn an_authority_filed_under_another_spelling_names_its_own_path() {
+        let home = tempfile::tempdir().unwrap();
+        let target = Path::new("/fixture/a");
+        let other = authority_path(home.path(), Path::new("/fixture/a/"));
+        std::fs::create_dir_all(other.parent().unwrap()).unwrap();
+        std::fs::write(&other, "{}\n").unwrap();
+        let Err(JournalError::Failed { path, .. }) = inspect(home.path(), target) else {
+            panic!("an authority filed under another spelling was not reported");
+        };
+        assert_eq!(
+            path,
+            authority_path(home.path(), target).display().to_string()
+        );
     }
 
     /// 3.1.5 rule 3: each shape of disagreement is a failure, never a
@@ -1567,6 +1677,54 @@ mod tests {
                 recover(&recover_as(home.path(), target, &found, choice)),
                 Err(JournalError::Refused(_))
             ));
+        }
+    }
+
+    #[test]
+    fn an_interrupted_discard_never_acknowledges_the_pending_grant() {
+        for fault in [
+            Fault::AfterStep1,
+            Fault::AfterStep2,
+            Fault::DuringStep3,
+            Fault::BetweenStep3And4,
+        ] {
+            let home = tempfile::tempdir().unwrap();
+            let target = Path::new("/fixture/a");
+            let _ = change_with_fault(
+                &request(home.path(), target, "009-x"),
+                Action::Grant,
+                Fault::BetweenStep3And4,
+            );
+            let found = inspect(home.path(), target).unwrap();
+            assert!(
+                recover_with_fault(
+                    &recover_as(home.path(), target, &found, Choice::DiscardPending),
+                    fault,
+                )
+                .is_err()
+            );
+
+            match read(home.path(), target) {
+                Ok(journal) => assert!(journal.in_force().is_empty(), "{fault:?}"),
+                Err(error) => assert!(
+                    matches!(error, JournalError::Pending { .. }),
+                    "{fault:?}: {error}"
+                ),
+            }
+
+            let interrupted = inspect(home.path(), target).unwrap();
+            recover(&recover_as(
+                home.path(),
+                target,
+                &interrupted,
+                Choice::DiscardPending,
+            ))
+            .unwrap();
+            assert_eq!(state(home.path(), target), State::Agree, "{fault:?}");
+            assert!(
+                read(home.path(), target).unwrap().in_force().is_empty(),
+                "{fault:?}"
+            );
         }
     }
 
