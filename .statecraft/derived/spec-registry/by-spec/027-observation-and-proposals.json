@@ -4,6 +4,7 @@
     "dependsOn": [
       "001-boundaries-and-authority",
       "003-work-and-run-semantics",
+      "005-acceptance-and-evidence",
       "006-command-surface"
     ],
     "extends": [
@@ -27,23 +28,23 @@
     "id": "027-observation-and-proposals",
     "implementation": "pending",
     "sectionDigests": {
-      "027-observation-and-proposals": "1a45f31e586557a4334cb4d45c1e329b7fc337f153aafaa896cce9dc93b75b75",
+      "027-observation-and-proposals": "8c996b40519f06eb3681985c1169e326ea629d0eb8700798d79df77467321248",
       "1-purpose": "e1d3a148568456365ab0ac3fc0d6a29db26dca4a2f4d1f9fb9ac4642ccc4360b",
       "2-territory": "dbb377aa34db80548a8ea8ec727be4659f33e35c6d35f296a3a4e98cc509806f",
       "3-1-an-observation-is-of-exactly-one-commit": "df7d99edb1440e0bed0ae12fc39955062d6781bb7ab5ed61f0fb32df7febd183",
       "3-10-internal-seams": "b1e27aa03f78d97efb8567eb8cfef40eb28e6c68b06a70b79a7a1c11c560f47c",
-      "3-11-observable-negative-cases": "b4e23f687f13e4914b6bcd30166569acf82b7685478e99a312c8a72a7d0a2790",
+      "3-11-observable-negative-cases": "e8c1d09ae4479a2fd2d10b2b10f7ef0439c15521c1559bdb7a3d73028782566c",
       "3-2-a-refused-observation-is-recorded-not-skipped": "c82517723295fbd296b44a9c785c82af62a449ad56857655c08e75febd56602f",
-      "3-3-three-closed-projections": "9b3d8ad1f0df3ace46a1c7377a185bccc4b37a306c86aaeb74453f2f29e1a568",
+      "3-3-three-closed-projections": "c60fd46ddfaafb3c011eaf13e4c2b57d122315217f753b9803f5dcdb7948208b",
       "3-4-subscriptions-are-built-in-and-closed": "6e8f1697ede95bc6d1091cc63205a6228b22fabcc3ad12b66262c953c990b9b1",
       "3-5-a-proposal-s-identity-is-its-cause-not-its-moment": "78583323b1934bfd219cbc412fcf390fcf0148822fa8d6e2968763a2a7c8480c",
-      "3-6-preconditions-are-re-derived-at-admission": "9aef355210da78ceb8545ffdd43329d6d4a358d7c322db3303efc6d4d21a346d",
+      "3-6-preconditions-are-re-derived-at-admission": "bf58aacc1a2565bb0b34c3fe6c91993ebe41592470c5f7bb9308d823d2325f76",
       "3-7-the-run-record-names-its-cause": "1519170e80453ce34ee6069ce37b051ae6afd139b7a02d7ad00876e56237e828",
-      "3-8-the-observation-chain": "c1497c99d5e2bc219fc6b8436bffb105284926465ebb2b629a92472c5b650c5a",
+      "3-8-the-observation-chain": "73baee5301623c1a0cdbf76c72bf7d469c62d93f940d89bf6d695514e1d9ae25",
       "3-9-verbs": "ddd7bb789f9be854926db220760e3219b357b6bbe9b79422ac5bc5d4733f28ab",
-      "3-behavior": "07c5d01722792af59cde1007fb70936754e34244385cd846293d4149c132bc12",
+      "3-behavior": "dbd2bee285f7b77af723c0042f4fcd88cb6309d781e118fec1b688cb6229902a",
       "4-out-of-scope": "04328be2fd57e679d67f28298b135aa2288e7f09b468a9a35f697d0b7a17be00",
-      "5-resolved-decisions": "d16f7b05930875b15b83013e158a55e4e79a4fb42987db77c7ea3bb5c8154b75",
+      "5-resolved-decisions": "6e1d902c3cf7195508d9ac4c27fb55b4f170bd717b007b85c1a147533b87a4f5",
       "verification": "e87b8afb3fd0498f068b3c6807a84d2d23c4f23906471f564e4c0633f63ef2a8"
     },
     "sectionHeadings": [
@@ -71,6 +72,6 @@
     "summary": "Adds the transition this product lacks between \"spec-spine says the repository means X\" and \"the operator is offered the work that follows\". One observation reads exactly one commit through spec-spine's existing structured reports, reduces the answers to three closed projections, and compares them with the last observation recorded for that repository. Each semantic transition a built-in subscription names becomes a proposal with a deterministic identity, recorded in an append-only chain in the product home. A proposal is never executed by this spec: the operator admits it, admission re-derives its preconditions against the current commit, and an admitted proposal enters spec 003's existing run path with its cause recorded in the attempt's intent. No watcher, no loop, no automatic admission, and no change to spec-spine.\n",
     "title": "Observation and proposals: noticing that a repository's governed truth changed, and proposing typed work without acting on it"
   },
-  "shardHash": "68b3a3bdb8f538598d1a55db5d544d7480e1b59835e605d920b677e83a1f1070",
+  "shardHash": "0c931b3a3d2f5ee0999fb6d85573157bbe212f346f0285f75efa762b0468bfda",
   "specVersion": "1.9.0"
 }

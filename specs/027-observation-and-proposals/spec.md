@@ -31,6 +31,9 @@ extends:
 depends_on:
   - "001-boundaries-and-authority"
   - "003-work-and-run-semantics"
+  # Section 3.9: `proposal show` reports an admitted run's acceptance state as
+  # spec 005 records it.
+  - "005-acceptance-and-evidence"
   - "006-command-surface"
 ---
 
@@ -164,7 +167,11 @@ observations, keyed by spec id where the value is keyed:
 - `entered` (absent or `excluded` before, `eligible` now);
 - `exited` (`eligible` before, absent or `excluded` now), carrying the reason;
 - `reason-changed` (`excluded` in both, with different reasons);
-- `contract-moved` (`eligible` in both, with different closure digests);
+- `contract-moved` (`eligible` in both, with different `contract-identity`
+  values: two different digests, a digest before and `unavailable` now, or
+  `unavailable` before and a digest now; two `unavailable` values with
+  different reasons are not a move, because no contract was bound under
+  either);
 - `corpus-changed` (the `corpus-state` value differs).
 
 The transitions of one observation are sorted by projection, then spec id,
@@ -239,8 +246,9 @@ operator act naming the operator and a reason. Admission:
 
 `stale` is a disposition, not a failure: the proposal was right when it was
 made and the repository moved. A refusal from spec 003 (a live attempt holds
-the lock; a capability token is absent) is reported as that refusal and leaves
-the proposal `open`; nothing about the proposal was wrong.
+the lock; a capability token is absent) is reported as that refusal, and the
+admission writes `released` with reason `run-refused`, which returns the
+proposal to `open`; nothing about the proposal was wrong.
 
 ### 3.7 The run record names its cause
 
@@ -272,6 +280,7 @@ Entry kinds, closed:
 | `proposed` | proposal id, kind, spec id, subscription, justifying row, observation id |
 | `recurred` | proposal id, observation id (section 3.5 rule 1) |
 | `admitting` | proposal id, fresh observation id, operator, reason |
+| `released` | proposal id, the `admitting` entry it ends, and one of `run-refused` (section 3.6) or `admission-interrupted` (crash analysis below); the proposal is `open` again, and it is not a disposition |
 | `disposed` | proposal id, one of `admitted` (with run id and attempt), `stale` (with the differing value), `dismissed` (operator, reason), `acknowledged` (operator), `superseded` (by which proposal) |
 
 **There is no mutable checkpoint.** "The last answered observation" is the
@@ -283,9 +292,10 @@ and the two could disagree after a crash.
 (section 3.7), then `disposed`. A process that dies after `admitting`:
 
 - with no attempt intent naming the proposal: no effect happened, because
-  spec 003 writes its intent before any effect. Recovery writes
-  `disposed: stale` with reason `admission-interrupted` and the proposal may be
-  admitted again under a new admission.
+  spec 003 writes its intent before any effect. Recovery writes `released`
+  with reason `admission-interrupted`, so the proposal is `open` again and may
+  be admitted under a new admission, which re-derives its preconditions as
+  any admission does (section 3.6).
 - with an attempt intent naming the proposal: recovery writes
   `disposed: admitted` naming that run and attempt. Whether the attempt's own
   effect happened is spec 003's question, answered by spec 003's recovery,
@@ -363,9 +373,9 @@ contract there.
 | A spec re-enters under a different contract | A new proposal; any open one for that spec is `superseded`. |
 | `proposal admit` after the spec left eligibility | `stale`, naming the exclusion reason; exit 1; no run. |
 | `proposal admit` after the contract moved | `stale`, naming both digests; exit 1; no run. |
-| `proposal admit` while an attempt is live | spec 003's refusal, exit 2; the proposal stays `open`. |
+| `proposal admit` while an attempt is live | spec 003's refusal, exit 2; the admission writes `released`, reason `run-refused`, and the proposal is `open`. |
 | `proposal admit` on a `notice`, or on a disposed proposal | Refused, exit 2, naming its kind or disposition. |
-| The process dies after `admitting` and before the attempt intent | Recovery disposes `stale`, reason `admission-interrupted`; no run is replayed. |
+| The process dies after `admitting` and before the attempt intent | Recovery writes `released`, reason `admission-interrupted`; the proposal is `open` again; no run is replayed. |
 | The process dies after the attempt intent and before `disposed` | Recovery disposes `admitted`, naming the run found by the intent's proposal member. |
 | Two `observe` invocations on one repository at once | The second is refused, exit 2, naming the held observation lock. |
 | The chain's tail is torn | Read to the last complete entry, the torn tail reported, appended after. |
@@ -421,6 +431,13 @@ commit-pair `delta` report (its spec 071), not a difference between two
 snapshots, so it is not a transition over repository state and is not used as
 one here.
 
+**2026-09-29: an interrupted or refused admission is released, not disposed.**
+The first draft disposed an interrupted admission as `stale` and then called
+the proposal admissible, which the closed dispositions could not express. A
+`released` entry now ends an `admitting` entry without deciding the proposal:
+it is `open` again, and the next admission re-derives its preconditions.
+`contract-moved` covers a move to or from `unavailable`, so the
+`moved-contract` notice fires when a bound contract stops resolving.
 ## Verification
 
 ```verify:cli
