@@ -211,7 +211,7 @@ of this spec, not of any repository:
 |---|---|---|
 | `eligible-work` | `work-eligibility` `entered` with a `contract-identity` digest, or `contract-identity` `contract-moved` from `unavailable` to a digest for a spec still `eligible` | `run` for that spec |
 | `withdrawn-work` | `work-eligibility` `exited` | `notice`, naming the reason and every open `run` proposal for that spec |
-| `moved-contract` | `contract-identity` `contract-moved` | `notice`, naming every open `run` proposal and every live or unaccepted attempt bound to the earlier digest |
+| `moved-contract` | `contract-identity` `contract-moved` from a digest (to another digest or to `unavailable`) | `notice`, naming every open `run` proposal and every live or unaccepted attempt bound to the earlier digest |
 | `corpus-refusal` | `corpus-state` `corpus-changed` into `refused` | `notice`, naming spec-spine's class and message |
 | none | `work-eligibility` `reason-changed` | nothing; the transition is recorded only |
 | none | `corpus-state` `corpus-changed` back to `answered` | nothing; the transition is recorded only |
@@ -220,7 +220,8 @@ of this spec, not of any repository:
 transitions and propose nothing. A spec that enters eligibility with its
 `contract-identity` `unavailable` gets no `run` proposal: there is no
 contract an attempt could bind to, and admission would only reach spec 003's
-binding refusal. Its proposal is made when a digest first appears.
+binding refusal. Its proposal is made when a digest first appears. That first digest is not
+a move away from anything bound, so it makes no `moved-contract` notice.
 
 A `notice` has no effect to admit; it is closed only by `proposal acknowledge`.
 Only a `run` proposal can be admitted or dismissed.
@@ -588,6 +589,8 @@ proposal exists that admission can only fail. Acknowledgment closes one
 occurrence of a notice; a second occurrence of the same transition reopens it.
 This narrows the earlier entries: only `admitted` and `dismissed` stand
 against a recurrence.
+ `moved-contract` fires only on a move away from a digest,
+because nothing can be bound to `unavailable`.
 
 ## Verification
 
