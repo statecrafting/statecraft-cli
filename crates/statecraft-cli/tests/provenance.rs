@@ -169,17 +169,20 @@ fn entry(declaration: &serde_json::Value, path: &str) -> serde_json::Value {
 
 /// Items 1, 3 and 4 on a fresh project: roles from the closed list, the one
 /// producer identity from the build, and a pin that is what the project
-/// declares (nothing, today) and never what `PATH` answered.
+/// declares and never what `PATH` answered. Since spec 018 section 3.3 the
+/// producer scaffolds its own exact pin, so a fresh project declares the
+/// linked producer's version and `PATH` must offer a binary it admits.
 #[test]
 fn a_fresh_initialization_records_roles_the_linked_producer_and_the_declared_pin() {
-    let f = Fixture::new("0.23.0");
+    let version = statecraft_home::producer::PRODUCER_VERSION;
+    let f = Fixture::new(version);
     let (exit, report) = f.init();
     assert_eq!(exit, 0, "{report}");
     assert_eq!(report["outcome"], "complete", "{report}");
 
     // The observation is reported, and named as one.
     let observed = &report["observedSpecSpine"];
-    assert_eq!(observed["version"], "0.23.0", "{report}");
+    assert_eq!(observed["version"], version, "{report}");
     // Selected by spec 002 section 5's rule of 2026-09-25 and run by its
     // path, so the program is the file that answered.
     assert_eq!(observed["foundBy"], "path");
@@ -189,9 +192,11 @@ fn a_fresh_initialization_records_roles_the_linked_producer_and_the_declared_pin
     );
 
     let d = f.declaration();
-    // The producer's scaffold writes the pin commented out, so the project
-    // declares none; `PATH`'s 0.23.0 is not a pin.
-    assert_eq!(d["pins"]["spec_spine"], "unpinned", "{d}");
+    // The producer's scaffold carries its own exact pin (spec 018 section
+    // 3.3), read from the file written rather than from what `PATH` answered.
+    assert_eq!(d["pins"]["spec_spine"], version, "{d}");
+    let config = std::fs::read_to_string(f.at(CONFIG)).unwrap();
+    assert_eq!(statecraft_home::setup::exact_pin(&config).unwrap(), version);
     let producer = &d["pins"]["producer"];
     assert_eq!(producer["name"], "spec-spine-core");
     assert_eq!(
@@ -295,10 +300,18 @@ fn edited_authored_inputs_are_customized_information_and_an_edited_template_is_d
 /// producer is information, because a project may move its own pin.
 #[test]
 fn a_declared_pin_the_producer_and_the_executable_disagreeing_are_distinct_reports() {
-    let f = Fixture::new("0.23.0");
+    let version = statecraft_home::producer::PRODUCER_VERSION;
+    let f = Fixture::new(version);
     assert_eq!(f.init().0, 0);
+    // The project moves its own pin: the scaffold's exact pin (spec 018
+    // section 3.3) is edited, which an authored input allows.
     f.edit(CONFIG, |t| {
-        format!("{t}\n[meta]\nrequired_version = \"=0.24.0\"\n")
+        let moved = t.replace(
+            &format!("required_version = \"={version}\""),
+            "required_version = \"=0.24.0\"",
+        );
+        assert_ne!(moved, t, "the scaffold carries the exact pin");
+        moved
     });
     // The executable on PATH does not satisfy the pin, so initialization does
     // not run it (spec 002 section 5, 2026-09-25, the rule the delivered
@@ -309,7 +322,9 @@ fn a_declared_pin_the_producer_and_the_executable_disagreeing_are_distinct_repor
     assert_eq!(rerun["outcome"], "partial", "{rerun}");
     let rendered = rerun.to_string();
     assert!(
-        rendered.contains("(PATH, reports 0.23.0): it does not satisfy pin =0.24.0"),
+        rendered.contains(&format!(
+            "(PATH, reports {version}): it does not satisfy pin =0.24.0"
+        )),
         "{rerun}"
     );
     assert_eq!(f.declaration()["pins"]["spec_spine"], "0.24.0");
@@ -318,8 +333,9 @@ fn a_declared_pin_the_producer_and_the_executable_disagreeing_are_distinct_repor
     assert_eq!(exit, 1, "{report}");
     let findings = lines(&report, "findings");
     assert!(
-        findings
-            .contains(&"pin spec-spine: declared 0.24.0, observed executable 0.23.0".to_string()),
+        findings.contains(&format!(
+            "pin spec-spine: declared 0.24.0, observed executable {version}"
+        )),
         "{findings:?}"
     );
     let producer = format!(
@@ -388,7 +404,13 @@ fn a_declaration_recorded_before_provenance_is_read_without_guessed_values() {
 fn alternative(f: &Fixture) -> PathBuf {
     let alt = f.dir.path().join("alt/spec-spine");
     std::fs::create_dir_all(alt.parent().unwrap()).unwrap();
-    std::fs::write(alt.parent().unwrap().join("version"), "0.23.0").unwrap();
+    // The version the fresh scaffold pins (spec 018 section 3.3), so the
+    // override is admitted and judges.
+    std::fs::write(
+        alt.parent().unwrap().join("version"),
+        statecraft_home::producer::PRODUCER_VERSION,
+    )
+    .unwrap();
     let script = STUB.replace(
         "here=\"$(dirname \"$0\")\"\n",
         "here=\"$(dirname \"$0\")\"\necho \"$*\" >> \"$here/calls\"\n",
@@ -403,7 +425,7 @@ fn alternative(f: &Fixture) -> PathBuf {
 /// nothing, and `PATH` judges.
 #[test]
 fn initialization_selects_spec_spine_by_the_one_variable() {
-    let f = Fixture::new("0.23.0");
+    let f = Fixture::new(statecraft_home::producer::PRODUCER_VERSION);
     let alt = alternative(&f);
     let alt_s = alt.display().to_string();
     let calls = alt.parent().unwrap().join("calls");

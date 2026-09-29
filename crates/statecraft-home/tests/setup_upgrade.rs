@@ -9,6 +9,7 @@
 use statecraft_environment::digest::digest_bytes;
 use statecraft_environment::manifest::{Manifest, Pins};
 use statecraft_home::setup::{self, Action, ConflictKind, Inputs, Profile};
+use statecraft_home::setup_input;
 use std::collections::BTreeMap;
 use std::path::Path;
 
@@ -23,7 +24,19 @@ fn project() -> tempfile::TempDir {
     ] {
         std::fs::write(dir.path().join(rel), text).unwrap();
     }
-    std::fs::create_dir_all(dir.path().join(".git")).unwrap();
+    // Spec 018 section 3.4: a git work tree whose index tracks the Rust
+    // prerequisites, as a checkout would carry them.
+    for args in [
+        &["init", "--quiet"][..],
+        &["add", "rust-toolchain.toml", "Cargo.lock"],
+    ] {
+        let out = std::process::Command::new("git")
+            .args(args)
+            .current_dir(dir.path())
+            .output()
+            .unwrap();
+        assert!(out.status.success(), "git {args:?}");
+    }
     dir
 }
 
@@ -45,6 +58,7 @@ fn plan_and_apply_with(
         manifest,
         spec_spine_toml: Some(TOML),
         derived_dir: ".statecraft/derived",
+        bound: &setup_input::Bound::with_producer("0.26.0"),
     })
     .unwrap();
     setup::apply(
@@ -514,16 +528,22 @@ fn revision_three_states_a_rule_for_the_queue_and_the_upgrade_order() {
     assert!(steps.contains("never by a second review"), "{steps}");
 }
 
+/// The authored-content script a revision-3 project ran: executable, which
+/// is when revision 3 ran it and what a declared checker must be (spec 018
+/// section 3.4).
+fn authored_content_script(root: &Path) {
+    use std::os::unix::fs::PermissionsExt;
+    let path = root.join(setup::AUTHORED_CONTENT_SCRIPT);
+    std::fs::create_dir_all(path.parent().unwrap()).unwrap();
+    std::fs::write(&path, "#!/bin/sh\nexit 0\n").unwrap();
+    std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o755)).unwrap();
+}
+
 fn applied_revision_three(with_script: bool) -> (tempfile::TempDir, Manifest) {
     let dir = project();
     let root = dir.path();
     if with_script {
-        std::fs::create_dir_all(root.join("scripts")).unwrap();
-        std::fs::write(
-            root.join(setup::AUTHORED_CONTENT_SCRIPT),
-            "#!/bin/sh\nexit 0\n",
-        )
-        .unwrap();
+        authored_content_script(root);
     }
     let mut manifest = Manifest::new(Pins {
         product: "0.0.0".into(),
@@ -663,12 +683,7 @@ fn a_revision_four_project_upgrades_to_the_registered_revision() {
 fn upgrade_from_revision_four(target: &Profile, want: u32) {
     let dir = project();
     let root = dir.path();
-    std::fs::create_dir_all(root.join("scripts")).unwrap();
-    std::fs::write(
-        root.join(setup::AUTHORED_CONTENT_SCRIPT),
-        "#!/bin/sh\nexit 0\n",
-    )
-    .unwrap();
+    authored_content_script(root);
     let mut manifest = Manifest::new(Pins {
         product: "0.0.0".into(),
         spec_spine: "unpinned".into(),

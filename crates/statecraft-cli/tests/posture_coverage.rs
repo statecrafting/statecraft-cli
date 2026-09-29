@@ -50,6 +50,15 @@ fn json_of(out: &Output) -> Value {
 
 /// The fake spec-spine. `verify fixture --plan --json` reads the suite from
 /// the directory it runs in; `plan-exit` in its own directory makes it fail.
+/// The stub answers as the linked producer: a fresh scaffold pins that
+/// release exactly (spec 018 section 3.3), so initialization admits it.
+fn as_linked(script: &str) -> String {
+    let linked = format!("spec-spine {}", statecraft_home::producer::PRODUCER_VERSION);
+    let stubbed = script.replace("spec-spine 0.23.0", &linked);
+    assert!(stubbed.contains(&linked), "the stub reports a version");
+    stubbed
+}
+
 const FAKE_SPEC_SPINE: &str = r#"#!/bin/sh
 here="$(dirname "$0")"
 case "$*" in
@@ -162,7 +171,7 @@ impl Fixture {
         std::fs::write(f.project().join("README.md"), "x\n").unwrap();
         f.git(&["add", "."]);
         f.git(&["commit", "--quiet", "-m", "base"]);
-        executable(&f.bin().join("spec-spine"), FAKE_SPEC_SPINE);
+        executable(&f.bin().join("spec-spine"), &as_linked(FAKE_SPEC_SPINE));
         std::fs::copy(
             Path::new(env!("CARGO_MANIFEST_DIR"))
                 .join("../statecraft-adapter-claude-code/testdata/stream/success.jsonl"),

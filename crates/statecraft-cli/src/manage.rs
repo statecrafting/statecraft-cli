@@ -170,7 +170,9 @@ pub fn settings_intent(args: &[String]) -> Option<Intent> {
 }
 
 /// The setup-profile flags of `init plan|apply` (spec 002 section 5,
-/// 2026-09-24): `--profile <id>`, `--plan <identity>`, `--verify-local`.
+/// 2026-09-24): `--profile <id>`, `--plan <identity>`, `--verify-local`, and
+/// spec 018's `--setup-input <file>`, resolved against the working directory
+/// and read by the flow, never here.
 /// `Some(None)` is no flag at all; `None` is a usage error: an unrecognised
 /// flag, a repeated one, or a flag missing its value. `--verify-local` on a
 /// plan is accepted and does nothing, because a plan writes nothing to check.
@@ -194,6 +196,10 @@ fn setup_request(args: &[String]) -> Option<Option<statecraft_home::flow::SetupR
                 i += 1;
             }
             "--verify-local" if !request.verify_local => request.verify_local = true,
+            "--setup-input" if request.input.is_none() => {
+                request.input = Some(input_path(&value(i)?));
+                i += 1;
+            }
             _ => {
                 if let Some(v) = arg.strip_prefix("--profile=") {
                     if request.profile.is_some() {
@@ -205,6 +211,11 @@ fn setup_request(args: &[String]) -> Option<Option<statecraft_home::flow::SetupR
                         return None;
                     }
                     request.plan = Some(v.to_string());
+                } else if let Some(v) = arg.strip_prefix("--setup-input=") {
+                    if request.input.is_some() || v.is_empty() {
+                        return None;
+                    }
+                    request.input = Some(input_path(v));
                 } else {
                     return None;
                 }
@@ -214,6 +225,36 @@ fn setup_request(args: &[String]) -> Option<Option<statecraft_home::flow::SetupR
         i += 1;
     }
     Some(any.then_some(request))
+}
+
+/// A setup input's path, made absolute against the working directory: the
+/// document may live outside the target (spec 018 section 3.1), and nothing
+/// inside it is resolved against its own directory.
+fn input_path(typed: &str) -> std::path::PathBuf {
+    std::path::absolute(typed).unwrap_or_else(|_| std::path::PathBuf::from(typed))
+}
+
+/// Spec 018's two usage refusals of `init plan|apply`, decided before any
+/// operation runs: `--setup-input` on apply without `--plan <identity>`, and
+/// `--profile` naming another profile than the input does. `None` is no
+/// usage error; a document that does not read is left for the plan to
+/// refuse, with its own reason.
+pub fn setup_usage(verb: crate::commands::Verb, rest: &[String]) -> Option<String> {
+    use crate::commands::Verb;
+    if !matches!(verb, Verb::InitPlan | Verb::InitApply) {
+        return None;
+    }
+    let request = setup_request(rest)??;
+    let input = request.input.as_ref()?;
+    if verb == Verb::InitApply && request.plan.is_none() {
+        return Some(format!(
+            "{}: --setup-input needs --plan <identity>, the setup plan `init plan` reported for the same input",
+            verb.spelling()
+        ));
+    }
+    let named = request.profile.as_ref()?;
+    statecraft_home::setup_input::profile_conflict(input, named)
+        .map(|why| format!("{}: {why}", verb.spelling()))
 }
 
 /// Which operation a verb names, given what followed it.
@@ -352,8 +393,10 @@ pub fn usage(verb: crate::commands::Verb) -> &'static str {
              [--program <executable>] [--deadline <seconds>] [--synthetic]"
         }
         Verb::StartupQualify => " <path> <session-id> <capture-dir>",
-        Verb::InitPlan => " <path> [--profile <id>] [--plan <identity>]",
-        Verb::InitApply => " <path> [--profile <id>] [--plan <identity>] [--verify-local]",
+        Verb::InitPlan => " <path> [--profile <id>] [--setup-input <file>] [--plan <identity>]",
+        Verb::InitApply => {
+            " <path> [--profile <id>] [--setup-input <file> --plan <identity>] [--plan <identity>] [--verify-local]"
+        }
         Verb::StartupShow => " <path> <run-id> [--attempt <n>]",
         Verb::StartupTrial => " <path> (--provider-session | --synthetic) [--deadline <seconds>]",
         _ => " <path>",

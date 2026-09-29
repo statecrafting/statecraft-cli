@@ -23,6 +23,15 @@ use std::process::{Command, Output};
 /// A `spec-spine` whose behavior is set by files beside it: `check-exit`,
 /// `compile-mode` (`ok`, or `signal`), and `vanish`, which removes the stub
 /// after its first `check --help`.
+/// The stub answers as the linked producer: a fresh scaffold pins that
+/// release exactly (spec 018 section 3.3), so initialization admits it.
+fn as_linked(script: &str) -> String {
+    let linked = format!("spec-spine {}", statecraft_home::producer::PRODUCER_VERSION);
+    let stubbed = script.replace("spec-spine 0.23.0", &linked);
+    assert!(stubbed.contains(&linked), "the stub reports a version");
+    stubbed
+}
+
 const STUB: &str = r#"#!/bin/sh
 here="$(dirname "$0")"
 case "$*" in
@@ -64,8 +73,12 @@ impl Fixture {
                 .unwrap();
             assert!(out.status.success(), "git {args:?}");
         }
-        statecraft_adapter::fixture::install_script(&f.bin().join("spec-spine"), STUB, 0o755)
-            .unwrap();
+        statecraft_adapter::fixture::install_script(
+            &f.bin().join("spec-spine"),
+            as_linked(STUB),
+            0o755,
+        )
+        .unwrap();
         f.set("check-exit", "0");
         f.set("compile-mode", "ok");
         f

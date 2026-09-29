@@ -913,6 +913,12 @@ pub struct Prerequisite {
     pub observed: String,
     /// Whether it is met.
     pub met: bool,
+    /// Who owns it (spec 018 section 3.4): the target project, or the
+    /// governance producer for a `spec-spine.toml` it scaffolds.
+    pub owner: String,
+    /// What follows when it is unmet, and what this product will not do
+    /// about it; `none` when it is met.
+    pub consequence: String,
 }
 
 /// How one of the six results stands.
@@ -1029,6 +1035,11 @@ pub struct Plan {
     pub plan_identity: String,
     /// The validated parameters.
     pub parameters: Parameters,
+    /// The setup input, or its absence (spec 018 section 3.2).
+    pub input: crate::setup_input::InputReport,
+    /// Every effective parameter, defaults included, with where it came
+    /// from (spec 018 section 3.2). Retained while the profile is withheld.
+    pub effective: Vec<crate::setup_input::Effective>,
     /// Every path, in render order, the policy document last.
     pub files: Vec<FilePlan>,
     /// Local prerequisites, observed.
@@ -1099,13 +1110,34 @@ impl Plan {
             &self.identity[..12],
             self.plan_identity
         );
+        match (&self.input.supplied, &self.input.digest) {
+            (true, Some(digest)) => out.push_str(&format!(
+                "setup      input {} ({}, digest {})\n",
+                self.input.path.as_deref().unwrap_or(""),
+                crate::setup_input::SCHEMA,
+                short(digest)
+            )),
+            _ => out.push_str(&format!("setup      input none: {}\n", self.input.detail)),
+        }
+        for e in &self.effective {
+            out.push_str(&format!(
+                "setup      parameter {} = {} ({})\n",
+                e.name,
+                e.value,
+                e.provenance.word()
+            ));
+        }
         for p in &self.prerequisites {
             out.push_str(&format!(
-                "setup      prerequisite {}: {} ({})\n",
+                "setup      prerequisite {}: {} ({}; owner {})\n",
                 p.name,
                 if p.met { "met" } else { "UNMET" },
-                p.observed
+                p.observed,
+                p.owner
             ));
+            if !p.met {
+                out.push_str(&format!("             {}\n", p.consequence));
+            }
         }
         if let Some(why) = &self.withheld {
             out.push_str(&format!("setup      withheld: {why}\n"));
@@ -1281,6 +1313,9 @@ pub struct Inputs<'a> {
     pub spec_spine_toml: Option<&'a str>,
     /// The project's derived directory.
     pub derived_dir: &'a str,
+    /// What spec 018 binds beyond the profile's own reads: the setup input,
+    /// the parameters it named, and the linked producer.
+    pub bound: &'a crate::setup_input::Bound,
 }
 
 /// Compute the profile plan. Reads, never writes. `Err` is a refusal: a
@@ -1293,47 +1328,17 @@ pub fn plan(inputs: &Inputs<'_>) -> Result<Plan, String> {
     let identity = profile.identity();
     let source = profile.source_identity();
 
-    // Prerequisites, observed (S-4: the exact pin is required).
-    let pin = inputs
-        .spec_spine_toml
-        .ok_or_else(|| "spec-spine.toml is absent".to_string())
-        .and_then(exact_pin);
-    let exists = |rel: &str| root.join(rel).exists();
-    let prerequisites = vec![
-        Prerequisite {
-            name: "an exact spec-spine pin".into(),
-            observed: match &pin {
-                Ok(v) => format!("required_version = \"={v}\""),
-                Err(e) => e.clone(),
-            },
-            met: pin.is_ok(),
+    // Prerequisites, observed (S-4: the exact pin is required; spec 018
+    // section 3.4: each with its owner and consequence).
+    let prerequisites = crate::prerequisite::observe(
+        root,
+        &crate::prerequisite::Pin {
+            text: inputs.spec_spine_toml,
+            adopted: root.join("spec-spine.toml").exists(),
+            producer_version: &inputs.bound.producer_version,
         },
-        Prerequisite {
-            name: "rust-toolchain.toml".into(),
-            observed: if exists("rust-toolchain.toml") {
-                "present"
-            } else {
-                "absent; the profile requires it and never writes it"
-            }
-            .into(),
-            met: exists("rust-toolchain.toml"),
-        },
-        Prerequisite {
-            name: "Cargo.lock".into(),
-            observed: if exists("Cargo.lock") {
-                "present"
-            } else {
-                "absent; every cargo verb runs --locked"
-            }
-            .into(),
-            met: exists("Cargo.lock"),
-        },
-        Prerequisite {
-            name: "a git work tree".into(),
-            observed: if exists(".git") { "present" } else { "absent" }.into(),
-            met: exists(".git"),
-        },
-    ];
+        &params,
+    );
     let unmet: Vec<String> = prerequisites
         .iter()
         .filter(|p| !p.met)
@@ -1566,8 +1571,22 @@ pub fn plan(inputs: &Inputs<'_>) -> Result<Plan, String> {
     });
 
     // The plan identity: the profile, the declared block, and every path the
-    // plan reads or would write, observed and intended.
+    // plan reads or would write, observed and intended. Spec 018 section 3.5
+    // adds the input or its absence, the linked producer and its pinned
+    // scaffold, and every prerequisite observation.
     let mut id_text = format!("profile {identity}\nsource {source}\n");
+    id_text.push_str(&inputs.bound.input.identity_line());
+    for fact in &inputs.bound.facts {
+        id_text.push_str(&format!("{fact}\n"));
+    }
+    for p in &prerequisites {
+        id_text.push_str(&format!(
+            "prerequisite {} {} {}\n",
+            p.name,
+            if p.met { "met" } else { "unmet" },
+            p.observed
+        ));
+    }
     id_text.push_str(&format!(
         "block {}\n",
         serde_json::to_string(&block).expect("serializable")
@@ -1616,6 +1635,8 @@ pub fn plan(inputs: &Inputs<'_>) -> Result<Plan, String> {
         revision: profile.revision,
         identity: identity.clone(),
         plan_identity,
+        effective: crate::setup_input::effective(&params, &inputs.bound.supplied, &block),
+        input: inputs.bound.input.clone(),
         parameters: params,
         files,
         prerequisites,
@@ -2179,6 +2200,7 @@ mod tests {
             manifest: &manifest,
             spec_spine_toml: Some("[meta]\nrequired_version = \"=0.25.0\"\n"),
             derived_dir: ".statecraft/derived",
+            bound: &crate::setup_input::Bound::with_producer("0.25.0"),
         })
         .unwrap();
         for f in &plan.files {

@@ -331,6 +331,12 @@ case "$*" in
   *) exit 3 ;;
 esac
 SPINE
+  # The stub answers as the release the fixture's scaffold pins exactly
+  # (spec 018 section 3.3); a binary the pin does not admit is never run.
+  pinned="$(sed -n 's/^required_version = "=\(.*\)"$/\1/p' "$PROJECT/spec-spine.toml")"
+  [ -n "$pinned" ] || fail "the fixture's spec-spine.toml carries no exact pin"
+  sed "s/'spec-spine 0\.20\.0'/'spec-spine $pinned'/" "$runbin/spec-spine" >"$runbin/spec-spine.pinned"
+  mv "$runbin/spec-spine.pinned" "$runbin/spec-spine"
   cat >"$runbin/claude" <<'FAKE'
 #!/bin/sh
 # A LOCAL FAKE PROVIDER for the run path. Never a provider, never live evidence.
