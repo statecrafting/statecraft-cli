@@ -107,6 +107,14 @@ repository key, so that the eligibility this spec records is the eligibility
 `work list` would print for the same inputs. Reimplementing any of them here
 would give one question two answers.
 
+The `moved-contract` notice (section 3.4) and `proposal show` (section 3.9)
+also read two records this spec does not own: spec 003's run record, for the
+attempts bound to a given closure digest (the binding of spec 003 section
+3.1.3, which each attempt records), and spec 005's acceptance records,
+through `statecraft-acceptance`, for whether an attempt is accepted. Both are
+read-only; this spec never writes either record beyond the one intent member
+of section 3.7.
+
 ## 3. Behavior
 
 ### 3.1 An observation is of exactly one commit
