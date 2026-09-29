@@ -213,6 +213,8 @@ of this spec, not of any repository:
 | `withdrawn-work` | `work-eligibility` `exited` | `notice`, naming the reason and every open `run` proposal for that spec |
 | `moved-contract` | `contract-identity` `contract-moved` | `notice`, naming every open `run` proposal and every live or unaccepted attempt bound to the earlier digest |
 | `corpus-refusal` | `corpus-state` `corpus-changed` into `refused` | `notice`, naming spec-spine's class and message |
+| none | `work-eligibility` `reason-changed` | nothing; the transition is recorded only |
+| none | `corpus-state` `corpus-changed` back to `answered` | nothing; the transition is recorded only |
 
 `reason-changed` and `corpus-changed` back to `answered` are recorded as
 transitions and propose nothing.
@@ -374,8 +376,9 @@ held by its caller and never acquires it. Admission's fresh observation
 hold, so it neither waits on itself nor runs unlocked, and no other writer
 can append between the fresh observation and the disposition.
 
-A `run` proposal still `open` when a newer proposal for the same spec is made
-under a different contract is `superseded` by it, so at most one `run`
+A `run` proposal still `open` when another `run` proposal for the same spec
+under a different contract is made, or is reopened by a recurrence (section
+3.5 rule 2), is `superseded` by it, so at most one `run`
 proposal per spec is open at a time.
 
 ### 3.9 Verbs
@@ -567,7 +570,16 @@ exit 0.** The first observation has no second commit to compare, so
 a change, and the first observation has nothing to change from; its refusal
 is already the verb's exit and the chain's record.
 
+**2026-09-29: a reopened proposal supersedes like a new one.** Supersession
+is about which `run` proposal for a spec is open, not about when its entry was
+first written, so a recurrence that reopens one supersedes the other.
+
 ## Verification
+
+This block is the implementing change's acceptance, run by `make verify
+SPEC=027-observation-and-proposals`. The gate does not run it, and until that
+change creates `crates/statecraft-observe/` it fails, as a draft's acceptance
+should.
 
 ```verify:cli
 cargo build --workspace --locked
