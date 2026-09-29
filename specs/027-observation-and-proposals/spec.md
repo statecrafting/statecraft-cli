@@ -332,6 +332,14 @@ observation. Admission takes spec 003's lock through the run path, in that
 order only (observation lock, then repository lock), so the two cannot
 deadlock.
 
+The observation lock is not reentrant and is taken once per verb. `observe`
+and `proposal admit` each acquire it at entry and hold it until they return;
+the observation itself is one library operation that requires the lock to be
+held by its caller and never acquires it. Admission's fresh observation
+(section 3.6, step 1) is that same operation called under admission's own
+hold, so it neither waits on itself nor runs unlocked, and no other writer
+can append between the fresh observation and the disposition.
+
 A `run` proposal still `open` when a newer proposal for the same spec is made
 under a different contract is `superseded` by it, so at most one `run`
 proposal per spec is open at a time.
@@ -345,7 +353,7 @@ envelope (spec 007), calls exactly one library operation, and follows spec
 | Verb | Does |
 |---|---|
 | `observe <path> [--ref <ref>]` | One observation (sections 3.1 to 3.5). Prints the observation id, `answered`, `refused` or `unchanged`, the transitions, and each proposal made or recurred. |
-| `observe show <path>` | The last answered observation, and whether the ref now resolves to a commit it has not observed. Writes nothing. |
+| `observe show <path> [--ref <ref>]` | The last answered observation, and whether the ref (resolved with `observe`'s default, section 3.1) now resolves to a commit the chain has no `observed` entry for. Writes nothing. |
 | `proposal list <path>` | Open proposals, in the order they were first proposed. Writes nothing. |
 | `proposal show <path> <id>` | The causal trace: every observation that produced it, the transition and the two projection values, the subscription, each disposition, and for `admitted` the run and attempt with their outcome and acceptance state as spec 003 and spec 005 report them. Writes nothing. |
 | `proposal admit <path> <id> <operator> <reason...>` | Section 3.6. |
@@ -402,6 +410,7 @@ contract there.
 | A spec re-enters under a different contract | A new proposal; any open one for that spec is `superseded`. |
 | `proposal admit` after the spec left eligibility | `stale`, naming the exclusion reason; exit 1; no run. |
 | `proposal admit` after the contract moved | `stale`, naming both digests; exit 1; no run. |
+| `proposal admit` when the fresh observation is `refused` | The `observed` entry records the refusal; `stale`, naming spec-spine's class; exit 1; no run. |
 | `proposal admit` while an attempt is live | spec 003's refusal, exit 2; the admission writes `released`, reason `run-refused`, and the proposal is `open`. |
 | `proposal admit` on a `notice`, or on a disposed proposal | Refused, exit 2, naming its kind or disposition. |
 | `proposal dismiss` on a `notice`, or `proposal acknowledge` on a `run` proposal | Refused, exit 2, naming its kind and the verb that closes it. |
@@ -491,6 +500,11 @@ identity digests a tagged scope instead of a spec id. Exit 2 stays spec
 006's single refusal outcome; which refusal it was is the envelope's class
 and message and whether a `released` entry was written, as spec 007 intends,
 rather than a new exit code.
+
+**2026-09-29: the observation lock is held once, by the verb.** Admission
+contains an observation, so the observation operation requires a held lock
+instead of taking one; `observe show` takes the same `--ref` and default as
+`observe`, so "the ref" in it is never a guess.
 
 ## Verification
 
