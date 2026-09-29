@@ -2,7 +2,7 @@
 id: "018-governed-bootstrap-inputs"
 title: "Governed inputs for a complete first bootstrap"
 status: approved
-implementation: in-progress
+implementation: complete
 created: "2026-09-27"
 summary: >
   Amends 002's initialization contract and 009's producer call so a fresh

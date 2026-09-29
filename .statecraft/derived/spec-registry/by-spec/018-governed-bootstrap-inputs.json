@@ -39,7 +39,7 @@
       }
     ],
     "id": "018-governed-bootstrap-inputs",
-    "implementation": "in-progress",
+    "implementation": "complete",
     "obligations": [
       {
         "anchor": "3-5-plan-identity-application-and-convergence",
@@ -101,6 +101,6 @@
     "summary": "Amends 002's initialization contract and 009's producer call so a fresh repository can supply setup-profile parameters through one explicit, plan-bound input document, receives the exact governance-producer pin from the producer itself, and remains honestly partial when project-owned prerequisites are absent.\n",
     "title": "Governed inputs for a complete first bootstrap"
   },
-  "shardHash": "143078ae14cd52123d3fccbd4ef92579864e425a9adfcc39fa97a7f4f0b128d2",
+  "shardHash": "18967e896e80b29a7d65b725f92bc71de49ac21de13a81a44792932f44e827ed",
   "specVersion": "1.9.0"
 }
