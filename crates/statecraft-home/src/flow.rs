@@ -1316,7 +1316,11 @@ fn bound(
 ) -> crate::setup_input::Bound {
     let identity = ctx.producer.identity();
     let mut scaffold = String::new();
-    for f in &starter.governance {
+    // By path, so the digest is the scaffold's bytes and not the order the
+    // producer happened to return them in.
+    let mut files: Vec<&producer::ScaffoldFile> = starter.governance.iter().collect();
+    files.sort_by(|a, b| a.rel_path.cmp(&b.rel_path));
+    for f in files {
         scaffold.push_str(&format!(
             "{} {}\n",
             f.rel_path,

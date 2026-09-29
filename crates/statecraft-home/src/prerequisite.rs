@@ -154,6 +154,8 @@ fn checker(root: &Path, rel: &str) -> Prerequisite {
             };
             if !inside {
                 Some("outside the target")
+            } else if m.file_type().is_symlink() {
+                Some("a symbolic link, not a regular file")
             } else if !m.file_type().is_file() {
                 Some("not a regular file")
             } else if !executable(&m) {
@@ -350,6 +352,16 @@ mod tests {
         assert_eq!(
             observed(&at()),
             (false, format!("{rel}: outside the target"))
+        );
+        std::fs::remove_file(root.join(rel)).unwrap();
+
+        let inside = root.join("scripts/real.sh");
+        std::fs::write(&inside, "#!/bin/sh\n").unwrap();
+        std::fs::set_permissions(&inside, std::fs::Permissions::from_mode(0o755)).unwrap();
+        std::os::unix::fs::symlink(&inside, root.join(rel)).unwrap();
+        assert_eq!(
+            observed(&at()),
+            (false, format!("{rel}: a symbolic link, not a regular file"))
         );
         std::fs::remove_file(root.join(rel)).unwrap();
 

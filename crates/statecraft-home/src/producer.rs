@@ -12,8 +12,8 @@
 //! consumers; this product no longer asks for it.
 //!
 //! The call returns the serialized `Scaffold` files-as-data shape with its
-//! `ScaffoldFile` fields, performs no write and discovers no environment. This product owns the reconciliation and every filesystem
-//! write. The removed `spec-spine init` command is not invoked, no governance
+//! `ScaffoldFile` fields, performs no write and discovers no environment.
+//! This product owns the reconciliation and every filesystem write. The removed `spec-spine init` command is not invoked, no governance
 //! template is vendored here, and there is no fallback installer built from old
 //! kit bytes.
 //!
