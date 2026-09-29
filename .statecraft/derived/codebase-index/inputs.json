@@ -19,7 +19,7 @@
       "contentHash": "9c3d64929b662cdc2f3623473dcc4bb5c1c2832ae9e5fb52e28b66b486db886a"
     },
     "AGENTS.md": {
-      "contentHash": "5c7db1d6c9cb79689e6d2ff0e155261296b3e318f7550a5da5f540e398a969f7"
+      "contentHash": "6e31b1a99672852312f4b1545302c1daa6e58e6e1d1edeb56effbbae4e998580"
     },
     "CLAUDE.md": {
       "contentHash": "01e63121f953e076fde60b67abaa33a23b697ea2aade6c48c5c1ea5c4f27797b"
@@ -31,7 +31,7 @@
       "contentHash": "ec95a5af0a77225dacef596f9fac4b5b4ebf77d971eca05f269d6e206fb0f143"
     },
     "docs/adoption/spec-spine.md": {
-      "contentHash": "104249fc97a36cb428f1fc1288c7f2ea985b0491495e1d38a4030709e0e0154f"
+      "contentHash": "ce93ebf1828a9ae7f7988ad4f8d43587b93f300e1efbc85107b4a350f2400c93"
     },
     "docs/decisions/00-founding-decisions.md": {
       "contentHash": "ebafe963e1207aed7cf45980234329223809a3a8e87384dfc7274fdb098ed92b"
@@ -85,7 +85,7 @@
       "contentHash": "670a5a04a7c3dd79e9fba400f4c54d01ee7f7602a3f5eaa90299cdbf268edc36"
     },
     "spec-spine.toml": {
-      "contentHash": "3022e4de8e478d47697c441247dc4da4fc5fa8a24e00366892654b508204f299"
+      "contentHash": "64dfde35066eeaa745a8f30a38b15541ba329103ac1ff247b3eebde0e21c6d12"
     },
     "standards/spec/constitution.md": {
       "contentHash": "27d45bf3ade1274e0469c340aa8f3988ab537c5c4b1f24345cd1fb473c365bb0"

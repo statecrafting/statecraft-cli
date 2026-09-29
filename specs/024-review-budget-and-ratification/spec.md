@@ -1,7 +1,7 @@
 ---
 id: "024-review-budget-and-ratification"
 title: "Setup profile revision 12: a token-budgeted AI review and ratification as a merge condition"
-status: draft
+status: approved
 implementation: in-progress
 created: "2026-09-27"
 summary: >

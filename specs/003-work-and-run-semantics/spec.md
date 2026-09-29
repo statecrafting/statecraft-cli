@@ -977,6 +977,14 @@ entry the binary never calls. Still open, so 003 stays `in-progress`: the
 confined-child line of the acceptance (spec `004` section 3.18), the branch
 directory of that section's rule 3, and section 3.5.1 rule 6.
 
+**2026-09-29: a closure failure is read wherever the producer writes it.**
+From spec-spine 0.28.0 (its spec 152), `registry closure --json` answers a
+failure with the family envelope on stdout and nothing on stderr. Read by
+stderr alone, a stale ledger became an unresolved member and a pin refusal
+became stale. When stderr is empty and stdout is an envelope, the words read
+are `error.message` with the `spec-spine: ` prefix the stderr line carried, so
+section 3.1.3's states are decided by the same words under every release.
+
 ## Verification
 
 Each line is one command. §3.8's twenty-two rows are integration tests named after
