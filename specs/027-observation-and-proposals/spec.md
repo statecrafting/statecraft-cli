@@ -570,10 +570,10 @@ contains an observation, so the observation operation requires a held lock
 instead of taking one; `observe show` takes the same `--ref` and default as
 `observe`, so "the ref" in it is never a guess.
 
-**2026-09-29: every recurrence of an open or reopened proposal writes
-`recurred`.** Only a decided proposal (`admitted`, `dismissed`,
-`acknowledged`) records nothing on recurrence; an `open` one records the
-recurrence, which keeps the ref admission re-observes current.
+**2026-09-29: every recurrence writes `recurred`.** An `open` proposal stays
+open; an `admitted` or `dismissed` run proposal stays disposed; and a `stale`,
+`superseded` or `acknowledged` proposal reopens. The recurrence keeps its
+causal observation readable and the ref admission re-observes current.
 
 **2026-09-29: every chain writer holds the lock; explanations are
 spec-spine's; a retry is `run`.** `proposal dismiss` and `proposal

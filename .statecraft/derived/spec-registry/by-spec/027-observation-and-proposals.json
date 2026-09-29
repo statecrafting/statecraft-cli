@@ -29,7 +29,7 @@
     "id": "027-observation-and-proposals",
     "implementation": "pending",
     "sectionDigests": {
-      "027-observation-and-proposals": "9b769d793d2bafc085953bea32739a7cd78c1bac665b860f6505ba7a9adf39e9",
+      "027-observation-and-proposals": "f5a2f306f26dde2bcac437e1db91e7b1163f27609181f2f04a05cbead7615fb0",
       "1-purpose": "e1d3a148568456365ab0ac3fc0d6a29db26dca4a2f4d1f9fb9ac4642ccc4360b",
       "2-territory": "332356853c1ce8aaf012ba80e4bd24bc7d70ea14f080972b6144f4aeb1bd38eb",
       "3-1-an-observation-is-of-exactly-one-commit": "1fc320f1bf93415d575172c57d2edcdb156f1259693310b3009e68e2003a8c6f",
@@ -45,7 +45,7 @@
       "3-9-verbs": "4c45939e7b9ac58e0f3d2d18d65f0969d31aa98e8a07dc43f6fca10540766bf2",
       "3-behavior": "8c493777815f6436485fe482f7d6728155d7ef769be6bb7ef463d806cc87e9ae",
       "4-out-of-scope": "04328be2fd57e679d67f28298b135aa2288e7f09b468a9a35f697d0b7a17be00",
-      "5-resolved-decisions": "a6d7fc9892e4acaaa9df1ecdb7db0875c0c9e6384b0ac50a0d185c41501830c2",
+      "5-resolved-decisions": "8670fb079643764e885358b0d5473f68514d7976c6050111b5eefb265c762483",
       "verification": "56a1c76aa30baa5167277ba205008d1c657034622f3ce37b5817913a8e286f1e"
     },
     "sectionHeadings": [
@@ -73,6 +73,6 @@
     "summary": "Adds the transition this product lacks between \"spec-spine says the repository means X\" and \"the operator is offered the work that follows\". One observation reads exactly one commit through spec-spine's existing structured reports, reduces the answers to three closed projections, and compares them with the last observation recorded for that repository. Each semantic transition a built-in subscription names becomes a proposal with a deterministic identity, recorded in an append-only chain in the product home. A proposal is never executed by this spec: the operator admits it, admission re-derives its preconditions against the current commit, and an admitted proposal enters spec 003's existing run path with its cause recorded in the attempt's intent. No watcher, no loop, no automatic admission, and no change to spec-spine.\n",
     "title": "Observation and proposals: noticing that a repository's governed truth changed, and proposing typed work without acting on it"
   },
-  "shardHash": "e34d67b6a52b31bd742e5df88f5c6bf3c697566a2cbb580a570f6911f0e1cf85",
+  "shardHash": "d5f393bb624ca43e7a7c723406250b58ca722da5b7aef250e2f45a7bcd623707",
   "specVersion": "1.9.0"
 }
