@@ -761,6 +761,16 @@ fn observe(path: &Path) -> String {
     }
 }
 
+/// Whether `path` is absent. Other metadata failures remain failures instead
+/// of being treated as permission to create the path.
+fn is_absent(path: &Path) -> std::io::Result<bool> {
+    match std::fs::symlink_metadata(path) {
+        Ok(_) => Ok(false),
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(true),
+        Err(e) => Err(e),
+    }
+}
+
 /// `path` and each ancestor that does not exist yet, so a `create_dir_all`
 /// or a write that creates its parents is observed whole.
 fn chain(path: &Path) -> Vec<std::path::PathBuf> {
@@ -997,9 +1007,15 @@ fn preflight(ctx: &Context<'_>, now: &str, report: &mut Report) -> Result<Prepar
     // carries the producer's exact pin of its own identity, verified before
     // anything is written. An adopted file is never rewritten, and is judged
     // as a setup prerequisite instead.
-    if std::fs::symlink_metadata(resolve(ctx.root, "spec-spine.toml")).is_err()
-        && let Err(reason) = producer::verify_pin(&starter)
-    {
+    let pin_path = resolve(ctx.root, "spec-spine.toml");
+    let pin_absent = is_absent(&pin_path).map_err(|e| {
+        failed(
+            Step::Plan,
+            format!("spec-spine.toml: {e}"),
+            "the project pin could not be inspected",
+        )
+    })?;
+    if pin_absent && let Err(reason) = producer::verify_pin(&starter) {
         return Err(StepReport::new(
             Step::Plan,
             StepState::Refused { reason },
@@ -2100,4 +2116,20 @@ fn step_register(
 /// a diff. Reads nothing.
 pub fn digest_of(contents: &str) -> String {
     digest_bytes(contents.as_bytes())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::is_absent;
+    use std::path::Path;
+
+    #[test]
+    fn absence_is_distinct_from_an_unreadable_path() {
+        let crate_root = Path::new(env!("CARGO_MANIFEST_DIR"));
+        assert!(!is_absent(&crate_root.join("Cargo.toml")).unwrap());
+        assert!(is_absent(&crate_root.join("definitely-not-a-statecraft-file")).unwrap());
+
+        let error = is_absent(Path::new("\0")).unwrap_err();
+        assert_ne!(error.kind(), std::io::ErrorKind::NotFound);
+    }
 }
