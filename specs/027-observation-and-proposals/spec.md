@@ -123,8 +123,8 @@ of that commit's tracked bytes.
    answer about a ledger that is committed with the tree, and a working tree
    has no identity an observation could record.
 2. **The observation's input identity** is the canonical digest of: the
-   repository key (spec 003 section 3.1.4), the commit id, the spec-spine
-   version token the reports carry, the lifecycle policy as read at that
+   repository key (spec 003 section 5, 2026-09-23, "one repository key"), the
+   commit id, the spec-spine version token the reports carry, the lifecycle policy as read at that
    commit (with whether it was declared or defaulted), and the override
    journal's current state (spec 003 section 3.1.5). Overrides are product
    state that changes eligibility, so an observation that omitted them would
@@ -274,6 +274,15 @@ the lock; a capability token is absent) is reported as that refusal, and the
 admission writes `released` with reason `run-refused`, which returns the
 proposal to `open`; nothing about the proposal was wrong.
 
+**A retry is `run`, and a dismissal blocks nothing.** Admission is the only
+way a proposal causes a run, and it causes at most one: a proposal disposed
+`admitted` is never admitted again. Retrying that work, after any outcome, is
+spec 003's `run`, which appends an attempt under spec 003's rules and
+needs no proposal. `run` does not read the observation chain, so no
+disposition here, `dismissed` included, ever blocks, delays or conditions a
+`run`; a dismissal only stops this spec proposing the same work under the
+same contract again (section 3.5).
+
 ### 3.7 The run record names its cause
 
 The attempt intent gains one optional member naming the admitting proposal's
@@ -335,8 +344,10 @@ observation. Admission takes spec 003's lock through the run path, in that
 order only (observation lock, then repository lock), so the two cannot
 deadlock.
 
-The observation lock is not reentrant and is taken once per verb. `observe`
-and `proposal admit` each acquire it at entry and hold it until they return;
+The observation lock is not reentrant and is taken once per verb. Every verb
+that appends to the chain (`observe`, `proposal admit`, `proposal dismiss` and
+`proposal acknowledge`) acquires it at entry and holds it until it returns, and
+the read-only verbs take no lock;
 the observation itself is one library operation that requires the lock to be
 held by its caller and never acquires it. Admission's fresh observation
 (section 3.6, step 1) is that same operation called under admission's own
@@ -358,7 +369,7 @@ envelope (spec 007), calls exactly one library operation, and follows spec
 | `observe <path> [--ref <ref>]` | One observation (sections 3.1 to 3.5). Prints the observation id, `answered`, `refused` or `unchanged`, the transitions, and each proposal made or recurred. |
 | `observe show <path> [--ref <ref>]` | The last answered observation, and whether the ref (resolved with `observe`'s default, section 3.1) now resolves to a commit the chain has no `observed` entry for. Writes nothing. |
 | `proposal list <path>` | Open proposals, in the order they were first proposed. Writes nothing. |
-| `proposal show <path> <id>` | The causal trace: every observation that produced it, the transition and the two projection values, the subscription, each disposition, and for `admitted` the run and attempt with their outcome and acceptance state as spec 003 and spec 005 report them. Writes nothing. |
+| `proposal show <path> <id>` | The causal trace: every observation that produced it, the transition and the two projection values, the subscription, each disposition, and for `admitted` the run and attempt with their outcome and acceptance state as spec 003 and spec 005 report them. For each transition it cites spec-spine's `delta` report between the two compared commits, verbatim, as the explanation of what changed; it never derives one from this spec's projections, and a refused or absent report is shown as `unavailable` with spec-spine's reason. Writes nothing. |
 | `proposal admit <path> <id> <operator> <reason...>` | Section 3.6. |
 | `proposal dismiss <path> <id> <operator> <reason...>` | Closes a `run` proposal without running it. |
 | `proposal acknowledge <path> <id> <operator>` | Closes a `notice`. |
@@ -513,6 +524,13 @@ instead of taking one; `observe show` takes the same `--ref` and default as
 `recurred`.** Only a decided proposal (`admitted`, `dismissed`,
 `acknowledged`) records nothing on recurrence; an `open` one records the
 recurrence, which keeps the ref admission re-observes current.
+
+**2026-09-29: every chain writer holds the lock; explanations are
+spec-spine's; a retry is `run`.** `proposal dismiss` and `proposal
+acknowledge` append, so they take the observation lock like the other two
+writers. `proposal show` explains a transition with spec-spine's `delta`
+report rather than a locally derived diff. The chain never gates `run`.
+
 ## Verification
 
 ```verify:cli
