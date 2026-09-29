@@ -570,10 +570,14 @@ contains an observation, so the observation operation requires a held lock
 instead of taking one; `observe show` takes the same `--ref` and default as
 `observe`, so "the ref" in it is never a guess.
 
-**2026-09-29: every recurrence writes `recurred`.** This entry follows section
-3.5 and the later recurrence decision below. An `open` proposal stays open; an
-`admitted` or `dismissed` `run` proposal stays disposed; and a `stale` or
-`superseded` proposal, or an `acknowledged` `notice`, reopens. The recurrence
+**2026-09-29: every recurrence writes `recurred`.** The earlier wording of this
+entry said that decided proposals record nothing, which contradicted section
+3.5 and the later recurrence decision below; this is the correction. Section
+3.4 makes the dispositions kind-specific: only a `run` can be `admitted` or
+`dismissed`, and only a `notice` can be `acknowledged`, so there is no
+`acknowledged` `run` or `admitted` `notice`. An `open` proposal stays open; an
+`admitted` or `dismissed` `run` stays disposed; and a `stale` or `superseded`
+proposal, or an `acknowledged` `notice`, becomes `open` again. The recurrence
 keeps its causal observation readable and the ref admission re-observes
 current.
 
