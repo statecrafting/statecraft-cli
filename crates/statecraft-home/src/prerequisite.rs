@@ -9,7 +9,9 @@
 //! project's, and an adopted `spec-spine.toml` is its owner's.
 
 use crate::setup::{Parameters, Prerequisite};
+use std::io;
 use std::path::Path;
+use std::path::PathBuf;
 
 /// The governance producer owns a `spec-spine.toml` it scaffolds.
 pub const PRODUCER_OWNER: &str = "governance producer";
@@ -148,12 +150,12 @@ fn checker(root: &Path, rel: &str) -> Prerequisite {
     let failed = match std::fs::symlink_metadata(&path) {
         Err(_) => Some("absent"),
         Ok(m) => {
-            let inside = match (path.canonicalize(), root.canonicalize()) {
-                (Ok(p), Ok(r)) => p.starts_with(r),
-                _ => false,
-            };
-            if !inside && (!m.file_type().is_symlink() || path.canonicalize().is_ok()) {
+            let resolved_path = path.canonicalize();
+            let location = canonical_location(&resolved_path, &root.canonicalize());
+            if matches!(location, Ok(false)) {
                 Some("outside the target")
+            } else if location.is_err() && (!m.file_type().is_symlink() || resolved_path.is_ok()) {
+                Some("canonical path unreadable")
             } else if m.file_type().is_symlink() {
                 Some("a symbolic link, not a regular file")
             } else if !m.file_type().is_file() {
@@ -178,6 +180,15 @@ fn checker(root: &Path, rel: &str) -> Prerequisite {
             "Statecraft never invents or copies a content policy: add the executable checker at {rel}, or leave governance.authored_content unset"
         ),
     )
+}
+
+/// Whether two resolved paths put the checker inside the target. A failure to
+/// resolve either side is not evidence that the checker is outside it.
+fn canonical_location(path: &io::Result<PathBuf>, root: &io::Result<PathBuf>) -> io::Result<bool> {
+    match (path, root) {
+        (Ok(path), Ok(root)) => Ok(path.starts_with(root)),
+        (Err(error), _) | (_, Err(error)) => Err(io::Error::new(error.kind(), error.to_string())),
+    }
 }
 
 #[cfg(unix)]
@@ -386,5 +397,16 @@ mod tests {
             !none.iter().any(|p| p.name.contains("checker")),
             "no checker is required when none is declared"
         );
+    }
+
+    #[test]
+    fn an_unreadable_canonical_root_is_not_reported_as_outside() {
+        let path = Ok(PathBuf::from("/target/scripts/check.sh"));
+        let root = Err(io::Error::new(
+            io::ErrorKind::PermissionDenied,
+            "root cannot be resolved",
+        ));
+        let error = canonical_location(&path, &root).expect_err("the root did not resolve");
+        assert_eq!(error.kind(), io::ErrorKind::PermissionDenied);
     }
 }
