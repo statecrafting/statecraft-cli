@@ -209,7 +209,7 @@ of this spec, not of any repository:
 
 | Subscription | Transition | Proposal kind |
 |---|---|---|
-| `eligible-work` | `work-eligibility` `entered` | `run` for that spec |
+| `eligible-work` | `work-eligibility` `entered` with a `contract-identity` digest, or `contract-identity` `contract-moved` from `unavailable` to a digest for a spec still `eligible` | `run` for that spec |
 | `withdrawn-work` | `work-eligibility` `exited` | `notice`, naming the reason and every open `run` proposal for that spec |
 | `moved-contract` | `contract-identity` `contract-moved` | `notice`, naming every open `run` proposal and every live or unaccepted attempt bound to the earlier digest |
 | `corpus-refusal` | `corpus-state` `corpus-changed` into `refused` | `notice`, naming spec-spine's class and message |
@@ -217,7 +217,10 @@ of this spec, not of any repository:
 | none | `corpus-state` `corpus-changed` back to `answered` | nothing; the transition is recorded only |
 
 `reason-changed` and `corpus-changed` back to `answered` are recorded as
-transitions and propose nothing.
+transitions and propose nothing. A spec that enters eligibility with its
+`contract-identity` `unavailable` gets no `run` proposal: there is no
+contract an attempt could bind to, and admission would only reach spec 003's
+binding refusal. Its proposal is made when a digest first appears.
 
 A `notice` has no effect to admit; it is closed only by `proposal acknowledge`.
 Only a `run` proposal can be admitted or dismissed.
@@ -249,9 +252,13 @@ Consequences, each intended:
 2. A spec that exits and re-enters eligibility under **the same** contract
    yields the same id. If that proposal is still `open`, the recurrence is
    recorded as `recurred` and the proposal stays `open`, so its latest ref is
-   the one admission re-observes (section 3.6). If it was `admitted` or `dismissed` (a
-   `notice`: `acknowledged`), the earlier disposition stands and nothing new
-   is proposed: the same work under the same contract was already decided. If
+   the one admission re-observes (section 3.6). If it was `admitted` or
+   `dismissed`, the earlier disposition stands and nothing new is proposed:
+   the same work under the same contract was already decided. An
+   `acknowledged` `notice` is different: acknowledging records that the
+   operator saw one occurrence, not a decision about later ones, and a notice
+   recurs only when its transition happens again, so the recurrence is
+   recorded as `recurred` and the notice is `open` again. If
    it was `stale` or `superseded`, nobody decided the work; the recurrence is
    recorded as `recurred`, the proposal is `open` again, and an open `run`
    proposal for the same spec under another contract is `superseded` by it
@@ -441,6 +448,7 @@ contract there.
 | The target is not registered | Refused, exit 2, as every verb taking a target path refuses. |
 | spec-spine reports the observed commit's ledger stale | `refused` recorded with spec-spine's class; no eligibility or contract projection; a `corpus-refusal` notice when the previous observation was answered or refused with another class, and no `run` proposal; exit 1. |
 | A report lacks a field a projection needs | Refused naming the field and version; nothing recorded; exit 2. |
+| `observe show` on a repository with no `observed` entry | Answers `none`, naming that no observation is recorded; writes nothing; exit 0. |
 | An observation whose input identity equals the last one | `unchanged`, nothing recorded, exit 0. |
 | The operator's checkout has uncommitted edits to a spec | Not observed. The observation is of the commit, and nothing is recorded about the working tree. |
 | A refused observation between two answered ones | The transition spans the refusal; no spec is reported as having exited and re-entered. |
@@ -573,6 +581,13 @@ is already the verb's exit and the chain's record.
 **2026-09-29: a reopened proposal supersedes like a new one.** Supersession
 is about which `run` proposal for a spec is open, not about when its entry was
 first written, so a recurrence that reopens one supersedes the other.
+
+**2026-09-29: a run proposal needs a contract, and an acknowledged notice can
+recur.** `eligible-work` waits for a `contract-identity` digest, so no
+proposal exists that admission can only fail. Acknowledgment closes one
+occurrence of a notice; a second occurrence of the same transition reopens it.
+This narrows the earlier entries: only `admitted` and `dismissed` stand
+against a recurrence.
 
 ## Verification
 
