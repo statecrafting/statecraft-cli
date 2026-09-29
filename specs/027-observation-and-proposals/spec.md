@@ -382,7 +382,7 @@ envelope (spec 007), calls exactly one library operation, and follows spec
 | `observe <path> [--ref <ref>]` | One observation (sections 3.1 to 3.5). Prints the observation id, `answered`, `refused` or `unchanged`, the transitions, and each proposal made or recurred. |
 | `observe show <path> [--ref <ref>]` | The last answered observation, and whether the ref (resolved with `observe`'s default, section 3.1) now resolves to a commit the chain has no `observed` entry for. Writes nothing. |
 | `proposal list <path>` | Open proposals, in the order they were first proposed. Writes nothing. |
-| `proposal show <path> <id>` | The causal trace: every observation that produced it, the transition and the two projection values, the subscription, each disposition, and for `admitted` the run and attempt with their outcome and acceptance state as spec 003 and spec 005 report them. For each transition it cites spec-spine's `delta` report between the two compared commits, verbatim, as the explanation of what changed; it never derives one from this spec's projections, and a refused or absent report is shown as `unavailable` with spec-spine's reason. Writes nothing. |
+| `proposal show <path> <id>` | The causal trace: every observation that produced it, the transition and the two projection values, the subscription, each disposition, and for `admitted` the run and attempt with their outcome and acceptance state as spec 003 and spec 005 report them. For each transition it cites spec-spine's `delta` report between the two compared commits, verbatim, as the explanation of what changed; it never derives one from this spec's projections, and a refused or absent report is shown as `unavailable` with spec-spine's reason. An `entered (initial)` transition has no earlier commit, so it cites no `delta` and is shown as `initial`, naming the one commit observed. Writes nothing. |
 | `proposal admit <path> <id> <operator> <reason...>` | Section 3.6. |
 | `proposal dismiss <path> <id> <operator> <reason...>` | Closes a `run` proposal without running it. |
 | `proposal acknowledge <path> <id> <operator>` | Closes a `notice`. |
@@ -390,7 +390,9 @@ envelope (spec 007), calls exactly one library operation, and follows spec
 Exit codes follow spec 006: `observe` exits 0 for `answered` or `unchanged`
 and 1 for `refused` (a finding about the target, not a failure of this
 product); `proposal admit` exits as `run` would when admitted, 1 when the
-disposition is `stale`, and 2 when spec 003 refuses; a verb that finds the
+disposition is `stale`, and 2 when spec 003 refuses; `proposal dismiss` and
+`proposal acknowledge` exit 0 when they write their disposition, and the
+read-only verbs exit 0 when they answer; a verb that finds the
 observation lock held is refused, exit 2, and writes nothing; a verb whose
 write to the chain fails exits 4.
 
@@ -549,6 +551,10 @@ recovery runs at the next writer.** A stale admission has no effect, so it
 needs no `admitting` entry; an orphaned `admitting` is recovered by whichever
 verb next takes the observation lock, which is also the only time the orphan
 can be told from a live admission.
+
+**2026-09-29: an initial transition cites no `delta`, and the closing verbs
+exit 0.** The first observation has no second commit to compare, so
+`proposal show` names it `initial` instead of inventing a base.
 
 ## Verification
 
