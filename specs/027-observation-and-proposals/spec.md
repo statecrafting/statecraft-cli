@@ -263,7 +263,7 @@ operator act naming the operator and a reason. Admission:
 2. refuses, writing the disposition `stale` with the differing value, when
    the fresh observation is `refused`, when the spec is not `eligible` in it,
    or when its closure digest differs from the proposal's;
-3. otherwise enters spec 003's run path for that spec, at the fresh
+3. otherwise writes `admitting`, then enters spec 003's run path for that spec, at the fresh
    observation's commit, with the lock, workspace, lifecycle policy, override
    and contract binding that `run` applies, none of them bypassed or
    pre-decided by the proposal.
@@ -321,8 +321,11 @@ last `observed` entry with `answered`, read from the chain. A checkpoint file
 beside the chain would be a second copy of a fact the chain already records,
 and the two could disagree after a crash.
 
-**Crash analysis.** Writes are ordered `admitting`, then spec 003's intent
-(section 3.7), then `disposed`. A process that dies after `admitting`:
+**Crash analysis.** An admission that enters the run path writes, in order,
+`admitting`, then spec 003's intent (section 3.7), then `disposed`. An
+admission that ends `stale` never writes `admitting`: it writes `disposed:
+stale` directly after the fresh observation, under the same lock hold, and
+has no effect to recover. A process that dies after `admitting`:
 
 - with no attempt intent naming the proposal: no effect happened, because
   spec 003 writes its intent before any effect. Recovery writes `released`
@@ -336,6 +339,16 @@ and the two could disagree after a crash.
 
 So the observation chain holds no unknown state of its own; every ambiguity it
 could have is delegated to the record that already owns it.
+
+**Recovery runs at the next chain writer.** An `admitting` entry with no
+later `released` or `disposed` for its proposal is orphaned only if its
+writer died, because a live admission holds the observation lock until it
+returns. So every verb that appends to the chain, once it holds the lock and
+before its own work, recovers each orphaned `admitting` as above. A
+`proposal admit` naming an orphaned proposal therefore sees it `open` again
+(or `admitted`) before section 3.6 begins. The read-only verbs write nothing
+and report an orphaned `admitting` as `admission-interrupted, not yet
+recovered`.
 
 **Concurrency.** One writer per chain, held by a lock file in the product home
 beside the chain, distinct from spec 003's repository lock: an observation
@@ -530,6 +543,12 @@ spec-spine's; a retry is `run`.** `proposal dismiss` and `proposal
 acknowledge` append, so they take the observation lock like the other two
 writers. `proposal show` explains a transition with spec-spine's `delta`
 report rather than a locally derived diff. The chain never gates `run`.
+
+**2026-09-29: `admitting` is written only on the way into the run path, and
+recovery runs at the next writer.** A stale admission has no effect, so it
+needs no `admitting` entry; an orphaned `admitting` is recovered by whichever
+verb next takes the observation lock, which is also the only time the orphan
+can be told from a live admission.
 
 ## Verification
 
