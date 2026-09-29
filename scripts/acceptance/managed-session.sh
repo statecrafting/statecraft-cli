@@ -337,8 +337,8 @@ SPINE
   case "$pinned" in
     ''|*[!0-9.]*) fail "the fixture's spec-spine.toml carries no exact X.Y.Z pin" ;;
   esac
-  sed "s/'spec-spine 0\.20\.0'/'spec-spine $pinned'/" "$runbin/spec-spine" >"$runbin/spec-spine.pinned"
-  mv "$runbin/spec-spine.pinned" "$runbin/spec-spine"
+  sed "s/'spec-spine 0\.20\.0'/'spec-spine $pinned'/" "$runbin/spec-spine" >"$runbin/spec-spine.pinned" &&
+    mv "$runbin/spec-spine.pinned" "$runbin/spec-spine"
   cat >"$runbin/claude" <<'FAKE'
 #!/bin/sh
 # A LOCAL FAKE PROVIDER for the run path. Never a provider, never live evidence.

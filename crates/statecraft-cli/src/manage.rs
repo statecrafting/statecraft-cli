@@ -197,7 +197,11 @@ fn setup_request(args: &[String]) -> Option<Option<statecraft_home::flow::SetupR
             }
             "--verify-local" if !request.verify_local => request.verify_local = true,
             "--setup-input" if request.input.is_none() => {
-                request.input = Some(input_path(&value(i)?));
+                let typed = value(i)?;
+                if typed.is_empty() {
+                    return None;
+                }
+                request.input = Some(input_path(&typed));
                 i += 1;
             }
             _ => {

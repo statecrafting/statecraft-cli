@@ -152,7 +152,7 @@ fn checker(root: &Path, rel: &str) -> Prerequisite {
                 (Ok(p), Ok(r)) => p.starts_with(r),
                 _ => false,
             };
-            if !inside {
+            if !inside && (!m.file_type().is_symlink() || path.canonicalize().is_ok()) {
                 Some("outside the target")
             } else if m.file_type().is_symlink() {
                 Some("a symbolic link, not a regular file")
@@ -352,6 +352,13 @@ mod tests {
         assert_eq!(
             observed(&at()),
             (false, format!("{rel}: outside the target"))
+        );
+        std::fs::remove_file(root.join(rel)).unwrap();
+
+        std::os::unix::fs::symlink(root.join("scripts/missing.sh"), root.join(rel)).unwrap();
+        assert_eq!(
+            observed(&at()),
+            (false, format!("{rel}: a symbolic link, not a regular file"))
         );
         std::fs::remove_file(root.join(rel)).unwrap();
 

@@ -76,7 +76,7 @@ pub fn parse(bytes: &[u8], path: &str) -> Result<Document, String> {
             "unknown schema; this build reads `{SCHEMA}` only"
         )));
     }
-    let Some(profile) = map["profile"].as_str().filter(|p| !p.is_empty()) else {
+    let Some(profile) = map["profile"].as_str().filter(|p| !p.trim().is_empty()) else {
         return Err(refuse("`profile` must be a profile id".to_string()));
     };
     let serde_json::Value::Object(parameters) = &map["parameters"] else {
