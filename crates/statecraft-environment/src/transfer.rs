@@ -1098,6 +1098,7 @@ fn expected_digest(manifest: &Manifest, record: &TransferRecord) -> Option<Strin
 fn resulting_entry(
     ctx: &Context<'_>,
     path: &str,
+    from: Ownership,
     to: Ownership,
     digest: &str,
     bytes: u64,
@@ -1116,6 +1117,15 @@ fn resulting_entry(
         }),
         Ownership::Managed => {
             if governance_contract_path(path) {
+                if from != Ownership::User {
+                    return refuse(
+                        RefusalKind::MoveNotAdmitted,
+                        format!(
+                            "rule 1: governance path `{path}` can become managed only from user \
+                             ownership"
+                        ),
+                    );
+                }
                 return Ok(Some(ResultingEntry {
                     class: Class::Managed,
                     source: Source {
@@ -1210,7 +1220,7 @@ fn compute(
     }
     let opened = open_regular(ctx.root, path)?;
     check_alias(ctx, manifest, path, &opened)?;
-    let resulting = resulting_entry(ctx, path, to, &opened.digest, opened.bytes)?;
+    let resulting = resulting_entry(ctx, path, from, to, &opened.digest, opened.bytes)?;
     let entry = manifest.entry(path);
     let standing = Standing {
         class: current,

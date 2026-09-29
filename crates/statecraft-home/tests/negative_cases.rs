@@ -212,6 +212,37 @@ fn initialization_preserves_an_explicit_user_transfer_and_reversal_still_succeed
 }
 
 #[test]
+fn a_first_governance_transfer_to_managed_records_the_user_as_its_source() {
+    let sandbox = Sandbox::new();
+    let producer = conforming_producer();
+    let corpus = support::corpus_tool();
+    let probe = statecraft_environment::probe::CommandProbe {
+        git: "git".into(),
+        spec_spine: support::spec_spine_program(),
+    };
+    let authority = Unreachable::default();
+    let revisions = StaticRevision::default();
+    let h = harness!(sandbox, &producer, &corpus, &probe, &authority, &revisions);
+    h.execute(Operation::InitApply {
+        root: sandbox.project(),
+    });
+    let mut manifest = Manifest::read(&sandbox.project()).unwrap().unwrap();
+    manifest.remove("spec-spine.toml");
+    manifest.write(&sandbox.project()).unwrap();
+
+    transfer_governance(&sandbox, &producer, Ownership::User, Ownership::Managed);
+
+    let manifest = Manifest::read(&sandbox.project()).unwrap().unwrap();
+    assert!(matches!(
+        manifest.entry("spec-spine.toml").unwrap().transfer.as_ref(),
+        Some(statecraft_environment::manifest::Transfer {
+            from: statecraft_environment::claimant::Claimant::User { path },
+            ..
+        }) if path == "spec-spine.toml"
+    ));
+}
+
+#[test]
 fn initialization_recovers_only_the_exact_legacy_inferred_adoption() {
     let sandbox = Sandbox::new();
     let producer = conforming_producer();
