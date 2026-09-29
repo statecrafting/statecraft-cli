@@ -29,23 +29,23 @@
     "id": "027-observation-and-proposals",
     "implementation": "pending",
     "sectionDigests": {
-      "027-observation-and-proposals": "feac400e8899808fd3e7019499be9f934ca39f8868fc6ce07a74821a6b3a4eee",
+      "027-observation-and-proposals": "0cba68e02d9b95dcb082102f13c131dace1d7f385cfd5eeb4cb85a06d97c8ae5",
       "1-purpose": "e1d3a148568456365ab0ac3fc0d6a29db26dca4a2f4d1f9fb9ac4642ccc4360b",
       "2-territory": "dbb377aa34db80548a8ea8ec727be4659f33e35c6d35f296a3a4e98cc509806f",
       "3-1-an-observation-is-of-exactly-one-commit": "1fc320f1bf93415d575172c57d2edcdb156f1259693310b3009e68e2003a8c6f",
       "3-10-internal-seams": "b1e27aa03f78d97efb8567eb8cfef40eb28e6c68b06a70b79a7a1c11c560f47c",
-      "3-11-observable-negative-cases": "ebdf7f83b96f694f9f128970cb6a28d4e23478b77d475d2b3d72662bbd6e37fb",
+      "3-11-observable-negative-cases": "5c24a0871cd9985cd078e3b29e69a4cc92c9ae56c65c75585c9909db47414e01",
       "3-2-a-refused-observation-is-recorded-not-skipped": "f7694163d9af117a4ddbc1c1fb6186c43c09fcfa055313182d4a3cfd40945c81",
       "3-3-three-closed-projections": "37c78d234b9c1d44917a20d5f13943e6300699a7f9bb838947787b9df1b6d19c",
-      "3-4-subscriptions-are-built-in-and-closed": "2adff96e1ceef63cd31010fc48031ab9755c55c6b0608733c79f14aa0110033f",
+      "3-4-subscriptions-are-built-in-and-closed": "bb1af49c04db497036121e7a9485542ccf6d7cdde7c498aafdfc9b9222f59036",
       "3-5-a-proposal-s-identity-is-its-cause-not-its-moment": "973d14586e73877c17645c3063b33e10e252b86689018046ea3e2802eacf0c71",
       "3-6-preconditions-are-re-derived-at-admission": "e78b928449fdce75c46a5ffc068222ada9973f1fe4d03b08b0fa68b7d49facd0",
       "3-7-the-run-record-names-its-cause": "1519170e80453ce34ee6069ce37b051ae6afd139b7a02d7ad00876e56237e828",
       "3-8-the-observation-chain": "35996bd14cff0b921f0c7b1cfa74b670416d35b58fe40294a3bc4a73d64c44a2",
       "3-9-verbs": "4c45939e7b9ac58e0f3d2d18d65f0969d31aa98e8a07dc43f6fca10540766bf2",
-      "3-behavior": "34d33287a07eef36a2a946cb4ce5e77c5c5b29bdf0e7d046af8dd3f99150528f",
+      "3-behavior": "a88dc837a56cb7cc1902ea24062447277cedcb16d76d5f8cb7c2e9b6550d42e3",
       "4-out-of-scope": "04328be2fd57e679d67f28298b135aa2288e7f09b468a9a35f697d0b7a17be00",
-      "5-resolved-decisions": "dec11752581ca07a5b73be347d194e760af741c087a24c9837649de7974fa2f7",
+      "5-resolved-decisions": "a6d7fc9892e4acaaa9df1ecdb7db0875c0c9e6384b0ac50a0d185c41501830c2",
       "verification": "56a1c76aa30baa5167277ba205008d1c657034622f3ce37b5817913a8e286f1e"
     },
     "sectionHeadings": [
@@ -73,6 +73,6 @@
     "summary": "Adds the transition this product lacks between \"spec-spine says the repository means X\" and \"the operator is offered the work that follows\". One observation reads exactly one commit through spec-spine's existing structured reports, reduces the answers to three closed projections, and compares them with the last observation recorded for that repository. Each semantic transition a built-in subscription names becomes a proposal with a deterministic identity, recorded in an append-only chain in the product home. A proposal is never executed by this spec: the operator admits it, admission re-derives its preconditions against the current commit, and an admitted proposal enters spec 003's existing run path with its cause recorded in the attempt's intent. No watcher, no loop, no automatic admission, and no change to spec-spine.\n",
     "title": "Observation and proposals: noticing that a repository's governed truth changed, and proposing typed work without acting on it"
   },
-  "shardHash": "bf897748e09a44f943f30db69ef05b1b297ebb827e3372074aaed20e9ac2f86f",
+  "shardHash": "869e4dcbbfe0d93d1e9ceda5a611c1b8518c567bc8aadf06703032d016a92afb",
   "specVersion": "1.9.0"
 }

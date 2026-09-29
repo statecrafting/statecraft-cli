@@ -209,7 +209,7 @@ of this spec, not of any repository:
 
 | Subscription | Transition | Proposal kind |
 |---|---|---|
-| `eligible-work` | `work-eligibility` `entered` with a `contract-identity` digest, or `contract-identity` `contract-moved` from `unavailable` to a digest for a spec still `eligible` | `run` for that spec |
+| `eligible-work` | `work-eligibility` `entered` with a `contract-identity` digest, or `contract-identity` `contract-moved` to a digest (from `unavailable` or from another digest) | `run` for that spec |
 | `withdrawn-work` | `work-eligibility` `exited` | `notice`, naming the reason and every open `run` proposal for that spec |
 | `moved-contract` | `contract-identity` `contract-moved` from a digest (to another digest or to `unavailable`) | `notice`, naming every open `run` proposal and every live or unaccepted attempt bound to the earlier digest |
 | `corpus-refusal` | `corpus-state` `corpus-changed` into `refused` | `notice`, naming spec-spine's class and message |
@@ -466,6 +466,9 @@ contract there.
 | The process dies after the attempt intent and before `disposed` | Recovery disposes `admitted`, naming the run found by the intent's proposal member. |
 | Two `observe` invocations on one repository at once | The second is refused, exit 2, naming the held observation lock. |
 | The chain's tail is torn | Read to the last complete entry, the torn tail reported, appended after. |
+| A read-only verb meets a torn tail | Reads to the last complete entry and reports the incomplete tail without interpreting it: it holds no lock, so the tail may be a live write in progress. It repairs nothing; the next writer, under the lock, reports and appends after it. Exit 0. |
+| An open `run` proposal's contract moves to another digest | A new `run` proposal under the new digest supersedes it, and the `moved-contract` notice names it. |
+| An open `run` proposal's contract becomes `unavailable` | It stays `open`, named by the `moved-contract` notice; admitting it is `stale`, and it is superseded when a digest appears. |
 | A target file declaring subscriptions | Ignored as a subscription source; the set of section 3.4 is the only one. |
 | Any file under `.statecraft/derived/` | Never opened by this crate. |
 
@@ -590,6 +593,12 @@ occurrence of a notice; a second occurrence of the same transition reopens it.
 This narrows the earlier entries: only `admitted` and `dismissed` stand
 against a recurrence. `moved-contract` fires only on a move away from a
 digest, because nothing can be bound to `unavailable`.
+
+**2026-09-29: a contract move to a digest proposes the new work.** Without
+it, a spec whose contract moved while eligible would keep only a proposal
+admission must refuse as `stale`. The new proposal supersedes the old one,
+which keeps one open `run` proposal per spec. A read-only verb never
+interprets or repairs a torn tail.
 
 ## Verification
 
