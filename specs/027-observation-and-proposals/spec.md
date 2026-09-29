@@ -108,9 +108,11 @@ would give one question two answers.
 
 ### 3.1 An observation is of exactly one commit
 
-An observation names a registered repository and a ref (default: the ref the
-operator checkout's `HEAD` resolves to) and resolves the ref to a commit id
-once, before anything else is read. Every later read in that observation is
+An observation names a registered repository and a ref (default: the branch
+the operator checkout's `HEAD` names, or its commit id when `HEAD` is
+detached) and resolves the ref to a commit id once, before anything else is
+read. The ref is recorded as named, beside the commit it resolved to, so that
+admission can observe the same ref again (section 3.6). Every later read in that observation is
 of that commit's tracked bytes.
 
 1. **The operator's checkout is never read as the observed tree.** The commit
@@ -140,12 +142,20 @@ of that commit's tracked bytes.
 spec-spine may decline to answer for the observed commit: the committed ledger
 is stale, the corpus does not validate, a claim is unresolved, or the pin is
 not met. The observation then records `refused` with spec-spine's own exit
-class and message, computes no projection, matches no subscription, and makes
-no proposal.
+class and message, computes no `work-eligibility` or `contract-identity`
+projection, and its only possible transition is the `corpus-state` one below.
 
-A refused observation does not replace the last *answered* observation as the
-comparison base. The next answered observation is compared with the last
-answered one, and the transition it reports spans the refusal. A repository
+`corpus-state` is the one projection a refused observation has, and it is
+compared with the **immediately preceding** recorded observation, answered or
+refused. So the first refusal after an answer is a `corpus-changed` transition
+into `refused`, which the `corpus-refusal` subscription (section 3.4) turns
+into a notice; a second refusal with the same class is no transition; and the
+first answer after a refusal is `corpus-changed` back to `answered`.
+
+For the other two projections, a refused observation does not replace the
+last *answered* observation as the comparison base. The next answered
+observation is compared with the last answered one, and the transition it
+reports spans the refusal. A repository
 that is briefly stale therefore never looks as if every spec left eligibility
 and re-entered it.
 
@@ -161,8 +171,11 @@ this spec.
 | `work-eligibility` | for every spec the plan report names as ready: `eligible`, or `excluded` with spec 003's reason | spec 003 section 3.1 join, via `statecraft-run::work::select` |
 | `contract-identity` | for every `eligible` row: the context-closure digest spec 003 section 3.1.3 binds an attempt to, or `unavailable` with spec-spine's reason | spec-spine `registry closure`, through spec 003's binding |
 
-A **transition** is computed by comparing a projection's value in two answered
-observations, keyed by spec id where the value is keyed:
+A **transition** is computed by comparing a projection's value in two
+observations, keyed by spec id where the value is keyed: for
+`work-eligibility` and `contract-identity`, the current answered observation
+and the last answered one before it; for `corpus-state`, the current
+observation and the one immediately before it (section 3.2):
 
 - `entered` (absent or `excluded` before, `eligible` now);
 - `exited` (`eligible` before, absent or `excluded` now), carrying the reason;
@@ -235,7 +248,8 @@ so its first cause and each later recurrence stay readable.
 A `run` proposal is admitted only by `proposal admit` (section 3.9), an
 operator act naming the operator and a reason. Admission:
 
-1. performs a fresh observation of the ref the proposal was observed on;
+1. performs a fresh observation of the ref recorded on the proposal's latest
+   `proposed` or `recurred` entry (section 3.8);
 2. refuses, writing the disposition `stale` with the differing value, when
    the fresh observation is `refused`, when the spec is not `eligible` in it,
    or when its closure digest differs from the proposal's;
@@ -276,9 +290,9 @@ Entry kinds, closed:
 
 | Kind | Carries |
 |---|---|
-| `observed` | observation id, input identity (section 3.1), commit, `answered` or `refused`, projection digests, and the transitions |
-| `proposed` | proposal id, kind, spec id, subscription, justifying row, observation id |
-| `recurred` | proposal id, observation id (section 3.5 rule 1) |
+| `observed` | observation id, input identity (section 3.1), the ref as named and the commit it resolved to, `answered` or `refused`, projection digests, and the transitions |
+| `proposed` | proposal id, kind, spec id, subscription, justifying row, observation id, ref |
+| `recurred` | proposal id, observation id, ref (section 3.5 rule 1) |
 | `admitting` | proposal id, fresh observation id, operator, reason |
 | `released` | proposal id, the `admitting` entry it ends, and one of `run-refused` (section 3.6) or `admission-interrupted` (crash analysis below); the proposal is `open` again, and it is not a disposition |
 | `disposed` | proposal id, one of `admitted` (with run id and attempt), `stale` (with the differing value), `dismissed` (operator, reason), `acknowledged` (operator), `superseded` (by which proposal) |
@@ -363,7 +377,7 @@ contract there.
 |---|---|
 | The ref does not resolve | Refused, exit 2, naming the ref. Nothing recorded. |
 | The target is not registered | Refused, exit 2, as every verb taking a target path refuses. |
-| spec-spine reports the observed commit's ledger stale | `refused` recorded with spec-spine's class; no projection; no proposal; exit 1. |
+| spec-spine reports the observed commit's ledger stale | `refused` recorded with spec-spine's class; no eligibility or contract projection; a `corpus-refusal` notice when the previous observation was answered or refused with another class, and no `run` proposal; exit 1. |
 | A report lacks a field a projection needs | Refused naming the field and version; nothing recorded; exit 2. |
 | An observation whose input identity equals the last one | `unchanged`, nothing recorded, exit 0. |
 | The operator checkout has uncommitted edits to a spec | Not observed. The observation is of the commit, and nothing is recorded about the working tree. |
@@ -438,6 +452,15 @@ the proposal admissible, which the closed dispositions could not express. A
 it is `open` again, and the next admission re-derives its preconditions.
 `contract-moved` covers a move to or from `unavailable`, so the
 `moved-contract` notice fires when a bound contract stops resolving.
+
+**2026-09-29: `corpus-state` compares with the previous observation, and the
+ref is recorded.** A refused observation has only the `corpus-state`
+projection, compared with the observation immediately before it, so
+`corpus-refusal` fires on the first refusal and not again until an answer
+intervenes. The ref is not in the input identity, because the same commit
+reached by two refs is the same answer, but it is recorded on `observed`,
+`proposed` and `recurred`, and admission re-observes the ref of the
+proposal's latest cause.
 ## Verification
 
 ```verify:cli
