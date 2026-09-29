@@ -235,9 +235,12 @@ Consequences, each intended:
 
 1. The same semantic fact reached by different commits (a documentation-only
    commit between two observations, a rebase that preserves the corpus) yields
-   the same proposal id, and the second one is not recorded again.
+   the same proposal id, and it is not proposed again: the second observation
+   writes `recurred` against the proposal already made.
 2. A spec that exits and re-enters eligibility under **the same** contract
-   yields the same id. If that proposal was `admitted` or `dismissed` (a
+   yields the same id. If that proposal is still `open`, the recurrence is
+   recorded as `recurred` and the proposal stays `open`, so its latest ref is
+   the one admission re-observes (section 3.6). If it was `admitted` or `dismissed` (a
    `notice`: `acknowledged`), the earlier disposition stands and nothing new
    is proposed: the same work under the same contract was already decided. If
    it was `stale` or `superseded`, nobody decided the work; the recurrence is
@@ -506,6 +509,10 @@ contains an observation, so the observation operation requires a held lock
 instead of taking one; `observe show` takes the same `--ref` and default as
 `observe`, so "the ref" in it is never a guess.
 
+**2026-09-29: every recurrence of an open or reopened proposal writes
+`recurred`.** Only a decided proposal (`admitted`, `dismissed`,
+`acknowledged`) records nothing on recurrence; an `open` one records the
+recurrence, which keeps the ref admission re-observes current.
 ## Verification
 
 ```verify:cli
