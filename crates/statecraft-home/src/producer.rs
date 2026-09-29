@@ -9,9 +9,10 @@
 //! option (spec 018 section 3.3, amending spec 009's call): the returned
 //! `spec-spine.toml` carries `[meta] required_version = "=<linked version>"`.
 //! The unpinned `scaffold_init_json` stays the producer's default for other
-//! consumers; this product no longer asks for it. It returns the existing serialized `Scaffold` files-as-data shape with the
-//! existing `ScaffoldFile` fields, performs no write and discovers no
-//! environment. This product owns the reconciliation and every filesystem
+//! consumers; this product no longer asks for it.
+//!
+//! The call returns the serialized `Scaffold` files-as-data shape with its
+//! `ScaffoldFile` fields, performs no write and discovers no environment. This product owns the reconciliation and every filesystem
 //! write. The removed `spec-spine init` command is not invoked, no governance
 //! template is vendored here, and there is no fallback installer built from old
 //! kit bytes.

@@ -395,7 +395,7 @@ pub fn usage(verb: crate::commands::Verb) -> &'static str {
         Verb::StartupQualify => " <path> <session-id> <capture-dir>",
         Verb::InitPlan => " <path> [--profile <id>] [--setup-input <file>] [--plan <identity>]",
         Verb::InitApply => {
-            " <path> [--profile <id>] [--setup-input <file> --plan <identity>] [--plan <identity>] [--verify-local]"
+            " <path> [--profile <id>] [--setup-input <file>] [--plan <identity>] [--verify-local] (--setup-input needs --plan)"
         }
         Verb::StartupShow => " <path> <run-id> [--attempt <n>]",
         Verb::StartupTrial => " <path> (--provider-session | --synthetic) [--deadline <seconds>]",
