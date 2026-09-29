@@ -588,9 +588,8 @@ recur.** `eligible-work` waits for a `contract-identity` digest, so no
 proposal exists that admission can only fail. Acknowledgment closes one
 occurrence of a notice; a second occurrence of the same transition reopens it.
 This narrows the earlier entries: only `admitted` and `dismissed` stand
-against a recurrence.
- `moved-contract` fires only on a move away from a digest,
-because nothing can be bound to `unavailable`.
+against a recurrence. `moved-contract` fires only on a move away from a
+digest, because nothing can be bound to `unavailable`.
 
 ## Verification
 
