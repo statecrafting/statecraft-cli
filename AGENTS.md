@@ -81,8 +81,8 @@ carrying `implementation`, so the join stays. What `draft` withholds is
 *ratification*, which is why an unratified spec's unresolved units warn instead
 of refusing.
 
-Fifteen of the seventeen active specs are ratified. Specs `007` and `024` remain
-drafts, so a plan row for either is a reading suggestion rather than a work order. Spec
+All seventeen active specs are ratified; the owner ratified `007` and `024` on
+2026-09-27. Spec
 `015` is approved with `implementation: in-progress` because its live
 permission experiment has no admitted result, which no local implementation
 work can supply. Check the `status` field, not the plan output.
