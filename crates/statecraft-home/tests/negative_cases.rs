@@ -17,15 +17,57 @@
 
 mod support;
 
-use statecraft_environment::manifest::{Enrollment, Manifest, Pins, Project};
+use statecraft_environment::adapter::StaticProbe;
+use statecraft_environment::claimant::ForeignClaims;
+use statecraft_environment::manifest::{
+    Class, Enrollment, Entry, Manifest, Pins, Project, Role, Source, SourceKind,
+};
+use statecraft_environment::transfer::{Act, Context, Ownership};
 use statecraft_home::authority::{Answer as ConfigAnswer, DEFER_TO_TEAM, Layer, StaticRevision};
 use statecraft_home::flow::{Outcome, Step};
+use statecraft_home::producer::Producer as _;
 use statecraft_home::service::{Answer, Operation, Severity};
 use statecraft_home::team::{SharedApproval, Stated, Unreachable};
 use statecraft_home::{bridge, delivery, derived, harness, home, project, resolved};
 use support::{FixedClock, Harness, Sandbox, StatedProbe, conforming_producer, init_report};
 
 const CLOCK: FixedClock = FixedClock(1_760_000_000);
+
+fn transfer_governance(
+    sandbox: &Sandbox,
+    producer: &dyn statecraft_home::producer::Producer,
+    from: Ownership,
+    to: Ownership,
+) -> String {
+    let producer = producer.identity().describe();
+    let probe = StaticProbe::new();
+    let foreign = ForeignClaims::none();
+    let context = Context {
+        root: &sandbox.project(),
+        producer: &producer,
+        declarations: &[],
+        probe: &probe,
+        foreign: &foreign,
+    };
+    let plan =
+        statecraft_environment::transfer::plan(&context, "spec-spine.toml", from, to).unwrap();
+    statecraft_environment::transfer::apply(
+        &context,
+        "spec-spine.toml",
+        from,
+        to,
+        &plan.plan_id,
+        &Act {
+            operator: "fixture",
+            reason: "test",
+        },
+        &CLOCK,
+    )
+    .unwrap()
+    .record()
+    .id
+    .clone()
+}
 
 /// A harness wired to the real corpus tool, a conforming producer, and no
 /// platform at all.
@@ -84,6 +126,250 @@ fn fresh_solo_initialization_with_no_platform_credential_completes() {
     assert!(sandbox.exists("spec-spine.toml"));
     assert!(sandbox.exists("standards/spec/constitution.md"));
     assert!(sandbox.exists("specs/000-bootstrap/spec.md"));
+}
+
+#[test]
+fn initialization_preserves_an_explicit_user_transfer_and_reversal_still_succeeds() {
+    let sandbox = Sandbox::new();
+    let producer = conforming_producer();
+    let corpus = support::corpus_tool();
+    let probe = statecraft_environment::probe::CommandProbe {
+        git: "git".into(),
+        spec_spine: support::spec_spine_program(),
+    };
+    let authority = Unreachable::default();
+    let revisions = StaticRevision::default();
+    let h = harness!(sandbox, &producer, &corpus, &probe, &authority, &revisions);
+
+    h.execute(Operation::InitApply {
+        root: sandbox.project(),
+    });
+    let released = transfer_governance(&sandbox, &producer, Ownership::Managed, Ownership::User);
+    let file = sandbox.read("spec-spine.toml").unwrap();
+    let journal = Manifest::read(&sandbox.project())
+        .unwrap()
+        .unwrap()
+        .transfers;
+
+    let plan_answer = h.execute(Operation::InitPlan {
+        root: sandbox.project(),
+    });
+    let plan = init_report(&plan_answer);
+    assert_eq!(plan.outcome, Outcome::Complete, "steps: {:#?}", plan.steps);
+    assert!(plan.mutations.is_empty());
+    assert!(
+        plan.kept
+            .iter()
+            .any(|item| item == "spec-spine.toml: user-transfer-preserved")
+    );
+    assert!(!plan.adopted.iter().any(|path| path == "spec-spine.toml"));
+    assert!(!plan.writes.iter().any(|path| path == "spec-spine.toml"));
+
+    let apply_answer = h.execute(Operation::InitApply {
+        root: sandbox.project(),
+    });
+    let applied = init_report(&apply_answer);
+    assert_eq!(
+        applied.outcome,
+        Outcome::Complete,
+        "steps: {:#?}",
+        applied.steps
+    );
+    assert_eq!(sandbox.read("spec-spine.toml").unwrap(), file);
+    let manifest = Manifest::read(&sandbox.project()).unwrap().unwrap();
+    assert_eq!(manifest.transfers, journal);
+    assert!(manifest.entry("spec-spine.toml").is_none());
+
+    let producer = producer.identity().describe();
+    let transfer_probe = StaticProbe::new();
+    let foreign = ForeignClaims::none();
+    let context = Context {
+        root: &sandbox.project(),
+        producer: &producer,
+        declarations: &[],
+        probe: &transfer_probe,
+        foreign: &foreign,
+    };
+    let reverted = statecraft_environment::transfer::revert(
+        &context,
+        &released,
+        &Act {
+            operator: "fixture",
+            reason: "test-revert",
+        },
+        &CLOCK,
+    )
+    .unwrap();
+    assert_eq!(reverted.word(), "reverted");
+}
+
+#[test]
+fn initialization_recovers_only_the_exact_legacy_inferred_adoption() {
+    let sandbox = Sandbox::new();
+    let producer = conforming_producer();
+    let corpus = support::corpus_tool();
+    let probe = statecraft_environment::probe::CommandProbe {
+        git: "git".into(),
+        spec_spine: support::spec_spine_program(),
+    };
+    let authority = Unreachable::default();
+    let revisions = StaticRevision::default();
+    let h = harness!(sandbox, &producer, &corpus, &probe, &authority, &revisions);
+
+    h.execute(Operation::InitApply {
+        root: sandbox.project(),
+    });
+    transfer_governance(&sandbox, &producer, Ownership::Managed, Ownership::User);
+    let file = sandbox.read("spec-spine.toml").unwrap();
+    let mut manifest = Manifest::read(&sandbox.project()).unwrap().unwrap();
+    let journal = manifest.transfers.clone();
+    manifest.upsert(Entry {
+        path: "spec-spine.toml".to_string(),
+        class: Class::Adopted,
+        source: Source {
+            kind: SourceKind::Template,
+            identity: statecraft_environment::transfer::GOVERNANCE_SOURCE.to_string(),
+        },
+        digest: statecraft_environment::digest::digest_bytes(file.as_bytes()),
+        bytes: file.len() as u64,
+        written_at: "2026-09-26T00:00:00Z".to_string(),
+        transfer: None,
+        role: Role::Reference,
+    });
+    manifest.write(&sandbox.project()).unwrap();
+    let corrupt = std::fs::read(sandbox.project().join(".statecraft/environment.json")).unwrap();
+
+    let plan_answer = h.execute(Operation::InitPlan {
+        root: sandbox.project(),
+    });
+    let plan = init_report(&plan_answer);
+    assert_eq!(plan.outcome, Outcome::Complete, "steps: {:#?}", plan.steps);
+    assert!(
+        plan.kept
+            .iter()
+            .any(|item| item == "spec-spine.toml: inferred-adoption-recovered")
+    );
+    assert!(plan.mutations.is_empty());
+    assert_eq!(
+        std::fs::read(sandbox.project().join(".statecraft/environment.json")).unwrap(),
+        corrupt,
+        "plan repaired the manifest on disk"
+    );
+
+    let apply_answer = h.execute(Operation::InitApply {
+        root: sandbox.project(),
+    });
+    let applied = init_report(&apply_answer);
+    assert_eq!(
+        applied.outcome,
+        Outcome::Complete,
+        "steps: {:#?}",
+        applied.steps
+    );
+    assert!(
+        applied
+            .kept
+            .iter()
+            .any(|item| item == "spec-spine.toml: inferred-adoption-recovered")
+    );
+    assert_eq!(sandbox.read("spec-spine.toml").unwrap(), file);
+    let repaired = Manifest::read(&sandbox.project()).unwrap().unwrap();
+    assert_eq!(repaired.transfers, journal);
+    assert!(repaired.entry("spec-spine.toml").is_none());
+}
+
+#[test]
+fn initialization_refuses_a_user_journal_disagreement_outside_the_legacy_signature() {
+    let sandbox = Sandbox::new();
+    let producer = conforming_producer();
+    let corpus = support::corpus_tool();
+    let probe = statecraft_environment::probe::CommandProbe {
+        git: "git".into(),
+        spec_spine: support::spec_spine_program(),
+    };
+    let authority = Unreachable::default();
+    let revisions = StaticRevision::default();
+    let h = harness!(sandbox, &producer, &corpus, &probe, &authority, &revisions);
+
+    h.execute(Operation::InitApply {
+        root: sandbox.project(),
+    });
+    transfer_governance(&sandbox, &producer, Ownership::Managed, Ownership::User);
+    let file = sandbox.read("spec-spine.toml").unwrap();
+    let mut manifest = Manifest::read(&sandbox.project()).unwrap().unwrap();
+    manifest.upsert(Entry {
+        path: "spec-spine.toml".to_string(),
+        class: Class::Adopted,
+        source: Source {
+            kind: SourceKind::Template,
+            identity: "some-other-source".to_string(),
+        },
+        digest: statecraft_environment::digest::digest_bytes(file.as_bytes()),
+        bytes: file.len() as u64,
+        written_at: "2026-09-26T00:00:00Z".to_string(),
+        transfer: None,
+        role: Role::Reference,
+    });
+    manifest.write(&sandbox.project()).unwrap();
+    let before = std::fs::read(sandbox.project().join(".statecraft/environment.json")).unwrap();
+
+    let answer = h.execute(Operation::InitPlan {
+        root: sandbox.project(),
+    });
+    let report = init_report(&answer);
+    assert_eq!(report.outcome, Outcome::Refused);
+    assert_eq!(answer.severity(), Severity::Refused);
+    assert_eq!(
+        std::fs::read(sandbox.project().join(".statecraft/environment.json")).unwrap(),
+        before,
+        "a refusing plan changed the manifest"
+    );
+}
+
+#[test]
+fn initialization_rewrites_a_deleted_released_governance_path_as_managed() {
+    let sandbox = Sandbox::new();
+    let producer = conforming_producer();
+    let corpus = support::corpus_tool();
+    let probe = statecraft_environment::probe::CommandProbe {
+        git: "git".into(),
+        spec_spine: support::spec_spine_program(),
+    };
+    let authority = Unreachable::default();
+    let revisions = StaticRevision::default();
+    let h = harness!(sandbox, &producer, &corpus, &probe, &authority, &revisions);
+
+    h.execute(Operation::InitApply {
+        root: sandbox.project(),
+    });
+    transfer_governance(&sandbox, &producer, Ownership::Managed, Ownership::User);
+    let journal = Manifest::read(&sandbox.project())
+        .unwrap()
+        .unwrap()
+        .transfers;
+    std::fs::remove_file(sandbox.project().join("spec-spine.toml")).unwrap();
+
+    let answer = h.execute(Operation::InitApply {
+        root: sandbox.project(),
+    });
+    let report = init_report(&answer);
+    assert_eq!(
+        report.outcome,
+        Outcome::Complete,
+        "steps: {:#?}",
+        report.steps
+    );
+    let manifest = Manifest::read(&sandbox.project()).unwrap().unwrap();
+    let entry = manifest.entry("spec-spine.toml").unwrap();
+    assert_eq!(entry.class, Class::Managed);
+    assert_eq!(entry.source.kind, SourceKind::Template);
+    assert_eq!(
+        entry.source.identity,
+        statecraft_environment::transfer::GOVERNANCE_SOURCE
+    );
+    assert!(entry.transfer.is_none());
+    assert_eq!(manifest.transfers, journal);
+    assert!(statecraft_environment::transfer::disagreements(&manifest).is_empty());
 }
 
 // Row: `init apply` on an unarmed, unregistered project registers and

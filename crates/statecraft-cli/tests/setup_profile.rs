@@ -201,60 +201,6 @@ impl Fixture {
         (out.status.code().unwrap(), report, text)
     }
 
-    fn transfer(&self, from: &str, to: &str) -> String {
-        let root = self.project().display().to_string();
-        let plan = self.cli(
-            &[
-                "transfer",
-                "plan",
-                &root,
-                "spec-spine.toml",
-                from,
-                to,
-                "--json",
-            ],
-            &[],
-        );
-        assert_eq!(
-            plan.status.code(),
-            Some(0),
-            "{}",
-            String::from_utf8_lossy(&plan.stdout)
-        );
-        let plan: serde_json::Value = json_naming::from_output(&plan.stdout).unwrap();
-        let identity = json_naming::payload(&plan)["plan_id"]
-            .as_str()
-            .unwrap()
-            .to_string();
-        let applied = self.cli(
-            &[
-                "transfer",
-                "apply",
-                &root,
-                "spec-spine.toml",
-                from,
-                to,
-                &identity,
-                "fixture",
-                "profile-test",
-                "--json",
-            ],
-            &[],
-        );
-        assert_eq!(
-            applied.status.code(),
-            Some(0),
-            "{}{}",
-            String::from_utf8_lossy(&applied.stdout),
-            String::from_utf8_lossy(&applied.stderr)
-        );
-        let applied: serde_json::Value = json_naming::from_output(&applied.stdout).unwrap();
-        json_naming::payload(&applied)["record"]["id"]
-            .as_str()
-            .unwrap()
-            .to_string()
-    }
-
     /// Every file under the project outside `.git`, `target` and the runtime
     /// state, with its digest.
     fn walk(&self) -> BTreeMap<String, String> {
@@ -496,84 +442,6 @@ fn a_repeat_apply_changes_no_project_file() {
     assert!(project_mutations.is_empty(), "{project_mutations:?}");
 }
 
-#[test]
-fn the_current_revision_applies_and_converges_while_a_governance_path_stays_user() {
-    let f = Fixture::new();
-    let (exit, _, text) = f.init("apply", &[]);
-    assert_eq!(exit, 0, "{text}");
-    f.transfer("adopted", "user");
-    let file = std::fs::read(f.at("spec-spine.toml")).unwrap();
-    let manifest: serde_json::Value =
-        serde_json::from_slice(&std::fs::read(f.at(".statecraft/environment.json")).unwrap())
-            .unwrap();
-    let journal = serde_json::to_vec(&manifest["transfers"]).unwrap();
-
-    let before_plan = f.walk();
-    let (exit, plan, text) = f.init("plan", &["--profile", PROFILE]);
-    assert_eq!(exit, 0, "{text}");
-    assert_eq!(f.walk(), before_plan, "plan changed a project file");
-    assert!(
-        plan["kept"]
-            .as_array()
-            .unwrap()
-            .iter()
-            .any(|item| item == "spec-spine.toml: user-transfer-preserved")
-    );
-    assert_eq!(plan["setup"]["revision"], statecraft_home::setup::REVISION);
-    let identity = plan["setup"]["planIdentity"].as_str().unwrap().to_string();
-
-    let (exit, applied, text) = f.init("apply", &["--profile", PROFILE, "--plan", &identity]);
-    assert_eq!(exit, 0, "{text}");
-    assert_eq!(applied["outcome"], "complete", "{text}");
-    assert!(
-        applied["kept"]
-            .as_array()
-            .unwrap()
-            .iter()
-            .any(|item| item == "spec-spine.toml: user-transfer-preserved")
-    );
-    assert_eq!(std::fs::read(f.at("spec-spine.toml")).unwrap(), file);
-    let manifest: serde_json::Value =
-        serde_json::from_slice(&std::fs::read(f.at(".statecraft/environment.json")).unwrap())
-            .unwrap();
-    assert_eq!(serde_json::to_vec(&manifest["transfers"]).unwrap(), journal);
-    assert_eq!(
-        manifest["project"]["setup"]["revision"],
-        statecraft_home::setup::REVISION
-    );
-
-    let converged = f.walk();
-    let (exit, second_plan, text) = f.init("plan", &[]);
-    assert_eq!(exit, 0, "{text}");
-    assert_eq!(f.walk(), converged, "second plan changed a project file");
-    let (exit, repeated_plan, text) = f.init("plan", &[]);
-    assert_eq!(exit, 0, "{text}");
-    assert_eq!(
-        repeated_plan["setup"]["planIdentity"],
-        second_plan["setup"]["planIdentity"]
-    );
-    assert_eq!(f.walk(), converged, "repeated plan changed a project file");
-    for file in second_plan["setup"]["files"].as_array().unwrap() {
-        assert!(
-            file["action"] == "unchanged" || file["action"] == "left-alone",
-            "{file}"
-        );
-    }
-
-    let (exit, second_apply, text) = f.init("apply", &[]);
-    assert_eq!(exit, 0, "{text}");
-    for mutation in second_apply["mutations"].as_array().unwrap() {
-        assert!(
-            mutation["category"] != "project"
-                || mutation["path"]
-                    .as_str()
-                    .is_some_and(|path| path.ends_with("build-meta.json")),
-            "{mutation}"
-        );
-    }
-    assert_eq!(f.walk(), converged, "second apply changed a project file");
-}
-
 /// Whether a directory's permission bits stop this process writing in it
 /// (they do not for root).
 fn permissions_refuse(dir: &Path) -> bool {
@@ -584,23 +452,11 @@ fn permissions_refuse(dir: &Path) -> bool {
 fn an_interrupted_apply_resumes_to_the_same_tree() {
     // The uninterrupted reference.
     let reference = Fixture::new();
-    let (exit, _, text) = reference.init("apply", &[]);
-    assert_eq!(exit, 0, "{text}");
-    reference.transfer("adopted", "user");
     let (exit, _, text) = reference.init("apply", &["--profile", PROFILE]);
     assert_eq!(exit, 0, "{text}");
 
     // Interrupted after its second write: the scripts directory refuses.
     let f = Fixture::new();
-    let (exit, _, text) = f.init("apply", &[]);
-    assert_eq!(exit, 0, "{text}");
-    f.transfer("adopted", "user");
-    let governance = std::fs::read(f.at("spec-spine.toml")).unwrap();
-    let manifest_before = std::fs::read(f.at(".statecraft/environment.json")).unwrap();
-    let journal_before = {
-        let manifest: serde_json::Value = serde_json::from_slice(&manifest_before).unwrap();
-        serde_json::to_vec(&manifest["transfers"]).unwrap()
-    };
     let scripts = f.at("scripts/statecraft");
     std::fs::create_dir_all(&scripts).unwrap();
     std::fs::set_permissions(&scripts, std::fs::Permissions::from_mode(0o555)).unwrap();
@@ -616,23 +472,14 @@ fn an_interrupted_apply_resumes_to_the_same_tree() {
         "the resume record stays"
     );
     assert!(f.at(".github/workflows/statecraft-ci.yml").exists());
-    assert_eq!(
-        std::fs::read(f.at(".statecraft/environment.json")).unwrap(),
-        manifest_before,
-        "the existing manifest changed before the manifest-write step"
+    assert!(
+        !f.at(".statecraft/environment.json").exists(),
+        "the manifest is written last"
     );
-    assert_eq!(std::fs::read(f.at("spec-spine.toml")).unwrap(), governance);
     std::fs::set_permissions(&scripts, std::fs::Permissions::from_mode(0o755)).unwrap();
 
     let (exit, report, text) = f.init("apply", &["--profile", PROFILE]);
     assert_eq!(exit, 0, "{text}");
-    assert!(
-        report["kept"]
-            .as_array()
-            .unwrap()
-            .iter()
-            .any(|item| item == "spec-spine.toml: user-transfer-preserved")
-    );
     assert_eq!(
         setup_file(&report, ".github/workflows/statecraft-ci.yml")["action"],
         "resumed"
@@ -675,14 +522,6 @@ fn an_interrupted_apply_resumes_to_the_same_tree() {
             .collect()
     };
     assert_eq!(entries(&f), entries(&reference));
-    assert_eq!(std::fs::read(f.at("spec-spine.toml")).unwrap(), governance);
-    let manifest: serde_json::Value =
-        serde_json::from_slice(&std::fs::read(f.at(".statecraft/environment.json")).unwrap())
-            .unwrap();
-    assert_eq!(
-        serde_json::to_vec(&manifest["transfers"]).unwrap(),
-        journal_before
-    );
 }
 
 #[test]
