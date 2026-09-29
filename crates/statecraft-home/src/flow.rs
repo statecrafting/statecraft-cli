@@ -1827,8 +1827,11 @@ fn perform_writes(
     let identity = producer.identity().describe();
     for write in &computed.writes {
         let target = resolve(root, &write.path);
-        let released_rewrite = statecraft_environment::transfer::latest(manifest, &write.path)
-            .is_some_and(|record| record.to == statecraft_environment::transfer::Ownership::User);
+        let released_rewrite =
+            statecraft_environment::transfer::governance_contract_path(&write.path)
+                && statecraft_environment::transfer::latest(manifest, &write.path).is_some_and(
+                    |record| record.to == statecraft_environment::transfer::Ownership::User,
+                );
         let entry = Entry {
             path: write.path.clone(),
             class: Class::Managed,

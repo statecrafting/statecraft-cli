@@ -41,7 +41,7 @@ pub const GOVERNANCE_SOURCE: &str = "statecraft-governance";
 
 /// Whether `path` is one of the closed governance-template paths spec 002
 /// section 3.15 says this product can write as a file.
-fn governance_contract_path(path: &str) -> bool {
+pub fn governance_contract_path(path: &str) -> bool {
     matches!(
         path,
         "spec-spine.toml"
