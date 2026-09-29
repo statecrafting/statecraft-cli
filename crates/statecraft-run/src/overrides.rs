@@ -461,6 +461,10 @@ struct Scan {
 }
 
 fn scan(bytes: Vec<u8>, repository: &str) -> Scan {
+    let complete_len = bytes
+        .iter()
+        .rposition(|byte| *byte == b'\n')
+        .map_or(0, |i| i + 1);
     let text = String::from_utf8_lossy(&bytes).into_owned();
     let (complete, torn) = match text.rfind('\n') {
         Some(i) if i + 1 < text.len() => (&text[..=i], Some(text[i + 1..].to_string())),
@@ -473,7 +477,7 @@ fn scan(bytes: Vec<u8>, repository: &str) -> Scan {
         lines: Vec::new(),
         ends: Vec::new(),
         complete_lines: complete.lines().count() as u64,
-        complete_len: complete.len() as u64,
+        complete_len: complete_len as u64,
         torn,
         invalid: std::str::from_utf8(&bytes)
             .err()
@@ -1352,6 +1356,14 @@ mod tests {
 
     fn state(home: &Path, target: &Path) -> State {
         inspect(home, target).unwrap().state
+    }
+
+    #[test]
+    fn scan_measures_complete_lines_in_raw_bytes() {
+        let found = scan(vec![0xff, b'\n', b'x'], "/fixture/a");
+        assert!(found.invalid.is_some());
+        assert_eq!(found.complete_len, 2);
+        assert_eq!(found.torn.as_deref(), Some("x"));
     }
 
     #[test]
