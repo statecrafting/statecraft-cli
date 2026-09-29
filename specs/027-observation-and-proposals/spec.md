@@ -35,6 +35,9 @@ depends_on:
   # spec 005 records it.
   - "005-acceptance-and-evidence"
   - "006-command-surface"
+  # Section 3.9: every verb answers `--json` in the family envelope and tells
+  # refusals apart by its class.
+  - "007-family-envelope"
 ---
 
 # 027: Observation and proposals
@@ -109,7 +112,7 @@ would give one question two answers.
 ### 3.1 An observation is of exactly one commit
 
 An observation names a registered repository and a ref (default: the branch
-the operator checkout's `HEAD` names, or its commit id when `HEAD` is
+the operator's checkout has as `HEAD`, or its commit id when `HEAD` is
 detached) and resolves the ref to a commit id once, before anything else is
 read. The ref is recorded as named, beside the commit it resolved to, so that
 admission can observe the same ref again (section 3.6). Every later read in that observation is
@@ -151,6 +154,10 @@ refused. So the first refusal after an answer is a `corpus-changed` transition
 into `refused`, which the `corpus-refusal` subscription (section 3.4) turns
 into a notice; a second refusal with the same class is no transition; and the
 first answer after a refusal is `corpus-changed` back to `answered`.
+A repository's first observation has no predecessor, so if it is refused it
+is no transition and makes no notice; the refusal is reported by the exit
+code and recorded on its `observed` entry, and the next refusal with another
+class, or the next answer, is compared with it.
 
 For the other two projections, a refused observation does not replace the
 last *answered* observation as the comparison base. The next answered
@@ -432,7 +439,7 @@ contract there.
 | spec-spine reports the observed commit's ledger stale | `refused` recorded with spec-spine's class; no eligibility or contract projection; a `corpus-refusal` notice when the previous observation was answered or refused with another class, and no `run` proposal; exit 1. |
 | A report lacks a field a projection needs | Refused naming the field and version; nothing recorded; exit 2. |
 | An observation whose input identity equals the last one | `unchanged`, nothing recorded, exit 0. |
-| The operator checkout has uncommitted edits to a spec | Not observed. The observation is of the commit, and nothing is recorded about the working tree. |
+| The operator's checkout has uncommitted edits to a spec | Not observed. The observation is of the commit, and nothing is recorded about the working tree. |
 | A refused observation between two answered ones | The transition spans the refusal; no spec is reported as having exited and re-entered. |
 | The same eligibility reached by two commits | One proposal; the second observation writes `recurred`. |
 | A spec re-enters eligibility under the same contract after its proposal was dismissed | No new proposal; the dismissal stands and is named. |
@@ -555,6 +562,10 @@ can be told from a live admission.
 **2026-09-29: an initial transition cites no `delta`, and the closing verbs
 exit 0.** The first observation has no second commit to compare, so
 `proposal show` names it `initial` instead of inventing a base.
+
+**2026-09-29: a first refused observation makes no notice.** A notice reports
+a change, and the first observation has nothing to change from; its refusal
+is already the verb's exit and the chain's record.
 
 ## Verification
 

@@ -4,7 +4,8 @@
       "001-boundaries-and-authority",
       "003-work-and-run-semantics",
       "005-acceptance-and-evidence",
-      "006-command-surface"
+      "006-command-surface",
+      "007-family-envelope"
     ],
     "implementingPaths": [
       {
@@ -48,5 +49,5 @@
     "specStatus": "draft"
   },
   "schemaVersion": "1.2.0",
-  "shardHash": "4f4c78da049385d61a9581191fde9af8a37c298ba12bc5eb77ad639e2092105d"
+  "shardHash": "afd93b6630562d681a5a4bac15ec87d0004e444a2c197c6b2278efe57d040f19"
 }
