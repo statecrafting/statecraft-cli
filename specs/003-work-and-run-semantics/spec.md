@@ -963,6 +963,14 @@ journal entry.
 workspace consumes `attest-ledger-core =0.1.0`; a Git revision is not a
 publishable dependency identity.
 
+**2026-09-29: a closure failure is read wherever the producer writes it.**
+From spec-spine 0.28.0 (its spec 152), `registry closure --json` answers a
+failure with the family envelope on stdout and nothing on stderr. Read by
+stderr alone, a stale ledger became an unresolved member and a pin refusal
+became stale. When stderr is empty and stdout is an envelope, the words read
+are `error.message` with the `spec-spine: ` prefix the stderr line carried, so
+section 3.1.3's states are decided by the same words under every release.
+
 ## Verification
 
 Each line is one command. §3.8's twenty-two rows are integration tests named after

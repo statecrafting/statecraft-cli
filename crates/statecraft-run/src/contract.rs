@@ -172,13 +172,43 @@ impl ContractSource for SpecSpineCli {
     }
 }
 
+/// The producer's words about an answer that is not a closure.
+///
+/// Up to 0.27.0 they are on stderr and stdout is empty. From 0.28.0 (its spec
+/// 152) a `--json` read answers a failure with the family envelope on stdout
+/// and nothing on stderr, and `error.message` is the stderr line without its
+/// `spec-spine: ` prefix, so the prefix is restored and the words read the
+/// same under every release (spec 003 section 5, 2026-09-29).
+fn producer_words(stdout: &[u8], stderr: &[u8]) -> Vec<u8> {
+    if !String::from_utf8_lossy(stderr).trim().is_empty() {
+        return stderr.to_vec();
+    }
+    #[derive(Deserialize)]
+    struct Envelope {
+        error: Failure,
+    }
+    #[derive(Deserialize)]
+    struct Failure {
+        message: String,
+    }
+    match serde_json::from_slice::<Envelope>(stdout) {
+        Ok(e) => format!("spec-spine: {}", e.error.message).into_bytes(),
+        Err(_) => stderr.to_vec(),
+    }
+}
+
 /// Read one `registry closure` answer by its exit code and bytes.
 ///
 /// Under either of spec-spine's exit tables (spec 003 section 5, 2026-09-25):
 /// below 0.26.0 a stale ledger is 2 and a pin not met 3; from 0.26.0 a stale
 /// ledger is 1, beside a member that does not resolve, and a refusal to judge
-/// is 2. The producer's words say which.
+/// is 2. The producer's words say which, wherever the release put them.
 pub fn interpret(code: Option<i32>, stdout: &[u8], stderr: &[u8]) -> Resolution {
+    let failure = match code {
+        Some(0) => Vec::new(),
+        _ => producer_words(stdout, stderr),
+    };
+    let stderr = failure.as_slice();
     let words = String::from_utf8_lossy(stderr);
     match code {
         Some(1) if names_stale_only(&words) => Resolution::Stale {
@@ -522,6 +552,55 @@ mod tests {
         assert!(matches!(
             interpret(None, b"", b""),
             Resolution::Unreadable { .. }
+        ));
+    }
+
+    // Recorded 2026-09-29 from the published 0.28.0 over a clone of this
+    // repository: each failure is the family envelope on stdout and nothing on
+    // stderr (spec-spine's 152). Read by stderr alone, the stale ledger was an
+    // unresolved member and the pin refusal was stale.
+    #[test]
+    fn a_failure_answered_as_an_envelope_on_stdout_reads_as_itself() {
+        let stale = br#"{
+  "error": {
+    "kind": "stale",
+    "message": "index is stale: expected content-hash 19 shard(s) matching the corpus, got 1 stale shard(s):\n  modified 003-work-and-run-semantics.json"
+  },
+  "exitCode": 1,
+  "outcome": "finding",
+  "schemaVersion": "1.1.0",
+  "summary": "index is stale: expected content-hash 19 shard(s) matching the corpus, got 1 stale shard(s):\n  modified 003-work-and-run-semantics.json",
+  "tool": "spec-spine",
+  "verb": "registry.closure"
+}"#;
+        match interpret(Some(1), stale, b"") {
+            Resolution::Stale { detail } => assert!(
+                detail.starts_with("spec-spine: index is stale:"),
+                "{detail}"
+            ),
+            other => panic!("a stale ledger read as {other:?}"),
+        }
+        let refused = br#"{"error":{"kind":"refused","message":"refused: this repository requires spec-spine =0.1.0 (spec-spine.toml [meta] required_version); running 0.28.0. Install the required version, or change the pin deliberately"},"exitCode":2,"outcome":"refused","schemaVersion":"1.1.0","summary":"refused","tool":"spec-spine","verb":"registry.closure"}"#;
+        assert!(matches!(
+            interpret(Some(2), refused, b""),
+            Resolution::Unreadable { .. }
+        ));
+        let config = br#"{"error":{"kind":"config","message":"config error: TOML parse error at line 134, column 2"},"exitCode":2,"outcome":"refused","schemaVersion":"1.1.0","summary":"config error","tool":"spec-spine","verb":"registry.closure"}"#;
+        assert!(matches!(
+            interpret(Some(2), config, b""),
+            Resolution::Unreadable { .. }
+        ));
+        let not_found = br#"{"error":{"kind":"not-found","message":"not found: closure references that do not resolve: spec '999-nope': not found: spec '999-nope'"},"exitCode":1,"outcome":"finding","schemaVersion":"1.1.0","summary":"not found","tool":"spec-spine","verb":"registry.closure"}"#;
+        match interpret(Some(1), not_found, b"") {
+            Resolution::Unresolved { detail } => {
+                assert!(detail.contains("999-nope"), "{detail}")
+            }
+            other => panic!("an unresolved member read as {other:?}"),
+        }
+        // A stdout that is not an envelope leaves the words where they were.
+        assert!(matches!(
+            interpret(Some(1), b"not json", b""),
+            Resolution::Unresolved { .. }
         ));
     }
 
