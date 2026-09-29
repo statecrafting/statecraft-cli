@@ -337,6 +337,8 @@ SPINE
   case "$pinned" in
     ''|*[!0-9.]*) fail "the fixture's spec-spine.toml carries no exact X.Y.Z pin" ;;
   esac
+  grep -q "^  --version) echo 'spec-spine 0\.20\.0' ;;$" "$runbin/spec-spine" \
+    || fail "the fixture's spec-spine stub carries no version placeholder"
   sed "s/'spec-spine 0\.20\.0'/'spec-spine $pinned'/" "$runbin/spec-spine" >"$runbin/spec-spine.pinned" &&
     mv "$runbin/spec-spine.pinned" "$runbin/spec-spine"
   cat >"$runbin/claude" <<'FAKE'

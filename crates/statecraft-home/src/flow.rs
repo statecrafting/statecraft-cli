@@ -1331,24 +1331,6 @@ fn bound(
     document: Option<&crate::setup_input::Document>,
 ) -> crate::setup_input::Bound {
     let identity = ctx.producer.identity();
-    let mut scaffold = String::new();
-    // By path, so the digest is the scaffold's bytes and not the order the
-    // producer happened to return them in.
-    let mut files: Vec<&producer::ScaffoldFile> = starter.governance.iter().collect();
-    files.sort_by(|a, b| a.rel_path.cmp(&b.rel_path));
-    for f in files {
-        scaffold.push_str(&format!(
-            "{} {}\n",
-            f.rel_path,
-            digest_bytes(f.contents.as_bytes())
-        ));
-    }
-    if let Some(fragment) = &starter.ignore_fragment {
-        scaffold.push_str(&format!(
-            ".gitignore {}\n",
-            digest_bytes(fragment.as_bytes())
-        ));
-    }
     crate::setup_input::Bound {
         input: document.map_or_else(
             crate::setup_input::InputReport::absent,
@@ -1360,9 +1342,30 @@ fn bound(
         producer_version: identity.version.clone(),
         facts: vec![
             format!("producer {}", identity.describe()),
-            format!("scaffold {}", digest_bytes(scaffold.as_bytes())),
+            format!("scaffold {}", scaffold_digest(starter)),
         ],
     }
+}
+
+/// The pinned scaffold as path and content-digest rows. Sorting the complete
+/// set includes the synthetic `.gitignore` path and makes the identity
+/// independent of the order in which the producer returned governance files.
+fn scaffold_digest(starter: &producer::Starter) -> String {
+    let mut files: Vec<(&str, &str)> = starter
+        .governance
+        .iter()
+        .map(|file| (file.rel_path.as_str(), file.contents.as_str()))
+        .collect();
+    if let Some(fragment) = &starter.ignore_fragment {
+        files.push((".gitignore", fragment));
+    }
+    files.sort_by_key(|(path, _)| *path);
+
+    let mut scaffold = String::new();
+    for (path, contents) in files {
+        scaffold.push_str(&format!("{path} {}\n", digest_bytes(contents.as_bytes())));
+    }
+    digest_bytes(scaffold.as_bytes())
 }
 
 fn run(ctx: &Context<'_>, mode: Mode) -> Report {
@@ -2120,7 +2123,8 @@ pub fn digest_of(contents: &str) -> String {
 
 #[cfg(test)]
 mod tests {
-    use super::is_absent;
+    use super::{is_absent, scaffold_digest};
+    use crate::producer::{Conformance, Identity, ScaffoldFile, Starter};
     use std::path::Path;
 
     #[test]
@@ -2131,5 +2135,38 @@ mod tests {
 
         let error = is_absent(Path::new("\0")).unwrap_err();
         assert_ne!(error.kind(), std::io::ErrorKind::NotFound);
+    }
+
+    #[test]
+    fn scaffold_identity_sorts_the_ignore_fragment_with_governance_paths() {
+        let identity = Identity {
+            name: "recorded".to_string(),
+            version: "1.0.0".to_string(),
+        };
+        let starter = Starter {
+            governance: vec![ScaffoldFile {
+                rel_path: "Makefile".to_string(),
+                contents: "governance".to_string(),
+                overwrite: false,
+                executable: false,
+                append: false,
+                append_marker: None,
+            }],
+            ignore_fragment: Some("target/".to_string()),
+            out_of_contract: Vec::new(),
+            conformance: Conformance {
+                producer: identity,
+                conforming: true,
+                out_of_contract: Vec::new(),
+            },
+        };
+        let ignore = super::digest_bytes(b"target/");
+        let makefile = super::digest_bytes(b"governance");
+        let sorted = format!(".gitignore {ignore}\nMakefile {makefile}\n");
+
+        assert_eq!(
+            scaffold_digest(&starter),
+            super::digest_bytes(sorted.as_bytes())
+        );
     }
 }
