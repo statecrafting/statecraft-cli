@@ -479,3 +479,101 @@ own change.
 installs 0.26.0, the 22 shards are regenerated back, and `inputs.json` is
 removed. The readers from #159 and #161 stay, because they read both
 releases.
+
+### 2026-09-29: 0.28.0
+
+The owner decided on 2026-09-29 to adopt 0.28.0 as the next change, the
+recommended default after spec `007` section 3.4 left the `check` translation
+to this release. The CLI pin in `spec-spine.toml` and the linked
+`spec-spine-core` in the root `Cargo.toml` move together, as one producer
+identity. The producer's handoff is `statecraft-handoff-0.28.0.md`, released
+2026-09-26.
+
+*Identity.* Tag `v0.28.0` is annotated and signed. `git tag -v` reports a good
+ED25519 signature from the producer owner's key (`SHA256:h51+SsiQ…jEg`). The
+tag targets `854e5deaf968f4cfed95f2aed7275aa77c6b0398`, which is contained in
+the producer's `origin/main`.
+
+| Crate | Registry checksum (= downloaded `.crate`, = `Cargo.lock`, = handoff) |
+|---|---|
+| `spec-spine-cli` | `9556fc4f…6156b` |
+| `spec-spine-core` | `61f497d1…96a9` |
+| `spec-spine-types` | `da2fa877…c001f` |
+
+Each crate records `854e5dea` in `.cargo_vcs_info.json`, with no `dirty`
+flag, and each unpacked source equals `git archive v0.28.0`'s
+`crates/<crate>`, with `Cargo.toml.orig` equal to the tree's. `cargo install
+--locked` with rustc 1.96.0 gave `1324df82…5a08`.
+
+*The floor.* The `DEFAULT_BYPASS_PREFIXES` definition is byte-identical at
+`v0.27.0` and `v0.28.0`. Of the files that name it, one changed for another
+reason: `lib.rs` builds the `check --json` index report from the freshness
+report (spec-spine's 152).
+
+*Coupling.* `couple` gives the same exit code, the same checked-path count and
+the same text (apart from the version) under 0.27.0 and 0.28.0 over the
+twelve most recent merged ranges, `#149` to `#178` (3, 3, 5, 8, 32, 25, 11,
+14, 23, 3, 2 and 4 paths, oldest first). Each was run in its own clone with
+shards written by that version, in a commit that also unpins
+`spec-spine.toml`.
+
+*Exit codes and the text the hooks read.* On `check` and `check
+--fail-on-unresolved`, over a fresh, a stale, a hand-edited, an invalid, an
+unresolved (at `complete`), a mismatched-pin and an invalid-configuration
+tree, the exit codes and the whole output are byte-identical under both
+versions apart from the version string. Nothing in this product reads `check
+--json`, whose index half is the one `check` answer 0.28.0 changes.
+
+*What 0.28.0 changes that a reader here had to meet.* Every `--json` read now
+answers a failure with the family envelope on stdout and nothing on stderr
+(152 section 3.2). `registry closure --request - --json`, which spec `003`
+section 3.1.3 reads, was measured on a clone of this repository under both
+versions: a stale ledger (exit 1), a pin not met (exit 2) and a spec that does
+not resolve (exit 1) keep their exit codes and their words, which move from
+stderr to `error.message`. The reader decided by the stderr words alone, so
+under 0.28.0 it read the stale ledger as an unresolved member and the pin
+refusal as stale; the tests passed because they feed the reader 0.27.0's
+bytes. This change reads the envelope's message when stderr is empty (spec
+`003` section 5, 2026-09-29), with a test recorded from 0.28.0's answers. The
+other `--json` reads were checked: `registry list` and `registry plan` run
+only after `check` passed and a failure there already fails to parse; the
+hook's `config show --json` read discards a failure either way; `verify
+--json` and `verify --plan --json` are not among the seventeen reads 152
+changed.
+
+*The re-index.* The pin move rewrites one file,
+`.statecraft/derived/codebase-index/inputs.json`, whose `spec-spine.toml`
+content hash changes; no registry or index shard changes, because the registry
+(1.9.0) and index (1.2.0) schemas are unchanged. `registry plan --json` has
+the same keys and `lint --fail-on-warn` reports 0 warnings. Spec `003`'s
+decision entry then rewrites that spec's shards, as any edit does. The
+re-rendered environment moves only the two pins in
+`.statecraft/environment.json`; every rendered file is unchanged.
+
+*The library.* This product links `spec-spine-core` for `scaffold_init_json`
+only. `IndexCheckReport`'s new `unresolved_claims` field reaches no struct
+literal here. The declared toolchain floor stays 1.90, which
+`spec-spine-core` and `spec-spine-types` 0.28.0 declare: `cargo +1.90.0 build
+--workspace --locked` succeeds.
+
+*No impact, stated.* 147 refuses a `.statecraft` linked outside the
+repository; this repository's `.statecraft` is a directory and the product
+creates none as a link. 152 section 3.3 changes one `compact` message this
+product does not read. 148 to 151 and 154 are the producer's own tests,
+installer and sweep. Verdict schema `1.1.0` is MINOR and no reader here
+refuses it.
+
+*Evidence kinds, kept apart.* The producer's evidence is its release record
+and handoff. This repository's qualification is the identity, floor,
+coupling, exit, hook-text, closure, re-index and toolchain measurements above,
+plus `make gate` and `make code` against the pinned binary. Neither qualifies
+a bundle, which is not adopted.
+
+*What this does not do.* It does not replace 002 section 3.23's `check`
+translation, which still reads `check`'s human answer, unchanged in 0.28.0;
+reading the envelope instead is its own amendment of `002`, which spec `007`
+section 3.4 left to this release and which needs the owner's ratification.
+
+**Consequence if rejected.** Both pins return to `=0.27.0`, `make tools`
+installs 0.27.0, `inputs.json` and the environment pins are regenerated back.
+The closure reader stays, because it reads both releases.
