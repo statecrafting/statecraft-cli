@@ -234,9 +234,13 @@ Consequences, each intended:
    commit between two observations, a rebase that preserves the corpus) yields
    the same proposal id, and the second one is not recorded again.
 2. A spec that exits and re-enters eligibility under **the same** contract
-   yields the same id. If that proposal was admitted or dismissed, the
-   earlier disposition stands and nothing new is proposed: the same work under
-   the same contract was already decided.
+   yields the same id. If that proposal was `admitted` or `dismissed` (a
+   `notice`: `acknowledged`), the earlier disposition stands and nothing new
+   is proposed: the same work under the same contract was already decided. If
+   it was `stale` or `superseded`, nobody decided the work; the recurrence is
+   recorded as `recurred`, the proposal is `open` again, and an open `run`
+   proposal for the same spec under another contract is `superseded` by it
+   (section 3.8).
 3. A spec that re-enters under a **different** contract yields a new id,
    because the work it offers is not the same work.
 
@@ -348,8 +352,9 @@ envelope (spec 007), calls exactly one library operation, and follows spec
 Exit codes follow spec 006: `observe` exits 0 for `answered` or `unchanged`
 and 1 for `refused` (a finding about the target, not a failure of this
 product); `proposal admit` exits as `run` would when admitted, 1 when the
-disposition is `stale`, and 2 when spec 003 refuses; any verb that cannot write
-the chain exits 4.
+disposition is `stale`, and 2 when spec 003 refuses; a verb that finds the
+observation lock held is refused, exit 2, and writes nothing; a verb whose
+write to the chain fails exits 4.
 
 There is no verb that observes repeatedly, admits automatically, or admits more
 than one proposal. `proposal admit` is the operator naming one unit of work,
@@ -461,6 +466,14 @@ intervenes. The ref is not in the input identity, because the same commit
 reached by two refs is the same answer, but it is recorded on `observed`,
 `proposed` and `recurred`, and admission re-observes the ref of the
 proposal's latest cause.
+
+**2026-09-29: a stale or superseded proposal reopens on recurrence, and a held
+lock is a refusal.** Only `admitted`, `dismissed` and `acknowledged` are
+decisions about the work; a proposal made `stale` or `superseded` by the
+repository's movement is `open` again when its identity recurs. A held
+observation lock is exit 2, as section 3.11 states, and exit 4 is kept for a
+write that failed.
+
 ## Verification
 
 ```verify:cli
