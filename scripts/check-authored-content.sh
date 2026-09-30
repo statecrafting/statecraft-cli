@@ -126,6 +126,15 @@ SAMPLES
   expect 3 --identity HEAD
   expect 0 --text "$me"
 
+  # A failed findings-file write is an execution failure, even though both the
+  # shell and grep use status 1 for conditions that are otherwise nonfatal.
+  printf '%s\n' 'not a directory' > "$tmp/not-a-directory"
+  TMPDIR="$tmp/not-a-directory" "$me" --text "$tmp/clean file.txt" >/dev/null 2>&1
+  got=$?
+  if [ "$got" -ne 4 ]; then
+    echo "self-test: expected exit 4, got $got: unwritable findings path" >&2
+    failed=1
+  fi
   mkdir "$tmp/range repo" || exit 4
   (
     cd "$tmp/range repo" || exit 4
@@ -253,24 +262,30 @@ trap 'rm -f "$hits"' EXIT
 
 for ((i = 0; i < ${#files[@]}; i++)); do
   file=${files[$i]}
-  if LC_ALL=C grep -nI -F -- "$dash" "$file" > "$hits"; then
+  LC_ALL=C grep -nI -F -- "$dash" "$file" | tee "$hits" >/dev/null
+  scan_status=("${PIPESTATUS[@]}")
+  if [ "${scan_status[1]}" -ne 0 ] || [ "${scan_status[0]}" -gt 1 ]; then
+    echo "check-authored-content: could not scan $file" >&2
+    exit 4
+  elif [ "${scan_status[0]}" -eq 0 ]; then
     echo "U+2014 is refused in $file:" >&2
     sed 's/^/  /' "$hits" >&2
     echo "  Use a colon, semicolon, comma, parentheses, or two sentences." >&2
     status=1
-  elif [ "$?" -gt 1 ]; then
-    echo "check-authored-content: could not scan $file" >&2
-    exit 4
   fi
 
-  : > "$hits"
+  : > "$hits" || {
+    echo "check-authored-content: could not scan $file" >&2
+    exit 4
+  }
   while IFS= read -r pattern; do
     [ -n "$pattern" ] || continue
-    LC_ALL=C grep -niI -E -- "$pattern" "$file" >> "$hits"
-    [ "$?" -le 1 ] || {
+    LC_ALL=C grep -niI -E -- "$pattern" "$file" | tee -a "$hits" >/dev/null
+    scan_status=("${PIPESTATUS[@]}")
+    if [ "${scan_status[1]}" -ne 0 ] || [ "${scan_status[0]}" -gt 1 ]; then
       echo "check-authored-content: could not scan $file" >&2
       exit 4
-    }
+    fi
   done <<< "$attribution_patterns"
   if [ -s "$hits" ]; then
     echo "agent-session links and agent attribution are refused in $file:" >&2
