@@ -156,13 +156,13 @@ must include `apply-patch`, `commit`, `push`, `open-pull-request`, `publish`,
 No task may remove one of those prohibitions in version 1.
 
 The closed forbidden operation set is the authority for operation permission.
-The version 1 `publication: prohibited` member is a redundant, human-readable
-assertion of the required `publish` prohibition. During closed-schema decoding
-of raw task bytes, a missing `publish` prohibition or a publication value other
-than `prohibited` is malformed and refuses before spawn. No document with that
-disagreement is schema-valid. A later schema version may change both only by
-defining its own closed operation set and publication assertion together;
-neither field overrides the other.
+The required version 1 `publication: prohibited` member is a separate,
+human-readable assertion of the required `publish` prohibition. During
+closed-schema decoding of raw task bytes, a missing `publish` prohibition or a
+publication value other than `prohibited` is malformed and refuses before
+spawn. No document with that disagreement is schema-valid. A later schema
+version may change both only by defining its own closed operation set and
+publication assertion together; neither field overrides the other.
 
 `draft-artifact` permits result bytes only. `propose-patch` permits a patch as a
 result artifact, not a filesystem write. A path in `artifacts` is a logical
@@ -212,13 +212,15 @@ The result is a closed document with these required members:
 9. `reviewDisposition`, initially `not-reviewed`; and
 10. `acceptanceResult`, initially `not-attempted`.
 
-The last two members are Statecraft-defined schema sentinels carried in the raw
-provider result. The provider neither selects nor attests their values; any
-other value refuses schema validation. The raw provider result is immutable.
-Review and acceptance append separate records referring to its digest; they do
-not rewrite either sentinel. A projection may show the latest independent
-review and acceptance beside the provider document, but it must label their
-sources.
+The result schema delivered before spawn prescribes the last two members as
+constant literals. The provider emits those literals in its response; the
+adapter and supervisor neither inject nor rewrite them. They are
+Statecraft-defined schema sentinels carried in the raw provider result, not
+provider-selected review or acceptance testimony. Any other value refuses
+schema validation. The raw provider result is immutable. Review and acceptance
+append separate records referring to its digest; they do not rewrite either
+sentinel. A projection may show the latest independent review and acceptance
+beside the provider document, but it must label their sources.
 
 Every collection is present even when empty. Empty claims plus
 `claimed-complete` is representable and reviewable, not automatically valid.
@@ -240,11 +242,14 @@ Each claim contains exactly:
 | `contradictionRefs` | Ordered links to contradiction records. |
 | `reviewDisposition` | Initially `not-reviewed`. |
 
-The claim-level `reviewDisposition` is also a Statecraft-defined sentinel in
-the immutable raw result, not provider testimony. A later review record binds
-the result digest and identifies each reviewed `claimId` with its independent
-disposition. Projections join those records without rewriting the claim or its
-sentinel, and label unreviewed claims separately from claims a reviewer judged.
+The delivered result schema likewise prescribes claim-level
+`reviewDisposition` as the constant literal `not-reviewed`, which the provider
+emits without selecting a review judgment. The adapter and supervisor do not
+inject it. It is a Statecraft-defined sentinel in the immutable raw result, not
+provider testimony. A later review record binds the result digest and
+identifies each reviewed `claimId` with its independent disposition.
+Projections join those records without rewriting the claim or its sentinel,
+and label unreviewed claims separately from claims a reviewer judged.
 
 Lifecycle grades are assertions requiring support at that exact grade. A
 `released` claim is not satisfied by evidence of implementation, and an
