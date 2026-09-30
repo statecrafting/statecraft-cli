@@ -8,6 +8,7 @@
     "dependsOn": [
       "002-environment-lifecycle",
       "004-execution-adapter",
+      "006-command-surface",
       "008-harness-delivery"
     ],
     "implementingPaths": [
@@ -86,5 +87,5 @@
     "specStatus": "approved"
   },
   "schemaVersion": "1.2.0",
-  "shardHash": "c0abf9f889addf93a8470544521a19d5162e91512140458b240668f0d0a1c292"
+  "shardHash": "324f994fbe16982579365bb26b754915af551bed820cfffbdc970cd325b4060b"
 }

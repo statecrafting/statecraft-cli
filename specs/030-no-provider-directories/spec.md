@@ -32,6 +32,7 @@ extends:
 depends_on:
   - "002-environment-lifecycle"
   - "004-execution-adapter"
+  - "006-command-surface"
   - "008-harness-delivery"
 obligations:
   - id: "R-1"
@@ -53,7 +54,7 @@ obligations:
     inputs:
       - "crates/statecraft-cli/tests/no_provider_directories.rs"
       - "crates/statecraft-environment/tests/retirement.rs"
-      - "crates/statecraft-adapter-claude-code/src/environment.rs"
+      - "crates/statecraft-adapter-claude-code/tests/no_provider_directories.rs"
 ---
 
 # 030: No provider directories
@@ -241,5 +242,5 @@ fixture is a test adapter whose declaration shrinks between two applies.
 ```verify:cli
 cargo test -p statecraft-cli --test no_provider_directories
 cargo test -p statecraft-environment --test retirement
-cargo test -p statecraft-adapter-claude-code --lib environment
+cargo test -p statecraft-adapter-claude-code --test no_provider_directories
 ```
