@@ -15,8 +15,6 @@ amends:
   - "003-work-and-run-semantics"
   - "005-acceptance-and-evidence"
   - "006-command-surface"
-  - "019-context-packet-consumption"
-  - "020-documentation-task-and-result"
 extends:
   - { spec: "003-work-and-run-semantics", unit: { kind: directory, path: "crates/statecraft-run/" }, nature: additive }
   - { spec: "005-acceptance-and-evidence", unit: { kind: directory, path: "crates/statecraft-acceptance/" }, nature: additive }

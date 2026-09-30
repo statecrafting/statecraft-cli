@@ -3,9 +3,7 @@
     "amends": [
       "003-work-and-run-semantics",
       "005-acceptance-and-evidence",
-      "006-command-surface",
-      "019-context-packet-consumption",
-      "020-documentation-task-and-result"
+      "006-command-surface"
     ],
     "created": "2026-09-27",
     "dependsOn": [
@@ -119,6 +117,6 @@
     "summary": "Amends Statecraft's run, acceptance, and command contracts with an independent documentation-acceptance record. It keeps intended delivery, observed transport, schema validation, citation resolution, semantic review, and acceptance as separate facts; requires claim-grade support, preserved unknowns and contradictions, valid artifacts, and a fresh context manifest; and grants no application or publication authority.\n",
     "title": "Independent documentation acceptance and review"
   },
-  "shardHash": "652aa6d5b9082b65c5db26d745ee24184185e9c3c85830d0e4196faae9eee180",
+  "shardHash": "9c50b79edfd597bf342ff861301426f357923046492d384f2ee6642ba3a8f158",
   "specVersion": "1.9.0"
 }

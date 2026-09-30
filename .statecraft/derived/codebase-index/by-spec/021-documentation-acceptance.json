@@ -3,9 +3,7 @@
     "amends": [
       "003-work-and-run-semantics",
       "005-acceptance-and-evidence",
-      "006-command-surface",
-      "019-context-packet-consumption",
-      "020-documentation-task-and-result"
+      "006-command-surface"
     ],
     "dependsOn": [
       "003-work-and-run-semantics",
@@ -73,5 +71,5 @@
     "specStatus": "draft"
   },
   "schemaVersion": "1.2.0",
-  "shardHash": "652aa6d5b9082b65c5db26d745ee24184185e9c3c85830d0e4196faae9eee180"
+  "shardHash": "9c50b79edfd597bf342ff861301426f357923046492d384f2ee6642ba3a8f158"
 }
