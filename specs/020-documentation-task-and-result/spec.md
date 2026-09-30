@@ -202,10 +202,13 @@ The result is a closed document with these required members:
 9. `reviewDisposition`, initially `not-reviewed`; and
 10. `acceptanceResult`, initially `not-attempted`.
 
-The raw provider result is immutable. Review and acceptance append separate
-records referring to its digest; they do not rewrite either of the last two
-provider-returned fields. A projection may show the latest independent review
-and acceptance beside the provider document, but it must label their sources.
+The last two members are Statecraft-defined schema sentinels carried in the raw
+provider result. The provider neither selects nor attests their values; any
+other value refuses schema validation. The raw provider result is immutable.
+Review and acceptance append separate records referring to its digest; they do
+not rewrite either sentinel. A projection may show the latest independent
+review and acceptance beside the provider document, but it must label their
+sources.
 
 Every collection is present even when empty. Empty claims plus
 `claimed-complete` is representable and reviewable, not automatically valid.
