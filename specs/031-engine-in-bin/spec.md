@@ -45,11 +45,14 @@ obligations:
     anchor: "3-3-upgrade"
   - id: "V-1"
     kind: verification
-    text: "The revision-12 to revision-13 upgrade replaces the three templates that named `.tooling/bin`, and the resolver and hooks select `.bin/spec-spine`."
+    text: "The revision-12 to revision-13 upgrade replaces the three templates that named `.tooling/bin`, and spec-owned resolver and hook fixtures prove selection of `.bin/spec-spine`. The implementation adds the captured revision-12 fixture before this verification runs."
     anchor: "verification"
     inputs:
       - "crates/statecraft-home/tests/setup_upgrade.rs"
       - "crates/statecraft-home/tests/support/profile-r12/"
+      - "crates/statecraft-home/src/spec_spine.rs"
+      - "crates/statecraft-home/tests/harness_hooks.rs"
+      - "crates/statecraft-cli/tests/engine_in_bin.rs"
 ---
 
 # 031: The repository-local engine lives in .bin/
@@ -76,7 +79,10 @@ the resolver's repository-local candidate, the four delivered hooks, and tests
 under `crates/statecraft-home/` and `crates/statecraft-cli/`. It also moves this
 repository's own `Makefile`, `.gitignore`, `spec-spine.toml` exclusion and
 rendered profile files to revision 13, and the documents that state the
-location.
+location. Spec 023 is amended because its requirement names the contained
+copy's destination. The implementation unit that renders and tests that copy
+remains `crates/statecraft-home/`, owned by spec 002 and named by this spec's
+`extends` edge.
 
 ## 3. Behavior
 
@@ -141,9 +147,15 @@ install that could drift from the one CI runs.
 
 ## Verification
 
+The implementation first captures revision 12's changed template bytes under
+`tests/support/profile-r12/`, as earlier profile upgrades captured their
+predecessors. Spec 024's profile revision 12 is already implemented; its
+`implementation: in-progress` state records the separate live permission
+experiment and does not withhold those shipped template bytes.
+
 ```verify:cli
 cargo test -p statecraft-home --test setup_upgrade a_revision_twelve_project_upgrades_to_revision_thirteen
 cargo test -p statecraft-home --lib spec_spine
 cargo test -p statecraft-home --test harness_hooks contract_2
-cargo test -p statecraft-cli --test one_resolved_judge
+cargo test -p statecraft-cli --test engine_in_bin
 ```
