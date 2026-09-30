@@ -19,6 +19,10 @@
       {
         "path": "crates/statecraft-home/",
         "source": "spec-edge"
+      },
+      {
+        "path": "scripts/acceptance/managed-session.sh",
+        "source": "spec-edge"
       }
     ],
     "resolvedUnits": [
@@ -47,11 +51,24 @@
           "kind": "directory",
           "path": "crates/statecraft-home/"
         }
+      },
+      {
+        "locations": [
+          {
+            "file": "scripts/acceptance/managed-session.sh"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "scripts/acceptance/managed-session.sh"
+        }
       }
     ],
     "specId": "018-governed-bootstrap-inputs",
     "specStatus": "approved"
   },
   "schemaVersion": "1.2.0",
-  "shardHash": "1f9744ce7056758f12a227a7414a08a50f39c82044fd98494b66178137d1ec91"
+  "shardHash": "18967e896e80b29a7d65b725f92bc71de49ac21de13a81a44792932f44e827ed"
 }

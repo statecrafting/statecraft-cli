@@ -3,12 +3,17 @@
 //! Spec 002 section 3.15. Governance starter files come from the spec-spine
 //! **library** and from nowhere else:
 //!
-//! `spec_spine_core::scaffold_init_json(config_json) -> Result<String, Error>`
+//! `spec_spine_core::scaffold_init_opts_json(config_json, options_json) -> Result<String, Error>`
 //!
-//! It returns the existing serialized `Scaffold` files-as-data shape with the
-//! existing `ScaffoldFile` fields, performs no write and discovers no
-//! environment. This product owns the reconciliation and every filesystem
-//! write. The removed `spec-spine init` command is not invoked, no governance
+//! called with [`SCAFFOLD_OPTIONS`], the producer's supported pinned-scaffold
+//! option (spec 018 section 3.3, amending spec 009's call): the returned
+//! `spec-spine.toml` carries `[meta] required_version = "=<linked version>"`.
+//! The unpinned `scaffold_init_json` stays the producer's default for other
+//! consumers; this product no longer asks for it.
+//!
+//! The call returns the serialized `Scaffold` files-as-data shape with its
+//! `ScaffoldFile` fields, performs no write and discovers no environment.
+//! This product owns the reconciliation and every filesystem write. The removed `spec-spine init` command is not invoked, no governance
 //! template is vendored here, and there is no fallback installer built from old
 //! kit bytes.
 //!
@@ -52,6 +57,12 @@ pub fn linked() -> statecraft_environment::manifest::Producer {
         checksum: PRODUCER_CHECKSUM.to_string(),
     }
 }
+
+/// The options this product passes the producer (spec 018 section 3.3): an
+/// exact pin of the linked producer's own version, which the flow checks
+/// against [`Producer::identity`] before anything is written. An unknown
+/// option is the producer's `Error::Config`, never a silently unpinned file.
+pub const SCAFFOLD_OPTIONS: &str = r#"{"pinExactVersion":true}"#;
 
 /// The specs directory this product declares.
 pub const SPECS_DIR: &str = "specs";
@@ -304,7 +315,7 @@ pub struct Library;
 
 impl Producer for Library {
     fn scaffold(&self, config_json: &str) -> Result<String, ProducerError> {
-        spec_spine_core::scaffold_init_json(config_json)
+        spec_spine_core::scaffold_init_opts_json(config_json, SCAFFOLD_OPTIONS)
             .map_err(|e| ProducerError::Refused(format!("{e:?}")))
     }
 
@@ -379,6 +390,33 @@ pub fn produce(producer: &dyn Producer) -> Result<Starter, ProducerError> {
         out_of_contract,
         conformance,
     })
+}
+
+/// Spec 018 section 3.3: the `spec-spine.toml` the producer returned carries
+/// an exact pin, and it is the version of the producer that answered. `Ok`
+/// is that version; `Err` names what was returned and what was expected, and
+/// the flow refuses on it before its first write. Absent a returned
+/// configuration there is nothing to compare.
+pub fn verify_pin(starter: &Starter) -> Result<Option<String>, String> {
+    let Some(toml) = starter
+        .governance
+        .iter()
+        .find(|f| f.rel_path == "spec-spine.toml")
+    else {
+        return Ok(None);
+    };
+    let expected = &starter.conformance.producer.version;
+    match crate::setup::exact_pin(&toml.contents) {
+        Ok(version) if version == *expected => Ok(Some(version)),
+        Ok(version) => Err(format!(
+            "the governance producer returned spec-spine.toml pinned to ={version}, and its linked identity is {}; nothing is written",
+            starter.conformance.producer.describe()
+        )),
+        Err(why) => Err(format!(
+            "the governance producer was asked for an exact pin and returned a spec-spine.toml without one ({why}); its linked identity is {}; nothing is written",
+            starter.conformance.producer.describe()
+        )),
+    }
 }
 
 #[cfg(test)]
@@ -599,5 +637,50 @@ mod tests {
             .expect("the configuration is a governance file");
         assert!(toml.contents.contains(DERIVED_DIR));
         assert!(toml.contents.contains(STATE_DIR));
+    }
+
+    /// Spec 018 section 3.3: the real library, asked with the pinned option,
+    /// returns an exact pin of its own linked version.
+    #[test]
+    fn the_real_library_pins_its_own_version_exactly() {
+        let s = produce(&Library).expect("the library answers");
+        assert_eq!(verify_pin(&s).unwrap().as_deref(), Some(PRODUCER_VERSION));
+        let toml = &s
+            .governance
+            .iter()
+            .find(|f| f.rel_path == "spec-spine.toml")
+            .unwrap()
+            .contents;
+        assert!(
+            toml.lines()
+                .any(|l| l == format!("required_version = \"={PRODUCER_VERSION}\"")),
+            "{toml}"
+        );
+    }
+
+    #[test]
+    fn a_pin_other_than_the_producer_identity_or_none_is_refused() {
+        let with = |toml: &str, version: &str| {
+            let p = Recorded {
+                json: serde_json::json!({ "files": [{ "relPath": "spec-spine.toml", "contents": toml }] })
+                    .to_string(),
+                identity: Identity {
+                    name: "recorded".into(),
+                    version: version.into(),
+                },
+            };
+            verify_pin(&produce(&p).unwrap())
+        };
+        let pinned = "[meta]\nrequired_version = \"=1.2.3\"\n";
+        assert_eq!(with(pinned, "1.2.3").unwrap().as_deref(), Some("1.2.3"));
+        let other = with(pinned, "1.2.4").unwrap_err();
+        assert!(
+            other.contains("=1.2.3") && other.contains("recorded@1.2.4"),
+            "{other}"
+        );
+        let unpinned = with("[layout]\n", "1.2.3").unwrap_err();
+        assert!(unpinned.contains("without one"), "{unpinned}");
+        let ranged = with("[meta]\nrequired_version = \"1.2.3\"\n", "1.2.3").unwrap_err();
+        assert!(ranged.contains("not an exact pin"), "{ranged}");
     }
 }

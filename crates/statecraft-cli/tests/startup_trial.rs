@@ -108,7 +108,9 @@ impl Fixture {
         f.git(&["commit", "--quiet", "-m", "base"]);
         executable(
             &f.bin().join("spec-spine"),
-            "#!/bin/sh\ncase \"$*\" in\n  --version) echo 'spec-spine 0.20.0' ;;\n  check|'check --help') exit 0 ;;\n  compile|index) exit 0 ;;\n  *) exit 3 ;;\nesac\n",
+            &as_linked(
+                "#!/bin/sh\ncase \"$*\" in\n  --version) echo 'spec-spine 0.20.0' ;;\n  check|'check --help') exit 0 ;;\n  compile|index) exit 0 ;;\n  *) exit 3 ;;\nesac\n",
+            ),
         );
         let recorded = Path::new(env!("CARGO_MANIFEST_DIR"))
             .join("../statecraft-adapter-claude-code/testdata/stream/success.jsonl");
@@ -181,6 +183,15 @@ impl Fixture {
 }
 
 /// The fake provider: see the module comment.
+/// The stub answers as the linked producer: a fresh scaffold pins that
+/// release exactly (spec 018 section 3.3), so initialization admits it.
+fn as_linked(script: &str) -> String {
+    let linked = format!("spec-spine {}", statecraft_home::producer::PRODUCER_VERSION);
+    let stubbed = script.replace("spec-spine 0.20.0", &linked);
+    assert!(stubbed.contains(&linked), "the stub reports a version");
+    stubbed
+}
+
 const FAKE_PROVIDER: &str = r#"#!/bin/sh
 if [ "$1" = --version ]; then echo '2.1.267 (Claude Code)'; echo probed >> "$(dirname "$0")/probes"; exit 0; fi
 here="$(dirname "$0")"

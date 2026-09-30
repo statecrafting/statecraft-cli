@@ -483,6 +483,9 @@ fn manage_verb(
     home: &std::path::Path,
     format: Format,
 ) -> i32 {
+    if let Some(message) = statecraft_cli::manage::setup_usage(verb, rest) {
+        return usage(format, message);
+    }
     let Some(operation) = statecraft_cli::manage::operation(verb, rest, root) else {
         return usage(
             format,

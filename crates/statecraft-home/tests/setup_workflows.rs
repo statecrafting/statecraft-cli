@@ -70,7 +70,12 @@ fn render_profile(root: &Path, profile: &Profile, extra: &[(&str, serde_json::Va
             write(root, rel, text);
         }
     }
-    std::fs::create_dir_all(root.join(".git")).unwrap();
+    // Spec 018 section 3.4: a git work tree whose index tracks the Rust
+    // prerequisites. A repository the caller built is used as it is.
+    if !root.join(".git").exists() {
+        git(root, &["init", "--quiet"]);
+    }
+    git(root, &["add", "rust-toolchain.toml", "Cargo.lock"]);
     let manifest = Manifest::new(Pins {
         product: "0.0.0".into(),
         spec_spine: "unpinned".into(),
@@ -89,6 +94,7 @@ fn render_profile(root: &Path, profile: &Profile, extra: &[(&str, serde_json::Va
         manifest: &manifest,
         spec_spine_toml: Some(TOML),
         derived_dir: ".statecraft/derived",
+        bound: &statecraft_home::setup_input::Bound::with_producer("0.26.0"),
     })
     .unwrap();
     assert!(plan.withheld.is_none(), "{:?}", plan.withheld);

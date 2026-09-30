@@ -124,7 +124,8 @@ impl Fixture {
         // and ratifies no spec anywhere.
         executable(
             &f.bin().join("spec-spine"),
-            r#"#!/bin/sh
+            &as_linked(
+                r#"#!/bin/sh
 case "$*" in
   --version) echo 'spec-spine 0.20.0' ;;
   check|'check --help') exit 0 ;;
@@ -135,6 +136,7 @@ case "$*" in
   *) exit 3 ;;
 esac
 "#,
+            ),
         );
         let recorded = Path::new(env!("CARGO_MANIFEST_DIR"))
             .join("../statecraft-adapter-claude-code/testdata/stream/success.jsonl");
@@ -269,6 +271,15 @@ esac
 
 /// The fake provider. See the module comment for what it does and does not
 /// stand in for.
+/// The stub answers as the linked producer: a fresh scaffold pins that
+/// release exactly (spec 018 section 3.3), so initialization admits it.
+fn as_linked(script: &str) -> String {
+    let linked = format!("spec-spine {}", statecraft_home::producer::PRODUCER_VERSION);
+    let stubbed = script.replace("spec-spine 0.20.0", &linked);
+    assert!(stubbed.contains(&linked), "the stub reports a version");
+    stubbed
+}
+
 const FAKE_PROVIDER: &str = r#"#!/bin/sh
 if [ "$1" = --version ]; then echo '2.1.267 (Claude Code)'; exit 0; fi
 here="$(dirname "$0")"

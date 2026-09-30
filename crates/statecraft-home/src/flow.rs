@@ -712,9 +712,10 @@ pub struct Context<'a> {
 }
 
 /// What the operator asked of a setup profile: `init plan|apply <path>
-/// --profile <id> [--plan <identity>] [--verify-local]`. A project whose
-/// declaration already selects a profile is re-planned with it when no
-/// profile is named.
+/// [--profile <id>] [--setup-input <file>] [--plan <identity>]
+/// [--verify-local]`. A project whose declaration already selects a profile
+/// is re-planned with it when no profile is named; a setup input selects its
+/// own profile (spec 018 section 3.1).
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct SetupRequest {
     /// The profile named on the command line.
@@ -724,6 +725,9 @@ pub struct SetupRequest {
     pub plan: Option<String>,
     /// Run the rendered gate here after applying.
     pub verify_local: bool,
+    /// The setup input document (spec 018 section 3.1), read-only and read
+    /// again by an apply: never copied into the target or recorded.
+    pub input: Option<std::path::PathBuf>,
 }
 
 /// Compute the initialization: the preflight alone. Writes nothing, takes no
@@ -757,6 +761,16 @@ fn observe(path: &Path) -> String {
         Ok(_) => {
             std::fs::read(path).map_or_else(|_| "unreadable".to_string(), |b| digest_bytes(&b))
         }
+    }
+}
+
+/// Whether `path` is absent. Other metadata failures remain failures instead
+/// of being treated as permission to create the path.
+fn is_absent(path: &Path) -> std::io::Result<bool> {
+    match std::fs::symlink_metadata(path) {
+        Ok(_) => Ok(false),
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(true),
+        Err(e) => Err(e),
     }
 }
 
@@ -994,6 +1008,26 @@ fn preflight(ctx: &Context<'_>, now: &str, report: &mut Report) -> Result<Prepar
     })?;
     report.conformance = Some(starter.conformance.clone());
 
+    // Spec 018 section 3.3: a `spec-spine.toml` this run would create
+    // carries the producer's exact pin of its own identity, verified before
+    // anything is written. An adopted file is never rewritten, and is judged
+    // as a setup prerequisite instead.
+    let pin_path = resolve(ctx.root, "spec-spine.toml");
+    let pin_absent = is_absent(&pin_path).map_err(|e| {
+        failed(
+            Step::Plan,
+            format!("spec-spine.toml: {e}"),
+            "the project pin could not be inspected",
+        )
+    })?;
+    if pin_absent && let Err(reason) = producer::verify_pin(&starter) {
+        return Err(StepReport::new(
+            Step::Plan,
+            StepState::Refused { reason },
+            "the governance producer's pin does not match its identity",
+        ));
+    }
+
     // The managed files this product places: the producer's in-contract set,
     // plus this product's own managed instructions.
     let mut managed: Vec<(String, String)> = starter
@@ -1091,8 +1125,19 @@ fn preflight(ctx: &Context<'_>, now: &str, report: &mut Report) -> Result<Prepar
             "the project could not be planned",
         )
     })?;
+    let producer_identity = ctx.producer.identity().describe();
     for write in &computed.writes {
-        report.writes.push(write.path.clone());
+        let unchanged =
+            unchanged_write(ctx.root, write, &manifest, &producer_identity).map_err(|e| {
+                failed(
+                    Step::Governance,
+                    format!("{}: {e}", write.path),
+                    "the project could not be planned",
+                )
+            })?;
+        if !unchanged {
+            report.writes.push(write.path.clone());
+        }
     }
     for kept in &computed.kept {
         report.kept.push(kept.describe());
@@ -1213,10 +1258,33 @@ fn plan_setup(
         )
     };
     let recorded = manifest.project.setup.as_ref();
+    // Spec 018 section 3.1: the setup input, read here by plan and apply
+    // alike. A document that does not read is a planning refusal.
+    let document = match &ctx.setup.input {
+        Some(path) => Some(crate::setup_input::read(path).map_err(refused)?),
+        None => None,
+    };
+    if let (Some(named), Some(doc)) = (&ctx.setup.profile, &document)
+        && *named != doc.profile
+    {
+        return Err(refused(format!(
+            "--profile {named} and the setup input's profile {} disagree; neither is selected",
+            doc.profile
+        )));
+    }
+    if let (Some(selection), Some(doc)) = (recorded, &document)
+        && selection.profile != doc.profile
+    {
+        return Err(refused(format!(
+            "the declaration records setup profile {} and the setup input names {}; a supplied input must name the recorded profile",
+            selection.profile, doc.profile
+        )));
+    }
     let Some(id) = ctx
         .setup
         .profile
         .clone()
+        .or_else(|| document.as_ref().map(|d| d.profile.clone()))
         .or_else(|| recorded.map(|s| s.profile.clone()))
     else {
         if ctx.setup.plan.is_some() {
@@ -1232,17 +1300,27 @@ fn plan_setup(
             crate::setup::PROFILE_ID
         )));
     };
-    let block = recorded
+    // The recorded parameters, with the input's named ones over them: a
+    // requested upgrade under spec 002's managed reconciliation (spec 018
+    // section 5, 2026-09-28).
+    let mut block = recorded
         .filter(|s| s.profile == id)
         .map(|s| s.parameters.clone())
         .unwrap_or_default();
-    let toml = match std::fs::read_to_string(resolve(ctx.root, "spec-spine.toml")) {
-        Ok(text) => Some(text),
-        Err(_) => starter
+    let bound = bound(ctx, starter, document.as_ref());
+    if let Some(doc) = &document {
+        block.extend(doc.parameters.clone());
+    }
+    let pin_path = resolve(ctx.root, "spec-spine.toml");
+    let adopted_pin = std::fs::symlink_metadata(&pin_path).is_ok();
+    let toml = if adopted_pin {
+        std::fs::read_to_string(&pin_path).ok()
+    } else {
+        starter
             .governance
             .iter()
             .find(|f| f.rel_path == "spec-spine.toml")
-            .map(|f| f.contents.clone()),
+            .map(|f| f.contents.clone())
     };
     let plan = crate::setup::plan(&crate::setup::Inputs {
         root: ctx.root,
@@ -1251,17 +1329,73 @@ fn plan_setup(
         manifest,
         spec_spine_toml: toml.as_deref(),
         derived_dir: project::DERIVED,
+        bound: &bound,
     })
     .map_err(refused)?;
     if let Some(approved) = &ctx.setup.plan
         && *approved != plan.plan_identity
     {
+        // The identity is one-way, so the input's current digest is named
+        // for the operator to compare with the plan they reviewed (spec 018
+        // section 5, 2026-09-28).
+        let input = document.as_ref().map_or_else(String::new, |d| {
+            format!(
+                "; the setup input {} now has digest {}, and the plan identity binds it",
+                d.path, d.digest
+            )
+        });
         return Err(refused(format!(
-            "the approved setup plan {approved} is not the plan now, {}: an input changed after it was planned",
+            "the approved setup plan {approved} is not the plan now, {}: an input changed after it was planned{input}",
             plan.plan_identity
         )));
     }
     Ok(Some(plan))
+}
+
+/// What spec 018 binds into the setup plan: the input or its absence, the
+/// parameters it named, the producer that answered and the digest of its
+/// pinned scaffold (section 3.5 items 1 and 3).
+fn bound(
+    ctx: &Context<'_>,
+    starter: &producer::Starter,
+    document: Option<&crate::setup_input::Document>,
+) -> crate::setup_input::Bound {
+    let identity = ctx.producer.identity();
+    crate::setup_input::Bound {
+        input: document.map_or_else(
+            crate::setup_input::InputReport::absent,
+            crate::setup_input::InputReport::of,
+        ),
+        supplied: document
+            .map(|d| d.parameters.keys().cloned().collect())
+            .unwrap_or_default(),
+        producer_version: identity.version.clone(),
+        facts: vec![
+            format!("producer {}", identity.describe()),
+            format!("scaffold {}", scaffold_digest(starter)),
+        ],
+    }
+}
+
+/// The pinned scaffold as path and content-digest rows. Sorting the complete
+/// set includes the synthetic `.gitignore` path and makes the identity
+/// independent of the order in which the producer returned governance files.
+fn scaffold_digest(starter: &producer::Starter) -> String {
+    let mut files: Vec<(&str, &str)> = starter
+        .governance
+        .iter()
+        .map(|file| (file.rel_path.as_str(), file.contents.as_str()))
+        .collect();
+    if let Some(fragment) = &starter.ignore_fragment {
+        files.push((".gitignore", fragment));
+    }
+    files.sort_by_key(|(path, _)| *path);
+
+    let mut scaffold = String::new();
+    for (path, contents) in files {
+        scaffold.push_str(&format!("{path} {}\n", digest_bytes(contents.as_bytes())));
+    }
+    digest_bytes(scaffold.as_bytes())
 }
 
 fn run(ctx: &Context<'_>, mode: Mode) -> Report {
@@ -1285,6 +1419,20 @@ fn run(ctx: &Context<'_>, mode: Mode) -> Report {
         outcome: Outcome::Partial,
     };
     let mut rec = Recorder::new(ctx);
+
+    // Spec 018 section 3.5: an apply from a setup input performs only the
+    // plan the operator reviewed. Refused before the lock, so nothing at all
+    // is written.
+    if writing && ctx.setup.input.is_some() && ctx.setup.plan.is_none() {
+        report.steps.push(StepReport::new(
+            Step::Plan,
+            StepState::Refused {
+                reason: "--setup-input on apply needs --plan <identity>, the setup plan the operator reviewed".to_string(),
+            },
+            "the setup input's plan was not approved",
+        ));
+        return report.finish(true);
+    }
 
     // The manifest lock, first and only when performing: every write of the
     // declaration below happens under it, taken before the read, so a transfer
@@ -1827,42 +1975,8 @@ fn perform_writes(
     let identity = producer.identity().describe();
     for write in &computed.writes {
         let target = resolve(root, &write.path);
-        let released_rewrite =
-            statecraft_environment::transfer::governance_contract_path(&write.path)
-                && statecraft_environment::transfer::latest(manifest, &write.path).is_some_and(
-                    |record| record.to == statecraft_environment::transfer::Ownership::User,
-                );
-        let entry = Entry {
-            path: write.path.clone(),
-            class: Class::Managed,
-            source: Source {
-                kind: SourceKind::Template,
-                identity: if write.path == project::INSTRUCTIONS || released_rewrite {
-                    GOVERNANCE_SOURCE.to_string()
-                } else {
-                    identity.clone()
-                },
-            },
-            digest: write.digest.clone(),
-            bytes: write.contents.len() as u64,
-            written_at: now.to_string(),
-            transfer: manifest.entry(&write.path).and_then(|e| e.transfer.clone()),
-            role: write.role,
-        };
-        // A write whose bytes are already on disk, over an entry that records
-        // exactly what this one would, changes nothing: the file is left
-        // alone and the entry keeps the time it was really written. Without
-        // this a repeated `init apply` re-dated every such entry, so the
-        // committed manifest changed on each run although no file did.
-        let on_disk = digest_file(&target)?.map(|(d, _)| d);
-        let unchanged = on_disk.as_deref() == Some(write.digest.as_str())
-            && manifest.entry(&write.path).is_some_and(|recorded| {
-                Entry {
-                    written_at: recorded.written_at.clone(),
-                    ..entry.clone()
-                } == *recorded
-            });
-        if unchanged {
+        let entry = governance_entry(write, manifest, &identity, now);
+        if unchanged_write(root, write, manifest, &identity)? {
             continue;
         }
         rec.around(Step::Governance.word(), chain(&target), || {
@@ -1874,6 +1988,59 @@ fn perform_writes(
         manifest.upsert(entry);
     }
     Ok(())
+}
+
+/// The manifest entry a governance write records.
+fn governance_entry(
+    write: &statecraft_environment::plan::PlannedWrite,
+    manifest: &Manifest,
+    identity: &str,
+    now: &str,
+) -> Entry {
+    let released_rewrite = statecraft_environment::transfer::governance_contract_path(&write.path)
+        && statecraft_environment::transfer::latest(manifest, &write.path)
+            .is_some_and(|record| record.to == statecraft_environment::transfer::Ownership::User);
+    Entry {
+        path: write.path.clone(),
+        class: Class::Managed,
+        source: Source {
+            kind: SourceKind::Template,
+            identity: if write.path == project::INSTRUCTIONS || released_rewrite {
+                GOVERNANCE_SOURCE.to_string()
+            } else {
+                identity.to_string()
+            },
+        },
+        digest: write.digest.clone(),
+        bytes: write.contents.len() as u64,
+        written_at: now.to_string(),
+        transfer: manifest.entry(&write.path).and_then(|e| e.transfer.clone()),
+        role: write.role,
+    }
+}
+
+/// A write whose bytes are already on disk, over an entry that records
+/// exactly what this one would, changes nothing: the file is left alone and
+/// the entry keeps the time it was really written. Without this a repeated
+/// `init apply` re-dated every such entry, so the committed manifest changed
+/// on each run although no file did. The plan asks the same question, so a
+/// preview never lists a write the apply would not perform (spec 018 section
+/// 3.5: a converged plan proposes zero target writes).
+fn unchanged_write(
+    root: &Path,
+    write: &statecraft_environment::plan::PlannedWrite,
+    manifest: &Manifest,
+    identity: &str,
+) -> std::io::Result<bool> {
+    let on_disk = digest_file(&resolve(root, &write.path))?.map(|(d, _)| d);
+    let entry = governance_entry(write, manifest, identity, "");
+    Ok(on_disk.as_deref() == Some(write.digest.as_str())
+        && manifest.entry(&write.path).is_some_and(|recorded| {
+            Entry {
+                written_at: recorded.written_at.clone(),
+                ..entry
+            } == *recorded
+        }))
 }
 
 /// Why the ignore merge stopped the preflight.
@@ -2046,4 +2213,54 @@ fn step_register(
 /// a diff. Reads nothing.
 pub fn digest_of(contents: &str) -> String {
     digest_bytes(contents.as_bytes())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{is_absent, scaffold_digest};
+    use crate::producer::{Conformance, Identity, ScaffoldFile, Starter};
+    use std::path::Path;
+
+    #[test]
+    fn absence_is_distinct_from_an_unreadable_path() {
+        let crate_root = Path::new(env!("CARGO_MANIFEST_DIR"));
+        assert!(!is_absent(&crate_root.join("Cargo.toml")).unwrap());
+        assert!(is_absent(&crate_root.join("definitely-not-a-statecraft-file")).unwrap());
+
+        let error = is_absent(Path::new("\0")).unwrap_err();
+        assert_ne!(error.kind(), std::io::ErrorKind::NotFound);
+    }
+
+    #[test]
+    fn scaffold_identity_sorts_the_ignore_fragment_with_governance_paths() {
+        let identity = Identity {
+            name: "recorded".to_string(),
+            version: "1.0.0".to_string(),
+        };
+        let starter = Starter {
+            governance: vec![ScaffoldFile {
+                rel_path: "Makefile".to_string(),
+                contents: "governance".to_string(),
+                overwrite: false,
+                executable: false,
+                append: false,
+                append_marker: None,
+            }],
+            ignore_fragment: Some("target/".to_string()),
+            out_of_contract: Vec::new(),
+            conformance: Conformance {
+                producer: identity,
+                conforming: true,
+                out_of_contract: Vec::new(),
+            },
+        };
+        let ignore = super::digest_bytes(b"target/");
+        let makefile = super::digest_bytes(b"governance");
+        let sorted = format!(".gitignore {ignore}\nMakefile {makefile}\n");
+
+        assert_eq!(
+            scaffold_digest(&starter),
+            super::digest_bytes(sorted.as_bytes())
+        );
+    }
 }
