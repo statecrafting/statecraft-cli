@@ -133,9 +133,10 @@ later one is never consulted once an earlier one answers or refuses.
 3. **Launcher.** When spec-spine's own launcher is on PATH and answers its
    resolution query, its answer is the candidate: the engine the project
    declares, as the launcher resolved it, with the rule it used and the
-   artifact digest. It is put to the pin like any other. The launcher is
-   asked to resolve only; this product then runs the absolute engine path
-   itself, so the recorded identity is the executed one.
+   artifact digest. It is put to the pin like any other. The launcher query is
+   run with `SPEC_SPINE_FROZEN=1`, so resolution cannot acquire an engine. The
+   launcher is asked to resolve only; this product then runs the absolute
+   engine path itself, so the recorded identity is the executed one.
 4. **Repository-local install.** The one install path established by the active
    setup-profile authority. The resolver consumes that declaration rather than
    restating a path, so an engine-location authority change moves the candidate
@@ -173,12 +174,14 @@ already knows.
 The envelope is classified as follows. `ok` is fresh. A `finding` whose
 registry half reports `validationPassed: false` does not validate, and outranks
 staleness because regeneration cannot cure it. A `finding` with a half
-reporting `fresh: false` is stale. A `finding` with both halves fresh and an
-unresolved-unit error counted in the index half's diagnostics is an unresolved
-claim. Any other `finding` is a corpus that does not validate, naming the
-summary. `refused`, `usage` and `failed` are reads not performed. An envelope
-that does not parse, is not `check`'s, or whose `exitCode` disagrees with the
-process's establishes nothing.
+reporting `fresh: false` is stale: either the registry half or the index half
+is sufficient, after the validation failure rule above has been applied. A
+`finding` with both halves fresh and an unresolved-unit error counted in the
+index half's diagnostics is an unresolved claim. Any other `finding` is a
+corpus that does not validate, naming the summary. `refused`, `usage` and
+`failed` are reads not performed. An envelope that does not parse, is not
+`check`'s, or whose `exitCode` disagrees with the process's establishes
+nothing.
 
 ### 3.5 Resolution never acquires
 
