@@ -123,10 +123,12 @@ the same inputs choose the same file.
 The candidates, in order. The first that exists and is admitted answers; a
 later one is never consulted once an earlier one answers or refuses.
 
-1. **Supervisor.** In a managed session, the supervisor's resolved path
+1. **Supervisor.** A non-empty `STATECRAFT_RUN_ID` independently identifies a
+   managed session. In that session, the supervisor's resolved path
    (`STATECRAFT_SPEC_SPINE`) is the only candidate. It is not put to the pin:
    its identity is the supervisor's resolution. A path that is not executable
-   refuses.
+   refuses. Outside a managed session, `STATECRAFT_RUN_ID` is absent and the
+   same path variable is interpreted only by rule 2.
 2. **Operator override.** Outside a managed session, a non-empty
    `STATECRAFT_SPEC_SPINE` is the only candidate, put to the pin, with no
    fallback when it is absent or refused.
@@ -178,7 +180,11 @@ reporting `fresh: false` is stale: either the registry half or the index half
 is sufficient, after the validation failure rule above has been applied. A
 `finding` with both halves fresh and an unresolved-unit error counted in the
 index half's diagnostics is an unresolved claim. Any other `finding` is a
-corpus that does not validate, naming the summary. `refused`, `usage` and
+corpus that does not validate, naming the summary: the envelope's `finding`
+outcome establishes that result even when `validationPassed` is true, both
+halves are fresh and no unresolved unit is counted, because those fields
+exclude the preceding subclasses rather than converting a finding to `ok`.
+`refused`, `usage` and
 `failed` are reads not performed. An envelope that does not parse, is not
 `check`'s, or whose `exitCode` disagrees with the process's establishes
 nothing: the read is failed, the caller reports Statecraft exit 4 under spec
