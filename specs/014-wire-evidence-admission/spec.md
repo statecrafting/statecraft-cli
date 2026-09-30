@@ -232,9 +232,11 @@ identity, subject identity, dimensions, outcome, and reason required by section
 3.6. Its content-finding detail contains only the member path, detector identity
 when applicable, and category. It never copies the candidate value. An
 identical resubmission therefore refuses as `duplicate` at step 6 without
-scanning the candidate again. Digest and length verification may occur in
-quarantined memory before this screen; the manifest bytes are not then added to
-Statecraft custody when the screen refuses them.
+scanning the candidate again. Until this screen passes, manifest bytes exist
+only in bounded quarantined memory. Steps 3 through 6 must not copy a raw member
+value into a log, metric, trace, error, admission record, or other persistent or
+observable channel. The manifest bytes are not added to Statecraft custody when
+the screen refuses them.
 
 `encrypted-content` is unsupported until a separately ratified policy names
 its purpose, consent, key custody, retention period, deletion behavior, and
@@ -292,11 +294,12 @@ New reason strings may be preserved by older readers, but older readers do not
 reinterpret them.
 
 An identical duplicate is still `duplicate`: append-only history preserves
-both observations and admission refuses ambiguity. Retry reads the durable
-record first. It may resume only an operationally interrupted judgment over
-the same bytes, policy, and subject; otherwise it begins no replacement and
-reports `policy-mismatch`, `producer-mismatch`, or `subject-mismatch` for the
-changed identity.
+both observations and admission refuses ambiguity. The duplicate record names
+the prior admission-record digest and its reason without copying candidate
+content. Retry reads the durable record first. It may resume only an
+operationally interrupted judgment over the same bytes, policy, and subject;
+otherwise it begins no replacement and reports `policy-mismatch`,
+`producer-mismatch`, or `subject-mismatch` for the changed identity.
 
 ### 3.7 Additive `run show` projection
 
@@ -313,7 +316,8 @@ work. Human and JSON renderings come from one value and add, per attempt:
 - estimated cost labeled as an estimate with method identity;
 - attestation identity or `unknown`;
 - four evidence dimensions; and
-- admission outcome, reason, and policy identity, or the exact absence state.
+- admission outcome, reason, and policy identity, or the exact absence state;
+  a duplicate also shows the prior record digest and prior reason.
 
 The projection never renders secret values or raw captured traffic. Unknown,
 unsupported, unavailable, unverified, stale, refused, and not-recorded remain
@@ -362,7 +366,7 @@ asserts the admission record and both renderings:
 | wrong run, attempt, or effect | `subject-mismatch`; no admission |
 | wrong producer revision or digest | `producer-mismatch`; no admission |
 | changed bytes or length | integrity fails with `digest-mismatch` |
-| duplicate artifact | both records remain visible and admission refuses `duplicate` |
+| duplicate artifact | both records remain visible; admission refuses `duplicate` and names the prior record digest and reason |
 | earlier-attempt artifact | `stale`; retry does not adopt it |
 | retry with a changed policy identity | `policy-mismatch`; no replacement begins |
 | malformed, oversized, deeply nested, or duplicate-key input | bounded refusal `malformed` with no path or command followed |
