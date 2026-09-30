@@ -32,6 +32,10 @@ obligations:
     kind: invariant
     text: "A documentation result is provider testimony bound to an immutable task, never acceptance, publication authority, or evidence merely because it is structured."
     anchor: "3-1-separate-documents-and-authorities"
+  - id: "I-2"
+    kind: invariant
+    text: "A version 1 documentation task permanently prohibits patch application, repository publication, release, deployment, remote administration, credential reads, and provider selection, and no task field can grant one of those operations."
+    anchor: "3-3-authority-and-operation-limits"
   - id: "R-1"
     kind: requirement
     text: "Before execution, Statecraft records the complete documentation task, its context manifest, skill and schema identities, authority limits, required artifacts, review policy, deadline, and cost ceiling."
@@ -48,6 +52,7 @@ obligations:
       - "crates/statecraft-run/tests/documentation_contract.rs"
       - "crates/statecraft-adapter/tests/documentation_result.rs"
       - "crates/statecraft-acceptance/tests/documentation_contract.rs"
+      - "crates/statecraft-cli/tests/documentation_projection.rs"
 ---
 
 # 020: Documentation task and structured result contracts
@@ -167,11 +172,13 @@ protocol adds no documentation policy. Before spawn, it verifies only that the
 request is bounded, identities are internally consistent, and every required
 capability is declared by the selected adapter.
 
-The init event reports the task digest, context manifest digest, skill digest,
-result schema digest, and capability set the adapter says it applied. These are
-adapter observations under spec 004. They do not prove provider receipt or use.
-Missing, mismatched, duplicated, or contradictory observations remain explicit
-and make the later result ineligible for acceptance.
+The init event reports the task digest, context manifest digest, the exact skill
+digest or explicit `not-required`, result schema digest, and capability set the
+adapter says it applied. These are adapter observations under spec 004. They do
+not prove provider receipt or use. Missing, mismatched, duplicated, or
+contradictory required observations remain explicit and make the later result
+ineligible for acceptance. A task that records skill as `not-required` requires
+that exact observation and no skill digest.
 
 The terminal event carries exact raw result bytes and reports their media type,
 byte length and custody digest. The supervisor retains the raw bytes before

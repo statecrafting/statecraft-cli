@@ -58,6 +58,12 @@
         "text": "A documentation result is provider testimony bound to an immutable task, never acceptance, publication authority, or evidence merely because it is structured."
       },
       {
+        "anchor": "3-3-authority-and-operation-limits",
+        "id": "I-2",
+        "kind": "invariant",
+        "text": "A version 1 documentation task permanently prohibits patch application, repository publication, release, deployment, remote administration, credential reads, and provider selection, and no task field can grant one of those operations."
+      },
+      {
         "anchor": "3-2-the-documentation-task",
         "id": "R-1",
         "kind": "requirement",
@@ -75,27 +81,28 @@
         "inputs": [
           "crates/statecraft-run/tests/documentation_contract.rs",
           "crates/statecraft-adapter/tests/documentation_result.rs",
-          "crates/statecraft-acceptance/tests/documentation_contract.rs"
+          "crates/statecraft-acceptance/tests/documentation_contract.rs",
+          "crates/statecraft-cli/tests/documentation_projection.rs"
         ],
         "kind": "verification",
         "text": "Portable fixtures prove immutable task binding, closed schemas, provider-neutral delivery, claim-level provenance, explicit absence, and separation from acceptance and publication without live provider activity."
       }
     ],
     "sectionDigests": {
-      "020-documentation-task-and-structured-result-contracts": "734f8ef77ff01c621d987f6773e63efcece7fc576d7978ac62e933ccde9aa286",
+      "020-documentation-task-and-structured-result-contracts": "ed53193b0b5adbce8bd5f2427da8495fc9c0539e95542452f62c563f7fb10541",
       "1-purpose": "8b02f913b08663186d36ea3bcd0e8c7bbe0a31bfa9121baec73462c986d20da5",
       "2-territory-and-prerequisite": "746191492c5936ba79256a9021ca5ff97507f6338406e8da8b63dcab76fd35eb",
       "3-1-separate-documents-and-authorities": "b35f09424b454ccc5c8767a710f0c8c186a8a8f6f4c59e59b22a1fb19c52976b",
       "3-10-observable-negative-cases": "be0dab451f956f2ac9c98f565e059514e2c0168e8167ffec71c90f3ac422f457",
       "3-2-the-documentation-task": "0e543f0a35f6fb461d30ea4a4ee2707622dea52a6b4aa5ba3e35d9918d379a2c",
       "3-3-authority-and-operation-limits": "366d2599e5cb32fa3d86cfdf81b2beb83b8909b44a63e0f83fc503252cb24ad8",
-      "3-4-adapter-delivery-and-observation": "71cd6e7194cbeb1b69ce41bc44e12d2cb3b1be9b34d6ebda29ab3cfe4aa7a442",
+      "3-4-adapter-delivery-and-observation": "c77cb7d16f4eb7226f69bcbc541c312f89787a3019710f935b912fc9e378f82d",
       "3-5-the-structured-result": "6c21dcd2945c8d4df19f388f598899fa499f6d5d3bada72c4b0a03413e84d0f5",
       "3-6-claim-contract": "b67e2865ae8829a88f5fdb19094c86689dac649cf2c7239e679e49adff83b713",
       "3-7-unknowns-contradictions-omissions-and-failures": "0d86c8aa075a5466a0d030925377ab3984229abaef370f91d75f929d1adb209a",
       "3-8-durable-binding-and-retry": "a51e020cbafe52e333403f07054ed4ed6d08b3dd526d9f704cc538547b14975a",
       "3-9-command-projections": "587b0364536491e447ee2ff9d07dd51c45909723d24159143fa856ca63401dc7",
-      "3-behavior": "0b6ec8a2020ec0e8b6b6b76eb648be435126ac286221b67eb2663c2386825119",
+      "3-behavior": "d33dbaaa66255a56a565ea94e3f82e74485271af8168136f5e308326d855b086",
       "4-out-of-scope": "a4a674200e255a9485679c056b3d415c22b94b7d706f9beea80fedeb3d2210ca",
       "5-resolved-decisions": "645af635a54bdcc8dd906c05698552f56bd38f06f2b2ac0527aae295c12ae088",
       "verification": "6d5603eb03d66a09fc046a1cc97625712654f22d4eea117148915d84a903135c"
@@ -124,6 +131,6 @@
     "summary": "Amends Statecraft's run, adapter, acceptance, and command contracts with an immutable documentation-task document and a provider-neutral structured documentation result. It separates task authority from provider output, binds every claim to an explicit lifecycle grade and supporting references, preserves omissions and contradictions, and keeps provider completion apart from independent acceptance and publication.\n",
     "title": "Documentation task and structured result contracts"
   },
-  "shardHash": "7fa20c86b9355f84d12a12b0b12c17fb32bdb5eb5f60841b93763d63f5394e7e",
+  "shardHash": "cb53e641640549c194ad282b4eb52b50e36ceef1ab083856c094ddb3f194b563",
   "specVersion": "1.9.0"
 }
