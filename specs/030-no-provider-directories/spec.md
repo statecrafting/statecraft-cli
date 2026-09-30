@@ -97,7 +97,9 @@ This spec owns no product code. The implementation changes only the units its
 `extends` edges name: the adapter's declaration, the global harness's adapter
 template in `statecraft-home`, the plan and apply rules in
 `statecraft-environment`, and the plan's JSON view and the tests that drive the
-binary in `statecraft-cli`.
+binary in `statecraft-cli`. Spec 008's harness-template behavior is amended,
+but the implementation unit remains `crates/statecraft-home/`, owned by spec
+002 and named by this spec's `extends` edge.
 
 ## 3. Behavior
 
@@ -142,8 +144,8 @@ A root pointer file is a file, not a directory, and is permitted by section 5.
 A project initialized before this spec holds `.claude/statecraft/instructions.md`
 as a managed path and possibly `CLAUDE.md` as a pointer to it.
 
-- `env plan` names the instructions file as leaving the adapter's declaration
-  and the pointer as a write replacing its existing bytes.
+- `env plan` names the instructions file as `retire` and the pointer as a write
+  replacing its existing bytes.
 - `env upgrade` removes the instructions file when its digest matches the
   manifest's, under 002 section 3.6's removal rule, and removes the
   `.claude/statecraft/` and `.claude/` directories only when this removal left
