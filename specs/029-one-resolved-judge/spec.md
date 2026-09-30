@@ -30,7 +30,9 @@ extends:
   - { spec: "006-command-surface", unit: { kind: directory, path: "crates/statecraft-cli/" }, nature: corrective }
 depends_on:
   - "002-environment-lifecycle"
+  - "003-work-and-run-semantics"
   - "005-acceptance-and-evidence"
+  - "006-command-surface"
   - "008-harness-delivery"
 obligations:
   - id: "R-1"
@@ -60,7 +62,7 @@ obligations:
     inputs:
       - "crates/statecraft-cli/tests/one_resolved_judge.rs"
       - "crates/statecraft-environment/tests/check_envelope.rs"
-      - "crates/statecraft-home/src/spec_spine.rs"
+      - "crates/statecraft-home/tests/spec_spine_resolution.rs"
       - "crates/statecraft-home/tests/harness_hooks.rs"
 ---
 
@@ -274,6 +276,6 @@ on PATH, and a stub launcher.
 ```verify:cli
 cargo test -p statecraft-cli --test one_resolved_judge
 cargo test -p statecraft-environment --test check_envelope
-cargo test -p statecraft-home --lib spec_spine
+cargo test -p statecraft-home --test spec_spine_resolution
 cargo test -p statecraft-home --test harness_hooks contract_2
 ```

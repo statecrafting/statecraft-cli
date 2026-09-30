@@ -6,7 +6,9 @@
     "created": "2026-09-30",
     "dependsOn": [
       "002-environment-lifecycle",
+      "003-work-and-run-semantics",
       "005-acceptance-and-evidence",
+      "006-command-surface",
       "008-harness-delivery"
     ],
     "extends": [
@@ -90,7 +92,7 @@
         "inputs": [
           "crates/statecraft-cli/tests/one_resolved_judge.rs",
           "crates/statecraft-environment/tests/check_envelope.rs",
-          "crates/statecraft-home/src/spec_spine.rs",
+          "crates/statecraft-home/tests/spec_spine_resolution.rs",
           "crates/statecraft-home/tests/harness_hooks.rs"
         ],
         "kind": "verification",
@@ -98,7 +100,7 @@
       }
     ],
     "sectionDigests": {
-      "029-one-resolved-judge": "108e53305aebcd22f1d3bd4c9d1915db3f709b4c3f403a4d1f0f2bc4705f1769",
+      "029-one-resolved-judge": "9ae5304485984b7ef406c8048fedf87a21a3540a177f93d37f844aa14e2a842b",
       "1-purpose": "5e9b867e88f3203c2451e006f3403b2df127d58f0edd290bd9b2a2a215311341",
       "2-territory": "12da13be1b9cce43b5ed95d2bdd919829dff433c5e54aa856eeab00c60a7265a",
       "3-1-one-judge-per-operation": "0a33da0001b0f61e8d01a300060fc5535965a46f6c1986fef7ec39aba1a89c77",
@@ -110,7 +112,7 @@
       "3-behavior": "6b35a87b0ecb59747a0cffe25899ed3174307519a33dc71b342b13787174b100",
       "4-out-of-scope": "38112ecb1dc5b61f9e8e51e90cdc3e0384214dda73dbcdfba85d5fc6aaa4c22c",
       "5-resolved-decisions": "1d1ab2a61ea6f1f91f2e931182dcfbef5844eae57d50a4ef60e965fc23187bed",
-      "verification": "955fadc0b93630b32516fc51bf72e6e9d65b77e989ffee9f780dbf7e34e0f136"
+      "verification": "d50d6d9fe1adac9b8a7506d2be41308e32803019da75eb7b04a604c5a3ee4046"
     },
     "sectionHeadings": [
       "029: One resolved judge",
@@ -132,6 +134,6 @@
     "summary": "Every spec-spine invocation this product makes, in every verb and in every hook it delivers, runs the executable that one resolution selected for that operation, and records which one. No call site names a bare `spec-spine` and lets PATH decide. The resolution's sources are, in order, the supervisor's path in a managed session, an operator override, the project's declared engine as spec-spine's own launcher resolves it when that launcher is present, the repository-local install named by the active setup profile, the repository's own build and then PATH; every candidate except the supervisor's already-resolved path is put to the pin, and each passed over is named. `doctor` reports the resolved executable, never a separate PATH probe. Where the resolved engine carries `check --json`, the check is read from its envelope instead of from its wording. Amends spec 008 section 3.23 contracts 2, 4 and 5.\n",
     "title": "One resolved judge: every spec-spine call this product makes runs the executable one resolution selected"
   },
-  "shardHash": "4338d91505a1af1e22fd4095840044709cfaf584b7b99b3cf1713bb90ee29264",
+  "shardHash": "327e6a9068341506b891e58b22772926aa2da1b75b2fba53db53884753c1fa74",
   "specVersion": "1.9.0"
 }

@@ -5,7 +5,9 @@
     ],
     "dependsOn": [
       "002-environment-lifecycle",
+      "003-work-and-run-semantics",
       "005-acceptance-and-evidence",
+      "006-command-surface",
       "008-harness-delivery"
     ],
     "implementingPaths": [
@@ -101,5 +103,5 @@
     "specStatus": "approved"
   },
   "schemaVersion": "1.2.0",
-  "shardHash": "4338d91505a1af1e22fd4095840044709cfaf584b7b99b3cf1713bb90ee29264"
+  "shardHash": "327e6a9068341506b891e58b22772926aa2da1b75b2fba53db53884753c1fa74"
 }
