@@ -43,7 +43,7 @@ pub const DEFAULT_BASE_REVISION: &str = "HEAD";
 /// For an initialization the `spec-spine` binary is **selected** for the
 /// project by spec 002 section 5's rule of 2026-09-25 as spec 028 orders its
 /// candidates: `STATECRAFT_SPEC_SPINE`, then the launcher's resolution, the
-/// project's `.tooling/bin` and `target/release`, then `PATH`, each put to the
+/// project's `.bin` and `target/release`, then `PATH`, each put to the
 /// project's pin. The rule is the library's; this only chooses to apply it.
 /// An operation that names no repository resolves nothing.
 pub fn execute(home: &Path, operation: Operation) -> Answer<service::Answer> {

@@ -1,24 +1,20 @@
 {
   "mapping": {
     "amends": [
-      "008-harness-delivery"
+      "001-boundaries-and-authority",
+      "002-environment-lifecycle",
+      "010-profile-unresolved-claims",
+      "023-contained-commit-walk",
+      "024-review-budget-and-ratification"
     ],
     "dependsOn": [
       "002-environment-lifecycle",
-      "005-acceptance-and-evidence",
-      "008-harness-delivery"
+      "024-review-budget-and-ratification",
+      "028-one-resolved-judge"
     ],
     "implementingPaths": [
       {
-        "path": "crates/statecraft-acceptance/",
-        "source": "spec-edge"
-      },
-      {
         "path": "crates/statecraft-cli/",
-        "source": "spec-edge"
-      },
-      {
-        "path": "crates/statecraft-environment/",
         "source": "spec-edge"
       },
       {
@@ -26,24 +22,11 @@
         "source": "spec-edge"
       },
       {
-        "path": "crates/statecraft-run/",
+        "path": "docs/decisions/00-founding-decisions.md",
         "source": "spec-edge"
       }
     ],
     "resolvedUnits": [
-      {
-        "locations": [
-          {
-            "file": "crates/statecraft-acceptance/"
-          }
-        ],
-        "ownership": true,
-        "sourceField": "extends",
-        "unit": {
-          "kind": "directory",
-          "path": "crates/statecraft-acceptance/"
-        }
-      },
       {
         "locations": [
           {
@@ -55,19 +38,6 @@
         "unit": {
           "kind": "directory",
           "path": "crates/statecraft-cli/"
-        }
-      },
-      {
-        "locations": [
-          {
-            "file": "crates/statecraft-environment/"
-          }
-        ],
-        "ownership": true,
-        "sourceField": "extends",
-        "unit": {
-          "kind": "directory",
-          "path": "crates/statecraft-environment/"
         }
       },
       {
@@ -86,20 +56,20 @@
       {
         "locations": [
           {
-            "file": "crates/statecraft-run/"
+            "file": "docs/decisions/00-founding-decisions.md"
           }
         ],
         "ownership": true,
         "sourceField": "extends",
         "unit": {
-          "kind": "directory",
-          "path": "crates/statecraft-run/"
+          "kind": "file",
+          "path": "docs/decisions/00-founding-decisions.md"
         }
       }
     ],
-    "specId": "028-one-resolved-judge",
+    "specId": "030-engine-in-bin",
     "specStatus": "draft"
   },
   "schemaVersion": "1.2.0",
-  "shardHash": "5802e54192beba08bd18f141d5b8d35d351ca20105744bd2bda20888ed2a03fb"
+  "shardHash": "e61ec6640c0d7736fcdc2812788273172b25437bbc7b5a9ffcea77f355bce04e"
 }

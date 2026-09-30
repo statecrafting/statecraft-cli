@@ -11,7 +11,7 @@ summary: >
   lets PATH decide. The resolution's sources are, in order, the supervisor's
   path in a managed session, an operator override, the project's declared
   engine as spec-spine's own launcher resolves it when that launcher is
-  present, the repository-local `.tooling/bin` install, the repository's own
+  present, the repository-local `.bin` install, the repository's own
   build and then PATH; each candidate is put to the pin, and each passed over
   is named. `doctor` reports the resolved executable, never a separate PATH
   probe. Where the resolved engine carries `check --json`, the check is read
@@ -39,7 +39,7 @@ obligations:
     anchor: "3-1-one-judge-per-operation"
   - id: "R-2"
     kind: requirement
-    text: "The resolution consults, in order, the supervisor's path, the operator override, the launcher's resolution, `.tooling/bin`, the repository build and PATH; every candidate after the first two is put to the pin, and every candidate passed over is named."
+    text: "The resolution consults, in order, the supervisor's path, the operator override, the launcher's resolution, `.bin`, the repository build and PATH; every candidate after the first two is put to the pin, and every candidate passed over is named."
     anchor: "3-2-the-resolution"
   - id: "R-3"
     kind: requirement
@@ -55,7 +55,7 @@ obligations:
     anchor: "3-5-resolution-never-acquires"
   - id: "V-1"
     kind: verification
-    text: "A fixture with conflicting candidates on PATH, in `.tooling/bin` and in `target/release` proves every verb that calls spec-spine runs the same selected executable, and that doctor names it."
+    text: "A fixture with conflicting candidates on PATH, in `.bin` and in `target/release` proves every verb that calls spec-spine runs the same selected executable, and that doctor names it."
     anchor: "verification"
     inputs:
       - "crates/statecraft-cli/tests/one_resolved_judge.rs"
@@ -132,8 +132,9 @@ later one is never consulted once an earlier one answers or refuses.
    artifact digest. It is put to the pin like any other. The launcher is
    asked to resolve only; this product then runs the absolute engine path
    itself, so the recorded identity is the executed one.
-4. **Repository-local install.** `.tooling/bin/spec-spine`, the location this
-   product's setup profile installs into.
+4. **Repository-local install.** `.bin/spec-spine`, the location this
+   product's setup profile installs into (spec 030; `.tooling/bin` before it,
+   which is no longer read).
 5. **Repository build.** The repository's own `target/release/spec-spine`.
 6. **PATH.** The first `spec-spine` on PATH that is not the launcher.
 
@@ -175,7 +176,7 @@ install verb when present).
 
 | Case | Required behavior |
 |---|---|
-| A compatible engine in `.tooling/bin` and an incompatible one first on PATH | `.tooling/bin` answers; the PATH binary is named as passed over |
+| A compatible engine in `.bin` and an incompatible one first on PATH | `.bin` answers; the PATH binary is named as passed over |
 | `run`, `work list`, `accept`, `verify`, coverage and `doctor` in the same fixture | Each reports the same program and digest |
 | An override naming an incompatible engine, with a compatible one on PATH | Refused; nothing falls back |
 | A managed session whose supervisor path is not executable | Refused; no other candidate is consulted |
@@ -189,8 +190,8 @@ install verb when present).
   spec-spine's (its draft spec 188).
 - The linked producer used for scaffolding, which stays linked (spec-spine
   spec 170 section 3.1); the target-versus-linked guard is spec 018's.
-- Removing `.tooling/bin` or changing this repository's `Makefile`, which is
-  an authority change decided on its own.
+- Moving the install location and changing this repository's `Makefile`,
+  which spec 030 does on its own.
 
 ## 5. Resolved decisions
 
@@ -203,6 +204,13 @@ direction puts per-project engine selection in spec-spine's launcher. Until
 that launcher is present, `.tooling/bin` is the only pin-exact install this
 product itself creates, and ignoring it is what makes the correct engine
 invisible today.
+
+**2026-09-30: the repository-local candidate is `.bin/spec-spine`.** The owner
+decided that neither spec-spine nor this product uses `.tooling/bin`. Spec 030
+moves the setup profile's install to `.bin/`, and this resolution, the four
+delivered hooks and the refusal's remedy text name `.bin` accordingly. A
+`.tooling/bin/spec-spine` left in a checkout is not a candidate: reading both
+would keep the retired location alive as a second answer.
 
 **2026-09-30: `--json` support is read from the verb's help, not from a
 version.** The probe already runs `check --help` to establish the verb (008
@@ -269,7 +277,7 @@ the returned path keeps the recorded and executed identities the same.
 ## Verification
 
 Each line is one command. The fixtures are stub engines answering different
-versions in `.tooling/bin`, `target/release` and on PATH, and a stub launcher.
+versions in `.bin`, `target/release` and on PATH, and a stub launcher.
 
 ```verify:cli
 cargo test -p statecraft-cli --test one_resolved_judge

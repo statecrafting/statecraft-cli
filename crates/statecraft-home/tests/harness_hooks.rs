@@ -619,18 +619,13 @@ fn contract_2_the_repositorys_own_build_beats_path() {
     }
 }
 
-/// Spec 028 section 3.2: the repository-local `.tooling/bin` install beats the
+/// Spec 028 section 3.2: the repository-local `.bin` install beats the
 /// repository build and `PATH`, the order the verbs use.
 #[test]
 fn contract_2_the_repository_local_install_beats_the_build_and_path() {
     for file in ALL {
         let fixture = Fixture::new();
-        fixture.stub(
-            &fixture.root.join(".tooling/bin/spec-spine"),
-            "local",
-            0,
-            true,
-        );
+        fixture.stub(&fixture.root.join(".bin/spec-spine"), "local", 0, true);
         fixture.stub(
             &fixture.root.join("target/release/spec-spine"),
             "repo",

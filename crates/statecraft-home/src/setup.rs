@@ -35,7 +35,7 @@ use std::path::Path;
 /// The one registered profile.
 pub const PROFILE_ID: &str = "github-actions-rust";
 /// Its revision.
-pub const REVISION: u32 = 12;
+pub const REVISION: u32 = 13;
 /// Where the rendered policy document lives in the target.
 pub const POLICY_PATH: &str = ".statecraft/setup/github-actions-rust.json";
 /// The resume record, under the project's runtime state.
@@ -63,7 +63,7 @@ pub const REVIEW_TOOL_VERSION: &str = "2.1.116";
 pub const SOURCE_PREFIX: &str = "statecraft-setup:";
 /// The ignore fragment the profile adds to the governance one.
 pub const IGNORE_FRAGMENT: &str =
-    "# The repository-local spec-spine the setup profile installs.\n.tooling/\n";
+    "# The repository-local spec-spine the setup profile installs.\n.bin/\n";
 /// The visible skip classes, non-blocking for ordinary pull requests (S-2).
 pub const SKIP_CLASSES: [&str; 5] = ["draft", "fork", "dependabot", "oversized", "transient"];
 /// The places a CODEOWNERS file is read from; one existing anywhere is the
@@ -277,17 +277,17 @@ pub fn commands() -> serde_json::Value {
 /// enforced or reported, an unresolved claim refused or reported (revision 9,
 /// spec 010), and the declared authored-content script, if any.
 pub fn commands_for(p: &Parameters) -> serde_json::Value {
-    let mut coverage = vec![".tooling/bin/spec-spine", "index", "coverage"];
+    let mut coverage = vec![".bin/spec-spine", "index", "coverage"];
     if p.enforce_coverage {
         coverage.push("--fail-on-untraced");
     }
-    let mut index_check = vec![".tooling/bin/spec-spine", "index", "check"];
+    let mut index_check = vec![".bin/spec-spine", "index", "check"];
     if p.fail_on_unresolved {
         index_check.push("--fail-on-unresolved");
     }
     let mut governance = vec![
-        serde_json::json!([".tooling/bin/spec-spine", "check", "--fail-on-warn"]),
-        serde_json::json!([".tooling/bin/spec-spine", "lint", "--fail-on-warn"]),
+        serde_json::json!([".bin/spec-spine", "check", "--fail-on-warn"]),
+        serde_json::json!([".bin/spec-spine", "lint", "--fail-on-warn"]),
         serde_json::json!(coverage),
         serde_json::json!(index_check),
     ];
@@ -2327,12 +2327,7 @@ mod tests {
         let c = commands_for(&p);
         assert_eq!(
             c["governance"][2],
-            serde_json::json!([
-                ".tooling/bin/spec-spine",
-                "index",
-                "coverage",
-                "--fail-on-untraced"
-            ])
+            serde_json::json!([".bin/spec-spine", "index", "coverage", "--fail-on-untraced"])
         );
         assert_eq!(c["governance"][4], serde_json::json!(["scripts/check.sh"]));
     }
@@ -2365,16 +2360,11 @@ mod tests {
         let (on, off) = (commands_for(&d), commands_for(&off));
         assert_eq!(
             on["governance"][3],
-            serde_json::json!([
-                ".tooling/bin/spec-spine",
-                "index",
-                "check",
-                "--fail-on-unresolved"
-            ])
+            serde_json::json!([".bin/spec-spine", "index", "check", "--fail-on-unresolved"])
         );
         assert_eq!(
             off["governance"][3],
-            serde_json::json!([".tooling/bin/spec-spine", "index", "check"])
+            serde_json::json!([".bin/spec-spine", "index", "check"])
         );
         let mut rest = on.clone();
         rest["governance"][3] = off["governance"][3].clone();

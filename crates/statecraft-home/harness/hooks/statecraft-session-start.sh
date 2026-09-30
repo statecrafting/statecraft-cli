@@ -22,7 +22,7 @@ fi
 # and a broken or incompatible one refuses rather than falling back. The
 # retired SPEC_SPINE_BIN is reported as ignored and never selects. Otherwise, in
 # spec 028's order: the engine spec-spine's launcher resolves, the
-# repository-local .tooling/bin/spec-spine, the repository's own
+# repository-local .bin/spec-spine, the repository's own
 # target/release/spec-spine, then PATH; the first one compatible with the
 # repository's pin ([meta] required_version) judges; each one passed over is
 # named. An unpinned repository takes the first candidate and says it is
@@ -121,7 +121,7 @@ spec_spine_resolve() {
     IFS=:
   done
   IFS=$sc_ifs
-  for pair in "launcher|$sc_lpath" "repository-local install|$1/.tooling/bin/spec-spine" \
+  for pair in "launcher|$sc_lpath" "repository-local install|$1/.bin/spec-spine" \
               "repository build|$1/target/release/spec-spine" "PATH|$sc_path"; do
     rule=${pair%%|*}; c=${pair#*|}
     { [ -n "$c" ] && [ -f "$c" ] && [ -x "$c" ]; } || continue

@@ -51,7 +51,7 @@ date and the command that established it. Nothing else in this section moved.
 
 | ID | Constraint | How it was established |
 |---|---|---|
-| C-01 | The binary this corpus is compiled, linted and pinned against is the release `required_version` in `spec-spine.toml` names, installed at the repository-local `.tooling/bin/spec-spine`. The shared `~/.cargo/bin/spec-spine` is not this repository's binary and is not consulted by `make`. Which release that is, and since when, is recorded in `docs/adoption/spec-spine.md`, which also keeps this row's dated history (restated 2026-09-24 under `D-06` as amended). | `.tooling/bin/spec-spine --version`; `make tools` installs it from `required_version`. |
+| C-01 | The binary this corpus is compiled, linted and pinned against is the release `required_version` in `spec-spine.toml` names, installed at the repository-local `.bin/spec-spine` (`.tooling/bin/spec-spine` until 2026-09-30, spec 030). The shared `~/.cargo/bin/spec-spine` is not this repository's binary and is not consulted by `make`. Which release that is, and since when, is recorded in `docs/adoption/spec-spine.md`, which also keeps this row's dated history (restated 2026-09-24 under `D-06` as amended). | `.bin/spec-spine --version`; `make tools` installs it from `required_version`. |
 | C-02 | Unreleased producer work is never described here as available. The development checkout at `~/DevWork/spec-spine` may be ahead of every release; **no feature of an unreleased tree may be described here as available**. Which releases exist and which one is adopted is recorded in `docs/adoption/spec-spine.md`, which also keeps this row's dated history (restated 2026-09-24 under `D-06` as amended). | `git tag --sort=-creatordate` in that checkout; `cargo search spec-spine-cli`. |
 | C-03 | spec-spine 0.18.0's lifecycle is `status` in {draft, approved, superseded, retired} and `implementation` in {pending, in-progress, complete, n-a, deferred} or absent. `approved` plus `pending` is a work order; `draft` is never a claim about code; `approved` with an absent `implementation` makes an unresolved unit an **error**. | `standards/spec/contract.md`, scaffolded by the installed binary. |
 | C-04 | A corpus with no code is a supported steady state. `index coverage --fail-on-untraced` **refuses** on a code-free tree rather than passing vacuously, so it must not be in this repository's gate yet. | `~/DevWork/spec-spine/docs/specify-first.md`. |
@@ -260,7 +260,7 @@ shared by every project on the machine: work in the spec-spine checkout replaced
 it with 0.20.0, and every governed read in this repository then refused on the
 version check. The refusal is the good case. The bad one is a project whose pin
 happens to admit the replacement, which is then governed by a version it never
-adopted and cannot tell. So the binary is installed at `.tooling/bin`,
+adopted and cannot tell. So the binary is installed at `.tooling/bin` (at `.bin` since 2026-09-30, spec 030),
 gitignored, by `make tools`, which reads the version from `required_version` so
 the number is authored once. `make` prefers the local copy; CI uses only it.
 

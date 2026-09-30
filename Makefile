@@ -1,13 +1,13 @@
 # The check surface for this repository. Two variables, both overridable:
 #
 #   SPEC_SPINE  the binary to govern with. It resolves to the repository-local
-#               .tooling/bin/spec-spine when that exists, and only otherwise to
+#               .bin/spec-spine when that exists, and only otherwise to
 #               whatever is on PATH. The pin in spec-spine.toml is checked by
 #               the binary itself on every run.
 #   BASE        the ref the coupling gate compares against, resolved from the
 #               repository rather than assumed to be origin/main.
 #
-#   make tools           install the pinned spec-spine into .tooling/bin
+#   make tools           install the pinned spec-spine into .bin
 #   make gate            read-only: everything CI runs, in order
 #   make refresh         writing: recompute the committed shard trees
 #   make verify SPEC=001 one spec's declared acceptance
@@ -22,7 +22,7 @@
 #
 # Since S-5 (2026-09-24) `gate` and `code` run scripts/statecraft/gate.sh, the
 # script the rendered CI runs, so the local and CI definitions are one. That
-# script uses only .tooling/bin/spec-spine; SPEC_SPINE still selects the binary
+# script uses only .bin/spec-spine; SPEC_SPINE still selects the binary
 # for the other targets here.
 
 # The pinned version, read from the single place it is authored. Nothing here
@@ -36,7 +36,7 @@ SPEC_SPINE_VERSION := $(shell sed -n 's/^required_version = "=\(.*\)"/\1/p' spec
 # it last answers for all of them; this repository was measurably governed by the
 # wrong version that way. The local copy is gitignored, installed by `make tools`
 # at the exact pinned version, and preferred automatically when present.
-SPEC_SPINE_LOCAL := .tooling/bin/spec-spine
+SPEC_SPINE_LOCAL := .bin/spec-spine
 SPEC_SPINE ?= $(if $(wildcard $(SPEC_SPINE_LOCAL)),$(SPEC_SPINE_LOCAL),spec-spine)
 
 # The same resolution order the push gate uses: an exported default branch, then
@@ -67,17 +67,17 @@ SKIP_NOTE := no crate exists yet, so the workspace has no members and cargo has 
 ## coverage with the first source file, unresolved with the last unbuilt claim.
 ## A new spec claiming a crate it has not written yet will now fail the gate,
 ## which is the intended cost of having none outstanding.
-## Install the pinned spec-spine into .tooling/bin. Idempotent: `cargo install`
-## is a no-op when the same version is already there, so CI and a local session
-## run the same line. --locked builds spec-spine's own lockfile rather than a
-## freshly resolved one, so two installs of one version are the same binary.
+## Install the pinned spec-spine into .bin, through the rendered installer the
+## CI runs, so a local session and CI install the same way. Idempotent: it does
+## nothing when .bin/spec-spine already answers the pinned version. --locked
+## builds spec-spine's own lockfile rather than a freshly resolved one, so two
+## installs of one version are the same binary.
 tools:
 	@test -n "$(SPEC_SPINE_VERSION)" || { echo "no required_version in spec-spine.toml"; exit 3; }
-	cargo install spec-spine-cli --version $(SPEC_SPINE_VERSION) --locked --root .tooling
-	$(SPEC_SPINE_LOCAL) --version
+	sh scripts/statecraft/install-spec-spine.sh
 
 gate:
-	@echo "governing with: .tooling/bin/spec-spine (pin =$(SPEC_SPINE_VERSION)), through the rendered gate"
+	@echo "governing with: .bin/spec-spine (pin =$(SPEC_SPINE_VERSION)), through the rendered gate"
 	sh scripts/statecraft/gate.sh governance
 
 ## The Rust half of the check surface, as CI runs it. The four verbs below
@@ -148,7 +148,7 @@ status:
 	$(SPEC_SPINE) registry plan
 
 help:
-	@echo "tools    install the pinned spec-spine ($(SPEC_SPINE_VERSION)) into .tooling/bin"
+	@echo "tools    install the pinned spec-spine ($(SPEC_SPINE_VERSION)) into .bin"
 	@echo "gate     the corpus check surface: check, lint, authored content"
 	@echo "code     the workspace check surface: build, test, clippy, fmt"
 	@echo "refresh  recompute the committed shard trees"

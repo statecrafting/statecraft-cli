@@ -144,6 +144,9 @@ fn an_unmodified_file_is_replaced_and_a_customized_one_is_kept_with_three_digest
     );
 }
 
+const R12_GATE: &str = include_str!("support/profile-r12/gate.sh");
+const R12_INSTALL: &str = include_str!("support/profile-r12/install-spec-spine.sh");
+const R12_CI: &str = include_str!("support/profile-r12/statecraft-ci.yml");
 const R11_GATE: &str = include_str!("support/profile-r11/gate.sh");
 const R11_CI_GATE: &str = include_str!("support/profile-r11/ci-gate.sh");
 const R11_AI_REVIEW: &str = include_str!("support/profile-r11/ai-review.sh");
@@ -177,12 +180,31 @@ fn revision_nine() -> Profile {
     r9
 }
 
+/// Revision 12 of the registered profile: the three templates revision 13
+/// changed (spec 030), as revision 12 shipped them (main at c0469a3), which
+/// install and read the pinned engine at `.tooling/bin`.
+fn revision_twelve() -> Profile {
+    let mut r12 = Profile::registered();
+    assert_eq!(r12.revision, 13, "the registered profile is revision 13");
+    r12.revision = 12;
+    for t in &mut r12.templates {
+        let old = match t.path.as_str() {
+            "scripts/statecraft/gate.sh" => R12_GATE,
+            "scripts/statecraft/install-spec-spine.sh" => R12_INSTALL,
+            ".github/workflows/statecraft-ci.yml" => R12_CI,
+            _ => continue,
+        };
+        assert_ne!(t.body, old, "{}: revision 13 changed it", t.path);
+        t.body = old.to_string();
+    }
+    r12
+}
+
 /// Revision 11 of the registered profile: the five templates revision 12
 /// changed (spec 024), as revision 11 shipped them (spec 023's branch at
 /// c6185b5).
 fn revision_eleven() -> Profile {
-    let mut r11 = Profile::registered();
-    assert_eq!(r11.revision, 12, "the registered profile is revision 12");
+    let mut r11 = revision_twelve();
     r11.revision = 11;
     for t in &mut r11.templates {
         let old = match t.path.as_str() {
@@ -975,7 +997,7 @@ fn a_revision_eight_project_upgrades_to_revision_nine() {
         let policy: serde_json::Value =
             serde_json::from_str(&std::fs::read_to_string(root.join(setup::POLICY_PATH)).unwrap())
                 .unwrap();
-        let mut index_check = serde_json::json!([".tooling/bin/spec-spine", "index", "check"]);
+        let mut index_check = serde_json::json!([".bin/spec-spine", "index", "check"]);
         if on {
             index_check
                 .as_array_mut()
@@ -1144,7 +1166,7 @@ fn a_revision_eleven_project_upgrades_to_revision_twelve() {
         assert!(before.contains("profile github-actions-rust revision 11"));
         assert!(!before.contains("CONTEXT_TOKENS"), "{before}");
 
-        let r12 = Profile::registered();
+        let r12 = revision_twelve();
         assert_ne!(r12.identity(), r11.identity());
         let block = manifest.project.setup.as_ref().unwrap().parameters.clone();
         assert!(plan_and_apply_with(root, &r12, &mut manifest, &block).whole());
@@ -1196,4 +1218,64 @@ fn a_revision_eleven_project_upgrades_to_revision_twelve() {
         );
         assert_eq!(std::fs::read_to_string(root.join(review)).unwrap(), after);
     }
+}
+
+// Spec 030: revision 13 installs and reads the pinned engine at `.bin/`, and
+// a revision-12 project's three managed files that named `.tooling/bin` are
+// replaced by the ordinary managed upgrade.
+#[test]
+fn a_revision_twelve_project_upgrades_to_revision_thirteen() {
+    let dir = project();
+    let root = dir.path();
+    let mut manifest = Manifest::new(Pins {
+        product: "0.0.0".into(),
+        spec_spine: "unpinned".into(),
+        adapters: Default::default(),
+        producer: None,
+    });
+    let files = [
+        "scripts/statecraft/gate.sh",
+        "scripts/statecraft/install-spec-spine.sh",
+        ".github/workflows/statecraft-ci.yml",
+    ];
+    let r12 = revision_twelve();
+    assert!(plan_and_apply_with(root, &r12, &mut manifest, &BTreeMap::new()).whole());
+    for f in files {
+        let text = std::fs::read_to_string(root.join(f)).unwrap();
+        assert!(text.contains(".tooling/bin/spec-spine"), "{f}: {text}");
+    }
+
+    let r13 = Profile::registered();
+    assert_ne!(r13.identity(), r12.identity());
+    let block = manifest.project.setup.as_ref().unwrap().parameters.clone();
+    let upgrade = plan_and_apply_with(root, &r13, &mut manifest, &block);
+    assert!(upgrade.whole());
+    for f in files {
+        let file = upgrade.files.iter().find(|p| p.path == f).unwrap();
+        assert_eq!(file.action, Action::Replace, "{f}");
+        let text = std::fs::read_to_string(root.join(f)).unwrap();
+        assert!(text.contains("revision 13"), "{f}");
+        assert!(text.contains(".bin/spec-spine"), "{f}: {text}");
+        assert!(!text.contains(".tooling"), "{f}: {text}");
+    }
+    let policy: serde_json::Value =
+        serde_json::from_str(&std::fs::read_to_string(root.join(setup::POLICY_PATH)).unwrap())
+            .unwrap();
+    assert_eq!(policy["revision"], 13);
+    for command in policy["commands"]["governance"].as_array().unwrap() {
+        let program = command[0].as_str().unwrap();
+        assert!(!program.contains(".tooling"), "{policy}");
+    }
+    assert_eq!(policy["commands"]["governance"][0][0], ".bin/spec-spine");
+    assert_eq!(manifest.project.setup.as_ref().unwrap().revision, 13);
+    assert!(setup::IGNORE_FRAGMENT.contains("\n.bin/\n"));
+
+    let again = plan_and_apply_with(root, &r13, &mut manifest, &block);
+    assert!(again.whole());
+    assert!(
+        again
+            .files
+            .iter()
+            .all(|f| matches!(f.action, Action::Unchanged | Action::LeftAlone { .. }))
+    );
 }

@@ -45,7 +45,7 @@ target
 # `~/.cargo/bin` install: one binary on PATH is replaced by whichever project
 # built it last, and a governed read then either refuses on the pin or, worse,
 # answers under a version this repository never adopted.
-.tooling/
+.bin/
 
 # JetBrains project files are per-developer, not per-repository.
 .idea/

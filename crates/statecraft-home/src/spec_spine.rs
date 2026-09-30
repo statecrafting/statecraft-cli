@@ -17,7 +17,7 @@
 //! 3. **Otherwise** the convention candidates, as spec 028 section 3.2 orders
 //!    them: the engine spec-spine's own launcher resolves for the repository
 //!    (asked with `launcher resolve --json`, never trusted to run it), the
-//!    repository-local `.tooling/bin/spec-spine`, the repository's own
+//!    repository-local `.bin/spec-spine`, the repository's own
 //!    `target/release/spec-spine`, and then the first `spec-spine` on `PATH`
 //!    that is not the launcher. The first the pin admits is selected, and
 //!    each one passed over is named. An unpinned repository takes the first
@@ -70,7 +70,7 @@ pub enum Rule {
     Override,
     /// The engine spec-spine's launcher resolved for the repository.
     Launcher,
-    /// The repository-local install, `.tooling/bin/spec-spine`.
+    /// The repository-local install, `.bin/spec-spine`.
     RepositoryLocal,
     /// The repository's own `target/release/spec-spine`.
     RepositoryBuild,
@@ -340,10 +340,7 @@ fn conventions(root: &Path, pin: &Pin, path_var: Option<&str>) -> Selection {
             )),
         }
     }
-    candidates.push((
-        root.join(".tooling/bin").join(PROGRAM),
-        Rule::RepositoryLocal,
-    ));
+    candidates.push((root.join(".bin").join(PROGRAM), Rule::RepositoryLocal));
     candidates.push((
         root.join("target/release").join(PROGRAM),
         Rule::RepositoryBuild,
@@ -411,7 +408,7 @@ fn conventions(root: &Path, pin: &Pin, path_var: Option<&str>) -> Selection {
 
 /// The remedy a refusal names (spec 028 section 3.5): resolution never
 /// prepares an engine itself.
-pub const PREPARE: &str = "Prepare the pinned engine with `make tools` (into .tooling/bin), or \
+pub const PREPARE: &str = "Prepare the pinned engine with `make tools` (into .bin), or \
                            with `spec-spine launcher install` where spec-spine's launcher is \
                            installed; nothing was downloaded";
 
@@ -742,7 +739,7 @@ impl NotSelected {
                 // and has no binary learns which name to set instead.
                 let mut detail = format!(
                     "no spec-spine was found through the launcher, in the repository's \
-                     .tooling/bin or target/release, or on PATH. {PREPARE}"
+                     .bin or target/release, or on PATH. {PREPARE}"
                 );
                 for remark in selection.remarks() {
                     detail.push_str("; ");
@@ -997,7 +994,7 @@ mod tests {
         let bin = dir.path().join("bin");
         std::fs::create_dir_all(&root).unwrap();
         pinned(&root, Some("=0.23.0"));
-        stub(&root.join(".tooling/bin").join(PROGRAM), "0.23.0");
+        stub(&root.join(".bin").join(PROGRAM), "0.23.0");
         stub(&root.join("target/release").join(PROGRAM), "0.23.0");
         stub(&bin.join(PROGRAM), "0.23.0");
         let bin_s = bin.display().to_string();
@@ -1012,7 +1009,7 @@ mod tests {
         assert!(selected.describe().contains("rule repository-local"));
 
         // Incompatible: passed over, named, and recorded as considered.
-        stub(&root.join(".tooling/bin").join(PROGRAM), "0.22.0");
+        stub(&root.join(".bin").join(PROGRAM), "0.22.0");
         let s = select(&root, &env(&[("PATH", &bin_s)]));
         assert_eq!(s.outcome.clone().unwrap().rule, Rule::RepositoryBuild);
         assert!(s.passed_over[0].contains("repository-local install, reports 0.22.0"));

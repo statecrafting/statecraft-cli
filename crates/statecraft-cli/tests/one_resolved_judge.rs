@@ -1,7 +1,7 @@
 //! Spec 028 V-1: one resolved judge.
 //!
 //! A target pins `=0.23.0` and finds three candidate engines: an incompatible
-//! one first on `PATH`, a compatible one in the repository-local `.tooling/bin`
+//! one first on `PATH`, a compatible one in the repository-local `.bin`
 //! and an incompatible repository build. Every verb driven here asks spec-spine
 //! through the one resolution, so every governance call lands on the same
 //! file, and `doctor` names that file, its rule, its version and its digest.
@@ -65,7 +65,7 @@ impl Fixture {
         self.dir.path().join("calls")
     }
     fn local(&self) -> PathBuf {
-        self.target().join(".tooling/bin/spec-spine")
+        self.target().join(".bin/spec-spine")
     }
     fn build(&self) -> PathBuf {
         self.target().join("target/release/spec-spine")

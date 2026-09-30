@@ -28,7 +28,7 @@ use std::path::{Path, PathBuf};
 /// what to run rather than skipping: a check that quietly does not run is worse
 /// than one that fails.
 pub fn spec_spine_program() -> String {
-    let local = repo_root().join(".tooling/bin/spec-spine");
+    let local = repo_root().join(".bin/spec-spine");
     if local.is_file() {
         return local.display().to_string();
     }
@@ -42,7 +42,7 @@ pub fn spec_spine_program() -> String {
     }
     panic!(
         "no spec-spine is available. Run `make tools` to install the pinned version into \
-         .tooling/bin; this suite asserts against the real governance tool and will not \
+         .bin; this suite asserts against the real governance tool and will not \
          substitute a stand-in for it."
     );
 }

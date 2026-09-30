@@ -1,0 +1,105 @@
+{
+  "record": {
+    "amends": [
+      "001-boundaries-and-authority",
+      "002-environment-lifecycle",
+      "010-profile-unresolved-claims",
+      "023-contained-commit-walk",
+      "024-review-budget-and-ratification"
+    ],
+    "created": "2026-09-30",
+    "dependsOn": [
+      "002-environment-lifecycle",
+      "024-review-budget-and-ratification",
+      "028-one-resolved-judge"
+    ],
+    "extends": [
+      {
+        "nature": "corrective",
+        "spec": "002-environment-lifecycle",
+        "unit": {
+          "kind": "directory",
+          "path": "crates/statecraft-home/"
+        }
+      },
+      {
+        "nature": "corrective",
+        "spec": "006-command-surface",
+        "unit": {
+          "kind": "directory",
+          "path": "crates/statecraft-cli/"
+        }
+      },
+      {
+        "nature": "corrective",
+        "spec": "001-boundaries-and-authority",
+        "unit": {
+          "kind": "file",
+          "path": "docs/decisions/00-founding-decisions.md"
+        }
+      }
+    ],
+    "id": "030-engine-in-bin",
+    "implementation": "complete",
+    "obligations": [
+      {
+        "anchor": "3-1-one-location",
+        "id": "R-1",
+        "kind": "requirement",
+        "text": "Revision 13 installs the pinned spec-spine at `.bin/spec-spine`, and every rendered file and policy command that runs the repository-local engine names that path."
+      },
+      {
+        "anchor": "3-1-one-location",
+        "id": "R-2",
+        "kind": "requirement",
+        "text": "No verb, rendered file or delivered hook of this product reads `.tooling/bin`."
+      },
+      {
+        "anchor": "3-3-upgrade",
+        "id": "R-3",
+        "kind": "requirement",
+        "text": "A revision-12 project upgrades to revision 13 through the ordinary managed upgrade, and a second plan of the same selection writes nothing."
+      },
+      {
+        "anchor": "verification",
+        "id": "V-1",
+        "inputs": [
+          "crates/statecraft-home/tests/setup_upgrade.rs",
+          "crates/statecraft-home/tests/support/profile-r12/"
+        ],
+        "kind": "verification",
+        "text": "The revision-12 to revision-13 upgrade replaces the three templates that named `.tooling/bin`, and the resolver and hooks select `.bin/spec-spine`."
+      }
+    ],
+    "sectionDigests": {
+      "030-the-repository-local-engine-lives-in-bin": "0093c5185e2f809fc665a44d787bbfdac88f2acccd7091985c91eacb9f53e22a",
+      "1-purpose": "ca3fc8fa7f3d2b9b51f116e13bbb74d79cb964e8e3bde27b51991a7594ed1599",
+      "2-territory": "bb81b2b32f3a40e1f6051f64f3790bdea0bdcdeacecc37e8de69befd454bb903",
+      "3-1-one-location": "fcaa8bf37b0db2fbe0fda6d49eb21db4812d38d4590b0809feb010e136644bda",
+      "3-2-this-repository": "acb7dc16b24da8c36277a51e51d923e3dd5f96e059f34a38b2cbfc56ea99d4f0",
+      "3-3-upgrade": "d207d71d96ace681282f836570b93c3c6eef48ee58e6a4ca58f65d8de56d6754",
+      "3-behavior": "f01053941bfef3cc94609aa200e039675865a46ea049d82df7d51f63bac70077",
+      "4-out-of-scope": "9ddbfeeade73d23c3668248ef0b4dcef419feea36fc1e6f1e548309db3e3964e",
+      "5-resolved-decisions": "4f58d97c1f8a91435211ff7cc75941c489d09f00043314f4939adfd863c3b8ab",
+      "verification": "65baa6aa8e6831b9ac3b12762c42d19915dcdf149dc456a7762f56f21a7d7e3c"
+    },
+    "sectionHeadings": [
+      "030: The repository-local engine lives in .bin/",
+      "1. Purpose",
+      "2. Territory",
+      "3. Behavior",
+      "3.1 One location",
+      "3.2 This repository",
+      "3.3 Upgrade",
+      "4. Out of scope",
+      "5. Resolved decisions",
+      "Verification"
+    ],
+    "specPath": "specs/030-engine-in-bin/spec.md",
+    "status": "draft",
+    "summary": "The owner decided that neither spec-spine nor Statecraft uses `.tooling/bin` and that the repository-local spec-spine is `.bin/spec-spine`. Profile github-actions-rust revision 13 installs the pinned engine there, its gate, commit walk, CI cache and policy commands read it there, and its ignore fragment ignores `.bin/`. The resolver's repository-local candidate, the delivered hooks and this repository's own `Makefile` follow. A revision-12 project converges through the ordinary managed upgrade.\n",
+    "title": "Setup profile revision 13: the repository-local engine lives in .bin/"
+  },
+  "shardHash": "e61ec6640c0d7736fcdc2812788273172b25437bbc7b5a9ffcea77f355bce04e",
+  "specVersion": "1.9.0"
+}

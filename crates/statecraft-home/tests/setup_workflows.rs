@@ -9,7 +9,7 @@
 //! new expression cannot pass by being silently substituted with nothing.
 //!
 //! Revision 4's governance steps run the same way, with a stubbed
-//! `spec-spine` (at the fixture's `.tooling/bin`) and a stubbed `cargo`, and
+//! `spec-spine` (at the fixture's `.bin`) and a stubbed `cargo`, and
 //! the real `scripts/check-authored-content.sh` as the declared script.
 //!
 //! The mutation tests edit one blocking branch at a time in the rendered
@@ -1914,12 +1914,14 @@ const EM: &str = "\u{2014}";
 const SPEC_SPINE: &str = r#"#!/bin/sh
 printf '%s | %s\n' "$PWD" "$*" >> "$STUB_STATE/spec-spine-calls"
 # spec-spine's containment rule (its spec 144, from 0.28.0): a repository is
-# never read through a .tooling/bin/spec-spine link that leaves it. Every
-# answer records whether the binary it ran as was contained.
-ss=.tooling/bin/spec-spine
+# never read through a link that leaves it. Every answer records whether the
+# binary it ran as was contained. It judges the path it was run by, so a
+# revision-12 gate's .tooling/bin copy and a revision-13 gate's .bin copy are
+# held to the same rule.
+ss=$0
 if [ -L "$ss" ]; then
   to=$(readlink "$ss")
-  case "$to" in /*) ;; *) to=".tooling/bin/$to" ;; esac
+  case "$to" in /*) ;; *) to="$(dirname "$ss")/$to" ;; esac
   at=$(cd "$(dirname "$to")" 2>/dev/null && pwd -P) || at=/nonexistent
   case "$at/" in
     "$(pwd -P)"/*) ;;
@@ -2042,16 +2044,16 @@ impl Gov {
         write(root, "src/lib.rs", "pub fn one() -> u32 {\n    1\n}\n");
         write(root, "README.md", "# fixture\n");
         write(root, "spec-spine.toml", TOML);
-        write(root, ".gitignore", ".tooling/\n");
+        write(root, ".gitignore", ".bin/\n");
         std::fs::create_dir_all(root.join("scripts")).unwrap();
         statecraft_adapter::fixture::install_script(&root.join(DECLARED), CHECK_AUTHORED, 0o755)
             .unwrap();
         render_profile(root, profile, params);
         // A regular file, as install-spec-spine.sh leaves it: the stub
         // refuses a link that leaves the repository, as spec-spine does.
-        std::fs::create_dir_all(root.join(".tooling/bin")).unwrap();
+        std::fs::create_dir_all(root.join(".bin")).unwrap();
         statecraft_adapter::fixture::install_script(
-            &root.join(".tooling/bin/spec-spine"),
+            &root.join(".bin/spec-spine"),
             SPEC_SPINE,
             0o755,
         )
@@ -2901,10 +2903,7 @@ fn revision_four_adds_steps_not_jobs_and_keeps_the_gate_read_only() {
                 .unwrap()
                 .starts_with("actions/cache@")
         );
-        assert_eq!(
-            cache["with"]["path"].as_str(),
-            Some(".tooling/bin/spec-spine")
-        );
+        assert_eq!(cache["with"]["path"].as_str(), Some(".bin/spec-spine"));
         assert!(
             cache["with"]["key"]
                 .as_str()
@@ -3563,7 +3562,7 @@ fn the_rendered_gate_exits_in_the_family_contract() {
     let declared = [("governance.authored_content", serde_json::json!(DECLARED))];
     let gov = Gov::new(&declared);
     let root = gov.root();
-    let ss = root.join(".tooling/bin/spec-spine");
+    let ss = root.join(".bin/spec-spine");
     std::fs::remove_file(&ss).unwrap();
     std::os::unix::fs::symlink(exit_bin().join("spec-spine"), &ss).unwrap();
 
@@ -3716,7 +3715,7 @@ fn the_rendered_gate_exits_in_the_family_contract() {
 fn the_rendered_installer_exits_in_the_family_contract() {
     let gov = Gov::new(&[]);
     let root = gov.root();
-    std::fs::remove_file(root.join(".tooling/bin/spec-spine")).unwrap();
+    std::fs::remove_file(root.join(".bin/spec-spine")).unwrap();
     let run = |state: &[(&str, &str)]| {
         let stub_state = tempfile::tempdir().unwrap();
         for (name, code) in state {
