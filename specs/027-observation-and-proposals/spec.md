@@ -1,7 +1,7 @@
 ---
 id: "027-observation-and-proposals"
 title: "Observation and proposals: noticing that a repository's governed truth changed, and proposing typed work without acting on it"
-status: draft
+status: approved
 implementation: pending
 created: "2026-09-28"
 summary: >
