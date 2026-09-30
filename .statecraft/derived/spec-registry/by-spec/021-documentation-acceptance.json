@@ -73,21 +73,21 @@
       }
     ],
     "sectionDigests": {
-      "021-independent-documentation-acceptance-and-review": "4afcff498b6be9acae0a0b6f275516d7224d3ab59af576c796748b2e6d506195",
+      "021-independent-documentation-acceptance-and-review": "62e0166defe673ccb376b1400db6e2cb3d27742a73fe3d06a8347f90a18fc16f",
       "1-purpose": "f921d21dc2acd0050c4d2222cdaad28b04a276cffc257fdd193b8cfc92e0f49b",
       "2-territory-and-prerequisite": "5ce9c12370358e56ddc2dc688cf69763ad36ffe9a47e084e680b2c55b192cb76",
       "3-1-the-acceptance-subject": "02c89b6da6b75ec97dc28cf1d2de925a14b09344432dd798e05e0c7547063fff",
       "3-10-command-projections": "b2ceef1a43aeb1ab14ef06c8c54d77cca49a26a4b8164305d373b5b89175db7d",
-      "3-11-observable-negative-cases": "e7e9d2deaaa13f23275104f46004e305c0e1afb14c1c380d82c9b5a81b000587",
+      "3-11-observable-negative-cases": "f56ffb23549bbd35bb8e3b50dd235124c364e41bec4990e2a94790070ce63c11",
       "3-2-intended-observed-validated-reviewed-accepted": "df77fb3140a45337c0ccf3dc584d0d668bae8c44fbb2d852ef412b0e1d5b670f",
       "3-3-independent-dimensions": "6377c07dd8f51319a0d694f3f5f214c75d1b7846c2154443be4690d6cbc8b8e4",
       "3-4-reviewer-records-and-authority": "4d156b7361e5578c35e5c2c260bd272f2a7135a4ccfc5cf7235f26ba9fb1d744",
-      "3-5-claim-and-content-review": "568dac0dcc7924b4644d6f0f59e1116a6969b91fb2f7bf59e6dc978d45c1d52e",
+      "3-5-claim-and-content-review": "f2e40b2c27565a95e65363d1ce6b090d409b439950fe4b0745a2fab33766832e",
       "3-6-artifact-validation": "57f4d15ce510325ff2a9c61bb507b678cf607088e0173844e78d9646e3854e9c",
       "3-7-freshness-and-manifest-closure": "87e5aad82ad46bdf528859156b7fc552a97173e2e19f22f78b077dc9df647f4f",
       "3-8-corrections-and-re-review": "877796fb305f8d3f17c78d6a0c643ef1ee9cdc9a52d51ebe277a0fcfdfebc8ba",
       "3-9-final-result-and-retention": "6d96b6007ec7f60b81733df77f832b76503f60600729d3b571e175841191d6db",
-      "3-behavior": "31490e145d349b83e6aa9b912fc539c7740b8057bdb6da1cfcbdac046911c829",
+      "3-behavior": "ecc3b8b5dd634fa6c1a31b9dc7c10cdd986c5fa369cb654c9a03353ff2dfba90",
       "4-out-of-scope": "8d24d200c45d48c01db44da0d5b6f594ce2f942826371dd06d1242e1a53bdd00",
       "5-resolved-decisions": "a4d9be4a196157555b17fa970535d66c99c243aba1ae72c3db4bc7dc0aeb8eb5",
       "verification": "3755305d9f7bd188ed84fa3302d30b3ffdba9d177bde41902c4322bb45c3613c"
@@ -117,6 +117,6 @@
     "summary": "Amends Statecraft's run, acceptance, and command contracts with an independent documentation-acceptance record. It keeps intended delivery, observed transport, schema validation, citation resolution, semantic review, and acceptance as separate facts; requires claim-grade support, preserved unknowns and contradictions, valid artifacts, and a fresh context manifest; and grants no application or publication authority.\n",
     "title": "Independent documentation acceptance and review"
   },
-  "shardHash": "9c50b79edfd597bf342ff861301426f357923046492d384f2ee6642ba3a8f158",
+  "shardHash": "2660729eef735d0090a4fac4afbacf4609004b8150f6d016e75899bddf29e35d",
   "specVersion": "1.9.0"
 }

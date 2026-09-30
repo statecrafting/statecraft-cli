@@ -199,6 +199,13 @@ evidence; `tested` needs identified test evidence and its exact subject;
 `released` needs immutable release evidence. Approval, green CI, provider prose,
 or a resolved citation does not imply a stronger grade.
 
+A required claim with disposition `not-reviewed` makes the `semanticReview`
+dimension `not-recorded`. The judgment is incomplete and the overall result is
+`no-acceptance`, not `rejected`. A completed review that judges a required claim
+`unsupported`, `contradicted`, `insufficient-grade`, or `needs-correction`
+makes `semanticReview` fail and may produce `rejected` once the complete
+judgment runs.
+
 Every provider-reported unknown and contradiction is reviewed for faithful
 preservation in the artifact. Review also checks for unknowns, contradictions,
 unsupported claims, provider omissions, or Statecraft citation failures that
@@ -298,6 +305,7 @@ or publishes. Human and JSON output remain two renderings of one value.
 | Citation resolves but does not support the sentence | Citation resolution passes and claim review is `unsupported`. |
 | Claim says `tested` with implementation-only evidence | Claim review is `insufficient-grade`. |
 | Result omits a contradiction present in delivered context | Semantic review fails and names the omission. |
+| Required claim remains `not-reviewed` | Semantic review is `not-recorded`; overall result is `no-acceptance`. |
 | Executable example was not run | Example result is `unknown`, never pass. |
 | External link was not authorized for checking | Link result is `not-recorded`. |
 | Artifact bytes change after review | Earlier review does not bind and a new review is required. |
