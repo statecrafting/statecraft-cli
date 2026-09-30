@@ -144,7 +144,8 @@ content cannot replace the schema identity in the task.
 The candidate is the object the requested artifact describes or changes. It is
 not silently replaced by the prepared workspace candidate that later acceptance
 judges. When they differ, both identities remain visible and the review policy
-must say whether that difference is permitted.
+must explicitly permit that difference. A silent review policy prohibits the
+divergence.
 
 ### 3.3 Authority and operation limits
 
@@ -153,6 +154,13 @@ tokens: `read-context`, `draft-artifact`, and `propose-patch`. The forbidden set
 must include `apply-patch`, `commit`, `push`, `open-pull-request`, `publish`,
 `release`, `deploy`, `remote-admin`, `credential-read`, and `provider-select`.
 No task may remove one of those prohibitions in version 1.
+
+The closed forbidden operation set is the authority for operation permission.
+The version 1 `publication: prohibited` member is a redundant, human-readable
+assertion of the required `publish` prohibition. A task whose two values do not
+agree is malformed and refuses before spawn. A later schema version may change
+both only by defining its own closed operation set and publication assertion
+together; neither field overrides the other.
 
 `draft-artifact` permits result bytes only. `propose-patch` permits a patch as a
 result artifact, not a filesystem write. A path in `artifacts` is a logical
@@ -308,6 +316,8 @@ are not migrated or synthesized.
 | Citation resolves to equal text under another member identity | The citation fails under spec 019. |
 | Provider marks an unknown as known without support | The assertion is a claim and the original unknown remains visible. |
 | Result includes a patch for an expected path | The patch is a review artifact and is not applied. |
+| Task and workspace candidates differ under a silent review policy | The divergence is prohibited. |
+| `publication` and the `publish` operation prohibition disagree | The task is malformed and refuses before spawn. |
 | Provider says the task is complete | `providerCompletion` records the claim; acceptance remains independent. |
 | Result requests publication | The request has no authority and version 1 publication remains prohibited. |
 | Retry receives identical inputs | It still has a new attempt-bound task and result identity. |

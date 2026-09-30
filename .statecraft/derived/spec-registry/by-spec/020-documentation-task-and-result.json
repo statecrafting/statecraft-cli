@@ -89,20 +89,20 @@
       }
     ],
     "sectionDigests": {
-      "020-documentation-task-and-structured-result-contracts": "3155ea18ca7df7b1b97920e57bd8657a01f93430a87d7487daf566bedbfc2b9e",
+      "020-documentation-task-and-structured-result-contracts": "6190833aae3371d6d82f637fefce6ec47ac88c69e8b19a998ffb5feeb165d5b0",
       "1-purpose": "8b02f913b08663186d36ea3bcd0e8c7bbe0a31bfa9121baec73462c986d20da5",
       "2-territory-and-prerequisite": "746191492c5936ba79256a9021ca5ff97507f6338406e8da8b63dcab76fd35eb",
       "3-1-separate-documents-and-authorities": "b35f09424b454ccc5c8767a710f0c8c186a8a8f6f4c59e59b22a1fb19c52976b",
-      "3-10-observable-negative-cases": "be0dab451f956f2ac9c98f565e059514e2c0168e8167ffec71c90f3ac422f457",
-      "3-2-the-documentation-task": "0e543f0a35f6fb461d30ea4a4ee2707622dea52a6b4aa5ba3e35d9918d379a2c",
-      "3-3-authority-and-operation-limits": "366d2599e5cb32fa3d86cfdf81b2beb83b8909b44a63e0f83fc503252cb24ad8",
+      "3-10-observable-negative-cases": "ae2145779da5c7fcf8a9e07433502480e78666d643e0ccb2fc90511edc41cb96",
+      "3-2-the-documentation-task": "f4ab13fa8d4e1ee02c5458c9c89a0f4611d66f854c28e1569838dd4543d60cec",
+      "3-3-authority-and-operation-limits": "fdc61a86c8fac27efa182b2feeb0c8030ca2b658f6f7de5f63ea7f99567d5927",
       "3-4-adapter-delivery-and-observation": "c77cb7d16f4eb7226f69bcbc541c312f89787a3019710f935b912fc9e378f82d",
       "3-5-the-structured-result": "fe2049584a29850dc83ac06a6900d8694ffb27acdae49a9e02d36efab54d030a",
       "3-6-claim-contract": "8fe1d227a55c743cf92d22d61342b5631e74b0beb032e9bfea9b1a95ec5386fe",
       "3-7-unknowns-contradictions-omissions-and-failures": "0d86c8aa075a5466a0d030925377ab3984229abaef370f91d75f929d1adb209a",
       "3-8-durable-binding-and-retry": "a51e020cbafe52e333403f07054ed4ed6d08b3dd526d9f704cc538547b14975a",
       "3-9-command-projections": "587b0364536491e447ee2ff9d07dd51c45909723d24159143fa856ca63401dc7",
-      "3-behavior": "83e46eacce2a27a09c27207b677240e78957f908a62a08461d99e42b0ed20a5e",
+      "3-behavior": "1238e639ca4f429482c6db5d5301f196faf6fcccc77694b520b07b95b8cad6c8",
       "4-out-of-scope": "a4a674200e255a9485679c056b3d415c22b94b7d706f9beea80fedeb3d2210ca",
       "5-resolved-decisions": "645af635a54bdcc8dd906c05698552f56bd38f06f2b2ac0527aae295c12ae088",
       "verification": "6d5603eb03d66a09fc046a1cc97625712654f22d4eea117148915d84a903135c"
@@ -131,6 +131,6 @@
     "summary": "Amends Statecraft's run, adapter, acceptance, and command contracts with an immutable documentation-task document and a provider-neutral structured documentation result. It separates task authority from provider output, binds every claim to an explicit lifecycle grade and supporting references, preserves omissions and contradictions, and keeps provider completion apart from independent acceptance and publication.\n",
     "title": "Documentation task and structured result contracts"
   },
-  "shardHash": "cc1148f2a9f2b730e1284d74db825282a2b0ae1ee0c5e133a3c9d0b5d59c2cf6",
+  "shardHash": "9754e0d07e455ec3894a72a4304a8c6b9f8dea429b9f101a4d83010bcd4f2ea8",
   "specVersion": "1.9.0"
 }
