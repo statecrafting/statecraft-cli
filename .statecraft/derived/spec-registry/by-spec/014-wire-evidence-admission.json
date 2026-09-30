@@ -112,7 +112,7 @@
       }
     ],
     "sectionDigests": {
-      "014-admission-of-wire-exchange-evidence": "9610e17ba8ee7dda97a57e218e85c65a86b1d3c471a427b0bfddf8298a122050",
+      "014-admission-of-wire-exchange-evidence": "4055e755c6f779493f1d5e1398b7bee84872e102af6598dcc673a4e1c5921d23",
       "1-purpose": "df2f3d1dfc4957fb3d92a3697a104c0757d0edcac062fb01b30f509cc7bb3669",
       "2-territory-and-exact-inputs": "e103c336539547151d013ed52428c189bcc8c249f39c43096a10a4325e2b27a9",
       "3-1-artifact-identity-and-bounded-input": "540a67c6c6a2602d1418af63ec314ba4b094e1bbbd1659924c0f8b3f63a88060",
@@ -120,11 +120,11 @@
       "3-3-required-wire-facts": "dbc961db92a2e74525d877e9bb2cf585af1585423c2f41c43f33714e010ff479",
       "3-4-custody-retention-and-redaction": "5ad0ac88946821e423d8dcfb14204325b841f5a0af3e99211226bce1ff115cb0",
       "3-5-policy-requirement-behavior": "2905c31778ddf5fb020f6d69503b718ad6668a0bda6680d8ab7cda93eb50526c",
-      "3-6-deterministic-admission": "241c38d2920646ecccbb1823c3e787d711b4fe8b59c2d90a6bbb9b8567d478f3",
+      "3-6-deterministic-admission": "4527aaec8bdd4a0eb04eb1cadcac56dc67224196c7ee85524353efd77fcbd17b",
       "3-7-additive-run-show-projection": "be4aed074ee338d7e64527ab872dde34a632d290380af1d5fc63b646ce086edb",
       "3-8-no-testimony-becomes-authority": "aa2d57e51c6a0673a0bd9ff7f61d6d91d4a5755b93ee158628a852fa82efa8df",
       "3-9-compatibility-and-migration": "41488b800d5a0a07e6ca500d92476f7fe6de9ee4aebdd9376476d7ec97610fa6",
-      "3-behavior": "398dc2c41f6de7b4206031c022e3c161525d73f005f4a3d1ba086a33bb9d97e7",
+      "3-behavior": "11b05a48359be1af14a751b94e024011587e786a04f26a0becbdc84c7c3440a7",
       "4-observable-acceptance-and-negative-cases": "0e677855bbff3ab9cbc817c228dbfe29adaeaef24afc80523a1038fd6b399306",
       "5-out-of-scope": "7e9a4b73a404ab898a07638426eab4b0a311da3457d94b188d8a1075f471509d",
       "verification": "c237415ba5028fe2ca65bb39f0d012965f2067b6f606a9fa0010751143d785b4"
@@ -152,6 +152,6 @@
     "summary": "Amends the run record, evidence envelope, and command projection so an exact statecraft/wire-exchange/v1 artifact can be bound to one run attempt and sidecar effect, judged deterministically under explicit policy, and shown without retaining secret values or confusing producer testimony with independent acceptance.\n",
     "title": "Admission of wire-exchange evidence"
   },
-  "shardHash": "a4e93675c09a2409262c5366e4b790357bef16d5b8769eb28cd824f408ba4025",
+  "shardHash": "66a3ab63f3ce7a75601e340bd56278ecb79973da34fa17ba5f4177ab1960c040",
   "specVersion": "1.9.0"
 }
