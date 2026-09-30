@@ -123,22 +123,16 @@ pub enum Ran {
 }
 
 /// The real one: the `spec-spine` binary, asked rather than reimplemented.
+///
+/// There is no default: spec 028 section 3.1 requires the executable one
+/// resolution selected (`spec_spine::corpus_for`), so the caller names it.
 #[derive(Debug, Clone)]
 pub struct SpecSpineCommand {
-    /// The binary to run.
+    /// The binary to run: a resolved path, never a bare name.
     pub program: String,
     /// The rule that selected it (spec 002 section 5, 2026-09-25), when a
     /// selection did; `None` for a program named directly.
     pub found_by: Option<String>,
-}
-
-impl Default for SpecSpineCommand {
-    fn default() -> Self {
-        Self {
-            program: "spec-spine".to_string(),
-            found_by: None,
-        }
-    }
 }
 
 impl SpecSpineCommand {

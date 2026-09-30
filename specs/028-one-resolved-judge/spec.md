@@ -2,7 +2,7 @@
 id: "028-one-resolved-judge"
 title: "One resolved judge: every spec-spine call this product makes runs the executable one resolution selected"
 status: draft
-implementation: pending
+implementation: in-progress
 created: "2026-09-30"
 summary: >
   Every spec-spine invocation this product makes, in every verb and in every
@@ -92,12 +92,12 @@ The freshness probe (`crates/statecraft-environment/src/probe.rs`) also reads
 engine emits a structured envelope under `check --json`.
 
 This spec makes one resolution the only path to an executable and records what
-it chose. It is a proposal and authorizes no implementation.
+it chose.
 
 ## 2. Territory
 
-This spec owns no product code. A later implementation changes only the units
-its `extends` edges name: the selection in `statecraft-home`, the check probe
+This spec owns no product code. Its implementation changes only the units its
+`extends` edges name: the selection in `statecraft-home`, the check probe
 in `statecraft-environment`, the report source in `statecraft-run`, the suite
 source in `statecraft-acceptance`, and the call sites and `doctor` projection
 in `statecraft-cli`.
@@ -154,9 +154,10 @@ information, never as the judge.
 
 When the resolved engine states that it carries `check --json` (through its
 capabilities document once spec-spine's spec 170 is implemented, and until
-then by the engine's version being 0.18.0 or later, the first release whose
-`check` takes `--json`, read from each tag's `cmd_check.rs`), the probe runs `check --json` and reads the envelope's outcome and
-exit code. The verdict classes of spec 008 section 3.23 contract 4 are read
+then by `check --help` listing `--json`, which the probe already runs to
+establish the verb; 0.18.0 is the first release whose `check` takes it, read
+from each tag's `cmd_check.rs`), the probe runs `check --json` and reads the
+envelope's outcome and exit code. The verdict classes of spec 008 section 3.23 contract 4 are read
 from the envelope, never from wording. The wording reader remains only for an
 engine that does not carry `--json`, and is bounded to the exit tables it
 already knows.
@@ -203,6 +204,63 @@ that launcher is present, `.tooling/bin` is the only pin-exact install this
 product itself creates, and ignoring it is what makes the correct engine
 invisible today.
 
+**2026-09-30: `--json` support is read from the verb's help, not from a
+version.** The probe already runs `check --help` to establish the verb (008
+section 3.23 contract 5), and the help lists `--json` exactly when the engine
+carries it. Reading it there keeps no version table in this product, and an
+engine built from an untagged checkout answers correctly.
+
+**2026-09-30: how the envelope's classes are read.** `ok` is fresh. A
+`finding` whose registry half reports `validationPassed: false` does not
+validate, and outranks staleness because regenerating would not cure it. A
+`finding` with a half reporting `fresh: false` is stale. A `finding` with both
+halves fresh and an unresolved-unit error counted in the index half's
+diagnostics is an unresolved claim. Any other `finding` is read as a corpus
+that does not validate, naming the summary. `refused`, `usage` and `failed`
+are reads not performed. An envelope that does not parse, is not `check`'s, or
+whose `exitCode` disagrees with the process's establishes nothing. The run
+report (`statecraft-run`) reads `check` through the same probe, so there is
+one reader of `check` in this product.
+
+**2026-09-30: one resolution per process.** The command surface keeps the
+first selection it makes for a target and hands the same one to every later
+question in the process. A process runs one operation, so this is section
+3.1's "once per operation", and it is why a verb's steps (the report, the
+contract binding, coverage, the suite, the delta report and `doctor`) name one
+program and one digest.
+
+**2026-09-30: the launcher's envelope is recognized by its verb.** spec-spine's
+launcher names itself `spec-spine-launcher` with the verb `launcher.resolve`
+(its spec 188, D-12). An executable on `PATH` is a launcher when it answers
+that query with an envelope whose tool is `spec-spine-launcher` or
+`spec-spine` and whose verb begins `launcher`; an engine answers the unknown
+verb with a usage error and is not one. The query is made with
+`SPEC_SPINE_FROZEN=1`, so asking can never download. Only an absolute `path`
+is taken as an answer. The delivered hooks read the same envelope with `sed`
+and `grep`, because two of them run without `jq`.
+
+**2026-09-30: what `doctor` observes when nothing is selected.** The pin is
+compared with the version the resolution itself recorded: the selected
+program's, or when the pin admitted none, the first candidate the resolution
+passed over. It is never a separate `PATH` probe. The resolution, everything
+it passed over, and a differing `spec-spine` on `PATH` are notes.
+
+**2026-09-30: an operator override now reaches the verbs' own reads.** Before
+this spec, only initialization honored `STATECRAFT_SPEC_SPINE` outside a
+session, and `run`'s own reads went to `PATH`. Under section 3.2 rule 2 the
+override is the only candidate for every verb outside a managed session. The
+supervisor's selection for a session is unchanged: it reads neither variable,
+and a session's hooks receive the supervisor's path.
+
+**2026-09-30: what this implementation leaves in progress.** Section 3.3's
+requirement that the run record and the acceptance receipt name the
+resolution record is not yet met: `doctor` reports it and initialization
+records the rule, and the others record the version only. The delivered hooks
+resolve in section 3.2's order but still read `check` by its words (the
+bounded legacy reader), because moving them to the envelope changes every
+hook's verdict path and is its own change. `implementation` stays
+`in-progress` until both land.
+
 **2026-09-30: resolve, then execute the absolute path.** Running the launcher
 and trusting whatever it executes would record one identity and run another
 whenever the two resolutions differed. Asking for the resolution and executing
@@ -210,7 +268,12 @@ the returned path keeps the recorded and executed identities the same.
 
 ## Verification
 
-No implementation acceptance is declared while this spec is unratified. The
-`V-1` inputs name the fixture surface a later implementation adds: stub
-engines answering different versions in `.tooling/bin`, `target/release` and
-on PATH, and a stub launcher, driven through every verb that calls spec-spine.
+Each line is one command. The fixtures are stub engines answering different
+versions in `.tooling/bin`, `target/release` and on PATH, and a stub launcher.
+
+```verify:cli
+cargo test -p statecraft-cli --test one_resolved_judge
+cargo test -p statecraft-environment --test check_envelope
+cargo test -p statecraft-home --lib spec_spine
+cargo test -p statecraft-home --test harness_hooks contract_2
+```

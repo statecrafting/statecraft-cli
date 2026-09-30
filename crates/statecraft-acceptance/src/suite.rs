@@ -44,18 +44,13 @@ pub trait SuiteSource {
 }
 
 /// The real source: `spec-spine verify <spec> --json`, in the workspace.
+///
+/// There is no default: spec 028 section 3.1 requires the executable one
+/// resolution selected, so the caller names it.
 #[derive(Debug, Clone)]
 pub struct SpecSpineVerify {
-    /// The binary to run.
+    /// The binary to run: a resolved path, never a bare name.
     pub binary: String,
-}
-
-impl Default for SpecSpineVerify {
-    fn default() -> Self {
-        Self {
-            binary: "spec-spine".into(),
-        }
-    }
 }
 
 /// The verdict envelope `verify --json` emits (spec-spine's spec 034).

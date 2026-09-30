@@ -301,7 +301,7 @@ impl Fixture {
         let witness = self.root.join("witness");
         let body = if carries_verbs {
             format!(
-                "#!/bin/sh\nprintf '{label}\\n' >> '{}'\nprintf '%s\\n' \"$*\" >> '{}'\n\
+                "#!/bin/sh\ncase \"$1\" in launcher) exit 3 ;; esac\nprintf '{label}\\n' >> '{}'\nprintf '%s\\n' \"$*\" >> '{}'\n\
                  case \"$1\" in --version) echo 'spec-spine 9.9.9'; exit 0 ;; esac\n\
                  case \"$1 $2\" in\n  'check --help') {help}; exit 0 ;;\n  'lint --help'|'couple --help') exit 0 ;;\nesac\n\
                  for a in \"$@\"; do\n  if [ \"$a\" = config ]; then {}; fi\ndone\n\
@@ -320,7 +320,7 @@ impl Fixture {
             )
         } else {
             format!(
-                "#!/bin/sh\nprintf '{label}\\n' >> '{}'\n\
+                "#!/bin/sh\ncase \"$1\" in launcher) exit 3 ;; esac\nprintf '{label}\\n' >> '{}'\n\
                  case \"$1\" in --version) echo 'spec-spine 0.0.1'; exit 0 ;; esac\nexit 2\n",
                 witness.display()
             )
@@ -616,6 +616,63 @@ fn contract_2_the_repositorys_own_build_beats_path() {
 
         fixture.run_project(file, &[]);
         fixture.assert_only_ran("repo");
+    }
+}
+
+/// Spec 028 section 3.2: the repository-local `.tooling/bin` install beats the
+/// repository build and `PATH`, the order the verbs use.
+#[test]
+fn contract_2_the_repository_local_install_beats_the_build_and_path() {
+    for file in ALL {
+        let fixture = Fixture::new();
+        fixture.stub(
+            &fixture.root.join(".tooling/bin/spec-spine"),
+            "local",
+            0,
+            true,
+        );
+        fixture.stub(
+            &fixture.root.join("target/release/spec-spine"),
+            "repo",
+            0,
+            true,
+        );
+        fixture.stub(&fixture.path_dir.join("spec-spine"), "path", 0, true);
+
+        fixture.run_any(file, &[]);
+        fixture.assert_only_ran("local");
+    }
+}
+
+/// Spec 028 section 3.2: a launcher on `PATH` is asked for its resolution, the
+/// engine it names judges, and the launcher itself never runs a verb.
+#[test]
+fn contract_2_a_launcher_on_path_resolves_and_never_judges() {
+    for file in [SESSION_START, STOP] {
+        let fixture = Fixture::new();
+        let engine = fixture.root.join("store/spec-spine");
+        fixture.stub(&engine, "store", 0, true);
+        fixture.stub(
+            &fixture.root.join("target/release/spec-spine"),
+            "repo",
+            0,
+            true,
+        );
+        let envelope = format!(
+            r#"{{"exitCode":0,"outcome":"ok","report":{{"path":"{}","rule":"store"}},"summary":"ok","tool":"spec-spine-launcher","verb":"launcher.resolve"}}"#,
+            engine.display()
+        );
+        executable(
+            &fixture.path_dir.join("spec-spine"),
+            &format!(
+                "#!/bin/sh\nif [ \"$1 $2\" = 'launcher resolve' ]; then echo '{envelope}'; exit 0; fi\n\
+                 printf 'launcher\\n' >> '{}'\nexit 4\n",
+                fixture.root.join("witness").display()
+            ),
+        );
+
+        fixture.run_project(file, &[]);
+        fixture.assert_only_ran("store");
     }
 }
 
@@ -1768,7 +1825,7 @@ impl Fixture {
             Probe::RefusesThePinFrom026 => "echo 'spec-spine: refused: this repository requires spec-spine >=0.23, <0.24 (spec-spine.toml [meta] required_version); running 0.24.0.' >&2; exit 2".to_string(),
         };
         let body = format!(
-            "#!/bin/sh\nprintf '%s %s\\n' '{label}' \"$*\" >> '{calls}'\n\
+            "#!/bin/sh\ncase \"$1\" in launcher) exit 3 ;; esac\nprintf '%s %s\\n' '{label}' \"$*\" >> '{calls}'\n\
              case \"$1\" in --version) echo 'spec-spine {version}'; exit 0 ;; esac\n\
              case \"$1 $2\" in 'check --help') exit 0 ;; esac\n\
              case \" $* \" in\n\

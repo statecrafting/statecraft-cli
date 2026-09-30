@@ -10,7 +10,7 @@
 //! An upstream gap is reported upstream; it is not patched here.
 
 use serde::{Deserialize, Serialize};
-use statecraft_environment::probe::{names_refusal, names_stale_only};
+use statecraft_environment::probe::{CheckAnswer, Unavailability, run_check};
 use std::path::Path;
 use std::process::Command;
 
@@ -215,18 +215,13 @@ pub trait ReportSource {
 }
 
 /// The real source: `spec-spine` in the target, asked for JSON.
+///
+/// There is no default: spec 028 section 3.1 requires the executable one
+/// resolution selected, so the caller names it.
 #[derive(Debug, Clone)]
 pub struct SpecSpineCli {
-    /// The binary to run.
+    /// The binary to run: a resolved path, never a bare name.
     pub binary: String,
-}
-
-impl Default for SpecSpineCli {
-    fn default() -> Self {
-        Self {
-            binary: "spec-spine".into(),
-        }
-    }
 }
 
 impl SpecSpineCli {
@@ -278,27 +273,13 @@ impl ReportSource for SpecSpineCli {
         // are 1, 2 and anything else (a pin not met exits 3); from 0.26.0 a
         // stale ledger is 1 and a refusal 2, and the producer's words say
         // which (spec 003 section 5, 2026-09-25).
-        let check = self.run(target, &["check"])?;
-        if !check.status.success() {
-            let text = format!(
-                "{}{}",
-                String::from_utf8_lossy(&check.stderr),
-                String::from_utf8_lossy(&check.stdout)
-            );
-            let path = target.display().to_string();
-            let detail = text
-                .lines()
-                .map(str::trim)
-                .find(|l| !l.is_empty())
-                .unwrap_or("no detail")
-                .to_string();
-            return Err(check_refusal(
-                check.status.code(),
-                path,
-                version,
-                &text,
-                detail,
-            ));
+        // Spec 028 section 3.4: the probe's one reader, which reads the
+        // envelope where the engine's `check` takes `--json` and the words
+        // only where it does not.
+        let answer = run_check(&self.binary, target);
+        if let Some(refusal) = check_refusal(answer, target.display().to_string(), version.clone())
+        {
+            return Err(refusal);
         }
 
         // Section 3.1.2 rule 3: `list`, `plan`, `list`, so a disagreement is
@@ -310,34 +291,39 @@ impl ReportSource for SpecSpineCli {
     }
 }
 
-/// What a `check` that did not pass reports, read under either of
-/// spec-spine's exit tables (spec 003 section 5, 2026-09-25).
-fn check_refusal(
-    code: Option<i32>,
-    path: String,
-    version: String,
-    text: &str,
-    detail: String,
-) -> ReportError {
-    let stale = match code {
-        Some(1) => names_stale_only(text),
-        Some(2) => !names_refusal(text),
-        _ => false,
-    };
-    match code {
-        _ if stale => ReportError::LedgerStale {
+/// What a `check` that did not pass reports: `None` when it found the tree
+/// fresh. Each of the probe's answers maps to one refusal (spec 003 section 5,
+/// 2026-09-25): a corpus that does not validate, a stale ledger (an
+/// unresolved claim among them, as it always read here), and a refusal to
+/// judge at all.
+fn check_refusal(answer: CheckAnswer, path: String, version: String) -> Option<ReportError> {
+    Some(match answer {
+        CheckAnswer::Fresh => return None,
+        CheckAnswer::DoesNotValidate { detail } => {
+            ReportError::CorpusDoesNotCompile { path, detail }
+        }
+        CheckAnswer::Stale { detail, .. } => ReportError::LedgerStale {
             path,
             version,
             detail,
         },
-        Some(1) => ReportError::CorpusDoesNotCompile { path, detail },
-        code => ReportError::ProducerRefused {
+        CheckAnswer::NotPerformed { status, detail } => ReportError::ProducerRefused {
             path,
             version,
-            status: code.map_or_else(|| "signal".to_string(), |c| format!("exit {c}")),
+            status,
             detail,
         },
-    }
+        CheckAnswer::Unavailable {
+            why: Unavailability::LacksVerb,
+            detail,
+        } => ReportError::ProducerRefused {
+            path,
+            version,
+            status: "no check verb".to_string(),
+            detail,
+        },
+        CheckAnswer::Unavailable { detail, .. } => ReportError::NotRunnable { path, detail },
+    })
 }
 
 /// Join one bracketed read into a report (spec 003 sections 3.1.1 and 3.1.2).
@@ -472,8 +458,14 @@ mod tests {
     // Recorded 2026-09-25 from the published 0.25.0 and 0.26.0.
     #[test]
     fn a_check_refusal_is_read_under_both_exit_tables() {
-        let read =
-            |code, text: &str| check_refusal(Some(code), "p".into(), "v".into(), text, "d".into());
+        let read = |code, text: &str| {
+            let answer = statecraft_environment::probe::read_check(
+                Some(code),
+                &format!("exit {code}"),
+                text,
+            );
+            check_refusal(answer, "p".into(), "v".into()).expect("not fresh")
+        };
         let stale = "spec-registry: STALE\n1 stale shard(s):\ncodebase-index: STALE (run `spec-spine index`)";
         assert!(matches!(read(2, stale), ReportError::LedgerStale { .. }));
         assert!(matches!(read(1, stale), ReportError::LedgerStale { .. }));

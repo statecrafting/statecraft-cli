@@ -15,12 +15,11 @@ use statecraft_cli::render::{Answer, Format, usage_envelope};
 use statecraft_cli::slice;
 use statecraft_environment::claimant::{ForeignClaims, UnobservedShadows};
 use statecraft_environment::manifest::Manifest;
-use statecraft_environment::probe::CommandProbe;
 use statecraft_environment::registry::Registry;
 use statecraft_environment::time::SystemClock;
 use statecraft_run::policy::NoDeclarationFiled;
 use statecraft_run::record::Chain;
-use statecraft_run::report::{ReportSource, SpecSpineCli};
+use statecraft_run::report::ReportSource;
 use std::path::PathBuf;
 
 fn main() -> std::process::ExitCode {
@@ -95,7 +94,8 @@ fn run(args: &[String]) -> i32 {
                 }
                 _ => None,
             };
-            let probe = CommandProbe::default();
+            let probe =
+                statecraft_home::spec_spine::probe_for(&statecraft_cli::judge::selection(&path));
             match bind::project_register(&mut registry, &path, &probe) {
                 Ok(mut answer) => {
                     if let Err(e) = registry.write(&home) {
@@ -428,7 +428,9 @@ fn run(args: &[String]) -> i32 {
             }
             // Rule 1: the spec id must be one the corpus report names. The
             // report is spec-spine's, read the way `work list` reads it.
-            let known = match SpecSpineCli::default().corpus_report(&root) {
+            let known = match statecraft_cli::judge::report_source(&root)
+                .and_then(|cli| cli.corpus_report(&root))
+            {
                 Ok(report) => report.lifecycle_of(spec_id).is_some(),
                 Err(e) => return emit(&slice::report_error_answer(&e), format),
             };
@@ -520,7 +522,7 @@ fn slice_verb(
     // crate that owns it. Both halves come from spec-spine's structured output.
     let needs_report = matches!(verb, Verb::WorkList | Verb::WorkShow | Verb::Run);
     let (work, report) = if needs_report {
-        match SpecSpineCli::default().corpus_report(root) {
+        match statecraft_cli::judge::report_source(root).and_then(|cli| cli.corpus_report(root)) {
             Ok(report) => {
                 let (policy, disagreement) =
                     statecraft_run::policy::resolve(root, &NoDeclarationFiled, None);
@@ -894,12 +896,12 @@ fn run_verb(
     }
     // Spec 003 section 3.1.3: the contract is resolved by the producer and
     // written with the intent, before any effect. It is evidence, not a gate.
-    let contract = statecraft_run::contract::bind(
-        &SpecSpineCli::default(),
-        root,
-        spec_id,
-        report.lifecycle_of(spec_id),
-    );
+    let judge = match statecraft_cli::judge::report_source(root) {
+        Ok(judge) => judge,
+        Err(e) => return emit(&slice::report_error_answer(&e), format),
+    };
+    let contract =
+        statecraft_run::contract::bind(&judge, root, spec_id, report.lifecycle_of(spec_id));
     launch_attempt(
         root,
         home,
@@ -2020,12 +2022,16 @@ fn accept_verb(
 
     // Spec 005 section 3.18: the contract the attempt was bound to, compared
     // with the producer's resolution now, before anything else is observed.
+    let judge = match statecraft_cli::judge::report_source(root) {
+        Ok(judge) => judge,
+        Err(e) => return emit(&slice::report_error_answer(&e), format),
+    };
     let contract = statecraft_acceptance::contract::check(
         &chain.entries(),
         run_id,
         attempt.number,
         root,
-        &SpecSpineCli::default(),
+        &judge,
     );
     if contract.word == statecraft_acceptance::contract::Word::Stale {
         return emit(&slice::contract_stale_answer(&contract), format);
@@ -2047,7 +2053,7 @@ fn accept_verb(
     let workspace = statecraft_run::workspace::workspace_path(root, run_id);
     let context = statecraft_cli::accept::Context {
         repository: root.display().to_string(),
-        spec_spine_version: adapters::observed()
+        spec_spine_version: adapters::observed(root)
             .spec_spine
             .unwrap_or_else(|| "not-recorded".to_string()),
         adapter_version: statecraft_adapter_claude_code::manifest().version,
@@ -2156,9 +2162,14 @@ fn environment_verb(
                 &probe,
                 &foreign,
                 &UnobservedShadows,
-                &adapters::observed(),
+                &adapters::observed(root),
             ) {
                 Ok(mut report) => {
+                    // Spec 028 section 3.3: the judge this project resolves,
+                    // never a separately probed PATH binary.
+                    report
+                        .notes
+                        .extend(statecraft_cli::judge::doctor_notes(root));
                     // Spec 002 section 3.25 names `doctor` as one of the four
                     // things that stay possible while managed execution is
                     // refused. The comparison needs a product home, which the
