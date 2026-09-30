@@ -154,8 +154,8 @@ information, never as the judge.
 
 When the resolved engine states that it carries `check --json` (through its
 capabilities document once spec-spine's spec 170 is implemented, and until
-then by the engine's version being at or above the first release known to
-carry it), the probe runs `check --json` and reads the envelope's outcome and
+then by the engine's version being 0.18.0 or later, the first release whose
+`check` takes `--json`, read from each tag's `cmd_check.rs`), the probe runs `check --json` and reads the envelope's outcome and
 exit code. The verdict classes of spec 008 section 3.23 contract 4 are read
 from the envelope, never from wording. The wording reader remains only for an
 engine that does not carry `--json`, and is bounded to the exit tables it

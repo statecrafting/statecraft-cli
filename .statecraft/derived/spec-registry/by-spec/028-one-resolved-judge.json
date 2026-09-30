@@ -96,16 +96,16 @@
       }
     ],
     "sectionDigests": {
-      "028-one-resolved-judge": "22f18908cba00f38c87dcf57da82a03c9569cdfe7ecefbb285f5c28e768e7322",
+      "028-one-resolved-judge": "e5924243ec96e1ba0265465d0f2cffe8db78c2a64d30ee5ce39e2c1f7623bac6",
       "1-purpose": "d746cb8471381787b048a181c51c6aabe001dde5b6cbfe8796d8b202d715de12",
       "2-territory": "1b3ec3bb8a4a13ecec27701e44bbf3fb850dafb636d63db14d4c13af7e828d5a",
       "3-1-one-judge-per-operation": "43eb66d44f3a4dbeac80d7ac0c086e17c2e3ade4a5aedf670732bb0f139091bd",
       "3-2-the-resolution": "1e4172033b85478db68ecfade9ab00df05b8268d8bf28fb5f89c1630f5815ba4",
       "3-3-what-is-recorded-and-reported": "aba2e03743af6655834309496eed71fd7b583980a9d416acfd57db1d53177c7b",
-      "3-4-reading-check": "6ddfbf87fef52c5a6d8d205e10f9c296e0bec790afb47033a2078fd4d70bfb70",
+      "3-4-reading-check": "44c4d4503b7360a0a16047148826fa2957a3e2e6f068e839fe08f5ec006fe089",
       "3-5-resolution-never-acquires": "e81c856be443454d6fedb47344ec6f2c11910e29321425fd94665593a6a1bf5d",
       "3-6-observable-negative-cases": "40ab64b81cec01b21d699246d4f125e90604f43cfbe152a9f50a21930b7a6f4c",
-      "3-behavior": "c772c19314220f39883580d9d1ef24860289f0d850287ecc20764f652ac170d2",
+      "3-behavior": "e53a17fa411ad6ea04209ea1af1fe362d1f054ba9d905bb6fc31f51a6fee0e8d",
       "4-out-of-scope": "90fb901564cedc9329d438b425ce1c107397c904adaef314e6690190f89470f8",
       "5-resolved-decisions": "af563eb158c1b3a586b7538926bffc37a1de970979a539fb288cca2aff3d6c70",
       "verification": "e58fdc4a038d5a07c0d14b9a9b72b2aba1159e6e36cfac5affa4f00bc9a250e7"
@@ -130,6 +130,6 @@
     "summary": "Every spec-spine invocation this product makes, in every verb and in every hook it delivers, runs the executable that one resolution selected for that operation, and records which one. No call site names a bare `spec-spine` and lets PATH decide. The resolution's sources are, in order, the supervisor's path in a managed session, an operator override, the project's declared engine as spec-spine's own launcher resolves it when that launcher is present, the repository-local `.tooling/bin` install, the repository's own build and then PATH; each candidate is put to the pin, and each passed over is named. `doctor` reports the resolved executable, never a separate PATH probe. Where the resolved engine carries `check --json`, the check is read from its envelope instead of from its wording. Amends spec 008 section 3.23 contracts 2, 4 and 5.\n",
     "title": "One resolved judge: every spec-spine call this product makes runs the executable one resolution selected"
   },
-  "shardHash": "819d7687eb8b1dde4ce75e5880604b7951291446f8d24587b049d74b18806b5e",
+  "shardHash": "c2c3c59a9b1b73ed863da881418e0e4de8808844c9eaa2673191f7b74dbc4855",
   "specVersion": "1.9.0"
 }
