@@ -75,6 +75,7 @@ obligations:
       - "crates/statecraft-envelope/tests/wire_exchange_admission.rs"
       - "crates/statecraft-run/tests/wire_evidence_projection.rs"
       - "crates/statecraft-acceptance/tests/wire_evidence_policy.rs"
+      - "crates/statecraft-cli/tests/wire_evidence_show.rs"
 ---
 
 # 014: Admission of wire-exchange evidence
@@ -220,19 +221,19 @@ classifies the member as a raw request or response body, raw header map or
 value, cookie, authorization value, token, secret, or credential, or when a
 string value matches the exact secret-detector identity recorded in the
 attempt policy. The classification schema is exactly the combination of the
-pinned wire-witness spec 003 sections 3.1 through 3.3 and spec 005 section 3.4
-declared in `interface_references`; Statecraft loads no unpinned producer
-schema. Classification comes from those versioned sections, not a field-name
-heuristic. A missing detector identity, detector failure, or value that cannot
-be scanned within the section 3.1 bounds refuses admission rather than being
-retained. The admission record keeps the manifest digest, policy identity,
-subject identity, dimensions, outcome, and reason required by section 3.6. Its
-content-finding detail contains only the member path, detector identity when
-applicable, and category. It never copies the candidate value. An identical
-resubmission therefore refuses as `duplicate` at step 6 without scanning the
-candidate again. Digest and length verification may occur in quarantined memory
-before this screen; the manifest bytes are not then added to Statecraft custody
-when the screen refuses them.
+pinned wire-witness spec 003 sections 3.1 through 3.3 and wire-witness spec 005
+section 3.4 declared in `interface_references`; Statecraft loads no unpinned
+producer schema. Classification comes from those versioned sections, not a
+field-name heuristic. A missing detector identity, detector failure, or value
+that cannot be scanned within the section 3.1 bounds refuses admission rather
+than being retained. The admission record keeps the manifest digest, policy
+identity, subject identity, dimensions, outcome, and reason required by section
+3.6. Its content-finding detail contains only the member path, detector identity
+when applicable, and category. It never copies the candidate value. An
+identical resubmission therefore refuses as `duplicate` at step 6 without
+scanning the candidate again. Digest and length verification may occur in
+quarantined memory before this screen; the manifest bytes are not then added to
+Statecraft custody when the screen refuses them.
 
 `encrypted-content` is unsupported until a separately ratified policy names
 its purpose, consent, key custody, retention period, deletion behavior, and
