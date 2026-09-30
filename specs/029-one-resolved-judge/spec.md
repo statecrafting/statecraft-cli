@@ -11,7 +11,7 @@ summary: >
   lets PATH decide. The resolution's sources are, in order, the supervisor's
   path in a managed session, an operator override, the project's declared
   engine as spec-spine's own launcher resolves it when that launcher is
-  present, the repository-local `.bin` install, the repository's own
+  present, the repository-local install named by the active setup profile, the repository's own
   build and then PATH; each candidate is put to the pin, and each passed over
   is named. `doctor` reports the resolved executable, never a separate PATH
   probe. Where the resolved engine carries `check --json`, the check is read
@@ -39,7 +39,7 @@ obligations:
     anchor: "3-1-one-judge-per-operation"
   - id: "R-2"
     kind: requirement
-    text: "The resolution consults, in order, the supervisor's path, the operator override, the launcher's resolution, `.bin`, the repository build and PATH; every candidate except the supervisor's already-resolved path is put to the pin, and every candidate passed over is named."
+    text: "The resolution consults, in order, the supervisor's path, the operator override, the launcher's resolution, the active setup profile's repository-local install, the repository build and PATH; every candidate except the supervisor's already-resolved path is put to the pin, and every candidate passed over is named."
     anchor: "3-2-the-resolution"
   - id: "R-3"
     kind: requirement
@@ -55,7 +55,7 @@ obligations:
     anchor: "3-5-resolution-never-acquires"
   - id: "V-1"
     kind: verification
-    text: "A fixture with conflicting candidates on PATH, in `.bin` and in `target/release` proves every verb that calls spec-spine runs the same selected executable, and that doctor names it."
+    text: "A fixture with conflicting candidates on PATH, at the profile-declared repository-local path and in `target/release` proves every verb that calls spec-spine runs the same selected executable, and that doctor names it."
     anchor: "verification"
     inputs:
       - "crates/statecraft-cli/tests/one_resolved_judge.rs"
@@ -134,12 +134,10 @@ later one is never consulted once an earlier one answers or refuses.
    artifact digest. It is put to the pin like any other. The launcher is
    asked to resolve only; this product then runs the absolute engine path
    itself, so the recorded identity is the executed one.
-4. **Repository-local install.** `.bin/spec-spine`, the location this
-   product's setup profile installs into. The separately governed engine-location
-   change moves that install from `.tooling/bin`, which is no longer read. This
-   spec's implementation is blocked until that authority change is active; an
-   implementation must not silently omit the repository-local candidate while
-   the old location remains the active policy.
+4. **Repository-local install.** The one install path established by the active
+   setup-profile authority. The resolver consumes that declaration rather than
+   restating a path, so an engine-location authority change moves the candidate
+   without creating a second answer.
 5. **Repository build.** The repository's own `target/release/spec-spine`.
 6. **PATH.** The first `spec-spine` on PATH that is not the launcher.
 
@@ -168,6 +166,16 @@ from the envelope, never from wording. The wording reader remains only for an
 engine that does not carry `--json`, and is bounded to the exit tables it
 already knows.
 
+The envelope is classified as follows. `ok` is fresh. A `finding` whose
+registry half reports `validationPassed: false` does not validate, and outranks
+staleness because regeneration cannot cure it. A `finding` with a half
+reporting `fresh: false` is stale. A `finding` with both halves fresh and an
+unresolved-unit error counted in the index half's diagnostics is an unresolved
+claim. Any other `finding` is a corpus that does not validate, naming the
+summary. `refused`, `usage` and `failed` are reads not performed. An envelope
+that does not parse, is not `check`'s, or whose `exitCode` disagrees with the
+process's establishes nothing.
+
 ### 3.5 Resolution never acquires
 
 Resolution reads the filesystem and runs `--version` and the launcher's
@@ -181,7 +189,7 @@ install verb when present).
 
 | Case | Required behavior |
 |---|---|
-| A compatible engine in `.bin` and an incompatible one first on PATH | `.bin` answers; the PATH binary is named as passed over |
+| A compatible engine at the profile-declared repository-local path and an incompatible one first on PATH | The repository-local engine answers; the PATH binary is named as passed over |
 | `run`, `work list`, `accept`, `verify`, coverage and `doctor` in the same fixture | Each reports the same program and digest |
 | An override naming an incompatible engine, with a compatible one on PATH | Refused; nothing falls back |
 | A managed session whose supervisor path is not executable | Refused; no other candidate is consulted |
@@ -195,20 +203,19 @@ install verb when present).
   spec-spine's (its draft spec 188).
 - The linked producer used for scaffolding, which stays linked (spec-spine
   spec 170 section 3.1); the target-versus-linked guard is spec 018's.
-- Moving the install location and changing this repository's `Makefile`,
-  which remain a separate authority change and a prerequisite to implementing
-  this spec.
+- Moving the install location and changing this repository's `Makefile`, which
+  remain a separate authority change.
 
 ## 5. Resolved decisions
 
 
-**2026-09-30: the repository-local candidate is `.bin/spec-spine`.** The owner
-decided that neither spec-spine nor this product uses `.tooling/bin`. The
-separate setup-profile authority change moves the install to `.bin/`; this resolution, the four
-delivered hooks and the refusal's remedy text name `.bin` accordingly. A
-`.tooling/bin/spec-spine` left in a checkout is not a candidate: reading both
-would keep the retired location alive as a second answer. This spec therefore
-stays `implementation: pending` until that authority change lands.
+**2026-09-30: the repository-local candidate follows its owning authority.**
+This spec does not restate the install path. The active setup profile supplies
+one repository-local location, and the resolver and delivered hooks consume
+it. The separate engine-location authority changes that declaration to
+`.bin/spec-spine`; after it does, a `.tooling/bin/spec-spine` left in a checkout
+is not a candidate. Reading both would keep the retired location alive as a
+second answer.
 
 **2026-09-30: `--json` support is read from the verb's help, not from a
 version.** The probe already runs `check --help` to establish the verb (008
@@ -216,17 +223,9 @@ section 3.23 contract 5), and the help lists `--json` exactly when the engine
 carries it. Reading it there keeps no version table in this product, and an
 engine built from an untagged checkout answers correctly.
 
-**2026-09-30: how the envelope's classes are read.** `ok` is fresh. A
-`finding` whose registry half reports `validationPassed: false` does not
-validate, and outranks staleness because regenerating would not cure it. A
-`finding` with a half reporting `fresh: false` is stale. A `finding` with both
-halves fresh and an unresolved-unit error counted in the index half's
-diagnostics is an unresolved claim. Any other `finding` is read as a corpus
-that does not validate, naming the summary. `refused`, `usage` and `failed`
-are reads not performed. An envelope that does not parse, is not `check`'s, or
-whose `exitCode` disagrees with the process's establishes nothing. The run
-report (`statecraft-run`) reads `check` through the same probe, so there is
-one reader of `check` in this product.
+**2026-09-30: the envelope has one reader.** Section 3.4 fixes the classification
+and its precedence. The run report (`statecraft-run`) reads `check` through the
+same probe, so there is one reader of `check` in this product.
 
 **2026-09-30: one resolution per process.** The command surface keeps the
 first selection it makes for a target and hands the same one to every later
@@ -267,7 +266,8 @@ the returned path keeps the recorded and executed identities the same.
 ## Verification
 
 Each line is one command. The fixtures are stub engines answering different
-versions in `.bin`, `target/release` and on PATH, and a stub launcher.
+versions at the profile-declared repository-local path, in `target/release` and
+on PATH, and a stub launcher.
 
 ```verify:cli
 cargo test -p statecraft-cli --test one_resolved_judge
