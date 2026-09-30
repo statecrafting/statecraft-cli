@@ -1,7 +1,7 @@
 ---
 id: "026-ownership-disagreement"
 title: "doctor reports a path whose recorded ownership disagrees with the transfer journal or the current rendering"
-status: draft
+status: approved
 implementation: pending
 created: "2026-09-27"
 summary: >
