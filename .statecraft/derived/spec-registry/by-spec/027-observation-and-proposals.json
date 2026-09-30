@@ -69,10 +69,10 @@
       "Verification"
     ],
     "specPath": "specs/027-observation-and-proposals/spec.md",
-    "status": "draft",
+    "status": "approved",
     "summary": "Adds the transition this product lacks between \"spec-spine says the repository means X\" and \"the operator is offered the work that follows\". One observation reads exactly one commit through spec-spine's existing structured reports, reduces the answers to three closed projections, and compares them with the last observation recorded for that repository. Each semantic transition a built-in subscription names becomes a proposal with a deterministic identity, recorded in an append-only chain in the product home. A proposal is never executed by this spec: the operator admits it, admission re-derives its preconditions against the current commit, and an admitted proposal enters spec 003's existing run path with its cause recorded in the attempt's intent. No watcher, no loop, no automatic admission, and no change to spec-spine.\n",
     "title": "Observation and proposals: noticing that a repository's governed truth changed, and proposing typed work without acting on it"
   },
-  "shardHash": "fc49af359de4219be0e1440647b93e3f83b0fa75673ce8cd585d32c7a96307ee",
+  "shardHash": "28addf3bdbb51f5d80099df4dcb5583ca4430fa3ca671aebb032bee55274acc3",
   "specVersion": "1.9.0"
 }

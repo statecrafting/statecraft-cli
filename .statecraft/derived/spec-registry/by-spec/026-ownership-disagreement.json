@@ -41,7 +41,7 @@
         "anchor": "3-2-the-finding",
         "id": "R-1",
         "kind": "requirement",
-        "text": "doctor reports ownership-disagreement for every path where the manifest class, the latest transfer-journal record and the current rendering's class do not agree, naming each source and its value."
+        "text": "doctor reports ownership-disagreement whenever a non-none journal target differs from the recorded class; rendered is managed while journaled is user; recorded is adopted while rendered is managed; recorded is managed while rendered is absent; or an existing path has recorded user, journaled none and rendered managed. It names each source and its value."
       },
       {
         "anchor": "3-4-read-only-and-deterministic",
@@ -57,18 +57,18 @@
           "crates/statecraft-cli/tests/doctor_ownership.rs"
         ],
         "kind": "verification",
-        "text": "Fixture repositories prove each disagreement pair, the unavailable rendering, the legacy manifest without a journal, and byte-identical trees before and after doctor."
+        "text": "Fixture repositories prove every disagreement row, including recorded adopted with rendered managed, plus the unavailable rendering, the legacy manifest without a journal, and byte-identical trees before and after doctor."
       }
     ],
     "sectionDigests": {
-      "026-doctor-reports-ownership-disagreement": "cfcc408adbbee474802c6fff1342a2b29ea0afdfbad8d04fc2f492abb9e94d9a",
-      "1-purpose": "66d9c97a3480f9773c16c164bdb2c05a61d05c44db282de1876fce1e865fe872",
+      "026-doctor-reports-ownership-disagreement": "9d3d118f698a2b1290204a874e0132e2103e1c78dec90e8ae477ff43c8e54f75",
+      "1-purpose": "7ad074aece506ea21fc81ac23f46f8eac767205319cc803ffd4d2f5b78f44621",
       "2-territory": "ec5df6f394d9f0a48caf5a0bca00da7b6238d1157e91805e6cb68b6ec5b525ed",
       "3-1-three-facts-per-path": "3f3b4bad7a6865a3b73597aeb03cabd057ad019a3e4f27e8658f0c4755e7a2b6",
-      "3-2-the-finding": "7b9c7ed4bb33b81505d620c7dcfb3a019106e81298a23089bf2ed3fd7b943b3d",
-      "3-3-when-a-fact-cannot-be-read": "215f90fd1b35dbd8cd98ed04684a9ce7b667e9d126351f0a4f23f915dd085e78",
+      "3-2-the-finding": "a7d12cecfedad3b2da8a8feab9bfd2a0ba5f5873369cb093d98698367b61732c",
+      "3-3-when-a-fact-cannot-be-read": "61419c3cdfb7b7076dc83bd1b43d6bb8c3dee2886a1164f6f50f26c084ea6cac",
       "3-4-read-only-and-deterministic": "6f0496774c7af40573cebcd77a6150b564fd76b3f9da123e35b7f4a3c21eb47e",
-      "3-behavior": "c12ff95111d71d7ec6045cf22100d88c738dc4aba0240378bbf36db45c8ec2f8",
+      "3-behavior": "fa2bdb694438b84eb3eeff9b67eb96fd709979b98b34d777f45aafb2dacdb193",
       "4-out-of-scope": "4111be4195d886cc12a94a18cb31b177cb23059a14677cb6720f7dabe4c485f7",
       "5-resolved-decisions": "710d07ff29d78470b05b51687569bbacf3b946cf911b196e01c59cc3c51645a3",
       "verification": "c16f8dc96f995ed9e50ba283a36ae976701ad5fd1dc97b399fa6db88280dd95c"
@@ -87,10 +87,10 @@
       "Verification"
     ],
     "specPath": "specs/026-ownership-disagreement/spec.md",
-    "status": "draft",
-    "summary": "Amends spec 002 section 3.5 with one additive, read-only doctor finding, ownership-disagreement. For each path, doctor compares three facts: the manifest entry's class, the latest transfer-journal record for the path, and the class the current selection's rendering would give it. Any pair that disagrees is reported with both sources named. doctor repairs nothing, transfers nothing and never treats a rendering it could not compute as agreement. Backlog SC-006.\n",
+    "status": "approved",
+    "summary": "Amends spec 002 section 3.5 with one additive, read-only doctor finding, ownership-disagreement. For each path, doctor compares three facts: the manifest entry's class, the latest transfer-journal record for the path, and the class the current selection's rendering would give it. Each incompatible ownership state defined below is reported with both sources named. doctor repairs nothing, transfers nothing and never treats a rendering it could not compute as agreement. Backlog SC-006.\n",
     "title": "doctor reports a path whose recorded ownership disagrees with the transfer journal or the current rendering"
   },
-  "shardHash": "0666a34bd2717ae6dfe08c03b61f37a29526437867e104525c38a2534ed33254",
+  "shardHash": "95e2e28581516be07a2adbcd6839d9ce94643dc475e0bdb21655f3d8e8cfe153",
   "specVersion": "1.9.0"
 }
