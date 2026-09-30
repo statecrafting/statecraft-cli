@@ -50,11 +50,12 @@ obligations:
     anchor: "3-3-convergence-of-existing-projects"
   - id: "V-1"
     kind: verification
-    text: "A fixture with every provider directory absent is initialized, applied, checked, run and diagnosed; context delivery is evaluated as reached; and the tree afterwards holds no provider directory."
+    text: "A fixture with every provider directory absent is initialized, applied, checked, run and diagnosed; context delivery is evaluated as reached; the tree afterwards holds no provider directory; and plan refuses a declaration that names a provider-directory path."
     anchor: "verification"
     inputs:
       - "crates/statecraft-cli/tests/no_provider_directories.rs"
       - "crates/statecraft-environment/tests/retirement.rs"
+      - "crates/statecraft-environment/tests/provider_path_refusal.rs"
       - "crates/statecraft-adapter-claude-code/tests/no_provider_directories.rs"
 ---
 
@@ -99,7 +100,9 @@ template in `statecraft-home`, the plan and apply rules in
 `statecraft-environment`, and the plan's JSON view and the tests that drive the
 binary in `statecraft-cli`. Spec 008's harness-template behavior is amended,
 but the implementation unit remains `crates/statecraft-home/`, owned by spec
-002 and named by this spec's `extends` edge.
+002 and named by this spec's `extends` edge. No `extends` edge names spec 008
+because it owns no implementation unit: spec 008 itself extends spec 002's
+`crates/statecraft-home/` unit.
 
 ## 3. Behavior
 
@@ -244,5 +247,6 @@ fixture is a test adapter whose declaration shrinks between two applies.
 ```verify:cli
 cargo test -p statecraft-cli --test no_provider_directories
 cargo test -p statecraft-environment --test retirement
+cargo test -p statecraft-environment --test provider_path_refusal
 cargo test -p statecraft-adapter-claude-code --test no_provider_directories
 ```
