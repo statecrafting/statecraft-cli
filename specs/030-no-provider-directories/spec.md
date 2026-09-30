@@ -149,8 +149,8 @@ as a managed path and possibly `CLAUDE.md` as a pointer to it.
 
 - `env plan` names the instructions file as `retire` and the pointer as a write
   replacing its existing bytes.
-- `env upgrade` removes the instructions file when its digest matches the
-  manifest's, under 002 section 3.6's removal rule, and removes the
+- `env apply` and `env upgrade` remove the instructions file when its digest
+  matches the manifest's, under 002 section 3.6's removal rule, and remove the
   `.claude/statecraft/` and `.claude/` directories only when this removal left
   them empty. A drifted file is reported and left.
 - A managed pointer whose digest matches is rewritten to the new import. A
