@@ -1,7 +1,7 @@
 ---
 id: "028-agent-attribution-is-refused"
 title: "Agent attribution and agent commit identities are refused"
-status: draft
+status: approved
 implementation: complete
 created: "2026-09-30"
 summary: >

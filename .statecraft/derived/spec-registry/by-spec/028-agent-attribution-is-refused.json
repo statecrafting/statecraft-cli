@@ -57,10 +57,10 @@
       "Verification"
     ],
     "specPath": "specs/028-agent-attribution-is-refused/spec.md",
-    "status": "draft",
+    "status": "approved",
     "summary": "Amends spec 001's authored-content rules so agent attribution is suppressed at the project boundary and refused in every text the governance gate reads. The same gate refuses commits whose author or committer uses a known agent address. Display names do not decide identity, and external contributors remain allowed.\n",
     "title": "Agent attribution and agent commit identities are refused"
   },
-  "shardHash": "62fc7f2f3f97c1f0c75bc65b3ad4c58fc774443d2da5ce1c826651191287421a",
+  "shardHash": "0724f160dbeb0cb8e0b26d5fbc99578e16fb806b5d7c83bb7f3c9ff466a0b076",
   "specVersion": "1.9.0"
 }
