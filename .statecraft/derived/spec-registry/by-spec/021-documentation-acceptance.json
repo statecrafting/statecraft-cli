@@ -1,0 +1,122 @@
+{
+  "record": {
+    "amends": [
+      "003-work-and-run-semantics",
+      "005-acceptance-and-evidence",
+      "006-command-surface"
+    ],
+    "created": "2026-09-27",
+    "dependsOn": [
+      "003-work-and-run-semantics",
+      "005-acceptance-and-evidence",
+      "006-command-surface",
+      "019-context-packet-consumption",
+      "020-documentation-task-and-result"
+    ],
+    "extends": [
+      {
+        "nature": "additive",
+        "spec": "003-work-and-run-semantics",
+        "unit": {
+          "kind": "directory",
+          "path": "crates/statecraft-run/"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "005-acceptance-and-evidence",
+        "unit": {
+          "kind": "directory",
+          "path": "crates/statecraft-acceptance/"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "006-command-surface",
+        "unit": {
+          "kind": "directory",
+          "path": "crates/statecraft-cli/"
+        }
+      }
+    ],
+    "id": "021-documentation-acceptance",
+    "implementation": "pending",
+    "obligations": [
+      {
+        "anchor": "3-1-the-acceptance-subject",
+        "id": "I-1",
+        "kind": "invariant",
+        "text": "Documentation acceptance is an independent judgment over identified task, result, context, artifact, evidence, and review records; no producer or transport fact substitutes for another."
+      },
+      {
+        "anchor": "3-3-independent-dimensions",
+        "id": "R-1",
+        "kind": "requirement",
+        "text": "Acceptance reports delivery, transport, schema, citations, semantic support, artifact checks, context freshness, authority, and review disposition separately before deriving an overall result."
+      },
+      {
+        "anchor": "3-5-claim-and-content-review",
+        "id": "R-2",
+        "kind": "requirement",
+        "text": "Every accepted claim is supported at its stated lifecycle grade, every required unknown and contradiction remains visible, and no accepted result authorizes application or publication."
+      },
+      {
+        "anchor": "verification",
+        "id": "V-1",
+        "inputs": [
+          "crates/statecraft-acceptance/tests/documentation_acceptance.rs",
+          "crates/statecraft-run/tests/documentation_review.rs",
+          "crates/statecraft-cli/tests/documentation_acceptance.rs"
+        ],
+        "kind": "verification",
+        "text": "Portable fixtures prove independent dimensions, semantic-review authority, claim-grade support, artifact and freshness checks, correction history, privacy-bounded retention, and the absence of application or publication effects."
+      }
+    ],
+    "sectionDigests": {
+      "021-independent-documentation-acceptance-and-review": "e93c4fa7d2a8276ae68c373e02eb46b0327602fa7167a053a01108b5441ed7f8",
+      "1-purpose": "f921d21dc2acd0050c4d2222cdaad28b04a276cffc257fdd193b8cfc92e0f49b",
+      "2-territory-and-prerequisite": "5ce9c12370358e56ddc2dc688cf69763ad36ffe9a47e084e680b2c55b192cb76",
+      "3-1-the-acceptance-subject": "02c89b6da6b75ec97dc28cf1d2de925a14b09344432dd798e05e0c7547063fff",
+      "3-10-command-projections": "b2ceef1a43aeb1ab14ef06c8c54d77cca49a26a4b8164305d373b5b89175db7d",
+      "3-11-observable-negative-cases": "1ac5d45b0676f26d1df3a60df7af1dad8b3be26c4e133402aa752ef8e7f69471",
+      "3-2-intended-observed-validated-reviewed-accepted": "df77fb3140a45337c0ccf3dc584d0d668bae8c44fbb2d852ef412b0e1d5b670f",
+      "3-3-independent-dimensions": "6377c07dd8f51319a0d694f3f5f214c75d1b7846c2154443be4690d6cbc8b8e4",
+      "3-4-reviewer-records-and-authority": "4d156b7361e5578c35e5c2c260bd272f2a7135a4ccfc5cf7235f26ba9fb1d744",
+      "3-5-claim-and-content-review": "f2e40b2c27565a95e65363d1ce6b090d409b439950fe4b0745a2fab33766832e",
+      "3-6-artifact-validation": "57f4d15ce510325ff2a9c61bb507b678cf607088e0173844e78d9646e3854e9c",
+      "3-7-freshness-and-manifest-closure": "87e5aad82ad46bdf528859156b7fc552a97173e2e19f22f78b077dc9df647f4f",
+      "3-8-corrections-and-re-review": "877796fb305f8d3f17c78d6a0c643ef1ee9cdc9a52d51ebe277a0fcfdfebc8ba",
+      "3-9-final-result-and-retention": "5b90126867c4d9ef214dae9621276938b5e08e5d5a352f4dd3b151c97615d7e1",
+      "3-behavior": "98c1bba8b672dfa323deb787b8bbd616d4d03aa0fee71c2e22e6684966164229",
+      "4-out-of-scope": "8d24d200c45d48c01db44da0d5b6f594ce2f942826371dd06d1242e1a53bdd00",
+      "5-resolved-decisions": "a4d9be4a196157555b17fa970535d66c99c243aba1ae72c3db4bc7dc0aeb8eb5",
+      "verification": "3755305d9f7bd188ed84fa3302d30b3ffdba9d177bde41902c4322bb45c3613c"
+    },
+    "sectionHeadings": [
+      "021: Independent documentation acceptance and review",
+      "1. Purpose",
+      "2. Territory and prerequisite",
+      "3. Behavior",
+      "3.1 The acceptance subject",
+      "3.2 Intended, observed, validated, reviewed, accepted",
+      "3.3 Independent dimensions",
+      "3.4 Reviewer records and authority",
+      "3.5 Claim and content review",
+      "3.6 Artifact validation",
+      "3.7 Freshness and manifest closure",
+      "3.8 Corrections and re-review",
+      "3.9 Final result and retention",
+      "3.10 Command projections",
+      "3.11 Observable negative cases",
+      "4. Out of scope",
+      "5. Resolved decisions",
+      "Verification"
+    ],
+    "specPath": "specs/021-documentation-acceptance/spec.md",
+    "status": "draft",
+    "summary": "Amends Statecraft's run, acceptance, and command contracts with an independent documentation-acceptance record. It keeps intended delivery, observed transport, schema validation, citation resolution, semantic review, and acceptance as separate facts; requires claim-grade support, preserved unknowns and contradictions, valid artifacts, and a fresh context manifest; and grants no application or publication authority.\n",
+    "title": "Independent documentation acceptance and review"
+  },
+  "shardHash": "f263380468cdf675c27ee9865bd2309289409964e554a9d3d4809e17c3e8276b",
+  "specVersion": "1.9.0"
+}
