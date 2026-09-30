@@ -1,0 +1,74 @@
+{
+  "mapping": {
+    "amends": [
+      "001-boundaries-and-authority",
+      "002-environment-lifecycle",
+      "010-profile-unresolved-claims",
+      "023-contained-commit-walk",
+      "024-review-budget-and-ratification"
+    ],
+    "dependsOn": [
+      "002-environment-lifecycle",
+      "024-review-budget-and-ratification"
+    ],
+    "implementingPaths": [
+      {
+        "path": "crates/statecraft-cli/",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/statecraft-home/",
+        "source": "spec-edge"
+      },
+      {
+        "path": "docs/decisions/00-founding-decisions.md",
+        "source": "spec-edge"
+      }
+    ],
+    "resolvedUnits": [
+      {
+        "locations": [
+          {
+            "file": "crates/statecraft-cli/"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "directory",
+          "path": "crates/statecraft-cli/"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "crates/statecraft-home/"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "directory",
+          "path": "crates/statecraft-home/"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "docs/decisions/00-founding-decisions.md"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "docs/decisions/00-founding-decisions.md"
+        }
+      }
+    ],
+    "specId": "031-engine-in-bin",
+    "specStatus": "approved"
+  },
+  "schemaVersion": "1.2.0",
+  "shardHash": "6b4298f1959b4818be4e63e132c6e0476863b5d21b7bcdda7a480d3d10a0261d"
+}
