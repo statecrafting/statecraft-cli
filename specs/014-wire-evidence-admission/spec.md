@@ -271,7 +271,8 @@ or `unknown` at the read surface. It is never converted to an admission.
 Stable refusal reasons include `unsupported-artifact`, `malformed`,
 `digest-mismatch`, `producer-mismatch`, `subject-mismatch`, `duplicate`,
 `stale`, `incomplete`, `redaction-failed`, `retention-forbidden`,
-`prohibited-content`, `policy-unsatisfied`, and the existing spec 005 reasons.
+`prohibited-content`, `policy-mismatch`, `policy-unsatisfied`, and the existing
+spec 005 reasons.
 New reason strings may be preserved by older readers, but older readers do not
 reinterpret them.
 
@@ -279,7 +280,8 @@ An identical duplicate is still `duplicate`: append-only history preserves
 both observations and admission refuses ambiguity. Retry reads the durable
 record first. It may resume only an operationally interrupted judgment over
 the same bytes, policy, and subject; otherwise it begins no replacement and
-reports the changed identity.
+reports `policy-mismatch`, `producer-mismatch`, or `subject-mismatch` for the
+changed identity.
 
 ### 3.7 Additive `run show` projection
 
@@ -347,6 +349,7 @@ asserts the admission record and both renderings:
 | changed bytes or length | integrity fails with `digest-mismatch` |
 | duplicate artifact | both records remain visible and admission refuses `duplicate` |
 | earlier-attempt artifact | `stale`; retry does not adopt it |
+| retry with a changed policy identity | `policy-mismatch`; no replacement begins |
 | malformed, oversized, deeply nested, or duplicate-key input | bounded refusal `malformed` with no path or command followed |
 | manifest contains a raw body, credential field, registered secret, or detector match | `prohibited-content`; candidate bytes are not retained by Statecraft |
 | secret-detector identity is absent or its scan cannot complete | `prohibited-content`; admission fails closed without retaining candidate bytes |
