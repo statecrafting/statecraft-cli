@@ -222,11 +222,14 @@ declared in `interface_references`; Statecraft loads no unpinned producer
 schema. Classification comes from those versioned sections, not a field-name
 heuristic. A missing detector identity, detector failure, or value that cannot
 be scanned within the section 3.1 bounds refuses admission rather than being
-retained. The refusal record contains only the member path, detector identity
-when applicable, and category. It never copies the candidate value. Digest and
-length verification may occur in quarantined memory before this screen; the
-manifest bytes are not then added to Statecraft custody when the screen refuses
-them.
+retained. The admission record keeps the manifest digest, policy identity,
+subject identity, dimensions, outcome, and reason required by section 3.6. Its
+content-finding detail contains only the member path, detector identity when
+applicable, and category. It never copies the candidate value. An identical
+resubmission therefore refuses as `duplicate` at step 6 without scanning the
+candidate again. Digest and length verification may occur in quarantined memory
+before this screen; the manifest bytes are not then added to Statecraft custody
+when the screen refuses them.
 
 `encrypted-content` is unsupported until a separately ratified policy names
 its purpose, consent, key custody, retention period, deletion behavior, and
