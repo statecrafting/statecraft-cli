@@ -67,7 +67,7 @@
       "contentHash": "761b858c102914292d4b35d4317af4568a65b849b199ad249f056192490e7a0e"
     },
     "scripts/check-authored-content.sh": {
-      "contentHash": "c88416524951d41713eedcd245407ac61636ac70061b6237315d766cbfd83c63"
+      "contentHash": "e443830730e7d85a61a6926314e4578d0886448dd84ce6460d2e482e0abd91ab"
     },
     "scripts/check-spec-corpus.sh": {
       "contentHash": "d4482680aa448a517701da28bf172da652b2a42a540b68abf10f5a832a3444b6"
