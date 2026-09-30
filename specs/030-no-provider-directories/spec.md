@@ -24,6 +24,7 @@ amends:
   - "004-execution-adapter"
   - "002-environment-lifecycle"
   - "006-command-surface"
+  - "008-harness-delivery"
 extends:
   - { spec: "004-execution-adapter", unit: { kind: directory, path: "crates/statecraft-adapter-claude-code/" }, nature: corrective }
   - { spec: "002-environment-lifecycle", unit: { kind: directory, path: "crates/statecraft-home/" }, nature: corrective }
@@ -134,8 +135,7 @@ evaluates:
    `.statecraft/AGENTS.md` directly. For the Claude Code adapter that file is
    `CLAUDE.md` containing `@.statecraft/AGENTS.md`.
 
-A root pointer file is a file, not a directory, and is permitted by this
-section (section 5).
+A root pointer file is a file, not a directory, and is permitted by section 5.
 
 ### 3.3 Convergence of existing projects
 
