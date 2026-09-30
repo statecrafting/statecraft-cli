@@ -42,7 +42,7 @@ claude@users.noreply.github.com'
 # Agent-session links and agent attribution (001 3.6, amended by 028). A
 # co-author trailer is judged by its address, as a commit identity is. Each
 # extended regular expression is written so this file does not match itself.
-attribution_patterns='https://codex[.]ai/code/session_
+attribution_patterns='https://codex[.]ai/code/session_[0-9a-z_]{8}
 claude[.]ai/(chat|code)/[0-9a-f]{8}-
 claude[.]ai/code/(session_|project/)[0-9a-z_]{8}
 chatgpt[.]com/codex/tasks/task_[0-9a-z_]{8}
@@ -82,7 +82,7 @@ if [ "${1:-}" = "--self-test" ]; then
     printf '%s%s\n' "$a" "$b" > "$tmp/sample-$n.txt"
     expect "$want" --text "$tmp/sample-$n.txt"
   done <<'SAMPLES'
-1|HTTPS://CODEX.AI/|CODE/SESSION_example
+1|HTTPS://CODEX.AI/|CODE/SESSION_example1
 1|see https://claude.ai/|chat/0123abcd-4567-89ef-0123-456789abcdef
 1|see https://claude.ai/|code/0123abcd-4567-89ef-0123-456789abcdef
 1|see https://claude.ai/|code/session_01AbCdEfGhIjKlMn
@@ -109,6 +109,7 @@ if [ "${1:-}" = "--self-test" ]; then
 0|https://claude.ai/code/docs|
 0|claude.ai/code/session_ with no identifier|
 0|https://chatgpt.com/codex|
+0|https://codex.ai/code/session_|
 0|No Co-Authored-By line and no AI attribution of any form.|
 0|Co-authored-by: A Person <person@example.com>|
 0|Co-authored-by: Claude Dupont <claude.dupont@example.com>|
@@ -126,6 +127,13 @@ SAMPLES
   expect 3 --unknown
   expect 3 --identity HEAD
   expect 0 --text "$me"
+
+  finding_output=$("$me" --text "$tmp/forbidden-dash.txt" 2> "$tmp/finding-stderr.txt")
+  got=$?
+  if [ "$got" -ne 1 ] || [ -z "$finding_output" ] || [ -s "$tmp/finding-stderr.txt" ]; then
+    echo "self-test: an authored-content finding must be reported on stdout only" >&2
+    failed=1
+  fi
 
   # A failed findings-file write is an execution failure, even though both the
   # shell and grep use status 1 for conditions that are otherwise nonfatal.
@@ -275,9 +283,9 @@ for ((i = 0; i < ${#files[@]}; i++)); do
     echo "check-authored-content: could not scan $file" >&2
     exit 4
   elif [ "${scan_status[0]}" -eq 0 ]; then
-    echo "U+2014 is refused in $file:" >&2
-    sed 's/^/  /' "$hits" >&2
-    echo "  Use a colon, semicolon, comma, parentheses, or two sentences." >&2
+    echo "U+2014 is refused in $file:"
+    sed 's/^/  /' "$hits"
+    echo "  Use a colon, semicolon, comma, parentheses, or two sentences."
     status=1
   fi
 
@@ -295,9 +303,9 @@ for ((i = 0; i < ${#files[@]}; i++)); do
     fi
   done <<< "$attribution_patterns"
   if [ -s "$hits" ]; then
-    echo "agent-session links and agent attribution are refused in $file:" >&2
-    sort -t: -k1,1n -u "$hits" | sed 's/^/  /' >&2
-    echo "  Remove the link, trailer or footer; see spec 028 for the forms refused." >&2
+    echo "agent-session links and agent attribution are refused in $file:"
+    sort -t: -k1,1n -u "$hits" | sed 's/^/  /'
+    echo "  Remove the link, trailer or footer; see spec 028 for the forms refused."
     status=1
   fi
 done
@@ -315,7 +323,7 @@ if [ -n "$identity_base" ]; then
       if [ "$role" = author ]; then addr=$author; else addr=$committer; fi
       lower=$(printf '%s' "$addr" | tr '[:upper:]' '[:lower:]')
       if printf '%s\n' "$agent_identities" | grep -qxF -- "$lower"; then
-        echo "commit $short has an agent $role identity <$addr>; promote the work into commits under your own identity (spec 028 section 3.3)" >&2
+        echo "commit $short has an agent $role identity <$addr>; promote the work into commits under your own identity (spec 028 section 3.3)"
         status=1
       fi
     done
@@ -325,7 +333,7 @@ fi
 if [ "$mode" = tree ] && [ -d specs ] \
   && [ -n "$(find specs -mindepth 2 -name spec.md -type f -print -quit)" ]; then
   if [ ! -x scripts/check-spec-corpus.sh ]; then
-    echo "active specs exist but scripts/check-spec-corpus.sh is absent or not executable" >&2
+    echo "active specs exist but scripts/check-spec-corpus.sh is absent or not executable"
     status=1
   else
     scripts/check-spec-corpus.sh || status=1
