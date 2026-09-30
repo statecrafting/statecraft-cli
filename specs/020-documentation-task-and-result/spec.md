@@ -16,7 +16,6 @@ amends:
   - "004-execution-adapter"
   - "005-acceptance-and-evidence"
   - "006-command-surface"
-  - "019-context-packet-consumption"
 extends:
   - { spec: "003-work-and-run-semantics", unit: { kind: directory, path: "crates/statecraft-run/" }, nature: additive }
   - { spec: "004-execution-adapter", unit: { kind: directory, path: "crates/statecraft-adapter/" }, nature: additive }
