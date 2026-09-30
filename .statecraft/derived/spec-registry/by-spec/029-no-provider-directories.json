@@ -34,10 +34,18 @@
           "kind": "directory",
           "path": "crates/statecraft-environment/"
         }
+      },
+      {
+        "nature": "additive",
+        "spec": "006-command-surface",
+        "unit": {
+          "kind": "directory",
+          "path": "crates/statecraft-cli/"
+        }
       }
     ],
     "id": "029-no-provider-directories",
-    "implementation": "pending",
+    "implementation": "in-progress",
     "obligations": [
       {
         "anchor": "3-1-no-provider-directory-in-a-target",
@@ -61,24 +69,25 @@
         "anchor": "verification",
         "id": "V-1",
         "inputs": [
-          "crates/statecraft-cli/tests/no_provider_directories.rs"
+          "crates/statecraft-cli/tests/no_provider_directories.rs",
+          "crates/statecraft-environment/tests/retirement.rs"
         ],
         "kind": "verification",
         "text": "A fixture with every provider directory absent is initialized, applied, checked, run and diagnosed; context delivery is evaluated as reached; and the tree afterwards holds no provider directory."
       }
     ],
     "sectionDigests": {
-      "029-no-provider-directories": "441f2e88888568f5addfc301983f63e03617e5ae7ca37fd08207cb115944c9aa",
-      "1-purpose": "3102d57687bac18aa57b7e147b5f00006b2832626b7b1cff9adfaf4eec62f2e2",
-      "2-territory": "8f78e90f9533d906b53c3190ee5c675c560cce582767ee408f55a16bac8f46bc",
+      "029-no-provider-directories": "a60708e68d10bd106a3aea1f05a7d246766a42beaf09f33bcaa8417809ac259f",
+      "1-purpose": "99b250dfe4d211b4b81e18066435a986d18b214dde08c74eaab436c837732fe0",
+      "2-territory": "1782c580db97edc945d55ffe64ac33c81f53fc9674c44a7ba6440af12c3da466",
       "3-1-no-provider-directory-in-a-target": "0f791876ad0c6e082cc2e37d6622347a82612d83e2cf680c3a9e4f970634b8a6",
       "3-2-where-the-adapter-s-content-goes": "66e7c68b532f6ee59202db7edc1bee1fe6067f2ea58f6a8a373a073f7478a348",
       "3-3-convergence-of-existing-projects": "54541ecb85c2bd341097d0871e15642cad40b8ebe5b92c6ba4d2eb9517f998f4",
       "3-4-observable-negative-cases": "7ee4b1fc2a16d4dbaeb307cd6cafc0c62b92cf7237629cf20cd6d63b94020929",
       "3-behavior": "5253c4a25df95ad3938df033e8070ac6e6e49db7d76aad5cb5d5bd147d6faa15",
       "4-out-of-scope": "26255d2a5b42a25f47252b1e281ac936c24881bb82ab01682339085f021dac7c",
-      "5-resolved-decisions": "2c52eca422c8ffe27dd57ef1d24675aaed3cafb1e4826fc54b6ff97c589433b3",
-      "verification": "732b4e09ac563a7ce99ec7554fa8eeb9941d6c125b54b7a41c5255b644988000"
+      "5-resolved-decisions": "2ac5ab725eb6724d5cdfbe7c71fc04414b30cc3719112fbd04fadeaa935406fc",
+      "verification": "b1feae557cbb1f39e27605fd55a5f94e066d3569fdaf1cce74082926d2d0a36d"
     },
     "sectionHeadings": [
       "029: No provider directories",
@@ -98,6 +107,6 @@
     "summary": "Makes the absence of provider-specific project directories (`.claude/`, `.codex/`, `.agents/`, `.agent/` and their equivalents) a supported and tested operating condition. No adapter declares a managed or adopted path inside one. The Claude Code adapter's owned instructions file moves out of `.claude/statecraft/` into content this product already manages, and its pointer, where one is still needed, imports `.statecraft/AGENTS.md` directly. A project that already holds the old file converges through the ordinary upgrade and removal rules. A qualification case starts with every provider directory absent and proves initialization, the governed verbs and context delivery work and recreate none of them. Brings the adapter into line with spec 002 section 3.12 and spec 008 section 3.14, and amends the adapter declaration of spec 004.\n",
     "title": "A governed project needs no provider-specific directory, and this product writes none"
   },
-  "shardHash": "0f4d23230a36d1a04f62c68100b1d8bf12c9de5d53acd70dd5e098fb6cf435e9",
+  "shardHash": "59370150628cdaefc44fc1826d7ba3e52d4c8a4f1d67f3606387d623d5f19446",
   "specVersion": "1.9.0"
 }

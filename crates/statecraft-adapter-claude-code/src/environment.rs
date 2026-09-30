@@ -18,12 +18,22 @@
 //!
 //! # The pointer, and why the existing file wins
 //!
-//! Spec 002 section 3.8 allows the product its own file at its own path plus
-//! **at most one** pointer, written only where no file exists at that path. The
-//! pointer here is `CLAUDE.md` carrying an `@` import, which is the mechanism
-//! this harness actually loads. An existing `CLAUDE.md` is `user` class: it is
-//! reported `foreign`, the adapter reports itself degraded, and nothing is
-//! appended or merged.
+//! Spec 002 section 3.8 allows **at most one** pointer, written only where no
+//! file exists at that path. The pointer here is `CLAUDE.md` carrying an `@`
+//! import of `.statecraft/AGENTS.md`, which is the mechanism this harness
+//! actually loads. An existing `CLAUDE.md` is `user` class: it is reported
+//! `foreign`, the adapter reports itself degraded, and nothing is appended or
+//! merged.
+//!
+//! # No provider directory
+//!
+//! Spec 029: the adapter declares no path inside `.claude/` or any other
+//! provider directory. The facts this harness cannot express are the same in
+//! every project, so they are stated once, in the global harness's adapter
+//! template under the home (spec 008 section 3.14), and in [`UNEXPRESSIBLE`]
+//! for `env plan` and `doctor`. The file an earlier build owned,
+//! [`RETIRED_INSTRUCTIONS`], is no longer declared, and `env upgrade` removes
+//! it while it still carries the recorded bytes.
 
 use statecraft_environment::adapter::{Declaration, ManagedFile, Prerequisite};
 
@@ -39,8 +49,13 @@ pub const QUALIFICATION_RECORD: &str = "qualification-record";
 /// The credential path of spec 004 section 3.14.
 pub const CREDENTIAL_PATH: &str = "credential-path";
 
-/// The adapter's own file, which it owns outright.
-pub const OWNED_INSTRUCTIONS: &str = ".claude/statecraft/instructions.md";
+/// The file an earlier build of this adapter owned, inside `.claude/`. No
+/// longer declared (spec 029); named so convergence and its tests can.
+pub const RETIRED_INSTRUCTIONS: &str = ".claude/statecraft/instructions.md";
+
+/// The managed project instructions the pointer imports (spec 002 section
+/// 3.13).
+pub const MANAGED_INSTRUCTIONS: &str = ".statecraft/AGENTS.md";
 
 /// The single pointer path, written only where nothing exists.
 pub const POINTER: &str = "CLAUDE.md";
@@ -61,30 +76,20 @@ pub const UNEXPRESSIBLE: [&str; 3] = [
 
 /// The pointer file's contents.
 ///
-/// An `@` import rather than a copy: the pointer names the adapter's own file
-/// instead of duplicating it, so there is exactly one place the instructions
-/// live and no second copy to drift.
+/// An `@` import rather than a copy: the pointer names the managed project
+/// instructions directly (spec 029 section 3.2), so there is exactly one place
+/// the instructions live and no second copy to drift.
 pub fn pointer_contents() -> Vec<u8> {
-    format!("@{OWNED_INSTRUCTIONS}\n").into_bytes()
+    format!("@{MANAGED_INSTRUCTIONS}\n").into_bytes()
 }
 
-/// The adapter's own instructions file.
-///
-/// Deliberately short. What belongs in a target's instructions is not this
-/// spec's question, and a file that said more would be this adapter deciding it.
-pub fn instructions_contents() -> Vec<u8> {
-    let mut out = String::new();
-    out.push_str("# statecraft: managed harness instructions\n\n");
-    out.push_str(
-        "This file is managed by statecraft's `claude-code` adapter and is recorded in\n\
-         `.statecraft/environment.json`. Edit it and `doctor` reports the path as\n\
-         `drifted`; it is never repaired silently.\n\n",
-    );
-    out.push_str("Facts this harness cannot express, stated rather than dropped:\n\n");
-    for fact in UNEXPRESSIBLE {
-        out.push_str(&format!("- {fact}\n"));
-    }
-    out.into_bytes()
+/// The facts this harness cannot express, as the global harness's adapter
+/// template states them: a Markdown list, one fact per item.
+pub fn unexpressible_markdown() -> String {
+    UNEXPRESSIBLE
+        .iter()
+        .map(|fact| format!("- {fact}\n"))
+        .collect()
 }
 
 /// The three prerequisites section 3.7 names.
@@ -117,10 +122,7 @@ pub fn declaration() -> Declaration {
         name: HARNESS.to_string(),
         harness: HARNESS.to_string(),
         version: env!("CARGO_PKG_VERSION").to_string(),
-        files: vec![
-            ManagedFile::owned(OWNED_INSTRUCTIONS, instructions_contents()),
-            ManagedFile::pointer(POINTER, pointer_contents()),
-        ],
+        files: vec![ManagedFile::pointer(POINTER, pointer_contents())],
         unexpressible: UNEXPRESSIBLE.iter().map(|f| (*f).to_string()).collect(),
         prerequisites: prerequisites(),
     }
@@ -181,9 +183,20 @@ mod tests {
     }
 
     #[test]
-    fn the_pointer_imports_the_owned_file_rather_than_copying_it() {
+    fn the_pointer_imports_the_managed_instructions_rather_than_copying_them() {
         let text = String::from_utf8(pointer_contents()).unwrap();
-        assert_eq!(text.trim(), format!("@{OWNED_INSTRUCTIONS}"));
+        assert_eq!(text.trim(), "@.statecraft/AGENTS.md");
+    }
+
+    #[test]
+    fn no_declared_path_lies_in_a_provider_directory() {
+        let d = declaration();
+        assert!(
+            statecraft_environment::adapter::provider_paths(std::slice::from_ref(&d)).is_empty(),
+            "{:?}",
+            d.files.iter().map(|f| &f.path).collect::<Vec<_>>()
+        );
+        assert!(d.files.iter().all(|f| !f.path.starts_with(".claude")));
     }
 
     #[test]

@@ -2,7 +2,7 @@
 id: "029-no-provider-directories"
 title: "A governed project needs no provider-specific directory, and this product writes none"
 status: draft
-implementation: pending
+implementation: in-progress
 created: "2026-09-30"
 summary: >
   Makes the absence of provider-specific project directories (`.claude/`,
@@ -27,6 +27,7 @@ extends:
   - { spec: "004-execution-adapter", unit: { kind: directory, path: "crates/statecraft-adapter-claude-code/" }, nature: corrective }
   - { spec: "002-environment-lifecycle", unit: { kind: directory, path: "crates/statecraft-home/" }, nature: corrective }
   - { spec: "002-environment-lifecycle", unit: { kind: directory, path: "crates/statecraft-environment/" }, nature: additive }
+  - { spec: "006-command-surface", unit: { kind: directory, path: "crates/statecraft-cli/" }, nature: additive }
 depends_on:
   - "002-environment-lifecycle"
   - "004-execution-adapter"
@@ -50,6 +51,7 @@ obligations:
     anchor: "verification"
     inputs:
       - "crates/statecraft-cli/tests/no_provider_directories.rs"
+      - "crates/statecraft-environment/tests/retirement.rs"
 ---
 
 # 029: No provider directories
@@ -81,17 +83,17 @@ names two files in the target:
 | `.claude/statecraft/instructions.md` | managed | the facts the harness cannot express, and a note that the file is managed |
 | `CLAUDE.md` | pointer | `@.claude/statecraft/instructions.md` |
 
-So `env apply` on a fresh repository creates `.claude/`, and a test that starts
-with provider directories absent and asserts none is recreated fails on this
-product first. This spec removes that write and makes the absence tested. It is
-a proposal and authorizes no implementation.
+So `env apply` on a fresh repository created `.claude/`, and a test that
+starts with provider directories absent and asserts none is recreated failed on
+this product first. This spec removes that write and makes the absence tested.
 
 ## 2. Territory
 
-This spec owns no product code. A later implementation changes only the units
-its `extends` edges name: the adapter's declaration, the managed instructions
-rendering in `statecraft-home`, and the delivery evaluation in
-`statecraft-environment`.
+This spec owns no product code. The implementation changes only the units its
+`extends` edges name: the adapter's declaration, the global harness's adapter
+template in `statecraft-home`, the plan and apply rules in
+`statecraft-environment`, and the plan's JSON view and the tests that drive the
+binary in `statecraft-cli`.
 
 ## 3. Behavior
 
@@ -182,10 +184,70 @@ delivered session-start behavior finds no project instructions. Which
 clients read root `AGENTS.md` natively is measured per client by the
 delivery evaluation, which writes no pointer where the chain already reaches.
 
+**2026-09-30: the pointer is declared unconditionally, and written only where
+no file exists.** The adapter's declaration is one file, `CLAUDE.md` holding
+`@.statecraft/AGENTS.md`. Declaring it only where section 3.2's chain does not
+already reach would make the declaration a function of the tree, which 004's
+static declaration is not today. This build keeps the declaration static; the
+conditional pointer is the first item left open below.
+
+**2026-09-30: the facts live in the global harness template.**
+`statecraft_home::harness::shipped()` appends the adapter's unexpressible facts
+to the Claude Code adapter template it already ships, so the harness revision
+changes with them. `env plan` and `doctor` still report them from the
+declaration.
+
+**2026-09-30: retirement is one rule for `env apply` and `env upgrade`.** The
+two verbs share one library operation (002 section 3.6), so section 3.3's
+removal happens on either. A plan names each file it will remove as `retire`,
+and the JSON view carries them as `retired`. Only an entry that is `managed`,
+from an adapter source, in the `reference` role and without a transfer is
+retired, and only when the adapter that wrote it is configured, claims its
+paths and no longer declares the path. Adopted, transferred and authored
+entries, and entries of an adapter no longer configured, are never retired.
+
+**2026-09-30: nothing is retired where the adapter does not claim.** An adapter
+that does not claim its paths writes nothing, so the same apply could not
+rewrite a managed pointer importing the retired file. Removing the file there
+would break the import it left. Convergence therefore happens where the adapter
+claims, in one apply that rewrites the pointer and removes the file.
+
+**2026-09-30: removal is guarded like a write.** A retired path reached through
+a symbolic link is withheld and left. The digest is read again at removal, so a
+file edited after the plan is withheld as drifted with both digests, and its
+record stays. A file already gone loses only its record. Directories are
+removed bottom-up only while empty, never past the target root, so a user's
+file beside the retired one keeps its directory.
+
+**2026-09-30: section 3.3's first bullet reads as the plan's rendering.** The
+pointer does not leave the declaration; its bytes change. `env plan` names the
+instructions file as `retire` and the pointer as a write replacing existing
+bytes, which is what the operator acts on.
+
+**2026-09-30: what is left `in-progress`.** Two behaviors are not built.
+(1) The pointer is written wherever `CLAUDE.md` is absent, even where root
+`AGENTS.md` already reaches `.statecraft/AGENTS.md` for this harness; section
+3.2 and the second resolved decision above say no pointer is written there.
+(2) A foreign `CLAUDE.md` still reports the adapter `degraded` without asking
+whether another link of the chain reaches (section 3.4, fifth row). Both need
+the adapter's declaration or readiness to consult the delivery evaluation in
+`statecraft-home`, which the environment crate cannot see today.
+
+**2026-09-30: the binary's transfer tests follow the declaration.** With
+`CLAUDE.md` the adapter's only path, a move of an adapter path to `managed`
+through the binary meets 002 section 3.35's rule 2 (an instruction file stays
+`user`) before rule 1. The binary-level tests assert that refusal; rule 1 and
+the `managed` halves stay asserted by `statecraft-environment`'s
+`tests/transfer.rs` with a test adapter.
+
 ## Verification
 
-No implementation acceptance is declared while this spec is unratified. The
-`V-1` input names the fixture surface a later implementation adds: an isolated
-home and a fresh repository with no provider directory, driven through
-initialization, apply, check, run and doctor, with a tree listing taken
-afterwards.
+Each line is one command. The binary fixture is an isolated home, a stub
+`spec-spine` and a fresh repository with no provider directory; the library
+fixture is a test adapter whose declaration shrinks between two applies.
+
+```verify:cli
+cargo test -p statecraft-cli --test no_provider_directories
+cargo test -p statecraft-environment --test retirement
+cargo test -p statecraft-adapter-claude-code --lib environment
+```

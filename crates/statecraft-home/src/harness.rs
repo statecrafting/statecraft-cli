@@ -154,7 +154,7 @@ pub fn shipped() -> Vec<HarnessFile> {
         },
         HarnessFile {
             rel_path: "adapters/claude-code.md".to_string(),
-            contents: ADAPTER_CLAUDE_CODE.to_string(),
+            contents: adapter_claude_code(),
             executable: false,
         },
     ];
@@ -514,7 +514,22 @@ and reports whether the chain arrives at the managed file.
   may be placed, and only where no file exists at that path.
 - `unverified`: no documented rule this product can evaluate. Nothing is
   claimed, and nothing is injected on the strength of a file existing.
+
+The adapter writes nothing inside `.claude/` or any other provider directory in
+a project (spec 029). The facts this harness cannot express are the same in
+every project, so they are stated here, once:
+
 "#;
+
+/// The claude-code adapter template, with the facts the adapter cannot
+/// express in its harness (spec 029 section 3.2: harness facts, delivered once
+/// under the home rather than written into each project).
+fn adapter_claude_code() -> String {
+    format!(
+        "{ADAPTER_CLAUDE_CODE}{}",
+        statecraft_adapter_claude_code::environment::unexpressible_markdown()
+    )
+}
 
 #[cfg(test)]
 mod tests {

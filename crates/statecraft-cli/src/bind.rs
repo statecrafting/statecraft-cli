@@ -602,6 +602,20 @@ pub struct PlanView {
     /// its plan identity, or already satisfied (spec 002 section 3.4). A named
     /// path that is neither is in `refusals`. Empty when nothing was named.
     pub named: Vec<statecraft_environment::replace::Named>,
+    /// Files an adapter wrote and no longer declares, each still carrying its
+    /// recorded bytes, which an apply removes (spec 029 section 3.3). One that
+    /// drifted is in `withheld` instead.
+    pub retired: Vec<RetiredView>,
+}
+
+/// One file leaving an adapter's declaration, as the JSON contract carries it.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RetiredView {
+    /// The path.
+    pub path: String,
+    /// The adapter that wrote it and no longer declares it.
+    pub adapter: String,
 }
 
 /// One planned write, as the JSON contract carries it.
@@ -647,6 +661,14 @@ impl PlanView {
             withheld: plan.withheld.iter().map(WithheldView::of).collect(),
             refusals: plan.refusals.iter().map(|r| r.describe()).collect(),
             named: plan.named.clone(),
+            retired: plan
+                .retired
+                .iter()
+                .map(|r| RetiredView {
+                    path: r.path.clone(),
+                    adapter: r.adapter.clone(),
+                })
+                .collect(),
             adapters: plan
                 .adapters
                 .iter()

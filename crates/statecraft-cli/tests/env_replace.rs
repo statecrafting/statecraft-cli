@@ -26,9 +26,7 @@ mod json_naming;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Output};
 
-#[allow(dead_code)]
-const INSTRUCTIONS: &str = ".claude/statecraft/instructions.md";
-#[allow(dead_code)]
+/// The one file the adapter declares since spec 029: no provider directory.
 const POINTER: &str = "CLAUDE.md";
 
 struct Sandbox {
@@ -195,7 +193,7 @@ fn a_replacement_for_an_adapter_that_does_not_claim_is_refused_and_writes_nothin
     let sandbox = Sandbox::new(false);
     let before = sandbox.snapshot();
 
-    let planned = sandbox.plan(&[".claude/statecraft/instructions.md"]);
+    let planned = sandbox.plan(&[POINTER]);
     assert_eq!(code(&planned), 2, "{planned:?}");
     assert!(
         json_naming::payload(&json(&planned))["refusals"][0]
@@ -204,10 +202,7 @@ fn a_replacement_for_an_adapter_that_does_not_claim_is_refused_and_writes_nothin
             .contains("does not claim its paths"),
         "{planned:?}"
     );
-    let applied = sandbox.apply(
-        "apply",
-        &[(".claude/statecraft/instructions.md", &"0".repeat(64))],
-    );
+    let applied = sandbox.apply("apply", &[(POINTER, &"0".repeat(64))]);
     assert_eq!(code(&applied), 2, "{applied:?}");
     assert_eq!(sandbox.snapshot(), before);
 }
@@ -255,13 +250,18 @@ fn a_consent_without_a_plan_identity_is_a_usage_error() {
 mod claiming {
     use super::*;
 
-    /// Installed, then both managed files edited by the operator.
+    const EDITED: &[u8] = b"the operator edited the pointer";
+
+    /// Installed, then the one managed file edited by the operator.
     fn drifted() -> Sandbox {
+        drifted_with(EDITED)
+    }
+
+    fn drifted_with(edit: &[u8]) -> Sandbox {
         let sandbox = Sandbox::new(true);
         let first = sandbox.run(&["env", "apply", &sandbox.root(), "--json"]);
         assert_eq!(code(&first), 0, "the adapter claims and writes: {first:?}");
-        sandbox.write(INSTRUCTIONS, b"the operator edited the instructions");
-        sandbox.write(POINTER, b"the operator edited the pointer");
+        sandbox.write(POINTER, edit);
         sandbox
     }
 
@@ -297,7 +297,7 @@ mod claiming {
                 .as_array()
                 .unwrap()
                 .len(),
-            2
+            1
         );
         assert_eq!(sandbox.snapshot(), before, "nothing replaced implicitly");
     }
@@ -307,42 +307,44 @@ mod claiming {
         let sandbox = drifted();
         let before = sandbox.snapshot();
 
-        let out = sandbox.plan(&[INSTRUCTIONS]);
+        let out = sandbox.plan(&[POINTER]);
 
         let answer = json(&out);
         let named = &json_naming::payload(&answer)["named"][0];
         assert_eq!(named["state"], "replace", "{out:?}");
         assert_eq!(
             named["found"],
-            statecraft_environment::digest::digest_bytes(b"the operator edited the instructions")
+            statecraft_environment::digest::digest_bytes(EDITED)
         );
         assert_eq!(
             named["replacement"],
-            statecraft_environment::digest::digest_bytes(&declared(INSTRUCTIONS))
+            statecraft_environment::digest::digest_bytes(&declared(POINTER))
         );
         assert_eq!(named["planId"].as_str().unwrap().len(), 64);
-        assert_eq!(code(&out), 1, "the unnamed drift is still a finding");
+        assert_eq!(code(&out), 0, "the named drift is the only one: {out:?}");
         assert_eq!(sandbox.snapshot(), before);
     }
 
     #[test]
     fn apply_replaces_only_the_named_path_and_keeps_every_other_byte() {
         let sandbox = drifted();
-        let id = sandbox.plan_id(INSTRUCTIONS);
+        let before = sandbox.snapshot();
+        let id = sandbox.plan_id(POINTER);
 
-        let out = sandbox.apply("apply", &[(INSTRUCTIONS, &id)]);
+        let out = sandbox.apply("apply", &[(POINTER, &id)]);
 
-        assert_eq!(
-            code(&out),
-            1,
-            "the unnamed pointer drift is withheld: {out:?}"
-        );
-        assert_eq!(sandbox.read(INSTRUCTIONS), declared(INSTRUCTIONS));
-        assert_eq!(sandbox.read(POINTER), b"the operator edited the pointer");
+        assert_eq!(code(&out), 0, "{out:?}");
+        assert_eq!(sandbox.read(POINTER), declared(POINTER));
         assert_eq!(sandbox.read("README.md"), b"the user's readme");
+        let after = sandbox.snapshot();
+        for (path, bytes) in &before {
+            if path != POINTER && path != ".statecraft/environment.json" {
+                assert_eq!(after.get(path), Some(bytes), "{path}");
+            }
+        }
         assert_eq!(
-            recorded_digest(&sandbox, INSTRUCTIONS),
-            statecraft_environment::digest::digest_bytes(&declared(INSTRUCTIONS))
+            recorded_digest(&sandbox, POINTER),
+            statecraft_environment::digest::digest_bytes(&declared(POINTER))
         );
         assert_eq!(
             json_naming::payload(&json(&out))["named"][0]["state"],
@@ -353,24 +355,22 @@ mod claiming {
     #[test]
     fn upgrade_takes_the_same_consent() {
         let sandbox = drifted();
-        let a = sandbox.plan_id(INSTRUCTIONS);
-        let b = sandbox.plan_id(POINTER);
+        let id = sandbox.plan_id(POINTER);
 
-        let out = sandbox.apply("upgrade", &[(INSTRUCTIONS, &a), (POINTER, &b)]);
+        let out = sandbox.apply("upgrade", &[(POINTER, &id)]);
 
         assert_eq!(code(&out), 0, "{out:?}");
-        assert_eq!(sandbox.read(INSTRUCTIONS), declared(INSTRUCTIONS));
         assert_eq!(sandbox.read(POINTER), declared(POINTER));
     }
 
     #[test]
     fn a_stale_plan_is_refused_and_writes_nothing() {
         let sandbox = drifted();
-        let id = sandbox.plan_id(INSTRUCTIONS);
-        sandbox.write(INSTRUCTIONS, b"edited again after planning");
+        let id = sandbox.plan_id(POINTER);
+        sandbox.write(POINTER, b"edited again after planning");
         let before = sandbox.snapshot();
 
-        let out = sandbox.apply("apply", &[(INSTRUCTIONS, &id)]);
+        let out = sandbox.apply("apply", &[(POINTER, &id)]);
 
         assert_eq!(code(&out), 2, "{out:?}");
         assert!(
@@ -390,10 +390,11 @@ mod claiming {
     #[test]
     fn an_identity_for_another_drift_is_refused() {
         let sandbox = drifted();
-        let other = sandbox.plan_id(POINTER);
+        // The same path drifted to other bytes in another project.
+        let other = drifted_with(b"another operator's edit").plan_id(POINTER);
         let before = sandbox.snapshot();
 
-        let out = sandbox.apply("apply", &[(INSTRUCTIONS, &other)]);
+        let out = sandbox.apply("apply", &[(POINTER, &other)]);
 
         assert_eq!(code(&out), 2, "{out:?}");
         assert_eq!(sandbox.snapshot(), before);
@@ -401,94 +402,88 @@ mod claiming {
 
     #[test]
     fn user_adopted_occupied_and_protected_paths_are_never_replaced() {
-        let sandbox = Sandbox::new(true);
         // The pointer path holds the user's own file before install, so it is
         // occupied and withheld; it never becomes this product's.
-        sandbox.write(POINTER, b"the user's CLAUDE.md");
-        let first = sandbox.run(&["env", "apply", &sandbox.root()]);
+        let occupied = Sandbox::new(true);
+        occupied.write(POINTER, b"the user's CLAUDE.md");
+        let first = occupied.run(&["env", "apply", &occupied.root()]);
         assert_eq!(code(&first), 1, "{first:?}");
-        sandbox.write(INSTRUCTIONS, b"edited");
-        // Mark the instructions adopted in the committed manifest.
-        let mut manifest = statecraft_environment::manifest::Manifest::read(&sandbox.project())
+
+        // The pointer installed, edited, and marked adopted in the manifest.
+        let adopted = drifted();
+        let mut manifest = statecraft_environment::manifest::Manifest::read(&adopted.project())
             .unwrap()
             .unwrap();
-        let mut entry = manifest.entry(INSTRUCTIONS).unwrap().clone();
+        let mut entry = manifest.entry(POINTER).unwrap().clone();
         entry.class = statecraft_environment::manifest::Class::Adopted;
         manifest.upsert(entry);
-        manifest.write(&sandbox.project()).unwrap();
-        let before = sandbox.snapshot();
+        manifest.write(&adopted.project()).unwrap();
 
-        for path in [
-            POINTER,
-            INSTRUCTIONS,
-            "README.md",
-            "AGENTS.md",
-            ".statecraft/environment.json",
-            "../outside.md",
-        ] {
-            let planned = sandbox.plan(&[path]);
-            assert_eq!(code(&planned), 2, "{path}: {planned:?}");
-            let applied = sandbox.apply("apply", &[(path, &"0".repeat(64))]);
-            assert_eq!(code(&applied), 2, "{path}: {applied:?}");
+        for sandbox in [&occupied, &adopted] {
+            let before = sandbox.snapshot();
+            for path in [
+                POINTER,
+                "README.md",
+                "AGENTS.md",
+                ".statecraft/environment.json",
+                "../outside.md",
+            ] {
+                let planned = sandbox.plan(&[path]);
+                assert_eq!(code(&planned), 2, "{path}: {planned:?}");
+                let applied = sandbox.apply("apply", &[(path, &"0".repeat(64))]);
+                assert_eq!(code(&applied), 2, "{path}: {applied:?}");
+            }
+            assert_eq!(sandbox.snapshot(), before);
         }
-        assert_eq!(sandbox.snapshot(), before);
     }
 
     #[test]
     fn repeating_a_successful_replacement_reports_already_satisfied() {
         let sandbox = drifted();
-        let a = sandbox.plan_id(INSTRUCTIONS);
-        let b = sandbox.plan_id(POINTER);
-        assert_eq!(
-            code(&sandbox.apply("apply", &[(INSTRUCTIONS, &a), (POINTER, &b)])),
-            0
-        );
-        let files = sandbox.read(INSTRUCTIONS);
+        let id = sandbox.plan_id(POINTER);
+        assert_eq!(code(&sandbox.apply("apply", &[(POINTER, &id)])), 0);
+        let files = sandbox.read(POINTER);
 
-        let again = sandbox.apply("apply", &[(INSTRUCTIONS, &a), (POINTER, &b)]);
+        let again = sandbox.apply("apply", &[(POINTER, &id)]);
 
         assert_eq!(code(&again), 0, "{again:?}");
         let named = json_naming::payload(&json(&again))["named"].clone();
         assert_eq!(named[0]["state"], "already-satisfied", "{again:?}");
-        assert_eq!(named[1]["state"], "already-satisfied", "{again:?}");
-        assert_eq!(sandbox.read(INSTRUCTIONS), files);
+        assert_eq!(sandbox.read(POINTER), files);
     }
 
     #[test]
     fn an_interrupted_replacement_leaves_the_old_bytes_and_the_same_request_then_succeeds() {
         let sandbox = drifted();
-        let id = sandbox.plan_id(INSTRUCTIONS);
+        let id = sandbox.plan_id(POINTER);
         let manifest_before = sandbox.read(".statecraft/environment.json");
         // Staging cannot happen: its directory is a file.
         std::fs::create_dir_all(sandbox.project().join(".statecraft/state")).unwrap();
         sandbox.write(".statecraft/state/replace", b"in the way");
 
-        let failed = sandbox.apply("apply", &[(INSTRUCTIONS, &id)]);
+        let failed = sandbox.apply("apply", &[(POINTER, &id)]);
 
         assert_eq!(code(&failed), 4, "an i/o failure is a failure: {failed:?}");
-        assert_eq!(
-            sandbox.read(INSTRUCTIONS),
-            b"the operator edited the instructions"
-        );
+        assert_eq!(sandbox.read(POINTER), EDITED);
         assert_eq!(
             sandbox.read(".statecraft/environment.json"),
             manifest_before
         );
 
         std::fs::remove_file(sandbox.project().join(".statecraft/state/replace")).unwrap();
-        let retried = sandbox.apply("apply", &[(INSTRUCTIONS, &id)]);
-        assert_eq!(code(&retried), 1, "{retried:?}");
-        assert_eq!(sandbox.read(INSTRUCTIONS), declared(INSTRUCTIONS));
+        let retried = sandbox.apply("apply", &[(POINTER, &id)]);
+        assert_eq!(code(&retried), 0, "{retried:?}");
+        assert_eq!(sandbox.read(POINTER), declared(POINTER));
     }
 
     #[test]
     fn a_replacement_that_landed_before_the_manifest_is_recovered_by_repeating_it() {
         let sandbox = drifted();
-        let id = sandbox.plan_id(INSTRUCTIONS);
+        let id = sandbox.plan_id(POINTER);
         // The state a crash between the rename and the manifest write leaves.
-        sandbox.write(INSTRUCTIONS, &declared(INSTRUCTIONS));
+        sandbox.write(POINTER, &declared(POINTER));
 
-        let out = sandbox.apply("apply", &[(INSTRUCTIONS, &id)]);
+        let out = sandbox.apply("apply", &[(POINTER, &id)]);
 
         assert!(code(&out) <= 1, "{out:?}");
         assert_eq!(
@@ -496,8 +491,8 @@ mod claiming {
             "already-satisfied"
         );
         assert_eq!(
-            recorded_digest(&sandbox, INSTRUCTIONS),
-            statecraft_environment::digest::digest_bytes(&declared(INSTRUCTIONS))
+            recorded_digest(&sandbox, POINTER),
+            statecraft_environment::digest::digest_bytes(&declared(POINTER))
         );
     }
 
@@ -505,14 +500,14 @@ mod claiming {
     fn a_managed_path_replaced_by_a_symbolic_link_is_refused() {
         let sandbox = drifted();
         sandbox.write("elsewhere.md", b"linked");
-        std::fs::remove_file(sandbox.project().join(INSTRUCTIONS)).unwrap();
+        std::fs::remove_file(sandbox.project().join(POINTER)).unwrap();
         std::os::unix::fs::symlink(
             sandbox.project().join("elsewhere.md"),
-            sandbox.project().join(INSTRUCTIONS),
+            sandbox.project().join(POINTER),
         )
         .unwrap();
 
-        let out = sandbox.plan(&[INSTRUCTIONS]);
+        let out = sandbox.plan(&[POINTER]);
 
         assert_eq!(code(&out), 2, "{out:?}");
         assert_eq!(sandbox.read("elsewhere.md"), b"linked");
@@ -523,17 +518,17 @@ mod claiming {
         use std::os::unix::fs::PermissionsExt as _;
         let sandbox = drifted();
         std::fs::set_permissions(
-            sandbox.project().join(INSTRUCTIONS),
+            sandbox.project().join(POINTER),
             std::fs::Permissions::from_mode(0o640),
         )
         .unwrap();
-        let id = sandbox.plan_id(INSTRUCTIONS);
+        let id = sandbox.plan_id(POINTER);
         std::fs::create_dir_all(sandbox.project().join(".statecraft/state/replace")).unwrap();
         sandbox.write(".statecraft/state/replace/12345-0.tmp", b"left behind");
 
-        let out = sandbox.apply("apply", &[(INSTRUCTIONS, &id)]);
+        let out = sandbox.apply("apply", &[(POINTER, &id)]);
 
-        assert_eq!(code(&out), 1, "{out:?}");
+        assert_eq!(code(&out), 0, "{out:?}");
         assert_eq!(
             json_naming::payload(&json(&out))["swept"],
             serde_json::json!([".statecraft/state/replace/12345-0.tmp"])
@@ -544,11 +539,11 @@ mod claiming {
                 .join(".statecraft/state/replace/12345-0.tmp")
                 .exists()
         );
-        let mode = std::fs::metadata(sandbox.project().join(INSTRUCTIONS))
+        let mode = std::fs::metadata(sandbox.project().join(POINTER))
             .unwrap()
             .permissions()
             .mode();
         assert_eq!(mode & 0o777, 0o640);
-        assert_eq!(sandbox.read(INSTRUCTIONS), declared(INSTRUCTIONS));
+        assert_eq!(sandbox.read(POINTER), declared(POINTER));
     }
 }

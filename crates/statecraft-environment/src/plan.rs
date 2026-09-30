@@ -11,10 +11,12 @@
 //! the manifest says this product last wrote. Anything else is withheld and
 //! named.
 
-use crate::adapter::{Declaration, PathCollision, Readiness, collisions, readiness};
+use crate::adapter::{
+    Declaration, PathCollision, ProviderPath, Readiness, collisions, provider_paths, readiness,
+};
 use crate::claimant::{Claimant, ForeignClaims, resolve};
 use crate::digest::{digest_bytes, digest_file};
-use crate::manifest::{Class, Manifest, Role};
+use crate::manifest::{Class, Manifest, Role, SourceKind};
 use std::path::Path;
 
 /// Why a planned write will not happen.
@@ -164,6 +166,9 @@ pub enum Refusal {
     /// Refused at plan time, naming both adapters and the path, rather than
     /// discovered when the second write clobbers the first.
     AdapterPathCollision(PathCollision),
+    /// An adapter declared a path inside a provider directory (spec 029
+    /// section 3.1), which no adapter may write in a target.
+    ProviderDirectory(ProviderPath),
     /// The operator named a path for replacement that this product may not
     /// replace (spec 002 section 3.4, and [`crate::replace`]).
     Replacement {
@@ -182,11 +187,43 @@ impl Refusal {
                 "adapters {} and {} both declare {}",
                 c.adapters.0, c.adapters.1, c.path
             ),
+            Refusal::ProviderDirectory(p) => format!(
+                "adapter {} declares {}, inside the provider directory {}/, which no adapter \
+                 may write in a target",
+                p.adapter, p.path, p.directory
+            ),
             Refusal::Replacement { path, reason } => {
                 format!("replacement of {path} refused: {reason}")
             }
         }
     }
+}
+
+/// The refusals a set of declarations earns before any file is read: two
+/// adapters declaring one path, and a path inside a provider directory.
+pub fn declaration_refusals(declarations: &[Declaration]) -> Vec<Refusal> {
+    collisions(declarations)
+        .into_iter()
+        .map(Refusal::AdapterPathCollision)
+        .chain(
+            provider_paths(declarations)
+                .into_iter()
+                .map(Refusal::ProviderDirectory),
+        )
+        .collect()
+}
+
+/// A managed file an adapter wrote and no longer declares, whose bytes are
+/// still the ones recorded: removed on apply (spec 029 section 3.3, under
+/// spec 002 section 3.6's removal rule).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Retired {
+    /// The path.
+    pub path: String,
+    /// The adapter that wrote it.
+    pub adapter: String,
+    /// The recorded digest the file must still carry when it is removed.
+    pub digest: String,
 }
 
 /// What one adapter will do in this plan.
@@ -218,6 +255,9 @@ pub struct Plan {
     pub named: Vec<crate::replace::Named>,
     /// Authored inputs on disk, left alone. Information, never a withholding.
     pub kept: Vec<KeptAuthored>,
+    /// Files an adapter wrote and no longer declares, to be removed. One that
+    /// drifted is in `withheld` instead, and is left.
+    pub retired: Vec<Retired>,
 }
 
 impl Plan {
@@ -267,6 +307,12 @@ impl Plan {
         for k in &self.kept {
             out.push_str(&format!("keep {}\n", k.describe()));
         }
+        for r in &self.retired {
+            out.push_str(&format!(
+                "retire {} ({} no longer declares it)\n",
+                r.path, r.adapter
+            ));
+        }
         out
     }
 }
@@ -288,9 +334,7 @@ pub fn plan(
     // that will go on to refuse: two adapters contesting a path is a
     // configuration defect whether or not either could write today, and hiding
     // it behind an absent harness would surface it later as a mystery.
-    for c in collisions(declarations) {
-        out.refusals.push(Refusal::AdapterPathCollision(c));
-    }
+    out.refusals.extend(declaration_refusals(declarations));
 
     for declaration in declarations {
         let mut readiness = readiness(declaration, probe);
@@ -407,9 +451,51 @@ pub fn plan(
         });
     }
 
+    // Spec 029 section 3.3: a managed file a configured adapter wrote and no
+    // longer declares leaves with its unchanged bytes, and is reported and
+    // left when it drifted. An adopted, transferred or authored entry, and one
+    // from an adapter no longer configured, is never retired here. Nor is one
+    // whose adapter does not claim its paths: the same apply could not rewrite
+    // a pointer that imports the file, so removing it would break the import.
+    if let Some(manifest) = manifest {
+        for e in manifest.managed() {
+            if e.source.kind != SourceKind::Adapter
+                || e.transfer.is_some()
+                || e.role != Role::Reference
+            {
+                continue;
+            }
+            let Some(declaration) = declarations
+                .iter()
+                .find(|d| d.name == e.source.identity && readiness(d, probe).claims_paths())
+            else {
+                continue;
+            };
+            if declaration.paths().any(|p| p == e.path) {
+                continue;
+            }
+            match digest_file(&resolve(root, &e.path))? {
+                Some((found, _)) if found != e.digest => out.withheld.push(WithheldWrite {
+                    path: e.path.clone(),
+                    adapter: declaration.name.clone(),
+                    reason: Withholding::Drifted {
+                        expected: e.digest.clone(),
+                        found,
+                    },
+                }),
+                _ => out.retired.push(Retired {
+                    path: e.path.clone(),
+                    adapter: declaration.name.clone(),
+                    digest: e.digest.clone(),
+                }),
+            }
+        }
+    }
+
     out.writes.sort_by(|a, b| a.path.cmp(&b.path));
     out.withheld.sort_by(|a, b| a.path.cmp(&b.path));
     out.kept.sort_by(|a, b| a.path.cmp(&b.path));
+    out.retired.sort_by(|a, b| a.path.cmp(&b.path));
     Ok(out)
 }
 

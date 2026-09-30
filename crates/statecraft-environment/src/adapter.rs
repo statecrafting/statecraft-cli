@@ -214,6 +214,47 @@ pub fn readiness(declaration: &Declaration, probe: &dyn HarnessProbe) -> Readine
     }
 }
 
+/// Directories a provider's client reads as its own project configuration
+/// (spec 029 section 3.1). No adapter declares a path inside one, so no verb
+/// of this product creates one in a target.
+pub const PROVIDER_DIRECTORIES: [&str; 6] = [
+    ".claude", ".codex", ".agents", ".agent", ".cursor", ".gemini",
+];
+
+/// The provider directory a repository-relative path lies in, if any.
+pub fn provider_directory(path: &str) -> Option<&'static str> {
+    let first = path.trim_start_matches("./").split('/').next()?;
+    PROVIDER_DIRECTORIES.iter().copied().find(|d| *d == first)
+}
+
+/// A declared path inside a provider directory.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ProviderPath {
+    /// The adapter that declared it.
+    pub adapter: String,
+    /// The path.
+    pub path: String,
+    /// The provider directory it lies in.
+    pub directory: String,
+}
+
+/// Every declared path inside a provider directory, refused at plan time
+/// like a collision (spec 029 section 3.4), naming the adapter and the path.
+pub fn provider_paths(declarations: &[Declaration]) -> Vec<ProviderPath> {
+    declarations
+        .iter()
+        .flat_map(|d| {
+            d.paths().filter_map(|path| {
+                provider_directory(path).map(|directory| ProviderPath {
+                    adapter: d.name.clone(),
+                    path: path.to_string(),
+                    directory: directory.to_string(),
+                })
+            })
+        })
+        .collect()
+}
+
 /// A path two adapters both declare.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct PathCollision {
