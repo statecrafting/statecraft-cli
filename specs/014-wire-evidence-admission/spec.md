@@ -99,13 +99,17 @@ implementation may change only the existing units named by its `extends`
 edges. The three `amends` edges change approved requirements additively rather
 than editing those specs in place.
 
-The external interface input is wire-witness commit
+The binding and sidecar protocol input is wire-witness commit
 `f701a7b51e492ec98bf6b160bfd3e3f8bdf7990d`, tree
 `db9513c5faf81427c18468119590b2c2a712b4e6`, and spec 005 content digest
 `sha256:a8195055f0efc508abf86c7fbf86f577cce5556d12d8f3dfe67fd486a988f65d`.
 The four section pins remain current against the later approved producer text.
-The cited commit was a draft, and neither that commit nor later ratification is
-a released producer identity or permission to integrate it.
+The retention and redaction input is wire-witness commit
+`0e3297859e1da5c3fb6249521a189af447878c1e`, tree
+`67d41d5fc81a16da88285f8db8484212b25c5034`, and spec 003 content digest
+`sha256:86ba7b2ee74b02726fbc8b48e7f44f8f7ceb7492365196c7622c854afff54642`.
+The first cited commit was a draft. Neither commit nor later ratification is a
+released producer identity or permission to integrate it.
 
 ## 3. Behavior
 
@@ -127,8 +131,8 @@ applicable. It is never replaced with an empty value, zero, a nearby version,
 or a moving reference. Unknown fields are retained when the envelope relays
 them but do not gain meaning in this version.
 
-Before semantic interpretation, the reader enforces these limits while
-tokenizing the input:
+Before semantic interpretation, the reader refuses duplicate object member
+names as `malformed` and enforces these limits while tokenizing the input:
 
 - at most 1,048,576 manifest bytes;
 - at most 32 nested object or array levels;
