@@ -1311,13 +1311,16 @@ fn plan_setup(
     if let Some(doc) = &document {
         block.extend(doc.parameters.clone());
     }
-    let toml = match std::fs::read_to_string(resolve(ctx.root, "spec-spine.toml")) {
-        Ok(text) => Some(text),
-        Err(_) => starter
+    let pin_path = resolve(ctx.root, "spec-spine.toml");
+    let adopted_pin = std::fs::symlink_metadata(&pin_path).is_ok();
+    let toml = if adopted_pin {
+        std::fs::read_to_string(&pin_path).ok()
+    } else {
+        starter
             .governance
             .iter()
             .find(|f| f.rel_path == "spec-spine.toml")
-            .map(|f| f.contents.clone()),
+            .map(|f| f.contents.clone())
     };
     let plan = crate::setup::plan(&crate::setup::Inputs {
         root: ctx.root,

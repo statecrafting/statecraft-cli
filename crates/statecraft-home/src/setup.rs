@@ -1334,7 +1334,7 @@ pub fn plan(inputs: &Inputs<'_>) -> Result<Plan, String> {
         root,
         &crate::prerequisite::Pin {
             text: inputs.spec_spine_toml,
-            adopted: root.join("spec-spine.toml").exists(),
+            adopted: std::fs::symlink_metadata(root.join("spec-spine.toml")).is_ok(),
             producer_version: &inputs.bound.producer_version,
         },
         &params,
@@ -2207,6 +2207,42 @@ mod tests {
             let text = String::from_utf8(f.bytes.clone()).unwrap();
             assert!(!text.contains(MARK), "{} keeps a parameter", f.path);
         }
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn a_dangling_pin_is_adopted_and_unmet() {
+        use std::os::unix::fs::symlink;
+
+        let profile = Profile::registered();
+        let dir = tempfile::tempdir().unwrap();
+        symlink("missing", dir.path().join("spec-spine.toml")).unwrap();
+        let manifest = Manifest::new(statecraft_environment::manifest::Pins {
+            product: "0".into(),
+            spec_spine: "0".into(),
+            adapters: Default::default(),
+            producer: None,
+        });
+        let block = BTreeMap::new();
+        let plan = plan(&Inputs {
+            root: dir.path(),
+            profile: &profile,
+            block: &block,
+            manifest: &manifest,
+            spec_spine_toml: None,
+            derived_dir: ".statecraft/derived",
+            bound: &crate::setup_input::Bound::with_producer("0.25.0"),
+        })
+        .unwrap();
+        let pin = plan
+            .prerequisites
+            .iter()
+            .find(|p| p.name == "an exact spec-spine pin")
+            .unwrap();
+        assert!(!pin.met);
+        assert_eq!(pin.owner, crate::prerequisite::PROJECT_OWNER);
+        assert!(pin.observed.contains("absent"), "{}", pin.observed);
+        assert!(plan.withheld.is_some());
     }
 
     #[test]
