@@ -133,7 +133,7 @@
       }
     ],
     "sectionDigests": {
-      "014-admission-of-wire-exchange-evidence": "02dfa991dcbec9db8702c9e193af4b470d5b7be0593c8997c0618088c23a2149",
+      "014-admission-of-wire-exchange-evidence": "7308487301b51a7e9ecdf3d151dbc931b86e660e210a6d245fdd3f4dff4783cf",
       "1-purpose": "df2f3d1dfc4957fb3d92a3697a104c0757d0edcac062fb01b30f509cc7bb3669",
       "2-territory-and-exact-inputs": "e103c336539547151d013ed52428c189bcc8c249f39c43096a10a4325e2b27a9",
       "3-1-artifact-identity-and-bounded-input": "c51929e9be1422534547a689114510b80c42c41d093ce1c43f00b0fd9e515afe",
@@ -146,7 +146,7 @@
       "3-8-no-testimony-becomes-authority": "aa2d57e51c6a0673a0bd9ff7f61d6d91d4a5755b93ee158628a852fa82efa8df",
       "3-9-compatibility-and-migration": "41488b800d5a0a07e6ca500d92476f7fe6de9ee4aebdd9376476d7ec97610fa6",
       "3-behavior": "33505b28e8913440b9e903c0d01224f546c25a3425ed4552ab221179a778aaf7",
-      "4-observable-acceptance-and-negative-cases": "0e677855bbff3ab9cbc817c228dbfe29adaeaef24afc80523a1038fd6b399306",
+      "4-observable-acceptance-and-negative-cases": "b1b6bcdebd638b4f96ed3aca0ada600a4ac3476b90f38eab92ad5042729e391d",
       "5-out-of-scope": "7e9a4b73a404ab898a07638426eab4b0a311da3457d94b188d8a1075f471509d",
       "verification": "c237415ba5028fe2ca65bb39f0d012965f2067b6f606a9fa0010751143d785b4"
     },
@@ -173,6 +173,6 @@
     "summary": "Amends the run record, evidence envelope, and command projection so an exact statecraft/wire-exchange/v1 artifact can be bound to one run attempt and sidecar effect, judged deterministically under explicit policy, and shown without retaining secret values or confusing producer testimony with independent acceptance.\n",
     "title": "Admission of wire-exchange evidence"
   },
-  "shardHash": "cc04a22af93447a30ef67661fbd5b324b993f991c9fcf92449fb4fabc702e1cb",
+  "shardHash": "d39363fd32ab850d2239fce8f9a2d219f44d0654f672b3e6c161f5cdb282ed54",
   "specVersion": "1.9.0"
 }

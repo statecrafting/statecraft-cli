@@ -353,6 +353,7 @@ asserts the admission record and both renderings:
 | unknown schema or construction | `unsupported-artifact`; bytes are not guessed at |
 | incomplete capture with named gaps | visible gaps; admission follows the exact minimum-completeness policy |
 | redaction removed a required fact | `incomplete`, with redaction and the gap separately visible |
+| `encrypted-content` selected without a separately ratified retention policy | `retention-forbidden`; no candidate bytes enter Statecraft custody |
 | redaction or retention failure | the exact result remains visible; policy refuses when required |
 | requested and served identities differ | both remain visible; no equality is inferred |
 | provider usage with no independent corroboration | rendered only as provider testimony |
