@@ -82,7 +82,9 @@ rendered profile files to revision 13, and the documents that state the
 location. Spec 023 is amended because its requirement names the contained
 copy's destination. The implementation unit that renders and tests that copy
 remains `crates/statecraft-home/`, owned by spec 002 and named by this spec's
-`extends` edge.
+`extends` edge. Spec 010 is amended because its command table names the policy
+vectors' executable path. Those vectors are likewise rendered by
+`crates/statecraft-home/`; spec 010 owns no separate implementation unit.
 
 ## 3. Behavior
 
