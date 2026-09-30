@@ -1,0 +1,135 @@
+{
+  "record": {
+    "amends": [
+      "008-harness-delivery"
+    ],
+    "created": "2026-09-30",
+    "dependsOn": [
+      "002-environment-lifecycle",
+      "005-acceptance-and-evidence",
+      "008-harness-delivery"
+    ],
+    "extends": [
+      {
+        "nature": "corrective",
+        "spec": "002-environment-lifecycle",
+        "unit": {
+          "kind": "directory",
+          "path": "crates/statecraft-home/"
+        }
+      },
+      {
+        "nature": "corrective",
+        "spec": "002-environment-lifecycle",
+        "unit": {
+          "kind": "directory",
+          "path": "crates/statecraft-environment/"
+        }
+      },
+      {
+        "nature": "corrective",
+        "spec": "003-work-and-run-semantics",
+        "unit": {
+          "kind": "directory",
+          "path": "crates/statecraft-run/"
+        }
+      },
+      {
+        "nature": "corrective",
+        "spec": "005-acceptance-and-evidence",
+        "unit": {
+          "kind": "directory",
+          "path": "crates/statecraft-acceptance/"
+        }
+      },
+      {
+        "nature": "corrective",
+        "spec": "006-command-surface",
+        "unit": {
+          "kind": "directory",
+          "path": "crates/statecraft-cli/"
+        }
+      }
+    ],
+    "id": "029-one-resolved-judge",
+    "implementation": "pending",
+    "obligations": [
+      {
+        "anchor": "3-1-one-judge-per-operation",
+        "id": "R-1",
+        "kind": "requirement",
+        "text": "Every spec-spine invocation this product makes runs an executable chosen by the one resolution of section 3.2 for that operation; no call site constructs a bare `spec-spine` command."
+      },
+      {
+        "anchor": "3-2-the-resolution",
+        "id": "R-2",
+        "kind": "requirement",
+        "text": "The resolution consults, in order, the supervisor's path, the operator override, the launcher's resolution, `.bin`, the repository build and PATH; every candidate after the first two is put to the pin, and every candidate passed over is named."
+      },
+      {
+        "anchor": "3-3-what-is-recorded-and-reported",
+        "id": "R-3",
+        "kind": "requirement",
+        "text": "doctor reports the executable the resolution selected, with its rule, version and digest, and never a separately probed PATH binary as the judge."
+      },
+      {
+        "anchor": "3-4-reading-check",
+        "id": "R-4",
+        "kind": "requirement",
+        "text": "When the resolved engine states that `check` carries `--json`, freshness is read from the envelope's outcome and exit code; wording is read only by a bounded legacy reader for engines that do not."
+      },
+      {
+        "anchor": "3-5-resolution-never-acquires",
+        "id": "I-1",
+        "kind": "invariant",
+        "text": "Resolution never acquires, installs, downloads or repairs anything, and a missing pinned engine is a refusal naming the remedy, never a fallback to an engine the pin does not admit."
+      },
+      {
+        "anchor": "verification",
+        "id": "V-1",
+        "inputs": [
+          "crates/statecraft-cli/tests/one_resolved_judge.rs",
+          "crates/statecraft-environment/tests/check_envelope.rs"
+        ],
+        "kind": "verification",
+        "text": "A fixture with conflicting candidates on PATH, in `.bin` and in `target/release` proves every verb that calls spec-spine runs the same selected executable, and that doctor names it."
+      }
+    ],
+    "sectionDigests": {
+      "029-one-resolved-judge": "5452a6f940b03fd788eeddb3ac098c768cfd795670b75452788ad4cbf63e30ba",
+      "1-purpose": "5e9b867e88f3203c2451e006f3403b2df127d58f0edd290bd9b2a2a215311341",
+      "2-territory": "12da13be1b9cce43b5ed95d2bdd919829dff433c5e54aa856eeab00c60a7265a",
+      "3-1-one-judge-per-operation": "0a33da0001b0f61e8d01a300060fc5535965a46f6c1986fef7ec39aba1a89c77",
+      "3-2-the-resolution": "8cc6adcf40b8621dbce2685b20b016d378c879331a486ecaeb270d7fdbf3b5e5",
+      "3-3-what-is-recorded-and-reported": "531a285f8b6cf4589d26856dfcc110160062c12c49abaca98eff74ceb3ac6f9b",
+      "3-4-reading-check": "569369684f60802c8aa90a57ddc514002aa3638f233eb6c50784f5eb25b2f076",
+      "3-5-resolution-never-acquires": "07e3520cd2a383cbbdc6820a55fee469c140dcf2c4ec32ddead4ccefbd48aa37",
+      "3-6-observable-negative-cases": "ba9db0b921ddf2ab65219f31bf3c87783320f222e16827224dc71d83b7041a8b",
+      "3-behavior": "a43650ceab7cf468cdbf77ba79e1f395ad4bcd9384caabe43a4e712f486e3dfd",
+      "4-out-of-scope": "e28c1984cb8e30b9920e7b91097001660892e22265dd85658f713f40516661ae",
+      "5-resolved-decisions": "5b752ee7cb974be97cf43140e2f4f1ec7b40e0f9036b337803eaccd002fa037a",
+      "verification": "61aaf2bdc64f971bed7a1f10e2a3819dc64d4e4202d0a4a1868dce11f26d4655"
+    },
+    "sectionHeadings": [
+      "029: One resolved judge",
+      "1. Purpose",
+      "2. Territory",
+      "3. Behavior",
+      "3.1 One judge per operation",
+      "3.2 The resolution",
+      "3.3 What is recorded and reported",
+      "3.4 Reading `check`",
+      "3.5 Resolution never acquires",
+      "3.6 Observable negative cases",
+      "4. Out of scope",
+      "5. Resolved decisions",
+      "Verification"
+    ],
+    "specPath": "specs/029-one-resolved-judge/spec.md",
+    "status": "approved",
+    "summary": "Every spec-spine invocation this product makes, in every verb and in every hook it delivers, runs the executable that one resolution selected for that operation, and records which one. No call site names a bare `spec-spine` and lets PATH decide. The resolution's sources are, in order, the supervisor's path in a managed session, an operator override, the project's declared engine as spec-spine's own launcher resolves it when that launcher is present, the repository-local `.bin` install, the repository's own build and then PATH; each candidate is put to the pin, and each passed over is named. `doctor` reports the resolved executable, never a separate PATH probe. Where the resolved engine carries `check --json`, the check is read from its envelope instead of from its wording. Amends spec 008 section 3.23 contracts 2, 4 and 5.\n",
+    "title": "One resolved judge: every spec-spine call this product makes runs the executable one resolution selected"
+  },
+  "shardHash": "c1322c542efad30c3cdd540f40044a1fcb9c63f04414d7e381c959af4da0d1bd",
+  "specVersion": "1.9.0"
+}
