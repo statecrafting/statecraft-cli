@@ -39,7 +39,7 @@ obligations:
     anchor: "3-1-one-judge-per-operation"
   - id: "R-2"
     kind: requirement
-    text: "The resolution consults, in order, the supervisor's path, the operator override, the launcher's resolution, `.bin`, the repository build and PATH; every candidate after the first two is put to the pin, and every candidate passed over is named."
+    text: "The resolution consults, in order, the supervisor's path, the operator override, the launcher's resolution, `.bin`, the repository build and PATH; every candidate except the supervisor's already-resolved path is put to the pin, and every candidate passed over is named."
     anchor: "3-2-the-resolution"
   - id: "R-3"
     kind: requirement
@@ -60,6 +60,8 @@ obligations:
     inputs:
       - "crates/statecraft-cli/tests/one_resolved_judge.rs"
       - "crates/statecraft-environment/tests/check_envelope.rs"
+      - "crates/statecraft-home/src/spec_spine.rs"
+      - "crates/statecraft-home/tests/harness_hooks.rs"
 ---
 
 # 029: One resolved judge
@@ -134,7 +136,10 @@ later one is never consulted once an earlier one answers or refuses.
    itself, so the recorded identity is the executed one.
 4. **Repository-local install.** `.bin/spec-spine`, the location this
    product's setup profile installs into. The separately governed engine-location
-   change moves that install from `.tooling/bin`, which is no longer read.
+   change moves that install from `.tooling/bin`, which is no longer read. This
+   spec's implementation is blocked until that authority change is active; an
+   implementation must not silently omit the repository-local candidate while
+   the old location remains the active policy.
 5. **Repository build.** The repository's own `target/release/spec-spine`.
 6. **PATH.** The first `spec-spine` on PATH that is not the launcher.
 
@@ -191,7 +196,8 @@ install verb when present).
 - The linked producer used for scaffolding, which stays linked (spec-spine
   spec 170 section 3.1); the target-versus-linked guard is spec 018's.
 - Moving the install location and changing this repository's `Makefile`,
-  which remain a separate authority change.
+  which remain a separate authority change and a prerequisite to implementing
+  this spec.
 
 ## 5. Resolved decisions
 
@@ -201,7 +207,8 @@ decided that neither spec-spine nor this product uses `.tooling/bin`. The
 separate setup-profile authority change moves the install to `.bin/`; this resolution, the four
 delivered hooks and the refusal's remedy text name `.bin` accordingly. A
 `.tooling/bin/spec-spine` left in a checkout is not a candidate: reading both
-would keep the retired location alive as a second answer.
+would keep the retired location alive as a second answer. This spec therefore
+stays `implementation: pending` until that authority change lands.
 
 **2026-09-30: `--json` support is read from the verb's help, not from a
 version.** The probe already runs `check --help` to establish the verb (008
