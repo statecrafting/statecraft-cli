@@ -26,7 +26,7 @@ depends_on:
 obligations:
   - id: "R-1"
     kind: requirement
-    text: "doctor reports ownership-disagreement whenever the available facts imply incompatible ownership: a non-none journal target differs from the recorded class; a rendering would manage a path recorded or journaled as non-managed (for an unrecorded user path, only when the file exists); or a managed entry has no rendering source. It names each source and its value."
+    text: "doctor reports ownership-disagreement whenever a non-none journal target differs from the recorded class; rendered is managed while journaled is user; recorded is adopted while rendered is managed; recorded is managed while rendered is absent; or an existing path has recorded user, journaled none and rendered managed. It names each source and its value."
     anchor: "3-2-the-finding"
   - id: "I-1"
     kind: invariant
@@ -34,7 +34,7 @@ obligations:
     anchor: "3-4-read-only-and-deterministic"
   - id: "V-1"
     kind: verification
-    text: "Fixture repositories prove each disagreement pair, the unavailable rendering, the legacy manifest without a journal, and byte-identical trees before and after doctor."
+    text: "Fixture repositories prove every disagreement row, including recorded adopted with rendered managed, plus the unavailable rendering, the legacy manifest without a journal, and byte-identical trees before and after doctor."
     anchor: "verification"
     inputs:
       - "crates/statecraft-environment/tests/ownership_disagreement.rs"
@@ -92,10 +92,11 @@ For each path that appears in any of the three sources below, doctor reads:
 
 The available facts imply incompatible ownership, and
 `ownership-disagreement` is reported, whenever a non-`none` journal target
-differs from the recorded class; a rendering would manage a path recorded or
-journaled as non-managed (for an unrecorded `user` path, only when the file
-exists); or a `managed` entry has no rendering source. The following table
-enumerates those cases and their operational consequences:
+differs from the recorded class; rendered is `managed` while journaled is
+`user`; recorded is `adopted` while rendered is `managed`; recorded is
+`managed` while rendered is absent; or an existing path has recorded `user`,
+journaled `none` and rendered `managed`. The following table enumerates those
+cases and their operational consequences:
 
 | Pair | Disagreement |
 |---|---|
