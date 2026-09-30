@@ -181,7 +181,9 @@ index half's diagnostics is an unresolved claim. Any other `finding` is a
 corpus that does not validate, naming the summary. `refused`, `usage` and
 `failed` are reads not performed. An envelope that does not parse, is not
 `check`'s, or whose `exitCode` disagrees with the process's establishes
-nothing.
+nothing: the read is failed, the caller reports Statecraft exit 4 under spec
+008 section 3.23's translation, and an enforcing gate refuses. It never falls
+back to wording after an engine advertised `--json`.
 
 ### 3.5 Resolution never acquires
 
