@@ -50,6 +50,27 @@
     "interfaceReferences": [
       {
         "corpus": "wire-witness",
+        "digest": "sha256:86ba7b2ee74b02726fbc8b48e7f44f8f7ceb7492365196c7622c854afff54642",
+        "obtained": "2026-09-30",
+        "rationale": "Bind metadata-only classification, mandatory redaction, and capture-manifest custody to the producer sections that define them.",
+        "sections": [
+          {
+            "anchor": "3-1-retention-modes",
+            "digest": "sha256:e786af7a30c269f4eee8dfc296ba8306ad9fac24bc5a44ce778a0287ff46f68b"
+          },
+          {
+            "anchor": "3-2-redaction-before-custody",
+            "digest": "sha256:3a4913bff457d1cb1333e249ca7badbc24c855900e81d86225cab5f3edcda892"
+          },
+          {
+            "anchor": "3-3-durable-custody",
+            "digest": "sha256:c37e5251fb4ba7043e25e37aa79665c7b726eaa08245282d339358448f0407f2"
+          }
+        ],
+        "spec": "003-redaction-custody-and-retention"
+      },
+      {
+        "corpus": "wire-witness",
         "digest": "sha256:a8195055f0efc508abf86c7fbf86f577cce5556d12d8f3dfe67fd486a988f65d",
         "obtained": "2026-09-26",
         "rationale": "Admit the producer's exact attempt binding, closure, and evidence boundary rather than reconstruct its protocol in Statecraft.",
@@ -112,19 +133,19 @@
       }
     ],
     "sectionDigests": {
-      "014-admission-of-wire-exchange-evidence": "4055e755c6f779493f1d5e1398b7bee84872e102af6598dcc673a4e1c5921d23",
+      "014-admission-of-wire-exchange-evidence": "02dfa991dcbec9db8702c9e193af4b470d5b7be0593c8997c0618088c23a2149",
       "1-purpose": "df2f3d1dfc4957fb3d92a3697a104c0757d0edcac062fb01b30f509cc7bb3669",
       "2-territory-and-exact-inputs": "e103c336539547151d013ed52428c189bcc8c249f39c43096a10a4325e2b27a9",
-      "3-1-artifact-identity-and-bounded-input": "540a67c6c6a2602d1418af63ec314ba4b094e1bbbd1659924c0f8b3f63a88060",
+      "3-1-artifact-identity-and-bounded-input": "c51929e9be1422534547a689114510b80c42c41d093ce1c43f00b0fd9e515afe",
       "3-2-exact-subject-and-producer-binding": "c93a7d8c0313602cb9112812086fd14ab147b6bed455c0c2d1f252a5fa33bc49",
       "3-3-required-wire-facts": "dbc961db92a2e74525d877e9bb2cf585af1585423c2f41c43f33714e010ff479",
-      "3-4-custody-retention-and-redaction": "5ad0ac88946821e423d8dcfb14204325b841f5a0af3e99211226bce1ff115cb0",
+      "3-4-custody-retention-and-redaction": "1cdb4e6d6ebd4e1d5820d60b00d0bb3e53045c2e096366c458111fb98c167dfb",
       "3-5-policy-requirement-behavior": "2905c31778ddf5fb020f6d69503b718ad6668a0bda6680d8ab7cda93eb50526c",
       "3-6-deterministic-admission": "4527aaec8bdd4a0eb04eb1cadcac56dc67224196c7ee85524353efd77fcbd17b",
       "3-7-additive-run-show-projection": "be4aed074ee338d7e64527ab872dde34a632d290380af1d5fc63b646ce086edb",
       "3-8-no-testimony-becomes-authority": "aa2d57e51c6a0673a0bd9ff7f61d6d91d4a5755b93ee158628a852fa82efa8df",
       "3-9-compatibility-and-migration": "41488b800d5a0a07e6ca500d92476f7fe6de9ee4aebdd9376476d7ec97610fa6",
-      "3-behavior": "11b05a48359be1af14a751b94e024011587e786a04f26a0becbdc84c7c3440a7",
+      "3-behavior": "33505b28e8913440b9e903c0d01224f546c25a3425ed4552ab221179a778aaf7",
       "4-observable-acceptance-and-negative-cases": "0e677855bbff3ab9cbc817c228dbfe29adaeaef24afc80523a1038fd6b399306",
       "5-out-of-scope": "7e9a4b73a404ab898a07638426eab4b0a311da3457d94b188d8a1075f471509d",
       "verification": "c237415ba5028fe2ca65bb39f0d012965f2067b6f606a9fa0010751143d785b4"
@@ -152,6 +173,6 @@
     "summary": "Amends the run record, evidence envelope, and command projection so an exact statecraft/wire-exchange/v1 artifact can be bound to one run attempt and sidecar effect, judged deterministically under explicit policy, and shown without retaining secret values or confusing producer testimony with independent acceptance.\n",
     "title": "Admission of wire-exchange evidence"
   },
-  "shardHash": "66a3ab63f3ce7a75601e340bd56278ecb79973da34fa17ba5f4177ab1960c040",
+  "shardHash": "cc04a22af93447a30ef67661fbd5b324b993f991c9fcf92449fb4fabc702e1cb",
   "specVersion": "1.9.0"
 }

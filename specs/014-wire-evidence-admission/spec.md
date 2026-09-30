@@ -25,6 +25,18 @@ depends_on:
   - "006-command-surface"
 interface_references:
   - corpus: "wire-witness"
+    spec: "003-redaction-custody-and-retention"
+    digest: "sha256:86ba7b2ee74b02726fbc8b48e7f44f8f7ceb7492365196c7622c854afff54642"
+    sections:
+      - anchor: "3-1-retention-modes"
+        digest: "sha256:e786af7a30c269f4eee8dfc296ba8306ad9fac24bc5a44ce778a0287ff46f68b"
+      - anchor: "3-2-redaction-before-custody"
+        digest: "sha256:3a4913bff457d1cb1333e249ca7badbc24c855900e81d86225cab5f3edcda892"
+      - anchor: "3-3-durable-custody"
+        digest: "sha256:c37e5251fb4ba7043e25e37aa79665c7b726eaa08245282d339358448f0407f2"
+    obtained: "2026-09-30"
+    rationale: "Bind metadata-only classification, mandatory redaction, and capture-manifest custody to the producer sections that define them."
+  - corpus: "wire-witness"
     spec: "005-binding-and-sidecar-protocol"
     digest: "sha256:a8195055f0efc508abf86c7fbf86f577cce5556d12d8f3dfe67fd486a988f65d"
     sections:
@@ -120,7 +132,8 @@ tokenizing the input:
 
 - at most 1,048,576 manifest bytes;
 - at most 32 nested object or array levels;
-- at most 4,096 aggregate object members and array elements;
+- at most 4,096 object members plus array elements in total across the entire
+  manifest;
 - at most 1,024 elements in one array;
 - at most 128 UTF-8 bytes in one member name; and
 - at most 65,536 UTF-8 bytes in one string value.
@@ -198,7 +211,10 @@ member is outside the exact supported v1 manifest schema, when that schema
 classifies the member as a raw request or response body, raw header map or
 value, cookie, authorization value, token, secret, or credential, or when a
 string value matches the exact secret-detector identity recorded in the
-attempt policy. Classification comes from the versioned schema, not a field-name
+attempt policy. The classification schema is exactly the combination of the
+pinned wire-witness spec 003 sections 3.1 through 3.3 and spec 005 section 3.4
+declared in `interface_references`; Statecraft loads no unpinned producer
+schema. Classification comes from those versioned sections, not a field-name
 heuristic. A missing detector identity, detector failure, or value that cannot
 be scanned within the section 3.1 bounds refuses admission rather than being
 retained. The refusal record contains only the member path, detector identity
