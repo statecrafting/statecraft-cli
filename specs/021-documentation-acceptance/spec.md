@@ -269,8 +269,11 @@ The overall result is `accepted`, `rejected`, or `no-acceptance`. `accepted`
 requires every policy-required dimension to pass, the required review quorum to
 recommend acceptance, no unresolved required correction, and a stable subject
 through record creation. `rejected` means the complete judgment ran and at least
-one required dimension failed. An unknown, absent, unsupported, unreadable,
-moving, or authority-changing subject yields `no-acceptance` with reasons.
+one required dimension has the explicit state `fail`. Any required dimension in
+state `unknown`, `unsupported`, `unreadable`, or `not-recorded` makes the
+judgment incomplete and yields `no-acceptance` with reasons. An unknown, absent,
+unsupported, unreadable, moving, or authority-changing subject also yields
+`no-acceptance`.
 
 The record names every dimension and reason. It also repeats that acceptance
 does not authorize applying a patch, modifying an authored file, committing,
@@ -311,6 +314,7 @@ or publishes. Human and JSON output remain two renderings of one value.
 | Artifact bytes change after review | Earlier review does not bind and a new review is required. |
 | Context producer reports stale | Freshness fails regardless of semantic quality. |
 | Provider lists itself as reviewer | Reviewer authority is unknown or fails; it is not accepted. |
+| Required authority dimension is `unknown` | Overall result is `no-acceptance`, not rejection. |
 | Every dimension passes | Result may be accepted, but no application or publication authority follows. |
 
 ## 4. Out of scope
