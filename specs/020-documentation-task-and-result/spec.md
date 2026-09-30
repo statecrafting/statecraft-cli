@@ -34,7 +34,7 @@ obligations:
     anchor: "3-1-separate-documents-and-authorities"
   - id: "I-2"
     kind: invariant
-    text: "A version 1 documentation task permanently prohibits patch application, repository publication, release, deployment, remote administration, credential reads, and provider selection, and no task field can grant one of those operations."
+    text: "A version 1 documentation task permanently prohibits apply-patch, commit, push, open-pull-request, publish, release, deploy, remote-admin, credential-read, and provider-select, and no task field can grant one of those operations."
     anchor: "3-3-authority-and-operation-limits"
   - id: "R-1"
     kind: requirement
@@ -229,6 +229,12 @@ Each claim contains exactly:
 | `unsupportedReason` | Explicit reason, or `not-applicable`. |
 | `contradictionRefs` | Ordered links to contradiction records. |
 | `reviewDisposition` | Initially `not-reviewed`. |
+
+The claim-level `reviewDisposition` is also a Statecraft-defined sentinel in
+the immutable raw result, not provider testimony. A later review record binds
+the result digest and identifies each reviewed `claimId` with its independent
+disposition. Projections join those records without rewriting the claim or its
+sentinel, and label unreviewed claims separately from claims a reviewer judged.
 
 Lifecycle grades are assertions requiring support at that exact grade. A
 `released` claim is not satisfied by evidence of implementation, and an
