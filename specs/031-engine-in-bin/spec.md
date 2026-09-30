@@ -26,7 +26,7 @@ extends:
   - { spec: "002-environment-lifecycle", unit: { kind: directory, path: "crates/statecraft-home/" }, nature: corrective }
   - { spec: "006-command-surface", unit: { kind: directory, path: "crates/statecraft-cli/" }, nature: corrective }
   # C-01's current statement and D-06's rationale name the install location.
-  - { spec: "001-boundaries-and-authority", unit: "docs/decisions/00-founding-decisions.md", nature: corrective }
+  - { spec: "001-boundaries-and-authority", unit: { kind: file, path: "docs/decisions/00-founding-decisions.md" }, nature: corrective }
 depends_on:
   - "002-environment-lifecycle"
   - "024-review-budget-and-ratification"

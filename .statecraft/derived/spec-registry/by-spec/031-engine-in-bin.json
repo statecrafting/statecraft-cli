@@ -102,6 +102,6 @@
     "summary": "The owner decided that neither spec-spine nor Statecraft uses `.tooling/bin` and that the repository-local spec-spine is `.bin/spec-spine`. Profile github-actions-rust revision 13 installs the pinned engine there, its gate, commit walk, CI cache and policy commands read it there, and its ignore fragment ignores `.bin/`. The resolver's repository-local candidate, the delivered hooks and this repository's own `Makefile` follow. A revision-12 project converges through the ordinary managed upgrade.\n",
     "title": "Setup profile revision 13: the repository-local engine lives in .bin/"
   },
-  "shardHash": "6a54461caa63c6cc692e98dc4793c157f61d207d3e79bce3181f03902b7db83e",
+  "shardHash": "f70c6790f93cdcad3ad30508c175836b0f3ef5281171b0661902d013d2b0f7be",
   "specVersion": "1.9.0"
 }
