@@ -1,0 +1,66 @@
+{
+  "record": {
+    "amends": [
+      "001-boundaries-and-authority"
+    ],
+    "amendsSections": [
+      "3.6",
+      "3.7"
+    ],
+    "created": "2026-09-30",
+    "dependsOn": [
+      "001-boundaries-and-authority",
+      "016-bounded-active-specs"
+    ],
+    "establishes": [
+      {
+        "kind": "file",
+        "path": ".claude/settings.json"
+      }
+    ],
+    "extends": [
+      {
+        "nature": "additive",
+        "spec": "001-boundaries-and-authority",
+        "unit": {
+          "kind": "file",
+          "path": "scripts/check-authored-content.sh"
+        }
+      }
+    ],
+    "id": "028-agent-attribution-is-refused",
+    "implementation": "complete",
+    "sectionDigests": {
+      "028-agent-attribution-and-agent-commit-identities-are-refused": "795e9bc1ebb91ea9c3400b6f4cd2f165cb87941332551ecdaa9f0698c2588042",
+      "1-purpose": "606c392be5ebc54e6850ef0ab322e36adf9a8da8adfdf8e48c5c12786a0cd9e2",
+      "2-territory": "b1ef08d0f6163d3e7bb20a46adf21ca7cff1c222ce033dbe88b75bab2da3f0d1",
+      "3-1-project-settings-write-no-attribution": "c75d96982d2de8f032f6d2d68cd6f343fa9feb4ff0f9076654f62b3d8025be9f",
+      "3-2-the-checker-refuses-agent-links-and-attribution": "2f3a1f44a38dd41c7527b6b04888906e319fafaddade50a0226bc87ac8291eab",
+      "3-3-the-checker-refuses-an-agent-commit-identity": "30bba517b9317d4a287dc7f3e9a20a9acddda0fa661659fcd18a2c15863b6978",
+      "3-4-offline-evidence": "7298de9ba58b8b4c20b1c226fccd0a6debddf79a84910c0790d53e02d6643fe4",
+      "3-behavior": "6424b83833f66aa6ce6e754d95f2861ea70c1b29fb8260e9de4e9d6ab930eb4f",
+      "4-out-of-scope": "7df12befbca2757c5e216025ac3a8cc7864f4009b5c5be995e776aede2b3b87f",
+      "5-resolved-decisions": "eadca43d2b189e356270e3b7c1a437439c153ae33f901f31fb6eba0d30423502",
+      "verification": "4d68861983f9fc20d7ca8c251071b9d4713aaf2a3fbdc7c9eb5194657a3c5634"
+    },
+    "sectionHeadings": [
+      "028: Agent attribution and agent commit identities are refused",
+      "1. Purpose",
+      "2. Territory",
+      "3. Behavior",
+      "3.1 Project settings write no attribution",
+      "3.2 The checker refuses agent links and attribution",
+      "3.3 The checker refuses an agent commit identity",
+      "3.4 Offline evidence",
+      "4. Out of scope",
+      "5. Resolved decisions",
+      "Verification"
+    ],
+    "specPath": "specs/028-agent-attribution-is-refused/spec.md",
+    "status": "approved",
+    "summary": "Amends spec 001's authored-content rules so agent attribution is suppressed at the project boundary and refused in every text the governance gate reads. The same gate refuses commits whose author or committer uses a known agent address. Display names do not decide identity, and external contributors remain allowed.\n",
+    "title": "Agent attribution and agent commit identities are refused"
+  },
+  "shardHash": "0724f160dbeb0cb8e0b26d5fbc99578e16fb806b5d7c83bb7f3c9ff466a0b076",
+  "specVersion": "1.9.0"
+}

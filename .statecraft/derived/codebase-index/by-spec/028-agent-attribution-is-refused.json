@@ -1,0 +1,53 @@
+{
+  "mapping": {
+    "amends": [
+      "001-boundaries-and-authority"
+    ],
+    "dependsOn": [
+      "001-boundaries-and-authority",
+      "016-bounded-active-specs"
+    ],
+    "implementingPaths": [
+      {
+        "path": ".claude/settings.json",
+        "source": "spec-edge"
+      },
+      {
+        "path": "scripts/check-authored-content.sh",
+        "source": "spec-edge"
+      }
+    ],
+    "resolvedUnits": [
+      {
+        "locations": [
+          {
+            "file": ".claude/settings.json"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "kind": "file",
+          "path": ".claude/settings.json"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "scripts/check-authored-content.sh"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "scripts/check-authored-content.sh"
+        }
+      }
+    ],
+    "specId": "028-agent-attribution-is-refused",
+    "specStatus": "approved"
+  },
+  "schemaVersion": "1.2.0",
+  "shardHash": "0724f160dbeb0cb8e0b26d5fbc99578e16fb806b5d7c83bb7f3c9ff466a0b076"
+}
