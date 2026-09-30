@@ -41,7 +41,7 @@ obligations:
     anchor: "3-1-one-judge-per-operation"
   - id: "R-2"
     kind: requirement
-    text: "The resolution consults, in order, the supervisor's path, the operator override, the launcher's resolution, the active setup profile's repository-local install, the repository build and PATH; every candidate except the supervisor's already-resolved path is put to the pin, and every candidate passed over is named."
+    text: "In a managed session the supervisor's path is exclusive; otherwise an operator override, when set, is exclusive; only when neither is present does resolution consult the launcher, the active setup profile's repository-local install, the repository build and the first non-launcher `spec-spine` on PATH. Every candidate except the supervisor's already-resolved path is put to the pin, and every candidate passed over is named."
     anchor: "3-2-the-resolution"
   - id: "R-3"
     kind: requirement
@@ -280,5 +280,5 @@ on PATH, and a stub launcher.
 cargo test -p statecraft-cli --test one_resolved_judge
 cargo test -p statecraft-environment --test check_envelope
 cargo test -p statecraft-home --test spec_spine_resolution
-cargo test -p statecraft-home --test harness_hooks contract_2
+cargo test -p statecraft-home --test harness_hooks
 ```

@@ -66,7 +66,7 @@
         "anchor": "3-2-the-resolution",
         "id": "R-2",
         "kind": "requirement",
-        "text": "The resolution consults, in order, the supervisor's path, the operator override, the launcher's resolution, the active setup profile's repository-local install, the repository build and PATH; every candidate except the supervisor's already-resolved path is put to the pin, and every candidate passed over is named."
+        "text": "In a managed session the supervisor's path is exclusive; otherwise an operator override, when set, is exclusive; only when neither is present does resolution consult the launcher, the active setup profile's repository-local install, the repository build and the first non-launcher `spec-spine` on PATH. Every candidate except the supervisor's already-resolved path is put to the pin, and every candidate passed over is named."
       },
       {
         "anchor": "3-3-what-is-recorded-and-reported",
@@ -100,7 +100,7 @@
       }
     ],
     "sectionDigests": {
-      "029-one-resolved-judge": "366806c8adbf6d7eb53f000e3a49eea4f394af5697ba5a75fce53d6eedf73ede",
+      "029-one-resolved-judge": "065084d4319c1a3ccb1d4ea396c12bccc8f3283736088254f741696fc5af02ec",
       "1-purpose": "5e9b867e88f3203c2451e006f3403b2df127d58f0edd290bd9b2a2a215311341",
       "2-territory": "12da13be1b9cce43b5ed95d2bdd919829dff433c5e54aa856eeab00c60a7265a",
       "3-1-one-judge-per-operation": "0a33da0001b0f61e8d01a300060fc5535965a46f6c1986fef7ec39aba1a89c77",
@@ -112,7 +112,7 @@
       "3-behavior": "1142ee225de15bd1ad7dc66c7e0a3ebcdeb586b7c59e003404bb0f3901947b34",
       "4-out-of-scope": "38112ecb1dc5b61f9e8e51e90cdc3e0384214dda73dbcdfba85d5fc6aaa4c22c",
       "5-resolved-decisions": "1d1ab2a61ea6f1f91f2e931182dcfbef5844eae57d50a4ef60e965fc23187bed",
-      "verification": "d50d6d9fe1adac9b8a7506d2be41308e32803019da75eb7b04a604c5a3ee4046"
+      "verification": "11b31ce4e76d88767d34714317d34eb76091c2a1eb1e2413744b969efd1b1828"
     },
     "sectionHeadings": [
       "029: One resolved judge",
@@ -134,6 +134,6 @@
     "summary": "Every spec-spine invocation this product makes, in every verb and in every hook it delivers, runs the executable that one resolution selected for that operation, and records which one. No call site names a bare `spec-spine` and lets PATH decide. The resolution's sources are, in order, the supervisor's path in a managed session, an operator override, the project's declared engine as spec-spine's own launcher resolves it when that launcher is present, the repository-local install named by the active setup profile, the repository's own build and then PATH; every candidate except the supervisor's already-resolved path is put to the pin, and each passed over is named. `doctor` reports the resolved executable, never a separate PATH probe. Where the resolved engine carries `check --json`, the check is read from its envelope instead of from its wording. Amends spec 008 section 3.23 contracts 2, 4 and 5.\n",
     "title": "One resolved judge: every spec-spine call this product makes runs the executable one resolution selected"
   },
-  "shardHash": "ed1d0738ac9e337ffa0a84116ab8b7eba0679eec120164eadaf2f51751f44b46",
+  "shardHash": "1b842574979d82bf8f274798880c682c0f70099ca61452191fe1c2e5a36f2fbb",
   "specVersion": "1.9.0"
 }
