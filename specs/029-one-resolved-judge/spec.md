@@ -12,8 +12,8 @@ summary: >
   path in a managed session, an operator override, the project's declared
   engine as spec-spine's own launcher resolves it when that launcher is
   present, the repository-local install named by the active setup profile, the repository's own
-  build and then PATH; each candidate is put to the pin, and each passed over
-  is named. `doctor` reports the resolved executable, never a separate PATH
+  build and then PATH; every candidate except the supervisor's already-resolved
+  path is put to the pin, and each passed over is named. `doctor` reports the resolved executable, never a separate PATH
   probe. Where the resolved engine carries `check --json`, the check is read
   from its envelope instead of from its wording. Amends spec 008 section 3.23
   contracts 2, 4 and 5.
@@ -141,9 +141,11 @@ later one is never consulted once an earlier one answers or refuses.
 5. **Repository build.** The repository's own `target/release/spec-spine`.
 6. **PATH.** The first `spec-spine` on PATH that is not the launcher.
 
-Candidates 3 to 6 are put to the pin in order; the first admitted is selected,
-and every one passed over is named with its version and the pin. An unpinned
-repository takes the first candidate that exists and is reported unpinned.
+Candidate 2, when present outside a managed session, is put to the pin without
+fallback. Candidates 3 to 6 are put to the pin in order; the first admitted is
+selected, and every one passed over is named with its version and the pin. An
+unpinned repository takes the first candidate that exists and is reported
+unpinned.
 
 ### 3.3 What is recorded and reported
 
