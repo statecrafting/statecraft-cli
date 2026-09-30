@@ -8,10 +8,10 @@ summary: >
   Amends spec 002 section 3.5 with one additive, read-only doctor finding,
   ownership-disagreement. For each path, doctor compares three facts: the
   manifest entry's class, the latest transfer-journal record for the path, and
-  the class the current selection's rendering would give it. Each hazardous
-  mismatch defined below is reported with both sources named. doctor repairs
-  nothing, transfers nothing and never treats a rendering it could not compute
-  as agreement. Backlog SC-006.
+  the class the current selection's rendering would give it. Each incompatible
+  ownership state defined below is reported with both sources named. doctor
+  repairs nothing, transfers nothing and never treats a rendering it could not
+  compute as agreement. Backlog SC-006.
 amends:
   # Section 3.5, the doctor states and findings. Under the approved-spec
   # amendment rule, 002 stays unedited; registry relationships reports the edge.
@@ -26,7 +26,7 @@ depends_on:
 obligations:
   - id: "R-1"
     kind: requirement
-    text: "doctor reports ownership-disagreement for every path satisfying a disagreement row, naming each source and its value."
+    text: "doctor reports ownership-disagreement whenever the available facts imply incompatible ownership: a non-none journal target differs from the recorded class; a rendering would manage a path recorded or journaled as non-managed (for an unrecorded user path, only when the file exists); or a managed entry has no rendering source. It names each source and its value."
     anchor: "3-2-the-finding"
   - id: "I-1"
     kind: invariant
@@ -90,7 +90,12 @@ For each path that appears in any of the three sources below, doctor reads:
 
 ### 3.2 The finding
 
-`ownership-disagreement` is reported for a path when any of these holds:
+The available facts imply incompatible ownership, and
+`ownership-disagreement` is reported, whenever a non-`none` journal target
+differs from the recorded class; a rendering would manage a path recorded or
+journaled as non-managed (for an unrecorded `user` path, only when the file
+exists); or a `managed` entry has no rendering source. The following table
+enumerates those cases and their operational consequences:
 
 | Pair | Disagreement |
 |---|---|
@@ -104,9 +109,10 @@ The last row overlaps `foreign` where a claimant is named. In the final finding
 set, a path that satisfies `foreign` has only that finding; the overlapping
 `ownership-disagreement` row is omitted regardless of evaluation order. A
 `read-only` rendering never disagrees with any class, because reading is not
-ownership. An `adopted` recording is covered by the first row and by its
-`managed` rendering row; a `read-only` or absent rendering cannot rewrite or
-delete an adopted path and is not a disagreement.
+ownership. An `adopted` recording disagrees with a `managed` rendering under
+the recorded-rendered row. It disagrees with the journal only when a
+non-`none` journal target differs from `adopted`. A `read-only` or absent
+rendering cannot rewrite or delete an adopted path and is not a disagreement.
 
 Each finding names the path, the pair, and both values with their sources: the
 manifest entry, the journal record's identity, or the selection and producer
