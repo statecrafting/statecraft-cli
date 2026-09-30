@@ -119,6 +119,15 @@ pub struct Override {
     /// The SHA-256 of the grant's journal line.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub grant_line: Option<String>,
+    /// The SHA-256 of the journal's state authority at admission (section
+    /// 3.1.5 rule 7). Absent on an intent written before that section, and
+    /// read as not recorded.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub authority: Option<String>,
+    /// `verified`, or `operator-adopted, not verified` for a grant that
+    /// precedes an operator's adoption (section 3.1.5 rules 5 and 7).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub verification: Option<String>,
 }
 
 /// The overrides in force for one repository.
@@ -145,6 +154,8 @@ impl Overrides {
             operator_provenance: None,
             granted_at: None,
             grant_line: None,
+            authority: None,
+            verification: None,
         });
         self
     }

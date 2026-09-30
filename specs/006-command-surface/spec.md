@@ -111,6 +111,7 @@ group them:
 | `config show <path>` | `002` | The resolved configuration for a run in that project, per key, with provenance. |
 | `approval grant <path> <subject> <operator> <reason...>` / `approval show <path> <subject>` | `002` | Records a local approval for one subject; shows one subject's eligibility and the authority behind it. |
 | `override grant <path> <spec-id> <operator> <reason...>` / `override revoke <path> <spec-id> <operator> <reason...>` / `override show <path>` | `003` | Records, removes and shows the single-spec readiness override of `003` section 3.1.4 (section 3.11.5). |
+| `override recover <path> [<choice> <journal-digest> <authority-digest> <operator> <reason...>]` | `003` | Reports the override journal and its state authority, and records the operator's recovery choice, of `003` section 3.1.5 (section 3.11.8). |
 | `transfer plan <path> <file> <from> <to>` | `002` | Reports one path's ownership transfer and its plan identity. Writes nothing (section 3.11.7). |
 | `transfer apply <path> <file> <from> <to> <plan-id> <operator> <reason...>` | `002` | Applies that transfer if the plan is still current, and journals it in the manifest. |
 | `transfer revert <path> <transfer-id> <operator> <reason...>` | `002` | Applies the inverse of a recorded transfer if nothing changed since. |

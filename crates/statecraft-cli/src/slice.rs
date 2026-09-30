@@ -1110,6 +1110,12 @@ pub struct OverridesView {
     pub in_force: Vec<statecraft_run::overrides::InForce>,
     /// Whether the journal ends in a torn line, which is not in force.
     pub torn_last_line: bool,
+    /// An intended line the journal does not hold complete: an interrupted
+    /// write, never in force (spec 003 section 3.1.5 rule 4).
+    pub intended_line: Option<statecraft_run::overrides::Intended>,
+    /// The SHA-256 of the journal's state authority as read, or `null` where
+    /// there is none.
+    pub authority: Option<String>,
 }
 
 /// `override show <path>`
@@ -1129,10 +1135,22 @@ pub fn override_show_answer(
             torn.len()
         ));
     }
+    if let Some(i) = journal.intended() {
+        summary.push_str(&format!(
+            "an intended line at position {} was never appended complete; it is not in force, \
+             and the next grant or revocation clears it\n",
+            i.position
+        ));
+    }
     for o in &in_force {
         summary.push_str(&format!(
-            "{}  by {} ({}), granted {}: {}\n",
-            o.spec_id, o.operator, o.operator_provenance, o.granted_at, o.reason
+            "{}  by {} ({}), granted {}, {}: {}\n",
+            o.spec_id,
+            o.operator,
+            o.operator_provenance,
+            o.granted_at,
+            o.verification.word(),
+            o.reason
         ));
     }
     Answer::new(
@@ -1140,6 +1158,8 @@ pub fn override_show_answer(
             repository: repository.to_string(),
             in_force,
             torn_last_line: journal.torn().is_some(),
+            intended_line: journal.intended().cloned(),
+            authority: journal.authority().map(str::to_string),
         },
         Exit::Ok,
         summary,
@@ -1161,7 +1181,6 @@ pub fn override_change_answer(
     change: &'static str,
     result: Result<statecraft_run::overrides::InForce, statecraft_run::overrides::JournalError>,
 ) -> Answer<serde_json::Value> {
-    use statecraft_run::overrides::JournalError;
     match result {
         Ok(o) => {
             let summary = format!(
@@ -1179,16 +1198,168 @@ pub fn override_change_answer(
                 summary,
             )
         }
-        Err(JournalError::Refused(why)) => Answer::new(
+        Err(e) => journal_error_answer(&e),
+    }
+}
+
+/// A journal that could not be used (spec 006 section 3.11.8's amendment of
+/// 3.11.5): a refusal, a pending line or a write in progress is 2, and a
+/// journal that does not verify or disagrees with its authority is 4.
+pub fn journal_error_answer(
+    e: &statecraft_run::overrides::JournalError,
+) -> Answer<serde_json::Value> {
+    use statecraft_run::overrides::JournalError;
+    let why = match e {
+        JournalError::Refused(why) => why.clone(),
+        other => other.to_string(),
+    };
+    if e.is_refusal() {
+        Answer::new(
             serde_json::json!({ "refused": why }),
             Exit::Refused,
             format!("refused: {why}\n"),
-        ),
-        Err(e) => Answer::new(
-            serde_json::json!({ "failed": e.to_string() }),
+        )
+    } else {
+        Answer::new(
+            serde_json::json!({ "failed": why }),
             Exit::Failed,
-            format!("failed: {e}\n"),
-        ),
+            format!("failed: {why}\n"),
+        )
+    }
+}
+
+/// `override recover <path>`: both files as found, their state and the
+/// choices it allows (spec 006 section 3.11.8).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RecoverReportView {
+    /// The repository.
+    pub repository: String,
+    /// The journal, and its SHA-256 or `absent`.
+    pub journal: statecraft_run::overrides::FileFound,
+    /// Its complete lines.
+    pub journal_lines: u64,
+    /// The state authority, and its SHA-256 or `absent`.
+    pub authority: statecraft_run::overrides::FileFound,
+    /// The count the authority records, where it parsed.
+    pub authority_lines: Option<u64>,
+    /// The intended line it records.
+    pub intended_line: Option<statecraft_run::overrides::Intended>,
+    /// The byte length of a torn final line.
+    pub torn_bytes: Option<u64>,
+    /// The state's word.
+    pub state: &'static str,
+    /// What it means.
+    pub detail: String,
+    /// The choices it allows, none where the files agree.
+    pub allowed: Vec<statecraft_run::overrides::Choice>,
+    /// Whether another process held the repository lock while this was read.
+    pub in_progress: bool,
+}
+
+/// `override recover <path>`, from what [`statecraft_run::overrides::inspect`]
+/// found. 0 where nothing needs recovery, 1 for a state that does, and 2 for
+/// an interrupted write while another process holds the lock.
+pub fn recover_report_answer(
+    repository: &str,
+    found: &statecraft_run::overrides::Found,
+    busy: bool,
+) -> Answer<RecoverReportView> {
+    let allowed = found.state.allowed();
+    let in_progress = busy
+        && matches!(
+            found.state,
+            statecraft_run::overrides::State::IntentWithoutLine
+                | statecraft_run::overrides::State::IntentTorn
+                | statecraft_run::overrides::State::Pending
+        );
+    let mut summary = format!(
+        "journal   {} ({})\nauthority {} ({})\nstate     {}: {}\n",
+        found.journal.path,
+        found.journal.sha256,
+        found.authority.path,
+        found.authority.sha256,
+        found.state.word(),
+        found.state.describe()
+    );
+    let exit = if in_progress {
+        summary.push_str("another process holds the repository lock: a write is in progress\n");
+        Exit::Refused
+    } else if allowed.is_empty() {
+        Exit::Ok
+    } else {
+        let words: Vec<&str> = allowed.iter().map(|c| c.word()).collect();
+        summary.push_str(&format!(
+            "choices   {}\nrecord one with: override recover {repository} <choice> {} {} \
+             <operator> <reason...>\n",
+            words.join(", "),
+            found.journal.sha256,
+            found.authority.sha256
+        ));
+        Exit::Finding
+    };
+    Answer::new(
+        RecoverReportView {
+            repository: repository.to_string(),
+            journal: found.journal.clone(),
+            journal_lines: found.journal_lines(),
+            authority: found.authority.clone(),
+            authority_lines: found.authority_lines(),
+            intended_line: found.intended().cloned(),
+            torn_bytes: found.torn_bytes(),
+            state: found.state.word(),
+            detail: found.state.describe(),
+            allowed,
+            in_progress,
+        },
+        exit,
+        summary,
+    )
+}
+
+/// `override recover <path> <choice> ...`, from what the journal returned.
+pub fn recover_answer(
+    result: Result<statecraft_run::overrides::Recovered, statecraft_run::overrides::JournalError>,
+) -> Answer<serde_json::Value> {
+    match result {
+        Ok(r) => {
+            let mut summary = format!(
+                "recorded {} against the state {} (journal {}, authority {})\n",
+                r.choice.word(),
+                r.found.state,
+                r.found.journal,
+                r.found.authority
+            );
+            if let Some(v) = &r.voids {
+                summary.push_str(&format!(
+                    "voided the pending line {v}; it was never in force\n"
+                ));
+            }
+            if let Some(p) = &r.preserved {
+                summary.push_str(&format!(
+                    "the journal as found is preserved at {} ({})\n",
+                    p.path, p.sha256
+                ));
+            }
+            if matches!(
+                r.choice,
+                statecraft_run::overrides::Choice::AdoptAsRead
+                    | statecraft_run::overrides::Choice::AdoptPrefix
+                    | statecraft_run::overrides::Choice::AdoptEmpty
+            ) {
+                summary.push_str(
+                    "the adopted baseline is operator-adopted, not verified; every grant before \
+                     this line carries that label\n",
+                );
+            }
+            summary.push_str(&format!("{} override(s) in force\n", r.in_force.len()));
+            Answer::new(
+                serde_json::to_value(&r).unwrap_or_default(),
+                Exit::Ok,
+                summary,
+            )
+        }
+        Err(e) => journal_error_answer(&e),
     }
 }
 

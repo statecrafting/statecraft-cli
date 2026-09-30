@@ -93,6 +93,8 @@ pub enum Verb {
     OverrideRevoke,
     /// `override show <path>`
     OverrideShow,
+    /// `override recover <path> [<choice> <journal-digest> <authority-digest> <operator> <reason...>]`
+    OverrideRecover,
     /// `run reconcile <path> <run-id> <attempt> <finding> <launch-state> <operator> <reason...>`
     RunReconcile,
     /// `transfer plan <path> <file> <from> <to>`
@@ -161,6 +163,7 @@ impl Verb {
             Verb::OverrideGrant => "override grant",
             Verb::OverrideRevoke => "override revoke",
             Verb::OverrideShow => "override show",
+            Verb::OverrideRecover => "override recover",
             Verb::RunReconcile => "run reconcile",
             Verb::TransferPlan => "transfer plan",
             Verb::TransferApply => "transfer apply",
@@ -192,6 +195,8 @@ impl Verb {
             Verb::OverrideGrant
             | Verb::OverrideRevoke
             | Verb::OverrideShow
+            // Section 3.11.8: the recovery of 003 section 3.1.5.
+            | Verb::OverrideRecover
             | Verb::RunReconcile => "003-work-and-run-semantics",
             // `run` is 003's semantics through 004's adapter, and 006 section
             // 3.1 names both. The record and the outcome are 003's, so that is
@@ -281,6 +286,7 @@ impl Verb {
             Verb::OverrideGrant,
             Verb::OverrideRevoke,
             Verb::OverrideShow,
+            Verb::OverrideRecover,
             Verb::RunReconcile,
             Verb::TransferPlan,
             Verb::TransferApply,
@@ -341,6 +347,7 @@ impl Verb {
             ("override", Some("grant")) => Some((Verb::OverrideGrant, 2)),
             ("override", Some("revoke")) => Some((Verb::OverrideRevoke, 2)),
             ("override", Some("show")) => Some((Verb::OverrideShow, 2)),
+            ("override", Some("recover")) => Some((Verb::OverrideRecover, 2)),
             ("transfer", Some("plan")) => Some((Verb::TransferPlan, 2)),
             ("transfer", Some("apply")) => Some((Verb::TransferApply, 2)),
             ("transfer", Some("revert")) => Some((Verb::TransferRevert, 2)),
