@@ -1,0 +1,89 @@
+{
+  "mapping": {
+    "amends": [
+      "004-execution-adapter",
+      "002-environment-lifecycle"
+    ],
+    "dependsOn": [
+      "002-environment-lifecycle",
+      "004-execution-adapter",
+      "008-harness-delivery"
+    ],
+    "implementingPaths": [
+      {
+        "path": "crates/statecraft-adapter-claude-code/",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/statecraft-cli/",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/statecraft-environment/",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/statecraft-home/",
+        "source": "spec-edge"
+      }
+    ],
+    "resolvedUnits": [
+      {
+        "locations": [
+          {
+            "file": "crates/statecraft-adapter-claude-code/"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "directory",
+          "path": "crates/statecraft-adapter-claude-code/"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "crates/statecraft-cli/"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "directory",
+          "path": "crates/statecraft-cli/"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "crates/statecraft-environment/"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "directory",
+          "path": "crates/statecraft-environment/"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "crates/statecraft-home/"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "directory",
+          "path": "crates/statecraft-home/"
+        }
+      }
+    ],
+    "specId": "030-no-provider-directories",
+    "specStatus": "approved"
+  },
+  "schemaVersion": "1.2.0",
+  "shardHash": "482a83c7e18b2b52446c64121ce23d71fff7f6444a3b648ef2a5ca5e3e2d41f9"
+}
