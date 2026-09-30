@@ -9,6 +9,9 @@
     ".claude/rules/orchestrator-rules.md": {
       "contentHash": "5e39637ab19f54b29c19154a13161c94da5511ad696b8ff1626950da68412e29"
     },
+    ".claude/settings.json": {
+      "contentHash": "bc1c52409e2958785b357aac8b911f32875308d9ec1682cb0f1145b981e42180"
+    },
     ".github/workflows/statecraft-ai-review.yml": {
       "contentHash": "daa0cd0400d1aab5195440c0ac9a3df13f11fe110263f504d8310f3ba9878d5c"
     },
@@ -64,7 +67,7 @@
       "contentHash": "761b858c102914292d4b35d4317af4568a65b849b199ad249f056192490e7a0e"
     },
     "scripts/check-authored-content.sh": {
-      "contentHash": "a1ee2676a3d386c82bb8fcc02378e0fbd0529f77047690320e04d06466bf1979"
+      "contentHash": "9eb9d789e59f366705690f4ca80ca66dbb81825d2e35e4577c005d8071e159ad"
     },
     "scripts/check-spec-corpus.sh": {
       "contentHash": "d4482680aa448a517701da28bf172da652b2a42a540b68abf10f5a832a3444b6"
@@ -85,7 +88,7 @@
       "contentHash": "670a5a04a7c3dd79e9fba400f4c54d01ee7f7602a3f5eaa90299cdbf268edc36"
     },
     "spec-spine.toml": {
-      "contentHash": "64dfde35066eeaa745a8f30a38b15541ba329103ac1ff247b3eebde0e21c6d12"
+      "contentHash": "49b87df2e4b141d00b44557927360c9fca159595dfec1fb0d2f8a0dd8811fc00"
     },
     "standards/spec/constitution.md": {
       "contentHash": "27d45bf3ade1274e0469c340aa8f3988ab537c5c4b1f24345cd1fb473c365bb0"
