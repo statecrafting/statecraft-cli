@@ -152,9 +152,10 @@ attempt is a binding fact, not a replacement correlation key.
 
 The referenced intent must be the one sidecar intent for that attempt, and its
 outcome must close that same effect exactly once. An absent, invalid, orphaned,
-ambiguous, already closed, or mismatched effect fails subject binding. Evidence
-from an earlier attempt is stale for the current attempt and cannot be adopted
-by retry. A later attempt never inherits an earlier attempt's admission.
+ambiguous, already closed, or mismatched effect fails subject binding as
+`subject-mismatch`. Evidence bound to an earlier attempt instead refuses as
+`stale` for the current attempt and cannot be adopted by retry. A later attempt
+never inherits an earlier attempt's admission.
 
 The producer revision and digest are compared with the producer identity that
 the attempt recorded. Missing or unequal producer identity fails subject
@@ -259,9 +260,11 @@ Admission performs this ordered procedure over immutable input:
 6. read the durable record for an existing artifact with the same manifest,
    policy, and subject identities and refuse it as `duplicate`;
 7. apply the section 3.4 prohibited-content screen;
-8. validate required facts and cross-field consistency;
-9. apply the exact recorded acceptance policy; and
-10. append one admission record without changing prior records.
+8. enforce the section 3.4 retention gate and refuse `encrypted-content` as
+   `retention-forbidden` unless a separately ratified policy permits it;
+9. validate required facts and cross-field consistency;
+10. apply the exact recorded acceptance policy; and
+11. append one admission record without changing prior records.
 
 Every completed procedure yields exactly `admit` or `refuse`, one stable reason
 code, the four evidence dimensions, and the policy identity. An operational
