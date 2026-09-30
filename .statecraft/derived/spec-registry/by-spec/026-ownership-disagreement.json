@@ -87,10 +87,10 @@
       "Verification"
     ],
     "specPath": "specs/026-ownership-disagreement/spec.md",
-    "status": "draft",
+    "status": "approved",
     "summary": "Amends spec 002 section 3.5 with one additive, read-only doctor finding, ownership-disagreement. For each path, doctor compares three facts: the manifest entry's class, the latest transfer-journal record for the path, and the class the current selection's rendering would give it. Each incompatible ownership state defined below is reported with both sources named. doctor repairs nothing, transfers nothing and never treats a rendering it could not compute as agreement. Backlog SC-006.\n",
     "title": "doctor reports a path whose recorded ownership disagrees with the transfer journal or the current rendering"
   },
-  "shardHash": "957ce599066e2978aeb6a1790522f217303f2988810737251d2766a7f5dcab2b",
+  "shardHash": "95e2e28581516be07a2adbcd6839d9ce94643dc475e0bdb21655f3d8e8cfe153",
   "specVersion": "1.9.0"
 }
