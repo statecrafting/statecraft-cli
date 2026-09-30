@@ -110,6 +110,9 @@ The retention and redaction input is wire-witness commit
 `sha256:86ba7b2ee74b02726fbc8b48e7f44f8f7ceb7492365196c7622c854afff54642`.
 The first cited commit was a draft. Neither commit nor later ratification is a
 released producer identity or permission to integrate it.
+The frontmatter `created` date records the draft's creation, not its most recent
+amendment. An interface `obtained` date records when that reference was added or
+refreshed and may therefore postdate `created` while the spec remains draft.
 
 ## 3. Behavior
 
@@ -340,9 +343,9 @@ states, never inferred values. No migration rewrites a prior record. Writers
 continue using the established canonical constructions and append-only chain.
 
 Readers encountering an unknown artifact version preserve its reference and
-report `unsupported`; they do not partially interpret it. A future compatible
-reader may judge the preserved bytes under its own exact policy without
-changing the earlier result.
+report `unsupported-artifact`; they do not partially interpret it. A future
+compatible reader may judge the preserved bytes under its own exact policy
+without changing the earlier result.
 
 ## 4. Observable acceptance and negative cases
 
