@@ -46,8 +46,8 @@
       }
     ],
     "specId": "027-observation-and-proposals",
-    "specStatus": "draft"
+    "specStatus": "approved"
   },
   "schemaVersion": "1.2.0",
-  "shardHash": "fc49af359de4219be0e1440647b93e3f83b0fa75673ce8cd585d32c7a96307ee"
+  "shardHash": "28addf3bdbb51f5d80099df4dcb5583ca4430fa3ca671aebb032bee55274acc3"
 }
