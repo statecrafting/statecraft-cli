@@ -105,8 +105,8 @@
       }
     ],
     "specId": "019-context-packet-consumption",
-    "specStatus": "draft"
+    "specStatus": "approved"
   },
   "schemaVersion": "1.2.0",
-  "shardHash": "f10225c5847ec960203c64de90b601228c513011fcec91c13699b94f708951d7"
+  "shardHash": "364c7ea6ac8ca4679c2e82bbb3f74a0fdac76d20e7d26eeadb7532e9a43668a3"
 }

@@ -1,7 +1,7 @@
 ---
 id: "019-context-packet-consumption"
 title: "Immutable context-packet consumption across repository snapshots"
-status: draft
+status: approved
 implementation: pending
 created: "2026-09-27"
 summary: >

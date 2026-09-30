@@ -146,10 +146,10 @@
       "Verification"
     ],
     "specPath": "specs/019-context-packet-consumption/spec.md",
-    "status": "draft",
+    "status": "approved",
     "summary": "Amends Statecraft's run, adapter, acceptance, command, and governance-producer contracts so one task may bind immutable spec-spine context packets from several independently identified repository snapshots, record intended and provider-visible delivery separately, and judge packet integrity, closure, freshness, citations, and evidence without reimplementing producer-owned selectors, closures, or digests.\n",
     "title": "Immutable context-packet consumption across repository snapshots"
   },
-  "shardHash": "f10225c5847ec960203c64de90b601228c513011fcec91c13699b94f708951d7",
+  "shardHash": "364c7ea6ac8ca4679c2e82bbb3f74a0fdac76d20e7d26eeadb7532e9a43668a3",
   "specVersion": "1.9.0"
 }
