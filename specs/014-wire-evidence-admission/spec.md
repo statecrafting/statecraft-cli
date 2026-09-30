@@ -220,11 +220,12 @@ member is outside the exact supported v1 manifest schema, when that schema
 classifies the member as a raw request or response body, raw header map or
 value, cookie, authorization value, token, secret, or credential, or when a
 string value matches the exact secret-detector identity recorded in the
-attempt policy. The classification schema is exactly the combination of the
-pinned wire-witness spec 003 sections 3.1 through 3.3 and wire-witness spec 005
-section 3.4 declared in `interface_references`; Statecraft loads no unpinned
-producer schema. Classification comes from those versioned sections, not a
-field-name heuristic. A missing detector identity, detector failure, or value
+attempt policy. Classification and redaction authority comes exactly from the
+pinned wire-witness spec 003 sections 3.1 through 3.3. The recognized artifact
+reference and manifest boundary come from pinned wire-witness spec 005 section
+3.4. Both are declared in `interface_references`; Statecraft loads no unpinned
+producer schema. Classification comes from the versioned spec 003 sections, not
+a field-name heuristic. A missing detector identity, detector failure, or value
 that cannot be scanned within the section 3.1 bounds refuses admission rather
 than being retained. The admission record keeps the manifest digest, policy
 identity, subject identity, dimensions, outcome, and reason required by section
