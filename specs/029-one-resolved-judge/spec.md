@@ -61,6 +61,7 @@ obligations:
     anchor: "verification"
     inputs:
       - "crates/statecraft-cli/tests/one_resolved_judge.rs"
+      - "crates/statecraft-acceptance/tests/resolved_judge.rs"
       - "crates/statecraft-environment/tests/check_envelope.rs"
       - "crates/statecraft-home/tests/spec_spine_resolution.rs"
       - "crates/statecraft-home/tests/harness_hooks.rs"
@@ -184,8 +185,10 @@ corpus that does not validate, naming the summary: the envelope's `finding`
 outcome establishes that result even when `validationPassed` is true, both
 halves are fresh and no unresolved unit is counted, because those fields
 exclude the preceding subclasses rather than converting a finding to `ok`.
-`refused`, `usage` and
-`failed` are reads not performed. An envelope that does not parse, is not
+`refused`, `usage` and `failed` are reads not performed: the probe preserves
+the envelope's diagnostic, the caller reports Statecraft exit 4 under spec 008
+section 3.23's translation, and an enforcing gate refuses. An envelope that
+does not parse, is not
 `check`'s, or whose `exitCode` disagrees with the process's establishes
 nothing: the read is failed, the caller reports Statecraft exit 4 under spec
 008 section 3.23's translation, and an enforcing gate refuses. It never falls
@@ -286,6 +289,7 @@ on PATH, and a stub launcher.
 
 ```verify:cli
 cargo test -p statecraft-cli --test one_resolved_judge
+cargo test -p statecraft-acceptance --test resolved_judge
 cargo test -p statecraft-environment --test check_envelope
 cargo test -p statecraft-home --test spec_spine_resolution
 cargo test -p statecraft-home --test harness_hooks
