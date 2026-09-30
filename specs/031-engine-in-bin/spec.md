@@ -161,6 +161,6 @@ experiment and does not withhold those shipped template bytes.
 ```verify:cli
 cargo test -p statecraft-home --test setup_upgrade a_revision_twelve_project_upgrades_to_revision_thirteen
 cargo test -p statecraft-home --lib spec_spine
-cargo test -p statecraft-home --test harness_hooks contract_2
+cargo test -p statecraft-home --test harness_hooks contract_2_the_repository_local_engine_is_in_bin
 cargo test -p statecraft-cli --test engine_in_bin
 ```
