@@ -963,6 +963,20 @@ journal entry.
 workspace consumes `attest-ledger-core =0.1.0`; a Git revision is not a
 publishable dependency identity.
 
+**2026-09-28: section 3.1.5's state authority, as built.** The authority is
+`<key>.overrides.authority.json` beside the journal and counts as history for
+re-spelling. `work list`, `work show`, `override show` and the report form of
+`override recover` take the lock when free; while it is held, only rule 4's
+three states read as in progress, and every other state is answered as it
+would be unlocked. A grant or revocation clears an intent or torn line
+without an operator, recorded as `cleared` on its own line. `adopt-prefix`
+writes its baseline authority before it replaces the journal, so an
+interruption leaves rule 4's states rather than a new disagreement. The
+acceptance's interruptions are injected through a `#[doc(hidden)]` library
+entry the binary never calls. Still open, so 003 stays `in-progress`: the
+confined-child line of the acceptance (spec `004` section 3.18), the branch
+directory of that section's rule 3, and section 3.5.1 rule 6.
+
 **2026-09-29: a closure failure is read wherever the producer writes it.**
 From spec-spine 0.28.0 (its spec 152), `registry closure --json` answers a
 failure with the family envelope on stdout and nothing on stderr. Read by
