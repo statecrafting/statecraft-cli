@@ -16,7 +16,8 @@ amends:
   # Approved specs stay unedited; registry relationships reports the edges.
   # 001 section 3.13's dependency row names the install location; 002 owns the
   # setup profile; 010's command table and 023's contained copy spell the
-  # path; 024 is the revision this one follows.
+  # path; 024 establishes revision 12 as the registered profile revision,
+  # which this amendment supersedes with revision 13.
   - "001-boundaries-and-authority"
   - "002-environment-lifecycle"
   - "010-profile-unresolved-claims"
@@ -85,6 +86,8 @@ remains `crates/statecraft-home/`, owned by spec 002 and named by this spec's
 `extends` edge. Spec 010 is amended because its command table names the policy
 vectors' executable path. Those vectors are likewise rendered by
 `crates/statecraft-home/`; spec 010 owns no separate implementation unit.
+Spec 024 is amended because it establishes revision 12 as the registered
+profile revision; this spec supersedes that claim with revision 13.
 
 ## 3. Behavior
 
