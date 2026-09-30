@@ -149,11 +149,12 @@ divergence.
 
 ### 3.3 Authority and operation limits
 
-The allowed operation set is exhaustive, not illustrative. Version 1 has these
-tokens: `read-context`, `draft-artifact`, and `propose-patch`. The forbidden set
-must include `apply-patch`, `commit`, `push`, `open-pull-request`, `publish`,
-`release`, `deploy`, `remote-admin`, `credential-read`, and `provider-select`.
-No task may remove one of those prohibitions in version 1.
+Both operation sets are exhaustive, not illustrative. The version 1 allowed
+set is exactly `read-context`, `draft-artifact`, and `propose-patch`. The
+version 1 forbidden set is exactly `apply-patch`, `commit`, `push`,
+`open-pull-request`, `publish`, `release`, `deploy`, `remote-admin`,
+`credential-read`, and `provider-select`. An extra token or a missing token is
+malformed and requires a new schema version.
 
 The closed forbidden operation set is the authority for operation permission.
 The required version 1 `publication: prohibited` member is a separate,
@@ -209,8 +210,8 @@ The result is a closed document with these required members:
 7. execution evidence references and their claimed purpose;
 8. `providerCompletion`, exactly `claimed-complete`, `claimed-incomplete`, or
    `not-reported`;
-9. `reviewDisposition`, initially `not-reviewed`; and
-10. `acceptanceResult`, initially `not-attempted`.
+9. `reviewDisposition`, exactly the sentinel `not-reviewed`; and
+10. `acceptanceResult`, exactly the sentinel `not-attempted`.
 
 The result schema delivered before spawn prescribes the last two members as
 constant literals. The provider emits those literals in its response; the
@@ -240,7 +241,7 @@ Each claim contains exactly:
 | `evidenceRefs` | Ordered references submitted to spec 005 evidence admission. |
 | `unsupportedReason` | Explicit reason, or `not-applicable`. |
 | `contradictionRefs` | Ordered links to contradiction records. |
-| `reviewDisposition` | Initially `not-reviewed`. |
+| `reviewDisposition` | Exactly the sentinel `not-reviewed`. |
 
 The delivered result schema likewise prescribes claim-level
 `reviewDisposition` as the constant literal `not-reviewed`, which the provider
