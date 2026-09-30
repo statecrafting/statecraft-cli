@@ -23,6 +23,7 @@ amends:
   # relationships reports the edges.
   - "004-execution-adapter"
   - "002-environment-lifecycle"
+  - "006-command-surface"
 extends:
   - { spec: "004-execution-adapter", unit: { kind: directory, path: "crates/statecraft-adapter-claude-code/" }, nature: corrective }
   - { spec: "002-environment-lifecycle", unit: { kind: directory, path: "crates/statecraft-home/" }, nature: corrective }
@@ -52,6 +53,7 @@ obligations:
     inputs:
       - "crates/statecraft-cli/tests/no_provider_directories.rs"
       - "crates/statecraft-environment/tests/retirement.rs"
+      - "crates/statecraft-adapter-claude-code/src/environment.rs"
 ---
 
 # 030: No provider directories
@@ -139,7 +141,8 @@ section (section 5).
 A project initialized before this spec holds `.claude/statecraft/instructions.md`
 as a managed path and possibly `CLAUDE.md` as a pointer to it.
 
-- `env plan` names both as leaving the adapter's declaration.
+- `env plan` names the instructions file as leaving the adapter's declaration
+  and the pointer as a write replacing its existing bytes.
 - `env upgrade` removes the instructions file when its digest matches the
   manifest's, under 002 section 3.6's removal rule, and removes the
   `.claude/statecraft/` and `.claude/` directories only when this removal left
