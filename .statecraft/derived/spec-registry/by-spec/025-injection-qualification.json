@@ -1,0 +1,125 @@
+{
+  "record": {
+    "amends": [
+      "004-execution-adapter",
+      "020-documentation-task-and-result",
+      "021-documentation-acceptance"
+    ],
+    "created": "2026-09-27",
+    "dependsOn": [
+      "003-work-and-run-semantics",
+      "004-execution-adapter",
+      "005-acceptance-and-evidence",
+      "014-wire-evidence-admission",
+      "019-context-packet-consumption",
+      "020-documentation-task-and-result",
+      "021-documentation-acceptance",
+      "022-fixed-export-documentation"
+    ],
+    "extends": [
+      {
+        "nature": "additive",
+        "spec": "003-work-and-run-semantics",
+        "unit": {
+          "kind": "directory",
+          "path": "crates/statecraft-run/"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "004-execution-adapter",
+        "unit": {
+          "kind": "directory",
+          "path": "crates/statecraft-adapter/"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "005-acceptance-and-evidence",
+        "unit": {
+          "kind": "directory",
+          "path": "crates/statecraft-acceptance/"
+        }
+      }
+    ],
+    "id": "025-injection-qualification",
+    "implementation": "pending",
+    "obligations": [
+      {
+        "anchor": "3-1-the-invariant-and-where-it-lives",
+        "id": "I-1",
+        "kind": "invariant",
+        "text": "No byte of untrusted content, whatever surface carries it and whatever it says, changes a Statecraft authority decision: the task, the posture, the constructed environment, the capability set, evidence admission, review, acceptance, application or publication."
+      },
+      {
+        "anchor": "3-3-the-corpus",
+        "id": "R-1",
+        "kind": "requirement",
+        "text": "A versioned hostile-content corpus covers every untrusted surface and every payload class, and each case names the exact authority decision it must leave unchanged."
+      },
+      {
+        "anchor": "3-4-the-product-invariance-suite",
+        "id": "R-2",
+        "kind": "requirement",
+        "text": "The product-invariance suite runs offline through the fixture adapter and compares each hostile run's authority record with its benign twin; any difference fails the suite."
+      },
+      {
+        "anchor": "3-7-provider-susceptibility-is-a-measurement-not-a-boundary",
+        "id": "R-3",
+        "kind": "requirement",
+        "text": "Provider susceptibility is measured only under separate provider and spend authority, is recorded per case as testimony, and never qualifies, relaxes or substitutes for the product-invariance suite."
+      },
+      {
+        "anchor": "verification",
+        "id": "V-1",
+        "inputs": [
+          "crates/statecraft-adapter/tests/injection_invariance.rs",
+          "crates/statecraft-run/tests/injection_invariance.rs",
+          "crates/statecraft-acceptance/tests/injection_invariance.rs"
+        ],
+        "kind": "verification",
+        "text": "Portable fixtures run every corpus case against its benign twin with no live provider, network, credential or spend, and prove identical authority records."
+      }
+    ],
+    "sectionDigests": {
+      "025-prompt-injection-qualification": "ac4fedb7d1dd270450bdfc4f269bd2797d6eb46a35221e1d08c9952ab11ed3cb",
+      "1-purpose": "ae4f59c78635c11226697b8f6e61946584f48bcfd52c1b96e5650144e943626e",
+      "2-territory-and-prerequisite": "938aac8561bb662ce499f6bb016d0a2223902c21de6e43ac063b0bc9f8f65d18",
+      "3-1-the-invariant-and-where-it-lives": "b4080582e45c934c69534c2ff8d83441466677aa28cabbb2aef69cbe717d8328",
+      "3-2-untrusted-surfaces": "881800840d99e3576bbe7224642ab623252938a7f69e90f1f0fc3f529c2a4fd0",
+      "3-3-the-corpus": "3d7d22b9c3d69f47d76dcd6f1498a259d61e17deca0c79db479f65123f9662ce",
+      "3-4-the-product-invariance-suite": "266d50f32ec69aad46642b033e26f8c4db3e7a20242ae38d6c66ba17924394e7",
+      "3-5-a-new-negative-suite-row": "f043ad0d29050da329c46a069a320c9ddd261a6a1abd1d002454dbc07f8289ce",
+      "3-6-delimiters-and-detectors-are-not-controls": "1dd6da3e5e1c0728db085f355ca6031a78f5aaba79775c5624f1b4b74dfd8e49",
+      "3-7-provider-susceptibility-is-a-measurement-not-a-boundary": "7bb3554029f0438281d6aa1f8048bcce74f8aa5ad6f9d7877fbbedf424d378d5",
+      "3-8-observable-negative-cases": "ffa822e1ae9ea96ee70c0b40b0a0daf9a9a2e33959b28effd00bb289cacb3805",
+      "3-behavior": "6010d21c1f63fdca5458d3978129b8b230c591105508c4841fb11a601f47249b",
+      "4-out-of-scope": "02fc79b48e0d62caa900326f855d82de473f52e7a1cdcb75112fc84a6634a5b1",
+      "5-resolved-decisions": "f55fdd5f48c3971143e447b70b3c8cef17a53ad769561575a71319265e6a48e7",
+      "verification": "2fe04ef540a0e9c60d506eb26c4d69cdac6f05e51c2525056ad60d79b35eed6b"
+    },
+    "sectionHeadings": [
+      "025: Prompt-injection qualification",
+      "1. Purpose",
+      "2. Territory and prerequisite",
+      "3. Behavior",
+      "3.1 The invariant and where it lives",
+      "3.2 Untrusted surfaces",
+      "3.3 The corpus",
+      "3.4 The product-invariance suite",
+      "3.5 A new negative-suite row",
+      "3.6 Delimiters and detectors are not controls",
+      "3.7 Provider susceptibility is a measurement, not a boundary",
+      "3.8 Observable negative cases",
+      "4. Out of scope",
+      "5. Resolved decisions",
+      "Verification"
+    ],
+    "specPath": "specs/025-injection-qualification/spec.md",
+    "status": "draft",
+    "summary": "Amends the adapter negative suite and the documentation lane with a versioned hostile-content corpus and a deterministic product-invariance suite. Every surface that carries repository, packet, citation, provider, wire or tool-facing text is exercised with hostile payloads, and the suite proves by construction that Statecraft's decisions are unchanged: no authority expands, no credential is disclosed, no forbidden capability is invoked, no review or acceptance is bypassed. Provider susceptibility is a separate, later measurement that is recorded as testimony and is never the boundary. Delimiters and detectors are not security controls.\n",
+    "title": "Prompt-injection qualification: untrusted content never expands authority"
+  },
+  "shardHash": "0fb6986311b1c342cbc3e190e12250c3684e80d0fe83dc6ad17016ee91b3d477",
+  "specVersion": "1.9.0"
+}
