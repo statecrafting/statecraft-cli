@@ -1,7 +1,7 @@
 ---
 id: "021-documentation-acceptance"
 title: "Independent documentation acceptance and review"
-status: draft
+status: approved
 implementation: pending
 created: "2026-09-27"
 summary: >
