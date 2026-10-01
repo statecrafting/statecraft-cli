@@ -113,10 +113,10 @@
       "Verification"
     ],
     "specPath": "specs/021-documentation-acceptance/spec.md",
-    "status": "draft",
+    "status": "approved",
     "summary": "Amends Statecraft's run, acceptance, and command contracts with an independent documentation-acceptance record. It keeps intended delivery, observed transport, schema validation, citation resolution, semantic review, and acceptance as separate facts; requires claim-grade support, preserved unknowns and contradictions, valid artifacts, and a fresh context manifest; and grants no application or publication authority.\n",
     "title": "Independent documentation acceptance and review"
   },
-  "shardHash": "f263380468cdf675c27ee9865bd2309289409964e554a9d3d4809e17c3e8276b",
+  "shardHash": "9ef3fdb0f45ee3f8de134d49115c5fae4b720bc9398c3827ad67c13470130957",
   "specVersion": "1.9.0"
 }
