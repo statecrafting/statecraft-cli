@@ -2,7 +2,7 @@
 id: "030-no-provider-directories"
 title: "A governed project needs no provider-specific directory, and this product writes none"
 status: approved
-implementation: pending
+implementation: complete
 created: "2026-09-30"
 summary: >
   Makes the absence of provider-specific project directories (`.claude/`,
@@ -237,6 +237,30 @@ through the binary meets 002 section 3.35's rule 2 (an instruction file stays
 `user`) before rule 1. The binary-level tests assert that refusal; rule 1 and
 the `managed` halves stay asserted by `statecraft-environment`'s
 `tests/transfer.rs` with a test adapter.
+
+**2026-10-01: the binary decides the pointer per target.** The adapter
+declares the pointer through `declaration_for`, and the binary's environment
+verbs ask for it only when it is needed: the harness's load rule, evaluated
+with the pointer path left out, does not reach `.statecraft/AGENTS.md`, or the
+manifest records a pointer this adapter wrote. The second condition is what
+lets section 3.3 rewrite an earlier build's pointer rather than leave it
+importing a removed file. Transfer keeps the full declaration, so the transfer
+rules of 002 section 3.35 still see the adapter's one possible path.
+
+**2026-10-01: section 3.2's second link is not yet evaluated.** The delivery
+evaluation this product has (008 section 3.14) follows the file chain from a
+harness's entry files. Nothing evaluates a delivered session-start behavior as
+`reached`, so that link never stands in for the pointer. Where it is the only
+link, the pointer is still declared, which is the conservative reading.
+
+**2026-10-01: the library tests retirement against the file tree.** A file an
+adapter no longer declares is withheld, as still imported, while a path the
+same adapter declares keeps bytes after the plan that import it, because that
+write is withheld or not planned. The library has no delivery evaluation, so it
+does not take the escape of another link reaching the instructions: a drifted
+pointer that still imports the old file keeps it even where root `AGENTS.md`
+reaches. Section 3.3 makes a rewrite or another link necessary for retirement,
+not sufficient, so keeping the file is within it.
 
 ## Verification
 

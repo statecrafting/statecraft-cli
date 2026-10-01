@@ -39,6 +39,48 @@ pub fn declarations() -> Vec<Declaration> {
     vec![provider::environment::declaration()]
 }
 
+/// The ratified adapter set as it applies to one target.
+///
+/// Spec 030 section 3.2: the adapter's pointer is the last link of the delivery
+/// chain, so it is declared only where it is needed. It is left out when
+/// another link already reaches the managed instructions under the harness's
+/// documented load rule, evaluated as if the pointer path were absent, and the
+/// manifest records no pointer this adapter wrote. A recorded pointer stays
+/// declared, so convergence rewrites it rather than orphaning it (section 3.3).
+pub fn declarations_for(root: &Path) -> Vec<Declaration> {
+    vec![provider::environment::declaration_for(needs_pointer(root))]
+}
+
+/// Whether the Claude Code pointer is needed in this target.
+fn needs_pointer(root: &Path) -> bool {
+    use provider::environment::{HARNESS, POINTER};
+    use statecraft_environment::manifest::{Class, Manifest, SourceKind};
+    use statecraft_home::delivery;
+
+    // An unreadable manifest is the verb's to report; here it only means no
+    // pointer is known to be recorded, which keeps the pointer declared.
+    let recorded = match Manifest::read(root) {
+        Ok(Some(m)) => m.entry(POINTER).is_some_and(|e| {
+            e.class == Class::Managed
+                && e.source.kind == SourceKind::Adapter
+                && e.source.identity == HARNESS
+        }),
+        Ok(None) => false,
+        Err(_) => return true,
+    };
+    if recorded {
+        return true;
+    }
+    let Some(mut rule) = delivery::load_rules()
+        .into_iter()
+        .find(|r| r.harness == HARNESS)
+    else {
+        return true;
+    };
+    rule.entries.retain(|e| e != POINTER);
+    !delivery::evaluate(root, &rule).reached()
+}
+
 /// The child environment the adapter's prerequisites are probed against.
 ///
 /// **Constructed, not filtered** (spec 004 section 3.6): the child gets exactly

@@ -48,7 +48,7 @@
       }
     ],
     "id": "030-no-provider-directories",
-    "implementation": "pending",
+    "implementation": "complete",
     "obligations": [
       {
         "anchor": "3-1-no-provider-directory-in-a-target",
@@ -82,7 +82,7 @@
       }
     ],
     "sectionDigests": {
-      "030-no-provider-directories": "6877db4c95b6d6690dd357377be0399e198dad755ec87438b31f582c83af3ff2",
+      "030-no-provider-directories": "13274b00760166d541fb92a0b42609a89b49a34fb89e7f93dfe97709f6ebbb24",
       "1-purpose": "4c3c689d57dd7357d03099be3f090bee8630ac59e2c829e37abd5bf73654610f",
       "2-territory": "27127a13e12cbbbfe121bc498dff603c98b6126a249654d158d900b22723f690",
       "3-1-no-provider-directory-in-a-target": "a71a58b84236671f444876b7b9ae88d6739fd8115f8c384eef2f243f792e75cf",
@@ -91,7 +91,7 @@
       "3-4-observable-negative-cases": "8925cbe0ddf235c86908e1edbde4847aa700dcd96fcfdf6b57f114526cf7e3e2",
       "3-behavior": "b64f51a53bb0a6ee76c5ff915a58ba82fde7f5c13c9b0c3cdf7077ea76a44c53",
       "4-out-of-scope": "d96f8d9848c6560f276298fde84479f1e806fb8ca26d5612dde7d9d21a81b888",
-      "5-resolved-decisions": "f585a981213a59b11b575a65cea847a9ba0ec592ab98e8a2f0563626231c20cb",
+      "5-resolved-decisions": "996059b1f2ab4e197065571a2c595605a3c92aa16a19dc4f44bc9caf08eb45cf",
       "verification": "c7e949c1dc474d99d91243476dcd20d98dfbf4001c956e2b678a391e6185ab15"
     },
     "sectionHeadings": [
@@ -112,6 +112,6 @@
     "summary": "Makes the absence of provider-specific project directories (`.claude/`, `.codex/`, `.agents/`, `.agent/` and their equivalents) a supported and tested operating condition. No adapter declares a managed or adopted path inside one. The Claude Code adapter's owned instructions file moves out of `.claude/statecraft/` into content this product already manages, and its pointer, where one is still needed, imports `.statecraft/AGENTS.md` directly. A project that already holds the old file converges through the ordinary upgrade and removal rules. A qualification case starts with every provider directory absent and proves initialization, the governed verbs and context delivery work and recreate none of them. Brings the adapter into line with spec 002 section 3.12 and spec 008 section 3.14, and amends the adapter declaration of spec 004.\n",
     "title": "A governed project needs no provider-specific directory, and this product writes none"
   },
-  "shardHash": "d94f00d4ca48dfb5fbbb7a8d0f694531e7b09e6ee9bb12e60b477bfd05e84dc3",
+  "shardHash": "d7d497918811c5811bb13ea8df876354e834c99a4361bc42c2ac1cc3d6e11fbb",
   "specVersion": "1.9.0"
 }
