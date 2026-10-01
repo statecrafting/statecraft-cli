@@ -2,7 +2,7 @@
 id: "029-one-resolved-judge"
 title: "One resolved judge: every spec-spine call this product makes runs the executable one resolution selected"
 status: approved
-implementation: pending
+implementation: complete
 created: "2026-09-30"
 summary: >
   Every spec-spine invocation this product makes, in every verb and in every
@@ -280,6 +280,41 @@ and a session's hooks receive the supervisor's path.
 and trusting whatever it executes would record one identity and run another
 whenever the two resolutions differed. Asking for the resolution and executing
 the returned path keeps the recorded and executed identities the same.
+
+**2026-09-30: the record is one type, and each report carries it under
+`judge`.** `statecraft_environment::judge::JudgeRecord` is the section 3.3
+record, with the wire names `program`, `rule`, `version`, `digest` and
+`passedOver`. It lives in `statecraft-environment` because the three crates that
+write it (`statecraft-run`, `statecraft-acceptance` and `statecraft-home`) all
+depend on that one, and the selection that fills it stays in `statecraft-home`.
+The run record carries it in the attempt intent's `detail.judge`, written with
+the intent and before any effect; the acceptance receipt and the
+initialization report carry it as `judge`. A receipt or a report with no
+resolution (a stated double, a receipt minted before this spec) omits the key
+rather than writing `null`, so bytes written earlier read back unchanged.
+
+**2026-09-30: the profile's declaration is a constant the resolver reads.**
+Section 3.2 candidate 4 is `statecraft_home::setup::ENGINE`, the same constant
+the profile's rendered commands are built from. The delivered hooks are shell
+and cannot link it; `harness_hooks.rs` holds every repository-local path each
+hook names to that constant, so a hook naming a second location fails the
+build.
+
+**2026-09-30: an unpinned selection says so.** Section 3.2's "reported
+unpinned" is a notice on the selection naming the `spec-spine.toml` and the
+candidate taken. `doctor` and a refusal carry it with the other remarks; it
+changes nothing about which candidate answers.
+
+**2026-09-30: the hooks read the envelope in shell.** Section 3.4 applies to
+the three delivered hooks that read `check`'s verdict (session start, stop and
+the pull-request gate), as it does to the probe. Two of them run without `jq`,
+so the reader is `grep` and `sed` over the one envelope: the top-level
+`exitCode` and `outcome` are the first of their keys, and the index half is
+everything before the report's `registry` key, which spec-spine's sorted keys
+place after it. The classes and their precedence are section 3.4's. The
+post-edit hook shows `check`'s output to the session and reads no verdict from
+it, so it keeps the command it runs.
+
 
 ## Verification
 

@@ -228,6 +228,7 @@ pub fn begin_admitted(
             contract,
             admission,
             posture_coverage: None,
+            judge: None,
         },
     )
 }
@@ -244,6 +245,9 @@ pub struct IntentDetail<'a> {
     /// the digests of the plan and the allowance planning read. Written under
     /// `postureCoverage`; this crate carries it and judges nothing about it.
     pub posture_coverage: Option<&'a serde_json::Value>,
+    /// The spec-spine one resolution selected for this operation (spec 029
+    /// section 3.3). Written under `judge`.
+    pub judge: Option<&'a statecraft_environment::judge::JudgeRecord>,
 }
 
 /// [`begin_admitted`], with every part of the intent's detail named.
@@ -259,6 +263,7 @@ pub fn begin_with(
         contract,
         admission,
         posture_coverage,
+        judge,
     } = *intent;
     for run in runs(chain) {
         if let Some(live) = run.live_attempt() {
@@ -314,6 +319,10 @@ pub fn begin_with(
                 }
                 if let Some(coverage) = posture_coverage {
                     detail["postureCoverage"] = coverage.clone();
+                }
+                if let Some(judge) = judge {
+                    detail["judge"] = serde_json::to_value(judge)
+                        .unwrap_or_else(|e| serde_json::json!({ "unserializable": e.to_string() }));
                 }
                 detail
             },

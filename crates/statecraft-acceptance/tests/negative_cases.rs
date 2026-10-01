@@ -52,6 +52,7 @@ fn context() -> MintContext {
         adapter_version: "1.0.0".into(),
         attempt: "run-1/1".into(),
         authority_paths_touched: vec![],
+        judge: None,
     }
 }
 

@@ -44,6 +44,13 @@ pub struct Receipt {
     /// The authority-set paths the candidate touched.
     #[serde(default)]
     pub authority_paths_touched: Vec<String>,
+    /// The spec-spine that judged the acceptance: its program, rule, version,
+    /// digest and every candidate passed over (spec 029 section 3.3).
+    ///
+    /// Absent, not `null`, when no resolution was recorded, so a receipt
+    /// minted before the field existed reads back byte-identical.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub judge: Option<statecraft_environment::judge::JudgeRecord>,
 }
 
 /// One command in the receipt's ordered suite.
@@ -93,6 +100,9 @@ pub struct MintContext {
     pub attempt: String,
     /// The authority-set paths touched, from the authority evaluation.
     pub authority_paths_touched: Vec<String>,
+    /// The spec-spine one resolution selected for this acceptance (spec 029
+    /// section 3.3), when one was.
+    pub judge: Option<statecraft_environment::judge::JudgeRecord>,
 }
 
 /// Mint a receipt, or say why not.
@@ -143,6 +153,7 @@ pub fn mint(
         harness_revision: Recorded::Absent(Absence::NotRecorded),
         attempt: context.attempt.clone(),
         authority_paths_touched: context.authority_paths_touched.clone(),
+        judge: context.judge.clone(),
     })
 }
 
@@ -193,6 +204,7 @@ mod tests {
             adapter_version: "1.0.0".into(),
             attempt: "run-1/1".into(),
             authority_paths_touched: vec![],
+            judge: None,
         }
     }
 

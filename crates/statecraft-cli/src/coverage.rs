@@ -13,15 +13,14 @@
 //!   have edited it.
 //!
 //! The requirement is asked of `spec-spine verify <spec> --plan --json`, run
-//! with the `spec-spine` this product invokes for work selection
-//! ([`SpecSpineCli`]'s binary). The allowance is the adapter manifest's own
+//! with the `spec-spine` spec 029's one resolution selected for the target
+//! ([`crate::judge`]), the one work selection asks. The allowance is the adapter manifest's own
 //! commands plus the declaration's. Neither is derived from the other (rule 6).
 
 use statecraft_adapter::coverage::{
     Allowance, Coverage, DECLARATION_PATH, SuitePlan, declared_commands, read_plan,
 };
 use statecraft_environment::digest::digest_bytes;
-use statecraft_run::report::SpecSpineCli;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 
@@ -49,9 +48,9 @@ fn compare(spec: &str, base: Option<&str>, plan: &SuitePlan, allowance: &Allowan
     )
 }
 
-/// The spec-spine binary work selection uses.
-fn reader() -> String {
-    SpecSpineCli::default().binary
+/// The spec-spine binary work selection uses: the target's resolved judge.
+fn reader(root: &Path) -> Result<String, String> {
+    crate::judge::program(root)
 }
 
 /// Rule 4, at planning: the working tree as the operator invoked `run`.
@@ -66,7 +65,7 @@ pub fn at_planning(root: &Path, spec: &str) -> Result<Coverage, String> {
         Err(e) => return Err(format!("{DECLARATION_PATH} could not be read: {e}")),
     };
     let allowance = allowance(file.as_deref())?;
-    let plan = read_plan(&reader(), root, spec).map_err(|e| e.to_string())?;
+    let plan = read_plan(&reader(root)?, root, spec).map_err(|e| e.to_string())?;
     Ok(compare(spec, None, &plan, &allowance))
 }
 
@@ -188,7 +187,7 @@ pub fn at_base(root: &Path, base: &str, planned: &Coverage) -> Result<Coverage, 
         .ok_or_else(|| "the planning reading names no spec".to_string())?;
     let allowance = allowance(declaration_at(root, base)?.as_deref())?;
     let tree = export(root, base)?;
-    let plan = read_plan(&reader(), &tree.tree(), spec).map_err(|e| e.to_string())?;
+    let plan = read_plan(&reader(root)?, &tree.tree(), spec).map_err(|e| e.to_string())?;
     drop(tree);
     let mut coverage = compare(spec, Some(base), &plan, &allowance);
     if coverage.allowance_digest != planned.allowance_digest {
