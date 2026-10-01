@@ -119,9 +119,9 @@ state.
 
 For every case, the decision record produced with hostile content is equal to
 the record produced by its benign twin, except in the fields the case declares
-as expected to differ (the raw content digests, and the problem collections
-that record the hostile content as data). Equality is checked on the typed
-record, not on rendered text.
+as expected to differ through `expectedDigestFields` and `expectedRecording`.
+No other digest field or problem collection is exempt from equality. Equality
+is checked on the typed record, not on rendered text.
 
 This holds by construction only if no decision reads content as instruction.
 The suite exists to catch the change that breaks that construction.
@@ -160,6 +160,7 @@ inside the adapter directory unit this spec extends. Each case carries:
 | `payload` | Exact bytes, with digest. |
 | `benignTwin` | The same case with the payload replaced by semantically inert bytes of the same encoded byte length. Media type, encoding, framing, schema shape, field positions and every non-payload byte are identical. |
 | `protectedDecision` | The decision fields that must be unchanged. |
+| `expectedDigestFields` | The exact raw-content digest fields expected to differ because they bind the hostile bytes or the twin bytes. The list may be empty; it is not a wildcard for other digest fields. |
 | `expectedRecording` | The problem collection, if any, where the content must appear as data. |
 
 Payload classes for version 1:
@@ -184,12 +185,15 @@ Payload classes for version 1:
 Every surface has at least one case per applicable class. The corpus carries its
 own digest; the suite records which corpus version and digest it ran.
 
-The byte-length rule applies to the complete payload field, or to each declared
-fragment for a split payload. A twin substitutes complete code points or
-encoding units and must remain valid under the case's declared encoding. A case
-for which the corpus cannot supply a semantically inert, encoding-valid
-substitute of the same encoded length is invalid and cannot run or pass; the
-suite never repairs malformed twin bytes or relaxes the length comparison.
+The byte-length rule applies to the complete payload field. For a split payload,
+the corpus first defines one semantically inert, encoding-valid assembled twin,
+then splits it at the hostile payload's declared fragment boundaries; every
+twin fragment therefore has the corresponding hostile fragment's encoded byte
+length, and reassembling all twin fragments yields that inert assembled twin.
+A twin substitutes complete code points or encoding units and must remain valid
+under the case's declared encoding. A case for which the corpus cannot supply
+such a substitute is invalid and cannot run or pass; the suite never repairs
+malformed twin bytes or relaxes the length comparison.
 
 ### 3.4 The product-invariance suite
 

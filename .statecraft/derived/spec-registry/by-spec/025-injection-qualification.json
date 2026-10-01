@@ -82,18 +82,18 @@
       }
     ],
     "sectionDigests": {
-      "025-prompt-injection-qualification": "706117444135e08edb970f90d4189ca1c872643c597338ae95e6ba607caf2cfa",
+      "025-prompt-injection-qualification": "3835da714d224e9eec3593e8cfe8b1bc6cdccc30d155a71b2322deb8a8a7a11b",
       "1-purpose": "ae4f59c78635c11226697b8f6e61946584f48bcfd52c1b96e5650144e943626e",
       "2-territory-and-prerequisite": "7f6c48c2147a5250ccea93252e2d72e583b3be602c0b46c59f42245b2110bc9c",
-      "3-1-the-invariant-and-where-it-lives": "b4080582e45c934c69534c2ff8d83441466677aa28cabbb2aef69cbe717d8328",
+      "3-1-the-invariant-and-where-it-lives": "5ff2393c247b5e5414e9da2a8342407a6c69fd338cb95c58b119c88b7d5cee25",
       "3-2-untrusted-surfaces": "881800840d99e3576bbe7224642ab623252938a7f69e90f1f0fc3f529c2a4fd0",
-      "3-3-the-corpus": "aeb835938157dc2b038a5495ccb73a010371cb17ad070c7e7b24459ac7b7f218",
+      "3-3-the-corpus": "f98ddc405e5b1e812dd384cfb407d0ce83909a85d0e64180da6981a631ca0b82",
       "3-4-the-product-invariance-suite": "f57b6d4b573bf9ac3f790877c705daafde792122aa8940c0f687f924159bec92",
       "3-5-a-new-negative-suite-row": "f043ad0d29050da329c46a069a320c9ddd261a6a1abd1d002454dbc07f8289ce",
       "3-6-delimiters-and-detectors-are-not-controls": "1dd6da3e5e1c0728db085f355ca6031a78f5aaba79775c5624f1b4b74dfd8e49",
       "3-7-provider-susceptibility-is-a-measurement-not-a-boundary": "7bb3554029f0438281d6aa1f8048bcce74f8aa5ad6f9d7877fbbedf424d378d5",
       "3-8-observable-negative-cases": "ffa822e1ae9ea96ee70c0b40b0a0daf9a9a2e33959b28effd00bb289cacb3805",
-      "3-behavior": "e2582e236d768fabe42d1bdd3c2ac593041288168ec249afeb3195338402785d",
+      "3-behavior": "491738ed204303957f3e0df2aa09360b871fb4fdfa9eeb9acd8d9b50642c745f",
       "4-out-of-scope": "02fc79b48e0d62caa900326f855d82de473f52e7a1cdcb75112fc84a6634a5b1",
       "5-resolved-decisions": "f55fdd5f48c3971143e447b70b3c8cef17a53ad769561575a71319265e6a48e7",
       "verification": "2fe04ef540a0e9c60d506eb26c4d69cdac6f05e51c2525056ad60d79b35eed6b"
@@ -120,6 +120,6 @@
     "summary": "Amends the adapter negative suite and the documentation lane with a versioned hostile-content corpus and a deterministic product-invariance suite. Every surface that carries repository, packet, citation, provider, wire or tool-facing text is exercised with hostile payloads, and the suite proves by construction that Statecraft's decisions are unchanged: no authority expands, no credential is disclosed, no forbidden capability is invoked, no review or acceptance is bypassed. Provider susceptibility is a separate, later measurement that is recorded as testimony and is never the boundary. Delimiters and detectors are not security controls.\n",
     "title": "Prompt-injection qualification: untrusted content never expands authority"
   },
-  "shardHash": "a9172f56948e4e0b65dd5131d6ffb4282e01fe0e268a343d5772e600690332b2",
+  "shardHash": "012d4f3ea72e4d299677f29e0b101029dfd816c8a816cb476207345af517f975",
   "specVersion": "1.9.0"
 }
