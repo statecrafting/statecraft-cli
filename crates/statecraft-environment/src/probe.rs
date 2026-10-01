@@ -412,11 +412,7 @@ fn check_help(program: &str, dir: &Path) -> Result<String, CheckAnswer> {
             why: Unavailability::LacksVerb,
             detail: format!("`{program} check --help` ended {}", status_word(&o.status)),
         }),
-        Ok(o) => Ok(format!(
-            "{}{}",
-            String::from_utf8_lossy(&o.stdout),
-            String::from_utf8_lossy(&o.stderr)
-        )),
+        Ok(o) => Ok(String::from_utf8_lossy(&o.stdout).into_owned()),
     }
 }
 

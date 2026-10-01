@@ -172,6 +172,21 @@ fn json_support_is_read_from_the_verbs_own_help() {
 
 #[cfg(unix)]
 #[test]
+fn a_stderr_notice_does_not_claim_json_support() {
+    let dir = tempfile::tempdir().unwrap();
+    let repo = dir.path().join("repo");
+    std::fs::create_dir_all(&repo).unwrap();
+    std::fs::write(repo.join("spec-spine.toml"), "").unwrap();
+    let bin = dir.path().join("spec-spine");
+    let script = "#!/bin/sh\ncase \"$*\" in\n  'check --help') \
+echo 'Usage: spec-spine check'; echo 'notice: --json changes soon' >&2 ;;\n  check) \
+echo 'check: fresh'; exit 0 ;;\n  'check --json') echo 'wrong reader' >&2; exit 4 ;;\nesac\n";
+    fixture::install(&bin, script);
+    assert_eq!(run_check(bin.to_str().unwrap(), &repo), CheckAnswer::Fresh);
+}
+
+#[cfg(unix)]
+#[test]
 fn an_engine_whose_check_takes_json_is_read_from_its_envelope() {
     let dir = tempfile::tempdir().unwrap();
     let repo = dir.path().join("repo");
