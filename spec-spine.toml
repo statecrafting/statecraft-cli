@@ -17,7 +17,7 @@
 # adopted by review, not by resolution. Each move is its own change with its
 # own re-index, and its review (bypass floor, coupling, exit codes, identity)
 # is an entry in docs/adoption/spec-spine.md, not a comment here. `make tools`
-# installs this exact version into `.tooling/bin`, so a binary elsewhere on
+# installs this exact version into `.bin`, so a binary elsewhere on
 # PATH cannot answer for this repository.
 required_version = "=0.28.0"
 
@@ -84,7 +84,7 @@ extra_hashed_inputs = [
   ".gitignore",
 ]
 # Directories the symbol resolver and the coverage walk skip.
-resolver_exclusions = ["target", "node_modules", ".statecraft/derived", "dist", "build", ".next", ".tooling"]
+resolver_exclusions = ["target", "node_modules", ".statecraft/derived", "dist", "build", ".next", ".bin"]
 # Named path sets `index check --slice <name>` can gate on their own.
 # [index.slices]
 # api = ["crates/*/src/lib.rs"]

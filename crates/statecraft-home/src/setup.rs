@@ -35,7 +35,7 @@ use std::path::Path;
 /// The one registered profile.
 pub const PROFILE_ID: &str = "github-actions-rust";
 /// Its revision.
-pub const REVISION: u32 = 12;
+pub const REVISION: u32 = 13;
 /// Where the rendered policy document lives in the target.
 pub const POLICY_PATH: &str = ".statecraft/setup/github-actions-rust.json";
 /// The resume record, under the project's runtime state.
@@ -64,10 +64,10 @@ pub const SOURCE_PREFIX: &str = "statecraft-setup:";
 /// The one repository-local spec-spine the profile installs, relative to the
 /// project root. The rendered commands and the resolver (spec 029 section 3.2,
 /// candidate 4) consume this declaration rather than restating the path.
-pub const ENGINE: &str = ".tooling/bin/spec-spine";
+pub const ENGINE: &str = ".bin/spec-spine";
 /// The ignore fragment the profile adds to the governance one.
 pub const IGNORE_FRAGMENT: &str =
-    "# The repository-local spec-spine the setup profile installs.\n.tooling/\n";
+    "# The repository-local spec-spine the setup profile installs.\n.bin/\n";
 /// The visible skip classes, non-blocking for ordinary pull requests (S-2).
 pub const SKIP_CLASSES: [&str; 5] = ["draft", "fork", "dependabot", "oversized", "transient"];
 /// The places a CODEOWNERS file is read from; one existing anywhere is the
@@ -356,6 +356,7 @@ pub fn remote_obligations() -> Vec<String> {
         "revision 10: review.diff_cap defaults to 3000 changed lines; an explicit value from 1 through 20000 remains an operator choice and is preserved on upgrade (spec 017)".to_string(),
         "revision 11: the commit walk copies the spec-spine binary into each commit's temporary worktree as a regular file instead of linking to a binary outside it, so spec-spine's containment rule (its spec 144, from 0.28.0) can read every commit's tree; the walk's verdicts are otherwise unchanged (spec 023)".to_string(),
         "revision 12: the AI review leaves a managed file out only when its bytes match the digest the policy records, sends a file that only removes lines as a list under review.deletion_cap, measures the change in estimated tokens (bytes / 3) against a call budget of half review.context_tokens and a ceiling of review.max_calls calls, and reviews a larger change in file groups whose verdicts are merged; review.diff_cap is an added-line backstop, 20000 unless declared. With governance.require_ratified (default true) the coupling steps refuse a changed path a draft spec owns, and a pull request that moves a spec to approved needs the owner exception (spec 024)".to_string(),
+        "revision 13: the repository-local spec-spine is installed at .bin/spec-spine. The installer builds in a scratch root outside the repository and atomically moves only the executable into .bin; rendered gates, workflow caches, commit checks, policy commands, delivered hooks and local resolution use that one location. The previous .tooling ignore remains on upgrade, and .bin is also ignored (spec 031)".to_string(),
         "a repository that already runs these checks by hand keeps them by setting governance.enforce_coverage (index coverage --fail-on-untraced), governance.authored_content (the script's path; absent or not executable refuses), governance.authored_content_text (the title, the body and every commit message), governance.gate_each_commit (each commit's tree passes the gate and cargo fmt) and governance.require_signed_commits (each commit verified as signed by GitHub) (revision 4)".to_string(),
     ]
 }
@@ -2389,12 +2390,7 @@ mod tests {
         let c = commands_for(&p);
         assert_eq!(
             c["governance"][2],
-            serde_json::json!([
-                ".tooling/bin/spec-spine",
-                "index",
-                "coverage",
-                "--fail-on-untraced"
-            ])
+            serde_json::json!([".bin/spec-spine", "index", "coverage", "--fail-on-untraced"])
         );
         assert_eq!(c["governance"][4], serde_json::json!(["scripts/check.sh"]));
     }
@@ -2427,16 +2423,11 @@ mod tests {
         let (on, off) = (commands_for(&d), commands_for(&off));
         assert_eq!(
             on["governance"][3],
-            serde_json::json!([
-                ".tooling/bin/spec-spine",
-                "index",
-                "check",
-                "--fail-on-unresolved"
-            ])
+            serde_json::json!([".bin/spec-spine", "index", "check", "--fail-on-unresolved"])
         );
         assert_eq!(
             off["governance"][3],
-            serde_json::json!([".tooling/bin/spec-spine", "index", "check"])
+            serde_json::json!([".bin/spec-spine", "index", "check"])
         );
         let mut rest = on.clone();
         rest["governance"][3] = off["governance"][3].clone();

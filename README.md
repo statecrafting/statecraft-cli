@@ -137,7 +137,7 @@ cargo run -p statecraft-cli -- run show         <path> <run-id>   # one account,
 |---|---|---|
 | A **registered** target | every verb except `project register` and `project list` | Refused (2), naming the path. |
 | An **armed** target | `run`, and only `run` | Refused (2), naming `project arm <path>`. Discovery and inspection read an unarmed target, which is what registering one is for. |
-| A bare `spec-spine` resolvable on this process's `PATH`, and a corpus in the target that compiles | `work list`, `work show`, `run` | A finding (1) naming the target and what spec-spine said. Readiness is read from `registry plan` and `registry list`, never computed here and never read from `.statecraft/derived/`. The binary invoked is whatever `spec-spine` resolves to, not this repository's pinned `.tooling/bin` copy. |
+| A bare `spec-spine` resolvable on this process's `PATH`, and a corpus in the target that compiles | `work list`, `work show`, `run` | A finding (1) naming the target and what spec-spine said. Readiness is read from `registry plan` and `registry list`, never computed here and never read from `.statecraft/derived/`. The binary invoked is whatever `spec-spine` resolves to, not this repository's pinned `.bin` copy. |
 | The provider adapter's three prerequisites: a resolvable `claude` executable, the credential path, and a **qualification record** for the pair (this adapter's build, that provider version) under `<product home>/qualifications.json` | `env plan`, `env apply`, `env upgrade`, `doctor` | The adapter **refuses to claim its paths and names which one is absent**, and `doctor` reports the finding. `env apply` still runs: it reports `applied: 0 path(s) written` and exits 0, writing **no managed byte** while still creating the manifest at `.statecraft/environment.json` with the pins and an empty `entries` list. The withheld managed paths and the recorded pins are two different writes, and only the first is withheld. A missing record does not stop `run` either: an unqualified adapter still runs, and is labelled `unqualified` in the posture, the attempt record and the outcome. |
 
 The product's own state lives outside every target, at `$STATECRAFT_HOME` or
@@ -227,14 +227,14 @@ derived shards under `.statecraft/derived/` are compiler output, committed, and 
 through `spec-spine` subcommands.
 
 The binary is installed **into this repository**, at the gitignored
-`.tooling/bin`, and `make` prefers it over anything on `PATH`. A shared
+`.bin`, and `make` prefers it over anything on `PATH`. A shared
 `~/.cargo/bin/spec-spine` is one binary for every project on the machine, so
 whichever project built it last governs all of them; a local copy cannot be
 replaced by another project's work. `make tools` reads the exact version from
 `required_version`, so the pin is the only place the number is written.
 
 ```sh
-make tools       # install the pinned spec-spine into .tooling/bin
+make tools       # install the pinned spec-spine into .bin
 make gate        # read-only: freshness, lint, coverage, the authored-content rules
 make code        # read-only: build, test, clippy, fmt across the eight crates
 make refresh     # writing: recompute the committed shard trees

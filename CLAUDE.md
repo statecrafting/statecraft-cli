@@ -33,7 +33,7 @@ field, not the plan output.** Ratification is the owner's act; see AGENTS.md,
 ## Commands
 
 ```sh
-make tools                 # install the pinned spec-spine into .tooling/bin
+make tools                 # install the pinned spec-spine into .bin
 make gate                  # the corpus surface: freshness, lint, authored content
 make code                  # the workspace surface: build, test, clippy, fmt
 make refresh               # spec-spine compile && spec-spine index, after editing a spec.md
@@ -84,9 +84,9 @@ AGENTS.md records what to do if a spec genuinely needs to claim ahead.
 - **The pin is exact, stated once, and the binary is local.** `required_version`
   in `spec-spine.toml` is the only place the CLI pin is written (the linked
   core's is `[workspace.dependencies]` in the root `Cargo.toml`); the binary is
-  installed at the gitignored `.tooling/bin` by `make tools`, which reads the
+  installed at the gitignored `.bin` by `make tools`, which reads the
   version from the pin. Run spec-spine through `make` or as
-  `.tooling/bin/spec-spine`; a bare `spec-spine` is the shared `~/.cargo/bin`
+  `.bin/spec-spine`; a bare `spec-spine` is the shared `~/.cargo/bin`
   copy that any project on this machine replaces. Adopting a newer spine is its
   own change, with its own re-index, its own bypass-floor review and its own
   entry in `docs/adoption/spec-spine.md` (`D-06`).

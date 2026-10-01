@@ -4,7 +4,7 @@
 //!
 //! Every test runs `statecraft-cli` on a real directory with an isolated
 //! product home. Obligation 1 runs the rendered scripts with the **real**
-//! pinned spec-spine (the repository-local `.tooling/bin` copy, the same
+//! pinned spec-spine (the repository-local `.bin` copy, the same
 //! binary this repository's gate uses) and the real cargo. `doctor --remote`
 //! reads from a stub `gh` on `PATH`; nothing here reaches a host, a provider
 //! or the network.
@@ -32,12 +32,33 @@ fn repo_root() -> PathBuf {
 /// The pinned spec-spine this repository is governed by. Absent, the suite
 /// fails and says what to run: it asserts against the real tool.
 fn spec_spine() -> PathBuf {
-    let local = repo_root().join(".tooling/bin/spec-spine");
-    assert!(
-        local.is_file(),
-        "no .tooling/bin/spec-spine; run `make tools`. This suite runs the rendered gate with the real pinned tool."
+    let local = repo_root().join(".bin/spec-spine");
+    if local.is_file() {
+        return local;
+    }
+
+    // A profile-upgrade pull request is deliberately installed by the base
+    // revision. Read that trusted installer's own destination so the upgrade
+    // can test the real pinned tool without teaching product code a retired
+    // repository-local candidate.
+    if let Some(installer) = std::env::var_os("STATECRAFT_INSTALL")
+        && let Ok(script) = std::fs::read_to_string(installer)
+        && let Some(value) = script
+            .lines()
+            .find_map(|line| line.trim().strip_prefix("bin="))
+    {
+        let declared = Path::new(value.trim_matches(['\'', '"']));
+        if declared.is_relative() {
+            let installed = repo_root().join(declared);
+            if installed.is_file() {
+                return installed;
+            }
+        }
+    }
+
+    panic!(
+        "no .bin/spec-spine or executable declared by STATECRAFT_INSTALL; run `make tools`. This suite runs the rendered gate with the real pinned tool."
     );
-    local
 }
 
 /// The exact version this repository pins, read from its single stated
@@ -142,8 +163,8 @@ impl Fixture {
         }
         // The pinned tool, where the rendered install script looks for it,
         // so no network is needed to satisfy the pin.
-        std::fs::create_dir_all(p.join(".tooling/bin")).unwrap();
-        std::fs::copy(spec_spine(), p.join(".tooling/bin/spec-spine")).unwrap();
+        std::fs::create_dir_all(p.join(".bin")).unwrap();
+        std::fs::copy(spec_spine(), p.join(".bin/spec-spine")).unwrap();
         f
     }
 
@@ -288,7 +309,7 @@ fn a_fresh_rust_repository_passes_its_rendered_gate() {
     // and a Makefile was rendered because none existed.
     let ignore = std::fs::read_to_string(f.at(".gitignore")).unwrap();
     assert!(ignore.starts_with("/target\n"), "{ignore}");
-    assert!(ignore.contains("\n.tooling/\n"), "{ignore}");
+    assert!(ignore.contains("\n.bin/\n"), "{ignore}");
     let manifest: serde_json::Value =
         serde_json::from_slice(&std::fs::read(f.at(".statecraft/environment.json")).unwrap())
             .unwrap();

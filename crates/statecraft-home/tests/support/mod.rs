@@ -28,9 +28,27 @@ use std::path::{Path, PathBuf};
 /// what to run rather than skipping: a check that quietly does not run is worse
 /// than one that fails.
 pub fn spec_spine_program() -> String {
-    let local = repo_root().join(".tooling/bin/spec-spine");
+    let local = repo_root().join(".bin/spec-spine");
     if local.is_file() {
         return local.display().to_string();
+    }
+    // A profile-upgrade pull request is deliberately installed by the base
+    // revision. Read that trusted installer's own destination so the upgrade
+    // can test the real pinned tool without teaching product code a retired
+    // repository-local candidate.
+    if let Some(installer) = std::env::var_os("STATECRAFT_INSTALL")
+        && let Ok(script) = std::fs::read_to_string(installer)
+        && let Some(value) = script
+            .lines()
+            .find_map(|line| line.trim().strip_prefix("bin="))
+    {
+        let declared = Path::new(value.trim_matches(['\'', '"']));
+        if declared.is_relative() {
+            let installed = repo_root().join(declared);
+            if installed.is_file() {
+                return installed.display().to_string();
+            }
+        }
     }
     if std::process::Command::new("spec-spine")
         .arg("--version")
@@ -41,8 +59,8 @@ pub fn spec_spine_program() -> String {
         return "spec-spine".to_string();
     }
     panic!(
-        "no spec-spine is available. Run `make tools` to install the pinned version into \
-         .tooling/bin; this suite asserts against the real governance tool and will not \
+        "no spec-spine is available in .bin, through STATECRAFT_INSTALL, or on PATH. Run \
+         `make tools`; this suite asserts against the real governance tool and will not \
          substitute a stand-in for it."
     );
 }

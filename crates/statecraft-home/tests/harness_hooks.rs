@@ -617,6 +617,26 @@ fn contract_2_the_override_is_preferred() {
     }
 }
 
+/// Profile revision 13 gives every delivered hook the same repository-local
+/// candidate before the repository build and PATH fallbacks.
+#[test]
+fn contract_2_the_repository_local_engine_is_in_bin() {
+    for file in ALL {
+        let fixture = Fixture::new();
+        fixture.stub(&fixture.root.join(".bin/spec-spine"), "local", 0, true);
+        fixture.stub(
+            &fixture.root.join("target/release/spec-spine"),
+            "build",
+            0,
+            true,
+        );
+        fixture.stub(&fixture.path_dir.join("spec-spine"), "path", 0, true);
+
+        fixture.run_any(file, &[]);
+        fixture.assert_only_ran("local");
+    }
+}
+
 /// The repository's own release build beats `PATH`.
 ///
 /// This is the half a shipped hook is most likely to get wrong, and it is the
