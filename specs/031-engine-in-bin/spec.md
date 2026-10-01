@@ -2,7 +2,7 @@
 id: "031-engine-in-bin"
 title: "Setup profile revision 13: the repository-local engine lives in .bin/"
 status: approved
-implementation: pending
+implementation: complete
 created: "2026-09-30"
 summary: >
   The owner decided that neither spec-spine nor Statecraft uses `.tooling/bin`
@@ -149,6 +149,16 @@ keeps `.bin/` to the one file the resolver reads.
 **2026-09-30: `make tools` runs the rendered installer.** Revision 12's
 `Makefile` spelled its own `cargo install` line, a second definition of the
 install that could drift from the one CI runs.
+
+**2026-09-30: migration tests use the base installer's declared executable.**
+The first revision-13 pull request is intentionally installed by revision 12's
+base-trusted installer, so `.bin/spec-spine` is absent in its code job. The two
+CLI integration suites and the shared home-test helper first use
+`.bin/spec-spine`; only when it is absent under CI do they read the trusted base
+installer's own `bin=` declaration and use that exact pinned executable. This
+is a test-only transition seam. It adds no retired candidate to a product
+resolver, rendered file, verb or hook, and it disappears from execution once
+revision 13 is the base.
 
 ## Verification
 

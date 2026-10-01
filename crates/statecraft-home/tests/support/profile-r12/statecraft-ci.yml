@@ -121,7 +121,7 @@ jobs:
       - name: Cache spec-spine
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
-          path: .bin/spec-spine
+          path: .tooling/bin/spec-spine
           key: spec-spine-${{ steps.pin.outputs.version }}-${{ runner.os }}-${{ runner.arch }}
       - name: Install the pinned spec-spine
         run: sh "${STATECRAFT_INSTALL:?}"
@@ -223,7 +223,7 @@ jobs:
       - name: Cache spec-spine
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
-          path: .bin/spec-spine
+          path: .tooling/bin/spec-spine
           key: spec-spine-${{ steps.pin.outputs.version }}-${{ runner.os }}-${{ runner.arch }}
       - name: Install the pinned spec-spine
         run: sh "${STATECRAFT_INSTALL:?}"

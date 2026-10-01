@@ -165,7 +165,7 @@ pub fn as_draft(contents: &str) -> String {
 /// Build directories no project's resolver should walk.
 pub const BUILD_DIRS: [&str; 5] = ["target", "node_modules", "dist", "build", ".next"];
 /// The repository-local tool directory (`make tools` installs into it).
-pub const TOOL_DIR: &str = ".tooling";
+pub const TOOL_DIR: &str = ".bin";
 
 /// `[index] resolver_exclusions`, derived from the declared layout (spec 002
 /// section 5, 2026-09-24, provenance item 5): the derived and state roots this
