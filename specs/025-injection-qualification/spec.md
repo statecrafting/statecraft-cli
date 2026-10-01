@@ -1,7 +1,7 @@
 ---
 id: "025-injection-qualification"
 title: "Prompt-injection qualification: untrusted content never expands authority"
-status: draft
+status: approved
 implementation: pending
 created: "2026-09-27"
 summary: >

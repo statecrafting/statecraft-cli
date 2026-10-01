@@ -71,8 +71,8 @@
       }
     ],
     "specId": "025-injection-qualification",
-    "specStatus": "draft"
+    "specStatus": "approved"
   },
   "schemaVersion": "1.2.0",
-  "shardHash": "012d4f3ea72e4d299677f29e0b101029dfd816c8a816cb476207345af517f975"
+  "shardHash": "7f7fe4b0e9b9a546df4046ac2d0a3dd6f759dbeac57e888e6d0cfd24ef5a3b03"
 }
