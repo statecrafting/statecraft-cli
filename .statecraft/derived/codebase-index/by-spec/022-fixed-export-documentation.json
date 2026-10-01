@@ -88,8 +88,8 @@
       }
     ],
     "specId": "022-fixed-export-documentation",
-    "specStatus": "draft"
+    "specStatus": "approved"
   },
   "schemaVersion": "1.2.0",
-  "shardHash": "1b679b5c4b38f715b4cda634213f1674a0899b5bb25b21f9cade6e2d64cdbec6"
+  "shardHash": "d3db1e8b2e70a174cbb9cc2a1437928e57642353c84a241c1c4fffea0b6d651f"
 }

@@ -1,7 +1,7 @@
 ---
 id: "022-fixed-export-documentation"
 title: "Fixed-export documentation workflow"
-status: draft
+status: approved
 implementation: pending
 created: "2026-09-27"
 summary: >
