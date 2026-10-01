@@ -153,11 +153,12 @@ install that could drift from the one CI runs.
 **2026-09-30: migration tests use the base installer's declared executable.**
 The first revision-13 pull request is intentionally installed by revision 12's
 base-trusted installer, so `.bin/spec-spine` is absent in its code job. The two
-existing integration suites first use `.bin/spec-spine`; only when it is absent
-under CI do they read the trusted base installer's own `bin=` declaration and
-use that exact pinned executable. This is a test-only transition seam. It adds
-no retired candidate to a product resolver, rendered file, verb or hook, and it
-disappears from execution once revision 13 is the base.
+CLI integration suites and the shared home-test helper first use
+`.bin/spec-spine`; only when it is absent under CI do they read the trusted base
+installer's own `bin=` declaration and use that exact pinned executable. This
+is a test-only transition seam. It adds no retired candidate to a product
+resolver, rendered file, verb or hook, and it disappears from execution once
+revision 13 is the base.
 
 ## Verification
 
