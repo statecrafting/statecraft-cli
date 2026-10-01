@@ -74,7 +74,7 @@
       }
     ],
     "sectionDigests": {
-      "031-the-repository-local-engine-lives-in-bin": "44f4e6ea1265de38ad0128140d0af65d64092fa315a8525ea337c856ad125287",
+      "031-the-repository-local-engine-lives-in-bin": "a023df5d28cd418f1e398fb0d3cc95f852900a1b9044790c2aeeaf6587473678",
       "1-purpose": "8ba20db3853155c0b3a6b955f7a33f7d233eb6c7f5f417b328ea6f9df7ee08bb",
       "2-territory": "892002da663fcf54e82fcfb9977862eaaf9a9410cd40939815cb4c8d50cc9659",
       "3-1-one-location": "b5442ba06297ba85946a52bafdbd4d98528512ac0154f084afcb67c9c30bc67d",
@@ -82,7 +82,7 @@
       "3-3-upgrade": "d4d9a09a5767a78ada4c068fe5d92cf81b6a72f295cdf9b35f75fafa92960691",
       "3-behavior": "e6f9cf5b7f15a2039882f6ae9f9e19392ba06331fc5c7d2e0ab59115154f8413",
       "4-out-of-scope": "9576cfa5d6266b0ba475b88f0a787d46a7d5903a801a62cfe9cb2bfecd4df19f",
-      "5-resolved-decisions": "2232c66c674dcdb37382316c020a1554aa49867396c0e2a105b752a11622efaa",
+      "5-resolved-decisions": "d9b3fb379c8ab1c02229eda905f0f72bdfdfb36957ccfeecfcf4c8b414efd9e4",
       "verification": "4b91c760e2f7b605373b00c1dfd49282ea820201c0b0e53cdaf003237b773757"
     },
     "sectionHeadings": [
@@ -102,6 +102,6 @@
     "summary": "The owner decided that neither spec-spine nor Statecraft uses `.tooling/bin` and that the repository-local spec-spine is `.bin/spec-spine`. Profile github-actions-rust revision 13 installs the pinned engine there, its gate, commit walk, CI cache and policy commands read it there, and its ignore fragment ignores `.bin/`. The resolver's repository-local candidate, the delivered hooks and this repository's own `Makefile` follow. A revision-12 project converges through the ordinary managed upgrade.\n",
     "title": "Setup profile revision 13: the repository-local engine lives in .bin/"
   },
-  "shardHash": "8cfad9c4f3d8e345d09817128562223c8230c49bc6c460efc63c151c65e17119",
+  "shardHash": "0b871563033ede2e2519849bc6f33afb435dbf8b6e715adde2fcd8cc3860b9cd",
   "specVersion": "1.9.0"
 }

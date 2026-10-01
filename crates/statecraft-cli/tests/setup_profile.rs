@@ -33,11 +33,32 @@ fn repo_root() -> PathBuf {
 /// fails and says what to run: it asserts against the real tool.
 fn spec_spine() -> PathBuf {
     let local = repo_root().join(".bin/spec-spine");
-    assert!(
-        local.is_file(),
-        "no .bin/spec-spine; run `make tools`. This suite runs the rendered gate with the real pinned tool."
+    if local.is_file() {
+        return local;
+    }
+
+    // A profile-upgrade pull request is deliberately installed by the base
+    // revision. Read that trusted installer's own destination so the upgrade
+    // can test the real pinned tool without teaching product code a retired
+    // repository-local candidate.
+    if let Some(installer) = std::env::var_os("STATECRAFT_INSTALL")
+        && let Ok(script) = std::fs::read_to_string(installer)
+        && let Some(value) = script
+            .lines()
+            .find_map(|line| line.trim().strip_prefix("bin="))
+    {
+        let declared = Path::new(value.trim_matches(['\'', '"']));
+        if declared.is_relative() {
+            let installed = repo_root().join(declared);
+            if installed.is_file() {
+                return installed;
+            }
+        }
+    }
+
+    panic!(
+        "no .bin/spec-spine or executable declared by STATECRAFT_INSTALL; run `make tools`. This suite runs the rendered gate with the real pinned tool."
     );
-    local
 }
 
 /// The exact version this repository pins, read from its single stated
