@@ -504,6 +504,16 @@ pub fn plan(
                 });
                 continue;
             }
+            // Removal never follows a link, so a path reached through one is
+            // withheld here, as apply would withhold it, and the plan says so.
+            if crate::replace::link_on_path(root, &e.path)? {
+                out.withheld.push(WithheldWrite {
+                    path: e.path.clone(),
+                    adapter: declaration.name.clone(),
+                    reason: Withholding::SymbolicLink,
+                });
+                continue;
+            }
             match digest_file(&resolve(root, &e.path))? {
                 Some((found, _)) if found != e.digest => out.withheld.push(WithheldWrite {
                     path: e.path.clone(),

@@ -145,6 +145,24 @@ fn a_retired_file_reached_through_a_symbolic_link_is_kept_and_reported() {
     std::fs::rename(target.path().join("old"), target.path().join("real-old")).unwrap();
     std::os::unix::fs::symlink("real-old", target.path().join("old")).unwrap();
 
+    // The plan says what apply will do: withheld, not retired.
+    let planned = plan(
+        target.path(),
+        Some(&manifest),
+        &after,
+        &present(),
+        &ForeignClaims::none(),
+    )
+    .unwrap();
+    assert!(planned.retired.is_empty(), "{planned:?}");
+    assert!(
+        planned
+            .withheld
+            .iter()
+            .any(|w| w.path == OLD && w.reason == Withholding::SymbolicLink),
+        "{planned:?}"
+    );
+
     let outcome = run(target.path(), &mut manifest, &after);
 
     match outcome {
