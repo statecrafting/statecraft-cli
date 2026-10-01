@@ -170,10 +170,10 @@
       "Verification"
     ],
     "specPath": "specs/014-wire-evidence-admission/spec.md",
-    "status": "draft",
+    "status": "approved",
     "summary": "Amends the run record, evidence envelope, and command projection so an exact statecraft/wire-exchange/v1 artifact can be bound to one run attempt and sidecar effect, judged deterministically under explicit policy, and shown without retaining secret values or confusing producer testimony with independent acceptance.\n",
     "title": "Admission of wire-exchange evidence"
   },
-  "shardHash": "4d1bb0447b9af56a39d2621b938339c2a1a8e431ed396932cdfe3c9cdae474cb",
+  "shardHash": "9727ffa948c61451ebe1cd5564db49c1e64b4b78b468af47f17ffc02f558cec8",
   "specVersion": "1.9.0"
 }

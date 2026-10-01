@@ -1,7 +1,7 @@
 ---
 id: "013-supervised-wire-witness"
 title: "Supervised adoption of one wire-witness sidecar per attempt"
-status: draft
+status: approved
 implementation: pending
 created: "2026-09-26"
 summary: >
