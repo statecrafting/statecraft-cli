@@ -336,7 +336,23 @@ fn a_file_a_withheld_pointer_still_imports_is_kept_and_reported() {
             .contains("POINTER.md still imports it")
     );
 
-    run(target.path(), &mut manifest, &after);
+    let outcome = run(target.path(), &mut manifest, &after);
+    match outcome {
+        Outcome::Partial { withheld, .. } => {
+            assert!(
+                withheld
+                    .iter()
+                    .any(|w| w.path == OLD && w.reason == held.reason)
+            );
+            assert!(
+                withheld
+                    .iter()
+                    .any(|w| w.path == "POINTER.md"
+                        && matches!(w.reason, Withholding::Drifted { .. }))
+            );
+        }
+        other => panic!("{other:?}"),
+    }
     assert_eq!(std::fs::read(target.path().join(OLD)).unwrap(), b"old");
     assert!(
         manifest.entry(OLD).is_some(),

@@ -16,12 +16,9 @@
 #[path = "support/json_naming.rs"]
 mod json_naming;
 
+use statecraft_environment::adapter::PROVIDER_DIRECTORIES;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Output};
-
-const PROVIDER_DIRECTORIES: [&str; 6] = [
-    ".claude", ".codex", ".agents", ".agent", ".cursor", ".gemini",
-];
 
 /// A `spec-spine` that reports a compatible version, a fresh corpus and an
 /// empty backlog.
@@ -127,6 +124,15 @@ fn text(out: &Output) -> String {
 
 #[test]
 fn a_project_with_no_provider_directory_is_governed_and_gains_none() {
+    // Keep the scan current while independently checking spec 030 section 3.1.
+    for directory in [
+        ".claude", ".codex", ".agents", ".agent", ".cursor", ".gemini",
+    ] {
+        assert!(
+            PROVIDER_DIRECTORIES.contains(&directory),
+            "missing {directory}"
+        );
+    }
     let f = Fixture::new();
     let root = f.root();
     assert!(f.provider_directories().is_empty());
