@@ -1,8 +1,8 @@
 #!/bin/sh
-# Rendered by Statecraft from profile github-actions-rust revision 13.
+# Rendered by Statecraft from profile github-actions-rust revision {{sc:profile.revision}}.
 # The one definition of this repository's gate: `make gate` and `make code`
 # run it locally, and CI runs the same script, so the two cannot drift. Only
-# the repository-local .bin/spec-spine is used; a spec-spine elsewhere
+# the repository-local .tooling/bin/spec-spine is used; a spec-spine elsewhere
 # on PATH never answers for this repository.
 #
 # In CI this script is read at the base commit and run against the candidate's
@@ -25,7 +25,7 @@ leave() {
 }
 trap 'rc=$?; if [ "$rc" -ne 0 ]; then echo "gate.sh: a command failed (exit $rc) and stopped the gate; reported as failed (4)" >&2; exit 4; fi' EXIT
 
-SS=.bin/spec-spine
+SS=.tooling/bin/spec-spine
 BASE_SHA="${BASE_SHA:-}"
 case "$BASE_SHA" in 0000000000000000000000000000000000000000) BASE_SHA="" ;; esac
 # This script's own path, for the commit walk, which judges each commit with
@@ -35,15 +35,15 @@ SELF="$(cd "$(dirname "$0")" && pwd)/$(basename "$0")"
 # The project's governance parameters (revision 4, and FAIL_ON_UNRESOLVED from
 # revision 9, spec 010), rendered from its setup block. Each default keeps a
 # revision-3 project's behaviour except the base rule, which is a new refusal.
-DEFAULT_BRANCH='main'
-ENFORCE_COVERAGE=true
-AUTHORED_CONTENT='scripts/check-authored-content.sh'
-AUTHORED_CONTENT_TEXT=true
-GATE_EACH_COMMIT=true
-REQUIRE_SIGNED_COMMITS=true
-REQUIRE_DEFAULT_BASE=true
-FAIL_ON_UNRESOLVED=true
-REQUIRE_RATIFIED=true
+DEFAULT_BRANCH='{{sc:default_branch}}'
+ENFORCE_COVERAGE={{sc:governance.enforce_coverage}}
+AUTHORED_CONTENT='{{sc:governance.authored_content}}'
+AUTHORED_CONTENT_TEXT={{sc:governance.authored_content_text}}
+GATE_EACH_COMMIT={{sc:governance.gate_each_commit}}
+REQUIRE_SIGNED_COMMITS={{sc:governance.require_signed_commits}}
+REQUIRE_DEFAULT_BASE={{sc:governance.require_default_base}}
+FAIL_ON_UNRESOLVED={{sc:governance.fail_on_unresolved}}
+REQUIRE_RATIFIED={{sc:governance.require_ratified}}
 
 usage() {
   echo "usage: gate.sh governance|code|couple|couple-group|base|text|commits|pin" >&2
@@ -424,8 +424,8 @@ case "$MODE" in
         # it, and spec-spine refuses to read a repository through a link that
         # leaves it (its spec 144, from 0.28.0). The copy is a regular file
         # inside the worktree, and it goes when the worktree does.
-        contained="$wt/.bin/spec-spine"
-        if [ -n "$bin" ] && mkdir -p "$wt/.bin" && rm -f "$contained" \
+        contained="$wt/.tooling/bin/spec-spine"
+        if [ -n "$bin" ] && mkdir -p "$wt/.tooling/bin" && rm -f "$contained" \
           && cp "$bin" "$contained" && chmod 755 "$contained" \
           && [ -f "$contained" ] && [ ! -L "$contained" ] \
           && (cd "$wt" && sh "$script" governance && cargo fmt --all --check) > "$log" 2>&1; then

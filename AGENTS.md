@@ -38,13 +38,13 @@ Read before working. None of these writes.
 
 ```sh
 make tools                                # install the pinned spec-spine locally
-.tooling/bin/spec-spine --version         # must satisfy required_version in spec-spine.toml
+.bin/spec-spine --version                 # must satisfy required_version in spec-spine.toml
 make gate                                 # the whole read-only corpus surface
 make status                               # version, lifecycle counts, schedulable set
 git log --oneline -10
 ```
 
-Run `spec-spine` through `make`, or as `.tooling/bin/spec-spine`. A bare
+Run `spec-spine` through `make`, or as `.bin/spec-spine`. A bare
 `spec-spine` resolves to the shared `~/.cargo/bin` copy, which any project on
 this machine replaces, and this repository has been governed by the wrong
 version that way more than once. `make` prefers the local binary automatically.

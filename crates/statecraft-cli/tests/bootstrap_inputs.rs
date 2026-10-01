@@ -4,7 +4,7 @@
 //! The acceptance anchor is section 2's measured gap: a fresh repository with
 //! no toolchain files, planned and then applied with an explicit setup input.
 //! Every test runs `statecraft-cli` on a real directory with an isolated
-//! product home and the real pinned spec-spine from `.tooling/bin` (`make
+//! product home and the real pinned spec-spine from `.bin` (`make
 //! tools`); nothing here reaches a host, a provider or the network.
 
 #![cfg(unix)]
@@ -28,10 +28,10 @@ fn repo_root() -> PathBuf {
 }
 
 fn spec_spine() -> PathBuf {
-    let local = repo_root().join(".tooling/bin/spec-spine");
+    let local = repo_root().join(".bin/spec-spine");
     assert!(
         local.is_file(),
-        "no .tooling/bin/spec-spine; run `make tools`. This suite runs the real pinned tool."
+        "no .bin/spec-spine; run `make tools`. This suite runs the real pinned tool."
     );
     local
 }

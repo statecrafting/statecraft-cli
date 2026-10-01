@@ -44,7 +44,8 @@ pub const DEFAULT_BASE_REVISION: &str = "HEAD";
 /// For an initialization the `spec-spine` binary is **selected** for the
 /// project by spec 002 section 5's rule of 2026-09-25, the one the delivered
 /// hooks apply: `STATECRAFT_SPEC_SPINE`, then the project's own
-/// `target/release/spec-spine`, then `PATH`, each put to the project's pin.
+/// `.bin/spec-spine`, `target/release/spec-spine`, then `PATH`, each put to
+/// the project's pin.
 /// The rule is the library's; this only chooses to apply it.
 pub fn execute(home: &Path, operation: Operation) -> Answer<service::Answer> {
     let layout = Layout::new(home);

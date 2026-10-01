@@ -17,8 +17,8 @@ root=$(git -C "$(dirname "$fp")" rev-parse --show-toplevel 2>/dev/null) || exit 
 # one, a non-empty value is the operator's override and the only candidate,
 # and a broken or incompatible one refuses rather than falling back. The
 # retired SPEC_SPINE_BIN is reported as ignored and never selects. Otherwise
-# the repository's own
-# target/release/spec-spine, then PATH, and the first one compatible with the
+# the repository's own .bin/spec-spine, target/release/spec-spine, then PATH,
+# and the first one compatible with the
 # repository's pin ([meta] required_version) judges; each one passed over is
 # named. An unpinned repository takes the first candidate and says it is
 # unpinned. Returns 0 with sc set, 1 with sc_why set (not performed), or 2
@@ -87,8 +87,8 @@ spec_spine_resolve() {
     return 1
   fi
   found=''; n=0
-  for c in "$1/target/release/spec-spine" "$(command -v spec-spine 2>/dev/null)"; do
-    n=$((n+1)); if [ "$n" = 1 ]; then rule='repository build'; else rule=PATH; fi
+  for c in "$1/.bin/spec-spine" "$1/target/release/spec-spine" "$(command -v spec-spine 2>/dev/null)"; do
+    n=$((n+1)); case "$n" in 1) rule='repository-local binary' ;; 2) rule='repository build' ;; *) rule=PATH ;; esac
     { [ -n "$c" ] && [ -f "$c" ] && [ -x "$c" ]; } || continue
     found=1
     v=$(spec_spine_version "$c")

@@ -15,9 +15,9 @@
 //!    candidate, put to the pin, and with no fallback when it names no
 //!    executable or one the repository does not admit.
 //! 3. **Otherwise** the convention candidates, the repository's own
-//!    `target/release/spec-spine` and then `PATH`; the first the pin admits is
-//!    selected, and each one passed over is named. An unpinned repository
-//!    takes the first candidate.
+//!    `.bin/spec-spine`, `target/release/spec-spine`, and then `PATH`; the
+//!    first the pin admits is selected, and each one passed over is named. An
+//!    unpinned repository takes the first candidate.
 //! 4. **The retired name, [`RETIRED`], is reported and never read**: when it is
 //!    set and [`ENV`] is not, a notice says it was ignored and names the new
 //!    one.
@@ -56,6 +56,8 @@ pub enum Rule {
     Supervisor,
     /// The operator's override, outside one.
     Override,
+    /// The repository-local `.bin/spec-spine` installed by the setup profile.
+    RepositoryLocal,
     /// The repository's own `target/release/spec-spine`.
     RepositoryBuild,
     /// The first on `PATH`.
@@ -68,6 +70,7 @@ impl Rule {
         match self {
             Rule::Supervisor => "supervisor",
             Rule::Override => "override",
+            Rule::RepositoryLocal => "repository-local",
             Rule::RepositoryBuild => "repository-build",
             Rule::Path => "path",
         }
@@ -231,6 +234,7 @@ fn override_outcome(root: &Path, pin: &Pin, value: &str) -> Result<Selected, Uns
 fn conventions(root: &Path, pin: &Pin, path_var: Option<&str>) -> Selection {
     let mut passed_over = Vec::new();
     let candidates = [
+        (Some(root.join(".bin").join(PROGRAM)), Rule::RepositoryLocal),
         (
             Some(root.join("target/release").join(PROGRAM)),
             Rule::RepositoryBuild,
@@ -294,6 +298,7 @@ fn conventions(root: &Path, pin: &Pin, path_var: Option<&str>) -> Selection {
 
 fn rule_phrase(rule: Rule) -> &'static str {
     match rule {
+        Rule::RepositoryLocal => "repository-local binary",
         Rule::RepositoryBuild => "repository build",
         Rule::Path => "PATH",
         Rule::Supervisor => "supervisor",
@@ -538,9 +543,9 @@ impl NotSelected {
             Unselected::Absent => {
                 // The notices come too: an operator who set the retired name
                 // and has no binary learns which name to set instead.
-                let mut detail =
-                    "no spec-spine was found in the repository's target/release or on PATH"
-                        .to_string();
+                let mut detail = "no spec-spine was found at .bin/spec-spine, in the repository's \
+                                  target/release, or on PATH"
+                    .to_string();
                 for remark in selection.remarks() {
                     detail.push_str("; ");
                     detail.push_str(&remark);
@@ -783,6 +788,24 @@ mod tests {
         std::fs::create_dir_all(&empty).unwrap();
         let s = select(&empty, &env(&[("PATH", &empty.display().to_string())]));
         assert_eq!(s.outcome, Err(Unselected::Absent));
+    }
+
+    #[test]
+    fn the_repository_local_binary_precedes_the_build_and_path() {
+        let dir = tempfile::tempdir().unwrap();
+        let root = dir.path().join("repo");
+        let bin = dir.path().join("bin");
+        std::fs::create_dir_all(&root).unwrap();
+        pinned(&root, Some("=0.23.0"));
+        stub(&root.join(".bin").join(PROGRAM), "0.23.0");
+        stub(&root.join("target/release").join(PROGRAM), "0.23.0");
+        stub(&bin.join(PROGRAM), "0.23.0");
+
+        let selected = select(&root, &env(&[("PATH", &bin.display().to_string())]))
+            .outcome
+            .unwrap();
+        assert_eq!(selected.rule, Rule::RepositoryLocal);
+        assert_eq!(selected.program, root.join(".bin").join(PROGRAM));
     }
 
     #[test]
