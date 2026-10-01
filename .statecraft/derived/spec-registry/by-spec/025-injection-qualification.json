@@ -116,10 +116,10 @@
       "Verification"
     ],
     "specPath": "specs/025-injection-qualification/spec.md",
-    "status": "draft",
+    "status": "approved",
     "summary": "Amends the adapter negative suite and the documentation lane with a versioned hostile-content corpus and a deterministic product-invariance suite. Every surface that carries repository, packet, citation, provider, wire or tool-facing text is exercised with hostile payloads, and the suite proves by construction that Statecraft's decisions are unchanged: no authority expands, no credential is disclosed, no forbidden capability is invoked, no review or acceptance is bypassed. Provider susceptibility is a separate, later measurement that is recorded as testimony and is never the boundary. Delimiters and detectors are not security controls.\n",
     "title": "Prompt-injection qualification: untrusted content never expands authority"
   },
-  "shardHash": "012d4f3ea72e4d299677f29e0b101029dfd816c8a816cb476207345af517f975",
+  "shardHash": "7f7fe4b0e9b9a546df4046ac2d0a3dd6f759dbeac57e888e6d0cfd24ef5a3b03",
   "specVersion": "1.9.0"
 }
