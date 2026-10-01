@@ -1,0 +1,136 @@
+{
+  "record": {
+    "amends": [
+      "003-work-and-run-semantics",
+      "004-execution-adapter",
+      "005-acceptance-and-evidence",
+      "006-command-surface"
+    ],
+    "created": "2026-09-27",
+    "dependsOn": [
+      "003-work-and-run-semantics",
+      "004-execution-adapter",
+      "005-acceptance-and-evidence",
+      "006-command-surface",
+      "019-context-packet-consumption",
+      "020-documentation-task-and-result",
+      "021-documentation-acceptance"
+    ],
+    "extends": [
+      {
+        "nature": "additive",
+        "spec": "003-work-and-run-semantics",
+        "unit": {
+          "kind": "directory",
+          "path": "crates/statecraft-run/"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "004-execution-adapter",
+        "unit": {
+          "kind": "directory",
+          "path": "crates/statecraft-adapter/"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "005-acceptance-and-evidence",
+        "unit": {
+          "kind": "directory",
+          "path": "crates/statecraft-acceptance/"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "006-command-surface",
+        "unit": {
+          "kind": "directory",
+          "path": "crates/statecraft-cli/"
+        }
+      }
+    ],
+    "id": "022-fixed-export-documentation",
+    "implementation": "pending",
+    "obligations": [
+      {
+        "anchor": "3-1-the-fixed-export-profile",
+        "id": "I-1",
+        "kind": "invariant",
+        "text": "A fixed-export documentation run preserves immutable input, delivery, raw result, validation, review, correction, acceptance, application, and publication as separate records and authorities."
+      },
+      {
+        "anchor": "3-3-bounded-offline-execution",
+        "id": "R-1",
+        "kind": "requirement",
+        "text": "The offline profile consumes only revision-pinned retained bytes, invokes only an explicitly selected local adapter, performs no network or repository mutation, and records every output before interpretation."
+      },
+      {
+        "anchor": "3-10-the-deterministic-pilot",
+        "id": "R-2",
+        "kind": "requirement",
+        "text": "The pilot proves complete task-to-acceptance behavior with deterministic fixtures and a fake adapter while withholding live provider, application, remote export, and publication authority."
+      },
+      {
+        "anchor": "verification",
+        "id": "V-1",
+        "inputs": [
+          "crates/statecraft-run/tests/fixed_export_documentation.rs",
+          "crates/statecraft-adapter/tests/fixed_export_adapter.rs",
+          "crates/statecraft-acceptance/tests/fixed_export_acceptance.rs",
+          "crates/statecraft-cli/tests/fixed_export_documentation.rs"
+        ],
+        "kind": "verification",
+        "text": "Portable fixtures prove exact export binding, offline adapter execution, raw-result custody, independent validation and review, append-only correction, and the absence of repository, network, provider, and publication effects."
+      }
+    ],
+    "sectionDigests": {
+      "022-fixed-export-documentation-workflow": "6d822e1a0cf579e0269861b853fc1191d8f4ec1c81a21e445e41845dc8e2225e",
+      "1-purpose": "453fb6ca66e6a6bddf5ad5f36f7c78027c5d7227d5a8142ff0ca4a8e9ed98f2f",
+      "2-territory-and-prerequisites": "ff51106eed5b13236a5d4bbc835102d9266d01e2ffedf2b1ff999c9e7cc6125a",
+      "3-1-the-fixed-export-profile": "0a6dc2a594647bdf77ac5bc24986efc4bb0d1f595ab4779513be12306f64f289",
+      "3-10-the-deterministic-pilot": "917f8df3ebfc3a18e03dc19224eacc0df684dcfea08b6861134e6faef333682c",
+      "3-11-command-workflow": "208d6a4a2b74f50d9dac0ca81f6be98a5e6f483e5dd7fac697b1224496aede79",
+      "3-12-observable-negative-cases": "5135ea67027c14bb2880ff4d1d55007c2f63b1d23ef4cdf2567045bfa2cd136c",
+      "3-2-preparation-from-fixed-exports": "729b18bb56a238f5a4c1fc1113c3d19bcabd694eaa491eedea0c4ed9856821aa",
+      "3-3-bounded-offline-execution": "b95e343e0581bd414b21354a249617e7d91d2d5f48c290b1e8cea4de827adc35",
+      "3-4-delivery-and-raw-result-custody": "efa88928a47bbe3e0ee516e8f50afe576cf8b32dc0dad9e21e761a758825e74b",
+      "3-5-validation-and-citation-resolution": "9c63ac5694efa9f02af4213c70f97f8b6e63915be863d13ff83de3ed663f22b1",
+      "3-6-reviewable-artifacts-and-proposed-patches": "b01b86506a317a9f5256f37bcd25e2d9525732874d18dd58647bdd58ba413ec6",
+      "3-7-human-review": "fa6eeeaacf72f3596c0c287e41ee2c91c0dc2db42ede0098f696533e4a751bae",
+      "3-8-correction-and-re-review": "fdac64b07b6b9f2353e68150f3c490bdb10ea06756bda71757a310a0d652ca95",
+      "3-9-acceptance-application-and-publication": "f8f5997b1e6852f89778e522e17b62accda575923a81ea2fbc5ef516cded218a",
+      "3-behavior": "0e8d97191ea291f0e3bf6d0697e3cc289e3c77127a0c32e82a8f2bc923c4e071",
+      "4-out-of-scope": "363e8719654ac3628d8908bf2a89d115567a14e4a6989a2f28e8d0224e0e4324",
+      "5-resolved-decisions": "6e20f3fb6e2f8de64cd764b3156bdf2a54000cb5dc64b2eccabdfc356dc4984b",
+      "verification": "02666f6d7aa5b5d63eac803a15ee05bfde0355282aaef8a4aa173e9e5dda9427"
+    },
+    "sectionHeadings": [
+      "022: Fixed-export documentation workflow",
+      "1. Purpose",
+      "2. Territory and prerequisites",
+      "3. Behavior",
+      "3.1 The fixed-export profile",
+      "3.2 Preparation from fixed exports",
+      "3.3 Bounded offline execution",
+      "3.4 Delivery and raw-result custody",
+      "3.5 Validation and citation resolution",
+      "3.6 Reviewable artifacts and proposed patches",
+      "3.7 Human review",
+      "3.8 Correction and re-review",
+      "3.9 Acceptance, application, and publication",
+      "3.10 The deterministic pilot",
+      "3.11 Command workflow",
+      "3.12 Observable negative cases",
+      "4. Out of scope",
+      "5. Resolved decisions",
+      "Verification"
+    ],
+    "specPath": "specs/022-fixed-export-documentation/spec.md",
+    "status": "draft",
+    "summary": "Amends Statecraft's run, adapter, acceptance, and command contracts with a bounded offline documentation workflow over revision-pinned context exports. It preserves immutable task, delivery, raw result, validation, review, correction, and acceptance records as separate facts; proves the workflow with a deterministic fake adapter; and grants no live provider, repository application, remote export, or publication authority.\n",
+    "title": "Fixed-export documentation workflow"
+  },
+  "shardHash": "1b679b5c4b38f715b4cda634213f1674a0899b5bb25b21f9cade6e2d64cdbec6",
+  "specVersion": "1.9.0"
+}
