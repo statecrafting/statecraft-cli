@@ -1,7 +1,7 @@
 ---
 id: "020-documentation-task-and-result"
 title: "Documentation task and structured result contracts"
-status: draft
+status: approved
 implementation: pending
 created: "2026-09-27"
 summary: >

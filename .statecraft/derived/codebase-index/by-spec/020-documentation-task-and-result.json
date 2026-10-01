@@ -86,8 +86,8 @@
       }
     ],
     "specId": "020-documentation-task-and-result",
-    "specStatus": "draft"
+    "specStatus": "approved"
   },
   "schemaVersion": "1.2.0",
-  "shardHash": "54bdcebdb18497c92bb73381d12ae21b5ccc371126f6658dd1a42120ccf44d33"
+  "shardHash": "ad9a59aa073328e7fe9675544da26e25183f58ad4cffe32bfaf22145b40b5cf2"
 }
