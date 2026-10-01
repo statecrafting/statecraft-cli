@@ -1,7 +1,7 @@
 ---
 id: "014-wire-evidence-admission"
 title: "Admission of wire-exchange evidence"
-status: draft
+status: approved
 implementation: pending
 created: "2026-09-26"
 summary: >
