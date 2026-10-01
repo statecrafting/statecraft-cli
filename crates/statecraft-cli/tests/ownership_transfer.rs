@@ -741,6 +741,8 @@ fn a_file_restored_after_env_remove_does_not_block_transfers() {
         eprintln!("skipped: no path is managed where the adapter does not claim its paths");
         return;
     }
+    let (c, v) = s.json(&["env", "apply", &root]);
+    assert!(c <= 1, "{v}");
     assert_eq!(
         s.entry(OWNED).unwrap()["class"],
         "managed",

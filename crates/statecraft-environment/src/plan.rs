@@ -496,7 +496,7 @@ pub fn plan(
             // Retirement follows the effective plan: while a path this adapter
             // declares keeps bytes that import the file, because its write is
             // withheld or not planned, the file still delivers what it held.
-            if let Some(by) = still_imported_by(root, declaration, &out.writes, &e.path)? {
+            if let Some(by) = still_imported_by(root, declarations, &out.writes, &e.path)? {
                 out.withheld.push(WithheldWrite {
                     path: e.path.clone(),
                     adapter: declaration.name.clone(),
@@ -536,7 +536,7 @@ pub fn plan(
 /// adapters this product ships write.
 fn still_imported_by(
     root: &Path,
-    declaration: &Declaration,
+    declarations: &[Declaration],
     writes: &[PlannedWrite],
     retiring: &str,
 ) -> std::io::Result<Option<String>> {
@@ -546,20 +546,22 @@ fn still_imported_by(
             .filter_map(|l| l.trim().strip_prefix('@'))
             .any(|p| p.trim() == retiring)
     };
-    for file in &declaration.files {
-        let after = match writes
-            .iter()
-            .find(|w| w.path == file.path && w.adapter == declaration.name)
-        {
-            Some(w) => w.contents.clone(),
-            None => match std::fs::read(resolve(root, &file.path)) {
-                Ok(bytes) => bytes,
-                Err(e) if e.kind() == std::io::ErrorKind::NotFound => continue,
-                Err(e) => return Err(e),
-            },
-        };
-        if imports(&after) {
-            return Ok(Some(file.path.clone()));
+    for declaration in declarations {
+        for file in &declaration.files {
+            let after = match writes
+                .iter()
+                .find(|w| w.path == file.path && w.adapter == declaration.name)
+            {
+                Some(w) => w.contents.clone(),
+                None => match std::fs::read(resolve(root, &file.path)) {
+                    Ok(bytes) => bytes,
+                    Err(e) if e.kind() == std::io::ErrorKind::NotFound => continue,
+                    Err(e) => return Err(e),
+                },
+            };
+            if imports(&after) {
+                return Ok(Some(file.path.clone()));
+            }
         }
     }
     Ok(None)

@@ -329,3 +329,53 @@ fn a_file_a_withheld_pointer_still_imports_is_kept_and_reported() {
         edited
     );
 }
+
+#[test]
+fn a_file_another_adapter_still_imports_is_kept_and_reported() {
+    let target = tempfile::tempdir().unwrap();
+    let mut manifest = Manifest::new(pins());
+    let before = [
+        adapter("a", vec![ManagedFile::owned(OLD, b"old".to_vec())]),
+        adapter(
+            "b",
+            vec![ManagedFile::pointer(
+                "OTHER.md",
+                format!("@{OLD}\n").into_bytes(),
+            )],
+        ),
+    ];
+    assert!(matches!(
+        run(target.path(), &mut manifest, &before),
+        Outcome::Applied { .. }
+    ));
+    let after = vec![
+        adapter("a", vec![]),
+        adapter(
+            "b",
+            vec![ManagedFile::pointer(
+                "OTHER.md",
+                format!("@{OLD}\n").into_bytes(),
+            )],
+        ),
+    ];
+
+    let outcome = run(target.path(), &mut manifest, &after);
+
+    match outcome {
+        Outcome::Partial { withheld, .. } => {
+            let held = withheld
+                .iter()
+                .find(|w| w.path == OLD)
+                .unwrap_or_else(|| panic!("{withheld:?}"));
+            assert_eq!(
+                held.reason,
+                Withholding::StillImported {
+                    by: "OTHER.md".into()
+                }
+            );
+        }
+        other => panic!("{other:?}"),
+    }
+    assert_eq!(std::fs::read(target.path().join(OLD)).unwrap(), b"old");
+    assert!(manifest.entry(OLD).is_some(), "the record stays");
+}
