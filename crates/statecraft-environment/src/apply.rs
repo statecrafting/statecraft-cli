@@ -198,9 +198,7 @@ pub fn perform(
             withheld.push(WithheldWrite {
                 path: r.path.clone(),
                 adapter: r.adapter.clone(),
-                reason: crate::plan::Withholding::Modification {
-                    why: "reached through a symbolic link; left as it is".to_string(),
-                },
+                reason: crate::plan::Withholding::SymbolicLink,
             });
             continue;
         }

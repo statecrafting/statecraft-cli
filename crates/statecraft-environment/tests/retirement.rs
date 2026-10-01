@@ -138,6 +138,31 @@ fn a_drifted_undeclared_file_is_withheld_and_left_with_its_record() {
     assert!(manifest.entry(OLD).is_some(), "the record stays");
 }
 
+#[cfg(unix)]
+#[test]
+fn a_retired_file_reached_through_a_symbolic_link_is_kept_and_reported() {
+    let (target, mut manifest, after) = installed();
+    std::fs::rename(target.path().join("old"), target.path().join("real-old")).unwrap();
+    std::os::unix::fs::symlink("real-old", target.path().join("old")).unwrap();
+
+    let outcome = run(target.path(), &mut manifest, &after);
+
+    match outcome {
+        Outcome::Partial { withheld, .. } => {
+            assert_eq!(withheld.len(), 1);
+            assert_eq!(withheld[0].path, OLD);
+            assert_eq!(withheld[0].reason, Withholding::SymbolicLink);
+            assert_eq!(
+                withheld[0].reason.describe(),
+                "reached through a symbolic link; left as it is"
+            );
+        }
+        other => panic!("{other:?}"),
+    }
+    assert_eq!(std::fs::read(target.path().join(OLD)).unwrap(), b"old");
+    assert!(manifest.entry(OLD).is_some(), "the record stays");
+}
+
 #[test]
 fn an_adopted_entry_or_an_unconfigured_adapter_retires_nothing() {
     // Adopted: the operator took it, so it is theirs to remove.

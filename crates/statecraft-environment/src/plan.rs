@@ -51,6 +51,9 @@ pub enum Withholding {
         /// Why, in one line.
         why: String,
     },
+    /// A file an adapter no longer declares, kept because resolving its path
+    /// would cross a symbolic link.
+    SymbolicLink,
     /// A file an adapter no longer declares, kept because a file this plan
     /// does not rewrite still imports it (spec 030 section 3.3): removing it
     /// would break the import that delivers it.
@@ -72,6 +75,7 @@ impl Withholding {
             Withholding::Drifted { .. }
             | Withholding::Adopted
             | Withholding::Modification { .. }
+            | Withholding::SymbolicLink
             | Withholding::StillImported { .. } => None,
         }
     }
@@ -90,6 +94,9 @@ impl Withholding {
             }
             Withholding::Adopted => "adopted, never rewritten".to_string(),
             Withholding::Modification { why } => format!("bridge withheld: {why}"),
+            Withholding::SymbolicLink => {
+                "reached through a symbolic link; left as it is".to_string()
+            }
             Withholding::StillImported { by } => format!(
                 "no longer declared, kept: {by} still imports it and this plan does not \
                  rewrite {by}"
