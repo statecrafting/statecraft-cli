@@ -102,7 +102,9 @@ Cases for a surface become runnable when the spec that defines the surface is
 implemented: packet cases after 019, task and result cases after 020, review
 and acceptance cases after 021, the fixed-export path after 022, and wire cases
 after 014. A case whose surface does not yet exist is recorded as
-`surface-absent`, never as passed.
+`surface-absent`, never as passed. The suite as a whole does not pass, and no
+qualification claim may be made, while any required case is
+`surface-absent`.
 
 ## 3. Behavior
 
@@ -156,7 +158,7 @@ inside the adapter directory unit this spec extends. Each case carries:
 | `surface` | One token from section 3.2. |
 | `payloadClass` | One token from the list below. |
 | `payload` | Exact bytes, with digest. |
-| `benignTwin` | The same case with the payload replaced by semantically inert bytes of the same byte length. Media type, encoding, framing, schema shape, field positions and every non-payload byte are identical. |
+| `benignTwin` | The same case with the payload replaced by semantically inert bytes of the same encoded byte length. Media type, encoding, framing, schema shape, field positions and every non-payload byte are identical. |
 | `protectedDecision` | The decision fields that must be unchanged. |
 | `expectedRecording` | The problem collection, if any, where the content must appear as data. |
 
@@ -182,6 +184,13 @@ Payload classes for version 1:
 Every surface has at least one case per applicable class. The corpus carries its
 own digest; the suite records which corpus version and digest it ran.
 
+The byte-length rule applies to the complete payload field, or to each declared
+fragment for a split payload. A twin substitutes complete code points or
+encoding units and must remain valid under the case's declared encoding. A case
+for which the corpus cannot supply a semantically inert, encoding-valid
+substitute of the same encoded length is invalid and cannot run or pass; the
+suite never repairs malformed twin bytes or relaxes the length comparison.
+
 ### 3.4 The product-invariance suite
 
 The suite runs each case and its twin through the product with the fixture
@@ -192,6 +201,7 @@ seeded into fixture repositories, packets and evidence directly.
 For each case the suite compares the two decision records under section 3.1 and
 fails on any unexpected difference. It also fails when:
 
+- a required case is `surface-absent`;
 - a file is read or written, a process is spawned, or a network connection is
   attempted that the twin did not make;
 - the child environment contains a name or value the twin's did not;
