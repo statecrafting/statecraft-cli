@@ -127,10 +127,10 @@
       "Verification"
     ],
     "specPath": "specs/020-documentation-task-and-result/spec.md",
-    "status": "draft",
+    "status": "approved",
     "summary": "Amends Statecraft's run, adapter, acceptance, and command contracts with an immutable documentation-task document and a provider-neutral structured documentation result. It separates task authority from provider output, binds every claim to an explicit lifecycle grade and supporting references, preserves omissions and contradictions, and keeps provider completion apart from independent acceptance and publication.\n",
     "title": "Documentation task and structured result contracts"
   },
-  "shardHash": "54bdcebdb18497c92bb73381d12ae21b5ccc371126f6658dd1a42120ccf44d33",
+  "shardHash": "ad9a59aa073328e7fe9675544da26e25183f58ad4cffe32bfaf22145b40b5cf2",
   "specVersion": "1.9.0"
 }
