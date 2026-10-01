@@ -116,6 +116,22 @@ fn the_profile_declared_install_answers_and_an_incompatible_path_binary_is_named
 }
 
 #[test]
+fn a_launcher_resolved_path_that_is_not_executable_is_named() {
+    let f = Fixture::new(Some("=0.23.0"));
+    let missing = f.dir.path().join("gone/spec-spine");
+    f.launcher(&missing);
+
+    let s = f.select(&[]);
+    assert!(matches!(s.outcome, Err(Unselected::Refused(_))), "{s:?}");
+    assert_eq!(s.passed_over.len(), 1, "{s:?}");
+    assert!(
+        s.passed_over[0].contains(&missing.display().to_string()),
+        "{s:?}"
+    );
+    assert!(s.passed_over[0].contains("not executable"), "{s:?}");
+}
+
+#[test]
 fn an_incompatible_override_is_refused_and_nothing_falls_back() {
     let f = Fixture::new(Some("=0.23.0"));
     f.engine(&f.on_path(), "0.23.0");

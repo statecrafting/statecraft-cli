@@ -332,14 +332,17 @@ fn conventions(root: &Path, pin: &Pin, path_var: Option<&str>) -> Selection {
     if let Some((at, answer)) = launcher {
         match answer {
             LauncherAnswer::Resolved { path, digest } => {
-                candidates.push((path.clone(), Rule::Launcher));
-                if let Some(said) = digest
-                    && executable(&path)
+                if !executable(&path) {
+                    passed_over.push(format!(
+                        "passed over {} (launcher at {}): the resolved path is not executable",
+                        path.display(),
+                        at.display()
+                    ));
+                } else if let Some(said) = digest
                     && digest_of(&path).as_deref() != Some(said.as_str())
                 {
                     // The file changed between the launcher's answer and this
                     // read: neither identity can be recorded as the other.
-                    candidates.pop();
                     passed_over.push(format!(
                         "passed over {} (launcher at {}): the launcher reported {said}, and the \
                          file now reads {}",
@@ -347,6 +350,8 @@ fn conventions(root: &Path, pin: &Pin, path_var: Option<&str>) -> Selection {
                         at.display(),
                         digest_of(&path).unwrap_or_else(|| "unreadable".to_string())
                     ));
+                } else {
+                    candidates.push((path, Rule::Launcher));
                 }
             }
             LauncherAnswer::Unresolved(why) => passed_over.push(format!(
