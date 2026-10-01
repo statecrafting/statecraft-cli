@@ -1,0 +1,179 @@
+{
+  "record": {
+    "amends": [
+      "003-work-and-run-semantics",
+      "005-acceptance-and-evidence",
+      "006-command-surface"
+    ],
+    "created": "2026-09-26",
+    "dependsOn": [
+      "003-work-and-run-semantics",
+      "005-acceptance-and-evidence",
+      "006-command-surface"
+    ],
+    "extends": [
+      {
+        "nature": "additive",
+        "spec": "003-work-and-run-semantics",
+        "unit": {
+          "kind": "directory",
+          "path": "crates/statecraft-run/"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "005-acceptance-and-evidence",
+        "unit": {
+          "kind": "directory",
+          "path": "crates/statecraft-envelope/"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "005-acceptance-and-evidence",
+        "unit": {
+          "kind": "directory",
+          "path": "crates/statecraft-acceptance/"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "006-command-surface",
+        "unit": {
+          "kind": "directory",
+          "path": "crates/statecraft-cli/"
+        }
+      }
+    ],
+    "id": "014-wire-evidence-admission",
+    "implementation": "pending",
+    "interfaceReferences": [
+      {
+        "corpus": "wire-witness",
+        "digest": "sha256:86ba7b2ee74b02726fbc8b48e7f44f8f7ceb7492365196c7622c854afff54642",
+        "obtained": "2026-09-30",
+        "rationale": "Bind metadata-only classification, mandatory redaction, and capture-manifest custody to the producer sections that define them.",
+        "sections": [
+          {
+            "anchor": "3-1-retention-modes",
+            "digest": "sha256:e786af7a30c269f4eee8dfc296ba8306ad9fac24bc5a44ce778a0287ff46f68b"
+          },
+          {
+            "anchor": "3-2-redaction-before-custody",
+            "digest": "sha256:3a4913bff457d1cb1333e249ca7badbc24c855900e81d86225cab5f3edcda892"
+          },
+          {
+            "anchor": "3-3-durable-custody",
+            "digest": "sha256:c37e5251fb4ba7043e25e37aa79665c7b726eaa08245282d339358448f0407f2"
+          }
+        ],
+        "spec": "003-redaction-custody-and-retention"
+      },
+      {
+        "corpus": "wire-witness",
+        "digest": "sha256:a8195055f0efc508abf86c7fbf86f577cce5556d12d8f3dfe67fd486a988f65d",
+        "obtained": "2026-09-26",
+        "rationale": "Admit the producer's exact attempt binding, closure, and evidence boundary rather than reconstruct its protocol in Statecraft.",
+        "sections": [
+          {
+            "anchor": "3-1-attemptbinding",
+            "digest": "sha256:68aafeb66bf494eda066bff13eb506fce5f9a8b3777505a74d98ec09fa8e11ca"
+          },
+          {
+            "anchor": "3-2-versioned-stdio",
+            "digest": "sha256:d64434f79125e34a81f99f23670275a9d7946a02df05d34b8deee56e10fca8ec"
+          },
+          {
+            "anchor": "3-3-bracketed-lifetime",
+            "digest": "sha256:b40040b08f584f275ea4f52b4281378c23fd365c783e888fb957acf81cd9c5f1"
+          },
+          {
+            "anchor": "3-4-evidence-envelope-boundary",
+            "digest": "sha256:f9fc1f6171b7fd157397a32b9ff1e711da66c7e6edce56401738e85c9794ab20"
+          }
+        ],
+        "spec": "005-binding-and-sidecar-protocol"
+      }
+    ],
+    "obligations": [
+      {
+        "anchor": "3-2-exact-subject-and-producer-binding",
+        "id": "I-1",
+        "kind": "invariant",
+        "text": "A wire-exchange artifact is judged only for the exact run id, attempt, and sidecar effect id it repeats unchanged."
+      },
+      {
+        "anchor": "3-8-no-testimony-becomes-authority",
+        "id": "I-2",
+        "kind": "invariant",
+        "text": "Transport testimony, schema validity, policy judgment, independent acceptance, provider qualification, and correctness remain separate facts."
+      },
+      {
+        "anchor": "3-6-deterministic-admission",
+        "id": "R-1",
+        "kind": "requirement",
+        "text": "Admission produces one deterministic admit or refuse outcome with one stable reason code and the evidence dimensions that led to it."
+      },
+      {
+        "anchor": "3-4-custody-retention-and-redaction",
+        "id": "R-2",
+        "kind": "requirement",
+        "text": "Metadata-only retention is the default, and no retained field contains a secret value or raw credential-bearing traffic."
+      },
+      {
+        "anchor": "verification",
+        "id": "V-1",
+        "inputs": [
+          "crates/statecraft-envelope/tests/wire_exchange_admission.rs",
+          "crates/statecraft-run/tests/wire_evidence_projection.rs",
+          "crates/statecraft-acceptance/tests/wire_evidence_policy.rs",
+          "crates/statecraft-cli/tests/wire_evidence_show.rs"
+        ],
+        "kind": "verification",
+        "text": "Portable fixtures prove admission, refusal, historical compatibility, and the additive run show projection without live provider activity."
+      }
+    ],
+    "sectionDigests": {
+      "014-admission-of-wire-exchange-evidence": "d79c968b78b42b7ad5a8711d119b414f029463ba361c40a35ed498add0add3c8",
+      "1-purpose": "df2f3d1dfc4957fb3d92a3697a104c0757d0edcac062fb01b30f509cc7bb3669",
+      "2-territory-and-exact-inputs": "6a07f1328106300826e8c1cb7167f7cc47b3c38b78e47cab2022491d97626a59",
+      "3-1-artifact-identity-and-bounded-input": "3f54e4cd3c01ff223836373106979c83188f9e19da3dfef5bc1a80ae23cf4666",
+      "3-2-exact-subject-and-producer-binding": "bd645b2bacb164f81c17de59e52c57cfe7eac8593128e8ee3fdfa46e9717a433",
+      "3-3-required-wire-facts": "dbc961db92a2e74525d877e9bb2cf585af1585423c2f41c43f33714e010ff479",
+      "3-4-custody-retention-and-redaction": "c3c14d4bc123a0a701b95beafb5cd2abfebacce0f555504ff7e289a7382b0784",
+      "3-5-policy-requirement-behavior": "2905c31778ddf5fb020f6d69503b718ad6668a0bda6680d8ab7cda93eb50526c",
+      "3-6-deterministic-admission": "79c90a08817a820aac1c8d5f88b04940e3970120d8b5b15e2c470dcf72d68d01",
+      "3-7-additive-run-show-projection": "8cba040fd6fee91245e32184b375f928568738d9f02a03ac6c3199f3c49ebc05",
+      "3-8-no-testimony-becomes-authority": "aa2d57e51c6a0673a0bd9ff7f61d6d91d4a5755b93ee158628a852fa82efa8df",
+      "3-9-compatibility-and-migration": "2fd56afa3095291f6d5035325ee93b00c77f4a66493c58dff1fbf1dbaab21476",
+      "3-behavior": "dba9d0e8a8ca351a048c39dd3579b7363851912fe3e3757c0342910b19564e13",
+      "4-observable-acceptance-and-negative-cases": "678ddddb0971632f13e908845c845db08dc8807ca45b145d15895f7bad07af66",
+      "5-out-of-scope": "7e9a4b73a404ab898a07638426eab4b0a311da3457d94b188d8a1075f471509d",
+      "verification": "c237415ba5028fe2ca65bb39f0d012965f2067b6f606a9fa0010751143d785b4"
+    },
+    "sectionHeadings": [
+      "014: Admission of wire-exchange evidence",
+      "1. Purpose",
+      "2. Territory and exact inputs",
+      "3. Behavior",
+      "3.1 Artifact identity and bounded input",
+      "3.2 Exact subject and producer binding",
+      "3.3 Required wire facts",
+      "3.4 Custody, retention, and redaction",
+      "3.5 Policy requirement behavior",
+      "3.6 Deterministic admission",
+      "3.7 Additive `run show` projection",
+      "3.8 No testimony becomes authority",
+      "3.9 Compatibility and migration",
+      "4. Observable acceptance and negative cases",
+      "5. Out of scope",
+      "Verification"
+    ],
+    "specPath": "specs/014-wire-evidence-admission/spec.md",
+    "status": "draft",
+    "summary": "Amends the run record, evidence envelope, and command projection so an exact statecraft/wire-exchange/v1 artifact can be bound to one run attempt and sidecar effect, judged deterministically under explicit policy, and shown without retaining secret values or confusing producer testimony with independent acceptance.\n",
+    "title": "Admission of wire-exchange evidence"
+  },
+  "shardHash": "4d1bb0447b9af56a39d2621b938339c2a1a8e431ed396932cdfe3c9cdae474cb",
+  "specVersion": "1.9.0"
+}
