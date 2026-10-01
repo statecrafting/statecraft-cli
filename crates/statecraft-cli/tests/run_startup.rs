@@ -1706,13 +1706,21 @@ fn reconciliation_reads_an_attempt_recorded_inside_the_target() {
 /// The supervisor sets `STATECRAFT_SPEC_SPINE` in the constructed environment
 /// from its own selection, and a value in the operator's environment, under
 /// either name, neither reaches the session nor changes what is selected.
+///
+/// Spec 029: outside a session the operator's value is the override the verb's
+/// own reads honor, so the inherited binary is a working engine and records
+/// only calls made from inside the managed session.
 #[test]
 fn a_managed_run_replaces_an_inherited_spec_spine_selection_with_the_supervisors() {
     let f = Fixture::new();
     let inherited = f.dir.path().join("inherited-spec-spine");
     executable(
         &inherited,
-        "#!/bin/sh\necho inherited >> \"$0.calls\"\nexit 3\n",
+        &format!(
+            "#!/bin/sh\nif [ -n \"$STATECRAFT_RUN_ID\" ]; then echo inherited >> \"$0.calls\"; fi\n\
+             exec {} \"$@\"\n",
+            f.bin().join("spec-spine").display()
+        ),
     );
     let inherited_s = inherited.display().to_string();
     let out = f.cli_with(
@@ -1739,6 +1747,6 @@ fn a_managed_run_replaces_an_inherited_spec_spine_selection_with_the_supervisors
     );
     assert!(
         !f.dir.path().join("inherited-spec-spine.calls").exists(),
-        "the operator's binary was invoked"
+        "the operator's binary was invoked inside the session"
     );
 }

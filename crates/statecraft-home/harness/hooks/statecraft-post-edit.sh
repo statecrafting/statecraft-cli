@@ -16,9 +16,10 @@ root=$(git -C "$(dirname "$fp")" rev-parse --show-toplevel 2>/dev/null) || exit 
 # set) it is the supervisor's resolved path and the only candidate. Outside
 # one, a non-empty value is the operator's override and the only candidate,
 # and a broken or incompatible one refuses rather than falling back. The
-# retired SPEC_SPINE_BIN is reported as ignored and never selects. Otherwise
-# the repository's own
-# target/release/spec-spine, then PATH, and the first one compatible with the
+# retired SPEC_SPINE_BIN is reported as ignored and never selects. Otherwise, in
+# spec 029's order: the engine spec-spine's launcher resolves, the
+# repository-local .tooling/bin/spec-spine, the repository's own
+# target/release/spec-spine, then PATH; the first one compatible with the
 # repository's pin ([meta] required_version) judges; each one passed over is
 # named. An unpinned repository takes the first candidate and says it is
 # unpinned. Returns 0 with sc set, 1 with sc_why set (not performed), or 2
@@ -86,9 +87,39 @@ spec_spine_resolve() {
     esac
     return 1
   fi
-  found=''; n=0
-  for c in "$1/target/release/spec-spine" "$(command -v spec-spine 2>/dev/null)"; do
-    n=$((n+1)); if [ "$n" = 1 ]; then rule='repository build'; else rule=PATH; fi
+  found=''; sc_launcher=''; sc_lpath=''; sc_path=''
+  # Spec 029 section 3.2: the first launcher on PATH is asked for its
+  # resolution (frozen: it downloads nothing) and is never itself the judge;
+  # the PATH candidate is the first spec-spine on PATH that is not a launcher.
+  sc_ifs=$IFS; IFS=:
+  for d in $PATH; do
+    IFS=$sc_ifs
+    c="$d/spec-spine"
+    if [ -n "$d" ] && [ -f "$c" ] && [ -x "$c" ]; then
+      la=$(cd "$1" && SPEC_SPINE_FROZEN=1 "$c" launcher resolve --json 2>/dev/null)
+      if printf '%s' "$la" | grep -q '"verb"[[:space:]]*:[[:space:]]*"launcher'; then
+        if [ -z "$sc_launcher" ]; then
+          sc_launcher=$c
+          if printf '%s' "$la" | grep -q '"outcome"[[:space:]]*:[[:space:]]*"ok"'; then
+            sc_lpath=$(printf '%s\n' "$la" | sed -n 's/.*"path"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' | head -1)
+          fi
+          case "$sc_lpath" in
+            /*) ;;
+            *) sc_lpath=''; found=1
+               sc_passed="${sc_passed}passed over the launcher at $c: it resolved no engine
+" ;;
+          esac
+        fi
+      elif [ -z "$sc_path" ]; then
+        sc_path=$c
+      fi
+    fi
+    IFS=:
+  done
+  IFS=$sc_ifs
+  for pair in "launcher|$sc_lpath" "repository-local install|$1/.tooling/bin/spec-spine" \
+              "repository build|$1/target/release/spec-spine" "PATH|$sc_path"; do
+    rule=${pair%%|*}; c=${pair#*|}
     { [ -n "$c" ] && [ -f "$c" ] && [ -x "$c" ]; } || continue
     found=1
     v=$(spec_spine_version "$c")

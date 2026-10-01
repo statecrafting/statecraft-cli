@@ -78,6 +78,12 @@ pub trait Corpus {
         None
     }
 
+    /// The resolution record that selected [`Corpus::program`] (spec 029
+    /// section 3.3), when a selection did.
+    fn judge(&self) -> Option<statecraft_environment::judge::JudgeRecord> {
+        None
+    }
+
     /// Whether the tool is there and carries `check`, asked before anything is
     /// run (spec 002 section 3.23, contract 5). `Err` carries the answer that
     /// says why not.
@@ -123,22 +129,19 @@ pub enum Ran {
 }
 
 /// The real one: the `spec-spine` binary, asked rather than reimplemented.
+///
+/// There is no default: spec 029 section 3.1 requires the executable one
+/// resolution selected (`spec_spine::corpus_for`), so the caller names it.
 #[derive(Debug, Clone)]
 pub struct SpecSpineCommand {
-    /// The binary to run.
+    /// The binary to run: a resolved path, never a bare name.
     pub program: String,
     /// The rule that selected it (spec 002 section 5, 2026-09-25), when a
     /// selection did; `None` for a program named directly.
     pub found_by: Option<String>,
-}
-
-impl Default for SpecSpineCommand {
-    fn default() -> Self {
-        Self {
-            program: "spec-spine".to_string(),
-            found_by: None,
-        }
-    }
+    /// The whole resolution record (spec 029 section 3.3), when a selection
+    /// made it; `None` for a program named directly.
+    pub judge: Option<statecraft_environment::judge::JudgeRecord>,
 }
 
 impl SpecSpineCommand {
@@ -223,6 +226,9 @@ impl Corpus for SpecSpineCommand {
     }
     fn found_by(&self) -> Option<String> {
         self.found_by.clone()
+    }
+    fn judge(&self) -> Option<statecraft_environment::judge::JudgeRecord> {
+        self.judge.clone()
     }
     fn version(&self) -> Option<String> {
         let output = std::process::Command::new(&self.program)
@@ -518,6 +524,11 @@ pub struct Report {
     /// a pin (spec 002 section 5, 2026-09-24, provenance item 4). The pin the
     /// project declares is the declaration's `pins.spec_spine`.
     pub observed_spec_spine: ObservedExecutable,
+    /// The resolution that selected the executable (spec 029 section 3.3):
+    /// its program, rule, version, digest and every candidate passed over.
+    /// Absent when a stated double answered, which no resolution selected.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub judge: Option<statecraft_environment::judge::JudgeRecord>,
     /// The selected setup profile's plan, and its six results (spec 002
     /// section 5, 2026-09-24, the setup-profile entry).
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -1415,6 +1426,7 @@ fn run(ctx: &Context<'_>, mode: Mode) -> Report {
         delivery: Vec::new(),
         qualification: None,
         observed_spec_spine: ObservedExecutable::of(ctx.corpus),
+        judge: ctx.corpus.judge(),
         setup: None,
         outcome: Outcome::Partial,
     };

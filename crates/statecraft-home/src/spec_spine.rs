@@ -14,13 +14,23 @@
 //! 2. **Outside one**, a non-empty value is the operator's override: the only
 //!    candidate, put to the pin, and with no fallback when it names no
 //!    executable or one the repository does not admit.
-//! 3. **Otherwise** the convention candidates, the repository's own
-//!    `target/release/spec-spine` and then `PATH`; the first the pin admits is
-//!    selected, and each one passed over is named. An unpinned repository
-//!    takes the first candidate.
+//! 3. **Otherwise** the convention candidates, as spec 029 section 3.2 orders
+//!    them: the engine spec-spine's own launcher resolves for the repository
+//!    (asked with `launcher resolve --json`, never trusted to run it), the
+//!    repository-local install the setup profile declares
+//!    ([`crate::setup::ENGINE`]), the repository's own
+//!    `target/release/spec-spine`, and then the first `spec-spine` on `PATH`
+//!    that is not the launcher. The first the pin admits is selected, and
+//!    each one passed over is named. An unpinned repository takes the first
+//!    candidate.
 //! 4. **The retired name, [`RETIRED`], is reported and never read**: when it is
 //!    set and [`ENV`] is not, a notice says it was ignored and names the new
 //!    one.
+//!
+//! Resolution never acquires (spec 029 section 3.5): it reads the filesystem
+//! and runs `--version` and the launcher's resolution query, nothing else.
+//! Every selected binary carries the SHA-256 of its bytes, so what is reported
+//! is the file that runs.
 //!
 //! The supervisor's own selection is [`for_supervisor`]: rule 3 alone. It
 //! reads neither variable from the operator's environment, so an operator's
@@ -28,6 +38,7 @@
 //! result in the constructed environment over any value already there.
 
 use crate::flow::{Corpus, SpecSpineCommand};
+use statecraft_environment::judge::JudgeRecord;
 use statecraft_environment::probe::{CheckAnswer, CommandProbe, Unavailability, names_pin_refusal};
 use statecraft_environment::qualify::{CorpusState, TargetProbe};
 use std::path::{Path, PathBuf};
@@ -45,6 +56,9 @@ pub const MANAGED: &str = crate::launch::ENV_RUN;
 /// The executable's file name.
 pub const PROGRAM: &str = "spec-spine";
 
+/// The `tool` spec-spine's launcher names in its envelope.
+pub const LAUNCHER: &str = "spec-spine-launcher";
+
 /// The guard a managed launch is refused under when candidates exist and the
 /// project admits none of them.
 pub const SELECTION_GUARD: &str = "spec-spine-selection";
@@ -56,9 +70,13 @@ pub enum Rule {
     Supervisor,
     /// The operator's override, outside one.
     Override,
+    /// The engine spec-spine's launcher resolved for the repository.
+    Launcher,
+    /// The repository-local install the setup profile declares ([`crate::setup::ENGINE`]).
+    RepositoryLocal,
     /// The repository's own `target/release/spec-spine`.
     RepositoryBuild,
-    /// The first on `PATH`.
+    /// The first on `PATH` that is not the launcher.
     Path,
 }
 
@@ -68,6 +86,8 @@ impl Rule {
         match self {
             Rule::Supervisor => "supervisor",
             Rule::Override => "override",
+            Rule::Launcher => "launcher",
+            Rule::RepositoryLocal => "repository-local",
             Rule::RepositoryBuild => "repository-build",
             Rule::Path => "path",
         }
@@ -83,6 +103,31 @@ pub struct Selected {
     pub rule: Rule,
     /// What it reported to `--version`, when it answered.
     pub version: Option<String>,
+    /// `sha256:<hex>` of its bytes, read when it was selected; `None` only
+    /// when the file could not be read.
+    pub digest: Option<String>,
+}
+
+impl Selected {
+    fn new(program: &Path, rule: Rule, version: Option<String>) -> Self {
+        Self {
+            digest: digest_of(program),
+            program: absolute(program),
+            rule,
+            version,
+        }
+    }
+
+    /// One line naming the selection: program, rule, version and digest.
+    pub fn describe(&self) -> String {
+        format!(
+            "{} (rule {}, reports {}, {})",
+            self.program.display(),
+            self.rule.word(),
+            self.version.as_deref().unwrap_or("no version"),
+            self.digest.as_deref().unwrap_or("digest unreadable")
+        )
+    }
 }
 
 /// Why nothing was selected.
@@ -104,6 +149,10 @@ pub struct Selection {
     pub outcome: Result<Selected, Unselected>,
     /// Every convention candidate passed over, one sentence each.
     pub passed_over: Vec<String>,
+    /// The candidates put to the pin and passed over, in order, each with
+    /// what it reported: what `doctor` names as observed when nothing was
+    /// selected, taken from this resolution and never from a separate probe.
+    pub considered: Vec<Selected>,
     /// Notices that change nothing, such as the retired name being ignored.
     pub notices: Vec<String>,
 }
@@ -116,6 +165,42 @@ impl Selection {
             .chain(self.passed_over.iter())
             .cloned()
             .collect()
+    }
+
+    /// What every report about a judged operation names (spec 029 section
+    /// 3.3), or `None` when nothing was selected and so nothing judged.
+    pub fn record(&self) -> Option<JudgeRecord> {
+        self.outcome.as_ref().ok().map(|selected| JudgeRecord {
+            program: selected.program.display().to_string(),
+            rule: selected.rule.word().to_string(),
+            version: selected.version.clone(),
+            digest: selected.digest.clone(),
+            passed_over: self.passed_over.clone(),
+        })
+    }
+
+    /// The selected binary, or the sentence a refusal carries: the pin, every
+    /// candidate passed over and the preparation command (spec 029 section
+    /// 3.5).
+    pub fn judge(&self) -> Result<&Selected, String> {
+        match &self.outcome {
+            Ok(selected) => Ok(selected),
+            Err(why) => Err(NotSelected::from(why, self).answer().describe()),
+        }
+    }
+}
+
+/// The selection for an operation that names no repository: nothing is
+/// resolved, and every spec-spine question it would ask is answered as
+/// unavailable, naming why.
+pub fn without_repository() -> Selection {
+    Selection {
+        outcome: Err(Unselected::Refused(
+            "this operation names no repository, so no spec-spine is resolved for it".to_string(),
+        )),
+        passed_over: Vec::new(),
+        considered: Vec::new(),
+        notices: Vec::new(),
     }
 }
 
@@ -139,11 +224,7 @@ pub fn select(root: &Path, var: &dyn Fn(&str) -> Option<String>) -> Selection {
         let path = PathBuf::from(&value);
         let outcome = if set(MANAGED).is_some() {
             if executable(&path) {
-                Ok(Selected {
-                    version: version_of(&path),
-                    program: absolute(&path),
-                    rule: Rule::Supervisor,
-                })
+                Ok(Selected::new(&path, Rule::Supervisor, version_of(&path)))
             } else {
                 Err(Unselected::Refused(format!(
                     "the supervisor's binary {ENV}={value} is not an executable, and no other \
@@ -156,10 +237,12 @@ pub fn select(root: &Path, var: &dyn Fn(&str) -> Option<String>) -> Selection {
         return Selection {
             outcome,
             passed_over: Vec::new(),
+            considered: Vec::new(),
             notices,
         };
     }
     let mut selection = conventions(root, &pin, set("PATH").as_deref());
+    notices.append(&mut selection.notices);
     selection.notices = notices;
     selection
 }
@@ -211,11 +294,7 @@ fn override_outcome(root: &Path, pin: &Pin, value: &str) -> Result<Selected, Uns
     let version = version_of(&path);
     let shown = version.as_deref().unwrap_or("no version");
     match pin.admits(&path, root, version.as_deref()) {
-        Admits::Yes => Ok(Selected {
-            program: absolute(&path),
-            rule: Rule::Override,
-            version,
-        }),
+        Admits::Yes => Ok(Selected::new(&path, Rule::Override, version)),
         Admits::No => Err(Unselected::Refused(format!(
             "the override {ENV}={value} reports {shown}, which does not satisfy {}. {remedy}",
             pin.words()
@@ -230,39 +309,104 @@ fn override_outcome(root: &Path, pin: &Pin, value: &str) -> Result<Selected, Uns
 
 fn conventions(root: &Path, pin: &Pin, path_var: Option<&str>) -> Selection {
     let mut passed_over = Vec::new();
-    let candidates = [
-        (
-            Some(root.join("target/release").join(PROGRAM)),
-            Rule::RepositoryBuild,
-        ),
-        (on_path(path_var), Rule::Path),
-    ];
+    let on_path = path_entries(path_var);
+    // The first launcher on PATH is asked, and every launcher on PATH is left
+    // out of the PATH candidate: a launcher is never itself the judge.
+    let mut launcher = None;
+    let mut path_engine = None;
+    for candidate in on_path {
+        match ask_launcher(&candidate, root) {
+            Some(answer) => {
+                if launcher.is_none() {
+                    launcher = Some((candidate, answer));
+                }
+            }
+            None => {
+                if path_engine.is_none() {
+                    path_engine = Some(candidate);
+                }
+            }
+        }
+    }
+    let mut candidates = Vec::new();
+    if let Some((at, answer)) = launcher {
+        match answer {
+            LauncherAnswer::Resolved { path, digest } => {
+                if !executable(&path) {
+                    passed_over.push(format!(
+                        "passed over {} (launcher at {}): the resolved path is not executable",
+                        path.display(),
+                        at.display()
+                    ));
+                } else if let Some(said) = digest
+                    && digest_of(&path).as_deref() != Some(said.as_str())
+                {
+                    // The file changed between the launcher's answer and this
+                    // read: neither identity can be recorded as the other.
+                    passed_over.push(format!(
+                        "passed over {} (launcher at {}): the launcher reported {said}, and the \
+                         file now reads {}",
+                        path.display(),
+                        at.display(),
+                        digest_of(&path).unwrap_or_else(|| "unreadable".to_string())
+                    ));
+                } else {
+                    candidates.push((path, Rule::Launcher));
+                }
+            }
+            LauncherAnswer::Unresolved(why) => passed_over.push(format!(
+                "passed over the launcher at {}: it resolved no engine ({why})",
+                at.display()
+            )),
+        }
+    }
+    candidates.push((root.join(crate::setup::ENGINE), Rule::RepositoryLocal));
+    candidates.push((
+        root.join("target/release").join(PROGRAM),
+        Rule::RepositoryBuild,
+    ));
+    if let Some(engine) = path_engine {
+        candidates.push((engine, Rule::Path));
+    }
     let mut found = false;
+    let mut considered = Vec::new();
     for (candidate, rule) in candidates {
-        let Some(candidate) = candidate.filter(|c| executable(c)) else {
+        if !executable(&candidate) {
             continue;
-        };
+        }
         found = true;
         let version = version_of(&candidate);
         let shown = version.clone().unwrap_or_else(|| "no version".to_string());
         let what = rule_phrase(rule);
         match pin.admits(&candidate, root, version.as_deref()) {
             Admits::Yes => {
+                // Section 3.2: an unpinned repository takes the first
+                // candidate that exists, and the selection says so.
+                let notices = if pin.requirement.is_none() {
+                    vec![format!(
+                        "{} is unpinned: {} ({what}) was taken as the first candidate that \
+                         exists, with nothing to compare it to",
+                        pin.source.display(),
+                        candidate.display()
+                    )]
+                } else {
+                    Vec::new()
+                };
                 return Selection {
-                    outcome: Ok(Selected {
-                        program: absolute(&candidate),
-                        rule,
-                        version,
-                    }),
+                    outcome: Ok(Selected::new(&candidate, rule, version)),
                     passed_over,
-                    notices: Vec::new(),
+                    considered,
+                    notices,
                 };
             }
-            Admits::No => passed_over.push(format!(
-                "passed over {} ({what}, reports {shown}): it does not satisfy {}",
-                candidate.display(),
-                pin.words()
-            )),
+            Admits::No => {
+                passed_over.push(format!(
+                    "passed over {} ({what}, reports {shown}): it does not satisfy {}",
+                    candidate.display(),
+                    pin.words()
+                ));
+                considered.push(Selected::new(&candidate, rule, version));
+            }
             Admits::NotPerformed => {
                 return Selection {
                     outcome: Err(Unselected::Refused(format!(
@@ -272,14 +416,15 @@ fn conventions(root: &Path, pin: &Pin, path_var: Option<&str>) -> Selection {
                         pin.words()
                     ))),
                     passed_over,
+                    considered,
                     notices: Vec::new(),
                 };
             }
         }
     }
-    let outcome = if found {
+    let outcome = if found || !passed_over.is_empty() {
         Err(Unselected::Refused(format!(
-            "no candidate satisfies {}",
+            "no candidate satisfies {}. {PREPARE}",
             pin.words()
         )))
     } else {
@@ -288,12 +433,78 @@ fn conventions(root: &Path, pin: &Pin, path_var: Option<&str>) -> Selection {
     Selection {
         outcome,
         passed_over,
+        considered,
         notices: Vec::new(),
+    }
+}
+
+/// The remedy a refusal names (spec 029 section 3.5): resolution never
+/// prepares an engine itself.
+pub const PREPARE: &str = "Prepare the pinned engine with `make tools` (the setup profile's \
+                           repository-local install), or with `spec-spine launcher install` where spec-spine's launcher is \
+                           installed; nothing was downloaded";
+
+/// What spec-spine's launcher answered to `launcher resolve --json`.
+#[derive(Debug, Clone, PartialEq, Eq)]
+enum LauncherAnswer {
+    /// The engine it resolved, and the digest it read.
+    Resolved {
+        path: PathBuf,
+        digest: Option<String>,
+    },
+    /// It is the launcher, and resolved nothing: its summary.
+    Unresolved(String),
+}
+
+/// Ask `candidate` for the launcher's resolution in `root`. `None` means the
+/// candidate is not a launcher: it did not answer a launcher envelope (an
+/// engine answers the unknown verb with a usage error). The query writes and
+/// downloads nothing (spec-spine spec 188 section 3.7).
+fn ask_launcher(candidate: &Path, root: &Path) -> Option<LauncherAnswer> {
+    let output = Command::new(candidate)
+        .args(["launcher", "resolve", "--json"])
+        .current_dir(root)
+        .env_remove("SPEC_SPINE_ACQUIRE")
+        .env("SPEC_SPINE_FROZEN", "1")
+        .output()
+        .ok()?;
+    read_launcher(&output.stdout)
+}
+
+/// Read a launcher envelope. Pure, so the shape is testable without a
+/// process.
+fn read_launcher(stdout: &[u8]) -> Option<LauncherAnswer> {
+    let value: serde_json::Value = serde_json::from_slice(stdout).ok()?;
+    // The launcher names itself `spec-spine-launcher` and its verb
+    // `launcher.resolve` (spec-spine spec 188, D-12); `spec-spine` is accepted
+    // too, since the launcher is installed under that name.
+    let tool = value.get("tool")?.as_str()?;
+    if !matches!(tool, PROGRAM | LAUNCHER) || !value.get("verb")?.as_str()?.starts_with("launcher")
+    {
+        return None;
+    }
+    let text = |v: Option<&serde_json::Value>| v.and_then(|v| v.as_str()).map(str::to_string);
+    let report = value.get("report");
+    let path = text(report.and_then(|r| r.get("path")));
+    match (text(value.get("outcome")).as_deref(), path) {
+        (Some("ok"), Some(path)) if Path::new(&path).is_absolute() => {
+            Some(LauncherAnswer::Resolved {
+                path: PathBuf::from(path),
+                digest: text(report.and_then(|r| r.get("digest"))),
+            })
+        }
+        _ => Some(LauncherAnswer::Unresolved(
+            text(value.get("summary"))
+                .map(|s| s.lines().next().unwrap_or_default().to_string())
+                .unwrap_or_else(|| "no summary".to_string()),
+        )),
     }
 }
 
 fn rule_phrase(rule: Rule) -> &'static str {
     match rule {
+        Rule::Launcher => "launcher",
+        Rule::RepositoryLocal => "repository-local install",
         Rule::RepositoryBuild => "repository build",
         Rule::Path => "PATH",
         Rule::Supervisor => "supervisor",
@@ -301,11 +512,32 @@ fn rule_phrase(rule: Rule) -> &'static str {
     }
 }
 
-fn on_path(path_var: Option<&str>) -> Option<PathBuf> {
-    std::env::split_paths(path_var?)
+/// Every executable `spec-spine` on `PATH`, in order, each file once.
+fn path_entries(path_var: Option<&str>) -> Vec<PathBuf> {
+    let Some(path_var) = path_var else {
+        return Vec::new();
+    };
+    let mut seen = Vec::new();
+    for candidate in std::env::split_paths(path_var)
         .filter(|dir| !dir.as_os_str().is_empty())
         .map(|dir| dir.join(PROGRAM))
-        .find(|candidate| executable(candidate))
+        .filter(|candidate| executable(candidate))
+    {
+        let key = std::fs::canonicalize(&candidate).unwrap_or_else(|_| candidate.clone());
+        if !seen.iter().any(|(k, _): &(PathBuf, PathBuf)| *k == key) {
+            seen.push((key, candidate));
+        }
+    }
+    seen.into_iter().map(|(_, c)| c).collect()
+}
+
+/// `sha256:<hex>` of a file's bytes.
+fn digest_of(path: &Path) -> Option<String> {
+    let bytes = std::fs::read(path).ok()?;
+    Some(format!(
+        "sha256:{}",
+        statecraft_environment::digest::digest_bytes(&bytes)
+    ))
 }
 
 fn executable(path: &Path) -> bool {
@@ -472,6 +704,7 @@ pub fn corpus_for(selection: &Selection) -> Box<dyn Corpus> {
         Ok(selected) => Box::new(SpecSpineCommand {
             program: selected.program.display().to_string(),
             found_by: Some(selected.rule.word().to_string()),
+            judge: selection.record(),
         }),
         Err(why) => Box::new(NotSelected::from(why, selection)),
     }
@@ -483,14 +716,13 @@ pub fn corpus_for(selection: &Selection) -> Box<dyn Corpus> {
 pub fn probe_for(selection: &Selection) -> SelectedProbe {
     match &selection.outcome {
         Ok(selected) => SelectedProbe {
-            inner: CommandProbe {
-                spec_spine: selected.program.display().to_string(),
-                ..CommandProbe::default()
-            },
+            inner: CommandProbe::new(selected.program.display().to_string()),
             refused: None,
         },
+        // The inner probe is asked only about git: the corpus question is
+        // answered from the refusal and never reaches a program.
         Err(why) => SelectedProbe {
-            inner: CommandProbe::default(),
+            inner: CommandProbe::new(String::new()),
             refused: Some(NotSelected::from(why, selection).answer()),
         },
     }
@@ -538,9 +770,11 @@ impl NotSelected {
             Unselected::Absent => {
                 // The notices come too: an operator who set the retired name
                 // and has no binary learns which name to set instead.
-                let mut detail =
-                    "no spec-spine was found in the repository's target/release or on PATH"
-                        .to_string();
+                let mut detail = format!(
+                    "no spec-spine was found through the launcher, at the repository-local \
+                     {} or target/release, or on PATH. {PREPARE}",
+                    crate::setup::ENGINE
+                );
                 for remark in selection.remarks() {
                     detail.push_str("; ");
                     detail.push_str(&remark);
@@ -785,6 +1019,111 @@ mod tests {
         assert_eq!(s.outcome, Err(Unselected::Absent));
     }
 
+    // Spec 029 section 3.2: the repository-local install answers before the
+    // repository build and PATH, and a selection carries its digest.
+    #[test]
+    fn the_repository_local_install_comes_before_the_build_and_path() {
+        let dir = tempfile::tempdir().unwrap();
+        let root = dir.path().join("repo");
+        let bin = dir.path().join("bin");
+        std::fs::create_dir_all(&root).unwrap();
+        pinned(&root, Some("=0.23.0"));
+        stub(&root.join(crate::setup::ENGINE), "0.23.0");
+        stub(&root.join("target/release").join(PROGRAM), "0.23.0");
+        stub(&bin.join(PROGRAM), "0.23.0");
+        let bin_s = bin.display().to_string();
+        let s = select(&root, &env(&[("PATH", &bin_s)]));
+        let selected = s.outcome.unwrap();
+        assert_eq!(selected.rule, Rule::RepositoryLocal);
+        let digest = selected.digest.clone().unwrap();
+        assert!(
+            digest.starts_with("sha256:") && digest.len() == 71,
+            "{digest}"
+        );
+        assert!(selected.describe().contains("rule repository-local"));
+
+        // Incompatible: passed over, named, and recorded as considered.
+        stub(&root.join(crate::setup::ENGINE), "0.22.0");
+        let s = select(&root, &env(&[("PATH", &bin_s)]));
+        assert_eq!(s.outcome.clone().unwrap().rule, Rule::RepositoryBuild);
+        assert!(s.passed_over[0].contains("repository-local install, reports 0.22.0"));
+        assert_eq!(s.considered[0].version.as_deref(), Some("0.22.0"));
+    }
+
+    #[test]
+    fn a_launcher_answer_is_read_from_its_envelope_and_anything_else_is_not_a_launcher() {
+        let ok = br#"{"exitCode":0,"outcome":"ok","report":{"digest":"sha256:ab","path":"/store/spec-spine","rule":"store"},"summary":"launcher resolve: ok","tool":"spec-spine-launcher","verb":"launcher.resolve"}"#;
+        assert_eq!(
+            read_launcher(ok),
+            Some(LauncherAnswer::Resolved {
+                path: PathBuf::from("/store/spec-spine"),
+                digest: Some("sha256:ab".into()),
+            })
+        );
+        let missing = br#"{"exitCode":1,"outcome":"finding","summary":"release 0.23.0 is not installed\nmore","tool":"spec-spine-launcher","verb":"launcher.resolve"}"#;
+        assert_eq!(
+            read_launcher(missing),
+            Some(LauncherAnswer::Unresolved(
+                "release 0.23.0 is not installed".into()
+            ))
+        );
+        // A relative path is never executed as an answer.
+        let relative = br#"{"outcome":"ok","report":{"path":"spec-spine"},"tool":"spec-spine-launcher","verb":"launcher.resolve"}"#;
+        assert!(matches!(
+            read_launcher(relative),
+            Some(LauncherAnswer::Unresolved(_))
+        ));
+        // An engine's usage error, another tool, or another verb: not a
+        // launcher.
+        assert_eq!(read_launcher(b"error: unrecognized subcommand"), None);
+        assert_eq!(
+            read_launcher(br#"{"outcome":"usage","tool":"spec-spine","verb":"check"}"#),
+            None
+        );
+        assert_eq!(
+            read_launcher(br#"{"outcome":"ok","tool":"other","verb":"launcher resolve"}"#),
+            None
+        );
+    }
+
+    #[test]
+    fn a_launcher_on_path_resolves_and_is_never_the_path_candidate() {
+        let dir = tempfile::tempdir().unwrap();
+        let root = dir.path().join("repo");
+        let bin = dir.path().join("bin");
+        std::fs::create_dir_all(&root).unwrap();
+        pinned(&root, Some("=0.23.0"));
+        let engine = dir.path().join("store/spec-spine");
+        stub(&engine, "0.23.0");
+        let envelope = format!(
+            r#"{{"exitCode":0,"outcome":"ok","report":{{"path":"{}"}},"summary":"ok","tool":"spec-spine-launcher","verb":"launcher.resolve"}}"#,
+            engine.display()
+        );
+        std::fs::create_dir_all(&bin).unwrap();
+        install(
+            &bin.join(PROGRAM),
+            &format!(
+                "#!/bin/sh\nif [ \"$1\" = launcher ]; then echo '{envelope}'; exit 0; fi\nexit 4\n"
+            ),
+        );
+        let bin_s = bin.display().to_string();
+        let s = select(&root, &env(&[("PATH", &bin_s)]));
+        let selected = s.outcome.clone().unwrap();
+        assert_eq!(selected.rule, Rule::Launcher);
+        assert_eq!(selected.program, engine);
+
+        // The launcher resolves an engine the pin does not admit: passed over,
+        // and the launcher itself is never tried as PATH.
+        stub(&engine, "0.24.0");
+        let s = select(&root, &env(&[("PATH", &bin_s)]));
+        assert!(matches!(s.outcome, Err(Unselected::Refused(_))), "{s:?}");
+        assert!(
+            s.passed_over[0].contains("(launcher, reports 0.24.0)"),
+            "{s:?}"
+        );
+        assert_eq!(s.passed_over.len(), 1, "{s:?}");
+    }
+
     #[test]
     fn the_supervisor_reads_neither_variable_and_its_value_replaces_an_inherited_one() {
         let dir = tempfile::tempdir().unwrap();
@@ -827,6 +1166,7 @@ mod tests {
                 "no candidate satisfies pin =0.23.0".into(),
             )),
             passed_over: vec!["passed over /x (PATH, reports 0.22.0)".into()],
+            considered: vec![],
             notices: vec![],
         };
         let corpus = corpus_for(&selection);

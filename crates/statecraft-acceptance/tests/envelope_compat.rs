@@ -135,6 +135,7 @@ fn a_minted_receipt_is_written_exactly_as_before() {
         adapter_version: "0.0.0".into(),
         attempt: "attempt-1".into(),
         authority_paths_touched: vec![],
+        judge: None,
     };
     let suite = SuiteResult::new(vec![Check::ran("make gate", 0, None)], None);
     let receipt = mint(&judged, &suite, &context, None).expect("the fixture's receipt mints");

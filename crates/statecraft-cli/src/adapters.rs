@@ -156,32 +156,19 @@ pub fn pins(root: &std::path::Path) -> statecraft_environment::manifest::Pins {
     }
 }
 
-/// What is true right now, for `doctor` to compare the pins against.
-pub fn observed() -> statecraft_environment::doctor::Observed {
+/// What is true right now in `root`, for `doctor` to compare the pins
+/// against.
+///
+/// The spec-spine version is the one the target's resolved judge reported
+/// (spec 029 section 3.3), never a separate `PATH` probe. `None` when nothing
+/// was selected or it did not answer, which `doctor` reports rather than
+/// filling in: a pin compared against an invented version is worse than a pin
+/// compared against nothing.
+pub fn observed(root: &Path) -> statecraft_environment::doctor::Observed {
     statecraft_environment::doctor::Observed {
         product: Some(env!("CARGO_PKG_VERSION").to_string()),
-        spec_spine: observed_spec_spine(),
+        spec_spine: crate::judge::observed_version(root),
     }
-}
-
-/// The spec-spine version now on the path, asked of spec-spine.
-///
-/// `None` when it cannot be asked, which `doctor` reports rather than filling
-/// in: a pin compared against an invented version is worse than a pin compared
-/// against nothing.
-fn observed_spec_spine() -> Option<String> {
-    let output = std::process::Command::new("spec-spine")
-        .arg("--version")
-        .output()
-        .ok()?;
-    if !output.status.success() {
-        return None;
-    }
-    // `spec-spine 0.20.0`: the version is the last whitespace-separated token.
-    String::from_utf8_lossy(&output.stdout)
-        .split_whitespace()
-        .next_back()
-        .map(str::to_string)
 }
 
 #[cfg(test)]
@@ -289,7 +276,7 @@ mod tests {
     #[test]
     fn what_is_observed_carries_this_builds_product_version() {
         assert_eq!(
-            observed().product.as_deref(),
+            observed(std::path::Path::new(".")).product.as_deref(),
             Some(env!("CARGO_PKG_VERSION"))
         );
     }
