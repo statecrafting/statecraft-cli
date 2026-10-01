@@ -2,7 +2,7 @@
 id: "031-engine-in-bin"
 title: "Setup profile revision 13: the repository-local engine lives in .bin/"
 status: approved
-implementation: pending
+implementation: in-progress
 created: "2026-09-30"
 summary: >
   The owner decided that neither spec-spine nor Statecraft uses `.tooling/bin`
