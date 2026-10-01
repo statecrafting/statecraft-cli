@@ -1,0 +1,139 @@
+{
+  "record": {
+    "amends": [
+      "003-work-and-run-semantics",
+      "004-execution-adapter"
+    ],
+    "created": "2026-09-26",
+    "dependsOn": [
+      "001-boundaries-and-authority",
+      "003-work-and-run-semantics",
+      "004-execution-adapter"
+    ],
+    "extends": [
+      {
+        "nature": "additive",
+        "spec": "003-work-and-run-semantics",
+        "unit": {
+          "kind": "directory",
+          "path": "crates/statecraft-run/"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "004-execution-adapter",
+        "unit": {
+          "kind": "directory",
+          "path": "crates/statecraft-adapter/"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "004-execution-adapter",
+        "unit": {
+          "kind": "directory",
+          "path": "crates/statecraft-adapter-claude-code/"
+        }
+      }
+    ],
+    "id": "013-supervised-wire-witness",
+    "implementation": "pending",
+    "interfaceReferences": [
+      {
+        "corpus": "wire-witness",
+        "digest": "sha256:a8195055f0efc508abf86c7fbf86f577cce5556d12d8f3dfe67fd486a988f65d",
+        "obtained": "2026-09-26",
+        "rationale": "Adopt the exact attempt-binding, stdio, and bracketed-lifetime contract rather than infer a sidecar protocol locally. The producer's code-formatted `AttemptBinding` heading canonicalizes exactly to `3-1-attemptbinding`.\n",
+        "sections": [
+          {
+            "anchor": "3-1-attemptbinding",
+            "digest": "sha256:68aafeb66bf494eda066bff13eb506fce5f9a8b3777505a74d98ec09fa8e11ca"
+          },
+          {
+            "anchor": "3-2-versioned-stdio",
+            "digest": "sha256:d64434f79125e34a81f99f23670275a9d7946a02df05d34b8deee56e10fca8ec"
+          },
+          {
+            "anchor": "3-3-bracketed-lifetime",
+            "digest": "sha256:b40040b08f584f275ea4f52b4281378c23fd365c783e888fb957acf81cd9c5f1"
+          }
+        ],
+        "spec": "005-binding-and-sidecar-protocol"
+      }
+    ],
+    "obligations": [
+      {
+        "anchor": "3-2-attempt-binding-and-effect-bracketing",
+        "id": "I-1",
+        "kind": "invariant",
+        "text": "Statecraft mints the run id, attempt, and effect id before spawn, and every sidecar record repeats all three unchanged."
+      },
+      {
+        "anchor": "3-4-hostile-traffic-stays-out-of-the-supervisor",
+        "id": "I-2",
+        "kind": "invariant",
+        "text": "Only the witness sidecar parses hostile TLS, HTTP, SSE, or WebSocket traffic; the trusted supervisor treats protocol messages and artifacts as bounded data."
+      },
+      {
+        "anchor": "3-3-one-sidecar-and-one-endpoint",
+        "id": "R-1",
+        "kind": "requirement",
+        "text": "Each attempt has at most one supervisor-owned witness sidecar and exactly one supplied per-attempt loopback endpoint when witness capture is requested."
+      },
+      {
+        "anchor": "3-7-witness-posture-and-policy",
+        "id": "R-2",
+        "kind": "requirement",
+        "text": "Every attempt records one accurate witness posture, while task or acceptance policy alone decides whether missing evidence refuses acceptance."
+      }
+    ],
+    "sectionDigests": {
+      "013-supervised-wire-witness-adoption": "f47bab71262d534559d742c68724da08acb24f7f2119d0b5b6917a37f9a8634e",
+      "1-purpose": "e760804bcd1a589b51b603e7ea7450e0eb99d94b26444b9ba5bc032f7c47dc99",
+      "2-territory": "c49da03b853bc97970e1f58889e5421423b0782ab77363f69f919b17e165e090",
+      "3-1-linked-producer-adoption": "572994e602eb4e7d0063cbc5bce2ca6ee3d0ee54b0c41b51f098a5a1e0ce8736",
+      "3-2-attempt-binding-and-effect-bracketing": "e296d99bd186ebc6b04b55bd4c5532f5b4f4a9880061ba4f9ee42db865c58977",
+      "3-3-one-sidecar-and-one-endpoint": "42208e26c2fe6aa4f559708a76042e9f338948bca94422a3a1355f9baaa7e477",
+      "3-4-hostile-traffic-stays-out-of-the-supervisor": "fee7ab4a135a9a6d825e44474307b528754a83201002d14311c79b2a1a0aa590",
+      "3-5-ephemeral-ca-custody": "4b28ec8f41fa297247f959f07191d43d316bf681086bb4f7f401e4304c8c5ff6",
+      "3-6-1-the-child": "1a326b19b597a00b8899c36d7fa1b827a0d48e6a7e02a05754f50a7ae2f5e7eb",
+      "3-6-2-the-sidecar": "15a8dbe9f79d5dc73cb55daa4dc2743d721a7486debcad4d665a614a809c3a14",
+      "3-6-3-records-and-residuals": "aaae9fdcc5c7e32a6115d4472dac1a152a0b98e18e12667f44b8f87a4836f63e",
+      "3-6-confinement-amendment": "fe8f6ff70edea55cc977c87f9cf0300da165a3f05085c0675cca59aa6ed94f33",
+      "3-7-witness-posture-and-policy": "a3b061079a1665387288a51baf42deeacfc81878614d78760b23f1385b93e7a7",
+      "3-behavior": "0ea8098c8b4fa52ef152ce1783afd067a5f298f59a7334c66d051a0196e03ce3",
+      "4-observable-negative-cases": "2965b5b5dd152a538905e0b65725b595b41ce62ee845d7d1fe66ba9b9c737b96",
+      "5-compatibility-and-adoption": "9083427a01e4adfe7ad215c3bcffe7b3a189f1f73da359ebfc0fd32600f30c99",
+      "6-out-of-scope": "3d2cc96d427dbf41f15d964e1cabc182642403cc9030b09ef91d134437316517",
+      "7-decisions-recorded-during-implementation": "b519cb7e1f7fad6bb88ee1bce37044137da637ccbd17abcfea2b2eacc7bde416",
+      "verification": "8d0a36cf3e12c58a2269d3d5bb434f8e72758fe4d7d7174cf7c1f0d5e9daec86"
+    },
+    "sectionHeadings": [
+      "013: Supervised wire-witness adoption",
+      "1. Purpose",
+      "2. Territory",
+      "3. Behavior",
+      "3.1 Linked-producer adoption",
+      "3.2 Attempt binding and effect bracketing",
+      "3.3 One sidecar and one endpoint",
+      "3.4 Hostile traffic stays out of the supervisor",
+      "3.5 Ephemeral CA custody",
+      "3.6 Confinement amendment",
+      "3.6.1 The child",
+      "3.6.2 The sidecar",
+      "3.6.3 Records and residuals",
+      "3.7 Witness posture and policy",
+      "4. Observable negative cases",
+      "5. Compatibility and adoption",
+      "6. Out of scope",
+      "7. Decisions recorded during implementation",
+      "Verification"
+    ],
+    "specPath": "specs/013-supervised-wire-witness/spec.md",
+    "status": "draft",
+    "summary": "Amends 003 and 004 so Statecraft may adopt wire-witness as an exact linked producer, bracket one sidecar as its own durable effect, supply one per-attempt loopback proxy endpoint to the child, and report confinement and witness posture without treating testimony as authority or creating a general sidecar host.\n",
+    "title": "Supervised adoption of one wire-witness sidecar per attempt"
+  },
+  "shardHash": "c4b37efd73941ce2ba56ad3de0157e37abe03a144f64bde3e0b588f153c0d70f",
+  "specVersion": "1.9.0"
+}
