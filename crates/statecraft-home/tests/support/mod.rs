@@ -79,6 +79,7 @@ pub fn corpus_tool() -> SpecSpineCommand {
     SpecSpineCommand {
         program: spec_spine_program(),
         found_by: None,
+        judge: None,
     }
 }
 

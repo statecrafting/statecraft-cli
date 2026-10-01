@@ -26,7 +26,7 @@ use statecraft_acceptance::independence::SuiteResult;
 use statecraft_acceptance::judged::{Base, Candidate, Judged, NoAcceptance, Policy};
 use statecraft_acceptance::outcome::Acceptance;
 use statecraft_acceptance::receipt::{MintContext, mint};
-use statecraft_acceptance::suite::{SpecSpineVerify, SuiteSource};
+use statecraft_acceptance::suite::SuiteSource;
 use std::path::Path;
 
 /// The authority set this repository declares, by path.
@@ -170,7 +170,12 @@ pub fn obtain_delta_report(
     candidate: &str,
     spec_spine_version: &str,
 ) -> Box<dyn DeltaReport> {
-    let output = std::process::Command::new("spec-spine")
+    let Ok(program) = crate::judge::program(target) else {
+        return Box::new(NoDeltaReport {
+            spec_spine_version: spec_spine_version.to_string(),
+        });
+    };
+    let output = std::process::Command::new(program)
         .args(["delta", "--base", base, "--head", candidate, "--json"])
         .current_dir(target)
         .output();
@@ -236,7 +241,19 @@ pub fn judge(
     // The suite runs before the authority set is judged, because an unrun suite
     // is `no acceptance` whatever the authority answer is, and running it is how
     // that becomes known.
-    let suite = SpecSpineVerify::default().run_suite(workspace, &context.spec_id);
+    // Spec 029: the target's resolved judge, the one the contract check
+    // before this already asked. A target with none never reaches here; if
+    // it did, the suite did not run.
+    let Ok(verify) = crate::judge::verify_source(target) else {
+        return (
+            Acceptance::None {
+                reason: NoAcceptance::SuiteDidNotRun { unrun_checks: 0 },
+            },
+            None,
+            absent(),
+        );
+    };
+    let suite = verify.run_suite(workspace, &context.spec_id);
     if !suite.ran() {
         return (
             Acceptance::None {
@@ -271,6 +288,8 @@ pub fn judge(
         adapter_version: context.adapter_version.clone(),
         attempt: context.attempt.clone(),
         authority_paths_touched: verdict.repository_members_touched.clone(),
+        // Spec 029 section 3.3: the receipt names the judge the suite ran.
+        judge: crate::judge::selection(target).record(),
     };
 
     match mint(&judged, &suite, &mint_context, authority_change) {

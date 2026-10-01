@@ -68,8 +68,8 @@
       }
     ],
     "specId": "021-documentation-acceptance",
-    "specStatus": "draft"
+    "specStatus": "approved"
   },
   "schemaVersion": "1.2.0",
-  "shardHash": "f263380468cdf675c27ee9865bd2309289409964e554a9d3d4809e17c3e8276b"
+  "shardHash": "9ef3fdb0f45ee3f8de134d49115c5fae4b720bc9398c3827ad67c13470130957"
 }

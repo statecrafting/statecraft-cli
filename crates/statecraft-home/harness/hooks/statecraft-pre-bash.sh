@@ -90,9 +90,10 @@ case "$cmd" in 'gh pr create'*|*'&& gh pr create'*|*'; gh pr create'*) ;; *) exi
 # set) it is the supervisor's resolved path and the only candidate. Outside
 # one, a non-empty value is the operator's override and the only candidate,
 # and a broken or incompatible one refuses rather than falling back. The
-# retired SPEC_SPINE_BIN is reported as ignored and never selects. Otherwise
-# the repository's own .bin/spec-spine, target/release/spec-spine, then PATH,
-# and the first one compatible with the
+# retired SPEC_SPINE_BIN is reported as ignored and never selects. Otherwise, in
+# spec 029's order: the engine spec-spine's launcher resolves, the
+# repository-local .bin/spec-spine, the repository's own
+# target/release/spec-spine, then PATH; the first one compatible with the
 # repository's pin ([meta] required_version) judges; each one passed over is
 # named. An unpinned repository takes the first candidate and says it is
 # unpinned. Returns 0 with sc set, 1 with sc_why set (not performed), or 2
@@ -160,9 +161,39 @@ spec_spine_resolve() {
     esac
     return 1
   fi
-  found=''; n=0
-  for c in "$1/.bin/spec-spine" "$1/target/release/spec-spine" "$(command -v spec-spine 2>/dev/null)"; do
-    n=$((n+1)); case "$n" in 1) rule='repository-local binary' ;; 2) rule='repository build' ;; *) rule=PATH ;; esac
+  found=''; sc_launcher=''; sc_lpath=''; sc_path=''
+  # Spec 029 section 3.2: the first launcher on PATH is asked for its
+  # resolution (frozen: it downloads nothing) and is never itself the judge;
+  # the PATH candidate is the first spec-spine on PATH that is not a launcher.
+  sc_ifs=$IFS; IFS=:
+  for d in $PATH; do
+    IFS=$sc_ifs
+    c="$d/spec-spine"
+    if [ -n "$d" ] && [ -f "$c" ] && [ -x "$c" ]; then
+      la=$(cd "$1" && SPEC_SPINE_FROZEN=1 "$c" launcher resolve --json 2>/dev/null)
+      if printf '%s' "$la" | grep -q '"verb"[[:space:]]*:[[:space:]]*"launcher'; then
+        if [ -z "$sc_launcher" ]; then
+          sc_launcher=$c
+          if printf '%s' "$la" | grep -q '"outcome"[[:space:]]*:[[:space:]]*"ok"'; then
+            sc_lpath=$(printf '%s\n' "$la" | sed -n 's/.*"path"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' | head -1)
+          fi
+          case "$sc_lpath" in
+            /*) ;;
+            *) sc_lpath=''; found=1
+               sc_passed="${sc_passed}passed over the launcher at $c: it resolved no engine
+" ;;
+          esac
+        fi
+      elif [ -z "$sc_path" ]; then
+        sc_path=$c
+      fi
+    fi
+    IFS=:
+  done
+  IFS=$sc_ifs
+  for pair in "launcher|$sc_lpath" "repository-local install|$1/.bin/spec-spine" \
+              "repository build|$1/target/release/spec-spine" "PATH|$sc_path"; do
+    rule=${pair%%|*}; c=${pair#*|}
     { [ -n "$c" ] && [ -f "$c" ] && [ -x "$c" ]; } || continue
     found=1
     v=$(spec_spine_version "$c")
@@ -190,6 +221,51 @@ spec_spine_judge() {
   fi
   printf '%s)' "$j"
 }
+# Spec 029 section 3.4: where the engine's `check --help` lists --json, the
+# verdict is read from the envelope's outcome and exit code, never from its
+# wording. Sets sc_class (fresh, stale, invalid, unresolved or not-read),
+# sc_reg (fresh, stale or invalid), sc_idx (fresh, stale, unresolved or
+# stale+unresolved) and sc_detail (the summary's first line, or why nothing
+# was established). Returns 1, having run nothing but the help, when the
+# engine does not carry --json; only then does the bounded wording reader
+# below it answer. The keys are read in spec-spine's sorted order, so the
+# index half is everything before the report's "registry" key.
+spec_spine_check_json() {
+  sc_help=$("$sc" check --help 2>/dev/null)
+  case "$sc_help" in *--json*) ;; *) return 1 ;; esac
+  case "$sc_help" in *--fail-on-unresolved*) ;; *) return 1 ;; esac
+  sc_j=$(cd "$1" && "$sc" check --fail-on-unresolved --json 2>/dev/null); sc_jc=$?
+  sc_one=$(printf '%s' "$sc_j" | tr -d '\n')
+  sc_class=not-read; sc_reg=fresh; sc_idx=fresh
+  if ! printf '%s' "$sc_one" | grep -Eq '"tool": *"spec-spine"' || ! printf '%s' "$sc_one" | grep -Eq '"verb": *"check"'; then
+    sc_detail="check --json did not answer check's envelope (exit $sc_jc)"; return 0
+  fi
+  sc_ec=$(printf '%s' "$sc_one" | grep -Eo '"exitCode": *[0-9]+' | head -1 | grep -Eo '[0-9]+$')
+  if [ "$sc_ec" != "$sc_jc" ]; then
+    sc_detail="check --json declared exit ${sc_ec:-none} and ended $sc_jc"; return 0
+  fi
+  sc_detail=$(printf '%s' "$sc_one" | grep -Eo '"summary": *"([^"\\]|\\.)*"' | head -1 | sed 's/^"summary": *"//; s/"$//; s/\\n.*//')
+  sc_outcome=$(printf '%s' "$sc_one" | grep -Eo '"outcome": *"[a-z]+"' | head -1 | sed 's/.*"\([a-z]*\)"$/\1/')
+  case "$sc_outcome" in
+    ok) sc_class=fresh; return 0 ;;
+    finding) ;;
+    *) sc_m=$(printf '%s' "$sc_one" | grep -Eo '"message": *"([^"\\]|\\.)*"' | head -1 | sed 's/^"message": *"//; s/"$//; s/\\n.*//')
+       sc_detail="check --json answered ${sc_outcome:-no outcome} (exit $sc_jc): ${sc_m:-$sc_detail}"; return 0 ;;
+  esac
+  sc_ih=${sc_one%%\"registry\":*}
+  sc_rh=${sc_one#*\"registry\":}; sc_rh=${sc_rh%%\"summary\":*}
+  if printf '%s' "$sc_rh" | grep -Eq '"validationPassed": *false'; then sc_reg=invalid
+  elif printf '%s' "$sc_rh" | grep -Eq '"fresh": *false'; then sc_reg=stale; fi
+  sc_u=0; printf '%s' "$sc_ih" | grep -Eq '"errors": *[1-9]' && sc_u=1
+  if printf '%s' "$sc_ih" | grep -Eq '"fresh": *false'; then
+    if [ "$sc_u" = 1 ]; then sc_idx=stale+unresolved; else sc_idx=stale; fi
+  elif [ "$sc_u" = 1 ]; then sc_idx=unresolved; fi
+  if [ "$sc_reg" = invalid ]; then sc_class=invalid
+  elif [ "$sc_reg" = stale ] || [ "$sc_idx" = stale ] || [ "$sc_idx" = stale+unresolved ]; then sc_class=stale
+  elif [ "$sc_idx" = unresolved ]; then sc_class=unresolved
+  else sc_class=invalid; fi
+  return 0
+}
 spec_spine_resolve "$root"; rrc=$?
 [ -n "$sc_notice" ] && printf '%s\n' "$sc_notice" | sed 's/^/[pr-gate] /' >&2
 [ -n "$sc_passed" ] && printf '%s' "$sc_passed" | sed 's/^/[pr-gate] /' >&2
@@ -216,6 +292,36 @@ judge=$(spec_spine_judge)
 # Contract 4 as amended (H-4): the gate's unresolved-claim flag, so this gate
 # refuses what the merge gate refuses. Exit 1 then carries two readings and
 # the report text says which; exit 2 is stale and nothing else.
+# Spec 029 section 3.4: an engine that carries `check --json` is read from its
+# envelope, and every class but fresh refuses; the wording reader below
+# answers only for an engine that does not.
+if spec_spine_check_json "$root"; then
+  case "$sc_class" in
+    fresh) ;;
+    stale)
+      { echo "[pr-gate] BLOCKED: a committed shard tree is stale in $root."
+        echo '[pr-gate] Run: spec-spine compile and index, whichever tree it named, then commit the shards, push, and retry.'
+        [ "$sc_idx" = stale+unresolved ] && echo '[pr-gate] The index also records an unresolved claim, which regenerating does not clear: run spec-spine index diagnostics.'
+        echo "[pr-gate] $judge"; } >&2
+      exit 2 ;;
+    unresolved)
+      { echo "[pr-gate] BLOCKED: the index in $root records an unresolved claim, which the gate refuses (spec-spine check --fail-on-unresolved)."
+        echo '[pr-gate] Run: spec-spine index diagnostics, then fix the spec or write the unit it claims. Regenerating does not clear it: the diagnostic is recomputed from the corpus on every run.'
+        echo "[pr-gate] $judge"; } >&2
+      exit 2 ;;
+    invalid)
+      { echo "[pr-gate] BLOCKED: the corpus in $root does not validate: $sc_detail"
+        echo '[pr-gate] Run: spec-spine check, fix the violations it names, and retry. Staleness is not meaningful against a corpus that does not compile.'
+        echo "[pr-gate] $judge"; } >&2
+      exit 2 ;;
+    *)
+      { echo "[pr-gate] BLOCKED: the freshness read was not performed in $root: $sc_detail"
+        echo '[pr-gate] The tree has NOT been judged and is not known to be stale; regenerating repairs nothing here.'
+        echo "[pr-gate] $judge"; } >&2
+      exit 2 ;;
+  esac
+  cec=0
+else
 cout=$("$sc" --repo "$root" check --fail-on-unresolved 2>&1); cec=$?
 # spec-spine has two exit tables (spec 002 section 5, 2026-09-25, "both exit
 # tables"). From 0.26.0 a stale tree exits 1 and 2 is a refusal to judge, which
@@ -294,6 +400,7 @@ case "$cec" in
     echo "[pr-gate] $judge"; } >&2
      exit 2 ;;
 esac
+fi
 # Spec 093 3.13: the derived tree is asked about in all three states git
 # distinguishes, and each is read on its own. `git diff` alone compares the
 # index to the working tree, so a staged shard and an untracked one both

@@ -61,6 +61,10 @@ pub const REVIEW_TOOL: &str = "claude-code";
 pub const REVIEW_TOOL_VERSION: &str = "2.1.116";
 /// The source identity prefix a profile's manifest entries carry.
 pub const SOURCE_PREFIX: &str = "statecraft-setup:";
+/// The one repository-local spec-spine the profile installs, relative to the
+/// project root. The rendered commands and the resolver (spec 029 section 3.2,
+/// candidate 4) consume this declaration rather than restating the path.
+pub const ENGINE: &str = ".bin/spec-spine";
 /// The ignore fragment the profile adds to the governance one.
 pub const IGNORE_FRAGMENT: &str =
     "# The repository-local spec-spine the setup profile installs.\n.bin/\n";
@@ -277,17 +281,17 @@ pub fn commands() -> serde_json::Value {
 /// enforced or reported, an unresolved claim refused or reported (revision 9,
 /// spec 010), and the declared authored-content script, if any.
 pub fn commands_for(p: &Parameters) -> serde_json::Value {
-    let mut coverage = vec![".bin/spec-spine", "index", "coverage"];
+    let mut coverage = vec![ENGINE, "index", "coverage"];
     if p.enforce_coverage {
         coverage.push("--fail-on-untraced");
     }
-    let mut index_check = vec![".bin/spec-spine", "index", "check"];
+    let mut index_check = vec![ENGINE, "index", "check"];
     if p.fail_on_unresolved {
         index_check.push("--fail-on-unresolved");
     }
     let mut governance = vec![
-        serde_json::json!([".bin/spec-spine", "check", "--fail-on-warn"]),
-        serde_json::json!([".bin/spec-spine", "lint", "--fail-on-warn"]),
+        serde_json::json!([ENGINE, "check", "--fail-on-warn"]),
+        serde_json::json!([ENGINE, "lint", "--fail-on-warn"]),
         serde_json::json!(coverage),
         serde_json::json!(index_check),
     ];

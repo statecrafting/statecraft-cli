@@ -130,10 +130,10 @@
       "Verification"
     ],
     "specPath": "specs/013-supervised-wire-witness/spec.md",
-    "status": "draft",
+    "status": "approved",
     "summary": "Amends 003 and 004 so Statecraft may adopt wire-witness as an exact linked producer, bracket one sidecar as its own durable effect, supply one per-attempt loopback proxy endpoint to the child, and report confinement and witness posture without treating testimony as authority or creating a general sidecar host.\n",
     "title": "Supervised adoption of one wire-witness sidecar per attempt"
   },
-  "shardHash": "c4b37efd73941ce2ba56ad3de0157e37abe03a144f64bde3e0b588f153c0d70f",
+  "shardHash": "fec38d5811606e08ce39219e8225260b5bedfdfb43715a51957e38a05fc2cbf5",
   "specVersion": "1.9.0"
 }

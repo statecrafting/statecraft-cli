@@ -282,6 +282,26 @@ impl Fixture {
         );
     }
 
+    /// A stub whose `check --help` lists `--json`: `check --json` answers
+    /// `envelope` and exits `code`, and a `check` without `--json` answers the
+    /// opposite in words (fresh, exit 0), so a hook that read the wording
+    /// would be caught (spec 029 section 3.4).
+    fn stub_envelope(&self, at: &Path, envelope: &str, code: i32) {
+        let body = format!(
+            "#!/bin/sh\ncase \"$1\" in launcher) exit 3 ;; esac\nprintf 'envelope\\n' >> '{witness}'\nprintf '%s\\n' \"$*\" >> '{argv}'\n\
+             case \"$1\" in --version) echo 'spec-spine 9.9.9'; exit 0 ;; esac\n\
+             case \"$1 $2\" in\n  'check --help') echo '      --fail-on-unresolved'; echo '      --json'; exit 0 ;;\n  'lint --help'|'couple --help') exit 0 ;;\nesac\n\
+             for a in \"$@\"; do\n  if [ \"$a\" = config ]; then {config}; fi\ndone\n\
+             json=\nfor a in \"$@\"; do\n  if [ \"$a\" = --json ]; then json=1; fi\ndone\n\
+             for a in \"$@\"; do\n  if [ \"$a\" = check ]; then\n    if [ -n \"$json\" ]; then cat <<'ENVELOPE'\n{envelope}\nENVELOPE\n      exit {code}\n    fi\n    printf '%s\\n' 'spec-registry: fresh' 'codebase-index: fresh'; exit 0\n  fi\ndone\n\
+             exit 0\n",
+            witness = self.root.join("witness").display(),
+            argv = self.root.join("argv").display(),
+            config = ConfigAnswer::Reports(DERIVED_DIR).shell(),
+        );
+        executable(at, &body);
+    }
+
     /// Every argument vector any carrying stub was invoked with, one per line.
     fn argv(&self) -> String {
         std::fs::read_to_string(self.root.join("argv")).unwrap_or_default()
@@ -301,7 +321,7 @@ impl Fixture {
         let witness = self.root.join("witness");
         let body = if carries_verbs {
             format!(
-                "#!/bin/sh\nprintf '{label}\\n' >> '{}'\nprintf '%s\\n' \"$*\" >> '{}'\n\
+                "#!/bin/sh\ncase \"$1\" in launcher) exit 3 ;; esac\nprintf '{label}\\n' >> '{}'\nprintf '%s\\n' \"$*\" >> '{}'\n\
                  case \"$1\" in --version) echo 'spec-spine 9.9.9'; exit 0 ;; esac\n\
                  case \"$1 $2\" in\n  'check --help') {help}; exit 0 ;;\n  'lint --help'|'couple --help') exit 0 ;;\nesac\n\
                  for a in \"$@\"; do\n  if [ \"$a\" = config ]; then {}; fi\ndone\n\
@@ -320,7 +340,7 @@ impl Fixture {
             )
         } else {
             format!(
-                "#!/bin/sh\nprintf '{label}\\n' >> '{}'\n\
+                "#!/bin/sh\ncase \"$1\" in launcher) exit 3 ;; esac\nprintf '{label}\\n' >> '{}'\n\
                  case \"$1\" in --version) echo 'spec-spine 0.0.1'; exit 0 ;; esac\nexit 2\n",
                 witness.display()
             )
@@ -636,6 +656,85 @@ fn contract_2_the_repositorys_own_build_beats_path() {
 
         fixture.run_project(file, &[]);
         fixture.assert_only_ran("repo");
+    }
+}
+
+/// Spec 029 section 3.2: the repository-local install the setup profile
+/// declares beats the repository build and `PATH`, the order the verbs use.
+#[test]
+fn contract_2_the_repository_local_install_beats_the_build_and_path() {
+    for file in ALL {
+        let fixture = Fixture::new();
+        fixture.stub(
+            &fixture.root.join(statecraft_home::setup::ENGINE),
+            "local",
+            0,
+            true,
+        );
+        fixture.stub(
+            &fixture.root.join("target/release/spec-spine"),
+            "repo",
+            0,
+            true,
+        );
+        fixture.stub(&fixture.path_dir.join("spec-spine"), "path", 0, true);
+
+        fixture.run_any(file, &[]);
+        fixture.assert_only_ran("local");
+    }
+}
+
+/// Spec 029 section 3.2 candidate 4: a hook is shell and cannot link the
+/// profile's declaration, so each one is held to it here. A hook naming any
+/// other repository-local path would be a second answer.
+#[test]
+fn contract_2_every_hook_names_the_profile_declared_install() {
+    let declared = format!("$1/{}", statecraft_home::setup::ENGINE);
+    for file in ALL {
+        let body = hook_body(file);
+        assert!(body.contains(&declared), "{file} does not name {declared}");
+        for (at, _) in body.match_indices("bin/spec-spine") {
+            let start = body[..at]
+                .rfind(|c: char| c.is_whitespace() || c == '|' || c == '"')
+                .map_or(0, |i| i + 1);
+            let named = &body[start..at + "bin/spec-spine".len()];
+            assert!(
+                named.ends_with(statecraft_home::setup::ENGINE),
+                "{file} names {named}, not the profile's {declared}"
+            );
+        }
+    }
+}
+
+/// Spec 029 section 3.2: a launcher on `PATH` is asked for its resolution, the
+/// engine it names judges, and the launcher itself never runs a verb.
+#[test]
+fn contract_2_a_launcher_on_path_resolves_and_never_judges() {
+    for file in [SESSION_START, STOP] {
+        let fixture = Fixture::new();
+        let engine = fixture.root.join("store/spec-spine");
+        fixture.stub(&engine, "store", 0, true);
+        fixture.stub(
+            &fixture.root.join("target/release/spec-spine"),
+            "repo",
+            0,
+            true,
+        );
+        let envelope = format!(
+            r#"{{"exitCode":0,"outcome":"ok","report":{{"path":"{}","rule":"store"}},"summary":"ok","tool":"spec-spine-launcher","verb":"launcher.resolve"}}"#,
+            engine.display()
+        );
+        executable(
+            &fixture.path_dir.join("spec-spine"),
+            &format!(
+                "#!/bin/sh\nif [ \"$1 $2\" = 'launcher resolve' ]; then echo '{envelope}'; exit 0; fi\n\
+                 printf 'launcher\\n' >> '{}'\nexit 4\n",
+                fixture.root.join("witness").display()
+            ),
+        );
+
+        fixture.run_project(file, &[]);
+        fixture.assert_only_ran("store");
     }
 }
 
@@ -1788,7 +1887,7 @@ impl Fixture {
             Probe::RefusesThePinFrom026 => "echo 'spec-spine: refused: this repository requires spec-spine >=0.23, <0.24 (spec-spine.toml [meta] required_version); running 0.24.0.' >&2; exit 2".to_string(),
         };
         let body = format!(
-            "#!/bin/sh\nprintf '%s %s\\n' '{label}' \"$*\" >> '{calls}'\n\
+            "#!/bin/sh\ncase \"$1\" in launcher) exit 3 ;; esac\nprintf '%s %s\\n' '{label}' \"$*\" >> '{calls}'\n\
              case \"$1\" in --version) echo 'spec-spine {version}'; exit 0 ;; esac\n\
              case \"$1 $2\" in 'check --help') exit 0 ;; esac\n\
              case \" $* \" in\n\
@@ -2421,5 +2520,154 @@ fn one_variable_the_retired_names_value_cannot_inject_a_line() {
             seen.contains("ignored SPEC_SPINE_BIN=/x INJECTED line: that name is retired"),
             "{file}: {seen}"
         );
+    }
+}
+
+/// A `check --json` envelope in spec-spine's sorted, pretty-printed shape.
+fn check_envelope(
+    outcome: &str,
+    exit: i32,
+    registry: (bool, bool),
+    index_fresh: bool,
+    unresolved: u32,
+) -> String {
+    let (fresh, valid) = registry;
+    format!(
+        r#"{{
+  "exitCode": {exit},
+  "outcome": "{outcome}",
+  "report": {{
+    "index": {{
+      "diagnostics": {{
+        "byCode": {{}},
+        "errors": {unresolved},
+        "warnings": 0
+      }},
+      "fresh": {index_fresh}
+    }},
+    "registry": {{
+      "fresh": {fresh},
+      "validationPassed": {valid},
+      "warnings": 0
+    }}
+  }},
+  "schemaVersion": "1.1.0",
+  "summary": "check: {outcome}\nsecond line",
+  "tool": "spec-spine",
+  "verb": "check"
+}}"#
+    )
+}
+
+/// Spec 029 section 3.4: where `check --help` lists `--json`, every
+/// freshness-reading hook reads the envelope and never the wording, and each
+/// class is reported as itself.
+#[test]
+fn contract_4_an_engine_carrying_json_is_read_from_its_envelope() {
+    let rows = [
+        // (envelope, process exit, what each advisory hook must say)
+        (check_envelope("finding", 1, (true, true), false, 0), 1, "STALE"),
+        (
+            check_envelope("finding", 1, (true, true), true, 2),
+            1,
+            "UNRESOLVED CLAIM",
+        ),
+        (
+            check_envelope("finding", 1, (true, false), true, 0),
+            1,
+            "INVALID",
+        ),
+        // The declared exit disagrees with the process's: nothing was
+        // established, whatever the outcome says.
+        (check_envelope("ok", 0, (true, true), true, 0), 1, "NOT READ"),
+        (
+            r#"{"error":{"message":"refused: the pin"},"exitCode":2,"outcome":"refused","summary":"refused","tool":"spec-spine","verb":"check"}"#.to_string(),
+            2,
+            "NOT READ",
+        ),
+    ];
+    for file in [SESSION_START, STOP] {
+        for (envelope, code, expect) in &rows {
+            let fixture = Fixture::new();
+            fixture.stub_envelope(&fixture.on_path(), envelope, *code);
+            let seen = text(&fixture.run_project(file, &[]));
+            assert!(
+                seen.contains(expect),
+                "{file} did not read {expect} from the envelope: {seen}"
+            );
+            assert!(
+                fixture
+                    .argv()
+                    .lines()
+                    .any(|l| l == "check --fail-on-unresolved --json"),
+                "{file} did not ask for the envelope: {}",
+                fixture.argv()
+            );
+            assert!(
+                !fixture
+                    .argv()
+                    .lines()
+                    .any(|l| l == "check --fail-on-unresolved"),
+                "{file} also read the wording: {}",
+                fixture.argv()
+            );
+        }
+    }
+
+    // A fresh envelope: the Stop hook says nothing, the session hook says
+    // fresh for both halves.
+    let fixture = Fixture::new();
+    fixture.stub_envelope(
+        &fixture.on_path(),
+        &check_envelope("ok", 0, (true, true), true, 0),
+        0,
+    );
+    let seen = text(&fixture.run_project(SESSION_START, &[]));
+    assert!(
+        seen.contains("spec registry: fresh; codebase index: fresh"),
+        "{seen}"
+    );
+    assert!(
+        !text(&fixture.run_project(STOP, &[])).contains("[freshness]"),
+        "a fresh envelope was reported"
+    );
+}
+
+/// Spec 029 section 3.4, the enforcing gate: every class read from the
+/// envelope but fresh refuses the pull request, and a read that established
+/// nothing refuses too.
+#[test]
+fn contract_4_the_pull_request_gate_reads_the_envelope_and_refuses_all_but_fresh() {
+    let rows = [
+        (
+            check_envelope("finding", 1, (false, true), true, 0),
+            1,
+            "stale",
+        ),
+        (
+            check_envelope("finding", 1, (true, true), true, 1),
+            1,
+            "unresolved claim",
+        ),
+        (
+            check_envelope("finding", 1, (true, false), true, 0),
+            1,
+            "does not validate",
+        ),
+        (
+            check_envelope("ok", 0, (true, true), true, 0),
+            4,
+            "was not performed",
+        ),
+    ];
+    for (envelope, code, expect) in &rows {
+        let fixture = pinned_fixture(None);
+        fixture.stub_envelope(&fixture.on_path(), envelope, *code);
+        let payload = bash_payload("gh pr create --title x --body y", &fixture.root);
+        let out = fixture.run_payload(PRE_BASH, &payload, &[("SPEC_SPINE_DEFAULT_BRANCH", "main")]);
+        let seen = text(&out);
+        assert_eq!(out.status.code(), Some(2), "{seen}");
+        assert!(seen.contains("BLOCKED"), "{seen}");
+        assert!(seen.contains(expect), "expected {expect}: {seen}");
     }
 }

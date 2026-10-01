@@ -13,11 +13,10 @@
 
 use crate::exit::Exit;
 use crate::render::Answer;
-use statecraft_environment::probe::CommandProbe;
 use statecraft_environment::qualify::TargetProbe;
 use statecraft_environment::time::SystemClock;
 use statecraft_home::authority::{GitRevision, RunChoices};
-use statecraft_home::flow::{Corpus, SpecSpineCommand};
+use statecraft_home::flow::Corpus;
 use statecraft_home::home::Layout;
 use statecraft_home::producer::Library;
 use statecraft_home::service::{self, Operation, Severity};
@@ -42,28 +41,24 @@ pub const DEFAULT_BASE_REVISION: &str = "HEAD";
 /// client and saying so is the honest answer.
 ///
 /// For an initialization the `spec-spine` binary is **selected** for the
-/// project by spec 002 section 5's rule of 2026-09-25, the one the delivered
-/// hooks apply: `STATECRAFT_SPEC_SPINE`, then the project's own
-/// `.bin/spec-spine`, `target/release/spec-spine`, then `PATH`, each put to
-/// the project's pin.
-/// The rule is the library's; this only chooses to apply it.
+/// project by spec 002 section 5's rule of 2026-09-25 as spec 029 orders its
+/// candidates: `STATECRAFT_SPEC_SPINE`, then the launcher's resolution, the
+/// project's `.bin/spec-spine` and `target/release`, then `PATH`, each put to the
+/// project's pin. The rule is the library's; this only chooses to apply it.
+/// An operation that names no repository resolves nothing.
 pub fn execute(home: &Path, operation: Operation) -> Answer<service::Answer> {
     let layout = Layout::new(home);
     let producer = Library;
-    let (corpus, probe): (Box<dyn Corpus>, Box<dyn TargetProbe>) =
-        match operation.initialized_root() {
-            Some(root) => {
-                let selection = spec_spine::select_here(root);
-                (
-                    spec_spine::corpus_for(&selection),
-                    Box::new(spec_spine::probe_for(&selection)),
-                )
-            }
-            None => (
-                Box::new(SpecSpineCommand::default()),
-                Box::new(CommandProbe::default()),
-            ),
+    let (corpus, probe): (Box<dyn Corpus>, Box<dyn TargetProbe>) = {
+        let selection = match operation.initialized_root() {
+            Some(root) => crate::judge::selection(root),
+            None => std::sync::Arc::new(spec_spine::without_repository()),
         };
+        (
+            spec_spine::corpus_for(&selection),
+            Box::new(spec_spine::probe_for(&selection)),
+        )
+    };
     let authority = Unreachable::default();
     let revisions = GitRevision;
     let clock = SystemClock;
@@ -447,6 +442,7 @@ mod tests {
                     version: "0.25.0".into(),
                     found_by: "path".into(),
                 },
+                judge: None,
                 bridge: None,
                 delivery: vec![],
                 qualification: None,

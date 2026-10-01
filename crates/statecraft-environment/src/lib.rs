@@ -41,6 +41,7 @@ pub mod apply;
 pub mod claimant;
 pub mod digest;
 pub mod doctor;
+pub mod judge;
 pub mod manifest;
 pub mod plan;
 pub mod probe;

@@ -12,24 +12,27 @@ use std::path::Path;
 use std::process::Command;
 
 /// A probe that shells out to the real tools.
+///
+/// There is no default: spec 029 section 3.1 requires that nothing constructs
+/// a spec-spine invocation without the executable one resolution selected, so
+/// the caller names it (`statecraft-home`'s `spec_spine::probe_for`).
 #[derive(Debug, Clone)]
 pub struct CommandProbe {
     /// The `git` binary to run.
     pub git: String,
-    /// The `spec-spine` binary to run.
+    /// The `spec-spine` binary to run: a resolved path, never a bare name.
     pub spec_spine: String,
 }
 
-impl Default for CommandProbe {
-    fn default() -> Self {
+impl CommandProbe {
+    /// A probe running `git` from `PATH` and the resolved `spec_spine`.
+    pub fn new(spec_spine: impl Into<String>) -> Self {
         Self {
             git: "git".into(),
-            spec_spine: "spec-spine".into(),
+            spec_spine: spec_spine.into(),
         }
     }
-}
 
-impl CommandProbe {
     fn run(&self, program: &str, dir: &Path, args: &[&str]) -> Option<std::process::Output> {
         Command::new(program)
             .args(args)
@@ -207,9 +210,29 @@ impl CheckAnswer {
 /// lacks the verb spends a code of its own on the unknown subcommand (`clap`'s
 /// 2, which would read as stale; spec-spine 0.23.0's 3, which would read as a
 /// read not performed).
+///
+/// Spec 029 section 3.4: when the verb's own help lists `--json`, the answer
+/// is read from the envelope ([`read_check_envelope`]) and never from the
+/// words. The wording reader ([`read_check`]) remains only for an engine whose
+/// `check` does not take `--json` (below spec-spine 0.18.0), bounded to the
+/// two exit tables it already knows.
 pub fn run_check(program: &str, dir: &Path) -> CheckAnswer {
-    if let Some(unavailable) = check_unavailable(program, dir) {
-        return unavailable;
+    let help = match check_help(program, dir) {
+        Ok(help) => help,
+        Err(unavailable) => return unavailable,
+    };
+    if takes_json(&help) {
+        return match Command::new(program)
+            .args(["check", "--json"])
+            .current_dir(dir)
+            .output()
+        {
+            Ok(o) => read_check_envelope(o.status.code(), &status_word(&o.status), &o.stdout),
+            Err(e) => CheckAnswer::Unavailable {
+                why: Unavailability::Absent,
+                detail: format!("{program}: {e}"),
+            },
+        };
     }
     let output = match Command::new(program).arg("check").current_dir(dir).output() {
         Ok(o) => o,
@@ -272,23 +295,124 @@ pub fn read_check(code: Option<i32>, status: &str, text: &str) -> CheckAnswer {
     }
 }
 
+/// Read one `check --json` answer: the family envelope (spec-spine's spec 034
+/// and 132), classified by its `outcome` and its report's members, never by
+/// its words. Pure, so every class is testable against recorded envelopes.
+///
+/// - `ok` is fresh.
+/// - `finding` whose registry half did not validate is a corpus that does not
+///   validate; one whose registry or index half is not fresh is stale, which
+///   regenerating cures; one whose index half records an unresolved-unit
+///   error, fresh otherwise, is an unresolved claim; any other finding is
+///   read as a corpus that does not validate, naming the summary.
+/// - `refused`, `usage` and `failed` are reads not performed.
+/// - An envelope that does not parse, is not spec-spine's `check`, or whose
+///   `exitCode` disagrees with the process's is a read not performed: nothing
+///   about the corpus was established.
+pub fn read_check_envelope(code: Option<i32>, status: &str, stdout: &[u8]) -> CheckAnswer {
+    let not_performed = |detail: String| CheckAnswer::NotPerformed {
+        status: status.to_string(),
+        detail,
+    };
+    let Ok(value) = serde_json::from_slice::<serde_json::Value>(stdout) else {
+        return not_performed("`check --json` did not answer an envelope".to_string());
+    };
+    let text = |v: Option<&serde_json::Value>| v.and_then(|v| v.as_str()).map(str::to_string);
+    if text(value.get("tool")).as_deref() != Some("spec-spine")
+        || text(value.get("verb")).as_deref() != Some("check")
+    {
+        return not_performed("`check --json` answered an envelope that is not check's".into());
+    }
+    let declared = value.get("exitCode").and_then(|v| v.as_i64());
+    if declared.is_none() || declared != code.map(i64::from) {
+        return not_performed(format!(
+            "`check --json` declared exit {} and ended {status}",
+            declared.map_or_else(|| "none".to_string(), |c| c.to_string())
+        ));
+    }
+    let first = |s: String| {
+        s.lines()
+            .map(str::trim)
+            .find(|l| !l.is_empty())
+            .unwrap_or("no detail")
+            .to_string()
+    };
+    let summary = first(text(value.get("summary")).unwrap_or_default());
+    let report = value.get("report");
+    let half = |name: &str| report.and_then(|r| r.get(name));
+    let flag = |name: &str, member: &str| half(name).and_then(|h| h.get(member)?.as_bool());
+    match text(value.get("outcome")).as_deref() {
+        Some("ok") => CheckAnswer::Fresh,
+        Some("finding") => {
+            let stale_detail = || {
+                ["registry", "index"]
+                    .into_iter()
+                    .filter(|h| flag(h, "fresh") == Some(false))
+                    .map(|h| {
+                        format!(
+                            "{h}: {}",
+                            first(text(half(h).and_then(|v| v.get("actual"))).unwrap_or_default())
+                        )
+                    })
+                    .collect::<Vec<_>>()
+                    .join("; ")
+            };
+            let unresolved = half("index")
+                .and_then(|i| i.get("diagnostics")?.get("errors")?.as_u64())
+                .is_some_and(|n| n > 0);
+            if flag("registry", "validationPassed") == Some(false) {
+                CheckAnswer::DoesNotValidate { detail: summary }
+            } else if flag("registry", "fresh") == Some(false)
+                || flag("index", "fresh") == Some(false)
+            {
+                CheckAnswer::Stale {
+                    reading: StaleReading::Stale,
+                    detail: stale_detail(),
+                }
+            } else if unresolved {
+                CheckAnswer::Stale {
+                    reading: StaleReading::UnresolvedClaim,
+                    detail: summary,
+                }
+            } else {
+                CheckAnswer::DoesNotValidate { detail: summary }
+            }
+        }
+        _ => not_performed(first(
+            text(value.get("error").and_then(|e| e.get("message"))).unwrap_or(summary),
+        )),
+    }
+}
+
+/// Whether a verb's `--help` lists `--json` (spec 029 section 3.4): the
+/// engine states it, and no version table is kept here.
+pub fn takes_json(help: &str) -> bool {
+    help.lines()
+        .any(|l| l.trim_start().split([' ', ',', '=']).any(|w| w == "--json"))
+}
+
 /// Contract 5 alone: `check --help`, and the answer it implies when the binary
 /// is absent or does not carry the verb. `None` means the verb is there.
 pub fn check_unavailable(program: &str, dir: &Path) -> Option<CheckAnswer> {
+    check_help(program, dir).err()
+}
+
+/// `check --help`'s text, or the answer its failure implies.
+fn check_help(program: &str, dir: &Path) -> Result<String, CheckAnswer> {
     match Command::new(program)
         .args(["check", "--help"])
         .current_dir(dir)
         .output()
     {
-        Err(e) => Some(CheckAnswer::Unavailable {
+        Err(e) => Err(CheckAnswer::Unavailable {
             why: Unavailability::Absent,
             detail: format!("{program}: {e}"),
         }),
-        Ok(o) if !o.status.success() => Some(CheckAnswer::Unavailable {
+        Ok(o) if !o.status.success() => Err(CheckAnswer::Unavailable {
             why: Unavailability::LacksVerb,
             detail: format!("`{program} check --help` ended {}", status_word(&o.status)),
         }),
-        Ok(_) => None,
+        Ok(o) => Ok(String::from_utf8_lossy(&o.stdout).into_owned()),
     }
 }
 
@@ -399,7 +523,7 @@ mod tests {
     #[test]
     fn a_directory_that_is_not_a_repository_is_not_a_work_tree() {
         let dir = tempfile::tempdir().unwrap();
-        assert!(!CommandProbe::default().is_git_work_tree(dir.path()));
+        assert!(!CommandProbe::new("spec-spine-that-does-not-exist").is_git_work_tree(dir.path()));
     }
 
     #[test]

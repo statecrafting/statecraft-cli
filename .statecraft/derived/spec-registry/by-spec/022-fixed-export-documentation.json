@@ -127,10 +127,10 @@
       "Verification"
     ],
     "specPath": "specs/022-fixed-export-documentation/spec.md",
-    "status": "draft",
+    "status": "approved",
     "summary": "Amends Statecraft's run, adapter, acceptance, and command contracts with a bounded offline documentation workflow over revision-pinned context exports. It preserves immutable task, delivery, raw result, validation, review, correction, and acceptance records as separate facts; proves the workflow with a deterministic fake adapter; and grants no live provider, repository application, remote export, or publication authority.\n",
     "title": "Fixed-export documentation workflow"
   },
-  "shardHash": "1b679b5c4b38f715b4cda634213f1674a0899b5bb25b21f9cade6e2d64cdbec6",
+  "shardHash": "d3db1e8b2e70a174cbb9cc2a1437928e57642353c84a241c1c4fffea0b6d651f",
   "specVersion": "1.9.0"
 }
