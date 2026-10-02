@@ -125,9 +125,14 @@ working-directory-relative paths, never their extraction location (`$0` or
 
 The local gate reads the script's executable Git blob at the supplied base
 commit and runs it against the candidate tree. A missing base commit or a
-non-executable base blob refuses. First adoption may use the candidate's
-script when the base carries none, and says so. Local runs without a supplied
-base use the working tree script.
+non-executable base blob refuses. First adoption means the trusted base policy
+has no external code declaration and the selected script path has no base blob.
+Only then may the gate use the executable candidate script, with an explicit
+adoption diagnostic. A base policy that already declares external code must
+never fall back to candidate bytes when its script is missing or invalid.
+Adding this workflow or script still requires the protected owner authority
+exception for the exact run. Local runs without a supplied base use the
+working tree script.
 
 ### 3.4 Commit walk
 
@@ -144,6 +149,10 @@ content identity. Revision 13 remains a captured migration fixture, never a
 second live registration. Ordinary managed reconciliation upgrades clean
 files and preserves customized files with their intended copies. A second
 unchanged plan writes nothing. Repository-local engine location stays `.bin`.
+The amendment to spec 031 retains both legacy `.tooling/` and current `.bin/`
+ignore entries when replacing a managed ignore block, and aligns its engine
+location regression assertion with that compatibility promise. Retaining the
+legacy ignore is not permission for rendered commands to use `.tooling/bin`.
 
 ## 4. Out of scope
 
