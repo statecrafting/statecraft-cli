@@ -1,0 +1,61 @@
+{
+  "mapping": {
+    "amends": [
+      "002-environment-lifecycle",
+      "006-command-surface",
+      "018-governed-bootstrap-inputs",
+      "023-contained-commit-walk",
+      "031-engine-in-bin"
+    ],
+    "dependsOn": [
+      "002-environment-lifecycle",
+      "006-command-surface",
+      "018-governed-bootstrap-inputs",
+      "023-contained-commit-walk",
+      "024-review-budget-and-ratification",
+      "031-engine-in-bin"
+    ],
+    "implementingPaths": [
+      {
+        "path": "crates/statecraft-cli/",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/statecraft-home/",
+        "source": "spec-edge"
+      }
+    ],
+    "resolvedUnits": [
+      {
+        "locations": [
+          {
+            "file": "crates/statecraft-cli/"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "directory",
+          "path": "crates/statecraft-cli/"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "crates/statecraft-home/"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "directory",
+          "path": "crates/statecraft-home/"
+        }
+      }
+    ],
+    "specId": "032-external-code-profile",
+    "specStatus": "approved"
+  },
+  "schemaVersion": "1.2.0",
+  "shardHash": "8d6ed79880ffcf5f608c2b74d88e6256cdd1eb42a09bb14e4b07197ce88c44d7"
+}
