@@ -73,7 +73,7 @@ existing managed-file drift rules and project authority remain in force.
 
 `init plan <path> --spine '=X.Y.Z'` requests one exact release. The syntax is
 `=` followed by three decimal components, each either zero or a nonzero digit
-followed by digits. Whitespace, leading zeros, prerelease and build suffixes,
+followed by zero or more digits. Whitespace, leading zeros, prerelease and build suffixes,
 ranges, wildcards and missing components refuse. Both `--spine <value>` and
 `--spine=<value>` are accepted on these two verbs only; repeated or missing
 options are usage errors (exit 3). An invalid or unsupported request is a
