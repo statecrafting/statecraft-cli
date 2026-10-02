@@ -218,8 +218,34 @@ fn revision_eleven() -> Profile {
 
 /// Revision 12 of the registered profile: the three templates revision 13
 /// changed (spec 031), captured byte for byte from main at adf83c8.
+fn revision_thirteen() -> Profile {
+    let mut p = Profile::registered();
+    p.revision = 13;
+    for (path, body) in [
+        (
+            "scripts/statecraft/gate.sh",
+            include_str!("support/profile-r13/gate.sh"),
+        ),
+        (
+            "scripts/statecraft/ci-gate.sh",
+            include_str!("support/profile-r13/ci-gate.sh"),
+        ),
+        (
+            ".github/workflows/statecraft-ci.yml",
+            include_str!("support/profile-r13/statecraft-ci.yml"),
+        ),
+    ] {
+        p.templates
+            .iter_mut()
+            .find(|t| t.path == path)
+            .unwrap()
+            .body = body.into();
+    }
+    p
+}
+
 fn revision_twelve() -> Profile {
-    let mut r12 = Profile::registered();
+    let mut r12 = revision_thirteen();
     assert_eq!(r12.revision, 13, "the registered profile is revision 13");
     r12.revision = 12;
     for t in &mut r12.templates {
@@ -1273,7 +1299,7 @@ fn a_revision_twelve_project_upgrades_to_revision_thirteen() {
     policy_entry.bytes = policy.len() as u64;
     manifest.upsert(policy_entry);
 
-    let r13 = Profile::registered();
+    let r13 = revision_thirteen();
     assert_ne!(r13.identity(), r12.identity());
     let upgrade = plan_and_apply_with(root, &r13, &mut manifest, &block);
     assert!(upgrade.whole());
@@ -1294,7 +1320,7 @@ fn a_revision_twelve_project_upgrades_to_revision_thirteen() {
     assert!(ignore.contains(".tooling/"), "{ignore}");
     assert_eq!(
         upgrade.ignore_fragment,
-        "# The repository-local spec-spine the setup profile installs.\n.bin/\n"
+        "# The repository-local spec-spine the setup profile installs.\n.tooling/\n.bin/\n"
     );
     let policy = std::fs::read_to_string(root.join(setup::POLICY_PATH)).unwrap();
     assert!(policy.contains(".bin/spec-spine"), "{policy}");
@@ -1322,4 +1348,46 @@ fn a_revision_twelve_project_upgrades_to_revision_thirteen() {
         [gate, installer, workflow, setup::POLICY_PATH]
             .map(|rel| std::fs::read(root.join(rel)).unwrap())
     );
+}
+
+/// Spec 032: the predecessor stays available for ordinary managed migration.
+#[test]
+fn a_revision_thirteen_project_upgrades_to_revision_fourteen() {
+    let dir = project();
+    let mut manifest = Manifest::new(Pins {
+        product: "0.0.0".into(),
+        spec_spine: "unpinned".into(),
+        adapters: Default::default(),
+        producer: None,
+    });
+    assert!(plan_and_apply(dir.path(), &revision_thirteen(), &mut manifest).whole());
+    let next = Profile::registered();
+    assert_eq!(next.revision, 14);
+    let upgraded = plan_and_apply(dir.path(), &next, &mut manifest);
+    assert!(upgraded.whole());
+    let repeated = plan_and_apply(dir.path(), &next, &mut manifest);
+    assert!(repeated.files.iter().all(|f| !f.action.writes()));
+    let wf =
+        std::fs::read_to_string(dir.path().join(".github/workflows/statecraft-ci.yml")).unwrap();
+    assert!(wf.contains("Build, test, clippy, fmt"));
+    assert!(wf.contains("runs-on: ubuntu-latest"));
+    assert_eq!(upgraded.commands, setup::commands());
+    // The former migration fixture placed the old rule outside the managed
+    // block and therefore missed the revision-13 managed-block regression.
+    // Exercise the same ignore merge used by init with actual old ownership.
+    let old_ignore = format!(
+        "target/\n{}\n{}\n# Repository-local legacy install\n.tooling/\n{}\n",
+        statecraft_home::ignore::BEGIN,
+        statecraft_home::ignore::BLOCK_NOTE,
+        statecraft_home::ignore::END,
+    );
+    let merged =
+        statecraft_home::ignore::merge(Some(&old_ignore), &upgraded.ignore_fragment).unwrap();
+    assert!(merged.contents_after.contains(".tooling/\n"));
+    assert!(merged.contents_after.contains(".bin/\n"));
+    assert!(merged.contents_after.starts_with("target/\n"));
+    let repeated_ignore =
+        statecraft_home::ignore::merge(Some(&merged.contents_after), &repeated.ignore_fragment)
+            .unwrap();
+    assert!(repeated_ignore.unchanged);
 }

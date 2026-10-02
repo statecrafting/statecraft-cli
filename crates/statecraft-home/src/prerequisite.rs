@@ -8,7 +8,7 @@
 //! toolchain, a lock file, a content policy and a work tree are the target
 //! project's, and an adopted `spec-spine.toml` is its owner's.
 
-use crate::setup::{Parameters, Prerequisite};
+use crate::setup::{Code, Parameters, Prerequisite};
 use std::io;
 use std::path::Path;
 use std::path::PathBuf;
@@ -35,19 +35,39 @@ pub struct Pin<'a> {
 
 /// Observe every prerequisite of `github-actions-rust`, in a stable order.
 pub fn observe(root: &Path, pin: &Pin<'_>, params: &Parameters) -> Vec<Prerequisite> {
-    let mut out = vec![
-        exact_pin(pin),
-        tracked_file(
-            root,
-            "rust-toolchain.toml",
-            "Statecraft never generates, copies or selects a toolchain: commit the project's rust-toolchain.toml",
-        ),
-        tracked_file(
-            root,
-            "Cargo.lock",
-            "Statecraft never generates it or runs a dependency resolver, and every cargo verb the gate runs is --locked: commit the project's Cargo.lock",
-        ),
-    ];
+    let mut out = vec![exact_pin(pin)];
+    match &params.code {
+        Code::Rust => {
+            out.push(tracked_file(
+                root,
+                "rust-toolchain.toml",
+                "Statecraft never selects a toolchain: commit the project's rust-toolchain.toml",
+            ));
+            out.push(tracked_file(root, "Cargo.lock", "Statecraft never resolves dependencies: commit the project's Cargo.lock for --locked checks"));
+        }
+        Code::External { workflow, script } => {
+            out.push(tracked_file(
+                root,
+                workflow,
+                "commit the project's reusable code workflow",
+            ));
+            out.push(tracked_file(
+                root,
+                script,
+                "commit the project's executable local code script",
+            ));
+            let mut executable = checker(root, script);
+            executable.name = "the declared external code script".into();
+            executable.consequence = if executable.met {
+                "none".into()
+            } else {
+                "Statecraft never invents code checks: supply the contained executable script"
+                    .into()
+            };
+
+            out.push(executable);
+        }
+    }
     if let Some(rel) = &params.authored_content {
         out.push(checker(root, rel));
     }
@@ -120,6 +140,16 @@ fn tracked_file(root: &Path, rel: &str, remedy: &str) -> Prerequisite {
     let observed = match std::fs::symlink_metadata(root.join(rel)) {
         Err(_) => Err("absent"),
         Ok(m) if !m.file_type().is_file() => Err("present, and not a regular file"),
+        Ok(_)
+            if !root
+                .join(rel)
+                .canonicalize()
+                .ok()
+                .zip(root.canonicalize().ok())
+                .is_some_and(|(p, r)| p.starts_with(r)) =>
+        {
+            Err("outside the target or unreadable canonical path")
+        }
         Ok(_) if !tracked(root, rel) => {
             Err("present, and not tracked by git (a checkout would not have it)")
         }

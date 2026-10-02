@@ -5,10 +5,15 @@ use statecraft_home::{producer, setup};
 #[test]
 fn revision_thirteen_uses_bin_for_every_managed_engine_path() {
     let profile = setup::Profile::registered();
-    assert_eq!(profile.revision, 13);
+    assert!(profile.revision >= 13);
     assert_eq!(producer::TOOL_DIR, ".bin");
     assert!(setup::IGNORE_FRAGMENT.contains(".bin/"));
-    assert!(!setup::IGNORE_FRAGMENT.contains(".tooling"));
+    // Spec 031 retains the old ignore line without reading or executing that directory.
+    assert!(
+        setup::IGNORE_FRAGMENT
+            .lines()
+            .any(|line| line == ".tooling/")
+    );
 
     let template = |path: &str| {
         profile
