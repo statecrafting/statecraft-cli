@@ -2,14 +2,27 @@
   "record": {
     "amends": [
       "002-environment-lifecycle",
-      "006-command-surface"
+      "006-command-surface",
+      "018-governed-bootstrap-inputs",
+      "029-one-resolved-judge"
     ],
     "created": "2026-10-02",
     "dependsOn": [
       "002-environment-lifecycle",
-      "006-command-surface"
+      "006-command-surface",
+      "018-governed-bootstrap-inputs",
+      "029-one-resolved-judge",
+      "032-external-code-profile"
     ],
     "extends": [
+      {
+        "nature": "additive",
+        "spec": "002-environment-lifecycle",
+        "unit": {
+          "kind": "directory",
+          "path": "crates/statecraft-home/"
+        }
+      },
       {
         "nature": "additive",
         "spec": "002-environment-lifecycle",
@@ -56,16 +69,17 @@
       }
     ],
     "sectionDigests": {
-      "033-consented-spec-spine-pin": "a7ad00710b4210223b3e6b4ff79c307520529b9cd5b20a9db2aacea0efde0c4f",
+      "033-consented-spec-spine-pin": "f863a77768c032a436e9feeeddb21ea60b0db695954be17e06c4fa98f0af8c05",
       "1-purpose": "21a5a556d24254316c6f73bd5237eb7b6b8e093662dd728d4b29eb93e846c5ab",
-      "2-territory": "77d3911bc876fcbc10d55f4b2038c4fe04415d5c1fdc34a36042791cfa9f692f",
-      "3-1-exact-request": "5c3e22d872cb3a9b1d722eaa2d63c1b573221878edbbac3263b23abb254a3b9e",
-      "3-2-reviewed-plan": "7810687c09d8726b07f9fc5e182da9ab09f651de76bee9f7157612054bff0d3f",
-      "3-3-minimal-apply": "c62de1c9240b9621ec0f82519faae42e742403953187c5c6e8bcb2c35d9b6591",
+      "2-territory": "b1a43a755cff2b38618a7dd19a0148033a123ef037946052a88ff59b64495337",
+      "3-1-exact-request": "473c07dd6c60bdc6fb6711a50ac3e60ee20a0079563ca1b1262c0c0c7c38cb71",
+      "3-2-reviewed-plan": "d883c0d45f2744dc785aa12cf1a945860fb2d9382845b34b213a1e868607443e",
+      "3-3-minimal-apply": "094fda67c015dbf933bf6129cb6fde617a23d21b60c681238222ba9f76c23792",
       "3-4-authority-boundary": "74f8b9d35b298252191b923345ca9116ea1079b80a5434305972fa243f0d1509",
-      "3-contract": "1dd267e26ac875c7ba738dbcb69f838ea498c454315ba4bdb5ea9f07c44f0212",
-      "4-acceptance-criteria": "88ed8d55c778a4e11d8f963ad7b1343df710fdf26b79dbe839daf0bffbb27c1a",
-      "5-resolved-decisions": "3fcbd03ee6bc4f702429e130a7c39137bd47a75cc32f186b6436a72578fac13f"
+      "3-contract": "8bb899b6e31280aeb600c72c57389711e748f57d5b49adb099fdb19de6413e3d",
+      "4-acceptance-criteria": "73b6f84dd97643611a5aee30dcfe92b42e54e62ed3f92c9f4d572cc53d2f07c0",
+      "5-resolved-decisions": "aacd6f1e2d222d165d44b424846a5d52a73d202abc27a8b378b79110dae80b76",
+      "verification": "9021d9443f9cf834d042de7cb8937b89997b5f2da3465dc1660e1f13487d8543"
     },
     "sectionHeadings": [
       "033: Consented spec-spine pin",
@@ -77,13 +91,14 @@
       "3.3 Minimal apply",
       "3.4 Authority boundary",
       "4. Acceptance criteria",
-      "5. Resolved decisions"
+      "5. Resolved decisions",
+      "Verification"
     ],
     "specPath": "specs/033-consented-spine-pin/spec.md",
     "status": "draft",
     "summary": "Adds an explicit exact --spine request to init plan and init apply. The source and destination pins, producer identity, original configuration digest and minimal authored edit are part of the consented plan identity. Apply changes only the existing required_version value in spec-spine.toml after revalidating the plan, then uses the ordinary managed upgrade rules. No implicit pin move, dependency rewrite, ratification or branch protection change is authorized by initialization.\n",
     "title": "A reviewed initialization plan may explicitly move the adopted spec-spine pin"
   },
-  "shardHash": "33d6a513e87e1bb4c0013956d0ccc92e1c541a52f0fb8524530e080a09910c11",
+  "shardHash": "eba62a19f690e5d60ebe381bf4c0a3b8a61f76e26c6409d3979f1f6e2b11c9d6",
   "specVersion": "1.9.0"
 }

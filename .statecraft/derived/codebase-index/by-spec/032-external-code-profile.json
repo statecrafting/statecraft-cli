@@ -4,22 +4,20 @@
       "002-environment-lifecycle",
       "006-command-surface",
       "018-governed-bootstrap-inputs",
-      "029-one-resolved-judge"
+      "023-contained-commit-walk",
+      "031-engine-in-bin"
     ],
     "dependsOn": [
       "002-environment-lifecycle",
       "006-command-surface",
       "018-governed-bootstrap-inputs",
-      "029-one-resolved-judge",
-      "032-external-code-profile"
+      "023-contained-commit-walk",
+      "024-review-budget-and-ratification",
+      "031-engine-in-bin"
     ],
     "implementingPaths": [
       {
         "path": "crates/statecraft-cli/",
-        "source": "spec-edge"
-      },
-      {
-        "path": "crates/statecraft-environment/",
         "source": "spec-edge"
       },
       {
@@ -44,19 +42,6 @@
       {
         "locations": [
           {
-            "file": "crates/statecraft-environment/"
-          }
-        ],
-        "ownership": true,
-        "sourceField": "extends",
-        "unit": {
-          "kind": "directory",
-          "path": "crates/statecraft-environment/"
-        }
-      },
-      {
-        "locations": [
-          {
             "file": "crates/statecraft-home/"
           }
         ],
@@ -68,9 +53,9 @@
         }
       }
     ],
-    "specId": "033-consented-spine-pin",
-    "specStatus": "draft"
+    "specId": "032-external-code-profile",
+    "specStatus": "approved"
   },
   "schemaVersion": "1.2.0",
-  "shardHash": "eba62a19f690e5d60ebe381bf4c0a3b8a61f76e26c6409d3979f1f6e2b11c9d6"
+  "shardHash": "d3385c2f81047c7b18d62b2e5f6adc83c17f4526136404e4092550d17698471a"
 }

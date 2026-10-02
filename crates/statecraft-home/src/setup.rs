@@ -35,7 +35,7 @@ use std::path::Path;
 /// The one registered profile.
 pub const PROFILE_ID: &str = "github-actions-rust";
 /// Its revision.
-pub const REVISION: u32 = 13;
+pub const REVISION: u32 = 14;
 /// Where the rendered policy document lives in the target.
 pub const POLICY_PATH: &str = ".statecraft/setup/github-actions-rust.json";
 /// The resume record, under the project's runtime state.
@@ -67,7 +67,7 @@ pub const SOURCE_PREFIX: &str = "statecraft-setup:";
 pub const ENGINE: &str = ".bin/spec-spine";
 /// The ignore fragment the profile adds to the governance one.
 pub const IGNORE_FRAGMENT: &str =
-    "# The repository-local spec-spine the setup profile installs.\n.bin/\n";
+    "# The repository-local spec-spine the setup profile installs.\n.tooling/\n.bin/\n";
 /// The visible skip classes, non-blocking for ordinary pull requests (S-2).
 pub const SKIP_CLASSES: [&str; 5] = ["draft", "fork", "dependabot", "oversized", "transient"];
 /// The places a CODEOWNERS file is read from; one existing anywhere is the
@@ -298,14 +298,27 @@ pub fn commands_for(p: &Parameters) -> serde_json::Value {
     if let Some(script) = &p.authored_content {
         governance.push(serde_json::json!([script]));
     }
-    serde_json::json!({
-        "governance": governance,
-        "code": [
+    let code = match &p.code {
+        Code::Rust => serde_json::json!([
             ["cargo", "build", "--workspace", "--locked"],
             ["cargo", "test", "--workspace", "--locked"],
-            ["cargo", "clippy", "--workspace", "--all-targets", "--locked", "--", "-D", "warnings"],
+            [
+                "cargo",
+                "clippy",
+                "--workspace",
+                "--all-targets",
+                "--locked",
+                "--",
+                "-D",
+                "warnings"
+            ],
             ["cargo", "fmt", "--all", "--check"],
-        ],
+        ]),
+        Code::External { script, .. } => serde_json::json!([[script]]),
+    };
+    serde_json::json!({
+        "governance": governance,
+        "code": code,
     })
 }
 
@@ -330,6 +343,7 @@ pub fn authority_rule() -> serde_json::Value {
             POLICY_PATH,
             "scripts/statecraft/*",
             "the declared governance.authored_content script",
+            "the declared ci.code.script",
         ],
         "compared": "the candidate's own changes, base...head",
         "requires": "the owner exception approved for the run; in the merge queue, for the run recorded for the entry's pull request",
@@ -364,6 +378,8 @@ pub fn remote_obligations() -> Vec<String> {
 /// The parameters a project may set, validated.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct Parameters {
+    /// Project-owned code selection, required locally and in CI (spec 032).
+    pub code: Code,
     /// The branch a push is gated on.
     pub default_branch: String,
     /// The added-line backstop (revision 12, spec 024; changed lines before).
@@ -411,6 +427,125 @@ pub struct Parameters {
     /// requires, each a call of the project's own reusable workflow
     /// (revision 7).
     pub extra_required_jobs: Vec<ExtraJob>,
+}
+
+/// The required code surface. External projects supply both local qualification
+/// and a reusable CI workflow; neither selection disables the required job.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[serde(tag = "kind", rename_all = "lowercase")]
+pub enum Code {
+    /// The existing locked Rust workspace checks.
+    Rust,
+    /// Project-owned code checks, including platform suites in the workflow.
+    External {
+        /// A direct reusable workflow under `.github/workflows/`.
+        workflow: String,
+        /// A contained executable repository-relative script.
+        script: String,
+    },
+}
+
+fn workflow_path(workflow: &str) -> Result<(), String> {
+    let name = workflow.strip_prefix(WORKFLOW_DIR).unwrap_or("");
+    let wf_ok = safe_path_chars(workflow)
+        && !name.is_empty()
+        && !name.contains('/')
+        && !name.starts_with('.')
+        && (name.ends_with(".yml") || name.ends_with(".yaml"));
+    if !wf_ok {
+        return Err(format!(
+            "ci.code or ci.extra_required_jobs: `{workflow}` is not a workflow file directly under {WORKFLOW_DIR}"
+        ));
+    }
+    if Profile::registered()
+        .templates
+        .iter()
+        .any(|t| t.path == workflow)
+    {
+        return Err(format!(
+            "ci.code or ci.extra_required_jobs: `{workflow}` is a workflow the profile renders"
+        ));
+    }
+    Ok(())
+}
+
+fn code_selection(root: &Path, value: &serde_json::Value) -> Result<Code, String> {
+    let obj = value.as_object().ok_or("ci.code must be an object")?;
+    match obj.get("kind").and_then(|v| v.as_str()) {
+        Some("rust") if obj.len() == 1 => Ok(Code::Rust),
+        Some("external") => {
+            if obj.len() != 3
+                || obj
+                    .keys()
+                    .any(|k| !["kind", "workflow", "script"].contains(&k.as_str()))
+            {
+                return Err("ci.code external needs exactly kind, workflow and script".into());
+            }
+            let workflow = obj
+                .get("workflow")
+                .and_then(|v| v.as_str())
+                .ok_or("ci.code.workflow must be a string")?;
+            workflow_path(workflow)?;
+            // Missing, linked or escaping project inputs remain unmet
+            // prerequisites. Never parse bytes outside the target to decide
+            // whether a profile can be installed inside it.
+            let path = root.join(workflow);
+            let contained = std::fs::symlink_metadata(&path).is_ok_and(|m| m.file_type().is_file())
+                && path
+                    .canonicalize()
+                    .ok()
+                    .zip(root.canonicalize().ok())
+                    .is_some_and(|(p, r)| p.starts_with(r));
+            if contained {
+                let yaml: serde_yaml::Value = serde_yaml::from_slice(
+                    &std::fs::read(root.join(workflow))
+                        .map_err(|e| format!("ci.code.workflow unreadable: {e}"))?,
+                )
+                .map_err(|e| format!("ci.code.workflow invalid YAML: {e}"))?;
+                let call = match &yaml["on"] {
+                    serde_yaml::Value::String(name) => name == "workflow_call",
+                    serde_yaml::Value::Sequence(names) => names
+                        .iter()
+                        .any(|name| name.as_str() == Some("workflow_call")),
+                    serde_yaml::Value::Mapping(events) => {
+                        events.contains_key(serde_yaml::Value::String("workflow_call".into()))
+                    }
+                    _ => false,
+                };
+                if !call || yaml["jobs"].as_mapping().is_none_or(|jobs| jobs.is_empty()) {
+                    return Err(
+                        "ci.code.workflow needs structured on: workflow_call and nonempty jobs"
+                            .into(),
+                    );
+                }
+            }
+            let script = obj
+                .get("script")
+                .and_then(|v| v.as_str())
+                .ok_or("ci.code.script must be a string")?;
+            if !safe_path_chars(script)
+                || script.contains("..")
+                || script.starts_with('/')
+                || script.starts_with('-')
+                || script.ends_with('/')
+            {
+                return Err("ci.code.script must be a plain repository-relative path".into());
+            }
+            if Profile::registered()
+                .templates
+                .iter()
+                .any(|t| t.path == script)
+                || script == POLICY_PATH
+            {
+                return Err("ci.code.script cannot be a profile-owned file".into());
+            }
+            Ok(Code::External {
+                workflow: workflow.into(),
+                script: script.into(),
+            })
+        }
+        _ => Err("ci.code.kind must be rust or external; rust has no additional fields".into()),
+    }
 }
 
 /// One declared extra required job (revision 7): a job id the rendered
@@ -465,26 +600,7 @@ fn extra_required_jobs(root: &Path, value: &serde_json::Value) -> Result<Vec<Ext
         if out.iter().any(|e| e.job == job) {
             return Err(format!("{KEY}: `{job}` is declared twice"));
         }
-        let name = workflow.strip_prefix(WORKFLOW_DIR).unwrap_or("");
-        let wf_ok = safe_path_chars(workflow)
-            && !name.is_empty()
-            && !name.contains('/')
-            && !name.starts_with('.')
-            && (name.ends_with(".yml") || name.ends_with(".yaml"));
-        if !wf_ok {
-            return Err(format!(
-                "{KEY}: `{workflow}` is not a workflow file directly under {WORKFLOW_DIR}"
-            ));
-        }
-        if Profile::registered()
-            .templates
-            .iter()
-            .any(|t| t.path == workflow)
-        {
-            return Err(format!(
-                "{KEY}: `{workflow}` is a workflow the profile renders"
-            ));
-        }
+        workflow_path(workflow)?;
         if !root.join(workflow).is_file() {
             return Err(format!(
                 "{KEY}: `{workflow}` does not exist; write the reusable workflow (on: workflow_call) first"
@@ -518,6 +634,7 @@ fn extra_job_text(jobs: &[ExtraJob]) -> (String, String) {
 impl Parameters {
     fn defaults(default_branch: String, exclude: Vec<String>) -> Parameters {
         Parameters {
+            code: Code::Rust,
             default_branch,
             diff_cap: DEFAULT_DIFF_CAP,
             context_tokens: DEFAULT_CONTEXT_TOKENS,
@@ -586,6 +703,7 @@ pub fn parameters(
             }
             "review.max_calls" => p.max_calls = bounded(key, value, MAX_CALLS_RANGE)?,
             "review.deletion_cap" => p.deletion_cap = bounded(key, value, DELETION_CAP_RANGE)?,
+            "ci.code" => p.code = code_selection(root, value)?,
             "ci.extra_required_jobs" => p.extra_required_jobs = extra_required_jobs(root, value)?,
             "governance.authored_content" => {
                 let v = value
@@ -1390,16 +1508,26 @@ pub fn plan(inputs: &Inputs<'_>) -> Result<Plan, String> {
         "governance.authored_content",
         params.authored_content.clone().unwrap_or_default(),
     );
+    values.insert(
+        "ci.code_script",
+        match &params.code {
+            Code::Rust => String::new(),
+            Code::External { script, .. } => script.clone(),
+        },
+    );
     let (extra_jobs, extra_needs) = extra_job_text(&params.extra_required_jobs);
     values.insert("ci.extra_jobs", extra_jobs);
     values.insert("ci.extra_needs", extra_needs);
-    let owned_paths: Vec<&str> = profile
+    let mut owned_paths: Vec<&str> = profile
         .templates
         .iter()
         .filter(|t| t.role != Role::Codeowners)
         .map(|t| t.path.as_str())
         .chain(std::iter::once(POLICY_PATH))
         .collect();
+    if let Code::External { workflow, script } = &params.code {
+        owned_paths.extend([workflow.as_str(), script.as_str()]);
+    }
     values.insert(
         "codeowners.lines",
         owned_paths
@@ -1465,7 +1593,20 @@ pub fn plan(inputs: &Inputs<'_>) -> Result<Plan, String> {
     };
 
     for t in &profile.templates {
-        let bytes = render(&t.body, &values)?.into_bytes();
+        let mut text = render(&t.body, &values)?;
+        if t.path == ".github/workflows/statecraft-ci.yml"
+            && let Code::External { workflow, .. } = &params.code
+        {
+            let start = text
+                .find("  code:\n")
+                .ok_or("code job absent from profile")?;
+            let end = text[start..]
+                .find("  ai-review:\n")
+                .ok_or("ai-review absent from profile")?
+                + start;
+            text.replace_range(start..end, &format!("  code:\n    name: code\n    uses: ./{workflow}\n    permissions:\n      contents: read\n\n"));
+        }
+        let bytes = text.into_bytes();
         let managed_before = inputs
             .manifest
             .entry(&t.path)
@@ -1531,6 +1672,15 @@ pub fn plan(inputs: &Inputs<'_>) -> Result<Plan, String> {
     policy["review"]["release_branch_pattern"] = serde_json::json!(params.release_branch_pattern);
     let commands = commands_for(&params);
     policy["commands"] = commands.clone();
+    if let Code::External { workflow, script } = &params.code {
+        policy["prerequisites"]["local"] = serde_json::json!([
+            "an exact spec-spine pin",
+            workflow,
+            script,
+            "a git work tree"
+        ]);
+        policy["jobs"]["code"]["workflow"] = serde_json::json!(workflow);
+    }
     // Revision 7: a declared extra job is required on every event, by the
     // same rule as the profile's own required jobs.
     for e in &params.extra_required_jobs {
@@ -1616,6 +1766,14 @@ pub fn plan(inputs: &Inputs<'_>) -> Result<Plan, String> {
         ".gitignore",
     ] {
         id_text.push_str(&format!("read {rel} {}\n", observe(&root.join(rel))));
+    }
+    if let Code::External { workflow, script } = &params.code {
+        for rel in [workflow, script] {
+            id_text.push_str(&format!(
+                "external-read {rel} {}\n",
+                observe(&root.join(rel))
+            ));
+        }
     }
     if let Some(text) = inputs.spec_spine_toml {
         id_text.push_str(&format!("pin-source {}\n", digest_bytes(text.as_bytes())));

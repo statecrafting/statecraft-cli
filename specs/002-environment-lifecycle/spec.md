@@ -732,6 +732,15 @@ implementation, which is the condition AGENTS.md recorded for it; it defends
 every claimed file rather than reporting a number (13 then, 149 on
 2026-09-23).
 
+The check-envelope integration fixtures serialize executable script
+installation and the complete child-process read lifetime (2026-10-02).
+This keeps a concurrent test spawn from retaining another fixture's writable
+script descriptor until exec and causing Linux `ETXTBSY`. Both help-reader
+and JSON-envelope assertions remain unchanged; the synchronization changes
+test delivery only and makes no production lifecycle change. A failed
+fixture assertion does not mask a subsequent fixture read through mutex
+poisoning.
+
 Each line is one command. Every row of section 3.10 is one integration test
 named after the row it covers, so a row that stops being covered shows up as a
 deleted test rather than as a quietly weakened assertion.
