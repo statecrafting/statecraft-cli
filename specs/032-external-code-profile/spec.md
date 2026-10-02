@@ -23,6 +23,7 @@ depends_on:
   - "002-environment-lifecycle"
   - "006-command-surface"
   - "018-governed-bootstrap-inputs"
+  - "023-contained-commit-walk"
   - "024-review-budget-and-ratification"
   - "031-engine-in-bin"
 obligations:
