@@ -82,7 +82,7 @@ jobs:
           elif ! jq -e '.authority_rule' "${work}/policy.json" > /dev/null; then
             echo "the base's policy predates revision 5: ci-gate reports an authority change and does not block it"
           else
-            { jq -r '.files[].path, (.parameters.authored_content // empty), (.parameters.code.script // empty)' "${work}/policy.json"; echo "$policy"; } | sort -u > "${work}/set"
+            { jq -r '.files[].path, (.parameters.authored_content // empty)' "${work}/policy.json"; echo "$policy"; } | sort -u > "${work}/set"
             git diff --name-only "${BASE_SHA}...${HEAD_SHA}" | sort -u > "${work}/changed"
             { comm -12 "${work}/set" "${work}/changed"; grep '^scripts/statecraft/' "${work}/changed" || true; grep '^\.github/workflows/' "${work}/changed" || true; } | sort -u > "${work}/touched"
             if [ -s "${work}/touched" ]; then

@@ -158,6 +158,19 @@ impl Repo {
                 statecraft_adapter::fixture::install_script(&root.join(rel), CHECK_AUTHORED, 0o755)
                     .unwrap();
             }
+            if *k == "ci.code" && v["kind"] == "external" {
+                let workflow = v["workflow"].as_str().unwrap();
+                let script = v["script"].as_str().unwrap();
+                std::fs::create_dir_all(root.join(script).parent().unwrap()).unwrap();
+                write(root, workflow, REUSABLE);
+                statecraft_adapter::fixture::install_script(
+                    &root.join(script),
+                    "#!/bin/sh\ncd \"${STATECRAFT_PROJECT_ROOT:?}\"\ntest -f src/lib.rs || exit 7\necho trusted-code\nexit 1\n",
+                    0o755,
+                )
+                .unwrap();
+                git(root, &["add", workflow, script]);
+            }
             if *k == "ci.extra_required_jobs" {
                 for e in v.as_array().unwrap() {
                     write(root, e["workflow"].as_str().unwrap(), REUSABLE);
@@ -4471,4 +4484,354 @@ fn an_unreadable_base_refuses_and_never_reads_the_candidate() {
         ran.text
     );
     assert!(ran.stub_file("claude-called").is_none());
+}
+
+/// Spec 032: both independent authority computations require the owner for
+/// a script outside the managed scripts directory. The trusted script runs
+/// even when a candidate replaces its checks with an unconditional success.
+#[test]
+fn external_code_cannot_weaken_its_own_checks_or_escape_owner_authority() {
+    let script = "scripts/project-code.sh";
+    let workflow = ".github/workflows/project-code.yml";
+    let mut repo = Repo::new_with(
+        &[(
+            "ci.code",
+            serde_json::json!({"kind":"external", "workflow":workflow, "script":script}),
+        )],
+        &[
+            ".github/workflows/statecraft-ci.yml",
+            "scripts/statecraft",
+            POLICY,
+            script,
+            workflow,
+        ],
+        &[],
+    );
+    repo.commit(script, "#!/bin/sh\necho weakened-code\nexit 0\n");
+    let (exit, text) = gate_sh(repo.root(), &["code"], &[("BASE_SHA", &repo.base)], &[]);
+    assert_eq!(exit, 1, "{text}");
+    assert!(text.contains("trusted-code"), "{text}");
+    assert!(!text.contains("weakened-code"), "{text}");
+    let out = authority_output(&repo);
+    assert_eq!(out.output("authority_change"), "true", "{}", out.text);
+    for (exception, want) in [
+        ("skipped", 1),
+        ("failure", 1),
+        ("cancelled", 1),
+        ("success", 0),
+    ] {
+        let results = needs(
+            &as_refs(&with(("review-exception", exception))),
+            Some("no-findings"),
+            false,
+        );
+        let ran = run_gate(&repo, "pull_request", &results, "topic");
+        assert_eq!(ran.exit, want, "{}", ran.text);
+        assert!(ran.text.contains(script), "{}", ran.text);
+    }
+    // A bad code result remains blocking even with the owner exception.
+    for result in ["failure", "cancelled", "skipped"] {
+        let mut states = with(("code", result));
+        states
+            .iter_mut()
+            .find(|(job, _)| *job == "review-exception")
+            .unwrap()
+            .1 = "success".into();
+        let results = needs(&as_refs(&states), Some("no-findings"), false);
+        let ran = run_gate(&repo, "pull_request", &results, "topic");
+        assert_ne!(ran.exit, 0, "{}", ran.text);
+    }
+}
+
+/// The external script is judged in each commit's candidate root, with its
+/// implementation read from the frozen base rather than the candidate.
+#[test]
+fn external_code_commit_walk_uses_trusted_base_with_candidate_relative_paths() {
+    let script = "scripts/project-code.sh";
+    let workflow = ".github/workflows/project-code.yml";
+    let mut repo = Repo::new_with(
+        &[
+            (
+                "ci.code",
+                serde_json::json!({"kind":"external", "workflow":workflow, "script":script}),
+            ),
+            ("governance.gate_each_commit", serde_json::json!(true)),
+        ],
+        &["scripts/statecraft", POLICY, script, workflow],
+        &[],
+    );
+    repo.commit(script, "#!/bin/sh\necho weakened-code\nexit 0\n");
+    std::fs::create_dir_all(repo.root().join(".bin")).unwrap();
+    statecraft_adapter::fixture::install_script(
+        &repo.root().join(".bin/spec-spine"),
+        SPEC_SPINE,
+        0o755,
+    )
+    .unwrap();
+    let (exit, text) = gate_sh(
+        repo.root(),
+        &["commits"],
+        &[("BASE_SHA", &repo.base), ("HEAD_SHA", &repo.head)],
+        &[],
+    );
+    assert_eq!(exit, 1, "{text}");
+    // Both commits reach the root-relative source check and the trusted
+    // script's deliberate finding, including the commit that weakens it.
+    assert_eq!(text.matches("trusted-code").count(), 2, "{text}");
+    assert!(!text.contains("weakened-code"), "{text}");
+    assert!(!text.contains("cargo fmt"), "{text}");
+    assert!(text.contains("governance"), "{text}");
+}
+
+/// Changing the candidate declaration cannot rewrite the base authority set.
+#[test]
+fn external_code_original_authority_survives_candidate_reselection() {
+    let script = "scripts/project-code.sh";
+    for selection in [
+        serde_json::json!({"kind":"rust"}),
+        serde_json::json!({"kind":"external", "workflow":".github/workflows/other.yml", "script":"scripts/other.sh"}),
+        serde_json::Value::Null,
+    ] {
+        let mut repo = Repo::new_with(
+            &[(
+                "ci.code",
+                serde_json::json!({"kind":"external", "workflow":".github/workflows/project-code.yml", "script":script}),
+            )],
+            &[
+                "scripts/statecraft",
+                POLICY,
+                script,
+                ".github/workflows/project-code.yml",
+                ".github/workflows/statecraft-ci.yml",
+            ],
+            &[],
+        );
+        let mut policy: serde_json::Value =
+            serde_json::from_str(&std::fs::read_to_string(repo.root().join(POLICY)).unwrap())
+                .unwrap();
+        if selection.is_null() {
+            policy["parameters"].as_object_mut().unwrap().remove("code");
+        } else {
+            policy["parameters"]["code"] = selection;
+        }
+        repo.commit(POLICY, &serde_json::to_string_pretty(&policy).unwrap());
+        repo.commit(script, "#!/bin/sh\necho weakened-code\nexit 0\n");
+        let out = authority_output(&repo);
+        assert_eq!(out.output("authority_change"), "true", "{}", out.text);
+        assert!(out.text.contains(script), "{}", out.text);
+        let results = needs(
+            &as_refs(&with(("review-exception", "skipped"))),
+            Some("no-findings"),
+            false,
+        );
+        let ran = run_gate(&repo, "pull_request", &results, "topic");
+        assert_eq!(ran.exit, 1, "{}", ran.text);
+        assert!(ran.text.contains(script), "{}", ran.text);
+        let (exit, text) = gate_sh(repo.root(), &["code"], &[("BASE_SHA", &repo.base)], &[]);
+        assert_eq!(exit, 1, "{text}");
+        assert!(text.contains("trusted-code"), "{text}");
+        assert!(!text.contains("weakened-code"), "{text}");
+    }
+}
+
+/// A missing base executable refuses; candidate bytes never substitute for it.
+#[test]
+fn external_code_missing_base_blob_never_falls_back_to_candidate() {
+    let script = "scripts/project-code.sh";
+    let mut repo = Repo::new_with(
+        &[(
+            "ci.code",
+            serde_json::json!({"kind":"external", "workflow":".github/workflows/project-code.yml", "script":script}),
+        )],
+        &["scripts/statecraft", POLICY, script],
+        &[],
+    );
+    git(repo.root(), &["rm", script]);
+    git(repo.root(), &["commit", "--quiet", "-m", "remove script"]);
+    repo.base = git(repo.root(), &["rev-parse", "HEAD"]);
+    repo.commit(script, "#!/bin/sh\necho candidate-fallback\nexit 0\n");
+    git(repo.root(), &["update-index", "--chmod=+x", script]);
+    git(
+        repo.root(),
+        &[
+            "commit",
+            "--quiet",
+            "--allow-empty",
+            "-m",
+            "executable candidate",
+        ],
+    );
+    assert!(git(repo.root(), &["ls-tree", "HEAD", "--", script]).starts_with("100755 "));
+    use std::os::unix::fs::PermissionsExt;
+    std::fs::set_permissions(
+        repo.root().join(script),
+        std::fs::Permissions::from_mode(0o755),
+    )
+    .unwrap();
+    let (exit, text) = gate_sh(repo.root(), &["code"], &[("BASE_SHA", &repo.base)], &[]);
+    assert_eq!(exit, 2, "{text}");
+    assert!(
+        text.contains("declared by the trusted base is missing"),
+        "{text}"
+    );
+    assert!(!text.contains("candidate-fallback"), "{text}");
+}
+
+/// First adoption can use a candidate executable only without a base external declaration.
+#[test]
+fn external_code_first_adoption_requires_no_base_external_declaration() {
+    let script = "scripts/project-code.sh";
+    let mut repo = Repo::new_with(
+        &[(
+            "ci.code",
+            serde_json::json!({"kind":"external", "workflow":".github/workflows/project-code.yml", "script":script}),
+        )],
+        &["scripts/statecraft", POLICY, script],
+        &[],
+    );
+    let mut policy: serde_json::Value =
+        serde_json::from_str(&std::fs::read_to_string(repo.root().join(POLICY)).unwrap()).unwrap();
+    policy["parameters"].as_object_mut().unwrap().remove("code");
+    repo.commit(POLICY, &serde_json::to_string_pretty(&policy).unwrap());
+    git(repo.root(), &["rm", script]);
+    git(
+        repo.root(),
+        &["commit", "--quiet", "-m", "base before external adoption"],
+    );
+    repo.base = git(repo.root(), &["rev-parse", "HEAD"]);
+    repo.commit(script, "#!/bin/sh\necho genuine-adoption\nexit 0\n");
+    git(repo.root(), &["update-index", "--chmod=+x", script]);
+    git(
+        repo.root(),
+        &["commit", "--quiet", "-m", "adopt executable"],
+    );
+    // update-index proves tracked authority; the actual candidate must also be executable.
+    use std::os::unix::fs::PermissionsExt;
+    std::fs::set_permissions(
+        repo.root().join(script),
+        std::fs::Permissions::from_mode(0o755),
+    )
+    .unwrap();
+    let (exit, text) = gate_sh(repo.root(), &["code"], &[("BASE_SHA", &repo.base)], &[]);
+    assert_eq!(exit, 0, "{text}");
+    assert!(text.contains("candidate runs (adoption)"), "{text}");
+    assert!(text.contains("genuine-adoption"), "{text}");
+}
+
+/// Runtime containment applies after setup as well, including linked ancestors.
+/// Trusted Git bytes still execute from their deliberately separate extraction.
+#[test]
+fn external_code_runtime_refuses_linked_parents_locally_and_at_first_adoption() {
+    use std::os::unix::fs::{PermissionsExt, symlink};
+    let script = "checks/nested/project-code.sh";
+    for mode in ["local", "adoption", "trusted"] {
+        for linked_parent in ["checks", "checks/nested"] {
+            let mut repo = Repo::new_with(
+                &[(
+                    "ci.code",
+                    serde_json::json!({"kind":"external", "workflow":".github/workflows/project-code.yml", "script":script}),
+                )],
+                &["scripts/statecraft", POLICY, script],
+                &[],
+            );
+            if mode == "adoption" {
+                let mut policy: serde_json::Value = serde_json::from_str(
+                    &std::fs::read_to_string(repo.root().join(POLICY)).unwrap(),
+                )
+                .unwrap();
+                policy["parameters"].as_object_mut().unwrap().remove("code");
+                repo.commit(POLICY, &serde_json::to_string_pretty(&policy).unwrap());
+                git(repo.root(), &["rm", script]);
+                git(
+                    repo.root(),
+                    &["commit", "--quiet", "-m", "base before adoption"],
+                );
+                repo.base = git(repo.root(), &["rev-parse", "HEAD"]);
+                repo.commit(script, "#!/bin/sh\nexit 0\n");
+                git(repo.root(), &["update-index", "--chmod=+x", script]);
+                git(
+                    repo.root(),
+                    &["commit", "--quiet", "-m", "adopt executable"],
+                );
+            }
+            let outside = tempfile::tempdir().unwrap();
+            let leaf = if linked_parent == "checks" {
+                "nested/project-code.sh"
+            } else {
+                "project-code.sh"
+            };
+            let target = outside.path().join(leaf);
+            std::fs::create_dir_all(target.parent().unwrap()).unwrap();
+            std::fs::write(
+                &target,
+                format!(
+                    "#!/bin/sh\ntouch '{}/outside-executed'\necho outside-project-executed\nexit 0\n",
+                    outside.path().display()
+                ),
+            )
+            .unwrap();
+            std::fs::set_permissions(&target, std::fs::Permissions::from_mode(0o755)).unwrap();
+            std::fs::remove_dir_all(repo.root().join(linked_parent)).unwrap();
+            symlink(outside.path(), repo.root().join(linked_parent)).unwrap();
+            assert!(repo.root().join(script).is_file());
+            let env = if mode == "local" {
+                vec![]
+            } else {
+                vec![("BASE_SHA", repo.base.as_str())]
+            };
+            let (exit, text) = gate_sh(repo.root(), &["code"], &env, &[]);
+            if mode == "trusted" {
+                assert_eq!(exit, 1, "{mode}/{linked_parent}: {text}");
+                assert!(text.contains("trusted-code"), "{text}");
+            } else {
+                assert_eq!(exit, 2, "{mode}/{linked_parent}: {text}");
+                assert!(text.contains("linked path component"), "{text}");
+            }
+            assert!(!outside.path().join("outside-executed").exists(), "{text}");
+            assert!(!text.contains("outside-project-executed"), "{text}");
+        }
+    }
+}
+
+/// A candidate executable cannot repair an invalid trusted-base executable mode.
+#[test]
+fn external_code_non_executable_base_never_uses_executable_candidate() {
+    let script = "scripts/project-code.sh";
+    let mut repo = Repo::new_with(
+        &[(
+            "ci.code",
+            serde_json::json!({"kind":"external", "workflow":".github/workflows/project-code.yml", "script":script}),
+        )],
+        &["scripts/statecraft", POLICY, script],
+        &[],
+    );
+    git(repo.root(), &["update-index", "--chmod=-x", script]);
+    git(
+        repo.root(),
+        &["commit", "--quiet", "-m", "invalid base executable mode"],
+    );
+    repo.base = git(repo.root(), &["rev-parse", "HEAD"]);
+    repo.commit(script, "#!/bin/sh\necho candidate-fallback\nexit 0\n");
+    git(repo.root(), &["update-index", "--chmod=+x", script]);
+    git(
+        repo.root(),
+        &[
+            "commit",
+            "--quiet",
+            "--allow-empty",
+            "-m",
+            "executable candidate",
+        ],
+    );
+    use std::os::unix::fs::PermissionsExt;
+    std::fs::set_permissions(
+        repo.root().join(script),
+        std::fs::Permissions::from_mode(0o755),
+    )
+    .unwrap();
+    assert!(git(repo.root(), &["ls-tree", "HEAD", "--", script]).starts_with("100755 "));
+    let (exit, text) = gate_sh(repo.root(), &["code"], &[("BASE_SHA", &repo.base)], &[]);
+    assert_eq!(exit, 2, "{text}");
+    assert!(text.contains("not executable at the base"), "{text}");
+    assert!(!text.contains("candidate-fallback"), "{text}");
 }
