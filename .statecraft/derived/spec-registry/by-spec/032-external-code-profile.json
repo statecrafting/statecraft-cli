@@ -71,15 +71,15 @@
       }
     ],
     "sectionDigests": {
-      "032-required-project-owned-code-checks": "6a5598365b0c8034a82e56e419aaf8ffc8949fb915af2399fee9875067dad2fa",
+      "032-required-project-owned-code-checks": "f1c01faea33a2035ecec4045c5a7ab17f8b580b86671127d52d97486fda4186c",
       "1-purpose": "137f39b684c18789eb42857826ec139d98a9794dfaa71c5e663e591b9656239b",
       "2-territory": "1381c1dc47a5b1ba4ef9281004196c8f50c96e19af1520f732da2e55816d7076",
       "3-1-explicit-selection": "cbf12fb5b0f08252a914249c9d0f4e5d6e3ff4d882c561c5e72f0dae891ed661",
       "3-2-required-code": "ce101ea5414ae5fc6240ccff851b2b8481dd213f0cfb2d334e7b965fe1376823",
-      "3-3-authority-and-consent": "cb40f27f1ce8b0cb8399fede3437bb12197fcccf2b8c6f6ae147753eab551327",
+      "3-3-authority-and-consent": "80d4ebe32bd30da7a78a1ff0b58e2d835b9380da45cf06db9beb57e9dd9b5e4b",
       "3-4-commit-walk": "97660f88953adc2aa3d849ee925842b62021789260f5036bf0c8f6a21ff41856",
       "3-5-revision-and-upgrade": "2528117aee4622114c8db2b152cba237bbfec362f25e71d535bab5090e3f5241",
-      "3-behavior": "d6afe1c06836928a10918009e20bbfa6dc5c434fc6516729f7bffb10d8f97d36",
+      "3-behavior": "9db71fff42096867d2406be39c4e780bb933b9a28f625464926fadc4a7c62f15",
       "4-out-of-scope": "8851ef1a6710a853622c31c0f5154c5057663232c77fbdcb9934afeb243e0700",
       "5-decisions-awaiting-ratification": "8ae8b77a8915c586619da3cf4ae77f6d39ceb637e2a44cdcbe0cc5e6ae6cae4c",
       "verification": "0bf2e002b0ba1a7c880618c1aebf51923a94bbd5823a4b45c1a9425d99d6f4a6"
@@ -103,6 +103,6 @@
     "summary": "Profile revision 14 keeps Rust as its default and admits an explicitly selected external code surface. A contained executable local script and a tracked reusable workflow remain required. Rust prerequisites apply only to the Rust selection. Governance, coupling, AI review, protected owner exceptions and the single required aggregate retain their existing rules.\n",
     "title": "Required project-owned code checks under managed governance"
   },
-  "shardHash": "f4eb34ff72ed77f9f98c5b94a8a57cc75c95ca54259374c79c5d9ca2caacd22d",
+  "shardHash": "57d4f1a4ec2e4d546674cd140712a061a19098405de952606ba7e202dab03641",
   "specVersion": "1.9.0"
 }

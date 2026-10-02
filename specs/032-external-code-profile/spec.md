@@ -117,6 +117,11 @@ detection and `ci-gate.sh` recomputation. Editing or deleting it requires the
 protected owner exception for the exact run, even if candidate policy or
 workflow detection claims otherwise.
 
+The script runs with the candidate project root as its working directory and
+`STATECRAFT_PROJECT_ROOT` set to that root. Scripts use this explicit root or
+working-directory-relative paths, never their extraction location (`$0` or
+`dirname`), because a trusted blob runs from a temporary file.
+
 The local gate reads the script's executable Git blob at the supplied base
 commit and runs it against the candidate tree. A missing base commit or a
 non-executable base blob refuses. First adoption may use the candidate's
