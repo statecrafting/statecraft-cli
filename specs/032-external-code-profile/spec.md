@@ -1,7 +1,7 @@
 ---
 id: "032-external-code-profile"
 title: "Required project-owned code checks under managed governance"
-status: draft
+status: approved
 implementation: pending
 created: "2026-10-02"
 summary: >
