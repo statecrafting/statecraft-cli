@@ -181,8 +181,9 @@ fn a_stderr_notice_does_not_claim_json_support() {
     let script = "#!/bin/sh\ncase \"$*\" in\n  'check --help') \
 echo 'Usage: spec-spine check'; echo 'notice: --json changes soon' >&2 ;;\n  check) \
 echo 'check: fresh'; exit 0 ;;\n  'check --json') echo 'wrong reader' >&2; exit 4 ;;\nesac\n";
-    fixture::install(&bin, script);
-    assert_eq!(run_check(bin.to_str().unwrap(), &repo), CheckAnswer::Fresh);
+    fixture::with_script(&bin, script, || {
+        assert_eq!(run_check(bin.to_str().unwrap(), &repo), CheckAnswer::Fresh);
+    });
 }
 
 #[cfg(unix)]
@@ -199,24 +200,32 @@ fn an_engine_whose_check_takes_json_is_read_from_its_envelope() {
          'check --json') printf '%s\n' '{stale}'; exit 1 ;;\n  \
          check) echo 'this engine was read by its words' >&2; exit 1 ;;\nesac\n"
     );
-    fixture::install(&bin, &script);
-    match run_check(bin.to_str().unwrap(), &repo) {
-        CheckAnswer::Stale { reading, .. } => assert_eq!(reading, StaleReading::Stale),
-        other => panic!("{other:?}"),
-    }
+    fixture::with_script(&bin, &script, || {
+        match run_check(bin.to_str().unwrap(), &repo) {
+            CheckAnswer::Stale { reading, .. } => assert_eq!(reading, StaleReading::Stale),
+            other => panic!("{other:?}"),
+        }
+    });
 }
 
-/// Writes a script without the `ETXTBSY` race: staged under another name, then
-/// renamed, and only executed after the file is closed.
+/// Keep fixture installation and child execution in one serialized lifetime.
+/// A concurrent spawn can inherit another thread's writable script descriptor
+/// until exec closes it, even after the writer itself has closed and renamed
+/// the file. Staging alone therefore does not prevent Linux `ETXTBSY`.
 #[cfg(unix)]
 mod fixture {
     use std::os::unix::fs::PermissionsExt;
     use std::path::Path;
+    use std::sync::Mutex;
 
-    pub fn install(at: &Path, script: &str) {
+    static SCRIPT_LIFETIME: Mutex<()> = Mutex::new(());
+
+    pub fn with_script<T>(at: &Path, script: &str, run: impl FnOnce() -> T) -> T {
+        let _lifetime = SCRIPT_LIFETIME.lock().unwrap();
         let staged = at.with_extension("staged");
         std::fs::write(&staged, script).unwrap();
         std::fs::set_permissions(&staged, std::fs::Permissions::from_mode(0o755)).unwrap();
         std::fs::rename(&staged, at).unwrap();
+        run()
     }
 }
