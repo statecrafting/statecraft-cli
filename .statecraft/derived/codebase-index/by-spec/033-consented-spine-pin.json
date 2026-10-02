@@ -69,8 +69,8 @@
       }
     ],
     "specId": "033-consented-spine-pin",
-    "specStatus": "draft"
+    "specStatus": "approved"
   },
   "schemaVersion": "1.2.0",
-  "shardHash": "eba62a19f690e5d60ebe381bf4c0a3b8a61f76e26c6409d3979f1f6e2b11c9d6"
+  "shardHash": "8450e8a26a397d6adac8db4c2a24d3586c51465e259e75acad51924f8af29aa7"
 }

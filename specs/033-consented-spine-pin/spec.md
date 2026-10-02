@@ -1,7 +1,7 @@
 ---
 id: "033-consented-spine-pin"
 title: "A reviewed initialization plan may explicitly move the adopted spec-spine pin"
-status: draft
+status: approved
 implementation: pending
 created: "2026-10-02"
 summary: >
