@@ -2202,7 +2202,7 @@ fn environment_verb(
     remote: Option<bind::RemoteAsk>,
     format: Format,
 ) -> i32 {
-    let declarations = adapters::declarations();
+    let declarations = adapters::declarations_for(root);
     let probe = adapters::probe(home);
     // No second installer is left to claim a path (spec 002 sections 3.21 and
     // 3.22), so no package identity exists to name. An occupied path is still

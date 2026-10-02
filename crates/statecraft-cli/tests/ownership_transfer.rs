@@ -8,14 +8,16 @@
 //! was. The library's own suite is `statecraft-environment`'s
 //! `tests/transfer.rs`.
 //!
-//! The installed adapter is the claude-code one the binary configures. Whether
-//! it *claims* its paths depends on its credential prerequisite, which is
-//! satisfied only on macOS (spec 004 section 3.14), and rule 1 admits a move
-//! to `managed` only where it does. So every test that needs a `managed` path
-//! asserts the move on macOS, against a fake provider and a synthetic
-//! qualification record, and elsewhere asserts the refusal
-//! (`adapter-not-claiming`) and reports the rest skipped. The library suite
-//! asserts the `managed` halves on every platform with a test probe.
+//! The installed adapter is the claude-code one the binary configures. Since
+//! spec 030 it declares one path, the `CLAUDE.md` pointer, which is an
+//! instruction file rule 2 keeps `user`: through the binary a move of it to
+//! `managed` is refused `instruction-file` on every platform. Whether the
+//! adapter *claims* depends on its credential prerequisite, satisfied only on
+//! macOS (spec 004 section 3.14), so the tests that need a `managed` path (the
+//! pointer written by `env apply` where nothing was there) run on macOS against
+//! a fake provider and a synthetic qualification record, and report themselves
+//! skipped elsewhere. The library suite asserts rule 1 and the `managed` halves
+//! on every platform with a test adapter.
 
 #![cfg(unix)]
 
@@ -27,7 +29,7 @@ use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Output};
 
-const OWNED: &str = ".claude/statecraft/instructions.md";
+const OWNED: &str = "CLAUDE.md";
 
 fn binary() -> PathBuf {
     PathBuf::from(env!("CARGO_BIN_EXE_statecraft-cli"))
@@ -323,74 +325,27 @@ fn user_to_adopted_and_back_through_the_binary() {
 }
 
 // Acceptance: `user` to `managed` for an adapter path `env apply` withheld as
-// `foreign`, after which `env apply` writes it, and the reversal, after which
-// it is withheld again.
+// `foreign`. Since spec 030 the one path the configured adapter declares is
+// the `CLAUDE.md` pointer, an instruction file rule 2 keeps `user`, so through
+// the binary the move is refused on every platform, whether or not the adapter
+// claims. The move itself, its `env apply` and its reversal are asserted by the
+// library suite with a test adapter whose path is not an instruction file.
 #[test]
-fn a_withheld_adapter_path_moved_to_managed_is_written_then_withheld_after_reversal() {
+fn the_adapters_only_path_is_an_instruction_file_and_never_becomes_managed() {
     let s = Sandbox::with(&[(OWNED, b"the user's copy\n")]);
-    let claiming = s.claiming();
-    if cfg!(target_os = "macos") {
-        assert!(claiming, "the fake provider and record satisfy the adapter");
-    }
     let root = s.root();
-    if !claiming {
-        s.refused(
-            "adapter-not-claiming",
-            &["transfer", "plan", &root, OWNED, "user", "managed"],
+    s.refused(
+        "instruction-file",
+        &["transfer", "plan", &root, OWNED, "user", "managed"],
+    );
+    {
+        let (c, v) = s.json(&["env", "apply", &root]);
+        assert!(c <= 2, "{v}");
+        assert_eq!(
+            s.read(OWNED),
+            b"the user's copy\n",
+            "withheld, never merged"
         );
-        eprintln!("skipped: the adapter does not claim its paths on this platform");
-        return;
-    }
-    {
-        let (c, v) = s.json(&["env", "apply", &root]);
-        assert_eq!(c, 1, "partial: {v}");
-        assert!(v.to_string().contains(OWNED), "withheld and named: {v}");
-        assert_eq!(s.read(OWNED), b"the user's copy\n");
-    }
-
-    let plan = s.plan(OWNED, "user", "managed");
-    assert_eq!(
-        json_naming::payload(&plan)["current"]["declaredBy"],
-        "claude-code"
-    );
-    let id = s.transfer(OWNED, "user", "managed");
-    let entry = s.entry(OWNED).unwrap();
-    assert_eq!(entry["class"], "managed");
-    assert_eq!(entry["source"]["identity"], "claude-code");
-    assert_eq!(
-        entry["transfer"]["evaluated_against"],
-        format!(
-            "spec-spine-core@{}",
-            statecraft_home::producer::PRODUCER_VERSION
-        )
-    );
-    assert_eq!(
-        s.read(OWNED),
-        b"the user's copy\n",
-        "the transfer wrote nothing"
-    );
-
-    {
-        let (c, v) = s.json(&["env", "apply", &root]);
-        assert_eq!(c, 0, "applied: {v}");
-        assert_ne!(s.read(OWNED), b"the user's copy\n", "env apply wrote it");
-    }
-    let written = s.read(OWNED);
-
-    let (c, v) = s.revert(&id);
-    assert_eq!(c, 0, "{v}");
-    assert!(s.entry(OWNED).is_none());
-    assert_eq!(
-        s.read(OWNED),
-        written,
-        "reversal changes ownership, never content"
-    );
-
-    {
-        let (c, v) = s.json(&["env", "apply", &root]);
-        assert_eq!(c, 1, "withheld again: {v}");
-        assert!(v.to_string().contains(OWNED), "{v}");
-        assert_eq!(s.read(OWNED), written);
     }
 }
 
@@ -780,15 +735,19 @@ fn a_transfer_while_another_process_holds_the_manifest_lock_is_refused_busy() {
 // disagree.
 #[test]
 fn a_file_restored_after_env_remove_does_not_block_transfers() {
-    let s = Sandbox::with(&[(OWNED, b"the user's copy\n")]);
+    let s = Sandbox::new();
     let root = s.root();
     if !s.claiming() {
         eprintln!("skipped: no path is managed where the adapter does not claim its paths");
         return;
     }
-    s.transfer(OWNED, "user", "managed");
     let (c, v) = s.json(&["env", "apply", &root]);
-    assert_eq!(c, 0, "{v}");
+    assert!(c <= 1, "{v}");
+    assert_eq!(
+        s.entry(OWNED).unwrap()["class"],
+        "managed",
+        "env apply wrote it"
+    );
     let (c, v) = s.json(&["env", "remove", &root]);
     assert!(c <= 1, "{v}");
     assert!(!s.project().join(OWNED).exists());
@@ -810,8 +769,10 @@ fn a_file_restored_after_env_remove_does_not_block_transfers() {
     assert_eq!(c, 0, "{v}");
 }
 
-// Rule 1 on every platform: with no qualification record the adapter claims
-// nothing, so this product would not itself write its paths.
+// With no qualification record the adapter claims nothing. Rule 2 still
+// answers first for its only path, an instruction file, and adoption still
+// needs no source. Rule 1's refusal is the library suite's, since no path the
+// binary's adapter declares can reach it (spec 030).
 #[test]
 fn user_to_managed_is_refused_where_the_adapter_does_not_claim_its_paths() {
     let s = Sandbox::with(&[(OWNED, b"the user's copy\n")]);
@@ -819,10 +780,15 @@ fn user_to_managed_is_refused_where_the_adapter_does_not_claim_its_paths() {
     assert!(!s.claiming());
     let root = s.root();
     s.refused(
-        "adapter-not-claiming",
+        "instruction-file",
         &["transfer", "plan", &root, OWNED, "user", "managed"],
     );
-    let (c, v) = s.json(&["transfer", "plan", &root, OWNED, "user", "adopted"]);
+    s.refused(
+        "instruction-file",
+        &["transfer", "plan", &root, OWNED, "user", "adopted"],
+    );
+    s.write("notes.md", b"one\n");
+    let (c, v) = s.json(&["transfer", "plan", &root, "notes.md", "user", "adopted"]);
     assert_eq!(c, 0, "adoption needs no source: {v}");
 }
 

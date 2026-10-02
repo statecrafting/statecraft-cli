@@ -109,13 +109,10 @@ pub fn apply_current(
 ) -> Result<Outcome, ApplyError> {
     // A refusal at plan time depends on the declarations alone, and is
     // answered before the lock, so it creates not even runtime state.
-    let colliding = crate::adapter::collisions(declarations);
+    let colliding = crate::plan::declaration_refusals(declarations);
     if !colliding.is_empty() {
         return Ok(Outcome::Refused {
-            reasons: colliding
-                .into_iter()
-                .map(|c| crate::plan::Refusal::AdapterPathCollision(c).describe())
-                .collect(),
+            reasons: colliding.iter().map(|r| r.describe()).collect(),
         });
     }
     let _held = crate::manifest::lock(root, WRITER_WAIT)?;
@@ -188,6 +185,52 @@ pub fn perform(
         written.push(w.path.clone());
     }
 
+    // Spec 030 section 3.3: files an adapter no longer declares, removed only
+    // while they still carry the recorded bytes and are reached through no
+    // link, then every parent directory this removal left empty, up to the
+    // target. A file that changed since the plan is kept, with its record.
+    let mut withheld = computed.withheld.clone();
+    for r in &computed.retired {
+        if crate::replace::link_on_path(root, &r.path).map_err(|source| ApplyError::Io {
+            path: r.path.clone(),
+            source,
+        })? {
+            withheld.push(WithheldWrite {
+                path: r.path.clone(),
+                adapter: r.adapter.clone(),
+                reason: crate::plan::Withholding::SymbolicLink,
+            });
+            continue;
+        }
+        let target = resolve(root, &r.path);
+        match digest_file(&target).map_err(|source| ApplyError::Io {
+            path: r.path.clone(),
+            source,
+        })? {
+            Some((found, _)) if found != r.digest => {
+                withheld.push(WithheldWrite {
+                    path: r.path.clone(),
+                    adapter: r.adapter.clone(),
+                    reason: crate::plan::Withholding::Drifted {
+                        expected: r.digest.clone(),
+                        found,
+                    },
+                });
+                continue;
+            }
+            Some(_) => {
+                std::fs::remove_file(&target).map_err(|source| ApplyError::Io {
+                    path: r.path.clone(),
+                    source,
+                })?;
+                prune_emptied(root, &target);
+            }
+            None => {}
+        }
+        manifest.remove(&r.path);
+        written.push(r.path.clone());
+    }
+
     // Pins record the adapter set that produced this environment. Recorded,
     // never silently satisfied: doctor compares them, nothing repairs them.
     for d in declarations {
@@ -199,14 +242,28 @@ pub fn perform(
 
     manifest.write(root)?;
 
-    Ok(if computed.withheld.is_empty() {
+    Ok(if withheld.is_empty() {
         Outcome::Applied { written }
     } else {
-        Outcome::Partial {
-            written,
-            withheld: computed.withheld.clone(),
-        }
+        Outcome::Partial { written, withheld }
     })
+}
+
+/// Remove each parent of `removed` that the removal left empty, stopping at
+/// the first that is not empty or is the target root itself.
+fn prune_emptied(root: &Path, removed: &Path) {
+    let mut at = removed.parent();
+    while let Some(dir) = at {
+        if dir == root || !dir.starts_with(root) {
+            break;
+        }
+        // `remove_dir` refuses a directory that is not empty, which is the
+        // whole test: nothing inside one is ever removed here.
+        if std::fs::remove_dir(dir).is_err() {
+            break;
+        }
+        at = dir.parent();
+    }
 }
 
 /// What an apply carrying per-path consents did.
@@ -239,14 +296,11 @@ pub fn apply_consented_current(
 ) -> Result<Consented, ApplyError> {
     // A refusal at plan time depends on the declarations alone, and is
     // answered before the lock, so it creates not even runtime state.
-    let colliding = crate::adapter::collisions(declarations);
+    let colliding = crate::plan::declaration_refusals(declarations);
     if !colliding.is_empty() {
         return Ok(Consented {
             outcome: Outcome::Refused {
-                reasons: colliding
-                    .into_iter()
-                    .map(|c| crate::plan::Refusal::AdapterPathCollision(c).describe())
-                    .collect(),
+                reasons: colliding.iter().map(|r| r.describe()).collect(),
             },
             named: Vec::new(),
             swept: Vec::new(),

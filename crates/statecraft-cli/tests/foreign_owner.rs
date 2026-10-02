@@ -175,7 +175,6 @@ fn doctor_still_reports_the_adapters_own_bytes_unrecorded_as_an_unmanaged_write(
 fn env_plan_and_apply_name_the_owner_of_every_path_they_withhold() {
     let f = Fixture::new();
     qualify_the_adapter(&f);
-    let owned = statecraft_adapter_claude_code::environment::OWNED_INSTRUCTIONS;
     std::fs::write(f.project().join(POINTER), USER_BYTES).unwrap();
 
     let (exit, plan) = f.json(&["env", "plan", &f.root()]);
@@ -209,28 +208,24 @@ fn env_plan_and_apply_name_the_owner_of_every_path_they_withhold() {
         std::fs::read(f.project().join(POINTER)).unwrap(),
         USER_BYTES
     );
-    assert!(f.project().join(owned).is_file(), "its own path is written");
+    assert!(
+        !f.project().join(".claude").exists(),
+        "the adapter declares no path inside a provider directory (spec 030)"
+    );
 
-    // The adapter's own path, occupied by the user before any apply, is
-    // withheld with the same owner.
+    // A user's file at the path an earlier build owned is not this adapter's
+    // any more: never written over, never withheld as the adapter's.
     let g = Fixture::new();
     qualify_the_adapter(&g);
-    let at = g.project().join(owned);
+    let retired = statecraft_adapter_claude_code::environment::RETIRED_INSTRUCTIONS;
+    let at = g.project().join(retired);
     std::fs::create_dir_all(at.parent().unwrap()).unwrap();
     std::fs::write(&at, USER_BYTES).unwrap();
     let (exit, applied) = g.json(&["env", "apply", &g.root()]);
-    assert_eq!(exit, 1, "partial: {applied}");
-    let withheld = applied["report"]["withheld"].as_array().unwrap();
-    let entry = withheld
-        .iter()
-        .find(|w| w["path"] == owned)
-        .unwrap_or_else(|| panic!("{applied}"));
-    assert_eq!(entry["owner"], "user");
+    assert_eq!(exit, 0, "{applied}");
     assert!(
-        entry["reason"]
-            .as_str()
-            .unwrap()
-            .starts_with("claimed by owner user")
+        applied["report"].get("withheld").is_none(),
+        "an applied outcome has no withheld paths: {applied}"
     );
     assert_eq!(
         std::fs::read(&at).unwrap(),
@@ -238,13 +233,13 @@ fn env_plan_and_apply_name_the_owner_of_every_path_they_withhold() {
         "never written over"
     );
 
-    // And `doctor` agrees with the apply about who holds it.
-    let (_, value) = g.json(&["doctor", &g.root()]);
+    // And `doctor` agrees with the apply about who holds the pointer.
+    let (_, value) = f.json(&["doctor", &f.root()]);
     let found = findings(&value);
     assert!(
         found
             .iter()
-            .any(|l| l.starts_with(&format!("foreign {owned}, owner user"))),
+            .any(|l| l.starts_with(&format!("foreign {POINTER}, owner user"))),
         "{found:?}"
     );
 }
