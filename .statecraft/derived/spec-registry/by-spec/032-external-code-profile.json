@@ -2,6 +2,7 @@
   "record": {
     "amends": [
       "002-environment-lifecycle",
+      "006-command-surface",
       "018-governed-bootstrap-inputs",
       "023-contained-commit-walk",
       "031-engine-in-bin"
@@ -72,15 +73,15 @@
       }
     ],
     "sectionDigests": {
-      "032-required-project-owned-code-checks": "de67bd0b92d270519313e50e76440c1d24a5f2dacaa778cdcd281abf4eb5c732",
+      "032-required-project-owned-code-checks": "7afa781a2d7b06a1bc10641dd632161f9deedd844df5451a60a7c7d49021a1b4",
       "1-purpose": "137f39b684c18789eb42857826ec139d98a9794dfaa71c5e663e591b9656239b",
       "2-territory": "1381c1dc47a5b1ba4ef9281004196c8f50c96e19af1520f732da2e55816d7076",
       "3-1-explicit-selection": "cbf12fb5b0f08252a914249c9d0f4e5d6e3ff4d882c561c5e72f0dae891ed661",
       "3-2-required-code": "ce101ea5414ae5fc6240ccff851b2b8481dd213f0cfb2d334e7b965fe1376823",
-      "3-3-authority-and-consent": "ba3b1bca7a1075152b2bce35d8b86dd6b9f4141ce53ef144f4fa82e4c76b7deb",
+      "3-3-authority-and-consent": "a911d9b832d23562e337a407ffdabec924b5e19fe7e10fa0464efe4261c95885",
       "3-4-commit-walk": "97660f88953adc2aa3d849ee925842b62021789260f5036bf0c8f6a21ff41856",
       "3-5-revision-and-upgrade": "af20cef68e293c0cea3db9fa1da2376f1a2e021415be9860c82659a65930e2b0",
-      "3-behavior": "2e71b43fcbe07d7a9815b2477e41b0276aa2740139a08af96f699d6c1dbd8438",
+      "3-behavior": "bb3b40c755fc65a18ce79905b004486ec42a3537bfba87cf1d4256f308dc4ac7",
       "4-out-of-scope": "8851ef1a6710a853622c31c0f5154c5057663232c77fbdcb9934afeb243e0700",
       "5-owner-ratification-decision-2026-10-02": "12ac9786c5297eaf61e085a34dada11e92f80b5f3a4a037cc75f029564c26529",
       "verification": "0bf2e002b0ba1a7c880618c1aebf51923a94bbd5823a4b45c1a9425d99d6f4a6"
@@ -104,6 +105,6 @@
     "summary": "Profile revision 14 keeps Rust as its default and admits an explicitly selected external code surface. A contained executable local script and a tracked reusable workflow remain required. Rust prerequisites apply only to the Rust selection. Governance, coupling, AI review, protected owner exceptions and the single required aggregate retain their existing rules.\n",
     "title": "Required project-owned code checks under managed governance"
   },
-  "shardHash": "91d2bb4115ca8a37c69cc5ac3ff4f13c7b99f8c850fa2cc16a02b7f2c59d22ac",
+  "shardHash": "c91112de47a8f415cc4c0014e22b194ae7ff2edf5c1603dc55ad313dbcaed2db",
   "specVersion": "1.9.0"
 }

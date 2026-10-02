@@ -2,6 +2,7 @@
   "mapping": {
     "amends": [
       "002-environment-lifecycle",
+      "006-command-surface",
       "018-governed-bootstrap-inputs",
       "023-contained-commit-walk",
       "031-engine-in-bin"
@@ -55,5 +56,5 @@
     "specStatus": "approved"
   },
   "schemaVersion": "1.2.0",
-  "shardHash": "91d2bb4115ca8a37c69cc5ac3ff4f13c7b99f8c850fa2cc16a02b7f2c59d22ac"
+  "shardHash": "c91112de47a8f415cc4c0014e22b194ae7ff2edf5c1603dc55ad313dbcaed2db"
 }

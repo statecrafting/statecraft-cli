@@ -12,6 +12,7 @@ summary: >
   exceptions and the single required aggregate retain their existing rules.
 amends:
   - "002-environment-lifecycle"
+  - "006-command-surface"
   - "018-governed-bootstrap-inputs"
   - "023-contained-commit-walk"
   - "031-engine-in-bin"
@@ -131,7 +132,10 @@ Only then may the gate use the executable candidate script, with an explicit
 adoption diagnostic. A base policy that already declares external code must
 never fall back to candidate bytes when its script is missing or invalid.
 Adding this workflow or script still requires the protected owner authority
-exception for the exact run. Local runs without a supplied base use the
+exception for the exact run. An owner-approved removal and later reintroduction
+are two protected authority changes; reintroduction is not an unreviewed
+lineage reset. The supplied current trusted base defines script selection,
+not an all-history tombstone. Local runs without a supplied base use the
 working tree script.
 
 ### 3.4 Commit walk
