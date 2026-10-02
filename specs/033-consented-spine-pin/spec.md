@@ -52,9 +52,9 @@ obligations:
 
 A fleet upgrade currently requires an operator to edit the adopted pin before
 initialization can render the new profile. The operator cannot review the pin
-move and its managed consequences as one plan. This draft proposes that explicit
-pin request as an initialization input. It does not claim implementation,
-acceptance, release or owner ratification.
+move and its managed consequences as one plan. This approved spec requires that
+explicit pin request as an initialization input. Owner ratification grants the
+specified contract; implementation, passing acceptance and release remain unclaimed.
 
 ## 2. Territory
 
@@ -215,14 +215,14 @@ require a separately reviewed bridge before the pin move can land.
 
 ## 5. Resolved decisions
 
-Exact producer equality keeps this proposal independent of older profile
+Exact producer equality keeps this contract independent of older profile
 rendering and bridge mode. Preserving the authored configuration by a single
 value edit makes the consent reviewable and avoids reformatting an adopted
 user's file. A separate environment replacement keeps this amendment focused
 on one authored value rather than introducing another drift consent surface.
 Effective-pin resolution enables a read-only preview while retaining one judge,
 exclusive overrides and the prohibition on acquisition. Acceptance criteria
-are proposed behavior, not evidence that the implementation exists.
+specify required behavior, not evidence that the implementation exists.
 
 ## Verification
 
@@ -231,7 +231,7 @@ real plan/apply boundary; the binary suite also checks human and JSON reports
 and exit classes. Failure injection covers the atomic pin write, manifest
 recording and a subsequent initialization operation. Existing suites guard
 ordinary initialization, exact resolution and revision 14 external code.
-These commands are the proposed acceptance, not passing evidence on this draft.
+These commands declare required acceptance; they are not passing implementation evidence.
 
 ```verify:cli
 cargo test -p statecraft-home --test consented_spine_pin
