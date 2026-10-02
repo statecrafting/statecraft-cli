@@ -221,11 +221,29 @@ mod fixture {
     static SCRIPT_LIFETIME: Mutex<()> = Mutex::new(());
 
     pub fn with_script<T>(at: &Path, script: &str, run: impl FnOnce() -> T) -> T {
-        let _lifetime = SCRIPT_LIFETIME.lock().unwrap();
+        // Each test owns a new file; a prior assertion failure invalidates no
+        // shared fixture data and must not mask the next test's own result.
+        let _lifetime = SCRIPT_LIFETIME.lock().unwrap_or_else(|e| e.into_inner());
         let staged = at.with_extension("staged");
         std::fs::write(&staged, script).unwrap();
         std::fs::set_permissions(&staged, std::fs::Permissions::from_mode(0o755)).unwrap();
         std::fs::rename(&staged, at).unwrap();
         run()
+    }
+
+    #[test]
+    fn a_failed_fixture_does_not_mask_the_next_child_read() {
+        let dir = tempfile::tempdir().unwrap();
+        let bin = dir.path().join("script");
+        let script = "#!/bin/sh\nexit 0\n";
+        assert!(
+            std::panic::catch_unwind(|| {
+                with_script(&bin, script, || panic!("the fixture assertion failed"));
+            })
+            .is_err()
+        );
+        with_script(&bin, script, || {
+            assert!(std::process::Command::new(&bin).status().unwrap().success());
+        });
     }
 }
