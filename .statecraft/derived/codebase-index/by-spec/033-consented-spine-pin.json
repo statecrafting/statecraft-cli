@@ -1,0 +1,76 @@
+{
+  "mapping": {
+    "amends": [
+      "002-environment-lifecycle",
+      "006-command-surface",
+      "018-governed-bootstrap-inputs",
+      "029-one-resolved-judge"
+    ],
+    "dependsOn": [
+      "002-environment-lifecycle",
+      "006-command-surface",
+      "018-governed-bootstrap-inputs",
+      "029-one-resolved-judge",
+      "032-external-code-profile"
+    ],
+    "implementingPaths": [
+      {
+        "path": "crates/statecraft-cli/",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/statecraft-environment/",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/statecraft-home/",
+        "source": "spec-edge"
+      }
+    ],
+    "resolvedUnits": [
+      {
+        "locations": [
+          {
+            "file": "crates/statecraft-cli/"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "directory",
+          "path": "crates/statecraft-cli/"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "crates/statecraft-environment/"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "directory",
+          "path": "crates/statecraft-environment/"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "crates/statecraft-home/"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "directory",
+          "path": "crates/statecraft-home/"
+        }
+      }
+    ],
+    "specId": "033-consented-spine-pin",
+    "specStatus": "approved"
+  },
+  "schemaVersion": "1.2.0",
+  "shardHash": "e8e999adaa832c8826653864bb482ea3b9039b358bb7e79a8cfbf1ce47067448"
+}
