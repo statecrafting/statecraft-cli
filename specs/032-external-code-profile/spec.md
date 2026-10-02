@@ -20,6 +20,7 @@ extends:
   - { spec: "006-command-surface", unit: { kind: directory, path: "crates/statecraft-cli/" }, nature: corrective }
 depends_on:
   - "002-environment-lifecycle"
+  - "006-command-surface"
   - "018-governed-bootstrap-inputs"
   - "024-review-budget-and-ratification"
   - "031-engine-in-bin"
@@ -151,12 +152,14 @@ jobs, Windows installer repair, consented engine-pin movement, bridge
 planning, and changes to engine governance semantics remain separate work.
 Revision 14 does not claim that tailored projects use identical build verbs.
 
-## 5. Decisions awaiting ratification
+## 5. Owner ratification decision (2026-10-02)
 
-The producer extension is proposed separately from the original three draft
-ratifications. Owner ratification is required before implementation can land
-under `governance.require_ratified`. Preserving code evidence and trusted-base
-authority takes precedence over making a profile installation appear complete.
+The owner explicitly approved this contract in the request, "Approve spec 032
+and continue rollout". This separate spec-only ratification precedes landing
+its producer implementation under `governance.require_ratified`. Approval of
+the contract does not establish implementation completeness or hosted CI
+success. Preserving code evidence and trusted-base authority takes precedence
+over making a profile installation appear complete.
 
 ## Verification
 

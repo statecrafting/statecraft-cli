@@ -8,6 +8,7 @@
     ],
     "dependsOn": [
       "002-environment-lifecycle",
+      "006-command-surface",
       "018-governed-bootstrap-inputs",
       "024-review-budget-and-ratification",
       "031-engine-in-bin"
@@ -54,5 +55,5 @@
     "specStatus": "approved"
   },
   "schemaVersion": "1.2.0",
-  "shardHash": "f355a5b562958023e01ed648f28b36da56370cccb24dd8e1b9bdc7f16903a9c1"
+  "shardHash": "82fb5a19da948f5d3006ef8827f44809897e7b728e56b4f2df6c5eb46087ca7a"
 }
