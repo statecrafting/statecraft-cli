@@ -190,33 +190,10 @@ pub fn declared_pin(root: &Path) -> String {
 
 /// [`declared_pin`] over the file's text: the exact version, or `None`.
 pub fn declared_pin_in(text: &str) -> Option<String> {
-    let mut in_meta = false;
-    for raw in text.lines() {
-        let line = raw.trim();
-        if line.starts_with('[') {
-            in_meta = line == "[meta]";
-            continue;
-        }
-        if !in_meta || line.starts_with('#') {
-            continue;
-        }
-        let Some(rest) = line.strip_prefix("required_version") else {
-            continue;
-        };
-        let Some(value) = rest.trim_start().strip_prefix('=') else {
-            continue;
-        };
-        let value = value.split('#').next().unwrap_or("").trim();
-        let value = value.strip_prefix('"')?.strip_suffix('"')?;
-        let version = value.strip_prefix('=')?;
-        let parts: Vec<&str> = version.split('.').collect();
-        let exact = parts.len() == 3
-            && parts
-                .iter()
-                .all(|p| !p.is_empty() && p.bytes().all(|b| b.is_ascii_digit()));
-        return exact.then(|| version.to_string());
-    }
-    None
+    let value = crate::spine_pin::value(text).ok()?;
+    crate::spine_pin::exact(&value.requirement)
+        .ok()
+        .map(str::to_string)
 }
 
 /// Whether a project coordinates with a team, and which one.
@@ -422,6 +399,9 @@ pub struct Manifest {
     /// is byte-identical to what an earlier build wrote.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub transfers: Vec<TransferRecord>,
+    /// Spec 033: the successfully adopted pin and its complete consent identity.
+    #[serde(default, rename = "spinePin", skip_serializing_if = "Option::is_none")]
+    pub spine_pin: Option<crate::spine_pin::Disposition>,
     /// Which repository's manifest bytes this value was read from, and their
     /// digest: what [`Manifest::write`] checks is still on disk before it
     /// replaces anything. Never serialized, and never part of equality.
@@ -731,6 +711,7 @@ impl Manifest {
             modifications: Vec::new(),
             project: Project::default(),
             transfers: Vec::new(),
+            spine_pin: None,
             origin: Origin::default(),
         }
     }

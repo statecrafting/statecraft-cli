@@ -231,13 +231,9 @@ fn edited_authored_inputs_are_customized_information_and_an_edited_template_is_d
     let (before_exit, before) = f.doctor();
     assert_eq!(state_of(&before, CONFIG), "seeded", "{before}");
 
-    let pin = format!(
-        "required_version = \"={}\"",
-        statecraft_home::producer::PRODUCER_VERSION
-    );
-    // The scaffold leaves the whole `[meta]` table commented, so pinning is
-    // adding it.
-    f.edit(CONFIG, |t| format!("{t}\n[meta]\n{pin}\n"));
+    // Spec 018 scaffolds the exact pin already. Customize valid authored
+    // bytes without introducing a duplicate [meta] table.
+    f.edit(CONFIG, |t| format!("{t}\n# customized configuration\n"));
     f.edit(CONSTITUTION, |t| format!("{t}\nAmended 2026-09-24.\n"));
     let config_bytes = std::fs::read(f.at(CONFIG)).unwrap();
 

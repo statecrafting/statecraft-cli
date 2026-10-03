@@ -1352,7 +1352,7 @@ fn a_revision_twelve_project_upgrades_to_revision_thirteen() {
 
 /// Spec 032: the predecessor stays available for ordinary managed migration.
 #[test]
-fn a_revision_thirteen_project_upgrades_to_revision_fourteen() {
+fn a_revision_thirteen_project_upgrades_to_the_registered_revision() {
     let dir = project();
     let mut manifest = Manifest::new(Pins {
         product: "0.0.0".into(),
@@ -1362,7 +1362,7 @@ fn a_revision_thirteen_project_upgrades_to_revision_fourteen() {
     });
     assert!(plan_and_apply(dir.path(), &revision_thirteen(), &mut manifest).whole());
     let next = Profile::registered();
-    assert_eq!(next.revision, 14);
+    assert_eq!(next.revision, statecraft_home::setup::REVISION);
     let upgraded = plan_and_apply(dir.path(), &next, &mut manifest);
     assert!(upgraded.whole());
     let repeated = plan_and_apply(dir.path(), &next, &mut manifest);
@@ -1390,4 +1390,55 @@ fn a_revision_thirteen_project_upgrades_to_revision_fourteen() {
         statecraft_home::ignore::merge(Some(&merged.contents_after), &repeated.ignore_fragment)
             .unwrap();
     assert!(repeated_ignore.unchanged);
+}
+
+/// Spec 033: the adopted revision-14 installer migrates through managed
+/// matching, and a user's installer edit remains withheld.
+#[test]
+fn revision_fourteen_installer_upgrades_to_fifteen_without_replacing_customized_bytes() {
+    let dir = project();
+    let root = dir.path();
+    let mut old = Profile::registered();
+    old.revision = 14;
+    old.templates
+        .iter_mut()
+        .find(|t| t.path == "scripts/statecraft/install-spec-spine.sh")
+        .unwrap()
+        .body = include_str!("support/profile-r14/install-spec-spine.sh").into();
+    let mut manifest = Manifest::new(Pins {
+        product: "test".into(),
+        spec_spine: "unpinned".into(),
+        adapters: Default::default(),
+        producer: None,
+    });
+    assert!(plan_and_apply(root, &old, &mut manifest).whole());
+    let next = Profile::registered();
+    assert_eq!(next.revision, 15);
+    let installer = "scripts/statecraft/install-spec-spine.sh";
+    let upgraded = plan_and_apply(root, &next, &mut manifest);
+    assert_eq!(
+        upgraded
+            .files
+            .iter()
+            .find(|f| f.path == installer)
+            .unwrap()
+            .action,
+        Action::Replace
+    );
+    let customized = std::fs::read_to_string(root.join(installer)).unwrap() + "# user edit\n";
+    std::fs::write(root.join(installer), &customized).unwrap();
+    let refused = plan_and_apply(root, &next, &mut manifest);
+    assert!(matches!(
+        refused
+            .files
+            .iter()
+            .find(|f| f.path == installer)
+            .unwrap()
+            .action,
+        Action::Conflict { .. }
+    ));
+    assert_eq!(
+        std::fs::read_to_string(root.join(installer)).unwrap(),
+        customized
+    );
 }

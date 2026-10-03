@@ -207,6 +207,14 @@ pub fn without_repository() -> Selection {
 /// Select for an operation this product runs in `root`, reading the
 /// environment through `var`.
 pub fn select(root: &Path, var: &dyn Fn(&str) -> Option<String>) -> Selection {
+    select_using(root, var, None)
+}
+
+fn select_using(
+    root: &Path,
+    var: &dyn Fn(&str) -> Option<String>,
+    proposed: Option<&str>,
+) -> Selection {
     let set = |name: &str| var(name).filter(|v| !v.is_empty());
     let mut notices = Vec::new();
     let chosen = set(ENV);
@@ -219,11 +227,25 @@ pub fn select(root: &Path, var: &dyn Fn(&str) -> Option<String>) -> Selection {
             old.replace(['\n', '\r'], " ")
         ));
     }
-    let pin = Pin::of(root);
+    let pin = proposed.map_or_else(
+        || Pin::of(root),
+        |request| Pin {
+            requirement: Some(request.to_string()),
+            source: root.join("spec-spine.toml"),
+        },
+    );
+    if proposed.is_some() && set(MANAGED).is_some() && chosen.is_none() {
+        return Selection { outcome: Err(Unselected::Refused("the managed supervisor supplied no exact judge; prepare the requested engine separately".into())), passed_over: vec![], considered: vec![], notices };
+    }
     if let Some(value) = chosen {
         let path = PathBuf::from(&value);
         let outcome = if set(MANAGED).is_some() {
-            if executable(&path) {
+            if proposed.is_some() {
+                override_outcome(root, &pin, &value).map(|mut selected| {
+                    selected.rule = Rule::Supervisor;
+                    selected
+                })
+            } else if executable(&path) {
                 Ok(Selected::new(&path, Rule::Supervisor, version_of(&path)))
             } else {
                 Err(Unselected::Refused(format!(
@@ -250,6 +272,42 @@ pub fn select(root: &Path, var: &dyn Fn(&str) -> Option<String>) -> Selection {
 /// [`select`] against this process's environment.
 pub fn select_here(root: &Path) -> Selection {
     select(root, &|name| std::env::var(name).ok())
+}
+
+/// Resolve the spec 033 proposed pin without changing disk or acquiring tools.
+pub fn select_exact(root: &Path, request: &str, var: &dyn Fn(&str) -> Option<String>) -> Selection {
+    let version = match statecraft_environment::spine_pin::exact(request) {
+        Ok(version) => version,
+        Err(reason) => {
+            return Selection {
+                outcome: Err(Unselected::Refused(reason)),
+                passed_over: vec![],
+                considered: vec![],
+                notices: vec![],
+            };
+        }
+    };
+    let mut selection = select_using(root, var, Some(request));
+    if selection
+        .outcome
+        .as_ref()
+        .is_ok_and(|s| s.version.as_deref() != Some(version) || s.digest.is_none())
+    {
+        selection.outcome = Err(Unselected::Refused(format!(
+            "requested {request} needs an exact-version executable with readable bytes; prepare it separately with make tools or cargo install spec-spine-cli --version '{request}' --locked"
+        )));
+    }
+    if matches!(selection.outcome, Err(Unselected::Absent)) {
+        selection.outcome = Err(Unselected::Refused(format!(
+            "no judge for requested {request}; prepare it separately with make tools or cargo install spec-spine-cli --version '{request}' --locked"
+        )));
+    }
+    selection
+}
+
+/// Resolve the consented exact pin against this process's environment.
+pub fn select_exact_here(root: &Path, request: &str) -> Selection {
+    select_exact(root, request, &|name| std::env::var(name).ok())
 }
 
 /// The supervisor's selection for a managed session in `root`: the
@@ -657,44 +715,14 @@ impl Pin {
 
 /// `=X.Y.Z` with three numeric parts yields `X.Y.Z`.
 fn exact(requirement: &str) -> Option<&str> {
-    let version = requirement.strip_prefix('=')?.trim();
-    let parts: Vec<&str> = version.split('.').collect();
-    (parts.len() == 3
-        && parts
-            .iter()
-            .all(|p| !p.is_empty() && p.bytes().all(|b| b.is_ascii_digit())))
-    .then_some(version)
+    statecraft_environment::spine_pin::exact(requirement).ok()
 }
 
 /// The quoted value of an uncommented `required_version` in `[meta]`.
 fn required_version(text: &str) -> Option<String> {
-    let mut in_meta = false;
-    for raw in text.lines() {
-        let line = raw.trim_start();
-        if line.starts_with('[') {
-            let header: String = line
-                .split('#')
-                .next()
-                .unwrap_or("")
-                .chars()
-                .filter(|c| !c.is_whitespace())
-                .collect();
-            in_meta = header == "[meta]";
-            continue;
-        }
-        if !in_meta {
-            continue;
-        }
-        let Some(rest) = line.strip_prefix("required_version") else {
-            continue;
-        };
-        let Some(value) = rest.trim_start().strip_prefix('=') else {
-            continue;
-        };
-        let value = value.trim_start().strip_prefix('"')?;
-        return value.find('"').map(|end| value[..end].to_string());
-    }
-    None
+    statecraft_environment::spine_pin::value(text)
+        .ok()
+        .map(|v| v.requirement)
 }
 
 /// The corpus tool for an operation in `root`: the selected binary, or one

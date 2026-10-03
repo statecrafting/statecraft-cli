@@ -48,6 +48,7 @@ pub mod probe;
 pub mod qualify;
 pub mod registry;
 pub mod replace;
+pub mod spine_pin;
 pub mod time;
 pub mod transfer;
 

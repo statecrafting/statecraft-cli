@@ -2,7 +2,7 @@
 id: "033-consented-spine-pin"
 title: "A reviewed initialization plan may explicitly move the adopted spec-spine pin"
 status: approved
-implementation: pending
+implementation: complete
 created: "2026-10-02"
 summary: >
   Adds an explicit exact --spine request to init plan and init apply. The
