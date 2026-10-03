@@ -69,3 +69,16 @@ Read-only access supports the existing base-policy and shared-object reads.
 Correcting acceptance preserves that direction without widening write access.
 This draft records the exact replacement text for owner ratification; the
 direction to implement does not itself change the lifecycle label.
+
+## Verification
+
+These commands exercise the provider-neutral fixed probe and the real product
+run and acceptance paths with synthetic providers. They require no provider
+credentials. Platform-specific probes run only on their matching platform;
+passing one platform does not qualify the other.
+
+```verify:cli
+cargo test -p statecraft-cli --test protected_boundary --locked
+cargo test -p statecraft-cli --test run_startup --locked
+cargo test -p statecraft-cli --test contract_binding --locked
+```
