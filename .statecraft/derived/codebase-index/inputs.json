@@ -63,6 +63,9 @@
     "docs/decisions/archive/006-command-surface-implementation-journal.md": {
       "contentHash": "237282ccab431fa77aa58e220aa075361c72ae9ee69c3a1c24dbdb03dd83ef75"
     },
+    "docs/proposals/007-offline-enrolment-contract.md": {
+      "contentHash": "668c1fda197ee34a4ab4a05e08cc7ba0e6d190df4c740bc4eaacec5810c78eee"
+    },
     "scripts/acceptance/managed-session.sh": {
       "contentHash": "761b858c102914292d4b35d4317af4568a65b849b199ad249f056192490e7a0e"
     },

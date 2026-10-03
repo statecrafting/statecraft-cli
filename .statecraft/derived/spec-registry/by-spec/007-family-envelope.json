@@ -8,6 +8,12 @@
       "001-boundaries-and-authority",
       "006-command-surface"
     ],
+    "establishes": [
+      {
+        "kind": "file",
+        "path": "docs/proposals/007-offline-enrolment-contract.md"
+      }
+    ],
     "extends": [
       {
         "nature": "corrective",
@@ -21,9 +27,9 @@
     "id": "007-family-envelope",
     "implementation": "in-progress",
     "sectionDigests": {
-      "007-the-family-envelope": "923fb0e00064b61d1f89527fe067d4096c4015d89f38b4e46737336240a34c0d",
+      "007-the-family-envelope": "16858f9cbcc1d99b0eb7cc03960574ea5922930ed6ac87cab8ff747dbeb728d1",
       "1-purpose": "ef14bfcd223140609b148653f4274dbe7ee8445885b8831dd4ceaa5adea8abb1",
-      "2-territory": "3d2c1e8f2d618f24fd9983eda189f296e1728ac19dbcffc0f9b559c56c090371",
+      "2-territory": "bb3ef212b9207f2e971b815a4edfafe8d609897bed62d25d841bda02aad2f506",
       "3-1-the-envelope": "a3d7487e9ec8ed8312518b0069c9f67b503d838fee46a2cc82f6c848e18f22ab",
       "3-2-error-kinds": "065e7346c8f7999c927b34eb1508a855f8965a1cb5a36d3912160f2180a3e302",
       "3-3-usage-errors": "14c4da8700d08665f3f9f0d98e6d9f19c2790206835d6a368e38db2c48726425",
@@ -31,7 +37,8 @@
       "3-behavior": "78caa5f928f050f457baaeb2c4355c4a9760dc6b9ce17a804fceb319dec81cc5",
       "4-out-of-scope": "94d737fab1c790836b9b452415ee407ed858a6cdc09dcae36f5ef3814da2282a",
       "5-resolved-decisions": "4eb52664189c9422a54885354af177fe08941b870246e152c4641ce6b37e56dd",
-      "verification": "5d8b795e3efdf5bf7a8e3436e21f21d3e35217d55f2278c9b9660181a8ab3a8e"
+      "6-offline-signing-proposal-pending-owner-review": "fcdb58d6c38eb2ce896460fab107d136ebe971b0ea8eea09c1bb8959612b6ec8",
+      "verification": "4bf67f072f0ce76d5cc24b8da424cb7cada252f8a36cd4ee271846ff73b0e9cb"
     },
     "sectionHeadings": [
       "007: The family envelope",
@@ -44,13 +51,14 @@
       "3.4 What does not change",
       "4. Out of scope",
       "5. Resolved decisions",
-      "Verification"
+      "Verification",
+      "6. Offline signing proposal, pending owner review"
     ],
     "specPath": "specs/007-family-envelope/spec.md",
     "status": "approved",
     "summary": "Amends 006 sections 3.3 and 3.4. Every --json answer this product writes becomes the envelope spec-spine has written since 0.26.0 (its spec 132 section 3.4): schemaVersion, tool, verb, outcome, exitCode, summary, then report for exit 0 or 1 and error for 2, 3 or 4, where error.kind is one of the family's ten tokens. No exit number moves. A usage error under --json is an envelope on stdout. The replacement of 002 section 3.23's check translation, which #118 proposed for the same change, is left to the spec-spine 0.28.0 adoption, which changes the producer answer it would read. Replaces the historical proposal from #118 with the amendment that the current model requires (001 section 5).\n",
     "title": "The family envelope: every --json answer in the exit and JSON contract spec-spine speaks"
   },
-  "shardHash": "0ba411a649a78053ffa552edc0fc3ab8d4bd0c195c7cf44eeeb39acd5024797e",
+  "shardHash": "5d42b04152da1703256005838acb15886771da4859ef2f048c964d57a98c590f",
   "specVersion": "1.9.0"
 }

@@ -11,9 +11,26 @@
       {
         "path": "crates/statecraft-cli/",
         "source": "spec-edge"
+      },
+      {
+        "path": "docs/proposals/007-offline-enrolment-contract.md",
+        "source": "spec-edge"
       }
     ],
     "resolvedUnits": [
+      {
+        "locations": [
+          {
+            "file": "docs/proposals/007-offline-enrolment-contract.md"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "kind": "file",
+          "path": "docs/proposals/007-offline-enrolment-contract.md"
+        }
+      },
       {
         "locations": [
           {
@@ -32,5 +49,5 @@
     "specStatus": "approved"
   },
   "schemaVersion": "1.2.0",
-  "shardHash": "0ba411a649a78053ffa552edc0fc3ab8d4bd0c195c7cf44eeeb39acd5024797e"
+  "shardHash": "5d42b04152da1703256005838acb15886771da4859ef2f048c964d57a98c590f"
 }
