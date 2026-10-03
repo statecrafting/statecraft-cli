@@ -107,9 +107,21 @@ direction to implement does not itself change the lifecycle label.
 These commands exercise the provider-neutral fixed probe and the real product
 run and acceptance paths with synthetic providers. They require no provider
 credentials. Platform-specific probes run only on their matching platform;
-passing one platform does not qualify the other.
+passing one platform does not qualify the other. The replacement retains spec
+004's original verification commands and adds the boundary regressions below.
 
 ```verify:cli
+cargo build --workspace --locked
+cargo test --workspace --locked
+cargo clippy --workspace --all-targets --locked -- -D warnings
+cargo fmt --all --check
+spec-spine index coverage --fail-on-untraced
+cargo test -p statecraft-adapter --test no_provider_names
+cargo test -p statecraft-adapter --test negative_suite
+cargo test -p statecraft-adapter-claude-code --test negative_cases
+cargo test -p statecraft-environment --test negative_cases
+test -f crates/statecraft-adapter-claude-code/src/lib.rs
+test -d crates/statecraft-adapter-claude-code/testdata/stream
 cargo test -p statecraft-cli --test protected_boundary --locked
 cargo test -p statecraft-cli --test run_startup --locked
 cargo test -p statecraft-cli --test contract_binding --locked
