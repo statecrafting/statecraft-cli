@@ -12,6 +12,24 @@
     "dependsOn": [
       "004-execution-adapter"
     ],
+    "extends": [
+      {
+        "nature": "corrective",
+        "spec": "002-environment-lifecycle",
+        "unit": {
+          "kind": "directory",
+          "path": "crates/statecraft-home/"
+        }
+      },
+      {
+        "nature": "corrective",
+        "spec": "006-command-surface",
+        "unit": {
+          "kind": "directory",
+          "path": "crates/statecraft-cli/"
+        }
+      }
+    ],
     "id": "034-boundary-read-acceptance",
     "implementation": "pending",
     "sectionDigests": {
@@ -43,6 +61,6 @@
     "summary": "Corrects the self-test and hostile-fixture acceptance of spec 004 section 3.18 to preserve rule 2: the operator checkout and other attempt workspaces remain readable, and mutations are refused. Product home and launch records remain inaccessible except for the existing explicit exceptions.\n",
     "title": "Protected boundary acceptance preserves read-only checkout access"
   },
-  "shardHash": "5e7d36fd535c22d0b7726caade4dc5388f5b755d45a376c669741be877bf6ed8",
+  "shardHash": "5f0bf2d4902864e75717e1743c25d6e1507630c4825f2b327c19981e0a811ee3",
   "specVersion": "1.9.0"
 }

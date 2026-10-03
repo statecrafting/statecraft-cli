@@ -8,10 +8,47 @@
     "dependsOn": [
       "004-execution-adapter"
     ],
-    "implementingPaths": [],
+    "implementingPaths": [
+      {
+        "path": "crates/statecraft-cli/",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/statecraft-home/",
+        "source": "spec-edge"
+      }
+    ],
+    "resolvedUnits": [
+      {
+        "locations": [
+          {
+            "file": "crates/statecraft-cli/"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "directory",
+          "path": "crates/statecraft-cli/"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "crates/statecraft-home/"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "directory",
+          "path": "crates/statecraft-home/"
+        }
+      }
+    ],
     "specId": "034-boundary-read-acceptance",
     "specStatus": "draft"
   },
   "schemaVersion": "1.2.0",
-  "shardHash": "5e7d36fd535c22d0b7726caade4dc5388f5b755d45a376c669741be877bf6ed8"
+  "shardHash": "5f0bf2d4902864e75717e1743c25d6e1507630c4825f2b327c19981e0a811ee3"
 }

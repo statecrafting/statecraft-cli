@@ -15,6 +15,9 @@ amends:
   - "015-managed-session-evidence"
 amends_verification:
   - "004-execution-adapter"
+extends:
+  - { spec: "002-environment-lifecycle", unit: { kind: directory, path: "crates/statecraft-home/" }, nature: corrective }
+  - { spec: "006-command-surface", unit: { kind: directory, path: "crates/statecraft-cli/" }, nature: corrective }
 depends_on:
   - "004-execution-adapter"
 ---
