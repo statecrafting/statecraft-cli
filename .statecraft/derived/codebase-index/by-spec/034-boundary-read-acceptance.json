@@ -1,7 +1,9 @@
 {
   "mapping": {
     "amends": [
-      "004-execution-adapter"
+      "004-execution-adapter",
+      "006-command-surface",
+      "015-managed-session-evidence"
     ],
     "dependsOn": [
       "004-execution-adapter"
@@ -11,5 +13,5 @@
     "specStatus": "draft"
   },
   "schemaVersion": "1.2.0",
-  "shardHash": "6825d7a0cfa6925e2e9aeb76807149e9a5cbc7fe0013c9401f5d6bb91df59247"
+  "shardHash": "5e7d36fd535c22d0b7726caade4dc5388f5b755d45a376c669741be877bf6ed8"
 }

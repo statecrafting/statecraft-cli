@@ -11,6 +11,8 @@ summary: >
   remain inaccessible except for the existing explicit exceptions.
 amends:
   - "004-execution-adapter"
+  - "006-command-surface"
+  - "015-managed-session-evidence"
 amends_verification:
   - "004-execution-adapter"
 depends_on:
@@ -28,10 +30,11 @@ require refused reads there. The owner selected preservation of rule 2 on
 
 ## 2. Boundaries
 
-This amendment replaces only the conflicting read expectations in rule 8 and
-the section 3.18 hostile-fixture acceptance. It neither adds writable roots
-nor changes confinement mechanisms, preflight refusal, invocation identity,
-posture, protected evidence access, or any open item in rule 12.
+This amendment corrects the conflicting read expectations in rule 8 and the
+section 3.18 hostile-fixture acceptance. It also changes capture project
+binding under spec 006 section 3.11.2 and spec 015 sections 3.29 and 3.30.
+It adds no writable roots and preserves confinement mechanisms, preflight
+refusal, protected evidence access and rule 12 open items.
 
 ## 3. Required behavior
 
@@ -54,6 +57,26 @@ Reads and mutations of the run chain, override journal and state authority,
 and launch records remain refused. Every other positive and negative
 acceptance requirement of section 3.18 remains unchanged.
 
+### 3.3 Confined capture project binding
+
+Authorized by the owner on 2026-10-03. A confined `startup capture` executes
+in its own writable workspace exported from the trusted source commit, while
+its source project remains read-only. The launcher records the canonical
+source-project root, source commit and tree separately from its actual working
+directory and confinement policy. The provider init event must still report
+that exact actual working directory, which must equal the policy workspace.
+
+All three controls must carry source bindings naming the same project, commit
+and tree. Qualification requires the source root to match the requested
+canonical operator project and its current trusted commit and tree. Different
+workspaces are expected; missing, mixed, substituted or mismatched source or
+workspace bindings refuse qualification. Existing program, arguments, payload,
+version, distinct-session and structured-event requirements remain unchanged.
+
+Legacy captures without confinement or source binding retain their strict
+working-directory comparisons. A source binding is never synthesized while
+reading an old record. A confined capture without a source binding is refused.
+
 ## 4. Acceptance criteria
 
 1. A fixed-probe result distinguishes allowed checkout reads from refused
@@ -62,6 +85,12 @@ acceptance requirement of section 3.18 remains unchanged.
    checkout and other attempt workspaces, including the alias cases.
 3. There is no test-only denial of the checkout sentinel used to make an
    otherwise readable checkout appear inaccessible.
+
+4. Three distinct confined workspaces qualify only against one matching trusted
+   source identity; changed source roots, commits, trees or policy workspaces
+   refuse before an observation record is written.
+5. Legacy directory checks remain strict, and mixed legacy/confined controls
+   refuse.
 
 ## 5. Resolved decisions
 
@@ -81,4 +110,6 @@ passing one platform does not qualify the other.
 cargo test -p statecraft-cli --test protected_boundary --locked
 cargo test -p statecraft-cli --test run_startup --locked
 cargo test -p statecraft-cli --test contract_binding --locked
+cargo test -p statecraft-cli --test qualification_workflow --locked
+cargo test -p statecraft-cli --test acceptance_script --locked
 ```
