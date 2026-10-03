@@ -1,0 +1,42 @@
+{
+  "record": {
+    "amends": [
+      "004-execution-adapter"
+    ],
+    "amendsVerification": [
+      "004-execution-adapter"
+    ],
+    "created": "2026-10-03",
+    "dependsOn": [
+      "004-execution-adapter"
+    ],
+    "id": "034-boundary-read-acceptance",
+    "implementation": "pending",
+    "sectionDigests": {
+      "034-protected-boundary-read-acceptance": "3a27e756d5bf157526d522d05658270b05b203199c2fcb7b79033285a941800c",
+      "1-purpose": "14b642b1664ae4353037ac6e05ba69b8e4b3de2750ad3bbbaafa2542c39e9ddc",
+      "2-boundaries": "75d3b79847743cdc7a1bd60c8cebe235ce2ec4fa8d7431a4e55ed3761822aa38",
+      "3-1-self-test": "3180743dc85561763ed9eecc57d639b5adf6512bf0b0c2db8f60e1ba5ab21049",
+      "3-2-hostile-fixture-acceptance": "1a42231f77896341ba032d606d175a9603e42129042023ed61ee3dce149eae8f",
+      "3-required-behavior": "b339450385ad1af2d9c33dbffd70069562ef63a6a046ba4a4fc8bf55e211ccbb",
+      "4-acceptance-criteria": "4e0fd87b083460aa1cb91a1074073d9a8b13697221e64671e7c051f30c4925d7",
+      "5-resolved-decisions": "d5a99305fc65dacc26cab0f1ed658b43dd2cc763130876b5f2dc77a091d46bc9"
+    },
+    "sectionHeadings": [
+      "034: Protected boundary read acceptance",
+      "1. Purpose",
+      "2. Boundaries",
+      "3. Required behavior",
+      "3.1 Self-test",
+      "3.2 Hostile-fixture acceptance",
+      "4. Acceptance criteria",
+      "5. Resolved decisions"
+    ],
+    "specPath": "specs/034-boundary-read-acceptance/spec.md",
+    "status": "draft",
+    "summary": "Corrects the self-test and hostile-fixture acceptance of spec 004 section 3.18 to preserve rule 2: the operator checkout and other attempt workspaces remain readable, and mutations are refused. Product home and launch records remain inaccessible except for the existing explicit exceptions.\n",
+    "title": "Protected boundary acceptance preserves read-only checkout access"
+  },
+  "shardHash": "d36235322c2690ad1e5e50bb3c9a3fb3b139c27284d9f22024a47d7ff8c8b4f0",
+  "specVersion": "1.9.0"
+}

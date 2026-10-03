@@ -1,0 +1,15 @@
+{
+  "mapping": {
+    "amends": [
+      "004-execution-adapter"
+    ],
+    "dependsOn": [
+      "004-execution-adapter"
+    ],
+    "implementingPaths": [],
+    "specId": "034-boundary-read-acceptance",
+    "specStatus": "draft"
+  },
+  "schemaVersion": "1.2.0",
+  "shardHash": "d36235322c2690ad1e5e50bb3c9a3fb3b139c27284d9f22024a47d7ff8c8b4f0"
+}
