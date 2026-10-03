@@ -209,9 +209,8 @@ fn directory(root: &Path) -> Result<std::fs::File, String> {
 }
 
 #[cfg(unix)]
-fn read_at(dir: &std::fs::File) -> Result<Vec<u8>, String> {
+fn source(dir: &std::fs::File) -> Result<std::fs::File, String> {
     use rustix::fs::{Mode, OFlags, openat};
-    use std::io::Read;
     let fd = openat(
         dir,
         "spec-spine.toml",
@@ -219,10 +218,17 @@ fn read_at(dir: &std::fs::File) -> Result<Vec<u8>, String> {
         Mode::empty(),
     )
     .map_err(|e| format!("spec-spine.toml must be a contained regular file: {e}"))?;
-    let mut file = std::fs::File::from(fd);
+    let file = std::fs::File::from(fd);
     if !file.metadata().map_err(|e| e.to_string())?.is_file() {
         return Err("spec-spine.toml is not a regular file".into());
     }
+    Ok(file)
+}
+
+#[cfg(unix)]
+fn read_at(dir: &std::fs::File) -> Result<Vec<u8>, String> {
+    use std::io::Read;
+    let mut file = source(dir)?;
     let mut bytes = Vec::new();
     file.read_to_end(&mut bytes).map_err(|e| e.to_string())?;
     Ok(bytes)
@@ -246,7 +252,10 @@ fn atomic(edit: &Edit) -> Result<(), String> {
         std::process::id(),
         SERIAL.fetch_add(1, Ordering::Relaxed)
     );
-    let mode = std::fs::symlink_metadata(edit.root.join("spec-spine.toml"))
+    // Permissions come from a validated regular file under the held root,
+    // never from a link substituted between preflight and staging.
+    let mode = source(&dir)?
+        .metadata()
         .map_err(|e| e.to_string())?
         .permissions()
         .mode();
@@ -292,6 +301,23 @@ fn atomic(_edit: &Edit) -> Result<(), String> {
 #[cfg(all(test, unix))]
 mod tests {
     use super::*;
+    #[test]
+    fn a_successful_atomic_edit_preserves_private_file_permissions() {
+        use std::os::unix::fs::PermissionsExt;
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("spec-spine.toml");
+        std::fs::write(&path, "[meta]\nrequired_version=\"=0.1.0\"\n").unwrap();
+        std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o600)).unwrap();
+        Edit::plan(dir.path(), "=0.2.0").unwrap().apply().unwrap();
+        assert_eq!(
+            std::fs::metadata(&path).unwrap().permissions().mode() & 0o777,
+            0o600
+        );
+        assert_eq!(
+            std::fs::read_to_string(&path).unwrap(),
+            "[meta]\nrequired_version=\"=0.2.0\"\n"
+        );
+    }
     #[test]
     fn text_inside_multiline_values_cannot_authorize_an_edit_of_a_dotted_pin() {
         let text = "decoy = '''\n[meta]\nrequired_version = \"=0.1.0\"\n'''\nmeta.required_version = \"=0.1.0\"\n";
