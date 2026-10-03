@@ -51,6 +51,17 @@ fn run(args: &[String]) -> i32 {
         Format::Human
     };
 
+    if !matches!(invocation.verb, Verb::InitPlan | Verb::InitApply)
+        && invocation
+            .rest
+            .iter()
+            .any(|a| a == "--spine" || a.starts_with("--spine="))
+    {
+        return usage(
+            format,
+            "--spine is accepted only by init plan and init apply".into(),
+        );
+    }
     let home = product_home();
     let mut registry = match Registry::read(&home) {
         Ok(r) => r,

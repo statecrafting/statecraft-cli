@@ -533,6 +533,9 @@ pub struct Report {
     /// section 5, 2026-09-24, the setup-profile entry).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub setup: Option<crate::setup::Plan>,
+    /// Spec 033: authored pin action and actual completion.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub spine_pin: Option<statecraft_environment::spine_pin::Disposition>,
     /// How it ended.
     pub outcome: Outcome,
 }
@@ -593,8 +596,16 @@ impl Report {
                 Some(Phase::Late) => " (late)",
                 None => "",
             };
+            let reason = match &step.state {
+                StepState::Failed { reason } | StepState::Refused { reason }
+                    if !step.detail.contains(reason) =>
+                {
+                    format!(": {reason}")
+                }
+                _ => String::new(),
+            };
             out.push_str(&format!(
-                "{:<11} {:<9} {}{phase}\n",
+                "{:<11} {:<9} {}{reason}{phase}\n",
                 step.step.word(),
                 step.state.word(),
                 step.detail
@@ -629,6 +640,19 @@ impl Report {
                 "delivery   {}: {}\n",
                 d.harness,
                 d.verdict.describe()
+            ));
+        }
+        if let Some(pin) = &self.spine_pin {
+            out.push_str(&format!(
+                "spine      ={} -> ={}: {} (original {}, value bytes {}..{}, plan {}, manifest {})\n",
+                pin.source,
+                pin.target,
+                pin.outcome,
+                pin.original_digest,
+                pin.value_range.start,
+                pin.value_range.end,
+                pin.plan_identity,
+                if pin.recorded { "recorded" } else { "not-recorded" }
             ));
         }
         if let Some(setup) = &self.setup {
@@ -731,6 +755,8 @@ pub struct Context<'a> {
 pub struct SetupRequest {
     /// The profile named on the command line.
     pub profile: Option<String>,
+    /// Spec 033: explicit consent to one canonical exact release.
+    pub spine: Option<String>,
     /// The plan identity the operator approved: apply refuses, writing
     /// nothing but the lock, when the recomputed plan differs.
     pub plan: Option<String>,
@@ -960,6 +986,7 @@ struct Prepared {
     bridge: bridge::Plan,
     corpus: Result<(), CheckAnswer>,
     setup: Option<crate::setup::Plan>,
+    pin: Option<statecraft_environment::spine_pin::Edit>,
 }
 
 /// The `.gitignore` merge, decided in the preflight.
@@ -974,6 +1001,24 @@ struct IgnorePlan {
 fn preflight(ctx: &Context<'_>, now: &str, report: &mut Report) -> Result<Prepared, StepReport> {
     let failed = |step: Step, reason: String, detail: &str| {
         StepReport::new(step, StepState::Failed { reason }, detail)
+    };
+
+    let mut pin = match &ctx.setup.spine {
+        Some(request) => {
+            let version = statecraft_environment::spine_pin::exact(request).map_err(pin_refusal)?;
+            if version != ctx.producer.identity().version || version != producer::PRODUCER_VERSION {
+                return Err(pin_refusal(format!(
+                    "requested {request} differs from linked producer {}",
+                    producer::PRODUCER_VERSION
+                )));
+            }
+            verify_pin_judge(ctx, version).map_err(pin_refusal)?;
+            Some(
+                statecraft_environment::spine_pin::Edit::plan(ctx.root, request)
+                    .map_err(pin_refusal)?,
+            )
+        }
+        None => None,
     };
 
     // 1. home: what step 1 would write, from what the home holds now.
@@ -1178,7 +1223,12 @@ fn preflight(ctx: &Context<'_>, now: &str, report: &mut Report) -> Result<Prepar
     // The setup profile, planned beside the governance plan and from the
     // same reconciliation. A parameter it refuses, or an approved plan that
     // is not the plan now, is a precondition: nothing is written.
-    let setup = plan_setup(ctx, &starter, &manifest)?;
+    let mut setup = plan_setup(ctx, &starter, &manifest, pin.as_ref())?;
+    if pin.is_some() && setup.is_none() {
+        return Err(pin_refusal(
+            "--spine requires a selected setup profile".into(),
+        ));
+    }
     if let Some(plan) = &setup {
         for f in plan.files.iter().filter(|f| f.action.writes()) {
             report.writes.push(f.path.clone());
@@ -1237,7 +1287,39 @@ fn preflight(ctx: &Context<'_>, now: &str, report: &mut Report) -> Result<Prepar
 
     // 6. corpus. Degradable: whether the tool is there and carries `check` is
     //    decided now and reported, and it stops nothing but step 6.
-    let corpus = ctx.corpus.carries_check(ctx.root);
+    // The proposed pin is in memory: asking the actual tree's check would
+    // judge its old pin. Availability was established by exact resolution.
+    let corpus = if pin.is_some() {
+        Ok(())
+    } else {
+        ctx.corpus.carries_check(ctx.root)
+    };
+    if let Some(edit) = &mut pin {
+        let identity = pin_identity(
+            ctx,
+            &starter,
+            &computed,
+            &ignore,
+            &bridge_plan,
+            setup.as_ref().unwrap(),
+            personal.is_some(),
+        )
+        .map_err(pin_refusal)?;
+        edit.disposition.plan_identity = identity.clone();
+        if let Some(approved) = &ctx.setup.plan
+            && approved != &identity
+        {
+            return Err(pin_refusal(format!(
+                "approved plan {approved} differs from complete initialization plan {identity}; review a new plan"
+            )));
+        }
+        setup.as_mut().unwrap().plan_identity = identity;
+        report.spine_pin = Some(edit.disposition.clone());
+        if edit.disposition.changes {
+            report.writes.push("spec-spine.toml".into());
+        }
+    }
+    report.setup = setup.clone();
 
     Ok(Prepared {
         personal,
@@ -1252,6 +1334,7 @@ fn preflight(ctx: &Context<'_>, now: &str, report: &mut Report) -> Result<Prepar
         bridge: bridge_plan,
         corpus,
         setup,
+        pin,
     })
 }
 
@@ -1260,6 +1343,7 @@ fn plan_setup(
     ctx: &Context<'_>,
     starter: &producer::Starter,
     manifest: &Manifest,
+    pin: Option<&statecraft_environment::spine_pin::Edit>,
 ) -> Result<Option<crate::setup::Plan>, StepReport> {
     let refused = |reason: String| {
         StepReport::new(
@@ -1324,7 +1408,9 @@ fn plan_setup(
     }
     let pin_path = resolve(ctx.root, "spec-spine.toml");
     let adopted_pin = std::fs::symlink_metadata(&pin_path).is_ok();
-    let toml = if adopted_pin {
+    let toml = if let Some(edit) = pin {
+        Some(edit.proposed.clone())
+    } else if adopted_pin {
         std::fs::read_to_string(&pin_path).ok()
     } else {
         starter
@@ -1344,6 +1430,7 @@ fn plan_setup(
     })
     .map_err(refused)?;
     if let Some(approved) = &ctx.setup.plan
+        && pin.is_none()
         && *approved != plan.plan_identity
     {
         // The identity is one-way, so the input's current digest is named
@@ -1409,6 +1496,137 @@ fn scaffold_digest(starter: &producer::Starter) -> String {
     digest_bytes(scaffold.as_bytes())
 }
 
+/// A pin precondition is a refusal, including unreadable original inputs.
+fn pin_refusal(reason: String) -> StepReport {
+    StepReport::new(
+        Step::Plan,
+        StepState::Refused { reason },
+        "the consented spec-spine pin could not be planned",
+    )
+}
+
+fn verify_pin_judge(ctx: &Context<'_>, version: &str) -> Result<(), String> {
+    let judge = ctx.corpus.judge().ok_or_else(|| format!(
+        "no exact judge for ={version}; prepare the requested spec-spine separately with make tools"))?;
+    let program = Path::new(&judge.program);
+    if !program.is_absolute()
+        || judge.version.as_deref() != Some(version)
+        || ctx.corpus.version().as_deref() != Some(version)
+    {
+        return Err(format!(
+            "the selected absolute judge must report requested ={version}; prepare it separately with make tools"
+        ));
+    }
+    let bytes = std::fs::read(program).map_err(|e| format!("judge bytes unreadable: {e}"))?;
+    if judge.digest.as_deref() != Some(format!("sha256:{}", digest_bytes(&bytes)).as_str()) {
+        return Err("the selected judge's executable digest changed; review a new plan".into());
+    }
+    Ok(())
+}
+
+/// Observe authored inputs without following links or reading transient state.
+/// Directories are traversed, but state created by taking the manifest lock
+/// is excluded from the identity, as are tool caches and dependency installs.
+fn pin_tree(root: &Path) -> Result<Vec<(String, String)>, String> {
+    let mut rows = Vec::new();
+    let mut stack = vec![root.to_path_buf()];
+    while let Some(dir) = stack.pop() {
+        for entry in
+            std::fs::read_dir(&dir).map_err(|e| format!("observe {}: {e}", dir.display()))?
+        {
+            let entry = entry.map_err(|e| e.to_string())?;
+            let path = entry.path();
+            let rel = path.strip_prefix(root).map_err(|e| e.to_string())?;
+            if matches!(
+                rel.components().next().and_then(|c| c.as_os_str().to_str()),
+                Some(".git" | ".bin" | ".tooling" | "target" | "node_modules")
+            ) || rel.starts_with(project::STATE)
+            {
+                continue;
+            }
+            let kind = entry.file_type().map_err(|e| e.to_string())?;
+            let state = if kind.is_symlink() {
+                format!(
+                    "link:{}",
+                    std::fs::read_link(&path)
+                        .map_err(|e| e.to_string())?
+                        .display()
+                )
+            } else if kind.is_dir() {
+                stack.push(path.clone());
+                // The manifest lock can create this parent. Its meaningful
+                // children, plus every planned target observation, are bound.
+                if rel == Path::new(".statecraft") {
+                    continue;
+                }
+                "directory".into()
+            } else if kind.is_file() {
+                digest_bytes(
+                    &std::fs::read(&path)
+                        .map_err(|e| format!("observe {}: {e}", path.display()))?,
+                )
+            } else {
+                "special-file".into()
+            };
+            rows.push((rel.to_string_lossy().into_owned(), state));
+        }
+    }
+    rows.sort();
+    Ok(rows)
+}
+
+fn pin_identity(
+    ctx: &Context<'_>,
+    starter: &producer::Starter,
+    computed: &statecraft_environment::plan::Plan,
+    ignore: &IgnorePlan,
+    bridge: &bridge::Plan,
+    setup: &crate::setup::Plan,
+    personal_absent: bool,
+) -> Result<String, String> {
+    let root = std::fs::canonicalize(ctx.root).map_err(|e| e.to_string())?;
+    let mut home_paths = ctx.home.owned_files();
+    home_paths.extend(ctx.home.directories());
+    home_paths.push(ctx.home.registry_file());
+    home_paths.push(ctx.home.qualifications_file());
+    home_paths.extend(tree(&ctx.home.harness_dir()));
+    home_paths.sort();
+    home_paths.dedup();
+    let home: Vec<_> = home_paths
+        .iter()
+        .map(|p| (p.display().to_string(), observe(p)))
+        .collect();
+    let writes: Vec<_> = computed
+        .writes
+        .iter()
+        .map(|w| {
+            (
+                &w.path,
+                &w.adapter,
+                &w.digest,
+                w.replaces_existing,
+                observe(&root.join(&w.path)),
+            )
+        })
+        .collect();
+    let data = serde_json::json!({
+        "contract": "033", "root": root, "request": ctx.setup.spine,
+        "setupInputNow": ctx.setup.input.as_ref().map(|p| (p.display().to_string(), observe(p))),
+        "judge": ctx.corpus.judge(), "producer": ctx.producer.identity().describe(),
+        "productVersion": ctx.product_version, "scaffold": scaffold_digest(starter),
+        "target": pin_tree(&root)?, "manifest": observe(&root.join(statecraft_environment::manifest::MANIFEST_PATH)),
+        "home": home, "personalDefault": personal_absent,
+        "orderedActions": ["pin", "home", "governance", "ignore", "setup", "bridge", "manifest", "compile", "index", "check", "register", "delivery", "local-checks"],
+        "governanceWrites": writes, "setup": setup, "ignore": ignore.contents,
+        "bridge": bridge, "verifyLocal": ctx.setup.verify_local,
+        "git": ctx.target_probe.is_git_work_tree(&root), "base": ctx.target_probe.has_base_revision(&root),
+    });
+    Ok(format!(
+        "spine-init:{}",
+        digest_bytes(data.to_string().as_bytes())
+    ))
+}
+
 fn run(ctx: &Context<'_>, mode: Mode) -> Report {
     let writing = mode == Mode::Apply;
     let now = rfc3339_utc(ctx.clock.now_unix());
@@ -1428,18 +1646,36 @@ fn run(ctx: &Context<'_>, mode: Mode) -> Report {
         observed_spec_spine: ObservedExecutable::of(ctx.corpus),
         judge: ctx.corpus.judge(),
         setup: None,
+        spine_pin: None,
         outcome: Outcome::Partial,
     };
     let mut rec = Recorder::new(ctx);
 
+    if writing
+        && ctx.setup.spine.is_none()
+        && ctx
+            .setup
+            .plan
+            .as_deref()
+            .is_some_and(|p| p.starts_with("spine-init:"))
+    {
+        report.steps.push(pin_refusal(
+            "this plan requires the same explicit --spine request".into(),
+        ));
+        return report.finish(true);
+    }
+
     // Spec 018 section 3.5: an apply from a setup input performs only the
     // plan the operator reviewed. Refused before the lock, so nothing at all
     // is written.
-    if writing && ctx.setup.input.is_some() && ctx.setup.plan.is_none() {
+    if writing
+        && (ctx.setup.input.is_some() || ctx.setup.spine.is_some())
+        && ctx.setup.plan.is_none()
+    {
         report.steps.push(StepReport::new(
             Step::Plan,
             StepState::Refused {
-                reason: "--setup-input on apply needs --plan <identity>, the setup plan the operator reviewed".to_string(),
+                reason: "--setup-input or --spine on apply needs --plan <identity>, the plan the operator reviewed".to_string(),
             },
             "the setup input's plan was not approved",
         ));
@@ -1487,7 +1723,14 @@ fn run(ctx: &Context<'_>, mode: Mode) -> Report {
 
     let prepared = match preflight(ctx, &now, &mut report) {
         Ok(p) => p,
-        Err(stop) => {
+        Err(mut stop) => {
+            if ctx.setup.spine.is_some()
+                && let StepState::Failed { reason } = &stop.state
+            {
+                stop.state = StepState::Refused {
+                    reason: reason.clone(),
+                };
+            }
             let refused = matches!(stop.state, StepState::Refused { .. });
             report.steps.push(stop);
             report.mutations = rec.list;
@@ -1507,6 +1750,7 @@ fn run(ctx: &Context<'_>, mode: Mode) -> Report {
         bridge: bridge_plan,
         corpus: corpus_ready,
         setup,
+        pin,
     } = prepared;
 
     macro_rules! stop_failed {
@@ -1519,6 +1763,68 @@ fn run(ctx: &Context<'_>, mode: Mode) -> Report {
             report.mutations = rec.list;
             return report.finish(false);
         }};
+    }
+
+    // Spec 033: revalidate the same judge and original bytes before effects.
+    // A failed atomic pin operation stops every subsequent initialization write.
+    if writing && let Some(edit) = &pin {
+        if let Err(reason) =
+            verify_pin_judge(ctx, &edit.disposition.target).and_then(|_| edit.revalidate())
+        {
+            report.steps.push(pin_refusal(reason));
+            report.mutations = rec.list;
+            return report.finish(true);
+        }
+        let checked = plan_setup(ctx, &starter, &manifest, Some(edit)).and_then(|fresh| {
+            let fresh = fresh.ok_or_else(|| pin_refusal("the profile selection changed".into()))?;
+            let identity = pin_identity(
+                ctx,
+                &starter,
+                &computed,
+                &ignore,
+                &bridge_plan,
+                &fresh,
+                personal.is_some(),
+            )
+            .map_err(pin_refusal)?;
+            if identity != edit.disposition.plan_identity {
+                return Err(pin_refusal(
+                    "the reviewed action set changed before effects; review a new plan".into(),
+                ));
+            }
+            Ok(())
+        });
+        if let Err(stop) = checked {
+            report.steps.push(stop);
+            report.mutations = rec.list;
+            return report.finish(true);
+        }
+        let result = rec.around(
+            "spine-pin",
+            chain(&ctx.root.join("spec-spine.toml")),
+            || edit.apply(),
+        );
+        let committed = edit.committed();
+        let disposition = report.spine_pin.as_mut().unwrap();
+        disposition.outcome = if committed {
+            if disposition.changes {
+                "written"
+            } else {
+                "unchanged"
+            }
+        } else {
+            "not-written"
+        }
+        .into();
+        if let Err(reason) = result {
+            stop_failed!(
+                Step::Governance,
+                reason,
+                "the pin operation failed; later initialization writes stopped"
+            );
+        }
+        manifest.spine_pin = report.spine_pin.clone();
+        manifest.spine_pin.as_mut().unwrap().recorded = true;
     }
 
     // 1. home. The product's own home, never a native agent location: writing
@@ -1687,6 +1993,9 @@ fn run(ctx: &Context<'_>, mode: Mode) -> Report {
                 )
             );
         }
+        if let Some(pin) = &mut report.spine_pin {
+            pin.recorded = true;
+        }
         // The manifest is written, so the setup's resume record has done its
         // work: an interrupted run before this point re-plans from it.
         if setup.is_some() {
@@ -1768,30 +2077,36 @@ fn run(ctx: &Context<'_>, mode: Mode) -> Report {
 
     // 7. register. Registration and qualification, and then it stops: arming
     //    is a separate act and execution is another one again.
-    let register_report = match step_register(ctx, &mut rec, writing) {
-        Ok((qualification, detail)) => {
-            report.qualification = Some(qualification);
-            StepReport::new(Step::Register, StepState::Done, detail)
-        }
-        Err(RegisterFailure::Refused(reason)) => {
-            let r = StepReport::new(
-                Step::Register,
-                StepState::Refused { reason },
-                "the project was not registered",
-            );
-            // Decided in the preflight when step 6 already found the tool
-            // unavailable; otherwise a producer refused after mutations.
-            if corpus_refused_early || !writing {
-                r
-            } else {
-                r.late()
+    let register_report = if pin.is_some() && !writing {
+        StepReport::new(Step::Register, StepState::Withheld {
+            reason: "qualification needs the proposed pin on disk; the actual tree and trusted base gate have not passed".into(),
+        }, "would register after apply; trusted-base engine compatibility is unverified and may require a separately reviewed bridge")
+    } else {
+        match step_register(ctx, &mut rec, writing) {
+            Ok((qualification, detail)) => {
+                report.qualification = Some(qualification);
+                StepReport::new(Step::Register, StepState::Done, detail)
             }
+            Err(RegisterFailure::Refused(reason)) => {
+                let r = StepReport::new(
+                    Step::Register,
+                    StepState::Refused { reason },
+                    "the project was not registered",
+                );
+                // Decided in the preflight when step 6 already found the tool
+                // unavailable; otherwise a producer refused after mutations.
+                if corpus_refused_early || !writing {
+                    r
+                } else {
+                    r.late()
+                }
+            }
+            Err(RegisterFailure::Failed(reason)) => StepReport::new(
+                Step::Register,
+                StepState::Failed { reason },
+                "the project could not be registered",
+            ),
         }
-        Err(RegisterFailure::Failed(reason)) => StepReport::new(
-            Step::Register,
-            StepState::Failed { reason },
-            "the project could not be registered",
-        ),
     };
     let registered = register_report.state.done();
     report.steps.push(register_report);

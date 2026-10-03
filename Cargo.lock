@@ -725,6 +725,7 @@ dependencies = [
  "statecraft-adapter-claude-code",
  "tempfile",
  "thiserror",
+ "toml",
 ]
 
 [[package]]

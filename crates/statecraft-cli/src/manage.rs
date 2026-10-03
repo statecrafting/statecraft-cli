@@ -51,7 +51,15 @@ pub fn execute(home: &Path, operation: Operation) -> Answer<service::Answer> {
     let producer = Library;
     let (corpus, probe): (Box<dyn Corpus>, Box<dyn TargetProbe>) = {
         let selection = match operation.initialized_root() {
-            Some(root) => crate::judge::selection(root),
+            Some(root) => match &operation {
+                Operation::InitWithSetup { setup, .. } if setup.spine.is_some() => {
+                    std::sync::Arc::new(spec_spine::select_exact_here(
+                        root,
+                        setup.spine.as_deref().unwrap(),
+                    ))
+                }
+                _ => crate::judge::selection(root),
+            },
             None => std::sync::Arc::new(spec_spine::without_repository()),
         };
         (
@@ -187,6 +195,14 @@ fn setup_request(args: &[String]) -> Option<Option<statecraft_home::flow::SetupR
                 request.profile = Some(value(i)?);
                 i += 1;
             }
+            "--spine" if request.spine.is_none() => {
+                let v = value(i)?;
+                if v.is_empty() {
+                    return None;
+                }
+                request.spine = Some(v);
+                i += 1;
+            }
             "--plan" if request.plan.is_none() => {
                 request.plan = Some(value(i)?);
                 i += 1;
@@ -201,7 +217,12 @@ fn setup_request(args: &[String]) -> Option<Option<statecraft_home::flow::SetupR
                 i += 1;
             }
             _ => {
-                if let Some(v) = arg.strip_prefix("--profile=") {
+                if let Some(v) = arg.strip_prefix("--spine=") {
+                    if request.spine.is_some() || v.is_empty() {
+                        return None;
+                    }
+                    request.spine = Some(v.to_string());
+                } else if let Some(v) = arg.strip_prefix("--profile=") {
                     if request.profile.is_some() {
                         return None;
                     }
@@ -394,9 +415,11 @@ pub fn usage(verb: crate::commands::Verb) -> &'static str {
              [--program <executable>] [--deadline <seconds>] [--synthetic]"
         }
         Verb::StartupQualify => " <path> <session-id> <capture-dir>",
-        Verb::InitPlan => " <path> [--profile <id>] [--setup-input <file>] [--plan <identity>]",
+        Verb::InitPlan => {
+            " <path> [--profile <id>] [--setup-input <file>] [--spine =X.Y.Z] [--plan <identity>]"
+        }
         Verb::InitApply => {
-            " <path> [--profile <id>] [--setup-input <file>] [--plan <identity>] [--verify-local] (--setup-input needs --plan)"
+            " <path> [--profile <id>] [--setup-input <file>] [--spine =X.Y.Z] [--plan <identity>] [--verify-local] (--setup-input needs --plan)"
         }
         Verb::StartupShow => " <path> <run-id> [--attempt <n>]",
         Verb::StartupTrial => " <path> (--provider-session | --synthetic) [--deadline <seconds>]",
@@ -428,6 +451,7 @@ mod tests {
     fn a_complete_initialization_exits_zero_and_a_partial_one_is_a_finding() {
         let report = |outcome| {
             service::Answer::Init(Box::new(flow::Report {
+                spine_pin: None,
                 mode: flow::Mode::Apply,
                 root: "/p".into(),
                 steps: vec![],

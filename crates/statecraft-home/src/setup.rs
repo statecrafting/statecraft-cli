@@ -35,7 +35,7 @@ use std::path::Path;
 /// The one registered profile.
 pub const PROFILE_ID: &str = "github-actions-rust";
 /// Its revision.
-pub const REVISION: u32 = 14;
+pub const REVISION: u32 = 15;
 /// Where the rendered policy document lives in the target.
 pub const POLICY_PATH: &str = ".statecraft/setup/github-actions-rust.json";
 /// The resume record, under the project's runtime state.
@@ -1380,45 +1380,15 @@ fn observe(path: &Path) -> String {
 /// uncommented `required_version = "=X.Y.Z"` in `[meta]`, read the way the
 /// rendered `install-spec-spine.sh` reads it.
 pub fn exact_pin(text: &str) -> Result<String, String> {
-    let mut section = String::new();
-    for line in text.lines() {
-        let t = line.trim();
-        if t.starts_with('[') {
-            section = t.chars().filter(|c| !c.is_whitespace()).collect();
-            continue;
-        }
-        if section != "[meta]" {
-            continue;
-        }
-        let Some(rest) = t.strip_prefix("required_version") else {
-            continue;
-        };
-        let Some(value) = rest.trim_start().strip_prefix('=') else {
-            continue;
-        };
-        let value = value.trim();
-        let Some(inner) = value.strip_prefix('"').and_then(|v| v.strip_suffix('"')) else {
-            return Err(format!("required_version {value} is not a quoted version"));
-        };
-        let Some(version) = inner.strip_prefix('=') else {
-            return Err(format!(
-                "required_version \"{inner}\" is not an exact pin (=X.Y.Z)"
-            ));
-        };
-        let parts: Vec<&str> = version.split('.').collect();
-        let exact = parts.len() == 3
-            && parts
-                .iter()
-                .all(|p| !p.is_empty() && p.chars().all(|c| c.is_ascii_digit()));
-        return if exact {
-            Ok(version.to_string())
-        } else {
-            Err(format!(
-                "required_version \"{inner}\" is not an exact pin (=X.Y.Z)"
-            ))
-        };
-    }
-    Err("spec-spine.toml [meta] carries no required_version".to_string())
+    let value = statecraft_environment::spine_pin::value(text)?;
+    statecraft_environment::spine_pin::exact(&value.requirement)
+        .map(str::to_string)
+        .map_err(|reason| {
+            format!(
+                "required_version {:?} is not an exact pin: {reason}",
+                value.requirement
+            )
+        })
 }
 
 /// Everything the plan reads, supplied by the flow.
