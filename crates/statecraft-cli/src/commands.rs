@@ -103,6 +103,12 @@ pub enum Verb {
     TransferApply,
     /// `transfer revert <path> <transfer-id> <operator> <reason...>`
     TransferRevert,
+    /// `trust root-generate --out <seed> --public-out <public> --confirm-new-root`
+    TrustRootGenerate,
+    /// `trust issuer-sign --kind <kind> --seed-file <seed> ...`
+    TrustIssuerSign,
+    /// `trust issuer-verify --kind <kind> --root-public <public> ...`
+    TrustIssuerVerify,
     /// `--help`, optionally with a group or a verb as its topic.
     ///
     /// Not part of the command tree: [`Verb::all`] lists the operations, and a
@@ -168,6 +174,9 @@ impl Verb {
             Verb::TransferPlan => "transfer plan",
             Verb::TransferApply => "transfer apply",
             Verb::TransferRevert => "transfer revert",
+            Verb::TrustRootGenerate => "trust root-generate",
+            Verb::TrustIssuerSign => "trust issuer-sign",
+            Verb::TrustIssuerVerify => "trust issuer-verify",
             Verb::Help => "--help",
         }
     }
@@ -238,6 +247,12 @@ impl Verb {
             | Verb::TransferPlan
             | Verb::TransferApply
             | Verb::TransferRevert => "002-environment-lifecycle",
+            // Spec 036: the offline issuer verbs. The formats and verifier are
+            // the envelope crate's (spec 035); custody, entropy and
+            // confirmation are this crate's own.
+            Verb::TrustRootGenerate | Verb::TrustIssuerSign | Verb::TrustIssuerVerify => {
+                "006-command-surface"
+            }
             Verb::Help => "006-command-surface",
         }
     }
@@ -291,13 +306,16 @@ impl Verb {
             Verb::TransferPlan,
             Verb::TransferApply,
             Verb::TransferRevert,
+            Verb::TrustRootGenerate,
+            Verb::TrustIssuerSign,
+            Verb::TrustIssuerVerify,
         ]
     }
 
     /// The groups a help topic may name.
-    pub const GROUPS: [&'static str; 15] = [
+    pub const GROUPS: [&'static str; 16] = [
         "project", "env", "work", "run", "accept", "home", "init", "migrate", "config", "approval",
-        "harness", "session", "startup", "override", "transfer",
+        "harness", "session", "startup", "override", "transfer", "trust",
     ];
 
     /// Parse a verb from the leading arguments, returning how many it consumed.
@@ -351,6 +369,9 @@ impl Verb {
             ("transfer", Some("plan")) => Some((Verb::TransferPlan, 2)),
             ("transfer", Some("apply")) => Some((Verb::TransferApply, 2)),
             ("transfer", Some("revert")) => Some((Verb::TransferRevert, 2)),
+            ("trust", Some("root-generate")) => Some((Verb::TrustRootGenerate, 2)),
+            ("trust", Some("issuer-sign")) => Some((Verb::TrustIssuerSign, 2)),
+            ("trust", Some("issuer-verify")) => Some((Verb::TrustIssuerVerify, 2)),
             _ => None,
         }
     }
@@ -505,7 +526,9 @@ pub fn help_text(topic: &[String]) -> String {
          changed since the plan is shown again rather than overwritten. `--remove-settings`\n\
          takes back only what this product can prove it placed.\n\
          Initialization stops after registering and qualifying: arming and running\n\
-         are separate explicit acts.\n",
+         are separate explicit acts.\n\
+         The `trust` verbs are offline: every path is an explicit option, they read\n\
+         no home or project, and `issuer-sign` signs only with `--confirm <digest>`.\n",
     );
     out
 }
