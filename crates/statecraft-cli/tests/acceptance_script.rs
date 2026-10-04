@@ -37,9 +37,11 @@ struct Run {
 
 impl Run {
     fn new() -> Self {
-        Self {
-            dir: tempfile::tempdir().expect("a temporary directory"),
-        }
+        let dir = tempfile::tempdir().expect("a temporary directory");
+        // Linux grants the provider's configuration file in place only, so
+        // it must already exist (spec 004 section 3.18).
+        std::fs::write(dir.path().join(".claude.json"), b"{}").expect("a configuration file");
+        Self { dir }
     }
 
     /// A path with a space, both quote kinds, a backslash and a dollar sign.
