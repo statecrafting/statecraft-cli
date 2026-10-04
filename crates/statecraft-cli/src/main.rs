@@ -24,6 +24,9 @@ use std::path::PathBuf;
 
 fn main() -> std::process::ExitCode {
     let args: Vec<String> = std::env::args().skip(1).collect();
+    if args.len() == 2 && args[0] == "__boundary_probe" {
+        return std::process::ExitCode::from(statecraft_adapter::boundary::probe(&args[1]) as u8);
+    }
     let code = run(&args);
     std::process::ExitCode::from(code as u8)
 }
@@ -1151,7 +1154,135 @@ fn launch_attempt(
     // Spec 029 section 3.3: the intent names the spec-spine this run's reads
     // were judged by, the one resolution every later step reuses.
     let judge = statecraft_cli::judge::selection(root).record();
-    let session = match statecraft_run::session::begin_with(
+    let manifest_adapter = statecraft_adapter_claude_code::manifest();
+    let initial_environment = adapters::child_environment();
+    let path = initial_environment
+        .variables
+        .get("PATH")
+        .cloned()
+        .unwrap_or_default();
+    let preliminary_probe =
+        statecraft_adapter_claude_code::ConstructedEnvironmentProbe::from_child_environment(
+            &initial_environment.variables,
+        );
+    let Some(program) = preliminary_probe.resolved_executable() else {
+        return boundary_refused("provider executable unavailable", format);
+    };
+    let probe_executable = match std::env::current_exe() {
+        Ok(program) => program,
+        Err(e) => return boundary_refused(&e.to_string(), format),
+    };
+    let mut startup_prepared = None;
+    let mut boundary_admission = None;
+    let mut git_variables = std::collections::BTreeMap::new();
+    let mut confined_probe = None;
+    let mut preparation_owned = None;
+    let mut admission =
+        |workspace: &statecraft_run::workspace::Workspace, number: u32| -> Result<(), String> {
+            let identity = statecraft_home::launch::AttemptIdentity {
+                run_id: run_id.clone(),
+                attempt: number,
+            };
+            let exchange = identity.exchange_dir(&places);
+            let records = identity.records_dir(&places);
+            if exchange.symlink_metadata().is_ok() || records.symlink_metadata().is_ok() {
+                return Err("preparation paths already exist and are not adopted".into());
+            }
+            preparation_owned = Some((exchange, records));
+            startup_prepared = match &project_manifest {
+                None => None,
+                Some(manifest) => {
+                    let now = statecraft_environment::time::rfc3339_utc(
+                        statecraft_environment::time::Clock::now_unix(&SystemClock),
+                    );
+                    match statecraft_home::launch::prepare(&statecraft_home::launch::Preparation {
+                        root,
+                        places: &places,
+                        workspace: &workspace.path,
+                        base_commit: &workspace.base_commit,
+                        attempt: statecraft_home::launch::AttemptIdentity {
+                            run_id: run_id.clone(),
+                            attempt: number,
+                        },
+                        recorded_at: &now,
+                        layout: &layout,
+                        manifest,
+                        adapter: statecraft_home::startup::AdapterIdentity {
+                            name: manifest_adapter_name(&manifest_adapter),
+                            harness: statecraft_home::session::SUPPORTED_HARNESS.to_string(),
+                            version: manifest_adapter.version.clone(),
+                        },
+                        program: &program.display().to_string(),
+                    }) {
+                        Ok(prepared) => Some(prepared),
+                        Err(why) => return Err(why.to_string()),
+                    }
+                }
+            };
+            let identity = statecraft_home::launch::AttemptIdentity {
+                run_id: run_id.clone(),
+                attempt: number,
+            };
+            let exchange = identity.exchange_dir(&places);
+            std::fs::create_dir_all(&exchange).map_err(|e| e.to_string())?;
+            let objects = exchange.join("objects");
+            std::fs::create_dir(&objects).map_err(|e| e.to_string())?;
+            let common = statecraft_run::trusted_git::common(root).map_err(|e| e.to_string())?;
+            let refs = common.join("refs/heads/statecraft").join(&run_id);
+            let logs = common.join("logs/refs/heads/statecraft").join(&run_id);
+            for directory in [&refs, &logs] {
+                std::fs::create_dir_all(directory).map_err(|e| e.to_string())?;
+            }
+            let admin = common
+                .join("worktrees")
+                .join(workspace.path.file_name().ok_or("workspace has no name")?);
+            if !admin.is_dir() {
+                return Err("exact worktree administrative directory unavailable".into());
+            }
+            for (name, value) in [
+                ("GIT_DIR", admin.clone()),
+                ("GIT_COMMON_DIR", common.clone()),
+                ("GIT_WORK_TREE", workspace.path.clone()),
+                ("GIT_OBJECT_DIRECTORY", objects.clone()),
+                ("GIT_ALTERNATE_OBJECT_DIRECTORIES", common.join("objects")),
+            ] {
+                git_variables.insert(name.into(), value.display().to_string());
+            }
+            let gate = identity.gate_log_path(&places);
+            let gated = gate.is_file();
+            let admitted = statecraft_home::confinement::admit(
+                statecraft_home::confinement::Roots {
+                    home,
+                    target: root,
+                    workspace: &workspace.path,
+                    exchange: &exchange,
+                    records: &places.records,
+                    gate: gated.then_some(gate.as_path()),
+                    git_writes: vec![objects, refs, logs, admin],
+                    provider: true,
+                },
+                &probe_executable,
+                &path,
+            )?;
+            admitted
+                .boundary
+                .resolve(&program, &path)
+                .map_err(|e| e.to_string())?;
+            let mut variables = initial_environment.variables.clone();
+            variables.extend(admitted.variables.clone());
+            variables.extend(git_variables.clone());
+            confined_probe = Some(adapters::probe_confined(
+                home,
+                &program,
+                &workspace.path,
+                &variables,
+                &admitted,
+            )?);
+            admitted.retest(&probe_executable)?;
+            boundary_admission = Some(admitted);
+            Ok(())
+        };
+    let session = match statecraft_run::session::begin_checked(
         &mut chain,
         root,
         &run_id,
@@ -1163,9 +1294,57 @@ fn launch_attempt(
             posture_coverage: planning.as_ref(),
             judge: judge.as_ref(),
         },
+        Some(&mut admission),
     ) {
         Ok(s) => s,
         Err(e) => {
+            if let statecraft_run::session::SessionError::Boundary(detail) = &e {
+                // The refusal is durable before these supervisor-created,
+                // unlaunched paths move. Retain them for diagnosis without
+                // making the next attempt adopt a failed preparation.
+                if let Some((exchange, records)) = &preparation_owned {
+                    let archive = places.records.join("refused-preparations").join(format!(
+                        "{}-{}",
+                        run_id,
+                        chain.entries().len()
+                    ));
+                    let timestamp = statecraft_environment::time::rfc3339_utc(
+                        statecraft_environment::time::Clock::now_unix(&SystemClock),
+                    );
+                    let key = format!("{run_id}/boundary-archive/{}", chain.entries().len());
+                    let decision = statecraft_run::Entry {
+                        kind: statecraft_run::Kind::Outcome,
+                        run_id: run_id.clone(),
+                        attempt: 0,
+                        subject: "boundary-preparation-archive".into(),
+                        effect_id: statecraft_run::Identity::Absent,
+                        idempotency_key: None,
+                        detail: serde_json::json!({ "refusal": detail, "exchange": exchange, "records": records, "archive": archive }),
+                    };
+                    if let Err(error) = chain.append(&key, &timestamp, &decision) {
+                        return boundary_refused(
+                            &format!("{detail}; archive decision: {error}"),
+                            format,
+                        );
+                    }
+                    let archived = (|| -> std::io::Result<()> {
+                        std::fs::create_dir_all(&archive)?;
+                        for (source, name) in [(exchange, "exchange"), (records, "records")] {
+                            if source.symlink_metadata().is_ok() {
+                                std::fs::rename(source, archive.join(name))?;
+                            }
+                        }
+                        Ok(())
+                    })();
+                    if let Err(error) = archived {
+                        return boundary_refused(
+                            &format!("{detail}; archive preparation: {error}"),
+                            format,
+                        );
+                    }
+                }
+                return boundary_refused(detail, format);
+            }
             // Spec 002 section 3.32 rule 24: a live attempt is never
             // replayed, and the refusal names what its launch records
             // establish.
@@ -1226,6 +1405,7 @@ fn launch_attempt(
                     &mut chain,
                     &places,
                     &session,
+                    boundary_admission.as_ref(),
                     statecraft_run::attempt::Outcome::Refused,
                     &accounting,
                     serde_json::json!({ "trialRefusal": e.to_string() }),
@@ -1251,7 +1431,7 @@ fn launch_attempt(
 
     // Preflight refuses before any process is created, naming the token (spec
     // 004 section 3.3). The manifest is read here and only here.
-    let manifest_adapter = statecraft_adapter_claude_code::manifest();
+
     let manifest = &manifest_adapter;
     let environment = adapters::child_environment_with(&[], covered.as_ref().ok());
     let requested = statecraft_adapter::capability::Requested::none()
@@ -1295,6 +1475,7 @@ fn launch_attempt(
             &mut chain,
             &places,
             &session,
+            boundary_admission.as_ref(),
             statecraft_run::attempt::Outcome::Refused,
             &accounting,
             serde_json::json!({ "postureCoverageRefusal": why, "posture": posture }),
@@ -1324,6 +1505,7 @@ fn launch_attempt(
                 &mut chain,
                 &places,
                 &session,
+                boundary_admission.as_ref(),
                 statecraft_run::attempt::Outcome::Refused,
                 &accounting,
                 serde_json::json!({ "preflightRefusal": refusal.to_string(), "posture": posture }),
@@ -1335,30 +1517,13 @@ fn launch_attempt(
         }
     };
 
-    let (probe, probed_version) = adapters::probe_reporting_version(home);
+    let boundary_admission =
+        boundary_admission.expect("successful boundary check admitted the launch");
+    let (probe, probed_version) = confined_probe.expect("admission observed the provider version");
     if let Some(t) = trial.as_mut() {
         t.probed_version = probed_version;
     }
     posture.qualification = probe.qualification();
-    let Some(program) = probe.resolved_executable() else {
-        let mut accounting = statecraft_run::refusal::Accounting::default();
-        accounting.observe(statecraft_run::refusal::RefusalEvent {
-            guard: "constructed-environment".to_string(),
-            detail: "the provider executable does not resolve on the child's PATH".to_string(),
-        });
-        return conclude_and_emit(
-            &mut chain,
-            &places,
-            &session,
-            statecraft_run::attempt::Outcome::Refused,
-            &accounting,
-            serde_json::json!({ "preflightRefusal": "provider executable unresolvable", "posture": posture }),
-            unlaunched(project_manifest.is_some(), None),
-            &contract,
-            trial,
-            format,
-        );
-    };
 
     // Spec 002 section 5, 2026-09-25: the supervisor selects the spec-spine
     // binary a managed session's hooks use, by the convention candidates
@@ -1393,6 +1558,7 @@ fn launch_attempt(
                         &mut chain,
                         &places,
                         &session,
+                        Some(&boundary_admission),
                         statecraft_run::attempt::Outcome::Refused,
                         &accounting,
                         serde_json::json!({ "preflightRefusal": detail, "posture": posture }),
@@ -1411,55 +1577,9 @@ fn launch_attempt(
     // nothing is launched and the attempt is refused under its own guard. A
     // repository holding no manifest is not a managed session and records no
     // startup evidence; its answer says so.
-    let prepared = match &project_manifest {
-        None => None,
-        Some(manifest) => {
-            let now = statecraft_environment::time::rfc3339_utc(
-                statecraft_environment::time::Clock::now_unix(&SystemClock),
-            );
-            match statecraft_home::launch::prepare(&statecraft_home::launch::Preparation {
-                root,
-                places: &places,
-                workspace: &session.workspace.path,
-                base_commit: &session.workspace.base_commit,
-                attempt: statecraft_home::launch::AttemptIdentity {
-                    run_id: run_id.clone(),
-                    attempt: session.attempt,
-                },
-                recorded_at: &now,
-                layout: &layout,
-                manifest,
-                adapter: statecraft_home::startup::AdapterIdentity {
-                    name: manifest_adapter_name(&manifest_adapter),
-                    harness: statecraft_home::session::SUPPORTED_HARNESS.to_string(),
-                    version: manifest_adapter.version.clone(),
-                },
-                program: &program.display().to_string(),
-            }) {
-                Ok(prepared) => Some(prepared),
-                Err(why) => {
-                    let mut accounting = statecraft_run::refusal::Accounting::default();
-                    accounting.observe(statecraft_run::refusal::RefusalEvent {
-                        guard: statecraft_home::launch::STARTUP_RECORD_GUARD.to_string(),
-                        detail: why.to_string(),
-                    });
-                    return conclude_and_emit(
-                        &mut chain,
-                        &places,
-                        &session,
-                        statecraft_run::attempt::Outcome::Refused,
-                        &accounting,
-                        serde_json::json!({ "startupRefusal": why.to_string(), "posture": posture }),
-                        unlaunched(true, Some(why.to_string())),
-                        &contract,
-                        trial,
-                        format,
-                    );
-                }
-            }
-        }
-    };
-    let environment = match &prepared {
+
+    let prepared = startup_prepared;
+    let mut environment = match &prepared {
         Some(p) => {
             let binding = statecraft_home::spec_spine::managed_binding(
                 &p.intent.environment(),
@@ -1469,6 +1589,12 @@ fn launch_attempt(
         }
         None => environment,
     };
+    environment
+        .variables
+        .extend(boundary_admission.variables.clone());
+    environment.variables.extend(git_variables);
+    environment.confinement = Some(std::sync::Arc::clone(&boundary_admission.boundary));
+    posture = posture.with_confinement(boundary_admission.boundary.record().clone());
 
     // Spec 002 section 3.27: the floor reaches a managed session through the
     // per-session settings argument. Section 3.32 rule 25: where a revision is
@@ -1570,11 +1696,13 @@ fn launch_attempt(
             }
             supervised
         }
-        (None, _) => statecraft_adapter_claude_code::execution::supervise(
+        (None, _) => statecraft_adapter_claude_code::execution::supervise_with_in(
             &invocation,
             &request,
             &environment,
             &negotiation.granted,
+            &exchange,
+            &mut statecraft_adapter::supervisor::Unwatched,
         ),
     };
     let watched = watch.map(|w| w.watched()).unwrap_or_default();
@@ -1621,6 +1749,7 @@ fn launch_attempt(
                 &mut chain,
                 &places,
                 &session,
+                Some(&boundary_admission),
                 statecraft_run::attempt::Outcome::Interrupted,
                 &accounting,
                 serde_json::json!({ "supervisorError": e.to_string(), "posture": posture, "startup": startup.detail }),
@@ -1632,9 +1761,22 @@ fn launch_attempt(
         }
     };
 
+    let transfer = statecraft_home::confinement::import_objects(
+        &boundary_admission,
+        root,
+        &session.workspace.path,
+        &run_id,
+        &environment.variables,
+    );
     let supervised = &execution.supervised;
     let posture = posture.with_execution(supervised);
     let mut accounting = statecraft_run::refusal::Accounting::default();
+    if let Err(why) = &transfer {
+        accounting.observe(statecraft_run::refusal::RefusalEvent {
+            guard: "object-transfer".into(),
+            detail: why.clone(),
+        });
+    }
     for refusal in statecraft_adapter::protocol::refusals(&supervised.events) {
         accounting.observe(refusal);
     }
@@ -1671,6 +1813,7 @@ fn launch_attempt(
         &mut chain,
         &places,
         &session,
+        Some(&boundary_admission),
         execution.termination(),
         &accounting,
         serde_json::json!({
@@ -1679,6 +1822,7 @@ fn launch_attempt(
                 .iter()
                 .map(|c| c.token())
                 .collect::<Vec<_>>(),
+            "objectTransfer": transfer.as_ref().map_err(ToString::to_string),
             "applied": posture.applied.iter().map(|c| c.token()).collect::<Vec<_>>(),
             "posture": posture,
             "degraded": negotiation.degraded.iter().map(|c| c.token()).collect::<Vec<_>>(),
@@ -2033,20 +2177,35 @@ fn conclude_and_emit(
     chain: &mut Chain,
     places: &statecraft_home::launch::Places,
     session: &statecraft_run::session::Session,
+    boundary: Option<&statecraft_home::confinement::Admission>,
     termination: impl Into<statecraft_run::session::Termination>,
     accounting: &statecraft_run::refusal::Accounting,
-    detail: serde_json::Value,
+    mut detail: serde_json::Value,
     mut startup: statecraft_home::launch::RunStartup,
     contract: &statecraft_run::contract::Binding,
     trial: Option<TrialRun>,
     format: Format,
 ) -> i32 {
+    let mut accounting = accounting.clone();
+    detail["privateReferenceCleanup"] = match boundary.map_or_else(
+        || Ok(Vec::new()),
+        |boundary| statecraft_home::confinement::remove_extra_refs(boundary, &session.run_id),
+    ) {
+        Ok(removed) => serde_json::json!({ "removed": removed }),
+        Err(error) => {
+            accounting.observe(statecraft_run::refusal::RefusalEvent {
+                guard: "private-reference-cleanup".into(),
+                detail: error.clone(),
+            });
+            serde_json::json!({ "refused": error })
+        }
+    };
     match statecraft_run::session::conclude_observed(
         chain,
         &places.target,
         session,
         termination.into(),
-        accounting,
+        &accounting,
         detail,
         &SystemClock,
     ) {
@@ -2185,8 +2344,9 @@ fn accept_verb(
         attempt: format!("{run_id}/{}", attempt.number),
         spec_id: run_id.to_string(),
     };
-    let (acceptance, _suite, _freshness) = statecraft_cli::accept::judge(
+    let (acceptance, _suite, _freshness, boundary) = statecraft_cli::accept::judge_with_diagnostic(
         root,
+        home,
         &workspace,
         &attempt.base_commit,
         // The attempt concluded `completed`, which spec 003 section 3.8 makes
@@ -2195,7 +2355,7 @@ fn accept_verb(
         &context,
     );
     emit(
-        &slice::accept_answer_with(acceptance, Some(contract)),
+        &slice::accept_answer_with_boundary(acceptance, Some(contract), boundary),
         format,
     )
 }
@@ -2214,7 +2374,10 @@ fn environment_verb(
     format: Format,
 ) -> i32 {
     let declarations = adapters::declarations_for(root);
-    let probe = adapters::probe(home);
+    let probe = match adapters::probe(home, root) {
+        Ok(probe) => probe,
+        Err(detail) => return boundary_refused(&detail, format),
+    };
     // No second installer is left to claim a path (spec 002 sections 3.21 and
     // 3.22), so no package identity exists to name. An occupied path is still
     // named with its owner: the library classes a file no manifest records as
@@ -2397,4 +2560,15 @@ fn absolute(path: &str) -> PathBuf {
         Ok(cwd) => cwd.join(p),
         Err(_) => p,
     }
+}
+
+fn boundary_refused(detail: &str, format: Format) -> i32 {
+    emit(
+        &Answer::new(
+            serde_json::json!({ "outcome": "refused", "reason": "boundary-unavailable", "detail": detail, "platform": std::env::consts::OS }),
+            Exit::Refused,
+            format!("statecraft: boundary unavailable: {detail}"),
+        ),
+        format,
+    )
 }

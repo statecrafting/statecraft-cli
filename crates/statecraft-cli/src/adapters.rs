@@ -154,27 +154,59 @@ pub fn records(home: &Path) -> Vec<PairedRecord> {
 ///
 /// Built from the constructed child environment, so "is the provider resolvable"
 /// is asked of what the child would actually get and not of this process.
-pub fn probe(home: &Path) -> provider::ConstructedEnvironmentProbe {
-    probe_reporting_version(home).0
+pub fn probe(home: &Path, target: &Path) -> Result<provider::ConstructedEnvironmentProbe, String> {
+    probe_reporting_version(home, target).map(|result| result.0)
 }
 
-/// [`probe`], and the version its one `--version` call reported, for a caller
-/// that records it (spec 002 section 3.33 rule 34). The same single call: the
-/// trial's budget counts it once.
+/// Observe one version in a disposable workspace under an admitted policy.
+/// Missing providers remain a prerequisite finding; unavailable confinement
+/// refuses the observation instead of running a provider outside the boundary.
 pub fn probe_reporting_version(
     home: &Path,
-) -> (provider::ConstructedEnvironmentProbe, Option<String>) {
+    target: &Path,
+) -> Result<(provider::ConstructedEnvironmentProbe, Option<String>), String> {
     let environment = child_environment();
-    let mut probe =
+    let probe =
         provider::ConstructedEnvironmentProbe::from_child_environment(&environment.variables);
-    let mut observed = None;
-    if let Some(executable) = probe.resolved_executable()
-        && let Some(version) = provider::observe_provider_version(&executable)
-    {
-        probe = probe.observing_provider_version(&version);
-        observed = Some(version);
-    }
-    (probe.with_records(records(home)), observed)
+    let Some(program) = probe.resolved_executable() else {
+        return Ok((probe.with_records(records(home)), None));
+    };
+    let workspace = tempfile::tempdir().map_err(|error| error.to_string())?;
+    let exchange_parent = home.join("exchange");
+    std::fs::create_dir_all(&exchange_parent).map_err(|error| error.to_string())?;
+    let exchange = tempfile::Builder::new()
+        .prefix("version-")
+        .tempdir_in(&exchange_parent)
+        .map_err(|error| error.to_string())?;
+    let executable = std::env::current_exe().map_err(|error| error.to_string())?;
+    let admission = statecraft_home::confinement::admit(
+        statecraft_home::confinement::Roots {
+            home,
+            target,
+            workspace: workspace.path(),
+            exchange: exchange.path(),
+            records: &home.join("records"),
+            gate: None,
+            git_writes: Vec::new(),
+            provider: true,
+        },
+        &executable,
+        environment
+            .variables
+            .get("PATH")
+            .map(String::as_str)
+            .unwrap_or(""),
+    )?;
+    let mut variables = environment.variables;
+    variables.extend(admission.variables.clone());
+    let program = admission
+        .boundary
+        .resolve(
+            &program,
+            variables.get("PATH").map(String::as_str).unwrap_or(""),
+        )
+        .map_err(|error| error.to_string())?;
+    probe_confined(home, &program, workspace.path(), &variables, &admission)
 }
 
 /// The pins a first `env apply` records in the manifest.
@@ -211,6 +243,38 @@ pub fn observed(root: &Path) -> statecraft_environment::doctor::Observed {
         product: Some(env!("CARGO_PKG_VERSION").to_string()),
         spec_spine: crate::judge::observed_version(root),
     }
+}
+
+/// Observe the provider version under the exact admitted launch policy.
+pub fn probe_confined(
+    home: &Path,
+    program: &Path,
+    workspace: &Path,
+    variables: &std::collections::BTreeMap<String, String>,
+    admission: &statecraft_home::confinement::Admission,
+) -> Result<(provider::ConstructedEnvironmentProbe, Option<String>), String> {
+    let mut probe = provider::ConstructedEnvironmentProbe::from_child_environment(variables);
+    let observed = statecraft_adapter::supervisor::capture_confined(
+        program,
+        &["--version"],
+        workspace,
+        variables,
+        b"",
+        std::time::Duration::from_secs(10),
+        &admission.boundary,
+    )
+    .map_err(|error| format!("{} boundary version-launch: {error}", std::env::consts::OS))?;
+    let observed = Some(observed)
+        .filter(|output| {
+            output.code == Some(0) && !output.timed_out && output.surviving_processes.is_none()
+        })
+        .and_then(|output| {
+            statecraft_home::capture::version_of(&String::from_utf8_lossy(&output.stdout))
+        });
+    if let Some(version) = &observed {
+        probe = probe.observing_provider_version(version);
+    }
+    Ok((probe.with_records(records(home)), observed))
 }
 
 #[cfg(test)]

@@ -62,6 +62,9 @@ pub struct Request {
 /// Why nothing was launched.
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
 pub enum Refused {
+    /// No provider may start without an exact OS boundary.
+    #[error("boundary unavailable: {0}")]
+    Boundary(String),
     /// The working directory is not one.
     #[error("{path} is not a directory the session can run in: {detail}")]
     Root {
@@ -263,16 +266,77 @@ pub fn launch(request: &Request) -> Result<Launched, Failed> {
     let program = resolve(&request.program, &request.environment)?;
     let program_digest = digest_file(&program)?.map(|(d, _)| d);
 
+    let command = match control {
+        Control::Allowed => ALLOWED_COMMAND,
+        Control::Refusal | Control::WithoutPayload => REFUSED_COMMAND,
+    };
+    let payload = crate::session::payload_json();
+    let exchange = request.exchange.capture_exchange(control.word())?;
+    std::fs::create_dir_all(&exchange)?;
+    let exchange = exchange.canonicalize()?;
+    let workspace = tempfile::Builder::new()
+        .prefix("capture-workspace-")
+        .tempdir_in(&exchange)?;
+    let source_project = admission::SourceProject::read(&root).map_err(Refused::Boundary)?;
+    statecraft_run::trusted_git::export(&root, &source_project.commit, workspace.path())
+        .map_err(|e| Refused::Boundary(e.to_string()))?;
+    let settings_path = if control.carries_the_payload() {
+        let path = exchange.join(format!("{}.settings.json", control.word()));
+        crate::launch::write_once(&path, &payload)?;
+        Some(path)
+    } else {
+        None
+    };
+    let home = request
+        .exchange
+        .exchange
+        .parent()
+        .and_then(Path::parent)
+        .ok_or_else(|| Refused::Boundary("product home unavailable".into()))?;
+    let executable = std::env::current_exe()?;
+    let path = request
+        .environment
+        .get("PATH")
+        .map(String::as_str)
+        .unwrap_or("");
+    let admission = crate::confinement::admit(
+        crate::confinement::Roots {
+            home,
+            target: &root,
+            workspace: workspace.path(),
+            exchange: &exchange,
+            records: &directory,
+            gate: None,
+            git_writes: vec![],
+            provider: true,
+        },
+        &executable,
+        path,
+    )
+    .map_err(Refused::Boundary)?;
+    let program = admission
+        .boundary
+        .resolve(&program, path)
+        .map_err(|e| Refused::Boundary(e.to_string()))?;
+    let mut environment = request.environment.clone();
+    environment.extend(admission.variables.clone());
     // The probe. A version read beside the launch, by the same resolved
     // executable, so the record says which binary answered.
-    let probed = statecraft_adapter::supervisor::capture(
+    let probed = statecraft_adapter::supervisor::capture_confined(
         &program,
         &["--version"],
-        &root,
-        &request.environment,
+        workspace.path(),
+        &environment,
         b"",
         PROBE_DEADLINE,
-    )?;
+        &admission.boundary,
+    )
+    .map_err(|error| {
+        Refused::Boundary(format!(
+            "{} boundary version-launch: {error}",
+            std::env::consts::OS
+        ))
+    })?;
     let probe = String::from_utf8_lossy(&probed.stdout).to_string();
     let probe_version = if probed.code == Some(0) {
         version_of(&probe)
@@ -280,21 +344,6 @@ pub fn launch(request: &Request) -> Result<Launched, Failed> {
         None
     };
 
-    let command = match control {
-        Control::Allowed => ALLOWED_COMMAND,
-        Control::Refusal | Control::WithoutPayload => REFUSED_COMMAND,
-    };
-    let payload = crate::session::payload_json();
-    let settings_path = if control.carries_the_payload() {
-        let exchange = request.exchange.capture_exchange(control.word())?;
-        std::fs::create_dir_all(&exchange)?;
-        let exchange = exchange.canonicalize()?;
-        let path = exchange.join(format!("{}.settings.json", control.word()));
-        crate::launch::write_once(&path, &payload)?;
-        Some(path)
-    } else {
-        None
-    };
     let settings_arg = settings_path.as_ref().map(|p| p.display().to_string());
     let arguments = admission::arguments(
         control,
@@ -304,21 +353,29 @@ pub fn launch(request: &Request) -> Result<Launched, Failed> {
     );
     let prompt = admission::prompt(command);
     let args: Vec<&str> = arguments.iter().map(String::as_str).collect();
-    let captured = statecraft_adapter::supervisor::capture(
+    admission.retest(&executable).map_err(Refused::Boundary)?;
+    let captured = statecraft_adapter::supervisor::capture_confined(
         &program,
         &args,
-        &root,
-        &request.environment,
+        workspace.path(),
+        &environment,
         prompt.as_bytes(),
         Duration::from_secs(request.deadline_seconds),
+        &admission.boundary,
     )?;
 
     // The file as the provider left it, read as data: never through a link,
     // never a pipe, and bounded. Its digest is the record's; its bytes are
     // copied to the operator's directory now that the provider has exited.
-    let settings_after = settings_path
-        .as_ref()
-        .map(|p| crate::launch::read_child_file(p, SETTINGS_LIMIT));
+    let settings_after = settings_path.as_ref().map(|p| {
+        admission
+            .exchange
+            .read(
+                Path::new(p.file_name().expect("settings file name")),
+                SETTINGS_LIMIT as usize,
+            )
+            .map(|bytes| Some((bytes, false)))
+    });
     let settings_digest_after = settings_after.as_ref().map(|read| match read {
         Ok(Some((bytes, false))) => digest_bytes(bytes),
         Ok(Some((_, true))) => format!("unreadable: longer than {SETTINGS_LIMIT} bytes"),
@@ -376,11 +433,13 @@ pub fn launch(request: &Request) -> Result<Launched, Failed> {
         invocation: Invocation {
             program: program.display().to_string(),
             arguments,
-            working_directory: root.display().to_string(),
+            working_directory: workspace.path().display().to_string(),
         },
         settings: settings_arg.as_ref().map(|_| payload.clone()),
         capture,
         launch: Some(Launch {
+            source_project: Some(source_project),
+            confinement: Some(admission.boundary.record().clone()),
             capture_id,
             control,
             origin: request.origin,

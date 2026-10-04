@@ -162,7 +162,16 @@ pub fn producer() -> String {
 /// `managed` is admitted only where the adapter claims its paths.
 pub fn execute(request: &Request, home: &Path) -> Answer<serde_json::Value> {
     let declarations = adapters::declarations();
-    let probe = adapters::probe(home);
+    let probe = match adapters::probe(home, request.root()) {
+        Ok(probe) => probe,
+        Err(detail) => {
+            return Answer::new(
+                serde_json::json!({ "outcome": "refused", "reason": "boundary-unavailable", "detail": detail, "platform": std::env::consts::OS }),
+                Exit::Refused,
+                format!("statecraft: boundary unavailable: {detail}"),
+            );
+        }
+    };
     let foreign = ForeignClaims::none();
     let producer = producer();
     let ctx = Context {

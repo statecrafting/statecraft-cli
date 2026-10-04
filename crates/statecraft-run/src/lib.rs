@@ -64,3 +64,5 @@ pub use report::{CorpusReport, ReportError};
 pub use session::{Concluded, Session, SessionError, begin, conclude, runs};
 pub use work::{WorkItem, WorkList, select};
 pub use workspace::Workspace;
+
+pub mod trusted_git;

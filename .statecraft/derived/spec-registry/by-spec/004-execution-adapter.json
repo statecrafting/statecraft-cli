@@ -20,6 +20,14 @@
     "extends": [
       {
         "nature": "additive",
+        "spec": "002-environment-lifecycle",
+        "unit": {
+          "kind": "directory",
+          "path": "crates/statecraft-home/"
+        }
+      },
+      {
+        "nature": "additive",
         "spec": "005-acceptance-and-evidence",
         "unit": {
           "kind": "directory",
@@ -112,6 +120,6 @@
     "summary": "The single seam through which this product runs an agent, and the first provider behind it. Fixes the three-part protocol (a request the supervisor writes, an event stream it reads, a result it records), the closed capability vocabulary with required tokens refusing before any process starts and preferred tokens degrading visibly, the negative suite that qualifies an adapter binary version, and the constructed rather than filtered child environment whose property is a complete record and explicitly not containment of hostile code. Sections 3.9 to 3.16 name Claude Code as the first provider and fix what its stream can and cannot witness: which capability tokens the manifest may declare, each against a measurement rather than a reading of the flags; the finding that a mid-stream denial notification accompanies the terminal refusal record and that a denied session still classifies itself as a success; which of two denial mechanisms the adapter must use, because they have opposite evidence properties; and what a qualification record binds to.\n",
     "title": "The execution adapter boundary and the first provider: one protocol, declared capabilities, a qualification suite, a constructed child environment, and what a real stream can witness"
   },
-  "shardHash": "9a48ff94f0063809ed91d6007ff0306f7deb949c4c9915ec281f28e435da6572",
+  "shardHash": "661fff41b27315fc502b5887de048cb972866539ce9b21e36385fe7e476f4419",
   "specVersion": "1.9.0"
 }

@@ -148,6 +148,9 @@ pub enum SessionError {
         /// Its live attempt's number.
         attempt: u32,
     },
+    /// The exact execution boundary could not be admitted before an attempt.
+    #[error("boundary unavailable: {0}")]
+    Boundary(String),
     /// The workspace could not be prepared or released.
     #[error(transparent)]
     Workspace(#[from] WorkspaceError),
@@ -259,6 +262,24 @@ pub fn begin_with(
     clock: &dyn Clock,
     intent: &IntentDetail<'_>,
 ) -> Result<Session, SessionError> {
+    begin_checked(chain, target, run_id, base_revision, clock, intent, None)
+}
+
+/// Admission callback, invoked before the attempt intent becomes durable.
+pub type BoundaryCheck<'a> = dyn FnMut(&Workspace, u32) -> Result<(), String> + 'a;
+
+/// Prepare under a distinct effect intent, then admit the exact boundary.
+/// A refusal records the preparation effect but appends no attempt.
+#[allow(clippy::too_many_arguments)]
+pub fn begin_checked(
+    chain: &mut Chain,
+    target: &Path,
+    run_id: &str,
+    base_revision: &str,
+    clock: &dyn Clock,
+    intent: &IntentDetail<'_>,
+    mut check: Option<&mut BoundaryCheck<'_>>,
+) -> Result<Session, SessionError> {
     let IntentDetail {
         contract,
         admission,
@@ -278,6 +299,43 @@ pub fn begin_with(
     let existing = runs(chain).into_iter().find(|r| r.id == run_id);
     let number = existing.map(|r| r.attempts.len() as u32 + 1).unwrap_or(1);
     let timestamp = rfc3339_utc(clock.now_unix());
+
+    let follows = crate::reconcile::since_last_intent(chain);
+    let prepared = if let Some(check) = check.as_mut() {
+        let subject = "boundary-preparation";
+        let key = format!("{run_id}/{number}/{subject}/{}", chain.entries().len());
+        chain.append(
+            &format!("{key}/intent"),
+            &timestamp,
+            &Entry {
+                kind: Kind::Intent,
+                run_id: run_id.into(),
+                attempt: 0,
+                subject: subject.into(),
+                effect_id: Identity::Absent,
+                idempotency_key: Some(
+                    workspace::workspace_path(target, run_id)
+                        .display()
+                        .to_string(),
+                ),
+                detail: serde_json::json!({ "baseCommit": base_commit, "plannedAttempt": number }),
+            },
+        )?;
+        let workspace = workspace::prepare(target, run_id, base_revision);
+        let result = match &workspace {
+            Ok(workspace) => check(workspace, number),
+            Err(error) => Err(format!("workspace preparation: {error}")),
+        };
+        chain.append(&format!("{key}/outcome"), &timestamp, &Entry {
+            kind: Kind::Outcome, run_id: run_id.into(), attempt: 0,
+            subject: subject.into(), effect_id: Identity::Absent, idempotency_key: None,
+            detail: serde_json::json!({ "admitted": result.is_ok(), "refusal": result.as_ref().err(), "branchMigration": workspace.as_ref().ok().and_then(|workspace| workspace.migrated_from.as_ref().map(|old| serde_json::json!({ "from": old, "to": workspace.branch }))) }),
+        })?;
+        result.map_err(SessionError::Boundary)?;
+        Some(workspace?)
+    } else {
+        None
+    };
 
     chain.append(
         &format!("{run_id}/{number}/intent"),
@@ -313,7 +371,6 @@ pub fn begin_with(
                 }
                 // Section 3.6.1 rule 4: the attempts reconciled since the
                 // previous intent, whichever run they belong to.
-                let follows = crate::reconcile::since_last_intent(chain);
                 if !follows.is_empty() {
                     detail["follows"] = serde_json::Value::Array(follows);
                 }
@@ -329,7 +386,10 @@ pub fn begin_with(
         },
     )?;
 
-    let workspace = workspace::prepare(target, run_id, base_revision)?;
+    let workspace = match prepared {
+        Some(workspace) => workspace,
+        None => workspace::prepare(target, run_id, base_revision)?,
+    };
     Ok(Session {
         run_id: run_id.to_string(),
         attempt: number,
@@ -528,6 +588,40 @@ mod tests {
         git(dir.path(), &["add", "."]);
         git(dir.path(), &["commit", "--quiet", "-m", "one"]);
         dir
+    }
+
+    #[test]
+    fn boundary_refusal_records_preparation_without_appending_an_attempt() {
+        let home = tempfile::tempdir().unwrap();
+        let target = repo();
+        let (mut chain, _) = Chain::open(home.path(), target.path()).unwrap();
+        let mut refuse = |_: &Workspace, _: u32| Err("fixed probe refused".into());
+        let result = begin_checked(
+            &mut chain,
+            target.path(),
+            "r1",
+            "HEAD",
+            &FixedClock(0),
+            &IntentDetail::default(),
+            Some(&mut refuse),
+        );
+        assert!(matches!(result, Err(SessionError::Boundary(_))));
+        assert!(live_attempt(&chain).is_none());
+        assert!(runs(&chain).iter().all(|run| run.attempts.is_empty()));
+        assert_eq!(chain.entries().len(), 2);
+        assert_eq!(chain.entries()[1].detail["admitted"], false);
+        let mut admit = |_: &Workspace, _: u32| Ok(());
+        let session = begin_checked(
+            &mut chain,
+            target.path(),
+            "r1",
+            "HEAD",
+            &FixedClock(1),
+            &IntentDetail::default(),
+            Some(&mut admit),
+        )
+        .unwrap();
+        assert_eq!(session.attempt, 1);
     }
 
     #[test]

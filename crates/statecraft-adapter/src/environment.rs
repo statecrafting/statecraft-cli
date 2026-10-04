@@ -57,6 +57,10 @@ pub enum EnvironmentState {
 /// A constructed child environment.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ChildEnvironment {
+    /// Admitted immutable OS boundary. It cannot be supplied by serialized
+    /// operator or provider configuration.
+    #[serde(skip)]
+    pub confinement: Option<std::sync::Arc<crate::boundary::Prepared>>,
     /// Exactly what the child gets. Nothing else is inherited.
     pub variables: BTreeMap<String, String>,
     /// The commands the posture declares the run will need.
@@ -157,6 +161,7 @@ pub fn construct(blueprint: &Blueprint, suite: &CheckSuiteCommands) -> ChildEnvi
             ));
         }
         return ChildEnvironment {
+            confinement: None,
             variables,
             commands: blueprint.commands.clone(),
             state: EnvironmentState::Refused { reasons },
@@ -170,6 +175,7 @@ pub fn construct(blueprint: &Blueprint, suite: &CheckSuiteCommands) -> ChildEnvi
     };
 
     ChildEnvironment {
+        confinement: None,
         variables,
         commands: blueprint.commands.clone(),
         state,

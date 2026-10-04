@@ -84,29 +84,10 @@ pub fn planning_record(planned: &Coverage) -> serde_json::Value {
 /// `git` against the target, isolated from configuration that could run code
 /// or change what a read returns: no system or global configuration, no hooks,
 /// no fsmonitor. Only the target's own repository configuration still applies.
-fn git(root: &Path) -> Command {
-    let mut command = Command::new("git");
-    // Every inherited `GIT_*` variable goes: they can name another index,
-    // directory, object store or configuration, including configuration
-    // injected through `GIT_CONFIG_COUNT` and `GIT_CONFIG_PARAMETERS`.
-    for (name, _) in std::env::vars_os() {
-        if name.to_string_lossy().starts_with("GIT_") {
-            command.env_remove(name);
-        }
-    }
-    command
-        .env("GIT_CONFIG_NOSYSTEM", "1")
-        .env("GIT_CONFIG_GLOBAL", "/dev/null")
-        .args(["-c", "core.hooksPath=/dev/null", "-c", "core.fsmonitor="])
-        // With global configuration off, a `safe.directory` the operator set
-        // there is gone too; the target is the registered repository this
-        // product was asked to read, so it is named here.
-        .arg("-c")
-        .arg(format!("safe.directory={}", root.display()))
-        .arg("-C")
-        .arg(root)
-        .stdin(Stdio::null());
-    command
+fn git(root: &Path) -> Result<Command, String> {
+    let mut command = statecraft_run::trusted_git::command(root).map_err(|e| e.to_string())?;
+    command.stdin(Stdio::null());
+    Ok(command)
 }
 
 fn run_git(mut command: Command, what: &str) -> Result<Vec<u8>, String> {
@@ -125,54 +106,39 @@ fn run_git(mut command: Command, what: &str) -> Result<Vec<u8>, String> {
 /// The declaration at `base`, as `git show` returns it; `None` when the base
 /// commit holds no such file.
 fn declaration_at(root: &Path, base: &str) -> Result<Option<Vec<u8>>, String> {
-    let mut listed = git(root);
+    let mut listed = git(root)?;
     listed.args(["ls-tree", "--name-only", base, "--", DECLARATION_PATH]);
     let listed = run_git(listed, &format!("git ls-tree {base}"))?;
     if listed.iter().all(u8::is_ascii_whitespace) {
         return Ok(None);
     }
-    let mut shown = git(root);
+    let mut shown = git(root)?;
     shown.args(["show", &format!("{base}:{DECLARATION_PATH}")]);
     run_git(shown, &format!("git show {base}:{DECLARATION_PATH}")).map(Some)
 }
 
 /// An export of one commit's tree, in a fresh private temporary directory
 /// that is removed when this is dropped.
-struct Export {
+pub(crate) struct Export {
     scratch: tempfile::TempDir,
 }
 
 impl Export {
-    fn tree(&self) -> PathBuf {
+    pub(crate) fn tree(&self) -> PathBuf {
         self.scratch.path().join("tree")
     }
 }
 
-/// Export `base`'s whole tree through a temporary index: `read-tree` into an
-/// index file of our own, then `checkout-index` of every entry into the export.
-/// Unlike `git archive`, no `export-ignore` or `export-subst` attribute can
-/// change what is read, so the tree read is the commit's tree. The target's
-/// own index and working tree are never touched.
-fn export(root: &Path, base: &str) -> Result<Export, String> {
+/// Export exact commit blobs without interpreting attributes, filters or child metadata.
+pub(crate) fn export(root: &Path, base: &str) -> Result<Export, String> {
     let scratch = tempfile::Builder::new()
         .prefix("statecraft-base-export-")
         .tempdir()
         .map_err(|e| format!("a temporary directory for the export: {e}"))?;
     let export = Export { scratch };
-    let index = export.scratch.path().join("index");
     let tree = export.tree();
     std::fs::create_dir(&tree).map_err(|e| format!("{}: {e}", tree.display()))?;
-    let mut read = git(root);
-    read.env("GIT_INDEX_FILE", &index).args(["read-tree", base]);
-    run_git(read, &format!("git read-tree {base}"))?;
-    let mut checkout = git(root);
-    checkout.env("GIT_INDEX_FILE", &index).args([
-        "checkout-index",
-        "--all",
-        "--force",
-        &format!("--prefix={}/", tree.display()),
-    ]);
-    run_git(checkout, &format!("git checkout-index of {base}"))?;
+    statecraft_run::trusted_git::export(root, base, &tree).map_err(|e| e.to_string())?;
     Ok(export)
 }
 

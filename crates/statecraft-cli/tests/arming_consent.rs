@@ -36,6 +36,7 @@ struct Fixture {
     home: tempfile::TempDir,
     target: tempfile::TempDir,
     bin: tempfile::TempDir,
+    operator_home: tempfile::TempDir,
 }
 
 impl Fixture {
@@ -85,22 +86,27 @@ esac
         )
         .unwrap();
 
-        // The spawn marker is written beside the stub rather than in the
-        // workspace, so "was a provider spawned" stays answerable even when no
-        // workspace was prepared. It is written only on a session invocation:
-        // `--version` is a probe and returns before it.
+        // Session diagnostics stay in the confined workspace. A version
+        // observation returns before writing the marker.
         executable(
             &bin.path().join("claude"),
             r#"#!/bin/sh
 here="$(dirname "$0")"
 if [ "$1" = --version ]; then echo '2.1.267'; exit 0; fi
-: > "$here/spawned"
+: > spawned
 /bin/cat > /dev/null
 /bin/cat "$here/stream.jsonl"
 "#,
         );
 
-        Self { home, target, bin }
+        let operator_home = tempfile::tempdir().unwrap();
+        std::fs::write(operator_home.path().join(".claude.json"), "{}").unwrap();
+        Self {
+            home,
+            target,
+            bin,
+            operator_home,
+        }
     }
 
     fn root(&self) -> &str {
@@ -112,6 +118,7 @@ if [ "$1" = --version ]; then echo '2.1.267'; exit 0; fi
             .args(args)
             .env_clear()
             .env("STATECRAFT_HOME", self.home.path())
+            .env("HOME", self.operator_home.path())
             .env(
                 "PATH",
                 format!("{}:/usr/bin:/bin", self.bin.path().display()),
@@ -125,11 +132,17 @@ if [ "$1" = --version ]; then echo '2.1.267'; exit 0; fi
 
     /// Whether a provider process was created.
     fn spawned(&self) -> bool {
-        self.bin.path().join("spawned").exists()
+        self.target
+            .path()
+            .join(".statecraft/state/workspaces/fixture/spawned")
+            .exists()
     }
 
     fn clear_spawn_marker(&self) {
-        let marker = self.bin.path().join("spawned");
+        let marker = self
+            .target
+            .path()
+            .join(".statecraft/state/workspaces/fixture/spawned");
         if marker.exists() {
             std::fs::remove_file(marker).unwrap();
         }

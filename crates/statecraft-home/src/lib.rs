@@ -57,6 +57,7 @@ pub mod admission;
 pub mod authority;
 pub mod bridge;
 pub mod capture;
+pub mod confinement;
 pub mod delivery;
 pub mod derived;
 pub mod flow;

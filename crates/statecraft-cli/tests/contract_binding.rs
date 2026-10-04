@@ -35,6 +35,7 @@ struct Fixture {
     target: tempfile::TempDir,
     home: tempfile::TempDir,
     bin: tempfile::TempDir,
+    operator_home: tempfile::TempDir,
 }
 
 const EXPANSION: &str = r#"#!/bin/sh
@@ -44,7 +45,8 @@ case "$*" in
   check|'check --help') exit 0 ;;
   'registry plan --json') echo '{"ready":[{"id":"107-x","status":"approved","title":"with obligations"}]}' ;;
   'registry list --json') echo '{"items":[{"id":"107-x","status":"approved","implementation":"pending","obligations":[{"id":"R-1","kind":"requirement","text":"t","anchor":"a"},{"id":"R-2","kind":"requirement","text":"u","anchor":"a","withdrawn":true}]}]}' ;;
-  'verify '*' --plan --json') printf '{"exitCode":0,"ok":true,"report":{"commands":[],"skipped":[],"specId":"%s"},"schemaVersion":"0.6.0","verb":"verify"}' $2 ;;
+  'verify '*' --plan --json') if [ -f "$here/suite-plan" ]; then /bin/cat "$here/suite-plan"; exit 0; fi; printf '{"exitCode":0,"ok":true,"report":{"commands":[],"skipped":[],"specId":"%s"},"schemaVersion":"0.6.0","verb":"verify"}' $2 ;;
+  'delta --base '*' --head '*' --json') printf '{"exitCode":0,"ok":true,"report":{"schemaVersion":"0.1.0","tool":{"name":"spec-spine","version":"0.22.0"},"classifiedUnder":"base","base":"%s","mergeBase":"%s","head":"%s","changes":[],"counts":{},"priorPolicy":{"required":false,"classes":[]}},"schemaVersion":"0.6.0","verb":"delta"}' "$3" "$3" "$5" ;;
   'registry closure --help') exit 0 ;;
   'registry closure --request - --json')
     /bin/cat > "$here/closure-request"
@@ -94,7 +96,9 @@ impl Fixture {
             target: tempfile::tempdir().unwrap(),
             home: tempfile::tempdir().unwrap(),
             bin: tempfile::tempdir().unwrap(),
+            operator_home: tempfile::tempdir().unwrap(),
         };
+        std::fs::write(f.operator_home.path().join(".claude.json"), "{}").unwrap();
         let t = f.target.path();
         git(t, &["init", "--quiet"]);
         git(t, &["config", "user.name", "fixture"]);
@@ -143,6 +147,7 @@ impl Fixture {
             .args(args)
             .env_clear()
             .env("STATECRAFT_HOME", self.home.path())
+            .env("HOME", self.operator_home.path())
             .env("PATH", format!("{}:/usr/bin:/bin", self.bin().display()))
             .env("USER", "fixture-operator")
             .output()
@@ -316,4 +321,73 @@ fn a_producer_without_closures_binds_unsupported_and_accept_reads_not_recorded()
         "policy-digest-uncomputable",
         "{v}"
     );
+}
+
+/// The real accept path executes candidate code under a suite boundary. Suite
+/// writes remain legal, but checkout, home, Git and shared caches stay protected.
+#[test]
+fn acceptance_confines_candidate_code_and_keeps_suite_artifacts_out_of_the_candidate() {
+    let f = Fixture::new(EXPANSION);
+    std::fs::write(f.target.path().join("Makefile"), "all:\n\ttrue\n").unwrap();
+    std::fs::write(f.home.path().join("protected-suite"), "authority").unwrap();
+    git(f.target.path(), &["add", "Makefile"]);
+    git(
+        f.target.path(),
+        &["commit", "--quiet", "-m", "fixture policy"],
+    );
+    assert_eq!(f.run().0, 0);
+    let suite = format!(
+        "test -d \"$CARGO_HOME\" && test -z \"$(ls -A \"$CARGO_HOME\")\" && printf cache > \"$CARGO_HOME/artifact\" && printf generated > suite-artifact && chmod 755 suite-artifact && ! cat '{}' && ! sh -c \"printf changed > '{}/source.txt'\" && ! git update-ref refs/heads/statecraft/107-x/work HEAD",
+        f.home.path().join("protected-suite").display(),
+        f.target.path().display()
+    );
+    std::fs::write(
+        f.bin().join("suite-plan"),
+        serde_json::json!({
+            "exitCode":0, "ok":true, "report":{"commands":[suite], "skipped":[], "specId":"107-x"},
+            "schemaVersion":"0.6.0", "verb":"verify"
+        })
+        .to_string(),
+    )
+    .unwrap();
+    let (code, answer) = f.accept();
+    assert_eq!(code, 0, "{answer}");
+    let receipt = &json_naming::payload(&answer)["receipt"];
+    assert!(receipt["confinement"]["digest"].is_string(), "{answer}");
+    assert_eq!(
+        std::fs::read_to_string(f.target.path().join("source.txt")).unwrap(),
+        "base"
+    );
+    assert_eq!(
+        std::fs::read_to_string(f.home.path().join("protected-suite")).unwrap(),
+        "authority"
+    );
+    let workspace = f.target.path().join(".statecraft/state/workspaces/107-x");
+    assert_eq!(
+        std::fs::read_to_string(workspace.join("suite-artifact")).unwrap(),
+        "generated"
+    );
+}
+
+#[test]
+fn acceptance_reports_the_failed_boundary_step_without_a_new_receipt_or_record() {
+    let f = Fixture::new(EXPANSION);
+    assert_eq!(f.run().0, 0);
+    let chain = statecraft_run::record::chain_path(f.home.path(), f.target.path());
+    let before = std::fs::read(&chain).unwrap();
+    let reference = f
+        .target
+        .path()
+        .join(".git/refs/heads/statecraft/107-x/work");
+    std::fs::remove_file(&reference).unwrap();
+    std::os::unix::fs::symlink(f.target.path().join("source.txt"), &reference).unwrap();
+    let (code, answer) = f.accept();
+    assert_eq!(code, 2, "{answer}");
+    let report = json_naming::payload(&answer);
+    assert_eq!(report["acceptance"], "not-attempted", "{answer}");
+    assert_eq!(report["reason"], "boundary-unavailable", "{answer}");
+    assert_eq!(report["boundary"]["platform"], std::env::consts::OS);
+    assert_eq!(report["boundary"]["step"], "object-import");
+    assert!(report.get("receipt").is_none());
+    assert_eq!(std::fs::read(chain).unwrap(), before);
 }

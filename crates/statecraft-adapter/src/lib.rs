@@ -30,14 +30,13 @@
 //!
 //! # What this crate does not claim
 //!
-//! **No isolation.** Section 3.6 is explicit, and so is
-//! [`environment::RESIDUALS`]: the supervisor's path is the only publishing path
-//! this product *provides*, which is a statement about what it hands the child
-//! and not about what the child can reach. No document in this repository may
-//! say the child cannot publish.
+//! [`boundary`] enforces section 3.18's protected evidence and read-only roots.
+//! Its recorded open items and [`environment::RESIDUALS`] remain explicit.
+//! This product makes no claim that the child cannot publish.
 
-#![forbid(unsafe_code)]
+#![deny(unsafe_code)]
 
+pub mod boundary;
 pub mod capability;
 pub mod coverage;
 pub mod environment;
