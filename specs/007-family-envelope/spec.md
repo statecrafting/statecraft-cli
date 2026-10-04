@@ -15,6 +15,8 @@ summary: >
   spec-spine 0.28.0 adoption, which changes the producer answer it would read.
   Replaces the historical proposal from #118 with the amendment that the
   current model requires (001 section 5).
+establishes:
+  - { kind: file, path: "docs/proposals/007-offline-enrolment-contract.md" }
 amends:
   # Section 3.4's rendering ({value, exit, summary}) is replaced and 3.3's
   # vocabulary gains a JSON spelling. 006 is not edited to record it.
@@ -49,7 +51,8 @@ and this is it.
 
 ## 2. Territory
 
-None of its own. The code it changes is 006's, reached through the `extends`
+The proposed offline-contract record named in section 6 is its own. The code
+it changes is 006's, reached through the `extends`
 edge above: the rendering in `crates/statecraft-cli/src/render.rs`, the verb's
 dotted name in `commands.rs`, the usage and failure paths in `main.rs`, and the
 sites in `bind.rs` and `slice.rs` that name a specific error kind.
@@ -165,3 +168,22 @@ cargo test -p statecraft-cli --lib render::
 cargo test -p statecraft-cli --test family_envelope
 cargo test -p statecraft-cli --tests
 ```
+
+## 6. Offline signing proposal, owner-approved 2026-10-03
+
+Grade: proposed only. The owner requested preparation of an offline Ed25519
+issuer enrollment ceremony through this spec.
+`docs/proposals/007-offline-enrolment-contract.md` records the proposed domains,
+RootSetV2 signature placement, offline command surface and planned enrollment,
+rotation and revocation tests. It changes no approved cryptographic requirement.
+
+The current shared crate belongs to 005, not this spec. Before implementation,
+the proposal requires a separate ratified amendment of 005 for its shared
+contract and of 006 for its command surface. This spec supplies command JSON
+rendering only. No code, pin, key or signature is changed.
+
+Decision, 2026-10-03: the owner approved the proposal's format as drafted and
+accepted the unbounded enrollment window for the first enrollment only, with
+finite expiry recorded as a follow-up before any rotation. The 005 and 006
+amendments remain separate changes; this entry approves their direction, not
+their text.
