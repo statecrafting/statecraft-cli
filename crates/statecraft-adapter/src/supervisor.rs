@@ -257,9 +257,15 @@ fn spawn_supervised(
 ) -> std::io::Result<Launched> {
     let workspace = workspace_to_enter(&request.workspace)?;
 
-    let mut command = Command::new(program);
+    let mut command = match &environment.confinement {
+        Some(boundary) => boundary.command(program, args),
+        None => {
+            let mut command = Command::new(program);
+            command.args(args);
+            command
+        }
+    };
     command
-        .args(args)
         .current_dir(workspace)
         .env_clear()
         .envs(&environment.variables)
@@ -346,21 +352,40 @@ fn read_supervised<E: Send + 'static, R: Read + Send + 'static>(
         let mut stdout = BufReader::new(stdout);
         let mut failure = None;
         'read: {
-            for (i, line) in (&mut stdout).lines().enumerate() {
-                let line = match line {
+            let mut total = 0usize;
+            let mut i = 0;
+            loop {
+                const LINE_LIMIT: usize = 1024 * 1024;
+                const STREAM_LIMIT: usize = 64 * 1024 * 1024;
+                let mut bytes = Vec::new();
+                let read = (&mut stdout)
+                    .take((LINE_LIMIT + 1) as u64)
+                    .read_until(b'\n', &mut bytes);
+                let length = match read {
+                    Ok(0) => break,
+                    Ok(length) => length,
+                    Err(error) => {
+                        failure = Some(format!("while reading the event stream: {error}"));
+                        break 'read;
+                    }
+                };
+                total += length;
+                i += 1;
+                if length > LINE_LIMIT || total > STREAM_LIMIT {
+                    failure = Some("event stream exceeds its size bound".into());
+                    break;
+                }
+                let line = match String::from_utf8(bytes) {
                     Ok(line) => line,
-                    Err(e) => {
-                        // A read that failed is not a stream that ended. Say so
-                        // here rather than letting the absence of a result event
-                        // describe it later.
-                        failure = Some(format!("while reading the event stream: {e}"));
+                    Err(error) => {
+                        failure = Some(format!("while reading the event stream: {error}"));
                         break 'read;
                     }
                 };
                 if line.trim().is_empty() {
                     continue;
                 }
-                let event = decode(&line, i + 1);
+                let event = decode(&line, i);
                 let stop_parsing = event.as_ref().map_or(true, is_terminal);
                 let item = match event {
                     Ok(event) => Item::Event(event),
@@ -587,10 +612,50 @@ pub fn capture(
     stdin: &[u8],
     deadline: Duration,
 ) -> std::io::Result<Captured> {
+    capture_with_boundary(program, args, workspace, environment, stdin, deadline, None)
+}
+
+/// Capture a program under an already admitted immutable OS boundary.
+pub fn capture_confined(
+    program: &Path,
+    args: &[&str],
+    workspace: &Path,
+    environment: &std::collections::BTreeMap<String, String>,
+    stdin: &[u8],
+    deadline: Duration,
+    boundary: &crate::boundary::Prepared,
+) -> std::io::Result<Captured> {
+    capture_with_boundary(
+        program,
+        args,
+        workspace,
+        environment,
+        stdin,
+        deadline,
+        Some(boundary),
+    )
+}
+
+#[allow(clippy::too_many_arguments)]
+fn capture_with_boundary(
+    program: &Path,
+    args: &[&str],
+    workspace: &Path,
+    environment: &std::collections::BTreeMap<String, String>,
+    stdin: &[u8],
+    deadline: Duration,
+    boundary: Option<&crate::boundary::Prepared>,
+) -> std::io::Result<Captured> {
     let workspace = workspace_to_enter(workspace)?;
-    let mut command = Command::new(program);
+    let mut command = match boundary {
+        Some(boundary) => boundary.command(program, args),
+        None => {
+            let mut command = Command::new(program);
+            command.args(args);
+            command
+        }
+    };
     command
-        .args(args)
         .current_dir(workspace)
         .env_clear()
         .envs(environment)
@@ -614,8 +679,13 @@ pub fn capture(
     let pipe = |mut from: Box<dyn Read + Send>| {
         std::thread::spawn(move || {
             let mut out = Vec::new();
-            let _ = from.read_to_end(&mut out);
-            out
+            let limit = 16 * 1024 * 1024;
+            (&mut from).take(limit + 1).read_to_end(&mut out)?;
+            if out.len() as u64 > limit {
+                std::io::copy(&mut from, &mut std::io::sink())?;
+                return Err(std::io::Error::other("captured output exceeds 16 MiB"));
+            }
+            Ok::<_, std::io::Error>(out)
         })
     };
     let out = pipe(Box::new(child.stdout.take().expect("stdout was piped")));
@@ -660,8 +730,10 @@ pub fn capture(
     let (stdout, stderr) = if out.is_finished() && err.is_finished() {
         let _ = writer.join();
         (
-            out.join().unwrap_or_default(),
-            err.join().unwrap_or_default(),
+            out.join()
+                .map_err(|_| std::io::Error::other("stdout reader panicked"))??,
+            err.join()
+                .map_err(|_| std::io::Error::other("stderr reader panicked"))??,
         )
     } else {
         // A survivor may hold a pipe. The readers are dropped rather than
@@ -961,6 +1033,63 @@ mod tests {
     use crate::environment::{Blueprint, CheckSuiteCommands, construct};
     use crate::protocol::{AttemptIdentity, Classification, read_stream};
     use std::io::Write;
+
+    #[test]
+    fn an_oversized_event_is_drained_and_never_decoded() {
+        let directory = tempfile::tempdir().unwrap();
+        std::fs::write(
+            directory.path().join("oversized"),
+            vec![b'x'; 1024 * 1024 + 2],
+        )
+        .unwrap();
+        std::fs::write(
+            directory.path().join("adapter.sh"),
+            "cat > /dev/null\ncat oversized\n",
+        )
+        .unwrap();
+        let request = Request {
+            workspace: directory.path().to_path_buf(),
+            base_commit: "0".repeat(40),
+            prompt: Vec::new(),
+            capabilities: Requested::none(),
+            deadline_seconds: 10,
+            attempt: AttemptIdentity {
+                run_id: "bounded-event".into(),
+                number: 1,
+            },
+        };
+        let environment = construct(
+            &Blueprint::empty().allowing("PATH", "/usr/bin:/bin"),
+            &CheckSuiteCommands(vec![]),
+        );
+        let Launched::Running(spawned) = spawn_supervised(
+            Path::new("/bin/sh"),
+            &["adapter.sh"],
+            &request,
+            &environment,
+            &mut |_| Ok(()),
+        )
+        .unwrap() else {
+            panic!("fixture launched");
+        };
+        let run: Supervised = read_supervised(
+            spawned.child,
+            spawned.stdout,
+            spawned.writer,
+            spawned.deadline,
+            Instant::now,
+            parse_event,
+            |event| matches!(event, Event::Result { .. }),
+            &mut Unwatched,
+        )
+        .unwrap();
+        assert!(run.events.is_empty());
+        assert!(
+            matches!(run.stream_error, Some(StreamError::ReadFailed { ref detail, .. }) if detail.contains("size bound"))
+        );
+        assert_eq!(run.outcome, Outcome::Interrupted);
+        assert!(run.surviving_processes.is_none());
+    }
 
     /// A reader that passes `budget` bytes through and then fails every read.
     ///
