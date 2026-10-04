@@ -76,9 +76,10 @@ workspaces are expected; missing, mixed, substituted or mismatched source or
 workspace bindings refuse qualification. Existing program, arguments, payload,
 version, distinct-session and structured-event requirements remain unchanged.
 
-Legacy captures without confinement or source binding retain their strict
-working-directory comparisons. A source binding is never synthesized while
-reading an old record. A confined capture without a source binding is refused.
+Legacy captures carry neither confinement nor source binding and retain their
+strict working-directory comparisons. A source binding is never synthesized
+while reading an old record. A capture with only one of confinement and source
+binding is refused, including an unconfined capture carrying a source binding.
 
 ## 4. Acceptance criteria
 

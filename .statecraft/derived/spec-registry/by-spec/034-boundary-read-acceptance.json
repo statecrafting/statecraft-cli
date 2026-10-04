@@ -33,13 +33,13 @@
     "id": "034-boundary-read-acceptance",
     "implementation": "pending",
     "sectionDigests": {
-      "034-protected-boundary-read-acceptance": "ff20b01100c6e7d8c203c887c5eb76e7c57d7dc6c660ea8829f7eaae2d26054f",
+      "034-protected-boundary-read-acceptance": "1929985774ef2f7b7dd127bdb3358677d7df720065b629f3856e731135718dce",
       "1-purpose": "14b642b1664ae4353037ac6e05ba69b8e4b3de2750ad3bbbaafa2542c39e9ddc",
       "2-boundaries": "392cce6d6243fb768395c1e28275416f5fed855ab2326e8d8cfd4bcd69bdf072",
       "3-1-self-test": "3180743dc85561763ed9eecc57d639b5adf6512bf0b0c2db8f60e1ba5ab21049",
       "3-2-hostile-fixture-acceptance": "1a42231f77896341ba032d606d175a9603e42129042023ed61ee3dce149eae8f",
-      "3-3-confined-capture-project-binding": "322f82f37bf8e207d06171b4f09f9920d83140465af713d68bf7734b452796b4",
-      "3-required-behavior": "12f2e4c87288fafad2efc0bc8e0451ae1d68e6a669a06e55d42db7b097cdcfd0",
+      "3-3-confined-capture-project-binding": "1cc5c10533c3188edf64334adc5abfaf2b3e6ae9537ed3dbeeaa4f0510f28f39",
+      "3-required-behavior": "405a50464e4641f5ef9318391544b2ad028778dd8b96b583216c8d19a486223e",
       "4-acceptance-criteria": "e13c4e3cde9f0ac75ce582ca002daa671fd6d77ab9b62e8ab6f4a0cec9d80258",
       "5-resolved-decisions": "90cb5324f189fd90988e1bdb5db772dd760b212b5a8d03742c8c146caa7edcd1",
       "verification": "373edc2287846f26653085f6d77e6e59847ef9833d731e7c6569e3d9ef3db7f7"
@@ -61,6 +61,6 @@
     "summary": "Corrects the self-test and hostile-fixture acceptance of spec 004 section 3.18 to preserve rule 2: the operator checkout and other attempt workspaces remain readable, and mutations are refused. Product home and launch records remain inaccessible except for the existing explicit exceptions.\n",
     "title": "Protected boundary acceptance preserves read-only checkout access"
   },
-  "shardHash": "e6d5340f65a14636d9f3b2de58a06e6ec28b7f0882bee09f2a55ae5595742aba",
+  "shardHash": "3bc9f1733a1302e5905db94bc4ae4903f988c032c27c975bc7df72fc3c1f5ff5",
   "specVersion": "1.9.0"
 }
