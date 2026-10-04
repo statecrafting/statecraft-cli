@@ -959,6 +959,13 @@ the declared mechanism.
 deadline state, and process completion remain separate observations so a later
 admission cannot infer one from another.
 
+**2026-10-04: boundary admission precedes the attempt.** A session prepares its
+workspace under its own effect intent and admits the exact boundary before the
+attempt intent becomes durable; a refusal records the preparation and appends
+no attempt. Supervisor Git resolves its program from absolute `PATH`
+directories and refuses a workspace or provider configuration directory, so a
+child cannot substitute the Git the supervisor runs.
+
 ## Verification
 
 Each line is one command. §3.5's suite is eight tests named `suite_1` to
