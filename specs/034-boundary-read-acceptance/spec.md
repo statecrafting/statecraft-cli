@@ -1,7 +1,7 @@
 ---
 id: "034-boundary-read-acceptance"
 title: "Protected boundary acceptance preserves read-only checkout access"
-status: draft
+status: approved
 implementation: pending
 created: "2026-10-03"
 summary: >

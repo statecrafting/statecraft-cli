@@ -57,10 +57,10 @@
       "Verification"
     ],
     "specPath": "specs/034-boundary-read-acceptance/spec.md",
-    "status": "draft",
+    "status": "approved",
     "summary": "Corrects the self-test and hostile-fixture acceptance of spec 004 section 3.18 to preserve rule 2: the operator checkout and other attempt workspaces remain readable, and mutations are refused. Product home and launch records remain inaccessible except for the existing explicit exceptions.\n",
     "title": "Protected boundary acceptance preserves read-only checkout access"
   },
-  "shardHash": "b63e1de393fac16afc2af9cc4ca909adf3a560c1c8ee68cc85e4abb146077d67",
+  "shardHash": "c14502e2584fffd1df97fb6cb6a5772d40fd538c37bb0dea7dd20eb85b12dda5",
   "specVersion": "1.9.0"
 }
