@@ -95,7 +95,8 @@ impl Sandbox {
         let root = s.root();
         assert!(code(&s.run(&["project", "register", &root])) <= 1);
         // `env apply` is what creates the manifest a transfer is recorded in.
-        assert!(code(&s.run(&["env", "apply", &root])) <= 1);
+        let applied = s.run(&["env", "apply", &root]);
+        assert!(code(&applied) <= 1, "{}", stdout(&applied));
         assert!(s.project().join(".statecraft/environment.json").exists());
         s
     }

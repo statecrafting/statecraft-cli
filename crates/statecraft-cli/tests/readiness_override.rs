@@ -66,6 +66,7 @@ impl Fixture {
             dir: tempfile::tempdir().unwrap(),
         };
         std::fs::create_dir_all(f.bin()).unwrap();
+        std::fs::write(f.dir.path().join(".claude.json"), b"{}").unwrap();
         executable(
             &f.bin().join("spec-spine"),
             &format!(

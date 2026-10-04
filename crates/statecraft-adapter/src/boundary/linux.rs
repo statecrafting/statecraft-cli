@@ -76,6 +76,10 @@ impl Rules {
         let file = unsafe { File::from_raw_fd(fd as i32) };
         let mut entries = Vec::<(std::path::PathBuf, u64)>::new();
         read_siblings(Path::new("/"), &policy.inaccessible, &mut entries)?;
+        // Siblings are listed before they are opened, so one can vanish in
+        // between. A vanished sibling needs no rule: omitting it only denies.
+        let siblings = entries.len();
+        let mut vanished = Vec::new();
         for path in &policy.readable {
             entries.push((path.clone(), READ));
         }
@@ -96,7 +100,7 @@ impl Rules {
                 entries.push((device.into(), FILE));
             }
         }
-        for (path, access) in &entries {
+        for (index, (path, access)) in entries.iter().enumerate() {
             let name = CString::new(path.as_os_str().as_bytes())
                 .map_err(|_| Refused::at("landlock-root", "NUL"))?;
             // SAFETY: name is terminated; O_PATH does not read device contents.
@@ -107,9 +111,14 @@ impl Rules {
                 )
             };
             if root < 0 {
+                let error = io::Error::last_os_error();
+                if index < siblings && error.raw_os_error() == Some(libc::ENOENT) {
+                    vanished.push(index);
+                    continue;
+                }
                 return Err(Refused::at(
                     "landlock-open-root",
-                    format!("{}: {}", path.display(), io::Error::last_os_error()),
+                    format!("{}: {error}", path.display()),
                 ));
             }
             let handle = unsafe { File::from_raw_fd(root) };
@@ -132,6 +141,9 @@ impl Rules {
                     format!("{}: {}", path.display(), io::Error::last_os_error()),
                 ));
             }
+        }
+        for index in vanished.into_iter().rev() {
+            entries.remove(index);
         }
         let port = Port {
             access: 2,

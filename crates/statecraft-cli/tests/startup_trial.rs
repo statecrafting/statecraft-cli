@@ -99,6 +99,7 @@ impl Fixture {
         };
         std::fs::create_dir_all(f.project()).unwrap();
         std::fs::create_dir_all(f.bin()).unwrap();
+        std::fs::write(f.dir.path().join(".claude.json"), b"{}").unwrap();
         f.git(&["init", "--quiet", "--initial-branch=main"]);
         f.git(&["config", "user.email", "fixture@example.invalid"]);
         f.git(&["config", "user.name", "fixture"]);
