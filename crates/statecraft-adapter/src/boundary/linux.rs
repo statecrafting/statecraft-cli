@@ -245,33 +245,46 @@ fn read_siblings(
 }
 
 fn listeners() -> Result<(), Refused> {
+    // SAFETY: geteuid has no arguments and cannot fail.
+    let euid = unsafe { libc::geteuid() };
     for table in ["tcp", "tcp6", "udp", "udp6"] {
         let data = std::fs::read_to_string(format!("/proc/net/{table}"))
             .map_err(|e| Refused::at("listener-check", e))?;
-        for line in data.lines().skip(1) {
-            let fields: Vec<_> = line.split_whitespace().collect();
-            if fields.len() < 8 {
-                return Err(Refused::at(
-                    "listener-check",
-                    "unknown proc socket table format",
-                ));
-            }
-            let port = fields[1]
-                .rsplit(':')
-                .next()
-                .and_then(|p| u16::from_str_radix(p, 16).ok())
-                .ok_or_else(|| Refused::at("listener-check", "invalid socket port"))?;
-            let uid: u32 = fields[7]
-                .parse()
-                .map_err(|_| Refused::at("listener-check", "invalid socket owner"))?;
-            if (table.starts_with("tcp") && port == 443 && fields[3] == "0A")
-                || (table.starts_with("udp") && uid == unsafe { libc::geteuid() })
-            {
-                return Err(Refused::at(
-                    "listener-check",
-                    format!("host {table} listener on port {port}, UID {uid}"),
-                ));
-            }
+        listener_in(table, &data, euid)?;
+    }
+    Ok(())
+}
+
+/// Refuse a TCP port 443 listener, or a same-user UDP listener, in one
+/// `/proc/net` table.
+fn listener_in(table: &str, data: &str, euid: u32) -> Result<(), Refused> {
+    for line in data.lines().skip(1) {
+        let fields: Vec<_> = line.split_whitespace().collect();
+        if fields.len() < 8 {
+            return Err(Refused::at(
+                "listener-check",
+                "unknown proc socket table format",
+            ));
+        }
+        let port = fields[1]
+            .rsplit(':')
+            .next()
+            .and_then(|p| u16::from_str_radix(p, 16).ok())
+            .ok_or_else(|| Refused::at("listener-check", "invalid socket port"))?;
+        let uid: u32 = fields[7]
+            .parse()
+            .map_err(|_| Refused::at("listener-check", "invalid socket owner"))?;
+        // A UDP socket listens only while unconnected: a connected one, such
+        // as a resolver's ephemeral client socket, takes datagrams from its
+        // one peer and is not the listener section 3.18 names.
+        let unconnected = fields[2].bytes().all(|b| b == b'0' || b == b':');
+        if (table.starts_with("tcp") && port == 443 && fields[3] == "0A")
+            || (table.starts_with("udp") && unconnected && uid == euid)
+        {
+            return Err(Refused::at(
+                "listener-check",
+                format!("host {table} listener on port {port}, UID {uid}"),
+            ));
         }
     }
     Ok(())
@@ -575,6 +588,28 @@ mod mount_tests {
         .err()
         .unwrap();
         assert_eq!(refusal.step, "mount-alias");
+    }
+
+    #[test]
+    fn only_an_unconnected_same_user_udp_socket_is_a_listener() {
+        let header = "  sl  local_address rem_address   st tx_queue rx_queue tr tm->when retrnsmt   uid  timeout inode\n";
+        let row = |remote: &str, uid: u32| {
+            format!(
+                "{header}  1: 0100007F:C5B5 {remote} 07 00000000:00000000 00:00000000 00000000 {uid} 0 1\n"
+            )
+        };
+        let connected = row("3500007F:0035", 1001);
+        assert!(listener_in("udp", &connected, 1001).is_ok());
+        let unconnected = row("00000000:0000", 1001);
+        assert_eq!(
+            listener_in("udp", &unconnected, 1001).unwrap_err().step,
+            "listener-check"
+        );
+        assert!(listener_in("udp", &unconnected, 1002).is_ok());
+        let v6 = format!(
+            "{header}  1: 00000000000000000000000001000000:C5B5 00000000000000000000000000000000:0000 07 00000000:00000000 00:00000000 00000000 1001 0 1\n"
+        );
+        assert!(listener_in("udp6", &v6, 1001).is_err());
     }
 
     #[test]
