@@ -27,7 +27,7 @@
     "id": "007-family-envelope",
     "implementation": "in-progress",
     "sectionDigests": {
-      "007-the-family-envelope": "16858f9cbcc1d99b0eb7cc03960574ea5922930ed6ac87cab8ff747dbeb728d1",
+      "007-the-family-envelope": "47ceb35ef879921b965f747b06124af9f8ad58ee733254809dd849a80e2bd153",
       "1-purpose": "ef14bfcd223140609b148653f4274dbe7ee8445885b8831dd4ceaa5adea8abb1",
       "2-territory": "bb3ef212b9207f2e971b815a4edfafe8d609897bed62d25d841bda02aad2f506",
       "3-1-the-envelope": "a3d7487e9ec8ed8312518b0069c9f67b503d838fee46a2cc82f6c848e18f22ab",
@@ -37,7 +37,7 @@
       "3-behavior": "78caa5f928f050f457baaeb2c4355c4a9760dc6b9ce17a804fceb319dec81cc5",
       "4-out-of-scope": "94d737fab1c790836b9b452415ee407ed858a6cdc09dcae36f5ef3814da2282a",
       "5-resolved-decisions": "4eb52664189c9422a54885354af177fe08941b870246e152c4641ce6b37e56dd",
-      "6-offline-signing-proposal-pending-owner-review": "fcdb58d6c38eb2ce896460fab107d136ebe971b0ea8eea09c1bb8959612b6ec8",
+      "6-offline-signing-proposal-owner-approved-2026-10-03": "bdd33d210ce7f4827a3daf0611817811681766de800c40b8be889d98301affbe",
       "verification": "4bf67f072f0ce76d5cc24b8da424cb7cada252f8a36cd4ee271846ff73b0e9cb"
     },
     "sectionHeadings": [
@@ -52,13 +52,13 @@
       "4. Out of scope",
       "5. Resolved decisions",
       "Verification",
-      "6. Offline signing proposal, pending owner review"
+      "6. Offline signing proposal, owner-approved 2026-10-03"
     ],
     "specPath": "specs/007-family-envelope/spec.md",
     "status": "approved",
     "summary": "Amends 006 sections 3.3 and 3.4. Every --json answer this product writes becomes the envelope spec-spine has written since 0.26.0 (its spec 132 section 3.4): schemaVersion, tool, verb, outcome, exitCode, summary, then report for exit 0 or 1 and error for 2, 3 or 4, where error.kind is one of the family's ten tokens. No exit number moves. A usage error under --json is an envelope on stdout. The replacement of 002 section 3.23's check translation, which #118 proposed for the same change, is left to the spec-spine 0.28.0 adoption, which changes the producer answer it would read. Replaces the historical proposal from #118 with the amendment that the current model requires (001 section 5).\n",
     "title": "The family envelope: every --json answer in the exit and JSON contract spec-spine speaks"
   },
-  "shardHash": "5d42b04152da1703256005838acb15886771da4859ef2f048c964d57a98c590f",
+  "shardHash": "616bddf7daba93766c16eff993a96ff59e048358e20f5c5f1f27ff5144dc020c",
   "specVersion": "1.9.0"
 }

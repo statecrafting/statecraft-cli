@@ -237,3 +237,13 @@ block or command against tests that do not exist claims readiness here.
 | Domains and V2 schema | Approve draft; revise format | Review and approve this explicit format | Enables separate implementation, strict migration and cross-product vectors. |
 | Enrollment expiry | Accept current unbounded window; require finite expiry | Explicitly decide before signing | Finite expiry requires renderer work; no signed bytes silently change. |
 | Event-time semantics | Proposed effective/since rules; another explicit rule | Proposed rules after vector review | Preserves historical valid signatures and refuses compromised future ones. |
+
+## Owner decision, 2026-10-03
+
+The owner approved this contract as proposed on 2026-10-03: the three fixed
+domains, exact-byte enrollment signing, detached signatures in RootSetV2 and
+the offline verb surface. The first enrollment uses the current renderer with
+no `not_after`; a finite-expiry renderer option is a recorded follow-up that
+must land before any rotation or second enrollment is signed. This approval
+authorizes the 005 and 006 amendments and implementation with golden vectors.
+It does not authorize an agent to generate a root or sign an enrollment.

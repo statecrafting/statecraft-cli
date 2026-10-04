@@ -169,7 +169,7 @@ cargo test -p statecraft-cli --test family_envelope
 cargo test -p statecraft-cli --tests
 ```
 
-## 6. Offline signing proposal, pending owner review
+## 6. Offline signing proposal, owner-approved 2026-10-03
 
 Grade: proposed only. The owner requested preparation of an offline Ed25519
 issuer enrollment ceremony through this spec.
@@ -180,5 +180,10 @@ rotation and revocation tests. It changes no approved cryptographic requirement.
 The current shared crate belongs to 005, not this spec. Before implementation,
 the proposal requires a separate ratified amendment of 005 for its shared
 contract and of 006 for its command surface. This spec supplies command JSON
-rendering only. No code, pin, key or signature is changed; existing approval and
-implementation status do not ratify this proposal.
+rendering only. No code, pin, key or signature is changed.
+
+Decision, 2026-10-03: the owner approved the proposal's format as drafted and
+accepted the unbounded enrollment window for the first enrollment only, with
+finite expiry recorded as a follow-up before any rotation. The 005 and 006
+amendments remain separate changes; this entry approves their direction, not
+their text.
