@@ -83,10 +83,10 @@
       "Verification"
     ],
     "specPath": "specs/036-offline-issuer-verbs/spec.md",
-    "status": "draft",
+    "status": "approved",
     "summary": "Amends 006 for the command half of the offline issuer enrollment contract the owner approved on 2026-10-03 (docs/proposals/007-offline-enrolment-contract.md). Adds three verbs to the existing binary: root-generate writes a new offline owner seed only to an explicit path, with owner-only permissions and an explicit confirmation option; issuer-sign signs one enrollment, rotation or revocation only after strict decoding, history checks and a confirmation naming the exact payload digest; issuer-verify checks a detached authorization against an independently pinned owner key and, with the full option group, issuer eligibility under the operator's exact pin. Formats and verification are 035's; no verb reads the product home, contacts a network, opens a cell or store, or signs an arbitrary domain.\n",
     "title": "The offline issuer verbs: trust root-generate, trust issuer-sign and trust issuer-verify"
   },
-  "shardHash": "bb5096196444517d64f7d51ea68ddc313049a13da3e917a4dfb97a68c625c832",
+  "shardHash": "26441de48643ab3ebc0dc50ade6fa0db528943eb75c6c69f92c89f38996a2438",
   "specVersion": "1.9.0"
 }

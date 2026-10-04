@@ -1,7 +1,7 @@
 ---
 id: "036-offline-issuer-verbs"
 title: "The offline issuer verbs: trust root-generate, trust issuer-sign and trust issuer-verify"
-status: draft
+status: approved
 implementation: in-progress
 created: "2026-10-03"
 summary: >
