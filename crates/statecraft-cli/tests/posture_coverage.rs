@@ -88,7 +88,7 @@ while [ "$#" -gt 0 ]; do
   shift
 done
 /bin/cat > /dev/null
-echo launched >> "$here/launches"
+echo launched >> "$PWD/launches"
 session=11111111-1111-1111-1111-111111111111
 escape() { /usr/bin/awk 'BEGIN { ORS = "" } { gsub(/\\/, "\\\\"); gsub(/"/, "\\\""); gsub(/\t/, "\\t"); if (NR > 1) printf "\\n"; print }'; }
 command_for() {
@@ -164,6 +164,7 @@ impl Fixture {
         };
         std::fs::create_dir_all(f.project()).unwrap();
         std::fs::create_dir_all(f.bin()).unwrap();
+        std::fs::write(f.dir.path().join(".claude.json"), b"{}").unwrap();
         f.git(&["init", "--quiet", "--initial-branch=main"]);
         f.git(&["config", "user.email", "fixture@example.invalid"]);
         f.git(&["config", "user.name", "fixture"]);
@@ -233,10 +234,15 @@ impl Fixture {
     }
 
     fn launches(&self) -> usize {
-        std::fs::read_to_string(self.bin().join("launches"))
-            .unwrap_or_default()
-            .lines()
-            .count()
+        std::fs::read_to_string(
+            self.project()
+                .join(".statecraft/state/workspaces")
+                .join(RUN)
+                .join("launches"),
+        )
+        .unwrap_or_default()
+        .lines()
+        .count()
     }
 
     fn verify_dirs(&self) -> Vec<PathBuf> {

@@ -99,6 +99,7 @@ impl Fixture {
         };
         std::fs::create_dir_all(f.project()).unwrap();
         std::fs::create_dir_all(f.bin()).unwrap();
+        std::fs::write(f.dir.path().join(".claude.json"), b"{}").unwrap();
         f.git(&["init", "--quiet", "--initial-branch=main"]);
         f.git(&["config", "user.email", "fixture@example.invalid"]);
         f.git(&["config", "user.name", "fixture"]);
@@ -148,7 +149,7 @@ impl Fixture {
     }
 
     fn launches(&self) -> usize {
-        std::fs::read_to_string(self.bin().join("launches"))
+        std::fs::read_to_string(self.workspace().join("launches"))
             .unwrap_or_default()
             .lines()
             .count()
@@ -193,7 +194,7 @@ fn as_linked(script: &str) -> String {
 }
 
 const FAKE_PROVIDER: &str = r#"#!/bin/sh
-if [ "$1" = --version ]; then echo '2.1.267 (Claude Code)'; echo probed >> "$(dirname "$0")/probes"; exit 0; fi
+if [ "$1" = --version ]; then echo '2.1.267 (Claude Code)'; echo probed >> "$PWD/probes"; exit 0; fi
 here="$(dirname "$0")"
 settings=""
 while [ "$#" -gt 0 ]; do
@@ -201,9 +202,9 @@ while [ "$#" -gt 0 ]; do
   shift
 done
 mode="$(/bin/cat "$here/mode" 2>/dev/null || echo faithful)"
-/bin/cp "$settings" "$here/received-settings"
-/bin/cat > "$here/received-prompt"
-echo launched >> "$here/launches"
+/bin/cp "$settings" "$PWD/received-settings"
+/bin/cat > "$PWD/received-prompt"
+echo launched >> "$PWD/launches"
 session=11111111-1111-1111-1111-111111111111
 escape() { /usr/bin/awk 'BEGIN { ORS = "" } { gsub(/\\/, "\\\\"); gsub(/"/, "\\\""); gsub(/\t/, "\\t"); if (NR > 1) printf "\\n"; print }'; }
 command_for() {
@@ -225,7 +226,7 @@ finish() { /usr/bin/sed -n '4,$p' "$here/native.jsonl"; }
 request() {
   printf '{"type":"assistant","message":{"role":"assistant","content":[{"type":"tool_use","id":"toolu_trial","name":"Read","input":{"file_path":"%s/STATECRAFT-TRIAL-SENTINEL"}}]},"session_id":"%s"}\n' "$PWD" "$session"
 }
-consult() { printf '{"tool_name":"Read","tool_input":{}}' | /bin/sh -c "$gate_cmd" 2>> "$here/gate-stderr"; }
+consult() { printf '{"tool_name":"Read","tool_input":{}}' | /bin/sh -c "$gate_cmd" 2>> "$PWD/gate-stderr"; }
 execute() {
   content="$(/usr/bin/tr -d '\n' < "$PWD/STATECRAFT-TRIAL-SENTINEL")"
   printf '{"type":"user","message":{"role":"user","content":[{"type":"tool_result","tool_use_id":"toolu_trial","content":"%s","is_error":false}]},"session_id":"%s"}\n' "$content" "$session"
@@ -274,7 +275,7 @@ fn a_faithful_synthetic_trial_is_established_and_says_it_is_synthetic() {
     // One session and one version probe: the budget.
     assert_eq!(f.launches(), 1);
     assert_eq!(
-        std::fs::read_to_string(f.bin().join("probes"))
+        std::fs::read_to_string(f.workspace().join("probes"))
             .unwrap()
             .lines()
             .count(),
@@ -298,13 +299,13 @@ fn a_faithful_synthetic_trial_is_established_and_says_it_is_synthetic() {
     let facts = &t["record"]["facts"];
     assert_eq!(
         facts["settingsWritten"].as_str().unwrap().as_bytes(),
-        std::fs::read(f.bin().join("received-settings")).unwrap()
+        std::fs::read(f.workspace().join("received-settings")).unwrap()
     );
     assert_eq!(facts["decision"]["event"], "init");
     assert_eq!(facts["probedVersion"], "2.1.267");
     assert_eq!(facts["maxTurns"], 3);
     // The prompt delivered is the trial's, and it names the sentinel.
-    let prompt = std::fs::read_to_string(f.bin().join("received-prompt")).unwrap();
+    let prompt = std::fs::read_to_string(f.workspace().join("received-prompt")).unwrap();
     assert!(prompt.contains("STATECRAFT-TRIAL-SENTINEL"), "{prompt}");
     assert!(f.workspace().join("STATECRAFT-TRIAL-SENTINEL").is_file());
 

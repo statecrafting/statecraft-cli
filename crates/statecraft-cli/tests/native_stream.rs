@@ -36,6 +36,8 @@ fn native_run(
     let target = tempfile::tempdir().unwrap();
     let home = tempfile::tempdir().unwrap();
     let bin = tempfile::tempdir().unwrap();
+    let operator = tempfile::tempdir().unwrap();
+    std::fs::write(operator.path().join(".claude.json"), b"{}").unwrap();
     git(target.path(), &["init", "--quiet"]);
     git(target.path(), &["config", "user.name", "fixture"]);
     git(
@@ -114,9 +116,11 @@ esac
             .args(args)
             .env_clear()
             .env("STATECRAFT_HOME", home.path())
+            .env("HOME", operator.path())
             .env("PATH", &path)
             // Spec 004 section 3.14: the account name is carried to the child
-            // with this process's own value, and `HOME` still is not.
+            // with this process's own value; the operator HOME is used only
+            // by launch admission and is still withheld from the child.
             .env("USER", "fixture-operator")
             .output()
             .unwrap()
@@ -132,10 +136,22 @@ esac
     assert_eq!(
         output.status.code(),
         Some(if expected == "completed" { 0 } else { 1 }),
-        "{output:?}"
+        "{output:?}; entries: {:?}",
+        statecraft_run::Chain::open(home.path(), target.path())
+            .unwrap()
+            .0
+            .entries()
     );
     let answer: serde_json::Value = json_naming::from_output(&output.stdout).unwrap();
-    assert_eq!(answer["report"]["outcome"], expected);
+    assert_eq!(
+        answer["report"]["outcome"],
+        expected,
+        "{:?}",
+        statecraft_run::Chain::open(home.path(), target.path())
+            .unwrap()
+            .0
+            .entries()
+    );
     assert_eq!(answer["report"]["adapterClaimed"], claim);
     assert_eq!(answer["report"]["refusals"], refusals);
     // Spec 006 section 3.4 permits additive fields. The original seven stay,

@@ -343,10 +343,11 @@ fn the_preflight_runs_the_run_path_and_reads_its_startup_evidence_back() {
         v["record"]["launch"]["settingsWritten"]["digest"],
         v["intent"]["payload"]["digest"]
     );
-    // The fake was given exactly the document the intent names.
+    // The attempted side-channel write beside the executable is refused.
+    assert!(!run.acc().join("runbin/received-settings").exists());
     assert_eq!(
-        std::fs::read_to_string(run.acc().join("runbin/received-settings")).unwrap(),
-        v["intent"]["settingsDocument"].as_str().unwrap()
+        v["record"]["launch"]["settingsWritten"]["digest"],
+        v["intent"]["payload"]["digest"]
     );
     // Spec 002 section 3.37: the four records are in the product home, and
     // nothing of the attempt is in the target.

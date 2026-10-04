@@ -469,29 +469,25 @@ pub struct GateLog {
 /// further than `limit` bytes. `Ok(None)` when nothing is at the path.
 /// Returns the bytes and whether the file held more.
 pub(crate) fn read_child_file(path: &Path, limit: u64) -> std::io::Result<Option<(Vec<u8>, bool)>> {
-    use std::io::Read;
-    let mut options = std::fs::OpenOptions::new();
-    options.read(true);
-    #[cfg(unix)]
-    {
-        use std::os::unix::fs::OpenOptionsExt;
-        options.custom_flags(libc::O_NOFOLLOW | libc::O_NONBLOCK);
-    }
-    let file = match options.open(path) {
-        Ok(f) => f,
-        Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(None),
-        Err(e) => return Err(e),
+    let parent = path
+        .parent()
+        .ok_or_else(|| std::io::Error::other("data path has no parent"))?;
+    let name = path
+        .file_name()
+        .ok_or_else(|| std::io::Error::other("data path has no name"))?;
+    let root = match statecraft_adapter::boundary::DataRoot::open(parent) {
+        Ok(root) => root,
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(None),
+        Err(error) => return Err(error),
     };
-    if !file.metadata()?.file_type().is_file() {
-        return Err(std::io::Error::other(
-            "not a regular file; a link, a directory, a pipe or a device is not read",
-        ));
+    match root.read_prefix(
+        Path::new(name),
+        usize::try_from(limit).map_err(std::io::Error::other)?,
+    ) {
+        Ok(bytes) => Ok(Some(bytes)),
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(None),
+        Err(error) => Err(error),
     }
-    let mut bytes = Vec::new();
-    file.take(limit + 1).read_to_end(&mut bytes)?;
-    let truncated = bytes.len() as u64 > limit;
-    bytes.truncate(limit as usize);
-    Ok(Some((bytes, truncated)))
 }
 
 /// The revision a run selected, by full digest and by where it is installed.
@@ -686,8 +682,9 @@ pub struct Preparation<'a> {
 }
 
 /// An intent written to disk, with the digest of the bytes written.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone)]
 pub struct Prepared {
+    exchange_reader: std::sync::Arc<statecraft_adapter::boundary::DataRoot>,
     /// The intent.
     pub intent: Intent,
     /// Where it was written.
@@ -695,6 +692,13 @@ pub struct Prepared {
     /// SHA-256 of the bytes written.
     pub digest: String,
 }
+
+impl PartialEq for Prepared {
+    fn eq(&self, other: &Self) -> bool {
+        self.intent == other.intent && self.path == other.path && self.digest == other.digest
+    }
+}
+impl Eq for Prepared {}
 
 impl Prepared {
     /// The exact settings document the session is to be given.
@@ -904,6 +908,10 @@ pub fn prepare(p: &Preparation<'_>) -> Result<Prepared, NotPrepared> {
         _ => NotPrepared::Io(e.to_string()),
     })?;
     Ok(Prepared {
+        exchange_reader: std::sync::Arc::new(
+            statecraft_adapter::boundary::DataRoot::open(&p.attempt.exchange_dir(p.places))
+                .map_err(io)?,
+        ),
         digest: digest_bytes(json.as_bytes()),
         intent,
         path: intent_path,
@@ -1763,7 +1771,11 @@ pub struct GateLogCopy {
 /// read without following a link, and labelled child-attested. Returns the
 /// consultations read and the copy's description; a failure is recorded, not
 /// raised, because the record is still owed.
-fn copy_gate_log(places: &Places, attempt: &AttemptIdentity) -> (Vec<String>, GateLogCopy) {
+fn copy_gate_log(
+    places: &Places,
+    attempt: &AttemptIdentity,
+    reader: &statecraft_adapter::boundary::DataRoot,
+) -> (Vec<String>, GateLogCopy) {
     let source = attempt.gate_log_path(places);
     let target = attempt.records_dir(places).join(files::GATE_LOG);
     let mut copy = GateLogCopy {
@@ -1775,7 +1787,10 @@ fn copy_gate_log(places: &Places, attempt: &AttemptIdentity) -> (Vec<String>, Ga
         truncated: false,
         failure: None,
     };
-    let (bytes, truncated) = match read_child_file(&source, GATE_LOG_LIMIT) {
+    let (bytes, truncated) = match reader
+        .read_prefix(Path::new(files::GATE_LOG), GATE_LOG_LIMIT as usize)
+        .map(Some)
+    {
         Ok(Some(read)) => read,
         Ok(None) => {
             copy.failure = Some("the gate log the supervisor created is gone".to_string());
@@ -1951,7 +1966,7 @@ pub fn finalize(
     };
 
     let (gate, gate_log) = if intent.gated() {
-        let (words, copy) = copy_gate_log(places, &intent.attempt);
+        let (words, copy) = copy_gate_log(places, &intent.attempt, &prepared.exchange_reader);
         (Some(words), Some(copy))
     } else {
         (None, None)

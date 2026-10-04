@@ -686,6 +686,9 @@ pub struct AcceptView {
     /// Whether the contract the attempt was bound to still holds.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub contract: Option<statecraft_acceptance::contract::Comparison>,
+    /// Boundary preparation refusal, separate from the acceptance verdict.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub boundary: Option<crate::accept::BoundaryDiagnostic>,
 }
 
 /// A stale ledger at `accept`: refused before anything is judged, and nothing
@@ -708,9 +711,22 @@ pub fn accept_answer_with(
     acceptance: Acceptance,
     contract: Option<statecraft_acceptance::contract::Comparison>,
 ) -> Answer<AcceptView> {
+    accept_answer_with_boundary(acceptance, contract, None)
+}
+
+/// Acceptance with the concrete boundary refusal beside its verdict.
+pub fn accept_answer_with_boundary(
+    acceptance: Acceptance,
+    contract: Option<statecraft_acceptance::contract::Comparison>,
+    boundary: Option<crate::accept::BoundaryDiagnostic>,
+) -> Answer<AcceptView> {
     let exit = match &acceptance {
         Acceptance::Accepted { .. } => Exit::Ok,
         Acceptance::Failed { .. } => Exit::Finding,
+        Acceptance::NotAttempted {
+            reason: statecraft_acceptance::judged::NotAttemptedReason::BoundaryUnavailable,
+            ..
+        } => Exit::Refused,
         Acceptance::NotAttempted { .. } => Exit::Finding,
         Acceptance::None { reason } => match reason {
             // A digest nobody can compute identifies no policy, so nothing was
@@ -769,10 +785,17 @@ pub fn accept_answer_with(
     if let Some(c) = &contract {
         summary.push_str(&c.describe());
     }
+    if let Some(b) = &boundary {
+        summary.push_str(&format!(
+            "  {} boundary {}: {}\n",
+            b.platform, b.step, b.detail
+        ));
+    }
     Answer::new(
         AcceptView {
             acceptance,
             contract,
+            boundary,
         },
         exit,
         summary,
