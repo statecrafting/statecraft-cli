@@ -48,6 +48,11 @@ statecraft-run = { path = "../statecraft-run" }
 # Spec 004 section 3.17: the launch reading exports the base commit's tree into
 # a private temporary directory.
 tempfile = "3.27.0"
+# Spec 036: the offline owner root's seed comes from the operating system's
+# initialized random source, and is held only in zeroizing buffers.
+getrandom = "0.2.17"
+hex = "0.4.3"
+zeroize = "1.9.0"
 
 [dev-dependencies]
 tempfile = "3.27.0"
