@@ -1,0 +1,7 @@
+{
+  "kind": "enrolment",
+  "payload_digest": "f338593154930f059823175b1d281338a09a2a1844fc6385ba714c75b9f1c49e",
+  "root_key_id": "7098feedc6af1c3976cd89febe4858bd88a01d2aecebb77ad4bfe184768996d4",
+  "schema_version": 1,
+  "signature": "4489b0620c3c581c6e938f19f4902933fb589cd9471637ee03ce3a657f5e8a11cba8981df4dbd33b867fd928818a85dc26d0572c6da89b94b049ee64eadd8909"
+}

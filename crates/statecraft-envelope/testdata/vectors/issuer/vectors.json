@@ -1,0 +1,17 @@
+{
+  "enrolment_digest": "f338593154930f059823175b1d281338a09a2a1844fc6385ba714c75b9f1c49e",
+  "issuer_id": "87887917cd0a1ce3bfe4b5044e74308e73657967ddb676164a298163dba82d53",
+  "note": "TEST-ONLY vectors from public labelled seeds; never production material",
+  "online_key_id": "2d1b4327776e7d8def3f4fa474bc3f9ed76a07f62a3b272d6b6515dcfa4a2e59",
+  "online_public_key": "ab5e78887e31cbac9224fba19d47f409c36ac8e21156db6244eb744601a55f40",
+  "online_seed_label": "statecraft TEST-ONLY online issuer seed: public, never production",
+  "owner_key_id": "7098feedc6af1c3976cd89febe4858bd88a01d2aecebb77ad4bfe184768996d4",
+  "owner_public_key": "cdc159ed7c4fa822d68617880bd6c54e7622eb5fc23e507112ab709d354e1edc",
+  "owner_seed_label": "statecraft TEST-ONLY owner root seed: public, never production",
+  "revocation_digest": "8aa960eabacb465a20049897ef064d2a130cd1db46299221c6af3a4d33ad3cb8",
+  "root_set_digest": "eb1861b457d645448f11d0f22c0089ad32e02426f922ef86e320026994889774",
+  "root_set_version": 7,
+  "rotation_digest": "662031368664aef4686f79aefd7beb802e80d3edd0b39650f4d52c786561bf2a",
+  "successor_public_key": "0576c68429992525ecea95966cb0fade6d4668ef78ca792db8764b5dcd689ff6",
+  "successor_seed_label": "statecraft TEST-ONLY successor issuer seed: public, never production"
+}

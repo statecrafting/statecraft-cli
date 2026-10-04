@@ -1,0 +1,7 @@
+{
+  "kind": "revocation",
+  "payload_digest": "8aa960eabacb465a20049897ef064d2a130cd1db46299221c6af3a4d33ad3cb8",
+  "root_key_id": "7098feedc6af1c3976cd89febe4858bd88a01d2aecebb77ad4bfe184768996d4",
+  "schema_version": 1,
+  "signature": "55b1529cb3c20d76a5e4f14c5e9b9453e511c22ea66721e353a2dfc17dbef5d5a9731dc5ed349f5ef8b07aecbbab398ceca0ae870396e1266c7334049898dc0e"
+}

@@ -1,0 +1,106 @@
+{
+  "record": {
+    "amends": [
+      "005-acceptance-and-evidence"
+    ],
+    "created": "2026-10-03",
+    "dependsOn": [
+      "001-boundaries-and-authority",
+      "005-acceptance-and-evidence"
+    ],
+    "extends": [
+      {
+        "nature": "additive",
+        "spec": "005-acceptance-and-evidence",
+        "unit": {
+          "kind": "directory",
+          "path": "crates/statecraft-envelope/"
+        }
+      }
+    ],
+    "id": "035-offline-issuer-contract",
+    "implementation": "in-progress",
+    "obligations": [
+      {
+        "anchor": "3-1-domains-and-strict-encodings",
+        "id": "R-1",
+        "kind": "requirement",
+        "text": "Each of the three record kinds signs under exactly one fixed domain with the unchanged family preimage; cross-kind and cross-family verification fails even for identical bytes."
+      },
+      {
+        "anchor": "3-2-payloads",
+        "id": "R-2",
+        "kind": "requirement",
+        "text": "Enrollment, rotation and revocation payloads decode strictly from exact canonical bytes and bind to the exact original identity.created fact."
+      },
+      {
+        "anchor": "3-3-detached-records",
+        "id": "R-3",
+        "kind": "requirement",
+        "text": "The detached signature and owner public records have exactly their named members; selectors are checked and grant no authority."
+      },
+      {
+        "anchor": "3-4-rootsetv2",
+        "id": "R-4",
+        "kind": "requirement",
+        "text": "A RootSetV2 is read strictly, verified as a complete history in which any defect refuses the whole set, and named by the digest of its complete canonical encoding."
+      },
+      {
+        "anchor": "3-5-eligibility",
+        "id": "R-5",
+        "kind": "requirement",
+        "text": "Issuer eligibility is answered at an explicit evidence time and scope with the stated rotation, revocation and window rules, and no clock is read."
+      },
+      {
+        "anchor": "3-6-operator-pin",
+        "id": "R-6",
+        "kind": "requirement",
+        "text": "Only the operator pin of an exact version and digest admits a set; rollback and same-version replacement refuse."
+      },
+      {
+        "anchor": "3-7-the-boundary-reader",
+        "id": "R-7",
+        "kind": "requirement",
+        "text": "A V2 document is never handed to a permissive reader, and a legacy V1 set cannot establish a trusted V2 issuer."
+      }
+    ],
+    "sectionDigests": {
+      "035-offline-issuer-authorization": "f3e0d3f1ca18a9fb856e531c5278e9eb064c04eb11ea74880426b52ad17ccf18",
+      "1-purpose": "5068cf615acbde1601dd985d25b00bff6fa1e7aaef0604a2519a2e645cf8ece8",
+      "2-territory": "8220d766b93a09410e7c699dd2e2c3d3fcbe0e90b54da4d14af552c09a377e0f",
+      "3-1-domains-and-strict-encodings": "d5a9e2845936c31b84140aabf799a37b35bbc2b9b5b26ea7c9f45be2754fc6ae",
+      "3-2-payloads": "7e32130f5605d7834f40d970d22906994bb72083c38144dc040dc4e5e1392f73",
+      "3-3-detached-records": "1d504680ffd019461d1b921ececbdf0aa144e628a045b1ec1d7f3480fdc09195",
+      "3-4-rootsetv2": "2e04362f8eebf2ee92d3498cc5f15ff4e4f76b870d215bbcc6d50df02f60575b",
+      "3-5-eligibility": "a6a45bf189db04a0ef51de04c29b82803710dbd9ba47248f1d7cf5e53bdd9138",
+      "3-6-operator-pin": "56fc8e2577b08969d19449ce49edf5c80c06ef65cbd7a7df5a1dcf005a903df5",
+      "3-7-the-boundary-reader": "69aa20afb14cff890d64e75fb81e78222aaca1098bc84483372e54a4724de6be",
+      "3-behavior": "90177ecaae06e687c6c76a37068bd2c1388fcde4a7c224bd3ebc449d76b0fc3a",
+      "4-out-of-scope": "3911d60080aee1a632387f74feee5ab4e03297d9176db2be527aba9925efff36",
+      "5-resolved-decisions": "d34b14852dcad39ccfb260d873ef0caf035a6d47059a4e144ee1bc0d0d2ddd88",
+      "verification": "8f8f35f6a07d1589b0e9f11e7a02f335fdb3a195fee4353028eddced62a9a2d4"
+    },
+    "sectionHeadings": [
+      "035: Offline issuer authorization",
+      "1. Purpose",
+      "2. Territory",
+      "3. Behavior",
+      "3.1 Domains and strict encodings",
+      "3.2 Payloads",
+      "3.3 Detached records",
+      "3.4 RootSetV2",
+      "3.5 Eligibility",
+      "3.6 Operator pin",
+      "3.7 The boundary reader",
+      "4. Out of scope",
+      "5. Resolved decisions",
+      "Verification"
+    ],
+    "specPath": "specs/035-offline-issuer-contract/spec.md",
+    "status": "approved",
+    "summary": "Amends 005 for the shared half of the offline issuer enrollment contract the owner approved on 2026-10-03 (docs/proposals/007-offline-enrolment-contract.md). Adds three closed signing domains (trust.issuer-enrolment, trust.issuer-rotation, trust.issuer-revocation) under the unchanged family preimage, strict key, signature and payload decoding, the detached signature and owner public records, the RootSetV2 reader with its digest and complete history verification, issuer eligibility at an explicit time and scope, and the operator version and digest pin that refuses rollback. The envelope crate stays pure: no file, clock, entropy or network. Custody and the offline verbs are 036's; adoption in a cell is the platform's.\n",
+    "title": "Offline issuer authorization: three fixed domains, detached owner signatures and the pinned RootSetV2"
+  },
+  "shardHash": "f391a5f450a01f2c07cf5d21d18521523a741d95714642809a450558cc6949ae",
+  "specVersion": "1.9.0"
+}
