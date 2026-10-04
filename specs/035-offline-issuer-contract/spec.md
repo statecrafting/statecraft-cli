@@ -1,7 +1,7 @@
 ---
 id: "035-offline-issuer-contract"
 title: "Offline issuer authorization: three fixed domains, detached owner signatures and the pinned RootSetV2"
-status: draft
+status: approved
 implementation: in-progress
 created: "2026-10-03"
 summary: >

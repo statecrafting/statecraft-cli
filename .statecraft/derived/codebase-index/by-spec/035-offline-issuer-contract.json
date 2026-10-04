@@ -29,8 +29,8 @@
       }
     ],
     "specId": "035-offline-issuer-contract",
-    "specStatus": "draft"
+    "specStatus": "approved"
   },
   "schemaVersion": "1.2.0",
-  "shardHash": "33fa5b58692978d6d5b1b2988951b6c56fb87bd4a5b8e32dea83955c03b4c70c"
+  "shardHash": "f391a5f450a01f2c07cf5d21d18521523a741d95714642809a450558cc6949ae"
 }

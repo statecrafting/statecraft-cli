@@ -97,10 +97,10 @@
       "Verification"
     ],
     "specPath": "specs/035-offline-issuer-contract/spec.md",
-    "status": "draft",
+    "status": "approved",
     "summary": "Amends 005 for the shared half of the offline issuer enrollment contract the owner approved on 2026-10-03 (docs/proposals/007-offline-enrolment-contract.md). Adds three closed signing domains (trust.issuer-enrolment, trust.issuer-rotation, trust.issuer-revocation) under the unchanged family preimage, strict key, signature and payload decoding, the detached signature and owner public records, the RootSetV2 reader with its digest and complete history verification, issuer eligibility at an explicit time and scope, and the operator version and digest pin that refuses rollback. The envelope crate stays pure: no file, clock, entropy or network. Custody and the offline verbs are 036's; adoption in a cell is the platform's.\n",
     "title": "Offline issuer authorization: three fixed domains, detached owner signatures and the pinned RootSetV2"
   },
-  "shardHash": "33fa5b58692978d6d5b1b2988951b6c56fb87bd4a5b8e32dea83955c03b4c70c",
+  "shardHash": "f391a5f450a01f2c07cf5d21d18521523a741d95714642809a450558cc6949ae",
   "specVersion": "1.9.0"
 }
