@@ -1,0 +1,67 @@
+{
+  "enrolments": [
+    {
+      "payload": {
+        "issuer_id": "87887917cd0a1ce3bfe4b5044e74308e73657967ddb676164a298163dba82d53",
+        "not_before": {
+          "logical": 0,
+          "physical": 1790000000000
+        },
+        "public_key": "ab5e78887e31cbac9224fba19d47f409c36ac8e21156db6244eb744601a55f40",
+        "scope": "platform"
+      },
+      "root_key_id": "7098feedc6af1c3976cd89febe4858bd88a01d2aecebb77ad4bfe184768996d4",
+      "signature": "4489b0620c3c581c6e938f19f4902933fb589cd9471637ee03ce3a657f5e8a11cba8981df4dbd33b867fd928818a85dc26d0572c6da89b94b049ee64eadd8909"
+    }
+  ],
+  "origin": "pinned",
+  "owner_roots": [
+    {
+      "key_id": "7098feedc6af1c3976cd89febe4858bd88a01d2aecebb77ad4bfe184768996d4",
+      "public_key": "cdc159ed7c4fa822d68617880bd6c54e7622eb5fc23e507112ab709d354e1edc",
+      "scope": "platform",
+      "status": "active"
+    }
+  ],
+  "revocations": [
+    {
+      "payload": {
+        "body": {
+          "identity": "87887917cd0a1ce3bfe4b5044e74308e73657967ddb676164a298163dba82d53",
+          "key": "2d1b4327776e7d8def3f4fa474bc3f9ed76a07f62a3b272d6b6515dcfa4a2e59",
+          "reason": "compromise",
+          "since": {
+            "logical": 0,
+            "physical": 1790000000500
+          }
+        },
+        "kind": "identity.key_revoked",
+        "v": 1
+      },
+      "root_key_id": "7098feedc6af1c3976cd89febe4858bd88a01d2aecebb77ad4bfe184768996d4",
+      "signature": "55b1529cb3c20d76a5e4f14c5e9b9453e511c22ea66721e353a2dfc17dbef5d5a9731dc5ed349f5ef8b07aecbbab398ceca0ae870396e1266c7334049898dc0e"
+    }
+  ],
+  "root_set_version": 7,
+  "rotations": [
+    {
+      "payload": {
+        "body": {
+          "effective": {
+            "logical": 0,
+            "physical": 1790000001000
+          },
+          "from": "2d1b4327776e7d8def3f4fa474bc3f9ed76a07f62a3b272d6b6515dcfa4a2e59",
+          "identity": "87887917cd0a1ce3bfe4b5044e74308e73657967ddb676164a298163dba82d53",
+          "to": "0576c68429992525ecea95966cb0fade6d4668ef78ca792db8764b5dcd689ff6",
+          "toKeyId": "ca55d779a6af53a0192f21f4c486194c98bae4f536f0a37d99c98bc8ccc1ca2d"
+        },
+        "kind": "identity.key_rotated",
+        "v": 1
+      },
+      "root_key_id": "7098feedc6af1c3976cd89febe4858bd88a01d2aecebb77ad4bfe184768996d4",
+      "signature": "ddd0b042d6597a78d9db7faf9e44bb225cd1237d963390010b2eeee8fd702e80160db3d01934ad82269e5c48dc9032b9da0c995464159b9354414183dd2a900a"
+    }
+  ],
+  "schema_version": 2
+}

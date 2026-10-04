@@ -24,6 +24,12 @@ pub struct SignDomain(pub &'static str);
 pub const DOMAIN_ENTRY: SignDomain = SignDomain("ledger.entry");
 /// The attestation domain (hqgit 027 B-2).
 pub const DOMAIN_ATTESTATION: SignDomain = SignDomain("attestation");
+/// An owner root's authorization of an issuer enrollment (spec 035 section 3.1).
+pub const DOMAIN_ISSUER_ENROLMENT: SignDomain = SignDomain("trust.issuer-enrolment");
+/// An owner root's authorization of an issuer key rotation (spec 035 section 3.1).
+pub const DOMAIN_ISSUER_ROTATION: SignDomain = SignDomain("trust.issuer-rotation");
+/// An owner root's authorization of an issuer key revocation (spec 035 section 3.1).
+pub const DOMAIN_ISSUER_REVOCATION: SignDomain = SignDomain("trust.issuer-revocation");
 
 /// Build the preimage.
 pub fn preimage(domain: SignDomain, bytes: &[u8]) -> Vec<u8> {
@@ -94,6 +100,27 @@ impl PublicKey {
         let s = DalekSignature::from_bytes(&sig.0);
         vk.verify(&preimage(domain, bytes), &s)
             .map_err(|_| Error::Crypto("signature does not verify".into()))
+    }
+}
+
+impl PublicKey {
+    /// Verify a domain-separated signature strictly (spec 035 section 3.1):
+    /// a weak or small-order key, a small-order `R` and a noncanonical `S` are
+    /// all refused, where [`PublicKey::verify`] keeps its historical rule.
+    pub fn verify_strict(
+        &self,
+        domain: SignDomain,
+        bytes: &[u8],
+        sig: &Signature,
+    ) -> Result<(), Error> {
+        let vk = VerifyingKey::from_bytes(&self.0)
+            .map_err(|_| Error::Crypto("public key is not a valid Ed25519 point".into()))?;
+        if vk.is_weak() {
+            return Err(Error::Crypto("public key is weak (small order)".into()));
+        }
+        let s = DalekSignature::from_bytes(&sig.0);
+        vk.verify_strict(&preimage(domain, bytes), &s)
+            .map_err(|_| Error::Crypto("signature does not verify strictly".into()))
     }
 }
 
