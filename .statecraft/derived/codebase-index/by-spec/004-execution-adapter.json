@@ -32,6 +32,10 @@
         "source": "spec-edge"
       },
       {
+        "path": "crates/statecraft-home/",
+        "source": "spec-edge"
+      },
+      {
         "path": "crates/statecraft-run/",
         "source": "spec-edge"
       }
@@ -105,6 +109,19 @@
       {
         "locations": [
           {
+            "file": "crates/statecraft-home/"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "directory",
+          "path": "crates/statecraft-home/"
+        }
+      },
+      {
+        "locations": [
+          {
             "file": "crates/statecraft-run/"
           }
         ],
@@ -120,5 +137,5 @@
     "specStatus": "approved"
   },
   "schemaVersion": "1.2.0",
-  "shardHash": "8657a1aa8b8d45a08a71771314511207076f42e4fb022f4351f15b3e561f5138"
+  "shardHash": "1d4fc6816e32a461c269066d009706bef28db48afb5cfb1334b9ad8be1bacb0c"
 }

@@ -110,6 +110,9 @@ impl Check {
 pub struct SuiteResult {
     /// Every check, in order.
     pub checks: Vec<Check>,
+    /// Exact boundary used by this suite; absent in pre-boundary records.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub confinement: Option<statecraft_adapter::boundary::Record>,
     /// What the agent said, kept in a field named for a claim.
     ///
     /// Never read as a result. Its only role in any decision is that it is
@@ -123,6 +126,7 @@ impl SuiteResult {
         Self {
             checks,
             agent_claim,
+            confinement: None,
         }
     }
 

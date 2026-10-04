@@ -91,6 +91,8 @@ pub enum NoAcceptance {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]
 pub enum NotAttemptedReason {
+    /// The required operating-system boundary could not be admitted.
+    BoundaryUnavailable,
     /// The attempt failed.
     AttemptFailed,
     /// A guard refused.
@@ -105,6 +107,7 @@ impl NotAttemptedReason {
     /// The reason as it is written.
     pub fn word(self) -> &'static str {
         match self {
+            NotAttemptedReason::BoundaryUnavailable => "boundary-unavailable",
             NotAttemptedReason::AttemptFailed => "attempt-failed",
             NotAttemptedReason::AttemptRefused => "attempt-refused",
             NotAttemptedReason::AttemptInterrupted => "attempt-interrupted",
