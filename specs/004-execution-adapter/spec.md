@@ -890,6 +890,11 @@ of rule 12 as open, so that no attempt's record reads as meeting IX while rule
 - On Linux, a same-user UDP listener or TCP port 443 listener started after
   the launch's check is not refused by the mechanism; the check narrows that
   to what starts during the attempt.
+- On Linux, a connected same-user UDP socket is not a listener and is not
+  refused. A confined child reaches it only by sending from its peer's exact
+  address and port, which it can do only by binding that address, for instance
+  where the peer's socket shares its port through `SO_REUSEPORT` with the same
+  user.
 - It is not containment of hostile code in general and claims nothing about
   credentials or publishing (section 3.6).
 
@@ -969,6 +974,13 @@ child cannot substitute the Git the supervisor runs.
 **2026-10-04: native calls stay in one module.** The adapter denies unsafe code
 everywhere except the boundary's native module, which holds every system call
 the confinement makes and does only syscall-level work after `fork`.
+
+**2026-10-04: a UDP listener is an unconnected socket.** Section 3.18 refuses a
+Linux launch while a process of the same user listens on UDP. The check refuses
+an unconnected same-user UDP socket and admits a connected one, such as a
+resolver's ephemeral client socket, which takes datagrams from its one peer.
+The owner approved this reading on 2026-10-04, with the route through a shared
+peer port recorded as an open item.
 
 ## Verification
 

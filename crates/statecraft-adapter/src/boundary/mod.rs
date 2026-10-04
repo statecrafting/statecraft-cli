@@ -21,6 +21,7 @@ pub const OPEN_ITEMS: &[&str] = &[
     "The gate log is child-attested",
     "Real-provider confined activation requires separate owner authorization",
     "Linux listeners created after the listener check remain an open route",
+    "A Linux connected same-user UDP socket is reachable from its peer's address and port",
     "This boundary makes no claim about credentials or publishing",
 ];
 
