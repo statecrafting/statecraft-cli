@@ -55,6 +55,9 @@ impl Sandbox {
         std::fs::create_dir_all(s.home()).unwrap();
         std::fs::create_dir_all(s.bin()).unwrap();
         std::fs::create_dir_all(s.project()).unwrap();
+        // Linux grants the provider's configuration file in place only, so
+        // it must already exist (spec 004 section 3.18).
+        std::fs::write(s.dir.path().join(".claude.json"), b"{}").unwrap();
         statecraft_adapter::fixture::install_script(
             &s.bin().join("claude"),
             "#!/bin/sh\n[ \"$1\" = --version ] && { echo 2.1.267; exit 0; }\nexit 3\n",
