@@ -99,8 +99,9 @@ reading an old record. A confined capture without a source binding is refused.
 
 Read-only access supports the existing base-policy and shared-object reads.
 Correcting acceptance preserves that direction without widening write access.
-This draft records the exact replacement text for owner ratification; the
-direction to implement does not itself change the lifecycle label.
+Only spec 004's verification command list is replaced. The existing command
+lists of specs 006 and 015 remain in force; their behavioral amendments do not
+replace those lists.
 
 ## Verification
 
@@ -109,6 +110,8 @@ run and acceptance paths with synthetic providers. They require no provider
 credentials. Platform-specific probes run only on their matching platform;
 passing one platform does not qualify the other. The replacement retains spec
 004's original verification commands and adds the boundary regressions below.
+The `protected_boundary` target is delivered with the separate implementation.
+While implementation is pending, this declaration is not passing acceptance.
 
 ```verify:cli
 cargo build --workspace --locked
