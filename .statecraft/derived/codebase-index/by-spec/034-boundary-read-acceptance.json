@@ -1,11 +1,12 @@
 {
   "mapping": {
     "amends": [
-      "006-command-surface"
+      "004-execution-adapter",
+      "006-command-surface",
+      "015-managed-session-evidence"
     ],
     "dependsOn": [
-      "001-boundaries-and-authority",
-      "006-command-surface"
+      "004-execution-adapter"
     ],
     "implementingPaths": [
       {
@@ -13,24 +14,11 @@
         "source": "spec-edge"
       },
       {
-        "path": "docs/proposals/007-offline-enrolment-contract.md",
+        "path": "crates/statecraft-home/",
         "source": "spec-edge"
       }
     ],
     "resolvedUnits": [
-      {
-        "locations": [
-          {
-            "file": "docs/proposals/007-offline-enrolment-contract.md"
-          }
-        ],
-        "ownership": true,
-        "sourceField": "establishes",
-        "unit": {
-          "kind": "file",
-          "path": "docs/proposals/007-offline-enrolment-contract.md"
-        }
-      },
       {
         "locations": [
           {
@@ -43,11 +31,24 @@
           "kind": "directory",
           "path": "crates/statecraft-cli/"
         }
+      },
+      {
+        "locations": [
+          {
+            "file": "crates/statecraft-home/"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "directory",
+          "path": "crates/statecraft-home/"
+        }
       }
     ],
-    "specId": "007-family-envelope",
+    "specId": "034-boundary-read-acceptance",
     "specStatus": "approved"
   },
   "schemaVersion": "1.2.0",
-  "shardHash": "616bddf7daba93766c16eff993a96ff59e048358e20f5c5f1f27ff5144dc020c"
+  "shardHash": "3bc9f1733a1302e5905db94bc4ae4903f988c032c27c975bc7df72fc3c1f5ff5"
 }

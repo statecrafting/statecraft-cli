@@ -5,32 +5,17 @@
     ],
     "dependsOn": [
       "001-boundaries-and-authority",
-      "006-command-surface"
+      "006-command-surface",
+      "007-family-envelope",
+      "035-offline-issuer-contract"
     ],
     "implementingPaths": [
       {
         "path": "crates/statecraft-cli/",
         "source": "spec-edge"
-      },
-      {
-        "path": "docs/proposals/007-offline-enrolment-contract.md",
-        "source": "spec-edge"
       }
     ],
     "resolvedUnits": [
-      {
-        "locations": [
-          {
-            "file": "docs/proposals/007-offline-enrolment-contract.md"
-          }
-        ],
-        "ownership": true,
-        "sourceField": "establishes",
-        "unit": {
-          "kind": "file",
-          "path": "docs/proposals/007-offline-enrolment-contract.md"
-        }
-      },
       {
         "locations": [
           {
@@ -45,9 +30,9 @@
         }
       }
     ],
-    "specId": "007-family-envelope",
+    "specId": "036-offline-issuer-verbs",
     "specStatus": "approved"
   },
   "schemaVersion": "1.2.0",
-  "shardHash": "616bddf7daba93766c16eff993a96ff59e048358e20f5c5f1f27ff5144dc020c"
+  "shardHash": "26441de48643ab3ebc0dc50ade6fa0db528943eb75c6c69f92c89f38996a2438"
 }

@@ -30,6 +30,7 @@ pub mod error;
 pub mod fact;
 pub mod hash;
 pub mod hlc;
+pub mod issuer;
 pub mod portable;
 pub mod reference;
 pub mod roots;
