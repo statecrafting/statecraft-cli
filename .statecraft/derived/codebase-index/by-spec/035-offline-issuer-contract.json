@@ -1,0 +1,36 @@
+{
+  "mapping": {
+    "amends": [
+      "005-acceptance-and-evidence"
+    ],
+    "dependsOn": [
+      "001-boundaries-and-authority",
+      "005-acceptance-and-evidence"
+    ],
+    "implementingPaths": [
+      {
+        "path": "crates/statecraft-envelope/",
+        "source": "spec-edge"
+      }
+    ],
+    "resolvedUnits": [
+      {
+        "locations": [
+          {
+            "file": "crates/statecraft-envelope/"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "directory",
+          "path": "crates/statecraft-envelope/"
+        }
+      }
+    ],
+    "specId": "035-offline-issuer-contract",
+    "specStatus": "approved"
+  },
+  "schemaVersion": "1.2.0",
+  "shardHash": "f391a5f450a01f2c07cf5d21d18521523a741d95714642809a450558cc6949ae"
+}

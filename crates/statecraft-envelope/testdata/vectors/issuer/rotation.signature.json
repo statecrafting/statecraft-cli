@@ -1,0 +1,7 @@
+{
+  "kind": "rotation",
+  "payload_digest": "662031368664aef4686f79aefd7beb802e80d3edd0b39650f4d52c786561bf2a",
+  "root_key_id": "7098feedc6af1c3976cd89febe4858bd88a01d2aecebb77ad4bfe184768996d4",
+  "schema_version": 1,
+  "signature": "ddd0b042d6597a78d9db7faf9e44bb225cd1237d963390010b2eeee8fd702e80160db3d01934ad82269e5c48dc9032b9da0c995464159b9354414183dd2a900a"
+}
