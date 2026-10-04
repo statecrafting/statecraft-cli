@@ -63,6 +63,7 @@ pub mod manage;
 pub mod render;
 pub mod slice;
 pub mod transfer;
+pub mod trust;
 
 pub use commands::{Invocation, UsageError, Verb, parse};
 pub use exit::Exit;

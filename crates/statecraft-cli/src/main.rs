@@ -62,6 +62,14 @@ fn run(args: &[String]) -> i32 {
             "--spine is accepted only by init plan and init apply".into(),
         );
     }
+    // Spec 036: the offline trust verbs read no product home and no
+    // registered project, so they are dispatched before either is consulted.
+    if matches!(
+        invocation.verb,
+        Verb::TrustRootGenerate | Verb::TrustIssuerSign | Verb::TrustIssuerVerify
+    ) {
+        return trust_verb(invocation.verb, &invocation.rest, format);
+    }
     let home = product_home();
     let mut registry = match Registry::read(&home) {
         Ok(r) => r,
@@ -481,6 +489,24 @@ fn run(args: &[String]) -> i32 {
             print!("{}", statecraft_cli::commands::help_text(&invocation.rest));
             Exit::Ok.code()
         }
+        Verb::TrustRootGenerate | Verb::TrustIssuerSign | Verb::TrustIssuerVerify => {
+            trust_verb(invocation.verb, &invocation.rest, format)
+        }
+    }
+}
+
+/// One spec 036 offline trust verb: parse its explicit options, call its one
+/// operation, render the answer. It never reads the product home.
+fn trust_verb(verb: Verb, rest: &[String], format: Format) -> i32 {
+    use statecraft_cli::trust;
+    let outcome = match verb {
+        Verb::TrustRootGenerate => trust::root_generate(rest),
+        Verb::TrustIssuerSign => trust::issuer_sign(rest),
+        _ => trust::issuer_verify(rest),
+    };
+    match outcome {
+        Ok(answer) => emit(&answer, format),
+        Err(message) => usage(format, message),
     }
 }
 
