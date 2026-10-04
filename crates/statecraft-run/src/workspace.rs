@@ -12,7 +12,6 @@
 
 use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
-use std::process::Command;
 
 /// Where workspaces live inside a target.
 pub const WORKSPACES_DIR: &str = ".statecraft/state/workspaces";
@@ -32,6 +31,9 @@ pub struct Workspace {
     pub base_commit: String,
     /// The branch created for the worktree.
     pub branch: String,
+    /// Legacy private branch moved under the admission lock, when necessary.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub migrated_from: Option<String>,
 }
 
 /// Why preparation did not happen.
@@ -75,22 +77,7 @@ pub enum WorkspaceError {
 }
 
 fn git(dir: &Path, args: &[&str]) -> Result<String, WorkspaceError> {
-    let out = Command::new("git")
-        .args(args)
-        .current_dir(dir)
-        .output()
-        .map_err(|e| WorkspaceError::Git {
-            args: args.join(" "),
-            dir: dir.display().to_string(),
-            detail: e.to_string(),
-        })?;
-    if !out.status.success() {
-        return Err(WorkspaceError::Git {
-            args: args.join(" "),
-            dir: dir.display().to_string(),
-            detail: String::from_utf8_lossy(&out.stderr).trim().to_string(),
-        });
-    }
+    let out = crate::trusted_git::output(dir, args)?;
     Ok(String::from_utf8_lossy(&out.stdout).trim().to_string())
 }
 
@@ -123,7 +110,7 @@ pub fn prepare(
 ) -> Result<Workspace, WorkspaceError> {
     let base_commit = resolve_base(target, base_revision)?;
     let path = workspace_path(target, run_id);
-    let branch = format!("statecraft/run/{run_id}");
+    let branch = format!("statecraft/{run_id}/work");
 
     if path.exists() {
         // Ours, and already prepared? Then this is the no-op the spec requires.
@@ -134,7 +121,13 @@ pub fn prepare(
                 path: path.display().to_string(),
             });
         }
-        let head = git(&path, &["rev-parse", "HEAD"])?;
+        let old = format!("statecraft/run/{run_id}");
+        let mut migrated_from = None;
+        if crate::trusted_git::private_reference(target, &format!("refs/heads/{branch}")).is_err() {
+            git(target, &["branch", "-m", &old, &branch])?;
+            migrated_from = Some(old);
+        }
+        let head = crate::trusted_git::private_reference(target, &format!("refs/heads/{branch}"))?;
         return Ok(Workspace {
             run_id: run_id.to_string(),
             path,
@@ -143,6 +136,7 @@ pub fn prepare(
             // workspace is the fact.
             base_commit: head,
             branch,
+            migrated_from,
         });
     }
 
@@ -171,6 +165,7 @@ pub fn prepare(
         path,
         base_commit,
         branch,
+        migrated_from: None,
     })
 }
 
