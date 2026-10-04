@@ -966,6 +966,10 @@ no attempt. Supervisor Git resolves its program from absolute `PATH`
 directories and refuses a workspace or provider configuration directory, so a
 child cannot substitute the Git the supervisor runs.
 
+**2026-10-04: native calls stay in one module.** The adapter denies unsafe code
+everywhere except the boundary's native module, which holds every system call
+the confinement makes and does only syscall-level work after `fork`.
+
 ## Verification
 
 Each line is one command. §3.5's suite is eight tests named `suite_1` to
