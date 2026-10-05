@@ -124,7 +124,7 @@ fn operator_path(target: &Path, common: &Path, path: &Path) -> Result<PathBuf, W
     }
     if prohibited
         .iter()
-        .any(|root| resolved.starts_with(root.canonicalize().unwrap_or_else(|_| root.clone())))
+        .any(|root| resolved.starts_with(canonical_root(root)))
     {
         return Err(error(
             path,
@@ -132,6 +132,29 @@ fn operator_path(target: &Path, common: &Path, path: &Path) -> Result<PathBuf, W
         ));
     }
     Ok(resolved)
+}
+
+/// A prohibited root as the resolved path would spell it. A root that does not
+/// exist yet keeps its name under its nearest existing, canonical ancestor, so
+/// a symlinked `HOME` cannot hide it.
+fn canonical_root(root: &Path) -> PathBuf {
+    let mut missing = Vec::new();
+    let mut existing = root;
+    loop {
+        if let Ok(canonical) = existing.canonicalize() {
+            return missing
+                .iter()
+                .rev()
+                .fold(canonical, |path, name| path.join(name));
+        }
+        match (existing.parent(), existing.file_name()) {
+            (Some(parent), Some(name)) => {
+                missing.push(name);
+                existing = parent;
+            }
+            _ => return root.to_path_buf(),
+        }
+    }
 }
 
 fn configuration(
@@ -276,16 +299,19 @@ pub fn common(target: &Path) -> Result<PathBuf, WorkspaceError> {
 
 /// Build a command anchored to the trusted common directory.
 pub fn command(target: &Path) -> Result<Command, WorkspaceError> {
-    let mut command = safe(&program()?);
+    let program = program()?;
+    // One resolution, so the command and its filter probe name one directory.
+    let common = common(target)?;
+    let mut command = safe(&program);
     command
         .arg("--git-dir")
-        .arg(common(target)?)
+        .arg(&common)
         .arg("--work-tree")
         .arg(target);
     // Local filter configuration cannot select an executable during checkout.
-    let configuration = safe(&program()?)
+    let configuration = safe(&program)
         .arg("--git-dir")
-        .arg(common(target)?)
+        .arg(&common)
         .args([
             "config",
             "--local",
@@ -511,6 +537,8 @@ pub fn export(target: &Path, revision: &str, destination: &Path) -> Result<(), W
 /// `..` components all lead and climb no higher than the root, and the rest
 /// descends. Every ancestor the export writes is an ordinary directory, so a
 /// leading `..` is lexical, and a link the descent meets obeys this rule too.
+/// A `..` after a name is refused even when it reads as inside (`c/../d`): if
+/// `c` is itself a link, the kernel climbs from its target, not from `c`.
 fn contained_link(link: &Path, target: &[u8]) -> bool {
     use std::os::unix::ffi::OsStrExt;
     use std::path::Component;
@@ -586,6 +614,19 @@ mod tests {
                 .unwrap_err()
                 .to_string()
                 .contains("child-writable root")
+        );
+    }
+
+    #[test]
+    fn a_missing_root_is_spelled_under_its_canonical_ancestor() {
+        let scratch = tempfile::tempdir().unwrap();
+        let real = scratch.path().join("real");
+        std::fs::create_dir(&real).unwrap();
+        let link = scratch.path().join("link");
+        std::os::unix::fs::symlink(&real, &link).unwrap();
+        assert_eq!(
+            canonical_root(&link.join(".claude/projects")),
+            real.canonicalize().unwrap().join(".claude/projects")
         );
     }
 
