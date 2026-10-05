@@ -32,8 +32,8 @@ pub fn program() -> Result<PathBuf, WorkspaceError> {
         {
             return Err(error(&directory, "provider-writable PATH directory"));
         }
-        if let Some(home) = std::env::var_os("STATECRAFT_HOME")
-            && resolved.starts_with(canonical_root(&Path::new(&home).join("exchange")))
+        if let Some(exchange) = exchange_root()
+            && resolved.starts_with(canonical_root(&exchange))
         {
             return Err(error(&directory, "exchange PATH directory"));
         }
@@ -42,6 +42,14 @@ pub fn program() -> Result<PathBuf, WorkspaceError> {
     Path::new("/usr/bin/git")
         .canonicalize()
         .map_err(|e| error(Path::new("/usr/bin/git"), e))
+}
+
+/// The product home's exchange directory: `STATECRAFT_HOME`, or `~/.statecraft`.
+fn exchange_root() -> Option<PathBuf> {
+    match std::env::var_os("STATECRAFT_HOME") {
+        Some(home) => Some(Path::new(&home).join("exchange")),
+        None => std::env::var_os("HOME").map(|home| Path::new(&home).join(".statecraft/exchange")),
+    }
 }
 
 fn safe(program: &Path) -> Command {
@@ -105,14 +113,7 @@ fn operator_path(target: &Path, common: &Path, path: &Path) -> Result<PathBuf, W
             Path::new(&home).join(".claude.json"),
         ]);
     }
-    if let Some(home) = std::env::var_os("STATECRAFT_HOME") {
-        prohibited.push(Path::new(&home).join("exchange"));
-    }
-    if std::env::var_os("STATECRAFT_HOME").is_none()
-        && let Some(home) = std::env::var_os("HOME")
-    {
-        prohibited.push(Path::new(&home).join(".statecraft/exchange"));
-    }
+    prohibited.extend(exchange_root());
     let text = resolved.to_string_lossy();
     if text.contains("/.statecraft/state/workspaces/")
         || resolved
