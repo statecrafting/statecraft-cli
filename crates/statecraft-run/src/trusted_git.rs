@@ -263,7 +263,11 @@ pub fn common(target: &Path) -> Result<PathBuf, WorkspaceError> {
     .canonicalize()
     .map_err(|e| error(target, e))?;
     configuration(target, &common, &common.join("config"), 0)?;
-    if common.join("config.worktree").exists() {
+    if !common
+        .join("config.worktree")
+        .symlink_metadata()
+        .is_err_and(|e| e.kind() == std::io::ErrorKind::NotFound)
+    {
         configuration(target, &common, &common.join("config.worktree"), 0)?;
     }
     object_alternates(target, &common, &common.join("objects"), 0)?;
@@ -332,25 +336,31 @@ pub fn private_reference(target: &Path, branch: &str) -> Result<String, Workspac
     {
         return Err(error(target, "invalid private reference path"));
     }
+    let common = common(target)?;
     let flags = OFlags::RDONLY | OFlags::CLOEXEC | OFlags::NOFOLLOW;
-    let mut directory = open(common(target)?, flags | OFlags::DIRECTORY, Mode::empty())
-        .map_err(|e| error(target, e))?;
-    for component in &components[..components.len() - 1] {
-        directory = openat(
+    let loose = || -> rustix::io::Result<_> {
+        let mut directory = open(&common, flags | OFlags::DIRECTORY, Mode::empty())?;
+        for component in &components[..components.len() - 1] {
+            directory = openat(
+                &directory,
+                component.as_os_str(),
+                flags | OFlags::DIRECTORY,
+                Mode::empty(),
+            )?;
+        }
+        openat(
             &directory,
-            component.as_os_str(),
-            flags | OFlags::DIRECTORY,
+            components.last().unwrap().as_os_str(),
+            flags | OFlags::NONBLOCK,
             Mode::empty(),
         )
-        .map_err(|e| error(target, e))?;
-    }
-    let file = openat(
-        &directory,
-        components.last().unwrap().as_os_str(),
-        flags | OFlags::NONBLOCK,
-        Mode::empty(),
-    )
-    .map_err(|e| error(target, e))?;
+    };
+    let file = match loose() {
+        Ok(file) => file,
+        // Git packs references on gc; an absent loose file is read there.
+        Err(rustix::io::Errno::NOENT) => return packed_reference(target, &common, branch),
+        Err(e) => return Err(error(target, e)),
+    };
     let file = std::fs::File::from(file);
     if !file.metadata().map_err(|e| error(target, e))?.is_file() {
         return Err(error(target, "private reference is not an ordinary file"));
@@ -359,19 +369,40 @@ pub fn private_reference(target: &Path, branch: &str) -> Result<String, Workspac
     file.take(129)
         .read_to_end(&mut bytes)
         .map_err(|e| error(target, e))?;
-    let text = std::str::from_utf8(&bytes)
-        .map_err(|e| error(target, e))?
-        .trim();
-    if bytes.len() > 128
-        || !matches!(text.len(), 40 | 64)
-        || !text.bytes().all(|b| b.is_ascii_hexdigit())
-    {
+    if bytes.len() > 128 {
+        return Err(error(
+            target,
+            "private reference is not a bounded object identity",
+        ));
+    }
+    let text = std::str::from_utf8(&bytes).map_err(|e| error(target, e))?;
+    object_identity(target, text.trim())
+}
+
+fn object_identity(target: &Path, text: &str) -> Result<String, WorkspaceError> {
+    if !matches!(text.len(), 40 | 64) || !text.bytes().all(|b| b.is_ascii_hexdigit()) {
         return Err(error(
             target,
             "private reference is not a bounded object identity",
         ));
     }
     Ok(text.into())
+}
+
+/// A private reference from the common directory's `packed-refs`, read as an
+/// ordinary file with the same bounds as configuration.
+fn packed_reference(target: &Path, common: &Path, branch: &str) -> Result<String, WorkspaceError> {
+    let bytes = ordinary_bytes(&common.join("packed-refs"), 64 * 1024 * 1024)?;
+    let text = std::str::from_utf8(&bytes).map_err(|e| error(target, e))?;
+    text.lines()
+        .filter(|line| !line.starts_with('#') && !line.starts_with('^'))
+        .find_map(|line| {
+            line.split_once(' ')
+                .filter(|(_, name)| *name == branch)
+                .map(|(identity, _)| identity)
+        })
+        .ok_or_else(|| error(target, "private reference not found"))
+        .and_then(|identity| object_identity(target, identity))
 }
 
 /// Export trusted commit bytes without applying attributes or filter drivers.
@@ -605,5 +636,25 @@ mod tests {
         std::os::unix::fs::symlink(target.path().join(".git/config"), directory.join("work"))
             .unwrap();
         assert!(private_reference(target.path(), "refs/heads/statecraft/attempt/work").is_err());
+    }
+
+    #[test]
+    fn a_packed_private_reference_is_read_from_packed_refs() {
+        let target = repository();
+        let identity = "b".repeat(40);
+        std::fs::write(
+            target.path().join(".git/packed-refs"),
+            format!(
+                "# pack-refs with: peeled fully-peeled sorted\n{} refs/heads/main\n{identity} refs/heads/statecraft/attempt/work\n^{}\n",
+                "c".repeat(40),
+                "d".repeat(40)
+            ),
+        )
+        .unwrap();
+        assert_eq!(
+            private_reference(target.path(), "refs/heads/statecraft/attempt/work").unwrap(),
+            identity
+        );
+        assert!(private_reference(target.path(), "refs/heads/statecraft/other/work").is_err());
     }
 }
