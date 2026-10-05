@@ -202,7 +202,11 @@ fn object_alternates(
     }
     let bytes = ordinary_bytes(&path, 64 * 1024)?;
     let text = std::str::from_utf8(&bytes).map_err(|e| error(&path, e))?;
-    for line in text.lines().filter(|line| !line.is_empty()) {
+    // Git skips empty lines and lines that begin with `#`.
+    for line in text
+        .lines()
+        .filter(|line| !line.is_empty() && !line.starts_with('#'))
+    {
         let alternate = if Path::new(line).is_absolute() {
             PathBuf::from(line)
         } else {
@@ -447,6 +451,9 @@ pub fn export(target: &Path, revision: &str, destination: &Path) -> Result<(), W
         match fields[0] {
             "120000" => {
                 use std::os::unix::ffi::OsStrExt;
+                if !contained_link(relative, &bytes) {
+                    return Err(error(target, "export symlink leaves the tree"));
+                }
                 std::os::unix::fs::symlink(std::ffi::OsStr::from_bytes(&bytes), &path)
                     .map_err(|e| error(target, e))?;
             }
@@ -466,6 +473,28 @@ pub fn export(target: &Path, revision: &str, destination: &Path) -> Result<(), W
         }
     }
     Ok(())
+}
+
+/// Whether a symlink at `link`, relative to the export root, resolves inside
+/// the tree whatever the other links in it say. The target is relative, its
+/// `..` components all lead and climb no higher than the root, and the rest
+/// descends. Every ancestor the export writes is an ordinary directory, so a
+/// leading `..` is lexical, and a link the descent meets obeys this rule too.
+fn contained_link(link: &Path, target: &[u8]) -> bool {
+    use std::os::unix::ffi::OsStrExt;
+    use std::path::Component;
+    let target = Path::new(std::ffi::OsStr::from_bytes(target));
+    let mut climbs = 0usize;
+    let mut descending = false;
+    for component in target.components() {
+        match component {
+            Component::ParentDir if !descending => climbs += 1,
+            Component::CurDir => {}
+            Component::Normal(_) => descending = true,
+            _ => return false,
+        }
+    }
+    !target.as_os_str().is_empty() && climbs < link.components().count()
 }
 
 #[cfg(test)]
@@ -527,6 +556,36 @@ mod tests {
                 .to_string()
                 .contains("child-writable root")
         );
+    }
+
+    #[test]
+    fn commented_object_alternates_are_skipped() {
+        let target = repository();
+        std::fs::write(
+            target.path().join(".git/objects/info/alternates"),
+            "# /does/not/exist\n\n",
+        )
+        .unwrap();
+        assert!(common(target.path()).is_ok());
+    }
+
+    #[test]
+    fn export_symlinks_must_stay_inside_the_tree() {
+        let link = Path::new("a/b/link");
+        for inside in ["c", "./c/d", "../c", "../../c", "..", "../.."] {
+            assert!(contained_link(link, inside.as_bytes()), "{inside}");
+        }
+        for outside in [
+            "",
+            "/etc/passwd",
+            "../../..",
+            "c/../..",
+            "c/../d",
+            "../c/../..",
+        ] {
+            assert!(!contained_link(link, outside.as_bytes()), "{outside}");
+        }
+        assert!(!contained_link(Path::new("link"), b".."));
     }
 
     #[test]
