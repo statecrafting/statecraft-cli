@@ -123,7 +123,11 @@ pub fn prepare(
         }
         let old = format!("statecraft/run/{run_id}");
         let mut migrated_from = None;
-        if crate::trusted_git::private_reference(target, &format!("refs/heads/{branch}")).is_err() {
+        // Migrate only a workspace still on the old name. An unreadable new
+        // branch with no old one is reported by the read below, not renamed.
+        if crate::trusted_git::private_reference(target, &format!("refs/heads/{branch}")).is_err()
+            && crate::trusted_git::private_reference(target, &format!("refs/heads/{old}")).is_ok()
+        {
             git(target, &["branch", "-m", &old, &branch])?;
             migrated_from = Some(old);
         }

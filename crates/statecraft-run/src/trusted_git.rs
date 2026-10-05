@@ -226,6 +226,9 @@ fn object_alternates(
     {
         return Ok(());
     }
+    // The file is judged where it resolves, so a linked `info` cannot carry it
+    // into a child-writable root.
+    let path = operator_path(target, common, &path)?;
     let bytes = ordinary_bytes(&path, 64 * 1024)?;
     let text = std::str::from_utf8(&bytes).map_err(|e| error(&path, e))?;
     // Git skips empty lines and lines that begin with `#`.
