@@ -141,7 +141,13 @@ fn serve(listener: File, roots: &[PathBuf]) {
         let mut request = Notification::default();
         // SAFETY: validated UAPI layout, zeroed before each receive.
         if unsafe { libc::ioctl(listener.as_raw_fd(), 0xc0502100_u64, &mut request) } != 0 {
-            continue;
+            // A request withdrawn by its exiting target, or an interrupted
+            // receive, is transient. Anything else would recur under POLLIN, so
+            // the listener stops, and the filtered calls then fail closed.
+            match io::Error::last_os_error().raw_os_error() {
+                Some(libc::ENOENT | libc::EINTR) => continue,
+                _ => return,
+            }
         }
         let result = emulate(&listener, &request, roots);
         let response = Response {

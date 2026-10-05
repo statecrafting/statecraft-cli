@@ -12,6 +12,9 @@ mod metadata;
 const CREATE: libc::c_long = 444;
 const ADD: libc::c_long = 445;
 const RESTRICT: libc::c_long = 446;
+// Readable is also executable, as spec 004 grants the harness store: a child
+// that can read a file can copy it into its writable root, where FILE already
+// grants EXECUTE, so withholding it here would deny nothing.
 const READ: u64 = 1 | 4 | 8;
 const FILE: u64 = 1 | 2 | 4 | (1 << 14) | (1 << 15);
 
