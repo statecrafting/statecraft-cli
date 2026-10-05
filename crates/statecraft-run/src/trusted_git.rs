@@ -25,13 +25,15 @@ pub fn program() -> Result<PathBuf, WorkspaceError> {
         {
             return Err(error(&directory, "workspace PATH directory"));
         }
+        // Compared as resolved paths, so a symlinked HOME hides neither root.
+        let resolved = canonical_root(&directory);
         if let Some(home) = std::env::var_os("HOME")
-            && directory.starts_with(Path::new(&home).join(".claude"))
+            && resolved.starts_with(canonical_root(&Path::new(&home).join(".claude")))
         {
             return Err(error(&directory, "provider-writable PATH directory"));
         }
         if let Some(home) = std::env::var_os("STATECRAFT_HOME")
-            && directory.starts_with(Path::new(&home).join("exchange"))
+            && resolved.starts_with(canonical_root(&Path::new(&home).join("exchange")))
         {
             return Err(error(&directory, "exchange PATH directory"));
         }
@@ -435,6 +437,9 @@ fn packed_reference(target: &Path, common: &Path, branch: &str) -> Result<String
 /// The destination must be an empty supervisor-owned directory.
 pub fn export(target: &Path, revision: &str, destination: &Path) -> Result<(), WorkspaceError> {
     use std::os::unix::fs::PermissionsExt;
+    if revision.is_empty() || revision.starts_with('-') {
+        return Err(error(target, "export revision is not a revision"));
+    }
     let entries = output(target, &["ls-tree", "-rz", "--full-tree", revision])?;
     let mut total = 0usize;
     for entry in entries
@@ -628,6 +633,14 @@ mod tests {
             canonical_root(&link.join(".claude/projects")),
             real.canonicalize().unwrap().join(".claude/projects")
         );
+    }
+
+    #[test]
+    fn an_option_is_not_an_export_revision() {
+        let target = repository();
+        let destination = tempfile::tempdir().unwrap();
+        let refused = export(target.path(), "--output=/tmp/x", destination.path()).unwrap_err();
+        assert!(refused.to_string().contains("not a revision"));
     }
 
     #[test]
