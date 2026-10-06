@@ -292,7 +292,10 @@ pub fn judge_with_diagnostic(
     };
     let mut variables = std::collections::BTreeMap::from([("PATH".into(), path.clone())]);
     variables.extend(admitted.variables.clone());
-    let cache = Path::new(&variables["TMPDIR"]).join("suite-cache");
+    let Some(scratch) = variables.get("TMPDIR") else {
+        return boundary_unavailable("cache-root", "admission supplied no TMPDIR");
+    };
+    let cache = Path::new(scratch).join("suite-cache");
     if std::fs::create_dir(&cache).is_err() {
         return boundary_unavailable("cache-root", "preparation refused");
     }
