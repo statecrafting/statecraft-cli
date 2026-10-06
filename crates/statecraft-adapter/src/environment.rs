@@ -27,14 +27,17 @@ use std::collections::BTreeMap;
 /// these were **measured** in the archived predecessor rather than imagined.
 pub const RESIDUALS: [&str; 4] = [
     "a reachable absolute path bypasses any path-based redirection",
-    "the home directory remains readable unless an operating-system mechanism is applied, \
-     which this product does not apply",
+    UNCONFINED_HOME,
     "a credential held in an OS keychain answers a process that asks for it, and at least \
      one supported provider authenticates from that same keychain, so denying it breaks \
      the provider",
     "nothing here prevents the child from using a credential it finds by any of the above; \
      a publish that goes around the supervisor leaves no record",
 ];
+
+/// The residual an admitted operating-system boundary removes from a posture.
+pub const UNCONFINED_HOME: &str = "the home directory remains readable unless an \
+     operating-system mechanism is applied, which this product does not apply";
 
 /// Whether the constructed environment was applied, degraded, or refused.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]

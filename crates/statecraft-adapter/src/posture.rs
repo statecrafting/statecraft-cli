@@ -9,7 +9,7 @@
 
 use crate::capability::Capability;
 use crate::coverage::{Coverage, CoverageRecord};
-use crate::environment::{ChildEnvironment, EnvironmentState, RESIDUALS};
+use crate::environment::{ChildEnvironment, EnvironmentState, RESIDUALS, UNCONFINED_HOME};
 use crate::manifest::{Manifest, Qualification};
 use serde::{Deserialize, Serialize};
 
@@ -58,7 +58,8 @@ impl Posture {
     /// Attach the measured boundary without retaining an unconfined-home claim.
     #[must_use]
     pub fn with_confinement(mut self, record: crate::boundary::Record) -> Self {
-        self.residuals.retain(|residual| residual != RESIDUALS[1]);
+        self.residuals
+            .retain(|residual| residual != UNCONFINED_HOME);
         self.confinement = Some(record);
         self
     }
@@ -101,10 +102,8 @@ impl Posture {
             unverifiable_refusal_account: negotiation.unverifiable_refusal_account(),
             surviving_processes: None,
             coverage: CoverageRecord::default(),
-            confinement: environment
-                .confinement
-                .as_ref()
-                .map(|boundary| boundary.record().clone()),
+            // Set below, with the residual it removes.
+            confinement: None,
         };
         match &environment.confinement {
             Some(boundary) => posture.with_confinement(boundary.record().clone()),
