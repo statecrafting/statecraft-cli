@@ -1120,15 +1120,14 @@ fn an_intent_that_cannot_be_written_refuses_the_attempt_and_launches_nothing() {
     assert_eq!(code(&out), 2, "{}", text(&out));
     let answer = json(&out);
     assert_eq!(json_naming::payload(&answer)["outcome"], "refused");
-    assert_eq!(
-        json_naming::payload(&answer)["reason"],
-        "boundary-unavailable"
-    );
+    assert_eq!(json_naming::payload(&answer)["reason"], "startup-record");
+    assert_eq!(json_naming::payload(&answer)["startup"]["launched"], false);
     assert!(
-        json_naming::payload(&answer)["detail"]
+        json_naming::payload(&answer)["startup"]["error"]
             .as_str()
             .unwrap()
-            .contains("could not be recorded")
+            .contains("could not be recorded"),
+        "{answer}"
     );
     assert_eq!(f.launches(), 0, "a process was created with no intent");
 }

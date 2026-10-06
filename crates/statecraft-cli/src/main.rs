@@ -1206,6 +1206,7 @@ fn launch_attempt(
     let mut git_variables = std::collections::BTreeMap::new();
     let mut confined_probe = None;
     let mut preparation_owned = None;
+    let mut startup_refusal = None;
     let mut admission =
         |workspace: &statecraft_run::workspace::Workspace, number: u32| -> Result<(), String> {
             let identity = statecraft_home::launch::AttemptIdentity {
@@ -1244,7 +1245,12 @@ fn launch_attempt(
                         program: &program.display().to_string(),
                     }) {
                         Ok(prepared) => Some(prepared),
-                        Err(why) => return Err(why.to_string()),
+                        Err(why) => {
+                            // Not a boundary failure: the startup intent could
+                            // not be recorded, and the refusal says so.
+                            startup_refusal = Some(why.to_string());
+                            return Err(why.to_string());
+                        }
                     }
                 }
             };
@@ -1328,6 +1334,12 @@ fn launch_attempt(
         Ok(s) => s,
         Err(e) => {
             if let statecraft_run::session::SessionError::Boundary(detail) = &e {
+                // A startup intent that could not be recorded is refused as
+                // itself, not as an unavailable boundary.
+                let refuse = |suffix: String| match &startup_refusal {
+                    Some(why) => startup_record_refused(&format!("{why}{suffix}"), format),
+                    None => boundary_refused(&format!("{detail}{suffix}"), format),
+                };
                 // The refusal is durable before these supervisor-created,
                 // unlaunched paths move. Retain them for diagnosis without
                 // making the next attempt adopt a failed preparation.
@@ -1351,10 +1363,7 @@ fn launch_attempt(
                         detail: serde_json::json!({ "refusal": detail, "exchange": exchange, "records": records, "archive": archive }),
                     };
                     if let Err(error) = chain.append(&key, &timestamp, &decision) {
-                        return boundary_refused(
-                            &format!("{detail}; archive decision: {error}"),
-                            format,
-                        );
+                        return refuse(format!("; archive decision: {error}"));
                     }
                     let archived = (|| -> std::io::Result<()> {
                         std::fs::create_dir_all(&archive)?;
@@ -1366,13 +1375,10 @@ fn launch_attempt(
                         Ok(())
                     })();
                     if let Err(error) = archived {
-                        return boundary_refused(
-                            &format!("{detail}; archive preparation: {error}"),
-                            format,
-                        );
+                        return refuse(format!("; archive preparation: {error}"));
                     }
                 }
-                return boundary_refused(detail, format);
+                return refuse(String::new());
             }
             // Spec 002 section 3.32 rule 24: a live attempt is never
             // replayed, and the refusal names what its launch records
@@ -2589,6 +2595,24 @@ fn absolute(path: &str) -> PathBuf {
         Ok(cwd) => cwd.join(p),
         Err(_) => p,
     }
+}
+
+/// The startup intent could not be recorded before admission, so nothing was
+/// launched and no attempt was appended. This is not a boundary failure.
+fn startup_record_refused(why: &str, format: Format) -> i32 {
+    emit(
+        &Answer::new(
+            serde_json::json!({
+                "outcome": "refused",
+                "reason": statecraft_home::launch::STARTUP_RECORD_GUARD,
+                "detail": why,
+                "startup": { "launched": false, "error": why },
+            }),
+            Exit::Refused,
+            format!("statecraft: startup refused: {why}"),
+        ),
+        format,
+    )
 }
 
 fn boundary_refused(detail: &str, format: Format) -> i32 {

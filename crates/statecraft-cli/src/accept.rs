@@ -59,7 +59,7 @@ fn git(dir: &Path, args: &[&str]) -> Option<String> {
 /// tree was clean, and which paths were dirty when it was not. `head_stable` is
 /// the caller's to decide from the run record, so it is a parameter.
 #[cfg(test)]
-pub fn identify_candidate(workspace: &Path, head_stable: bool) -> Result<Candidate, NoAcceptance> {
+fn identify_candidate(workspace: &Path, head_stable: bool) -> Result<Candidate, NoAcceptance> {
     let sha = git(workspace, &["rev-parse", "HEAD"]).ok_or_else(|| {
         NoAcceptance::CandidateUnidentified {
             detail: format!("HEAD does not resolve in {}", workspace.display()),
@@ -158,6 +158,15 @@ pub fn changed_paths(workspace: &Path, base: &str, candidate: &str) -> Vec<Strin
             .collect()
     })
     .unwrap_or_default()
+}
+
+/// Whether a suite command runs spec-spine with `--json`, judged by its words
+/// rather than substrings: a word whose last path segment is `spec-spine`, and
+/// a `--json` word. A path such as `out/spec-spine-report.json` is neither.
+fn invokes_spec_spine_json(command: &str) -> bool {
+    let words = || command.split_whitespace();
+    words().any(|word| word.rsplit('/').next() == Some("spec-spine"))
+        && words().any(|word| word == "--json")
 }
 
 /// Obtain spec-spine's change classification for this candidate.
@@ -391,6 +400,10 @@ pub fn judge_with_diagnostic(
     };
     let mut checks = Vec::new();
     for command in &plan.commands {
+        // Re-test before every suite process, not once: each command is a new
+        // process under the same policy. The probe removes its workspace file
+        // and fails the self-test (`workspaceCleanup`) if it cannot, so no
+        // command sees a probe artifact.
         if let Err(error) = admitted.retest(&executable) {
             return boundary_unavailable("self-test", error.to_string());
         }
@@ -426,10 +439,7 @@ pub fn judge_with_diagnostic(
                                 .map(|word| matches!(word, "ok" | "passed"))
                         })
                 });
-                if command.contains("spec-spine")
-                    && command.contains("--json")
-                    && structured.is_none()
-                {
+                if invokes_spec_spine_json(command) && structured.is_none() {
                     checks.push(Check::missing_report(command, output.code.unwrap_or(-1)));
                 } else {
                     checks.push(Check::ran(command, output.code.unwrap_or(-1), structured));
@@ -608,6 +618,17 @@ fn absent() -> Recorded<String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn spec_spine_json_is_recognised_by_words_not_substrings() {
+        assert!(invokes_spec_spine_json(".bin/spec-spine verify 004 --json"));
+        assert!(invokes_spec_spine_json("spec-spine gate --json"));
+        assert!(!invokes_spec_spine_json(
+            "tool --json --out /results/spec-spine-report.json"
+        ));
+        assert!(!invokes_spec_spine_json("spec-spine verify 004"));
+        assert!(!invokes_spec_spine_json("cargo test --json-spec-spine"));
+    }
 
     fn git_run(dir: &Path, args: &[&str]) {
         let out = std::process::Command::new("git")
