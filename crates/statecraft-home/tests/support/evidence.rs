@@ -169,6 +169,8 @@ pub fn launch(control: Control, stdout: &str) -> Launch {
     let payload = statecraft_home::session::payload_json();
     let digest = statecraft_environment::digest::digest_bytes(payload.as_bytes());
     Launch {
+        source_project: None,
+        confinement: None,
         capture_id: format!("capture-{}", control.word()),
         control,
         origin: Origin::Launched,

@@ -66,7 +66,6 @@ libc = "0.2.189"
 # tree-sitter grammars. build.rs reads what the lock resolved.
 spec-spine-core.workspace = true
 
-[dev-dependencies]
 tempfile = "3.27.0"
 
 [lints.rust]

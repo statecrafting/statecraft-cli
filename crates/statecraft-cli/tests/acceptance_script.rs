@@ -37,9 +37,11 @@ struct Run {
 
 impl Run {
     fn new() -> Self {
-        Self {
-            dir: tempfile::tempdir().expect("a temporary directory"),
-        }
+        let dir = tempfile::tempdir().expect("a temporary directory");
+        // Linux grants the provider's configuration file in place only, so
+        // it must already exist (spec 004 section 3.18).
+        std::fs::write(dir.path().join(".claude.json"), b"{}").expect("a configuration file");
+        Self { dir }
     }
 
     /// A path with a space, both quote kinds, a backslash and a dollar sign.
@@ -226,16 +228,22 @@ fn an_incomplete_launch_stops_the_stage_before_another_session() {
     }
 }
 
-/// Captures that a session removed are unreadable: a failure, not a verdict.
+/// A confined session cannot remove a previous control's capture record.
 #[test]
-fn captures_that_cannot_be_read_are_a_failure() {
+fn a_capture_cannot_delete_another_controls_record() {
     let run = Run::new();
     run.preflight();
     let target = run.captures().join("refusal.json").display().to_string();
     let out = run.fake_run("tamper", &[("FAKE_TAMPER", &target)]);
     let text = both(&out);
-    assert_eq!(code(&out), 4, "{text}");
-    assert!(text.contains("could not be read"), "{text}");
+    assert_eq!(code(&out), 1, "{text}");
+    assert!(text.contains("launch did not complete"), "{text}");
+    assert!(Path::new(&target).is_file());
+    let stderr = std::fs::read_to_string(run.captures().join("allowed-command.stderr")).unwrap();
+    assert!(
+        stderr.contains("Operation not permitted") || stderr.contains("Permission denied"),
+        "{stderr}"
+    );
 }
 
 /// Insufficient evidence of another kind: the version probe answered nothing,
@@ -399,10 +407,15 @@ impl Run {
     }
 
     fn trial_launches(&self) -> usize {
-        std::fs::read_to_string(self.acc().join("trialbin/launches"))
-            .unwrap_or_default()
-            .lines()
-            .count()
+        let places = statecraft_home::launch::Places::of(
+            &self.acc().join("home"),
+            &self.acc().join("project"),
+        );
+        let identity = statecraft_home::launch::AttemptIdentity {
+            run_id: statecraft_home::trial::RUN_ID.into(),
+            attempt: 1,
+        };
+        usize::from(identity.launched_path(&places).is_file())
     }
 }
 

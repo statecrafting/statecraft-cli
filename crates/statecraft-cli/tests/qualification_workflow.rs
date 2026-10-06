@@ -36,6 +36,8 @@ struct Sandbox {
 impl Sandbox {
     fn new() -> Self {
         let dir = tempfile::tempdir().expect("a temporary directory");
+        std::fs::write(dir.path().join(".claude.json"), b"{}\n")
+            .expect("existing provider configuration for the Linux in-place grant");
         let sandbox = Self { dir };
         sandbox.init_repo(&sandbox.project());
         sandbox
@@ -875,7 +877,6 @@ fn a_captures_settings_file_is_in_the_exchange_directory_and_not_the_operators_w
     let sandbox = upgraded();
     let dir = sandbox.capture_dir();
     std::fs::create_dir_all(&dir).unwrap();
-    let trace = sandbox.dir.path().join("trace");
     let out = Command::new(binary())
         .args([
             "startup",
@@ -892,12 +893,13 @@ fn a_captures_settings_file_is_in_the_exchange_directory_and_not_the_operators_w
         .env("STATECRAFT_NATIVE_ROOT", sandbox.native())
         .env("HOME", sandbox.dir.path())
         .env("FAKE_PROVIDER_MODE", "faithful")
-        .env("FAKE_TRACE", &trace)
+        .env("FAKE_TRACE", "stderr")
         .env("FAKE_OPERATOR_DIR", &dir)
         .output()
         .expect("the binary runs");
     assert_eq!(code(&out), 0, "{}", stdout(&out));
-    let trace = std::fs::read_to_string(&trace).expect("the fake traced its session");
+    let trace =
+        std::fs::read_to_string(dir.join("refusal.stderr")).expect("the fake traced its session");
     let given = trace
         .lines()
         .find_map(|l| l.strip_prefix("settings "))
@@ -941,4 +943,123 @@ fn a_captures_settings_file_is_in_the_exchange_directory_and_not_the_operators_w
         record["launch"]["settingsDigestAfter"],
         statecraft_environment::digest::digest_bytes(&std::fs::read(given).unwrap())
     );
+}
+
+/// Confined controls bind one trusted source, never their distinct scratch paths.
+#[test]
+fn confined_capture_source_and_workspace_substitutions_are_refused() {
+    let sandbox = upgraded();
+    for control in ["refusal", "allowed-command", "without-payload"] {
+        let out = sandbox.capture(control, "faithful", &[]);
+        assert_eq!(code(&out), 0, "{}", stdout(&out));
+    }
+    let paths: Vec<_> = ["refusal", "allowed-command", "without-payload"]
+        .map(|control| sandbox.capture_dir().join(format!("{control}.json")))
+        .into_iter()
+        .collect();
+    let originals: Vec<Vec<u8>> = paths
+        .iter()
+        .map(|path| std::fs::read(path).unwrap())
+        .collect();
+    let records: Vec<serde_json::Value> = originals
+        .iter()
+        .map(|bytes| serde_json::from_slice(bytes).unwrap())
+        .collect();
+    assert_ne!(
+        records[0]["invocation"]["workingDirectory"],
+        records[1]["invocation"]["workingDirectory"]
+    );
+    assert_eq!(
+        records[0]["launch"]["sourceProject"],
+        records[1]["launch"]["sourceProject"]
+    );
+    let qualify = |session: &str| {
+        sandbox.run(&[
+            "startup",
+            "qualify",
+            &sandbox.project_arg(),
+            session,
+            &sandbox.capture_dir().display().to_string(),
+        ])
+    };
+    let accepted = qualify("source-valid");
+    assert_eq!(code(&accepted), 1, "{}", stdout(&accepted));
+    let durable = sandbox
+        .project()
+        .join(".statecraft/state/startup/source-valid.json");
+    let before = std::fs::read(&durable).unwrap();
+    for field in [
+        "root",
+        "commit",
+        "tree",
+        "missing-source",
+        "missing-confinement",
+        "workspace",
+        "policy-workspace",
+        "legacy",
+    ] {
+        let mut changed = records[1].clone();
+        match field {
+            "root" => {
+                changed["launch"]["sourceProject"]["root"] = serde_json::json!("/another/project")
+            }
+            "commit" | "tree" => {
+                changed["launch"]["sourceProject"][field] = serde_json::json!("0".repeat(40))
+            }
+            "missing-source" => {
+                changed["launch"]
+                    .as_object_mut()
+                    .unwrap()
+                    .remove("sourceProject");
+            }
+            "missing-confinement" => {
+                changed["launch"]
+                    .as_object_mut()
+                    .unwrap()
+                    .remove("confinement");
+            }
+            "workspace" => {
+                changed["invocation"]["workingDirectory"] = serde_json::json!("/another/workspace")
+            }
+            "policy-workspace" => {
+                changed["launch"]["confinement"]["policy"]["writable"] = serde_json::json!([])
+            }
+            "legacy" => {
+                changed["launch"]
+                    .as_object_mut()
+                    .unwrap()
+                    .remove("sourceProject");
+                changed["launch"]
+                    .as_object_mut()
+                    .unwrap()
+                    .remove("confinement");
+            }
+            _ => unreachable!(),
+        }
+        std::fs::write(&paths[1], serde_json::to_vec(&changed).unwrap()).unwrap();
+        let session = format!("source-{field}");
+        let refused = qualify(&session);
+        assert_eq!(code(&refused), 2, "{field}: {}", stdout(&refused));
+        assert!(
+            stdout(&refused).contains("project binding refused"),
+            "{field}: {}",
+            stdout(&refused)
+        );
+        assert!(
+            !sandbox
+                .project()
+                .join(format!(".statecraft/state/startup/{session}.json"))
+                .exists()
+        );
+        assert_eq!(std::fs::read(&durable).unwrap(), before);
+        std::fs::write(&paths[1], &originals[1]).unwrap();
+    }
+    // A consistent substitution in all records still cannot name a different source tree.
+    for (path, original) in paths.iter().zip(&records) {
+        let mut changed = original.clone();
+        changed["launch"]["sourceProject"]["tree"] = serde_json::json!("0".repeat(40));
+        std::fs::write(path, serde_json::to_vec(&changed).unwrap()).unwrap();
+    }
+    assert_eq!(code(&qualify("source-consistent-substitution")), 2);
+    assert_eq!(std::fs::read(&durable).unwrap(), before);
 }

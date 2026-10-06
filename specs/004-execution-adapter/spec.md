@@ -24,6 +24,8 @@ establishes:
   - { kind: directory, path: "crates/statecraft-adapter/" }
   - { kind: directory, path: "crates/statecraft-adapter-claude-code/" }
 extends:
+  # Bind the existing launch and capture services to section 3.18 admission.
+  - { spec: "002-environment-lifecycle", unit: { kind: directory, path: "crates/statecraft-home/" }, nature: additive }
   # Inspection folds the recorded posture through the reviewable account.
   - { spec: "005-acceptance-and-evidence", unit: { kind: directory, path: "crates/statecraft-acceptance/" }, nature: additive }
   # Keep the provider claim separate from the mapped termination when the

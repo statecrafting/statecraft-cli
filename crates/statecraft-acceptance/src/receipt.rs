@@ -23,6 +23,9 @@ pub struct Receipt {
     pub candidate: String,
     /// The ordered suite, each command with its exit code.
     pub suite: Vec<SuiteEntry>,
+    /// Measured suite boundary; absent means the original unconfined suite.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub confinement: Option<statecraft_adapter::boundary::Record>,
     /// The policy digest.
     pub policy_digest: String,
     /// This product's version.
@@ -134,6 +137,7 @@ pub fn mint(
     }
 
     Ok(Receipt {
+        confinement: suite.confinement.clone(),
         repository: context.repository.clone(),
         base: judged.base.sha.clone(),
         candidate: judged.candidate.sha.clone(),

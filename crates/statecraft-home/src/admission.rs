@@ -280,6 +280,43 @@ impl ProcessEnd {
     }
 }
 
+/// Trusted source identity, recorded before a confined capture starts.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SourceProject {
+    /// Canonical operator project.
+    pub root: String,
+    /// Exact trusted source commit.
+    pub commit: String,
+    /// Exact exported tree.
+    pub tree: String,
+}
+
+impl SourceProject {
+    /// Read only trusted operator metadata; never use the confined workspace.
+    pub fn read(root: &std::path::Path) -> Result<Self, String> {
+        let root = root.canonicalize().map_err(|e| e.to_string())?;
+        let revision = |name: &str| -> Result<String, String> {
+            let result =
+                statecraft_run::trusted_git::output(&root, &["rev-parse", "--verify", name])
+                    .map_err(|e| e.to_string())?;
+            let value = String::from_utf8(result.stdout).map_err(|e| e.to_string())?;
+            let value = value.trim();
+            if !matches!(value.len(), 40 | 64) || !value.bytes().all(|b| b.is_ascii_hexdigit()) {
+                return Err("invalid trusted source object identity".into());
+            }
+            Ok(value.into())
+        };
+        let commit = revision("HEAD^{commit}")?;
+        let tree = revision(&format!("{commit}^{{tree}}"))?;
+        Ok(Self {
+            root: root.display().to_string(),
+            commit,
+            tree,
+        })
+    }
+}
+
 /// What the launching operation recorded, beside the invocation it launched.
 ///
 /// Section 3.30 rule 12. Written by the same operation that started the
@@ -287,6 +324,12 @@ impl ProcessEnd {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Launch {
+    /// Separate source identity for confined captures; never synthesized for legacy data.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub source_project: Option<SourceProject>,
+    /// Exact OS confinement; an older absence means unconfined.
+    #[serde(default)]
+    pub confinement: Option<statecraft_adapter::boundary::Record>,
     /// This capture's identity.
     pub capture_id: String,
     /// Which control the launch was.
@@ -413,6 +456,12 @@ impl Evidence {
 /// an absence would lose the fact that a claim was made and refused.
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
 pub enum NotAdmitted {
+    /// A confined capture does not bind its source and actual workspace.
+    #[error("capture project binding refused: {detail}")]
+    ProjectBinding {
+        /// The missing or mismatched identity.
+        detail: String,
+    },
     /// No version was read.
     #[error("no harness version was recorded; the observation is version specific")]
     NoVersion,
@@ -1224,6 +1273,43 @@ fn bound(evidence: &Evidence, control: Control, m: &Measurement) -> Result<(), N
         .launch
         .as_ref()
         .ok_or(NotAdmitted::NoLaunchRecord { control: c })?;
+    match (&launch.confinement, &launch.source_project) {
+        (None, None) => {}
+        (Some(record), Some(source)) => {
+            let workspace = std::path::Path::new(&m.invocation.working_directory);
+            if !workspace.is_absolute()
+                || workspace == std::path::Path::new(&source.root)
+                || !record
+                    .policy
+                    .writable
+                    .iter()
+                    .any(|grant| grant.directory && grant.path == workspace)
+                || !record
+                    .policy
+                    .readonly
+                    .iter()
+                    .any(|root| root == std::path::Path::new(&source.root))
+            {
+                return Err(NotAdmitted::ProjectBinding {
+                    detail: format!("{c}: source or workspace disagrees with confinement policy"),
+                });
+            }
+            for object in [&source.commit, &source.tree] {
+                if !matches!(object.len(), 40 | 64)
+                    || !object.bytes().all(|b| b.is_ascii_hexdigit())
+                {
+                    return Err(NotAdmitted::ProjectBinding {
+                        detail: format!("{c}: invalid source object identity"),
+                    });
+                }
+            }
+        }
+        _ => {
+            return Err(NotAdmitted::ProjectBinding {
+                detail: format!("{c}: confinement and source binding must both be present"),
+            });
+        }
+    }
     if launch.control != control {
         return Err(NotAdmitted::ControlMislabelled {
             control: c,
@@ -1630,7 +1716,18 @@ pub fn admitted(evidence: &Evidence) -> Result<Vec<(Control, Trailer)>, NotAdmit
                 value: la.capture_id.clone(),
             });
         }
-        if a.invocation.working_directory != b.invocation.working_directory {
+        let source_a = la.and_then(|launch| launch.source_project.as_ref());
+        let source_b = lb.and_then(|launch| launch.source_project.as_ref());
+        if source_a != source_b {
+            return Err(NotAdmitted::ProjectBinding {
+                detail: format!(
+                    "{} and {} name different source projects, commits or trees",
+                    first.word(),
+                    second.word()
+                ),
+            });
+        }
+        if source_a.is_none() && a.invocation.working_directory != b.invocation.working_directory {
             return Err(NotAdmitted::DifferentWorkingDirectories {
                 first: first.word(),
                 a: a.invocation.working_directory.clone(),
@@ -1702,6 +1799,22 @@ pub fn admitted_in(
         .unwrap_or_else(|_| root.to_path_buf())
         .display()
         .to_string();
+    if let Some(source) = evidence
+        .refusal
+        .launch
+        .as_ref()
+        .and_then(|launch| launch.source_project.as_ref())
+    {
+        let current =
+            SourceProject::read(root).map_err(|detail| NotAdmitted::ProjectBinding { detail })?;
+        if source != &current {
+            return Err(NotAdmitted::ProjectBinding {
+                detail: "source project, commit or tree no longer matches the operator project"
+                    .into(),
+            });
+        }
+        return Ok(trailers);
+    }
     let found = &evidence.refusal.invocation.working_directory;
     if found != &expected {
         return Err(NotAdmitted::AnotherProject {

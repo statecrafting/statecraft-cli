@@ -24,6 +24,9 @@ use std::path::PathBuf;
 
 fn main() -> std::process::ExitCode {
     let args: Vec<String> = std::env::args().skip(1).collect();
+    if args.len() == 2 && args[0] == "__boundary_probe" {
+        return std::process::ExitCode::from(statecraft_adapter::boundary::probe(&args[1]) as u8);
+    }
     let code = run(&args);
     std::process::ExitCode::from(code as u8)
 }
