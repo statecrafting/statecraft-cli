@@ -9,7 +9,7 @@
 
 use crate::capability::Capability;
 use crate::coverage::{Coverage, CoverageRecord};
-use crate::environment::{ChildEnvironment, EnvironmentState, RESIDUALS};
+use crate::environment::{ChildEnvironment, EnvironmentState, RESIDUALS, UNCONFINED_HOME};
 use crate::manifest::{Manifest, Qualification};
 use serde::{Deserialize, Serialize};
 
@@ -49,9 +49,20 @@ pub struct Posture {
     /// section has none and reads as `not-checked`, never as covered.
     #[serde(default)]
     pub coverage: CoverageRecord,
+    /// Exact admitted OS boundary; absence on older records means unconfined.
+    #[serde(default)]
+    pub confinement: Option<crate::boundary::Record>,
 }
 
 impl Posture {
+    /// Attach the measured boundary without retaining an unconfined-home claim.
+    #[must_use]
+    pub fn with_confinement(mut self, record: crate::boundary::Record) -> Self {
+        self.residuals
+            .retain(|residual| residual != UNCONFINED_HOME);
+        self.confinement = Some(record);
+        self
+    }
     /// Record the supervisor's observed applied set and process residuals.
     /// Missing initialization records no applied capabilities, never the
     /// manifest's declarations as observations.
@@ -78,7 +89,7 @@ impl Posture {
         applied: &[Capability],
         environment: &ChildEnvironment,
     ) -> Self {
-        Self {
+        let posture = Self {
             adapter: manifest.adapter.clone(),
             adapter_version: manifest.version.clone(),
             qualification,
@@ -91,6 +102,12 @@ impl Posture {
             unverifiable_refusal_account: negotiation.unverifiable_refusal_account(),
             surviving_processes: None,
             coverage: CoverageRecord::default(),
+            // Set below, with the residual it removes.
+            confinement: None,
+        };
+        match &environment.confinement {
+            Some(boundary) => posture.with_confinement(boundary.record().clone()),
+            None => posture,
         }
     }
 
@@ -144,6 +161,18 @@ impl Posture {
         }
         if let Some(s) = &self.surviving_processes {
             out.push_str(&format!("residual: a process outlived the kill: {s}\n"));
+        }
+        match &self.confinement {
+            Some(record) => {
+                out.push_str(&format!(
+                    "confinement {} {}\n",
+                    record.mechanism, record.digest
+                ));
+                for item in &record.open_items {
+                    out.push_str(&format!("open item: {item}\n"));
+                }
+            }
+            None => out.push_str("confinement: unconfined (not recorded)\n"),
         }
         out.push_str(&self.coverage.render());
         for r in &self.residuals {
