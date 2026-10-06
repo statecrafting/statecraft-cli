@@ -320,7 +320,7 @@ pub fn session_error_answer(e: &SessionError) -> Answer<String> {
         // A live attempt is a precondition, named (spec 003 section 3.7).
         SessionError::LiveAttempt { .. } => Exit::Refused,
         // An unresolvable base or an occupied path is also a precondition.
-        SessionError::Workspace(_) => Exit::Refused,
+        SessionError::Workspace(_) | SessionError::Boundary(_) => Exit::Refused,
         // A record that could not be written is nobody's request.
         SessionError::Record(_) => Exit::Failed,
     };
