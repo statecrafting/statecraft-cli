@@ -408,11 +408,17 @@ impl Run {
             &self.acc().join("home"),
             &self.acc().join("project"),
         );
-        let identity = statecraft_home::launch::AttemptIdentity {
-            run_id: statecraft_home::trial::RUN_ID.into(),
-            attempt: 1,
-        };
-        usize::from(identity.launched_path(&places).is_file())
+        // Every attempt that left a launch record, so a second launch counts.
+        (1..=16)
+            .filter(|&attempt| {
+                statecraft_home::launch::AttemptIdentity {
+                    run_id: statecraft_home::trial::RUN_ID.into(),
+                    attempt,
+                }
+                .launched_path(&places)
+                .is_file()
+            })
+            .count()
     }
 }
 
