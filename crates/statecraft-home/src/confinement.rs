@@ -147,6 +147,19 @@ pub fn admit(roots: Roots<'_>, executable: &Path, path: &str) -> Result<Admissio
             let configuration = operator_home.join(".claude.json");
             #[cfg(target_os = "macos")]
             adjacent_prefixes.push(configuration);
+            // Landlock grants a file only once it exists, and creating the
+            // provider's configuration is not the supervisor's to do.
+            #[cfg(target_os = "linux")]
+            if configuration
+                .symlink_metadata()
+                .is_err_and(|e| e.kind() == std::io::ErrorKind::NotFound)
+            {
+                return Err(format!(
+                    "{} is absent; run the provider once, unconfined, to create it",
+                    configuration.display()
+                )
+                .into());
+            }
             #[cfg(target_os = "linux")]
             writable.push(Grant {
                 path: configuration,
