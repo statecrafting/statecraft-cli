@@ -128,8 +128,10 @@ no `regex`. Three crates enter the envelope's own normal dependency closure:
 `statecraft-run`'s `attest-ledger-core`. Each of the three is Apache-2.0 and
 `unsafe_code = "forbid"`, none has a build script, and none reads a clock, the
 environment, the file system or the network. The core's other dependencies
-(`serde`, `serde_json`, `hex`, `sha2` 0.10) were already in the envelope's
-closure. The crate's literal Apache-2.0
+were already in the envelope's own closure before this change: `serde`,
+`serde_json` and `hex` directly, and `sha2` 0.10.9 through `ed25519-dalek`
+2.2.0 (the envelope's direct `sha2` is 0.11, a separate crate that also
+stays). The crate's literal Apache-2.0
 licence (005 section 3.15) is unaffected.
 
 ### 3.5 The platform
