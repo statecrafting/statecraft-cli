@@ -22,6 +22,8 @@ fn check(records: Option<Vec<PairedRecord>>, version: &str, expected: &str) {
     let target = tempfile::tempdir().unwrap();
     let home = tempfile::tempdir().unwrap();
     let bin = tempfile::tempdir().unwrap();
+    let operator_home = tempfile::tempdir().unwrap();
+    std::fs::write(operator_home.path().join(".claude.json"), "{}").unwrap();
     for args in [
         vec!["init", "--quiet"],
         vec!["config", "user.name", "fixture"],
@@ -88,6 +90,7 @@ if [ "$1" = --version ]; then /bin/cat "$(dirname "$0")/version"; exit 0; fi
             .args(args)
             .env_clear()
             .env("STATECRAFT_HOME", home.path())
+            .env("HOME", operator_home.path())
             .env("PATH", &path)
             // Spec 004 section 3.14: the account name is carried to the child
             // with this process's own value, and `HOME` still is not.
@@ -143,9 +146,22 @@ if [ "$1" = --version ]; then /bin/cat "$(dirname "$0")/version"; exit 0; fi
     let entries = chain.entries();
     let outcomes: Vec<_> = entries.iter().filter(|e| e.subject == "attempt").collect();
     assert_eq!(outcomes.len(), 2);
+    assert_eq!(outcomes[0].detail["posture"], *posture);
+    let first_digest = posture["confinement"]["digest"].as_str().unwrap();
     for entry in outcomes {
-        assert_eq!(entry.detail["posture"], *posture);
+        assert_eq!(entry.detail["posture"]["qualification"], expected);
+        assert!(entry.detail["posture"]["confinement"]["digest"].is_string());
     }
+    assert_ne!(
+        chain
+            .entries()
+            .iter()
+            .rfind(|e| e.subject == "attempt")
+            .unwrap()
+            .detail["posture"]["confinement"]["digest"],
+        first_digest,
+        "each attempt records its own exchange and temporary roots"
+    );
     assert_eq!(statecraft_run::session::runs(&chain)[0].attempts.len(), 2);
     let before = std::fs::read(statecraft_run::record::chain_path(
         home.path(),
@@ -161,7 +177,15 @@ if [ "$1" = --version ]; then /bin/cat "$(dirname "$0")/version"; exit 0; fi
     let shown = run(&["run", "show", root, "fixture", "--json"]);
     assert_eq!(shown.status.code(), Some(0), "{shown:?}");
     let shown: Value = json_naming::from_output(&shown.stdout).unwrap();
-    assert_eq!(shown["report"]["posture"]["value"], *posture);
+    assert_eq!(
+        shown["report"]["posture"]["value"],
+        chain
+            .entries()
+            .iter()
+            .rfind(|e| e.subject == "attempt")
+            .unwrap()
+            .detail["posture"]
+    );
     assert_eq!(
         shown["report"]["posture"]["from_record"],
         "attempt#fixture/2"

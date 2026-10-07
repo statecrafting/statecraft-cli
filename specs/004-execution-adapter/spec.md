@@ -984,6 +984,11 @@ resolver's ephemeral client socket, which takes datagrams from its one peer.
 The owner approved this reading on 2026-10-04, with the route through a shared
 peer port recorded as an open item.
 
+**2026-10-04: a boundary refusal is reported beside the verdict.** An
+acceptance not attempted because the boundary was unavailable exits as a
+refusal, not a finding, and the answer carries the refusing platform, step and
+detail next to the acceptance rather than in place of it.
+
 ## Verification
 
 Each line is one command. §3.5's suite is eight tests named `suite_1` to

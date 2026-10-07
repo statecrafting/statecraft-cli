@@ -22,11 +22,11 @@
 use statecraft_acceptance::absence::{Absence, Recorded};
 use statecraft_acceptance::authority::{self, Declared, DeltaReport, NoDeltaReport};
 use statecraft_acceptance::delta::SpecSpineDeltaReport;
+use statecraft_acceptance::independence::Check;
 use statecraft_acceptance::independence::SuiteResult;
 use statecraft_acceptance::judged::{Base, Candidate, Judged, NoAcceptance, Policy};
 use statecraft_acceptance::outcome::Acceptance;
 use statecraft_acceptance::receipt::{MintContext, mint};
-use statecraft_acceptance::suite::SuiteSource;
 use std::path::Path;
 
 /// The authority set this repository declares, by path.
@@ -46,11 +46,7 @@ pub fn declared_authority_set() -> Declared {
 }
 
 fn git(dir: &Path, args: &[&str]) -> Option<String> {
-    let out = std::process::Command::new("git")
-        .args(args)
-        .current_dir(dir)
-        .output()
-        .ok()?;
+    let out = statecraft_run::trusted_git::output(dir, args).ok()?;
     if !out.status.success() {
         return None;
     }
@@ -62,7 +58,8 @@ fn git(dir: &Path, args: &[&str]) -> Option<String> {
 /// Three facts, each observed rather than assumed: the sha, whether the work
 /// tree was clean, and which paths were dirty when it was not. `head_stable` is
 /// the caller's to decide from the run record, so it is a parameter.
-pub fn identify_candidate(workspace: &Path, head_stable: bool) -> Result<Candidate, NoAcceptance> {
+#[cfg(test)]
+fn identify_candidate(workspace: &Path, head_stable: bool) -> Result<Candidate, NoAcceptance> {
     let sha = git(workspace, &["rev-parse", "HEAD"]).ok_or_else(|| {
         NoAcceptance::CandidateUnidentified {
             detail: format!("HEAD does not resolve in {}", workspace.display()),
@@ -146,7 +143,13 @@ pub fn policy_digest(
 pub fn changed_paths(workspace: &Path, base: &str, candidate: &str) -> Vec<String> {
     git(
         workspace,
-        &["diff", "--name-only", &format!("{base}..{candidate}")],
+        &[
+            "diff",
+            "--no-ext-diff",
+            "--no-textconv",
+            "--name-only",
+            &format!("{base}..{candidate}"),
+        ],
     )
     .map(|t| {
         t.lines()
@@ -155,6 +158,15 @@ pub fn changed_paths(workspace: &Path, base: &str, candidate: &str) -> Vec<Strin
             .collect()
     })
     .unwrap_or_default()
+}
+
+/// Whether a suite command runs spec-spine with `--json`, judged by its words
+/// rather than substrings: a word whose last path segment is `spec-spine`, and
+/// a `--json` word. A path such as `out/spec-spine-report.json` is neither.
+fn invokes_spec_spine_json(command: &str) -> bool {
+    let words = || command.split_whitespace();
+    words().any(|word| word.rsplit('/').next() == Some("spec-spine"))
+        && words().any(|word| word == "--json")
 }
 
 /// Obtain spec-spine's change classification for this candidate.
@@ -215,45 +227,246 @@ pub struct Context {
 /// the receipt. What is here is the order they run in.
 pub fn judge(
     target: &Path,
+    home: &Path,
     workspace: &Path,
     base_commit: &str,
     head_stable: bool,
     context: &Context,
 ) -> (Acceptance, Option<SuiteResult>, Recorded<String>) {
-    let candidate = match identify_candidate(workspace, head_stable) {
-        Ok(c) => c,
-        Err(reason) => return (Acceptance::None { reason }, None, absent()),
+    let (acceptance, suite, freshness, _) =
+        judge_with_diagnostic(target, home, workspace, base_commit, head_stable, context);
+    (acceptance, suite, freshness)
+}
+
+/// A failed boundary preparation step, carried beside the not-attempted answer.
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct BoundaryDiagnostic {
+    /// Platform that refused launch.
+    pub platform: String,
+    /// Preparation step that failed.
+    pub step: String,
+    /// Concrete failure detail.
+    pub detail: String,
+}
+
+/// Judge with a structured platform and failed-step diagnostic on refusal.
+pub fn judge_with_diagnostic(
+    target: &Path,
+    home: &Path,
+    workspace: &Path,
+    base_commit: &str,
+    head_stable: bool,
+    context: &Context,
+) -> (
+    Acceptance,
+    Option<SuiteResult>,
+    Recorded<String>,
+    Option<BoundaryDiagnostic>,
+) {
+    let (run_id, number) = match context.attempt.rsplit_once('/') {
+        Some((run, number)) => match number.parse::<u32>() {
+            Ok(number) => (run, number),
+            Err(error) => return boundary_unavailable("attempt-identity", error.to_string()),
+        },
+        None => return boundary_unavailable("attempt-identity", "preparation refused"),
+    };
+    let places = statecraft_home::launch::Places::of(home, target);
+    let identity = statecraft_home::launch::AttemptIdentity {
+        run_id: run_id.into(),
+        attempt: number,
+    };
+    let exchange = identity.exchange_dir(&places);
+    let executable = match std::env::current_exe() {
+        Ok(path) => path,
+        Err(error) => return boundary_unavailable("current-executable", error.to_string()),
+    };
+    let path = std::env::var("PATH").unwrap_or_default();
+    let admitted = match statecraft_home::confinement::admit(
+        statecraft_home::confinement::Roots {
+            home,
+            target,
+            workspace,
+            exchange: &exchange,
+            records: &places.records,
+            gate: None,
+            git_writes: vec![],
+            provider: false,
+        },
+        &executable,
+        &path,
+    ) {
+        Ok(admitted) => admitted,
+        Err(error) => return boundary_unavailable("admission", error.to_string()),
+    };
+    let mut variables = std::collections::BTreeMap::from([("PATH".into(), path.clone())]);
+    variables.extend(admitted.variables.clone());
+    let Some(scratch) = variables.get("TMPDIR") else {
+        return boundary_unavailable("cache-root", "admission supplied no TMPDIR");
+    };
+    let cache = Path::new(scratch).join("suite-cache");
+    if std::fs::create_dir(&cache).is_err() {
+        return boundary_unavailable("cache-root", "preparation refused");
+    }
+    for name in [
+        "HOME",
+        "CARGO_HOME",
+        "XDG_CACHE_HOME",
+        "XDG_CONFIG_HOME",
+        "XDG_DATA_HOME",
+        "npm_config_cache",
+        "PIP_CACHE_DIR",
+        "GOCACHE",
+        "GOMODCACHE",
+        "NUGET_PACKAGES",
+    ] {
+        let directory = cache.join(name);
+        if std::fs::create_dir(&directory).is_err() {
+            return boundary_unavailable("cache-directory", "preparation refused");
+        }
+        variables.insert(name.into(), directory.display().to_string());
+    }
+    if let Some(operator_home) = std::env::var_os("HOME") {
+        variables.insert(
+            "RUSTUP_HOME".into(),
+            Path::new(&operator_home)
+                .join(".rustup")
+                .display()
+                .to_string(),
+        );
+    }
+    variables.insert(
+        "GIT_OBJECT_DIRECTORY".into(),
+        exchange.join("objects").display().to_string(),
+    );
+    let common = match statecraft_run::trusted_git::common(target) {
+        Ok(path) => path,
+        Err(error) => return boundary_unavailable("trusted-git", error.to_string()),
+    };
+    variables.insert(
+        "GIT_ALTERNATE_OBJECT_DIRECTORIES".into(),
+        common.join("objects").display().to_string(),
+    );
+    let imported = match statecraft_home::confinement::import_objects(
+        &admitted, target, workspace, run_id, &variables,
+    ) {
+        Ok(imported) => imported,
+        Err(error) => return boundary_unavailable("object-import", error.to_string()),
+    };
+    let Some(verified_head) = imported["head"].as_str() else {
+        return boundary_unavailable("imported-head", "preparation refused");
+    };
+    variables.remove("GIT_OBJECT_DIRECTORY");
+    variables.remove("GIT_ALTERNATE_OBJECT_DIRECTORIES");
+    let held_workspace = match statecraft_adapter::boundary::DataRoot::open(workspace) {
+        Ok(root) => root,
+        Err(error) => return boundary_unavailable("workspace-handle", error.to_string()),
+    };
+    let base_export = match crate::coverage::export(target, base_commit) {
+        Ok(export) => export,
+        Err(error) => return boundary_unavailable("base-export", error.to_string()),
+    };
+    let candidate = match identify_private_candidate(
+        target,
+        &held_workspace,
+        &base_export.tree(),
+        run_id,
+        verified_head,
+        head_stable,
+    ) {
+        Ok(candidate) => candidate,
+        Err(reason) => return (Acceptance::None { reason }, None, absent(), None),
     };
     let declared = declared_authority_set();
     let policy = match policy_digest(target, base_commit, &declared) {
         Ok(p) => p,
-        Err(reason) => return (Acceptance::None { reason }, None, absent()),
+        Err(reason) => return (Acceptance::None { reason }, None, absent(), None),
     };
 
+    let program = match crate::judge::program(target) {
+        Ok(program) => program,
+        Err(error) => return boundary_unavailable("judge-program", error.to_string()),
+    };
+    if let Err(error) = admitted.boundary.resolve(Path::new(&program), &path) {
+        return boundary_unavailable("judge-resolution", error.to_string());
+    }
+    let plan = match statecraft_adapter::coverage::read_plan(
+        &program,
+        &base_export.tree(),
+        &context.spec_id,
+    ) {
+        Ok(plan) => plan,
+        Err(error) => return boundary_unavailable("suite-plan", error.to_string()),
+    };
+    let mut checks = Vec::new();
+    for command in &plan.commands {
+        // Re-test before every suite process, not once: each command is a new
+        // process under the same policy. The probe removes its workspace file
+        // and fails the self-test (`workspaceCleanup`) if it cannot, so no
+        // command sees a probe artifact.
+        if let Err(error) = admitted.retest(&executable) {
+            return boundary_unavailable("self-test", error.to_string());
+        }
+        let shell = match admitted.boundary.resolve(Path::new("/bin/sh"), &path) {
+            Ok(shell) => shell,
+            Err(error) => return boundary_unavailable("shell-resolution", error.to_string()),
+        };
+        match statecraft_adapter::supervisor::capture_confined(
+            &shell,
+            &["-c", command],
+            workspace,
+            &variables,
+            b"",
+            std::time::Duration::from_secs(600),
+            &admitted.boundary,
+        ) {
+            Ok(output) if !output.timed_out && output.surviving_processes.is_none() => {
+                let text = String::from_utf8_lossy(&output.stdout);
+                let report: Option<serde_json::Value> =
+                    serde_json::from_slice(&output.stdout).ok().or_else(|| {
+                        let start = text.find("{\n  \"exitCode\"")?;
+                        serde_json::from_str(&text[start..]).ok()
+                    });
+                let structured = report.as_ref().and_then(|report| {
+                    report
+                        .get("ok")
+                        .and_then(serde_json::Value::as_bool)
+                        .or_else(|| {
+                            report
+                                .get("outcome")
+                                .or_else(|| report.pointer("/report/outcome"))
+                                .and_then(serde_json::Value::as_str)
+                                .map(|word| matches!(word, "ok" | "passed"))
+                        })
+                });
+                if invokes_spec_spine_json(command) && structured.is_none() {
+                    checks.push(Check::missing_report(command, output.code.unwrap_or(-1)));
+                } else {
+                    checks.push(Check::ran(command, output.code.unwrap_or(-1), structured));
+                }
+            }
+            Ok(_) => checks.push(Check::did_not_run(
+                command,
+                "suite deadline or surviving process",
+            )),
+            Err(error) => return boundary_unavailable("suite-launch", error.to_string()),
+        }
+    }
+    let mut suite = SuiteResult::new(checks, None);
+    suite.confinement = Some(admitted.boundary.record().clone());
+    // Generated suite files are not part of the candidate. Re-read only the
+    // private reference from the trusted common directory after execution.
+    let branch = format!("refs/heads/statecraft/{run_id}/work");
+    let after_head = statecraft_run::trusted_git::private_reference(target, &branch).ok();
+    let mut after = candidate.clone();
+    after.head_stable &= after_head.as_deref() == Some(candidate.sha.as_str());
     let judged = Judged {
-        candidate: candidate.clone(),
+        candidate: after,
         base: Base {
-            sha: base_commit.to_string(),
+            sha: base_commit.into(),
         },
         policy,
     };
-
-    // The suite runs before the authority set is judged, because an unrun suite
-    // is `no acceptance` whatever the authority answer is, and running it is how
-    // that becomes known.
-    // Spec 029: the target's resolved judge, the one the contract check
-    // before this already asked. A target with none never reaches here; if
-    // it did, the suite did not run.
-    let Ok(verify) = crate::judge::verify_source(target) else {
-        return (
-            Acceptance::None {
-                reason: NoAcceptance::SuiteDidNotRun { unrun_checks: 0 },
-            },
-            None,
-            absent(),
-        );
-    };
-    let suite = verify.run_suite(workspace, &context.spec_id);
     if !suite.ran() {
         return (
             Acceptance::None {
@@ -263,10 +476,11 @@ pub fn judge(
             },
             Some(suite),
             absent(),
+            None,
         );
     }
 
-    let paths = changed_paths(workspace, base_commit, &candidate.sha);
+    let paths = changed_paths(target, base_commit, &candidate.sha);
     let report = obtain_delta_report(
         target,
         base_commit,
@@ -301,10 +515,100 @@ pub fn judge(
                 },
                 Some(suite),
                 freshness,
+                None,
             )
         }
-        Err(reason) => (Acceptance::Failed { reason }, Some(suite), absent()),
+        Err(reason) => (Acceptance::Failed { reason }, Some(suite), absent(), None),
     }
+}
+
+fn boundary_unavailable(
+    step: &str,
+    detail: impl ToString,
+) -> (
+    Acceptance,
+    Option<SuiteResult>,
+    Recorded<String>,
+    Option<BoundaryDiagnostic>,
+) {
+    (
+        Acceptance::NotAttempted {
+            reason: statecraft_acceptance::judged::NotAttemptedReason::BoundaryUnavailable,
+            refusal_count: None,
+        },
+        None,
+        absent(),
+        Some(BoundaryDiagnostic {
+            platform: std::env::consts::OS.into(),
+            step: step.into(),
+            detail: detail.to_string(),
+        }),
+    )
+}
+
+fn identify_private_candidate(
+    target: &Path,
+    workspace: &statecraft_adapter::boundary::DataRoot,
+    base_tree: &Path,
+    run: &str,
+    verified_head: &str,
+    head_stable: bool,
+) -> Result<Candidate, NoAcceptance> {
+    let identify = |detail: String| NoAcceptance::CandidateUnidentified { detail };
+    let branch = format!("refs/heads/statecraft/{run}/work");
+    let reference = statecraft_run::trusted_git::private_reference(target, &branch)
+        .ok()
+        .ok_or_else(|| identify("private branch has no object identity".into()))?;
+    if reference != verified_head {
+        return Err(identify(
+            "private branch changed after verified import".into(),
+        ));
+    }
+    let sha = verified_head.to_string();
+    let export = crate::coverage::export(target, &sha).map_err(identify)?;
+    let expected = statecraft_adapter::boundary::DataRoot::open(&export.tree())
+        .and_then(|root| root.snapshot())
+        .map_err(|e| identify(e.to_string()))?;
+    let actual = workspace.snapshot().map_err(|e| identify(e.to_string()))?;
+    let mut dirty = Vec::new();
+    for (path, entry) in &expected {
+        if actual.get(path) != Some(entry) {
+            dirty.push(path.display().to_string());
+        }
+    }
+    for path in actual.keys().filter(|path| !expected.contains_key(*path)) {
+        // Ignore rules are interpreted only from the trusted base export.
+        let mut command =
+            statecraft_run::trusted_git::command(target).map_err(|e| identify(e.to_string()))?;
+        let ignored = command
+            .arg("--work-tree")
+            .arg(base_tree)
+            .args([
+                "-c",
+                "core.excludesFile=/dev/null",
+                "check-ignore",
+                "--no-index",
+                "--quiet",
+                "--",
+            ])
+            .arg(path)
+            .current_dir(base_tree)
+            .status()
+            .map_err(|e| identify(e.to_string()))?;
+        if ignored.code() != Some(0) {
+            if ignored.code() != Some(1) {
+                return Err(identify("trusted ignore comparison refused".into()));
+            }
+            dirty.push(path.display().to_string());
+        }
+    }
+    dirty.sort();
+    Ok(Candidate {
+        sha,
+        work_tree_clean: dirty.is_empty(),
+        head_stable,
+        dirty_paths: dirty,
+    })
 }
 
 fn absent() -> Recorded<String> {
@@ -314,6 +618,17 @@ fn absent() -> Recorded<String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn spec_spine_json_is_recognised_by_words_not_substrings() {
+        assert!(invokes_spec_spine_json(".bin/spec-spine verify 004 --json"));
+        assert!(invokes_spec_spine_json("spec-spine gate --json"));
+        assert!(!invokes_spec_spine_json(
+            "tool --json --out /results/spec-spine-report.json"
+        ));
+        assert!(!invokes_spec_spine_json("spec-spine verify 004"));
+        assert!(!invokes_spec_spine_json("cargo test --json-spec-spine"));
+    }
 
     fn git_run(dir: &Path, args: &[&str]) {
         let out = std::process::Command::new("git")
@@ -424,8 +739,14 @@ mod tests {
             spec_id: "000".into(),
         };
         // `head_stable: false` is the observation spec 003 section 3.8 makes.
-        let (acceptance, _, freshness) =
-            judge(target.path(), target.path(), &base, false, &context);
+        let (acceptance, _, freshness) = judge(
+            target.path(),
+            target.path(),
+            target.path(),
+            &base,
+            false,
+            &context,
+        );
         assert!(acceptance.receipt().is_none());
         assert_eq!(freshness, absent());
     }

@@ -343,11 +343,8 @@ fn the_preflight_runs_the_run_path_and_reads_its_startup_evidence_back() {
         v["record"]["launch"]["settingsWritten"]["digest"],
         v["intent"]["payload"]["digest"]
     );
-    // The fake was given exactly the document the intent names.
-    assert_eq!(
-        std::fs::read_to_string(run.acc().join("runbin/received-settings")).unwrap(),
-        v["intent"]["settingsDocument"].as_str().unwrap()
-    );
+    // The attempted side-channel write beside the executable is refused.
+    assert!(!run.acc().join("runbin/received-settings").exists());
     // Spec 002 section 3.37: the four records are in the product home, and
     // nothing of the attempt is in the target.
     let project = run.acc().join("project");
@@ -411,11 +408,17 @@ impl Run {
             &self.acc().join("home"),
             &self.acc().join("project"),
         );
-        let identity = statecraft_home::launch::AttemptIdentity {
-            run_id: statecraft_home::trial::RUN_ID.into(),
-            attempt: 1,
-        };
-        usize::from(identity.launched_path(&places).is_file())
+        // Every attempt that left a launch record, so a second launch counts.
+        (1..=16)
+            .filter(|&attempt| {
+                statecraft_home::launch::AttemptIdentity {
+                    run_id: statecraft_home::trial::RUN_ID.into(),
+                    attempt,
+                }
+                .launched_path(&places)
+                .is_file()
+            })
+            .count()
     }
 }
 

@@ -112,6 +112,7 @@ impl Fixture {
         };
         std::fs::create_dir_all(f.project()).unwrap();
         std::fs::create_dir_all(f.bin()).unwrap();
+        std::fs::write(f.dir.path().join(".claude.json"), b"{}").unwrap();
         f.git(&["init", "--quiet", "--initial-branch=main"]);
         f.git(&["config", "user.email", "fixture@example.invalid"]);
         f.git(&["config", "user.name", "fixture"]);
@@ -196,7 +197,7 @@ esac
     }
 
     fn received(&self, name: &str) -> Vec<u8> {
-        std::fs::read(self.bin().join(name)).unwrap_or_default()
+        std::fs::read(self.workspace().join(".fixture-output").join(name)).unwrap_or_default()
     }
 
     /// What the fake did, in order.
@@ -215,7 +216,7 @@ esac
     }
 
     fn launches(&self) -> usize {
-        std::fs::read_to_string(self.bin().join("launches"))
+        std::fs::read_to_string(self.workspace().join(".fixture-output/launches"))
             .unwrap_or_default()
             .lines()
             .count()
@@ -283,19 +284,21 @@ fn as_linked(script: &str) -> String {
 const FAKE_PROVIDER: &str = r#"#!/bin/sh
 if [ "$1" = --version ]; then echo '2.1.267 (Claude Code)'; exit 0; fi
 here="$(dirname "$0")"
+output="$PWD/.fixture-output"
+/bin/mkdir -p "$output"
 settings=""
 while [ "$#" -gt 0 ]; do
   case "$1" in --settings) settings="$2"; shift ;; esac
   shift
 done
 mode="$(/bin/cat "$here/mode" 2>/dev/null || echo faithful)"
-/bin/cp "$settings" "$here/received-settings"
-echo "$settings" > "$here/received-settings-path"
-/bin/ls -A "$(dirname "$settings")" > "$here/exchange-listing"
-/usr/bin/env > "$here/received-env"
-/bin/cat > "$here/received-prompt"
-echo launched >> "$here/launches"
-log() { echo "$1" >> "$here/order"; }
+/bin/cp "$settings" "$output/received-settings"
+echo "$settings" > "$output/received-settings-path"
+/bin/ls -A "$(dirname "$settings")" > "$output/exchange-listing"
+/usr/bin/env > "$output/received-env"
+/bin/cat > "$output/received-prompt"
+echo launched >> "$output/launches"
+log() { echo "$1" >> "$output/order"; }
 session=11111111-1111-1111-1111-111111111111
 escape() { /usr/bin/awk 'BEGIN { ORS = "" } { gsub(/\\/, "\\\\"); gsub(/"/, "\\\""); gsub(/\t/, "\\t"); if (NR > 1) printf "\\n"; print }'; }
 respond() {
@@ -312,7 +315,7 @@ gate_cmd="$(command_for PreToolUse)"
 tool() {
   rc=0
   if [ -n "$gate_cmd" ] && [ "$mode" != ignores-hooks ]; then
-    printf '{"tool_name":"Bash","tool_input":{"command":"touch %s"}}' "$1" | /bin/sh -c "$gate_cmd" 2>> "$here/gate-stderr"
+    printf '{"tool_name":"Bash","tool_input":{"command":"touch %s"}}' "$1" | /bin/sh -c "$gate_cmd" 2>> "$output/gate-stderr"
     rc=$?
   fi
   log "gate $1 exit=$rc"
@@ -330,15 +333,22 @@ if [ -f "$here/block-record" ]; then
   /bin/mkdir -p "$(/bin/cat "$here/block-record")"
 fi
 # A child writing the decision before the supervisor does (spec 002 section
-# 3.37 rule 2), which the confinement of spec 004 section 3.18 will refuse and
-# this build does not yet: the gate's copy is beside the settings file.
+# 3.37 rule 2), refused by spec 004 section 3.18: the gate's copy is beside
+# the settings file.
 if [ "$mode" = plant-decision ]; then
-  printf '{"decision":"admitted"}\n' > "$(dirname "$settings")/admission.json"
-  log "planted"
+  if printf '{"decision":"admitted"}\n' > "$(dirname "$settings")/admission.json"; then
+    log planted
+  else
+    log plant-refused
+  fi
 fi
 if [ "$mode" = ignores-hooks ]; then
   : > "$PWD/sentinel-before-decision"
   log "effect sentinel-before-decision"
+fi
+if [ -f "$here/hostile" ]; then
+  /bin/sh "$here/hostile" "$settings" > "$output/hostile-report" 2> "$output/hostile-errors"
+  log "hostile exit=$?"
 fi
 if [ "$mode" = early-tool ]; then
   tool sentinel-early &
@@ -371,10 +381,224 @@ fn position(order: &[String], line: &str) -> usize {
         .unwrap_or_else(|| panic!("{line:?} is not in {order:?}"))
 }
 
-/// The whole route: initialization, the explicit requirement, a run whose
-/// startup hook and gate the run supplied itself, and the judgement read back,
-/// with every identity an operator asks about compared with what the provider
-/// was actually given.
+#[test]
+fn a_hostile_provider_cannot_change_authority_or_redirect_supervisor_git() {
+    let f = Fixture::new();
+    let home = f.home().join("protected-fixture");
+    let records = f.places().records.join("protected-fixture");
+    let protected_chain =
+        statecraft_run::record::chain_path(&f.home(), &f.project().join("another-project"));
+    let protected_override =
+        statecraft_run::overrides::journal_path(&f.home(), &f.project().join("another-project"));
+    let protected_authority =
+        statecraft_run::overrides::authority_path(&f.home(), &f.project().join("another-project"));
+    let active_chain = statecraft_run::record::chain_path(&f.home(), &f.project());
+    let target = f.project().join("protected-fixture");
+    let other = f
+        .project()
+        .join(".statecraft/state/workspaces/other/protected-fixture");
+    for path in [
+        &home,
+        &records,
+        &protected_chain,
+        &protected_override,
+        &protected_authority,
+        &target,
+        &other,
+    ] {
+        std::fs::create_dir_all(path.parent().unwrap()).unwrap();
+        std::fs::write(path, b"authority").unwrap();
+    }
+    // The checkout sentinel is committed so its presence is ordinary input.
+    f.git(&["add", "protected-fixture"]);
+    f.git(&["commit", "--quiet", "-m", "protected input"]);
+    let quote = |path: &Path| format!("'{}'", path.display().to_string().replace('\'', "'\\''"));
+    let script = format!(
+        r#"#!/bin/sh
+home={home}
+records={records}
+target={target}
+other={other}
+chain={chain}
+override={override_journal}
+authority={authority}
+active_chain={active_chain}
+deny_mutations() {{
+  path="$1"
+  (printf changed > "$path") && exit 31
+  (printf changed >> "$path") && exit 32
+  rm "$path" && exit 33
+  mv "$path" "$PWD/stolen" && exit 34
+  chmod 777 "$path" && exit 35
+  ln "$path" "$PWD/hard-alias" && exit 36
+}}
+for path in "$home" "$records" "$chain" "$override" "$authority" "$active_chain"; do
+  cat "$path" && exit 30
+  deny_mutations "$path"
+  relative="$(/usr/bin/perl -MFile::Spec -e 'print File::Spec->abs2rel($ARGV[0], $ARGV[1])' "$path" "$PWD")"
+  cat "$relative" && exit 52
+  deny_mutations "$relative"
+  variant="$(printf '%s' "$path" | tr '[:lower:]' '[:upper:]')"
+  if [ "$(uname -s)" = Darwin ]; then
+    cat "$variant" && exit 53
+    deny_mutations "$variant"
+  fi
+  ln -s "$path" "$PWD/alias"
+  cat "$PWD/alias" && exit 37
+  (printf changed > "$PWD/alias") && exit 49
+  chmod 777 "$PWD/alias" && exit 50
+  rm "$PWD/alias"
+done
+for path in "$target" "$other"; do
+  [ "$(cat "$path")" = authority ] || exit 38
+  deny_mutations "$path"
+  ln -s "$path" "$PWD/alias"
+  [ "$(cat "$PWD/alias")" = authority ] || exit 39
+  (printf changed > "$PWD/alias") && exit 49
+  chmod 777 "$PWD/alias" && exit 50
+  rm "$PWD/alias"
+  relative="$(/usr/bin/perl -MFile::Spec -e 'print File::Spec->abs2rel($ARGV[0], $ARGV[1])' "$path" "$PWD")"
+  [ "$(cat "$relative")" = authority ] || exit 56
+  deny_mutations "$relative"
+  if [ "$(uname -s)" = Darwin ]; then
+    variant="$(printf '%s' "$path" | tr '[:lower:]' '[:upper:]')"
+    [ "$(cat "$variant")" = authority ] || exit 57
+    deny_mutations "$variant"
+  fi
+done
+if [ "$(uname -s)" = Darwin ]; then
+  cat {home_firmlink} && exit 58
+  deny_mutations {home_firmlink}
+  [ "$(cat {target_firmlink})" = authority ] || exit 59
+  deny_mutations {target_firmlink}
+fi
+mv "$(dirname "$home")" "$PWD/stolen-home" && exit 54
+mv "$(dirname "$target")" "$PWD/stolen-target" && exit 55
+# A descendant that leaves the original session retains the same restrictions.
+/usr/bin/perl -MPOSIX=setsid -MFcntl=O_WRONLY -e 'setsid() >= 0 or exit 1; open(my $read, "<", $ARGV[0]) and exit 2; sysopen(my $write, $ARGV[1], O_WRONLY) and exit 3; exit 0' "$home" "$target" || exit 51
+gate="$(dirname "$1")/gate.log"
+printf hostile-trace >> "$gate" || exit 40
+chmod 777 "$gate" && exit 41
+rm "$gate" && exit 42
+printf forged > "$(dirname "$1")/admission.json" && exit 43
+printf own > "$PWD/provider-commit"
+git -c core.hooksPath=/dev/null add provider-commit || exit 44
+git -c user.name=fixture -c user.email=fixture@example.invalid -c core.hooksPath=/dev/null commit -qm provider || exit 45
+git update-ref refs/heads/statecraft/replay/extra HEAD || exit 46
+# These paths are writable data. No later supervisor invocation follows them.
+printf '%s\n' 'gitdir: /untrusted' > "$PWD/.git" || exit 47
+printf '%s\n' /untrusted > "$GIT_DIR/commondir" || exit 48
+printf '%s\n' passed
+"#,
+        home = quote(&home),
+        records = quote(&records),
+        target = quote(&target),
+        other = quote(&other),
+        chain = quote(&protected_chain),
+        override_journal = quote(&protected_override),
+        authority = quote(&protected_authority),
+        active_chain = quote(&active_chain),
+        home_firmlink = quote(
+            &Path::new("/System/Volumes/Data")
+                .join(home.canonicalize().unwrap().strip_prefix("/").unwrap(),)
+        ),
+        target_firmlink = quote(
+            &Path::new("/System/Volumes/Data")
+                .join(target.canonicalize().unwrap().strip_prefix("/").unwrap(),)
+        ),
+    );
+    executable(&f.bin().join("hostile"), &script);
+    let out = f.run();
+    let chain_path = statecraft_run::record::chain_path(&f.home(), &f.project());
+    assert_eq!(
+        code(&out),
+        0,
+        "{}\nchain: {}",
+        text(&out),
+        std::fs::read_to_string(chain_path).unwrap()
+    );
+    assert!(
+        f.order().contains(&"hostile exit=0".into()),
+        "{:?}: {}",
+        f.order(),
+        String::from_utf8_lossy(&f.received("hostile-errors"))
+    );
+    assert_eq!(f.received("hostile-report"), b"passed\n");
+    for path in [
+        &home,
+        &records,
+        &protected_chain,
+        &protected_override,
+        &protected_authority,
+        &target,
+        &other,
+    ] {
+        assert_eq!(std::fs::read(path).unwrap(), b"authority");
+    }
+    let head = statecraft_run::trusted_git::output(
+        &f.project(),
+        &["show", "refs/heads/statecraft/replay/work:provider-commit"],
+    )
+    .unwrap();
+    assert_eq!(head.stdout, b"own");
+    let references = statecraft_run::trusted_git::output(
+        &f.project(),
+        &[
+            "for-each-ref",
+            "--format=%(refname)",
+            "refs/heads/statecraft/replay/",
+        ],
+    )
+    .unwrap();
+    assert_eq!(
+        String::from_utf8(references.stdout).unwrap().trim(),
+        "refs/heads/statecraft/replay/work"
+    );
+    assert_eq!(
+        json_naming::payload(&json(&out))["posture"]["value"]["confinement"]["platform"],
+        std::env::consts::OS
+    );
+}
+
+/// Object import failure still concludes with durable reference cleanup evidence.
+#[test]
+fn failed_object_import_still_records_removed_private_references() {
+    let f = Fixture::new();
+    executable(
+        &f.bin().join("hostile"),
+        r#"#!/bin/sh
+printf own > "$PWD/provider-commit"
+git -c core.hooksPath=/dev/null add provider-commit || exit 44
+git -c user.name=fixture -c user.email=fixture@example.invalid -c core.hooksPath=/dev/null commit -qm provider || exit 45
+git update-ref refs/heads/statecraft/replay/extra HEAD || exit 46
+# Remove the private objects, so the confined producer cannot export this head.
+rm -rf "$GIT_OBJECT_DIRECTORY"/* || exit 47
+printf passed
+"#,
+    );
+    let out = f.run();
+    assert_eq!(code(&out), 1, "{}", text(&out));
+    assert!(
+        f.order().contains(&"hostile exit=0".into()),
+        "{:?}",
+        f.order()
+    );
+    let chain = String::from_utf8(chain_bytes(&f)).unwrap();
+    assert!(chain.contains("object-transfer"), "{chain}");
+    assert!(chain.contains("privateReferenceCleanup"), "{chain}");
+    assert!(
+        chain.contains("refs/heads/statecraft/replay/extra"),
+        "{chain}"
+    );
+    assert!(
+        !f.project()
+            .join(".git/refs/heads/statecraft/replay/extra")
+            .exists()
+    );
+    assert!(f.exchange_dir(1).join("objects").is_dir());
+}
+
+/// Managed startup keeps each supplied identity bound to its launch evidence.
 #[test]
 fn a_managed_run_supplies_its_startup_hook_and_gate_and_releases_work_on_admission() {
     let f = Fixture::new();
@@ -421,10 +645,12 @@ fn a_managed_run_supplies_its_startup_hook_and_gate_and_releases_work_on_admissi
     let listing = String::from_utf8(f.received("exchange-listing")).unwrap();
     let mut listing: Vec<&str> = listing.lines().collect();
     listing.sort_unstable();
-    assert_eq!(listing.len(), 3, "{listing:?}");
+    assert_eq!(listing.len(), 5, "{listing:?}");
     assert_eq!(&listing[..2], ["admission-gate", "gate.log"]);
+    assert_eq!(listing[2], "objects");
+    assert!(listing[4].starts_with("temporary-"));
     assert!(
-        listing[2].starts_with("statecraft-settings-"),
+        listing[3].starts_with("statecraft-settings-"),
         "{listing:?}"
     );
     // After the run: the decision's copy the gate read, identical to the
@@ -591,7 +817,7 @@ fn a_mismatched_revision_is_refused_before_its_tool_calls_run() {
     executable(&substitute, &format!("{hook}# an older revision\n"));
     f.substitute_start_hook(&substitute);
     f.mode("early-tool");
-    let _ = std::fs::remove_file(f.bin().join("order"));
+    let _ = std::fs::remove_file(f.workspace().join(".fixture-output/order"));
     let _ = std::fs::remove_file(f.workspace().join("sentinel-after"));
 
     let out = f.run();
@@ -891,9 +1117,10 @@ fn an_intent_that_cannot_be_written_refuses_the_attempt_and_launches_nothing() {
     std::fs::write(&records, "not a directory").unwrap();
 
     let out = f.run();
-    assert_eq!(code(&out), 1, "{}", text(&out));
+    assert_eq!(code(&out), 2, "{}", text(&out));
     let answer = json(&out);
     assert_eq!(json_naming::payload(&answer)["outcome"], "refused");
+    assert_eq!(json_naming::payload(&answer)["reason"], "startup-record");
     assert_eq!(json_naming::payload(&answer)["startup"]["launched"], false);
     assert!(
         json_naming::payload(&answer)["startup"]["error"]
@@ -910,16 +1137,23 @@ fn an_intent_that_cannot_be_written_refuses_the_attempt_and_launches_nothing() {
 #[test]
 fn a_record_that_cannot_be_stored_fails_the_run_and_reads_back_as_unreadable() {
     let f = Fixture::new();
-    // Something at the path the record belongs at, placed while the session
-    // runs. A stand-in for any failure of the record's write; not a claim
-    // that a child can reach the launch records.
-    std::fs::write(
-        f.bin().join("block-record"),
-        f.attempt_dir(1).join("record.json").display().to_string(),
-    )
-    .unwrap();
-
-    let out = f.run();
+    // Inject the storage failure from the trusted test parent. A confined
+    // provider cannot mutate launch records to simulate a disk failure.
+    f.mode("block");
+    let out = std::thread::scope(|scope| {
+        let child = scope.spawn(|| f.run());
+        let deadline = std::time::Instant::now() + std::time::Duration::from_secs(15);
+        while !f.order().iter().any(|line| line == "blocked") {
+            assert!(
+                std::time::Instant::now() < deadline,
+                "provider did not block"
+            );
+            std::thread::sleep(std::time::Duration::from_millis(10));
+        }
+        std::fs::create_dir(f.attempt_dir(1).join("record.json")).unwrap();
+        std::fs::write(f.bin().join("release"), "").unwrap();
+        child.join().unwrap()
+    });
     assert_eq!(code(&out), 4, "{}", text(&out));
     let answer = json(&out);
     assert_eq!(json_naming::payload(&answer)["startup"]["launched"], true);
@@ -1544,59 +1778,28 @@ fn a_gate_log_that_is_a_link_is_not_followed_and_writes_nothing() {
     assert_eq!(chain_bytes(&f), before);
 }
 
-/// Rule 2: a child that writes the decision into its exchange directory
-/// before the supervisor does has not made the decision. The launch records
-/// hold the supervisor's; its copy is refused rather than adopted or silently
-/// put over the plant; and the attempt is refused with the failure named.
+/// Rule 2 and spec 004 section 3.18: the child's attempted decision mutation
+/// is refused, and only the supervisor's admitted decision reaches the gate.
 #[test]
 fn a_decision_the_child_planted_before_the_supervisors_is_not_the_decision() {
     let f = Fixture::new();
     f.mode("plant-decision");
     let out = f.run();
-    assert_eq!(code(&out), 1, "{}", text(&out));
-    let answer = json(&out);
-    assert_eq!(
-        json_naming::payload(&answer)["outcome"],
-        "refused",
-        "{answer}"
+    assert_eq!(code(&out), 0, "{}", text(&out));
+    assert!(
+        f.order().iter().any(|l| l == "plant-refused"),
+        "{:?}",
+        f.order()
     );
-    assert!(f.order().iter().any(|l| l == "planted"), "{:?}", f.order());
-    // The plant is gone, and the records say what the supervisor decided.
-    assert!(!f.exchange_dir(1).join("admission.json").exists());
+    assert!(!f.order().iter().any(|l| l == "planted"));
+    assert_eq!(
+        std::fs::read(f.exchange_dir(1).join("admission.json")).unwrap(),
+        std::fs::read(f.attempt_dir(1).join("admission.json")).unwrap()
+    );
     let v = value(&f.show(None));
-    // Unconfined, the gate trusts any decision file in its directory, so a
-    // tool call the child makes before the supervisor removes the plant can
-    // run (measured on CI's Linux runner, 2026-09-23; spec 004 section 3.18's
-    // confinement is what closes it). The gate log is child-attested (spec
-    // 002 section 3.37 rule 3): this fixture's child does not touch it, so a
-    // call that ran shows up as an admission in the copy. A child that
-    // rewrites the log or the gate script could leave no entry, so an absent
-    // entry proves nothing (spec 002 section 5, 2026-09-23 correction).
-    if f.workspace().join("sentinel-after").exists() {
-        assert!(
-            v["gate"]
-                .as_array()
-                .is_some_and(|g| g.iter().any(|l| l == "admitted")),
-            "a released call left no admission in the gate log: {v}"
-        );
-    }
-    assert_eq!(v["verdict"], "not-admitted", "{v}");
-    assert_eq!(
-        v["admission"]["intentDigest"].as_str().map(str::len),
-        Some(64)
-    );
-    let error = v["record"]["launch"]["admissionError"].as_str().unwrap();
-    assert!(error.contains("did not write"), "{error}");
-    assert!(error.contains("gate withholds"), "{error}");
-    assert!(v["reasons"].to_string().contains("did not write"), "{v}");
-    let (chain, _) =
-        statecraft_run::record::Chain::open(&f.home(), &f.project()).expect("the record");
-    let outcome = chain
-        .entries()
-        .into_iter()
-        .find(|e| e.kind == statecraft_run::record::Kind::Outcome && e.attempt == 1)
-        .expect("attempt 1's outcome");
-    assert_eq!(outcome.detail["refusals"], 1, "{}", outcome.detail);
+    assert_eq!(v["verdict"], "unverified", "{v}");
+    assert!(f.workspace().join("sentinel-after").is_file());
+    assert!(v["record"]["launch"]["admissionError"].is_null());
 }
 
 /// Move an attempt's records, byte for byte, from the product home to where
@@ -1613,6 +1816,9 @@ fn move_to_legacy(f: &Fixture, n: u32) {
                 .to_string_lossy()
                 .starts_with("statecraft-settings-")
             {
+                continue;
+            }
+            if entry.file_type().unwrap().is_dir() {
                 continue;
             }
             let to = legacy.join(entry.file_name());
