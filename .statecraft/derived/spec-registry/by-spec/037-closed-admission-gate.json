@@ -1,0 +1,77 @@
+{
+  "record": {
+    "amends": [
+      "005-acceptance-and-evidence"
+    ],
+    "created": "2026-10-07",
+    "dependsOn": [
+      "005-acceptance-and-evidence"
+    ],
+    "extends": [
+      {
+        "nature": "additive",
+        "spec": "005-acceptance-and-evidence",
+        "unit": {
+          "kind": "directory",
+          "path": "crates/statecraft-envelope/"
+        }
+      }
+    ],
+    "id": "037-closed-admission-gate",
+    "implementation": "in-progress",
+    "obligations": [
+      {
+        "anchor": "3-1-the-gate",
+        "id": "R-1",
+        "kind": "requirement",
+        "text": "admission::evaluate builds one closed action-gate gate per evaluation, every check required, registered in the order the refusals are reported, and refuses with every deny in that order."
+      },
+      {
+        "anchor": "3-3-what-does-not-change",
+        "id": "R-2",
+        "kind": "requirement",
+        "text": "For every policy and input, the Admission value, its serialized bytes and the policy-eval claim equal those of the evaluator at 8ba0a8e."
+      },
+      {
+        "anchor": "3-4-the-dependency",
+        "id": "R-3",
+        "kind": "requirement",
+        "text": "The envelope depends on action-gate-core exactly 0.3.0 with no default features, and its dependency closure stays pure and Apache-2.0 compatible."
+      }
+    ],
+    "sectionDigests": {
+      "037-closed-admission-gate": "668d8b9cd8ff02b98dd974832b2ceef475e5b0448dd8e12d62b9c16a23b582e8",
+      "1-purpose": "5099b66c9d65ef7a028fbda8e4a9093356a1b9db4d4c49e43250e860c61b0e35",
+      "2-territory": "7841aafc88b94b5f305ef378a780dd4c2edb3ede1a2743775f7f25cd850250ba",
+      "3-1-the-gate": "5a695dd7a2d30a673a254b5edf697d99fa7fe2dd3840d450ff3bc535a84ca54b",
+      "3-2-from-a-deny-to-a-refusal": "fb5ae27583c4b69c16161e0ab753d29f4c93e9bca908276d1493cbab0ac7a1b9",
+      "3-3-what-does-not-change": "ff68f9526db0a07504d07dbd3a1749663829b563fc300497215677546e1c2c37",
+      "3-4-the-dependency": "2e9f493108f6f9118ec401e88ba638a1bcd4a962797a91314e6d2c6fe414e890",
+      "3-5-the-platform": "aac6408ec3e27ec6b7033c438a718e7eebec4e67b7ce37ad8bc1d8e2c9d6c68a",
+      "3-behavior": "efaf784755c49daf7f741240970f040bb2b4dd7ba867995ace879b1ba88dfe46",
+      "4-out-of-scope": "aa554e9c716738e71f324c6f3a18b6d4a384f5e589f8ae625007a965a05a025d",
+      "5-resolved-decisions": "78d3af1dd0712000869711feda52067e5cf00082f5942d740972fdec63e4ab18",
+      "verification": "3b1301a2ecd3453fc6991a1bc3d87ab3cd9aead8a724720570c69eacb19f3955"
+    },
+    "sectionHeadings": [
+      "037: Closed admission gate",
+      "1. Purpose",
+      "2. Territory",
+      "3. Behavior",
+      "3.1 The gate",
+      "3.2 From a deny to a refusal",
+      "3.3 What does not change",
+      "3.4 The dependency",
+      "3.5 The platform",
+      "4. Out of scope",
+      "5. Resolved decisions",
+      "Verification"
+    ],
+    "specPath": "specs/037-closed-admission-gate/spec.md",
+    "status": "draft",
+    "summary": "Amends 005 for how the envelope's admission::evaluate combines its requirements. It builds one closed action-gate gate per evaluation (action-gate-core 0.3.0, action-gate spec 004), with one required check per requirement registered in today's reason order, and maps every deny back to its RefusalCode. Decisions, refusal codes, their order, the serialized Admission and the policy-eval claim are unchanged, which a differential test against the frozen pre-change evaluator proves. The envelope stays pure and Apache-2.0; the policy digest stays the policy's identity.\n",
+    "title": "Envelope admission evaluates through action-gate's closed mode, with identical decisions and bytes"
+  },
+  "shardHash": "37fe4fb20cc91f124acaf9a78176d128bd1b8e748d14a970be2809e77dac839c",
+  "specVersion": "1.9.0"
+}
