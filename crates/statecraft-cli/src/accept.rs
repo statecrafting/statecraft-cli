@@ -305,8 +305,8 @@ pub fn judge_with_diagnostic(
         return boundary_unavailable("cache-root", "admission supplied no TMPDIR");
     };
     let cache = Path::new(scratch).join("suite-cache");
-    if std::fs::create_dir(&cache).is_err() {
-        return boundary_unavailable("cache-root", "preparation refused");
+    if let Err(error) = std::fs::create_dir(&cache) {
+        return boundary_unavailable("cache-root", format!("{}: {error}", cache.display()));
     }
     for name in [
         "HOME",
@@ -321,8 +321,11 @@ pub fn judge_with_diagnostic(
         "NUGET_PACKAGES",
     ] {
         let directory = cache.join(name);
-        if std::fs::create_dir(&directory).is_err() {
-            return boundary_unavailable("cache-directory", "preparation refused");
+        if let Err(error) = std::fs::create_dir(&directory) {
+            return boundary_unavailable(
+                "cache-directory",
+                format!("{}: {error}", directory.display()),
+            );
         }
         variables.insert(name.into(), directory.display().to_string());
     }
@@ -577,7 +580,9 @@ fn identify_private_candidate(
         }
     }
     for path in actual.keys().filter(|path| !expected.contains_key(*path)) {
-        // Ignore rules are interpreted only from the trusted base export.
+        // Ignore rules are interpreted only from the trusted base export. The
+        // later `--work-tree` replaces the target's, so `path` resolves against
+        // `base_tree`, and a path absent from it answers 1, not an error.
         let mut command =
             statecraft_run::trusted_git::command(target).map_err(|e| identify(e.to_string()))?;
         let ignored = command

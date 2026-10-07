@@ -1796,6 +1796,9 @@ fn a_decision_the_child_planted_before_the_supervisors_is_not_the_decision() {
         std::fs::read(f.exchange_dir(1).join("admission.json")).unwrap(),
         std::fs::read(f.attempt_dir(1).join("admission.json")).unwrap()
     );
+    // The OS denies the write inside the child, so the supervisor observes no
+    // event to record: the refusal is proven by the child's own report and the
+    // unchanged admission bytes above, and the verdict judges the run alone.
     let v = value(&f.show(None));
     assert_eq!(v["verdict"], "unverified", "{v}");
     assert!(f.workspace().join("sentinel-after").is_file());
