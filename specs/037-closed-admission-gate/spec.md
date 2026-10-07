@@ -121,12 +121,15 @@ recorded.
 
 `action-gate-core = { version = "=0.3.0", default-features = false }`: exact,
 because a decision rule is adopted by review, and without `checks-common`, so
-no `regex`. It adds three crates to the envelope's normal dependency closure,
+no `regex`. Three crates enter the envelope's own normal dependency closure:
 `action-gate-core` 0.3.0, `action-gate-types` 0.1.0 and
-`canonical-keysort-json` 0.1.0, each Apache-2.0, each `unsafe_code = "forbid"`,
-none with a build script, and none reading a clock, the environment, the file
-system or the network. Its other dependencies (`serde`, `serde_json`, `hex`,
-`sha2` 0.10) were already in the closure. The crate's literal Apache-2.0
+`canonical-keysort-json` 0.1.0. Only the first two are new to this workspace's
+`Cargo.lock`; `canonical-keysort-json` 0.1.0 was already locked here, through
+`statecraft-run`'s `attest-ledger-core`. Each of the three is Apache-2.0 and
+`unsafe_code = "forbid"`, none has a build script, and none reads a clock, the
+environment, the file system or the network. The core's other dependencies
+(`serde`, `serde_json`, `hex`, `sha2` 0.10) were already in the envelope's
+closure. The crate's literal Apache-2.0
 licence (005 section 3.15) is unaffected.
 
 ### 3.5 The platform
