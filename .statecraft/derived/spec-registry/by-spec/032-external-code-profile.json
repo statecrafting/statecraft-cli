@@ -35,7 +35,7 @@
       }
     ],
     "id": "032-external-code-profile",
-    "implementation": "in-progress",
+    "implementation": "complete",
     "obligations": [
       {
         "anchor": "3-2-required-code",
@@ -106,6 +106,6 @@
     "summary": "Profile revision 14 keeps Rust as its default and admits an explicitly selected external code surface. A contained executable local script and a tracked reusable workflow remain required. Rust prerequisites apply only to the Rust selection. Governance, coupling, AI review, protected owner exceptions and the single required aggregate retain their existing rules.\n",
     "title": "Required project-owned code checks under managed governance"
   },
-  "shardHash": "d3385c2f81047c7b18d62b2e5f6adc83c17f4526136404e4092550d17698471a",
+  "shardHash": "5fa1e3deec945394d7bc2b354b368c55d9ef258e5471107dc47e241505d07dca",
   "specVersion": "1.9.0"
 }
