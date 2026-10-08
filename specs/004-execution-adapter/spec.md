@@ -994,6 +994,16 @@ cache root or one of its directories cannot be created, the boundary refusal's
 detail carries the path and the operating system error, so an operator can tell
 a permission failure from a leftover directory without rerunning.
 
+**2026-10-08: a record is published by a no-replace rename.** Section 3.18's
+alias scan refuses a protected file with more than one link. A launch record
+was created by hard-linking a private temporary file to its final name, so for
+the moment before the temporary name was removed both names had two links, and
+a boundary admitted then refused the shared home. One run's record write could
+refuse another run's launch. The record is now renamed into place with the
+platform's no-replace flag, which keeps the write exclusive and whole and never
+gives the file a second name. A filesystem that refuses the flag keeps the
+hard link. The scan itself is unchanged.
+
 ## Verification
 
 Each line is one command. §3.5's suite is eight tests named `suite_1` to

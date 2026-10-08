@@ -57,6 +57,11 @@ statecraft-run = { path = "../statecraft-run" }
 # by platform and architecture, and the standard library does not name them.
 libc = "0.2.189"
 
+# `write_once` publishes a record by a no-replace rename, which the standard
+# library does not name. The same crate and version `statecraft-environment`
+# takes its manifest lock with, so the lock gains no package.
+rustix = { version = "1.1.5", features = ["fs"] }
+
 # The governance producer (spec 002 section 3.15), as an exact, reproducible
 # crates.io dependency rather than a path to a sibling checkout. Its version and
 # features are stated once, in the root Cargo.toml's [workspace.dependencies]
