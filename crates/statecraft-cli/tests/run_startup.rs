@@ -2046,7 +2046,11 @@ fn run_captured_until_blocked(f: &Fixture, mode: &str) -> std::process::Child {
 /// as a session reaching the home would: the record still verifies.
 fn forge_an_entry(f: &Fixture) {
     let (mut chain, _) = statecraft_run::record::Chain::open(&f.home(), &f.project()).unwrap();
-    let mut entry = chain.entries()[0].clone();
+    let mut entry = chain
+        .entries()
+        .first()
+        .cloned()
+        .expect("the attempt's intent is already recorded");
     entry.run_id = "forged-by-the-session".to_string();
     chain
         .append("forged", "2026-10-08T00:00:00Z", &entry)
@@ -2068,6 +2072,7 @@ fn a_change_to_the_record_while_the_process_ran_is_audited_and_the_attempt_stays
     let v = json_naming::payload(&json(&out)).clone();
     assert_eq!(v["recorded"], true, "{v}");
     assert_eq!(v["attemptLive"], true, "{v}");
+    assert!(!v["next"].as_str().unwrap().contains("  "), "{v}");
     let changes = v["finding"]["changes"].as_array().unwrap();
     assert!(
         changes

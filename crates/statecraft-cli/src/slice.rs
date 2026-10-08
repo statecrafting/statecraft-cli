@@ -437,7 +437,9 @@ pub fn record_changed_answer(
     recorded: Result<(), String>,
 ) -> Answer<RecordChangedView> {
     let next = format!(
-        "the record was changed by something this product did not run; if it still verifies,          `run reconcile {root} {} {} ...` decides the attempt, and if it does not, restore it          from outside this product",
+        "the record was changed by something this product did not run; if it still verifies, \
+         `run reconcile {root} {} {} ...` decides the attempt, and if it does not, restore it \
+         from outside this product",
         finding.run_id, finding.attempt
     );
     let mut summary = format!("{}\n", finding.describe());
