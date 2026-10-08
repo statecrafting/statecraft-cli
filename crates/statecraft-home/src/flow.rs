@@ -779,6 +779,97 @@ pub fn apply(ctx: &Context<'_>) -> Report {
     run(ctx, Mode::Apply)
 }
 
+/// What the current selection would render, path by path (spec 026 section
+/// 3.1, fact 3), computed by the same preflight `init plan` runs, which writes
+/// nothing. The governance producer's paths and the setup profile's are
+/// named here; the adapters' are named by the caller from the declarations
+/// `env plan` reads. A path initialization adopts, or depends on without
+/// rewriting, is `read-only`; a path the operator released is not rendered;
+/// a profile path the profile leaves alone is not rendered.
+pub fn rendering(ctx: &Context<'_>) -> statecraft_environment::ownership::RenderingFact {
+    use statecraft_environment::ownership::{Rendered, Rendering, RenderingFact};
+    use statecraft_environment::plan::Withholding;
+    let now = rfc3339_utc(ctx.clock.now_unix());
+    let mut scratch = Report {
+        mode: Mode::Plan,
+        root: ctx.root.display().to_string(),
+        steps: Vec::new(),
+        writes: Vec::new(),
+        withheld: Vec::new(),
+        adopted: Vec::new(),
+        kept: Vec::new(),
+        mutations: Vec::new(),
+        conformance: None,
+        bridge: None,
+        delivery: Vec::new(),
+        qualification: None,
+        observed_spec_spine: ObservedExecutable::of(ctx.corpus),
+        judge: None,
+        setup: None,
+        spine_pin: None,
+        outcome: Outcome::Partial,
+    };
+    let prepared = match preflight_judging_journal(ctx, &now, &mut scratch, false) {
+        Ok(prepared) => prepared,
+        Err(step) => {
+            let reason = match &step.state {
+                StepState::Refused { reason }
+                | StepState::Failed { reason }
+                | StepState::Withheld { reason } => reason.clone(),
+                StepState::Done => String::new(),
+            };
+            return RenderingFact::Unavailable(format!(
+                "{} {}: {}: {reason}",
+                step.step.word(),
+                step.state.word(),
+                step.detail
+            ));
+        }
+    };
+    let mut out = Rendering::new();
+    let governance = format!(
+        "governance producer {}",
+        prepared.starter.conformance.producer.describe()
+    );
+    let released = |path: &str| {
+        prepared
+            .preserved_user
+            .iter()
+            .chain(&prepared.recovered)
+            .any(|p| p == path)
+    };
+    for write in &prepared.computed.writes {
+        if !released(&write.path) {
+            out.name(&write.path, Rendered::Managed, &governance);
+        }
+    }
+    for kept in &prepared.computed.kept {
+        out.name(&kept.path, Rendered::Managed, &governance);
+    }
+    for held in &prepared.computed.withheld {
+        if released(&held.path) {
+            continue;
+        }
+        let class = match held.reason {
+            Withholding::Adopted => Rendered::ReadOnly,
+            _ => Rendered::Managed,
+        };
+        out.name(&held.path, class, &governance);
+    }
+    for path in &prepared.adopted {
+        out.name(path, Rendered::ReadOnly, &governance);
+    }
+    if let Some(plan) = &prepared.setup {
+        let source = format!("setup profile {} revision {}", plan.profile, plan.revision);
+        for f in &plan.files {
+            if !matches!(f.action, crate::setup::Action::LeftAlone { .. }) {
+                out.name(&f.path, Rendered::Managed, &source);
+            }
+        }
+    }
+    RenderingFact::Computed(out)
+}
+
 /// Observes changes on disk around each write.
 ///
 /// Spec 002 section 5, 2026-09-24, rule 1: a mutation is read from disk before
@@ -999,6 +1090,18 @@ struct IgnorePlan {
 /// The preflight: every read and computation `init apply` depends on, and
 /// every precondition it can refuse on. Writes nothing.
 fn preflight(ctx: &Context<'_>, now: &str, report: &mut Report) -> Result<Prepared, StepReport> {
+    preflight_judging_journal(ctx, now, report, true)
+}
+
+/// The preflight. `journal_refuses` is false only for spec 026's rendering,
+/// which reports a journal disagreement as its own finding and still needs
+/// what the selection would render.
+fn preflight_judging_journal(
+    ctx: &Context<'_>,
+    now: &str,
+    report: &mut Report,
+    journal_refuses: bool,
+) -> Result<Prepared, StepReport> {
     let failed = |step: Step, reason: String, detail: &str| {
         StepReport::new(step, StepState::Failed { reason }, detail)
     };
@@ -1150,18 +1253,20 @@ fn preflight(ctx: &Context<'_>, now: &str, report: &mut Report) -> Result<Prepar
             "{bootstrap}: not scaffolded, {existing} already holds the ordinal 000 and a second 000 spec would collide"
         ));
     }
-    let reconciled = step_reconcile(ctx, &managed, &mut manifest, now).map_err(|e| match e {
-        ReconcileStop::Read(e) => failed(
-            Step::Reconcile,
-            e.to_string(),
-            "the project could not be read",
-        ),
-        ReconcileStop::Journal(reason) => StepReport::new(
-            Step::Reconcile,
-            StepState::Refused { reason },
-            "the transfer journal disagrees with the declaration",
-        ),
-    })?;
+    let reconciled = step_reconcile(ctx, &managed, &mut manifest, now, journal_refuses).map_err(
+        |e| match e {
+            ReconcileStop::Read(e) => failed(
+                Step::Reconcile,
+                e.to_string(),
+                "the project could not be read",
+            ),
+            ReconcileStop::Journal(reason) => StepReport::new(
+                Step::Reconcile,
+                StepState::Refused { reason },
+                "the transfer journal disagrees with the declaration",
+            ),
+        },
+    )?;
 
     // 4. governance. Which paths are written and which are withheld is spec
     //    002's plan, asked rather than restated here.
@@ -2210,6 +2315,7 @@ fn step_reconcile(
     managed: &[(String, String)],
     manifest: &mut Manifest,
     now: &str,
+    journal_refuses: bool,
 ) -> Result<Reconciled, ReconcileStop> {
     let mut out = Reconciled::default();
     for (path, _) in managed {
@@ -2259,7 +2365,7 @@ fn step_reconcile(
         out.adopted.push(path.clone());
     }
     let disagreements = statecraft_environment::transfer::disagreements(manifest);
-    if !disagreements.is_empty() {
+    if journal_refuses && !disagreements.is_empty() {
         return Err(ReconcileStop::Journal(disagreements.join("; ")));
     }
     Ok(out)

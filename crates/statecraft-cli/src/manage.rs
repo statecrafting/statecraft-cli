@@ -84,6 +84,29 @@ pub fn execute(home: &Path, operation: Operation) -> Answer<service::Answer> {
     wrap(service::execute(&ports, operation))
 }
 
+/// What the current selection would render for `root`, for `doctor`'s
+/// ownership comparison (spec 026 section 3.1). The same concrete producer,
+/// judge selection and clock `init plan` is given, and the same preflight,
+/// which writes nothing.
+pub fn rendering(home: &Path, root: &Path) -> statecraft_environment::ownership::RenderingFact {
+    let layout = Layout::new(home);
+    let producer = Library;
+    let selection = crate::judge::selection(root);
+    let corpus = spec_spine::corpus_for(&selection);
+    let probe = spec_spine::probe_for(&selection);
+    let clock = SystemClock;
+    statecraft_home::flow::rendering(&statecraft_home::flow::Context {
+        home: &layout,
+        root,
+        producer: &producer,
+        corpus: corpus.as_ref(),
+        target_probe: &probe,
+        clock: &clock,
+        product_version: env!("CARGO_PKG_VERSION").to_string(),
+        setup: Default::default(),
+    })
+}
+
 fn answer_exit(answer: &service::Answer) -> Exit {
     match answer.severity() {
         Severity::Ok => Exit::Ok,

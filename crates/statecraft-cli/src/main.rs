@@ -2612,6 +2612,21 @@ fn environment_verb(
                     if let Some(finding) = statecraft_home::required::doctor_finding(&standing) {
                         report.findings.push(finding);
                     }
+                    // Spec 026: recorded, journaled and rendered ownership,
+                    // compared. The rendering is `init plan`'s preflight and
+                    // the declarations `env plan` reads; both write nothing.
+                    let mut rendering = statecraft_cli::manage::rendering(home, root);
+                    if let statecraft_environment::ownership::RenderingFact::Computed(r) =
+                        &mut rendering
+                    {
+                        r.name_declarations(&declarations);
+                    }
+                    statecraft_environment::ownership::report(
+                        root,
+                        &manifest,
+                        &rendering,
+                        &mut report,
+                    );
                     match remote {
                         None => emit(&bind::doctor_answer(report), format),
                         Some(ask) => {

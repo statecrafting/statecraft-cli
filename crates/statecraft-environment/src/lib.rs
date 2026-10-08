@@ -17,7 +17,8 @@
 //! - [`plan`] computes what an apply would do; [`apply`] performs it and can
 //!   remove it again, and [`replace`] is the one route by which a drifted
 //!   managed file is rewritten: per path, with the operator's consent.
-//! - [`doctor`] diagnoses and never repairs.
+//! - [`doctor`] diagnoses and never repairs; [`ownership`] adds its
+//!   comparison of recorded, journaled and rendered ownership (spec 026).
 //! - [`transfer`] moves one path between the classes when, and only when, an
 //!   operator asks for it by path (spec 002 section 3.35), and journals the act
 //!   in the manifest.
@@ -43,6 +44,7 @@ pub mod digest;
 pub mod doctor;
 pub mod judge;
 pub mod manifest;
+pub mod ownership;
 pub mod plan;
 pub mod probe;
 pub mod qualify;
