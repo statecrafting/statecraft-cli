@@ -727,6 +727,12 @@ fact into publication authority.
 contract an attempt was bound to with the current contract and reports drift
 without rewriting either record.
 
+**2026-10-08: the reviewable account reads refusals from the sample the
+supervisor writes.** Spec 003 section 3.5's accounting record carries its
+bounded sample as `sample`, one object per refusal naming its `guard`. The
+account's `refusals` read a `sample_guards` member no build wrote, so `run
+show` listed no refusal for a refused run. It now lists each sampled guard.
+
 ## Verification
 
 Each line is one command. §3.10's twenty-two rows are integration tests named

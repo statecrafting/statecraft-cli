@@ -250,8 +250,20 @@ pub fn fold(run_id: &str, entries: &[Entry]) -> ReviewableOutcome {
         authority: Sourced::new(unrecorded_authority(), &record_name(None)),
         acceptance: Sourced::new(acceptance, &outcome_record),
         receipt_freshness: Recorded::Absent(Absence::NotRecorded),
+        // The accounting record's bounded sample, as spec 003 section 3.5
+        // writes it: one object per refusal, each naming its guard.
         refusals: Sourced::new(
-            strings(accounting_entry, "sample_guards"),
+            accounting_entry
+                .and_then(|e| e.detail.get("sample"))
+                .and_then(|v| v.as_array())
+                .map(|sample| {
+                    sample
+                        .iter()
+                        .filter_map(|r| r.get("guard").and_then(|g| g.as_str()))
+                        .map(str::to_string)
+                        .collect()
+                })
+                .unwrap_or_default(),
             &record_name(accounting_entry),
         ),
     }
@@ -387,7 +399,9 @@ mod tests {
                 "r1",
                 1,
                 "refusals",
-                json!({"count": 3, "sample_guards": ["permission-deny-rule/Bash"]}),
+                json!({"count": 3, "sample": [
+                    {"guard": "permission-deny-rule/Bash", "detail": "refused"}
+                ]}),
             ),
         ];
         let account = fold("r1", &entries);
