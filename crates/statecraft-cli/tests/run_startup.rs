@@ -358,6 +358,8 @@ if [ "$mode" = early-tool ]; then
 fi
 /usr/bin/sed -n '1,3p' "$here/native.jsonl"
 log "init emitted"
+# Spec 003 section 3.5.1: structured write requests the session reports.
+if [ -f "$here/write-request" ]; then /bin/cat "$here/write-request"; fi
 if [ -n "${early:-}" ]; then wait "$early"; fi
 if [ "$mode" = tool-then-block ]; then
   tool sentinel-released
@@ -1958,4 +1960,182 @@ fn a_managed_run_replaces_an_inherited_spec_spine_selection_with_the_supervisors
         !f.dir.path().join("inherited-spec-spine.calls").exists(),
         "the operator's binary was invoked inside the session"
     );
+}
+
+/// Spec 003 section 3.5.1 rule 1, first kind: a `Write` into the product home
+/// is one finding with its tool-use id and classification, beside a refusal
+/// count it does not change; an `Edit` inside the workspace is none.
+#[test]
+fn a_write_request_into_the_home_is_a_finding_and_one_into_the_workspace_is_not() {
+    let f = Fixture::new();
+    let forged = f.home().join("records").join("forged.jsonl");
+    let line = serde_json::json!({
+        "type": "assistant",
+        "message": {"content": [
+            {"type": "tool_use", "id": "toolu_home", "name": "Write",
+             "input": {"file_path": forged.display().to_string(), "content": "x"}},
+            {"type": "tool_use", "id": "toolu_work", "name": "Edit",
+             "input": {"file_path": "src/lib.rs"}}
+        ]}
+    });
+    std::fs::write(f.bin().join("write-request"), format!("{line}\n")).unwrap();
+    let out = f.run();
+    assert!(code(&out) <= 1, "{}", text(&out));
+
+    let (chain, _) = statecraft_run::record::Chain::open(&f.home(), &f.project()).unwrap();
+    let accounting = chain
+        .entries()
+        .into_iter()
+        .find(|e| e.kind == statecraft_run::record::Kind::Accounting && e.run_id == RUN)
+        .expect("the accounting record");
+    assert_eq!(accounting.detail["count"], 0, "{}", accounting.detail);
+    let findings = accounting.detail["tamperFindings"].as_array().unwrap();
+    assert_eq!(findings.len(), 1, "{}", accounting.detail);
+    assert_eq!(findings[0]["toolUseId"], "toolu_home");
+    assert_eq!(findings[0]["tool"], "Write");
+    assert_eq!(findings[0]["classification"], "unresolved");
+    assert!(accounting.detail.get("tamper_attempts").is_none());
+    assert!(!forged.exists(), "the request was only a request");
+
+    let shown = f.cli(&["run", "show", &f.root(), RUN, "--json"]);
+    let tamper = json_naming::payload(&json(&shown))["tamper"][0].clone();
+    assert_eq!(tamper["recorded"], "checked", "{tamper}");
+    assert_eq!(tamper["writeRequest"], "observed", "{tamper}");
+    assert_eq!(tamper["recordChange"], "none-observed", "{tamper}");
+    let human = f.cli(&["run", "show", &f.root(), RUN]);
+    assert!(
+        text(&human).contains("write requests observed; record changes none observed"),
+        "{}",
+        text(&human)
+    );
+    assert!(text(&human).contains("toolu_home"), "{}", text(&human));
+    assert!(!text(&human).contains("toolu_work"), "{}", text(&human));
+}
+
+/// Start `run` in `mode` with its answer captured, and wait until the fake
+/// blocks after the startup decision.
+fn run_captured_until_blocked(f: &Fixture, mode: &str) -> std::process::Child {
+    f.mode(mode);
+    let launcher = Command::new(env!("CARGO_BIN_EXE_statecraft-cli"))
+        .args(["run", &f.root(), RUN, "--json"])
+        .env_clear()
+        .env("STATECRAFT_HOME", f.home())
+        .env("STATECRAFT_NATIVE_ROOT", f.dir.path().join("native"))
+        .env("HOME", f.dir.path())
+        .env("PATH", format!("{}:/usr/bin:/bin", f.bin().display()))
+        .env("USER", "fixture-operator")
+        .stdout(std::process::Stdio::piped())
+        .stderr(std::process::Stdio::piped())
+        .spawn()
+        .unwrap();
+    let started = std::time::Instant::now();
+    while !(f.order().iter().any(|l| l == "blocked")
+        && f.attempt_dir(1).join("admission.json").is_file())
+    {
+        assert!(
+            started.elapsed() < std::time::Duration::from_secs(60),
+            "the fake never blocked: {:?}",
+            f.order()
+        );
+        std::thread::sleep(std::time::Duration::from_millis(20));
+    }
+    launcher
+}
+
+/// Append a well-formed entry to the run record from outside the supervisor,
+/// as a session reaching the home would: the record still verifies.
+fn forge_an_entry(f: &Fixture) {
+    let (mut chain, _) = statecraft_run::record::Chain::open(&f.home(), &f.project()).unwrap();
+    let mut entry = chain.entries()[0].clone();
+    entry.run_id = "forged-by-the-session".to_string();
+    chain
+        .append("forged", "2026-10-08T00:00:00Z", &entry)
+        .unwrap();
+}
+
+/// Spec 003 section 3.5.1 rule 1, second kind, and rule 2: a change to the
+/// record while the process ran is written to the audit file, nothing more is
+/// appended, the attempt stays live, and `run show` and a later `run` name it.
+#[test]
+fn a_change_to_the_record_while_the_process_ran_is_audited_and_the_attempt_stays_live() {
+    let f = Fixture::new();
+    let launcher = run_captured_until_blocked(&f, "block");
+    forge_an_entry(&f);
+    let forged = chain_bytes(&f);
+    std::fs::write(f.bin().join("release"), "").unwrap();
+    let out = launcher.wait_with_output().unwrap();
+    assert_eq!(code(&out), 1, "{}", text(&out));
+    let v = json_naming::payload(&json(&out)).clone();
+    assert_eq!(v["recorded"], true, "{v}");
+    assert_eq!(v["attemptLive"], true, "{v}");
+    let changes = v["finding"]["changes"].as_array().unwrap();
+    assert!(
+        changes
+            .iter()
+            .any(|c| c["path"].as_str().unwrap().ends_with(".jsonl")
+                && c["before"]["length"].as_u64() < c["after"]["length"].as_u64()),
+        "{v}"
+    );
+    assert_eq!(
+        chain_bytes(&f),
+        forged,
+        "nothing was appended after the change"
+    );
+    let (chain, _) = statecraft_run::record::Chain::open(&f.home(), &f.project()).unwrap();
+    assert!(
+        !chain
+            .entries()
+            .iter()
+            .any(|e| e.run_id == RUN && e.kind == statecraft_run::record::Kind::Accounting),
+        "no outcome or accounting for the attempt"
+    );
+    let audit = statecraft_run::tamper::read_audit(&f.home(), &f.project()).unwrap();
+    assert_eq!(audit.len(), 1);
+    assert_eq!((audit[0].run_id.as_str(), audit[0].attempt), (RUN, 1));
+
+    let shown = f.cli(&["run", "show", &f.root(), RUN]);
+    assert!(
+        text(&shown).contains("a change to the record this product did not make"),
+        "{}",
+        text(&shown)
+    );
+    let shown = f.cli(&["run", "show", &f.root(), RUN, "--json"]);
+    let tamper = json_naming::payload(&json(&shown))["tamper"][0].clone();
+    assert_eq!(tamper["recordChange"], "observed", "{tamper}");
+
+    let later = f.run();
+    assert_eq!(code(&later), 2, "{}", text(&later));
+    let refusal = json_naming::payload(&json(&later))["audit"].clone();
+    assert_eq!(refusal[0]["runId"], RUN, "{}", text(&later));
+    assert_eq!(f.launches(), 1, "nothing was launched for the later run");
+
+    // The record still verifies, so the attempt goes to reconciliation, whose
+    // answer names the finding.
+    let state = json_naming::payload(&json(&later))["launchState"]
+        .as_str()
+        .unwrap_or_else(|| panic!("{}", text(&later)))
+        .to_string();
+    let reconciled = reconcile(&f, "unknown", &state, &["--json"]);
+    assert_eq!(code(&reconciled), 0, "{}", text(&reconciled));
+    let named = json_naming::payload(&json(&reconciled))["audit"].clone();
+    assert_eq!(named[0]["attempt"], 1, "{}", text(&reconciled));
+}
+
+/// Spec 003 section 3.5.1 rule 3: an audit file that cannot be written is a
+/// failure that prints the finding, never a silence, and the attempt stays
+/// live.
+#[test]
+fn an_audit_file_that_cannot_be_written_fails_and_prints_the_finding() {
+    let f = Fixture::new();
+    let launcher = run_captured_until_blocked(&f, "block");
+    std::fs::create_dir_all(statecraft_run::tamper::audit_path(&f.home(), &f.project())).unwrap();
+    forge_an_entry(&f);
+    std::fs::write(f.bin().join("release"), "").unwrap();
+    let out = launcher.wait_with_output().unwrap();
+    assert_eq!(code(&out), 4, "{}", text(&out));
+    let v = json_naming::payload(&json(&out)).clone();
+    assert_eq!(v["recorded"], false, "{v}");
+    assert!(v["auditError"].is_string(), "{v}");
+    assert_eq!(v["finding"]["runId"], RUN, "{v}");
+    assert_eq!(v["attemptLive"], true, "{v}");
 }

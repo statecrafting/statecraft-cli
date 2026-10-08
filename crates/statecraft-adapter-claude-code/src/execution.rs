@@ -33,6 +33,83 @@ pub struct Execution {
     /// read back from that file after it was written. What this adapter
     /// supplied, as opposed to what it was asked to supply.
     pub settings_written: Vec<u8>,
+    /// Every file-write request the session's structured stream carried,
+    /// classified by what the stream says became of it (spec 003 section
+    /// 3.5.1 rule 1, first kind). `Err` when the stream could not be mapped
+    /// or a request could not be read, so the kind is unknown.
+    pub write_requests: Result<Vec<statecraft_run::tamper::Requested>, String>,
+}
+
+/// The tools whose documented input names a file the tool writes, and the
+/// field that names it (spec 003 section 3.5.1 rule 1, first kind).
+pub const FILE_WRITE_TOOLS: [(&str, &str); 4] = [
+    ("Write", "file_path"),
+    ("Edit", "file_path"),
+    ("MultiEdit", "file_path"),
+    ("NotebookEdit", "notebook_path"),
+];
+
+/// Every file-write request in `events`, each classified: refused when the
+/// terminal denials name it or a result note says it did not execute,
+/// executed when a result answers it without error, and unresolved otherwise.
+/// A tool use that cannot be read, or a write tool whose target field is not
+/// a string, is an error rather than skipped.
+pub fn write_requests(
+    events: &[ProviderEvent],
+) -> Result<Vec<statecraft_run::tamper::Requested>, String> {
+    use statecraft_run::tamper::{Classification, Requested};
+    let mut requests = Vec::new();
+    let mut executed = std::collections::BTreeSet::new();
+    let mut refused = std::collections::BTreeSet::new();
+    for event in events {
+        match event {
+            ProviderEvent::Assistant(m) => {
+                for u in m.tool_uses()? {
+                    let Some((_, field)) = FILE_WRITE_TOOLS.iter().find(|(t, _)| *t == u.name)
+                    else {
+                        continue;
+                    };
+                    let target = u
+                        .input
+                        .get(*field)
+                        .and_then(serde_json::Value::as_str)
+                        .ok_or_else(|| format!("a {} request without a string {field}", u.name))?;
+                    requests.push(Requested {
+                        tool: u.name.clone(),
+                        tool_use_id: u.id.clone(),
+                        target: target.to_string(),
+                        classification: Classification::Unresolved,
+                    });
+                }
+            }
+            ProviderEvent::User(m) => {
+                for n in &m.tool_result_meta {
+                    if n.non_execution_kind.is_some() {
+                        refused.insert(n.id.clone());
+                    }
+                }
+                for r in m.tool_results()? {
+                    if !r.is_error {
+                        executed.insert(r.tool_use_id);
+                    }
+                }
+            }
+            ProviderEvent::Result(r) => {
+                refused.extend(r.permission_denials.iter().map(|d| d.tool_use_id.clone()));
+            }
+            _ => {}
+        }
+    }
+    for r in &mut requests {
+        r.classification = if refused.contains(&r.tool_use_id) {
+            Classification::Refused
+        } else if executed.contains(&r.tool_use_id) {
+            Classification::Executed
+        } else {
+            Classification::Unresolved
+        };
+    }
+    Ok(requests)
 }
 
 /// One hook's reported response, as the provider streamed it.
@@ -340,6 +417,7 @@ fn map_native(
         _ => None,
     });
     let mut terminal = None;
+    let mut write_requests = write_requests(&events);
     match map_stream(&events, granted) {
         Ok(mapped) => {
             supervised.events = mapped.events;
@@ -362,6 +440,7 @@ fn map_native(
             }
         }
         Err(error) => {
+            write_requests = Err(format!("the stream was not mapped: {error}"));
             // Missing initialization cannot erase independently readable
             // terminal denials (004 section 3.11). Preserve their events for
             // the run supervisor's accounting without inventing an init or
@@ -389,12 +468,51 @@ fn map_native(
         hook_responses,
         session_id,
         settings_written: Vec::new(),
+        write_requests,
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn each_write_request_is_classified_by_what_the_stream_says() {
+        use statecraft_run::tamper::Classification;
+        let text = [
+            r#"{"type":"assistant","message":{"content":[
+                {"type":"tool_use","id":"w","name":"Write","input":{"file_path":"/h/a"}},
+                {"type":"tool_use","id":"e","name":"Edit","input":{"file_path":"b"}},
+                {"type":"tool_use","id":"n","name":"NotebookEdit","input":{"notebook_path":"c"}},
+                {"type":"tool_use","id":"m","name":"MultiEdit","input":{"file_path":"d"}},
+                {"type":"tool_use","id":"r","name":"Read","input":{"file_path":"e"}}]}}"#,
+            r#"{"type":"user","message":{"content":[
+                {"type":"tool_result","tool_use_id":"e","is_error":false,"content":"ok"},
+                {"type":"tool_result","tool_use_id":"n","is_error":true,"content":"no"}]},
+                "tool_result_meta":[{"id":"m","non_execution_kind":"denied"}]}"#,
+            r#"{"type":"result","subtype":"success","is_error":false,"num_turns":1,
+                "permission_denials":[{"tool_name":"Write","tool_use_id":"w","tool_input":{}}]}"#,
+        ]
+        .map(|l| l.replace('\n', " "))
+        .join("\n");
+        let events = crate::stream::read_jsonl(&text).unwrap();
+        let found = write_requests(&events).unwrap();
+        let got: Vec<_> = found
+            .iter()
+            .map(|r| (r.tool_use_id.as_str(), r.target.as_str(), r.classification))
+            .collect();
+        assert_eq!(
+            got,
+            [
+                ("w", "/h/a", Classification::Refused),
+                ("e", "b", Classification::Executed),
+                ("n", "c", Classification::Unresolved),
+                ("m", "d", Classification::Refused),
+            ]
+        );
+        let bad = r#"{"type":"assistant","message":{"content":[{"type":"tool_use","id":"x","name":"Write","input":{}}]}}"#;
+        assert!(write_requests(&crate::stream::read_jsonl(bad).unwrap()).is_err());
+    }
     use statecraft_adapter::capability::Requested;
     use statecraft_adapter::environment::{Blueprint, CheckSuiteCommands, construct};
     use statecraft_adapter::protocol::AttemptIdentity;

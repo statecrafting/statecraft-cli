@@ -34,12 +34,15 @@ pub struct Accounting {
     pub count: u32,
     /// Up to [`SAMPLE_LIMIT`] examples.
     pub sample: Vec<RefusalEvent>,
-    /// Recorded when the supervised process tried to write here.
-    ///
-    /// Impossible by placement: the chain lives in the product home and the
-    /// supervised process runs inside a worktree in the target. The attempt is
-    /// still recorded, because an attempt to tamper is itself evidence.
-    pub tamper_attempts: Vec<String>,
+    /// Section 3.5.1 rule 2: every structured request to write a protected
+    /// path, beside the count, which it does not change. Its presence marks a
+    /// record checked under that section (rule 4); a record written before it
+    /// carried `tamper_attempts`, which no build ever filled, or neither.
+    #[serde(rename = "tamperFindings")]
+    pub tamper_findings: Vec<crate::tamper::WriteRequest>,
+    /// Section 3.5.1 rule 6: each kind's answer for this attempt.
+    #[serde(rename = "tamperAnswers")]
+    pub tamper_answers: crate::tamper::Answers,
 }
 
 impl Accounting {
@@ -51,9 +54,13 @@ impl Accounting {
         }
     }
 
-    /// Record that the supervised process tried to reach this accounting.
-    pub fn note_tamper_attempt(&mut self, detail: &str) {
-        self.tamper_attempts.push(detail.to_string());
+    /// Accounting for an attempt refused before any process existed, so
+    /// both kinds of section 3.5.1 are established and empty.
+    pub fn without_process() -> Self {
+        Self {
+            tamper_answers: crate::tamper::Answers::without_process(),
+            ..Self::default()
+        }
     }
 
     /// Whether any refusal was counted.
@@ -111,9 +118,21 @@ mod tests {
     }
 
     #[test]
-    fn a_tamper_attempt_is_itself_recorded() {
+    fn a_tamper_finding_is_recorded_beside_the_count_and_does_not_change_it() {
         let mut a = Accounting::default();
-        a.note_tamper_attempt("wrote to the product home from the worktree");
-        assert_eq!(a.tamper_attempts.len(), 1);
+        a.tamper_findings.push(crate::tamper::WriteRequest {
+            kind: "write-request".into(),
+            target: "/home/records/x.jsonl".into(),
+            resolved: "/home/records/x.jsonl".into(),
+            tool: "Write".into(),
+            tool_use_id: "toolu_1".into(),
+            classification: crate::tamper::Classification::Executed,
+        });
+        assert_eq!(a.count, 0);
+        assert_eq!(decide(Outcome::Completed, &a), Outcome::Completed);
+        let wire = serde_json::to_value(&a).unwrap();
+        assert_eq!(wire["tamperFindings"][0]["toolUseId"], "toolu_1");
+        assert_eq!(wire["tamperAnswers"]["writeRequest"], "unknown");
+        assert!(wire.get("tamper_attempts").is_none());
     }
 }

@@ -11,11 +11,19 @@
         "source": "spec-edge"
       },
       {
+        "path": "crates/statecraft-adapter-claude-code/",
+        "source": "spec-edge"
+      },
+      {
         "path": "crates/statecraft-cli/",
         "source": "spec-edge"
       },
       {
         "path": "crates/statecraft-environment/",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/statecraft-home/",
         "source": "spec-edge"
       },
       {
@@ -53,6 +61,19 @@
       {
         "locations": [
           {
+            "file": "crates/statecraft-adapter-claude-code/"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "directory",
+          "path": "crates/statecraft-adapter-claude-code/"
+        }
+      },
+      {
+        "locations": [
+          {
             "file": "crates/statecraft-cli/"
           }
         ],
@@ -75,11 +96,24 @@
           "kind": "directory",
           "path": "crates/statecraft-environment/"
         }
+      },
+      {
+        "locations": [
+          {
+            "file": "crates/statecraft-home/"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "directory",
+          "path": "crates/statecraft-home/"
+        }
       }
     ],
     "specId": "003-work-and-run-semantics",
     "specStatus": "approved"
   },
   "schemaVersion": "1.2.0",
-  "shardHash": "997bfc04e6144d522a0e465a5865c6cd0421d50b46416751df1f13c34e6cf30e"
+  "shardHash": "81a1adc4be98d2384ea6408156214521109c459617e1c907bc34879971043058"
 }
