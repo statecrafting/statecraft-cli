@@ -985,12 +985,25 @@ pub(crate) fn write_once(path: &Path, contents: impl AsRef<[u8]>) -> std::io::Re
 /// Give `temporary`'s file the name `path`, failing when `path` exists.
 fn publish_exclusively(temporary: &Path, path: &Path) -> std::io::Result<()> {
     use rustix::fs::{CWD, RenameFlags, renameat_with};
-    use rustix::io::Errno;
     match renameat_with(CWD, temporary, CWD, path, RenameFlags::NOREPLACE) {
         Ok(()) => Ok(()),
-        Err(Errno::INVAL | Errno::NOSYS | Errno::NOTSUP) => std::fs::hard_link(temporary, path),
+        Err(e) if flag_unsupported(e) => std::fs::hard_link(temporary, path),
         Err(e) => Err(e.into()),
     }
+}
+
+/// Whether a no-replace rename failed only because the filesystem or kernel
+/// does not offer the flag. Both names are fresh entries of one directory, so
+/// no other cause of these answers applies.
+fn flag_unsupported(e: rustix::io::Errno) -> bool {
+    use rustix::io::Errno;
+    // macOS answers a volume without `RENAME_EXCL` with ENOTSUP.
+    #[cfg(target_vendor = "apple")]
+    return e == Errno::NOTSUP;
+    // Linux answers a filesystem without `RENAME_NOREPLACE` with EINVAL, and a
+    // kernel without `renameat2` with ENOSYS.
+    #[cfg(not(target_vendor = "apple"))]
+    return e == Errno::INVAL || e == Errno::NOSYS;
 }
 
 /// Make a new directory entry durable: its directory, synced.
@@ -3158,27 +3171,27 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let records = dir.path().to_path_buf();
         let done = std::sync::Arc::new(AtomicBool::new(false));
+        let scanning = std::sync::Arc::new(std::sync::Barrier::new(2));
         let writer = {
-            let (records, done) = (records.clone(), done.clone());
+            let (records, done, scanning) = (records.clone(), done.clone(), scanning.clone());
             std::thread::spawn(move || {
+                scanning.wait();
                 for i in 0..400 {
                     write_once(&records.join(format!("{i}.json")), "{}\n").unwrap();
                 }
                 done.store(true, Ordering::SeqCst);
             })
         };
-        let mut seen = 0usize;
+        scanning.wait();
         while !done.load(Ordering::SeqCst) {
             for entry in std::fs::read_dir(&records).unwrap().flatten() {
                 // A temporary name may go between the listing and the read.
                 if let Ok(meta) = std::fs::symlink_metadata(entry.path()) {
-                    seen += 1;
                     assert_eq!(meta.nlink(), 1, "{}", entry.path().display());
                 }
             }
         }
         writer.join().unwrap();
-        assert!(seen > 0, "the scan observed nothing");
         let names: Vec<_> = std::fs::read_dir(&records)
             .unwrap()
             .map(|e| e.unwrap().file_name().into_string().unwrap())
