@@ -2,7 +2,7 @@
 id: "032-external-code-profile"
 title: "Required project-owned code checks under managed governance"
 status: approved
-implementation: in-progress
+implementation: complete
 created: "2026-10-02"
 summary: >
   Profile revision 14 keeps Rust as its default and admits an explicitly
