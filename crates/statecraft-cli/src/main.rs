@@ -660,11 +660,21 @@ fn slice_verb(
                     else {
                         return emit(&slice::no_such_run_answer(run_id), format);
                     };
+                    // Spec 003 section 3.5.1: each attempt's evidence, from
+                    // its accounting record and the audit file beside it.
+                    let tamper = statecraft_run::tamper::read_audit(home, root).and_then(|audit| {
+                        slice::AttemptTamperView::of_run(&chain.entries(), run_id, &audit)
+                    });
+                    let tamper = match tamper {
+                        Ok(t) => t,
+                        Err(e) => return fail(&e, format),
+                    };
                     emit(
                         &slice::run_show_with_admissions(
                             statecraft_acceptance::suite::fold(run_id, &chain.entries()),
                             &run,
                             slice::ReconciliationView::of_run(&chain.positioned_entries(), run_id),
+                            tamper,
                         ),
                         format,
                     )
@@ -965,12 +975,18 @@ fn reconcile_verb(
         evidence,
         at: &at,
     };
+    let audit = match statecraft_run::tamper::read_audit(home, &root) {
+        Ok(found) => found
+            .into_iter()
+            .filter(|f| f.run_id == run_id && f.attempt == attempt)
+            .collect(),
+        Err(e) => return fail(&e, format),
+    };
     emit(
-        &slice::reconcile_answer(statecraft_run::reconcile::reconcile(
-            &mut chain,
-            &request,
-            observation,
-        )),
+        &slice::reconcile_answer(
+            statecraft_run::reconcile::reconcile(&mut chain, &request, observation),
+            audit,
+        ),
         format,
     )
 }
@@ -1411,12 +1427,20 @@ fn launch_attempt(
                             .find(|a| a.number == *attempt)
                             .and_then(|a| a.reconciliation)
                     });
+                // Spec 003 section 3.5.1 rule 2: a later run names the
+                // change found while that attempt's process ran.
+                let audit = statecraft_run::tamper::read_audit(home, root)
+                    .unwrap_or_default()
+                    .into_iter()
+                    .filter(|f| f.run_id == *live_run && f.attempt == *attempt)
+                    .collect();
                 return emit(
                     &slice::live_attempt_answer(
                         &e,
                         &root.display().to_string(),
                         startup,
                         reconciliation,
+                        audit,
                     ),
                     format,
                 );
@@ -1431,7 +1455,7 @@ fn launch_attempt(
         match statecraft_home::trial::place_sentinel(&session.workspace.path) {
             Ok(sentinel) => t.sentinel = Some(sentinel),
             Err(e) => {
-                let mut accounting = statecraft_run::refusal::Accounting::default();
+                let mut accounting = statecraft_run::refusal::Accounting::without_process();
                 accounting.observe(statecraft_run::refusal::RefusalEvent {
                     guard: "trial-sentinel".to_string(),
                     detail: format!("the trial's sentinel could not be placed: {e}"),
@@ -1501,7 +1525,7 @@ fn launch_attempt(
         Ok(c) => c.refusal(),
     };
     if let Some(why) = coverage_refusal {
-        let mut accounting = statecraft_run::refusal::Accounting::default();
+        let mut accounting = statecraft_run::refusal::Accounting::without_process();
         accounting.observe(statecraft_run::refusal::RefusalEvent {
             guard: statecraft_adapter::coverage::GUARD.to_string(),
             detail: why.clone(),
@@ -1531,7 +1555,7 @@ fn launch_attempt(
             // refused rather than left live: an intent with no outcome
             // would send the next run to reconciliation for something that
             // never started.
-            let mut accounting = statecraft_run::refusal::Accounting::default();
+            let mut accounting = statecraft_run::refusal::Accounting::without_process();
             accounting.observe(statecraft_run::refusal::RefusalEvent {
                 guard: "adapter-preflight".to_string(),
                 detail: refusal.to_string(),
@@ -1584,7 +1608,7 @@ fn launch_attempt(
                         detail.push_str("; ");
                     }
                     detail.push_str(&why);
-                    let mut accounting = statecraft_run::refusal::Accounting::default();
+                    let mut accounting = statecraft_run::refusal::Accounting::without_process();
                     accounting.observe(statecraft_run::refusal::RefusalEvent {
                         guard: statecraft_home::spec_spine::SELECTION_GUARD.to_string(),
                         detail: detail.clone(),
@@ -1693,6 +1717,10 @@ fn launch_attempt(
     }
     .exchange_dir(&places);
     let sentinel = trial.as_ref().and_then(|t| t.sentinel.clone());
+    // Spec 003 section 3.5.1 rule 1, second kind: the protected files are
+    // digested after the intent is durable and before the spawn, under the
+    // repository lock this process holds throughout.
+    let before = statecraft_run::tamper::Snapshot::take(home, root);
     let supervised = match (watch.as_mut(), &sentinel) {
         // Spec 002 section 3.33 rule 34: the trial keeps a timeline beside
         // the attempt's own watch, which it forwards to unchanged.
@@ -1741,6 +1769,58 @@ fn launch_attempt(
         ),
     };
     let watched = watch.map(|w| w.watched()).unwrap_or_default();
+    // ... and again once the process has ended, before anything is appended.
+    // The chain appends from the head it read at opening, so a change found
+    // here ends the attempt's writes: it stays live (rule 2).
+    let record_change = before
+        .and_then(|before| {
+            statecraft_run::tamper::Snapshot::take(home, root)
+                .map(|after| after.changes_since(&before, &watched.wrote))
+        })
+        .map_err(|e| format!("the record could not be digested: {e}"));
+    if let Ok(changes) = &record_change
+        && !changes.is_empty()
+    {
+        let finding = statecraft_run::tamper::AuditFinding {
+            kind: "record-change".to_string(),
+            run_id: run_id.clone(),
+            attempt: session.attempt,
+            found_at: statecraft_environment::time::rfc3339_utc(
+                statecraft_environment::time::Clock::now_unix(&SystemClock),
+            ),
+            changes: changes.clone(),
+        };
+        let recorded =
+            statecraft_run::tamper::append_audit(home, root, &finding).map_err(|e| e.to_string());
+        return emit(
+            &slice::record_changed_answer(&root.display().to_string(), finding, recorded),
+            format,
+        );
+    }
+    let protected = {
+        let record = boundary_admission.boundary.record();
+        let forbidden: Vec<_> = record
+            .policy
+            .inaccessible
+            .iter()
+            .chain(&record.policy.readonly)
+            .cloned()
+            .collect();
+        let writable: Vec<_> = record
+            .policy
+            .writable
+            .iter()
+            .map(|g| g.path.clone())
+            .collect();
+        statecraft_run::tamper::Protected::new(home, &forbidden, &writable)
+    };
+    // Rule 6: a confinement record without its self-test result leaves both
+    // kinds unknown.
+    let self_tested = !boundary_admission.boundary.record().self_test.is_empty();
+    let record_answer = match &record_change {
+        Ok(_) if self_tested => statecraft_run::tamper::Answer::NoneObserved,
+        _ => statecraft_run::tamper::Answer::Unknown,
+    };
     if let Some(t) = trial.as_mut() {
         t.process = match &supervised {
             Ok(e) => statecraft_home::trial::ProcessEnd {
@@ -1770,6 +1850,15 @@ fn launch_attempt(
                 guard: "supervisor".to_string(),
                 detail: e.to_string(),
             });
+            // No stream was mapped; with no process there was nothing to map.
+            accounting.tamper_answers = statecraft_run::tamper::Answers {
+                write_request: if watched.spawned.is_none() && self_tested {
+                    statecraft_run::tamper::Answer::NoneObserved
+                } else {
+                    statecraft_run::tamper::Answer::Unknown
+                },
+                record_change: record_answer,
+            };
             let startup = finalize_startup(
                 &places,
                 &layout,
@@ -1815,6 +1904,23 @@ fn launch_attempt(
     for refusal in statecraft_adapter::protocol::refusals(&supervised.events) {
         accounting.observe(refusal);
     }
+    // Spec 003 section 3.5.1 rule 1, first kind: beside the count, which it
+    // does not change.
+    let write_answer = match &execution.write_requests {
+        Ok(requests) => {
+            accounting.tamper_findings = protected.judge(&session.workspace.path, requests);
+            statecraft_run::tamper::Answer::of(!accounting.tamper_findings.is_empty())
+        }
+        Err(_) => statecraft_run::tamper::Answer::Unknown,
+    };
+    accounting.tamper_answers = statecraft_run::tamper::Answers {
+        write_request: if self_tested {
+            write_answer
+        } else {
+            statecraft_run::tamper::Answer::Unknown
+        },
+        record_change: record_answer,
+    };
 
     // Spec 002 section 3.31: the record is written from what the launch
     // produced, and a startup decision that refused governed work refuses the

@@ -23,6 +23,8 @@
 //! - [`attempt`] holds the closed outcome set and the rule that a retry appends.
 //! - [`refusal`] is the supervisor's own accounting, which no exit code can
 //!   overrule.
+//! - [`tamper`] is section 3.5.1's evidence: a request to write a protected
+//!   path, and a change to the record while the process ran.
 //! - [`recovery`] folds the record, reconciles every intent with no outcome, and
 //!   blocks a retry it cannot resolve.
 //! - [`session`] is one run from intent to outcome, and the fold that reads runs
@@ -51,6 +53,7 @@ pub mod refusal;
 pub mod report;
 pub mod repository;
 pub mod session;
+pub mod tamper;
 pub mod work;
 pub mod workspace;
 

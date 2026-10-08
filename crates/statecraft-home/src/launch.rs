@@ -1470,6 +1470,10 @@ pub struct LaunchWatch<'a> {
     pub admission: Option<Admission>,
     /// Why the decision could not be persisted, where it could not.
     pub admission_error: Option<String>,
+    /// Every launch record this watch wrote while the process ran, with the
+    /// exact bytes, so spec 003 section 3.5.1's after-digest compares them
+    /// with what the supervisor wrote rather than with the before-digest.
+    pub wrote: Vec<(PathBuf, Vec<u8>)>,
 }
 
 impl<'a> LaunchWatch<'a> {
@@ -1493,6 +1497,7 @@ impl<'a> LaunchWatch<'a> {
             session: None,
             admission: None,
             admission_error: None,
+            wrote: Vec::new(),
         }
     }
 
@@ -1589,7 +1594,11 @@ impl<'a> LaunchWatch<'a> {
             .and_then(|json| {
                 let line = format!("{json}\n");
                 let path = intent.attempt.admission_path(self.places);
-                write_once(&path, &line)
+                let wrote = write_once(&path, &line);
+                if wrote.is_ok() {
+                    self.wrote.push((path.clone(), line.clone().into_bytes()));
+                }
+                wrote
                     .and_then(|()| sync_parent(&path))
                     .map_err(|e| format!("the startup decision could not be persisted: {e}"))?;
                 if !intent.gated() {
@@ -1629,6 +1638,7 @@ impl<'a> LaunchWatch<'a> {
             confirmation_error: self.confirmation_error.clone(),
             admission: self.admission.clone(),
             admission_error: self.admission_error.clone(),
+            wrote: self.wrote.clone(),
         }
     }
 }
@@ -1644,13 +1654,14 @@ impl Watch<(usize, ProviderEvent)> for LaunchWatch<'_> {
             confirmed_at: (self.now)(),
             intent_digest: self.prepared.digest.clone(),
         };
+        let path = intent.attempt.launched_path(self.places);
         let written = serde_json::to_string_pretty(&launched)
             .map_err(|e| std::io::Error::other(e.to_string()))
             .and_then(|json| {
-                write_once(
-                    &intent.attempt.launched_path(self.places),
-                    format!("{json}\n"),
-                )
+                let bytes = format!("{json}\n").into_bytes();
+                write_once(&path, &bytes)?;
+                self.wrote.push((path.clone(), bytes));
+                Ok(())
             });
         written.map_err(|e| {
             let why = format!(
@@ -1691,6 +1702,8 @@ pub struct Watched {
     pub admission: Option<Admission>,
     /// Why the decision could not be persisted.
     pub admission_error: Option<String>,
+    /// The launch records written while the process ran, with their bytes.
+    pub wrote: Vec<(PathBuf, Vec<u8>)>,
 }
 
 // ---------------------------------------------------------------------------

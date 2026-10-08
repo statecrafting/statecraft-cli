@@ -36,12 +36,28 @@
           "kind": "directory",
           "path": "crates/statecraft-environment/"
         }
+      },
+      {
+        "nature": "additive",
+        "spec": "004-execution-adapter",
+        "unit": {
+          "kind": "directory",
+          "path": "crates/statecraft-adapter-claude-code/"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "002-environment-lifecycle",
+        "unit": {
+          "kind": "directory",
+          "path": "crates/statecraft-home/"
+        }
       }
     ],
     "id": "003-work-and-run-semantics",
     "implementation": "in-progress",
     "sectionDigests": {
-      "003-work-selection-workspace-preparation-the-run-record-and-recovery": "dfb45a0c639040844a5bf22f64f8cca67aad90b3613d059548d168951a3c2807",
+      "003-work-selection-workspace-preparation-the-run-record-and-recovery": "abc950b8e9d08d9be2be221c41b1c79c531090f7e0f7bb32a53d0a3ee9f70f9d",
       "1-purpose": "6e2e713486514a4371080ee9ad901b71b92b198ff8944d2cac7db353dfdd1ee6",
       "2-territory": "f200d26f7fab70304d4ec5b21bbfba40301c0a2a5b38fc266d1d37da0f01b4a4",
       "3-1-1-ready-is-not-ratified": "e902124dba1a1dfc0ed218701ac4b36773d42c1359d537fe8dfce993379529fa",
@@ -62,8 +78,8 @@
       "3-8-observable-negative-cases": "64b35b1a553ef276500ef17c7ef9beff5d4488a934d422acddee2b429583bc0b",
       "3-behavior": "237d46d757464901295e709683c551332d6e0b9b2ca0bd1bb6577c7d54dd7752",
       "4-out-of-scope": "0953737fbaaf06f31c4272c3b10a57178c967c1127355c9826627a1267c76fdd",
-      "5-resolved-decisions": "1a5745a6e7cf8835d3ac9ce1c6542e1a78c43413ae770c9d5fe464d067e89b74",
-      "verification": "31b33969410d5ba51a42678f60dc22264f541b2480ada745b3c0cc2f839d9a1e"
+      "5-resolved-decisions": "eccc65795bb30fce4e3dbbab2febd4d0335e0a74756b98f4d4b3b596b05bfa03",
+      "verification": "2c93bbf45af155c448a9fc915d7c2ca15f414a47118ff522639aebad8815aad1"
     },
     "sectionHeadings": [
       "003: Work selection, workspace preparation, the run record, and recovery",
@@ -95,6 +111,6 @@
     "summary": "The core loop's semantics. How a unit of work is identified by reading spec-spine's structured report rather than re-deriving it; how an isolated workspace is prepared so the operator's checkout is never edited; the append-only hash-linked run record with intent written before an effect and outcome after it; the closed outcome set (completed, failed, refused, interrupted, cancelled) and the rule that a retry appends an attempt rather than replacing history; supervisor-owned refusal accounting a supervised process cannot erase; and reconciliation of an ambiguous effect before any retry, with no exactly-once promise.\n",
     "title": "Work selection, workspace preparation, the run record, and recovery after interruption"
   },
-  "shardHash": "997bfc04e6144d522a0e465a5865c6cd0421d50b46416751df1f13c34e6cf30e",
+  "shardHash": "81a1adc4be98d2384ea6408156214521109c459617e1c907bc34879971043058",
   "specVersion": "1.9.0"
 }
