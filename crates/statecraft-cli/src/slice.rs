@@ -533,8 +533,10 @@ impl AttemptTamperView {
         }
         for f in audit.iter().filter(|f| f.run_id == run_id) {
             match out.iter_mut().find(|v| v.attempt == f.attempt) {
+                // A recorded answer is kept as recorded; one that disagrees
+                // with the audit file stays visible beside its finding.
                 Some(v) => {
-                    v.record_change = Some(Answer::Observed);
+                    v.record_change.get_or_insert(Answer::Observed);
                     v.audit.push(f.clone());
                 }
                 None => out.push(Self {

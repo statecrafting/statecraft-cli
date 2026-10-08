@@ -380,12 +380,11 @@ pub fn audit_path(home: &Path, target: &Path) -> PathBuf {
     crate::record::chain_path(home, target).with_extension("audit.jsonl")
 }
 
-/// Append one finding and make it durable, with the directory when the append
-/// created the file (rule 3: a finding that cannot be made durable is an
-/// error the caller reports, never a silence).
+/// Append one finding and make it durable, with its directory, so the entry
+/// is durable however the file came to exist (rule 3: a finding that cannot
+/// be made durable is an error the caller reports, never a silence).
 pub fn append_audit(home: &Path, target: &Path, finding: &AuditFinding) -> std::io::Result<()> {
     let path = audit_path(home, target);
-    let created = !path.exists();
     let line = serde_json::to_string(finding).map_err(std::io::Error::other)?;
     let mut file = std::fs::OpenOptions::new()
         .create(true)
@@ -393,7 +392,7 @@ pub fn append_audit(home: &Path, target: &Path, finding: &AuditFinding) -> std::
         .open(&path)?;
     file.write_all(format!("{line}\n").as_bytes())?;
     file.sync_all()?;
-    if created && let Some(parent) = path.parent() {
+    if let Some(parent) = path.parent() {
         std::fs::File::open(parent)?.sync_all()?;
     }
     Ok(())
