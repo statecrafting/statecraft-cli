@@ -2,7 +2,7 @@
 id: "024-review-budget-and-ratification"
 title: "Setup profile revision 12: a token-budgeted AI review and ratification as a merge condition"
 status: approved
-implementation: in-progress
+implementation: complete
 created: "2026-09-27"
 summary: >
   Amends spec 002's setup profile and spec 017's review cap. github-actions-rust

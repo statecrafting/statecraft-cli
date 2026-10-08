@@ -2,7 +2,7 @@
 id: "035-offline-issuer-contract"
 title: "Offline issuer authorization: three fixed domains, detached owner signatures and the pinned RootSetV2"
 status: approved
-implementation: in-progress
+implementation: complete
 created: "2026-10-03"
 summary: >
   Amends 005 for the shared half of the offline issuer enrollment contract the
