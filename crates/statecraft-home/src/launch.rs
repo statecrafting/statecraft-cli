@@ -945,9 +945,18 @@ fn nonce() -> std::io::Result<String> {
 /// Create a file that must not already exist, whole or not at all.
 ///
 /// The bytes go to a private temporary file in the same directory, which is
-/// then hard-linked to the final name. The link is the exclusive step: it
-/// fails if the name exists, and a reader never sees half a file. A rename
-/// would replace an existing file, which is the one thing this must not do.
+/// then renamed to the final name with the no-replace flag. That rename is
+/// the exclusive step: it fails if the name exists, and a reader never sees
+/// half a file. A plain rename would replace an existing file, which is the
+/// one thing this must not do.
+///
+/// A hard link would be exclusive too, but for the moment between the link
+/// and the temporary file's removal both names carry a link count of two,
+/// and a boundary admitted in that moment refuses the home it scans as
+/// holding a multiply linked protected file (spec 004 section 3.18). Every
+/// project shares the home's records, so one run's write would refuse
+/// another's launch. The link remains only for a filesystem that refuses
+/// the flag.
 pub(crate) fn write_once(path: &Path, contents: impl AsRef<[u8]>) -> std::io::Result<()> {
     let parent = path.parent().ok_or_else(|| {
         std::io::Error::new(std::io::ErrorKind::InvalidInput, "a record needs a parent")
@@ -966,11 +975,35 @@ pub(crate) fn write_once(path: &Path, contents: impl AsRef<[u8]>) -> std::io::Re
             .open(&temporary)?;
         file.write_all(contents.as_ref())?;
         file.sync_all()?;
-        std::fs::hard_link(&temporary, path)
+        publish_exclusively(&temporary, path)
     })();
-    // The temporary name goes whatever happened; the linked name stays.
+    // The temporary name goes whatever happened; the published name stays.
     let _ = std::fs::remove_file(&temporary);
     written
+}
+
+/// Give `temporary`'s file the name `path`, failing when `path` exists.
+fn publish_exclusively(temporary: &Path, path: &Path) -> std::io::Result<()> {
+    use rustix::fs::{CWD, RenameFlags, renameat_with};
+    match renameat_with(CWD, temporary, CWD, path, RenameFlags::NOREPLACE) {
+        Ok(()) => Ok(()),
+        Err(e) if flag_unsupported(e) => std::fs::hard_link(temporary, path),
+        Err(e) => Err(e.into()),
+    }
+}
+
+/// Whether a no-replace rename failed only because the filesystem or kernel
+/// does not offer the flag. Both names are fresh entries of one directory, so
+/// no other cause of these answers applies.
+fn flag_unsupported(e: rustix::io::Errno) -> bool {
+    use rustix::io::Errno;
+    // macOS answers a volume without `RENAME_EXCL` with ENOTSUP.
+    #[cfg(target_vendor = "apple")]
+    return e == Errno::NOTSUP;
+    // Linux answers a filesystem without `RENAME_NOREPLACE` with EINVAL, and a
+    // kernel without `renameat2` with ENOSYS.
+    #[cfg(not(target_vendor = "apple"))]
+    return e == Errno::INVAL || e == Errno::NOSYS;
 }
 
 /// Make a new directory entry durable: its directory, synced.
@@ -3125,6 +3158,46 @@ mod tests {
                 outcome: Some("completed".into()),
             })
             .collect()
+    }
+
+    /// A boundary admitted while another run writes a record must not see a
+    /// multiply linked file in the home, so no name `write_once` creates is
+    /// ever observed with a second link (spec 004 section 3.18).
+    #[cfg(unix)]
+    #[test]
+    fn a_record_being_written_is_never_seen_multiply_linked() {
+        use std::os::unix::fs::MetadataExt;
+        use std::sync::atomic::{AtomicBool, Ordering};
+        let dir = tempfile::tempdir().unwrap();
+        let records = dir.path().to_path_buf();
+        let done = std::sync::Arc::new(AtomicBool::new(false));
+        let scanning = std::sync::Arc::new(std::sync::Barrier::new(2));
+        let writer = {
+            let (records, done, scanning) = (records.clone(), done.clone(), scanning.clone());
+            std::thread::spawn(move || {
+                scanning.wait();
+                for i in 0..400 {
+                    write_once(&records.join(format!("{i}.json")), "{}\n").unwrap();
+                }
+                done.store(true, Ordering::SeqCst);
+            })
+        };
+        scanning.wait();
+        while !done.load(Ordering::SeqCst) {
+            for entry in std::fs::read_dir(&records).unwrap().flatten() {
+                // A temporary name may go between the listing and the read.
+                if let Ok(meta) = std::fs::symlink_metadata(entry.path()) {
+                    assert_eq!(meta.nlink(), 1, "{}", entry.path().display());
+                }
+            }
+        }
+        writer.join().unwrap();
+        let names: Vec<_> = std::fs::read_dir(&records)
+            .unwrap()
+            .map(|e| e.unwrap().file_name().into_string().unwrap())
+            .collect();
+        assert_eq!(names.len(), 400);
+        assert!(names.iter().all(|n| !n.starts_with(".statecraft-partial")));
     }
 
     #[test]
