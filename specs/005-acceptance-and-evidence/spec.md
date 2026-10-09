@@ -2,7 +2,7 @@
 id: "005-acceptance-and-evidence"
 title: "Independent acceptance, the receipt, the separately reported evidence dimensions, and the envelope two products exchange"
 status: approved
-implementation: in-progress
+implementation: complete
 created: "2026-09-16"
 summary: >
   How a claim of completion becomes, or fails to become, an acceptance. Fixes
@@ -19,6 +19,10 @@ summary: >
 establishes:
   - { kind: directory, path: "crates/statecraft-acceptance/" }
   - { kind: directory, path: "crates/statecraft-envelope/" }
+extends:
+  # Section 3.19's acceptance through the binary lives in the command
+  # surface's test suite; this spec adds to it and owns nothing there.
+  - { spec: "006-command-surface", unit: { kind: directory, path: "crates/statecraft-cli/" }, nature: additive }
 depends_on:
   - "000-bootstrap"
   - "001-boundaries-and-authority"
@@ -733,6 +737,22 @@ bounded sample as `sample`, one object per refusal naming its `guard`. The
 account's `refusals` read a `sample_guards` member no build wrote, so `run
 show` listed no refusal for a refused run. It now lists each sampled guard.
 
+**2026-10-08: implementation complete.** This spec moved to `in-progress` on
+2026-09-23 only for section 3.19. Section 3.19 is now delivered and tested,
+and the other sections were already implemented. Rule 1: the suite runs under
+the confinement, with an empty per-attempt cache root and protected home,
+checkout and Git (`contract_binding`'s
+`acceptance_confines_candidate_code_and_keeps_suite_artifacts_out_of_the_candidate`).
+Rule 2: cleanliness is read from the private branch and the trusted base's
+ignore rules, never from the workspace's own Git files
+(`cleanliness_reads_ignore_rules_from_the_trusted_base_and_never_from_the_workspace`).
+Rule 3: a boundary that cannot be established is a refusal, with exit 2, no
+receipt and no record (`acceptance_reports_the_failed_boundary_step_without_a_new_receipt_or_record`).
+Rule 4 re-judges nothing. This spec applies spec 004 section 3.18's
+confinement and accounts for no part of Constitution IX of its own, so
+section 3.18 rule 12's open route keeps spec 004 from `complete`, not this
+spec.
+
 ## Verification
 
 Each line is one command. §3.10's twenty-two rows are integration tests named
@@ -758,4 +778,5 @@ cargo test -p statecraft-envelope --test vectors
 test -f crates/statecraft-envelope/PROVENANCE.md
 grep -q 'license = "Apache-2.0"' crates/statecraft-envelope/Cargo.toml
 cargo test -p statecraft-acceptance --lib contract
+cargo test -p statecraft-cli --test contract_binding
 ```
