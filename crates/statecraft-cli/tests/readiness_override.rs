@@ -1230,6 +1230,13 @@ fn every_journal_state_answers_work_show_and_the_override_verbs_by_its_code() {
     ] {
         let out = f.cli(&args);
         assert_eq!(code(&out), 2, "in progress: {args:?}: {}", text(&out));
+        // Refused by the held lock, not by the pending line beneath it.
+        assert!(text(&out).contains("lock"), "{args:?}: {}", text(&out));
+        assert!(
+            !text(&out).contains("override recover"),
+            "{args:?}: {}",
+            text(&out)
+        );
     }
     assert_eq!(files(&f, &root), before);
     drop(held);
@@ -1387,7 +1394,7 @@ fn a_run_whose_boundary_cannot_be_established_is_refused_with_no_attempt() {
         })
         .unwrap_or(0);
     assert_eq!(attempts, 0, "{v}");
-    // With a trusted `PATH` the same run is admitted.
+    // With the second name removed, the same run is admitted.
     let out = f.cli(&["run", &root, DRAFT]);
     assert!(code(&out) <= 1, "{}", text(&out));
 }

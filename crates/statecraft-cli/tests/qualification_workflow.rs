@@ -1083,7 +1083,7 @@ fn a_capture_whose_boundary_cannot_be_established_is_refused_and_writes_nothing(
         .map(|entries| entries.count())
         .unwrap_or(0);
     assert_eq!(records, 0, "a refused capture wrote into {}", dir.display());
-    // The same capture with a trusted `PATH` is admitted.
+    // With the second name removed, the same capture is admitted.
     let out = sandbox.capture("refusal", "faithful", &[]);
     assert_eq!(code(&out), 0, "{}", stdout(&out));
 }
