@@ -559,3 +559,60 @@ fn a_trial_record_edited_after_writing_reads_back_as_disagreeing() {
     assert!(h.contains("RELOAD"), "{h}");
     assert!(h.contains("trial     not-established"), "{h}");
 }
+
+/// Spec 006 section 3.11.4, amended by spec 004 section 3.18 rule 9: a trial
+/// whose boundary cannot be established is refused with 2, nothing launched
+/// and nothing recorded, and the project's one trial is not spent.
+#[test]
+fn a_trial_whose_boundary_cannot_be_established_is_refused_and_not_spent() {
+    let f = Fixture::new();
+    // A protected file with a second name refuses the boundary's admission
+    // (rule 2: no spelling of a protected path, a hard link included).
+    let alias = f.dir.path().join("alias-of-protected");
+    std::fs::hard_link(f.home().join("projects.json"), &alias).unwrap();
+    let out = f.trial(&["--synthetic"]);
+    std::fs::remove_file(&alias).unwrap();
+    assert_eq!(code(&out), 2, "{}", text(&out));
+    assert!(text(&out).contains("boundary"), "{}", text(&out));
+    assert_eq!(f.launches(), 0);
+    assert!(!f.attempt_dir().join("launched.json").exists());
+    assert!(!f.attempt_dir().join("trial.json").exists());
+    let out = f.trial(&["--synthetic"]);
+    assert_eq!(code(&out), 0, "{}", text(&out));
+    assert_eq!(f.launches(), 1);
+}
+
+/// Spec 006 section 3.7: `doctor` on a clean environment exits 0. The
+/// fixture is the operator's route: initialized, the harness requirement
+/// committed, the bridge in place, registered and armed.
+#[test]
+fn doctor_on_a_clean_environment_exits_zero() {
+    let f = Fixture::new();
+    let record = statecraft_adapter_claude_code::qualification::record(
+        "2.1.267",
+        "synthetic-fixture-only",
+        "2026-09-23T00:00:00Z",
+    );
+    std::fs::write(
+        f.home().join("qualifications.json"),
+        serde_json::to_vec(&vec![record]).unwrap(),
+    )
+    .unwrap();
+    let out = f.cli(&["doctor", &f.root()]);
+    if cfg!(target_os = "macos") {
+        assert_eq!(code(&out), 0, "{}", text(&out));
+        assert!(text(&out).contains("no findings"), "{}", text(&out));
+    } else {
+        // Elsewhere the provider's credential mechanism is absent (spec 004
+        // section 3.14), so the adapter is unavailable and that is the one
+        // finding: the environment is otherwise clean.
+        assert_eq!(code(&out), 1, "{}", text(&out));
+        let findings: Vec<_> = text(&out)
+            .lines()
+            .filter(|l| l.starts_with("finding"))
+            .map(str::to_string)
+            .collect();
+        assert_eq!(findings.len(), 1, "{}", text(&out));
+        assert!(findings[0].contains("credential"), "{}", text(&out));
+    }
+}
