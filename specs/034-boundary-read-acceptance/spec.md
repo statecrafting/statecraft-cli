@@ -2,7 +2,7 @@
 id: "034-boundary-read-acceptance"
 title: "Protected boundary acceptance preserves read-only checkout access"
 status: approved
-implementation: pending
+implementation: complete
 created: "2026-10-03"
 summary: >
   Corrects the self-test and hostile-fixture acceptance of spec 004 section
@@ -104,6 +104,31 @@ Only spec 004's verification command list is replaced. The existing command
 lists of specs 006 and 015 remain in force; their behavioral amendments do not
 replace those lists.
 
+**2026-10-08: the implementation is complete; rule 12 is not this spec's to
+close.** The correction was delivered by the split stack of #214 (#217 to
+#221) and was never moved off `pending`. Each acceptance criterion has a named
+test: the fixed probe's `targetRead`, `targetWriteDenied` and refused home and
+launch-record reads and writes (criterion 1, `protected_boundary`'s
+`exact_policy_preserves_readonly_access_and_denies_evidence_access`); the
+hostile provider through the real `run` path, which reads the checkout and
+another attempt's workspace by absolute, relative, symbolic-link, case-variant
+and firmlink spellings and is refused every mutation of them, while every read
+and mutation of the run chain, the override journal, its state authority and
+the launch records is refused, including from a descendant in a new session
+(criterion 2, `run_startup`'s
+`a_hostile_provider_cannot_change_authority_or_redirect_supervisor_git`); a
+checkout sentinel that both tests read is ordinary committed input under a
+read-only grant, and no test denies it (criterion 3); and
+three confined captures that qualify against one source identity, with each
+substituted root, commit, tree, workspace and policy workspace, a missing
+source or confinement and a mixed legacy control refused before any
+observation record is written (criteria 4 and 5,
+`qualification_workflow`'s
+`confined_capture_source_and_workspace_substitutions_are_refused`). This spec
+corrects acceptance and adds a binding; it states that rule 12's open items
+are preserved and accounts for no part of Constitution IX of its own, so spec
+004 section 3.18 rule 12 keeps 004, not this amendment, from `complete`.
+
 ## Verification
 
 These commands exercise the provider-neutral fixed probe and the real product
@@ -111,8 +136,8 @@ run and acceptance paths with synthetic providers. They require no provider
 credentials. Platform-specific probes run only on their matching platform;
 passing one platform does not qualify the other. The replacement retains spec
 004's original verification commands and adds the boundary regressions below.
-The `protected_boundary` target is delivered with the separate implementation.
-While implementation is pending, this declaration is not passing acceptance.
+The `protected_boundary` target was delivered with the separate
+implementation.
 
 ```verify:cli
 cargo build --workspace --locked
