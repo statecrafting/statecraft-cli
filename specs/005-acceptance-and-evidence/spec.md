@@ -19,6 +19,10 @@ summary: >
 establishes:
   - { kind: directory, path: "crates/statecraft-acceptance/" }
   - { kind: directory, path: "crates/statecraft-envelope/" }
+extends:
+  # Section 3.19's acceptance through the binary lives in the command
+  # surface's test suite; this spec adds to it and owns nothing there.
+  - { spec: "006-command-surface", unit: { kind: directory, path: "crates/statecraft-cli/" }, nature: additive }
 depends_on:
   - "000-bootstrap"
   - "001-boundaries-and-authority"

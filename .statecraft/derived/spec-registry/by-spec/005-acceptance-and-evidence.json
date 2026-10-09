@@ -17,6 +17,16 @@
         "path": "crates/statecraft-envelope/"
       }
     ],
+    "extends": [
+      {
+        "nature": "additive",
+        "spec": "006-command-surface",
+        "unit": {
+          "kind": "directory",
+          "path": "crates/statecraft-cli/"
+        }
+      }
+    ],
     "id": "005-acceptance-and-evidence",
     "implementation": "complete",
     "sectionDigests": {
@@ -90,6 +100,6 @@
     "summary": "How a claim of completion becomes, or fails to become, an acceptance. Fixes the identification of candidate bytes and the trusted base, the authority-set rule that stops a candidate from being judged by rules it wrote, the receipt that binds repository, base, candidate, suite, exit codes and policy digest, the four evidence dimensions reported separately from admission with closed value sets, independently supplied trust roots, the preservation of original bytes and named hash constructions, and the three names for absence, none of which reads as success. It also owns the envelope crate the statecraft platform wrote against these serializations and transferred here, which makes one owner for the reference, the dimensions, admission and the absence words rather than two implementations of one wire format.\n",
     "title": "Independent acceptance, the receipt, the separately reported evidence dimensions, and the envelope two products exchange"
   },
-  "shardHash": "30fe10baea96ce5c1bbc9950352434e3caad07bff737c5366f868e3d7a83c592",
+  "shardHash": "5f8b04d7f4d60caeee94ef0dd0d0e953ab3ec5d8b237eb4b8ba820fde62924d7",
   "specVersion": "1.9.0"
 }

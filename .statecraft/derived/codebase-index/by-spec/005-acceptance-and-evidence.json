@@ -12,6 +12,10 @@
         "source": "spec-edge"
       },
       {
+        "path": "crates/statecraft-cli/",
+        "source": "spec-edge"
+      },
+      {
         "path": "crates/statecraft-envelope",
         "source": "manifest-metadata"
       },
@@ -46,11 +50,24 @@
           "kind": "directory",
           "path": "crates/statecraft-envelope/"
         }
+      },
+      {
+        "locations": [
+          {
+            "file": "crates/statecraft-cli/"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "directory",
+          "path": "crates/statecraft-cli/"
+        }
       }
     ],
     "specId": "005-acceptance-and-evidence",
     "specStatus": "approved"
   },
   "schemaVersion": "1.2.0",
-  "shardHash": "30fe10baea96ce5c1bbc9950352434e3caad07bff737c5366f868e3d7a83c592"
+  "shardHash": "5f8b04d7f4d60caeee94ef0dd0d0e953ab3ec5d8b237eb4b8ba820fde62924d7"
 }
