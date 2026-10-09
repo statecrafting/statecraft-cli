@@ -1394,7 +1394,14 @@ fn a_run_whose_boundary_cannot_be_established_is_refused_with_no_attempt() {
         })
         .unwrap_or(0);
     assert_eq!(attempts, 0, "{v}");
-    // With the second name removed, the same run is admitted.
+    // With the second name removed, the same run is admitted. It may conclude
+    // as a finding (1), as every run in this file may: what this asserts is
+    // that it is no longer refused (2) at the boundary.
     let out = f.cli(&["run", &root, DRAFT]);
     assert!(code(&out) <= 1, "{}", text(&out));
+    assert!(
+        !text(&out).contains("boundary unavailable"),
+        "{}",
+        text(&out)
+    );
 }

@@ -1080,7 +1080,7 @@ fn a_capture_whose_boundary_cannot_be_established_is_refused_and_writes_nothing(
     assert!(stdout(&out).contains("boundary"), "{}", stdout(&out));
     assert_eq!(code(&out), 2, "{}", stdout(&out));
     let records = std::fs::read_dir(&dir)
-        .map(|entries| entries.count())
+        .map(|entries| entries.filter_map(Result::ok).count())
         .unwrap_or(0);
     assert_eq!(records, 0, "a refused capture wrote into {}", dir.display());
     // With the second name removed, the same capture is admitted.
