@@ -1045,21 +1045,8 @@ pub fn disagreements(manifest: &Manifest) -> Vec<String> {
             continue;
         }
         paths.push(&r.path);
-        let entry = manifest.entry(&r.path);
         let now = Ownership::of(manifest, &r.path);
-        if now == r.to {
-            continue;
-        }
-        let removed_by_env_remove = r.to == Ownership::Managed && entry.is_none();
-        let rewritten_by_env_apply = r.to == Ownership::User
-            && entry.is_some_and(|e| {
-                e.class == Class::Managed
-                    && e.transfer.is_none()
-                    && (e.source.kind == SourceKind::Adapter
-                        || (e.source.kind == SourceKind::Template
-                            && e.source.identity == GOVERNANCE_SOURCE))
-            });
-        if removed_by_env_remove || rewritten_by_env_apply {
+        if now == r.to || superseded(manifest, r) {
             continue;
         }
         out.push(format!(
@@ -1072,6 +1059,26 @@ pub fn disagreements(manifest: &Manifest) -> Vec<String> {
         ));
     }
     out
+}
+
+/// Whether a path's latest record was followed by one of the two recorded
+/// operations of this product that rule 5 does not count as a disagreement: a
+/// move to `managed` whose entry `env remove` then removed, and a move to
+/// `user` whose file `env apply` (or initialization, for a governance
+/// template) then wrote afresh as `managed`. Spec 026 reads such a record as
+/// no longer naming the path's class.
+pub fn superseded(manifest: &Manifest, record: &TransferRecord) -> bool {
+    let entry = manifest.entry(&record.path);
+    let removed_by_env_remove = record.to == Ownership::Managed && entry.is_none();
+    let rewritten_by_env_apply = record.to == Ownership::User
+        && entry.is_some_and(|e| {
+            e.class == Class::Managed
+                && e.transfer.is_none()
+                && (e.source.kind == SourceKind::Adapter
+                    || (e.source.kind == SourceKind::Template
+                        && e.source.identity == GOVERNANCE_SOURCE))
+        });
+    removed_by_env_remove || rewritten_by_env_apply
 }
 
 fn recorded_without_journal(manifest: &Manifest) -> Vec<String> {

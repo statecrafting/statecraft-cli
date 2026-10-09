@@ -2,7 +2,7 @@
 id: "026-ownership-disagreement"
 title: "doctor reports a path whose recorded ownership disagrees with the transfer journal or the current rendering"
 status: approved
-implementation: pending
+implementation: complete
 created: "2026-09-27"
 summary: >
   Amends spec 002 section 3.5 with one additive, read-only doctor finding,
@@ -161,9 +161,58 @@ an operation that would act on the wrong owner's file, which is what section
 reads an operator's file does not claim it; the SC-004 defect was treating a
 read as ownership, and this finding must not repeat it.
 
+**2026-10-08: what the rendering is.** Section 3.1 computes the rendering
+"exactly as `env plan` computes it", and `env plan` covers only the adapters,
+while the governance contract paths and the setup profile's files are planned
+by `init plan`, which asks the same planner for the governance paths. So the
+rendering is two read-only computations joined: `init plan`'s preflight for
+the governance producer's paths and the selected profile's, and the
+declarations `env plan` reads for the adapters'. Within it, a path
+initialization adopts or depends on without rewriting is `read-only`; a
+governance path the operator released and whose file is present is not
+rendered, because initialization preserves it; a profile path the profile
+leaves alone is not rendered; and an adapter that does not claim its paths on
+this host still renders them, because its absence is reported as
+`adapter-unavailable` and is not a change of owner. Where two sources name one
+path, `managed` is kept over `read-only`.
+
+**2026-10-08: the journaled fact follows spec 002 section 3.35 rule 5.** That
+rule names two recorded operations of this product that follow a transfer and
+are not a disagreement: a move to `managed` whose entry `env remove` removed,
+and a move to `user` whose file `env apply` or initialization wrote afresh. A
+latest record followed by one of them no longer names the path's class, and
+reads as `none` here, so `doctor` and `transfer plan` judge the journal by one
+definition, which both now call. Without this, either operation would leave
+`doctor` reporting a disagreement the transfer verbs do not.
+
+**2026-10-08: a journal disagreement does not make the rendering
+unavailable.** `init plan` refuses while the journal disagrees with the
+manifest. For the rendering that refusal is skipped, because the disagreement
+is this spec's first row and is reported as such, and treating it as an
+unavailable rendering would hide every other row.
+
+**2026-10-08: `ownership-rendering-unavailable` is information.** Section 3.3
+says it is reported once, with its reason, and names no exit; section 3.2's
+non-zero exit is for a row, which predicts a wrong operation. The report is a
+`doctor` note, so it never reads as agreement and does not by itself change the
+exit; the cause (a profile that does not resolve, a producer that does not
+answer, a pin that refuses) is reported where it already is.
+
 ## Verification
 
-No implementation acceptance is declared while this spec is unratified. The
-`V-1` inputs name the fixture surface a later implementation adds: an isolated
-home and fixture repositories exercising each table row, the unavailable
-rendering, a legacy manifest, and a tree digest taken before and after doctor.
+The library suite covers each row of section 3.2's table, `read-only`, the
+`foreign` overlap, the recorded follow-ons of the 2026-10-08 entry, an
+unavailable rendering, an entry transferred before the journal existed, and
+the order and read-only property of section 3.4. The binary suite drives
+`doctor --json` against fixture repositories in an isolated home, compares
+every file of the tree (`.git` included) before and after each run, and
+covers a legacy manifest without a journal, a released contract path the
+rendering would write again, a recorded/journaled and an unrendered managed
+entry, and a selection that does not resolve.
+
+```verify:cli
+cargo test -p statecraft-environment --test ownership_disagreement
+cargo test -p statecraft-cli --test doctor_ownership
+cargo test -p statecraft-environment --test transfer
+cargo test -p statecraft-cli --test ownership_transfer
+```
