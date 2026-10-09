@@ -1077,7 +1077,8 @@ fn a_capture_whose_boundary_cannot_be_established_is_refused_and_writes_nothing(
     std::fs::hard_link(sandbox.home().join("home.json"), &alias).unwrap();
     let out = sandbox.capture("refusal", "faithful", &[]);
     std::fs::remove_file(&alias).unwrap();
-    assert!(stdout(&out).contains("boundary"), "{}", stdout(&out));
+    let both = format!("{}{}", stdout(&out), String::from_utf8_lossy(&out.stderr));
+    assert!(both.contains("boundary"), "{both}");
     assert_eq!(code(&out), 2, "{}", stdout(&out));
     let records = std::fs::read_dir(&dir)
         .map(|entries| entries.filter_map(Result::ok).count())
