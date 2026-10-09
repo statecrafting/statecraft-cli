@@ -1185,3 +1185,209 @@ fn recover_usage_and_refusals() {
     assert_eq!(code(&out), 2, "{}", text(&out));
     assert!(files(&f, &root) == (None, None));
 }
+
+/// Spec 006 section 3.11.8's amendment of section 3.11.5, for the verbs the
+/// other tests do not reach: a pending line refuses `override revoke`, `work
+/// list` and `work show` with 2 naming `override recover`; a write in progress
+/// refuses `work show`, `override grant` and `override revoke` with 2; and a
+/// journal that disagrees with its authority fails `work show` with 4. Each
+/// writes nothing.
+#[test]
+fn every_journal_state_answers_work_show_and_the_override_verbs_by_its_code() {
+    // Pending.
+    let f = Fixture::new();
+    let root = f.repository("a");
+    let home = f.home();
+    let _ = statecraft_run::overrides::change_with_fault(
+        &fault_request(&f, &home, &root),
+        statecraft_run::overrides::Action::Grant,
+        statecraft_run::overrides::Fault::BetweenStep3And4,
+    );
+    let before = files(&f, &root);
+    for args in [
+        vec!["override", "revoke", &root, DRAFT, "bob", "why"],
+        vec!["work", "list", &root],
+        vec!["work", "show", &root, DRAFT],
+    ] {
+        let out = f.cli(&args);
+        assert_eq!(code(&out), 2, "pending: {args:?}: {}", text(&out));
+        assert!(
+            text(&out).contains("override recover"),
+            "{args:?}: {}",
+            text(&out)
+        );
+    }
+    assert_eq!(files(&f, &root), before);
+
+    // In progress: the same state while another process holds the lock.
+    let held = statecraft_run::lock::try_acquire(&f.home(), Path::new(&root)).unwrap();
+    let out = f.cli(&["work", "show", &root, DRAFT]);
+    assert_eq!(code(&out), 2, "{}", text(&out));
+    assert!(text(&out).contains("in progress"), "{}", text(&out));
+    for args in [
+        vec!["override", "grant", &root, "010-unready", "bob", "why"],
+        vec!["override", "revoke", &root, DRAFT, "bob", "why"],
+    ] {
+        let out = f.cli(&args);
+        assert_eq!(code(&out), 2, "in progress: {args:?}: {}", text(&out));
+    }
+    assert_eq!(files(&f, &root), before);
+    drop(held);
+
+    // A disagreement: the authority deleted, the journal remaining.
+    let f = Fixture::new();
+    let root = f.repository("a");
+    assert_eq!(
+        code(&f.cli(&["override", "grant", &root, DRAFT, "alice", "why"])),
+        0
+    );
+    std::fs::remove_file(statecraft_run::overrides::authority_path(
+        &f.home(),
+        Path::new(&root),
+    ))
+    .unwrap();
+    let before = files(&f, &root);
+    let out = f.cli(&["work", "show", &root, DRAFT]);
+    assert_eq!(code(&out), 4, "{}", text(&out));
+    assert!(text(&out).contains("override"), "{}", text(&out));
+    assert_eq!(files(&f, &root), before);
+}
+
+/// `adopt-prefix` and `adopt-empty` are recorded through the binary with 0,
+/// and leave a journal and authority that agree.
+#[test]
+fn adopt_prefix_and_adopt_empty_are_recorded_through_the_binary() {
+    // A journal whose last line does not read: only `adopt-prefix` keeps
+    // what verifies.
+    let f = Fixture::new();
+    let root = f.repository("a");
+    assert_eq!(
+        code(&f.cli(&["override", "grant", &root, DRAFT, "alice", "why"])),
+        0
+    );
+    let journal = statecraft_run::overrides::journal_path(&f.home(), Path::new(&root));
+    let mut bytes = std::fs::read(&journal).unwrap();
+    bytes.extend_from_slice(b"{\"not\": \"a line\"}\n");
+    std::fs::write(&journal, bytes).unwrap();
+    let (exit, report) = recover_report(&f, &root);
+    assert_eq!(exit, 1, "{report}");
+    assert!(
+        report["allowed"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|c| c == "adopt-prefix"),
+        "{report}"
+    );
+    let out = recover_with(&f, &root, "adopt-prefix");
+    assert_eq!(code(&out), 0, "{}", text(&out));
+    let (exit, report) = recover_report(&f, &root);
+    assert_eq!(
+        (exit, report["state"].as_str()),
+        (0, Some("agree")),
+        "{report}"
+    );
+
+    // An authority whose journal is missing: `adopt-empty`.
+    let f = Fixture::new();
+    let root = f.repository("a");
+    assert_eq!(
+        code(&f.cli(&["override", "grant", &root, DRAFT, "alice", "why"])),
+        0
+    );
+    std::fs::remove_file(statecraft_run::overrides::journal_path(
+        &f.home(),
+        Path::new(&root),
+    ))
+    .unwrap();
+    let out = recover_with(&f, &root, "adopt-empty");
+    assert_eq!(code(&out), 0, "{}", text(&out));
+    let (exit, report) = recover_report(&f, &root);
+    assert_eq!(
+        (exit, report["state"].as_str()),
+        (0, Some("agree")),
+        "{report}"
+    );
+    let shown = f.cli(&["override", "show", &root, "--json"]);
+    let v: serde_json::Value = json_naming::from_output(&shown.stdout).unwrap();
+    assert_eq!(v["report"]["inForce"].as_array().unwrap().len(), 0, "{v}");
+}
+
+/// `override recover` exits 4 when the files cannot be read, and 2 for an
+/// empty operator, writing nothing in either case.
+#[test]
+fn recover_fails_on_unreadable_files_and_refuses_an_empty_operator() {
+    use std::os::unix::fs::PermissionsExt;
+    let f = Fixture::new();
+    let root = f.repository("a");
+    assert_eq!(
+        code(&f.cli(&["override", "grant", &root, DRAFT, "alice", "why"])),
+        0
+    );
+    std::fs::remove_file(statecraft_run::overrides::authority_path(
+        &f.home(),
+        Path::new(&root),
+    ))
+    .unwrap();
+    let (_, report) = recover_report(&f, &root);
+    let before = files(&f, &root);
+    let out = f.cli(&[
+        "override",
+        "recover",
+        &root,
+        "adopt-as-read",
+        report["journal"]["sha256"].as_str().unwrap(),
+        report["authority"]["sha256"].as_str().unwrap(),
+        "",
+        "settling",
+    ]);
+    assert_eq!(code(&out), 2, "{}", text(&out));
+    assert_eq!(files(&f, &root), before);
+
+    let journal = statecraft_run::overrides::journal_path(&f.home(), Path::new(&root));
+    std::fs::set_permissions(&journal, std::fs::Permissions::from_mode(0o000)).unwrap();
+    if std::fs::read(&journal).is_ok() {
+        // Running with privileges that ignore file modes: nothing to observe.
+        std::fs::set_permissions(&journal, std::fs::Permissions::from_mode(0o600)).unwrap();
+        return;
+    }
+    let out = f.cli(&["override", "recover", &root]);
+    std::fs::set_permissions(&journal, std::fs::Permissions::from_mode(0o600)).unwrap();
+    assert_eq!(code(&out), 4, "{}", text(&out));
+    assert_eq!(files(&f, &root), before);
+}
+
+/// Spec 006 section 3.11.3, amended by spec 004 section 3.18 rule 9: a `run`
+/// whose boundary cannot be established is refused with 2, nothing launched
+/// and no attempt appended.
+#[test]
+fn a_run_whose_boundary_cannot_be_established_is_refused_with_no_attempt() {
+    let f = Fixture::new();
+    let root = f.repository("a");
+    assert_eq!(
+        code(&f.cli(&["override", "grant", &root, DRAFT, "alice", "why"])),
+        0
+    );
+    // A protected file with a second name refuses the boundary's admission
+    // (rule 2: no spelling of a protected path, a hard link included).
+    let alias = f.dir.path().join("alias-of-protected");
+    std::fs::hard_link(f.home().join("projects.json"), &alias).unwrap();
+    let out = f.cli(&["run", &root, DRAFT, "--json"]);
+    std::fs::remove_file(&alias).unwrap();
+    assert_eq!(code(&out), 2, "{}", text(&out));
+    assert!(text(&out).contains("boundary"), "{}", text(&out));
+    let listed = f.cli(&["run", "list", &root, "--json"]);
+    let v: serde_json::Value = json_naming::from_output(&listed.stdout).unwrap();
+    let attempts: usize = v["report"]["runs"]
+        .as_array()
+        .map(|runs| {
+            runs.iter()
+                .map(|r| r["attempts"].as_array().map_or(0, Vec::len))
+                .sum()
+        })
+        .unwrap_or(0);
+    assert_eq!(attempts, 0, "{v}");
+    // With a trusted `PATH` the same run is admitted.
+    let out = f.cli(&["run", &root, DRAFT]);
+    assert!(code(&out) <= 1, "{}", text(&out));
+}

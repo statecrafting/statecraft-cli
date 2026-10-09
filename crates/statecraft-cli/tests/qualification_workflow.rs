@@ -1063,3 +1063,27 @@ fn confined_capture_source_and_workspace_substitutions_are_refused() {
     assert_eq!(code(&qualify("source-consistent-substitution")), 2);
     assert_eq!(std::fs::read(&durable).unwrap(), before);
 }
+
+/// Spec 006 section 3.11.2, amended by spec 004 section 3.18 rule 9: a capture
+/// whose boundary cannot be established is refused with 2, launches nothing
+/// and writes no capture record.
+#[test]
+fn a_capture_whose_boundary_cannot_be_established_is_refused_and_writes_nothing() {
+    let sandbox = upgraded();
+    let dir = sandbox.capture_dir();
+    // A protected file with a second name refuses the boundary's admission
+    // (rule 2: no spelling of a protected path, a hard link included).
+    let alias = sandbox.dir.path().join("alias-of-protected");
+    std::fs::hard_link(sandbox.home().join("home.json"), &alias).unwrap();
+    let out = sandbox.capture("refusal", "faithful", &[]);
+    std::fs::remove_file(&alias).unwrap();
+    assert!(stdout(&out).contains("boundary"), "{}", stdout(&out));
+    assert_eq!(code(&out), 2, "{}", stdout(&out));
+    let records = std::fs::read_dir(&dir)
+        .map(|entries| entries.count())
+        .unwrap_or(0);
+    assert_eq!(records, 0, "a refused capture wrote into {}", dir.display());
+    // The same capture with a trusted `PATH` is admitted.
+    let out = sandbox.capture("refusal", "faithful", &[]);
+    assert_eq!(code(&out), 0, "{}", stdout(&out));
+}
