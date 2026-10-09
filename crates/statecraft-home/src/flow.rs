@@ -844,7 +844,11 @@ pub fn rendering(ctx: &Context<'_>) -> statecraft_environment::ownership::Render
         }
     }
     for kept in &prepared.computed.kept {
-        out.name(&kept.path, Rendered::Managed, &governance);
+        // A kept path has a manifest entry and a released one has none, so
+        // the guard never fires today; it keeps the three loops one rule.
+        if !released(&kept.path) {
+            out.name(&kept.path, Rendered::Managed, &governance);
+        }
     }
     for held in &prepared.computed.withheld {
         if released(&held.path) {
