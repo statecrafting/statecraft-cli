@@ -376,3 +376,49 @@ fn render(remote: &RemoteParameters) -> DesiredState {
         remote,
     })
 }
+
+#[test]
+fn legacy_remote_results_distinguish_denied_unsupported_and_unanswered_reads() {
+    use statecraft_home::setup::{Host, HostError, ResultState};
+    struct FailedHost(HostError);
+    impl Host for FailedHost {
+        fn get(&self, _: &str) -> Result<serde_json::Value, HostError> {
+            Err(self.0.clone())
+        }
+    }
+    let dir = project();
+    let out = std::process::Command::new("git")
+        .args([
+            "remote",
+            "add",
+            "origin",
+            "https://github.com/owner/repo.git",
+        ])
+        .current_dir(dir.path())
+        .output()
+        .unwrap();
+    assert!(out.status.success());
+    for (error, expected) in [
+        (
+            HostError::Unauthorized("HTTP 403".into()),
+            "refused the credential's read authority",
+        ),
+        (
+            HostError::Unsupported("plan limitation".into()),
+            "does not support the read",
+        ),
+        (HostError::Unreachable("HTTP 502".into()), "did not answer"),
+    ] {
+        let results =
+            setup::remote_results(dir.path(), &manifest(), &FailedHost(error), Some("head"));
+        for outcome in [
+            results.remote_prerequisites,
+            results.required_checks,
+            results.ci_executed,
+            results.ai_review_produced,
+        ] {
+            assert_eq!(outcome.state, ResultState::Unverified);
+            assert!(outcome.detail.contains(expected), "{}", outcome.detail);
+        }
+    }
+}

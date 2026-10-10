@@ -187,7 +187,8 @@ impl DesiredState {
     /// The canonical bytes: keys sorted, two-space indentation, a final
     /// newline.
     pub fn canonical(&self) -> Vec<u8> {
-        let value = serde_json::to_value(self).expect("serializable");
+        let mut value = serde_json::to_value(self).expect("serializable");
+        value.sort_all_objects();
         let mut text = serde_json::to_string_pretty(&value).expect("serializable");
         text.push('\n');
         text.into_bytes()
@@ -417,7 +418,7 @@ pub fn static_part(
     exception_environment: &str,
     credentials: &[String],
 ) -> String {
-    serde_json::json!({
+    let mut value = serde_json::json!({
         "schema": SCHEMA,
         "path": PATH,
         "requiredChecks": [{"name": AGGREGATE, "appId": gate_app_id}],
@@ -427,6 +428,7 @@ pub fn static_part(
         "workflowToken": {"defaultPermissions": "read", "canApprovePullRequestReviews": false},
         "secrets": [{"anyOf": credentials, "visibility": SECRET_VISIBILITY}],
         "customProperties": {"schemaOwner": "organization"},
-    })
-    .to_string()
+    });
+    value.sort_all_objects();
+    value.to_string()
 }

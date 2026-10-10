@@ -2221,11 +2221,17 @@ pub fn remote_results(
         .or_else(|| head_of(root))
         .unwrap_or_default();
 
-    let unreachable = |what: &str, e: &str| {
-        Outcome::new(
-            ResultState::Unverified,
-            format!("{what}: the host did not answer ({e})"),
-        )
+    let unverified = |what: &str, e: &HostError| {
+        let detail = match e {
+            HostError::Unauthorized(why) => {
+                format!("{what}: the host refused the credential's read authority ({why})")
+            }
+            HostError::Unsupported(why) => {
+                format!("{what}: the host or plan does not support the read ({why})")
+            }
+            _ => format!("{what}: the host did not answer ({})", e.reason()),
+        };
+        Outcome::new(ResultState::Unverified, detail)
     };
 
     // remote-prerequisites
@@ -2234,13 +2240,13 @@ pub fn remote_results(
         match host.get(&format!("repos/{slug}/actions/secrets/{CREDENTIAL}")) {
             Ok(_) => {}
             Err(HostError::NotFound) => missing.push(format!("the secret {CREDENTIAL} is not set")),
-            Err(e) => return unreachable("the secret", &e.reason()),
+            Err(e) => return unverified("the secret", &e),
         }
         match host.get(&format!("repos/{slug}/actions/permissions")) {
             Ok(v) if v["enabled"] == serde_json::json!(true) => {}
             Ok(_) => missing.push("Actions is not enabled".to_string()),
             Err(HostError::NotFound) => missing.push("Actions is not enabled".to_string()),
-            Err(e) => return unreachable("Actions permissions", &e.reason()),
+            Err(e) => return unverified("Actions permissions", &e),
         }
         match host.get(&format!("repos/{slug}/actions/permissions/workflow")) {
             Ok(v) if v["default_workflow_permissions"] == "read" => {}
@@ -2251,7 +2257,7 @@ pub fn remote_results(
             Err(HostError::NotFound) => {
                 missing.push("the workflow token default is unknown".into())
             }
-            Err(e) => return unreachable("workflow permissions", &e.reason()),
+            Err(e) => return unverified("workflow permissions", &e),
         }
         match host.get(&format!(
             "repos/{slug}/environments/{EXCEPTION_ENVIRONMENT}"
@@ -2269,7 +2275,7 @@ pub fn remote_results(
             Err(HostError::NotFound) => missing.push(format!(
                 "the Environment {EXCEPTION_ENVIRONMENT} does not exist"
             )),
-            Err(e) => return unreachable("the exception Environment", &e.reason()),
+            Err(e) => return unverified("the exception Environment", &e),
         }
         if missing.is_empty() {
             Outcome::new(
@@ -2329,7 +2335,7 @@ pub fn remote_results(
             ResultState::NotSatisfied,
             format!("{branch} has no branch protection"),
         ),
-        Err(e) => unreachable("branch protection", &e.reason()),
+        Err(e) => unverified("branch protection", &e),
     };
 
     // ci-executed
@@ -2370,7 +2376,7 @@ pub fn remote_results(
             ResultState::NotSatisfied,
             format!("{head} is not known to the host"),
         ),
-        Err(e) => unreachable("check runs", &e.reason()),
+        Err(e) => unverified("check runs", &e),
     };
 
     // ai-review-produced
@@ -2398,7 +2404,7 @@ pub fn remote_results(
             ResultState::NotSatisfied,
             format!("no evidence artifact for {head}"),
         ),
-        Err(e) => unreachable("artifacts", &e.reason()),
+        Err(e) => unverified("artifacts", &e),
     };
 
     Results {
