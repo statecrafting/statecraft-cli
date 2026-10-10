@@ -646,6 +646,56 @@ fn an_absent_secret_name_is_drifted_and_no_value_is_requested() {
 }
 
 #[test]
+fn organization_secret_names_are_compared_across_pages_and_partial_reads_are_unverified() {
+    let doc = render(&full_remote());
+    let mut host = matching(&doc);
+    host.answers.insert(
+        r(&format!("/actions/secrets/{}", setup::CREDENTIAL)),
+        Err(HostError::NotFound),
+    );
+    let names: Vec<_> = (0..100)
+        .map(|i| serde_json::json!({"name": format!("OTHER_{i}")}))
+        .collect();
+    host.answers.insert(
+        r("/actions/organization-secrets?per_page=100"),
+        Ok(serde_json::json!({"total_count": 101, "secrets": names})),
+    );
+    let next = r("/actions/organization-secrets?per_page=100&page=2");
+    host.answers.insert(
+        next.clone(),
+        Ok(serde_json::json!({
+            "total_count": 101, "secrets": [{"name": setup::PREFERRED_CREDENTIAL}]
+        })),
+    );
+    let leaf = "secrets.ANTHROPIC_API_KEY|CLAUDE_CODE_OAUTH_TOKEN";
+    let c = remote_state::compare(Ok(Some(doc.clone())), Some(SLUG), &host);
+    assert_eq!(state(&c, leaf), FieldState::Matching);
+    assert!(host.asked.borrow().contains(&next));
+
+    host.answers
+        .insert(next, Err(HostError::Unauthorized("HTTP 403".into())));
+    let c = remote_state::compare(Ok(Some(doc)), Some(SLUG), &host);
+    assert_eq!(state(&c, leaf), FieldState::Unauthorized);
+}
+
+#[test]
+fn malformed_unicode_identities_are_findings_instead_of_panics() {
+    let dir = project();
+    let mut m = manifest();
+    let plan = plan_with(dir.path(), &m, &BTreeMap::new()).unwrap();
+    apply(dir.path(), &plan, &mut m);
+    let path = dir.path().join(remote_state::PATH);
+    let mut doc = DesiredState::parse(&std::fs::read(&path).unwrap()).unwrap();
+    doc.profile.identity = "a".repeat(11) + "é";
+    std::fs::write(&path, doc.canonical()).unwrap();
+    assert!(
+        remote_state::read_local(dir.path(), &m)
+            .unwrap_err()
+            .contains("selected profile")
+    );
+}
+
+#[test]
 fn a_feature_absent_from_the_plan_is_unsupported_and_names_the_limitation() {
     let doc = render(&full_remote());
     let mut host = matching(&doc);

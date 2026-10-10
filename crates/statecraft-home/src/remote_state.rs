@@ -619,7 +619,7 @@ pub fn read_local(
 }
 
 fn short(s: &str) -> &str {
-    if s.len() > 12 { &s[..12] } else { s }
+    &s[..s.char_indices().nth(12).map_or(s.len(), |(i, _)| i)]
 }
 
 /// The comparison, from the local read and the host. The host is asked
@@ -1658,6 +1658,53 @@ fn token_leaves(
     }
 }
 
+// The absence of a name is evidence only after every page was read.
+fn organization_secret_names(
+    reads: &Reads<'_>,
+    wanted: &[String],
+) -> Result<Vec<String>, HostError> {
+    let mut names = Vec::new();
+    let mut page = 1;
+    loop {
+        let path = if page == 1 {
+            "/actions/organization-secrets?per_page=100".into()
+        } else {
+            format!("/actions/organization-secrets?per_page=100&page={page}")
+        };
+        let answer = reads.get(&path).map_err(|e| match e {
+            HostError::NotFound if page > 1 => {
+                HostError::Unreachable("a secret names page is absent".into())
+            }
+            other => other,
+        })?;
+        let entries = answer["secrets"]
+            .as_array()
+            .ok_or_else(|| HostError::Unreachable("the secret names answer has no list".into()))?;
+        for entry in entries {
+            names.push(
+                entry["name"]
+                    .as_str()
+                    .ok_or_else(|| {
+                        HostError::Unreachable("a secret name is absent from the answer".into())
+                    })?
+                    .to_owned(),
+            );
+        }
+        let more = answer["total_count"]
+            .as_u64()
+            .map_or(entries.len() == 100, |total| (names.len() as u64) < total);
+        if !more || names.iter().any(|name| wanted.contains(name)) {
+            return Ok(names);
+        }
+        if entries.is_empty() {
+            return Err(HostError::Unreachable(
+                "the secret names listing is incomplete".into(),
+            ));
+        }
+        page += 1;
+    }
+}
+
 fn secret_leaves(
     doc: &DesiredState,
     reads: &Reads<'_>,
@@ -1681,12 +1728,10 @@ fn secret_leaves(
             }
         }
         if s.visibility.iter().any(|v| v == "organization") && owner_is_user(repo) != Some(true) {
-            match reads.get("/actions/organization-secrets?per_page=100") {
+            match organization_secret_names(reads, &s.any_of) {
                 Ok(v) => {
-                    for x in v["secrets"].as_array().into_iter().flatten() {
-                        if let Some(n) = x["name"].as_str()
-                            && s.any_of.iter().any(|a| a == n)
-                        {
+                    for n in &v {
+                        if s.any_of.iter().any(|a| a == n) {
                             seen.push(json!({"name": n, "visibility": "organization"}));
                         }
                     }
