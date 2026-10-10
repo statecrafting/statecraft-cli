@@ -965,9 +965,9 @@ reconstructing it from current state.
 about an unresolved attempt and never rewrites or rolls back the original
 journal entry.
 
-**2026-10-10: the ledger dependency is the exact registry release.** The
-workspace consumes `attest-ledger-core =0.2.0`, adopted at the owner's
-request on 2026-10-10; a Git revision is not a publishable dependency identity.
+**2026-09-25: the ledger dependency is the exact registry release.** The
+workspace consumes `attest-ledger-core =0.1.0`; a Git revision is not a
+publishable dependency identity.
 
 **2026-09-28: section 3.1.5's state authority, as built.** The authority is
 `<key>.overrides.authority.json` beside the journal and counts as history for
@@ -1018,6 +1018,10 @@ section 3.1.3's states are decided by the same words under every release.
 
 Still open, so 003 stays `in-progress`: the confined-child line of section
 3.1.5's acceptance, and the branch directory of spec `004` section 3.18 rule 3.
+
+**2026-10-10: adopt the next exact registry release.** At the owner's request,
+the workspace now consumes `attest-ledger-core =0.2.0`. The exact registry
+identity requirement remains unchanged.
 
 ## Verification
 
