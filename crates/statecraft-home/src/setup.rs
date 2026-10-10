@@ -2409,6 +2409,37 @@ pub fn remote_results(
     }
 }
 
+/// `doctor --remote`: the six results and the desired-state comparison
+/// (spec 012 section 3.2). A local finding about the document is raised
+/// before any host is asked, so the host is then asked nothing.
+pub fn remote_report(
+    root: &Path,
+    manifest: &Manifest,
+    host: &dyn Host,
+    head: Option<&str>,
+) -> (Results, crate::remote_state::Comparison) {
+    let local = crate::remote_state::read_local(root, manifest);
+    if let Err(finding) = &local {
+        let why = format!("no host was asked: {finding}");
+        let results = Results {
+            files_installed: installed_from_manifest(root, manifest),
+            local_checks: Outcome::new(
+                ResultState::NotRun,
+                "`doctor --remote` does not run the local gate",
+            ),
+            remote_prerequisites: Outcome::new(ResultState::Unverified, why.clone()),
+            required_checks: Outcome::new(ResultState::Unverified, why.clone()),
+            ci_executed: Outcome::new(ResultState::Unverified, why.clone()),
+            ai_review_produced: Outcome::new(ResultState::Unverified, why),
+        };
+        return (results, crate::remote_state::compare(local, None, host));
+    }
+    let results = remote_results(root, manifest, host, head);
+    let slug = repository_slug(root);
+    let comparison = crate::remote_state::compare(local, slug.as_deref(), host);
+    (results, comparison)
+}
+
 /// `files-installed`, from the manifest's profile entries and the disk.
 pub fn installed_from_manifest(root: &Path, manifest: &Manifest) -> Outcome {
     if manifest.project.setup.is_none() {
