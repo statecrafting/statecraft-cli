@@ -1558,7 +1558,7 @@ fn exception_leaves(
         .filter_map(|r| match r["type"].as_str() {
             Some("User") => r["reviewer"]["login"].as_str().map(|l| format!("@{l}")),
             Some("Team") => {
-                let org = owner_login(repo).unwrap_or_default();
+                let org = owner_login(repo)?;
                 r["reviewer"]["slug"]
                     .as_str()
                     .map(|s| format!("@{org}/{s}"))
@@ -1569,6 +1569,17 @@ fn exception_leaves(
     // Section 3.3 rule 5: each declared reviewer separately.
     for (field, x) in reviewer_fields {
         let want = x.as_str().unwrap_or_default();
+        if want.contains('/') && owner_login(repo).is_none() {
+            let (state, reason) = match repo {
+                Err(e) => failed("the repository owner needed to identify team reviewers", e),
+                Ok(_) => (
+                    FieldState::Unverified,
+                    "the repository owner needed to identify team reviewers is unknown".into(),
+                ),
+            };
+            out.push(result(field, state, Some(x), None, reason));
+            continue;
+        }
         let found = configured.iter().any(|c| c.eq_ignore_ascii_case(want));
         out.push(result(
             field,

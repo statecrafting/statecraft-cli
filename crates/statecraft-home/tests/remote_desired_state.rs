@@ -696,6 +696,55 @@ fn malformed_unicode_identities_are_findings_instead_of_panics() {
 }
 
 #[test]
+fn team_reviewers_preserve_an_unreadable_owner_without_hiding_independent_fields() {
+    for (answer, expected) in [
+        (
+            Err(HostError::Unreachable("HTTP 502".into())),
+            FieldState::Unavailable,
+        ),
+        (
+            Err(HostError::Unauthorized("HTTP 403".into())),
+            FieldState::Unauthorized,
+        ),
+        (
+            Ok(serde_json::json!({"private": false, "owner": {"type": "Organization"}})),
+            FieldState::Unverified,
+        ),
+    ] {
+        let doc = render(&full_remote());
+        let mut host = matching(&doc);
+        host.answers.insert(r(""), answer);
+        let c = remote_state::compare(Ok(Some(doc)), Some(SLUG), &host);
+        assert_eq!(
+            state(&c, "reviewException.reviewers.@owner/release"),
+            expected
+        );
+        assert_eq!(
+            state(&c, "reviewException.reviewers.@owner"),
+            FieldState::Matching
+        );
+        assert_eq!(
+            state(&c, "reviewException.preventSelfReview"),
+            FieldState::Matching
+        );
+        assert!(
+            !c.extras
+                .iter()
+                .any(|extra| extra.observed == serde_json::json!("@/release"))
+        );
+    }
+}
+
+#[test]
+fn the_contents_fixture_wraps_every_base64_line_at_sixty_columns() {
+    let encoded = b64(&[0; 180]);
+    assert_eq!(
+        encoded.lines().map(str::len).collect::<Vec<_>>(),
+        vec![60; 4]
+    );
+}
+
+#[test]
 fn a_feature_absent_from_the_plan_is_unsupported_and_names_the_limitation() {
     let doc = render(&full_remote());
     let mut host = matching(&doc);
