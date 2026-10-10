@@ -119,6 +119,33 @@ fn the_profile_renders_one_canonical_document_the_manifest_records() {
     let bytes = std::fs::read(root.join(remote_state::PATH)).unwrap();
     let doc = DesiredState::parse(&bytes).unwrap();
     assert_eq!(doc.canonical(), bytes, "the committed bytes are canonical");
+    // Check the emitted ordering independently of canonical() itself.
+    let text = std::str::from_utf8(&bytes).unwrap();
+    let keys: Vec<_> = text
+        .lines()
+        .filter_map(|line| {
+            line.strip_prefix("  \"")
+                .and_then(|rest| rest.split('"').next())
+        })
+        .collect();
+    let mut sorted = keys.clone();
+    sorted.sort();
+    assert_eq!(
+        keys, sorted,
+        "the emitted root keys are lexicographically sorted"
+    );
+    assert!(text.contains("\"profile\": {\n    \"id\":"));
+    let obligations = setup::remote_obligations();
+    let revision = |n| {
+        obligations
+            .iter()
+            .position(|note| note.starts_with(&format!("revision {n}:")))
+            .unwrap()
+    };
+    assert!(
+        revision(13) < revision(16),
+        "revision notes stay chronological"
+    );
     assert_eq!(doc.schema, remote_state::SCHEMA);
     assert_eq!(
         doc.profile,
