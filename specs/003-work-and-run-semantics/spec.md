@@ -965,7 +965,7 @@ reconstructing it from current state.
 about an unresolved attempt and never rewrites or rolls back the original
 journal entry.
 
-**2026-09-25: the ledger dependency is the exact registry release.** The
+**2026-10-10: the ledger dependency is the exact registry release.** The
 workspace consumes `attest-ledger-core =0.2.0`, adopted at the owner's
 request on 2026-10-10; a Git revision is not a publishable dependency identity.
 
