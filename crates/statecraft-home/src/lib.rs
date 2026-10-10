@@ -68,6 +68,7 @@ pub mod launch;
 pub mod prerequisite;
 pub mod producer;
 pub mod project;
+pub mod remote_state;
 pub mod required;
 pub mod resolved;
 pub mod service;

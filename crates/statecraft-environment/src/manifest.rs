@@ -281,6 +281,27 @@ pub struct SetupSelection {
     /// The project's parameter values.
     #[serde(default)]
     pub parameters: BTreeMap<String, serde_json::Value>,
+    /// The remote desired-state document the selection rendered (spec 012
+    /// section 3.1); absent before profile revision 16.
+    #[serde(
+        default,
+        rename = "remoteState",
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub remote_state: Option<RemoteStateRecord>,
+}
+
+/// Where a selection's remote desired-state document is, its digest and its
+/// schema version (spec 012 section 3.1). The profile id and revision are
+/// the selection's own.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct RemoteStateRecord {
+    /// Repository-relative.
+    pub path: String,
+    /// The rendered bytes' digest.
+    pub digest: String,
+    /// The document's schema version.
+    pub schema: String,
 }
 
 /// A declared value this product refuses to commit, and why.

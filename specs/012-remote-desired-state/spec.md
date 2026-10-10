@@ -2,7 +2,7 @@
 id: "012-remote-desired-state"
 title: "A setup profile declares remote desired state and doctor compares it without writing"
 status: approved
-implementation: pending
+implementation: in-progress
 created: "2026-09-26"
 summary: >
   Amends 002's setup-profile and remote-doctor contract. A profile renders a
@@ -199,10 +199,81 @@ current plan or settings.
 
 ## 5. Resolved decisions
 
-None. This draft has no implementation authority.
+### 2026-10-10: choices the implementation made where this spec is silent
+
+1. **Revision and location.** The document is a new rendered file, so it is
+   profile revision 16 of `github-actions-rust`: a changed byte is a different
+   revision. It renders at `.statecraft/setup/github-actions-rust.remote.json`
+   beside the policy, with schema `statecraft/remote-desired-state/1`, is a
+   member of the authority set, is listed in the policy's `files`, and is one
+   of the governed paths `CODEOWNERS` covers. The profile identity commits to
+   the document's parameter-independent part. The manifest records the path,
+   digest and schema in the selection's `remoteState`; the profile id and
+   revision are the selection's own fields and the entry's source identity.
+   Canonical means sorted keys, two-space indentation and a final newline.
+2. **Where declared values come from.** Fields the profile already fixes are
+   rendered from it: `ci-gate` from GitHub Actions (app id 15368), the
+   declared extra jobs aggregated by `ci-gate`, code-owner review required
+   over the profile's owned paths with `review.code_owners` as the required
+   owners when declared, the exception Environment with self-review
+   prevented, a `read` workflow token that may not approve pull requests, and
+   one secret requirement satisfied by `ANTHROPIC_API_KEY` or
+   `CLAUDE_CODE_OAUTH_TOKEN` at repository or organization visibility. Three
+   setup parameters declare what the profile cannot know:
+   `remote.merge_queue`, `remote.exception_reviewers` and
+   `remote.custom_properties`. Each is closed (an unknown key refuses the
+   plan), and each omitted one is omitted from the document, so `doctor
+   --remote` reports it `unverified` and not a finding.
+3. **The local finding, and what a pre-16 selection gets.** A document whose
+   profile claim differs from the selection, whose bytes differ from the
+   recorded digest, that fails to parse, or that is absent after the
+   selection rendered it, is a local finding: no host is asked, and the six
+   results' four remote rows are `unverified` with that reason. A selection
+   from before revision 16 records no document and gets a note, not a
+   finding.
+4. **Host reads.** Required checks and code-owner review are read from both
+   classic branch protection and the rulesets that apply to the default
+   branch; a match from either is `matching`, and when neither matches while
+   one source failed, the failure's state is reported rather than `drifted`.
+   The `profile` leaf compares the policy on the default branch, and an extra
+   job compares the policy's required declaration and the rendered workflow's
+   `ci-gate` `needs`, both read through the contents API. `CODEOWNERS` is read
+   at its three locations; exact paths, directory prefixes, `*`, `/dir/*` and
+   `/dir/**` are evaluated with last-match-wins, and any other pattern that
+   could decide a governed path makes that leaf `unverified`.
+5. **Capability classification.** A personal repository makes merge queue and
+   custom-property leaves `unsupported`, and makes Environment reviewers on a
+   private repository `unsupported`. A private organization repository
+   without required reviewers is `unverified`, because the organization's
+   plan is not visible to the read. A `gh` failure is classified from its
+   error stream alone: HTTP 404 is not found, 401 or 403 naming a plan
+   upgrade is `unsupported`, other 401 or 403 is `unauthorized`, anything else
+   is `unavailable`. The reason keeps only the HTTP status, never a response
+   body, header or credential.
+6. **Exit and surface.** `doctor --remote --json` carries the comparison as
+   `remoteState` beside the six results: the document, its schema, any local
+   finding or note, one result per leaf with `declared`, the expected and
+   observed values and a reason, observed undeclared `extras`, and a
+   per-state summary. The exit is a finding when the local diagnostic has
+   findings, when the document is a local finding, or when any declared leaf
+   is not `matching`. `--apply`, with or without `--remote`, is the usage
+   refusal the argument parser already gives.
 
 ## Verification
 
-Implementation acceptance is not run while `implementation: pending`. Draft
-review uses the repository gate, code gate, coupling gate, and frontmatter
-relationship report; those checks establish corpus consistency only.
+The library suite renders the document through the profile and checks its
+fields, canonical bytes, manifest record and closed parameters, and drives
+the comparison against a fake host for every leaf and each negative case of
+section 3.6: an unreachable host, one unauthorized read, an absent secret, a
+plan without the feature, a check from the wrong App, a document that
+disagrees with the selection, undeclared extra state, and omitted fields. The
+binary suite renders the document through `init apply`, runs `doctor --remote
+--json` against a stub `gh` that answers only reads, checks the per-field
+report, the finding exit and an unchanged tree, and checks that `--apply` is
+a usage refusal and that local `doctor` asks no host.
+
+```verify:cli
+cargo test -p statecraft-home --test remote_desired_state
+cargo test -p statecraft-cli --test setup_profile
+cargo test -p statecraft-home --test setup_upgrade
+```
