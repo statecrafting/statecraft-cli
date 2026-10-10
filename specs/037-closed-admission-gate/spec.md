@@ -1,7 +1,7 @@
 ---
 id: "037-closed-admission-gate"
 title: "Envelope admission evaluates through action-gate's closed mode, with identical decisions and bytes"
-status: draft
+status: approved
 implementation: in-progress
 created: "2026-10-07"
 summary: >

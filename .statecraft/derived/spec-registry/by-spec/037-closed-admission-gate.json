@@ -68,10 +68,10 @@
       "Verification"
     ],
     "specPath": "specs/037-closed-admission-gate/spec.md",
-    "status": "draft",
+    "status": "approved",
     "summary": "Amends 005 for how the envelope's admission::evaluate combines its requirements. It builds one closed action-gate gate per evaluation (action-gate-core 0.3.0, action-gate spec 004), with one required check per requirement registered in today's reason order, and maps every deny back to its RefusalCode. Decisions, refusal codes, their order, the serialized Admission and the policy-eval claim are unchanged, which a differential test against the frozen pre-change evaluator proves. The envelope stays pure and Apache-2.0; the policy digest stays the policy's identity.\n",
     "title": "Envelope admission evaluates through action-gate's closed mode, with identical decisions and bytes"
   },
-  "shardHash": "47bc95addb7efcaf780413dc492a956a424f48ca6a9900928cf12985074982d2",
+  "shardHash": "b775b25425e9ee5cf673a1fa9fd561c7822a6cb99a6e7d3531645bd7f65bd59e",
   "specVersion": "1.9.0"
 }
