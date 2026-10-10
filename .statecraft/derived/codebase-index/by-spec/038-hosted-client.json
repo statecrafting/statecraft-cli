@@ -11,47 +11,10 @@
       "035-offline-issuer-contract",
       "036-offline-issuer-verbs"
     ],
-    "implementingPaths": [
-      {
-        "path": "crates/statecraft-cli/",
-        "source": "spec-edge"
-      },
-      {
-        "path": "crates/statecraft-envelope/",
-        "source": "spec-edge"
-      }
-    ],
-    "resolvedUnits": [
-      {
-        "locations": [
-          {
-            "file": "crates/statecraft-cli/"
-          }
-        ],
-        "ownership": true,
-        "sourceField": "extends",
-        "unit": {
-          "kind": "directory",
-          "path": "crates/statecraft-cli/"
-        }
-      },
-      {
-        "locations": [
-          {
-            "file": "crates/statecraft-envelope/"
-          }
-        ],
-        "ownership": true,
-        "sourceField": "extends",
-        "unit": {
-          "kind": "directory",
-          "path": "crates/statecraft-envelope/"
-        }
-      }
-    ],
+    "implementingPaths": [],
     "specId": "038-hosted-client",
     "specStatus": "draft"
   },
   "schemaVersion": "1.2.0",
-  "shardHash": "899245355fb05861879d81179c18ef5c4d1a936415674732c721a22c6b911dfd"
+  "shardHash": "b918067aa3f25a6c4c42b57e3b689cb008f4077e37ea2b9ec5ed480a14cf9769"
 }
