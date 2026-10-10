@@ -392,6 +392,8 @@ pub fn remote_obligations() -> Vec<String> {
         "revision 11: the commit walk copies the spec-spine binary into each commit's temporary worktree as a regular file instead of linking to a binary outside it, so spec-spine's containment rule (its spec 144, from 0.28.0) can read every commit's tree; the walk's verdicts are otherwise unchanged (spec 023)".to_string(),
         "revision 12: the AI review leaves a managed file out only when its bytes match the digest the policy records, sends a file that only removes lines as a list under review.deletion_cap, measures the change in estimated tokens (bytes / 3) against a call budget of half review.context_tokens and a ceiling of review.max_calls calls, and reviews a larger change in file groups whose verdicts are merged; review.diff_cap is an added-line backstop, 20000 unless declared. With governance.require_ratified (default true) the coupling steps refuse a changed path a draft spec owns, and a pull request that moves a spec to approved needs the owner exception (spec 024)".to_string(),
         "revision 13: the repository-local spec-spine is installed at .bin/spec-spine. The installer builds in a scratch root outside the repository and atomically moves only the executable into .bin; rendered gates, workflow caches, commit checks, policy commands, delivered hooks and local resolution use that one location. The previous .tooling ignore remains on upgrade, and .bin is also ignored (spec 031)".to_string(),
+        "revision 14: external code selection runs the project-owned reusable workflow and script behind the required code job; that script joins the trusted-base authority set, and failed, cancelled or skipped code still blocks ci-gate (spec 032)".to_string(),
+        "revision 15: an exact consented spec-spine pin move is reviewed with its initialization plan, and the managed installer reads that adopted pin; this changes no required remote check or branch-protection authority (spec 033)".to_string(),
         format!("revision 16: the profile renders {} (schema {}), a canonical desired-state document of what this profile expects of the remote: required checks with their App, the extra required jobs and their aggregation by ci-gate, code-owner review and the governed paths CODEOWNERS covers, the merge queue (remote.merge_queue), the exception Environment and its reviewers (remote.exception_reviewers), workflow-token defaults, secret names, and repository custom properties (remote.custom_properties). An omitted field is no claim. `doctor --remote` compares every field read-only and reports each as matching, drifted, unavailable, unauthorized, unsupported or unverified; this product never applies it, and an owner-operated applier outside this product needs its own authorization (spec 012)", crate::remote_state::PATH, crate::remote_state::SCHEMA),
         "a repository that already runs these checks by hand keeps them by setting governance.enforce_coverage (index coverage --fail-on-untraced), governance.authored_content (the script's path; absent or not executable refuses), governance.authored_content_text (the title, the body and every commit message), governance.gate_each_commit (each commit's tree passes the gate and cargo fmt) and governance.require_signed_commits (each commit verified as signed by GitHub) (revision 4)".to_string(),
     ]
@@ -2088,9 +2090,9 @@ impl HostError {
 pub fn classify_gh_failure(stderr: &str) -> HostError {
     let status = stderr
         .split("HTTP ")
-        .nth(1)
-        .and_then(|rest| rest.get(..3))
-        .filter(|code| code.bytes().all(|b| b.is_ascii_digit()));
+        .skip(1)
+        .filter_map(|rest| rest.get(..3))
+        .find(|code| code.bytes().all(|b| b.is_ascii_digit()));
     let lower = stderr.to_ascii_lowercase();
     let plan = [
         "upgrade to github",

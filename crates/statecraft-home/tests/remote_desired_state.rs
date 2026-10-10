@@ -98,6 +98,26 @@ fn declared() -> BTreeMap<String, serde_json::Value> {
 // ------------------------------------------------------------- the document
 
 #[test]
+fn http_status_classification_skips_non_status_prefixes_and_keeps_only_the_status() {
+    use statecraft_home::setup::HostError;
+    for code in ["401", "403", "502"] {
+        let error = setup::classify_gh_failure(&format!(
+            "Sending HTTP request with private context\ngh: private response (HTTP {code})"
+        ));
+        let expected = format!("HTTP {code}");
+        match error {
+            HostError::Unauthorized(reason) if code != "502" => assert_eq!(reason, expected),
+            HostError::Unreachable(reason) if code == "502" => assert_eq!(reason, expected),
+            other => panic!("unexpected classification: {other:?}"),
+        }
+    }
+    assert_eq!(
+        setup::classify_gh_failure("Sending HTTP request\ngh: missing (HTTP 404)"),
+        HostError::NotFound
+    );
+}
+
+#[test]
 fn the_profile_renders_one_canonical_document_the_manifest_records() {
     let dir = project();
     let root = dir.path();
@@ -139,10 +159,12 @@ fn the_profile_renders_one_canonical_document_the_manifest_records() {
             .position(|note| note.starts_with(&format!("revision {n}:")))
             .unwrap()
     };
-    assert!(
-        revision(13) < revision(16),
-        "revision notes stay chronological"
-    );
+    for (earlier, later) in [(13, 14), (14, 15), (15, 16)] {
+        assert!(
+            revision(earlier) < revision(later),
+            "revision notes stay chronological"
+        );
+    }
     assert_eq!(doc.schema, remote_state::SCHEMA);
     assert_eq!(
         doc.profile,
