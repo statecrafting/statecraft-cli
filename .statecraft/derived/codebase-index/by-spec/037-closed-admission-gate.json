@@ -1,0 +1,35 @@
+{
+  "mapping": {
+    "amends": [
+      "005-acceptance-and-evidence"
+    ],
+    "dependsOn": [
+      "005-acceptance-and-evidence"
+    ],
+    "implementingPaths": [
+      {
+        "path": "crates/statecraft-envelope/",
+        "source": "spec-edge"
+      }
+    ],
+    "resolvedUnits": [
+      {
+        "locations": [
+          {
+            "file": "crates/statecraft-envelope/"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "directory",
+          "path": "crates/statecraft-envelope/"
+        }
+      }
+    ],
+    "specId": "037-closed-admission-gate",
+    "specStatus": "approved"
+  },
+  "schemaVersion": "1.2.0",
+  "shardHash": "b775b25425e9ee5cf673a1fa9fd561c7822a6cb99a6e7d3531645bd7f65bd59e"
+}

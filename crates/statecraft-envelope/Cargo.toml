@@ -36,6 +36,10 @@ sha2 = "0.11.0"
 ed25519-dalek = "2.2.0"
 hex = "0.4.3"
 thiserror = "2.0.20"
+# Admission's closed evaluation mode (spec 037; action-gate spec 004).
+# Exact, because a decision rule is adopted by review; no default features,
+# so no `regex` and no reference checks: the pure gate and its types only.
+action-gate-core = { version = "=0.3.0", default-features = false }
 
 [lints.rust]
 missing_docs = "warn"
