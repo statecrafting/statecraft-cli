@@ -1,8 +1,15 @@
 //! Admission is policy (spec 004 B-10 to B-12): a pure function over verdicts
 //! and decisions, returning the CLI's `Admission` with the reasons named, and
 //! the claim of the `statecraft/policy-eval/v1` attestation that records it.
+//!
+//! The combinator is action-gate's closed evaluation mode (spec 037): one gate
+//! per evaluation, every check required, every deny reported in order. What
+//! a policy requires, what a refusal is called and how it serializes stay here.
 
 use std::collections::BTreeSet;
+use std::sync::Arc;
+
+use action_gate_core::{ActionContext, Check, Decision as GateDecision, Gate, Outcome};
 
 use crate::attestation::{AttestationId, Principal};
 use crate::dimensions::{
@@ -46,103 +53,292 @@ fn signature_requirement(p: &AdmissionPolicy) -> SignatureRequirement {
     }
 }
 
-/// Evaluate. Deterministic; reads nothing but its arguments.
-pub fn evaluate(policy: &AdmissionPolicy, input: &AdmissionInput<'_>) -> Admission {
-    let mut reasons = Vec::new();
+/// The action every admission check is evaluated against. The checks own their
+/// inputs, so the context carries nothing else.
+const ACTION: &str = "statecraft.admission";
 
-    for required in &policy.require_artifacts {
-        let present = input.verdicts.iter().any(|(_, v)| matches!(&v.evidence, Evidence::Artifact { reference } if reference.evidence_type == *required));
-        if !present {
-            reasons.push(RefusalCode::MissingRequiredArtifact {
-                evidence_type: required.clone(),
-            });
-        }
-    }
+/// The reason an admission check allows with.
+const SATISFIED: &str = "statecraft:allow:admission:satisfied";
 
-    for (_, v) in input.verdicts {
-        if policy.require_integrity {
-            match v.integrity.status {
-                Integrity::Pass => {}
-                Integrity::Fail => reasons.push(RefusalCode::RequiredDimensionNotPassed {
-                    dimension: "integrity".into(),
-                    value: "fail".into(),
-                }),
-                Integrity::Unknown => reasons.push(RefusalCode::DimensionUnknown {
-                    dimension: "integrity".into(),
-                }),
-            }
-        }
-        match signature_requirement(policy) {
-            SignatureRequirement::Any => {}
-            SignatureRequirement::UnsignedOk => match v.signature.status {
-                Signature::Pass | Signature::Unsigned => {}
-                Signature::Fail => reasons.push(RefusalCode::RequiredDimensionNotPassed {
-                    dimension: "signature".into(),
-                    value: "fail".into(),
-                }),
-                Signature::Unknown => reasons.push(RefusalCode::DimensionUnknown {
-                    dimension: "signature".into(),
-                }),
+/// One requirement of a policy over one input, as an action-gate check.
+///
+/// Each check owns the part of the input it judges and answers with at most
+/// one refusal. A requirement the policy does not set is satisfied, so a
+/// permissive policy admits.
+enum Requirement {
+    /// `require_artifacts`: an artifact verdict of this type is present.
+    Artifact {
+        evidence_type: String,
+        present: Arc<BTreeSet<String>>,
+    },
+    /// `require_integrity`, for one verdict.
+    Integrity { required: bool, status: Integrity },
+    /// The signature, for one verdict, under the policy's requirement.
+    Signature {
+        requirement: SignatureRequirement,
+        status: Signature,
+    },
+    /// Issuer trust, for one verdict; required only under `Trusted`.
+    IssuerTrust {
+        requirement: SignatureRequirement,
+        status: IssuerTrust,
+    },
+    /// `require_subject_binding`, for one verdict.
+    SubjectBinding {
+        required: bool,
+        status: SubjectBinding,
+    },
+    /// `approver_may_not_be_submitter`.
+    ApproverIsSubmitter {
+        forbidden: bool,
+        approvers: Arc<Vec<Principal>>,
+        submitter: Principal,
+    },
+    /// `min_approvals`, counting distinct principals when `approvers_distinct`,
+    /// and never the submitter when `approver_may_not_be_submitter`.
+    ApprovalCount {
+        need: u32,
+        distinct: bool,
+        exclude_submitter: bool,
+        approvers: Arc<Vec<Principal>>,
+        submitter: Principal,
+    },
+}
+
+fn not_passed(dimension: &str, value: &str) -> Option<RefusalCode> {
+    Some(RefusalCode::RequiredDimensionNotPassed {
+        dimension: dimension.into(),
+        value: value.into(),
+    })
+}
+
+fn unknown(dimension: &str) -> Option<RefusalCode> {
+    Some(RefusalCode::DimensionUnknown {
+        dimension: dimension.into(),
+    })
+}
+
+impl Requirement {
+    /// The refusal this requirement makes of its input, if any.
+    fn refusal(&self) -> Option<RefusalCode> {
+        match self {
+            Requirement::Artifact {
+                evidence_type,
+                present,
+            } => (!present.contains(evidence_type)).then(|| RefusalCode::MissingRequiredArtifact {
+                evidence_type: evidence_type.clone(),
+            }),
+            Requirement::Integrity { required, status } => match (required, status) {
+                (false, _) | (true, Integrity::Pass) => None,
+                (true, Integrity::Fail) => not_passed("integrity", "fail"),
+                (true, Integrity::Unknown) => unknown("integrity"),
             },
-            SignatureRequirement::Trusted => {
-                if v.signature.status != Signature::Pass {
-                    let value = match v.signature.status {
-                        Signature::Unsigned => "unsigned",
-                        Signature::Fail => "fail",
-                        _ => "unknown",
-                    };
-                    reasons.push(RefusalCode::RequiredDimensionNotPassed {
-                        dimension: "signature".into(),
-                        value: value.into(),
-                    });
+            Requirement::Signature {
+                requirement,
+                status,
+            } => match (requirement, status) {
+                (SignatureRequirement::Any, _) => None,
+                (SignatureRequirement::UnsignedOk, Signature::Pass | Signature::Unsigned) => None,
+                (SignatureRequirement::UnsignedOk, Signature::Fail) => {
+                    not_passed("signature", "fail")
                 }
-                match v.issuer_trust.status {
-                    IssuerTrust::Pass => {}
-                    IssuerTrust::Fail => reasons.push(RefusalCode::RequiredDimensionNotPassed {
-                        dimension: "issuerTrust".into(),
-                        value: "fail".into(),
-                    }),
-                    IssuerTrust::Unknown => reasons.push(RefusalCode::IssuerTrustRequired),
+                (SignatureRequirement::UnsignedOk, Signature::Unknown) => unknown("signature"),
+                (SignatureRequirement::Trusted, Signature::Pass) => None,
+                (SignatureRequirement::Trusted, Signature::Unsigned) => {
+                    not_passed("signature", "unsigned")
                 }
+                (SignatureRequirement::Trusted, Signature::Fail) => not_passed("signature", "fail"),
+                (SignatureRequirement::Trusted, Signature::Unknown) => {
+                    not_passed("signature", "unknown")
+                }
+            },
+            Requirement::IssuerTrust {
+                requirement,
+                status,
+            } => match (requirement, status) {
+                (SignatureRequirement::Trusted, IssuerTrust::Fail) => {
+                    not_passed("issuerTrust", "fail")
+                }
+                (SignatureRequirement::Trusted, IssuerTrust::Unknown) => {
+                    Some(RefusalCode::IssuerTrustRequired)
+                }
+                _ => None,
+            },
+            Requirement::SubjectBinding { required, status } => match (required, status) {
+                (false, _) | (true, SubjectBinding::Pass | SubjectBinding::NotApplicable) => None,
+                (true, SubjectBinding::Fail) => Some(RefusalCode::SubjectMismatch),
+                (true, SubjectBinding::Unknown) => unknown("subjectBinding"),
+            },
+            Requirement::ApproverIsSubmitter {
+                forbidden,
+                approvers,
+                submitter,
+            } => (*forbidden && approvers.contains(submitter))
+                .then_some(RefusalCode::ApproverIsSubmitter),
+            Requirement::ApprovalCount {
+                need,
+                distinct,
+                exclude_submitter,
+                approvers,
+                submitter,
+            } => {
+                let counted = approvers
+                    .iter()
+                    .filter(|p| !(*exclude_submitter && *p == submitter));
+                let have = if *distinct {
+                    counted.collect::<BTreeSet<_>>().len() as u32
+                } else {
+                    counted.count() as u32
+                };
+                (have < *need).then_some(RefusalCode::ApprovalsInsufficient { have, need: *need })
             }
         }
-        if policy.require_subject_binding {
-            match v.subject_binding.status {
-                SubjectBinding::Pass | SubjectBinding::NotApplicable => {}
-                SubjectBinding::Fail => reasons.push(RefusalCode::SubjectMismatch),
-                SubjectBinding::Unknown => reasons.push(RefusalCode::DimensionUnknown {
-                    dimension: "subjectBinding".into(),
-                }),
-            }
-        }
+    }
+}
+
+/// A [`Requirement`] under its gate id.
+struct AdmissionCheck {
+    id: String,
+    requirement: Requirement,
+}
+
+impl Check for AdmissionCheck {
+    fn id(&self) -> &str {
+        &self.id
     }
 
-    let mut approvers: Vec<&Principal> = input
-        .decisions
-        .iter()
-        .filter(|d| d.approves)
-        .map(|d| &d.reviewer)
-        .collect();
-    if policy.approver_may_not_be_submitter && approvers.contains(&input.submitter) {
-        reasons.push(RefusalCode::ApproverIsSubmitter);
-        approvers.retain(|p| *p != input.submitter);
+    /// Always decides: an allow when satisfied, otherwise a blocking deny whose
+    /// reason is the refusal's canonical JSON, which [`refusal_of`] reads back.
+    fn evaluate(&self, _ctx: &ActionContext) -> Option<GateDecision> {
+        Some(match self.requirement.refusal() {
+            None => GateDecision {
+                outcome: Outcome::Allow,
+                reason: SATISFIED.into(),
+                check_ids: vec![self.id.clone()],
+                blocking: false,
+            },
+            Some(refusal) => GateDecision::deny(
+                serde_json::to_string(&refusal).expect("a refusal code serializes"),
+                vec![self.id.clone()],
+            )
+            .blocking(),
+        })
     }
-    let count = if policy.approvers_distinct {
-        approvers.iter().collect::<BTreeSet<_>>().len() as u32
-    } else {
-        approvers.len() as u32
-    };
-    if count < policy.min_approvals {
-        reasons.push(RefusalCode::ApprovalsInsufficient {
-            have: count,
+}
+
+/// The closed gate for one evaluation (spec 037): one required check per
+/// requirement, registered in the order the refusals are reported.
+fn gate(policy: &AdmissionPolicy, input: &AdmissionInput<'_>) -> Gate {
+    let mut checks = Vec::new();
+    let mut add =
+        |id: String, requirement: Requirement| checks.push(AdmissionCheck { id, requirement });
+
+    let present: Arc<BTreeSet<String>> = Arc::new(
+        input
+            .verdicts
+            .iter()
+            .filter_map(|(_, v)| match &v.evidence {
+                Evidence::Artifact { reference } => Some(reference.evidence_type.clone()),
+                Evidence::Attestation { .. } => None,
+            })
+            .collect(),
+    );
+    for (i, evidence_type) in policy.require_artifacts.iter().enumerate() {
+        add(
+            format!("artifact/{i}"),
+            Requirement::Artifact {
+                evidence_type: evidence_type.clone(),
+                present: present.clone(),
+            },
+        );
+    }
+
+    let requirement = signature_requirement(policy);
+    for (i, (_, v)) in input.verdicts.iter().enumerate() {
+        add(
+            format!("verdict/{i}/integrity"),
+            Requirement::Integrity {
+                required: policy.require_integrity,
+                status: v.integrity.status,
+            },
+        );
+        add(
+            format!("verdict/{i}/signature"),
+            Requirement::Signature {
+                requirement,
+                status: v.signature.status,
+            },
+        );
+        add(
+            format!("verdict/{i}/issuer-trust"),
+            Requirement::IssuerTrust {
+                requirement,
+                status: v.issuer_trust.status,
+            },
+        );
+        add(
+            format!("verdict/{i}/subject-binding"),
+            Requirement::SubjectBinding {
+                required: policy.require_subject_binding,
+                status: v.subject_binding.status,
+            },
+        );
+    }
+
+    let approvers: Arc<Vec<Principal>> = Arc::new(
+        input
+            .decisions
+            .iter()
+            .filter(|d| d.approves)
+            .map(|d| d.reviewer.clone())
+            .collect(),
+    );
+    add(
+        "approver-is-submitter".into(),
+        Requirement::ApproverIsSubmitter {
+            forbidden: policy.approver_may_not_be_submitter,
+            approvers: approvers.clone(),
+            submitter: input.submitter.clone(),
+        },
+    );
+    add(
+        "approval-count".into(),
+        Requirement::ApprovalCount {
             need: policy.min_approvals,
-        });
-    }
+            distinct: policy.approvers_distinct,
+            exclude_submitter: policy.approver_may_not_be_submitter,
+            approvers,
+            submitter: input.submitter.clone(),
+        },
+    );
 
-    if reasons.is_empty() {
+    let ids: Vec<String> = checks.iter().map(|c| c.id.clone()).collect();
+    checks
+        .into_iter()
+        .fold(Gate::builder(), |b, c| b.check(c))
+        .require_all(ids)
+        .build()
+}
+
+/// The refusal a deny names. Every check here always decides and writes its
+/// refusal as the reason, so a deny the gate made itself cannot occur; if one
+/// ever did, it is kept verbatim as an unknown code, and admission still refuses.
+fn refusal_of(deny: &GateDecision) -> RefusalCode {
+    serde_json::from_str(&deny.reason)
+        .unwrap_or_else(|_| RefusalCode::Unknown(serde_json::Value::String(deny.reason.clone())))
+}
+
+/// Evaluate. Deterministic; reads nothing but its arguments.
+///
+/// One closed action-gate gate (action-gate spec 004, `action-gate-core`
+/// 0.3.0) with every check required; every deny, in registration order, is one
+/// refusal. Admits exactly when nothing denies.
+pub fn evaluate(policy: &AdmissionPolicy, input: &AdmissionInput<'_>) -> Admission {
+    let evaluation = gate(policy, input).evaluate_exhaustive(&ActionContext::new(ACTION));
+    if evaluation.denials.is_empty() {
         Admission::Admit
     } else {
-        Admission::refuse(reasons)
+        Admission::refuse(evaluation.denials.iter().map(refusal_of).collect())
     }
 }
 
@@ -183,4 +379,49 @@ pub fn policy_eval_claim(
         .unwrap()
         .with("reasons", Value::Array(reasons))
         .unwrap()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::attestation::PrincipalKind;
+    use action_gate_core::{Mode, closed};
+
+    #[test]
+    fn the_gate_is_closed_and_requires_every_check_it_registers() {
+        let sam = Principal::new(PrincipalKind::Human, "sam");
+        let policy = AdmissionPolicy {
+            require_artifacts: vec!["a".into(), "b".into()],
+            ..AdmissionPolicy::strict()
+        };
+        let input = AdmissionInput {
+            verdicts: &[],
+            decisions: &[],
+            submitter: &sam,
+        };
+        let gate = gate(&policy, &input);
+        assert_eq!(gate.mode(), Mode::Closed);
+        let mut registered = gate.check_ids();
+        assert_eq!(
+            registered,
+            [
+                "artifact/0",
+                "artifact/1",
+                "approver-is-submitter",
+                "approval-count"
+            ]
+        );
+        registered.sort_unstable();
+        assert_eq!(gate.required_ids(), registered);
+        assert!(gate.unregistered_required().is_empty());
+    }
+
+    #[test]
+    fn a_deny_the_gate_made_itself_still_refuses() {
+        let deny = GateDecision::deny(closed::NO_CHECK_DECIDED, vec![]).blocking();
+        assert_eq!(
+            refusal_of(&deny),
+            RefusalCode::Unknown(serde_json::Value::String(closed::NO_CHECK_DECIDED.into()))
+        );
+    }
 }

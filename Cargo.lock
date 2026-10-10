@@ -3,6 +3,30 @@
 version = 4
 
 [[package]]
+name = "action-gate-core"
+version = "0.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "462261da44651a95c079c2e4a9f5f777eaa1bb22f76157bf70bc04b8e9a6e2b3"
+dependencies = [
+ "action-gate-types",
+ "canonical-keysort-json",
+ "hex",
+ "serde",
+ "serde_json",
+ "sha2 0.10.9",
+]
+
+[[package]]
+name = "action-gate-types"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f06b181e4649459d2fafaf0ffe087ee29f467d04044e50f9d1c0738564c63264"
+dependencies = [
+ "serde",
+ "serde_json",
+]
+
+[[package]]
 name = "arrayvec"
 version = "0.7.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -710,6 +734,7 @@ dependencies = [
 name = "statecraft-envelope"
 version = "0.0.0"
 dependencies = [
+ "action-gate-core",
  "blake3",
  "ed25519-dalek 2.2.0",
  "hex",
