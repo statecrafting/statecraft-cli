@@ -17,12 +17,11 @@ publish.workspace = true
 
 [dependencies]
 # The record envelope, reused rather than reimplemented (spec 001 section 3.2).
-# The crates.io release, pinned exactly: attest-ledger-core and
-# attest-ledger-types 0.1.0 are the same source as the git revision `a9c3595`
-# this crate pinned before, differing only in repository metadata (spec 003
-# section 5, 2026-09-25). An exact pin because the record hash is this crate's
-# persisted format; moving to a later release is its own change.
-attest-ledger-core = "=0.1.0"
+# The crates.io release, pinned exactly: the record hash is this crate's
+# persisted format, so moving to a later release is its own change.
+# Version 0.2.0 was adopted at the owner's request on 2026-10-10
+# (spec 003 section 5).
+attest-ledger-core = "=0.2.0"
 serde = { version = "1.0.229", features = ["derive"] }
 serde_json = "1.0.151"
 thiserror = "2.0.20"
