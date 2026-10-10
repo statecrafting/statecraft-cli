@@ -46,7 +46,7 @@
     "id": "012-remote-desired-state",
     "implementation": "complete",
     "sectionDigests": {
-      "012-remote-desired-state": "97a99f193bd4868d8b9659025ee577ce46a091f3411cdde8abcbff044ff712c8",
+      "012-remote-desired-state": "a9f002fe56eaabe979c203490a6dbff331fbc955942969d3c1bd05b25dfe6562",
       "1-purpose": "3449b4245ff82b4bb32b0cb394dd1a1ae8d94fcf11aa0b70172e3c23a0f850df",
       "2-territory": "7b7b73aea6f1f8a262b1a18922fa3e2d350dc0ce64a903e5e76996e1ab73c59e",
       "2026-10-10-choices-the-implementation-made-where-this-spec-is-silent": "3fd21950d3ba98e1fcaa6610189834cb623268cee5f759819bc42c8df391fc40",
@@ -59,7 +59,7 @@
       "3-behavior": "a368c846b8c353e60ac1b748de7df91402ac464dfe2bfffd24b401b2a27908d6",
       "4-out-of-scope": "971db66573d9472d2bde5b5bccb7e2c5f3a54a2130eda2e97a6e5b768ef27cf8",
       "5-resolved-decisions": "f8460cda7fe38cea29387851a951073e87cf2d169b7a4dea60e44d31b2980aa3",
-      "verification": "b1750aed6fc01ec5f0efd1daa9503c6cc3ebb03aadd089a0e1febccc2afcf5fa"
+      "verification": "5adb637d95a3861b2f27add3bf7a8d450252be452b6e02a265d32926a1d2500e"
     },
     "sectionHeadings": [
       "012: Remote desired state",
@@ -82,6 +82,6 @@
     "summary": "Amends 002's setup-profile and remote-doctor contract. A profile renders a versioned desired remote-state document covering required checks, extra jobs, code-owner review, merge queue, the review-exception environment and its reviewers, workflow-token defaults, secret names, repository custom properties, and profile identity. doctor --remote compares every field independently and never writes remote state or reads a secret value.\n",
     "title": "A setup profile declares remote desired state and doctor compares it without writing"
   },
-  "shardHash": "a834a35b3c9dd4934d3bdb643a63f065d33b1c2bf605ef4801c677fbddf6d68d",
+  "shardHash": "c4000ef5503d9ca75565e0a4b70e300ebd11d3adb1ff884f123edf817afa0eec",
   "specVersion": "1.9.0"
 }

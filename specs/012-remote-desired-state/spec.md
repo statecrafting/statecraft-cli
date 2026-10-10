@@ -261,6 +261,14 @@ current plan or settings.
 
 ## Verification
 
+This is the acceptance contract for the complete implementation. While
+`implementation: in-progress`, the rendering slice supplies document,
+manifest, parameter, host-error classification and upgrade tests. The
+comparison slice must add the fake-host and CLI comparison tests described
+below before completion. Passing the commands on the rendering slice runs
+only the tests already present, including the existing `setup_profile`
+suite; it does not establish the comparison or its CLI acceptance.
+
 The library suite renders the document through the profile and checks its
 fields, canonical bytes, manifest record and closed parameters, and drives
 the comparison against a fake host for every leaf and each negative case of
