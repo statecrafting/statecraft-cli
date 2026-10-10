@@ -12,30 +12,12 @@
       "035-offline-issuer-contract",
       "036-offline-issuer-verbs"
     ],
-    "extends": [
-      {
-        "nature": "additive",
-        "spec": "006-command-surface",
-        "unit": {
-          "kind": "directory",
-          "path": "crates/statecraft-cli/"
-        }
-      },
-      {
-        "nature": "additive",
-        "spec": "005-acceptance-and-evidence",
-        "unit": {
-          "kind": "directory",
-          "path": "crates/statecraft-envelope/"
-        }
-      }
-    ],
     "id": "038-hosted-client",
     "implementation": "pending",
     "sectionDigests": {
-      "038-the-hosted-client": "f3aa0db55cd10d9852ab594d7adc13a6f8882513f82d0e588776a660725bc047",
+      "038-the-hosted-client": "ab04ecb97adcbc19f6d834e6563279e881f391fec41b9ea73ec5660772c1cc22",
       "1-purpose": "19d2fb289e0ca0d67ea780dde95778e4966490cf41af4ccc94fc3c35d28141a9",
-      "2-territory": "3294d1b18d7bdfb2c00b99b8aaa758d8bd982898ab3347aa7270ca0635ec9cc6",
+      "2-territory": "2f18f9cc7d64ed2f8ff4f73f57756abb6a00f5998c4361b62752c6eb949ff0ac",
       "3-1-the-cell-and-what-this-product-learns-from-it": "0ddb53442a7df9ccbf6f00adeeb426636e15eeda81700c4b3f4decc4cd7ebd8c",
       "3-2-login-the-device-authorization-grant": "82303ac28fb52ec4e094b3ecde875c326f28a14a50c484430fe0fac03574e651",
       "3-3-holding-a-credential": "fa029bc6b2c746051e0243352d3e3f8816e8a382c1f23a6023900c1dce048bc8",
@@ -69,6 +51,6 @@
     "summary": "Amends 006 with the CLI's half of the hosted thin path that the Statecraft platform's spec 005 section 3.2 names and its 004 B-3 leaves open. The operator logs in with the OAuth device authorization grant (RFC 8628) against the cell's own issuer, as the public native client that the cell's manifest declares. `hosted submit` registers the revision this product accepted locally and submits its receipt and artifact bytes idempotently. `hosted decision` retrieves the revision's decision bundle and verifies it offline against a root set the operator pinned independently, never against the bundle's own. Tokens never reach a log, a receipt, a repository or a JSON answer. Nothing here dispatches work, records a reviewer's decision, or acts on an approval.\n",
     "title": "The hosted client: device-grant login, submit and decision against one Statecraft cell"
   },
-  "shardHash": "899245355fb05861879d81179c18ef5c4d1a936415674732c721a22c6b911dfd",
+  "shardHash": "b918067aa3f25a6c4c42b57e3b689cb008f4077e37ea2b9ec5ed480a14cf9769",
   "specVersion": "1.9.0"
 }

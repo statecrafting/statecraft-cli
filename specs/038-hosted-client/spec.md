@@ -18,9 +18,10 @@ summary: >
   acts on an approval.
 amends:
   - "006-command-surface"
-extends:
-  - { spec: "006-command-surface", unit: { kind: directory, path: "crates/statecraft-cli/" }, nature: additive }
-  - { spec: "005-acceptance-and-evidence", unit: { kind: directory, path: "crates/statecraft-envelope/" }, nature: additive }
+# No `extends` yet. The implementing change adds the two edges it needs, on
+# crates/statecraft-cli/ (006) and crates/statecraft-envelope/ (005). The gate
+# counts an extender as an owner, so a draft that extends a directory refuses
+# every pull request touching it until the draft is ratified.
 depends_on:
   - "001-boundaries-and-authority"
   - "005-acceptance-and-evidence"
@@ -59,8 +60,10 @@ the half that obtains, holds and presents a token.
 
 ## 2. Territory
 
-At draft this spec owns no code. Its `extends` edges name the units an
-implementation reaches. It reaches spec 006's binary to add the `hosted` verb
+At draft this spec owns no code and declares no `extends` edge, because the
+gate counts an extender as an owner and would refuse every change to a draft's
+extended directory. The implementing change adds the edges with the code. It
+reaches spec 006's binary to add the `hosted` verb
 group, and spec 005's envelope crate to add the offline decision-bundle reader
 (section 3.6). The proposed implementation adds one crate,
 `crates/statecraft-hosted/`, the only crate allowed to speak HTTP to a cell,
