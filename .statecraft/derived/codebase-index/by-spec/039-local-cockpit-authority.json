@@ -1,0 +1,18 @@
+{
+  "mapping": {
+    "amends": [
+      "001-boundaries-and-authority",
+      "002-environment-lifecycle"
+    ],
+    "dependsOn": [
+      "001-boundaries-and-authority",
+      "002-environment-lifecycle",
+      "007-family-envelope"
+    ],
+    "implementingPaths": [],
+    "specId": "039-local-cockpit-authority",
+    "specStatus": "draft"
+  },
+  "schemaVersion": "1.2.0",
+  "shardHash": "33e105a7b2bbcb8cfae98b2087418d55aa1fa49110543891a166f615b0f5c7b7"
+}
