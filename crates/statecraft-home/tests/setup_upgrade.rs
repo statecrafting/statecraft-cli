@@ -1395,7 +1395,8 @@ fn a_revision_thirteen_project_upgrades_to_the_registered_revision() {
 /// Spec 033: the adopted revision-14 installer migrates through managed
 /// matching, and a user's installer edit remains withheld.
 #[test]
-fn revision_fourteen_installer_upgrades_to_fifteen_without_replacing_customized_bytes() {
+fn revision_fourteen_installer_upgrades_to_the_registered_revision_without_replacing_customized_bytes()
+ {
     let dir = project();
     let root = dir.path();
     let mut old = Profile::registered();
@@ -1414,7 +1415,7 @@ fn revision_fourteen_installer_upgrades_to_fifteen_without_replacing_customized_
     assert!(plan_and_apply(root, &old, &mut manifest).whole());
     let next = Profile::registered();
     // Revision 16 (spec 012) adds a file and changes no installer byte.
-    assert!(next.revision >= 15);
+    assert!(next.revision >= 16);
     let installer = "scripts/statecraft/install-spec-spine.sh";
     let upgraded = plan_and_apply(root, &next, &mut manifest);
     assert_eq!(
