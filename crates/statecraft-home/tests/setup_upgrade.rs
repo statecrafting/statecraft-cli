@@ -1415,7 +1415,7 @@ fn revision_fourteen_installer_upgrades_to_the_registered_revision_without_repla
     assert!(plan_and_apply(root, &old, &mut manifest).whole());
     let next = Profile::registered();
     // Revision 16 (spec 012) adds a file and changes no installer byte.
-    assert!(next.revision >= 16);
+    assert_eq!(next.revision, 16);
     let installer = "scripts/statecraft/install-spec-spine.sh";
     let upgraded = plan_and_apply(root, &next, &mut manifest);
     assert_eq!(
