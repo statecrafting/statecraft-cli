@@ -345,6 +345,9 @@ pub struct LiveAttemptView {
     pub reconciliation: Option<statecraft_run::reconcile::Reconciliation>,
     /// Why, in order.
     pub reasons: Vec<String>,
+    /// Every change to the record found while this attempt's process ran
+    /// (spec 003 section 3.5.1 rule 2).
+    pub audit: Vec<statecraft_run::tamper::AuditFinding>,
     /// What to do next.
     pub next: String,
 }
@@ -358,6 +361,7 @@ pub fn live_attempt_answer(
     root: &str,
     startup: Option<statecraft_home::launch::AttemptStartup>,
     reconciliation: Option<statecraft_run::reconcile::Reconciliation>,
+    audit: Vec<statecraft_run::tamper::AuditFinding>,
 ) -> Answer<LiveAttemptView> {
     let (run_id, attempt) = match e {
         SessionError::LiveAttempt { run_id, attempt } => (run_id.clone(), *attempt),
@@ -382,6 +386,7 @@ pub fn live_attempt_answer(
         launch_state: startup.as_ref().map(|s| s.verdict.word().to_string()),
         reconciliation,
         reasons: startup.map(|s| s.reasons).unwrap_or_default(),
+        audit,
         next,
     };
     let mut summary = format!("{}\n", view.refusal);
@@ -398,8 +403,187 @@ pub fn live_attempt_answer(
     for reason in &view.reasons {
         summary.push_str(&format!("  - {reason}\n"));
     }
+    for finding in &view.audit {
+        summary.push_str(&format!("  audit: {}\n", finding.describe()));
+    }
     summary.push_str(&format!("  next: {}\n", view.next));
     Answer::new(view, Exit::Refused, summary)
+}
+
+/// What `run` answers when the record changed while the attempt's process
+/// ran (spec 003 section 3.5.1 rules 2 and 3).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RecordChangedView {
+    /// The finding, as the audit file holds it.
+    pub finding: statecraft_run::tamper::AuditFinding,
+    /// Whether the finding is durable in the audit file.
+    pub recorded: bool,
+    /// Why it is not, where it is not.
+    pub audit_error: Option<String>,
+    /// The attempt stays live: nothing more is appended to a record in doubt.
+    pub attempt_live: bool,
+    /// What to do next.
+    pub next: String,
+}
+
+/// The record changed while the process ran. A finding (exit 1) when the
+/// audit file holds it; a failure (exit 4) when it could not be made durable,
+/// with the finding printed so it is never dropped (rule 3). The attempt
+/// stays live either way.
+pub fn record_changed_answer(
+    root: &str,
+    finding: statecraft_run::tamper::AuditFinding,
+    recorded: Result<(), String>,
+) -> Answer<RecordChangedView> {
+    let next = format!(
+        "the record was changed by something this product did not run; if it still verifies, \
+         `run reconcile {root} {} {} ...` decides the attempt, and if it does not, restore it \
+         from outside this product",
+        finding.run_id, finding.attempt
+    );
+    let mut summary = format!("{}\n", finding.describe());
+    for c in &finding.changes {
+        let state = |s: &Option<statecraft_run::tamper::FileState>| {
+            s.as_ref().map_or("absent".to_string(), |s| {
+                format!("{} bytes, sha256 {}", s.length, s.sha256)
+            })
+        };
+        summary.push_str(&format!(
+            "  {}: before {}; after {}\n",
+            c.path,
+            state(&c.before),
+            state(&c.after)
+        ));
+    }
+    let (exit, audit_error) = match recorded {
+        Ok(()) => (Exit::Finding, None),
+        Err(e) => {
+            summary.push_str(&format!("  the audit file could not be written: {e}\n"));
+            (Exit::Failed, Some(e))
+        }
+    };
+    summary.push_str(&format!("  the attempt stays live\n  next: {next}\n"));
+    Answer::new(
+        RecordChangedView {
+            finding,
+            recorded: audit_error.is_none(),
+            audit_error,
+            attempt_live: true,
+            next,
+        },
+        exit,
+        summary,
+    )
+}
+
+/// One attempt's section 3.5.1 evidence, as `run show` renders it.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AttemptTamperView {
+    /// The attempt.
+    pub attempt: u32,
+    /// `checked`, or `not-recorded` for an accounting record that predates
+    /// section 3.5.1 (rule 4), which is never a clean result.
+    pub recorded: String,
+    /// The first kind's answer, where the record carries one.
+    pub write_request: Option<statecraft_run::tamper::Answer>,
+    /// The second kind's answer, where the record carries one.
+    pub record_change: Option<statecraft_run::tamper::Answer>,
+    /// The first kind's findings.
+    pub findings: Vec<statecraft_run::tamper::WriteRequest>,
+    /// The second kind's findings, from the audit file.
+    pub audit: Vec<statecraft_run::tamper::AuditFinding>,
+}
+
+impl AttemptTamperView {
+    /// One view per attempt of `run_id`: from its accounting record where it
+    /// has one, and from the audit file, which names attempts whose record
+    /// was left without one.
+    pub fn of_run(
+        entries: &[statecraft_run::record::Entry],
+        run_id: &str,
+        audit: &[statecraft_run::tamper::AuditFinding],
+    ) -> Result<Vec<Self>, String> {
+        use statecraft_run::tamper::{Answer, Checked, checked};
+        let mut out: Vec<Self> = Vec::new();
+        for e in entries {
+            if e.run_id != run_id || e.kind != statecraft_run::record::Kind::Accounting {
+                continue;
+            }
+            let view = match checked(&e.detail)? {
+                Checked::NotRecorded => Self {
+                    attempt: e.attempt,
+                    recorded: "not-recorded".into(),
+                    write_request: None,
+                    record_change: None,
+                    findings: Vec::new(),
+                    audit: Vec::new(),
+                },
+                Checked::Checked { findings, answers } => Self {
+                    attempt: e.attempt,
+                    recorded: "checked".into(),
+                    write_request: answers.map(|a| a.write_request),
+                    record_change: answers.map(|a| a.record_change),
+                    findings,
+                    audit: Vec::new(),
+                },
+            };
+            out.push(view);
+        }
+        for f in audit.iter().filter(|f| f.run_id == run_id) {
+            match out.iter_mut().find(|v| v.attempt == f.attempt) {
+                // A recorded answer is kept as recorded; one that disagrees
+                // with the audit file stays visible beside its finding.
+                Some(v) => {
+                    v.record_change.get_or_insert(Answer::Observed);
+                    v.audit.push(f.clone());
+                }
+                None => out.push(Self {
+                    attempt: f.attempt,
+                    recorded: "checked".into(),
+                    write_request: None,
+                    record_change: Some(Answer::Observed),
+                    findings: Vec::new(),
+                    audit: vec![f.clone()],
+                }),
+            }
+        }
+        out.sort_by_key(|v| v.attempt);
+        Ok(out)
+    }
+
+    /// The lines `run show` prints.
+    pub fn describe(&self) -> String {
+        if self.recorded == "not-recorded" {
+            return format!(
+                "attempt {} tamper evidence: no structured finding recorded\n",
+                self.attempt
+            );
+        }
+        let word =
+            |a: Option<statecraft_run::tamper::Answer>| a.map_or("not recorded", |a| a.word());
+        let mut out = format!(
+            "attempt {} tamper evidence: write requests {}; record changes {}\n",
+            self.attempt,
+            word(self.write_request),
+            word(self.record_change)
+        );
+        for f in &self.findings {
+            let classification = serde_json::to_value(f.classification)
+                .ok()
+                .and_then(|v| v.as_str().map(str::to_string))
+                .unwrap_or_default();
+            out.push_str(&format!(
+                "  {} {} ({}) -> {}, {classification}\n",
+                f.tool, f.tool_use_id, f.target, f.resolved
+            ));
+        }
+        for f in &self.audit {
+            out.push_str(&format!("  audit: {}\n", f.describe()));
+        }
+        out
+    }
 }
 
 /// Every run for a target, as the JSON contract carries it.
@@ -513,6 +697,8 @@ pub struct RunShowView {
     /// Every reconciliation of the run, in chain order (spec 006 section
     /// 3.11.6, spec 003 section 3.6.1 rules 5 and 6).
     pub reconciliations: Vec<ReconciliationView>,
+    /// Each attempt's tamper evidence (spec 003 section 3.5.1).
+    pub tamper: Vec<AttemptTamperView>,
 }
 
 /// One reconciliation record, as `run show` renders it.
@@ -618,6 +804,7 @@ pub fn run_show_with_admissions(
     account: ReviewableOutcome,
     run: &Run,
     reconciliations: Vec<ReconciliationView>,
+    tamper: Vec<AttemptTamperView>,
 ) -> Answer<RunShowView> {
     let mut summary = account.render();
     let admissions: Vec<AttemptAdmissionView> = run
@@ -641,11 +828,15 @@ pub fn run_show_with_admissions(
     for r in &reconciliations {
         summary.push_str(&format!("{}\n", r.describe()));
     }
+    for t in &tamper {
+        summary.push_str(&t.describe());
+    }
     Answer::new(
         RunShowView {
             account,
             admissions,
             reconciliations,
+            tamper,
         },
         Exit::Ok,
         summary,
@@ -808,6 +999,47 @@ mod tests {
     use statecraft_run::policy::{Overrides, Policy};
     use statecraft_run::report::{CorpusReport, ReadySpec, SpecLifecycle};
     use statecraft_run::work::select;
+
+    fn accounting(attempt: u32, detail: serde_json::Value) -> statecraft_run::record::Entry {
+        statecraft_run::record::Entry {
+            kind: statecraft_run::record::Kind::Accounting,
+            run_id: "r".into(),
+            attempt,
+            subject: "refusals".into(),
+            idempotency_key: None,
+            detail,
+            effect_id: statecraft_run::record::Identity::Absent,
+        }
+    }
+
+    /// Spec 003 section 3.5.1 rule 4: an accounting record in the older shape
+    /// reads as "no structured finding recorded", never as a clean result, and
+    /// an empty new one reads as checked.
+    #[test]
+    fn an_older_accounting_shape_reads_as_no_structured_finding_recorded() {
+        let entries = [
+            accounting(
+                1,
+                serde_json::json!({"count": 0, "sample": [], "tamper_attempts": []}),
+            ),
+            accounting(
+                2,
+                serde_json::json!({"count": 0, "sample": [], "tamperFindings": [],
+                    "tamperAnswers": {"writeRequest": "none-observed", "recordChange": "unknown"}}),
+            ),
+        ];
+        let views = AttemptTamperView::of_run(&entries, "r", &[]).unwrap();
+        assert_eq!(views[0].recorded, "not-recorded");
+        assert_eq!(
+            views[0].describe(),
+            "attempt 1 tamper evidence: no structured finding recorded\n"
+        );
+        assert_eq!(views[1].recorded, "checked");
+        assert_eq!(
+            views[1].describe(),
+            "attempt 2 tamper evidence: write requests none observed; record changes unknown\n"
+        );
+    }
 
     fn list(ready: &[(&str, &str)]) -> WorkList {
         select(
@@ -1408,11 +1640,14 @@ pub fn reconcile_refused_answer(detail: &str) -> Answer<serde_json::Value> {
 }
 
 /// `run reconcile`, from what the run crate returned (spec 006 section 3.11.6).
+/// A successful answer names every change to the record found while the
+/// attempt's process ran (spec 003 section 3.5.1 rule 2).
 pub fn reconcile_answer(
     result: Result<
         statecraft_run::reconcile::Reconciliation,
         statecraft_run::reconcile::ReconcileError,
     >,
+    audit: Vec<statecraft_run::tamper::AuditFinding>,
 ) -> Answer<serde_json::Value> {
     use statecraft_run::reconcile::ReconcileError;
     match result {
@@ -1437,11 +1672,12 @@ pub fn reconcile_answer(
                     }
                 ));
             }
-            Answer::new(
-                serde_json::to_value(&r).unwrap_or_default(),
-                Exit::Ok,
-                summary,
-            )
+            for finding in &audit {
+                summary.push_str(&format!("audit: {}\n", finding.describe()));
+            }
+            let mut value = serde_json::to_value(&r).unwrap_or_default();
+            value["audit"] = serde_json::to_value(&audit).unwrap_or_default();
+            Answer::new(value, Exit::Ok, summary)
         }
         Err(ReconcileError::Refused(why)) => Answer::new(
             serde_json::json!({ "refused": why }),

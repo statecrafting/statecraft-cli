@@ -25,7 +25,7 @@
       }
     ],
     "id": "007-family-envelope",
-    "implementation": "in-progress",
+    "implementation": "complete",
     "sectionDigests": {
       "007-the-family-envelope": "47ceb35ef879921b965f747b06124af9f8ad58ee733254809dd849a80e2bd153",
       "1-purpose": "ef14bfcd223140609b148653f4274dbe7ee8445885b8831dd4ceaa5adea8abb1",
@@ -59,6 +59,6 @@
     "summary": "Amends 006 sections 3.3 and 3.4. Every --json answer this product writes becomes the envelope spec-spine has written since 0.26.0 (its spec 132 section 3.4): schemaVersion, tool, verb, outcome, exitCode, summary, then report for exit 0 or 1 and error for 2, 3 or 4, where error.kind is one of the family's ten tokens. No exit number moves. A usage error under --json is an envelope on stdout. The replacement of 002 section 3.23's check translation, which #118 proposed for the same change, is left to the spec-spine 0.28.0 adoption, which changes the producer answer it would read. Replaces the historical proposal from #118 with the amendment that the current model requires (001 section 5).\n",
     "title": "The family envelope: every --json answer in the exit and JSON contract spec-spine speaks"
   },
-  "shardHash": "616bddf7daba93766c16eff993a96ff59e048358e20f5c5f1f27ff5144dc020c",
+  "shardHash": "4a44e1b967f1f41bbe28153e8bf10d50ae9462ac54356e762d241a856854c9cc",
   "specVersion": "1.9.0"
 }

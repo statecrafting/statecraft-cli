@@ -2,7 +2,7 @@
 id: "006-command-surface"
 title: "The command surface: one binary, every verb the other specs name, and what an exit code means"
 status: approved
-implementation: in-progress
+implementation: complete
 created: "2026-09-16"
 summary: >
   The binary, and every verb reachable through it. Specs 002 to 005 each
@@ -648,6 +648,29 @@ unchanged where compatibility requires their existing spelling.
 small and dependency-light; completion generation is deferred until a measured
 need justifies a declarative command table.
 
+**2026-10-08: implementation complete.** This spec moved to `in-progress` on
+2026-09-23 for the exit-code amendments of spec 004 section 3.18, spec 005
+section 3.19 and spec 003 section 3.1.5, and for section 3.11.8. Every verb of
+section 3.1 is dispatched, and every amendment was already implemented. The
+remaining gaps were tests only, and each now has one. A boundary that cannot
+be established refuses `run`, `startup trial` and `startup capture` with 2,
+with nothing launched, no attempt appended, no capture record written and the
+one trial not spent. The tests force the refusal with a second name for a
+protected home file, which only the boundary's alias scan refuses
+(`a_run_whose_boundary_cannot_be_established_is_refused_with_no_attempt`,
+`a_trial_whose_boundary_cannot_be_established_is_refused_and_not_spent`,
+`a_capture_whose_boundary_cannot_be_established_is_refused_and_writes_nothing`).
+A pending line, a write in progress and a disagreement each answer `work show`
+and the override verbs by their code
+(`every_journal_state_answers_work_show_and_the_override_verbs_by_its_code`).
+`adopt-prefix` and `adopt-empty` are recorded with 0. `override recover` fails
+with 4 on files it cannot read and refuses an empty operator with 2. `doctor`
+on a clean environment exits 0 (`doctor_on_a_clean_environment_exits_zero`).
+That holds on macOS only. Elsewhere the provider's credential mechanism is
+absent (spec 004 section 3.14), so the adapter is unavailable and that is the
+one finding, and the test asserts exactly that. This spec binds the verbs
+other specs define and accounts for no part of Constitution IX of its own.
+
 ## Verification
 
 Each line is one command. §3.7's rows are integration tests that **spawn the
@@ -724,4 +747,6 @@ cargo test -p statecraft-cli --test ownership_transfer
 cargo run -q -p statecraft-cli -- transfer --help
 cargo test -p statecraft-cli --test env_replace
 cargo test -p statecraft-cli --test env_remove_bridge
+cargo test -p statecraft-cli --test readiness_override
+cargo test -p statecraft-cli --test startup_trial
 ```

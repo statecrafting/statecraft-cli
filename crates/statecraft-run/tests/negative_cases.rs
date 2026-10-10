@@ -467,9 +467,43 @@ fn the_chain_lives_where_the_supervised_process_cannot_reach_and_tampering_is_re
         "and certainly not inside the workspace the supervised process runs in"
     );
 
-    let mut accounting = Accounting::default();
-    accounting.note_tamper_attempt("write to the product home from the workspace");
-    assert_eq!(accounting.tamper_attempts.len(), 1);
+    // Section 3.5.1 rule 1, first kind: a request into the home is a
+    // finding, recorded beside the count, which it does not change.
+    let protected = statecraft_run::tamper::Protected::new(home.path(), &[], &[]);
+    let accounting = Accounting {
+        tamper_findings: protected.judge(
+            &ws.path,
+            &[statecraft_run::tamper::Requested {
+                tool: "Write".into(),
+                tool_use_id: "toolu_1".into(),
+                target: chain.display().to_string(),
+                classification: statecraft_run::tamper::Classification::Refused,
+            }],
+        ),
+        ..Accounting::default()
+    };
+    assert_eq!(accounting.tamper_findings.len(), 1);
+    assert_eq!(accounting.count, 0);
+}
+
+// Section 3.5.1 rule 4: an edited earlier record is corruption, refused on
+// opening, and not reported as tampering.
+#[test]
+fn an_edited_earlier_record_is_refused_on_opening_as_corruption() {
+    let home = tempfile::tempdir().unwrap();
+    let target = tempfile::tempdir().unwrap();
+    let (mut chain, _) = Chain::open(home.path(), target.path()).unwrap();
+    for i in 0..3 {
+        chain
+            .append(&i.to_string(), "t", &entry(Kind::Intent, "r", i, "s", None))
+            .unwrap();
+    }
+    let path = statecraft_run::record::chain_path(home.path(), target.path());
+    let text = std::fs::read_to_string(&path).unwrap();
+    let edited = text.replacen("\"attempt\":0", "\"attempt\":7", 1);
+    assert_ne!(edited, text, "the fixture edits the first record");
+    std::fs::write(&path, edited).unwrap();
+    assert!(Chain::open(home.path(), target.path()).is_err());
 }
 
 // Row 15: a retry is requested for a completed attempt.

@@ -177,6 +177,8 @@ pub enum Finding {
         /// Why managed execution is refused.
         reason: String,
     },
+    /// Two of a path's three ownership facts disagree (spec 026).
+    OwnershipDisagreement(crate::ownership::Disagreement),
 }
 
 impl Finding {
@@ -221,6 +223,7 @@ impl Finding {
             Finding::HarnessRequirement { standing, reason } => {
                 format!("harness-requirement {standing}: {reason}")
             }
+            Finding::OwnershipDisagreement(d) => d.describe(),
         }
     }
 }

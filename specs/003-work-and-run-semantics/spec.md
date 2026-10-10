@@ -30,6 +30,12 @@ extends:
   # re-key a repository's history. Neither changes what `006` or `002` requires.
   - { spec: "006-command-surface", unit: { kind: directory, path: "crates/statecraft-cli/" }, nature: corrective }
   - { spec: "002-environment-lifecycle", unit: { kind: directory, path: "crates/statecraft-environment/" }, nature: corrective }
+  # Section 3.5.1 (section 5, 2026-10-08): the adapter hands the supervisor
+  # each file-write request the stream carried, and the launch watch the
+  # bytes it wrote while the process ran. Each adds a field and changes no
+  # behaviour `004` or `002` requires.
+  - { spec: "004-execution-adapter", unit: { kind: directory, path: "crates/statecraft-adapter-claude-code/" }, nature: additive }
+  - { spec: "002-environment-lifecycle", unit: { kind: directory, path: "crates/statecraft-home/" }, nature: additive }
 depends_on:
   - "000-bootstrap"
   - "001-boundaries-and-authority"
@@ -985,6 +991,34 @@ became stale. When stderr is empty and stdout is an envelope, the words read
 are `error.message` with the `spec-spine: ` prefix the stderr line carried, so
 section 3.1.3's states are decided by the same words under every release.
 
+**2026-10-08: section 3.5.1, as built.** Rules 1 to 6 are implemented in
+`crates/statecraft-run/src/tamper.rs` and wired into `run`, `run show` and
+`run reconcile`. The choices the section left open are these.
+
+- Rule 6's answers are recorded in the accounting record as `tamperAnswers`
+  (`writeRequest`, `recordChange`), beside `tamperFindings`. An answer the
+  supervisor did not establish defaults to `unknown`.
+- An attempt refused before any process existed answers `none-observed` for
+  both kinds, because nothing could have written.
+- A write request is `refused` when the terminal denials name it or a result
+  note says it did not execute, `executed` when a result answers it without
+  error, and `unresolved` otherwise.
+- The first kind's protected paths are the product home and the
+  confinement's inaccessible and read-only roots, less its write grants.
+- The second kind digests the run record, the override journal and its
+  authority, and every file under the repository's launch-records directory.
+  `launched.json` and `admission.json` are compared with the bytes the watch
+  wrote, and `record.json` is written after the second digest.
+- The audit file is `<key>.audit.jsonl` beside the record. `run` answers a
+  recorded change as a finding (exit 1) and an unrecorded one as a failure
+  (exit 4). The attempt stays live either way.
+- An older record's `tamper_attempts` is no longer written, and `run show`
+  reads such a record as "no structured finding recorded". `Accounting` is
+  therefore no longer exempt from the JSON naming rule.
+
+Still open, so 003 stays `in-progress`: the confined-child line of section
+3.1.5's acceptance, and the branch directory of spec `004` section 3.18 rule 3.
+
 ## Verification
 
 Each line is one command. §3.8's twenty-two rows are integration tests named after
@@ -1003,4 +1037,12 @@ test -f crates/statecraft-run/src/record.rs
 test -f crates/statecraft-run/tests/negative_cases.rs
 cargo test -p statecraft-run --lib report
 cargo test -p statecraft-run --lib contract
+cargo test -p statecraft-run --lib tamper
+cargo test -p statecraft-run --test negative_cases an_edited_earlier_record_is_refused_on_opening_as_corruption
+cargo test -p statecraft-adapter-claude-code --lib each_write_request_is_classified_by_what_the_stream_says
+cargo test -p statecraft-cli --lib an_older_accounting_shape_reads_as_no_structured_finding_recorded
+cargo test -p statecraft-cli --test run_startup a_write_request_into_the_home_is_a_finding_and_one_into_the_workspace_is_not
+cargo test -p statecraft-cli --test run_startup a_change_to_the_record_while_the_process_ran_is_audited_and_the_attempt_stays_live
+cargo test -p statecraft-cli --test run_startup an_audit_file_that_cannot_be_written_fails_and_prints_the_finding
+cargo test -p statecraft-cli --test readiness_override while_another_process_holds_the_repository_lock_grant_and_run_refuse
 ```

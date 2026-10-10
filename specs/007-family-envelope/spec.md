@@ -2,7 +2,7 @@
 id: "007-family-envelope"
 title: "The family envelope: every --json answer in the exit and JSON contract spec-spine speaks"
 status: approved
-implementation: in-progress
+implementation: complete
 created: "2026-09-25"
 summary: >
   Amends 006 sections 3.3 and 3.4. Every --json answer this product writes

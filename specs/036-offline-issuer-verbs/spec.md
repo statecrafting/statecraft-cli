@@ -2,7 +2,7 @@
 id: "036-offline-issuer-verbs"
 title: "The offline issuer verbs: trust root-generate, trust issuer-sign and trust issuer-verify"
 status: approved
-implementation: in-progress
+implementation: complete
 created: "2026-10-03"
 summary: >
   Amends 006 for the command half of the offline issuer enrollment contract the

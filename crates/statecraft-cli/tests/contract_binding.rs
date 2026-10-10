@@ -391,3 +391,45 @@ fn acceptance_reports_the_failed_boundary_step_without_a_new_receipt_or_record()
     assert!(report.get("receipt").is_none());
     assert_eq!(std::fs::read(chain).unwrap(), before);
 }
+
+/// Spec 005 section 3.19 rule 2: cleanliness is judged against the private
+/// branch's commit with ignore rules read from the trusted base. A file the
+/// base ignores is not dirty; a file the base does not ignore stays dirty even
+/// when the workspace adds an ignore rule naming it, and that rule's own file
+/// is dirty too.
+#[test]
+fn cleanliness_reads_ignore_rules_from_the_trusted_base_and_never_from_the_workspace() {
+    let f = Fixture::new(EXPANSION);
+    std::fs::write(f.target.path().join("Makefile"), "all:\n\ttrue\n").unwrap();
+    std::fs::write(f.target.path().join(".gitignore"), "ignored.log\n").unwrap();
+    git(f.target.path(), &["add", "Makefile", ".gitignore"]);
+    git(
+        f.target.path(),
+        &["commit", "--quiet", "-m", "fixture policy"],
+    );
+    assert_eq!(f.run().0, 0);
+    let workspace = f.target.path().join(".statecraft/state/workspaces/107-x");
+    std::fs::write(workspace.join("ignored.log"), "base-ignored").unwrap();
+    std::fs::write(workspace.join("dirty.txt"), "uncommitted").unwrap();
+    std::fs::create_dir_all(workspace.join("sub")).unwrap();
+    std::fs::write(workspace.join("sub/.gitignore"), "/../dirty.txt\n*\n").unwrap();
+    std::fs::write(workspace.join("sub/hidden.txt"), "uncommitted").unwrap();
+    std::fs::write(
+        f.bin().join("suite-plan"),
+        serde_json::json!({
+            "exitCode":0, "ok":true, "report":{"commands":["true"], "skipped":[], "specId":"107-x"},
+            "schemaVersion":"0.6.0", "verb":"verify"
+        })
+        .to_string(),
+    )
+    .unwrap();
+    let (code, answer) = f.accept();
+    assert_eq!(code, 1, "{answer}");
+    let text = answer.to_string();
+    assert!(text.contains("work-tree-dirty"), "{answer}");
+    for dirty in ["dirty.txt", "sub/.gitignore", "sub/hidden.txt"] {
+        assert!(text.contains(dirty), "{dirty}: {answer}");
+    }
+    assert!(!text.contains("ignored.log"), "{answer}");
+    assert!(json_naming::payload(&answer).get("receipt").is_none());
+}
