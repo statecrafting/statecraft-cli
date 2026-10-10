@@ -1,0 +1,57 @@
+{
+  "mapping": {
+    "amends": [
+      "006-command-surface"
+    ],
+    "dependsOn": [
+      "001-boundaries-and-authority",
+      "005-acceptance-and-evidence",
+      "006-command-surface",
+      "007-family-envelope",
+      "035-offline-issuer-contract",
+      "036-offline-issuer-verbs"
+    ],
+    "implementingPaths": [
+      {
+        "path": "crates/statecraft-cli/",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/statecraft-envelope/",
+        "source": "spec-edge"
+      }
+    ],
+    "resolvedUnits": [
+      {
+        "locations": [
+          {
+            "file": "crates/statecraft-cli/"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "directory",
+          "path": "crates/statecraft-cli/"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "crates/statecraft-envelope/"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "directory",
+          "path": "crates/statecraft-envelope/"
+        }
+      }
+    ],
+    "specId": "038-hosted-client",
+    "specStatus": "draft"
+  },
+  "schemaVersion": "1.2.0",
+  "shardHash": "899245355fb05861879d81179c18ef5c4d1a936415674732c721a22c6b911dfd"
+}

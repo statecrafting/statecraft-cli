@@ -1,0 +1,74 @@
+{
+  "record": {
+    "amends": [
+      "006-command-surface"
+    ],
+    "created": "2026-10-10",
+    "dependsOn": [
+      "001-boundaries-and-authority",
+      "005-acceptance-and-evidence",
+      "006-command-surface",
+      "007-family-envelope",
+      "035-offline-issuer-contract",
+      "036-offline-issuer-verbs"
+    ],
+    "extends": [
+      {
+        "nature": "additive",
+        "spec": "006-command-surface",
+        "unit": {
+          "kind": "directory",
+          "path": "crates/statecraft-cli/"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "005-acceptance-and-evidence",
+        "unit": {
+          "kind": "directory",
+          "path": "crates/statecraft-envelope/"
+        }
+      }
+    ],
+    "id": "038-hosted-client",
+    "implementation": "pending",
+    "sectionDigests": {
+      "038-the-hosted-client": "f3aa0db55cd10d9852ab594d7adc13a6f8882513f82d0e588776a660725bc047",
+      "1-purpose": "19d2fb289e0ca0d67ea780dde95778e4966490cf41af4ccc94fc3c35d28141a9",
+      "2-territory": "3294d1b18d7bdfb2c00b99b8aaa758d8bd982898ab3347aa7270ca0635ec9cc6",
+      "3-1-the-cell-and-what-this-product-learns-from-it": "0ddb53442a7df9ccbf6f00adeeb426636e15eeda81700c4b3f4decc4cd7ebd8c",
+      "3-2-login-the-device-authorization-grant": "82303ac28fb52ec4e094b3ecde875c326f28a14a50c484430fe0fac03574e651",
+      "3-3-holding-a-credential": "fa029bc6b2c746051e0243352d3e3f8816e8a382c1f23a6023900c1dce048bc8",
+      "3-4-request-rules-every-hosted-verb-follows": "3242ea9d375867d309de9b80a6d78ce9ae30ac8c5983c0b5808b37d721bb65d1",
+      "3-5-hosted-submit-register-the-revision-and-submit-its-evidence": "693166f11fb9141699a53b98f9113540502338d354f24c85fd53e944a495983d",
+      "3-6-hosted-decision-retrieve-and-verify-offline": "dafb350aa610fb34687b294d4ee1e60da584ef7618fe6d36ca8ff3d995e42bd0",
+      "3-7-observable-negative-cases": "e83388a257b59829224b1e45d5706a0fff9c6cd2000811ff8aab2421ee8654d0",
+      "3-behavior": "622eda253dcf26214eafc183b67459459823e552ce565a246711980f4347584d",
+      "4-out-of-scope": "194ca113a88997d63f0f381bae3ce9a503dbde7e97e8f1a098e35a83635c5562",
+      "5-open-questions-for-ratification": "2a90d43bbe7c10492f12e007ffb5cc70e366f9f0e153c0377d79f3ffb7d2116e",
+      "verification": "15e489028c9b1a459b5c648317d480355becd3ae8bee917b55c93823aa52213f"
+    },
+    "sectionHeadings": [
+      "038: The hosted client",
+      "1. Purpose",
+      "2. Territory",
+      "3. Behavior",
+      "3.1 The cell, and what this product learns from it",
+      "3.2 Login: the device authorization grant",
+      "3.3 Holding a credential",
+      "3.4 Request rules every hosted verb follows",
+      "3.5 `hosted submit`: register the revision and submit its evidence",
+      "3.6 `hosted decision`: retrieve and verify offline",
+      "3.7 Observable negative cases",
+      "4. Out of scope",
+      "5. Open questions for ratification",
+      "Verification"
+    ],
+    "specPath": "specs/038-hosted-client/spec.md",
+    "status": "draft",
+    "summary": "Amends 006 with the CLI's half of the hosted thin path that the Statecraft platform's spec 005 section 3.2 names and its 004 B-3 leaves open. The operator logs in with the OAuth device authorization grant (RFC 8628) against the cell's own issuer, as the public native client that the cell's manifest declares. `hosted submit` registers the revision this product accepted locally and submits its receipt and artifact bytes idempotently. `hosted decision` retrieves the revision's decision bundle and verifies it offline against a root set the operator pinned independently, never against the bundle's own. Tokens never reach a log, a receipt, a repository or a JSON answer. Nothing here dispatches work, records a reviewer's decision, or acts on an approval.\n",
+    "title": "The hosted client: device-grant login, submit and decision against one Statecraft cell"
+  },
+  "shardHash": "899245355fb05861879d81179c18ef5c4d1a936415674732c721a22c6b911dfd",
+  "specVersion": "1.9.0"
+}
