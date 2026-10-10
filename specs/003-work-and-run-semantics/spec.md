@@ -1019,6 +1019,10 @@ section 3.1.3's states are decided by the same words under every release.
 Still open, so 003 stays `in-progress`: the confined-child line of section
 3.1.5's acceptance, and the branch directory of spec `004` section 3.18 rule 3.
 
+**2026-10-10: adopt the next exact registry release.** At the owner's request,
+the workspace now consumes `attest-ledger-core =0.2.0`. The exact registry
+identity requirement remains unchanged.
+
 ## Verification
 
 Each line is one command. §3.8's twenty-two rows are integration tests named after
