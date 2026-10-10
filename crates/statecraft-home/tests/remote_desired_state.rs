@@ -921,6 +921,37 @@ fn a_missing_property_schema_is_distinct_from_a_missing_value() {
 }
 
 #[test]
+fn codeowners_literals_respect_root_relative_paths_and_nested_directory_names() {
+    for (pattern, path, expected) in [
+        ("src/docs", "src/docs/file.md", FieldState::Matching),
+        ("src/docs/", "src/docs/file.md", FieldState::Matching),
+        ("src/docs", "nested/src/docs/file.md", FieldState::Drifted),
+        ("apps/", "nested/apps/src/file.rs", FieldState::Matching),
+        ("apps", "nested/apps/src/file.rs", FieldState::Matching),
+        ("/apps/", "nested/apps/src/file.rs", FieldState::Drifted),
+        ("apps/", "apps", FieldState::Drifted),
+        ("apps", "apps", FieldState::Matching),
+        ("apps/", "myapps/file.rs", FieldState::Drifted),
+        ("/docs/*", "docs/nested/file.md", FieldState::Drifted),
+        ("/docs/**", "docs/nested/file.md", FieldState::Matching),
+    ] {
+        let mut doc = render(&full_remote());
+        doc.code_owner_review.paths = vec![path.into()];
+        let mut host = matching(&doc);
+        host.answers.insert(
+            r("/contents/.github/CODEOWNERS?ref=main"),
+            Ok(contents(&format!("{pattern} @owner\n"))),
+        );
+        let c = remote_state::compare(Ok(Some(doc)), Some(SLUG), &host);
+        assert_eq!(
+            state(&c, "codeOwnerReview.paths"),
+            expected,
+            "{pattern}: {path}"
+        );
+    }
+}
+
+#[test]
 fn codeowners_must_give_every_governed_path_the_declared_owners() {
     let doc = render(&full_remote());
     let mut host = matching(&doc);

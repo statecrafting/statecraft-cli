@@ -1219,9 +1219,22 @@ fn codeowners_for(text: &str, path: &str) -> Option<Vec<String>> {
             true
         } else if simple {
             let dir = anchored.trim_end_matches('/');
-            target == anchored
-                || (target.starts_with(dir) && target[dir.len()..].starts_with('/'))
-                    && (pattern.starts_with('/') || !dir.contains('/'))
+            if pattern.starts_with('/') || dir.contains('/') {
+                // A leading or middle slash makes a literal root-relative.
+                (!pattern.ends_with('/') && target == dir)
+                    || target
+                        .strip_prefix(dir)
+                        .is_some_and(|rest| rest.starts_with('/'))
+            } else {
+                // A basename can match at any depth. A trailing slash only
+                // matches directory components, not the final file name.
+                let candidates = if pattern.ends_with('/') {
+                    target.rsplit_once('/').map_or("", |(parent, _)| parent)
+                } else {
+                    target
+                };
+                candidates.split('/').any(|component| component == dir)
+            }
         } else if let Some(dir) = anchored.strip_suffix("/**").or(anchored.strip_suffix("/*"))
             && !dir.contains(['*', '?', '[', '!', '\\'])
         {
