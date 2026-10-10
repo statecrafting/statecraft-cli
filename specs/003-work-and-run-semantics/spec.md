@@ -966,8 +966,8 @@ about an unresolved attempt and never rewrites or rolls back the original
 journal entry.
 
 **2026-09-25: the ledger dependency is the exact registry release.** The
-workspace consumes `attest-ledger-core =0.1.0`; a Git revision is not a
-publishable dependency identity.
+workspace consumes `attest-ledger-core =0.2.0`, adopted at the owner's
+request on 2026-10-10; a Git revision is not a publishable dependency identity.
 
 **2026-09-28: section 3.1.5's state authority, as built.** The authority is
 `<key>.overrides.authority.json` beside the journal and counts as history for

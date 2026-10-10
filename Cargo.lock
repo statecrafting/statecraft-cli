@@ -34,9 +34,9 @@ checksum = "d3fb67a6e08acf24fdeccbac2cb6ac4305825bd1f117462e0e6f2f193345ad56"
 
 [[package]]
 name = "attest-ledger-core"
-version = "0.1.0"
+version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "cdf835c5e3680ddaf4dd9c4da525a8762ce5803e1f3245889a7393f3ccd5f183"
+checksum = "9fe378fabe203deac490a6890c8f26a8005492f34df0fd9e8a25a1c30537f6ab"
 dependencies = [
  "attest-ledger-types",
  "base64",
@@ -51,9 +51,9 @@ dependencies = [
 
 [[package]]
 name = "attest-ledger-types"
-version = "0.1.0"
+version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "16b5cb6e21a7f0342be61b4cf42bfdad81360f2efdf4eeec4dc33c32734691d7"
+checksum = "58eb12ca1faf38bf59ce8fd387cb9de77773288a99b738def9a7c61ec90dbf1f"
 dependencies = [
  "serde",
  "serde_json",
