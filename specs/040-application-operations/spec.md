@@ -1,7 +1,7 @@
 ---
 id: "040-application-operations"
 title: "Callable application operations with unchanged envelopes and chain effects"
-status: draft
+status: approved
 implementation: pending
 created: "2026-10-10"
 summary: >
@@ -50,11 +50,10 @@ Exposing a second caller without first moving that orchestration would duplicate
 admission or let callers bypass it.
 
 The direction is platform design
-`statecraft:a176227:docs/design/07-statecraft-dev-local-cockpit.md`, sections
+`statecraft:8fa73bc:docs/design/07-statecraft-dev-local-cockpit.md`, sections
 2, 5, 8, 12 and 13, and P-25 in
-`statecraft:a176227:docs/decisions/00-adoption-register.md`. Platform PR 28 is
-still open at drafting; its squash-merged source revision replaces these
-citations when available. CLI references were checked against `f98f9f0`:
+`statecraft:8fa73bc:docs/decisions/00-adoption-register.md`. Platform PR 28 was
+squash-merged as `8fa73bc`. CLI references were checked against `f98f9f0`:
 `crates/statecraft-cli/src/main.rs`, `src/lib.rs`, `src/render.rs` and the
 regression suites named below. External design remains proposed; this spec is
 the local requirement to ratify.

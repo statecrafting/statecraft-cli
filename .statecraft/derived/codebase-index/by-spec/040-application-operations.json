@@ -14,8 +14,8 @@
     ],
     "implementingPaths": [],
     "specId": "040-application-operations",
-    "specStatus": "draft"
+    "specStatus": "approved"
   },
   "schemaVersion": "1.2.0",
-  "shardHash": "9b52ba2e833e5e824c8ad67555ad0b48fa979f3a0b04803ab0ae443b55fbe371"
+  "shardHash": "1968b31e4c352dad42c47a4b97914504e5d323115ed73cbe46da5693685819a9"
 }
