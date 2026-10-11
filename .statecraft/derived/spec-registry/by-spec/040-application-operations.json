@@ -36,13 +36,13 @@
       }
     ],
     "sectionDigests": {
-      "040-application-operations": "9d6c7de0afe81989af81d6537322afedf28615dcba53e7c7f27c742f53f1461a",
+      "040-application-operations": "2a2c6f61ed7723680ab075cc93cc21aded73688f7ecf8ffe87b22f32cd9297bd",
       "1-purpose": "5d3b7cc989a7fa78386e49ba57059232527fbfaa59b0d9e801f3a5d1d521c0ea",
       "2-territory": "ec999b040ebbb4f216610869be6b8d4dfdba0f44154d52d0a780e3f8b360aa8c",
       "3-1-the-callable-boundary": "7e53a6e230c2df7f36ad311fc0460c19f6b3f4ec1b030a1f55034eb95c3f44e0",
       "3-2-observable-equivalence": "23772b5fc00f85e6d1dce7f2508b643151fa151e3e38a61574f921968b9f67ed",
-      "3-3-delivery-stack": "71ff9e6c1f627ff91a69d2f365a686415a162ce9e8c7fd528bcd8ca661067ead",
-      "3-behavior": "0fd29ca0b743e97b0e4834d6726320053a31aa2eda5895577e66042a03845082",
+      "3-3-delivery-stack": "d927f700529d7b3d4655249aa22fdc12ef7652b099171872fac6fdfd9610bbfd",
+      "3-behavior": "ff1aeedeb9546c9a210b4c80a11314ee81b1116f3aa1b2477e5d37ceb4335083",
       "4-out-of-scope": "b7bcf520963f4dffe5ddfd57027b2a23e00a4955eb3331de469ed76d47e67b4d",
       "5-resolved-decisions": "e0680ae24238398122a34604630401b44abc327af79c8576550c475a51236630",
       "verification": "1110d51a8e676078d419cee927b09ab17dd1e161c145dcd755a11e1c4c9291ef"
@@ -64,6 +64,6 @@
     "summary": "Extract run, shared attempt launch, acceptance, override recovery, run reconciliation and startup trial orchestration from the binary into the existing CLI library. Typed operations own admission and effects and return render::Answer. Verb adapters parse and render. Four independently green delivery slices preserve envelope bytes, record ordering and execution ownership, providing the shared boundary a later local cockpit calls.\n",
     "title": "Callable application operations with unchanged envelopes and chain effects"
   },
-  "shardHash": "20412642c3057f765d140db2df3524639638c2191047c921041bff68f6fc1651",
+  "shardHash": "053602057276b655c356f05f8f94593347753a81b5617a3b34966c04a9ca9c6b",
   "specVersion": "1.9.0"
 }

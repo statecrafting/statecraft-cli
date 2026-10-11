@@ -11,10 +11,7 @@ summary: >
   render::Answer. Verb adapters parse and render. Four independently green
   delivery slices preserve envelope bytes, record ordering and execution
   ownership, providing the shared boundary a later local cockpit calls.
-amends:
-  - "006-command-surface"
-# Add the extends edge on 006's crates/statecraft-cli/ with the first
-# implementing slice; forward ownership must not block unrelated CLI changes.
+amends: ["006-command-surface"]
 depends_on:
   - "002-environment-lifecycle"
   - "003-work-and-run-semantics"
@@ -145,6 +142,9 @@ tested through HTTP in the later specs that expose them. Distribution, session,
 SSE and browser-disconnect scenarios stay with B, C and D in their scope.
 
 ### 3.3 Delivery stack
+
+Section 3.1's prohibition on HTTP and async dependencies in core crates applies
+throughout all four independently buildable and verified delivery slices.
 
 Deliver in order as independently green PRs based on main, each naming its
 predecessor. Count additions plus deletions toward the roughly 1,000 changed
