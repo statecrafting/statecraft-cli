@@ -171,7 +171,7 @@ Taken by the agent drafting this spec; the owner ratifies them by approving it.
   seeded mixed inputs whose coverage the test asserts. No new dependency.
 - **R-3 is measured on the resolved graph** (2026-10-10). A unit test in
   `admission.rs`, inside `--lib admission`, reads `cargo metadata --offline
-  --locked` and asserts the exact pin with no default features, that the three
+  --locked` filtered to the host platform, and asserts the exact pin with no default features, that the three
   crates section 3.4 names are the only ones `action-gate-core` adds to the
   envelope's normal closure, that no `regex` is in it, and that each of the
   three is Apache-2.0, forbids unsafe code, has no build script and names no

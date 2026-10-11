@@ -453,9 +453,22 @@ mod tests {
         use std::collections::BTreeMap;
         use std::path::Path;
 
+        // The host's graph only: an unfiltered resolve needs the sources of
+        // every platform's dependencies, which an offline host never fetched.
+        let rustc = std::env::var("RUSTC").unwrap_or_else(|_| "rustc".into());
+        let version = std::process::Command::new(rustc)
+            .arg("-vV")
+            .output()
+            .expect("rustc -vV runs");
+        let version = String::from_utf8(version.stdout).expect("rustc -vV is UTF-8");
+        let host = version
+            .lines()
+            .find_map(|l| l.strip_prefix("host: "))
+            .expect("rustc -vV names the host");
         let cargo = std::env::var("CARGO").unwrap_or_else(|_| "cargo".into());
         let out = std::process::Command::new(cargo)
             .args(["metadata", "--format-version", "1", "--offline", "--locked"])
+            .args(["--filter-platform", host])
             .current_dir(env!("CARGO_MANIFEST_DIR"))
             .output()
             .expect("cargo metadata runs");
