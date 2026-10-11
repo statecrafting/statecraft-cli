@@ -607,41 +607,109 @@ mod tests {
                     }
                 }
             }
+            let code: Vec<(&std::path::PathBuf, String)> = sources
+                .iter()
+                .map(|(path, text)| (path, without_comments(text)))
+                .collect();
             assert!(
-                manifest.contains("unsafe_code = \"forbid\"")
-                    || sources.iter().any(|(path, text)| {
-                        path.ends_with("src/lib.rs") && text.contains("#![forbid(unsafe_code)]")
+                manifest
+                    .lines()
+                    .any(|l| l.trim() == "unsafe_code = \"forbid\"")
+                    || code.iter().any(|(path, text)| {
+                        path.ends_with("src/lib.rs")
+                            && text.lines().any(|l| l.trim() == "#![forbid(unsafe_code)]")
                     }),
                 "{what} does not forbid unsafe code"
             );
-            // Identifiers, not substrings: `use std::{fs, env}` is caught and
-            // `lifetime::` is not. Comment lines are skipped; a match anywhere
-            // else fails closed, to be read and reviewed.
-            for (path, text) in &sources {
-                for line in text.lines() {
-                    let code = line.trim_start();
-                    if code.starts_with("//") || code.starts_with("/*") || code.starts_with('*') {
-                        continue;
-                    }
-                    for word in code.split(|c: char| !(c.is_alphanumeric() || c == '_')) {
-                        assert!(
-                            ![
-                                "env",
-                                "fs",
-                                "net",
-                                "time",
-                                "process",
-                                "thread",
-                                "SystemTime",
-                                "Instant",
-                            ]
-                            .contains(&word),
-                            "{what}: {} names `{word}`: {line}",
-                            path.display()
-                        );
-                    }
+            // Identifiers, not substrings, outside comments: `use std::{fs,
+            // env}` is caught and `lifetime::` is not. A match anywhere else,
+            // a string literal included, fails closed, to be read and reviewed.
+            for (path, text) in &code {
+                for word in text.split(|c: char| !(c.is_alphanumeric() || c == '_')) {
+                    assert!(
+                        ![
+                            "env",
+                            "fs",
+                            "net",
+                            "time",
+                            "process",
+                            "thread",
+                            "SystemTime",
+                            "Instant",
+                        ]
+                        .contains(&word),
+                        "{what}: {} names `{word}`",
+                        path.display()
+                    );
                 }
             }
         }
+    }
+
+    #[test]
+    fn admission_purity_scan_reads_code_not_comments() {
+        let src =
+            "a // env\n/* fs\n /* net */ time\n*/ b \"// x\" c '\"' d '\\'' e\nuse std::{fs, env};";
+        let code = without_comments(src);
+        assert_eq!(
+            code,
+            "a \n\n\n b \"// x\" c '\"' d '\\'' e\nuse std::{fs, env};"
+        );
+    }
+
+    /// Rust source with its line and (nested) block comments blanked. String
+    /// literals are kept, so a comment marker inside one is not a comment; a
+    /// char literal is stepped over so a quote inside it opens no string.
+    fn without_comments(text: &str) -> String {
+        let c: Vec<char> = text.chars().collect();
+        let mut out = String::with_capacity(text.len());
+        let (mut i, mut depth, mut in_str) = (0, 0usize, false);
+        while i < c.len() {
+            let next = c.get(i + 1).copied();
+            if depth > 0 {
+                if c[i] == '*' && next == Some('/') {
+                    depth -= 1;
+                    i += 2;
+                } else if c[i] == '/' && next == Some('*') {
+                    depth += 1;
+                    i += 2;
+                } else {
+                    if c[i] == '\n' {
+                        out.push('\n');
+                    }
+                    i += 1;
+                }
+            } else if in_str {
+                out.push(c[i]);
+                if c[i] == '\\' {
+                    if let Some(n) = next {
+                        out.push(n);
+                    }
+                    i += 2;
+                    continue;
+                }
+                in_str = c[i] != '"';
+                i += 1;
+            } else if c[i] == '/' && next == Some('/') {
+                while i < c.len() && c[i] != '\n' {
+                    i += 1;
+                }
+            } else if c[i] == '/' && next == Some('*') {
+                depth = 1;
+                i += 2;
+            } else if c[i] == '\'' && (c.get(i + 2) == Some(&'\'') || next == Some('\\')) {
+                // A char literal: 'x' or an escape such as '\'' or '\u{..}'.
+                let end = (i + 2..c.len())
+                    .find(|&j| c[j] == '\'' && j > i + 1 + usize::from(next == Some('\\')));
+                let end = end.unwrap_or(c.len() - 1);
+                out.extend(&c[i..=end]);
+                i = end + 1;
+            } else {
+                in_str = c[i] == '"';
+                out.push(c[i]);
+                i += 1;
+            }
+        }
+        out
     }
 }
