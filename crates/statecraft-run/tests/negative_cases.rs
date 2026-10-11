@@ -270,6 +270,98 @@ fn two_runs_never_share_a_workspace() {
     assert_ne!(a.path, b.path);
 }
 
+// Section 3.2, as amended by spec 004 section 3.18 rule 3: a workspace whose
+// branch still lives in the shared `statecraft/run/` directory has it moved
+// into the run's own directory on the next preparation, which says so.
+#[test]
+fn a_workspace_on_the_shared_run_branch_is_moved_into_its_own_directory() {
+    let dir = repo();
+    let path = workspace::workspace_path(dir.path(), "run-1");
+    std::fs::create_dir_all(path.parent().unwrap()).unwrap();
+    git(
+        dir.path(),
+        &[
+            "worktree",
+            "add",
+            "--quiet",
+            "-b",
+            "statecraft/run/run-1",
+            &path.to_string_lossy(),
+            "HEAD",
+        ],
+    );
+    let legacy_head = git(
+        dir.path(),
+        &["rev-parse", "refs/heads/statecraft/run/run-1"],
+    );
+
+    let moved = workspace::prepare(dir.path(), "run-1", "HEAD").unwrap();
+    assert_eq!(moved.path, path);
+    assert_eq!(moved.branch, "statecraft/run-1/work");
+    assert_eq!(moved.migrated_from.as_deref(), Some("statecraft/run/run-1"));
+    assert_eq!(moved.base_commit, legacy_head);
+    assert_eq!(
+        git(
+            dir.path(),
+            &[
+                "for-each-ref",
+                "--format=%(refname)",
+                "refs/heads/statecraft/"
+            ]
+        ),
+        "refs/heads/statecraft/run-1/work",
+        "the old name is gone and nothing else was created"
+    );
+    assert_eq!(
+        git(&path, &["symbolic-ref", "HEAD"]),
+        "refs/heads/statecraft/run-1/work",
+        "the worktree follows its branch"
+    );
+
+    // Moved once: the next preparation reports the workspace and moves nothing.
+    let again = workspace::prepare(dir.path(), "run-1", "HEAD").unwrap();
+    assert_eq!(again.migrated_from, None);
+    assert_eq!(again.branch, moved.branch);
+}
+
+// The same, where the run's own directory cannot be created: the rename
+// fails, preparation refuses, and the old branch is left where it was.
+#[test]
+fn a_shared_run_branch_that_cannot_be_moved_refuses_and_is_left_in_place() {
+    let dir = repo();
+    let path = workspace::workspace_path(dir.path(), "run-1");
+    std::fs::create_dir_all(path.parent().unwrap()).unwrap();
+    git(
+        dir.path(),
+        &[
+            "worktree",
+            "add",
+            "--quiet",
+            "-b",
+            "statecraft/run/run-1",
+            &path.to_string_lossy(),
+            "HEAD",
+        ],
+    );
+    // A branch named for the run's directory makes the directory impossible.
+    git(dir.path(), &["branch", "statecraft/run-1", "HEAD"]);
+
+    match workspace::prepare(dir.path(), "run-1", "HEAD") {
+        Err(WorkspaceError::Git { .. }) => {}
+        other => panic!("expected the rename to refuse, got {other:?}"),
+    }
+    let refs = git(
+        dir.path(),
+        &[
+            "for-each-ref",
+            "--format=%(refname)",
+            "refs/heads/statecraft/",
+        ],
+    );
+    assert!(refs.contains("refs/heads/statecraft/run/run-1"), "{refs}");
+    assert!(!refs.contains("refs/heads/statecraft/run-1/"), "{refs}");
+}
+
 #[test]
 fn the_operators_checkout_is_never_edited() {
     let dir = repo();

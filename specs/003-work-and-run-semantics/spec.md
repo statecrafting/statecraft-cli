@@ -1023,6 +1023,24 @@ Still open, so 003 stays `in-progress`: the confined-child line of section
 the workspace now consumes `attest-ledger-core =0.2.0`. The exact registry
 identity requirement remains unchanged.
 
+**2026-10-10: the two confinement items, closed by test.** Section 3.1.5's
+confined-child line is covered by a run whose own repository holds a granted
+override: the hostile fixture reads, overwrites, appends to, truncates (by
+open and by `truncate(2)`), renames away, renames over and deletes that
+repository's journal and authority, by absolute, relative and linked path,
+and renames their directory. Each is refused, both files keep their bytes, and
+`override show` reports the same grant in force. Spec `004` section 3.18 rule
+3's branch directory is covered at both levels: `workspace::prepare` moves a
+workspace's `statecraft/run/<run>` branch to `statecraft/<run>/work` once and
+moves nothing the second time, and through the binary the move is recorded on
+the boundary-preparation outcome as `branchMigration`, the posture grants the
+run's directory and not the shared one, and a rename that cannot be made
+refuses with exit 2, nothing launched, no attempt appended and the old branch
+left in place. Section 3.5.1 rule 6 closed with the 2026-10-08 entry. Still
+open, so 003 stays `in-progress`: spec `004` section 3.18 rule 12, whose route
+through a later unconfined process keeps every spec that accounts for IX from
+`complete` (spec `002` section 3.36 rule 2a); closing it is the owner's act.
+
 ## Verification
 
 Each line is one command. §3.8's twenty-two rows are integration tests named after
