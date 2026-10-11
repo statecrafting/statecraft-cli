@@ -142,15 +142,15 @@ The platform repository and archived frontend are read-only sources.
 
 ## 5. Resolved decisions
 
-Bart ratified this spec as written on 2026-10-10 and explicitly directed the
-`status: approved` change in PR 242. That owner act precedes completion of PR
-review; review and command results do not confer ratification. The owner act
-is recorded in [signed commit dbaf2b5](https://github.com/statecrafting/statecraft-cli/commit/dbaf2b5210acfe73ce0f1123e850d3715f0ea9a4),
-whose signature GitHub verifies for `bartekus`.
+Bart ratified this spec as written on 2026-10-10 with the instruction:
+"I, Bart, ratify it; set `status: approved`." The approved status records
+that owner act. Review and command results do not confer ratification.
+Changes to approved requirements require a separately ratified amending spec
+under 001 section 5; the corpus checks below do not replace that owner act.
 
 The amendment is its own authority change. Keeping the historical F-04 row
 and approved specs unchanged preserves provenance; the amendment graph records
-the current exception when the owner ratifies this spec. `implementation: n-a`
+the ratified exception. `implementation: n-a`
 means there is no code to implement in this decision and does not assert that
 Statecraft Dev exists.
 

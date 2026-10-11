@@ -764,7 +764,8 @@ fn doctor_remote_reads_the_six_results_and_writes_nothing() {
     // Every host call was a read.
     for call in calls.lines() {
         assert!(
-            call.starts_with("api -X GET repos/owner/fixture/"),
+            call == "api -X GET repos/owner/fixture"
+                || call.starts_with("api -X GET repos/owner/fixture/"),
             "{call}"
         );
     }
@@ -804,4 +805,100 @@ fn doctor_remote_reads_the_six_results_and_writes_nothing() {
     ] {
         assert_eq!(setup[name]["state"], "unverified", "{name}: {text}");
     }
+}
+
+/// Spec 012 sections 3.2 and 3.6: `doctor --remote` reports the rendered
+/// desired-state document per leaf beside the six results, exits with a
+/// finding when a declared leaf is not matching, and writes nothing.
+#[test]
+fn doctor_remote_compares_the_desired_state_per_field() {
+    let f = applied_with_remote();
+    let project = f.project();
+    assert!(
+        project
+            .join(".statecraft/setup/github-actions-rust.remote.json")
+            .is_file(),
+        "revision 16 renders the desired-state document"
+    );
+    let before = f.walk();
+    let bin = f.dir.path().join("bin");
+    std::fs::create_dir_all(&bin).unwrap();
+    statecraft_adapter::fixture::install_script(&bin.join("gh"), GH, 0o755).unwrap();
+    std::fs::write(bin.join("gh-mode"), "down").unwrap();
+    let out = f.cli(
+        &[
+            "doctor",
+            &project.display().to_string(),
+            "--remote",
+            "--json",
+        ],
+        &[],
+    );
+    let text = format!(
+        "{}{}",
+        String::from_utf8_lossy(&out.stdout),
+        String::from_utf8_lossy(&out.stderr)
+    );
+    let answer: serde_json::Value =
+        json_naming::from_output(&out.stdout).unwrap_or_else(|e| panic!("{e}: {text}"));
+    let remote = &json_naming::payload(&answer)["remoteState"];
+    assert_eq!(
+        remote["document"],
+        ".statecraft/setup/github-actions-rust.remote.json"
+    );
+    assert_eq!(remote["schema"], "statecraft/remote-desired-state/1");
+    let fields = remote["fields"].as_array().expect("one result per leaf");
+    assert!(fields.len() > 10, "{text}");
+    for field in fields {
+        let state = field["state"].as_str().unwrap();
+        if field["declared"] == true {
+            // An unreachable host: unavailable, never matching.
+            assert_eq!(state, "unavailable", "{field}");
+        } else {
+            assert_eq!(state, "unverified", "{field}");
+        }
+    }
+    assert_eq!(
+        out.status.code(),
+        Some(1),
+        "a declared field that is not matching is a finding: {text}"
+    );
+    assert_eq!(before, f.walk(), "doctor --remote changed a project file");
+    let calls = std::fs::read_to_string(bin.join("gh-calls")).unwrap_or_default();
+    for call in calls.lines() {
+        assert!(call.starts_with("api -X GET "), "{call}");
+    }
+}
+
+/// Spec 012 section 3.6: asking this product to apply remote state is a
+/// usage refusal, and local `doctor` asks no host at all.
+#[test]
+fn there_is_no_remote_apply_and_local_doctor_reads_no_host() {
+    let f = applied_with_remote();
+    let project = f.project().display().to_string();
+    let bin = f.dir.path().join("bin");
+    std::fs::create_dir_all(&bin).unwrap();
+    statecraft_adapter::fixture::install_script(&bin.join("gh"), GH, 0o755).unwrap();
+    std::fs::write(bin.join("gh-mode"), "full").unwrap();
+    let before = f.walk();
+    for args in [
+        &["doctor", project.as_str(), "--remote", "--apply"][..],
+        &["doctor", project.as_str(), "--apply"],
+    ] {
+        let out = f.cli(args, &[]);
+        assert_eq!(
+            out.status.code(),
+            Some(3),
+            "{args:?}: {}",
+            String::from_utf8_lossy(&out.stderr)
+        );
+    }
+    let out = f.cli(&["doctor", project.as_str(), "--json"], &[]);
+    assert!(out.status.code().is_some_and(|c| c <= 1), "{out:?}");
+    assert!(
+        !bin.join("gh-calls").exists(),
+        "no host was asked: {}",
+        std::fs::read_to_string(bin.join("gh-calls")).unwrap_or_default()
+    );
+    assert_eq!(before, f.walk());
 }

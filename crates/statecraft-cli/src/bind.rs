@@ -548,6 +548,8 @@ pub struct DoctorRemoteView {
     pub setup: statecraft_home::setup::Results,
     /// Whether all six are satisfied.
     pub setup_complete: bool,
+    /// The desired-state comparison, one result per leaf (spec 012).
+    pub remote_state: statecraft_home::remote_state::Comparison,
 }
 
 /// `doctor --remote`. The exit is the diagnostic's: a result that is not
@@ -555,8 +557,11 @@ pub struct DoctorRemoteView {
 pub fn doctor_remote_answer(
     report: Report,
     results: statecraft_home::setup::Results,
+    comparison: statecraft_home::remote_state::Comparison,
 ) -> Answer<DoctorRemoteView> {
-    let exit = if report.has_findings() {
+    // Spec 012 section 3.2: a declared field that is not `matching` is a
+    // finding; each field's state remains the explanation.
+    let exit = if report.has_findings() || comparison.has_findings() {
         Exit::Finding
     } else {
         Exit::Ok
@@ -573,10 +578,12 @@ pub fn doctor_remote_answer(
             outcome.detail
         ));
     }
+    summary.push_str(&comparison.render());
     let view = DoctorRemoteView {
         report: ReportView::of(&report),
         setup_complete: results.complete(),
         setup: results,
+        remote_state: comparison,
     };
     Answer::new(view, exit, summary.trim_end().to_string())
 }

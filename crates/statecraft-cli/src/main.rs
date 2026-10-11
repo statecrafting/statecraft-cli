@@ -2630,13 +2630,18 @@ fn environment_verb(
                     match remote {
                         None => emit(&bind::doctor_answer(report), format),
                         Some(ask) => {
-                            let results = statecraft_home::setup::remote_results(
+                            // Spec 012: the six results and the per-field
+                            // desired-state comparison, read-only.
+                            let (results, comparison) = statecraft_home::setup::remote_report(
                                 root,
                                 &manifest,
                                 &statecraft_home::setup::GhHost::default(),
                                 ask.head.as_deref(),
                             );
-                            emit(&bind::doctor_remote_answer(report, results), format)
+                            emit(
+                                &bind::doctor_remote_answer(report, results, comparison),
+                                format,
+                            )
                         }
                     }
                 }
