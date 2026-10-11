@@ -160,7 +160,11 @@ is presented as the finished callable operation.
 | 4 | Run admission and startup trial orchestration; finish thin adapters and remove format/printing from the library path | `arming_consent`, `startup_trial`, `one_resolved_judge`, `family_envelope` |
 
 Each slice runs its named suites and local corpus/workspace checks before
-commit. New differential tests run as ordinary CLI integration tests in the
+commit. The delivery plan introduces `application_equivalence` in slice 1 for
+acceptance, recovery and reconciliation, then expands that target in slices
+2 through 4 alongside the operations each slice extracts. Each slice runs
+the target's tests for the operations delivered so far; final verification
+runs the accumulated target. New differential tests run as ordinary CLI integration tests in the
 existing workspace CI test job. Final completion requires every criterion and
 the full declared verification locally and in CI, with results distinguished.
 Set `implementation: complete` only in the final implementing PR once that
