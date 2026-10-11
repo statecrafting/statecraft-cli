@@ -33,8 +33,8 @@
       }
     ],
     "sectionDigests": {
-      "039-local-cockpit-authority": "94d9d74c4cbf1a02e3713fddf8fe507bb304d4a33de09f30eb3d8c05d364c5ea",
-      "1-purpose": "97be1f2a6cc179c38729cf53a4f44b2326885fc27084bba1af00ce7b2498908c",
+      "039-local-cockpit-authority": "7df4abdc71e337eb7c4b1e2b519aa153842c861f3d400a146060de40f2f24a1e",
+      "1-purpose": "236de58fc48a4f3bb16d5f5945e0f3bbe3a481bbe20ddf8a6113f285cf5a9796",
       "2-territory": "56693aca28a9fcbd94b2327118c46c95763f2d959ee5b96acc9d1cf69119ffb2",
       "3-1-the-narrow-exception": "9bce5ef71e02767e5bef8b7662d7391fdac0a75d5c0e5db12af2057dd7bdb321",
       "3-2-the-binding-boundary": "18b9f31db627bf7d81bf8a4ff23cec6e91569cb62f07a0af6e58761c92add85e",
@@ -57,10 +57,10 @@
       "Verification"
     ],
     "specPath": "specs/039-local-cockpit-authority/spec.md",
-    "status": "draft",
+    "status": "approved",
     "summary": "Amends 001's interface exclusion and reopens founding deferral F-04 only for Statecraft Dev: a one-repository loopback browser cockpit, calling the same typed local operations under 002 section 3.20. This is an authority decision, separate from the application extraction, server, distribution and command implementations. Ratification grants no production signing, release, hosted panel, daemon or detached execution authority.\n",
     "title": "Reopen F-04 for a local same-origin cockpit over the existing operations"
   },
-  "shardHash": "33e105a7b2bbcb8cfae98b2087418d55aa1fa49110543891a166f615b0f5c7b7",
+  "shardHash": "682f959bd51da2818d7368e06db1479466e44f01c5c02154e3324fb022bca163",
   "specVersion": "1.9.0"
 }

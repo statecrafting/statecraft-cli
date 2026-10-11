@@ -11,8 +11,8 @@
     ],
     "implementingPaths": [],
     "specId": "039-local-cockpit-authority",
-    "specStatus": "draft"
+    "specStatus": "approved"
   },
   "schemaVersion": "1.2.0",
-  "shardHash": "33e105a7b2bbcb8cfae98b2087418d55aa1fa49110543891a166f615b0f5c7b7"
+  "shardHash": "682f959bd51da2818d7368e06db1479466e44f01c5c02154e3324fb022bca163"
 }

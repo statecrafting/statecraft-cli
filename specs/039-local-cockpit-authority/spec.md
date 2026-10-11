@@ -1,7 +1,7 @@
 ---
 id: "039-local-cockpit-authority"
 title: "Reopen F-04 for a local same-origin cockpit over the existing operations"
-status: draft
+status: approved
 implementation: n-a
 created: "2026-10-10"
 summary: >
@@ -51,10 +51,12 @@ need proposed as the basis for reopening F-04, not a claim that any interface
 has been implemented or tested.
 
 The source direction is the proposed platform design record
-`statecraft:3ac9105:docs/design/07-statecraft-dev-local-cockpit.md`, sections
+`statecraft:a176227:docs/design/07-statecraft-dev-local-cockpit.md`, sections
 2, 5, 7, 8, 10 and 12. Its CLI references were checked against `f98f9f0`,
 which remains the source revision of this proposal. This spec carries the
 authority decision locally; the external proposal is not normative authority.
+Platform direction P-25 is recorded alongside it in
+`statecraft:a176227:docs/decisions/00-adoption-register.md`.
 
 ## 2. Territory
 
