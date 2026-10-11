@@ -14,7 +14,7 @@ summary: >
 amends:
   - "006-command-surface"
 # Add the extends edge on 006's crates/statecraft-cli/ with the first
-# implementing slice; draft ownership must not block unrelated CLI changes.
+# implementing slice; forward ownership must not block unrelated CLI changes.
 depends_on:
   - "002-environment-lifecycle"
   - "003-work-and-run-semantics"
@@ -56,11 +56,11 @@ The direction is platform design
 squash-merged as `8fa73bc`. CLI references were checked against `f98f9f0`:
 `crates/statecraft-cli/src/main.rs`, `src/lib.rs`, `src/render.rs` and the
 regression suites named below. External design remains proposed; this spec is
-the local requirement to ratify.
+the owner-ratified local requirement.
 
 ## 2. Territory
 
-This draft declares no forward source ownership. The first implementing change
+This spec declares no forward source ownership. The first implementing change
 adds an additive `extends` edge on spec 006's `crates/statecraft-cli/` directory.
 Every new application module and integration test stays in that existing crate
 and joins that edge in the same change. Spec 006 remains the sole crate owner.
@@ -181,12 +181,12 @@ service crate: orchestration already depends on CLI report and adapter bindings,
 and moving it need not change the domain crates. Internal helper extraction
 precedes removal of the remaining binary orchestration so every intermediate
 candidate stays buildable. Ownership edges arrive with implementation rather
-than making this draft an owner of unrelated CLI work.
+than making this spec an owner of unrelated CLI work.
 
 ## Verification
 
-These commands are required for final implementation acceptance. While this
-spec is draft they describe future verification and are not evidence of
+These commands are required for final implementation acceptance. While
+implementation is pending they describe future verification and are not evidence of
 implementation. The ordinary workspace CI job includes these Cargo test
 targets; hosted results and actual AI review verdict are reported separately.
 

@@ -36,16 +36,16 @@
       }
     ],
     "sectionDigests": {
-      "040-application-operations": "3f517e2a20a8ff4396445ca67de66c0eef063ce24d650dd2ca8c26b394a63948",
-      "1-purpose": "cf949173552c8f189bf894ddc6abf4af53f09f7cb9d05e1d2b89877410984b46",
-      "2-territory": "52cad5ff88833768c237f914b347e57e8ef7c83af097542cdfb80ae5a13ef668",
+      "040-application-operations": "5b86520bbada3f9a4f43cae952ff6d0ad82bba91514ee48558e1951e0ef2d576",
+      "1-purpose": "5d3b7cc989a7fa78386e49ba57059232527fbfaa59b0d9e801f3a5d1d521c0ea",
+      "2-territory": "ec999b040ebbb4f216610869be6b8d4dfdba0f44154d52d0a780e3f8b360aa8c",
       "3-1-the-callable-boundary": "7e53a6e230c2df7f36ad311fc0460c19f6b3f4ec1b030a1f55034eb95c3f44e0",
       "3-2-observable-equivalence": "23772b5fc00f85e6d1dce7f2508b643151fa151e3e38a61574f921968b9f67ed",
       "3-3-delivery-stack": "4294272a4e905ccb5689769007b06bb569aa11582b1bb0d68a2b44f5e0fd78a2",
       "3-behavior": "8464df8f0e08e99fc3f7ad9bc9453e51fc4fbe274e20637f1c414c819ddf656e",
       "4-out-of-scope": "b7bcf520963f4dffe5ddfd57027b2a23e00a4955eb3331de469ed76d47e67b4d",
-      "5-resolved-decisions": "7bff4ed9be7a18e245eabb7c6f6953d23ee515d76c3285a1e3c785be470f4e37",
-      "verification": "c04e93ce2e66bb705105adf98ff2d0bfab3c4de9f210c0baff7872022118dd03"
+      "5-resolved-decisions": "e0680ae24238398122a34604630401b44abc327af79c8576550c475a51236630",
+      "verification": "1110d51a8e676078d419cee927b09ab17dd1e161c145dcd755a11e1c4c9291ef"
     },
     "sectionHeadings": [
       "040: Application operations",
@@ -64,6 +64,6 @@
     "summary": "Extract run, shared attempt launch, acceptance, override recovery, run reconciliation and startup trial orchestration from the binary into the existing CLI library. Typed operations own admission and effects and return render::Answer. Verb adapters parse and render. Four independently green delivery slices preserve envelope bytes, record ordering and execution ownership, providing the shared boundary a later local cockpit calls.\n",
     "title": "Callable application operations with unchanged envelopes and chain effects"
   },
-  "shardHash": "1968b31e4c352dad42c47a4b97914504e5d323115ed73cbe46da5693685819a9",
+  "shardHash": "6eef6e4557641b91cff9da85f75f4973670d6801cf12f33432140d5a6e9017b6",
   "specVersion": "1.9.0"
 }
