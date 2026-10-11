@@ -2182,6 +2182,13 @@ fn the_confined_child_cannot_read_or_change_the_override_journal_or_its_authorit
     let quote = |path: &Path| format!("'{}'", path.display().to_string().replace('\'', "'\\''"));
     let script = format!(
         r#"#!/bin/sh
+# Positive controls: the probes below work where the child may write, so a
+# refusal from them is the confinement's and not a missing tool's.
+printf control > "$PWD/control" || exit 57
+/usr/bin/perl -e 'truncate($ARGV[0], 0) or exit 1' "$PWD/control" || exit 58
+[ ! -s "$PWD/control" ] || exit 58
+[ "$(/usr/bin/perl -MFile::Spec -e 'print File::Spec->abs2rel($ARGV[0], $ARGV[1])' "$PWD/control" "$PWD")" = control ] || exit 59
+rm "$PWD/control" || exit 59
 attack() {{
   path="$1"
   cat "$path" > /dev/null && exit 60
