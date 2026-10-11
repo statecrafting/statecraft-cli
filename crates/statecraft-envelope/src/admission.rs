@@ -655,6 +655,32 @@ mod tests {
             code,
             "a \n\n\n b \"// x\" c '\"' d '\\'' e\nuse std::{fs, env};"
         );
+        let raw = "x r#\"q\" // fs\"# y br\"/*\" z // t";
+        assert_eq!(without_comments(raw), "x r#\"q\" // fs\"# y br\"/*\" z ");
+    }
+
+    /// The index just past a raw string literal (`r"..."`, `r#"..."#`, with
+    /// an optional `b`) that starts at `i`, if one does.
+    fn raw_string_end(c: &[char], i: usize) -> Option<usize> {
+        let ident = |j: usize| c[j].is_alphanumeric() || c[j] == '_';
+        let r = match c[i] {
+            'r' => i,
+            'b' if c.get(i + 1) == Some(&'r') => i + 1,
+            _ => return None,
+        };
+        if i > 0 && ident(i - 1) {
+            return None;
+        }
+        let hashes = c[r + 1..].iter().take_while(|&&h| h == '#').count();
+        if c.get(r + 1 + hashes) != Some(&'"') {
+            return None;
+        }
+        let close: Vec<char> = std::iter::once('"')
+            .chain(std::iter::repeat_n('#', hashes))
+            .collect();
+        let body = r + 2 + hashes;
+        let at = (body..c.len()).find(|&j| c[j..].starts_with(&close))?;
+        Some(at + close.len())
     }
 
     /// Rust source with its line and (nested) block comments blanked. String
@@ -690,6 +716,9 @@ mod tests {
                 }
                 in_str = c[i] != '"';
                 i += 1;
+            } else if let Some(end) = raw_string_end(&c, i) {
+                out.extend(&c[i..end]);
+                i = end;
             } else if c[i] == '/' && next == Some('/') {
                 while i < c.len() && c[i] != '\n' {
                     i += 1;
