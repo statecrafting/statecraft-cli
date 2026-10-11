@@ -1,0 +1,66 @@
+{
+  "record": {
+    "amends": [
+      "001-boundaries-and-authority",
+      "002-environment-lifecycle"
+    ],
+    "created": "2026-10-10",
+    "dependsOn": [
+      "001-boundaries-and-authority",
+      "002-environment-lifecycle",
+      "007-family-envelope"
+    ],
+    "id": "039-local-cockpit-authority",
+    "implementation": "n-a",
+    "obligations": [
+      {
+        "anchor": "3-1-the-narrow-exception",
+        "id": "R-1",
+        "kind": "requirement",
+        "text": "F-04 is reopened only for the one-repository loopback same-origin cockpit; all other interface scope stays deferred."
+      },
+      {
+        "anchor": "3-2-the-binding-boundary",
+        "id": "R-2",
+        "kind": "requirement",
+        "text": "The cockpit calls the existing typed operations, preserves the family envelope and authoritative records, and introduces no second execution owner or detached run."
+      },
+      {
+        "anchor": "3-3-separate-implementation-authority",
+        "id": "R-3",
+        "kind": "requirement",
+        "text": "Each implementation slice requires its own ratified spec and named positive and negative acceptance, carrying the server session, origin, request, and path security controls and the signed, rooted, rollback-resistant, atomic, offline distribution requirements in section 3.3; this decision authorizes no implementation by itself."
+      }
+    ],
+    "sectionDigests": {
+      "039-local-cockpit-authority": "124a6b9a8ae1b526babbf8467befc3385a5654c341b9599628f218470260fe73",
+      "1-purpose": "5d4772e1380b1812d27bce29dfa52fba9ada2b559c23aba09c0ff1865a74d40f",
+      "2-territory": "56693aca28a9fcbd94b2327118c46c95763f2d959ee5b96acc9d1cf69119ffb2",
+      "3-1-the-narrow-exception": "9bce5ef71e02767e5bef8b7662d7391fdac0a75d5c0e5db12af2057dd7bdb321",
+      "3-2-the-binding-boundary": "18b9f31db627bf7d81bf8a4ff23cec6e91569cb62f07a0af6e58761c92add85e",
+      "3-3-separate-implementation-authority": "9d70a9de507f01a79d178d8254bbabb74cc5456e783b2baed815d1b99c9aa64c",
+      "3-behavior": "6b51a389e9196eedb05196462ccd92e4910083d28ea4b5eeb7be8ec1254d409c",
+      "4-out-of-scope": "ebea467e7ae551bae08a7c707b7693a84edef25e177cd496c256290aeeafdace",
+      "5-resolved-decisions": "ae825a837d9cccb14454ca1e65098cfebb32c0673ff7c75ddf6122f15936fdd0",
+      "verification": "fab971236969500583eabe684d6118aad58cc41a8e8df4fea70f1a8378631eec"
+    },
+    "sectionHeadings": [
+      "039: Local cockpit authority",
+      "1. Purpose",
+      "2. Territory",
+      "3. Behavior",
+      "3.1 The narrow exception",
+      "3.2 The binding boundary",
+      "3.3 Separate implementation authority",
+      "4. Out of scope",
+      "5. Resolved decisions",
+      "Verification"
+    ],
+    "specPath": "specs/039-local-cockpit-authority/spec.md",
+    "status": "approved",
+    "summary": "Amends 001's interface exclusion and reopens founding deferral F-04 only for Statecraft Dev: a one-repository loopback browser cockpit, calling the same typed local operations under 002 section 3.20. This is an authority decision, separate from the application extraction, server, distribution and command implementations. Ratification grants no production signing, release, hosted panel, daemon or detached execution authority.\n",
+    "title": "Reopen F-04 for a local same-origin cockpit over the existing operations"
+  },
+  "shardHash": "d25ffeb1aaf453ee6c44be1d5edd230b903786f79fd9b361cba7c32b43a2e5c6",
+  "specVersion": "1.9.0"
+}
