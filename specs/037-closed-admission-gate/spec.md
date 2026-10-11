@@ -2,7 +2,7 @@
 id: "037-closed-admission-gate"
 title: "Envelope admission evaluates through action-gate's closed mode, with identical decisions and bytes"
 status: approved
-implementation: in-progress
+implementation: complete
 created: "2026-10-07"
 summary: >
   Amends 005 for how the envelope's admission::evaluate combines its
@@ -169,6 +169,15 @@ Taken by the agent drafting this spec; the owner ratifies them by approving it.
   Every evidence requirement against every single verdict, every approval
   requirement against every decision sequence of up to three, and 20,000
   seeded mixed inputs whose coverage the test asserts. No new dependency.
+- **R-3 is measured on the resolved graph** (2026-10-10). A unit test in
+  `admission.rs`, inside `--lib admission`, reads `cargo metadata --offline
+  --locked` filtered to the host platform, and asserts the exact pin with no default features, that the three
+  crates section 3.4 names are the only ones `action-gate-core` adds to the
+  envelope's normal closure, that no `regex` is in it, and that each of the
+  three is Apache-2.0, forbids unsafe code, has no build script and names no
+  clock, environment, file system, network, process or thread API. R-1 is held
+  by the registration-order unit test, R-2 by the differential test; with all
+  three covered and the acceptance green, implementation is complete.
 
 ## Verification
 
