@@ -2,7 +2,7 @@
 id: "012-remote-desired-state"
 title: "A setup profile declares remote desired state and doctor compares it without writing"
 status: approved
-implementation: in-progress
+implementation: complete
 created: "2026-09-26"
 summary: >
   Amends 002's setup-profile and remote-doctor contract. A profile renders a
