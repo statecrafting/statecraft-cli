@@ -35,7 +35,7 @@ use std::path::Path;
 /// The one registered profile.
 pub const PROFILE_ID: &str = "github-actions-rust";
 /// Its revision.
-pub const REVISION: u32 = 15;
+pub const REVISION: u32 = 16;
 /// Where the rendered policy document lives in the target.
 pub const POLICY_PATH: &str = ".statecraft/setup/github-actions-rust.json";
 /// The resume record, under the project's runtime state.
@@ -122,6 +122,8 @@ pub enum Role {
     Makefile,
     /// A `CODEOWNERS`, rendered only when none exists (S-3).
     Codeowners,
+    /// The remote desired-state document (revision 16, spec 012).
+    RemoteState,
 }
 
 /// One template of a profile.
@@ -234,6 +236,19 @@ impl Profile {
             "policy {}\n",
             digest_bytes(static_policy().to_string().as_bytes())
         ));
+        // Revision 16 (spec 012 section 3.1): the desired-state document's
+        // identity is part of the profile's.
+        text.push_str(&format!(
+            "remote-state {}\n",
+            digest_bytes(
+                crate::remote_state::static_part(
+                    GATE_APP_ID,
+                    EXCEPTION_ENVIRONMENT,
+                    &credentials()
+                )
+                .as_bytes()
+            )
+        ));
         digest_bytes(text.as_bytes())
     }
 
@@ -241,6 +256,12 @@ impl Profile {
     pub fn source_identity(&self) -> String {
         format!("{SOURCE_PREFIX}{}@{}", self.id, self.revision)
     }
+}
+
+/// The reviewer credential names, preferred first; any one satisfies the
+/// review's secret requirement.
+pub fn credentials() -> Vec<String> {
+    vec![PREFERRED_CREDENTIAL.to_string(), CREDENTIAL.to_string()]
 }
 
 /// The part of the policy that does not depend on the project.
@@ -371,6 +392,9 @@ pub fn remote_obligations() -> Vec<String> {
         "revision 11: the commit walk copies the spec-spine binary into each commit's temporary worktree as a regular file instead of linking to a binary outside it, so spec-spine's containment rule (its spec 144, from 0.28.0) can read every commit's tree; the walk's verdicts are otherwise unchanged (spec 023)".to_string(),
         "revision 12: the AI review leaves a managed file out only when its bytes match the digest the policy records, sends a file that only removes lines as a list under review.deletion_cap, measures the change in estimated tokens (bytes / 3) against a call budget of half review.context_tokens and a ceiling of review.max_calls calls, and reviews a larger change in file groups whose verdicts are merged; review.diff_cap is an added-line backstop, 20000 unless declared. With governance.require_ratified (default true) the coupling steps refuse a changed path a draft spec owns, and a pull request that moves a spec to approved needs the owner exception (spec 024)".to_string(),
         "revision 13: the repository-local spec-spine is installed at .bin/spec-spine. The installer builds in a scratch root outside the repository and atomically moves only the executable into .bin; rendered gates, workflow caches, commit checks, policy commands, delivered hooks and local resolution use that one location. The previous .tooling ignore remains on upgrade, and .bin is also ignored (spec 031)".to_string(),
+        "revision 14: external code selection runs the project-owned reusable workflow and script behind the required code job; that script joins the trusted-base authority set, and failed, cancelled or skipped code still blocks ci-gate (spec 032)".to_string(),
+        "revision 15: an exact consented spec-spine pin move is reviewed with its initialization plan, and the managed installer reads that adopted pin; this changes no required remote check or branch-protection authority (spec 033)".to_string(),
+        format!("revision 16: the profile renders {} (schema {}), a canonical desired-state document of what this profile expects of the remote: required checks with their App, the extra required jobs and their aggregation by ci-gate, code-owner review and the governed paths CODEOWNERS covers, the merge queue (remote.merge_queue), the exception Environment and its reviewers (remote.exception_reviewers), workflow-token defaults, secret names, and repository custom properties (remote.custom_properties). An omitted field is no claim. `doctor --remote` compares every field read-only and reports each as matching, drifted, unavailable, unauthorized, unsupported or unverified; this product never applies it, and an owner-operated applier outside this product needs its own authorization (spec 012)", crate::remote_state::PATH, crate::remote_state::SCHEMA),
         "a repository that already runs these checks by hand keeps them by setting governance.enforce_coverage (index coverage --fail-on-untraced), governance.authored_content (the script's path; absent or not executable refuses), governance.authored_content_text (the title, the body and every commit message), governance.gate_each_commit (each commit's tree passes the gate and cargo fmt) and governance.require_signed_commits (each commit verified as signed by GitHub) (revision 4)".to_string(),
     ]
 }
@@ -427,6 +451,14 @@ pub struct Parameters {
     /// requires, each a call of the project's own reusable workflow
     /// (revision 7).
     pub extra_required_jobs: Vec<ExtraJob>,
+    /// `remote.*`: what the desired-state document declares beyond the
+    /// profile's fixed expectations (revision 16, spec 012).
+    #[serde(skip_serializing_if = "remote_is_empty")]
+    pub remote: crate::remote_state::RemoteParameters,
+}
+
+fn remote_is_empty(r: &crate::remote_state::RemoteParameters) -> bool {
+    *r == crate::remote_state::RemoteParameters::default()
 }
 
 /// The required code surface. External projects supply both local qualification
@@ -652,6 +684,7 @@ impl Parameters {
             fail_on_unresolved: true,
             require_ratified: true,
             extra_required_jobs: Vec::new(),
+            remote: crate::remote_state::RemoteParameters::default(),
         }
     }
 }
@@ -705,6 +738,16 @@ pub fn parameters(
             "review.deletion_cap" => p.deletion_cap = bounded(key, value, DELETION_CAP_RANGE)?,
             "ci.code" => p.code = code_selection(root, value)?,
             "ci.extra_required_jobs" => p.extra_required_jobs = extra_required_jobs(root, value)?,
+            "remote.merge_queue" => {
+                p.remote.merge_queue = Some(crate::remote_state::merge_queue(value)?)
+            }
+            "remote.exception_reviewers" => {
+                p.remote.exception_reviewers =
+                    Some(crate::remote_state::exception_reviewers(value)?)
+            }
+            "remote.custom_properties" => {
+                p.remote.custom_properties = Some(crate::remote_state::custom_properties(value)?)
+            }
             "governance.authored_content" => {
                 let v = value
                     .as_str()
@@ -1493,7 +1536,7 @@ pub fn plan(inputs: &Inputs<'_>) -> Result<Plan, String> {
         .iter()
         .filter(|t| t.role != Role::Codeowners)
         .map(|t| t.path.as_str())
-        .chain(std::iter::once(POLICY_PATH))
+        .chain([POLICY_PATH, crate::remote_state::PATH])
         .collect();
     if let Code::External { workflow, script } = &params.code {
         owned_paths.extend([workflow.as_str(), script.as_str()]);
@@ -1633,6 +1676,51 @@ pub fn plan(inputs: &Inputs<'_>) -> Result<Plan, String> {
         });
     }
 
+    // Revision 16 (spec 012 section 3.1): the remote desired-state document,
+    // rendered before the policy so the policy lists it.
+    let desired = crate::remote_state::render(&crate::remote_state::Rendering {
+        profile: crate::remote_state::ProfileClaim {
+            id: profile.id.clone(),
+            revision: profile.revision,
+            identity: identity.clone(),
+        },
+        default_branch: &params.default_branch,
+        gate_app_id: GATE_APP_ID,
+        extra_jobs: params
+            .extra_required_jobs
+            .iter()
+            .map(|e| (e.job.clone(), e.workflow.clone()))
+            .collect(),
+        governed_paths: owned_paths.iter().map(|p| format!("/{p}")).collect(),
+        code_owners: &params.code_owners,
+        exception_environment: EXCEPTION_ENVIRONMENT,
+        credentials: credentials(),
+        remote: &params.remote,
+    });
+    let desired_bytes = desired.canonical();
+    {
+        let rel = crate::remote_state::PATH;
+        let (action, current, previous) = classify(rel, &desired_bytes);
+        before.insert(rel.to_string(), current.clone());
+        files.push(FilePlan {
+            path: rel.to_string(),
+            role: Role::RemoteState,
+            authority_set: true,
+            intended_copy: matches!(
+                action,
+                Action::Conflict {
+                    kind: ConflictKind::Customized | ConflictKind::EditedAfterInterruption
+                }
+            )
+            .then(|| format!("{INTENDED_DIR}/{rel}.intended")),
+            action,
+            intended: digest_bytes(&desired_bytes),
+            current,
+            previous,
+            bytes: desired_bytes,
+        });
+    }
+
     // The policy document, rendered last because it lists the others.
     let mut policy = static_policy();
     policy["id"] = serde_json::json!(profile.id);
@@ -1763,6 +1851,13 @@ pub fn plan(inputs: &Inputs<'_>) -> Result<Plan, String> {
         ),
     );
 
+    let remote_state = files.iter().find(|f| f.role == Role::RemoteState).map(|f| {
+        statecraft_environment::manifest::RemoteStateRecord {
+            path: f.path.clone(),
+            digest: f.intended.clone(),
+            schema: crate::remote_state::SCHEMA.to_string(),
+        }
+    });
     Ok(Plan {
         profile: profile.id.clone(),
         revision: profile.revision,
@@ -1785,6 +1880,7 @@ pub fn plan(inputs: &Inputs<'_>) -> Result<Plan, String> {
             revision: profile.revision,
             identity,
             parameters: block,
+            remote_state,
         }),
         before,
     })
@@ -1969,6 +2065,53 @@ pub enum HostError {
     NotFound,
     /// The host could not be asked, or answered something else.
     Unreachable(String),
+    /// The host refused the credential's read authority (spec 012 section
+    /// 3.2).
+    Unauthorized(String),
+    /// The host, the repository's plan or the API does not offer it.
+    Unsupported(String),
+}
+
+impl HostError {
+    /// Why, sanitized.
+    pub fn reason(&self) -> String {
+        match self {
+            HostError::NotFound => "not found".to_string(),
+            HostError::Unreachable(why) => why.clone(),
+            HostError::Unauthorized(why) => format!("unauthorized: {why}"),
+            HostError::Unsupported(why) => format!("unsupported: {why}"),
+        }
+    }
+}
+
+/// A `gh api` failure, classified from its error stream alone. The reason
+/// keeps only the HTTP status, never a response body, header or credential
+/// (spec 012 section 3.2).
+pub fn classify_gh_failure(stderr: &str) -> HostError {
+    let status = stderr
+        .split("HTTP ")
+        .skip(1)
+        .filter_map(|rest| rest.get(..3))
+        .find(|code| code.bytes().all(|b| b.is_ascii_digit()));
+    let lower = stderr.to_ascii_lowercase();
+    let plan = [
+        "upgrade to github",
+        "github enterprise",
+        "not available for",
+        "feature is not available",
+    ]
+    .iter()
+    .any(|m| lower.contains(m));
+    match status {
+        Some("404") => HostError::NotFound,
+        Some(code @ ("401" | "403")) if plan => {
+            HostError::Unsupported(format!("HTTP {code}, a plan limitation"))
+        }
+        Some(code @ ("401" | "403")) => HostError::Unauthorized(format!("HTTP {code}")),
+        Some(code) => HostError::Unreachable(format!("HTTP {code}")),
+        None if stderr.contains("Not Found") => HostError::NotFound,
+        None => HostError::Unreachable("gh exited without an HTTP status".to_string()),
+    }
 }
 
 /// The real host: `gh api`, read-only, with whatever credential `gh` holds.
@@ -1998,18 +2141,7 @@ impl Host for GhHost {
             return serde_json::from_slice(&out.stdout)
                 .map_err(|e| HostError::Unreachable(format!("unparseable answer: {e}")));
         }
-        let text = format!(
-            "{}{}",
-            String::from_utf8_lossy(&out.stderr),
-            String::from_utf8_lossy(&out.stdout)
-        );
-        if text.contains("HTTP 404") || text.contains("Not Found") {
-            Err(HostError::NotFound)
-        } else {
-            Err(HostError::Unreachable(
-                text.lines().next().unwrap_or("no output").to_string(),
-            ))
-        }
+        Err(classify_gh_failure(&String::from_utf8_lossy(&out.stderr)))
     }
 }
 
@@ -2089,11 +2221,17 @@ pub fn remote_results(
         .or_else(|| head_of(root))
         .unwrap_or_default();
 
-    let unreachable = |what: &str, e: &str| {
-        Outcome::new(
-            ResultState::Unverified,
-            format!("{what}: the host did not answer ({e})"),
-        )
+    let unverified = |what: &str, e: &HostError| {
+        let detail = match e {
+            HostError::Unauthorized(why) => {
+                format!("{what}: the host refused the credential's read authority ({why})")
+            }
+            HostError::Unsupported(why) => {
+                format!("{what}: the host or plan does not support the read ({why})")
+            }
+            _ => format!("{what}: the host did not answer ({})", e.reason()),
+        };
+        Outcome::new(ResultState::Unverified, detail)
     };
 
     // remote-prerequisites
@@ -2102,13 +2240,13 @@ pub fn remote_results(
         match host.get(&format!("repos/{slug}/actions/secrets/{CREDENTIAL}")) {
             Ok(_) => {}
             Err(HostError::NotFound) => missing.push(format!("the secret {CREDENTIAL} is not set")),
-            Err(HostError::Unreachable(e)) => return unreachable("the secret", &e),
+            Err(e) => return unverified("the secret", &e),
         }
         match host.get(&format!("repos/{slug}/actions/permissions")) {
             Ok(v) if v["enabled"] == serde_json::json!(true) => {}
             Ok(_) => missing.push("Actions is not enabled".to_string()),
             Err(HostError::NotFound) => missing.push("Actions is not enabled".to_string()),
-            Err(HostError::Unreachable(e)) => return unreachable("Actions permissions", &e),
+            Err(e) => return unverified("Actions permissions", &e),
         }
         match host.get(&format!("repos/{slug}/actions/permissions/workflow")) {
             Ok(v) if v["default_workflow_permissions"] == "read" => {}
@@ -2119,7 +2257,7 @@ pub fn remote_results(
             Err(HostError::NotFound) => {
                 missing.push("the workflow token default is unknown".into())
             }
-            Err(HostError::Unreachable(e)) => return unreachable("workflow permissions", &e),
+            Err(e) => return unverified("workflow permissions", &e),
         }
         match host.get(&format!(
             "repos/{slug}/environments/{EXCEPTION_ENVIRONMENT}"
@@ -2137,7 +2275,7 @@ pub fn remote_results(
             Err(HostError::NotFound) => missing.push(format!(
                 "the Environment {EXCEPTION_ENVIRONMENT} does not exist"
             )),
-            Err(HostError::Unreachable(e)) => return unreachable("the exception Environment", &e),
+            Err(e) => return unverified("the exception Environment", &e),
         }
         if missing.is_empty() {
             Outcome::new(
@@ -2197,7 +2335,7 @@ pub fn remote_results(
             ResultState::NotSatisfied,
             format!("{branch} has no branch protection"),
         ),
-        Err(HostError::Unreachable(e)) => unreachable("branch protection", &e),
+        Err(e) => unverified("branch protection", &e),
     };
 
     // ci-executed
@@ -2238,7 +2376,7 @@ pub fn remote_results(
             ResultState::NotSatisfied,
             format!("{head} is not known to the host"),
         ),
-        Err(HostError::Unreachable(e)) => unreachable("check runs", &e),
+        Err(e) => unverified("check runs", &e),
     };
 
     // ai-review-produced
@@ -2266,7 +2404,7 @@ pub fn remote_results(
             ResultState::NotSatisfied,
             format!("no evidence artifact for {head}"),
         ),
-        Err(HostError::Unreachable(e)) => unreachable("artifacts", &e),
+        Err(e) => unverified("artifacts", &e),
     };
 
     Results {
@@ -2277,6 +2415,37 @@ pub fn remote_results(
         ci_executed: ci,
         ai_review_produced: review,
     }
+}
+
+/// `doctor --remote`: the six results and the desired-state comparison
+/// (spec 012 section 3.2). A local finding about the document is raised
+/// before any host is asked, so the host is then asked nothing.
+pub fn remote_report(
+    root: &Path,
+    manifest: &Manifest,
+    host: &dyn Host,
+    head: Option<&str>,
+) -> (Results, crate::remote_state::Comparison) {
+    let local = crate::remote_state::read_local(root, manifest);
+    if let Err(finding) = &local {
+        let why = format!("no host was asked: {finding}");
+        let results = Results {
+            files_installed: installed_from_manifest(root, manifest),
+            local_checks: Outcome::new(
+                ResultState::NotRun,
+                "`doctor --remote` does not run the local gate",
+            ),
+            remote_prerequisites: Outcome::new(ResultState::Unverified, why.clone()),
+            required_checks: Outcome::new(ResultState::Unverified, why.clone()),
+            ci_executed: Outcome::new(ResultState::Unverified, why.clone()),
+            ai_review_produced: Outcome::new(ResultState::Unverified, why),
+        };
+        return (results, crate::remote_state::compare(local, None, host));
+    }
+    let results = remote_results(root, manifest, host, head);
+    let slug = repository_slug(root);
+    let comparison = crate::remote_state::compare(local, slug.as_deref(), host);
+    (results, comparison)
 }
 
 /// `files-installed`, from the manifest's profile entries and the disk.
@@ -2647,6 +2816,7 @@ mod tests {
             revision: 3,
             identity: String::new(),
             parameters: BTreeMap::new(),
+            remote_state: None,
         };
         assert_eq!(authored_content_note(&s), None);
         s.revision = REVISION;

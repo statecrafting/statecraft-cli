@@ -44,11 +44,12 @@
       }
     ],
     "id": "012-remote-desired-state",
-    "implementation": "pending",
+    "implementation": "complete",
     "sectionDigests": {
-      "012-remote-desired-state": "9d05383092ad4ed859bb9e334c51e5c0792fa12193e240284372fd6248361e7e",
+      "012-remote-desired-state": "a9f002fe56eaabe979c203490a6dbff331fbc955942969d3c1bd05b25dfe6562",
       "1-purpose": "3449b4245ff82b4bb32b0cb394dd1a1ae8d94fcf11aa0b70172e3c23a0f850df",
       "2-territory": "7b7b73aea6f1f8a262b1a18922fa3e2d350dc0ce64a903e5e76996e1ab73c59e",
+      "2026-10-10-choices-the-implementation-made-where-this-spec-is-silent": "3fd21950d3ba98e1fcaa6610189834cb623268cee5f759819bc42c8df391fc40",
       "3-1-the-desired-state-document": "5414dca612f88581d8d85fdcedbc901c0362aca6f60502b2e65731349a8b1831",
       "3-2-read-only-comparison": "fca20e469fa54a5848ff8ef63af95f60dab07ef44c0729a83a84ba10a5bb8002",
       "3-3-comparison-rules": "32d0b55705bcf543b81e208c7c4115349eb96edd9d8c6e66590c1612c7d17e7a",
@@ -57,8 +58,8 @@
       "3-6-observable-negative-cases": "e0836ea59b52a606e4a3ac32d0e023e2d8b09e02d42f304149d53d031432ee63",
       "3-behavior": "a368c846b8c353e60ac1b748de7df91402ac464dfe2bfffd24b401b2a27908d6",
       "4-out-of-scope": "971db66573d9472d2bde5b5bccb7e2c5f3a54a2130eda2e97a6e5b768ef27cf8",
-      "5-resolved-decisions": "0fcfde561cdac189ab24f30a3cae42b5331c89bef03efb422463a0e692a3877d",
-      "verification": "9264bb080196a40308eb9498057a2c75b26331d788879c4fba60bc6400c43876"
+      "5-resolved-decisions": "f8460cda7fe38cea29387851a951073e87cf2d169b7a4dea60e44d31b2980aa3",
+      "verification": "5adb637d95a3861b2f27add3bf7a8d450252be452b6e02a265d32926a1d2500e"
     },
     "sectionHeadings": [
       "012: Remote desired state",
@@ -73,6 +74,7 @@
       "3.6 Observable negative cases",
       "4. Out of scope",
       "5. Resolved decisions",
+      "2026-10-10: choices the implementation made where this spec is silent",
       "Verification"
     ],
     "specPath": "specs/012-remote-desired-state/spec.md",
@@ -80,6 +82,6 @@
     "summary": "Amends 002's setup-profile and remote-doctor contract. A profile renders a versioned desired remote-state document covering required checks, extra jobs, code-owner review, merge queue, the review-exception environment and its reviewers, workflow-token defaults, secret names, repository custom properties, and profile identity. doctor --remote compares every field independently and never writes remote state or reads a secret value.\n",
     "title": "A setup profile declares remote desired state and doctor compares it without writing"
   },
-  "shardHash": "a0ba87109dfa821d2070b00ae86ab772c0c749422a6519721c1111e97483334f",
+  "shardHash": "c4000ef5503d9ca75565e0a4b70e300ebd11d3adb1ff884f123edf817afa0eec",
   "specVersion": "1.9.0"
 }
