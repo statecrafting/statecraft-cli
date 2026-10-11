@@ -1,0 +1,21 @@
+{
+  "mapping": {
+    "amends": [
+      "006-command-surface"
+    ],
+    "dependsOn": [
+      "002-environment-lifecycle",
+      "003-work-and-run-semantics",
+      "004-execution-adapter",
+      "005-acceptance-and-evidence",
+      "006-command-surface",
+      "007-family-envelope",
+      "039-local-cockpit-authority"
+    ],
+    "implementingPaths": [],
+    "specId": "040-application-operations",
+    "specStatus": "approved"
+  },
+  "schemaVersion": "1.2.0",
+  "shardHash": "053602057276b655c356f05f8f94593347753a81b5617a3b34966c04a9ca9c6b"
+}

@@ -1,0 +1,69 @@
+{
+  "record": {
+    "amends": [
+      "006-command-surface"
+    ],
+    "created": "2026-10-10",
+    "dependsOn": [
+      "002-environment-lifecycle",
+      "003-work-and-run-semantics",
+      "004-execution-adapter",
+      "005-acceptance-and-evidence",
+      "006-command-surface",
+      "007-family-envelope",
+      "039-local-cockpit-authority"
+    ],
+    "id": "040-application-operations",
+    "implementation": "pending",
+    "obligations": [
+      {
+        "anchor": "3-1-the-callable-boundary",
+        "id": "R-1",
+        "kind": "requirement",
+        "text": "Every callable operation performs its own authoritative admission, including registration, arming, lock acquisition, journal reads and report selection."
+      },
+      {
+        "anchor": "3-2-observable-equivalence",
+        "id": "R-2",
+        "kind": "requirement",
+        "text": "Library and verb yield byte-identical family envelopes and identical ordered chain effects under controlled observations, including refusals and interruptions."
+      },
+      {
+        "anchor": "3-3-delivery-stack",
+        "id": "R-3",
+        "kind": "requirement",
+        "text": "Four delivery slices remain independently buildable and verified; no HTTP or async dependency enters the core crates."
+      }
+    ],
+    "sectionDigests": {
+      "040-application-operations": "2a2c6f61ed7723680ab075cc93cc21aded73688f7ecf8ffe87b22f32cd9297bd",
+      "1-purpose": "5d3b7cc989a7fa78386e49ba57059232527fbfaa59b0d9e801f3a5d1d521c0ea",
+      "2-territory": "ec999b040ebbb4f216610869be6b8d4dfdba0f44154d52d0a780e3f8b360aa8c",
+      "3-1-the-callable-boundary": "7e53a6e230c2df7f36ad311fc0460c19f6b3f4ec1b030a1f55034eb95c3f44e0",
+      "3-2-observable-equivalence": "23772b5fc00f85e6d1dce7f2508b643151fa151e3e38a61574f921968b9f67ed",
+      "3-3-delivery-stack": "d927f700529d7b3d4655249aa22fdc12ef7652b099171872fac6fdfd9610bbfd",
+      "3-behavior": "ff1aeedeb9546c9a210b4c80a11314ee81b1116f3aa1b2477e5d37ceb4335083",
+      "4-out-of-scope": "b7bcf520963f4dffe5ddfd57027b2a23e00a4955eb3331de469ed76d47e67b4d",
+      "5-resolved-decisions": "e0680ae24238398122a34604630401b44abc327af79c8576550c475a51236630",
+      "verification": "1110d51a8e676078d419cee927b09ab17dd1e161c145dcd755a11e1c4c9291ef"
+    },
+    "sectionHeadings": [
+      "040: Application operations",
+      "1. Purpose",
+      "2. Territory",
+      "3. Behavior",
+      "3.1 The callable boundary",
+      "3.2 Observable equivalence",
+      "3.3 Delivery stack",
+      "4. Out of scope",
+      "5. Resolved decisions",
+      "Verification"
+    ],
+    "specPath": "specs/040-application-operations/spec.md",
+    "status": "approved",
+    "summary": "Extract run, shared attempt launch, acceptance, override recovery, run reconciliation and startup trial orchestration from the binary into the existing CLI library. Typed operations own admission and effects and return render::Answer. Verb adapters parse and render. Four independently green delivery slices preserve envelope bytes, record ordering and execution ownership, providing the shared boundary a later local cockpit calls.\n",
+    "title": "Callable application operations with unchanged envelopes and chain effects"
+  },
+  "shardHash": "053602057276b655c356f05f8f94593347753a81b5617a3b34966c04a9ca9c6b",
+  "specVersion": "1.9.0"
+}
