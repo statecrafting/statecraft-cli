@@ -394,8 +394,16 @@ mod tests {
             require_artifacts: vec!["a".into(), "b".into()],
             ..AdmissionPolicy::strict()
         };
+        let verdict = crate::verdict::verify_artifact(
+            &crate::reference::Reference::over_file_bytes("a", "1", b"bytes"),
+            Some(b"bytes"),
+            None,
+            &crate::roots::RootSet::empty(),
+        );
+        let id = AttestationId(Hash::of(b"v"));
+        let verdicts = [(id, verdict.clone()), (id, verdict)];
         let input = AdmissionInput {
-            verdicts: &[],
+            verdicts: &verdicts,
             decisions: &[],
             submitter: &sam,
         };
@@ -407,6 +415,14 @@ mod tests {
             [
                 "artifact/0",
                 "artifact/1",
+                "verdict/0/integrity",
+                "verdict/0/signature",
+                "verdict/0/issuer-trust",
+                "verdict/0/subject-binding",
+                "verdict/1/integrity",
+                "verdict/1/signature",
+                "verdict/1/issuer-trust",
+                "verdict/1/subject-binding",
                 "approver-is-submitter",
                 "approval-count"
             ]
@@ -423,5 +439,183 @@ mod tests {
             refusal_of(&deny),
             RefusalCode::Unknown(serde_json::Value::String(closed::NO_CHECK_DECIDED.into()))
         );
+    }
+
+    /// Spec 037 section 3.4 (R-3), measured on the resolved graph rather than
+    /// restated: the pin is exact with no default features, the three crates it
+    /// brings are the only ones it adds to the envelope's normal closure, that
+    /// closure carries no `regex`, and each of the three is Apache-2.0,
+    /// forbids unsafe code, has no build script and names no clock,
+    /// environment, file system, network, process or thread API.
+    #[test]
+    fn admission_dependency_is_exact_pure_and_apache() {
+        use serde_json::Value as J;
+        use std::collections::BTreeMap;
+        use std::path::Path;
+
+        let cargo = std::env::var("CARGO").unwrap_or_else(|_| "cargo".into());
+        let out = std::process::Command::new(cargo)
+            .args(["metadata", "--format-version", "1", "--offline", "--locked"])
+            .current_dir(env!("CARGO_MANIFEST_DIR"))
+            .output()
+            .expect("cargo metadata runs");
+        assert!(
+            out.status.success(),
+            "{}",
+            String::from_utf8_lossy(&out.stderr)
+        );
+        let meta: J = serde_json::from_slice(&out.stdout).expect("metadata is JSON");
+        let packages: BTreeMap<&str, &J> = meta["packages"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|p| (p["id"].as_str().unwrap(), p))
+            .collect();
+        let normal: BTreeMap<&str, Vec<&str>> = meta["resolve"]["nodes"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|n| {
+                let deps = n["deps"]
+                    .as_array()
+                    .unwrap()
+                    .iter()
+                    .filter(|d| {
+                        d["dep_kinds"]
+                            .as_array()
+                            .unwrap()
+                            .iter()
+                            .any(|k| k["kind"].is_null())
+                    })
+                    .map(|d| d["pkg"].as_str().unwrap())
+                    .collect();
+                (n["id"].as_str().unwrap(), deps)
+            })
+            .collect();
+        fn closure<'a>(
+            normal: &BTreeMap<&'a str, Vec<&'a str>>,
+            roots: Vec<&'a str>,
+        ) -> BTreeSet<&'a str> {
+            let mut seen = BTreeSet::new();
+            let mut todo = roots;
+            while let Some(id) = todo.pop() {
+                if seen.insert(id) {
+                    todo.extend(normal[id].iter().copied());
+                }
+            }
+            seen
+        }
+        let name_version = |id: &str| {
+            let p = packages[id];
+            format!(
+                "{} {}",
+                p["name"].as_str().unwrap(),
+                p["version"].as_str().unwrap()
+            )
+        };
+
+        let (envelope_id, envelope) = packages
+            .iter()
+            .find(|(_, p)| p["name"] == "statecraft-envelope")
+            .unwrap();
+        let pin: Vec<&J> = envelope["dependencies"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .filter(|d| d["name"] == "action-gate-core")
+            .collect();
+        assert_eq!(pin.len(), 1, "one action-gate-core dependency");
+        assert_eq!(pin[0]["req"], "=0.3.0", "the pin is exact");
+        assert!(pin[0]["kind"].is_null(), "a normal dependency");
+        assert_eq!(pin[0]["uses_default_features"], false);
+        assert_eq!(pin[0]["features"], J::Array(vec![]));
+
+        let direct = &normal[envelope_id];
+        let core = *direct
+            .iter()
+            .find(|id| packages[**id]["name"] == "action-gate-core")
+            .unwrap();
+        let with = closure(&normal, direct.clone());
+        let without = closure(
+            &normal,
+            direct.iter().copied().filter(|id| *id != core).collect(),
+        );
+        let added: BTreeSet<String> = with
+            .difference(&without)
+            .map(|id| name_version(id))
+            .collect();
+        assert_eq!(
+            added,
+            BTreeSet::from(
+                [
+                    "action-gate-core 0.3.0",
+                    "action-gate-types 0.1.0",
+                    "canonical-keysort-json 0.1.0"
+                ]
+                .map(String::from)
+            ),
+            "the crates action-gate-core adds to the envelope's normal closure"
+        );
+        assert!(
+            with.iter().all(|id| packages[id]["name"] != "regex"),
+            "no regex in the envelope's closure"
+        );
+
+        for id in with.difference(&without) {
+            let p = packages[id];
+            let what = name_version(id);
+            assert_eq!(p["license"], "Apache-2.0", "{what} licence");
+            assert!(
+                p["targets"].as_array().unwrap().iter().all(|t| {
+                    t["kind"]
+                        .as_array()
+                        .unwrap()
+                        .iter()
+                        .all(|k| k != "custom-build")
+                }),
+                "{what} has a build script"
+            );
+            let root = Path::new(p["manifest_path"].as_str().unwrap())
+                .parent()
+                .unwrap();
+            let manifest = std::fs::read_to_string(root.join("Cargo.toml")).unwrap();
+            assert!(
+                manifest.contains("unsafe_code = \"forbid\""),
+                "{what} does not forbid unsafe code"
+            );
+            let mut dirs = vec![root.join("src")];
+            while let Some(dir) = dirs.pop() {
+                for entry in std::fs::read_dir(&dir).unwrap() {
+                    let path = entry.unwrap().path();
+                    if path.is_dir() {
+                        dirs.push(path);
+                    } else if path.extension().is_some_and(|e| e == "rs") {
+                        let text = std::fs::read_to_string(&path).unwrap();
+                        for api in [
+                            "std::env",
+                            "env::",
+                            "std::fs",
+                            "fs::",
+                            "std::net",
+                            "net::",
+                            "std::time",
+                            "time::",
+                            "SystemTime",
+                            "Instant",
+                            "std::process",
+                            "process::",
+                            "std::thread",
+                            "thread::",
+                        ] {
+                            assert!(
+                                !text.contains(api),
+                                "{what}: {} names `{api}`",
+                                path.display()
+                            );
+                        }
+                    }
+                }
+            }
+        }
     }
 }
