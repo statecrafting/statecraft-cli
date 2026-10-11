@@ -29,7 +29,7 @@
         "anchor": "3-3-separate-implementation-authority",
         "id": "R-3",
         "kind": "requirement",
-        "text": "Each implementation slice requires its own ratified spec and named positive and negative acceptance; this decision authorizes no implementation by itself."
+        "text": "Each implementation slice requires its own ratified spec and named positive and negative acceptance, carrying the server session, origin, request, and path security controls and the signed, rooted, rollback-resistant, atomic, offline distribution requirements in section 3.3; this decision authorizes no implementation by itself."
       }
     ],
     "sectionDigests": {
@@ -61,6 +61,6 @@
     "summary": "Amends 001's interface exclusion and reopens founding deferral F-04 only for Statecraft Dev: a one-repository loopback browser cockpit, calling the same typed local operations under 002 section 3.20. This is an authority decision, separate from the application extraction, server, distribution and command implementations. Ratification grants no production signing, release, hosted panel, daemon or detached execution authority.\n",
     "title": "Reopen F-04 for a local same-origin cockpit over the existing operations"
   },
-  "shardHash": "e01eea0bfb9693d53498b4a04e5e5ba5791fb9a8758b2e0fc94e668b7897a728",
+  "shardHash": "57d5351a080301fff12712d67cf2e87b79b89e66cc8799ba4525015caae11791",
   "specVersion": "1.9.0"
 }

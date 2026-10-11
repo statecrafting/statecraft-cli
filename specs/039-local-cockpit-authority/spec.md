@@ -29,7 +29,7 @@ obligations:
     anchor: "3-2-the-binding-boundary"
   - id: "R-3"
     kind: requirement
-    text: "Each implementation slice requires its own ratified spec and named positive and negative acceptance; this decision authorizes no implementation by itself."
+    text: "Each implementation slice requires its own ratified spec and named positive and negative acceptance, carrying the server session, origin, request, and path security controls and the signed, rooted, rollback-resistant, atomic, offline distribution requirements in section 3.3; this decision authorizes no implementation by itself."
     anchor: "3-3-separate-implementation-authority"
 ---
 
