@@ -1,0 +1,70 @@
+{
+  "record": {
+    "amends": [
+      "002-environment-lifecycle",
+      "024-review-budget-and-ratification"
+    ],
+    "created": "2026-10-10",
+    "dependsOn": [
+      "001-boundaries-and-authority",
+      "002-environment-lifecycle",
+      "024-review-budget-and-ratification"
+    ],
+    "id": "041-review-authority-context",
+    "implementation": "pending",
+    "obligations": [
+      {
+        "anchor": "3-1-context-selection-and-provenance",
+        "id": "R-1",
+        "kind": "requirement",
+        "text": "Governance context comes only from validated base-commit blobs and base policy; candidate documents cannot replace trusted context."
+      },
+      {
+        "anchor": "3-2-bounded-complete-input",
+        "id": "R-2",
+        "kind": "requirement",
+        "text": "Complete context and fixed input fit explicit token budgets in every reviewer call; invalid or excessive context refuses before provider invocation."
+      },
+      {
+        "anchor": "3-3-review-guidance-and-authority",
+        "id": "R-3",
+        "kind": "requirement",
+        "text": "Reviewer guidance distinguishes evidence from unavailable context and preserves all ratification, exception and findings gates."
+      }
+    ],
+    "sectionDigests": {
+      "041-base-commit-governance-context-for-managed-ai-review": "083920b5d137e747b0d10da8cb37102b4fcba56c8895b996984556573b56f8ad",
+      "1-purpose": "5bc2023401c6eb836c58e924d8a196aad8d3b832acf0042caebdbbbec83abafe",
+      "2-territory": "202639219463536e6fb0388ba8b215e0190d2f59d4935c37356908698fa6a5cd",
+      "3-1-context-selection-and-provenance": "7c04fad33f2d6dfb0a808e68649c2c4f9b81475d3e0ce8eb3d87a7cb9c176b7e",
+      "3-2-bounded-complete-input": "19c1d23b6b04d7c69290733d30967f5fa1bf7a910029c07fe5c913323a874a1d",
+      "3-3-review-guidance-and-authority": "5a428083b162f0d140a13d5e3f3c6f83932b5064263ca81ffd2ed58639703086",
+      "3-4-evidence-and-named-acceptance-criteria": "b53d630cfd096f51b15cfa2504cebf62ae5f18eb798860c670bec36dac040a25",
+      "3-5-delivery-and-completion": "43cb49963d2d8566e3dc3ec6301708416cb83506ab067165b8c6db39372e9287",
+      "3-behavior": "7261ef4a0f69a240927ce948bcd4f373ef4f0952e64db532bb706b3ab8c2382b",
+      "4-out-of-scope": "f70a311f6c3502da693343917f8fbbc74d6c81108c0977e90a38167c256e4ab6",
+      "5-resolved-decisions": "7ade6475483b8cf618179335e139d3ada02b33a9f293b0810bb8f9b151381d20",
+      "verification": "3ab0f63f14248488c70e0b2d542962389bc2c42a17dbff9b812806ccccdee153"
+    },
+    "sectionHeadings": [
+      "041: Base-commit governance context for managed AI review",
+      "1. Purpose",
+      "2. Territory",
+      "3. Behavior",
+      "3.1 Context selection and provenance",
+      "3.2 Bounded complete input",
+      "3.3 Review guidance and authority",
+      "3.4 Evidence and named acceptance criteria",
+      "3.5 Delivery and completion",
+      "4. Out of scope",
+      "5. Resolved decisions",
+      "Verification"
+    ],
+    "specPath": "specs/041-review-authority-context/spec.md",
+    "status": "draft",
+    "summary": "Supply the managed reviewer with bounded governance documents selected from the base commit, record their provenance, and account for their bytes in every call. Candidate assertions remain review data. Missing context does not prove a contradiction, and review never grants owner ratification or an exception. Deliver the profile change separately from its self-adoption.\n",
+    "title": "Base-commit governance context for managed AI review"
+  },
+  "shardHash": "4c1ef8ea0831a1a28895c42ea56fe12032ee566971feebbe7f4ffa5e7f08f1e3",
+  "specVersion": "1.9.0"
+}
