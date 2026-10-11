@@ -33,15 +33,15 @@
       }
     ],
     "sectionDigests": {
-      "039-local-cockpit-authority": "7df4abdc71e337eb7c4b1e2b519aa153842c861f3d400a146060de40f2f24a1e",
-      "1-purpose": "236de58fc48a4f3bb16d5f5945e0f3bbe3a481bbe20ddf8a6113f285cf5a9796",
+      "039-local-cockpit-authority": "bc1ae7f4ffbcfbdd777492ba5301d97cc584d08e7dd20b32b5a72699bfdb8706",
+      "1-purpose": "200e02916543645229d3f4aa587ea1700a40511a30cf9cff0492e1be9df20688",
       "2-territory": "56693aca28a9fcbd94b2327118c46c95763f2d959ee5b96acc9d1cf69119ffb2",
       "3-1-the-narrow-exception": "9bce5ef71e02767e5bef8b7662d7391fdac0a75d5c0e5db12af2057dd7bdb321",
       "3-2-the-binding-boundary": "18b9f31db627bf7d81bf8a4ff23cec6e91569cb62f07a0af6e58761c92add85e",
       "3-3-separate-implementation-authority": "9d70a9de507f01a79d178d8254bbabb74cc5456e783b2baed815d1b99c9aa64c",
       "3-behavior": "6b51a389e9196eedb05196462ccd92e4910083d28ea4b5eeb7be8ec1254d409c",
       "4-out-of-scope": "ebea467e7ae551bae08a7c707b7693a84edef25e177cd496c256290aeeafdace",
-      "5-resolved-decisions": "0fd04dd2b824b54934867b0c1b278ad1b99af515f0973018b42d63ab4e084a36",
+      "5-resolved-decisions": "0966ce69e1db2554b79549708886c4871f7a33c0cd224d6057e753d930543ce1",
       "verification": "fab971236969500583eabe684d6118aad58cc41a8e8df4fea70f1a8378631eec"
     },
     "sectionHeadings": [
@@ -61,6 +61,6 @@
     "summary": "Amends 001's interface exclusion and reopens founding deferral F-04 only for Statecraft Dev: a one-repository loopback browser cockpit, calling the same typed local operations under 002 section 3.20. This is an authority decision, separate from the application extraction, server, distribution and command implementations. Ratification grants no production signing, release, hosted panel, daemon or detached execution authority.\n",
     "title": "Reopen F-04 for a local same-origin cockpit over the existing operations"
   },
-  "shardHash": "682f959bd51da2818d7368e06db1479466e44f01c5c02154e3324fb022bca163",
+  "shardHash": "e01eea0bfb9693d53498b4a04e5e5ba5791fb9a8758b2e0fc94e668b7897a728",
   "specVersion": "1.9.0"
 }

@@ -54,7 +54,9 @@ The source direction is the proposed platform design record
 `statecraft:a176227:docs/design/07-statecraft-dev-local-cockpit.md`, sections
 2, 5, 7, 8, 10 and 12. Its CLI references were checked against `f98f9f0`,
 which remains the source revision of this proposal. This spec carries the
-authority decision locally; the external proposal is not normative authority.
+authority decision locally. The external proposal has no independent normative
+authority: section 3.3 locally requires its cited scenarios to be restated as
+acceptance criteria in each applicable implementation spec, then ratified there.
 Platform direction P-25 is recorded alongside it in
 `statecraft:a176227:docs/decisions/00-adoption-register.md`.
 
@@ -138,6 +140,10 @@ publication infrastructure, production signing, release and deployment.
 The platform repository and archived frontend are read-only sources.
 
 ## 5. Resolved decisions
+
+Bart ratified this spec as written on 2026-10-10 and explicitly directed the
+`status: approved` change in PR 242. That owner act precedes completion of PR
+review; review and command results do not confer ratification.
 
 The amendment is its own authority change. Keeping the historical F-04 row
 and approved specs unchanged preserves provenance; the amendment graph records
