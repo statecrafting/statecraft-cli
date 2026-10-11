@@ -57,7 +57,7 @@
     "id": "003-work-and-run-semantics",
     "implementation": "in-progress",
     "sectionDigests": {
-      "003-work-selection-workspace-preparation-the-run-record-and-recovery": "191f5dddbc88391bb6a42d80e2cbf731f9b3cb498fcad0f47b37739df167e17e",
+      "003-work-selection-workspace-preparation-the-run-record-and-recovery": "d1ae79f1dcc69a00413d898d99e4ec21cc52359786284bc82c633e3ee20fd879",
       "1-purpose": "6e2e713486514a4371080ee9ad901b71b92b198ff8944d2cac7db353dfdd1ee6",
       "2-territory": "f200d26f7fab70304d4ec5b21bbfba40301c0a2a5b38fc266d1d37da0f01b4a4",
       "3-1-1-ready-is-not-ratified": "e902124dba1a1dfc0ed218701ac4b36773d42c1359d537fe8dfce993379529fa",
@@ -78,7 +78,7 @@
       "3-8-observable-negative-cases": "64b35b1a553ef276500ef17c7ef9beff5d4488a934d422acddee2b429583bc0b",
       "3-behavior": "237d46d757464901295e709683c551332d6e0b9b2ca0bd1bb6577c7d54dd7752",
       "4-out-of-scope": "0953737fbaaf06f31c4272c3b10a57178c967c1127355c9826627a1267c76fdd",
-      "5-resolved-decisions": "68d3338e11ce1045969977edee4f209c5ab4d8fd5791f655b2c16d5e3197170a",
+      "5-resolved-decisions": "9a256fd2d0825bb9cc9917de7382e983681e5660dbb5936df7ab2499d12b60b8",
       "verification": "2c93bbf45af155c448a9fc915d7c2ca15f414a47118ff522639aebad8815aad1"
     },
     "sectionHeadings": [
@@ -111,6 +111,6 @@
     "summary": "The core loop's semantics. How a unit of work is identified by reading spec-spine's structured report rather than re-deriving it; how an isolated workspace is prepared so the operator's checkout is never edited; the append-only hash-linked run record with intent written before an effect and outcome after it; the closed outcome set (completed, failed, refused, interrupted, cancelled) and the rule that a retry appends an attempt rather than replacing history; supervisor-owned refusal accounting a supervised process cannot erase; and reconciliation of an ambiguous effect before any retry, with no exactly-once promise.\n",
     "title": "Work selection, workspace preparation, the run record, and recovery after interruption"
   },
-  "shardHash": "b78cf21b0bececce5a40e16352673c30ba6a8aaa4026f6146e35cfae3ef6e773",
+  "shardHash": "101b7a397d6263e1245ec4ac470b05328d253c06424a0c5e2be617c6fa1f8fa9",
   "specVersion": "1.9.0"
 }

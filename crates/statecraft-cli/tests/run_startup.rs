@@ -2144,3 +2144,225 @@ fn an_audit_file_that_cannot_be_written_fails_and_prints_the_finding() {
     assert_eq!(v["finding"]["runId"], RUN, "{v}");
     assert_eq!(v["attemptLive"], true, "{v}");
 }
+
+/// Spec 003 section 3.1.5, acceptance, last line: from the confined child,
+/// reads, writes, truncation, renames and deletions of this repository's
+/// override journal and its state authority are refused (spec 004 section
+/// 3.18). Both files keep their bytes, and the override they record is still
+/// the one in force.
+#[test]
+fn the_confined_child_cannot_read_or_change_the_override_journal_or_its_authority() {
+    let f = Fixture::new();
+    let root = f.root();
+    let out = f.cli(&[
+        "override",
+        "grant",
+        &root,
+        RUN,
+        "alice",
+        "confinement",
+        "fixture",
+    ]);
+    assert_eq!(code(&out), 0, "{}", text(&out));
+    let journal = statecraft_run::overrides::journal_path(&f.home(), &f.project());
+    let authority = statecraft_run::overrides::authority_path(&f.home(), &f.project());
+    let before = [
+        std::fs::read(&journal).unwrap(),
+        std::fs::read(&authority).unwrap(),
+    ];
+    assert!(before.iter().all(|bytes| !bytes.is_empty()));
+    let in_force = |f: &Fixture| {
+        let shown = f.cli(&["override", "show", &root, "--json"]);
+        assert_eq!(code(&shown), 0, "{}", text(&shown));
+        json(&shown)["report"]["inForce"].clone()
+    };
+    let granted = in_force(&f);
+    assert_eq!(granted.as_array().unwrap().len(), 1, "{granted}");
+
+    let quote = |path: &Path| format!("'{}'", path.display().to_string().replace('\'', "'\\''"));
+    let script = format!(
+        r#"#!/bin/sh
+# Positive controls: the probes below work where the child may write, so a
+# refusal from them is the confinement's and not a missing tool's.
+printf control > "$PWD/control" || exit 57
+/usr/bin/perl -e 'truncate($ARGV[0], 0) or exit 1' "$PWD/control" || exit 58
+[ ! -s "$PWD/control" ] || exit 58
+[ "$(/usr/bin/perl -MFile::Spec -e 'print File::Spec->abs2rel($ARGV[0], $ARGV[1])' "$PWD/control" "$PWD")" = control ] || exit 59
+rm "$PWD/control" || exit 59
+attack() {{
+  path="$1"
+  cat "$path" > /dev/null && exit 60
+  (printf changed > "$path") && exit 61
+  (printf changed >> "$path") && exit 62
+  (: > "$path") && exit 63
+  /usr/bin/perl -e 'truncate($ARGV[0], 0) or exit 1' "$path" && exit 64
+  mv "$path" "$PWD/renamed" && exit 65
+  printf forged > "$PWD/forged"
+  mv "$PWD/forged" "$path" && exit 66
+  rm "$path" && exit 67
+  ln -s "$path" "$PWD/alias"
+  cat "$PWD/alias" > /dev/null && exit 68
+  (printf changed > "$PWD/alias") && exit 69
+  rm "$PWD/alias"
+  relative="$(/usr/bin/perl -MFile::Spec -e 'print File::Spec->abs2rel($ARGV[0], $ARGV[1])' "$path" "$PWD")"
+  cat "$relative" > /dev/null && exit 70
+  (: > "$relative") && exit 71
+  mv "$relative" "$PWD/renamed" && exit 72
+  rm "$relative" && exit 73
+}}
+attack {journal}
+attack {authority}
+mv "$(dirname {journal})" "$PWD/stolen-records" && exit 74
+printf '%s\n' passed
+"#,
+        journal = quote(&journal),
+        authority = quote(&authority),
+    );
+    executable(&f.bin().join("hostile"), &script);
+    let out = f.run();
+    assert_eq!(code(&out), 0, "{}", text(&out));
+    assert!(
+        f.order().contains(&"hostile exit=0".into()),
+        "{:?}: {}",
+        f.order(),
+        String::from_utf8_lossy(&f.received("hostile-errors"))
+    );
+    assert_eq!(f.received("hostile-report"), b"passed\n");
+    assert_eq!(
+        json_naming::payload(&json(&out))["posture"]["value"]["confinement"]["platform"],
+        std::env::consts::OS
+    );
+    assert_eq!(std::fs::read(&journal).unwrap(), before[0]);
+    assert_eq!(std::fs::read(&authority).unwrap(), before[1]);
+    assert_eq!(in_force(&f), granted);
+}
+
+/// Start a workspace for the run on the branch name used before spec 004
+/// section 3.18, in the shared `statecraft/run/` directory.
+fn legacy_workspace(f: &Fixture) -> String {
+    let legacy = format!("statecraft/run/{RUN}");
+    std::fs::create_dir_all(f.workspace().parent().unwrap()).unwrap();
+    let path = f.workspace().display().to_string();
+    f.git(&["worktree", "add", "--quiet", "-b", &legacy, &path, "HEAD"]);
+    legacy
+}
+
+fn statecraft_references(f: &Fixture) -> Vec<String> {
+    let out = statecraft_run::trusted_git::output(
+        &f.project(),
+        &[
+            "for-each-ref",
+            "--format=%(refname)",
+            "refs/heads/statecraft/",
+        ],
+    )
+    .unwrap();
+    String::from_utf8(out.stdout)
+        .unwrap()
+        .lines()
+        .map(str::to_string)
+        .collect()
+}
+
+fn boundary_preparations(f: &Fixture) -> Vec<serde_json::Value> {
+    let (chain, _) = statecraft_run::record::Chain::open(&f.home(), &f.project()).unwrap();
+    chain
+        .entries()
+        .into_iter()
+        .filter(|e| {
+            e.kind == statecraft_run::record::Kind::Outcome
+                && e.run_id == RUN
+                && e.subject == "boundary-preparation"
+        })
+        .map(|e| e.detail)
+        .collect()
+}
+
+/// Spec 004 section 3.18 rule 3 and spec 003 section 3.2: a workspace whose
+/// branch lives in the shared directory has it renamed into the run's own
+/// directory before launch, the rename is recorded, and the confinement grants
+/// the run's directory and never the shared one.
+#[test]
+fn a_workspace_on_the_shared_run_branch_is_moved_before_launch_and_the_move_recorded() {
+    let f = Fixture::new();
+    let legacy = legacy_workspace(&f);
+    let out = f.run();
+    assert_eq!(code(&out), 0, "{}", text(&out));
+    assert_eq!(f.launches(), 1);
+
+    let preparations = boundary_preparations(&f);
+    assert_eq!(preparations.len(), 1, "{preparations:?}");
+    assert_eq!(preparations[0]["admitted"], true, "{}", preparations[0]);
+    assert_eq!(
+        preparations[0]["branchMigration"],
+        serde_json::json!({ "from": legacy, "to": format!("statecraft/{RUN}/work") })
+    );
+    let references = statecraft_references(&f);
+    assert!(
+        references.contains(&format!("refs/heads/statecraft/{RUN}/work")),
+        "{references:?}"
+    );
+    assert!(
+        !references
+            .iter()
+            .any(|r| r.starts_with("refs/heads/statecraft/run/")),
+        "{references:?}"
+    );
+    let posture = json_naming::payload(&json(&out))["posture"]["value"]["confinement"].clone();
+    assert_eq!(posture["platform"], std::env::consts::OS, "{posture}");
+    let granted = posture.to_string();
+    assert!(
+        granted.contains(&format!("refs/heads/statecraft/{RUN}")),
+        "the run's own directory is granted: {posture}"
+    );
+    // The shared directory as a whole path component, with or without a
+    // trailing separator, so a run named `run-...` cannot match it.
+    assert!(
+        !granted.contains("refs/heads/statecraft/run/")
+            && !granted.contains("refs/heads/statecraft/run\""),
+        "the shared directory is never granted: {posture}"
+    );
+}
+
+/// The same rule's refusal: a rename that fails refuses the launch with
+/// nothing launched and no attempt appended, and leaves the branch where it
+/// was rather than granting the shared directory.
+#[test]
+fn a_shared_run_branch_that_cannot_be_moved_refuses_the_launch() {
+    let f = Fixture::new();
+    let legacy = legacy_workspace(&f);
+    // A branch named for the run's directory makes the directory impossible.
+    f.git(&["branch", &format!("statecraft/{RUN}"), "HEAD"]);
+    let out = f.run();
+    assert_eq!(code(&out), 2, "{}", text(&out));
+    assert!(
+        text(&out).contains("workspace preparation"),
+        "{}",
+        text(&out)
+    );
+    assert_eq!(f.launches(), 0, "nothing was launched");
+
+    let preparations = boundary_preparations(&f);
+    assert_eq!(preparations.len(), 1, "{preparations:?}");
+    assert_eq!(preparations[0]["admitted"], false, "{}", preparations[0]);
+    assert!(preparations[0]["branchMigration"].is_null());
+    let (chain, _) = statecraft_run::record::Chain::open(&f.home(), &f.project()).unwrap();
+    assert!(
+        !chain
+            .entries()
+            .iter()
+            .any(|e| e.run_id == RUN && e.attempt > 0),
+        "no attempt was appended"
+    );
+    let references = statecraft_references(&f);
+    assert!(
+        references.contains(&format!("refs/heads/{legacy}")),
+        "{references:?}"
+    );
+    assert!(
+        !references
+            .iter()
+            .any(|r| r.starts_with(&format!("refs/heads/statecraft/{RUN}/"))),
+        "{references:?}"
+    );
+}
