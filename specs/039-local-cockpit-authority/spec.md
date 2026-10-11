@@ -145,8 +145,12 @@ The platform repository and archived frontend are read-only sources.
 Bart ratified this spec as written on 2026-10-10 and explicitly directed the
 `status: approved` change in PR 242. That owner act precedes completion of PR
 review; review and command results do not confer ratification. The owner act
-is recorded in [signed commit dbaf2b5](https://github.com/statecrafting/statecraft-cli/commit/dbaf2b5210acfe73ce0f1123e850d3715f0ea9a4),
-whose signature GitHub verifies for `bartekus`.
+is recorded in this repository
+(`statecrafting/statecraft-cli`) by signed ancestor commit `dbaf2b5`, whose
+signature GitHub verifies for `bartekus`. It is locally readable with
+`git show dbaf2b5`, not a record in the external platform repository.
+Changes to approved requirements require a separately ratified amending spec
+under 001 section 5; the corpus checks below do not replace that owner act.
 
 The amendment is its own authority change. Keeping the historical F-04 row
 and approved specs unchanged preserves provenance; the amendment graph records
