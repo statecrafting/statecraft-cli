@@ -577,3 +577,34 @@ section 3.4 left to this release and which needs the owner's ratification.
 **Consequence if rejected.** Both pins return to `=0.27.0`, `make tools`
 installs 0.27.0, `inputs.json` and the environment pins are regenerated back.
 The closure reader stays, because it reads both releases.
+
+
+### 2026-10-10: 0.29.0 candidate for Wire Witness
+
+The owner requested the newest Statecraft CLI and spec-spine dependencies for
+Wire Witness on 2026-10-10. Statecraft main
+`4c12c5236b8e507f0c7569274862a4f5579d101d` still linked 0.28.0, so its
+supported consumer migration refused 0.29.0. This isolated prerequisite moves
+the exact CLI and linked-core pins together. It changes no source API, acceptance instruction, or approved spec.
+Supported self-initialization also renders current profile revision 16, adding
+its remote desired-state document and preserving the recorded parameters.
+Generated scripts differ only in their rendered-profile headers; remote
+settings are not applied. This is a local adoption
+candidate, not a merged producer or a published Statecraft release.
+
+Tag `v0.29.0` targets `519e9d59b842a6695978b7929158e59a40374ce4`.
+Its ED25519 signature verifies with the owner's existing Git signing key;
+the target matches the remote tag. The registry lock records both exact
+0.29.0 crates and their registry checksums. `DEFAULT_BYPASS_PREFIXES` and
+`scaffold_init_json` are unchanged between release tags. The release adds
+selected-content, affected-acceptance and consumer-contract commands and
+manifest projections. Existing consumers are checked rather than being
+silently switched to those optional capabilities.
+
+The consumer must use the build from this exact candidate for plan and apply.
+A local successful migration does not imply upstream merge, owner environment
+approval, publication, or machine qualification. Evidence is kept under
+`.statecraft/state/spine-029/` in this task worktree.
+
+Rejection restores both pins and the lockfile together, then regenerates the
+environment declaration and derived artifacts with the restored producer.
