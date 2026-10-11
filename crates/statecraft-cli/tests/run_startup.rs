@@ -2308,8 +2308,11 @@ fn a_workspace_on_the_shared_run_branch_is_moved_before_launch_and_the_move_reco
         granted.contains(&format!("refs/heads/statecraft/{RUN}")),
         "the run's own directory is granted: {posture}"
     );
+    // The shared directory as a whole path component, with or without a
+    // trailing separator, so a run named `run-...` cannot match it.
     assert!(
-        !granted.contains("refs/heads/statecraft/run"),
+        !granted.contains("refs/heads/statecraft/run/")
+            && !granted.contains("refs/heads/statecraft/run\""),
         "the shared directory is never granted: {posture}"
     );
 }
