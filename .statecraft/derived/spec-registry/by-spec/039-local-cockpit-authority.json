@@ -33,7 +33,7 @@
       }
     ],
     "sectionDigests": {
-      "039-local-cockpit-authority": "b9bd1ab6bbb36ef8bb9373e6288712d1d3f66de137fb0c0a8cd01a09b6398589",
+      "039-local-cockpit-authority": "124a6b9a8ae1b526babbf8467befc3385a5654c341b9599628f218470260fe73",
       "1-purpose": "5d4772e1380b1812d27bce29dfa52fba9ada2b559c23aba09c0ff1865a74d40f",
       "2-territory": "56693aca28a9fcbd94b2327118c46c95763f2d959ee5b96acc9d1cf69119ffb2",
       "3-1-the-narrow-exception": "9bce5ef71e02767e5bef8b7662d7391fdac0a75d5c0e5db12af2057dd7bdb321",
@@ -41,7 +41,7 @@
       "3-3-separate-implementation-authority": "9d70a9de507f01a79d178d8254bbabb74cc5456e783b2baed815d1b99c9aa64c",
       "3-behavior": "6b51a389e9196eedb05196462ccd92e4910083d28ea4b5eeb7be8ec1254d409c",
       "4-out-of-scope": "ebea467e7ae551bae08a7c707b7693a84edef25e177cd496c256290aeeafdace",
-      "5-resolved-decisions": "45bfe4daeccb846af31a9655a872bf5b9f6e045fc8661758abc8d4c67f7f93e7",
+      "5-resolved-decisions": "ae825a837d9cccb14454ca1e65098cfebb32c0673ff7c75ddf6122f15936fdd0",
       "verification": "fab971236969500583eabe684d6118aad58cc41a8e8df4fea70f1a8378631eec"
     },
     "sectionHeadings": [
@@ -61,6 +61,6 @@
     "summary": "Amends 001's interface exclusion and reopens founding deferral F-04 only for Statecraft Dev: a one-repository loopback browser cockpit, calling the same typed local operations under 002 section 3.20. This is an authority decision, separate from the application extraction, server, distribution and command implementations. Ratification grants no production signing, release, hosted panel, daemon or detached execution authority.\n",
     "title": "Reopen F-04 for a local same-origin cockpit over the existing operations"
   },
-  "shardHash": "5ac1641c68fef80cc1ff1f4e229f9b78cb9523813cde1d14308ab9683f57f47a",
+  "shardHash": "d25ffeb1aaf453ee6c44be1d5edd230b903786f79fd9b361cba7c32b43a2e5c6",
   "specVersion": "1.9.0"
 }
