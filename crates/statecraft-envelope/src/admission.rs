@@ -400,8 +400,10 @@ mod tests {
             None,
             &crate::roots::RootSet::empty(),
         );
-        let id = AttestationId(Hash::of(b"v"));
-        let verdicts = [(id, verdict.clone()), (id, verdict)];
+        let verdicts = [
+            (AttestationId(Hash::of(b"v0")), verdict.clone()),
+            (AttestationId(Hash::of(b"v1")), verdict),
+        ];
         let input = AdmissionInput {
             verdicts: &verdicts,
             decisions: &[],
@@ -450,7 +452,7 @@ mod tests {
     #[test]
     fn admission_dependency_is_exact_pure_and_apache() {
         use serde_json::Value as J;
-        use std::collections::BTreeMap;
+        use std::collections::{BTreeMap, BTreeSet};
         use std::path::Path;
 
         // The host's graph only: an unfiltered resolve needs the sources of
@@ -592,10 +594,7 @@ mod tests {
                 .parent()
                 .unwrap();
             let manifest = std::fs::read_to_string(root.join("Cargo.toml")).unwrap();
-            assert!(
-                manifest.contains("unsafe_code = \"forbid\""),
-                "{what} does not forbid unsafe code"
-            );
+            let mut sources = Vec::new();
             let mut dirs = vec![root.join("src")];
             while let Some(dir) = dirs.pop() {
                 for entry in std::fs::read_dir(&dir).unwrap() {
@@ -604,28 +603,42 @@ mod tests {
                         dirs.push(path);
                     } else if path.extension().is_some_and(|e| e == "rs") {
                         let text = std::fs::read_to_string(&path).unwrap();
-                        for api in [
-                            "std::env",
-                            "env::",
-                            "std::fs",
-                            "fs::",
-                            "std::net",
-                            "net::",
-                            "std::time",
-                            "time::",
-                            "SystemTime",
-                            "Instant",
-                            "std::process",
-                            "process::",
-                            "std::thread",
-                            "thread::",
-                        ] {
-                            assert!(
-                                !text.contains(api),
-                                "{what}: {} names `{api}`",
-                                path.display()
-                            );
-                        }
+                        sources.push((path, text));
+                    }
+                }
+            }
+            assert!(
+                manifest.contains("unsafe_code = \"forbid\"")
+                    || sources.iter().any(|(path, text)| {
+                        path.ends_with("src/lib.rs") && text.contains("#![forbid(unsafe_code)]")
+                    }),
+                "{what} does not forbid unsafe code"
+            );
+            // Identifiers, not substrings: `use std::{fs, env}` is caught and
+            // `lifetime::` is not. Comment lines are skipped; a match anywhere
+            // else fails closed, to be read and reviewed.
+            for (path, text) in &sources {
+                for line in text.lines() {
+                    let code = line.trim_start();
+                    if code.starts_with("//") || code.starts_with("/*") || code.starts_with('*') {
+                        continue;
+                    }
+                    for word in code.split(|c: char| !(c.is_alphanumeric() || c == '_')) {
+                        assert!(
+                            ![
+                                "env",
+                                "fs",
+                                "net",
+                                "time",
+                                "process",
+                                "thread",
+                                "SystemTime",
+                                "Instant",
+                            ]
+                            .contains(&word),
+                            "{what}: {} names `{word}`: {line}",
+                            path.display()
+                        );
                     }
                 }
             }
