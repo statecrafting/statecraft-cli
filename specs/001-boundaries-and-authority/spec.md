@@ -454,6 +454,12 @@ delivery, producer adoption, and managed-session evidence respectively. The
 relocation declarations preserve the moved requirements and spec-spine's delta
 report proves the move.
 
+**2026-10-12: `F-01` is lifted for spec 038's three hosted acts.** The owner
+ratified spec 038 and recorded, in the founding decision record, that `F-01`
+no longer defers device-grant login, evidence submission and decision
+retrieval against one operator-named cell. Everything else `F-01` defers
+stays deferred, and `F-02` and `F-03` are unchanged.
+
 ## Verification
 
 Each line below is one command. These assert the authored foundation, which

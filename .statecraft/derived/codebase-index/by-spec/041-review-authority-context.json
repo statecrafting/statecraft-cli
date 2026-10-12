@@ -11,8 +11,8 @@
     ],
     "implementingPaths": [],
     "specId": "041-review-authority-context",
-    "specStatus": "draft"
+    "specStatus": "approved"
   },
   "schemaVersion": "1.2.0",
-  "shardHash": "4c1ef8ea0831a1a28895c42ea56fe12032ee566971feebbe7f4ffa5e7f08f1e3"
+  "shardHash": "c438bb277f4b88713ae296b32f0e7f02a3208c6f2a968517bef36017f5b848ce"
 }

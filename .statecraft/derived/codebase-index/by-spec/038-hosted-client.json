@@ -13,8 +13,8 @@
     ],
     "implementingPaths": [],
     "specId": "038-hosted-client",
-    "specStatus": "draft"
+    "specStatus": "approved"
   },
   "schemaVersion": "1.2.0",
-  "shardHash": "b918067aa3f25a6c4c42b57e3b689cb008f4077e37ea2b9ec5ed480a14cf9769"
+  "shardHash": "0ef3e08087db74635ecf385b20e311e75c36f8c4a1b7c2ca361d2522c1f246ba"
 }

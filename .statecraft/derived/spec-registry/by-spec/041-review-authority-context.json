@@ -33,9 +33,9 @@
       }
     ],
     "sectionDigests": {
-      "041-base-commit-governance-context-for-managed-ai-review": "083920b5d137e747b0d10da8cb37102b4fcba56c8895b996984556573b56f8ad",
+      "041-base-commit-governance-context-for-managed-ai-review": "bbb6402bae800740c9f13d10cf831abb273b8be406cabfc564869b9a983c7c36",
       "1-purpose": "5bc2023401c6eb836c58e924d8a196aad8d3b832acf0042caebdbbbec83abafe",
-      "2-territory": "202639219463536e6fb0388ba8b215e0190d2f59d4935c37356908698fa6a5cd",
+      "2-territory": "d287d7f18cef1e9d4cb8d2b3ba53ef48c776950b7d154635628541f9dd72201a",
       "3-1-context-selection-and-provenance": "7c04fad33f2d6dfb0a808e68649c2c4f9b81475d3e0ce8eb3d87a7cb9c176b7e",
       "3-2-bounded-complete-input": "19c1d23b6b04d7c69290733d30967f5fa1bf7a910029c07fe5c913323a874a1d",
       "3-3-review-guidance-and-authority": "5a428083b162f0d140a13d5e3f3c6f83932b5064263ca81ffd2ed58639703086",
@@ -44,7 +44,7 @@
       "3-behavior": "7261ef4a0f69a240927ce948bcd4f373ef4f0952e64db532bb706b3ab8c2382b",
       "4-out-of-scope": "f70a311f6c3502da693343917f8fbbc74d6c81108c0977e90a38167c256e4ab6",
       "5-resolved-decisions": "7ade6475483b8cf618179335e139d3ada02b33a9f293b0810bb8f9b151381d20",
-      "verification": "3ab0f63f14248488c70e0b2d542962389bc2c42a17dbff9b812806ccccdee153"
+      "verification": "437a206907655c7fc32791baf7e0555c7139ee05b0146edc6089b7f1136b7274"
     },
     "sectionHeadings": [
       "041: Base-commit governance context for managed AI review",
@@ -61,10 +61,10 @@
       "Verification"
     ],
     "specPath": "specs/041-review-authority-context/spec.md",
-    "status": "draft",
+    "status": "approved",
     "summary": "Supply the managed reviewer with bounded governance documents selected from the base commit, record their provenance, and account for their bytes in every call. Candidate assertions remain review data. Missing context does not prove a contradiction, and review never grants owner ratification or an exception. Deliver the profile change separately from its self-adoption.\n",
     "title": "Base-commit governance context for managed AI review"
   },
-  "shardHash": "4c1ef8ea0831a1a28895c42ea56fe12032ee566971feebbe7f4ffa5e7f08f1e3",
+  "shardHash": "c438bb277f4b88713ae296b32f0e7f02a3208c6f2a968517bef36017f5b848ce",
   "specVersion": "1.9.0"
 }

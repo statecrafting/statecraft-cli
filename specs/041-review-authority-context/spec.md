@@ -1,7 +1,7 @@
 ---
 id: "041-review-authority-context"
 title: "Base-commit governance context for managed AI review"
-status: draft
+status: approved
 implementation: pending
 created: "2026-10-10"
 summary: >
@@ -56,7 +56,7 @@ next revision and rendering an upgrade.
 
 ## 2. Territory
 
-This draft declares no forward source ownership. The first implementing PR
+This spec declares no forward source ownership. The first implementing PR
 adds an additive `extends` edge on spec 002's `crates/statecraft-home/`
 directory for the profile renderer, template and tests. If CLI integration
 support changes, that PR also adds an additive edge on spec 006's
@@ -211,7 +211,7 @@ so each authority change is concrete and independently reviewable.
 
 ## Verification
 
-These commands declare implementation acceptance, not evidence that this draft
+These commands declare implementation acceptance, not evidence that this spec
 is implemented. The named criteria above must be exercised by the setup test
 targets; the existing 024 verification remains required as AC-REGRESSION.
 
