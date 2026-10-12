@@ -482,6 +482,21 @@ fn a_decision_for_an_unregistered_revision_is_not_registered() {
 }
 
 #[test]
+fn an_id_that_could_steer_the_url_is_refused_before_a_request() {
+    let (cell, origin) = api_cell(|_, _, _| answer(200, json!({"revision": REV})));
+    let c = credential(&origin, 0);
+    let http = Http::new();
+    for bad in ["../x", "abc", &format!("{REPO}/../y"), &"A".repeat(64)] {
+        assert!(api::register_revision(&http, &origin, &c, bad, "c", None, None).is_err());
+        assert!(api::submit(&http, &origin, &c, bad, REV, b"{}", &[]).is_err());
+        assert!(api::submit(&http, &origin, &c, REPO, bad, b"{}", &[]).is_err());
+        assert!(api::decision(&http, &origin, &c, bad, REV).is_err());
+        assert!(api::decision(&http, &origin, &c, REPO, bad).is_err());
+    }
+    assert!(cell.requests().is_empty());
+}
+
+#[test]
 fn the_declaration_names_the_cell_client_and_scopes_or_refuses() {
     let ok = json!({
         "schemaVersion": 1,

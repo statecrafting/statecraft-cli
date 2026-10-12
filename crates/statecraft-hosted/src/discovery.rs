@@ -29,7 +29,7 @@ const RESOURCE: Route = Route {
 };
 const CONFIGURATION: Route = Route {
     method: "GET",
-    template: "<issuer>/.well-known/openid-configuration",
+    template: "<issuer>.well-known/openid-configuration",
 };
 
 #[derive(Deserialize)]

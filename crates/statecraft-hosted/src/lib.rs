@@ -15,6 +15,13 @@
 //! crate returns for display. Errors name a request by its method and route
 //! template, never by a URL.
 
+// Section 3.3's custody is owner-only file modes, which this crate states with
+// the Unix permission bits; the workspace runs on macOS and Linux only.
+#[cfg(not(unix))]
+compile_error!(
+    "statecraft-hosted supports Unix platforms only: the credential is an owner-only file"
+);
+
 pub mod api;
 pub mod credential;
 pub mod declaration;

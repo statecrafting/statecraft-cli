@@ -83,6 +83,7 @@ pub fn register_revision(
     tree: Option<&str>,
     base: Option<&str>,
 ) -> Result<Registered, Error> {
+    require_id("repository", repository)?;
     let mut body = serde_json::json!({ "commit": commit });
     if let Some(t) = tree {
         body["tree"] = t.into();
@@ -113,6 +114,18 @@ pub fn register_revision(
         revision: parsed.revision,
         existed: reply.status == 200,
     })
+}
+
+/// Refuse an id that is not a lowercase 64-character hexadecimal hash before
+/// it is placed in a request path, so no caller can steer the URL.
+fn require_id(what: &str, id: &str) -> Result<(), Error> {
+    if is_hex64(id) {
+        Ok(())
+    } else {
+        Err(Error::Refused(format!(
+            "the {what} id is not a lowercase 64-character hexadecimal hash"
+        )))
+    }
 }
 
 fn is_hex64(s: &str) -> bool {
@@ -159,6 +172,8 @@ pub fn submit(
     submission: &[u8],
     artifacts: &[Vec<u8>],
 ) -> Result<Submitted, Error> {
+    require_id("repository", repository)?;
+    require_id("revision", revision)?;
     let key = idempotency_key(repository, revision, submission);
     let (content_type, body) = multipart(submission, artifacts);
     let reply = http.send(
@@ -236,6 +251,8 @@ pub fn decision(
     repository: &str,
     revision: &str,
 ) -> Result<Retrieved, Error> {
+    require_id("repository", repository)?;
+    require_id("revision", revision)?;
     let reply = http.send(
         DECISION,
         &origin.url(&format!(
