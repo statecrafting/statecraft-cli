@@ -1,7 +1,7 @@
 ---
 id: "038-hosted-client"
 title: "The hosted client: device-grant login, submit and decision against one Statecraft cell"
-status: draft
+status: approved
 implementation: pending
 created: "2026-10-10"
 summary: >
@@ -44,12 +44,12 @@ asks for is "the CLI consumer seam against the released native-client/device
 grants". Direct authenticated HTTP can exercise the cell, but it cannot prove
 the specified CLI thin path.
 
-On 2026-10-10 the owner chose that row as the decision basis for this draft
-(decision 2). This draft therefore proposes lifting `F-01`, the deferral of
+On 2026-10-10 the owner chose that row as the decision basis for this spec
+(decision 2), and ratified it on 2026-10-12. It lifts `F-01`, the deferral of
 any hosted control plane, for exactly the three acts below, against exactly
 one cell that the operator names. It lifts nothing else in `F-01` and nothing
-in `F-02` or `F-03`; section 5 lists what ratification must still settle. A
-draft authorizes no implementation.
+in `F-02` or `F-03`; section 5 records how ratification settled each open
+question.
 
 The server half exists. Rahi 038 (`approved`, `implementation: complete`)
 supplies the public native client, the device grant through the cell's
@@ -60,12 +60,11 @@ the half that obtains, holds and presents a token.
 
 ## 2. Territory
 
-At draft this spec owns no code and declares no `extends` edge, because the
-gate counts an extender as an owner and would refuse every change to a draft's
-extended directory. The implementing change adds the edges with the code. It
+At ratification this spec owns no code and declares no `extends` edge. The
+implementing change adds the edges with the code. It
 reaches spec 006's binary to add the `hosted` verb
 group, and spec 005's envelope crate to add the offline decision-bundle reader
-(section 3.6). The proposed implementation adds one crate,
+(section 3.6). The implementation adds one crate,
 `crates/statecraft-hosted/`, the only crate allowed to speak HTTP to a cell,
 in the way `statecraft-adapter-claude-code` is the only crate allowed to name
 a provider. The implementing change claims it in this spec's `establishes`,
@@ -90,9 +89,10 @@ in the same change that writes it, so the gate never sees a forward claim.
    manifest declares the public native client under `[[auth.native_clients]]`
    and the scopes its bearer routes require (Rahi consumer contract section
    8, item 2). The CLI presents that client id and requests exactly those
-   scopes, no wider. Where they come from on the CLI's side is open question
-   O-1. Until it is settled, the implementation reads both from the operator's
-   declaration and refuses when either is absent.
+   scopes, no wider. On the CLI's side both come from the project's committed
+   declaration, `.statecraft/hosted.json` (section 5, O-1), beside the cell's
+   origin and the repository id; a hosted verb refuses (exit 2) when the
+   declaration, the client id or the scopes are absent.
 
 ### 3.2 Login: the device authorization grant
 
@@ -116,8 +116,7 @@ in the same change that writes it, so the gate never sees a forward claim.
 
 1. **Where.** The credential is held under the product home, keyed by a
    digest of the origin, readable by the owner only (mode `0600`), and never
-   inside a repository or a worktree. Open question O-2 asks whether the
-   platform keychain replaces the file on macOS.
+   inside a repository or a worktree, on every platform (section 5, O-2).
 2. **Never disclosed.** No access token, refresh token or device code appears
    in stdout, stderr, a `--json` answer, a log, a run record, a receipt, an
    envelope, an evidence bundle or a commit message. A test scans every
@@ -245,38 +244,36 @@ in the same change that writes it, so the gate never sees a forward claim.
   (`F-03`). The platform's issuer signs its own entries.
 - More than one cell per project, cell discovery, and federation.
 
-## 5. Open questions for ratification
+## 5. Resolved decisions
 
-None of these is resolved by this draft. Each needs the owner's answer before
-or at ratification.
+**2026-10-12: the owner ratified this spec and settled O-1 to O-5.**
 
-- **O-1. The client id and the scopes on the CLI's side.** The cell's manifest
-  declares them, and the statecraft cell declares no native client yet. The
-  candidates are a project-committed declaration, an operator-held setting in
-  the product home, or values published by the cell in its resource metadata
-  (`scopes_supported`), with the client id still declared. Statecraft and the
-  CLI jointly own this answer (Rahi consumer contract section 8,
-  "Unresolved").
-- **O-2. Credential storage.** A `0600` file under the product home, or the
-  macOS Keychain with the file elsewhere. The Keychain matches how Claude Code
-  holds its credential on this machine, at the cost of a platform branch.
-- **O-3. `F-02` and submission.** `F-02` says that no verb in this corpus
-  publishes, and it lists push, pull request, merge, release and deploy. This
-  draft reads submitting evidence to the operator's own cell as outside that
-  list, because it changes no repository and no external system's state on
-  the repository's behalf. Ratification should either confirm that reading
-  in the decision record, or extend `F-02`'s list and keep `hosted submit`
-  behind its own owner decision.
-- **O-4. Lifting `F-01`.** Ratifying this spec records, in the founding
-  decision record, that `F-01` is lifted for these three acts against one
-  operator-named cell, citing decision 2. That entry belongs to spec 001's
-  record and lands with ratification, not with this draft.
-- **O-5. The crate.** Whether the HTTP client lives in a new
-  `statecraft-hosted` crate, as section 2 proposes, or behind a feature in an
-  existing one. It also asks which HTTP and TLS dependencies are admitted.
+- **O-1. The client id and the scopes come from a committed declaration.**
+  `.statecraft/hosted.json` names the cell's origin, the repository id, the
+  native client id and the exact scopes. It is reviewable and reproducible; an
+  operator-held setting or values read from the cell would make two checkouts
+  of one commit present different clients. `--cell` overrides the origin only.
+- **O-2. The credential is a `0600` file under the product home** on macOS and
+  Linux alike, keyed by the origin's digest. One code path, and the same
+  disclosure tests on both platforms.
+- **O-3. Submitting evidence to the operator's own cell is outside `F-02`.**
+  It changes no repository and no external system's state on the repository's
+  behalf; `F-02`'s list (push, pull request, merge, release, deploy) is
+  unchanged.
+- **O-4. `F-01` is lifted for these three acts against one operator-named
+  cell**, citing decision 2, and recorded in the founding decision record with
+  this ratification.
+- **O-5. The HTTP client is a new crate, `statecraft-hosted`,** using blocking
+  `ureq` with `rustls` and the bundled web PKI roots, and no async runtime. It
+  is the only crate allowed to speak HTTP to a cell.
 
 ## Verification
 
-Implementation acceptance is not run while this spec is a `draft` with
-`implementation: pending`. Draft review uses the repository gate and the
-frontmatter relationship report, which establish corpus consistency only.
+Implementation acceptance. These commands declare what the implementing change
+must pass; they are not evidence that it exists.
+
+```verify:cli
+cargo test -p statecraft-hosted --locked
+cargo test -p statecraft-envelope --locked --test decision_bundle
+cargo test -p statecraft-cli --locked --test hosted
+```

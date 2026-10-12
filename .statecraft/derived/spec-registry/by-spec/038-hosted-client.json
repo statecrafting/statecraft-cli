@@ -15,20 +15,20 @@
     "id": "038-hosted-client",
     "implementation": "pending",
     "sectionDigests": {
-      "038-the-hosted-client": "ab04ecb97adcbc19f6d834e6563279e881f391fec41b9ea73ec5660772c1cc22",
-      "1-purpose": "19d2fb289e0ca0d67ea780dde95778e4966490cf41af4ccc94fc3c35d28141a9",
-      "2-territory": "2f18f9cc7d64ed2f8ff4f73f57756abb6a00f5998c4361b62752c6eb949ff0ac",
-      "3-1-the-cell-and-what-this-product-learns-from-it": "0ddb53442a7df9ccbf6f00adeeb426636e15eeda81700c4b3f4decc4cd7ebd8c",
+      "038-the-hosted-client": "579a6abed8e3bd6407cb792ad0c067169cb8c09a324524d14d9a452cb1e00321",
+      "1-purpose": "bf62907c03689c7473c68fb510f92281db51df7b32ed6ebd115cdd5713e61dc2",
+      "2-territory": "cf8f6bb58625680881b05163a36188b52011df87be5e74454f898b13858905df",
+      "3-1-the-cell-and-what-this-product-learns-from-it": "16b69ada98e1a05e6478f2ce924e0116c64c5dd9d11e6b1c357d09496dcc357d",
       "3-2-login-the-device-authorization-grant": "82303ac28fb52ec4e094b3ecde875c326f28a14a50c484430fe0fac03574e651",
-      "3-3-holding-a-credential": "fa029bc6b2c746051e0243352d3e3f8816e8a382c1f23a6023900c1dce048bc8",
+      "3-3-holding-a-credential": "2d141f3b691236a566db390edc44f45550a42c9d0d4fba662458c7e7abd9f4b2",
       "3-4-request-rules-every-hosted-verb-follows": "3242ea9d375867d309de9b80a6d78ce9ae30ac8c5983c0b5808b37d721bb65d1",
       "3-5-hosted-submit-register-the-revision-and-submit-its-evidence": "693166f11fb9141699a53b98f9113540502338d354f24c85fd53e944a495983d",
       "3-6-hosted-decision-retrieve-and-verify-offline": "dafb350aa610fb34687b294d4ee1e60da584ef7618fe6d36ca8ff3d995e42bd0",
       "3-7-observable-negative-cases": "e83388a257b59829224b1e45d5706a0fff9c6cd2000811ff8aab2421ee8654d0",
-      "3-behavior": "622eda253dcf26214eafc183b67459459823e552ce565a246711980f4347584d",
+      "3-behavior": "33f80d6f04daf3698212a3c4bcfb63f430ed4feaf18fac897be947568eecf37d",
       "4-out-of-scope": "194ca113a88997d63f0f381bae3ce9a503dbde7e97e8f1a098e35a83635c5562",
-      "5-open-questions-for-ratification": "2a90d43bbe7c10492f12e007ffb5cc70e366f9f0e153c0377d79f3ffb7d2116e",
-      "verification": "15e489028c9b1a459b5c648317d480355becd3ae8bee917b55c93823aa52213f"
+      "5-resolved-decisions": "e78063201d54fcdd337d149d5c48cd1c32bf4a80a71fbffbbb449d8507598320",
+      "verification": "f61c2c2f9ce8e817d06b59fd2d0d471d8159fc3944d207570f074cbe1be1e99b"
     },
     "sectionHeadings": [
       "038: The hosted client",
@@ -43,14 +43,14 @@
       "3.6 `hosted decision`: retrieve and verify offline",
       "3.7 Observable negative cases",
       "4. Out of scope",
-      "5. Open questions for ratification",
+      "5. Resolved decisions",
       "Verification"
     ],
     "specPath": "specs/038-hosted-client/spec.md",
-    "status": "draft",
+    "status": "approved",
     "summary": "Amends 006 with the CLI's half of the hosted thin path that the Statecraft platform's spec 005 section 3.2 names and its 004 B-3 leaves open. The operator logs in with the OAuth device authorization grant (RFC 8628) against the cell's own issuer, as the public native client that the cell's manifest declares. `hosted submit` registers the revision this product accepted locally and submits its receipt and artifact bytes idempotently. `hosted decision` retrieves the revision's decision bundle and verifies it offline against a root set the operator pinned independently, never against the bundle's own. Tokens never reach a log, a receipt, a repository or a JSON answer. Nothing here dispatches work, records a reviewer's decision, or acts on an approval.\n",
     "title": "The hosted client: device-grant login, submit and decision against one Statecraft cell"
   },
-  "shardHash": "b918067aa3f25a6c4c42b57e3b689cb008f4077e37ea2b9ec5ed480a14cf9769",
+  "shardHash": "0ef3e08087db74635ecf385b20e311e75c36f8c4a1b7c2ca361d2522c1f246ba",
   "specVersion": "1.9.0"
 }

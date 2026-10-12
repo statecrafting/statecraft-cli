@@ -432,7 +432,7 @@ oversight, and reopened by a concrete consumer need rather than by availability.
 
 | ID | Deferred | Reopened by |
 |---|---|---|
-| F-01 | Hosted platform selection, any hosted control plane, and hqgit integration. | A hosted decision by the owner (I-04). |
+| F-01 | Hosted platform selection, any hosted control plane, and hqgit integration. Lifted on 2026-10-12 for spec `038`'s three acts only (login, submit, decision) against one operator-named cell; see section 5. | A hosted decision by the owner (I-04). |
 | F-02 | Publication of any kind: push, pull request, merge, release, deploy. No verb in this corpus publishes. | A first slice that is accepted and reviewed, and a separate decision. |
 | F-03 | Signing, key custody and trust-root enrollment. Spec 005 reports every signature `unsigned` and every issuer `unknown` until then. | An external consumer that requires a signed record. |
 | F-04 | Any user-interface surface beyond command output, including a read-only web view. | A reviewable-outcome need that command output genuinely cannot serve. |
@@ -698,3 +698,18 @@ name no release. No requirement text changed in the relocation.
 
 Publication, merges, releases and deployments are not covered by adopting any row
 here. F-02 holds until it is separately lifted.
+
+
+### 2026-10-12: F-01 lifted for the hosted client's three acts
+
+The repository owner ratified spec `038` on 2026-10-12 and, with it, settled
+its open questions O-3 and O-4. `F-01` is lifted for exactly three acts
+against exactly one cell the operator names: device-grant login, evidence
+submission and decision retrieval with offline verification. Hosted dispatch,
+runners, more than one cell and hqgit integration stay deferred under `F-01`.
+
+Submitting evidence to the operator's own cell is read as outside `F-02`: it
+changes no repository and no external system's state on the repository's
+behalf. `F-02`'s list is unchanged, and nothing here pushes, opens a pull
+request, merges, releases or deploys. `F-03` holds: the CLI submits unsigned
+evidence.
