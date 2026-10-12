@@ -20,8 +20,10 @@ amends:
   - "006-command-surface"
 establishes:
   - { kind: directory, path: "crates/statecraft-hosted/" }
-# The edges on crates/statecraft-cli/ (006) and crates/statecraft-envelope/
-# (005) arrive with the code that reaches them, later in this spec's stack.
+extends:
+  # The offline decision-bundle reader (section 3.6), pure, in 005's crate.
+  - { spec: "005-acceptance-and-evidence", unit: { kind: directory, path: "crates/statecraft-envelope/" }, nature: additive }
+# The edge on crates/statecraft-cli/ (006) arrives with the hosted verbs.
 depends_on:
   - "001-boundaries-and-authority"
   - "005-acceptance-and-evidence"
@@ -281,6 +283,23 @@ the manifest; the multipart boundary is derived from the parts and checked
 against them, so the request body is a function of its inputs.
 A credential is staged in a uniquely named owner-only file and renamed over
 the held one, so two saves for one cell never share a staging path.
+
+**2026-10-12: the bundle reader.** `statecraft_envelope::bundle` reads the
+cell's JSON (`revision`, `entries`, `objects`, `tombstones`, `root_set`,
+`admission`, `decisions`, hexadecimal hashes and byte arrays, extra members
+ignored) and checks, in order: every object against its identifier; each
+entry's decoding, parent link (from the second), clock and signature by a key
+the pinned V2 set holds as eligible at the entry's time in the given scope
+(`platform` for the cell's issuer); every payload, attestation and claim,
+telling a tombstoned object from a missing one; the revision id as the hash of
+its `revision.registered` fact; and each named decision. The admission is
+re-evaluated with the shared evaluator under the operator's pinned policy,
+with the submitter read from `registeredBy` as a human principal, and is
+compared by its decision and reasons; the platform's ordering of `inputs` is
+not compared. Without a pinned policy, or under another policy digest, it is
+reported as not reproduced, which is a finding. A cell that still judges
+under a version 1 root set names a digest no V2 pin can equal, and the reader
+reports that mismatch with both digests rather than translating between them.
 
 ## Verification
 

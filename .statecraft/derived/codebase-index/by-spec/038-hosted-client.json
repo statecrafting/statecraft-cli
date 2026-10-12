@@ -13,6 +13,10 @@
     ],
     "implementingPaths": [
       {
+        "path": "crates/statecraft-envelope/",
+        "source": "spec-edge"
+      },
+      {
         "path": "crates/statecraft-hosted",
         "source": "manifest-metadata"
       },
@@ -34,11 +38,24 @@
           "kind": "directory",
           "path": "crates/statecraft-hosted/"
         }
+      },
+      {
+        "locations": [
+          {
+            "file": "crates/statecraft-envelope/"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "directory",
+          "path": "crates/statecraft-envelope/"
+        }
       }
     ],
     "specId": "038-hosted-client",
     "specStatus": "approved"
   },
   "schemaVersion": "1.2.0",
-  "shardHash": "1f3ddd4a455c98f749113a025f91ffcab406b37d8fc07403abceb1d5361c345c"
+  "shardHash": "f28b8d2cdc9a98e6ff3d90af819c38f95ab9ab6bf08cd5bbb98c9cd9adf524a4"
 }

@@ -1417,6 +1417,14 @@ impl VerifiedRootSet {
         Ok(())
     }
 
+    /// The public key the verified history holds for `key`, whatever its
+    /// eligibility; ask [`VerifiedRootSet::eligibility`] first.
+    pub fn issuer_public_key(&self, key: &KeyId) -> Option<PublicKey> {
+        self.all_keys()
+            .find(|(_, k)| k.key.id() == *key)
+            .map(|(_, k)| k.key)
+    }
+
     /// Issuer eligibility of a key at an explicit evidence time and scope.
     /// No clock is read and no current time is substituted.
     pub fn eligibility(&self, key: &KeyId, at: Hlc, scope: &str) -> IssuerEligibility {

@@ -23,6 +23,7 @@
 pub mod absence;
 pub mod admission;
 pub mod attestation;
+pub mod bundle;
 pub mod cbor;
 pub mod dimensions;
 pub mod entry;
