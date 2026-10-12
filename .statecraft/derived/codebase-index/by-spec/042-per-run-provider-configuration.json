@@ -1,0 +1,17 @@
+{
+  "mapping": {
+    "amends": [
+      "004-execution-adapter"
+    ],
+    "dependsOn": [
+      "002-environment-lifecycle",
+      "003-work-and-run-semantics",
+      "004-execution-adapter"
+    ],
+    "implementingPaths": [],
+    "specId": "042-per-run-provider-configuration",
+    "specStatus": "approved"
+  },
+  "schemaVersion": "1.2.0",
+  "shardHash": "8ce3b1fe4fa836786d442a8cd75e685dc7bfb569cba61334c140b32f1a5f1613"
+}
