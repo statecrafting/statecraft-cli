@@ -39,6 +39,8 @@ statecraft-acceptance = { path = "../statecraft-acceptance" }
 statecraft-adapter = { path = "../statecraft-adapter" }
 statecraft-adapter-claude-code = { path = "../statecraft-adapter-claude-code" }
 statecraft-envelope = { path = "../statecraft-envelope" }
+# Spec 038: the only crate that speaks HTTP to a cell.
+statecraft-hosted = { path = "../statecraft-hosted" }
 statecraft-environment = { path = "../statecraft-environment" }
 # Spec 002's `extends` edge. The managed environment, the initialization flow
 # and the typed operation boundary live there; every verb this crate adds for
@@ -60,6 +62,8 @@ tempfile = "3.27.0"
 # writes one through the entry points the owning crates expose rather than
 # through a provider it cannot spawn on a check runner.
 serde_json = "1.0.151"
+# Spec 038: the scripted cell the hosted crate's suite also uses mints JWTs.
+base64 = "0.22.1"
 
 [lints.rust]
 missing_docs = "warn"

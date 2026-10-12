@@ -71,25 +71,38 @@ struct RegisteredBody {
     revision: String,
 }
 
-/// Register `commit` (with `tree` and `base` where known) under `repository`
-/// (section 3.5 rule 3). A repeat returns the existing `RevisionId`, which is
-/// success.
+/// The Git subject a revision is registered by: object ids in one format.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Subject<'a> {
+    /// `sha1` or `sha256`.
+    pub format: &'a str,
+    /// The commit.
+    pub commit: &'a str,
+    /// The tree, where known.
+    pub tree: Option<&'a str>,
+    /// The base, where there is one.
+    pub base: Option<&'a str>,
+}
+
+/// Register `subject` under `repository` (section 3.5 rule 3). A repeat
+/// returns the existing `RevisionId`, which is success.
 pub fn register_revision(
     http: &Http,
     origin: &Origin,
     credential: &Credential,
     repository: &str,
-    commit: &str,
-    tree: Option<&str>,
-    base: Option<&str>,
+    subject: &Subject<'_>,
 ) -> Result<Registered, Error> {
     require_id("repository", repository)?;
-    let mut body = serde_json::json!({ "commit": commit });
-    if let Some(t) = tree {
-        body["tree"] = t.into();
+    // Each object id travels with its format, as the platform's
+    // registration names a Git object (its 005 B-1).
+    let oid = |o: &str| serde_json::json!({ "format": subject.format, "oid": o });
+    let mut body = serde_json::json!({ "commit": oid(subject.commit) });
+    if let Some(t) = subject.tree {
+        body["tree"] = oid(t);
     }
-    if let Some(b) = base {
-        body["base"] = b.into();
+    if let Some(b) = subject.base {
+        body["base"] = oid(b);
     }
     let bytes = serde_json::to_vec(&body).expect("serializable");
     let reply = http.send(

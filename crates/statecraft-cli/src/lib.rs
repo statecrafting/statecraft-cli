@@ -58,6 +58,7 @@ pub mod bind;
 pub mod commands;
 pub mod coverage;
 pub mod exit;
+pub mod hosted;
 pub mod judge;
 pub mod manage;
 pub mod provider;

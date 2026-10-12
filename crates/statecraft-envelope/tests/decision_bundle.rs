@@ -517,3 +517,16 @@ fn an_erased_revision_registration_is_a_divergence() {
             .contains("revision id cannot be checked")
     );
 }
+
+#[test]
+fn a_decision_named_twice_is_a_divergence() {
+    let policy = AdmissionPolicy::permissive();
+    let (s, set, approval, eval) = decided(&policy);
+    let v = verify(
+        &s.bundle(set.digest, Some(eval), vec![approval, approval]),
+        &set,
+        SCOPE,
+        Some(&policy),
+    );
+    assert!(v.divergence.unwrap().contains("named twice"));
+}
