@@ -18,10 +18,10 @@ summary: >
   acts on an approval.
 amends:
   - "006-command-surface"
-# No `extends` yet. The implementing change adds the two edges it needs, on
-# crates/statecraft-cli/ (006) and crates/statecraft-envelope/ (005). The gate
-# counts an extender as an owner, so a draft that extends a directory refuses
-# every pull request touching it until the draft is ratified.
+establishes:
+  - { kind: directory, path: "crates/statecraft-hosted/" }
+# The edges on crates/statecraft-cli/ (006) and crates/statecraft-envelope/
+# (005) arrive with the code that reaches them, later in this spec's stack.
 depends_on:
   - "001-boundaries-and-authority"
   - "005-acceptance-and-evidence"
@@ -60,8 +60,9 @@ the half that obtains, holds and presents a token.
 
 ## 2. Territory
 
-At ratification this spec owns no code and declares no `extends` edge. The
-implementing change adds the edges with the code. It
+This spec owns `crates/statecraft-hosted/`, the HTTP client and credential
+custody, which the first implementing change wrote. The later changes add the
+`extends` edges with the code that needs them. It
 reaches spec 006's binary to add the `hosted` verb
 group, and spec 005's envelope crate to add the offline decision-bundle reader
 (section 3.6). The implementation adds one crate,
@@ -266,6 +267,18 @@ in the same change that writes it, so the gate never sees a forward claim.
 - **O-5. The HTTP client is a new crate, `statecraft-hosted`,** using blocking
   `ureq` with `rustls` and the bundled web PKI roots, and no async runtime. It
   is the only crate allowed to speak HTTP to a cell.
+
+**2026-10-12: choices the first implementing change made.** Plain `http` is
+admitted only for a literal loopback origin (`127.0.0.1` or `[::1]`), as RFC
+8252 treats a loopback redirect: such a request never leaves the machine, and
+it is how the acceptance tests stand up a cell. The issuer's discovery
+document is read at `<issuer>.well-known/openid-configuration`, which is where
+Rauthy serves it, and every endpoint it names must be on the origin. The
+client follows no redirect, so a bearer token is never carried to a location
+a response chose. The idempotency key is SHA-256 over a domain tag, the
+repository id, the `RevisionId` and the submission field's bytes, which carry
+the manifest; the multipart boundary is derived from the parts and checked
+against them, so the request body is a function of its inputs.
 
 ## Verification
 

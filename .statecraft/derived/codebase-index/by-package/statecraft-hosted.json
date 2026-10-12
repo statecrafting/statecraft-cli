@@ -1,0 +1,10 @@
+{
+  "package": {
+    "kind": "rust-lib",
+    "name": "statecraft-hosted",
+    "path": "crates/statecraft-hosted",
+    "specRef": "038-hosted-client"
+  },
+  "schemaVersion": "1.2.0",
+  "shardHash": "90c67bbd98ab83feb214d48b696492fbdcd98c1ca86bb71f8f3e56c433e25044"
+}
