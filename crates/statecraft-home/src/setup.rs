@@ -35,7 +35,7 @@ use std::path::Path;
 /// The one registered profile.
 pub const PROFILE_ID: &str = "github-actions-rust";
 /// Its revision.
-pub const REVISION: u32 = 16;
+pub const REVISION: u32 = 17;
 /// Where the rendered policy document lives in the target.
 pub const POLICY_PATH: &str = ".statecraft/setup/github-actions-rust.json";
 /// The resume record, under the project's runtime state.
@@ -95,6 +95,16 @@ const MAX_CALLS_RANGE: (u64, u64) = (1, 16);
 const DEFAULT_DELETION_CAP: u64 = 20_000;
 const DELETION_CAP_RANGE: (u64, u64) = (1_000, 200_000);
 const DEFAULT_RELEASE_PATTERN: &str = "release/*";
+/// Revision 17 (spec 041 section 3.1): the governance documents every review
+/// reads from the base commit, recorded as absent when a base lacks one.
+pub const DEFAULT_CONTEXT_PATHS: [&str; 4] = [
+    "AGENTS.md",
+    ".statecraft/AGENTS.md",
+    "standards/spec/constitution.md",
+    "standards/spec/contract.md",
+];
+/// The most additional paths `review.context_paths` may select.
+pub const MAX_CONTEXT_PATHS: usize = 32;
 /// Where a declared extra required job's reusable workflow lives (revision
 /// 7): GitHub calls a reusable workflow only from this directory, never from
 /// a subdirectory of it.
@@ -395,6 +405,7 @@ pub fn remote_obligations() -> Vec<String> {
         "revision 14: external code selection runs the project-owned reusable workflow and script behind the required code job; that script joins the trusted-base authority set, and failed, cancelled or skipped code still blocks ci-gate (spec 032)".to_string(),
         "revision 15: an exact consented spec-spine pin move is reviewed with its initialization plan, and the managed installer reads that adopted pin; this changes no required remote check or branch-protection authority (spec 033)".to_string(),
         format!("revision 16: the profile renders {} (schema {}), a canonical desired-state document of what this profile expects of the remote: required checks with their App, the extra required jobs and their aggregation by ci-gate, code-owner review and the governed paths CODEOWNERS covers, the merge queue (remote.merge_queue), the exception Environment and its reviewers (remote.exception_reviewers), workflow-token defaults, secret names, and repository custom properties (remote.custom_properties). An omitted field is no claim. `doctor --remote` compares every field read-only and reports each as matching, drifted, unavailable, unauthorized, unsupported or unverified; this product never applies it, and an owner-operated applier outside this product needs its own authorization (spec 012)", crate::remote_state::PATH, crate::remote_state::SCHEMA),
+        format!("revision 17: the AI review reads governance documents as Git blobs at the base commit ({} by default, absent ones recorded as absent) plus review.context_paths, at most {MAX_CONTEXT_PATHS} literal repository-relative paths read from the policy at the base, never from the candidate; the documents must fit a quarter of review.context_tokens whole or the review refuses with 2 before any provider call, every call's whole input must fit three quarters of it, the diff budget is what remains (at most half), and the evidence records each document's blob, digest and length and each call's budget (spec 041)", DEFAULT_CONTEXT_PATHS.join(", ")),
         "a repository that already runs these checks by hand keeps them by setting governance.enforce_coverage (index coverage --fail-on-untraced), governance.authored_content (the script's path; absent or not executable refuses), governance.authored_content_text (the title, the body and every commit message), governance.gate_each_commit (each commit's tree passes the gate and cargo fmt) and governance.require_signed_commits (each commit verified as signed by GitHub) (revision 4)".to_string(),
     ]
 }
@@ -419,6 +430,12 @@ pub struct Parameters {
     pub deletion_cap: u64,
     /// Repository-relative prefixes excluded from the review diff.
     pub exclude: Vec<String>,
+    /// `review.context_paths`: governance documents the review reads from
+    /// the base commit beside the defaults (revision 17, spec 041). Named in
+    /// camelCase in JSON, as spec 006's convention asks of a new key; the
+    /// keys before it are grandfathered with the manifest.
+    #[serde(rename = "contextPaths")]
+    pub context_paths: Vec<String>,
     /// The glob over head refs that makes a pull request a release candidate.
     pub release_branch_pattern: String,
     /// The owners a rendered CODEOWNERS names (empty: none is rendered).
@@ -673,6 +690,7 @@ impl Parameters {
             max_calls: DEFAULT_MAX_CALLS,
             deletion_cap: DEFAULT_DELETION_CAP,
             exclude,
+            context_paths: Vec::new(),
             release_branch_pattern: DEFAULT_RELEASE_PATTERN.to_string(),
             code_owners: Vec::new(),
             enforce_coverage: false,
@@ -687,6 +705,39 @@ impl Parameters {
             remote: crate::remote_state::RemoteParameters::default(),
         }
     }
+}
+
+/// Why a `review.context_paths` entry is refused, or `None` when it is a
+/// literal repository-relative name (spec 041 section 3.1). The rendered
+/// review applies the same rule at run time.
+pub fn context_path_refusal(path: &str) -> Option<&'static str> {
+    if path.is_empty() {
+        return Some("is empty");
+    }
+    if path.starts_with('/') {
+        return Some("is absolute");
+    }
+    if path.starts_with('-') {
+        return Some("starts with a hyphen");
+    }
+    if !path
+        .chars()
+        .all(|c| c.is_ascii_alphanumeric() || matches!(c, '_' | '-' | '.' | '/'))
+    {
+        return Some("contains a character outside letters, digits, `_`, `-`, `.` and `/`");
+    }
+    for segment in path.split('/') {
+        match segment {
+            "" => return Some("has an empty segment"),
+            "." | ".." => return Some("has a `.` or `..` segment"),
+            ".git" => return Some("names a `.git` path"),
+            _ => {}
+        }
+    }
+    if path.starts_with(".statecraft/state/") || path.starts_with(".statecraft/derived/") {
+        return Some("is a runtime or derived path");
+    }
+    None
 }
 
 fn safe_path_chars(s: &str) -> bool {
@@ -783,6 +834,32 @@ pub fn parameters(
                     return Err(format!("review.diff_cap {v} is outside 1..={MAX_DIFF_CAP}"));
                 }
                 p.diff_cap = v;
+            }
+            "review.context_paths" => {
+                let list = value
+                    .as_array()
+                    .ok_or("review.context_paths must be a list of repository-relative paths")?;
+                if list.len() > MAX_CONTEXT_PATHS {
+                    return Err(format!(
+                        "review.context_paths names {} paths, over the {MAX_CONTEXT_PATHS} allowed",
+                        list.len()
+                    ));
+                }
+                let mut out: Vec<String> = Vec::new();
+                for item in list {
+                    let v = item
+                        .as_str()
+                        .ok_or("review.context_paths entries must be strings")?;
+                    if let Some(why) = context_path_refusal(v) {
+                        return Err(format!("review.context_paths entry `{v}` {why}"));
+                    }
+                    if out.iter().any(|o| o == v) {
+                        return Err(format!("review.context_paths names `{v}` twice"));
+                    }
+                    out.push(v.to_string());
+                }
+                out.sort();
+                p.context_paths = out;
             }
             "review.exclude" => {
                 let list = value
@@ -1497,6 +1574,10 @@ pub fn plan(inputs: &Inputs<'_>) -> Result<Plan, String> {
         params.release_branch_pattern.clone(),
     );
     values.insert("review.tool_version", REVIEW_TOOL_VERSION.to_string());
+    values.insert(
+        "review.default_context_paths",
+        DEFAULT_CONTEXT_PATHS.join(" "),
+    );
     for (name, on) in [
         ("governance.enforce_coverage", params.enforce_coverage),
         (
@@ -1728,6 +1809,10 @@ pub fn plan(inputs: &Inputs<'_>) -> Result<Plan, String> {
     policy["identity"] = serde_json::json!(identity);
     policy["parameters"] = serde_json::to_value(&params).expect("serializable");
     policy["review"]["release_branch_pattern"] = serde_json::json!(params.release_branch_pattern);
+    // Revision 17 (spec 041): the review reads this selection from the
+    // policy at the base, never from the candidate.
+    policy["review"]["context_paths"] = serde_json::json!(params.context_paths);
+    policy["review"]["default_context_paths"] = serde_json::json!(DEFAULT_CONTEXT_PATHS);
     let commands = commands_for(&params);
     policy["commands"] = commands.clone();
     if let Code::External { workflow, script } = &params.code {
@@ -2545,6 +2630,57 @@ mod tests {
         assert_eq!(pin.owner, crate::prerequisite::PROJECT_OWNER);
         assert!(pin.observed.contains("absent"), "{}", pin.observed);
         assert!(plan.withheld.is_some());
+    }
+
+    /// Spec 041 AC-PATHS, the renderer's half: every invalid selection
+    /// refuses the plan, a valid literal list round-trips sorted, and the
+    /// policy persists it for the review to read at the base.
+    #[test]
+    fn review_context_paths_are_validated_and_persisted() {
+        let dir = tempfile::tempdir().unwrap();
+        let one = |v: serde_json::Value| {
+            let mut m = BTreeMap::new();
+            m.insert("review.context_paths".to_string(), v);
+            parameters(dir.path(), &m, ".statecraft/derived")
+        };
+        for (bad, why) in [
+            ("docs/../AGENTS.md", "`..`"),
+            ("/etc/passwd", "absolute"),
+            ("docs/*.md", "character"),
+            ("docs/[a].md", "character"),
+            ("-x", "hyphen"),
+            ("", "empty"),
+            ("docs//a.md", "empty segment"),
+            ("docs/a.md/", "empty segment"),
+            ("./a.md", "`.`"),
+            (".git/config", "`.git`"),
+            ("a/.git/x", "`.git`"),
+            (".statecraft/state/x", "runtime or derived"),
+            (".statecraft/derived/x", "runtime or derived"),
+            ("docs/a\tb.md", "character"),
+            ("docs/caf\u{e9}.md", "character"),
+        ] {
+            let err = one(serde_json::json!([bad])).unwrap_err();
+            assert!(err.contains(why), "{bad}: {err}");
+        }
+        let err = one(serde_json::json!(["a.md", "a.md"])).unwrap_err();
+        assert!(err.contains("twice"), "{err}");
+        let many: Vec<String> = (0..=MAX_CONTEXT_PATHS)
+            .map(|i| format!("d/{i}.md"))
+            .collect();
+        assert!(
+            one(serde_json::json!(many))
+                .unwrap_err()
+                .contains("over the 32")
+        );
+        assert!(one(serde_json::json!("a.md")).is_err());
+        assert!(one(serde_json::json!([1])).is_err());
+        let ok = one(serde_json::json!(["specs/024-x/spec.md", "AGENTS.md"])).unwrap();
+        assert_eq!(ok.context_paths, ["AGENTS.md", "specs/024-x/spec.md"]);
+        assert_eq!(
+            one(serde_json::json!([])).unwrap().context_paths,
+            Vec::<String>::new()
+        );
     }
 
     #[test]

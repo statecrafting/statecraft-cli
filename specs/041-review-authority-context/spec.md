@@ -13,6 +13,8 @@ summary: >
 amends:
   - "002-environment-lifecycle"
   - "024-review-budget-and-ratification"
+extends:
+  - { spec: "002-environment-lifecycle", unit: { kind: directory, path: "crates/statecraft-home/" }, nature: additive }
 depends_on:
   - "001-boundaries-and-authority"
   - "002-environment-lifecycle"
@@ -208,6 +210,21 @@ from replacing the rules it is reviewed against. Account for repeated context
 before grouping, preserving a bounded answer allowance and the existing cost
 limit. Keep registered profile delivery separate from generated self-adoption
 so each authority change is concrete and independently reviewable.
+
+**2026-10-12: implementation choices the spec left open.** The registered
+profile moves to revision 17. The selection is persisted twice in the policy:
+`review.context_paths` (what the review reads at the base) and
+`review.default_context_paths`, and in the rendered parameters as
+`contextPaths`, the camelCase name spec 006's convention asks of a new key.
+UTF-8 and NUL checks use `perl`, which both runner images and macOS carry;
+macOS `iconv` accepted invalid UTF-8 and its `tr` refused it, so neither is
+portable. A context refusal writes the evidence record with result
+`refused:context`, the reason and `providerCalled: false`. The per-call input
+check and the two "cannot be read" guards stay in the script although no
+fixture reaches them: the fixed input bounds every call, and a blob just
+listed that cannot be read needs a corrupt object store. Revision 12's
+grouping test now derives its window from the fixed input the script
+reports, because this spec's amended allocation counts that input.
 
 ## Verification
 

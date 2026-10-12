@@ -10,6 +10,16 @@
       "002-environment-lifecycle",
       "024-review-budget-and-ratification"
     ],
+    "extends": [
+      {
+        "nature": "additive",
+        "spec": "002-environment-lifecycle",
+        "unit": {
+          "kind": "directory",
+          "path": "crates/statecraft-home/"
+        }
+      }
+    ],
     "id": "041-review-authority-context",
     "implementation": "pending",
     "obligations": [
@@ -33,7 +43,7 @@
       }
     ],
     "sectionDigests": {
-      "041-base-commit-governance-context-for-managed-ai-review": "bbb6402bae800740c9f13d10cf831abb273b8be406cabfc564869b9a983c7c36",
+      "041-base-commit-governance-context-for-managed-ai-review": "95e1a84b2a3dbfc31fa67963ae2d5b6d2340c8f6cf51f0c8b12dedb871423ec1",
       "1-purpose": "5bc2023401c6eb836c58e924d8a196aad8d3b832acf0042caebdbbbec83abafe",
       "2-territory": "d287d7f18cef1e9d4cb8d2b3ba53ef48c776950b7d154635628541f9dd72201a",
       "3-1-context-selection-and-provenance": "7c04fad33f2d6dfb0a808e68649c2c4f9b81475d3e0ce8eb3d87a7cb9c176b7e",
@@ -43,7 +53,7 @@
       "3-5-delivery-and-completion": "43cb49963d2d8566e3dc3ec6301708416cb83506ab067165b8c6db39372e9287",
       "3-behavior": "7261ef4a0f69a240927ce948bcd4f373ef4f0952e64db532bb706b3ab8c2382b",
       "4-out-of-scope": "f70a311f6c3502da693343917f8fbbc74d6c81108c0977e90a38167c256e4ab6",
-      "5-resolved-decisions": "7ade6475483b8cf618179335e139d3ada02b33a9f293b0810bb8f9b151381d20",
+      "5-resolved-decisions": "5d89ac0395a50eaf118015f326b087ddcff59cf79992cfea3c228dcc934dd84d",
       "verification": "437a206907655c7fc32791baf7e0555c7139ee05b0146edc6089b7f1136b7274"
     },
     "sectionHeadings": [
@@ -65,6 +75,6 @@
     "summary": "Supply the managed reviewer with bounded governance documents selected from the base commit, record their provenance, and account for their bytes in every call. Candidate assertions remain review data. Missing context does not prove a contradiction, and review never grants owner ratification or an exception. Deliver the profile change separately from its self-adoption.\n",
     "title": "Base-commit governance context for managed AI review"
   },
-  "shardHash": "c438bb277f4b88713ae296b32f0e7f02a3208c6f2a968517bef36017f5b848ce",
+  "shardHash": "573c2485950f31e589ffd4a0241b8221928320ff19ed425d98b544ca0eebe0eb",
   "specVersion": "1.9.0"
 }
