@@ -126,7 +126,8 @@ fn the_profile_renders_one_canonical_document_the_manifest_records() {
     let root = dir.path();
     let mut m = manifest();
     let plan = plan_with(root, &m, &BTreeMap::new()).unwrap();
-    assert_eq!(plan.revision, 16);
+    // Revision 16 (spec 012) introduced the document; later revisions keep it.
+    assert!(plan.revision >= 16, "{}", plan.revision);
     let file = plan
         .files
         .iter()
@@ -185,11 +186,16 @@ fn the_profile_renders_one_canonical_document_the_manifest_records() {
     assert_eq!(record.schema, remote_state::SCHEMA);
     assert_eq!(
         (selection.profile.as_str(), selection.revision),
-        (setup::PROFILE_ID, 16)
+        (setup::PROFILE_ID, setup::REVISION)
     );
     let entry = m.entry(remote_state::PATH).unwrap();
     assert_eq!(entry.digest, digest_bytes(&bytes));
-    assert!(entry.source.identity.ends_with("github-actions-rust@16"));
+    assert!(
+        entry
+            .source
+            .identity
+            .ends_with(&format!("github-actions-rust@{}", setup::REVISION))
+    );
 
     // The policy lists it, and CODEOWNERS coverage includes it.
     let policy: serde_json::Value =
