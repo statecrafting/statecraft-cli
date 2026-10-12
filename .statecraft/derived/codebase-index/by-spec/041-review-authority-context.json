@@ -9,10 +9,30 @@
       "002-environment-lifecycle",
       "024-review-budget-and-ratification"
     ],
-    "implementingPaths": [],
+    "implementingPaths": [
+      {
+        "path": "crates/statecraft-home/",
+        "source": "spec-edge"
+      }
+    ],
+    "resolvedUnits": [
+      {
+        "locations": [
+          {
+            "file": "crates/statecraft-home/"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "directory",
+          "path": "crates/statecraft-home/"
+        }
+      }
+    ],
     "specId": "041-review-authority-context",
     "specStatus": "approved"
   },
   "schemaVersion": "1.2.0",
-  "shardHash": "c438bb277f4b88713ae296b32f0e7f02a3208c6f2a968517bef36017f5b848ce"
+  "shardHash": "573c2485950f31e589ffd4a0241b8221928320ff19ed425d98b544ca0eebe0eb"
 }

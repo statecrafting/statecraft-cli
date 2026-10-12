@@ -219,7 +219,7 @@ fn revision_eleven() -> Profile {
 /// Revision 12 of the registered profile: the three templates revision 13
 /// changed (spec 031), captured byte for byte from main at adf83c8.
 fn revision_thirteen() -> Profile {
-    let mut p = Profile::registered();
+    let mut p = revision_sixteen();
     p.revision = 13;
     for (path, body) in [
         (
@@ -242,6 +242,114 @@ fn revision_thirteen() -> Profile {
             .body = body.into();
     }
     p
+}
+
+/// Revision 16 of the registered profile: the review script revision 17
+/// changed (spec 041), captured byte for byte from main at 24f65ca.
+fn revision_sixteen() -> Profile {
+    let mut p = Profile::registered();
+    assert_eq!(p.revision, 17, "the registered profile is revision 17");
+    p.revision = 16;
+    let t = p
+        .templates
+        .iter_mut()
+        .find(|t| t.path == "scripts/statecraft/ai-review.sh")
+        .unwrap();
+    let old = include_str!("support/profile-r16/ai-review.sh");
+    assert_ne!(t.body, old, "revision 17 changed the review script");
+    t.body = old.into();
+    p
+}
+
+/// Spec 041 AC-UPGRADE: the next revision changes the identity, the
+/// selection validates and defaults, an ordinary plan and apply upgrades an
+/// older project, and a second identical plan writes nothing.
+#[test]
+fn review_context_profile_upgrade_is_explicit() {
+    let dir = project();
+    let root = dir.path();
+    let old = revision_sixteen();
+    let next = Profile::registered();
+    assert_ne!(old.identity(), next.identity());
+    let mut manifest = Manifest::new(Pins {
+        product: "test".into(),
+        spec_spine: "unpinned".into(),
+        adapters: Default::default(),
+        producer: None,
+    });
+    assert!(plan_and_apply(root, &old, &mut manifest).whole());
+    let policy = |root: &Path| -> serde_json::Value {
+        serde_json::from_str(&std::fs::read_to_string(root.join(setup::POLICY_PATH)).unwrap())
+            .unwrap()
+    };
+    let before = std::fs::read_to_string(root.join("scripts/statecraft/ai-review.sh")).unwrap();
+    assert!(!before.contains("GOVERNANCE CONTEXT"));
+
+    // The older selection (none) upgrades to the defaults only.
+    let upgraded = plan_and_apply(root, &next, &mut manifest);
+    assert!(upgraded.whole());
+    let script = "scripts/statecraft/ai-review.sh";
+    assert_eq!(
+        upgraded
+            .files
+            .iter()
+            .find(|f| f.path == script)
+            .unwrap()
+            .action,
+        Action::Replace
+    );
+    let p = policy(root);
+    assert_eq!(p["revision"], 17);
+    assert_eq!(p["review"]["context_paths"], serde_json::json!([]));
+    assert_eq!(
+        p["review"]["default_context_paths"],
+        serde_json::json!(setup::DEFAULT_CONTEXT_PATHS)
+    );
+    let rendered = std::fs::read_to_string(root.join(script)).unwrap();
+    assert!(rendered.contains("GOVERNANCE CONTEXT"));
+    assert!(rendered.contains(&format!(
+        "DEFAULT_CONTEXT_PATHS='{}'",
+        setup::DEFAULT_CONTEXT_PATHS.join(" ")
+    )));
+
+    // A declared selection persists in the policy, sorted.
+    let mut block = BTreeMap::new();
+    block.insert(
+        "review.context_paths".to_string(),
+        serde_json::json!(["specs/024-x/spec.md", "specs/002-x/spec.md"]),
+    );
+    let selected = plan_and_apply_with(root, &next, &mut manifest, &block);
+    assert!(selected.whole());
+    assert_eq!(
+        policy(root)["review"]["context_paths"],
+        serde_json::json!(["specs/002-x/spec.md", "specs/024-x/spec.md"])
+    );
+    let again = plan_and_apply_with(root, &next, &mut manifest, &block);
+    assert!(
+        again.files.iter().all(|f| !f.action.writes()),
+        "{:?}",
+        again
+            .files
+            .iter()
+            .map(|f| (&f.path, &f.action))
+            .collect::<Vec<_>>()
+    );
+
+    // An invalid selection refuses the plan.
+    block.insert(
+        "review.context_paths".to_string(),
+        serde_json::json!(["../outside.md"]),
+    );
+    let refused = setup::plan(&Inputs {
+        root,
+        profile: &next,
+        block: &block,
+        manifest: &manifest,
+        spec_spine_toml: Some(TOML),
+        derived_dir: ".statecraft/derived",
+        bound: &setup_input::Bound::with_producer("0.26.0"),
+    });
+    assert!(refused.is_err());
 }
 
 fn revision_twelve() -> Profile {
@@ -1414,8 +1522,8 @@ fn revision_fourteen_installer_upgrades_to_the_registered_revision_without_repla
     });
     assert!(plan_and_apply(root, &old, &mut manifest).whole());
     let next = Profile::registered();
-    // Revision 16 (spec 012) adds a file and changes no installer byte.
-    assert_eq!(next.revision, 16);
+    // Revisions 16 (spec 012) and 17 (spec 041) change no installer byte.
+    assert_eq!(next.revision, 17);
     let installer = "scripts/statecraft/install-spec-spine.sh";
     let upgraded = plan_and_apply(root, &next, &mut manifest);
     assert_eq!(
