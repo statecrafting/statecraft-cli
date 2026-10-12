@@ -15,9 +15,10 @@ summary: >
   and the first confined provider session is the activation rule 12 defers.
 amends:
   - "004-execution-adapter"
-# No `extends` yet: the implementing change adds edges on
-# crates/statecraft-home/ (002) and crates/statecraft-adapter/ (004) with the
-# code, because the gate counts an extender as an owner.
+extends:
+  - { spec: "002-environment-lifecycle", unit: { kind: directory, path: "crates/statecraft-home/" }, nature: additive }
+  - { spec: "006-command-surface", unit: { kind: directory, path: "crates/statecraft-cli/" }, nature: additive }
+  - { spec: "002-environment-lifecycle", unit: { kind: file, path: "scripts/acceptance/managed-session.sh" }, nature: additive }
 depends_on:
   - "002-environment-lifecycle"
   - "003-work-and-run-semantics"
@@ -65,10 +66,11 @@ the live provider sessions it needs, on the Claude Code subscription.
 
 ## 2. Territory
 
-At ratification this spec owns no code. The implementing change adds additive
-`extends` edges on spec 002's `crates/statecraft-home/` (the confinement
-roots and the launch) and spec 004's `crates/statecraft-adapter/` (the Seatbelt
-profile and the constructed environment), with the code.
+This spec owns no crate. It reaches spec 002's `crates/statecraft-home/` (the
+token's custody and the confinement roots) and spec 006's
+`crates/statecraft-cli/` (the `provider token` verbs) through additive
+`extends` edges; the Mach-service allowlist adds an edge on spec 004's
+`crates/statecraft-adapter/` with its code.
 
 ## 3. Behavior
 
@@ -199,6 +201,18 @@ keychain path that needed it is the fallback this spec refuses.
 - **O-2. The token is a `0600` file under the product home**, as spec 038
   settled for the hosted credential: one code path on both platforms, inside
   the protected set, so the child holds only its environment copy.
+
+**2026-10-12: the first implementing change.** The per-run directory is
+`provider-config` inside the launch's scratch root, which the admission
+already removes when it is dropped after the process tree exits. `provider
+token` is the command tree's one three-word group; `show` joins `set` and
+`clear` and answers only whether a usable token is stored. A token is read
+without following a link and refused when the file is not owner-only. The
+object producer that runs confined after an attempt is not given the token or
+the configuration directory. A version probe is a provider process and gets
+its own configuration directory, but authenticates nothing and is given no
+token, so `env plan` and `doctor` need none. The live acceptance script copies
+the operator's provisioned token into its disposable home.
 
 ## Verification
 

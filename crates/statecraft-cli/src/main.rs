@@ -498,6 +498,21 @@ fn run(args: &[String]) -> i32 {
         Verb::TrustRootGenerate | Verb::TrustIssuerSign | Verb::TrustIssuerVerify => {
             trust_verb(invocation.verb, &invocation.rest, format)
         }
+        Verb::ProviderTokenSet | Verb::ProviderTokenClear | Verb::ProviderTokenShow => {
+            let outcome = match invocation.verb {
+                Verb::ProviderTokenSet => {
+                    statecraft_cli::provider::token_set(&home, &invocation.rest)
+                }
+                Verb::ProviderTokenClear => {
+                    statecraft_cli::provider::token_clear(&home, &invocation.rest)
+                }
+                _ => statecraft_cli::provider::token_show(&home, &invocation.rest),
+            };
+            match outcome {
+                Ok(answer) => emit(&answer, format),
+                Err(message) => usage(format, message),
+            }
+        }
     }
 }
 
@@ -1311,6 +1326,7 @@ fn launch_attempt(
                     gate: gated.then_some(gate.as_path()),
                     git_writes: vec![objects, refs, logs, admin],
                     provider: true,
+                    authenticated: true,
                 },
                 &probe_executable,
                 &path,

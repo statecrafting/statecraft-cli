@@ -49,6 +49,14 @@ impl Run {
         self.dir.path().join("acc \"q\" 'x' \\ $y")
     }
 
+    fn fixture_token(&self) -> std::path::PathBuf {
+        let file = self.dir.path().join("fixture-provider-token");
+        if !file.exists() {
+            std::fs::write(&file, "fixture-provider-token-0042").unwrap();
+        }
+        file
+    }
+
     fn script(&self, stage: &str, env: &[(&str, &str)]) -> Output {
         let mut command = Command::new("sh");
         command
@@ -61,7 +69,9 @@ impl Run {
             .env("ACC", self.acc())
             .env("CLI", env!("CARGO_BIN_EXE_statecraft-cli"))
             // A provider that does not exist: nothing here can reach one.
-            .env("PROVIDER", "/nonexistent/provider");
+            .env("PROVIDER", "/nonexistent/provider")
+            // Spec 042: the fixture token the preflight copies in.
+            .env("PROVIDER_TOKEN_FILE", self.fixture_token());
         for (k, v) in env {
             command.env(k, v);
         }

@@ -13,6 +13,9 @@
 #[path = "support/json_naming.rs"]
 mod json_naming;
 
+#[path = "support/provider_token.rs"]
+mod provider_token;
+
 use std::path::{Path, PathBuf};
 use std::process::{Command, Output};
 
@@ -53,7 +56,7 @@ impl Fixture {
         Command::new(env!("CARGO_BIN_EXE_statecraft-cli"))
             .args(args)
             .env_clear()
-            .env("STATECRAFT_HOME", self.home())
+            .env("STATECRAFT_HOME", provider_token::with_token(self.home()))
             .env("HOME", self.dir.path())
             .env("PATH", format!("{}:/usr/bin:/bin", self.bin().display()))
             .env("USER", "fixture-operator")

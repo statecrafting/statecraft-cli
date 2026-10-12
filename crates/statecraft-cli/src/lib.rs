@@ -60,6 +60,7 @@ pub mod coverage;
 pub mod exit;
 pub mod judge;
 pub mod manage;
+pub mod provider;
 pub mod render;
 pub mod slice;
 pub mod transfer;

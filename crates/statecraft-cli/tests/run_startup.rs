@@ -25,6 +25,9 @@
 #[path = "support/json_naming.rs"]
 mod json_naming;
 
+#[path = "support/provider_token.rs"]
+mod provider_token;
+
 use std::path::{Path, PathBuf};
 use std::process::{Command, Output};
 
@@ -88,7 +91,7 @@ impl Fixture {
         Command::new(env!("CARGO_BIN_EXE_statecraft-cli"))
             .args(args)
             .env_clear()
-            .env("STATECRAFT_HOME", self.home())
+            .env("STATECRAFT_HOME", provider_token::with_token(self.home()))
             .env("STATECRAFT_NATIVE_ROOT", self.dir.path().join("native"))
             .env("HOME", self.dir.path())
             .env("PATH", format!("{}:/usr/bin:/bin", self.bin().display()))
@@ -1057,7 +1060,7 @@ fn a_launcher_killed_mid_session_leaves_the_outcome_unknown_and_nothing_is_repla
     let mut launcher = Command::new(env!("CARGO_BIN_EXE_statecraft-cli"))
         .args(["run", &f.root(), RUN, "--json"])
         .env_clear()
-        .env("STATECRAFT_HOME", f.home())
+        .env("STATECRAFT_HOME", provider_token::with_token(f.home()))
         .env("STATECRAFT_NATIVE_ROOT", f.dir.path().join("native"))
         .env("HOME", f.dir.path())
         .env("PATH", format!("{}:/usr/bin:/bin", f.bin().display()))
@@ -1247,7 +1250,7 @@ fn run_until_blocked(f: &Fixture, mode: &str) -> Unblock {
     let launcher = Command::new(env!("CARGO_BIN_EXE_statecraft-cli"))
         .args(["run", &f.root(), RUN, "--json"])
         .env_clear()
-        .env("STATECRAFT_HOME", f.home())
+        .env("STATECRAFT_HOME", provider_token::with_token(f.home()))
         .env("STATECRAFT_NATIVE_ROOT", f.dir.path().join("native"))
         .env("HOME", f.dir.path())
         .env("PATH", format!("{}:/usr/bin:/bin", f.bin().display()))
@@ -2019,7 +2022,7 @@ fn run_captured_until_blocked(f: &Fixture, mode: &str) -> std::process::Child {
     let launcher = Command::new(env!("CARGO_BIN_EXE_statecraft-cli"))
         .args(["run", &f.root(), RUN, "--json"])
         .env_clear()
-        .env("STATECRAFT_HOME", f.home())
+        .env("STATECRAFT_HOME", provider_token::with_token(f.home()))
         .env("STATECRAFT_NATIVE_ROOT", f.dir.path().join("native"))
         .env("HOME", f.dir.path())
         .env("PATH", format!("{}:/usr/bin:/bin", f.bin().display()))

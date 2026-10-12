@@ -7,6 +7,9 @@
 #[path = "support/json_naming.rs"]
 mod json_naming;
 
+#[path = "support/provider_token.rs"]
+mod provider_token;
+
 use serde_json::Value;
 use statecraft_adapter_claude_code::qualification::{PairedRecord, record};
 use std::path::Path;
@@ -89,7 +92,7 @@ if [ "$1" = --version ]; then /bin/cat "$(dirname "$0")/version"; exit 0; fi
         Command::new(env!("CARGO_BIN_EXE_statecraft-cli"))
             .args(args)
             .env_clear()
-            .env("STATECRAFT_HOME", home.path())
+            .env("STATECRAFT_HOME", provider_token::with_token(home.path()))
             .env("HOME", operator_home.path())
             .env("PATH", &path)
             // Spec 004 section 3.14: the account name is carried to the child

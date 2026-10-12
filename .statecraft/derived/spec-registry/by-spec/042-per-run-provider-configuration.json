@@ -9,6 +9,32 @@
       "003-work-and-run-semantics",
       "004-execution-adapter"
     ],
+    "extends": [
+      {
+        "nature": "additive",
+        "spec": "002-environment-lifecycle",
+        "unit": {
+          "kind": "directory",
+          "path": "crates/statecraft-home/"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "006-command-surface",
+        "unit": {
+          "kind": "directory",
+          "path": "crates/statecraft-cli/"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "002-environment-lifecycle",
+        "unit": {
+          "kind": "file",
+          "path": "scripts/acceptance/managed-session.sh"
+        }
+      }
+    ],
     "id": "042-per-run-provider-configuration",
     "implementation": "pending",
     "obligations": [
@@ -38,9 +64,9 @@
       }
     ],
     "sectionDigests": {
-      "042-per-run-provider-configuration-and-a-measured-mach-service-allowlist": "b4e727f5fc023e2352c6ad6bcbfd82bf4dc0f231d6c0d388b5b28c2231077a12",
+      "042-per-run-provider-configuration-and-a-measured-mach-service-allowlist": "7fea1dee4d1496c6c2146ae24dcbb0b7c73dc82982cdf3f6112238b3f92460b5",
       "1-purpose": "00ee0f6b5adae9f2746169b184bbd0490d5720830fc98fa602049313be4e9b5c",
-      "2-territory": "7f0c1b5821b6613662d7d7cc34f13f683cec73626c82c46ad0300fc7ea13a029",
+      "2-territory": "54d5aab8a2c750ff990afd454856068d5d2b30af06c049770843f12bb337c9b6",
       "3-1-the-per-run-configuration-directory": "8a11cc15029ce27042c7c441a915fff781954bdb9465a976d448396c0c843628",
       "3-2-the-provider-token": "4aea89edb62c3c9cbb750e19e2ec73e827b84862cbfbac8c1f68d147b7a14fb1",
       "3-3-the-constructed-environment": "378ff60da7ea3b34757bdfcdccdf13d4110a75d369bbc5a5a4b0c4058ef5e9ff",
@@ -49,7 +75,7 @@
       "3-6-observable-negative-cases": "9dfd0b2d2fc64ec3d54fbce65cfc94f53cca21b2155237d87b179280bc01b9cd",
       "3-behavior": "02ff2e1fc847d03122bc4fe65b2f19f13d5c02dd84fcbbf43ea3c6e3a544a8b0",
       "4-out-of-scope": "7bb51e56110981851a2df9add82a659e0d48aa361b1f1c04b592c2ce8d3c45c4",
-      "5-resolved-decisions": "57f5cb3e28cce0a7dae929ac004ddc430da783fadd833f698877939e6981f05c",
+      "5-resolved-decisions": "11c2f31328e3d7c2969541217c88de592167510d678502a083301e6765130d80",
       "verification": "3c27cbf7a15ebd0db94767fb0d757048c10633d66afada7e76dab94c024339e4"
     },
     "sectionHeadings": [
@@ -72,6 +98,6 @@
     "summary": "Amends 004 section 3.18 to close the two items its rule 12 names as open against constitution IX. A confined provider process gets its own configuration directory inside the attempt, discarded after it, and is authenticated by a provider token the operator provisions once, so the child no longer writes any file that an unconfined process later loads. On macOS every Mach service is refused except an allowlist measured against a confined provider session. Both rest on live measurements this spec names, and the first confined provider session is the activation rule 12 defers.\n",
     "title": "Per-run provider configuration and a measured Mach-service allowlist close spec 004's two open items against IX"
   },
-  "shardHash": "8ce3b1fe4fa836786d442a8cd75e685dc7bfb569cba61334c140b32f1a5f1613",
+  "shardHash": "637a7147ce89e90deab9d0e27292c20d9759065d16266384333a8e39bc19a307",
   "specVersion": "1.9.0"
 }

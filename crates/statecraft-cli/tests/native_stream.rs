@@ -7,6 +7,9 @@
 #[path = "support/json_naming.rs"]
 mod json_naming;
 
+#[path = "support/provider_token.rs"]
+mod provider_token;
+
 use std::path::Path;
 use std::process::{Command, Output};
 
@@ -115,7 +118,7 @@ esac
         Command::new(env!("CARGO_BIN_EXE_statecraft-cli"))
             .args(args)
             .env_clear()
-            .env("STATECRAFT_HOME", home.path())
+            .env("STATECRAFT_HOME", provider_token::with_token(home.path()))
             .env("HOME", operator.path())
             .env("PATH", &path)
             // Spec 004 section 3.14: the account name is carried to the child
@@ -361,7 +364,7 @@ esac
         Command::new(env!("CARGO_BIN_EXE_statecraft-cli"))
             .args(args)
             .env_clear()
-            .env("STATECRAFT_HOME", home.path())
+            .env("STATECRAFT_HOME", provider_token::with_token(home.path()))
             .env("PATH", &path)
             .env("USER", "fixture-operator")
             .output()
