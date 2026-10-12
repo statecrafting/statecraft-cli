@@ -17,6 +17,9 @@
 #[path = "support/json_naming.rs"]
 mod json_naming;
 
+#[path = "support/provider_token.rs"]
+mod provider_token;
+
 use std::path::{Path, PathBuf};
 use std::process::{Command, Output};
 
@@ -81,7 +84,7 @@ impl Sandbox {
     fn run(&self, args: &[&str]) -> Output {
         Command::new(binary())
             .args(args)
-            .env("STATECRAFT_HOME", self.home())
+            .env("STATECRAFT_HOME", provider_token::with_token(self.home()))
             .env("STATECRAFT_NATIVE_ROOT", self.native())
             .env("HOME", self.dir.path())
             .output()
@@ -165,7 +168,7 @@ impl Sandbox {
         args.extend(extra.iter().map(|a| a.to_string()));
         Command::new(binary())
             .args(&args)
-            .env("STATECRAFT_HOME", self.home())
+            .env("STATECRAFT_HOME", provider_token::with_token(self.home()))
             .env("STATECRAFT_NATIVE_ROOT", self.native())
             .env("HOME", self.dir.path())
             .env("FAKE_PROVIDER_MODE", mode)
@@ -889,7 +892,10 @@ fn a_captures_settings_file_is_in_the_exchange_directory_and_not_the_operators_w
             "--synthetic",
             "--json",
         ])
-        .env("STATECRAFT_HOME", sandbox.home())
+        .env(
+            "STATECRAFT_HOME",
+            provider_token::with_token(sandbox.home()),
+        )
         .env("STATECRAFT_NATIVE_ROOT", sandbox.native())
         .env("HOME", sandbox.dir.path())
         .env("FAKE_PROVIDER_MODE", "faithful")

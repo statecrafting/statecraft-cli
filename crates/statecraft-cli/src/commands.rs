@@ -109,6 +109,12 @@ pub enum Verb {
     TrustIssuerSign,
     /// `trust issuer-verify --kind <kind> --root-public <public> ...`
     TrustIssuerVerify,
+    /// `provider token set` (the token on standard input)
+    ProviderTokenSet,
+    /// `provider token clear`
+    ProviderTokenClear,
+    /// `provider token show`
+    ProviderTokenShow,
     /// `--help`, optionally with a group or a verb as its topic.
     ///
     /// Not part of the command tree: [`Verb::all`] lists the operations, and a
@@ -177,6 +183,9 @@ impl Verb {
             Verb::TrustRootGenerate => "trust root-generate",
             Verb::TrustIssuerSign => "trust issuer-sign",
             Verb::TrustIssuerVerify => "trust issuer-verify",
+            Verb::ProviderTokenSet => "provider token set",
+            Verb::ProviderTokenClear => "provider token clear",
+            Verb::ProviderTokenShow => "provider token show",
             Verb::Help => "--help",
         }
     }
@@ -253,6 +262,11 @@ impl Verb {
             Verb::TrustRootGenerate | Verb::TrustIssuerSign | Verb::TrustIssuerVerify => {
                 "006-command-surface"
             }
+            // Spec 042 section 3.2: the provider token's custody, in the
+            // home crate, reached through 042's edge on this crate.
+            Verb::ProviderTokenSet | Verb::ProviderTokenClear | Verb::ProviderTokenShow => {
+                "042-per-run-provider-configuration"
+            }
             Verb::Help => "006-command-surface",
         }
     }
@@ -309,13 +323,16 @@ impl Verb {
             Verb::TrustRootGenerate,
             Verb::TrustIssuerSign,
             Verb::TrustIssuerVerify,
+            Verb::ProviderTokenSet,
+            Verb::ProviderTokenClear,
+            Verb::ProviderTokenShow,
         ]
     }
 
     /// The groups a help topic may name.
-    pub const GROUPS: [&'static str; 16] = [
+    pub const GROUPS: [&'static str; 17] = [
         "project", "env", "work", "run", "accept", "home", "init", "migrate", "config", "approval",
-        "harness", "session", "startup", "override", "transfer", "trust",
+        "harness", "session", "startup", "override", "transfer", "trust", "provider",
     ];
 
     /// Parse a verb from the leading arguments, returning how many it consumed.
@@ -372,6 +389,13 @@ impl Verb {
             ("trust", Some("root-generate")) => Some((Verb::TrustRootGenerate, 2)),
             ("trust", Some("issuer-sign")) => Some((Verb::TrustIssuerSign, 2)),
             ("trust", Some("issuer-verify")) => Some((Verb::TrustIssuerVerify, 2)),
+            // The one three-word group: `provider token <act>` (spec 042).
+            ("provider", Some("token")) => match args.get(2).map(String::as_str) {
+                Some("set") => Some((Verb::ProviderTokenSet, 3)),
+                Some("clear") => Some((Verb::ProviderTokenClear, 3)),
+                Some("show") => Some((Verb::ProviderTokenShow, 3)),
+                _ => None,
+            },
             _ => None,
         }
     }

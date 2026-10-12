@@ -9,6 +9,13 @@ use std::os::unix::net::UnixListener;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
+/// The per-run provider configuration directory's name inside the scratch
+/// root (spec 042 section 3.1).
+pub const PROVIDER_CONFIG_DIR: &str = "provider-config";
+
+/// The environment name the provider reads its configuration directory from.
+pub const CONFIG_DIR_VARIABLE: &str = "CLAUDE_CONFIG_DIR";
+
 /// Existing supervisor-owned paths for one launch.
 pub struct Roots<'a> {
     /// Protected product home.
@@ -25,8 +32,13 @@ pub struct Roots<'a> {
     pub gate: Option<&'a Path>,
     /// Exact private Git administrative/reference roots, for a provider only.
     pub git_writes: Vec<PathBuf>,
-    /// Grant the provider's required configuration paths.
+    /// A provider process: a per-run configuration directory (spec 042
+    /// section 3.1).
     pub provider: bool,
+    /// A provider session that authenticates: the provisioned token is
+    /// placed in the environment, and its absence refuses (section 3.2). A
+    /// version probe authenticates nothing and is given no token.
+    pub authenticated: bool,
 }
 
 /// A probe and its live sentinels. Held until the corresponding launch finishes.
@@ -127,44 +139,36 @@ pub fn admit(roots: Roots<'_>, executable: &Path, path: &str) -> Result<Admissio
                 directory: true,
             });
         }
-        #[cfg(target_os = "macos")]
-        let mut adjacent_prefixes = Vec::new();
-        #[cfg(not(target_os = "macos"))]
+        // Spec 042 section 3.1: a provider gets a fresh configuration
+        // directory inside this launch's scratch root, its only
+        // provider-configuration writable root, removed with the scratch
+        // root when the admission is dropped after the process tree exits.
+        // The operator's own `~/.claude/` and `~/.claude.json` are no longer
+        // granted, so nothing the child writes is loaded later by a process
+        // outside the confinement (004 section 3.18 rule 12).
         let adjacent_prefixes = Vec::new();
+        let mut provider_variables = Vec::new();
         if roots.provider {
-            let operator_home = std::env::var_os("HOME")
-                .map(PathBuf::from)
-                .ok_or("operator home unavailable")?;
-            if !operator_home.is_absolute() {
-                return Err("operator home is relative".into());
-            }
-            let directory = operator_home.join(".claude");
-            std::fs::create_dir_all(&directory)?;
-            writable.push(Grant {
-                path: directory,
-                directory: true,
-            });
-            let configuration = operator_home.join(".claude.json");
-            #[cfg(target_os = "macos")]
-            adjacent_prefixes.push(configuration);
-            // Landlock grants a file only once it exists, and creating the
-            // provider's configuration is not the supervisor's to do.
-            #[cfg(target_os = "linux")]
-            if configuration
-                .symlink_metadata()
-                .is_err_and(|e| e.kind() == std::io::ErrorKind::NotFound)
+            // Section 3.2: refused before anything is prepared for a child.
+            let token = if roots.authenticated {
+                Some(crate::provider_token::read(roots.home)?)
+            } else {
+                None
+            };
+            let configuration = scratch.path().join(PROVIDER_CONFIG_DIR);
             {
-                return Err(format!(
-                    "{} is absent; run the provider once, unconfined, to create it",
-                    configuration.display()
-                )
-                .into());
+                use std::os::unix::fs::DirBuilderExt;
+                std::fs::DirBuilder::new()
+                    .mode(0o700)
+                    .create(&configuration)?;
             }
-            #[cfg(target_os = "linux")]
-            writable.push(Grant {
-                path: configuration,
-                directory: false,
-            });
+            provider_variables.push((
+                CONFIG_DIR_VARIABLE.to_string(),
+                configuration.display().to_string(),
+            ));
+            if let Some(token) = token {
+                provider_variables.push((crate::provider_token::VARIABLE.to_string(), token));
+            }
         }
         let harness = crate::home::Layout::new(roots.home).harness_dir();
         let mut readable = vec![roots.exchange.into()];
@@ -210,10 +214,11 @@ pub fn admit(roots: Roots<'_>, executable: &Path, path: &str) -> Result<Admissio
         let tested = boundary.self_test(executable, &probe);
         gate.set_len(length)?;
         tested?;
-        let variables = ["TMPDIR", "TMP", "TEMP"]
+        let mut variables: BTreeMap<String, String> = ["TMPDIR", "TMP", "TEMP"]
             .into_iter()
             .map(|name| (name.into(), scratch.path().display().to_string()))
             .collect();
+        variables.extend(provider_variables);
         let exchange = DataRoot::open(roots.exchange)?;
         let common = common_path.as_deref().map(DataRoot::open).transpose()?;
         Ok(Admission {
@@ -277,6 +282,10 @@ pub fn import_objects(
         "--revs",
     ];
     let mut producer_environment = variables.clone();
+    // The provider's token and configuration directory are the provider's
+    // alone (spec 042 section 3.2); the object producer is not given them.
+    producer_environment.remove(crate::provider_token::VARIABLE);
+    producer_environment.remove(CONFIG_DIR_VARIABLE);
     producer_environment.insert("GIT_CONFIG_NOSYSTEM".into(), "1".into());
     producer_environment.insert("GIT_CONFIG_SYSTEM".into(), "/dev/null".into());
     producer_environment.insert("GIT_CONFIG_GLOBAL".into(), "/dev/null".into());

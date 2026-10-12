@@ -107,6 +107,9 @@ TRIAL_TIMEOUT="${TRIAL_TIMEOUT:-120}"
 LOCAL_TIMEOUT="${LOCAL_TIMEOUT:-900}"
 # The provider, as named on PATH or by path.
 PROVIDER="${PROVIDER:-claude}"
+# The operator's provisioned provider token (spec 042), copied into the
+# fixture home by the preflight.
+PROVIDER_TOKEN_FILE="${PROVIDER_TOKEN_FILE:-${STATECRAFT_HOME_REAL:-$HOME/.statecraft}/credentials/claude-code-token}"
 # The product binary. Built by the preflight unless one is named.
 CLI="${CLI:-$ACC/bin/statecraft-cli}"
 
@@ -206,6 +209,15 @@ preflight() {
   rm -rf "$ACC"
   mkdir -p "$ACC" "$PROJECT" "$HOME_DIR" "$CAPTURE"
   : >"$MARKER"
+  # Spec 042 section 3.2: a confined provider session authenticates with the
+  # operator's provisioned token, never with the operator's own login. The
+  # fixture home is given a copy, owner-only; with none, the launch refuses
+  # with exit 2 and names `provider token set`.
+  if [ -f "$PROVIDER_TOKEN_FILE" ]; then
+    (umask 077 && mkdir -p "$HOME_DIR/credentials" \
+      && cp "$PROVIDER_TOKEN_FILE" "$HOME_DIR/credentials/claude-code-token") \
+      || fail "could not copy the provider token into the fixture home"
+  fi
 
   step "1. The product"
   if [ "$CLI" = "$ACC/bin/statecraft-cli" ]; then

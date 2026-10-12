@@ -8,10 +8,64 @@
       "003-work-and-run-semantics",
       "004-execution-adapter"
     ],
-    "implementingPaths": [],
+    "implementingPaths": [
+      {
+        "path": "crates/statecraft-cli/",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/statecraft-home/",
+        "source": "spec-edge"
+      },
+      {
+        "path": "scripts/acceptance/managed-session.sh",
+        "source": "spec-edge"
+      }
+    ],
+    "resolvedUnits": [
+      {
+        "locations": [
+          {
+            "file": "crates/statecraft-cli/"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "directory",
+          "path": "crates/statecraft-cli/"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "crates/statecraft-home/"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "directory",
+          "path": "crates/statecraft-home/"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "scripts/acceptance/managed-session.sh"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "file",
+          "path": "scripts/acceptance/managed-session.sh"
+        }
+      }
+    ],
     "specId": "042-per-run-provider-configuration",
     "specStatus": "approved"
   },
   "schemaVersion": "1.2.0",
-  "shardHash": "8ce3b1fe4fa836786d442a8cd75e685dc7bfb569cba61334c140b32f1a5f1613"
+  "shardHash": "637a7147ce89e90deab9d0e27292c20d9759065d16266384333a8e39bc19a307"
 }

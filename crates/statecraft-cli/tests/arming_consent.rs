@@ -21,6 +21,9 @@
 #[path = "support/json_naming.rs"]
 mod json_naming;
 
+#[path = "support/provider_token.rs"]
+mod provider_token;
+
 use serde_json::Value;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Output};
@@ -117,7 +120,10 @@ if [ "$1" = --version ]; then echo '2.1.267'; exit 0; fi
         Command::new(env!("CARGO_BIN_EXE_statecraft-cli"))
             .args(args)
             .env_clear()
-            .env("STATECRAFT_HOME", self.home.path())
+            .env(
+                "STATECRAFT_HOME",
+                provider_token::with_token(self.home.path()),
+            )
             .env("HOME", self.operator_home.path())
             .env(
                 "PATH",

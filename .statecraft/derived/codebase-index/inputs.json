@@ -67,7 +67,7 @@
       "contentHash": "3bb59e5cf7c30fca34432eb72b1d8a2d2f2b20fa8099687f4b88b1a7ec6a8190"
     },
     "scripts/acceptance/managed-session.sh": {
-      "contentHash": "761b858c102914292d4b35d4317af4568a65b849b199ad249f056192490e7a0e"
+      "contentHash": "876e5b9cf4a7aaef38422b6a9303019df33b760570bd6e57b9cd12c7477e1199"
     },
     "scripts/check-authored-content.sh": {
       "contentHash": "ce134272a70e0ca35a48c99dcecb8735abcc8e0755e326595cedbaaa9e3f5219"

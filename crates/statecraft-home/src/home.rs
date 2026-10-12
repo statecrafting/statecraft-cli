@@ -123,6 +123,12 @@ impl Layout {
         self.root.join("qualifications.json")
     }
 
+    /// The operator-provisioned provider token (spec 042 section 3.2):
+    /// owner-only, inside the protected set, read only by the supervisor.
+    pub fn provider_token_file(&self) -> PathBuf {
+        self.root.join("credentials").join("claude-code-token")
+    }
+
     /// Every directory a complete home has.
     pub fn directories(&self) -> Vec<PathBuf> {
         vec![self.root.clone(), self.harness_dir(), self.approvals_dir()]
