@@ -289,6 +289,15 @@ fn the_credential_is_owner_only_under_the_home_and_never_rendered() {
     // A file another user could read is refused, not used.
     std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o640)).unwrap();
     assert!(store.load(&origin).is_err());
+    // Concurrent saves for one origin each succeed; the last rename wins.
+    std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o600)).unwrap();
+    std::thread::scope(|s| {
+        for i in 0..8 {
+            let (store, origin) = (&store, &origin);
+            s.spawn(move || store.save(origin, &credential(origin, i)).unwrap());
+        }
+    });
+    assert!(store.load(&origin).unwrap().is_some());
     assert!(store.delete(&origin).unwrap());
     assert!(!store.delete(&origin).unwrap());
 }

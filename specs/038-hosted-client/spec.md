@@ -279,6 +279,8 @@ a response chose. The idempotency key is SHA-256 over a domain tag, the
 repository id, the `RevisionId` and the submission field's bytes, which carry
 the manifest; the multipart boundary is derived from the parts and checked
 against them, so the request body is a function of its inputs.
+A credential is staged in a uniquely named owner-only file and renamed over
+the held one, so two saves for one cell never share a staging path.
 
 ## Verification
 

@@ -81,7 +81,7 @@ impl Store {
     /// Write `credential` for `origin`, owner-only, by a rename.
     pub fn save(&self, origin: &Origin, credential: &Credential) -> Result<(), Error> {
         use std::io::Write;
-        use std::os::unix::fs::{DirBuilderExt, OpenOptionsExt, PermissionsExt};
+        use std::os::unix::fs::{DirBuilderExt, PermissionsExt};
         let io =
             |e: std::io::Error| Error::Refused(format!("the credential cannot be stored: {e}"));
         std::fs::DirBuilder::new()
@@ -91,21 +91,20 @@ impl Store {
             .map_err(io)?;
         std::fs::set_permissions(&self.dir, std::fs::Permissions::from_mode(0o700)).map_err(io)?;
         let bytes = serde_json::to_vec(credential).expect("serializable");
-        let target = self.path(origin);
-        let tmp = self
-            .dir
-            .join(format!(".{}.{}.tmp", origin.digest(), std::process::id()));
-        let _ = std::fs::remove_file(&tmp);
-        let mut file = std::fs::OpenOptions::new()
-            .write(true)
-            .create_new(true)
-            .mode(0o600)
-            .open(&tmp)
+        // A uniquely named staging file, created owner-only, so concurrent
+        // saves never share one; the rename replaces the held credential.
+        let mut staged = tempfile::Builder::new()
+            .prefix(&format!(".{}.", origin.digest()))
+            .suffix(".tmp")
+            .permissions(std::fs::Permissions::from_mode(0o600))
+            .tempfile_in(&self.dir)
             .map_err(io)?;
-        file.write_all(&bytes).map_err(io)?;
-        file.sync_all().map_err(io)?;
-        drop(file);
-        std::fs::rename(&tmp, &target).map_err(io)
+        staged.write_all(&bytes).map_err(io)?;
+        staged.as_file().sync_all().map_err(io)?;
+        staged
+            .persist(self.path(origin))
+            .map(|_| ())
+            .map_err(|e| io(e.error))
     }
 
     /// The credential held for `origin`, if any. A file another user could
