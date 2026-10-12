@@ -349,15 +349,22 @@ fn a_tombstoned_object_is_told_apart_from_a_missing_one() {
     let missing = s.bundle(set.digest, None, vec![approval]);
     let v = verify(&missing, &set, SCOPE, Some(&policy));
     assert!(v.divergence.unwrap().contains("no tombstone covers it"));
-    s.tombstones.push(
-        Tombstone {
-            target: claim,
-            reason: EraseReason::Erasure,
-            scope: TombstoneScope::Object,
-        }
-        .to_fact()
-        .canonical_bytes(),
+    let tombstone = Tombstone {
+        target: claim,
+        reason: EraseReason::Erasure,
+        scope: TombstoneScope::Object,
+    }
+    .to_fact();
+    // Carried but recorded by no entry: not trusted.
+    s.tombstones.push(tombstone.canonical_bytes());
+    let v = verify(
+        &s.bundle(set.digest, None, vec![approval]),
+        &set,
+        SCOPE,
+        Some(&policy),
     );
+    assert!(v.divergence.unwrap().contains("not recorded by any entry"));
+    s.append(&tombstone);
     let v = verify(
         &s.bundle(set.digest, None, vec![approval]),
         &set,
@@ -444,4 +451,69 @@ fn an_admission_the_pinned_policy_contradicts_diverges() {
         }
     );
     assert!(!v.passes());
+}
+
+#[test]
+fn an_attestation_about_another_revision_is_not_this_revisions_decision() {
+    let policy = AdmissionPolicy::permissive();
+    let owner = signer("statecraft TEST-ONLY bundle owner root: public, never production");
+    let issuer = signer("statecraft TEST-ONLY bundle platform issuer: public, never production");
+    let set = pinned(&owner, &issuer, SCOPE);
+    let mut s = Scope::new(issuer);
+    let real = s.revision;
+    // Issued, validly signed, about another revision.
+    s.revision = Hash::of(b"another revision");
+    let eval = s.attest(
+        POLICY_EVAL,
+        policy_eval_claim(policy_digest(&policy), &[], &Admission::Admit),
+    );
+    let approval = s.attest(APPROVAL, approval_claim(&real, "rae"));
+    s.revision = real;
+    let v = verify(
+        &s.bundle(set.digest, Some(eval), vec![]),
+        &set,
+        SCOPE,
+        Some(&policy),
+    );
+    assert_eq!(
+        v.divergence.as_deref(),
+        Some("the admission is about another revision")
+    );
+    let v = verify(
+        &s.bundle(set.digest, None, vec![approval]),
+        &set,
+        SCOPE,
+        Some(&policy),
+    );
+    assert!(v.divergence.unwrap().contains("about another revision"));
+}
+
+#[test]
+fn an_erased_revision_registration_is_a_divergence() {
+    let policy = AdmissionPolicy::permissive();
+    let (mut s, set, _, _) = decided(&policy);
+    let first = Entry::decode(&s.entries[0].canonical_bytes())
+        .unwrap()
+        .body
+        .payload;
+    s.objects.remove(&first.to_string_key());
+    let tombstone = Tombstone {
+        target: first,
+        reason: EraseReason::Erasure,
+        scope: TombstoneScope::Object,
+    }
+    .to_fact();
+    s.tombstones.push(tombstone.canonical_bytes());
+    s.append(&tombstone);
+    let v = verify(
+        &s.bundle(set.digest, None, vec![]),
+        &set,
+        SCOPE,
+        Some(&policy),
+    );
+    assert!(
+        v.divergence
+            .unwrap()
+            .contains("revision id cannot be checked")
+    );
 }

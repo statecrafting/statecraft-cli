@@ -239,12 +239,6 @@ pub fn verify(
 type Walked = (Vec<NamedDecision>, AdmissionCheck);
 
 fn walk(r: &mut Reader<'_>, policy: Option<&AdmissionPolicy>) -> Result<Walked, String> {
-    for (i, bytes) in r.bundle.tombstones.iter().enumerate() {
-        let fact = FactEnvelope::decode(bytes)
-            .map_err(|e| format!("tombstone {i} does not decode: {e}"))?;
-        let t = Tombstone::from_fact(&fact).map_err(|e| format!("tombstone {i}: {e}"))?;
-        r.tombstones.add(t);
-    }
     for (key, bytes) in &r.bundle.objects {
         let cid = parse_object_key(key)
             .ok_or_else(|| format!("object {key}: not an object identifier"))?;
@@ -257,9 +251,10 @@ fn walk(r: &mut Reader<'_>, policy: Option<&AdmissionPolicy>) -> Result<Walked, 
     if r.bundle.entries.is_empty() {
         return Err("the bundle holds no entries; it must begin at revision.registered".into());
     }
+    // First every entry's chain and signature, so the payloads they commit to
+    // are known before anything is resolved.
+    let mut entries: Vec<Entry> = Vec::new();
     let mut previous: Option<Entry> = None;
-    let mut attestations: BTreeMap<Hash, Attestation> = BTreeMap::new();
-    let mut submitter: Option<String> = None;
     for (i, bytes) in r.bundle.entries.iter().enumerate() {
         let entry = Entry::decode(bytes).map_err(|e| format!("entry {i} does not decode: {e}"))?;
         if let Some(p) = &previous {
@@ -276,8 +271,32 @@ fn walk(r: &mut Reader<'_>, policy: Option<&AdmissionPolicy>) -> Result<Walked, 
         entry
             .verify_signature(&key)
             .map_err(|_| format!("entry {i}: the signature does not recompute"))?;
+        previous = Some(entry.clone());
+        entries.push(entry);
+    }
+    // A tombstone is trusted only when a verified entry commits to it: one the
+    // bundle merely carries could hide a missing object.
+    let committed: BTreeSet<Cid> = entries.iter().map(|e| e.body.payload).collect();
+    for (i, bytes) in r.bundle.tombstones.iter().enumerate() {
+        let fact = FactEnvelope::decode(bytes)
+            .map_err(|e| format!("tombstone {i} does not decode: {e}"))?;
+        if !committed.contains(&fact.cid()) {
+            return Err(format!(
+                "tombstone {i} is not recorded by any entry in the bundle"
+            ));
+        }
+        let t = Tombstone::from_fact(&fact).map_err(|e| format!("tombstone {i}: {e}"))?;
+        r.tombstones.add(t);
+    }
+    let mut attestations: BTreeMap<Hash, Attestation> = BTreeMap::new();
+    let mut submitter: Option<String> = None;
+    for (i, entry) in entries.iter().enumerate() {
         let Some(payload) = r.object(&entry.body.payload, &format!("entry {i} payload"))? else {
-            previous = Some(entry);
+            // The revision is identified by its first fact; erased, it cannot
+            // be checked, and nothing after it can be bound to it.
+            if i == 0 {
+                return Err("entry 0's revision.registered fact is tombstoned; the revision id cannot be checked".into());
+            }
             continue;
         };
         let fact = FactEnvelope::decode(payload)
@@ -312,7 +331,6 @@ fn walk(r: &mut Reader<'_>, policy: Option<&AdmissionPolicy>) -> Result<Walked, 
                 attestations.insert(a.id().0, a);
             }
         }
-        previous = Some(entry);
     }
 
     let claim_of =
@@ -337,6 +355,12 @@ fn walk(r: &mut Reader<'_>, policy: Option<&AdmissionPolicy>) -> Result<Walked, 
                 )
             })?
             .clone();
+        if a.body.subject != r.bundle.revision {
+            return Err(format!(
+                "decision {} is about another revision",
+                id.to_hex()
+            ));
+        }
         let approves = match a.body.predicate.0.as_str() {
             APPROVAL => true,
             CHANGE_REQUEST => false,
@@ -375,6 +399,9 @@ fn walk(r: &mut Reader<'_>, policy: Option<&AdmissionPolicy>) -> Result<Walked, 
         .get(&admission_id)
         .ok_or_else(|| "the admission is not an attestation in the bundle".to_string())?
         .clone();
+    if a.body.subject != r.bundle.revision {
+        return Err("the admission is about another revision".into());
+    }
     if a.body.predicate.0 != POLICY_EVAL {
         return Err(format!(
             "the admission has the predicate {}",

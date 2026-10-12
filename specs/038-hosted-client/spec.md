@@ -300,6 +300,10 @@ not compared. Without a pinned policy, or under another policy digest, it is
 reported as not reproduced, which is a finding. A cell that still judges
 under a version 1 root set names a digest no V2 pin can equal, and the reader
 reports that mismatch with both digests rather than translating between them.
+A tombstone is trusted only when a verified entry in the bundle commits to
+its fact, an erased `revision.registered` is a divergence because the
+revision can no longer be checked, and a decision or admission attestation
+must be about the bundle's revision.
 
 ## Verification
 
