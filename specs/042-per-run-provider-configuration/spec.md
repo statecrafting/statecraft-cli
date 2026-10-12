@@ -1,7 +1,7 @@
 ---
 id: "042-per-run-provider-configuration"
 title: "Per-run provider configuration and a measured Mach-service allowlist close spec 004's two open items against IX"
-status: draft
+status: approved
 implementation: pending
 created: "2026-10-12"
 summary: >
@@ -65,7 +65,7 @@ the live provider sessions it needs, on the Claude Code subscription.
 
 ## 2. Territory
 
-At draft this spec owns no code. The implementing change adds additive
+At ratification this spec owns no code. The implementing change adds additive
 `extends` edges on spec 002's `crates/statecraft-home/` (the confinement
 roots and the launch) and spec 004's `crates/statecraft-adapter/` (the Seatbelt
 profile and the constructed environment), with the code.
@@ -188,14 +188,17 @@ keychain path that needed it is the fallback this spec refuses.
 - A second provider. The configuration-directory and token names are this
   provider's; another adapter states its own.
 
-## 5. Open questions for ratification
+## 5. Resolved decisions
 
-- **O-1. Linux.** M-1 to M-3 are planned on macOS, the platform this machine
-  runs. Linux closes only after its own M-2 and M-3 (a Linux host or
-  container with the provider installed). Ratification should confirm that
-  rule 12 may read closed per platform.
-- **O-2. The token's home.** A `0600` file under the product home, as spec 038
-  settled for the hosted credential, or the macOS Keychain.
+**2026-10-12: the owner ratified this spec and settled O-1 and O-2.**
+
+- **O-1. Rule 12 closes per platform.** M-1 to M-3 are taken on macOS, the
+  platform this machine runs, and close the two items there. Linux closes only
+  after its own M-2 and M-3; until then a Linux attempt's posture records both
+  items open.
+- **O-2. The token is a `0600` file under the product home**, as spec 038
+  settled for the hosted credential: one code path on both platforms, inside
+  the protected set, so the child holds only its environment copy.
 
 ## Verification
 

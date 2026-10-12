@@ -38,9 +38,9 @@
       }
     ],
     "sectionDigests": {
-      "042-per-run-provider-configuration-and-a-measured-mach-service-allowlist": "d94a574f8b31deb9fcf06088187dd455b80ee39edcf697d764ec61653b4c3988",
+      "042-per-run-provider-configuration-and-a-measured-mach-service-allowlist": "b4e727f5fc023e2352c6ad6bcbfd82bf4dc0f231d6c0d388b5b28c2231077a12",
       "1-purpose": "00ee0f6b5adae9f2746169b184bbd0490d5720830fc98fa602049313be4e9b5c",
-      "2-territory": "97d32947453361c1126659be95ba1cfb650465bcd71d1b8674163abf4c15056a",
+      "2-territory": "7f0c1b5821b6613662d7d7cc34f13f683cec73626c82c46ad0300fc7ea13a029",
       "3-1-the-per-run-configuration-directory": "8a11cc15029ce27042c7c441a915fff781954bdb9465a976d448396c0c843628",
       "3-2-the-provider-token": "4aea89edb62c3c9cbb750e19e2ec73e827b84862cbfbac8c1f68d147b7a14fb1",
       "3-3-the-constructed-environment": "378ff60da7ea3b34757bdfcdccdf13d4110a75d369bbc5a5a4b0c4058ef5e9ff",
@@ -49,7 +49,7 @@
       "3-6-observable-negative-cases": "9dfd0b2d2fc64ec3d54fbce65cfc94f53cca21b2155237d87b179280bc01b9cd",
       "3-behavior": "02ff2e1fc847d03122bc4fe65b2f19f13d5c02dd84fcbbf43ea3c6e3a544a8b0",
       "4-out-of-scope": "7bb51e56110981851a2df9add82a659e0d48aa361b1f1c04b592c2ce8d3c45c4",
-      "5-open-questions-for-ratification": "3c5e688041e09a199ba466eb4905a82ce2ce4e1c0cfab97af73de408e7664213",
+      "5-resolved-decisions": "57f5cb3e28cce0a7dae929ac004ddc430da783fadd833f698877939e6981f05c",
       "verification": "3c27cbf7a15ebd0db94767fb0d757048c10633d66afada7e76dab94c024339e4"
     },
     "sectionHeadings": [
@@ -64,14 +64,14 @@
       "3.5 What closes, and what is measured",
       "3.6 Observable negative cases",
       "4. Out of scope",
-      "5. Open questions for ratification",
+      "5. Resolved decisions",
       "Verification"
     ],
     "specPath": "specs/042-per-run-provider-configuration/spec.md",
-    "status": "draft",
+    "status": "approved",
     "summary": "Amends 004 section 3.18 to close the two items its rule 12 names as open against constitution IX. A confined provider process gets its own configuration directory inside the attempt, discarded after it, and is authenticated by a provider token the operator provisions once, so the child no longer writes any file that an unconfined process later loads. On macOS every Mach service is refused except an allowlist measured against a confined provider session. Both rest on live measurements this spec names, and the first confined provider session is the activation rule 12 defers.\n",
     "title": "Per-run provider configuration and a measured Mach-service allowlist close spec 004's two open items against IX"
   },
-  "shardHash": "bfce4fd3160ea444205536d0be12ca044fceb4ea8117663365cf0b7ec0073c3a",
+  "shardHash": "8ce3b1fe4fa836786d442a8cd75e685dc7bfb569cba61334c140b32f1a5f1613",
   "specVersion": "1.9.0"
 }

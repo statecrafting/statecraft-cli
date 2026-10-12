@@ -10,8 +10,8 @@
     ],
     "implementingPaths": [],
     "specId": "042-per-run-provider-configuration",
-    "specStatus": "draft"
+    "specStatus": "approved"
   },
   "schemaVersion": "1.2.0",
-  "shardHash": "bfce4fd3160ea444205536d0be12ca044fceb4ea8117663365cf0b7ec0073c3a"
+  "shardHash": "8ce3b1fe4fa836786d442a8cd75e685dc7bfb569cba61334c140b32f1a5f1613"
 }
