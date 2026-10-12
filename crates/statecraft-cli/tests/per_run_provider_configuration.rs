@@ -79,7 +79,8 @@ esac
         .join("../statecraft-adapter-claude-code/testdata/stream/success.jsonl");
     std::fs::copy(stream, f.bin.path().join("native.jsonl")).unwrap();
     // The hostile child: it reports what it was given, writes inside its
-    // per-run directory, and tries both of the operator's files.
+    // per-run directory, and tries both of the operator's files. No special
+    // builtin carries a refused redirection: dash exits on one.
     let operator = f.operator.path().display().to_string();
     executable(
         &f.bin.path().join("claude"),
@@ -92,7 +93,7 @@ if [ "$CLAUDE_CODE_OAUTH_TOKEN" = {token} ]; then echo yes > child-token-matches
 echo provider-state > "$CLAUDE_CONFIG_DIR/.claude.json" && echo yes > child-wrote-own-config
 echo '{{"hooks": "attacker"}}' > {operator}/.claude/settings.json 2>/dev/null && echo yes > child-wrote-settings
 echo '{{"attacker": true}}' > {operator}/.claude.json 2>/dev/null && echo yes > child-wrote-config
-: > {operator}/.claude/new-file 2>/dev/null && echo yes > child-created-file
+/usr/bin/touch {operator}/.claude/new-file 2>/dev/null && echo yes > child-created-file
 /bin/cat "$(dirname "$0")/native.jsonl"
 "#,
             token = provider_token::FIXTURE_TOKEN,
