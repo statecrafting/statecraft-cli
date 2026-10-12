@@ -21,7 +21,7 @@
       }
     ],
     "id": "041-review-authority-context",
-    "implementation": "pending",
+    "implementation": "complete",
     "obligations": [
       {
         "anchor": "3-1-context-selection-and-provenance",
@@ -75,6 +75,6 @@
     "summary": "Supply the managed reviewer with bounded governance documents selected from the base commit, record their provenance, and account for their bytes in every call. Candidate assertions remain review data. Missing context does not prove a contradiction, and review never grants owner ratification or an exception. Deliver the profile change separately from its self-adoption.\n",
     "title": "Base-commit governance context for managed AI review"
   },
-  "shardHash": "573c2485950f31e589ffd4a0241b8221928320ff19ed425d98b544ca0eebe0eb",
+  "shardHash": "b20cb11255f6729168d6778305ca4771201efeb8670b2acb7fc5812f43627c0f",
   "specVersion": "1.9.0"
 }

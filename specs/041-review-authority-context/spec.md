@@ -2,7 +2,7 @@
 id: "041-review-authority-context"
 title: "Base-commit governance context for managed AI review"
 status: approved
-implementation: pending
+implementation: complete
 created: "2026-10-10"
 summary: >
   Supply the managed reviewer with bounded governance documents selected from

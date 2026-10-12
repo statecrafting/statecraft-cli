@@ -79,43 +79,43 @@
   },
   "files": [
     {
-      "digest": "49645909a0dd37033db108304073c650daf4f3c28f56d27531de085cb3d6503f",
+      "digest": "b2939b70777c4edc8d81f57329d28181d6d28d0a5ab8d8111b67b06f623c4574",
       "path": ".github/workflows/statecraft-ci.yml",
       "role": "workflow"
     },
     {
-      "digest": "36ec218c7553237660fb673fbd0b7d437afdd03c44356e6e96212fd3995883b6",
+      "digest": "061ede83b139e4e2626bab53dfdbc3f0e650f951d39264846da2944a9d1e5a71",
       "path": ".github/workflows/statecraft-ai-review.yml",
       "role": "workflow"
     },
     {
-      "digest": "2845e685e29b583b19e6bcb1e34db2e92597cc0bc55fbc664fd2d1246d1aa3d7",
+      "digest": "7c05aa153a73f66e248d64913e1d292ca5de314bd396795ade8ac730faecaafe",
       "path": "scripts/statecraft/install-spec-spine.sh",
       "role": "script"
     },
     {
-      "digest": "1fbef51751802e6a099282cb3143ae84d64ca6ee1af33c16cfd2f47320d34b68",
+      "digest": "9d5ef19713f715481a77493eccab58c9122bd643fbdb3b5a8e58d015e9b99fb6",
       "path": "scripts/statecraft/gate.sh",
       "role": "script"
     },
     {
-      "digest": "d4a9fc19f140d4a5bb8f1cd54e43ae863ae6fb9dda68dc1e65ccc3ac5cbdcfb1",
+      "digest": "ad34b47fc85ab8f950b5d6f525544b49bd9a677d1cc6d7d413ba5eb01b09c3e2",
       "path": "scripts/statecraft/ci-gate.sh",
       "role": "script"
     },
     {
-      "digest": "12fb1b9d418600ce8d8c0d8c814705cdd3c2e0fc4a6c13fd383e35ba0661372a",
+      "digest": "9757ac56f148f7645d747b40b9892858f57c999b50a279c1ae591df3df2f9403",
       "path": "scripts/statecraft/ai-review.sh",
       "role": "script"
     },
     {
-      "digest": "36af908e4715ddedd182ac208c6ba7e8d5063626c7026c8eb49cc698c6053f57",
+      "digest": "5dfde3de36ad98c537415413f3f685d2a6f9906f616c47c6fd0e02c04bdd35eb",
       "path": ".statecraft/setup/github-actions-rust.remote.json",
       "role": "remote-state"
     }
   ],
   "id": "github-actions-rust",
-  "identity": "84502467bf0415db39b0bf77b9bc072cb09c7ab49505371306b80ab198f45e9f",
+  "identity": "fe0e763c8f217652df7975e429a8eb2c762657abc33344ef79f6d4e18733e7a6",
   "jobs": {
     "ai-review": {
       "merge_group": "recorded-review",
@@ -154,6 +154,10 @@
     },
     "code_owners": [
       "@bartekus"
+    ],
+    "contextPaths": [
+      "specs/002-environment-lifecycle/spec.md",
+      "specs/024-review-budget-and-ratification/spec.md"
     ],
     "context_tokens": 200000,
     "default_branch": "main",
@@ -200,10 +204,21 @@
     "revision 14: external code selection runs the project-owned reusable workflow and script behind the required code job; that script joins the trusted-base authority set, and failed, cancelled or skipped code still blocks ci-gate (spec 032)",
     "revision 15: an exact consented spec-spine pin move is reviewed with its initialization plan, and the managed installer reads that adopted pin; this changes no required remote check or branch-protection authority (spec 033)",
     "revision 16: the profile renders .statecraft/setup/github-actions-rust.remote.json (schema statecraft/remote-desired-state/1), a canonical desired-state document of what this profile expects of the remote: required checks with their App, the extra required jobs and their aggregation by ci-gate, code-owner review and the governed paths CODEOWNERS covers, the merge queue (remote.merge_queue), the exception Environment and its reviewers (remote.exception_reviewers), workflow-token defaults, secret names, and repository custom properties (remote.custom_properties). An omitted field is no claim. `doctor --remote` compares every field read-only and reports each as matching, drifted, unavailable, unauthorized, unsupported or unverified; this product never applies it, and an owner-operated applier outside this product needs its own authorization (spec 012)",
+    "revision 17: the AI review reads governance documents as Git blobs at the base commit (AGENTS.md, .statecraft/AGENTS.md, standards/spec/constitution.md, standards/spec/contract.md by default, absent ones recorded as absent) plus review.context_paths, at most 32 literal repository-relative paths read from the policy at the base, never from the candidate; the documents must fit a quarter of review.context_tokens whole or the review refuses with 2 before any provider call, every call's whole input must fit three quarters of it, the diff budget is what remains (at most half), and the evidence records each document's blob, digest and length and each call's budget (spec 041)",
     "a repository that already runs these checks by hand keeps them by setting governance.enforce_coverage (index coverage --fail-on-untraced), governance.authored_content (the script's path; absent or not executable refuses), governance.authored_content_text (the title, the body and every commit message), governance.gate_each_commit (each commit's tree passes the gate and cargo fmt) and governance.require_signed_commits (each commit verified as signed by GitHub) (revision 4)"
   ],
   "review": {
+    "context_paths": [
+      "specs/002-environment-lifecycle/spec.md",
+      "specs/024-review-budget-and-ratification/spec.md"
+    ],
     "credential": "CLAUDE_CODE_OAUTH_TOKEN",
+    "default_context_paths": [
+      "AGENTS.md",
+      ".statecraft/AGENTS.md",
+      "standards/spec/constitution.md",
+      "standards/spec/contract.md"
+    ],
     "findings_rule": {
       "exception_environment": "statecraft-review-exception",
       "requires": "a no-findings review, or an owner exception approved for the run"
@@ -224,5 +239,5 @@
     "tool": "claude-code",
     "tool_version": "2.1.116"
   },
-  "revision": 16
+  "revision": 17
 }
