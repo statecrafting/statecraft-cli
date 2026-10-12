@@ -1,0 +1,77 @@
+{
+  "record": {
+    "amends": [
+      "004-execution-adapter"
+    ],
+    "created": "2026-10-12",
+    "dependsOn": [
+      "002-environment-lifecycle",
+      "003-work-and-run-semantics",
+      "004-execution-adapter"
+    ],
+    "id": "042-per-run-provider-configuration",
+    "implementation": "pending",
+    "obligations": [
+      {
+        "anchor": "3-1-the-per-run-configuration-directory",
+        "id": "R-1",
+        "kind": "requirement",
+        "text": "Every supervised provider process runs with a fresh per-run configuration directory inside the attempt as its only provider-configuration writable root, removed after the process tree exits and never read by an unconfined process; the operator's provider configuration is not writable by the child."
+      },
+      {
+        "anchor": "3-2-the-provider-token",
+        "id": "R-2",
+        "kind": "requirement",
+        "text": "The provider is authenticated by an operator-provisioned token held under the product home, passed only in the constructed environment, never written to a record, log, argument or file the child can read, and its absence refuses the launch with exit 2."
+      },
+      {
+        "anchor": "3-4-the-mach-service-allowlist",
+        "id": "R-3",
+        "kind": "requirement",
+        "text": "On macOS the confinement refuses every Mach service lookup except a fixed allowlist, each entry justified by a recorded measurement against a confined provider session."
+      },
+      {
+        "anchor": "3-5-what-closes-and-what-is-measured",
+        "id": "R-4",
+        "kind": "requirement",
+        "text": "Rule 12's two open items are reported closed only for the provider version and platform their live measurements cover, and the attempt's posture records that coverage."
+      }
+    ],
+    "sectionDigests": {
+      "042-per-run-provider-configuration-and-a-measured-mach-service-allowlist": "d94a574f8b31deb9fcf06088187dd455b80ee39edcf697d764ec61653b4c3988",
+      "1-purpose": "00ee0f6b5adae9f2746169b184bbd0490d5720830fc98fa602049313be4e9b5c",
+      "2-territory": "97d32947453361c1126659be95ba1cfb650465bcd71d1b8674163abf4c15056a",
+      "3-1-the-per-run-configuration-directory": "8a11cc15029ce27042c7c441a915fff781954bdb9465a976d448396c0c843628",
+      "3-2-the-provider-token": "4aea89edb62c3c9cbb750e19e2ec73e827b84862cbfbac8c1f68d147b7a14fb1",
+      "3-3-the-constructed-environment": "378ff60da7ea3b34757bdfcdccdf13d4110a75d369bbc5a5a4b0c4058ef5e9ff",
+      "3-4-the-mach-service-allowlist": "37e02a59d86b5cd765c0ec631cf8771d232f1f03abef7377cc25c5e933dc169f",
+      "3-5-what-closes-and-what-is-measured": "0590e34eca3b36e7f19882e2c15aee48e187950a52bbbd70a9a6d0f513c9cdeb",
+      "3-6-observable-negative-cases": "9dfd0b2d2fc64ec3d54fbce65cfc94f53cca21b2155237d87b179280bc01b9cd",
+      "3-behavior": "02ff2e1fc847d03122bc4fe65b2f19f13d5c02dd84fcbbf43ea3c6e3a544a8b0",
+      "4-out-of-scope": "7bb51e56110981851a2df9add82a659e0d48aa361b1f1c04b592c2ce8d3c45c4",
+      "5-open-questions-for-ratification": "3c5e688041e09a199ba466eb4905a82ce2ce4e1c0cfab97af73de408e7664213",
+      "verification": "3c27cbf7a15ebd0db94767fb0d757048c10633d66afada7e76dab94c024339e4"
+    },
+    "sectionHeadings": [
+      "042: Per-run provider configuration and a measured Mach-service allowlist",
+      "1. Purpose",
+      "2. Territory",
+      "3. Behavior",
+      "3.1 The per-run configuration directory",
+      "3.2 The provider token",
+      "3.3 The constructed environment",
+      "3.4 The Mach-service allowlist",
+      "3.5 What closes, and what is measured",
+      "3.6 Observable negative cases",
+      "4. Out of scope",
+      "5. Open questions for ratification",
+      "Verification"
+    ],
+    "specPath": "specs/042-per-run-provider-configuration/spec.md",
+    "status": "draft",
+    "summary": "Amends 004 section 3.18 to close the two items its rule 12 names as open against constitution IX. A confined provider process gets its own configuration directory inside the attempt, discarded after it, and is authenticated by a provider token the operator provisions once, so the child no longer writes any file that an unconfined process later loads. On macOS every Mach service is refused except an allowlist measured against a confined provider session. Both rest on live measurements this spec names, and the first confined provider session is the activation rule 12 defers.\n",
+    "title": "Per-run provider configuration and a measured Mach-service allowlist close spec 004's two open items against IX"
+  },
+  "shardHash": "bfce4fd3160ea444205536d0be12ca044fceb4ea8117663365cf0b7ec0073c3a",
+  "specVersion": "1.9.0"
+}
