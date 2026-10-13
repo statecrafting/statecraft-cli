@@ -18,10 +18,20 @@
         "path": "crates/statecraft-hosted/"
       }
     ],
+    "extends": [
+      {
+        "nature": "additive",
+        "spec": "005-acceptance-and-evidence",
+        "unit": {
+          "kind": "directory",
+          "path": "crates/statecraft-envelope/"
+        }
+      }
+    ],
     "id": "038-hosted-client",
     "implementation": "pending",
     "sectionDigests": {
-      "038-the-hosted-client": "8678250a407b1cfa2a545a1089925cc40022d0f900981b7e113f1fd315911b42",
+      "038-the-hosted-client": "4ff688fa9a455ba0ddb5725310e3b3dba8000fad8d74a01e8489413441e53287",
       "1-purpose": "bf62907c03689c7473c68fb510f92281db51df7b32ed6ebd115cdd5713e61dc2",
       "2-territory": "f23d6866518de6df1416de1f24a6f1f89aea75f90e659163889cf0673275e9d8",
       "3-1-the-cell-and-what-this-product-learns-from-it": "16b69ada98e1a05e6478f2ce924e0116c64c5dd9d11e6b1c357d09496dcc357d",
@@ -33,7 +43,7 @@
       "3-7-observable-negative-cases": "e83388a257b59829224b1e45d5706a0fff9c6cd2000811ff8aab2421ee8654d0",
       "3-behavior": "33f80d6f04daf3698212a3c4bcfb63f430ed4feaf18fac897be947568eecf37d",
       "4-out-of-scope": "194ca113a88997d63f0f381bae3ce9a503dbde7e97e8f1a098e35a83635c5562",
-      "5-resolved-decisions": "182fe425589060d0f78e8abb3c863b16df9c936aa08c35c884e37c913585ab92",
+      "5-resolved-decisions": "0e4118fa441e0335adf8faaff11adba60b4d9ba8db7059b8a88472ad703c4a80",
       "verification": "f61c2c2f9ce8e817d06b59fd2d0d471d8159fc3944d207570f074cbe1be1e99b"
     },
     "sectionHeadings": [
@@ -57,6 +67,6 @@
     "summary": "Amends 006 with the CLI's half of the hosted thin path that the Statecraft platform's spec 005 section 3.2 names and its 004 B-3 leaves open. The operator logs in with the OAuth device authorization grant (RFC 8628) against the cell's own issuer, as the public native client that the cell's manifest declares. `hosted submit` registers the revision this product accepted locally and submits its receipt and artifact bytes idempotently. `hosted decision` retrieves the revision's decision bundle and verifies it offline against a root set the operator pinned independently, never against the bundle's own. Tokens never reach a log, a receipt, a repository or a JSON answer. Nothing here dispatches work, records a reviewer's decision, or acts on an approval.\n",
     "title": "The hosted client: device-grant login, submit and decision against one Statecraft cell"
   },
-  "shardHash": "1f3ddd4a455c98f749113a025f91ffcab406b37d8fc07403abceb1d5361c345c",
+  "shardHash": "566204002a3b5ffd2ab7a6fa81180695fb59ed6afc3dcd2bc61df19d78228d3c",
   "specVersion": "1.9.0"
 }
