@@ -24,7 +24,7 @@
       }
     ],
     "id": "015-managed-session-evidence",
-    "implementation": "in-progress",
+    "implementation": "complete",
     "relocates": [
       {
         "from": "3-29-what-admits-a-live-observation",
@@ -63,7 +63,7 @@
       }
     ],
     "sectionDigests": {
-      "015-managed-session-evidence-and-admission": "128ece2ce5871bbece49fc8cbcb82f2aa0b4c5c2886b04965b617656f1ee0dfe",
+      "015-managed-session-evidence-and-admission": "76684adf2e11c24e422ab457dc4c8d762997c5c0477997dd65df3f48e9ae543a",
       "1-purpose": "1c25d090154dbf3f9c71bd1de7e101c81d50a8412e90f54aee549ba802df95af",
       "2-territory": "bfe929d8ac266ce7924fa570802619c93815b5fb8dab0eea999de7cdf83b6749",
       "3-29-what-admits-a-live-observation": "e01517b191b8308a2d67ae3736fe0d50d089c76f44fbb1538645836e9cefccb9",
@@ -75,7 +75,7 @@
       "3-37-where-an-attempt-s-launch-records-live-and-what-the-child-is-given": "5dc14191d3b4333ae8cda8b80c20c72cafaf3e2f0ff0576013d97e11d17860d5",
       "3-behavior": "a1a4913381ba550bba250110d0d95809e7dfe3507231717b25ec563e9f2a1ab4",
       "4-out-of-scope": "269299b6bbb38d88bda45b7f49577f2626c896e2b29d3450a665e107213ce47d",
-      "5-resolved-decisions": "3ee097de6066c2ab5095d4cb4e5e8356aecb9c5a222c201227dacb1bf60daae3",
+      "5-resolved-decisions": "547d5eb615c01c5276764eafca68a4b6c5e588740148277c39d04f9571f45bdc",
       "verification": "0f718c0dae024d4c9943f05a1dce4a16a12ef6f9895f258a843b0b68cc9a905b"
     },
     "sectionHeadings": [
@@ -99,6 +99,6 @@
     "summary": "Carries the live-observation, control, startup-record, launch-state, managed-trial, trailer, and confinement requirements relocated from spec 002. It separates runtime evidence from installation and harness delivery.\n",
     "title": "Managed-session evidence and admission"
   },
-  "shardHash": "ba7ec4fa40d3effc43b59c114dba462e7056e31e71f257428b84ea02ea30e63f",
+  "shardHash": "0bace8ad953755a481df80d03793292190a10ec43b39cddb75d7bd3e0116a5fa",
   "specVersion": "1.9.0"
 }

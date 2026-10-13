@@ -2,7 +2,7 @@
 id: "015-managed-session-evidence"
 title: "Managed-session evidence and admission"
 status: approved
-implementation: in-progress
+implementation: complete
 created: "2026-09-26"
 summary: >
   Carries the live-observation, control, startup-record, launch-state, managed-trial, trailer, and confinement requirements relocated from spec 002. It separates runtime evidence from installation and harness delivery.
@@ -1021,6 +1021,16 @@ section 3.18 rule 2), so no record can be added to it after this section.
 ## 5. Resolved decisions
 
 **2026-09-26: runtime evidence is not installation state.** Admission binds records to one launch and one harness identity. The relocation preserves the previous requirements verbatim and creates no new live-provider claim.
+
+**2026-10-12: the live permission experiment is admitted.** With spec 042's
+per-run configuration and provisioned token in place, the owner-authorized
+`permission-experiment` stage ran its three sessions (refusal,
+allowed-command, without-payload) confined, on Claude Code 2.1.296 and macOS
+26.5.1, and the admission recorded the observation: launcher-attested and
+version specific, not a qualification. The `managed-startup` trial through
+the run path was established in the same series. The evidence summary is in
+`docs/adoption/042-provider-measurements.md`. Another provider version is a
+new observation.
 
 ## Verification
 
