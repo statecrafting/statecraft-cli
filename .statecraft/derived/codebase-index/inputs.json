@@ -13,7 +13,7 @@
       "contentHash": "bc1c52409e2958785b357aac8b911f32875308d9ec1682cb0f1145b981e42180"
     },
     ".github/workflows/statecraft-ai-review.yml": {
-      "contentHash": "f42b4a78b1ee70179030c3546da1b771f3733ad5a2013212dc9e3827b717374a"
+      "contentHash": "1880b5380c2457b28ea8b34903d2044ae099edc53ce735874092d0be8daab94c"
     },
     ".github/workflows/statecraft-ci.yml": {
       "contentHash": "fb89b720c96466faf4cce5d71b6f3ed36c9620cce45b4dce382e168d0513436c"
@@ -79,16 +79,16 @@
       "contentHash": "50138ae38377c0ff14f4f37ecdeed3cfd6500b50f91e5f7019232a11883ffdc3"
     },
     "scripts/statecraft/ai-review.sh": {
-      "contentHash": "ed3fd584ab00a2981bb63d8f61d7f097961baea32c86a6fff8e35b068fb01174"
+      "contentHash": "bbb42f5f4986c7974908b5f0404500b599dd079d29cd4775be573076ff2ce97a"
     },
     "scripts/statecraft/ci-gate.sh": {
-      "contentHash": "168c74b193b1c3005ff68c3513713834bbef8c523c3009e14b35414b1d289b08"
+      "contentHash": "1b63799d38fc163aa099c87514d53927b8330ef469539ac7ed49a8b4dacac400"
     },
     "scripts/statecraft/gate.sh": {
-      "contentHash": "c3392e65aa9970b9daf050e329a74dc48351bbfadc0e5bd41431b088805cf38f"
+      "contentHash": "c8316c2582cdf6883b45dc465dc263cdd8d8487acb8430d6ab93347aa89fffae"
     },
     "scripts/statecraft/install-spec-spine.sh": {
-      "contentHash": "5a97a82a8edfc5716bbdb0233f787e04649ad2ca602a49b994c2941c9c988fb0"
+      "contentHash": "4d1381da9195652bb5fbe40f093152c3498cb37964e6c47f0a95a32b9a733eb5"
     },
     "spec-spine.toml": {
       "contentHash": "fee81b49393aa8139368cbfa219ca60c1bac5e1bd57443dce45058284f08bd35"
