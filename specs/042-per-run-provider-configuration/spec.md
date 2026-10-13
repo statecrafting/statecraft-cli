@@ -229,6 +229,12 @@ record now names the closure and its scope in place of the two open items and
 the activation item; elsewhere they stay open. The verification block was a
 draft's placeholder and is declared with this change.
 
+**2026-10-12: Linux.** The same acceptance stages ran on Linux (a Docker
+Linux VM with Landlock, kernel 7.0.14): managed-startup established and the
+permission experiment admitted, each launch under `landlock-and-seccomp`. The
+Linux boundary record now names the closure and its version scope in place of
+the open item and the activation item; the listener and socket residuals stay.
+
 ## Verification
 
 The live measurements M-1 to M-3 are recorded in

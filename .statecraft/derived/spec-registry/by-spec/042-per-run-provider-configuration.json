@@ -78,7 +78,7 @@
       }
     ],
     "sectionDigests": {
-      "042-per-run-provider-configuration-and-a-measured-mach-service-allowlist": "9d1e5e0ebda6048b59e3aa57acc8308a3600225c0711baf63b1272c892eb5146",
+      "042-per-run-provider-configuration-and-a-measured-mach-service-allowlist": "6bfbe9c2d8789c62593ead6e175d3a650421d1a928d6237aa3a08a2d71cab81d",
       "1-purpose": "00ee0f6b5adae9f2746169b184bbd0490d5720830fc98fa602049313be4e9b5c",
       "2-territory": "54d5aab8a2c750ff990afd454856068d5d2b30af06c049770843f12bb337c9b6",
       "3-1-the-per-run-configuration-directory": "8a11cc15029ce27042c7c441a915fff781954bdb9465a976d448396c0c843628",
@@ -89,7 +89,7 @@
       "3-6-observable-negative-cases": "9dfd0b2d2fc64ec3d54fbce65cfc94f53cca21b2155237d87b179280bc01b9cd",
       "3-behavior": "02ff2e1fc847d03122bc4fe65b2f19f13d5c02dd84fcbbf43ea3c6e3a544a8b0",
       "4-out-of-scope": "7bb51e56110981851a2df9add82a659e0d48aa361b1f1c04b592c2ce8d3c45c4",
-      "5-resolved-decisions": "e85eeb9144fb3409065e085682aca0a6e074b9bcca7ffd433ae34c9404ecec86",
+      "5-resolved-decisions": "a528e5d6230b51b911fd4ce1cf1b3a4483e91d9bee330828d34db49ace3d0efd",
       "verification": "af50cb6659e700729e2a434f597d8ee605a5781415fdfbf54d23e3a98f4ba7f8"
     },
     "sectionHeadings": [
@@ -112,6 +112,6 @@
     "summary": "Amends 004 section 3.18 to close the two items its rule 12 names as open against constitution IX. A confined provider process gets its own configuration directory inside the attempt, discarded after it, and is authenticated by a provider token the operator provisions once, so the child no longer writes any file that an unconfined process later loads. On macOS every Mach service is refused except an allowlist measured against a confined provider session. Both rest on live measurements this spec names, and the first confined provider session is the activation rule 12 defers.\n",
     "title": "Per-run provider configuration and a measured Mach-service allowlist close spec 004's two open items against IX"
   },
-  "shardHash": "7ef09519c50873bdbe6304032f1a8d33501849efad299923e373f169e11d569c",
+  "shardHash": "949809fd99a20c148dfc63f1f7e9b569464c31d00c297b6ffd116774985bc13c",
   "specVersion": "1.9.0"
 }

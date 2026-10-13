@@ -16,11 +16,11 @@ mod native;
 
 /// Open items remain open even after an operating-system probe passes.
 ///
-/// Spec 042 closes rule 12's two items against constitution IX per platform,
-/// and only for what its live measurements cover (its section 3.5): on macOS,
-/// the per-run provider configuration and the Mach-service allowlist were
-/// measured with a confined provider session, so the items name that scope
-/// instead of standing open.
+/// Spec 042 closes rule 12's two items against constitution IX, and only for
+/// what its live measurements cover (its section 3.5): a confined provider
+/// session was measured on macOS and on Linux on 2026-10-12, so the items name
+/// that scope instead of standing open. The Mach-service item exists on macOS
+/// only; the listener and socket residuals exist on Linux only.
 #[cfg(target_os = "macos")]
 pub const OPEN_ITEMS: &[&str] = &[
     "Spec 042 closes rule 12's two IX items on macOS for the provider version its 2026-10-12 measurements name; with another provider version both are unmeasured",
@@ -29,15 +29,10 @@ pub const OPEN_ITEMS: &[&str] = &[
 ];
 
 /// Open items remain open even after an operating-system probe passes.
-///
-/// Off macOS spec 042's live measurements have not been taken, so rule 12's
-/// first item stays open here although the write grants it names are
-/// withdrawn (spec 042 section 3.5 rule 2).
 #[cfg(not(target_os = "macos"))]
 pub const OPEN_ITEMS: &[&str] = &[
-    "IX remains open on this platform through later unconfined consumers of provider configuration until spec 042's measurements cover it",
+    "Spec 042 closes rule 12's later-unconfined-consumer item on Linux for the provider version its 2026-10-12 measurements name; with another provider version it is unmeasured",
     "The gate log is child-attested",
-    "Real-provider confined activation on this platform is unmeasured",
     "Linux listeners created after the listener check remain an open route",
     "A Linux connected same-user UDP socket is reachable from its peer's address and port",
     "This boundary makes no claim about credentials or publishing",
