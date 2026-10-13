@@ -82,10 +82,9 @@ carrying `implementation`, so the join stays. What `draft` withholds is
 of refusing.
 
 All seventeen active specs are ratified; the owner ratified `007` and `024` on
-2026-09-27. Spec
-`015` is approved with `implementation: in-progress` because its live
-permission experiment has no admitted result, which no local implementation
-work can supply. Check the `status` field, not the plan output.
+2026-09-27. Spec `015`'s live permission experiment was admitted on
+2026-10-12 (Claude Code 2.1.296, macOS), which is what had kept it
+`in-progress`. Check the `status` field, not the plan output.
 
 spec-spine does not enforce the difference, so this repository does, and from
 setup profile revision 12 (spec `024`) its CI does too: a pull request that
