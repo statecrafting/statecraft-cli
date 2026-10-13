@@ -16,6 +16,9 @@ pub const PROVIDER_CONFIG_DIR: &str = "provider-config";
 /// The environment name the provider reads its configuration directory from.
 pub const CONFIG_DIR_VARIABLE: &str = "CLAUDE_CONFIG_DIR";
 
+/// The environment name the provider reads its own temporary area from.
+pub const TMPDIR_VARIABLE: &str = "CLAUDE_CODE_TMPDIR";
+
 /// Existing supervisor-owned paths for one launch.
 pub struct Roots<'a> {
     /// Protected product home.
@@ -166,6 +169,14 @@ pub fn admit(roots: Roots<'_>, executable: &Path, path: &str) -> Result<Admissio
                 CONFIG_DIR_VARIABLE.to_string(),
                 configuration.display().to_string(),
             ));
+            // Measured (spec 042 M-2): the provider keeps its own temporary
+            // area under /tmp/claude-<uid>, outside every writable root and
+            // shared with the operator's sessions, so a confined tool call
+            // fails there. It is pointed at this launch's scratch root.
+            provider_variables.push((
+                TMPDIR_VARIABLE.to_string(),
+                scratch.path().display().to_string(),
+            ));
             if let Some(token) = token {
                 provider_variables.push((crate::provider_token::VARIABLE.to_string(), token));
             }
@@ -286,6 +297,7 @@ pub fn import_objects(
     // alone (spec 042 section 3.2); the object producer is not given them.
     producer_environment.remove(crate::provider_token::VARIABLE);
     producer_environment.remove(CONFIG_DIR_VARIABLE);
+    producer_environment.remove(TMPDIR_VARIABLE);
     producer_environment.insert("GIT_CONFIG_NOSYSTEM".into(), "1".into());
     producer_environment.insert("GIT_CONFIG_SYSTEM".into(), "/dev/null".into());
     producer_environment.insert("GIT_CONFIG_GLOBAL".into(), "/dev/null".into());

@@ -15,11 +15,29 @@ use std::process::Command;
 mod native;
 
 /// Open items remain open even after an operating-system probe passes.
+///
+/// Spec 042 closes rule 12's two items against constitution IX per platform,
+/// and only for what its live measurements cover (its section 3.5): on macOS,
+/// the per-run provider configuration and the Mach-service allowlist were
+/// measured with a confined provider session, so the items name that scope
+/// instead of standing open.
+#[cfg(target_os = "macos")]
 pub const OPEN_ITEMS: &[&str] = &[
-    "IX remains open through later unconfined consumers of writable provider configuration",
-    "Other macOS Mach services are unmeasured",
+    "Spec 042 closes rule 12's two IX items on macOS for the provider version its 2026-10-12 measurements name; with another provider version both are unmeasured",
     "The gate log is child-attested",
-    "Real-provider confined activation requires separate owner authorization",
+    "This boundary makes no claim about credentials or publishing",
+];
+
+/// Open items remain open even after an operating-system probe passes.
+///
+/// Off macOS spec 042's live measurements have not been taken, so rule 12's
+/// first item stays open here although the write grants it names are
+/// withdrawn (spec 042 section 3.5 rule 2).
+#[cfg(not(target_os = "macos"))]
+pub const OPEN_ITEMS: &[&str] = &[
+    "IX remains open on this platform through later unconfined consumers of provider configuration until spec 042's measurements cover it",
+    "The gate log is child-attested",
+    "Real-provider confined activation on this platform is unmeasured",
     "Linux listeners created after the listener check remain an open route",
     "A Linux connected same-user UDP socket is reachable from its peer's address and port",
     "This boundary makes no claim about credentials or publishing",
