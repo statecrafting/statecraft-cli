@@ -134,6 +134,20 @@ impl<T: Serialize> Answer<T> {
         self
     }
 
+    /// The same answer with its value as JSON. The envelope serializes the
+    /// value to JSON and renders it in canonical key order, so an erased
+    /// answer renders byte for byte as the typed one (spec 040).
+    pub fn erase(self) -> Answer<Value> {
+        let value = serde_json::to_value(&self.value)
+            .unwrap_or_else(|e| Value::String(format!("could not serialize the answer: {e}")));
+        Answer {
+            value,
+            exit: self.exit,
+            summary: self.summary,
+            kind: self.kind,
+        }
+    }
+
     /// The kind the envelope's `error` names: `None` for 0 and 1; otherwise the
     /// site's own, or the exit's default (`refused` for 2, `usage` for 3, `io`
     /// for 4, because every failure this product constructs is a read or write

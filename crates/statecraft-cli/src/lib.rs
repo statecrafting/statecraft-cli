@@ -54,6 +54,7 @@
 
 pub mod accept;
 pub mod adapters;
+pub mod application;
 pub mod bind;
 pub mod commands;
 pub mod coverage;

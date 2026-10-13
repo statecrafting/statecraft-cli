@@ -230,6 +230,17 @@ fn run(args: &[String]) -> i32 {
                     ),
                 );
             };
+            // Spec 040: `accept` is a callable operation that resolves its
+            // own registration; the adapter only parses and renders.
+            if invocation.verb == Verb::Accept {
+                return accept_verb(
+                    &absolute(path),
+                    &home,
+                    &registry,
+                    invocation.rest.get(1).map(String::as_str),
+                    format,
+                );
+            }
             let root = match registered(&registry, &absolute(path)) {
                 Ok(root) => root,
                 Err(answer) => return emit(&answer, format),
@@ -697,12 +708,6 @@ fn slice_verb(
                 Err(e) => fail(&e.to_string(), format),
             }
         }
-        Verb::Accept => {
-            let Some(run_id) = rest.first() else {
-                return usage(format, "usage: accept <path> <run-id>".to_string());
-            };
-            accept_verb(root, home, run_id, format)
-        }
         _ => Exit::Usage.code(),
     }
 }
@@ -718,6 +723,7 @@ fn recover_verb(
     home: &std::path::Path,
     format: Format,
 ) -> i32 {
+    use statecraft_cli::application::{Context, RecoverChoice, override_recover};
     use statecraft_run::overrides::Choice;
     let show_usage = || {
         usage(
@@ -738,62 +744,41 @@ fn recover_verb(
             _ => return show_usage(),
         },
     };
-    let root = match registered(registry, &absolute(path)) {
-        Ok(root) => root,
-        Err(answer) => return emit(&answer, format),
-    };
-    let Some(choice) = choice else {
-        // The report takes the lock when it is free, so what it shows is not
-        // a write caught half way; while another process holds it, an
-        // interrupted state is a write in progress.
-        let held = match statecraft_run::lock::try_acquire(home, &root) {
-            Ok(held) => Some(held),
-            Err(statecraft_run::lock::LockError::Busy { .. }) => None,
-            Err(e) => return fail(&e.to_string(), format),
-        };
-        return match statecraft_run::overrides::inspect(home, &root) {
-            Ok(found) => emit(
-                &slice::recover_report_answer(&root.display().to_string(), &found, held.is_none()),
-                format,
-            ),
-            Err(e) => emit(&slice::journal_error_answer(&e), format),
-        };
-    };
     let reason = rest.get(5..).unwrap_or_default().join(" ");
-    let at = statecraft_environment::time::rfc3339_utc(
-        statecraft_environment::time::Clock::now_unix(&SystemClock),
-    );
+    let clock = statecraft_cli::application::process_clock();
+    let ctx = Context {
+        home,
+        registry,
+        clock: clock.as_ref(),
+    };
     emit(
-        &slice::recover_answer(statecraft_run::overrides::recover(
-            &statecraft_run::overrides::RecoverRequest {
-                home,
-                target: &root,
+        &override_recover(
+            &ctx,
+            &absolute(path),
+            choice.map(|choice| RecoverChoice {
                 choice,
                 journal: &rest[2],
                 authority: &rest[3],
                 operator: &rest[4],
                 reason: &reason,
-                at: &at,
-            },
-        )),
+            }),
+        ),
         format,
     )
 }
 
 /// `run reconcile <path> <run-id> <attempt> <finding> <launch-state> <operator> <reason...>`
 ///
-/// Spec 006 section 3.11.6 and spec 003 section 3.6.1. The binding reads the
-/// launch records through spec 002's `launch::inspect`, which only reads, and
-/// passes what it observed to the run crate, which decides and records.
+/// Spec 006 section 3.11.6 and spec 003 section 3.6.1, through spec 040's
+/// callable operation.
 fn reconcile_verb(
     rest: &[String],
     registry: &statecraft_environment::registry::Registry,
     home: &std::path::Path,
     format: Format,
 ) -> i32 {
-    use statecraft_run::reconcile::{EvidenceFile, LaunchState, Observation, Request};
-    use statecraft_run::recovery::Verdict;
-    let usage = || {
+    use statecraft_cli::application::{Context, ReconcileOperands, run_reconcile};
+    let show_usage = || {
         usage(
             format,
             "usage: run reconcile <path> <run-id> <attempt> <confirmed|absent|unknown> \
@@ -802,226 +787,48 @@ fn reconcile_verb(
         )
     };
     let mut positional: Vec<&String> = Vec::new();
-    let mut evidence_paths: Vec<&String> = Vec::new();
+    let mut evidence: Vec<String> = Vec::new();
     let mut args = rest.iter();
     while let Some(arg) = args.next() {
         if arg == "--evidence" {
             match args.next() {
-                Some(p) => evidence_paths.push(p),
-                None => return usage(),
+                Some(p) => evidence.push(p.clone()),
+                None => return show_usage(),
             }
         } else {
             positional.push(arg);
         }
     }
     if positional.len() < 7 {
-        return usage();
+        return show_usage();
     }
-    // Filed under the stored root, like every other verb that keys a record,
-    // so another spelling of a registered path reads the same chain.
-    let root = match stored_or_typed(registry, &absolute(positional[0])) {
-        Ok(root) => root,
-        Err(answer) => return emit(&answer, format),
-    };
-    let run_id = positional[1].as_str();
-    let Ok(attempt) = positional[2].parse::<u32>() else {
-        return usage();
-    };
-    let finding = match positional[3].as_str() {
-        "confirmed" => Verdict::Confirmed,
-        "absent" => Verdict::Absent,
-        "unknown" => Verdict::Unknown,
-        _ => return usage(),
-    };
-    let inspected = positional[4].as_str();
-    if LaunchState::from_word(inspected).is_none() {
-        return usage();
-    }
-    let operator = positional[5].as_str();
     let reason = positional[6..]
         .iter()
         .map(|s| s.as_str())
         .collect::<Vec<_>>()
         .join(" ");
-    if registry.get(&root).is_none() {
-        return emit(&bind::unregistered_answer(&root), format);
-    }
-    let mut evidence = Vec::new();
-    for p in evidence_paths {
-        // Hashed as it is read, never held whole: its content is not copied and
-        // not read for a decision (spec 003 section 3.6.1 rule 2).
-        match std::fs::File::open(p).and_then(statecraft_environment::digest::digest_reader) {
-            Ok((sha256, bytes)) => evidence.push(EvidenceFile {
-                path: p.clone(),
-                bytes,
-                sha256,
-            }),
-            Err(e) => {
-                return emit(
-                    &slice::reconcile_refused_answer(&format!(
-                        "the evidence file {p} could not be read: {e}; nothing was written"
-                    )),
-                    format,
-                );
-            }
-        }
-    }
-
-    // Rule 1: a run still supervising holds the lock.
-    let _held = match statecraft_run::lock::try_acquire(home, &root) {
-        Ok(held) => held,
-        Err(e @ statecraft_run::lock::LockError::Busy { .. }) => {
-            return emit(&slice::lock_busy_answer(&e.to_string()), format);
-        }
-        Err(e) => return fail(&e.to_string(), format),
+    let path = absolute(positional[0]);
+    let clock = statecraft_cli::application::process_clock();
+    let ctx = Context {
+        home,
+        registry,
+        clock: clock.as_ref(),
     };
-    let (mut chain, _) = match Chain::open(home, &root) {
-        Ok(c) => c,
-        Err(e) => return fail(&e.to_string(), format),
-    };
-
-    // Rule 2: read the launch records; never launch, signal or replay.
-    // Rule 3: the attempt's gate log is read whatever the manifest says, and a
-    // log that exists and cannot be read fails rather than reading as
-    // "nothing released".
-    //
-    // Spec 002 section 3.37 and 003 section 3.6.1's note: the records are in
-    // the product home, or inside the target where they were written before
-    // that section, never read from both; the gate log is the supervisor's
-    // copy, or the exchange directory's for an attempt it did not conclude,
-    // and it is child-attested either way.
-    let identity = statecraft_home::launch::AttemptIdentity {
-        run_id: run_id.to_string(),
-        attempt,
-    };
-    let places = statecraft_home::launch::Places::of(home, &root);
-    let (gate_log_path, gate) =
-        match statecraft_home::launch::read_gate_log_checked(&places, &identity) {
-            Ok((paths, gate)) => (
-                gate.as_ref().map_or_else(
-                    || {
-                        match paths.placement {
-                            statecraft_home::launch::Placement::Home => {
-                                identity.gate_log_path(&places)
-                            }
-                            statecraft_home::launch::Placement::Target => {
-                                paths.records.join(statecraft_home::launch::files::GATE_LOG)
-                            }
-                        }
-                        .display()
-                        .to_string()
-                    },
-                    |g| g.path.clone(),
-                ),
-                gate.map(|g| g.lines),
-            ),
-            Err(statecraft_home::launch::NotRead::NoSuchAttempt(why)) => {
-                return emit(
-                    &slice::reconcile_refused_answer(&format!("{why}; nothing was written")),
-                    format,
-                );
-            }
-            Err(e) => return fail(&format!("{e}; nothing was written"), format),
-        };
-    let gate_released_tool_call = gate
-        .as_ref()
-        .is_some_and(|g| g.iter().any(|w| w == "admitted"));
-    let observation = match statecraft_environment::manifest::Manifest::read(&root) {
-        Err(e) => return fail(&e.to_string(), format),
-        Ok(None) => Observation {
-            launch_state: LaunchState::Unrecorded,
-            gate_released_tool_call,
-            confirmed_pid: None,
-            pid_exists: None,
-            files: vec![gate_log_path],
+    match run_reconcile(
+        &ctx,
+        &ReconcileOperands {
+            path: &path,
+            run_id: positional[1],
+            attempt: positional[2],
+            finding: positional[3],
+            inspected: positional[4],
+            operator: positional[5],
+            reason: &reason,
+            evidence: &evidence,
         },
-        Ok(Some(_)) => {
-            let facts: Vec<statecraft_home::launch::AttemptFact> =
-                statecraft_run::session::runs(&chain)
-                    .into_iter()
-                    .find(|r| r.id == run_id)
-                    .map(|r| {
-                        r.attempts
-                            .iter()
-                            .map(|a| statecraft_home::launch::AttemptFact {
-                                number: a.number,
-                                outcome: a.outcome.map(|o| o.word().to_string()),
-                            })
-                            .collect()
-                    })
-                    .unwrap_or_default();
-            match statecraft_home::launch::inspect(&places, run_id, Some(attempt), &facts) {
-                Ok(shown) => {
-                    let pid = shown.launched.as_ref().map(|l| l.pid);
-                    Observation {
-                        launch_state: observed_launch_state(shown.verdict),
-                        gate_released_tool_call,
-                        confirmed_pid: pid,
-                        pid_exists: pid.map(statecraft_run::reconcile::process_exists),
-                        files: vec![
-                            shown.intent_path.clone(),
-                            shown.launched_path.clone(),
-                            shown.admission_path.clone(),
-                            shown.record_path.clone(),
-                            gate_log_path,
-                        ],
-                    }
-                }
-                Err(statecraft_home::launch::NotRead::NoSuchAttempt(why)) => {
-                    return emit(
-                        &slice::reconcile_refused_answer(&format!("{why}; nothing was written")),
-                        format,
-                    );
-                }
-                Err(e) => return fail(&e.to_string(), format),
-            }
-        }
-    };
-    let at = statecraft_environment::time::rfc3339_utc(
-        statecraft_environment::time::Clock::now_unix(&SystemClock),
-    );
-    let request = Request {
-        run_id,
-        attempt,
-        finding,
-        inspected,
-        operator,
-        reason: &reason,
-        evidence,
-        at: &at,
-    };
-    let audit = match statecraft_run::tamper::read_audit(home, &root) {
-        Ok(found) => found
-            .into_iter()
-            .filter(|f| f.run_id == run_id && f.attempt == attempt)
-            .collect(),
-        Err(e) => return fail(&e, format),
-    };
-    emit(
-        &slice::reconcile_answer(
-            statecraft_run::reconcile::reconcile(&mut chain, &request, observation),
-            audit,
-        ),
-        format,
-    )
-}
-
-/// Spec 002's launch verdict as the reconciliation's observed launch state,
-/// word for word and with no fallback (spec 003 section 3.6.1 rule 3).
-fn observed_launch_state(
-    verdict: statecraft_home::launch::Verdict,
-) -> statecraft_run::reconcile::LaunchState {
-    use statecraft_home::launch::Verdict as V;
-    use statecraft_run::reconcile::LaunchState as S;
-    match verdict {
-        V::NotLaunched => S::NotLaunched,
-        V::LaunchUnknown => S::LaunchUnknown,
-        V::OutcomeUnknown => S::OutcomeUnknown,
-        V::SpawnFailed => S::SpawnFailed,
-        V::Interrupted => S::Interrupted,
-        V::Mismatched | V::NotAdmitted | V::Unverified | V::Qualified => {
-            S::Completed(verdict.word().to_string())
-        }
+    ) {
+        Ok(answer) => emit(&answer, format),
+        Err(u) => usage(format, u.0),
     }
 }
 
@@ -2409,112 +2216,23 @@ fn conclude_and_emit(
 
 /// `accept <path> <run-id>`
 fn accept_verb(
-    root: &std::path::Path,
+    path: &std::path::Path,
     home: &std::path::Path,
-    run_id: &str,
+    registry: &Registry,
+    run_id: Option<&str>,
     format: Format,
 ) -> i32 {
-    let (chain, _) = match Chain::open(home, root) {
-        Ok(c) => c,
-        Err(e) => return fail(&e.to_string(), format),
-    };
-    let Some(run) = statecraft_run::session::runs(&chain)
-        .into_iter()
-        .find(|r| r.id == run_id)
-    else {
-        return emit(&slice::no_such_run_answer(run_id), format);
-    };
-    let Some(attempt) = run.attempts.last().cloned() else {
-        return emit(&slice::no_such_run_answer(run_id), format);
-    };
-
-    // Exactly one of spec 003's five outcomes is eligible, and the other four
-    // are recorded reasons rather than blanks (spec 005 section 3.1.1).
-    let Some(outcome) = attempt.outcome else {
-        return emit(
-            &slice::accept_answer(statecraft_acceptance::outcome::Acceptance::None {
-                reason: statecraft_acceptance::judged::NoAcceptance::CandidateUnidentified {
-                    detail: format!(
-                        "run {run_id} attempt {} is live, so nothing identifies stable candidate bytes",
-                        attempt.number
-                    ),
-                },
-            }),
-            format,
-        );
-    };
-    if let Err(reason) = statecraft_acceptance::judged::eligibility(outcome) {
-        let refusal_count = chain
-            .entries()
-            .iter()
-            .rev()
-            .find(|e| e.run_id == run_id && e.kind == statecraft_run::record::Kind::Accounting)
-            .and_then(|e| e.detail.get("count"))
-            .and_then(|v| v.as_u64())
-            .map(|c| c as u32);
-        return emit(
-            &slice::accept_answer(statecraft_acceptance::outcome::Acceptance::NotAttempted {
-                reason,
-                refusal_count,
-            }),
-            format,
-        );
-    }
-
-    // Spec 005 section 3.18: the contract the attempt was bound to, compared
-    // with the producer's resolution now, before anything else is observed.
-    let judge = match statecraft_cli::judge::report_source(root) {
-        Ok(judge) => judge,
-        Err(e) => return emit(&slice::report_error_answer(&e), format),
-    };
-    let contract = statecraft_acceptance::contract::check(
-        &chain.entries(),
-        run_id,
-        attempt.number,
-        root,
-        &judge,
-    );
-    if contract.word == statecraft_acceptance::contract::Word::Stale {
-        return emit(&slice::contract_stale_answer(&contract), format);
-    }
-    if contract.word.moved() {
-        return emit(
-            &slice::accept_answer_with(
-                statecraft_acceptance::outcome::Acceptance::None {
-                    reason: statecraft_acceptance::judged::NoAcceptance::ContractMoved {
-                        comparison: Box::new(contract.clone()),
-                    },
-                },
-                Some(contract),
-            ),
-            format,
-        );
-    }
-
-    let workspace = statecraft_run::workspace::workspace_path(root, run_id);
-    let context = statecraft_cli::accept::Context {
-        repository: root.display().to_string(),
-        spec_spine_version: adapters::observed(root)
-            .spec_spine
-            .unwrap_or_else(|| "not-recorded".to_string()),
-        adapter_version: statecraft_adapter_claude_code::manifest().version,
-        attempt: format!("{run_id}/{}", attempt.number),
-        spec_id: run_id.to_string(),
-    };
-    let (acceptance, _suite, _freshness, boundary) = statecraft_cli::accept::judge_with_diagnostic(
-        root,
+    use statecraft_cli::application::{Context, accept};
+    let clock = statecraft_cli::application::process_clock();
+    let ctx = Context {
         home,
-        &workspace,
-        &attempt.base_commit,
-        // The attempt concluded `completed`, which spec 003 section 3.8 makes
-        // impossible when the base moved: a moved base is `interrupted`.
-        true,
-        &context,
-    );
-    emit(
-        &slice::accept_answer_with_boundary(acceptance, Some(contract), boundary),
-        format,
-    )
+        registry,
+        clock: clock.as_ref(),
+    };
+    match accept(&ctx, path, run_id) {
+        Ok(answer) => emit(&answer, format),
+        Err(u) => usage(format, u.0),
+    }
 }
 
 /// One environment verb against one registered target.

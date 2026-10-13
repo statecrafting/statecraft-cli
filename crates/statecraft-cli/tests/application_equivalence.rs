@@ -1,0 +1,326 @@
+//! Spec 040 section 3.2: each verb and its typed operation, given the same
+//! logical inputs, answer byte-identical family envelopes and leave identical
+//! effects. Each case builds one fixture, keeps a pristine copy, runs the verb
+//! against it, records the envelope and every byte under the fixture, restores
+//! the pristine copy at the same path, runs the operation through
+//! `render::Answer`, and compares both. Nothing is normalized: the clock is
+//! fixed on both sides (the binary's through `STATECRAFT_TEST_CLOCK`, read only
+//! by a debug build), and the paths are the same paths.
+
+use statecraft_cli::application::{
+    Context, ReconcileOperands, RecoverChoice, Response, accept, override_recover, run_reconcile,
+};
+use statecraft_cli::commands::Verb;
+use statecraft_cli::render::Format;
+use statecraft_environment::registry::Registry;
+use statecraft_environment::time::FixedClock;
+use std::collections::BTreeMap;
+use std::path::{Path, PathBuf};
+use std::process::Command;
+
+const AT: i64 = 1_790_000_000;
+
+/// One fixture: a product home and a registered (or not) Git target, under
+/// one root so a snapshot covers both.
+struct Fixture {
+    dir: tempfile::TempDir,
+}
+
+impl Fixture {
+    fn new(register: bool) -> Fixture {
+        let f = Fixture {
+            dir: tempfile::tempdir().unwrap(),
+        };
+        let target = f.target();
+        std::fs::create_dir_all(&target).unwrap();
+        for args in [
+            &["init", "--quiet"][..],
+            &["config", "user.name", "fixture"],
+            &["config", "user.email", "fixture@example.com"],
+        ] {
+            assert!(
+                Command::new("git")
+                    .current_dir(&target)
+                    .args(args)
+                    .status()
+                    .unwrap()
+                    .success()
+            );
+        }
+        std::fs::write(target.join("a.txt"), "a").unwrap();
+        for args in [&["add", "a.txt"][..], &["commit", "--quiet", "-m", "base"]] {
+            assert!(
+                Command::new("git")
+                    .current_dir(&target)
+                    .args(args)
+                    .status()
+                    .unwrap()
+                    .success()
+            );
+        }
+        std::fs::create_dir_all(f.home()).unwrap();
+        if register {
+            let out = f.verb(&["project", "register", target.to_str().unwrap()]);
+            assert!(out.0 <= 1, "{}", out.1);
+        }
+        f
+    }
+    fn root(&self) -> &Path {
+        self.dir.path()
+    }
+    fn home(&self) -> PathBuf {
+        self.root().join("home")
+    }
+    fn target(&self) -> PathBuf {
+        self.root().join("target")
+    }
+
+    /// The verb, with `--json`, against this fixture: (exit, stdout).
+    fn verb(&self, args: &[&str]) -> (i32, String) {
+        let out = Command::new(env!("CARGO_BIN_EXE_statecraft-cli"))
+            .args(args)
+            .env_clear()
+            .env("STATECRAFT_HOME", self.home())
+            .env("HOME", self.root())
+            .env("PATH", "/usr/bin:/bin")
+            .env("STATECRAFT_TEST_CLOCK", AT.to_string())
+            .current_dir(self.root())
+            .output()
+            .unwrap();
+        (
+            out.status.code().unwrap(),
+            String::from_utf8(out.stdout).unwrap(),
+        )
+    }
+
+    fn registry(&self) -> Registry {
+        Registry::read(&self.home()).unwrap()
+    }
+
+    /// Every file under the fixture, by path, with its bytes; `.git`'s index
+    /// and logs are included because a verb could touch them too.
+    fn snapshot(&self) -> BTreeMap<PathBuf, Vec<u8>> {
+        let mut out = BTreeMap::new();
+        let mut stack = vec![self.root().to_path_buf()];
+        while let Some(dir) = stack.pop() {
+            for e in std::fs::read_dir(&dir).unwrap().flatten() {
+                let p = e.path();
+                let m = std::fs::symlink_metadata(&p).unwrap();
+                if m.is_dir() {
+                    stack.push(p);
+                } else {
+                    out.insert(
+                        p.strip_prefix(self.root()).unwrap().to_path_buf(),
+                        std::fs::read(&p).unwrap_or_default(),
+                    );
+                }
+            }
+        }
+        out
+    }
+
+    /// A pristine copy, restorable at the same path.
+    fn keep(&self) -> tempfile::TempDir {
+        let copy = tempfile::tempdir().unwrap();
+        assert!(
+            Command::new("cp")
+                .args([
+                    "-Rp",
+                    &format!("{}/.", self.root().display()),
+                    copy.path().to_str().unwrap()
+                ])
+                .status()
+                .unwrap()
+                .success()
+        );
+        copy
+    }
+    fn restore(&self, copy: &tempfile::TempDir) {
+        for e in std::fs::read_dir(self.root()).unwrap().flatten() {
+            let p = e.path();
+            if p.is_dir() {
+                std::fs::remove_dir_all(&p).unwrap();
+            } else {
+                std::fs::remove_file(&p).unwrap();
+            }
+        }
+        assert!(
+            Command::new("cp")
+                .args([
+                    "-Rp",
+                    &format!("{}/.", copy.path().display()),
+                    self.root().to_str().unwrap()
+                ])
+                .status()
+                .unwrap()
+                .success()
+        );
+    }
+}
+
+/// Run the verb, restore, run the operation; both envelopes and both
+/// resulting trees must be equal.
+fn equivalent(
+    f: &Fixture,
+    verb: Verb,
+    args: &[&str],
+    operation: impl Fn(&Context<'_>) -> Result<Response, String>,
+) {
+    let pristine = f.keep();
+    let mut full: Vec<&str> = args.to_vec();
+    full.push("--json");
+    let (code, by_verb) = f.verb(&full);
+    let after_verb = f.snapshot();
+    f.restore(&pristine);
+    let registry = f.registry();
+    let clock = FixedClock(AT);
+    let home = f.home();
+    let ctx = Context {
+        home: &home,
+        registry: &registry,
+        clock: &clock,
+    };
+    let by_operation = match operation(&ctx) {
+        Ok(answer) => {
+            assert_eq!(answer.exit.code(), code, "{args:?}");
+            answer.render(Format::Json(verb))
+        }
+        Err(usage) => {
+            assert_eq!(code, 3, "{args:?}: the operation said usage: {usage}");
+            statecraft_cli::render::usage_envelope(&verb.dotted(), &usage)
+        }
+    };
+    assert_eq!(by_verb, by_operation, "{args:?}: the envelopes differ");
+    let after_operation = f.snapshot();
+    assert_eq!(
+        after_verb.keys().collect::<Vec<_>>(),
+        after_operation.keys().collect::<Vec<_>>(),
+        "{args:?}: the files written differ"
+    );
+    for (path, bytes) in &after_verb {
+        assert_eq!(
+            Some(bytes),
+            after_operation.get(path),
+            "{args:?}: {} differs",
+            path.display()
+        );
+    }
+}
+
+fn usage_of(r: Result<Response, statecraft_cli::application::Usage>) -> Result<Response, String> {
+    r.map_err(|u| u.0)
+}
+
+/// A-EQ-ACCEPT: refusals before any judgement are the verb's, in its order.
+#[test]
+fn accept_answers_as_the_verb_does() {
+    // Unregistered, with and without a run id: registration is judged first.
+    let f = Fixture::new(false);
+    let t = f.target();
+    let target = t.to_str().unwrap();
+    equivalent(&f, Verb::Accept, &["accept", target, "replay"], |ctx| {
+        usage_of(accept(ctx, &t, Some("replay")))
+    });
+    equivalent(&f, Verb::Accept, &["accept", target], |ctx| {
+        usage_of(accept(ctx, &t, None))
+    });
+    // Registered: a missing run id is usage; an unknown run is its answer.
+    let f = Fixture::new(true);
+    let t = f.target();
+    let target = t.to_str().unwrap();
+    equivalent(&f, Verb::Accept, &["accept", target], |ctx| {
+        usage_of(accept(ctx, &t, None))
+    });
+    equivalent(&f, Verb::Accept, &["accept", target, "replay"], |ctx| {
+        usage_of(accept(ctx, &t, Some("replay")))
+    });
+}
+
+/// A-EQ-RECOVER: the report and a recorded choice, and an inadmissible one.
+#[test]
+fn override_recover_answers_and_records_as_the_verb_does() {
+    let f = Fixture::new(true);
+    let t = f.target();
+    let target = t.to_str().unwrap();
+    equivalent(
+        &f,
+        Verb::OverrideRecover,
+        &["override", "recover", target],
+        |ctx| Ok(override_recover(ctx, &t, None)),
+    );
+    for (choice, journal, authority) in [
+        ("adopt-empty", "absent", "absent"),
+        ("adopt-as-read", "absent", "absent"),
+        ("discard-pending", "0000", "absent"),
+    ] {
+        let args = [
+            "override", "recover", target, choice, journal, authority, "sam", "a", "reason",
+        ];
+        equivalent(&f, Verb::OverrideRecover, &args, |ctx| {
+            Ok(override_recover(
+                ctx,
+                &t,
+                Some(RecoverChoice {
+                    choice: statecraft_run::overrides::Choice::parse(choice).unwrap(),
+                    journal,
+                    authority,
+                    operator: "sam",
+                    reason: "a reason",
+                }),
+            ))
+        });
+    }
+    // Unregistered.
+    let f = Fixture::new(false);
+    let t = f.target();
+    equivalent(
+        &f,
+        Verb::OverrideRecover,
+        &["override", "recover", t.to_str().unwrap()],
+        |ctx| Ok(override_recover(ctx, &t, None)),
+    );
+}
+
+/// A-EQ-RECONCILE: refusals before and after resolution, and a missing
+/// attempt, invent no success.
+#[test]
+fn run_reconcile_refuses_as_the_verb_does() {
+    for registered in [false, true] {
+        let f = Fixture::new(registered);
+        let t = f.target();
+        let target = t.to_str().unwrap().to_string();
+        for (attempt, finding, state) in [
+            ("1", "absent", "not-launched"),
+            ("x", "absent", "not-launched"),
+            ("1", "maybe", "not-launched"),
+            ("1", "absent", "nonsense"),
+        ] {
+            let args = [
+                "run",
+                "reconcile",
+                target.as_str(),
+                "replay",
+                attempt,
+                finding,
+                state,
+                "sam",
+                "why",
+            ];
+            equivalent(&f, Verb::RunReconcile, &args, |ctx| {
+                usage_of(run_reconcile(
+                    ctx,
+                    &ReconcileOperands {
+                        path: &t,
+                        run_id: "replay",
+                        attempt,
+                        finding,
+                        inspected: state,
+                        operator: "sam",
+                        reason: "why",
+                        evidence: &[],
+                    },
+                ))
+            });
+        }
+    }
+}
