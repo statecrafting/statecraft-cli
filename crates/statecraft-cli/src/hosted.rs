@@ -258,6 +258,9 @@ pub fn submit(home: &Path, rest: &[String]) -> Outcome {
     let format =
         git(&root, &["rev-parse", "--show-object-format"]).unwrap_or_else(|| "sha1".into());
     let tree = git(&root, &["rev-parse", &format!("{commit}^{{tree}}")]);
+    // The plan previews exactly what registration sends: no base when the
+    // receipt names none.
+    let base = Some(receipt.base.clone()).filter(|b| !b.is_empty());
     let receipt_bytes = serde_json::to_vec(&receipt).expect("a receipt serializes");
     let reference = Reference::over_file_bytes(RECEIPT_TYPE, "1", &receipt_bytes);
     let manifest = json!({
@@ -268,7 +271,7 @@ pub fn submit(home: &Path, rest: &[String]) -> Outcome {
     let plan = json!({
         "cell": d.cell.as_str(),
         "repository": d.repository,
-        "register": {"format": format, "commit": commit, "tree": tree, "base": receipt.base},
+        "register": {"format": format, "commit": commit, "tree": tree, "base": base},
         "artifacts": [{"reference": RECEIPT_TYPE, "digest": reference.digest, "length": reference.bytes}],
     });
     if o.has("plan") {
@@ -294,7 +297,7 @@ pub fn submit(home: &Path, rest: &[String]) -> Outcome {
                 format: &format,
                 commit: &commit,
                 tree: tree.as_deref(),
-                base: Some(receipt.base.as_str()).filter(|b| !b.is_empty()),
+                base: base.as_deref(),
             },
         )?;
         let submission = serde_json::to_vec(&json!({

@@ -306,6 +306,9 @@ its fact, an erased `revision.registered` is a divergence because the
 revision can no longer be checked, and a decision or admission attestation
 must be about the bundle's revision, and a decision named twice is a
 divergence rather than counted twice.
+`VerifiedRootSet::issuer_public_key` is this spec's own addition to the
+envelope crate (#255), narrowed to the crate so no caller can take a key
+without asking its eligibility; spec 005's prior interface is unchanged.
 
 **2026-10-12: the verbs.** `hosted login <path> [--cell]`, `hosted logout
 <path> [--cell]`, `hosted submit <path> --receipt <file> [--plan]` and `hosted
