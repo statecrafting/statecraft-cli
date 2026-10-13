@@ -70,8 +70,27 @@ are unchanged, the child writes its own per-run directory, which is gone after
 the attempt, and no output, record or remaining file carries the token. Run on
 macOS locally and on Linux in CI (#253). **Pass.**
 
+## Linux
+
+Docker Desktop's Linux VM (kernel 7.0.14-linuxkit, Landlock among the active
+security modules), the product built from `main` at the time inside a
+`rust:1.96-bookworm` container, Claude Code 2.1.296 installed there, the
+operator's token mounted read-only and copied into the fixture home. The
+container ran with its own seccomp profile disabled so the product's filter is
+the one in force; the product installs Landlock and seccomp itself.
+
+| Stage | Sessions | Result |
+|---|---|---|
+| `preflight` | none (synthetic fake) | every precondition holds |
+| `managed-startup` | one, through `run` | **ESTABLISHED** |
+| `permission-experiment` | three | **ADMITTED**; each launch recorded `landlock-and-seccomp` on `linux` |
+
+No token bytes were found under the run's root except the owner-only
+credential copy. With M-3 already run on Linux in CI (#253), M-1 to M-3 are
+covered on Linux. **Pass.**
+
 ## Coverage
 
-Rule 12's two IX items are closed on macOS for Claude Code 2.1.296. On Linux
-M-1 to M-3's fixture half has run (M-3 in CI); a confined real-provider
-session on Linux has not, so a Linux attempt's posture keeps the items open.
+Rule 12's two IX items are closed on macOS, and its later-unconfined-consumer
+item on Linux (the Mach-service item does not arise there), for Claude Code
+2.1.296. Another provider version is a new measurement.
