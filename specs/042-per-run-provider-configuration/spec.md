@@ -2,7 +2,7 @@
 id: "042-per-run-provider-configuration"
 title: "Per-run provider configuration and a measured Mach-service allowlist close spec 004's two open items against IX"
 status: approved
-implementation: pending
+implementation: complete
 created: "2026-10-12"
 summary: >
   Amends 004 section 3.18 to close the two items its rule 12 names as open
@@ -15,7 +15,10 @@ summary: >
   and the first confined provider session is the activation rule 12 defers.
 amends:
   - "004-execution-adapter"
+establishes:
+  - { kind: file, path: "docs/adoption/042-provider-measurements.md" }
 extends:
+  - { spec: "004-execution-adapter", unit: { kind: directory, path: "crates/statecraft-adapter/" }, nature: additive }
   - { spec: "002-environment-lifecycle", unit: { kind: directory, path: "crates/statecraft-home/" }, nature: additive }
   - { spec: "006-command-surface", unit: { kind: directory, path: "crates/statecraft-cli/" }, nature: additive }
   - { spec: "002-environment-lifecycle", unit: { kind: file, path: "scripts/acceptance/managed-session.sh" }, nature: additive }
@@ -214,7 +217,28 @@ its own configuration directory, but authenticates nothing and is given no
 token, so `env plan` and `doctor` need none. The live acceptance script copies
 the operator's provisioned token into its disposable home.
 
+**2026-10-12: the measurements and what they changed.** M-1 to M-3 are
+recorded in `docs/adoption/042-provider-measurements.md` (macOS 26.5.1,
+Claude Code 2.1.296). M-2 produced a one-entry allowlist,
+`com.apple.system.opendirectoryd.libinfo`, and one further finding: the
+provider keeps a temporary area under `/private/tmp/claude-<uid>`, outside
+every writable root, so a confined tool call failed until
+`CLAUDE_CODE_TMPDIR` pointed it at the launch's scratch root. That name joins
+the constructed environment beside section 3.3's two. On macOS the boundary
+record now names the closure and its scope in place of the two open items and
+the activation item; elsewhere they stay open. The verification block was a
+draft's placeholder and is declared with this change.
+
 ## Verification
 
-Implementation acceptance is not run while this spec is a `draft` with
-`implementation: pending`.
+The live measurements M-1 to M-3 are recorded in
+`docs/adoption/042-provider-measurements.md` and are not re-run here; these
+commands are the local acceptance.
+
+```verify:cli
+cargo test -p statecraft-home --locked --lib provider_token
+cargo test -p statecraft-adapter --locked --lib boundary
+cargo test -p statecraft-cli --locked --test per_run_provider_configuration
+cargo test -p statecraft-cli --locked --test protected_boundary
+test -f docs/adoption/042-provider-measurements.md
+```

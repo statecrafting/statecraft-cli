@@ -23,6 +23,21 @@ pub(super) struct Prepared {
     linux: linux::Rules,
 }
 
+/// The Mach services a confined process may look up on macOS (spec 042
+/// section 3.4). Each is justified by a recorded measurement against a
+/// confined provider session (`docs/adoption/042-provider-measurements.md`):
+///
+/// - `com.apple.system.opendirectoryd.libinfo`: account lookup. Refused, the
+///   provider cannot resolve its home directory and exits before its first
+///   turn (`uv_os_homedir` ENOENT), because the constructed environment
+///   carries no `HOME`.
+///
+/// Lookups the same sessions made and that changed no outcome
+/// (`com.apple.system.notification_center`, `com.apple.logd`,
+/// `com.apple.securityd.xpc`) are refused and not admitted.
+#[cfg(target_os = "macos")]
+pub(super) const MACH_ALLOWLIST: &[&str] = &["com.apple.system.opendirectoryd.libinfo"];
+
 impl Prepared {
     pub(super) fn new(policy: &Policy) -> Result<Self, Refused> {
         #[cfg(target_os = "macos")]
@@ -34,8 +49,15 @@ impl Prepared {
                 ));
             }
             let mut profile = String::from(
-                "(version 1)\n(allow default)\n(deny file-write*)\n(deny signal)\n(allow signal (target same-sandbox))\n(deny network-outbound)\n(allow network-outbound (remote tcp \"*:443\"))\n(allow network-outbound (literal \"/private/var/run/mDNSResponder\"))\n(deny network-outbound (remote ip \"localhost:*\"))\n(deny appleevent-send)\n(deny job-creation)\n(deny mach-lookup (global-name \"com.apple.coreservices.launchservicesd\") (global-name \"com.apple.coreservices.appleevents\") (global-name \"com.apple.xpc.launchd\"))\n",
+                "(version 1)\n(allow default)\n(deny file-write*)\n(deny signal)\n(allow signal (target same-sandbox))\n(deny network-outbound)\n(allow network-outbound (remote tcp \"*:443\"))\n(allow network-outbound (literal \"/private/var/run/mDNSResponder\"))\n(deny network-outbound (remote ip \"localhost:*\"))\n(deny appleevent-send)\n(deny job-creation)\n(deny mach-lookup)\n",
             );
+            // Spec 042 section 3.4: every Mach service is refused except the
+            // measured allowlist; the three rule 6 names stay refused.
+            profile.push_str("(allow mach-lookup");
+            for name in MACH_ALLOWLIST {
+                profile.push_str(&format!(" (global-name {})", quote(Path::new(name))?));
+            }
+            profile.push_str(")\n");
             for root in &policy.inaccessible {
                 profile.push_str(&format!("(deny file-read* (subpath {}))\n", quote(root)?));
             }
@@ -619,4 +641,44 @@ pub(super) fn snapshot(root: &File) -> io::Result<BTreeMap<std::path::PathBuf, (
     let mut entries = BTreeMap::new();
     walk(root, Path::new(""), &mut entries, &mut 0, &mut 0)?;
     Ok(entries)
+}
+
+#[cfg(all(test, target_os = "macos"))]
+mod tests {
+    use super::*;
+
+    /// Spec 042 section 3.4: Mach lookups are refused by default and only
+    /// the measured allowlist is admitted; the three services rule 6 names
+    /// are in no allow rule.
+    #[test]
+    fn mach_lookups_are_refused_except_the_measured_allowlist() {
+        let prepared = Prepared::new(&Policy {
+            inaccessible: vec![],
+            readonly: vec![],
+            readable: vec![],
+            writable: vec![],
+            adjacent_prefixes: vec![],
+        })
+        .unwrap();
+        let profile = String::from_utf8(prepared.identity()).unwrap();
+        assert!(profile.contains("(deny mach-lookup)\n"), "{profile}");
+        let allow: Vec<&str> = profile
+            .lines()
+            .filter(|l| l.starts_with("(allow mach-lookup"))
+            .collect();
+        assert_eq!(
+            allow,
+            ["(allow mach-lookup (global-name \"com.apple.system.opendirectoryd.libinfo\"))"]
+        );
+        for refused in [
+            "com.apple.coreservices.launchservicesd",
+            "com.apple.coreservices.appleevents",
+            "com.apple.xpc.launchd",
+            "com.apple.securityd.xpc",
+        ] {
+            assert!(!allow.iter().any(|l| l.contains(refused)), "{refused}");
+        }
+        assert!(profile.contains("(deny appleevent-send)"));
+        assert!(profile.contains("(deny job-creation)"));
+    }
 }

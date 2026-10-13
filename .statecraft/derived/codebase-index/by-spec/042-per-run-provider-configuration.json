@@ -10,6 +10,10 @@
     ],
     "implementingPaths": [
       {
+        "path": "crates/statecraft-adapter/",
+        "source": "spec-edge"
+      },
+      {
         "path": "crates/statecraft-cli/",
         "source": "spec-edge"
       },
@@ -18,11 +22,41 @@
         "source": "spec-edge"
       },
       {
+        "path": "docs/adoption/042-provider-measurements.md",
+        "source": "spec-edge"
+      },
+      {
         "path": "scripts/acceptance/managed-session.sh",
         "source": "spec-edge"
       }
     ],
     "resolvedUnits": [
+      {
+        "locations": [
+          {
+            "file": "docs/adoption/042-provider-measurements.md"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "kind": "file",
+          "path": "docs/adoption/042-provider-measurements.md"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "crates/statecraft-adapter/"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "directory",
+          "path": "crates/statecraft-adapter/"
+        }
+      },
       {
         "locations": [
           {
@@ -67,5 +101,5 @@
     "specStatus": "approved"
   },
   "schemaVersion": "1.2.0",
-  "shardHash": "637a7147ce89e90deab9d0e27292c20d9759065d16266384333a8e39bc19a307"
+  "shardHash": "7ef09519c50873bdbe6304032f1a8d33501849efad299923e373f169e11d569c"
 }
