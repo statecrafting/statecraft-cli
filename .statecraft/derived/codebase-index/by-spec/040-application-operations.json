@@ -12,10 +12,30 @@
       "007-family-envelope",
       "039-local-cockpit-authority"
     ],
-    "implementingPaths": [],
+    "implementingPaths": [
+      {
+        "path": "crates/statecraft-cli/",
+        "source": "spec-edge"
+      }
+    ],
+    "resolvedUnits": [
+      {
+        "locations": [
+          {
+            "file": "crates/statecraft-cli/"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "directory",
+          "path": "crates/statecraft-cli/"
+        }
+      }
+    ],
     "specId": "040-application-operations",
     "specStatus": "approved"
   },
   "schemaVersion": "1.2.0",
-  "shardHash": "053602057276b655c356f05f8f94593347753a81b5617a3b34966c04a9ca9c6b"
+  "shardHash": "46a3c05077d55196a054f0464d0219829af92197c3a8eee80ed69206194082fb"
 }

@@ -12,6 +12,8 @@ summary: >
   delivery slices preserve envelope bytes, record ordering and execution
   ownership, providing the shared boundary a later local cockpit calls.
 amends: ["006-command-surface"]
+extends:
+  - { spec: "006-command-surface", unit: { kind: directory, path: "crates/statecraft-cli/" }, nature: additive }
 depends_on:
   - "002-environment-lifecycle"
   - "003-work-and-run-semantics"
@@ -186,6 +188,16 @@ and moving it need not change the domain crates. Internal helper extraction
 precedes removal of the remaining binary orchestration so every intermediate
 candidate stays buildable. Ownership edges arrive with implementation rather
 than making this spec an owner of unrelated CLI work.
+
+**2026-10-12: slice 1.** The operations live in `statecraft_cli::application`
+and return `Answer<Value>`: `Answer::envelope` already serializes the value to
+JSON and renders it in canonical key order, so erasing the value type changes
+no byte. A missing operand the verb only reported after resolving its target
+is returned as `Usage` after resolution, so the order of refusals is the
+verb's. The binary's clock comes from `application::process_clock`; a debug
+build reads `STATECRAFT_TEST_CLOCK` there so the differential tests can fix
+the one input the verb and the operation would otherwise disagree on, and a
+release build never reads it.
 
 ## Verification
 
