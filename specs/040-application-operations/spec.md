@@ -199,6 +199,11 @@ build reads `STATECRAFT_TEST_CLOCK` there so the differential tests can fix
 the one input the verb and the operation would otherwise disagree on, and a
 release build never reads it.
 
+**2026-10-12: slice 2.** The attempt plan, the trial's carried facts, startup
+finalization, the trial conclusion and the attempt conclusion move unchanged
+into `statecraft_cli::attempt`; the conclusion returns its answer, the binary
+renders it, and finalization and conclusion take the clock as an argument.
+
 ## Verification
 
 These commands are required for final implementation acceptance. While
