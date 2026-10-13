@@ -115,6 +115,14 @@ pub enum Verb {
     ProviderTokenClear,
     /// `provider token show`
     ProviderTokenShow,
+    /// `hosted login <path> [--cell <origin>]`
+    HostedLogin,
+    /// `hosted logout <path> [--cell <origin>]`
+    HostedLogout,
+    /// `hosted submit <path> --receipt <file> [--plan]`
+    HostedSubmit,
+    /// `hosted decision <path> --revision <id> --root-set <file> ...`
+    HostedDecision,
     /// `--help`, optionally with a group or a verb as its topic.
     ///
     /// Not part of the command tree: [`Verb::all`] lists the operations, and a
@@ -186,6 +194,10 @@ impl Verb {
             Verb::ProviderTokenSet => "provider token set",
             Verb::ProviderTokenClear => "provider token clear",
             Verb::ProviderTokenShow => "provider token show",
+            Verb::HostedLogin => "hosted login",
+            Verb::HostedLogout => "hosted logout",
+            Verb::HostedSubmit => "hosted submit",
+            Verb::HostedDecision => "hosted decision",
             Verb::Help => "--help",
         }
     }
@@ -267,6 +279,11 @@ impl Verb {
             Verb::ProviderTokenSet | Verb::ProviderTokenClear | Verb::ProviderTokenShow => {
                 "042-per-run-provider-configuration"
             }
+            // Spec 038: the hosted client, amending 006; HTTP and custody in
+            // its own crate, the bundle reader in the envelope crate.
+            Verb::HostedLogin | Verb::HostedLogout | Verb::HostedSubmit | Verb::HostedDecision => {
+                "038-hosted-client"
+            }
             Verb::Help => "006-command-surface",
         }
     }
@@ -326,13 +343,17 @@ impl Verb {
             Verb::ProviderTokenSet,
             Verb::ProviderTokenClear,
             Verb::ProviderTokenShow,
+            Verb::HostedLogin,
+            Verb::HostedLogout,
+            Verb::HostedSubmit,
+            Verb::HostedDecision,
         ]
     }
 
     /// The groups a help topic may name.
-    pub const GROUPS: [&'static str; 17] = [
+    pub const GROUPS: [&'static str; 18] = [
         "project", "env", "work", "run", "accept", "home", "init", "migrate", "config", "approval",
-        "harness", "session", "startup", "override", "transfer", "trust", "provider",
+        "harness", "session", "startup", "override", "transfer", "trust", "provider", "hosted",
     ];
 
     /// Parse a verb from the leading arguments, returning how many it consumed.
@@ -389,6 +410,10 @@ impl Verb {
             ("trust", Some("root-generate")) => Some((Verb::TrustRootGenerate, 2)),
             ("trust", Some("issuer-sign")) => Some((Verb::TrustIssuerSign, 2)),
             ("trust", Some("issuer-verify")) => Some((Verb::TrustIssuerVerify, 2)),
+            ("hosted", Some("login")) => Some((Verb::HostedLogin, 2)),
+            ("hosted", Some("logout")) => Some((Verb::HostedLogout, 2)),
+            ("hosted", Some("submit")) => Some((Verb::HostedSubmit, 2)),
+            ("hosted", Some("decision")) => Some((Verb::HostedDecision, 2)),
             // The one three-word group: `provider token <act>` (spec 042).
             ("provider", Some("token")) => match args.get(2).map(String::as_str) {
                 Some("set") => Some((Verb::ProviderTokenSet, 3)),

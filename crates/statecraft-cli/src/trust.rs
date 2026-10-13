@@ -54,16 +54,19 @@ pub const ISSUER_VERIFY_USAGE: &str = "usage: trust issuer-verify --kind <kind> 
 // Options
 // ---------------------------------------------------------------------------
 
-struct Opts {
+pub(crate) struct Opts {
     values: BTreeMap<String, String>,
     flags: BTreeSet<String>,
 }
 
 impl Opts {
-    fn get(&self, k: &str) -> Option<&str> {
+    pub(crate) fn get(&self, k: &str) -> Option<&str> {
         self.values.get(k).map(String::as_str)
     }
-    fn path(&self, k: &str) -> Option<PathBuf> {
+    pub(crate) fn has(&self, k: &str) -> bool {
+        self.flags.contains(k)
+    }
+    pub(crate) fn path(&self, k: &str) -> Option<PathBuf> {
         self.get(k).map(PathBuf::from)
     }
 }
@@ -71,7 +74,7 @@ impl Opts {
 /// `--name value` or `--name=value` for valued options, bare `--name` for
 /// flags. A repeated, unknown or positional argument, or a valued option with
 /// no value, is a usage error.
-fn parse_opts(
+pub(crate) fn parse_opts(
     rest: &[String],
     valued: &[&str],
     flags: &[&str],
@@ -123,7 +126,7 @@ fn parse_opts(
     Ok(o)
 }
 
-fn require(o: &Opts, names: &[&str], usage: &str) -> Result<(), String> {
+pub(crate) fn require(o: &Opts, names: &[&str], usage: &str) -> Result<(), String> {
     for n in names {
         if o.get(n).is_none() {
             return Err(format!("--{n} is required\n{usage}"));
@@ -136,7 +139,11 @@ fn require(o: &Opts, names: &[&str], usage: &str) -> Result<(), String> {
 // Answers
 // ---------------------------------------------------------------------------
 
-fn refused(kind: ErrorKind, summary: impl Into<String>, details: Value) -> Answer<Value> {
+pub(crate) fn refused(
+    kind: ErrorKind,
+    summary: impl Into<String>,
+    details: Value,
+) -> Answer<Value> {
     Answer::new(details, Exit::Refused, summary).with_kind(kind)
 }
 
@@ -144,7 +151,7 @@ fn failed(summary: impl Into<String>, details: Value) -> Answer<Value> {
     Answer::new(details, Exit::Failed, summary).with_kind(ErrorKind::Io)
 }
 
-fn envelope_refusal(what: &str, e: &EnvelopeError) -> Answer<Value> {
+pub(crate) fn envelope_refusal(what: &str, e: &EnvelopeError) -> Answer<Value> {
     let kind = match e {
         EnvelopeError::Decode(_) => ErrorKind::Schema,
         _ => ErrorKind::Validation,
@@ -208,7 +215,7 @@ fn create_new(path: &Path, bytes: &[u8], mode: u32) -> std::io::Result<()> {
 }
 
 /// Read a regular, non-symlinked input file of bounded size.
-fn read_input(path: &Path, what: &str) -> Result<Vec<u8>, Answer<Value>> {
+pub(crate) fn read_input(path: &Path, what: &str) -> Result<Vec<u8>, Answer<Value>> {
     let refuse = |msg: String| refused(ErrorKind::Refused, msg, Value::Null);
     let meta = std::fs::symlink_metadata(path)
         .map_err(|e| refuse(format!("{what} {}: {e}", path.display())))?;
@@ -660,7 +667,7 @@ pub fn issuer_verify(rest: &[String]) -> Outcome {
     Ok(verify(kind, &o, given != 0).unwrap_or_else(|a| a))
 }
 
-fn number(o: &Opts, k: &str, max: u64) -> Result<u64, Answer<Value>> {
+pub(crate) fn number(o: &Opts, k: &str, max: u64) -> Result<u64, Answer<Value>> {
     let s = o.get(k).expect("given");
     let ok =
         !s.is_empty() && s.bytes().all(|b| b.is_ascii_digit()) && (s == "0" || !s.starts_with('0'));

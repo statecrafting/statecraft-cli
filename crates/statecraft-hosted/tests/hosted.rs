@@ -7,7 +7,7 @@
 mod support;
 
 use serde_json::json;
-use statecraft_hosted::api::{self, Retrieved};
+use statecraft_hosted::api::{self, Retrieved, Subject};
 use statecraft_hosted::credential::{Credential, Store};
 use statecraft_hosted::declaration::Declaration;
 use statecraft_hosted::discovery::discover;
@@ -380,8 +380,19 @@ fn the_request_rules_classify_and_never_retry_a_4xx() {
                 .unwrap_or_else(|| answer(500, json!({})))
         });
         let c = credential(&origin, 0);
-        let err =
-            api::register_revision(&Http::new(), &origin, &c, REPO, "abc", None, None).unwrap_err();
+        let err = api::register_revision(
+            &Http::new(),
+            &origin,
+            &c,
+            REPO,
+            &Subject {
+                format: "sha1",
+                commit: "abc",
+                tree: None,
+                base: None,
+            },
+        )
+        .unwrap_err();
         assert_eq!(err.exit_code(), exit, "{label}: {err}");
         assert!(err.to_string().contains(says), "{label}: {err}");
         // Named by route template, never by URL; never the token. (The
@@ -400,9 +411,12 @@ fn the_request_rules_classify_and_never_retry_a_4xx() {
         &gone,
         &credential(&gone, 0),
         REPO,
-        "abc",
-        None,
-        None,
+        &Subject {
+            format: "sha1",
+            commit: "abc",
+            tree: None,
+            base: None,
+        },
     )
     .unwrap_err();
     assert_eq!(err.exit_code(), 4);
@@ -424,14 +438,39 @@ fn registering_twice_is_success_and_says_which() {
     });
     let c = credential(&origin, 0);
     let http = Http::new();
-    let first =
-        api::register_revision(&http, &origin, &c, REPO, "c0ffee", Some("7ee"), None).unwrap();
-    let again =
-        api::register_revision(&http, &origin, &c, REPO, "c0ffee", Some("7ee"), None).unwrap();
+    let first = api::register_revision(
+        &http,
+        &origin,
+        &c,
+        REPO,
+        &Subject {
+            format: "sha1",
+            commit: "c0ffee",
+            tree: Some("7ee"),
+            base: None,
+        },
+    )
+    .unwrap();
+    let again = api::register_revision(
+        &http,
+        &origin,
+        &c,
+        REPO,
+        &Subject {
+            format: "sha1",
+            commit: "c0ffee",
+            tree: Some("7ee"),
+            base: None,
+        },
+    )
+    .unwrap();
     assert_eq!((first.revision.as_str(), first.existed), (REV, false));
     assert_eq!((again.revision.as_str(), again.existed), (REV, true));
     let body: serde_json::Value = serde_json::from_slice(&cell.requests()[0].body).unwrap();
-    assert_eq!(body, json!({"commit": "c0ffee", "tree": "7ee"}));
+    assert_eq!(
+        body,
+        json!({"commit": {"format": "sha1", "oid": "c0ffee"}, "tree": {"format": "sha1", "oid": "7ee"}})
+    );
     assert_eq!(
         cell.requests()[0].header("authorization"),
         Some("Bearer access-secret-value")
@@ -496,7 +535,21 @@ fn an_id_that_could_steer_the_url_is_refused_before_a_request() {
     let c = credential(&origin, 0);
     let http = Http::new();
     for bad in ["../x", "abc", &format!("{REPO}/../y"), &"A".repeat(64)] {
-        assert!(api::register_revision(&http, &origin, &c, bad, "c", None, None).is_err());
+        assert!(
+            api::register_revision(
+                &http,
+                &origin,
+                &c,
+                bad,
+                &Subject {
+                    format: "sha1",
+                    commit: "c",
+                    tree: None,
+                    base: None
+                }
+            )
+            .is_err()
+        );
         assert!(api::submit(&http, &origin, &c, bad, REV, b"{}", &[]).is_err());
         assert!(api::submit(&http, &origin, &c, REPO, bad, b"{}", &[]).is_err());
         assert!(api::decision(&http, &origin, &c, bad, REV).is_err());

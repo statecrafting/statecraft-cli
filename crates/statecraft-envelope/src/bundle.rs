@@ -345,7 +345,12 @@ fn walk(r: &mut Reader<'_>, policy: Option<&AdmissionPolicy>) -> Result<Walked, 
 
     // The decisions named.
     let mut decisions = Vec::new();
+    let mut named = BTreeSet::new();
     for id in &r.bundle.decisions {
+        // A decision is counted once: a repeated id would count it twice.
+        if !named.insert(*id) {
+            return Err(format!("decision {} is named twice", id.to_hex()));
+        }
         let a = attestations
             .get(id)
             .ok_or_else(|| {

@@ -13,6 +13,10 @@
     ],
     "implementingPaths": [
       {
+        "path": "crates/statecraft-cli/",
+        "source": "spec-edge"
+      },
+      {
         "path": "crates/statecraft-envelope/",
         "source": "spec-edge"
       },
@@ -42,6 +46,19 @@
       {
         "locations": [
           {
+            "file": "crates/statecraft-cli/"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "directory",
+          "path": "crates/statecraft-cli/"
+        }
+      },
+      {
+        "locations": [
+          {
             "file": "crates/statecraft-envelope/"
           }
         ],
@@ -57,5 +74,5 @@
     "specStatus": "approved"
   },
   "schemaVersion": "1.2.0",
-  "shardHash": "566204002a3b5ffd2ab7a6fa81180695fb59ed6afc3dcd2bc61df19d78228d3c"
+  "shardHash": "6541241f013933310e037786986db73225085e951c4ea0b8350a5131d19948a1"
 }

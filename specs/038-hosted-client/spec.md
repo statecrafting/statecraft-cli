@@ -2,7 +2,7 @@
 id: "038-hosted-client"
 title: "The hosted client: device-grant login, submit and decision against one Statecraft cell"
 status: approved
-implementation: pending
+implementation: complete
 created: "2026-10-10"
 summary: >
   Amends 006 with the CLI's half of the hosted thin path that the Statecraft
@@ -23,7 +23,8 @@ establishes:
 extends:
   # The offline decision-bundle reader (section 3.6), pure, in 005's crate.
   - { spec: "005-acceptance-and-evidence", unit: { kind: directory, path: "crates/statecraft-envelope/" }, nature: additive }
-# The edge on crates/statecraft-cli/ (006) arrives with the hosted verbs.
+  # The `hosted` verb group (sections 3.2 to 3.6), in 006's binary.
+  - { spec: "006-command-surface", unit: { kind: directory, path: "crates/statecraft-cli/" }, nature: additive }
 depends_on:
   - "001-boundaries-and-authority"
   - "005-acceptance-and-evidence"
@@ -303,7 +304,25 @@ reports that mismatch with both digests rather than translating between them.
 A tombstone is trusted only when a verified entry in the bundle commits to
 its fact, an erased `revision.registered` is a divergence because the
 revision can no longer be checked, and a decision or admission attestation
-must be about the bundle's revision.
+must be about the bundle's revision, and a decision named twice is a
+divergence rather than counted twice.
+`VerifiedRootSet::issuer_public_key` is this spec's own addition to the
+envelope crate (#255), narrowed to the crate so no caller can take a key
+without asking its eligibility; spec 005's prior interface is unchanged.
+
+**2026-10-12: the verbs.** `hosted login <path> [--cell]`, `hosted logout
+<path> [--cell]`, `hosted submit <path> --receipt <file> [--plan]` and `hosted
+decision <path> --revision <id> --root-set <file> --pin-version <n>
+--pin-digest <hex> [--policy <file>] [--scope <scope>]`. `accept` answers a
+receipt and persists none, so section 3.5 rule 1's local receipt is the
+operator's saved `accept --json` answer: it must say `accepted`, and its
+candidate must be a commit in the project. The receipt is submitted as one
+artifact of evidence type `statecraft-cli/receipt`, and each Git object id is
+registered with its object format. A submission is recorded, one JSON line per
+request, in `.statecraft/state/hosted/submissions.jsonl`, which is runtime
+state and never committed. `hosted login` writes the verification address and
+code to standard error while it polls. An expired access token is renewed
+late, by the refresh rule, before a request.
 
 ## Verification
 

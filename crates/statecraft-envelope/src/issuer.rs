@@ -1419,7 +1419,7 @@ impl VerifiedRootSet {
 
     /// The public key the verified history holds for `key`, whatever its
     /// eligibility; ask [`VerifiedRootSet::eligibility`] first.
-    pub fn issuer_public_key(&self, key: &KeyId) -> Option<PublicKey> {
+    pub(crate) fn issuer_public_key(&self, key: &KeyId) -> Option<PublicKey> {
         self.all_keys()
             .find(|(_, k)| k.key.id() == *key)
             .map(|(_, k)| k.key)

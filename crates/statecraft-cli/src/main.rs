@@ -527,6 +527,19 @@ fn run(args: &[String]) -> i32 {
                 Err(message) => usage(format, message),
             }
         }
+        Verb::HostedLogin | Verb::HostedLogout | Verb::HostedSubmit | Verb::HostedDecision => {
+            use statecraft_cli::hosted;
+            let outcome = match invocation.verb {
+                Verb::HostedLogin => hosted::login(&home, &invocation.rest),
+                Verb::HostedLogout => hosted::logout(&home, &invocation.rest),
+                Verb::HostedSubmit => hosted::submit(&home, &invocation.rest),
+                _ => hosted::decision(&home, &invocation.rest),
+            };
+            match outcome {
+                Ok(answer) => emit(&answer, format),
+                Err(message) => usage(format, message),
+            }
+        }
     }
 }
 
