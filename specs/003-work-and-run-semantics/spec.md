@@ -2,7 +2,7 @@
 id: "003-work-and-run-semantics"
 title: "Work selection, workspace preparation, the run record, and recovery after interruption"
 status: approved
-implementation: in-progress
+implementation: complete
 created: "2026-09-16"
 summary: >
   The core loop's semantics. How a unit of work is identified by reading
@@ -1040,6 +1040,12 @@ left in place. Section 3.5.1 rule 6 closed with the 2026-10-08 entry. Still
 open, so 003 stays `in-progress`: spec `004` section 3.18 rule 12, whose route
 through a later unconfined process keeps every spec that accounts for IX from
 `complete` (spec `002` section 3.36 rule 2a); closing it is the owner's act.
+
+**2026-10-13: the last open item is closed.** Spec `004` section 3.18 rule
+12, the one item the previous entry left open, is closed per platform by spec
+042 (macOS and Linux, measured live for Claude Code 2.1.296;
+`docs/adoption/042-provider-measurements.md`), and `004` is complete. No
+requirement here changed, and nothing else kept this spec `in-progress`.
 
 ## Verification
 
