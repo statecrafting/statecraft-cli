@@ -632,6 +632,23 @@ only refused ones has no comparison base either, so its eligible rows are
 spec. The store, the verbs and admission follow in later changes of the
 stack, and the spec stays `pending` until the last.
 
+**2026-10-13: the store, the commit source and `observe`.** The chain is
+`observations/<repository key>.jsonl` in the product home and its lock the
+`.lock` beside it. A commit is materialized by spec 003's trusted Git export
+into `observations/trees/` in the home, once per commit, renamed into place
+whole; spec-spine reads that tree, which has no `.git`. The reports come from
+the judge spec 029 resolves, which is what section 3.1 rule 4's "the
+`spec-spine` on `PATH`" became for `work list` too. A stale ledger, a corpus
+that does not compile and a producer that refuses the target are spec-spine
+declining to answer, recorded as `refused` with class `ledger-stale`,
+`corpus-does-not-compile` or the producer's own status; every other reader
+failure, a missing field among them, records nothing and answers as `work
+list` does. The two keyed projections are written as rows naming their spec,
+because a spec id is data and spec 006 keeps JSON keys camelCase. A
+spec-scoped notice names the open `run` proposals for its spec when it is
+made; the attempts a `moved-contract` notice names, and `proposal show`'s
+causal trace, come with the proposal verbs.
+
 ## Verification
 
 This block is the implementing change's acceptance, run by `make verify

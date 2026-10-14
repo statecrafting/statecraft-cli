@@ -123,6 +123,10 @@ pub enum Verb {
     HostedSubmit,
     /// `hosted decision <path> --revision <id> --root-set <file> ...`
     HostedDecision,
+    /// `observe <path> [--ref <ref>]`
+    Observe,
+    /// `observe show <path> [--ref <ref>]`
+    ObserveShow,
     /// `--help`, optionally with a group or a verb as its topic.
     ///
     /// Not part of the command tree: [`Verb::all`] lists the operations, and a
@@ -198,6 +202,8 @@ impl Verb {
             Verb::HostedLogout => "hosted logout",
             Verb::HostedSubmit => "hosted submit",
             Verb::HostedDecision => "hosted decision",
+            Verb::Observe => "observe",
+            Verb::ObserveShow => "observe show",
             Verb::Help => "--help",
         }
     }
@@ -284,6 +290,9 @@ impl Verb {
             Verb::HostedLogin | Verb::HostedLogout | Verb::HostedSubmit | Verb::HostedDecision => {
                 "038-hosted-client"
             }
+            // Spec 027 section 3.9: observation and proposals, in its own
+            // crate, reached through 027's edge on this crate.
+            Verb::Observe | Verb::ObserveShow => "027-observation-and-proposals",
             Verb::Help => "006-command-surface",
         }
     }
@@ -347,13 +356,16 @@ impl Verb {
             Verb::HostedLogout,
             Verb::HostedSubmit,
             Verb::HostedDecision,
+            Verb::Observe,
+            Verb::ObserveShow,
         ]
     }
 
     /// The groups a help topic may name.
-    pub const GROUPS: [&'static str; 18] = [
+    pub const GROUPS: [&'static str; 19] = [
         "project", "env", "work", "run", "accept", "home", "init", "migrate", "config", "approval",
         "harness", "session", "startup", "override", "transfer", "trust", "provider", "hosted",
+        "observe",
     ];
 
     /// Parse a verb from the leading arguments, returning how many it consumed.
@@ -414,6 +426,9 @@ impl Verb {
             ("hosted", Some("logout")) => Some((Verb::HostedLogout, 2)),
             ("hosted", Some("submit")) => Some((Verb::HostedSubmit, 2)),
             ("hosted", Some("decision")) => Some((Verb::HostedDecision, 2)),
+            // `show` is reserved after `observe`, as `list` is after `run`.
+            ("observe", Some("show")) => Some((Verb::ObserveShow, 2)),
+            ("observe", _) => Some((Verb::Observe, 1)),
             // The one three-word group: `provider token <act>` (spec 042).
             ("provider", Some("token")) => match args.get(2).map(String::as_str) {
                 Some("set") => Some((Verb::ProviderTokenSet, 3)),
