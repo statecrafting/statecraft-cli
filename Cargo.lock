@@ -882,6 +882,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "statecraft-observe"
+version = "0.0.0"
+dependencies = [
+ "serde",
+ "serde_json",
+ "statecraft-environment",
+]
+
+[[package]]
 name = "statecraft-run"
 version = "0.0.0"
 dependencies = [

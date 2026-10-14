@@ -17,9 +17,9 @@ summary: >
   admitted proposal enters spec 003's existing run path with its cause
   recorded in the attempt's intent. No watcher, no loop, no automatic
   admission, and no change to spec-spine.
-# The crate this spec owns, `crates/statecraft-observe/`, is claimed by the
-# change that creates it (section 2): `index check --fail-on-unresolved`
-# refuses a claim on a directory that does not exist yet.
+# The crate this spec owns, claimed by the change that created it (section 2).
+establishes:
+  - { kind: directory, path: "crates/statecraft-observe/" }
 extends:
   # Section 3.7: the attempt intent names the proposal that caused it, written
   # once with the intent and before any effect. Additive: an intent without a
@@ -618,6 +618,19 @@ it, a spec whose contract moved while eligible would keep only a proposal
 admission must refuse as `stale`. The new proposal supersedes the old one,
 which keeps one open `run` proposal per spec. A read-only verb never
 interprets or repairs a torn tail.
+
+**2026-10-13: the first implementing change is the pure core.** The crate
+starts with section 3.10's value logic: the three projections, the
+transitions, the closed subscriptions, proposal identity, the chain's entry
+kinds and the fold that gives every proposal's state, with no git, spec-spine
+or product home. The `observed` entry carries the projection values beside
+their digests, because the next observation compares values and section 3.8
+keeps no checkpoint outside the chain. The first answered observation after
+only refused ones has no comparison base either, so its eligible rows are
+`entered` marked `initial`. An `exited` transition carries the value now:
+`excluded` with spec 003's reason, or none when the plan no longer names the
+spec. The store, the verbs and admission follow in later changes of the
+stack, and the spec stays `pending` until the last.
 
 ## Verification
 
