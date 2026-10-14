@@ -210,6 +210,16 @@ admission, cleanup and finalization unchanged; it takes the clock and returns
 its answer, and the two refusals it can answer before a launch move with it.
 The binary keeps a wrapper that renders.
 
+**2026-10-13: slice 4.** `application::run` and `application::startup_trial`
+perform registration, arming, the repository lock, the corpus report, the
+policy and the journal read themselves, in the verb's order, and launch
+through `launch::launch_attempt`; the binary's `run` and `startup trial`
+adapters read argv and render. As with `accept`'s run id, operands the
+adapter could not read reach the operation as `None` and are usage only after
+the admission the verb performed first, so the order of refusals is the
+verb's. The differential cases select the judge from the same environment on
+both sides, because the selection reads the process environment.
+
 ## Verification
 
 These commands are required for final implementation acceptance. While

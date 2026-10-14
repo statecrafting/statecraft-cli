@@ -497,3 +497,216 @@ fn observed_launch_state(
         }
     }
 }
+
+// --------------------------------------------------------------------- run
+
+/// `run <path> <spec-id>`: one attempt at one unit of work (spec 003, through
+/// spec 006 section 3.11).
+///
+/// Admission is the verb's, in its order: registration, then arming (spec 002
+/// section 3.1), then the repository lock, held through the attempt (spec 003
+/// section 3.1.5 rule 8), then the corpus report, the policy and the override
+/// journal read under that lock. A missing spec id is usage only after those,
+/// as the verb orders it. An unregistered or unarmed target refuses before
+/// any workspace, appended attempt or provider.
+pub fn run(ctx: &Context<'_>, path: &Path, spec_id: Option<&str>) -> Result<Response, Usage> {
+    let root = match registered(ctx.registry, path) {
+        Ok(root) => root,
+        Err(answer) => return Ok(answer),
+    };
+    let registration = ctx.registry.get(&root).expect("resolved above");
+    if !registration.armed {
+        return Ok(bind::unarmed_answer(&root).erase());
+    }
+    let held = match statecraft_run::lock::try_acquire(ctx.home, &root) {
+        Ok(held) => held,
+        Err(e @ statecraft_run::lock::LockError::Busy { .. }) => {
+            return Ok(slice::lock_busy_answer(&e.to_string()).erase());
+        }
+        Err(e) => return Ok(failed(&e.to_string())),
+    };
+    let report = match crate::judge::report_source(&root).and_then(|cli| {
+        use statecraft_run::report::ReportSource;
+        cli.corpus_report(&root)
+    }) {
+        Ok(report) => report,
+        Err(e) => return Ok(slice::report_error_answer(&e).erase()),
+    };
+    let (policy, disagreement) =
+        statecraft_run::policy::resolve(&root, &statecraft_run::policy::NoDeclarationFiled, None);
+    // Spec 003 section 3.1.4 rule 3 and 3.1.5 rule 3: a journal that does not
+    // read or verify is a failure, never an empty set of overrides.
+    let overrides = match statecraft_run::overrides::read_held(ctx.home, &root, &held) {
+        Ok(journal) => journal.overrides(),
+        Err(e) => return Ok(slice::journal_error_answer(&e).erase()),
+    };
+    let work = statecraft_run::work::select(&report, &policy, &overrides, disagreement);
+    let Some(spec_id) = spec_id else {
+        return Err(Usage("usage: run <path> <spec-id>".to_string()));
+    };
+    Ok(run_admitted(ctx, &root, spec_id, work, &report, held))
+}
+
+/// The attempt itself, once [`run`] has admitted it.
+fn run_admitted(
+    ctx: &Context<'_>,
+    root: &Path,
+    spec_id: &str,
+    work: statecraft_run::work::WorkList,
+    report: &statecraft_run::report::CorpusReport,
+    held: statecraft_run::lock::Held,
+) -> Response {
+    // A unit of work the policy did not admit is never run, and the reason is
+    // the answer (spec 003 section 3.1.1).
+    let eligibility = work.eligibility_of(spec_id);
+    let statecraft_run::work::Eligibility::Eligible(item) = &eligibility else {
+        return slice::work_show_answer(eligibility).erase();
+    };
+    // Spec 003 section 3.1.4 rule 5: how it was admitted goes into the intent.
+    let admission = item.admission(&work.policy);
+    // Spec 004 section 3.17 rule 4: the command coverage at planning, before
+    // anything is appended; each refusal here creates no process.
+    let planned = match crate::coverage::at_planning(root, spec_id) {
+        Ok(planned) => planned,
+        Err(why) => return crate::coverage::planning_refused_answer(&why, None).erase(),
+    };
+    if let Some(why) = planned.refusal() {
+        return crate::coverage::planning_refused_answer(&why, Some(&planned)).erase();
+    }
+    // Spec 003 section 3.1.3: the contract is resolved by the producer and
+    // written with the intent, before any effect. It is evidence, not a gate.
+    let judge = match crate::judge::report_source(root) {
+        Ok(judge) => judge,
+        Err(e) => return slice::report_error_answer(&e).erase(),
+    };
+    let contract =
+        statecraft_run::contract::bind(&judge, root, spec_id, report.lifecycle_of(spec_id));
+    crate::launch::launch_attempt(
+        ctx.clock,
+        root,
+        ctx.home,
+        spec_id,
+        crate::attempt::AttemptPlan::work_order(spec_id, admission, planned, held),
+        contract,
+        None,
+    )
+}
+
+// ----------------------------------------------------------- startup trial
+
+/// What `startup trial` was told: the origins the operator stated (exactly
+/// one is admissible) and the deadline in seconds.
+pub struct TrialOperands {
+    /// Each origin stated, in order.
+    pub stated: Vec<statecraft_home::trial::Origin>,
+    /// The deadline, in seconds.
+    pub deadline: u64,
+}
+
+/// `startup trial <path> (--provider-session | --synthetic) [--deadline <s>]`
+/// (spec 006 section 3.11.4, spec 002 section 3.33).
+///
+/// The trial drives a session, so it has `run`'s preconditions, a registered
+/// and armed target, judged first. `None` operands are ones the caller could
+/// not read; they are usage only after those, as the verb orders them. Every
+/// refusal here comes before an attempt is appended, so a refused trial
+/// spends nothing.
+pub fn startup_trial(
+    ctx: &Context<'_>,
+    path: &Path,
+    operands: Option<TrialOperands>,
+) -> Result<Response, Usage> {
+    use statecraft_home::trial;
+    let root = match registered(ctx.registry, path) {
+        Ok(root) => root,
+        Err(answer) => return Ok(answer),
+    };
+    let registration = ctx.registry.get(&root).expect("resolved above");
+    if !registration.armed {
+        return Ok(bind::unarmed_answer(&root).erase());
+    }
+    let Some(operands) = operands else {
+        return Err(Usage(format!(
+            "usage: startup trial{}",
+            crate::manage::usage(crate::commands::Verb::StartupTrial)
+        )));
+    };
+    let refused = |why: &str| Ok(slice::trial_refused_answer(why).erase());
+    let origin = match operands.stated.as_slice() {
+        [one] => *one,
+        [] => {
+            return refused(
+                "the trial runs a provider session or a local fake, and the operator must                      say which: pass --provider-session or --synthetic",
+            );
+        }
+        _ => return refused("--provider-session and --synthetic contradict each other; pass one"),
+    };
+    let deadline = operands.deadline;
+    if let Some(why) = trial::refuses_deadline(deadline) {
+        return refused(&why);
+    }
+    let manifest = match statecraft_environment::manifest::Manifest::read(&root) {
+        Ok(Some(m)) => m,
+        Ok(None) => {
+            return refused(&format!(
+                "{} holds no manifest, so it is not a managed project",
+                root.display()
+            ));
+        }
+        Err(e) => return Ok(failed(&e.to_string())),
+    };
+    let layout = statecraft_home::home::Layout::new(ctx.home);
+    let standing = statecraft_home::required::evaluate(&layout, &manifest, None);
+    if matches!(standing, statecraft_home::required::Standing::Unrequired) {
+        return refused(
+            "the project commits no harness requirement, so a run is not gated and a trial                  could not answer its question; commit one with `harness upgrade` first",
+        );
+    }
+    if let Some(reason) = standing.refuses_a_run() {
+        return Ok(bind::harness_refused_answer(&root, &reason).erase());
+    }
+    match Chain::open(ctx.home, &root) {
+        Ok((chain, _)) => {
+            if let Some(run) = statecraft_run::session::runs(&chain)
+                .into_iter()
+                .find(|r| r.id == trial::RUN_ID && !r.attempts.is_empty())
+            {
+                return refused(&format!(
+                    "this project's trial is spent: run {} holds {} attempt(s). A trial \
+                     happens once per project, and an uncertain one is never replayed; \
+                     inspect it with `startup show {} {}`",
+                    trial::RUN_ID,
+                    run.attempts.len(),
+                    root.display(),
+                    trial::RUN_ID
+                ));
+            }
+        }
+        Err(e) => return Ok(failed(&e.to_string())),
+    }
+    if root.join(trial::SENTINEL).exists() {
+        return refused(&format!(
+            "{} already exists in the project, so the sentinel's nonce could not be the \
+             only copy",
+            trial::SENTINEL
+        ));
+    }
+    Ok(crate::launch::launch_attempt(
+        ctx.clock,
+        &root,
+        ctx.home,
+        trial::RUN_ID,
+        crate::attempt::AttemptPlan::trial(deadline),
+        statecraft_run::contract::Binding::not_a_unit_of_work(),
+        Some(crate::attempt::TrialRun {
+            origin,
+            deadline_seconds: deadline,
+            sentinel: None,
+            probed_version: None,
+            settings_written: None,
+            entries: Vec::new(),
+            decision: None,
+            process: statecraft_home::trial::ProcessEnd::default(),
+        }),
+    ))
+}
