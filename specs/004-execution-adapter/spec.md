@@ -1008,8 +1008,7 @@ hard link. The scan itself is unchanged.
 this spec from `complete` on two items against IX: the route through a later
 unconfined process, and the unmeasured macOS Mach services. Both closing acts
 were the owner's, and both are taken: on 2026-10-12 the owner chose the
-per-run provider configuration directory and ratified spec `042`, which
-amends this section. `042` gives each launch its own provider configuration
+per-run provider configuration directory and ratified spec `042`. `042` gives each launch its own provider configuration
 directory under the launch's scratch root, so a child can no longer write
 configuration the operator's later sessions load, and it measured the effect
 on the provider's authentication live (M-1). Its M-2 measurement replaced the
