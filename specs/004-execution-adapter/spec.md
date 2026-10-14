@@ -2,7 +2,7 @@
 id: "004-execution-adapter"
 title: "The execution adapter boundary and the first provider: one protocol, declared capabilities, a qualification suite, a constructed child environment, and what a real stream can witness"
 status: approved
-implementation: in-progress
+implementation: complete
 created: "2026-09-16"
 summary: >
   The single seam through which this product runs an agent, and the first
@@ -1003,6 +1003,24 @@ refuse another run's launch. The record is now renamed into place with the
 platform's no-replace flag, which keeps the write exclusive and whole and never
 gives the file a second name. A filesystem that refuses the flag keeps the
 hard link. The scan itself is unchanged.
+
+**2026-10-13: rule 12's two items are closed; 004 complete.** Rule 12 kept
+this spec from `complete` on two items against IX: the route through a later
+unconfined process, and the unmeasured macOS Mach services. Both closing acts
+were the owner's, and both are taken: on 2026-10-12 the owner chose the
+per-run provider configuration directory and ratified spec `042`, which
+amends this section. `042` gives each launch its own provider configuration
+directory under the launch's scratch root, so a child can no longer write
+configuration the operator's later sessions load, and it measured the effect
+on the provider's authentication live (M-1). Its M-2 measurement replaced the
+default Mach allowance with a one-entry allowlist, and the first confined
+provider session ran on both platforms (macOS 26.5.1 and a Linux Landlock VM,
+Claude Code 2.1.296). The measurements are
+`docs/adoption/042-provider-measurements.md`. The closure is version scoped:
+an attempt's boundary record names the measured provider version and says
+that with another version both items are unmeasured, as rule 11 requires. The listener, connected-socket and
+child-attested gate-log residuals are not items against completion and stay
+recorded.
 
 ## Verification
 
