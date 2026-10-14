@@ -7,7 +7,6 @@
 //! cases that do not need one.
 
 use statecraft_cli::adapters;
-use statecraft_cli::attempt::{AttemptPlan, TrialRun};
 use statecraft_cli::bind;
 use statecraft_cli::commands::{Verb, parse, usage_verb};
 use statecraft_cli::exit::Exit;
@@ -242,25 +241,19 @@ fn run(args: &[String]) -> i32 {
                     format,
                 );
             }
+            if invocation.verb == Verb::Run {
+                return run_verb(
+                    &absolute(path),
+                    &home,
+                    &registry,
+                    invocation.rest.get(1).map(String::as_str),
+                    format,
+                );
+            }
             let root = match registered(&registry, &absolute(path)) {
                 Ok(root) => root,
                 Err(answer) => return emit(&answer, format),
             };
-            let registration = registry.get(&root).expect("resolved above");
-            // Registration makes a target visible; arming is what consents to
-            // it being driven (spec 002 section 3.1). `run` is the one verb
-            // here that drives, so it is the one verb this gates: discovery
-            // and inspection read, and reading an unarmed target was always
-            // the point of registering one.
-            //
-            // Placed here rather than inside `run_verb` because the consent is
-            // a property of the registration, which is read here and only
-            // here, and because refusing before the corpus report is what
-            // keeps the refusal ahead of every effect: no workspace, no
-            // appended attempt, no spawned provider.
-            if invocation.verb == Verb::Run && !registration.armed {
-                return emit(&bind::unarmed_answer(&root), format);
-            }
             slice_verb(invocation.verb, &root, &home, &invocation.rest[1..], format)
         }
         // Spec 010's verbs. Three of them take no path at all: the `home`
@@ -323,15 +316,13 @@ fn run(args: &[String]) -> i32 {
                     ),
                 );
             };
-            let root = match registered(&registry, &absolute(path)) {
-                Ok(root) => root,
-                Err(answer) => return emit(&answer, format),
-            };
-            let registration = registry.get(&root).expect("resolved above");
-            if !registration.armed {
-                return emit(&bind::unarmed_answer(&root), format);
-            }
-            trial_verb(&root, &home, &invocation.rest[1..], format)
+            trial_verb(
+                &absolute(path),
+                &home,
+                &registry,
+                &invocation.rest[1..],
+                format,
+            )
         }
         // Spec 006 section 3.11.3. A read: the run record says which attempts
         // exist and how they ended, and the library judges their startup
@@ -608,22 +599,9 @@ fn slice_verb(
 ) -> i32 {
     // Discovery is the join spec 003 section 3.1.1 prescribes, performed by the
     // crate that owns it. Both halves come from spec-spine's structured output.
-    let needs_report = matches!(verb, Verb::WorkList | Verb::WorkShow | Verb::Run);
-    // Spec 003 section 3.1.5 rule 8: `run` reads the journal and its authority
-    // once, under the repository lock, and holds that lock through its attempt,
-    // so no grant, revocation or recovery lands between the read and the
-    // intent.
-    let mut held = None;
-    if verb == Verb::Run {
-        held = Some(match statecraft_run::lock::try_acquire(home, root) {
-            Ok(held) => held,
-            Err(e @ statecraft_run::lock::LockError::Busy { .. }) => {
-                return emit(&slice::lock_busy_answer(&e.to_string()), format);
-            }
-            Err(e) => return fail(&e.to_string(), format),
-        });
-    }
-    let (work, report) = if needs_report {
+    // `run` reads the same join under its lock, inside its operation.
+    let needs_report = matches!(verb, Verb::WorkList | Verb::WorkShow);
+    let work = if needs_report {
         match statecraft_cli::judge::report_source(root).and_then(|cli| cli.corpus_report(root)) {
             Ok(report) => {
                 let (policy, disagreement) =
@@ -632,28 +610,21 @@ fn slice_verb(
                 // that does not read or verify, or disagrees with its state
                 // authority, is a failure, never an empty set of overrides; a
                 // pending line or a write in progress is a refusal.
-                let read = match &held {
-                    Some(held) => statecraft_run::overrides::read_held(home, root, held),
-                    None => statecraft_run::overrides::read(home, root),
-                };
-                let overrides = match read {
+                let overrides = match statecraft_run::overrides::read(home, root) {
                     Ok(journal) => journal.overrides(),
                     Err(e) => return emit(&slice::journal_error_answer(&e), format),
                 };
-                (
-                    Some(statecraft_run::work::select(
-                        &report,
-                        &policy,
-                        &overrides,
-                        disagreement,
-                    )),
-                    Some(report),
-                )
+                Some(statecraft_run::work::select(
+                    &report,
+                    &policy,
+                    &overrides,
+                    disagreement,
+                ))
             }
             Err(e) => return emit(&slice::report_error_answer(&e), format),
         }
     } else {
-        (None, None)
+        None
     };
 
     match verb {
@@ -664,20 +635,6 @@ fn slice_verb(
             };
             emit(
                 &slice::work_show_answer(work.expect("read above").eligibility_of(id)),
-                format,
-            )
-        }
-        Verb::Run => {
-            let Some(id) = rest.first() else {
-                return usage(format, "usage: run <path> <spec-id>".to_string());
-            };
-            run_verb(
-                root,
-                home,
-                id,
-                work.expect("read above"),
-                report.as_ref().expect("read above"),
-                held.expect("taken above"),
                 format,
             )
         }
@@ -846,229 +803,68 @@ fn reconcile_verb(
     }
 }
 
-/// `run <path> <spec-id>`
-///
-/// The three calls spec 006 section 3.11 leaves to the caller, in order: begin,
-/// supervise, conclude. The supervision is the adapter's; the other two are
-/// `statecraft_run::session`'s.
+/// `run <path> <spec-id>`, through spec 040's callable operation, which
+/// performs the admission and launches the attempt.
 fn run_verb(
-    root: &std::path::Path,
+    path: &std::path::Path,
     home: &std::path::Path,
-    spec_id: &str,
-    work: statecraft_run::work::WorkList,
-    report: &statecraft_run::report::CorpusReport,
-    held: statecraft_run::lock::Held,
+    registry: &Registry,
+    spec_id: Option<&str>,
     format: Format,
 ) -> i32 {
-    // A unit of work the policy did not admit is never run, and the reason is
-    // the answer (spec 003 section 3.1.1).
-    let eligibility = work.eligibility_of(spec_id);
-    let statecraft_run::work::Eligibility::Eligible(item) = &eligibility else {
-        return emit(&slice::work_show_answer(eligibility), format);
-    };
-    // Spec 003 section 3.1.4 rule 5: how it was admitted goes into the intent.
-    let admission = item.admission(&work.policy);
-    // Spec 004 section 3.17 rule 4: the command coverage at planning, from the
-    // working tree as the operator invoked `run`, before anything is appended.
-    // The requirement is read from the suite this spec declares and the
-    // allowance from the adapter and the committed declaration; a suite that
-    // cannot be read, a malformed declaration and a missing program each
-    // refuse here, with nothing appended and no process created.
-    let planned = match statecraft_cli::coverage::at_planning(root, spec_id) {
-        Ok(planned) => planned,
-        Err(why) => {
-            return emit(
-                &statecraft_cli::coverage::planning_refused_answer(&why, None),
-                format,
-            );
-        }
-    };
-    if let Some(why) = planned.refusal() {
-        return emit(
-            &statecraft_cli::coverage::planning_refused_answer(&why, Some(&planned)),
-            format,
-        );
-    }
-    // Spec 003 section 3.1.3: the contract is resolved by the producer and
-    // written with the intent, before any effect. It is evidence, not a gate.
-    let judge = match statecraft_cli::judge::report_source(root) {
-        Ok(judge) => judge,
-        Err(e) => return emit(&slice::report_error_answer(&e), format),
-    };
-    let contract =
-        statecraft_run::contract::bind(&judge, root, spec_id, report.lifecycle_of(spec_id));
-    launch_attempt(
-        root,
+    use statecraft_cli::application::{Context, run};
+    let clock = statecraft_cli::application::process_clock();
+    let ctx = Context {
         home,
-        spec_id,
-        AttemptPlan::work_order(spec_id, admission, planned, held),
-        contract,
-        None,
-        format,
-    )
-}
-
-/// One attempt through the adapter, through spec 040's library launch.
-#[allow(clippy::too_many_arguments)]
-fn launch_attempt(
-    root: &std::path::Path,
-    home: &std::path::Path,
-    run_id: &str,
-    plan: AttemptPlan,
-    contract: statecraft_run::contract::Binding,
-    trial: Option<TrialRun>,
-    format: Format,
-) -> i32 {
-    emit(
-        &statecraft_cli::launch::launch_attempt(
-            &SystemClock,
-            root,
-            home,
-            run_id,
-            plan,
-            contract,
-            trial,
-        ),
-        format,
-    )
+        registry,
+        clock: clock.as_ref(),
+    };
+    match run(&ctx, path, spec_id) {
+        Ok(answer) => emit(&answer, format),
+        Err(u) => usage(format, u.0),
+    }
 }
 
 /// `startup trial <path> (--provider-session | --synthetic) [--deadline <s>]`
 ///
-/// Spec 006 section 3.11.4 and spec 002 section 3.33. Every refusal here comes
-/// before an attempt is appended, so a refused trial spends nothing.
+/// Spec 006 section 3.11.4, through spec 040's callable operation. The
+/// adapter reads the flags; operands it cannot read are passed as `None`, and
+/// the operation answers usage after its admission, as the verb ordered them.
 fn trial_verb(
-    root: &std::path::Path,
+    path: &std::path::Path,
     home: &std::path::Path,
+    registry: &Registry,
     rest: &[String],
     format: Format,
 ) -> i32 {
+    use statecraft_cli::application::{Context, TrialOperands, startup_trial};
     use statecraft_home::trial;
-    let usage = || {
-        usage(
-            format,
-            format!(
-                "usage: startup trial{}",
-                statecraft_cli::manage::usage(Verb::StartupTrial)
-            ),
-        )
-    };
-    let mut stated = Vec::new();
-    let mut deadline = trial::DEFAULT_DEADLINE_SECONDS;
-    let mut args = rest.iter();
-    while let Some(arg) = args.next() {
-        match arg.as_str() {
-            "--provider-session" => stated.push(trial::Origin::ProviderSession),
-            "--synthetic" => stated.push(trial::Origin::Synthetic),
-            "--deadline" => match args.next().map(|n| n.parse::<u64>()) {
-                Some(Ok(n)) => deadline = n,
-                _ => return usage(),
-            },
-            _ => return usage(),
-        }
-    }
-    let origin = match stated.as_slice() {
-        [one] => *one,
-        [] => {
-            return emit(
-                &slice::trial_refused_answer(
-                    "the trial runs a provider session or a local fake, and the operator must                      say which: pass --provider-session or --synthetic",
-                ),
-                format,
-            );
-        }
-        _ => {
-            return emit(
-                &slice::trial_refused_answer(
-                    "--provider-session and --synthetic contradict each other; pass one",
-                ),
-                format,
-            );
-        }
-    };
-    if let Some(why) = trial::refuses_deadline(deadline) {
-        return emit(&slice::trial_refused_answer(&why), format);
-    }
-    let manifest = match Manifest::read(root) {
-        Ok(Some(m)) => m,
-        Ok(None) => {
-            return emit(
-                &slice::trial_refused_answer(&format!(
-                    "{} holds no manifest, so it is not a managed project",
-                    root.display()
-                )),
-                format,
-            );
-        }
-        Err(e) => return fail(&e.to_string(), format),
-    };
-    let layout = statecraft_home::home::Layout::new(home);
-    let standing = statecraft_home::required::evaluate(&layout, &manifest, None);
-    if matches!(standing, statecraft_home::required::Standing::Unrequired) {
-        return emit(
-            &slice::trial_refused_answer(
-                "the project commits no harness requirement, so a run is not gated and a trial                  could not answer its question; commit one with `harness upgrade` first",
-            ),
-            format,
-        );
-    }
-    if let Some(reason) = standing.refuses_a_run() {
-        return emit(&bind::harness_refused_answer(root, &reason), format);
-    }
-    match Chain::open(home, root) {
-        Ok((chain, _)) => {
-            if let Some(run) = statecraft_run::session::runs(&chain)
-                .into_iter()
-                .find(|r| r.id == trial::RUN_ID && !r.attempts.is_empty())
-            {
-                return emit(
-                    &slice::trial_refused_answer(&format!(
-                        "this project's trial is spent: run {} holds {} attempt(s). A trial \
-                         happens once per project, and an uncertain one is never replayed; \
-                         inspect it with `startup show {} {}`",
-                        trial::RUN_ID,
-                        run.attempts.len(),
-                        root.display(),
-                        trial::RUN_ID
-                    )),
-                    format,
-                );
+    let operands = (|| {
+        let mut stated = Vec::new();
+        let mut deadline = trial::DEFAULT_DEADLINE_SECONDS;
+        let mut args = rest.iter();
+        while let Some(arg) = args.next() {
+            match arg.as_str() {
+                "--provider-session" => stated.push(trial::Origin::ProviderSession),
+                "--synthetic" => stated.push(trial::Origin::Synthetic),
+                "--deadline" => deadline = args.next()?.parse::<u64>().ok()?,
+                _ => return None,
             }
         }
-        Err(e) => return fail(&e.to_string(), format),
-    }
-    if root.join(trial::SENTINEL).exists() {
-        return emit(
-            &slice::trial_refused_answer(&format!(
-                "{} already exists in the project, so the sentinel's nonce could not be the \
-                 only copy",
-                trial::SENTINEL
-            )),
-            format,
-        );
-    }
-    launch_attempt(
-        root,
+        Some(TrialOperands { stated, deadline })
+    })();
+    let clock = statecraft_cli::application::process_clock();
+    let ctx = Context {
         home,
-        trial::RUN_ID,
-        AttemptPlan::trial(deadline),
-        statecraft_run::contract::Binding::not_a_unit_of_work(),
-        Some(TrialRun {
-            origin,
-            deadline_seconds: deadline,
-            sentinel: None,
-            probed_version: None,
-            settings_written: None,
-            entries: Vec::new(),
-            decision: None,
-            process: statecraft_home::trial::ProcessEnd::default(),
-        }),
-        format,
-    )
+        registry,
+        clock: clock.as_ref(),
+    };
+    match startup_trial(&ctx, path, operands) {
+        Ok(answer) => emit(&answer, format),
+        Err(u) => usage(format, u.0),
+    }
 }
 
-/// Write the trial's record from what the attempt produced, then read every
-/// record back and judge it again (spec 002 section 3.33 rule 34).
 /// `accept <path> <run-id>`
 fn accept_verb(
     path: &std::path::Path,

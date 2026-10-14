@@ -46,7 +46,7 @@
       }
     ],
     "sectionDigests": {
-      "040-application-operations": "24e5f3e28e40327969f07b4b1f366b9b8f75b8616c36ff8a37b33ab9f332c369",
+      "040-application-operations": "cf58665eb7dfd5c72b11078eb3a8f99ddb84bb4d1be0696e3dcd1b82f161e5df",
       "1-purpose": "5d3b7cc989a7fa78386e49ba57059232527fbfaa59b0d9e801f3a5d1d521c0ea",
       "2-territory": "ec999b040ebbb4f216610869be6b8d4dfdba0f44154d52d0a780e3f8b360aa8c",
       "3-1-the-callable-boundary": "7e53a6e230c2df7f36ad311fc0460c19f6b3f4ec1b030a1f55034eb95c3f44e0",
@@ -54,7 +54,7 @@
       "3-3-delivery-stack": "d927f700529d7b3d4655249aa22fdc12ef7652b099171872fac6fdfd9610bbfd",
       "3-behavior": "ff1aeedeb9546c9a210b4c80a11314ee81b1116f3aa1b2477e5d37ceb4335083",
       "4-out-of-scope": "b7bcf520963f4dffe5ddfd57027b2a23e00a4955eb3331de469ed76d47e67b4d",
-      "5-resolved-decisions": "85d7c955df0809e96e2a4175ff9a1f7a44195e0a4fcd5eecc9e6117ab15df406",
+      "5-resolved-decisions": "b26c02b60ce5a25b314d8373a59a3a7d1a81a969b8426b3f0ac4fb8594c8d891",
       "verification": "1110d51a8e676078d419cee927b09ab17dd1e161c145dcd755a11e1c4c9291ef"
     },
     "sectionHeadings": [
@@ -74,6 +74,6 @@
     "summary": "Extract run, shared attempt launch, acceptance, override recovery, run reconciliation and startup trial orchestration from the binary into the existing CLI library. Typed operations own admission and effects and return render::Answer. Verb adapters parse and render. Four independently green delivery slices preserve envelope bytes, record ordering and execution ownership, providing the shared boundary a later local cockpit calls.\n",
     "title": "Callable application operations with unchanged envelopes and chain effects"
   },
-  "shardHash": "97969229fb43a2f43c13eab7af784f07104f1c420857d43ee90368bc6ed5a909",
+  "shardHash": "4882f94217eed869533e495938312653d8dc3f4a356d9f34c12cab73008c905f",
   "specVersion": "1.9.0"
 }

@@ -8,12 +8,14 @@
 //! by a debug build), and the paths are the same paths.
 
 use statecraft_cli::application::{
-    Context, ReconcileOperands, RecoverChoice, Response, accept, override_recover, run_reconcile,
+    Context, ReconcileOperands, RecoverChoice, Response, TrialOperands, accept, override_recover,
+    run, run_reconcile, startup_trial,
 };
 use statecraft_cli::commands::Verb;
 use statecraft_cli::render::Format;
 use statecraft_environment::registry::Registry;
 use statecraft_environment::time::FixedClock;
+use statecraft_home::trial::Origin;
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 use std::process::Command;
@@ -93,6 +95,38 @@ impl Fixture {
         )
     }
 
+    /// The verb, with `--json`, in this test process's own environment, so a
+    /// judge selection that reads the environment reads the same one the
+    /// in-process operation does: (exit, stdout).
+    fn verb_inheriting(&self, args: &[&str]) -> (i32, String) {
+        let out = Command::new(env!("CARGO_BIN_EXE_statecraft-cli"))
+            .args(args)
+            .env("STATECRAFT_HOME", self.home())
+            .env("STATECRAFT_TEST_CLOCK", AT.to_string())
+            .current_dir(self.root())
+            .output()
+            .unwrap();
+        (
+            out.status.code().unwrap(),
+            String::from_utf8(out.stdout).unwrap(),
+        )
+    }
+
+    fn arm(&self) {
+        let out = self.verb(&["project", "arm", self.target().to_str().unwrap()]);
+        assert_eq!(out.0, 0, "{}", out.1);
+    }
+
+    /// Pin the target to a spec-spine no binary reports, so no judge is
+    /// selected whatever this machine has installed.
+    fn pin_unresolvable(&self) {
+        std::fs::write(
+            self.target().join("spec-spine.toml"),
+            "[meta]\nrequired_version = \"=0.0.1\"\n",
+        )
+        .unwrap();
+    }
+
     fn registry(&self) -> Registry {
         Registry::read(&self.home()).unwrap()
     }
@@ -166,12 +200,44 @@ fn equivalent(
     args: &[&str],
     operation: impl Fn(&Context<'_>) -> Result<Response, String>,
 ) {
+    compare(f, verb, args, Setting::Clean, operation);
+}
+
+/// What each side runs under.
+#[derive(Clone, Copy, PartialEq)]
+enum Setting {
+    /// The verb in a cleared environment.
+    Clean,
+    /// The verb in this process's environment.
+    Inherited,
+    /// As `Inherited`, with the target's repository lock held by this
+    /// process throughout each side.
+    Busy,
+}
+
+fn compare(
+    f: &Fixture,
+    verb: Verb,
+    args: &[&str],
+    setting: Setting,
+    operation: impl Fn(&Context<'_>) -> Result<Response, String>,
+) {
     let pristine = f.keep();
     let mut full: Vec<&str> = args.to_vec();
     full.push("--json");
-    let (code, by_verb) = f.verb(&full);
+    let hold = || {
+        (setting == Setting::Busy)
+            .then(|| statecraft_run::lock::try_acquire(&f.home(), &f.target()).unwrap())
+    };
+    let held = hold();
+    let (code, by_verb) = match setting {
+        Setting::Clean => f.verb(&full),
+        Setting::Inherited | Setting::Busy => f.verb_inheriting(&full),
+    };
+    drop(held);
     let after_verb = f.snapshot();
     f.restore(&pristine);
+    let _held = hold();
     let registry = f.registry();
     let clock = FixedClock(AT);
     let home = f.home();
@@ -322,5 +388,124 @@ fn run_reconcile_refuses_as_the_verb_does() {
                 ))
             });
         }
+    }
+}
+
+/// A-EQ-RUN and A-ADMISSION: every admission `run` performs before a launch,
+/// in the verb's order: registration, arming, the lock, the judge, the spec
+/// id. None of them appends an attempt, on either side.
+#[test]
+fn run_admits_and_refuses_as_the_verb_does() {
+    // Unregistered: judged before the missing spec id.
+    let f = Fixture::new(false);
+    let t = f.target();
+    let target = t.to_str().unwrap();
+    equivalent(&f, Verb::Run, &["run", target, "001-x"], |ctx| {
+        usage_of(run(ctx, &t, Some("001-x")))
+    });
+    equivalent(&f, Verb::Run, &["run", target], |ctx| {
+        usage_of(run(ctx, &t, None))
+    });
+    // Registered and not armed: consent is judged before the lock.
+    let f = Fixture::new(true);
+    let t = f.target();
+    let target = t.to_str().unwrap();
+    compare(
+        &f,
+        Verb::Run,
+        &["run", target, "001-x"],
+        Setting::Busy,
+        |ctx| usage_of(run(ctx, &t, Some("001-x"))),
+    );
+    // Armed: a held lock refuses before the judge is consulted.
+    f.arm();
+    compare(
+        &f,
+        Verb::Run,
+        &["run", target, "001-x"],
+        Setting::Busy,
+        |ctx| usage_of(run(ctx, &t, Some("001-x"))),
+    );
+    // Armed with no judge: the report refusal comes before the spec id.
+    f.pin_unresolvable();
+    for args in [&["run", target, "001-x"][..], &["run", target]] {
+        let id = args.get(2).copied();
+        compare(&f, Verb::Run, args, Setting::Inherited, |ctx| {
+            usage_of(run(ctx, &t, id))
+        });
+    }
+}
+
+/// A-EQ-TRIAL and A-ADMISSION: the trial's admission, and each refusal that
+/// precedes its attempt, in the verb's order.
+#[test]
+fn startup_trial_admits_and_refuses_as_the_verb_does() {
+    let synthetic = || {
+        Some(TrialOperands {
+            stated: vec![Origin::Synthetic],
+            deadline: statecraft_home::trial::DEFAULT_DEADLINE_SECONDS,
+        })
+    };
+    // Unregistered, with operands and with unreadable ones.
+    let f = Fixture::new(false);
+    let t = f.target();
+    let target = t.to_str().unwrap();
+    equivalent(
+        &f,
+        Verb::StartupTrial,
+        &["startup", "trial", target, "--synthetic"],
+        |ctx| usage_of(startup_trial(ctx, &t, synthetic())),
+    );
+    equivalent(
+        &f,
+        Verb::StartupTrial,
+        &["startup", "trial", target, "--bogus"],
+        |ctx| usage_of(startup_trial(ctx, &t, None)),
+    );
+    // Registered, not armed.
+    let f = Fixture::new(true);
+    let t = f.target();
+    let target = t.to_str().unwrap();
+    equivalent(
+        &f,
+        Verb::StartupTrial,
+        &["startup", "trial", target, "--synthetic"],
+        |ctx| usage_of(startup_trial(ctx, &t, synthetic())),
+    );
+    // Armed: unreadable operands, no origin, two origins, a refused
+    // deadline, and a target with no manifest.
+    f.arm();
+    let cases: [(&[&str], Option<TrialOperands>); 5] = [
+        (&["--deadline", "x"], None),
+        (
+            &[],
+            Some(TrialOperands {
+                stated: vec![],
+                deadline: 60,
+            }),
+        ),
+        (
+            &["--synthetic", "--provider-session"],
+            Some(TrialOperands {
+                stated: vec![Origin::Synthetic, Origin::ProviderSession],
+                deadline: 60,
+            }),
+        ),
+        (
+            &["--synthetic", "--deadline", "0"],
+            Some(TrialOperands {
+                stated: vec![Origin::Synthetic],
+                deadline: 0,
+            }),
+        ),
+        (&["--synthetic"], synthetic()),
+    ];
+    for (flags, operands) in cases {
+        let mut args = vec!["startup", "trial", target];
+        args.extend_from_slice(flags);
+        let operands = std::cell::RefCell::new(operands);
+        equivalent(&f, Verb::StartupTrial, &args, |ctx| {
+            usage_of(startup_trial(ctx, &t, operands.borrow_mut().take()))
+        });
     }
 }
