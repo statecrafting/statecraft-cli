@@ -375,13 +375,13 @@ pub fn proposal_show(home: &Path, registry: &Registry, rest: &[String]) -> Outco
             .find(|r| &r.id == run_id)
             .and_then(|r| r.attempts.into_iter().find(|a| a.number == *attempt))
             .and_then(|a| a.outcome.map(|o| o.word().to_string()));
-        let acceptance =
-            statecraft_acceptance::suite::fold(run_id, &record.entries()).independent_result;
+        // Spec 005 judges acceptance when `accept` is asked and records no
+        // verdict, so the record has none to report.
         run = json!({
             "runId": run_id,
             "attempt": attempt,
             "outcome": outcome,
-            "acceptance": acceptance,
+            "acceptance": "not-recorded",
         });
     }
     let dispositions: Vec<Value> = dispositions
@@ -489,5 +489,100 @@ pub fn proposal_close(
                 format!("{word} {}\n", short(id)),
             ))
         }
+    }
+}
+
+/// `proposal admit`'s usage.
+pub const ADMIT_USAGE: &str = "usage: proposal admit <path> <id> <operator> <reason...>";
+
+/// `proposal admit <path> <id> <operator> <reason...>` (section 3.6): under
+/// the observation lock, recover, observe the proposal's ref afresh, and
+/// either dispose it `stale` (exit 1) or enter spec 003's run path at the
+/// fresh commit through spec 040's `run` operation, which takes the
+/// repository lock itself (observation lock, then repository lock, in that
+/// order only). Admitted, it answers as `run` does; refused by spec 003, it
+/// answers that refusal and the proposal is open again.
+pub fn proposal_admit(
+    home: &Path,
+    registry: &Registry,
+    clock: &dyn statecraft_environment::time::Clock,
+    rest: &[String],
+) -> Outcome {
+    use statecraft_observe::proposals::{Admission, AdmitError, admit};
+    let args = positional(rest);
+    let [path, id, operator, reason @ ..] = args.as_slice() else {
+        return Err(ADMIT_USAGE.to_string());
+    };
+    if reason.is_empty() {
+        return Err(ADMIT_USAGE.to_string());
+    }
+    let reason = reason.join(" ");
+    let path = absolute(path);
+    let root = match registered(registry, &path) {
+        Ok(root) => root,
+        Err(answer) => return Ok(answer),
+    };
+    let held = match store::lock(home, &root) {
+        Ok(held) => held,
+        Err(e) => return Ok(store_answer(&e)),
+    };
+    let mut chain = match Store::open(home, &root) {
+        Ok(chain) => chain,
+        Err(e) => return Ok(store_answer(&e)),
+    };
+    let at = statecraft_environment::time::rfc3339_utc(clock.now_unix());
+    if let Err(answer) = recovered(&held, &mut chain, home, &root, &at) {
+        return Ok(answer);
+    }
+    let judge = match crate::judge::report_source(&root) {
+        Ok(judge) => judge,
+        Err(e) => return Ok(crate::slice::report_error_answer(&e).erase()),
+    };
+    let commits = git(home);
+    let ctx = crate::application::Context {
+        home,
+        registry,
+        clock,
+    };
+    let admitted = admit(
+        &held,
+        &mut chain,
+        &Request {
+            home,
+            root: &root,
+            git_ref: None,
+            at: &at,
+        },
+        &Sources {
+            commits: &commits,
+            reports: &judge,
+            contracts: &judge,
+        },
+        id,
+        operator,
+        &reason,
+        |spec, commit| {
+            crate::application::run_admitted_proposal(
+                &ctx,
+                &root,
+                spec,
+                &crate::application::Origin {
+                    commit,
+                    proposal: id,
+                },
+            )
+        },
+    );
+    match admitted {
+        Ok(Admission::Admitted { answer, .. } | Admission::Released { answer }) => Ok(answer),
+        Ok(Admission::Stale { differing, .. }) => Ok(Answer::new(
+            json!({ "proposal": id, "disposition": "stale", "differing": differing }),
+            Exit::Finding,
+            format!("stale: {differing}; nothing was run\n"),
+        )),
+        Err(AdmitError::NotAdmissible(why)) => Ok(not_admissible(&why)),
+        Err(AdmitError::Observe(r)) => Ok(refusal_answer(r)),
+        Err(AdmitError::Store(e)) => Ok(store_answer(&e)),
+        Err(AdmitError::RunRecord(detail)) => Ok(failed(&detail)),
     }
 }

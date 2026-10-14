@@ -202,7 +202,12 @@ fn declined(e: &ReportError) -> Option<(String, String, String)> {
 /// What a new proposal names beside its identity: a spec-scoped notice names
 /// every open `run` proposal for its spec; a `corpus-refusal` names
 /// spec-spine's class and message.
-fn detail(candidate: &Candidate, ledger: &Ledger, refusal: Option<&Value>) -> Value {
+fn detail(
+    candidate: &Candidate,
+    ledger: &Ledger,
+    refusal: Option<&Value>,
+    bound: &[BoundAttempt],
+) -> Value {
     match (&candidate.kind, &candidate.scope) {
         (Kind::Notice, Scope::Spec { .. }) => {
             let open: Vec<&str> = ledger
@@ -210,7 +215,21 @@ fn detail(candidate: &Candidate, ledger: &Ledger, refusal: Option<&Value>) -> Va
                 .filter(|p| p.kind == Kind::Run && p.scope == candidate.scope)
                 .map(|p| p.id.as_str())
                 .collect();
-            json!({ "openRunProposals": open })
+            let mut detail = json!({ "openRunProposals": open });
+            // `moved-contract` also names every attempt bound to the earlier
+            // digest. No acceptance is recorded (spec 005 judges on demand),
+            // so each is unaccepted; whether it is live is said beside it.
+            if candidate.subscription == crate::subscription::Subscription::MovedContract
+                && let Some(earlier) = candidate.row["before"]["digest"].as_str()
+            {
+                let attempts: Vec<Value> = bound
+                    .iter()
+                    .filter(|a| a.digest == earlier)
+                    .map(|a| json!({ "runId": a.run_id, "attempt": a.attempt, "live": a.live }))
+                    .collect();
+                detail["boundAttempts"] = Value::Array(attempts);
+            }
+            detail
         }
         (Kind::Notice, Scope::Repository) => refusal.cloned().unwrap_or(Value::Null),
         (Kind::Run, _) => Value::Null,
@@ -227,19 +246,29 @@ fn append_planned(
     held: &Held,
     store: &mut Store,
     ledger: &mut Ledger,
-    at: &str,
+    request: &Request<'_>,
     observation: &str,
     git_ref: &str,
     candidates: &[Candidate],
     refusal: Option<&Value>,
 ) -> Result<Appended, Refusal> {
+    let bound = if candidates
+        .iter()
+        .any(|c| c.subscription == crate::subscription::Subscription::MovedContract)
+    {
+        bound_attempts(request.home, request.root)?
+    } else {
+        Vec::new()
+    };
     let entries = plan(ledger, observation, git_ref, candidates, |c, l| {
-        detail(c, l, refusal)
+        detail(c, l, refusal, &bound)
     });
     let mut proposals = Vec::new();
     let mut superseded = Vec::new();
     for entry in &entries {
-        store.append(held, at, entry).map_err(Refusal::Store)?;
+        store
+            .append(held, request.at, entry)
+            .map_err(Refusal::Store)?;
         ledger.apply(entry.clone());
         match entry {
             Entry::Proposed { proposal, .. } | Entry::Recurred { proposal, .. } => {
@@ -263,6 +292,41 @@ fn append_planned(
         }
     }
     Ok((proposals, superseded))
+}
+
+/// An attempt and the closure digest its intent bound it to (spec 003
+/// section 3.1.3).
+struct BoundAttempt {
+    run_id: String,
+    attempt: u32,
+    digest: String,
+    live: bool,
+}
+
+/// Every attempt in the run record with a bound closure digest.
+fn bound_attempts(home: &Path, root: &Path) -> Result<Vec<BoundAttempt>, Refusal> {
+    let (chain, _) = statecraft_run::record::Chain::open(home, root)
+        .map_err(|e| Refusal::Overrides(format!("the run record could not be read: {e}")))?;
+    let runs = statecraft_run::session::runs(&chain);
+    Ok(chain
+        .entries()
+        .into_iter()
+        .filter(|e| e.kind == statecraft_run::record::Kind::Intent)
+        .filter_map(|e| {
+            let digest = e.detail["contract"]["digest"].as_str()?.to_string();
+            let live = runs
+                .iter()
+                .find(|r| r.id == e.run_id)
+                .and_then(|r| r.attempts.iter().find(|a| a.number == e.attempt))
+                .is_some_and(|a| a.live());
+            Some(BoundAttempt {
+                run_id: e.run_id,
+                attempt: e.attempt,
+                digest,
+                live,
+            })
+        })
+        .collect())
 }
 
 /// One observation, under the caller's hold of the observation lock.
@@ -384,7 +448,7 @@ pub fn observe(
             held,
             store,
             &mut ledger,
-            request.at,
+            request,
             &last.observation,
             &last.git_ref,
             &missing,
@@ -433,7 +497,7 @@ pub fn observe(
         held,
         store,
         &mut ledger,
-        request.at,
+        request,
         &observation,
         &git_ref,
         &candidates,

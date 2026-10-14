@@ -535,7 +535,8 @@ fn run(args: &[String]) -> i32 {
         | Verb::ProposalList
         | Verb::ProposalShow
         | Verb::ProposalDismiss
-        | Verb::ProposalAcknowledge => {
+        | Verb::ProposalAcknowledge
+        | Verb::ProposalAdmit => {
             use statecraft_cli::observe as o;
             let clock = statecraft_cli::application::process_clock();
             let (home, registry, rest) = (&home, &registry, &invocation.rest);
@@ -550,6 +551,7 @@ fn run(args: &[String]) -> i32 {
                 Verb::ProposalAcknowledge => {
                     o::proposal_close(home, registry, clock.as_ref(), rest, true)
                 }
+                Verb::ProposalAdmit => o::proposal_admit(home, registry, clock.as_ref(), rest),
                 _ => unreachable!("the outer arm admits only the observe and proposal verbs"),
             };
             match outcome {

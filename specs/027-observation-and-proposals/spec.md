@@ -2,7 +2,7 @@
 id: "027-observation-and-proposals"
 title: "Observation and proposals: noticing that a repository's governed truth changed, and proposing typed work without acting on it"
 status: approved
-implementation: pending
+implementation: complete
 created: "2026-09-28"
 summary: >
   Adds the transition this product lacks between "spec-spine says the
@@ -662,6 +662,23 @@ repository scope the observation immediately before it; a producer that does
 not answer is `unavailable` with its reason. A refusal from a closing verb is
 told apart by its reason: `no-such-proposal`, `wrong-kind` (naming the verb
 that closes the kind) or `not-open` (naming where it stands).
+
+**2026-10-13: admission, the intent member, and 027 complete.** `proposal
+admit` holds the observation lock, recovers, observes the proposal's latest
+ref afresh, and writes `stale` naming what differs, or `admitting` and then
+enters spec 040's `run` operation at the fresh commit: the same registration,
+arming, repository lock, report, policy and journal admission as `run`, with
+the workspace prepared at the observed commit and the proposal written into
+the intent under `proposal`. Whether the admission ended `admitted` or
+`released` is read from the run record (an intent naming the proposal), never
+from the run's answer, so a crash between the two is decided the same way by
+recovery. The `moved-contract` notice names every attempt whose intent bound
+the earlier digest, with whether it is live; spec 005 judges acceptance when
+`accept` is asked and persists no verdict, so each such attempt is
+unaccepted, and `proposal show` reports acceptance as `not-recorded`. A
+commit holding a gitlink cannot be materialized by spec 003's trusted export,
+which takes regular blobs only; such an observation fails (exit 4) naming it,
+and records nothing.
 
 ## Verification
 

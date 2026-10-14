@@ -240,13 +240,14 @@ pub fn launch_attempt(
         &mut chain,
         root,
         &run_id,
-        "HEAD",
+        &plan.base,
         clock,
         &statecraft_run::session::IntentDetail {
             contract: Some(&contract),
             admission: plan.admission.as_ref(),
             posture_coverage: planning.as_ref(),
             judge: judge.as_ref(),
+            proposal: plan.proposal.as_deref(),
         },
         Some(&mut admission),
     ) {

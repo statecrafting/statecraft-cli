@@ -9,6 +9,16 @@ use std::process::{Command, Output};
 
 #[path = "support/json_naming.rs"]
 mod json_naming;
+#[path = "support/provider_token.rs"]
+mod provider_token;
+
+/// A provider that reads its prompt and replays a recorded successful
+/// stream, so an admitted proposal's attempt runs to an outcome.
+const PROVIDER: &str = r#"#!/bin/sh
+if [ "$1" = --version ]; then echo '2.1.267'; exit 0; fi
+/bin/cat > /dev/null
+/bin/cat "$(dirname "$0")/native.jsonl"
+"#;
 
 /// Answers from `.fake/` in the tree it runs in: `plan.json`, `list.json`,
 /// `closure-<spec>` (a digest) and `stale` (present means a stale ledger).
@@ -20,6 +30,7 @@ case "$*" in
   check) if [ -f "$f/stale" ]; then echo 'spec-registry: STALE'; echo 'spec-registry: STALE' >&2; exit 2; fi ;;
   'registry plan --json') /bin/cat "$f/plan.json" ;;
   'registry list --json') /bin/cat "$f/list.json" ;;
+  'verify '*' --plan --json') printf '{"exitCode":0,"ok":true,"report":{"commands":[],"skipped":[],"specId":"%s"},"schemaVersion":"0.6.0","verb":"verify"}' $2 ;;
   'registry closure --help') exit 0 ;;
   'registry closure --request - --json')
     req="$(/bin/cat)"
@@ -38,6 +49,7 @@ struct Fixture {
     target: tempfile::TempDir,
     home: tempfile::TempDir,
     bin: tempfile::TempDir,
+    operator_home: tempfile::TempDir,
 }
 
 fn git(dir: &Path, args: &[&str]) -> String {
@@ -56,15 +68,28 @@ impl Fixture {
             target: tempfile::tempdir().unwrap(),
             home: tempfile::tempdir().unwrap(),
             bin: tempfile::tempdir().unwrap(),
+            operator_home: tempfile::tempdir().unwrap(),
         };
+        std::fs::write(f.operator_home.path().join(".claude.json"), "{}").unwrap();
         let t = f.target.path();
         git(t, &["init", "--quiet", "-b", "main"]);
         git(t, &["config", "user.name", "fixture"]);
         git(t, &["config", "user.email", "fixture@example.com"]);
+        // As every governed target does: run state is never committed.
+        std::fs::write(t.join(".gitignore"), ".statecraft/state/\n").unwrap();
         let program = f.bin.path().join("spec-spine");
         std::fs::write(&program, SPEC_SPINE).unwrap();
         use std::os::unix::fs::PermissionsExt;
         std::fs::set_permissions(&program, std::fs::Permissions::from_mode(0o755)).unwrap();
+        let provider = f.bin.path().join("claude");
+        std::fs::write(&provider, PROVIDER).unwrap();
+        std::fs::set_permissions(&provider, std::fs::Permissions::from_mode(0o755)).unwrap();
+        std::fs::copy(
+            Path::new(env!("CARGO_MANIFEST_DIR"))
+                .join("../statecraft-adapter-claude-code/testdata/stream/success.jsonl"),
+            f.bin.path().join("native.jsonl"),
+        )
+        .unwrap();
         f.commit(
             &[("001-a", "approved", Some("c1")), ("002-b", "draft", None)],
             false,
@@ -128,12 +153,16 @@ impl Fixture {
         Command::new(env!("CARGO_BIN_EXE_statecraft-cli"))
             .args(args)
             .env_clear()
-            .env("STATECRAFT_HOME", self.home.path())
-            .env("HOME", self.home.path())
+            .env(
+                "STATECRAFT_HOME",
+                provider_token::with_token(self.home.path()),
+            )
+            .env("HOME", self.operator_home.path())
             .env(
                 "PATH",
                 format!("{}:/usr/bin:/bin", self.bin.path().display()),
             )
+            .env("USER", "fixture-operator")
             .output()
             .unwrap()
     }
@@ -446,4 +475,99 @@ fn the_proposal_verbs_list_trace_and_close_each_kind_by_its_own_verb() {
 
     let (code, unknown) = verb(&f, &["proposal", "show", &root, "nope"]);
     assert_eq!(code, 2, "{unknown}");
+}
+
+fn first_run_proposal(f: &Fixture) -> String {
+    let (_, first) = f.observe(&[]);
+    first["report"]["proposals"][0]["proposal"]
+        .as_str()
+        .unwrap()
+        .to_string()
+}
+
+#[test]
+fn admission_is_stale_when_the_repository_moved_and_never_runs() {
+    let f = Fixture::new(true);
+    let root = f.root();
+    let id = first_run_proposal(&f);
+    // The contract moved on the observed ref since the proposal was made.
+    f.commit(&[("001-a", "approved", Some("c2"))], false);
+    let (code, stale) = verb(&f, &["proposal", "admit", &root, &id, "sam", "go"]);
+    assert_eq!(code, 1, "{stale}");
+    assert!(
+        stale["report"]["differing"]
+            .as_str()
+            .unwrap()
+            .contains("c1")
+    );
+    let (_, shown) = verb(&f, &["proposal", "show", &root, &id]);
+    assert_eq!(shown["report"]["state"], "stale");
+    assert!(
+        !f.home.path().join("records").exists() || {
+            let out = f.cli(&["run", "show", &root, "001-a", "--json"]);
+            out.status.code() != Some(0)
+        }
+    );
+
+    // A notice is never admitted.
+    let g = Fixture::new(true);
+    let root = g.root();
+    g.observe(&[]);
+    g.commit(&[("001-a", "draft", None)], false);
+    let (_, exited) = g.observe(&[]);
+    let notice = exited["report"]["proposals"][0]["proposal"]
+        .as_str()
+        .unwrap();
+    let (code, wrong) = verb(&g, &["proposal", "admit", &root, notice, "sam", "go"]);
+    assert_eq!(code, 2);
+    assert_eq!(wrong["error"]["details"]["reason"], "wrong-kind");
+}
+
+#[test]
+fn a_spec_003_refusal_releases_the_admission_and_the_proposal_is_open_again() {
+    // Registered but not armed: spec 003's run path refuses before any
+    // attempt, so the admission is released, not disposed.
+    let f = Fixture::new(true);
+    let root = f.root();
+    let id = first_run_proposal(&f);
+    let (code, refused) = verb(&f, &["proposal", "admit", &root, &id, "sam", "go"]);
+    assert_eq!(code, 2, "{refused}");
+    let tail: Vec<_> = entries(&f.chain()).into_iter().rev().take(2).collect();
+    assert_eq!(tail, ["released", "admitting"]);
+    let (_, listed) = verb(&f, &["proposal", "list", &root]);
+    assert_eq!(listed["report"]["proposals"][0]["state"], "open");
+}
+
+#[test]
+fn an_admitted_proposal_enters_the_run_path_and_names_itself_in_the_intent() {
+    let f = Fixture::new(true);
+    let root = f.root();
+    assert_eq!(f.cli(&["project", "arm", &root]).status.code(), Some(0));
+    let id = first_run_proposal(&f);
+    let (code, ran) = verb(&f, &["proposal", "admit", &root, &id, "sam", "go"]);
+    assert!(code <= 1, "{ran}");
+    assert_eq!(ran["verb"], "proposal.admit");
+    let (_, shown) = verb(&f, &["proposal", "show", &root, &id]);
+    assert_eq!(shown["report"]["state"], "admitted", "{shown}");
+    assert_eq!(shown["report"]["run"]["runId"], "001-a");
+    assert_eq!(shown["report"]["run"]["attempt"], 1);
+    // Admitted once: a second admission is refused; a retry is `run`.
+    let (code, again) = verb(&f, &["proposal", "admit", &root, &id, "sam", "again"]);
+    assert_eq!(code, 2);
+    assert_eq!(again["error"]["details"]["reason"], "not-open");
+
+    // The contract moves: the moved-contract notice names the attempt bound
+    // to the earlier digest.
+    f.commit(&[("001-a", "approved", Some("c2"))], false);
+    let (code, moved) = f.observe(&[]);
+    assert_eq!(code, 0, "{moved}");
+    let notice = f
+        .chain()
+        .into_iter()
+        .find(|e| e["subscription"] == "moved-contract")
+        .unwrap();
+    assert_eq!(
+        notice["detail"]["boundAttempts"],
+        serde_json::json!([{ "runId": "001-a", "attempt": 1, "live": false }])
+    );
 }

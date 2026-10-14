@@ -418,6 +418,7 @@ fn the_grown_command_tree_still_has_no_verb_that_publishes() {
     // with spec 036's offline trust verbs; three more with spec 042's
     // provider token verbs; four more with spec 038's hosted verbs; two more
     // with spec 027's `observe` and `observe show`; and four more with its
-    // `proposal list`, `show`, `dismiss` and `acknowledge`.
-    assert_eq!(statecraft_cli::commands::Verb::all().len(), 59);
+    // `proposal list`, `show`, `dismiss` and `acknowledge`; and one more
+    // with `proposal admit`.
+    assert_eq!(statecraft_cli::commands::Verb::all().len(), 60);
 }

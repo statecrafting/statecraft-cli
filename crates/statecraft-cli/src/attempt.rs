@@ -30,6 +30,12 @@ pub struct AttemptPlan {
     /// The repository lock `run` took before it read the override journal
     /// (spec 003 section 3.1.5 rule 8). The trial takes its own.
     pub held: Option<statecraft_run::lock::Held>,
+    /// The revision the workspace is prepared at: `HEAD`, or for an admitted
+    /// spec 027 proposal the commit its fresh observation read.
+    pub base: String,
+    /// The spec 027 proposal whose admission this attempt is, written into
+    /// the intent.
+    pub proposal: Option<String>,
 }
 
 impl AttemptPlan {
@@ -47,6 +53,8 @@ impl AttemptPlan {
             admission: Some(admission),
             planned: Some(planned),
             held: Some(held),
+            base: "HEAD".to_string(),
+            proposal: None,
         }
     }
 
@@ -59,6 +67,8 @@ impl AttemptPlan {
             admission: None,
             planned: None,
             held: None,
+            base: "HEAD".to_string(),
+            proposal: None,
         }
     }
 }

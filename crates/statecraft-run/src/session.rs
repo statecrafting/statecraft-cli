@@ -232,6 +232,7 @@ pub fn begin_admitted(
             admission,
             posture_coverage: None,
             judge: None,
+            proposal: None,
         },
     )
 }
@@ -251,6 +252,9 @@ pub struct IntentDetail<'a> {
     /// The spec-spine one resolution selected for this operation (spec 029
     /// section 3.3). Written under `judge`.
     pub judge: Option<&'a statecraft_environment::judge::JudgeRecord>,
+    /// The spec 027 proposal whose admission caused this attempt. Written
+    /// under `proposal`; an intent without it was admitted by `run`.
+    pub proposal: Option<&'a str>,
 }
 
 /// [`begin_admitted`], with every part of the intent's detail named.
@@ -285,6 +289,7 @@ pub fn begin_checked(
         admission,
         posture_coverage,
         judge,
+        proposal,
     } = *intent;
     for run in runs(chain) {
         if let Some(live) = run.live_attempt() {
@@ -380,6 +385,11 @@ pub fn begin_checked(
                 if let Some(judge) = judge {
                     detail["judge"] = serde_json::to_value(judge)
                         .unwrap_or_else(|e| serde_json::json!({ "unserializable": e.to_string() }));
+                }
+                // Spec 027 section 3.7: the admitting proposal, once, with the
+                // intent, before any effect.
+                if let Some(proposal) = proposal {
+                    detail["proposal"] = serde_json::Value::String(proposal.to_string());
                 }
                 detail
             },

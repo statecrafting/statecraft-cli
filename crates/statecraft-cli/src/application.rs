@@ -510,6 +510,41 @@ fn observed_launch_state(
 /// as the verb orders it. An unregistered or unarmed target refuses before
 /// any workspace, appended attempt or provider.
 pub fn run(ctx: &Context<'_>, path: &Path, spec_id: Option<&str>) -> Result<Response, Usage> {
+    run_from(ctx, path, spec_id, None)
+}
+
+/// Where an admitted spec 027 proposal enters the run path: the commit its
+/// fresh observation read, and the proposal the intent names.
+pub struct Origin<'a> {
+    /// The commit the workspace is prepared at.
+    pub commit: &'a str,
+    /// The admitting proposal.
+    pub proposal: &'a str,
+}
+
+/// [`run`], entered by an admitted spec 027 proposal (section 3.6 step 3):
+/// the same admission (registration, arming, the repository lock, the
+/// report, the policy and the journal, none of them bypassed or pre-decided),
+/// with the workspace prepared at the observed commit and the proposal named
+/// in the intent.
+pub fn run_admitted_proposal(
+    ctx: &Context<'_>,
+    path: &Path,
+    spec_id: &str,
+    origin: &Origin<'_>,
+) -> Response {
+    match run_from(ctx, path, Some(spec_id), Some(origin)) {
+        Ok(answer) => answer,
+        Err(Usage(detail)) => failed(&detail),
+    }
+}
+
+fn run_from(
+    ctx: &Context<'_>,
+    path: &Path,
+    spec_id: Option<&str>,
+    origin: Option<&Origin<'_>>,
+) -> Result<Response, Usage> {
     let root = match registered(ctx.registry, path) {
         Ok(root) => root,
         Err(answer) => return Ok(answer),
@@ -544,7 +579,9 @@ pub fn run(ctx: &Context<'_>, path: &Path, spec_id: Option<&str>) -> Result<Resp
     let Some(spec_id) = spec_id else {
         return Err(Usage("usage: run <path> <spec-id>".to_string()));
     };
-    Ok(run_admitted(ctx, &root, spec_id, work, &report, held))
+    Ok(run_admitted(
+        ctx, &root, spec_id, work, &report, held, origin,
+    ))
 }
 
 /// The attempt itself, once [`run`] has admitted it.
@@ -555,6 +592,7 @@ fn run_admitted(
     work: statecraft_run::work::WorkList,
     report: &statecraft_run::report::CorpusReport,
     held: statecraft_run::lock::Held,
+    origin: Option<&Origin<'_>>,
 ) -> Response {
     // A unit of work the policy did not admit is never run, and the reason is
     // the answer (spec 003 section 3.1.1).
@@ -581,15 +619,12 @@ fn run_admitted(
     };
     let contract =
         statecraft_run::contract::bind(&judge, root, spec_id, report.lifecycle_of(spec_id));
-    crate::launch::launch_attempt(
-        ctx.clock,
-        root,
-        ctx.home,
-        spec_id,
-        crate::attempt::AttemptPlan::work_order(spec_id, admission, planned, held),
-        contract,
-        None,
-    )
+    let mut plan = crate::attempt::AttemptPlan::work_order(spec_id, admission, planned, held);
+    if let Some(origin) = origin {
+        plan.base = origin.commit.to_string();
+        plan.proposal = Some(origin.proposal.to_string());
+    }
+    crate::launch::launch_attempt(ctx.clock, root, ctx.home, spec_id, plan, contract, None)
 }
 
 // ----------------------------------------------------------- startup trial
