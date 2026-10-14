@@ -62,6 +62,7 @@ pub mod coverage;
 pub mod exit;
 pub mod hosted;
 pub mod judge;
+pub mod launch;
 pub mod manage;
 pub mod provider;
 pub mod render;

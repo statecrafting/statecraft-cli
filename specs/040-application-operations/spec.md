@@ -204,6 +204,12 @@ finalization, the trial conclusion and the attempt conclusion move unchanged
 into `statecraft_cli::attempt`; the conclusion returns its answer, the binary
 renders it, and finalization and conclusion take the clock as an argument.
 
+**2026-10-12: slice 3.** The shared launch body moves in order into
+`statecraft_cli::launch::launch_attempt`, with its supervision, held locks and
+admission, cleanup and finalization unchanged; it takes the clock and returns
+its answer, and the two refusals it can answer before a launch move with it.
+The binary keeps a wrapper that renders.
+
 ## Verification
 
 These commands are required for final implementation acceptance. While
