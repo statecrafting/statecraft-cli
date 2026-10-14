@@ -340,3 +340,30 @@ fn an_unresolved_ref_an_unregistered_target_and_a_held_lock_are_refused() {
     assert_eq!(code, 0);
     assert_eq!(pinned["report"]["ref"], first.as_str());
 }
+
+#[test]
+fn a_crash_after_the_observed_entry_is_completed_by_the_next_unchanged_observation() {
+    let f = Fixture::new(true);
+    f.observe(&[]);
+    // The process died after `observed` and before its `proposed`.
+    let dir = f.home.path().join("observations");
+    let file = std::fs::read_dir(&dir)
+        .unwrap()
+        .flatten()
+        .map(|e| e.path())
+        .find(|p| p.extension().is_some_and(|x| x == "jsonl"))
+        .unwrap();
+    let text = std::fs::read_to_string(&file).unwrap();
+    let first = text.lines().next().unwrap();
+    std::fs::write(&file, format!("{first}\n")).unwrap();
+    assert_eq!(entries(&f.chain()), ["observed"]);
+
+    let (code, again) = f.observe(&[]);
+    assert_eq!(code, 0, "{again}");
+    assert_eq!(again["report"]["result"], "unchanged");
+    assert_eq!(again["report"]["proposals"][0]["entry"], "proposed");
+    assert_eq!(entries(&f.chain()), ["observed", "proposed"]);
+    // And only once.
+    let (_, third) = f.observe(&[]);
+    assert!(third["report"]["proposals"].as_array().unwrap().is_empty());
+}

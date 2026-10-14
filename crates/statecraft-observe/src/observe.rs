@@ -77,11 +77,16 @@ impl CommitSource for Git {
         let kept = partial.keep();
         match std::fs::rename(&kept, &tree) {
             Ok(()) => Ok(tree),
-            Err(_) if tree.is_dir() => {
+            Err(e) => {
+                // Never leave a partial export behind, whether another
+                // observation won the race or the rename failed.
                 let _ = std::fs::remove_dir_all(&kept);
-                Ok(tree)
+                if tree.is_dir() {
+                    Ok(tree)
+                } else {
+                    Err(e.to_string())
+                }
             }
-            Err(e) => Err(e.to_string()),
         }
     }
 }
@@ -212,6 +217,54 @@ fn detail(candidate: &Candidate, ledger: &Ledger, refusal: Option<&Value>) -> Va
     }
 }
 
+/// Each proposal made or caused again, and each supersession (old, by).
+type Appended = (Vec<Touched>, Vec<(String, String)>);
+
+/// Plan and append what `candidates` call for under `observation`, returning
+/// each proposal made or caused again and each supersession.
+#[allow(clippy::too_many_arguments)]
+fn append_planned(
+    held: &Held,
+    store: &mut Store,
+    ledger: &mut Ledger,
+    at: &str,
+    observation: &str,
+    git_ref: &str,
+    candidates: &[Candidate],
+    refusal: Option<&Value>,
+) -> Result<Appended, Refusal> {
+    let entries = plan(ledger, observation, git_ref, candidates, |c, l| {
+        detail(c, l, refusal)
+    });
+    let mut proposals = Vec::new();
+    let mut superseded = Vec::new();
+    for entry in &entries {
+        store.append(held, at, entry).map_err(Refusal::Store)?;
+        ledger.apply(entry.clone());
+        match entry {
+            Entry::Proposed { proposal, .. } | Entry::Recurred { proposal, .. } => {
+                let p = ledger.proposal(proposal).expect("applied above");
+                proposals.push(Touched {
+                    proposal: proposal.clone(),
+                    kind: p.kind,
+                    scope: p.scope.clone(),
+                    entry: if matches!(entry, Entry::Proposed { .. }) {
+                        "proposed"
+                    } else {
+                        "recurred"
+                    },
+                });
+            }
+            Entry::Disposed {
+                proposal,
+                disposition: crate::proposal::Disposition::Superseded { by },
+            } => superseded.push((proposal.clone(), by.clone())),
+            _ => {}
+        }
+    }
+    Ok((proposals, superseded))
+}
+
 /// One observation, under the caller's hold of the observation lock.
 pub fn observe(
     held: &Held,
@@ -298,9 +351,45 @@ pub fn observe(
         "overrides": overrides,
     }));
     let mut ledger = Ledger::fold(store.entries().to_vec());
-    if let Some(last) = ledger.previous()
+    // Unchanged: the same input identity as the last recorded observation
+    // writes no second `observed` entry. If the process that wrote that entry
+    // died before every proposal it called for was appended, those are
+    // appended now, under the same observation, so a crash never silences a
+    // proposal (section 3.8: the chain holds no unknown state of its own).
+    if let Some(last) = ledger.previous().cloned()
         && last.input_identity == input_identity
     {
+        let position = ledger.observations.last().map_or(0, |(p, _)| *p);
+        let written: std::collections::BTreeSet<&str> = store.entries()[position + 1..]
+            .iter()
+            .filter_map(|e| match e {
+                Entry::Proposed {
+                    proposal,
+                    observation,
+                    ..
+                }
+                | Entry::Recurred {
+                    proposal,
+                    observation,
+                    ..
+                } if observation == &last.observation => Some(proposal.as_str()),
+                _ => None,
+            })
+            .collect();
+        let missing: Vec<Candidate> = matches(&last.transitions, &last.projections)
+            .into_iter()
+            .filter(|c| !written.contains(c.id().as_str()))
+            .collect();
+        let (proposals, superseded) = append_planned(
+            held,
+            store,
+            &mut ledger,
+            request.at,
+            &last.observation,
+            &last.git_ref,
+            &missing,
+            None,
+        )?;
         return Ok(Observation {
             result: "unchanged",
             observation: last.observation.clone(),
@@ -308,8 +397,8 @@ pub fn observe(
             commit,
             refusal: None,
             transitions: Vec::new(),
-            proposals: Vec::new(),
-            superseded: Vec::new(),
+            proposals,
+            superseded,
         });
     }
 
@@ -340,37 +429,16 @@ pub fn observe(
         .map_err(Refusal::Store)?;
     ledger.apply(observed);
 
-    let entries = plan(&ledger, &observation, &git_ref, &candidates, |c, l| {
-        detail(c, l, refusal.as_ref())
-    });
-    let mut proposals = Vec::new();
-    let mut superseded = Vec::new();
-    for entry in &entries {
-        store
-            .append(held, request.at, entry)
-            .map_err(Refusal::Store)?;
-        ledger.apply(entry.clone());
-        match entry {
-            Entry::Proposed { proposal, .. } | Entry::Recurred { proposal, .. } => {
-                let p = ledger.proposal(proposal).expect("applied above");
-                proposals.push(Touched {
-                    proposal: proposal.clone(),
-                    kind: p.kind,
-                    scope: p.scope.clone(),
-                    entry: if matches!(entry, Entry::Proposed { .. }) {
-                        "proposed"
-                    } else {
-                        "recurred"
-                    },
-                });
-            }
-            Entry::Disposed {
-                proposal,
-                disposition: crate::proposal::Disposition::Superseded { by },
-            } => superseded.push((proposal.clone(), by.clone())),
-            _ => {}
-        }
-    }
+    let (proposals, superseded) = append_planned(
+        held,
+        store,
+        &mut ledger,
+        request.at,
+        &observation,
+        &git_ref,
+        &candidates,
+        refusal.as_ref(),
+    )?;
     Ok(Observation {
         result: if projections.corpus_state.answered() {
             "answered"
