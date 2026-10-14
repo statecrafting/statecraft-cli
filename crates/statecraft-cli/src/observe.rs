@@ -89,12 +89,15 @@ pub fn observe(
         Ok(chain) => chain,
         Err(e) => return Ok(store_answer(&e)),
     };
+    let at = statecraft_environment::time::rfc3339_utc(clock.now_unix());
+    if let Err(answer) = recovered(&held, &mut chain, home, &root, &at) {
+        return Ok(answer);
+    }
     let judge = match crate::judge::report_source(&root) {
         Ok(judge) => judge,
         Err(e) => return Ok(crate::slice::report_error_answer(&e).erase()),
     };
     let commits = git(home);
-    let at = statecraft_environment::time::rfc3339_utc(clock.now_unix());
     let found = statecraft_observe::observe::observe(
         &held,
         &mut chain,
@@ -215,4 +218,276 @@ fn absolute(path: &str) -> PathBuf {
 
 fn short(id: &str) -> &str {
     id.get(..12).unwrap_or(id)
+}
+
+/// `proposal list`'s usage.
+pub const LIST_USAGE: &str = "usage: proposal list <path>";
+/// `proposal show`'s usage.
+pub const PROPOSAL_SHOW_USAGE: &str = "usage: proposal show <path> <id>";
+/// `proposal dismiss`'s usage.
+pub const DISMISS_USAGE: &str = "usage: proposal dismiss <path> <id> <operator> <reason...>";
+/// `proposal acknowledge`'s usage.
+pub const ACKNOWLEDGE_USAGE: &str = "usage: proposal acknowledge <path> <id> <operator>";
+
+fn positional(rest: &[String]) -> Vec<&str> {
+    rest.iter()
+        .filter(|a| a.as_str() != "--json")
+        .map(String::as_str)
+        .collect()
+}
+
+fn not_admissible(why: &statecraft_observe::proposals::NotAdmissible) -> Answer<Value> {
+    use statecraft_observe::proposals::NotAdmissible;
+    let reason = match why {
+        NotAdmissible::Unknown(_) => "no-such-proposal",
+        NotAdmissible::WrongKind { .. } => "wrong-kind",
+        NotAdmissible::NotOpen(_) => "not-open",
+    };
+    let answer = Answer::new(
+        json!({ "outcome": "refused", "reason": reason, "detail": why.to_string() }),
+        Exit::Refused,
+        format!("refused: {why}\n"),
+    );
+    if matches!(why, NotAdmissible::Unknown(_)) {
+        answer.with_kind(crate::render::ErrorKind::NotFound)
+    } else {
+        answer
+    }
+}
+
+/// Recover every orphaned admission under the caller's hold (section 3.8):
+/// the first thing every chain writer does after taking the lock.
+fn recovered(
+    held: &store::Held,
+    chain: &mut Store,
+    home: &Path,
+    root: &Path,
+    at: &str,
+) -> Result<Vec<statecraft_observe::proposal::Entry>, Answer<Value>> {
+    statecraft_observe::proposals::recover(held, chain, home, root, at).map_err(|e| match e {
+        statecraft_observe::proposals::RecoverError::Store(e) => store_answer(&e),
+        other => failed(&other.to_string()),
+    })
+}
+
+/// `proposal list <path>`: open proposals in the order first proposed, and
+/// any admission not yet recovered. Takes no lock and writes nothing.
+pub fn proposal_list(home: &Path, registry: &Registry, rest: &[String]) -> Outcome {
+    let args = positional(rest);
+    let [path] = args.as_slice() else {
+        return Err(LIST_USAGE.to_string());
+    };
+    let root = match registered(registry, &absolute(path)) {
+        Ok(root) => root,
+        Err(answer) => return Ok(answer),
+    };
+    let chain = match Store::open(home, &root) {
+        Ok(chain) => chain,
+        Err(e) => return Ok(store_answer(&e)),
+    };
+    let ledger = statecraft_observe::proposal::Ledger::fold(chain.entries().to_vec());
+    let rows = statecraft_observe::proposals::list(&ledger);
+    let mut summary = format!("{} open proposal(s)\n", rows.len());
+    for r in &rows {
+        summary.push_str(&format!(
+            "  {} {} for {} ({}, {}): {}\n",
+            r.kind.word(),
+            short(&r.proposal),
+            r.spec.as_deref().unwrap_or("the repository"),
+            r.subscription,
+            r.git_ref,
+            r.state
+        ));
+    }
+    Ok(Answer::new(
+        json!({ "proposals": rows, "tornTail": chain.torn_tail().map(|t| t.bytes) }),
+        Exit::Ok,
+        summary,
+    ))
+}
+
+/// spec-spine's `delta` between two commits, verbatim, or `unavailable` with
+/// its reason (section 3.9): never derived from the projections.
+fn delta(root: &Path, base: &str, head: &str) -> Value {
+    let program = match crate::judge::program(root) {
+        Ok(p) => p,
+        Err(why) => return json!({ "state": "unavailable", "reason": why }),
+    };
+    match std::process::Command::new(&program)
+        .args(["delta", "--base", base, "--head", head, "--json"])
+        .current_dir(root)
+        .output()
+    {
+        Ok(out) if out.status.success() => match serde_json::from_slice::<Value>(&out.stdout) {
+            Ok(report) => json!({ "state": "reported", "report": report }),
+            Err(e) => json!({ "state": "unavailable", "reason": format!("not JSON: {e}") }),
+        },
+        Ok(out) => json!({
+            "state": "unavailable",
+            "reason": String::from_utf8_lossy(&out.stderr).trim().to_string(),
+        }),
+        Err(e) => json!({ "state": "unavailable", "reason": e.to_string() }),
+    }
+}
+
+/// `proposal show <path> <id>`: the causal trace. Takes no lock and writes
+/// nothing.
+pub fn proposal_show(home: &Path, registry: &Registry, rest: &[String]) -> Outcome {
+    use statecraft_observe::proposal::{Disposition, Ledger};
+    let args = positional(rest);
+    let [path, id] = args.as_slice() else {
+        return Err(PROPOSAL_SHOW_USAGE.to_string());
+    };
+    let root = match registered(registry, &absolute(path)) {
+        Ok(root) => root,
+        Err(answer) => return Ok(answer),
+    };
+    let chain = match Store::open(home, &root) {
+        Ok(chain) => chain,
+        Err(e) => return Ok(store_answer(&e)),
+    };
+    let ledger = Ledger::fold(chain.entries().to_vec());
+    let Some(p) = ledger.proposal(id) else {
+        return Ok(not_admissible(
+            &statecraft_observe::proposals::NotAdmissible::Unknown(id.to_string()),
+        ));
+    };
+    let (causes, dispositions) = statecraft_observe::proposals::trace(&ledger, chain.entries(), p);
+    let causes: Vec<Value> = causes
+        .into_iter()
+        .map(|c| {
+            let explanation = match &c.compared_with {
+                None => json!({ "state": "initial", "commit": c.commit }),
+                Some(base) => delta(&root, base, &c.commit),
+            };
+            let mut v = serde_json::to_value(&c).expect("a cause serializes");
+            v["delta"] = explanation;
+            v
+        })
+        .collect();
+    let mut run = Value::Null;
+    if let statecraft_observe::proposal::State::Disposed(Disposition::Admitted { run_id, attempt }) =
+        &p.state
+        && let Ok((record, _)) = statecraft_run::record::Chain::open(home, &root)
+    {
+        let outcome = statecraft_run::session::runs(&record)
+            .into_iter()
+            .find(|r| &r.id == run_id)
+            .and_then(|r| r.attempts.into_iter().find(|a| a.number == *attempt))
+            .and_then(|a| a.outcome.map(|o| o.word().to_string()));
+        let acceptance =
+            statecraft_acceptance::suite::fold(run_id, &record.entries()).independent_result;
+        run = json!({
+            "runId": run_id,
+            "attempt": attempt,
+            "outcome": outcome,
+            "acceptance": acceptance,
+        });
+    }
+    let dispositions: Vec<Value> = dispositions
+        .into_iter()
+        .map(|(position, e)| {
+            let mut v = serde_json::to_value(&e).expect("an entry serializes");
+            v["position"] = json!(position);
+            v
+        })
+        .collect();
+    let summary = format!(
+        "{} {} for {} ({}): {}, {} cause(s)\n",
+        p.kind.word(),
+        short(&p.id),
+        p.scope.spec().unwrap_or("the repository"),
+        p.subscription.id(),
+        p.state.word(),
+        causes.len()
+    );
+    Ok(Answer::new(
+        json!({
+            "proposal": p.id,
+            "kind": p.kind,
+            "scope": p.scope,
+            "subscription": p.subscription.id(),
+            "row": p.row,
+            "state": p.state.word(),
+            "causes": causes,
+            "dispositions": dispositions,
+            "run": run,
+        }),
+        Exit::Ok,
+        summary,
+    ))
+}
+
+/// `proposal dismiss` and `proposal acknowledge`: under the observation lock,
+/// recover any orphaned admission, then write the one disposition. Exit 0
+/// when written; 2 when the lock is held or the proposal is of the other kind
+/// or not open.
+pub fn proposal_close(
+    home: &Path,
+    registry: &Registry,
+    clock: &dyn statecraft_environment::time::Clock,
+    rest: &[String],
+    acknowledge: bool,
+) -> Outcome {
+    use statecraft_observe::proposal::Disposition;
+    let args = positional(rest);
+    let (path, id, disposition) = if acknowledge {
+        let [path, id, operator] = args.as_slice() else {
+            return Err(ACKNOWLEDGE_USAGE.to_string());
+        };
+        (
+            *path,
+            *id,
+            Disposition::Acknowledged {
+                operator: operator.to_string(),
+            },
+        )
+    } else {
+        let [path, id, operator, reason @ ..] = args.as_slice() else {
+            return Err(DISMISS_USAGE.to_string());
+        };
+        if reason.is_empty() {
+            return Err(DISMISS_USAGE.to_string());
+        }
+        (
+            *path,
+            *id,
+            Disposition::Dismissed {
+                operator: operator.to_string(),
+                reason: reason.join(" "),
+            },
+        )
+    };
+    let root = match registered(registry, &absolute(path)) {
+        Ok(root) => root,
+        Err(answer) => return Ok(answer),
+    };
+    let held = match store::lock(home, &root) {
+        Ok(held) => held,
+        Err(e) => return Ok(store_answer(&e)),
+    };
+    let mut chain = match Store::open(home, &root) {
+        Ok(chain) => chain,
+        Err(e) => return Ok(store_answer(&e)),
+    };
+    let at = statecraft_environment::time::rfc3339_utc(clock.now_unix());
+    if let Err(answer) = recovered(&held, &mut chain, home, &root, &at) {
+        return Ok(answer);
+    }
+    match statecraft_observe::proposals::close(&held, &mut chain, id, disposition, &at) {
+        Err(e) => Ok(store_answer(&e)),
+        Ok(Err(why)) => Ok(not_admissible(&why)),
+        Ok(Ok(entry)) => {
+            let word = if acknowledge {
+                "acknowledged"
+            } else {
+                "dismissed"
+            };
+            Ok(Answer::new(
+                serde_json::to_value(&entry).expect("an entry serializes"),
+                Exit::Ok,
+                format!("{word} {}\n", short(id)),
+            ))
+        }
+    }
 }

@@ -127,6 +127,14 @@ pub enum Verb {
     Observe,
     /// `observe show <path> [--ref <ref>]`
     ObserveShow,
+    /// `proposal list <path>`
+    ProposalList,
+    /// `proposal show <path> <id>`
+    ProposalShow,
+    /// `proposal dismiss <path> <id> <operator> <reason...>`
+    ProposalDismiss,
+    /// `proposal acknowledge <path> <id> <operator>`
+    ProposalAcknowledge,
     /// `--help`, optionally with a group or a verb as its topic.
     ///
     /// Not part of the command tree: [`Verb::all`] lists the operations, and a
@@ -204,6 +212,10 @@ impl Verb {
             Verb::HostedDecision => "hosted decision",
             Verb::Observe => "observe",
             Verb::ObserveShow => "observe show",
+            Verb::ProposalList => "proposal list",
+            Verb::ProposalShow => "proposal show",
+            Verb::ProposalDismiss => "proposal dismiss",
+            Verb::ProposalAcknowledge => "proposal acknowledge",
             Verb::Help => "--help",
         }
     }
@@ -292,7 +304,12 @@ impl Verb {
             }
             // Spec 027 section 3.9: observation and proposals, in its own
             // crate, reached through 027's edge on this crate.
-            Verb::Observe | Verb::ObserveShow => "027-observation-and-proposals",
+            Verb::Observe
+            | Verb::ObserveShow
+            | Verb::ProposalList
+            | Verb::ProposalShow
+            | Verb::ProposalDismiss
+            | Verb::ProposalAcknowledge => "027-observation-and-proposals",
             Verb::Help => "006-command-surface",
         }
     }
@@ -358,14 +375,18 @@ impl Verb {
             Verb::HostedDecision,
             Verb::Observe,
             Verb::ObserveShow,
+            Verb::ProposalList,
+            Verb::ProposalShow,
+            Verb::ProposalDismiss,
+            Verb::ProposalAcknowledge,
         ]
     }
 
     /// The groups a help topic may name.
-    pub const GROUPS: [&'static str; 19] = [
+    pub const GROUPS: [&'static str; 20] = [
         "project", "env", "work", "run", "accept", "home", "init", "migrate", "config", "approval",
         "harness", "session", "startup", "override", "transfer", "trust", "provider", "hosted",
-        "observe",
+        "observe", "proposal",
     ];
 
     /// Parse a verb from the leading arguments, returning how many it consumed.
@@ -429,6 +450,10 @@ impl Verb {
             // `show` is reserved after `observe`, as `list` is after `run`.
             ("observe", Some("show")) => Some((Verb::ObserveShow, 2)),
             ("observe", _) => Some((Verb::Observe, 1)),
+            ("proposal", Some("list")) => Some((Verb::ProposalList, 2)),
+            ("proposal", Some("show")) => Some((Verb::ProposalShow, 2)),
+            ("proposal", Some("dismiss")) => Some((Verb::ProposalDismiss, 2)),
+            ("proposal", Some("acknowledge")) => Some((Verb::ProposalAcknowledge, 2)),
             // The one three-word group: `provider token <act>` (spec 042).
             ("provider", Some("token")) => match args.get(2).map(String::as_str) {
                 Some("set") => Some((Verb::ProviderTokenSet, 3)),

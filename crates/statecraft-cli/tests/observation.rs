@@ -367,3 +367,83 @@ fn a_crash_after_the_observed_entry_is_completed_by_the_next_unchanged_observati
     let (_, third) = f.observe(&[]);
     assert!(third["report"]["proposals"].as_array().unwrap().is_empty());
 }
+
+fn verb(f: &Fixture, args: &[&str]) -> (i32, Value) {
+    let mut all = args.to_vec();
+    all.push("--json");
+    let out = f.cli(&all);
+    (
+        out.status.code().unwrap(),
+        json_naming::from_output(&out.stdout).unwrap(),
+    )
+}
+
+#[test]
+fn the_proposal_verbs_list_trace_and_close_each_kind_by_its_own_verb() {
+    let f = Fixture::new(true);
+    let root = f.root();
+    let (_, first) = f.observe(&[]);
+    let run_id = first["report"]["proposals"][0]["proposal"]
+        .as_str()
+        .unwrap()
+        .to_string();
+    f.commit(&[("001-a", "draft", None)], false);
+    let (_, exited) = f.observe(&[]);
+    let notice_id = exited["report"]["proposals"][0]["proposal"]
+        .as_str()
+        .unwrap()
+        .to_string();
+
+    let (code, listed) = verb(&f, &["proposal", "list", &root]);
+    assert_eq!(code, 0);
+    let rows: Vec<_> = listed["report"]["proposals"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|r| r["kind"].as_str().unwrap().to_string())
+        .collect();
+    assert_eq!(rows, ["run", "notice"]);
+
+    // The trace: the run's one cause is initial; the notice's cites
+    // spec-spine's delta, which this producer does not answer, so it is
+    // unavailable with spec-spine's reason rather than derived.
+    let (code, shown) = verb(&f, &["proposal", "show", &root, &run_id]);
+    assert_eq!(code, 0, "{shown}");
+    assert_eq!(shown["report"]["causes"][0]["delta"]["state"], "initial");
+    let (_, notice) = verb(&f, &["proposal", "show", &root, &notice_id]);
+    assert_eq!(
+        notice["report"]["causes"][0]["delta"]["state"],
+        "unavailable"
+    );
+    assert_eq!(
+        notice["report"]["causes"][0]["transitions"][0]["kind"],
+        "exited"
+    );
+
+    // Each kind is closed only by its own verb, and only once.
+    let (code, wrong) = verb(&f, &["proposal", "acknowledge", &root, &run_id, "sam"]);
+    assert_eq!(code, 2, "{wrong}");
+    assert_eq!(wrong["error"]["details"]["reason"], "wrong-kind");
+    let (code, _) = verb(
+        &f,
+        &["proposal", "dismiss", &root, &run_id, "sam", "not", "now"],
+    );
+    assert_eq!(code, 0);
+    let (code, again) = verb(&f, &["proposal", "dismiss", &root, &run_id, "sam", "again"]);
+    assert_eq!(code, 2);
+    assert_eq!(again["error"]["details"]["reason"], "not-open");
+    let (code, _) = verb(&f, &["proposal", "acknowledge", &root, &notice_id, "sam"]);
+    assert_eq!(code, 0);
+    let (_, empty) = verb(&f, &["proposal", "list", &root]);
+    assert!(empty["report"]["proposals"].as_array().unwrap().is_empty());
+
+    // A dismissal stands against the same work under the same contract.
+    f.commit(&[("001-a", "approved", Some("c1"))], false);
+    let (_, back) = f.observe(&[]);
+    assert_eq!(back["report"]["proposals"][0]["entry"], "recurred");
+    let (_, shown) = verb(&f, &["proposal", "show", &root, &run_id]);
+    assert_eq!(shown["report"]["state"], "dismissed");
+
+    let (code, unknown) = verb(&f, &["proposal", "show", &root, "nope"]);
+    assert_eq!(code, 2, "{unknown}");
+}
