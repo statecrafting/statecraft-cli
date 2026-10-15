@@ -529,6 +529,19 @@ fn run(args: &[String]) -> i32 {
                 Err(message) => usage(format, message),
             }
         }
+        // Spec 027 section 3.9: one library operation each.
+        Verb::Observe | Verb::ObserveShow => {
+            let outcome = if invocation.verb == Verb::Observe {
+                let clock = statecraft_cli::application::process_clock();
+                statecraft_cli::observe::observe(&home, &registry, clock.as_ref(), &invocation.rest)
+            } else {
+                statecraft_cli::observe::show(&home, &registry, &invocation.rest)
+            };
+            match outcome {
+                Ok(answer) => emit(&answer, format),
+                Err(message) => usage(format, message),
+            }
+        }
     }
 }
 

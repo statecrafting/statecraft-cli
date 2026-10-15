@@ -64,6 +64,7 @@ pub mod hosted;
 pub mod judge;
 pub mod launch;
 pub mod manage;
+pub mod observe;
 pub mod provider;
 pub mod render;
 pub mod slice;

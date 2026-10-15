@@ -816,6 +816,7 @@ dependencies = [
  "statecraft-environment",
  "statecraft-home",
  "statecraft-hosted",
+ "statecraft-observe",
  "statecraft-run",
  "tempfile",
  "zeroize",
@@ -885,9 +886,13 @@ dependencies = [
 name = "statecraft-observe"
 version = "0.0.0"
 dependencies = [
+ "attest-ledger-core",
+ "rustix",
  "serde",
  "serde_json",
  "statecraft-environment",
+ "statecraft-run",
+ "tempfile",
 ]
 
 [[package]]

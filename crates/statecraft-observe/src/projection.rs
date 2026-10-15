@@ -105,11 +105,47 @@ pub struct Projections {
     /// `corpus-state`.
     pub corpus_state: CorpusState,
     /// `work-eligibility`, keyed by spec id.
-    #[serde(default)]
+    #[serde(default, with = "rows")]
     pub work_eligibility: BTreeMap<String, Eligibility>,
     /// `contract-identity`, keyed by spec id, for every `eligible` row.
-    #[serde(default)]
+    #[serde(default, with = "rows")]
     pub contract_identity: BTreeMap<String, Contract>,
+}
+
+/// A map keyed by spec id, written as rows in id order, each naming its
+/// spec: a spec id is data, not a field name, so it is never a JSON key.
+mod rows {
+    use serde::{Deserialize, Deserializer, Serialize, Serializer};
+    use std::collections::BTreeMap;
+
+    #[derive(Serialize, Deserialize)]
+    struct Row<T> {
+        spec: String,
+        #[serde(flatten)]
+        value: T,
+    }
+
+    pub fn serialize<T: Serialize + Clone, S: Serializer>(
+        map: &BTreeMap<String, T>,
+        s: S,
+    ) -> Result<S::Ok, S::Error> {
+        map.iter()
+            .map(|(spec, value)| Row {
+                spec: spec.clone(),
+                value: value.clone(),
+            })
+            .collect::<Vec<_>>()
+            .serialize(s)
+    }
+
+    pub fn deserialize<'de, T: Deserialize<'de>, D: Deserializer<'de>>(
+        d: D,
+    ) -> Result<BTreeMap<String, T>, D::Error> {
+        Ok(Vec::<Row<T>>::deserialize(d)?
+            .into_iter()
+            .map(|r| (r.spec, r.value))
+            .collect())
+    }
 }
 
 /// Each projection's canonical digest; a refused observation has only one.
