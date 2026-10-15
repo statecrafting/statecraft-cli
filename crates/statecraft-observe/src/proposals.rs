@@ -379,6 +379,8 @@ pub fn admit<A>(
 ) -> Result<Admission<A>, AdmitError> {
     use crate::projection::Eligibility;
     let ledger = Ledger::fold(store.entries().to_vec());
+    // The verb named is the one that closes the other kind: a `notice`
+    // handed to `admit` is refused as one `proposal acknowledge` closes.
     let p = open_of_kind(&ledger, id, Kind::Run, "proposal acknowledge")
         .map_err(AdmitError::NotAdmissible)?
         .clone();

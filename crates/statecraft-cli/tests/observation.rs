@@ -521,6 +521,11 @@ fn admission_is_stale_when_the_repository_moved_and_never_runs() {
     let (code, wrong) = verb(&g, &["proposal", "admit", &root, notice, "sam", "go"]);
     assert_eq!(code, 2);
     assert_eq!(wrong["error"]["details"]["reason"], "wrong-kind");
+    // The refusal names the verb that does close a notice.
+    assert_eq!(
+        wrong["error"]["details"]["detail"],
+        "the proposal is a `notice`, which `proposal acknowledge` closes"
+    );
 }
 
 #[test]
