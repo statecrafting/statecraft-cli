@@ -530,12 +530,27 @@ fn run(args: &[String]) -> i32 {
             }
         }
         // Spec 027 section 3.9: one library operation each.
-        Verb::Observe | Verb::ObserveShow => {
-            let outcome = if invocation.verb == Verb::Observe {
-                let clock = statecraft_cli::application::process_clock();
-                statecraft_cli::observe::observe(&home, &registry, clock.as_ref(), &invocation.rest)
-            } else {
-                statecraft_cli::observe::show(&home, &registry, &invocation.rest)
+        Verb::Observe
+        | Verb::ObserveShow
+        | Verb::ProposalList
+        | Verb::ProposalShow
+        | Verb::ProposalDismiss
+        | Verb::ProposalAcknowledge => {
+            use statecraft_cli::observe as o;
+            let clock = statecraft_cli::application::process_clock();
+            let (home, registry, rest) = (&home, &registry, &invocation.rest);
+            let outcome = match invocation.verb {
+                Verb::Observe => o::observe(home, registry, clock.as_ref(), rest),
+                Verb::ObserveShow => o::show(home, registry, rest),
+                Verb::ProposalList => o::proposal_list(home, registry, rest),
+                Verb::ProposalShow => o::proposal_show(home, registry, rest),
+                Verb::ProposalDismiss => {
+                    o::proposal_close(home, registry, clock.as_ref(), rest, false)
+                }
+                Verb::ProposalAcknowledge => {
+                    o::proposal_close(home, registry, clock.as_ref(), rest, true)
+                }
+                _ => unreachable!("the outer arm admits only the observe and proposal verbs"),
             };
             match outcome {
                 Ok(answer) => emit(&answer, format),

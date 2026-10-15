@@ -649,6 +649,20 @@ spec-scoped notice names the open `run` proposals for its spec when it is
 made; the attempts a `moved-contract` notice names, and `proposal show`'s
 causal trace, come with the proposal verbs.
 
+**2026-10-13: the closing verbs, the reads and recovery.** `proposal list`,
+`proposal show`, `proposal dismiss` and `proposal acknowledge` are bound;
+`proposal admit` follows with the intent member it needs. Recovery runs in
+every writer, `observe` included, after the lock and before its own work: an
+orphaned `admitting` whose proposal an attempt intent names is disposed
+`admitted` with that run and attempt, and any other is `released` with
+`admission-interrupted`. `proposal show` cites spec-spine's `delta` between
+each cause's commit and the commit it was compared with, which for a
+spec-scoped proposal is the last answered observation before it and for the
+repository scope the observation immediately before it; a producer that does
+not answer is `unavailable` with its reason. A refusal from a closing verb is
+told apart by its reason: `no-such-proposal`, `wrong-kind` (naming the verb
+that closes the kind) or `not-open` (naming where it stands).
+
 ## Verification
 
 This block is the implementing change's acceptance, run by `make verify

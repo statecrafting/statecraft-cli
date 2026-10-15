@@ -15,6 +15,7 @@
 pub mod observe;
 pub mod projection;
 pub mod proposal;
+pub mod proposals;
 pub mod store;
 pub mod subscription;
 pub mod transition;

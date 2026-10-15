@@ -416,7 +416,8 @@ fn the_grown_command_tree_still_has_no_verb_that_publishes() {
     // `run reconcile`; and three more with section 3.11.7's transfer verbs;
     // and one more with section 3.11.8's `override recover`; and three more
     // with spec 036's offline trust verbs; three more with spec 042's
-    // provider token verbs; four more with spec 038's hosted verbs; and two
-    // more with spec 027's `observe` and `observe show`.
-    assert_eq!(statecraft_cli::commands::Verb::all().len(), 55);
+    // provider token verbs; four more with spec 038's hosted verbs; two more
+    // with spec 027's `observe` and `observe show`; and four more with its
+    // `proposal list`, `show`, `dismiss` and `acknowledge`.
+    assert_eq!(statecraft_cli::commands::Verb::all().len(), 59);
 }
