@@ -123,6 +123,9 @@ pub enum Refusal {
     /// The override journal could not be read: overrides are part of the
     /// input identity, so no identity exists without them.
     Overrides(String),
+    /// spec 003's run record could not be read, so a moved contract's bound
+    /// attempts are unknown.
+    RunRecord(String),
     /// spec 003's reader refused in a way that is not spec-spine declining
     /// to answer for the commit (a missing field, an unrunnable producer).
     Report(ReportError),
@@ -133,7 +136,10 @@ pub enum Refusal {
 impl std::fmt::Display for Refusal {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Refusal::Ref(d) | Refusal::Materialize(d) | Refusal::Overrides(d) => f.write_str(d),
+            Refusal::Ref(d)
+            | Refusal::Materialize(d)
+            | Refusal::Overrides(d)
+            | Refusal::RunRecord(d) => f.write_str(d),
             Refusal::Report(e) => write!(f, "{e}"),
             Refusal::Store(e) => write!(f, "{e}"),
         }
@@ -306,7 +312,7 @@ struct BoundAttempt {
 /// Every attempt in the run record with a bound closure digest.
 fn bound_attempts(home: &Path, root: &Path) -> Result<Vec<BoundAttempt>, Refusal> {
     let (chain, _) = statecraft_run::record::Chain::open(home, root)
-        .map_err(|e| Refusal::Overrides(format!("the run record could not be read: {e}")))?;
+        .map_err(|e| Refusal::RunRecord(format!("the run record could not be read: {e}")))?;
     let runs = statecraft_run::session::runs(&chain);
     Ok(chain
         .entries()

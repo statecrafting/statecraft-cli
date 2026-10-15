@@ -56,7 +56,9 @@ fn refusal_answer(r: Refusal) -> Answer<Value> {
         ),
         Refusal::Report(e) => crate::slice::report_error_answer(&e).erase(),
         Refusal::Store(e) => store_answer(&e),
-        Refusal::Materialize(detail) | Refusal::Overrides(detail) => failed(&detail),
+        Refusal::Materialize(detail) | Refusal::Overrides(detail) | Refusal::RunRecord(detail) => {
+            failed(&detail)
+        }
     }
 }
 
@@ -583,6 +585,6 @@ pub fn proposal_admit(
         Err(AdmitError::NotAdmissible(why)) => Ok(not_admissible(&why)),
         Err(AdmitError::Observe(r)) => Ok(refusal_answer(r)),
         Err(AdmitError::Store(e)) => Ok(store_answer(&e)),
-        Err(AdmitError::RunRecord(detail)) => Ok(failed(&detail)),
+        Err(AdmitError::RunRecord(detail) | AdmitError::Unscoped(detail)) => Ok(failed(&detail)),
     }
 }

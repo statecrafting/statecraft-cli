@@ -351,6 +351,9 @@ pub enum AdmitError {
     Observe(crate::observe::Refusal),
     /// The run record could not be read after the run path returned.
     RunRecord(String),
+    /// The chain records a `run` proposal with no spec in its scope, which
+    /// no observation writes; nothing is admitted against it.
+    Unscoped(String),
     /// The chain could not be written.
     Store(StoreError),
 }
@@ -379,7 +382,11 @@ pub fn admit<A>(
     let p = open_of_kind(&ledger, id, Kind::Run, "proposal acknowledge")
         .map_err(AdmitError::NotAdmissible)?
         .clone();
-    let spec = p.scope.spec().unwrap_or_default().to_string();
+    let spec = p
+        .scope
+        .spec()
+        .ok_or_else(|| AdmitError::Unscoped(format!("the run proposal {id} names no spec")))?
+        .to_string();
     let fresh = crate::observe::observe(
         held,
         store,
