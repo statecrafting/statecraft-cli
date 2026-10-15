@@ -139,6 +139,24 @@ pub fn open_of_kind<'a>(
     Ok(p)
 }
 
+/// An operator's closing act (section 3.9): the only two dispositions
+/// [`close`] writes. The others are written by `observe` and `proposal admit`.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum Closing {
+    /// `proposal dismiss` closes a `run` without running it.
+    Dismissed {
+        /// Who.
+        operator: String,
+        /// Why.
+        reason: String,
+    },
+    /// `proposal acknowledge` closes a `notice`.
+    Acknowledged {
+        /// Who.
+        operator: String,
+    },
+}
+
 /// Close an open proposal by the operator's act: `dismissed` for a `run`,
 /// `acknowledged` for a `notice` (section 3.9). Refuses, writing nothing, a
 /// proposal of the other kind or one that is not open.
@@ -146,13 +164,21 @@ pub fn close(
     held: &Held,
     store: &mut Store,
     id: &str,
-    disposition: Disposition,
+    closing: Closing,
     at: &str,
 ) -> Result<Result<Entry, NotAdmissible>, StoreError> {
     let ledger = Ledger::fold(store.entries().to_vec());
-    let (kind, closed_by) = match disposition {
-        Disposition::Acknowledged { .. } => (Kind::Notice, "proposal dismiss"),
-        _ => (Kind::Run, "proposal acknowledge"),
+    let (kind, closed_by, disposition) = match closing {
+        Closing::Dismissed { operator, reason } => (
+            Kind::Run,
+            "proposal acknowledge",
+            Disposition::Dismissed { operator, reason },
+        ),
+        Closing::Acknowledged { operator } => (
+            Kind::Notice,
+            "proposal dismiss",
+            Disposition::Acknowledged { operator },
+        ),
     };
     if let Err(why) = open_of_kind(&ledger, id, kind, closed_by) {
         return Ok(Err(why));
@@ -324,10 +350,10 @@ mod tests {
         let home = tempfile::tempdir().unwrap();
         let root = Path::new("/fixture/a");
         let (held, mut store, ids) = seeded(home.path(), root, &[Kind::Run, Kind::Notice]);
-        let ack = Disposition::Acknowledged {
+        let ack = Closing::Acknowledged {
             operator: "sam".to_string(),
         };
-        let dismiss = Disposition::Dismissed {
+        let dismiss = Closing::Dismissed {
             operator: "sam".to_string(),
             reason: "no".to_string(),
         };

@@ -547,7 +547,10 @@ fn run(args: &[String]) -> i32 {
                 Verb::ProposalDismiss => {
                     o::proposal_close(home, registry, clock.as_ref(), rest, false)
                 }
-                _ => o::proposal_close(home, registry, clock.as_ref(), rest, true),
+                Verb::ProposalAcknowledge => {
+                    o::proposal_close(home, registry, clock.as_ref(), rest, true)
+                }
+                _ => unreachable!("the outer arm admits only the observe and proposal verbs"),
             };
             match outcome {
                 Ok(answer) => emit(&answer, format),

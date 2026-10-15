@@ -429,16 +429,16 @@ pub fn proposal_close(
     rest: &[String],
     acknowledge: bool,
 ) -> Outcome {
-    use statecraft_observe::proposal::Disposition;
+    use statecraft_observe::proposals::Closing;
     let args = positional(rest);
-    let (path, id, disposition) = if acknowledge {
+    let (path, id, closing) = if acknowledge {
         let [path, id, operator] = args.as_slice() else {
             return Err(ACKNOWLEDGE_USAGE.to_string());
         };
         (
             *path,
             *id,
-            Disposition::Acknowledged {
+            Closing::Acknowledged {
                 operator: operator.to_string(),
             },
         )
@@ -452,7 +452,7 @@ pub fn proposal_close(
         (
             *path,
             *id,
-            Disposition::Dismissed {
+            Closing::Dismissed {
                 operator: operator.to_string(),
                 reason: reason.join(" "),
             },
@@ -474,7 +474,7 @@ pub fn proposal_close(
     if let Err(answer) = recovered(&held, &mut chain, home, &root, &at) {
         return Ok(answer);
     }
-    match statecraft_observe::proposals::close(&held, &mut chain, id, disposition, &at) {
+    match statecraft_observe::proposals::close(&held, &mut chain, id, closing, &at) {
         Err(e) => Ok(store_answer(&e)),
         Ok(Err(why)) => Ok(not_admissible(&why)),
         Ok(Ok(entry)) => {
