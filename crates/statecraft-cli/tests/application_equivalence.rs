@@ -39,6 +39,10 @@ impl Fixture {
             &["init", "--quiet"][..],
             &["config", "user.name", "fixture"],
             &["config", "user.email", "fixture@example.com"],
+            // No background maintenance: its transient lock would land in
+            // one side's snapshot and not the other's.
+            &["config", "maintenance.auto", "false"],
+            &["config", "gc.auto", "0"],
         ] {
             assert!(
                 Command::new("git")
