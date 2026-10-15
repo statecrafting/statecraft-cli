@@ -313,6 +313,191 @@ pub fn trace(
     (causes, dispositions)
 }
 
+/// How an admission ended (section 3.6).
+#[derive(Debug)]
+pub enum Admission<A> {
+    /// The fresh observation disagrees with the proposal: `disposed: stale`,
+    /// naming what differs. No run.
+    Stale {
+        /// What differs.
+        differing: String,
+        /// The fresh observation.
+        observation: crate::observe::Observation,
+    },
+    /// The run path appended an attempt naming the proposal: `disposed:
+    /// admitted`. `answer` is the run's own.
+    Admitted {
+        /// The run.
+        run_id: String,
+        /// The attempt.
+        attempt: u32,
+        /// What the run path answered.
+        answer: A,
+    },
+    /// The run path refused before any attempt named the proposal:
+    /// `released`, reason `run-refused`; the proposal is open again.
+    Released {
+        /// What the run path answered.
+        answer: A,
+    },
+}
+
+/// Why an admission recorded nothing of its own.
+#[derive(Debug)]
+pub enum AdmitError {
+    /// Not a `run` proposal, or not open.
+    NotAdmissible(NotAdmissible),
+    /// The fresh observation recorded nothing.
+    Observe(crate::observe::Refusal),
+    /// The run record could not be read after the run path returned.
+    RunRecord(String),
+    /// The chain records a `run` proposal with no spec in its scope, which
+    /// no observation writes; nothing is admitted against it.
+    Unscoped(String),
+    /// The chain could not be written.
+    Store(StoreError),
+}
+
+/// `proposal admit` (section 3.6), under the caller's hold of the
+/// observation lock, after recovery: a fresh observation of the proposal's
+/// latest ref; `stale` when it is refused, the spec is not eligible, or the
+/// closure digest differs; otherwise `admitting`, then `enter` (spec 003's run
+/// path at the fresh commit, naming the proposal in its intent), then
+/// `admitted` when an attempt intent names the proposal and `released` when
+/// none does. Which of the two is read from the run record, never from the
+/// run path's answer.
+#[allow(clippy::too_many_arguments)]
+pub fn admit<A>(
+    held: &Held,
+    store: &mut Store,
+    request: &crate::observe::Request<'_>,
+    sources: &crate::observe::Sources<'_>,
+    id: &str,
+    operator: &str,
+    reason: &str,
+    enter: impl FnOnce(&str, &str) -> A,
+) -> Result<Admission<A>, AdmitError> {
+    use crate::projection::Eligibility;
+    let ledger = Ledger::fold(store.entries().to_vec());
+    // The verb named is the one that closes the other kind: a `notice`
+    // handed to `admit` is refused as one `proposal acknowledge` closes.
+    let p = open_of_kind(&ledger, id, Kind::Run, "proposal acknowledge")
+        .map_err(AdmitError::NotAdmissible)?
+        .clone();
+    let spec = p
+        .scope
+        .spec()
+        .ok_or_else(|| AdmitError::Unscoped(format!("the run proposal {id} names no spec")))?
+        .to_string();
+    let fresh = crate::observe::observe(
+        held,
+        store,
+        &crate::observe::Request {
+            git_ref: Some(p.latest_ref()),
+            ..*request
+        },
+        sources,
+    )
+    .map_err(AdmitError::Observe)?;
+    let ledger = Ledger::fold(store.entries().to_vec());
+    let now = ledger
+        .previous()
+        .expect("the fresh observation is recorded or equal to the last");
+    let projections = &now.projections;
+    let differing = if !projections.corpus_state.answered() {
+        Some(format!(
+            "the fresh observation is {}",
+            projections.corpus_state.word()
+        ))
+    } else {
+        match projections.work_eligibility.get(&spec) {
+            None => Some(format!("{spec} is no longer offered by the plan")),
+            Some(Eligibility::Excluded { reason }) => Some(format!("{spec} is excluded: {reason}")),
+            Some(Eligibility::Eligible) => {
+                let was = p.contract().unwrap_or_default();
+                match projections.contract_identity.get(&spec) {
+                    Some(c) if c.digest() == Some(was) => None,
+                    Some(c) => Some(format!(
+                        "the contract moved from {was} to {}",
+                        c.digest()
+                            .map_or_else(|| "unavailable".to_string(), str::to_string)
+                    )),
+                    None => Some(format!("no contract is bound for {spec}")),
+                }
+            }
+        }
+    };
+    if let Some(differing) = differing {
+        store
+            .append(
+                held,
+                request.at,
+                &Entry::Disposed {
+                    proposal: id.to_string(),
+                    disposition: Disposition::Stale {
+                        differing: differing.clone(),
+                    },
+                },
+            )
+            .map_err(AdmitError::Store)?;
+        return Ok(Admission::Stale {
+            differing,
+            observation: fresh,
+        });
+    }
+    let admitting = store.entries().len();
+    store
+        .append(
+            held,
+            request.at,
+            &Entry::Admitting {
+                proposal: id.to_string(),
+                observation: now.observation.clone(),
+                operator: operator.to_string(),
+                reason: reason.to_string(),
+            },
+        )
+        .map_err(AdmitError::Store)?;
+    let commit = now.commit.clone();
+    let answer = enter(&spec, &commit);
+    match caused_attempt(request.home, request.root, id).map_err(AdmitError::RunRecord)? {
+        Some((run_id, attempt)) => {
+            store
+                .append(
+                    held,
+                    request.at,
+                    &Entry::Disposed {
+                        proposal: id.to_string(),
+                        disposition: Disposition::Admitted {
+                            run_id: run_id.clone(),
+                            attempt,
+                        },
+                    },
+                )
+                .map_err(AdmitError::Store)?;
+            Ok(Admission::Admitted {
+                run_id,
+                attempt,
+                answer,
+            })
+        }
+        None => {
+            store
+                .append(
+                    held,
+                    request.at,
+                    &Entry::Released {
+                        proposal: id.to_string(),
+                        admitting,
+                        reason: Release::RunRefused,
+                    },
+                )
+                .map_err(AdmitError::Store)?;
+            Ok(Admission::Released { answer })
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

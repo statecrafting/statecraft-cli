@@ -135,6 +135,8 @@ pub enum Verb {
     ProposalDismiss,
     /// `proposal acknowledge <path> <id> <operator>`
     ProposalAcknowledge,
+    /// `proposal admit <path> <id> <operator> <reason...>`
+    ProposalAdmit,
     /// `--help`, optionally with a group or a verb as its topic.
     ///
     /// Not part of the command tree: [`Verb::all`] lists the operations, and a
@@ -216,6 +218,7 @@ impl Verb {
             Verb::ProposalShow => "proposal show",
             Verb::ProposalDismiss => "proposal dismiss",
             Verb::ProposalAcknowledge => "proposal acknowledge",
+            Verb::ProposalAdmit => "proposal admit",
             Verb::Help => "--help",
         }
     }
@@ -309,7 +312,8 @@ impl Verb {
             | Verb::ProposalList
             | Verb::ProposalShow
             | Verb::ProposalDismiss
-            | Verb::ProposalAcknowledge => "027-observation-and-proposals",
+            | Verb::ProposalAcknowledge
+            | Verb::ProposalAdmit => "027-observation-and-proposals",
             Verb::Help => "006-command-surface",
         }
     }
@@ -379,6 +383,7 @@ impl Verb {
             Verb::ProposalShow,
             Verb::ProposalDismiss,
             Verb::ProposalAcknowledge,
+            Verb::ProposalAdmit,
         ]
     }
 
@@ -454,6 +459,7 @@ impl Verb {
             ("proposal", Some("show")) => Some((Verb::ProposalShow, 2)),
             ("proposal", Some("dismiss")) => Some((Verb::ProposalDismiss, 2)),
             ("proposal", Some("acknowledge")) => Some((Verb::ProposalAcknowledge, 2)),
+            ("proposal", Some("admit")) => Some((Verb::ProposalAdmit, 2)),
             // The one three-word group: `provider token <act>` (spec 042).
             ("provider", Some("token")) => match args.get(2).map(String::as_str) {
                 Some("set") => Some((Verb::ProviderTokenSet, 3)),
