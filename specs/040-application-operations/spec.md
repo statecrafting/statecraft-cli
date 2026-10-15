@@ -220,6 +220,14 @@ the admission the verb performed first, so the order of refusals is the
 verb's. The differential cases select the judge from the same environment on
 both sides, because the selection reads the process environment.
 
+**2026-10-15: the fixture repository runs no git maintenance.** The
+differential cases compare every file each side writes, and a `git commit` in
+the fixture may start git's background maintenance, whose transient
+`.git/objects/maintenance.lock` then lands in one side's snapshot and not the
+other's (seen once on CI for `run`). The fixture sets `maintenance.auto` to
+`false` and `gc.auto` to `0` when it initializes the repository, so the only
+files compared are the ones the verb and the operation write.
+
 ## Verification
 
 These commands are required for final implementation acceptance. While
