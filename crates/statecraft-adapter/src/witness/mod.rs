@@ -11,6 +11,10 @@
 //!   stdio protocol (section 3.2): the one `start` line it writes, and the
 //!   bounded reader of what comes back. Every sidecar string is untrusted
 //!   testimony (section 3.4); nothing here parses proxy traffic.
+//! - [`effect`] brackets the sidecar as its own durable effect in the run
+//!   record: intent before spawn, one closing outcome after.
+//! - [`sidecar`] spawns the verified producer, waits for a bound and valid
+//!   `ready`, and ends custody after the child.
 //! - [`posture`] is section 3.7's closed witness-posture vocabulary and the
 //!   policy rule that alone decides whether a posture refuses acceptance.
 //!
@@ -22,9 +26,11 @@
 //! sidecar finished with complete, integral capture; it does not say the work
 //! is accepted, the provider was used, or the model complied.
 
+pub mod effect;
 pub mod ledger;
 pub mod posture;
 pub mod protocol;
+pub mod sidecar;
 
 pub use ledger::{ADOPTED, Adoption, ProducerRefusal, VerifiedProducer};
 pub use posture::{Requirement, WitnessPosture};
