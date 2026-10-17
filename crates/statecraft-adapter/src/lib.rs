@@ -25,6 +25,8 @@
 //!   programs the attempt's suite names, read independently (section 3.17).
 //! - [`posture`] is what every attempt reports, so an operator never has to ask.
 //! - [`supervisor`] spawns, holds a deadline, and kills descendants.
+//! - [`witness`] is spec 013's adoption ledger, sidecar protocol client and
+//!   witness posture: one exact producer, testimony never authority.
 //! - [`fixture`] is the adapter the negative suite runs against with no real
 //!   provider installed.
 //!
@@ -45,6 +47,7 @@ pub mod manifest;
 pub mod posture;
 pub mod protocol;
 pub mod supervisor;
+pub mod witness;
 
 pub use capability::{Capability, Negotiation, Requested, negotiate};
 pub use environment::{Blueprint, ChildEnvironment, EnvironmentState, RESIDUALS, construct};

@@ -332,7 +332,35 @@ qualification, and rollback evidence.
 
 ## 7. Decisions recorded during implementation
 
-None. This draft has no implementation authority.
+**2026-10-17: the adopted producer is wire-witness 0.1.0.** Its release
+record, `qualification/0.1.0/release-notes.md` at wire-witness commit
+`3a65a1f`, supplies section 3.1's seven facts, written once as the constant
+`ADOPTED` in `crates/statecraft-adapter/src/witness/ledger.rs`. Three targets
+are qualified (`aarch64-apple-darwin`, `aarch64-unknown-linux-gnu`,
+`x86_64-unknown-linux-gnu`); every other target is `witness-unavailable`. The
+rollback identity is `none`, because no earlier release claims interface major
+1: rolling back removes the adoption. The interface pins in the frontmatter are
+unchanged, and the release's section digests equal them, which a unit test
+checks against this file.
+
+**2026-10-17: a producer is verified by the digest of the one path it is
+given.** Verification reads an absolute path to a regular file, never a
+symlink, and compares its `sha256` with the ledger's for the running target.
+A mismatch refuses; nothing is searched for on `PATH` or anywhere else.
+
+**2026-10-17: `witness-required-and-missing` names a requirement the task did
+not act on.** Section 3.7 records one posture, and section 4 requires a
+sidecar that exits before `ready` to read `witness-failed`, never as anything
+else. So a requested witness that is unavailable, failed or incomplete keeps
+that posture even when policy requires evidence, and the requirement refuses
+acceptance for every posture but `witnessed`. `witness-required-and-missing`
+is the posture of an attempt whose policy required evidence while its task
+requested no capture, so no sidecar ran.
+
+**2026-10-17: a closing outcome with no terminal message names why no digest
+exists.** The reason is `sidecar-exited-before-ready` or `sidecar-stopped`;
+completion is `unknown` and attestation `unknown`, because wire-witness 0.1.0
+reports no attestation identity.
 
 ## Verification
 
