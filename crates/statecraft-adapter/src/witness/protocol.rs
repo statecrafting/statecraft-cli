@@ -514,7 +514,7 @@ fn text_list(message: &Map<String, Value>, name: &str) -> Result<Vec<String>, Fi
         Some(Value::Array(values)) => values
             .iter()
             .map(|v| match v {
-                Value::String(s) if s.len() <= MAX_TEXT => Ok(s.clone()),
+                Value::String(s) if !s.is_empty() && s.len() <= MAX_TEXT => Ok(s.clone()),
                 _ => Err(Finding::InvalidField(name.to_string())),
             })
             .collect(),
@@ -1022,6 +1022,14 @@ mod tests {
             reader.read(&no_reason),
             Err(Finding::InvalidField(_))
         ));
+        let empty_gap = message(
+            "finished",
+            json!({ "completeness": "incomplete", "reason": "r", "gaps": [""], "exchange_count": 0, "finding_count": 0 }),
+        );
+        assert_eq!(
+            reader.read(&empty_gap),
+            Err(Finding::InvalidField("gaps".into()))
+        );
         assert!(reader.terminal().is_none());
     }
 
