@@ -187,7 +187,10 @@ impl Start {
 }
 
 /// The `ready` message, as reported. Untrusted until [`Ready::validate`].
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+///
+/// Only [`Reader`] constructs one, so the multi-endpoint fact it records
+/// cannot be lost to a deserializer; it is serialized for the record only.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Ready {
     /// The reported endpoint text, exactly as sent.
