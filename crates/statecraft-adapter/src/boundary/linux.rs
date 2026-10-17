@@ -43,7 +43,10 @@ pub(super) struct Rules {
 }
 
 impl Rules {
-    pub(super) fn new(policy: &Policy) -> Result<Self, Refused> {
+    pub(super) fn new(
+        policy: &Policy,
+        endpoint: Option<std::net::SocketAddr>,
+    ) -> Result<Self, Refused> {
         // SAFETY: version query has no pointer arguments.
         let abi = unsafe { libc::syscall(CREATE, std::ptr::null::<u8>(), 0, 1) };
         if !(6..=9).contains(&abi) {
@@ -155,10 +158,33 @@ impl Rules {
         if unsafe { libc::syscall(ADD, file.as_raw_fd(), 2, &port, 0) } != 0 {
             return Err(Refused::at("landlock-port", io::Error::last_os_error()));
         }
+        // Spec 013 section 3.6.1: connect to the witness endpoint's port.
+        // Landlock mediates the port, not the address.
+        if let Some(endpoint) = endpoint {
+            let port = Port {
+                access: 2,
+                port: u64::from(endpoint.port()),
+            };
+            if unsafe { libc::syscall(ADD, file.as_raw_fd(), 2, &port, 0) } != 0 {
+                return Err(Refused::at(
+                    "landlock-witness-port",
+                    io::Error::last_os_error(),
+                ));
+            }
+        }
         let filter = filter()?;
-        let mut identity =
-            serde_json::to_vec(&("pinned-chmod-emulation-v1", abi, full, entries, policy))
-                .map_err(|e| Refused::at("ruleset-identity", e))?;
+        let mut identity = match endpoint {
+            None => serde_json::to_vec(&("pinned-chmod-emulation-v1", abi, full, entries, policy)),
+            Some(endpoint) => serde_json::to_vec(&(
+                "pinned-chmod-emulation-v1",
+                abi,
+                full,
+                entries,
+                policy,
+                endpoint.port(),
+            )),
+        }
+        .map_err(|e| Refused::at("ruleset-identity", e))?;
         for instruction in &filter {
             identity.extend_from_slice(&instruction.code.to_le_bytes());
             identity.extend_from_slice(&[instruction.jt, instruction.jf]);

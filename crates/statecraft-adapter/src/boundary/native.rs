@@ -39,7 +39,10 @@ pub(super) struct Prepared {
 pub(super) const MACH_ALLOWLIST: &[&str] = &["com.apple.system.opendirectoryd.libinfo"];
 
 impl Prepared {
-    pub(super) fn new(policy: &Policy) -> Result<Self, Refused> {
+    pub(super) fn new(
+        policy: &Policy,
+        endpoint: Option<std::net::SocketAddr>,
+    ) -> Result<Self, Refused> {
         #[cfg(target_os = "macos")]
         {
             if !Path::new("/usr/bin/sandbox-exec").is_file() {
@@ -51,6 +54,16 @@ impl Prepared {
             let mut profile = String::from(
                 "(version 1)\n(allow default)\n(deny file-write*)\n(deny signal)\n(allow signal (target same-sandbox))\n(deny network-outbound)\n(allow network-outbound (remote tcp \"*:443\"))\n(allow network-outbound (literal \"/private/var/run/mDNSResponder\"))\n(deny network-outbound (remote ip \"localhost:*\"))\n(deny appleevent-send)\n(deny job-creation)\n(deny mach-lookup)\n",
             );
+            // Spec 013 section 3.6.1: after all other loopback access is
+            // denied, one exception for the exact endpoint. Later rules win.
+            // The witnessed child may not bind a listener; Linux already
+            // refuses bind, because its ruleset handles bind with no rule.
+            if let Some(endpoint) = endpoint {
+                profile.push_str(&format!(
+                    "(allow network-outbound (remote ip \"localhost:{}\"))\n(deny network-bind)\n",
+                    endpoint.port()
+                ));
+            }
             // Spec 042 section 3.4: every Mach service is refused except the
             // measured allowlist; the three rule 6 names stay refused.
             profile.push_str("(allow mach-lookup");
@@ -103,12 +116,12 @@ impl Prepared {
         #[cfg(target_os = "linux")]
         {
             Ok(Self {
-                linux: linux::Rules::new(policy)?,
+                linux: linux::Rules::new(policy, endpoint)?,
             })
         }
         #[cfg(not(any(target_os = "linux", target_os = "macos")))]
         {
-            let _ = policy;
+            let _ = (policy, endpoint);
             Err(Refused::at("mechanism", "unsupported platform"))
         }
     }
@@ -361,7 +374,10 @@ pub(super) fn read_prefix(root: &File, path: &Path, limit: usize) -> io::Result<
     unreachable!()
 }
 
-pub(super) fn probe(probe: &Probe) -> BTreeMap<String, bool> {
+pub(super) fn probe(
+    probe: &Probe,
+    witness_endpoint: Option<std::net::SocketAddr>,
+) -> BTreeMap<String, bool> {
     let mut result = BTreeMap::new();
     let denied =
         |error: &io::Error| matches!(error.raw_os_error(), Some(libc::EACCES | libc::EPERM));
@@ -434,6 +450,30 @@ pub(super) fn probe(probe: &Probe) -> BTreeMap<String, bool> {
         "loopbackDenied".into(),
         loopback.as_ref().is_err_and(denied),
     );
+    if let Some(endpoint) = witness_endpoint {
+        result.insert(
+            "witnessEndpointConnect".into(),
+            std::net::TcpStream::connect_timeout(&endpoint, std::time::Duration::from_secs(1))
+                .is_ok(),
+        );
+        result.insert(
+            "witnessListenerDenied".into(),
+            std::net::TcpListener::bind("127.0.0.1:0")
+                .as_ref()
+                .is_err_and(denied),
+        );
+        // TEST-NET-1: never routed, so only the policy can answer at once.
+        #[cfg(target_os = "macos")]
+        result.insert(
+            "witnessNonLoopbackDenied".into(),
+            std::net::TcpStream::connect_timeout(
+                &std::net::SocketAddr::from(([192, 0, 2, 1], endpoint.port())),
+                std::time::Duration::from_secs(1),
+            )
+            .as_ref()
+            .is_err_and(denied),
+        );
+    }
     // SAFETY: signal 0 checks access without delivering a signal.
     result.insert(
         "supervisorSignalDenied".into(),
@@ -650,15 +690,46 @@ mod tests {
     /// Spec 042 section 3.4: Mach lookups are refused by default and only
     /// the measured allowlist is admitted; the three services rule 6 names
     /// are in no allow rule.
+    /// Spec 013 section 3.6.1: the endpoint exception follows the loopback
+    /// denial, names one port, and is absent without an endpoint.
     #[test]
-    fn mach_lookups_are_refused_except_the_measured_allowlist() {
-        let prepared = Prepared::new(&Policy {
+    fn the_witness_exception_is_one_port_after_the_loopback_denial() {
+        let empty = || Policy {
             inaccessible: vec![],
             readonly: vec![],
             readable: vec![],
             writable: vec![],
             adjacent_prefixes: vec![],
-        })
+        };
+        let plain = String::from_utf8(Prepared::new(&empty(), None).unwrap().identity()).unwrap();
+        assert!(!plain.contains("localhost:4"), "{plain}");
+        let endpoint = "127.0.0.1:41999".parse().unwrap();
+        let witnessed =
+            String::from_utf8(Prepared::new(&empty(), Some(endpoint)).unwrap().identity()).unwrap();
+        let deny = witnessed
+            .find("(deny network-outbound (remote ip \"localhost:*\"))")
+            .unwrap();
+        let allow = witnessed
+            .find("(allow network-outbound (remote ip \"localhost:41999\"))")
+            .unwrap();
+        assert!(deny < allow, "{witnessed}");
+        assert_eq!(witnessed.matches("localhost:").count(), 2, "{witnessed}");
+        assert!(witnessed.contains("(deny network-bind)\n"), "{witnessed}");
+        assert!(!plain.contains("network-bind"), "{plain}");
+    }
+
+    #[test]
+    fn mach_lookups_are_refused_except_the_measured_allowlist() {
+        let prepared = Prepared::new(
+            &Policy {
+                inaccessible: vec![],
+                readonly: vec![],
+                readable: vec![],
+                writable: vec![],
+                adjacent_prefixes: vec![],
+            },
+            None,
+        )
         .unwrap();
         let profile = String::from_utf8(prepared.identity()).unwrap();
         assert!(profile.contains("(deny mach-lookup)\n"), "{profile}");

@@ -19,6 +19,10 @@
         "source": "spec-edge"
       },
       {
+        "path": "crates/statecraft-cli/",
+        "source": "spec-edge"
+      },
+      {
         "path": "crates/statecraft-run/",
         "source": "spec-edge"
       }
@@ -53,6 +57,19 @@
       {
         "locations": [
           {
+            "file": "crates/statecraft-cli/"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "directory",
+          "path": "crates/statecraft-cli/"
+        }
+      },
+      {
+        "locations": [
+          {
             "file": "crates/statecraft-run/"
           }
         ],
@@ -68,5 +85,5 @@
     "specStatus": "approved"
   },
   "schemaVersion": "1.2.0",
-  "shardHash": "e5d13e5db9b6068b15d218aff2b564a9384202da037f198c94b9f081115025c1"
+  "shardHash": "1e6a04c7f745ad0209f4ef992090ad330467a95acb1349aed759b1eab7c87473"
 }
