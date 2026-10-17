@@ -35,6 +35,7 @@ pub const MAX_MANIFEST_BYTES: u64 = 64 * 1024 * 1024;
 
 /// Section 3.2's binding: minted by this product before spawn.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct AttemptBinding {
     /// The run.
     pub run_id: String,
@@ -78,6 +79,7 @@ pub struct Authority {
 /// The bounded resource limits of the `start` message. Every value is
 /// positive; the producer refuses a zero.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 #[allow(missing_docs)]
 pub struct Limits {
     pub header_bytes: u64,
@@ -91,6 +93,26 @@ pub struct Limits {
     pub queue_bytes: u64,
     pub idle_seconds: u64,
     pub total_seconds: u64,
+}
+
+impl Limits {
+    /// The producer's wire spelling, which is not this product's JSON
+    /// convention and so is written by hand.
+    fn json(&self) -> Value {
+        json!({
+            "header_bytes": self.header_bytes,
+            "header_count": self.header_count,
+            "frame_bytes": self.frame_bytes,
+            "message_bytes": self.message_bytes,
+            "decompressed_bytes": self.decompressed_bytes,
+            "event_bytes": self.event_bytes,
+            "concurrent_streams": self.concurrent_streams,
+            "connection_count": self.connection_count,
+            "queue_bytes": self.queue_bytes,
+            "idle_seconds": self.idle_seconds,
+            "total_seconds": self.total_seconds,
+        })
+    }
 }
 
 impl Default for Limits {
@@ -152,7 +174,7 @@ impl Start {
             "capture_authorities": authorities(&self.capture_authorities),
             "authentication_tunnels": authorities(&self.authentication_tunnels),
             "requested_retention": self.requested_retention,
-            "limits": serde_json::to_value(&self.limits).unwrap_or(Value::Null),
+            "limits": self.limits.json(),
             "output_directory": self.output_directory.display().to_string(),
             "certificate_path": self.certificate_path.display().to_string(),
             "host_policy_id": self.host_policy_id,
@@ -166,6 +188,7 @@ impl Start {
 
 /// The `ready` message, as reported. Untrusted until [`Ready::validate`].
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct Ready {
     /// The reported endpoint text, exactly as sent.
     pub endpoint: String,
@@ -186,6 +209,7 @@ pub struct Ready {
 
 /// The `finished` message, as reported.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct Terminal {
     /// What the sidecar says its capture was.
     pub completion: Completion,
@@ -868,6 +892,7 @@ mod tests {
         assert_eq!(value["binding"], binding().json());
         assert_eq!(value["listen_endpoint"], "127.0.0.1:41000");
         assert_eq!(value["limits"]["total_seconds"], 14_400);
+        assert_eq!(value["limits"]["header_bytes"], 65_536);
     }
 
     #[test]

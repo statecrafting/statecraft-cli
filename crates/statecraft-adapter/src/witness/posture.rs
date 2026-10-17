@@ -94,7 +94,7 @@ impl Requirement {
 /// What was observed of one attempt's witness, in order of occurrence.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Observed {
-    /// No sidecar was started because none was requested.
+    /// No sidecar was started.
     NotStarted,
     /// The producer or platform mechanism was unavailable before spawn.
     Unavailable,
@@ -117,14 +117,11 @@ pub enum Observed {
 #[must_use]
 pub fn derive(requirement: Requirement, observed: Observed) -> WitnessPosture {
     match (requirement.requested, observed) {
-        (false, _) | (true, Observed::NotStarted) => {
-            if requirement.required {
-                WitnessPosture::WitnessRequiredAndMissing
-            } else {
-                WitnessPosture::WitnessNotRequested
-            }
-        }
-        (true, Observed::Unavailable) => WitnessPosture::WitnessUnavailable,
+        (false, _) if requirement.required => WitnessPosture::WitnessRequiredAndMissing,
+        (false, _) => WitnessPosture::WitnessNotRequested,
+        // Requested, yet no sidecar started: the producer or the mechanism
+        // was not there to start, whatever the caller called it.
+        (true, Observed::NotStarted | Observed::Unavailable) => WitnessPosture::WitnessUnavailable,
         (true, Observed::Failed) => WitnessPosture::WitnessFailed,
         (true, Observed::Incomplete) => WitnessPosture::WitnessIncomplete,
         (true, Observed::Complete { intact, qualified }) => {
@@ -197,6 +194,26 @@ mod tests {
         let missing = derive(policy_only, Observed::NotStarted);
         assert_eq!(missing, WitnessPosture::WitnessRequiredAndMissing);
         assert!(policy_only.refuses_acceptance(missing));
+    }
+
+    #[test]
+    fn a_requested_witness_that_never_started_is_unavailable_never_required_and_missing() {
+        assert_eq!(
+            derive(REQUIRED, Observed::NotStarted),
+            WitnessPosture::WitnessUnavailable
+        );
+        assert_eq!(
+            derive(OPTIONAL, Observed::NotStarted),
+            WitnessPosture::WitnessUnavailable
+        );
+        let policy_only = Requirement {
+            requested: false,
+            required: true,
+        };
+        assert_eq!(
+            derive(policy_only, Observed::Failed),
+            WitnessPosture::WitnessRequiredAndMissing
+        );
     }
 
     #[test]
