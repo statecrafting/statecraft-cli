@@ -399,6 +399,22 @@ secret value, credential header, token, cookie, or raw traffic body survives.
 - claiming release, activation, observation, admission, or qualification from
   this draft.
 
+## 6. Resolved decisions
+
+**2026-10-17: the pure half is in the envelope crate.** Steps 1 to 3, 7 and
+9 of section 3.6 depend only on the reference, the manifest bytes and the
+recorded policy, so they live in `statecraft-envelope::wire`, beside spec
+005's reference and dimensions. The steps that read the run record are
+`statecraft-run`'s, and the ordered procedure that joins both is
+`statecraft-acceptance`'s.
+
+**2026-10-17: the producer's reference is read in its own wire form.**
+wire-witness 0.1.0 writes `sidecar_protocol.rs`'s `EvidenceReference` with
+snake_case members and `producer_identity` as `<name>@<revision>`. Those
+names are read by hand; the typed reference this product writes follows its
+own JSON naming. A reference member this version does not know gains no
+meaning.
+
 ## Verification
 
 Draft review requires `make refresh`, `make gate`, `make code`, relationship
