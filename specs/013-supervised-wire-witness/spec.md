@@ -364,6 +364,25 @@ exists.** The reason is `sidecar-exited-before-ready` or `sidecar-stopped`;
 completion is `unknown` and attestation `unknown`, because wire-witness 0.1.0
 reports no attestation identity.
 
+**2026-10-17: any protocol finding makes the attempt `witness-failed`.**
+Section 3.7 calls `witnessed` a bound sidecar that finished; testimony from a
+sidecar that also sent an unbound, duplicate, late or malformed message is not
+that, even when its first terminal message reports complete capture. The
+findings are kept, in order, in the closing outcome.
+
+**2026-10-17: the sidecar's termination words.** `finished` is an exit status
+of zero after a terminal message; `stopped` is an exit with no terminal message
+after the supervisor closed stdin, which the producer's spec calls
+`sidecar-stopped`; `killed` is a sidecar that outlived its grace period or was
+stopped for a custody violation or a refused `ready`; any other exit is
+`failed`. Stderr is discarded: the producer's diagnostics are not protocol
+evidence and this product does not redact them.
+
+**2026-10-17: the sidecar effect's identity is `<run>/<attempt>/witness-sidecar`.**
+Unique within a run because the attempt number is, and new on every retry. Its
+intent and outcome carry the subject `witness-sidecar`, which no attempt fold
+reads as an attempt.
+
 ## Verification
 
 This spec is `status: approved`. Implementation acceptance is not run while

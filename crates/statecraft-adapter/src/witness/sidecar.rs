@@ -238,7 +238,7 @@ impl Running {
                 Err(RecvTimeoutError::Timeout) => break,
             }
         }
-        let termination = self.reap(deadline, true);
+        let termination = self.reap(deadline);
         let integrity = self
             .reader
             .terminal()
@@ -274,16 +274,17 @@ impl Running {
         self.abort(&refusal.to_string())
     }
 
-    /// Wait for the process until `deadline`, then kill it.
-    fn reap(&mut self, deadline: Instant, closed_by_supervisor: bool) -> Termination {
+    /// Wait for the process, whose stdin this supervisor has closed, until
+    /// `deadline`, then kill it.
+    fn reap(&mut self, deadline: Instant) -> Termination {
         loop {
             match self.child.try_wait() {
                 Ok(Some(status)) => {
                     return match (status.success(), self.reader.terminal().is_some()) {
                         (true, true) => Termination::Finished,
-                        (_, false) if closed_by_supervisor && status.code().is_some() => {
-                            Termination::Stopped
-                        }
+                        // Exited by itself after stdin closed, with no terminal
+                        // message: EOF before `finished` is `sidecar-stopped`.
+                        (_, false) if status.code().is_some() => Termination::Stopped,
                         _ => Termination::Failed,
                     };
                 }
