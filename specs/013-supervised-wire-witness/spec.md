@@ -399,6 +399,26 @@ refusal on another loopback port, so its port may not be the endpoint's. The
 Linux record names `loopback-address-unenforced` with the port. A record
 without an endpoint has no `witnessEndpoint` member and is unchanged.
 
+**2026-10-17: the sidecar's confinement is the protected-evidence boundary in a
+sidecar role.** It reuses spec 004's mechanism and policy shape: the caller
+names the evidence, authority and operator-checkout roots inaccessible and the
+sidecar's per-attempt area readable and writable, so the process-route, signal
+and Mach-service denials are the child's. Networking differs: on macOS the
+profile allows bind and inbound only on `localhost:<port>` and outbound TCP
+only to the allowlist's ports, which replace the fixed 443, with no loopback
+route; on Linux the Landlock ruleset grants bind on the endpoint's port and
+connect only to the allowlist's ports, and the record names
+`sidecar-bind-address-unenforced`, `sidecar-connect-address-unenforced` and
+`sidecar-udp-unmediated`, because no additional mechanism narrows them. The
+record carries `sidecarOutboundPorts`, which marks it as the sidecar's. Its
+fixed probe requires the home, records and checkout sentinels unreadable and
+unwritable, a write and removal in the area, `sidecarEndpointBind`,
+`sidecarOtherListenerDenied` and `sidecarDisallowedOutboundDenied` (TEST-NET-1
+on port 9), beside the existing Unix-socket, signal and descriptor checks and,
+on Linux, the socket-family, `io_uring`, handle and descriptor checks. The
+sidecar is started only through a boundary that is its own; a child boundary
+refuses.
+
 ## Verification
 
 This spec is `status: approved`. Implementation acceptance is not run while

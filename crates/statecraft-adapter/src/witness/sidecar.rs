@@ -117,13 +117,51 @@ pub struct SpawnFailed(pub String);
 /// `witness-unavailable`; `Err(Err(Ended))` when a started sidecar failed or
 /// its `ready` refuses child spawn. Either way the child must not be spawned.
 pub fn start(plan: &Plan) -> Result<Running, Result<SpawnFailed, Box<Ended>>> {
-    let area = plan.start.output_directory.clone();
+    let argv = argv(plan);
+    let mut command = Command::new(&argv[0]);
+    command.args(&argv[1..]);
+    spawn(plan, command)
+}
+
+/// [`start`] under the sidecar's own confinement (spec 013 section 3.6.2),
+/// admitted by [`crate::boundary::Prepared::prepare_sidecar`] and self-tested
+/// by the caller immediately before. The wrapper, if any, runs inside it.
+///
+/// # Errors
+///
+/// As [`start`].
+pub fn start_confined(
+    plan: &Plan,
+    boundary: &crate::boundary::Prepared,
+) -> Result<Running, Result<SpawnFailed, Box<Ended>>> {
+    if boundary.record().sidecar_outbound_ports.is_none()
+        || boundary.record().witness_endpoint != Some(plan.start.listen_endpoint)
+    {
+        return Err(Ok(SpawnFailed(
+            "the boundary is not this sidecar's own confinement".into(),
+        )));
+    }
+    let argv = argv(plan);
+    let args: Vec<&str> = argv[1..].iter().filter_map(|a| a.to_str()).collect();
+    if args.len() + 1 != argv.len() {
+        return Err(Ok(SpawnFailed("a non-UTF-8 argument".into())));
+    }
+    spawn(
+        plan,
+        boundary.command(std::path::Path::new(&argv[0]), &args),
+    )
+}
+
+fn argv(plan: &Plan) -> Vec<OsString> {
     let mut argv = plan.wrapper.clone();
     argv.push(plan.producer.path.clone().into_os_string());
     argv.push("sidecar".into());
-    let mut command = Command::new(&argv[0]);
+    argv
+}
+
+fn spawn(plan: &Plan, mut command: Command) -> Result<Running, Result<SpawnFailed, Box<Ended>>> {
+    let area = plan.start.output_directory.clone();
     command
-        .args(&argv[1..])
         .env_clear()
         .envs(&plan.environment)
         .stdin(Stdio::piped())
