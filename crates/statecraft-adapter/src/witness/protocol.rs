@@ -523,8 +523,14 @@ fn text_list(message: &Map<String, Value>, name: &str) -> Result<Vec<String>, Fi
 }
 
 fn parse_ready(message: &Map<String, Value>) -> Result<Ready, Finding> {
-    let second_endpoint = matches!(message.get("endpoint"), Some(Value::Array(_)))
-        || message.contains_key("endpoints");
+    // The protocol's endpoint is one string. More than one endpoint, in an
+    // array or beside it, refuses child spawn as a second endpoint; any other
+    // shape, a one-element array included, is not the protocol's form.
+    let second_endpoint = match message.get("endpoint") {
+        Some(Value::Array(values)) if values.len() > 1 => true,
+        Some(Value::Array(_)) => return Err(Finding::InvalidField("endpoint".into())),
+        _ => message.contains_key("endpoints"),
+    };
     let endpoint = match message.get("endpoint") {
         Some(Value::Array(values)) => values
             .first()
@@ -1072,6 +1078,15 @@ mod tests {
         assert_eq!(
             two.validate(reserved, &area, &cert),
             Err(ReadyRefusal::SecondEndpoint)
+        );
+        let mut reader = Reader::new(binding());
+        let one_in_an_array = message(
+            "ready",
+            json!({ "endpoint": ["127.0.0.1:41000"], "certificate_path": cert.display().to_string() }),
+        );
+        assert_eq!(
+            reader.read(&one_in_an_array),
+            Err(Finding::InvalidField("endpoint".into()))
         );
     }
 
