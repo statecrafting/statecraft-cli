@@ -1,6 +1,6 @@
 //! Small native surface. Handles are owned; post-fork work is syscall-only.
 
-use super::{Policy, Probe, Refused};
+use super::{Network, Policy, Probe, Refused};
 use std::collections::BTreeMap;
 use std::ffi::CString;
 use std::fs::{File, OpenOptions};
@@ -39,10 +39,7 @@ pub(super) struct Prepared {
 pub(super) const MACH_ALLOWLIST: &[&str] = &["com.apple.system.opendirectoryd.libinfo"];
 
 impl Prepared {
-    pub(super) fn new(
-        policy: &Policy,
-        endpoint: Option<std::net::SocketAddr>,
-    ) -> Result<Self, Refused> {
+    pub(super) fn new(policy: &Policy, network: &Network) -> Result<Self, Refused> {
         #[cfg(target_os = "macos")]
         {
             if !Path::new("/usr/bin/sandbox-exec").is_file() {
@@ -51,18 +48,38 @@ impl Prepared {
                     "/usr/bin/sandbox-exec unavailable",
                 ));
             }
+            // Spec 013 section 3.6.2: the sidecar connects only to its
+            // allowlist's ports, which replace the fixed 443.
+            let outbound: Vec<u16> = match network {
+                Network::Sidecar { outbound, .. } => outbound.clone(),
+                _ => vec![443],
+            };
             let mut profile = String::from(
-                "(version 1)\n(allow default)\n(deny file-write*)\n(deny signal)\n(allow signal (target same-sandbox))\n(deny network-outbound)\n(allow network-outbound (remote tcp \"*:443\"))\n(allow network-outbound (literal \"/private/var/run/mDNSResponder\"))\n(deny network-outbound (remote ip \"localhost:*\"))\n(deny appleevent-send)\n(deny job-creation)\n(deny mach-lookup)\n",
+                "(version 1)\n(allow default)\n(deny file-write*)\n(deny signal)\n(allow signal (target same-sandbox))\n(deny network-outbound)\n",
+            );
+            for port in outbound {
+                profile.push_str(&format!(
+                    "(allow network-outbound (remote tcp \"*:{port}\"))\n"
+                ));
+            }
+            profile.push_str(
+                "(allow network-outbound (literal \"/private/var/run/mDNSResponder\"))\n(deny network-outbound (remote ip \"localhost:*\"))\n(deny appleevent-send)\n(deny job-creation)\n(deny mach-lookup)\n",
             );
             // Spec 013 section 3.6.1: after all other loopback access is
             // denied, one exception for the exact endpoint. Later rules win.
             // The witnessed child may not bind a listener; Linux already
             // refuses bind, because its ruleset handles bind with no rule.
-            if let Some(endpoint) = endpoint {
-                profile.push_str(&format!(
+            match network {
+                Network::Ordinary => {}
+                Network::Child(endpoint) => profile.push_str(&format!(
                     "(allow network-outbound (remote ip \"localhost:{}\"))\n(deny network-bind)\n",
                     endpoint.port()
-                ));
+                )),
+                // One listener, on the endpoint, accepting only there.
+                Network::Sidecar { endpoint, .. } => profile.push_str(&format!(
+                    "(deny network-bind)\n(allow network-bind (local ip \"localhost:{port}\"))\n(deny network-inbound)\n(allow network-inbound (local ip \"localhost:{port}\"))\n",
+                    port = endpoint.port()
+                )),
             }
             // Spec 042 section 3.4: every Mach service is refused except the
             // measured allowlist; the three rule 6 names stay refused.
@@ -116,12 +133,12 @@ impl Prepared {
         #[cfg(target_os = "linux")]
         {
             Ok(Self {
-                linux: linux::Rules::new(policy, endpoint)?,
+                linux: linux::Rules::new(policy, network)?,
             })
         }
         #[cfg(not(any(target_os = "linux", target_os = "macos")))]
         {
-            let _ = (policy, endpoint);
+            let _ = (policy, network);
             Err(Refused::at("mechanism", "unsupported platform"))
         }
     }
@@ -482,6 +499,91 @@ pub(super) fn probe(
     );
     #[cfg(target_os = "linux")]
     linux::probe_extra(probe, &mut result);
+    result.insert("noInheritedDescriptors".into(), no_inherited_descriptors());
+    result
+}
+
+/// Spec 013 section 3.6.2's fixed probe, run under the sidecar's policy.
+///
+/// `probe.workspace` is a new file in the sidecar's output area; every other
+/// path is protected and must be neither readable nor writable, the operator
+/// checkout included.
+pub(super) fn sidecar_probe(
+    probe: &Probe,
+    endpoint: std::net::SocketAddr,
+) -> BTreeMap<String, bool> {
+    let mut result = BTreeMap::new();
+    let denied =
+        |error: &io::Error| matches!(error.raw_os_error(), Some(libc::EACCES | libc::EPERM));
+    for (label, path) in [
+        ("home", &probe.home),
+        ("records", &probe.records),
+        ("target", &probe.target),
+    ] {
+        result.insert(
+            format!("{label}ReadDenied"),
+            std::fs::read(path).as_ref().is_err_and(denied),
+        );
+        let write = OpenOptions::new()
+            .write(true)
+            .custom_flags(libc::O_NOFOLLOW | libc::O_NONBLOCK)
+            .open(path);
+        result.insert(
+            format!("{label}WriteDenied"),
+            write.as_ref().is_err_and(denied),
+        );
+    }
+    result.insert(
+        "workspaceWrite".into(),
+        OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .custom_flags(libc::O_NOFOLLOW)
+            .open(&probe.workspace)
+            .and_then(|mut f| f.write_all(b"boundary probe\n"))
+            .is_ok(),
+    );
+    result.insert(
+        "workspaceCleanup".into(),
+        std::fs::remove_file(&probe.workspace).is_ok(),
+    );
+    let unix = std::os::unix::net::UnixStream::connect(&probe.unix_socket);
+    result.insert("unixDenied".into(), unix.as_ref().is_err_and(denied));
+    let listener = std::net::TcpListener::bind(endpoint);
+    result.insert("sidecarEndpointBind".into(), listener.is_ok());
+    drop(listener);
+    result.insert(
+        "sidecarOtherListenerDenied".into(),
+        std::net::TcpListener::bind("127.0.0.1:0")
+            .as_ref()
+            .is_err_and(denied),
+    );
+    // TEST-NET-1 on the discard port: outside any allowlist, never routed,
+    // so only the policy can answer at once.
+    result.insert(
+        "sidecarDisallowedOutboundDenied".into(),
+        std::net::TcpStream::connect_timeout(
+            &std::net::SocketAddr::from(([192, 0, 2, 1], 9)),
+            std::time::Duration::from_secs(1),
+        )
+        .as_ref()
+        .is_err_and(denied),
+    );
+    // SAFETY: signal 0 checks access without delivering a signal.
+    result.insert(
+        "supervisorSignalDenied".into(),
+        unsafe { libc::kill(probe.supervisor as i32, 0) } == -1
+            && denied(&io::Error::last_os_error()),
+    );
+    #[cfg(target_os = "linux")]
+    linux::probe_extra(probe, &mut result);
+    result.insert("noInheritedDescriptors".into(), no_inherited_descriptors());
+    result
+}
+
+/// Whether this process holds no descriptor beyond the standard three (and,
+/// on Linux, the one `read_dir` itself opens).
+fn no_inherited_descriptors() -> bool {
     #[cfg(target_os = "macos")]
     {
         let mut descriptors = vec![
@@ -501,18 +603,14 @@ pub(super) fn probe(
                 std::mem::size_of_val(descriptors.as_slice()) as i32,
             )
         };
-        result.insert(
-            "noInheritedDescriptors".into(),
-            bytes > 0
-                && (bytes as usize) < std::mem::size_of_val(descriptors.as_slice())
-                && descriptors[..bytes as usize / std::mem::size_of::<libc::proc_fdinfo>()]
-                    .iter()
-                    .all(|fd| fd.proc_fd <= 2),
-        );
+        bytes > 0
+            && (bytes as usize) < std::mem::size_of_val(descriptors.as_slice())
+            && descriptors[..bytes as usize / std::mem::size_of::<libc::proc_fdinfo>()]
+                .iter()
+                .all(|fd| fd.proc_fd <= 2)
     }
     #[cfg(target_os = "linux")]
-    result.insert(
-        "noInheritedDescriptors".into(),
+    {
         std::fs::read_dir("/proc/self/fd").is_ok_and(|entries| {
             entries.into_iter().all(|entry| {
                 entry
@@ -520,9 +618,12 @@ pub(super) fn probe(
                     .and_then(|e| e.file_name().to_str().and_then(|s| s.parse::<i32>().ok()))
                     .is_some_and(|fd| fd <= 3)
             })
-        }),
-    );
-    result
+        })
+    }
+    #[cfg(not(any(target_os = "linux", target_os = "macos")))]
+    {
+        false
+    }
 }
 
 pub(super) fn snapshot(root: &File) -> io::Result<BTreeMap<std::path::PathBuf, (u32, Vec<u8>)>> {
@@ -690,6 +791,41 @@ mod tests {
     /// Spec 042 section 3.4: Mach lookups are refused by default and only
     /// the measured allowlist is admitted; the three services rule 6 names
     /// are in no allow rule.
+    /// Spec 013 section 3.6.2: the sidecar binds and accepts only on its
+    /// endpoint, connects only to its allowlist, and has no loopback route.
+    #[test]
+    fn the_sidecar_profile_listens_on_one_endpoint_and_connects_to_its_allowlist() {
+        let policy = Policy {
+            inaccessible: vec![],
+            readonly: vec![],
+            readable: vec![],
+            writable: vec![],
+            adjacent_prefixes: vec![],
+        };
+        let network = Network::Sidecar {
+            endpoint: "127.0.0.1:41999".parse().unwrap(),
+            outbound: vec![443, 8443],
+        };
+        let profile =
+            String::from_utf8(Prepared::new(&policy, &network).unwrap().identity()).unwrap();
+        for rule in [
+            "(allow network-outbound (remote tcp \"*:443\"))\n",
+            "(allow network-outbound (remote tcp \"*:8443\"))\n",
+            "(deny network-bind)\n(allow network-bind (local ip \"localhost:41999\"))\n",
+            "(deny network-inbound)\n(allow network-inbound (local ip \"localhost:41999\"))\n",
+        ] {
+            assert!(profile.contains(rule), "{rule} in {profile}");
+        }
+        assert!(
+            !profile.contains("(allow network-outbound (remote ip \"localhost"),
+            "{profile}"
+        );
+        let deny = profile
+            .find("(deny network-outbound (remote ip \"localhost:*\"))")
+            .unwrap();
+        assert!(profile.find("*:8443").unwrap() < deny, "{profile}");
+    }
+
     /// Spec 013 section 3.6.1: the endpoint exception follows the loopback
     /// denial, names one port, and is absent without an endpoint.
     #[test]
@@ -701,11 +837,20 @@ mod tests {
             writable: vec![],
             adjacent_prefixes: vec![],
         };
-        let plain = String::from_utf8(Prepared::new(&empty(), None).unwrap().identity()).unwrap();
+        let plain = String::from_utf8(
+            Prepared::new(&empty(), &Network::Ordinary)
+                .unwrap()
+                .identity(),
+        )
+        .unwrap();
         assert!(!plain.contains("localhost:4"), "{plain}");
         let endpoint = "127.0.0.1:41999".parse().unwrap();
-        let witnessed =
-            String::from_utf8(Prepared::new(&empty(), Some(endpoint)).unwrap().identity()).unwrap();
+        let witnessed = String::from_utf8(
+            Prepared::new(&empty(), &Network::Child(endpoint))
+                .unwrap()
+                .identity(),
+        )
+        .unwrap();
         let deny = witnessed
             .find("(deny network-outbound (remote ip \"localhost:*\"))")
             .unwrap();
@@ -728,7 +873,7 @@ mod tests {
                 writable: vec![],
                 adjacent_prefixes: vec![],
             },
-            None,
+            &Network::Ordinary,
         )
         .unwrap();
         let profile = String::from_utf8(prepared.identity()).unwrap();

@@ -43,10 +43,7 @@ pub(super) struct Rules {
 }
 
 impl Rules {
-    pub(super) fn new(
-        policy: &Policy,
-        endpoint: Option<std::net::SocketAddr>,
-    ) -> Result<Self, Refused> {
+    pub(super) fn new(policy: &Policy, network: &Network) -> Result<Self, Refused> {
         // SAFETY: version query has no pointer arguments.
         let abi = unsafe { libc::syscall(CREATE, std::ptr::null::<u8>(), 0, 1) };
         if !(6..=9).contains(&abi) {
@@ -151,37 +148,51 @@ impl Rules {
         for index in vanished.into_iter().rev() {
             entries.remove(index);
         }
-        let port = Port {
-            access: 2,
-            port: 443,
+        // Access 2 is TCP connect and 1 is TCP bind; both are handled, so a
+        // port without a rule is refused. Spec 013 section 3.6.1 adds connect
+        // to the child's witness endpoint and section 3.6.2 gives the sidecar
+        // bind on it and connect only to its allowlist. Landlock mediates the
+        // port, not the address.
+        let (connect, bind): (Vec<u16>, Option<u16>) = match network {
+            Network::Ordinary => (vec![443], None),
+            Network::Child(endpoint) => (vec![443, endpoint.port()], None),
+            Network::Sidecar { endpoint, outbound } => (outbound.clone(), Some(endpoint.port())),
         };
-        if unsafe { libc::syscall(ADD, file.as_raw_fd(), 2, &port, 0) } != 0 {
-            return Err(Refused::at("landlock-port", io::Error::last_os_error()));
-        }
-        // Spec 013 section 3.6.1: connect to the witness endpoint's port.
-        // Landlock mediates the port, not the address.
-        if let Some(endpoint) = endpoint {
-            let port = Port {
-                access: 2,
-                port: u64::from(endpoint.port()),
+        let ports = connect
+            .iter()
+            .map(|p| (2_u64, *p))
+            .chain(bind.map(|p| (1_u64, p)));
+        for (access, port) in ports {
+            let rule = Port {
+                access,
+                port: u64::from(port),
             };
-            if unsafe { libc::syscall(ADD, file.as_raw_fd(), 2, &port, 0) } != 0 {
-                return Err(Refused::at(
-                    "landlock-witness-port",
-                    io::Error::last_os_error(),
-                ));
+            // SAFETY: the rule has the kernel UAPI layout and lifetime of call.
+            if unsafe { libc::syscall(ADD, file.as_raw_fd(), 2, &rule, 0) } != 0 {
+                return Err(Refused::at("landlock-port", io::Error::last_os_error()));
             }
         }
         let filter = filter()?;
-        let mut identity = match endpoint {
-            None => serde_json::to_vec(&("pinned-chmod-emulation-v1", abi, full, entries, policy)),
-            Some(endpoint) => serde_json::to_vec(&(
+        let mut identity = match network {
+            Network::Ordinary => {
+                serde_json::to_vec(&("pinned-chmod-emulation-v1", abi, full, entries, policy))
+            }
+            Network::Child(endpoint) => serde_json::to_vec(&(
                 "pinned-chmod-emulation-v1",
                 abi,
                 full,
                 entries,
                 policy,
                 endpoint.port(),
+            )),
+            Network::Sidecar { endpoint, outbound } => serde_json::to_vec(&(
+                "pinned-chmod-emulation-v1-sidecar",
+                abi,
+                full,
+                entries,
+                policy,
+                endpoint.port(),
+                outbound,
             )),
         }
         .map_err(|e| Refused::at("ruleset-identity", e))?;

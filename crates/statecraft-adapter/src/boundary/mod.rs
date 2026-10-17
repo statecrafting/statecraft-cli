@@ -85,6 +85,35 @@ pub struct Record {
     /// other record, which therefore stays byte-identical.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub witness_endpoint: Option<SocketAddr>,
+    /// Spec 013 section 3.6.2: set only on the witness sidecar's own record,
+    /// with the outbound TCP ports its capture allowlist requires. The
+    /// endpoint above is then the one it may bind, not connect to.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub sidecar_outbound_ports: Option<Vec<u16>>,
+}
+
+/// The network role an admitted policy is compiled for.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) enum Network {
+    /// Spec 004 section 3.18 as it stands.
+    Ordinary,
+    /// Spec 013 section 3.6.1: connect to one endpoint, bind nothing.
+    Child(SocketAddr),
+    /// Spec 013 section 3.6.2: bind and accept on one endpoint, connect only
+    /// to the allowlist's ports.
+    Sidecar {
+        endpoint: SocketAddr,
+        outbound: Vec<u16>,
+    },
+}
+
+impl Network {
+    fn endpoint(&self) -> Option<SocketAddr> {
+        match self {
+            Network::Ordinary => None,
+            Network::Child(endpoint) | Network::Sidecar { endpoint, .. } => Some(*endpoint),
+        }
+    }
 }
 
 /// A platform and failed step, suitable for an exit-2 preflight answer.
@@ -142,6 +171,8 @@ struct ProbeInput {
     probe: Probe,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     witness_endpoint: Option<SocketAddr>,
+    #[serde(default)]
+    sidecar: bool,
 }
 
 /// An admitted OS policy, holding its directory handles until all children end.
@@ -166,7 +197,7 @@ impl Prepared {
     /// Resolve an exact policy and refuse ambiguous aliases or unsupported roots.
     /// This does not launch the provider or append any attempt.
     pub fn prepare(policy: Policy) -> Result<Self, Refused> {
-        Self::prepare_with(policy, None)
+        Self::prepare_with(policy, Network::Ordinary)
     }
 
     /// [`Prepared::prepare`] plus spec 013 section 3.6.1's one exception: TCP
@@ -177,19 +208,38 @@ impl Prepared {
     /// On Linux the exception is a Landlock port rule, which cannot restrict
     /// the destination address, and the record names that residual.
     pub fn prepare_witnessed(policy: Policy, endpoint: SocketAddr) -> Result<Self, Refused> {
-        if endpoint.ip() != std::net::IpAddr::from([127, 0, 0, 1])
-            || endpoint.port() == 0
-            || endpoint.port() == 443
-        {
-            return Err(Refused::at(
-                "witness-endpoint",
-                format!("{endpoint} is not a 127.0.0.1 port other than 0 and 443"),
-            ));
-        }
-        Self::prepare_with(policy, Some(endpoint))
+        check_endpoint(endpoint)?;
+        Self::prepare_with(policy, Network::Child(endpoint))
     }
 
-    fn prepare_with(mut policy: Policy, endpoint: Option<SocketAddr>) -> Result<Self, Refused> {
+    /// The witness sidecar's own confinement, spec 013 section 3.6.2: the
+    /// filesystem policy the caller supplies (its output area and temporary
+    /// directory writable, the evidence and authority roots inaccessible),
+    /// TCP bind and accept on the one endpoint only, and TCP connect only to
+    /// `outbound`, the ports its capture allowlist requires.
+    ///
+    /// On Linux, Landlock restricts neither bind nor connect by address and
+    /// does not mediate UDP; the record names all three residuals.
+    pub fn prepare_sidecar(
+        policy: Policy,
+        endpoint: SocketAddr,
+        outbound: &[u16],
+    ) -> Result<Self, Refused> {
+        check_endpoint(endpoint)?;
+        let mut outbound = outbound.to_vec();
+        outbound.sort_unstable();
+        outbound.dedup();
+        if outbound.is_empty() || outbound.iter().any(|p| *p == 0 || *p == endpoint.port()) {
+            return Err(Refused::at(
+                "sidecar-outbound",
+                "the allowlist names no port, port 0, or the endpoint's own port",
+            ));
+        }
+        Self::prepare_with(policy, Network::Sidecar { endpoint, outbound })
+    }
+
+    fn prepare_with(mut policy: Policy, network: Network) -> Result<Self, Refused> {
+        let endpoint = network.endpoint();
         for roots in [
             &mut policy.inaccessible,
             &mut policy.readonly,
@@ -242,16 +292,31 @@ impl Prepared {
         for root in policy.inaccessible.iter().chain(&policy.readonly) {
             check_links(root, &policy)?;
         }
-        let native = native::Prepared::new(&policy, endpoint)?;
+        let native = native::Prepared::new(&policy, &network)?;
         let mut open_items: Vec<String> = OPEN_ITEMS.iter().map(|s| (*s).into()).collect();
-        if let Some(endpoint) = endpoint
-            && cfg!(target_os = "linux")
-        {
-            open_items.push(format!(
-                "loopback-address-unenforced: TCP port {} is permitted to every destination address, because Landlock mediates the port and not the address",
-                endpoint.port()
-            ));
+        if cfg!(target_os = "linux") {
+            match &network {
+                Network::Ordinary => {}
+                Network::Child(endpoint) => open_items.push(format!(
+                    "loopback-address-unenforced: TCP port {} is permitted to every destination address, because Landlock mediates the port and not the address",
+                    endpoint.port()
+                )),
+                Network::Sidecar { endpoint, outbound } => open_items.extend([
+                    format!(
+                        "sidecar-bind-address-unenforced: TCP bind on port {} is permitted on every local address",
+                        endpoint.port()
+                    ),
+                    format!(
+                        "sidecar-connect-address-unenforced: TCP connect to ports {outbound:?} is permitted to every destination address"
+                    ),
+                    "sidecar-udp-unmediated: Landlock does not mediate UDP".to_string(),
+                ]),
+            }
         }
+        let sidecar_outbound_ports = match &network {
+            Network::Sidecar { outbound, .. } => Some(outbound.clone()),
+            _ => None,
+        };
         let material = native.identity();
         let record = Record {
             platform: std::env::consts::OS.into(),
@@ -264,6 +329,7 @@ impl Prepared {
             self_test: BTreeMap::new(),
             open_items,
             witness_endpoint: endpoint,
+            sidecar_outbound_ports,
         };
         Ok(Self { native, record })
     }
@@ -355,10 +421,12 @@ impl Prepared {
         executable: &Path,
         probe: &Probe,
     ) -> Result<BTreeMap<String, bool>, Refused> {
-        if self
-            .record
-            .witness_endpoint
-            .is_some_and(|endpoint| endpoint.port() == probe.loopback_port)
+        let sidecar = self.record.sidecar_outbound_ports.is_some();
+        if !sidecar
+            && self
+                .record
+                .witness_endpoint
+                .is_some_and(|endpoint| endpoint.port() == probe.loopback_port)
         {
             return Err(Refused::at(
                 "probe-input",
@@ -368,6 +436,7 @@ impl Prepared {
         let encoded = serde_json::to_string(&ProbeInput {
             probe: probe.clone(),
             witness_endpoint: self.record.witness_endpoint,
+            sidecar,
         })
         .map_err(|e| Refused::at("probe-input", e))?;
         let output = crate::supervisor::capture_confined(
@@ -395,23 +464,46 @@ impl Prepared {
                 )
             })?;
         #[allow(unused_mut)]
-        let mut required = vec![
-            "homeReadDenied",
-            "homeWriteDenied",
-            "recordsReadDenied",
-            "recordsWriteDenied",
-            "targetRead",
-            "targetWriteDenied",
-            "workspaceWrite",
-            "workspaceCleanup",
-            "workspaceMetadata",
-            "targetMetadataDenied",
-            "gateWrite",
-            "unixDenied",
-            "loopbackDenied",
-            "supervisorSignalDenied",
-            "noInheritedDescriptors",
-        ];
+        let mut required = if sidecar {
+            // Spec 013 section 3.6.2: the protected set is unreadable and
+            // unwritable, the operator checkout included; only the area is
+            // written; one listener on the endpoint and no other; a target
+            // outside the allowlist is refused.
+            vec![
+                "homeReadDenied",
+                "homeWriteDenied",
+                "recordsReadDenied",
+                "recordsWriteDenied",
+                "targetReadDenied",
+                "targetWriteDenied",
+                "workspaceWrite",
+                "workspaceCleanup",
+                "unixDenied",
+                "supervisorSignalDenied",
+                "noInheritedDescriptors",
+                "sidecarEndpointBind",
+                "sidecarOtherListenerDenied",
+                "sidecarDisallowedOutboundDenied",
+            ]
+        } else {
+            vec![
+                "homeReadDenied",
+                "homeWriteDenied",
+                "recordsReadDenied",
+                "recordsWriteDenied",
+                "targetRead",
+                "targetWriteDenied",
+                "workspaceWrite",
+                "workspaceCleanup",
+                "workspaceMetadata",
+                "targetMetadataDenied",
+                "gateWrite",
+                "unixDenied",
+                "loopbackDenied",
+                "supervisorSignalDenied",
+                "noInheritedDescriptors",
+            ]
+        };
         #[cfg(target_os = "linux")]
         required.extend([
             "otherSocketFamilyDenied",
@@ -424,7 +516,7 @@ impl Prepared {
         // `loopbackDenied` is the refusal on another loopback port. On macOS
         // the same port at a non-loopback address is refused too; Linux cannot
         // prove that, which the record's residual says.
-        if self.record.witness_endpoint.is_some() {
+        if self.record.witness_endpoint.is_some() && !sidecar {
             required.push("witnessEndpointConnect");
             required.push("witnessListenerDenied");
             #[cfg(target_os = "macos")]
@@ -446,6 +538,20 @@ impl Prepared {
     pub fn record(&self) -> &Record {
         &self.record
     }
+}
+
+/// A witness endpoint is `127.0.0.1` on a port other than 0 and 443.
+fn check_endpoint(endpoint: SocketAddr) -> Result<(), Refused> {
+    if endpoint.ip() != std::net::IpAddr::from([127, 0, 0, 1])
+        || endpoint.port() == 0
+        || endpoint.port() == 443
+    {
+        return Err(Refused::at(
+            "witness-endpoint",
+            format!("{endpoint} is not a 127.0.0.1 port other than 0 and 443"),
+        ));
+    }
+    Ok(())
 }
 
 fn check_links(path: &Path, policy: &Policy) -> Result<(), Refused> {
@@ -482,7 +588,11 @@ fn check_links(path: &Path, policy: &Policy) -> Result<(), Refused> {
 pub fn probe(encoded: &str) -> i32 {
     match serde_json::from_str::<ProbeInput>(encoded) {
         Ok(input) => {
-            let result = native::probe(&input.probe, input.witness_endpoint);
+            let result = match (input.sidecar, input.witness_endpoint) {
+                (true, Some(endpoint)) => native::sidecar_probe(&input.probe, endpoint),
+                (true, None) => return 3,
+                (false, endpoint) => native::probe(&input.probe, endpoint),
+            };
             println!(
                 "{}",
                 serde_json::to_string(&result).expect("boolean observations")
