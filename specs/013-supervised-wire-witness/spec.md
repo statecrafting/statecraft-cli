@@ -388,10 +388,12 @@ reads as an attempt.
 
 **2026-10-17: the child's witness endpoint is `127.0.0.1` only.** Section 3.3
 permits a loopback endpoint; this product reserves an IPv4 one, so the macOS
-exception is one `localhost:<port>` rule after the loopback denial and the
+exception is one `localhost:<port>` rule after the loopback denial, followed by
+a `network-bind` denial because the child may not listen, and the
 Linux exception is one Landlock connect rule on that port. A `::1`, wildcard,
 port 0 or port 443 endpoint is refused at admission. The fixed probe adds
-`witnessEndpointConnect` everywhere and `witnessNonLoopbackDenied` on macOS,
+`witnessEndpointConnect` and `witnessListenerDenied` everywhere, and
+`witnessNonLoopbackDenied` on macOS,
 whose target is TEST-NET-1 on the endpoint's port; `loopbackDenied` is the
 refusal on another loopback port, so its port may not be the endpoint's. The
 Linux record names `loopback-address-unenforced` with the port. A record

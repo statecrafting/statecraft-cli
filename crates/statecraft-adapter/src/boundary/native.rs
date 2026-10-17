@@ -56,9 +56,11 @@ impl Prepared {
             );
             // Spec 013 section 3.6.1: after all other loopback access is
             // denied, one exception for the exact endpoint. Later rules win.
+            // The witnessed child may not bind a listener; Linux already
+            // refuses bind, because its ruleset handles bind with no rule.
             if let Some(endpoint) = endpoint {
                 profile.push_str(&format!(
-                    "(allow network-outbound (remote ip \"localhost:{}\"))\n",
+                    "(allow network-outbound (remote ip \"localhost:{}\"))\n(deny network-bind)\n",
                     endpoint.port()
                 ));
             }
@@ -454,6 +456,12 @@ pub(super) fn probe(
             std::net::TcpStream::connect_timeout(&endpoint, std::time::Duration::from_secs(1))
                 .is_ok(),
         );
+        result.insert(
+            "witnessListenerDenied".into(),
+            std::net::TcpListener::bind("127.0.0.1:0")
+                .as_ref()
+                .is_err_and(denied),
+        );
         // TEST-NET-1: never routed, so only the policy can answer at once.
         #[cfg(target_os = "macos")]
         result.insert(
@@ -706,6 +714,8 @@ mod tests {
             .unwrap();
         assert!(deny < allow, "{witnessed}");
         assert_eq!(witnessed.matches("localhost:").count(), 2, "{witnessed}");
+        assert!(witnessed.contains("(deny network-bind)\n"), "{witnessed}");
+        assert!(!plain.contains("network-bind"), "{plain}");
     }
 
     #[test]

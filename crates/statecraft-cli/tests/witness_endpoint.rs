@@ -97,6 +97,7 @@ fn the_child_reaches_the_endpoint_and_no_other_loopback_port() {
     assert_eq!(record.witness_endpoint, Some(endpoint));
     assert_eq!(record.self_test.get("witnessEndpointConnect"), Some(&true));
     assert_eq!(record.self_test.get("loopbackDenied"), Some(&true));
+    assert_eq!(record.self_test.get("witnessListenerDenied"), Some(&true));
     #[cfg(target_os = "macos")]
     assert_eq!(
         record.self_test.get("witnessNonLoopbackDenied"),

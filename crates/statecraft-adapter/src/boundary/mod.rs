@@ -419,12 +419,14 @@ impl Prepared {
             "openByHandleDenied",
             "supervisorFdDenied",
         ]);
-        // Spec 013 section 3.6.1: the supplied endpoint connects, and
+        // Spec 013 section 3.6.1: the supplied endpoint connects, the child
+        // cannot bind a listener, and
         // `loopbackDenied` is the refusal on another loopback port. On macOS
         // the same port at a non-loopback address is refused too; Linux cannot
         // prove that, which the record's residual says.
         if self.record.witness_endpoint.is_some() {
             required.push("witnessEndpointConnect");
+            required.push("witnessListenerDenied");
             #[cfg(target_os = "macos")]
             required.push("witnessNonLoopbackDenied");
         }
