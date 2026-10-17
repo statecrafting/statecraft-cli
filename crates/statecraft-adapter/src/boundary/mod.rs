@@ -8,6 +8,7 @@ use sha2::{Digest, Sha256};
 use std::collections::BTreeMap;
 use std::fs::{self, File};
 use std::io;
+use std::net::SocketAddr;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
@@ -79,6 +80,11 @@ pub struct Record {
     pub self_test: BTreeMap<String, bool>,
     /// Residual gaps, never inferred closed from the probe.
     pub open_items: Vec<String>,
+    /// Spec 013 section 3.6.1: the one per-attempt witness endpoint the child
+    /// may connect to, when witness capture was requested. Absent on every
+    /// other record, which therefore stays byte-identical.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub witness_endpoint: Option<SocketAddr>,
 }
 
 /// A platform and failed step, suitable for an exit-2 preflight answer.
@@ -127,6 +133,17 @@ pub struct Probe {
     pub protected_fd: i32,
 }
 
+/// What the probe child receives: the fixed probe plus the record's witness
+/// endpoint, so the endpoint is never a second input the caller could vary.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct ProbeInput {
+    #[serde(flatten)]
+    probe: Probe,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    witness_endpoint: Option<SocketAddr>,
+}
+
 /// An admitted OS policy, holding its directory handles until all children end.
 pub struct Prepared {
     native: native::Prepared,
@@ -148,7 +165,31 @@ impl Eq for Prepared {}
 impl Prepared {
     /// Resolve an exact policy and refuse ambiguous aliases or unsupported roots.
     /// This does not launch the provider or append any attempt.
-    pub fn prepare(mut policy: Policy) -> Result<Self, Refused> {
+    pub fn prepare(policy: Policy) -> Result<Self, Refused> {
+        Self::prepare_with(policy, None)
+    }
+
+    /// [`Prepared::prepare`] plus spec 013 section 3.6.1's one exception: TCP
+    /// connect to the exact per-attempt witness endpoint, and nothing else
+    /// on loopback. The endpoint must be `127.0.0.1` with a port that is
+    /// neither 0 nor 443.
+    ///
+    /// On Linux the exception is a Landlock port rule, which cannot restrict
+    /// the destination address, and the record names that residual.
+    pub fn prepare_witnessed(policy: Policy, endpoint: SocketAddr) -> Result<Self, Refused> {
+        if endpoint.ip() != std::net::IpAddr::from([127, 0, 0, 1])
+            || endpoint.port() == 0
+            || endpoint.port() == 443
+        {
+            return Err(Refused::at(
+                "witness-endpoint",
+                format!("{endpoint} is not a 127.0.0.1 port other than 0 and 443"),
+            ));
+        }
+        Self::prepare_with(policy, Some(endpoint))
+    }
+
+    fn prepare_with(mut policy: Policy, endpoint: Option<SocketAddr>) -> Result<Self, Refused> {
         for roots in [
             &mut policy.inaccessible,
             &mut policy.readonly,
@@ -201,7 +242,16 @@ impl Prepared {
         for root in policy.inaccessible.iter().chain(&policy.readonly) {
             check_links(root, &policy)?;
         }
-        let native = native::Prepared::new(&policy)?;
+        let native = native::Prepared::new(&policy, endpoint)?;
+        let mut open_items: Vec<String> = OPEN_ITEMS.iter().map(|s| (*s).into()).collect();
+        if let Some(endpoint) = endpoint
+            && cfg!(target_os = "linux")
+        {
+            open_items.push(format!(
+                "loopback-address-unenforced: TCP port {} is permitted to every destination address, because Landlock mediates the port and not the address",
+                endpoint.port()
+            ));
+        }
         let material = native.identity();
         let record = Record {
             platform: std::env::consts::OS.into(),
@@ -212,7 +262,8 @@ impl Prepared {
                 .collect(),
             policy,
             self_test: BTreeMap::new(),
-            open_items: OPEN_ITEMS.iter().map(|s| (*s).into()).collect(),
+            open_items,
+            witness_endpoint: endpoint,
         };
         Ok(Self { native, record })
     }
@@ -304,7 +355,21 @@ impl Prepared {
         executable: &Path,
         probe: &Probe,
     ) -> Result<BTreeMap<String, bool>, Refused> {
-        let encoded = serde_json::to_string(probe).map_err(|e| Refused::at("probe-input", e))?;
+        if self
+            .record
+            .witness_endpoint
+            .is_some_and(|endpoint| endpoint.port() == probe.loopback_port)
+        {
+            return Err(Refused::at(
+                "probe-input",
+                "the denied loopback port is the witness endpoint",
+            ));
+        }
+        let encoded = serde_json::to_string(&ProbeInput {
+            probe: probe.clone(),
+            witness_endpoint: self.record.witness_endpoint,
+        })
+        .map_err(|e| Refused::at("probe-input", e))?;
         let output = crate::supervisor::capture_confined(
             executable,
             &["__boundary_probe", &encoded],
@@ -354,6 +419,15 @@ impl Prepared {
             "openByHandleDenied",
             "supervisorFdDenied",
         ]);
+        // Spec 013 section 3.6.1: the supplied endpoint connects, and
+        // `loopbackDenied` is the refusal on another loopback port. On macOS
+        // the same port at a non-loopback address is refused too; Linux cannot
+        // prove that, which the record's residual says.
+        if self.record.witness_endpoint.is_some() {
+            required.push("witnessEndpointConnect");
+            #[cfg(target_os = "macos")]
+            required.push("witnessNonLoopbackDenied");
+        }
         required.sort_unstable();
         if output.code != Some(0)
             || output.timed_out
@@ -404,9 +478,9 @@ fn check_links(path: &Path, policy: &Policy) -> Result<(), Refused> {
 
 /// Execute only the fixed internal probe, never a provider or workspace command.
 pub fn probe(encoded: &str) -> i32 {
-    match serde_json::from_str::<Probe>(encoded) {
-        Ok(probe) => {
-            let result = native::probe(&probe);
+    match serde_json::from_str::<ProbeInput>(encoded) {
+        Ok(input) => {
+            let result = native::probe(&input.probe, input.witness_endpoint);
             println!(
                 "{}",
                 serde_json::to_string(&result).expect("boolean observations")

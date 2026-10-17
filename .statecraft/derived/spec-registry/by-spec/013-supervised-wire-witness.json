@@ -34,6 +34,14 @@
           "kind": "directory",
           "path": "crates/statecraft-adapter-claude-code/"
         }
+      },
+      {
+        "nature": "additive",
+        "spec": "006-command-surface",
+        "unit": {
+          "kind": "directory",
+          "path": "crates/statecraft-cli/"
+        }
       }
     ],
     "id": "013-supervised-wire-witness",
@@ -88,7 +96,7 @@
       }
     ],
     "sectionDigests": {
-      "013-supervised-wire-witness-adoption": "8bdf9d09902787b8f2ccb5e3b7e6e4f298afbbb2f4e3d2aec8e37a3f71ea13a1",
+      "013-supervised-wire-witness-adoption": "5cfc91dc47186309e19fcf20841c3d8c1dbba89b23df76e41077d39545bacd29",
       "1-purpose": "e760804bcd1a589b51b603e7ea7450e0eb99d94b26444b9ba5bc032f7c47dc99",
       "2-territory": "c49da03b853bc97970e1f58889e5421423b0782ab77363f69f919b17e165e090",
       "3-1-linked-producer-adoption": "572994e602eb4e7d0063cbc5bce2ca6ee3d0ee54b0c41b51f098a5a1e0ce8736",
@@ -105,7 +113,7 @@
       "4-observable-negative-cases": "2965b5b5dd152a538905e0b65725b595b41ce62ee845d7d1fe66ba9b9c737b96",
       "5-compatibility-and-adoption": "9083427a01e4adfe7ad215c3bcffe7b3a189f1f73da359ebfc0fd32600f30c99",
       "6-out-of-scope": "3d2cc96d427dbf41f15d964e1cabc182642403cc9030b09ef91d134437316517",
-      "7-decisions-recorded-during-implementation": "f39a40ad0512deda66f8581871400306b75c22187707380735e04e48077470e2",
+      "7-decisions-recorded-during-implementation": "53d9edb57d2d50a163569b6e869077c1f638c86e7f76fedc5924cb457f3048ce",
       "verification": "00c8cd5cb61a207471e5a069e2e281fd20b12b842ea37387ecc9556d55b5f8eb"
     },
     "sectionHeadings": [
@@ -134,6 +142,6 @@
     "summary": "Amends 003 and 004 so Statecraft may adopt wire-witness as an exact linked producer, bracket one sidecar as its own durable effect, supply one per-attempt loopback proxy endpoint to the child, and report confinement and witness posture without treating testimony as authority or creating a general sidecar host.\n",
     "title": "Supervised adoption of one wire-witness sidecar per attempt"
   },
-  "shardHash": "e5d13e5db9b6068b15d218aff2b564a9384202da037f198c94b9f081115025c1",
+  "shardHash": "2f7e4dbd4cd69d35bfc7b6542b7a1f9e679591f2e1b2c5cc813652c49e6725cb",
   "specVersion": "1.9.0"
 }
