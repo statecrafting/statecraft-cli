@@ -26,8 +26,9 @@ pub const MAX_NAME: usize = 128;
 /// At most this many UTF-8 bytes in one string value.
 pub const MAX_STRING: usize = 65_536;
 
-/// A decoded value. Objects are ordered by member name, which is the order
-/// the producer writes them in and the order every walk reports them in.
+/// A decoded value. An object's members are held sorted by name (byte order),
+/// whatever order the input wrote them in; every walk reports them in that
+/// sorted order, and every read is by name.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Json {
     /// `null`.
