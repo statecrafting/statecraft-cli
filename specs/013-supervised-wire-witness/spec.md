@@ -2,6 +2,8 @@
 id: "013-supervised-wire-witness"
 title: "Supervised adoption of one wire-witness sidecar per attempt"
 status: approved
+# Ratified 2026-10-01 in 4c727ec. Implementation lands as a PR stack, and only
+# its last change moves `implementation` to complete.
 implementation: pending
 created: "2026-09-26"
 summary: >
