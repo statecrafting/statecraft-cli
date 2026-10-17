@@ -302,8 +302,9 @@ impl Running {
     }
 }
 
-/// Read stdout one bounded line at a time on its own thread. The thread stops
-/// after [`MAX_MESSAGES`] lines, so a flooding sidecar meets a closed pipe.
+/// Read stdout one bounded line at a time on its own thread. It hands over
+/// one line more than [`MAX_MESSAGES`], so the reader records
+/// `too-many-messages` for a flooding sidecar, then stops and closes the pipe.
 fn read_lines<R: Read + Send + 'static>(stdout: R) -> Receiver<Line> {
     let (sender, receiver) = mpsc::channel();
     std::thread::spawn(move || {
