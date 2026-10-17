@@ -38,6 +38,7 @@ pub mod roots;
 pub mod sign;
 pub mod value;
 pub mod verdict;
+pub mod wire;
 
 pub use error::Error;
 
