@@ -364,8 +364,8 @@ reports no attestation identity.
 
 ## Verification
 
-Implementation acceptance is not run while `implementation: pending`. Draft
-review uses the repository gate, code gate, coupling gate, relationship report,
+This spec is `status: approved`. Implementation acceptance is not run while
+`implementation: pending`. Review before ratification used the repository gate, code gate, coupling gate, relationship report,
 and exact interface verification against wire-witness commit
 `f701a7b51e492ec98bf6b160bfd3e3f8bdf7990d`. Those checks establish corpus and
 reference consistency only.
@@ -374,7 +374,7 @@ Registry completeness requires the generated entries
 `.statecraft/derived/codebase-index/by-spec/013-supervised-wire-witness.json`
 and
 `.statecraft/derived/spec-registry/by-spec/013-supervised-wire-witness.json`.
-Draft publication commits both results from the pinned `make refresh`, and the
+Every change to this spec commits both results from the pinned `make refresh`, and the
 gate must report the codebase index and spec registry fresh.
 The AI review policy excludes `.statecraft/derived` from its authored-diff
 input. Absence from that filtered path list is therefore not evidence of

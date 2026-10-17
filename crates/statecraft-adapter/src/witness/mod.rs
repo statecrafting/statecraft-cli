@@ -14,6 +14,10 @@
 //! - [`posture`] is section 3.7's closed witness-posture vocabulary and the
 //!   policy rule that alone decides whether a posture refuses acceptance.
 //!
+//! These files sit in spec 004's claimed `crates/statecraft-adapter/`
+//! directory; spec 013, which is approved, reaches it through its additive
+//! `extends` edge on that unit and owns no code of its own (its section 2).
+//!
 //! Witness testimony is never authority. A `witnessed` posture says the bound
 //! sidecar finished with complete, integral capture; it does not say the work
 //! is accepted, the provider was used, or the model complied.
