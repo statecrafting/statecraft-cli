@@ -437,16 +437,27 @@ fn a_retry_under_a_changed_policy_begins_no_replacement() {
 fn malformed_oversized_nested_or_duplicate_key_input_is_a_bounded_refusal() {
     let duplicate = br#"{"artifactType":"a","artifactType":"b"}"#.to_vec();
     let nested = format!("{}1{}", "[".repeat(40), "]".repeat(40)).into_bytes();
-    let mut oversized = b"\"".to_vec();
-    oversized.extend(std::iter::repeat_n(b'a', 1_048_577));
-    oversized.push(b'"');
-    for bytes in [duplicate, nested, oversized] {
+    let mut long_string = b"\"".to_vec();
+    long_string.extend(std::iter::repeat_n(b'a', 65_537));
+    long_string.push(b'"');
+    for bytes in [duplicate, nested, long_string] {
         let reference = fixture::bytes(&fixture::reference(&bytes, &subject(1)));
         let s = Scene::with(bytes, reference, Some(&optional()), fixture::REVISION);
         let r = s.admit(1);
         assert_eq!(r.reason, Reason::Malformed);
         assert!(r.malformed.unwrap().starts_with("manifest: "));
     }
+    // A manifest over the bound refuses on its reference's length, before
+    // the bytes are read.
+    let mut oversized = b"\"".to_vec();
+    oversized.extend(std::iter::repeat_n(b'a', 1_048_577));
+    oversized.push(b'"');
+    let over = fixture::reference(&oversized, &subject(1));
+    let s = Scene::with(oversized, fixture::bytes(&over), Some(&optional()), "0.1.0");
+    let r = s.admit(1);
+    assert_eq!(r.reason, Reason::Malformed);
+    assert!(r.malformed.unwrap().starts_with("reference: "));
+
     let s = Scene::with(
         fixture::bytes(&base()),
         b"{\"sha256\":".to_vec(),

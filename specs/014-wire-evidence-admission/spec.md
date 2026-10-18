@@ -455,7 +455,9 @@ once per attempt; a second one makes it ambiguous, which refuses as
 judges under the historical empty policy, which names no detector and so
 admits nothing. A duplicate names the prior record by its chain record hash.
 
-**2026-10-18: the ordered procedure's open choices.** Step 3 verifies the
+**2026-10-18: the ordered procedure's open choices.** Step 1 refuses a
+reference whose stated byte length exceeds the manifest bound as `malformed`,
+so no caller reads more than that bound. Step 3 verifies the
 manifest's length and digest before its own bounded decoding, so a refusal
 there never interprets unverified bytes. An ambiguous policy refuses at step
 6 with the recorded identity `ambiguous`, since no one identity exists. Under
