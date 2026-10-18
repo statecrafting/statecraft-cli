@@ -246,7 +246,7 @@ fn run(args: &[String]) -> i32 {
                     &absolute(path),
                     &home,
                     &registry,
-                    invocation.rest.get(1).map(String::as_str),
+                    &invocation.rest[1..],
                     format,
                 );
             }
@@ -833,23 +833,52 @@ fn reconcile_verb(
     }
 }
 
-/// `run <path> <spec-id>`, through spec 040's callable operation, which
-/// performs the admission and launches the attempt.
+/// `run <path> <spec-id> [--witness | --require-witness]`, through spec
+/// 040's callable operation, which performs the admission and launches the
+/// attempt. Spec 013 section 7, 2026-10-17: `--witness` requests capture and
+/// `--require-witness` also requires it.
 fn run_verb(
     path: &std::path::Path,
     home: &std::path::Path,
     registry: &Registry,
-    spec_id: Option<&str>,
+    rest: &[String],
     format: Format,
 ) -> i32 {
-    use statecraft_cli::application::{Context, run};
+    use statecraft_adapter::witness::posture::Requirement;
+    use statecraft_cli::application::{Context, run_witnessed};
+    let mut spec_id = None;
+    let mut witness = Requirement::DEFAULT;
+    for arg in rest {
+        match arg.as_str() {
+            "--witness" => witness.requested = true,
+            "--require-witness" => {
+                witness.requested = true;
+                witness.required = true;
+            }
+            flag if flag.starts_with("--") => {
+                return usage(
+                    format,
+                    format!(
+                        "usage: run <path> <spec-id> [--witness | --require-witness]; unknown {flag}"
+                    ),
+                );
+            }
+            operand if spec_id.is_none() => spec_id = Some(operand),
+            _ => {
+                return usage(
+                    format,
+                    "usage: run <path> <spec-id> [--witness | --require-witness]".to_string(),
+                );
+            }
+        }
+    }
     let clock = statecraft_cli::application::process_clock();
     let ctx = Context {
         home,
         registry,
         clock: clock.as_ref(),
     };
-    match run(&ctx, path, spec_id) {
+    match run_witnessed(&ctx, path, spec_id, witness) {
         Ok(answer) => emit(&answer, format),
         Err(u) => usage(format, u.0),
     }

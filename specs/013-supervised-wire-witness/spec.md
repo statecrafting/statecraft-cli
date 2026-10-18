@@ -460,6 +460,62 @@ to bind; until the sidecar reports ready on it, a retest fails. A process that
 takes the port in between makes the sidecar's bind fail, which section 4 names
 as `witness-failed`, and never reaches the child.
 
+**2026-10-18: on macOS the sidecar reads the system's root bundle.** The
+released producer trusts only system roots for provider TLS, and its TLS
+library asks the platform's trust services for them, through Mach lookups the
+sidecar's confinement refuses as it does the child's. Measured with wire-witness
+0.1.0, that refusal exits the sidecar before ready as
+`attempt-preparation-failed`. The supervisor sets
+`SSL_CERT_FILE=/etc/ssl/cert.pem` in the sidecar's environment, which the
+library reads instead, so no Mach service is allowed. The residual: a root an
+operator added to a keychain, or a trust setting changed there, is not honored
+by the sidecar. On Linux the library reads the system's bundle from files and
+no variable is set; that route is not yet measured with the released producer.
+
+**2026-10-18: the sidecar's admission binds the endpoint first.** This
+clarifies the 2026-10-17 entry on the child's endpoint and changes no section 4
+word. The sidecar's admission self-test binds the endpoint before the sidecar
+does, so the supervisor releases the child's listener before that admission.
+A process that takes the port during the admission fails the sidecar's
+confinement, which section 4's `witness-unavailable` row covers because no
+sidecar process ran, as the entry on a witness that cannot start already
+records; the `witness-failed` bind failure of the 2026-10-17 entry is a port
+taken after the admission. Neither reaches the child.
+
+**2026-10-17: witnessing is requested on the run.** The owner decided that
+`statecraft run <path> <spec-id> --witness` requests capture for that attempt
+and `--require-witness` also requires it; no flag is the optional-by-default
+posture. Every attempt outcome records `witnessRequired` beside
+`witnessPosture`, which is what spec 014's acceptance policy reads; this spec
+records the requirement and does not refuse acceptance itself. A retry is a new
+`run` and states its own request.
+
+**2026-10-17: what a requested witness does when it cannot start.** A producer
+that is absent, foreign, or unqualified for the platform reserves no endpoint,
+and the child runs unwitnessed as `witness-unavailable`. Once an endpoint is
+reserved, any later failure refuses the child under the guard `witness`: a
+sidecar confinement that does not admit, an effect intent that cannot be
+written, a sidecar that cannot be spawned, exits before ready, or reports a
+ready that does not validate, or a child boundary that fails its retest against
+the listening sidecar. Each closes the effect when its intent was written and
+records `witness-unavailable` if no sidecar process ran and `witness-failed` if
+one did. An attempt refused for another reason before the sidecar started
+records `witness-unavailable` when witnessing was requested.
+
+**2026-10-17: the child's route and the sidecar's life in the launch.** The
+child is given `HTTPS_PROXY=http://<endpoint>` and `NODE_EXTRA_CA_CERTS=<the
+ready message's certificate path>`, both from the validated ready message and
+named in the provider adapter, which also names the capture allowlist
+(`api.anthropic.com:443`, family `anthropic`, `http/1.1` and `sse`) and the
+sidecar's outbound port, 443. Every other authority is tunneled unread by the
+producer. During the child, each provider event first reads the sidecar's
+protocol without blocking, and a custody violation stops the child and the
+sidecar. Custody ends after the child and its object import, whose retest
+connects to the endpoint the sidecar still holds. A record change that leaves
+the attempt live stops the sidecar and leaves its effect open, like the
+attempt. On Linux a sidecar record without its three address and UDP
+residuals is not qualified.
+
 ## Verification
 
 This spec is `status: approved` and `implementation: in-progress`; implementation acceptance is not run until it is complete.
