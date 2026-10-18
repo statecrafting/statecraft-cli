@@ -70,6 +70,7 @@ pub mod render;
 pub mod slice;
 pub mod transfer;
 pub mod trust;
+pub mod witness;
 
 pub use commands::{Invocation, UsageError, Verb, parse};
 pub use exit::Exit;

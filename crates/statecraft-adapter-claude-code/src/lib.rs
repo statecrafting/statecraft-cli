@@ -58,6 +58,7 @@ pub mod probe;
 pub mod qualification;
 pub mod spawn;
 pub mod stream;
+pub mod witness;
 
 pub use capabilities::{ADAPTER_NAME, MEASURED_PROVIDER_VERSION, manifest, supported};
 pub use denial::{DenialMechanism, ToolRestriction};
