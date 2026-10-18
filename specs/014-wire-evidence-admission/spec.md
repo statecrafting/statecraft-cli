@@ -415,6 +415,25 @@ names are read by hand; the typed reference this product writes follows its
 own JSON naming. A reference member this version does not know gains no
 meaning.
 
+**2026-10-17: the supported v1 member set.** It is the member set the 0.1.0
+manifest writer emits, plus the two section 3.3 representations that release
+does not yet write: a known attestation (`identity`, `construction`) and a
+labeled estimate (`label`, `value`, `currency`, `method`, `inputs`). Every
+member in it is metadata under the pinned producer sections; a member outside
+it is `prohibited-content` with the category `outside-schema`.
+
+**2026-10-17: the shipped secret detector.** Its identity is
+`statecraft/secret-detector/v1:action-gate-core@0.3.0+registered`:
+action-gate-core's default secret rules at the release this workspace pins,
+the rules wire-witness spec 003 section 3.2 names for the producer's own
+redaction, plus exact values an attempt registers in memory. Member names are
+scanned as well as string values, and a flagged name appears in a finding's
+path as `[secret-name]`, so a path cannot carry the value it reports.
+
+**2026-10-17: an admission carries the reason `satisfied`.** Section 3.6
+gives every completed procedure one stable reason code; refusals use the
+listed codes, and an admission uses this one.
+
 ## Verification
 
 Draft review requires `make refresh`, `make gate`, `make code`, relationship

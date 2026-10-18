@@ -12,10 +12,13 @@
 //!   names, before anything is interpreted.
 //! - [`reference`] reads the producer's evidence reference, in the producer's
 //!   own snake_case wire form, into this product's typed reference.
+//! - [`manifest`] is the exact v1 member set and the facts section 3.3 names.
+//! - [`screen`] is section 3.4's prohibited-content screen and the secret
+//!   detector it is bound to.
+//! - [`policy`] is the attempt's wire-evidence policy (section 3.5).
+//! - [`record`] is the admission record section 3.6 appends: identities,
+//!   dimensions, outcome and reason, and never a candidate value.
 //! - [`fixture`] builds portable fixtures in the producer's exact shape.
-//!
-//! The v1 member set, the prohibited-content screen, the policy and the
-//! admission record follow in the next change of the same series.
 //!
 //! The six grades of section 3.8 stay separate here by construction: nothing
 //! in this module reads provider usage, an estimate or an attestation as
@@ -23,7 +26,11 @@
 
 pub mod bounded;
 pub mod fixture;
+pub mod manifest;
+pub mod policy;
+pub mod record;
 pub mod reference;
+pub mod screen;
 
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
