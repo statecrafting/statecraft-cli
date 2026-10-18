@@ -621,6 +621,22 @@ pub struct AttemptRowView {
     /// conclusive one is why an `interrupted` outcome reads as it does (rule
     /// 4); an `unknown` one leaves the attempt live.
     pub reconciliation: Option<statecraft_run::reconcile::Reconciliation>,
+    /// Its witness posture (spec 013 section 3.7); `not-recorded` for an
+    /// attempt whose outcome predates that section or that has none yet.
+    pub witness_posture: String,
+}
+
+/// An attempt's witness posture word, `not-recorded` where none is recorded
+/// or the recorded word is not one spec 013 section 3.7 names.
+pub fn witness_posture_word(attempt: &statecraft_run::Attempt) -> &'static str {
+    statecraft_adapter::witness::WitnessPosture::from_record(
+        attempt
+            .witness_posture
+            .as_deref()
+            .map(serde_json::Value::from)
+            .as_ref(),
+    )
+    .word()
 }
 
 /// `run list <path>`
@@ -642,6 +658,7 @@ pub fn run_list_answer(runs: Vec<Run>) -> Answer<RunListView> {
                         outcome: a.outcome.map(|o| o.word().to_string()),
                         admission: a.admission.clone(),
                         reconciliation: a.reconciliation.clone(),
+                        witness_posture: witness_posture_word(a).to_string(),
                     })
                     .collect(),
             })
@@ -666,6 +683,7 @@ pub fn run_list_answer(runs: Vec<Run>) -> Answer<RunListView> {
             if let Some(r) = &a.reconciliation {
                 summary.push_str(&format!("{:<20}   {}\n", "", r.describe()));
             }
+            summary.push_str(&format!("{:<20}   witness {}\n", "", a.witness_posture));
         }
     }
     Answer::new(view, Exit::Ok, summary)
@@ -699,6 +717,18 @@ pub struct RunShowView {
     pub reconciliations: Vec<ReconciliationView>,
     /// Each attempt's tamper evidence (spec 003 section 3.5.1).
     pub tamper: Vec<AttemptTamperView>,
+    /// Each attempt's witness posture (spec 013 section 3.7).
+    pub witness: Vec<AttemptWitnessView>,
+}
+
+/// One attempt's witness posture. Testimony about capture, never acceptance.
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AttemptWitnessView {
+    /// The attempt.
+    pub attempt: u32,
+    /// Its posture word; `not-recorded` where none is recorded.
+    pub posture: String,
 }
 
 /// One reconciliation record, as `run show` renders it.
@@ -831,12 +861,24 @@ pub fn run_show_with_admissions(
     for t in &tamper {
         summary.push_str(&t.describe());
     }
+    let witness: Vec<AttemptWitnessView> = run
+        .attempts
+        .iter()
+        .map(|a| AttemptWitnessView {
+            attempt: a.number,
+            posture: witness_posture_word(a).to_string(),
+        })
+        .collect();
+    for w in &witness {
+        summary.push_str(&format!("attempt {} witness {}\n", w.attempt, w.posture));
+    }
     Answer::new(
         RunShowView {
             account,
             admissions,
             reconciliations,
             tamper,
+            witness,
         },
         Exit::Ok,
         summary,
@@ -1200,6 +1242,32 @@ mod tests {
         });
         assert_eq!(a.exit, Exit::Refused);
         assert!(a.summary.contains("r1"));
+    }
+
+    #[test]
+    fn a_witness_posture_is_shown_as_recorded_and_its_absence_as_not_recorded() {
+        let mut run = Run::new("r1");
+        for recorded in [None, Some("witness-not-requested"), Some("witnessed-ish")] {
+            run.append_attempt("abc");
+            let attempt = run.attempts.last_mut().unwrap();
+            attempt.outcome = Some(statecraft_run::Outcome::Completed);
+            attempt.witness_posture = recorded.map(str::to_string);
+        }
+        let a = run_list_answer(vec![run]);
+        let words: Vec<_> = a.value.runs[0]
+            .attempts
+            .iter()
+            .map(|a| a.witness_posture.as_str())
+            .collect();
+        assert_eq!(
+            words,
+            ["not-recorded", "witness-not-requested", "not-recorded"]
+        );
+        assert!(
+            a.summary.contains("witness witness-not-requested"),
+            "{}",
+            a.summary
+        );
     }
 
     #[test]

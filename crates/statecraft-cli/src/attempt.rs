@@ -307,6 +307,14 @@ pub fn conclude(
     trial: Option<TrialRun>,
 ) -> Response {
     let mut accounting = accounting.clone();
+    // Spec 013 section 3.7: every attempt records exactly one witness
+    // posture. A caller that started no sidecar leaves it to the default,
+    // which is what an attempt that requested none is.
+    if detail.get("witnessPosture").is_none() {
+        detail["witnessPosture"] = serde_json::Value::from(
+            statecraft_adapter::witness::WitnessPosture::WitnessNotRequested.word(),
+        );
+    }
     detail["privateReferenceCleanup"] = match boundary.map_or_else(
         || Ok(Vec::new()),
         |boundary| statecraft_home::confinement::remove_extra_refs(boundary, &session.run_id),
