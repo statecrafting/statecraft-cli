@@ -124,9 +124,12 @@ fn the_sidecar_runs_its_producer_writes_only_its_area_and_reads_no_protected_roo
         ("workspace", p.workspace.clone()),
     ];
     let mut checks = String::new();
+    // Reads, not `stat`: Landlock does not mediate metadata, so a file is
+    // read with `cat` and a directory listed with `ls`.
     for (name, path) in &probes {
+        let read = if path.is_dir() { "ls" } else { "cat" };
         checks.push_str(&format!(
-            "if ls '{}' >/dev/null 2>&1; then echo {name} >> \"$OUT/leaked\"; fi\n",
+            "if {read} '{}' >/dev/null 2>&1; then echo {name} >> \"$OUT/leaked\"; fi\n",
             path.display()
         ));
     }
