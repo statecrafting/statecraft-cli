@@ -32,7 +32,7 @@ use statecraft_envelope::wire::record::{AdmissionRecord, Binding, Prior};
 use statecraft_envelope::wire::{Producer, Stated, Subject, bare_digest};
 
 use crate::record::{Chain, Entry, Identity, Kind, RecordError};
-use crate::recovery::{EffectKey, FoldDefect, fold_effects};
+use crate::recovery::{EffectKey, fold_effects};
 
 /// The subject of spec 013's sidecar bracket.
 pub const SIDECAR_SUBJECT: &str = "witness-sidecar";
@@ -145,18 +145,15 @@ pub fn bind(
 }
 
 /// Whether spec 003's identity fold has `(run_id, effect_id)` closed exactly
-/// once, by one intent, with no defect naming it.
+/// once, by one intent, with no defect naming it: a duplicate intent, a
+/// double close, an orphaned or an ambiguous outcome all refuse it, and so
+/// does any keyed defect the fold reports later, through [`crate::recovery::FoldDefect::key`].
 fn closed_once(chain: &Chain, run_id: &str, effect_id: &str) -> bool {
     let fold = fold_effects(chain);
     let is = |k: &EffectKey| k.run_id == run_id && k.effect_id.as_str() == effect_id;
     fold.closed().iter().any(is)
         && !fold.ambiguous().iter().any(is)
-        && !fold.defects().iter().any(|d| match d {
-            FoldDefect::DuplicateIntent { key, .. } | FoldDefect::DoubleClose { key, .. } => {
-                is(key)
-            }
-            _ => false,
-        })
+        && !fold.defects().iter().any(|d| d.key().is_some_and(is))
 }
 
 /// Record the attempt's wire-evidence policy. Written once, before the
@@ -330,7 +327,7 @@ pub fn prior(
             continue;
         };
         if p.attempt != target.attempt
-            || a.manifest_digest != manifest_digest
+            || bare_digest(&a.manifest_digest) != bare_digest(manifest_digest)
             || &a.subject != subject
         {
             continue;

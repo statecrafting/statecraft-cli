@@ -117,6 +117,12 @@ pub fn judge(
         }
     };
     record.artifact = Stated::known(Artifact::from(&reference));
+    // A manifest the reference says is larger than the bound is refused here,
+    // so no caller reads more than `MAX_BYTES` of it.
+    if reference.byte_length > bounded::MAX_BYTES as u64 {
+        record.malformed = Some("reference: byte_length over the bound".to_string());
+        return refuse(record, Reason::Malformed);
+    }
 
     // 2. One supported artifact type, schema version and construction.
     if !reference.supported() {
