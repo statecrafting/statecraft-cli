@@ -83,6 +83,15 @@ pub struct Attempt {
     /// `unknown` leaves it live.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub reconciliation: Option<crate::reconcile::Reconciliation>,
+    /// The witness posture its outcome records (spec 013 section 3.7), as
+    /// written, or `None` for an outcome that predates that section or an
+    /// attempt with no outcome yet. Readers render `None` as `not-recorded`.
+    #[serde(
+        default,
+        rename = "witnessPosture",
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub witness_posture: Option<String>,
 }
 
 impl Attempt {
@@ -97,6 +106,7 @@ impl Attempt {
             policy_was_declared: false,
             admission: None,
             reconciliation: None,
+            witness_posture: None,
         }
     }
 

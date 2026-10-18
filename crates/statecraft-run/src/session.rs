@@ -107,6 +107,13 @@ pub fn runs(chain: &Chain) -> Vec<Run> {
                     // to rewrite one.
                     if a.outcome.is_none() {
                         a.outcome = Some(outcome);
+                        // Spec 013 section 3.7: written with the outcome, so
+                        // read with it, once.
+                        a.witness_posture = entry
+                            .detail
+                            .get("witnessPosture")
+                            .and_then(|v| v.as_str())
+                            .map(str::to_string);
                     }
                 }
             }
@@ -776,5 +783,62 @@ mod tests {
         let (reopened, report) = Chain::open(home.path(), target.path()).unwrap();
         assert!(report.records >= 3);
         assert_eq!(runs(&reopened), runs(&chain));
+    }
+
+    #[test]
+    fn the_witness_posture_is_folded_with_the_outcome_and_only_once() {
+        let home = tempfile::tempdir().unwrap();
+        let target = tempfile::tempdir().unwrap();
+        let (mut chain, _) = Chain::open(home.path(), target.path()).unwrap();
+        let entry = |kind, attempt, subject: &str, detail| Entry {
+            kind,
+            run_id: "r1".into(),
+            attempt,
+            subject: subject.into(),
+            idempotency_key: None,
+            detail,
+            effect_id: Identity::Absent,
+        };
+        let records = [
+            entry(
+                Kind::Intent,
+                1,
+                INTENT_SUBJECT,
+                serde_json::json!({ "baseCommit": "a" }),
+            ),
+            entry(
+                Kind::Outcome,
+                1,
+                OUTCOME_SUBJECT,
+                serde_json::json!({ "outcome": "completed" }),
+            ),
+            entry(
+                Kind::Intent,
+                2,
+                INTENT_SUBJECT,
+                serde_json::json!({ "baseCommit": "a" }),
+            ),
+            entry(
+                Kind::Outcome,
+                2,
+                OUTCOME_SUBJECT,
+                serde_json::json!({ "outcome": "failed", "witnessPosture": "witness-not-requested" }),
+            ),
+            entry(
+                Kind::Outcome,
+                2,
+                OUTCOME_SUBJECT,
+                serde_json::json!({ "outcome": "completed", "witnessPosture": "witnessed" }),
+            ),
+        ];
+        for (n, record) in records.iter().enumerate() {
+            chain.append(&format!("k{n}"), "t", record).unwrap();
+        }
+        let run = runs(&chain).remove(0);
+        assert_eq!(run.attempts[0].witness_posture, None);
+        assert_eq!(
+            run.attempts[1].witness_posture.as_deref(),
+            Some("witness-not-requested")
+        );
     }
 }

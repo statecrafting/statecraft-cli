@@ -419,6 +419,16 @@ on Linux, the socket-family, `io_uring`, handle and descriptor checks. The
 sidecar is started only through a boundary that is its own; a child boundary
 refuses.
 
+**2026-10-17: the posture is written with the attempt's outcome.** Every
+attempt outcome carries `witnessPosture`; an attempt that started no sidecar
+records `witness-not-requested`, which is what requesting none is. The fold
+reads it with the outcome, once. `run list` and `run show` expose one posture
+per attempt and render `not-recorded` for an outcome without the member, an
+attempt still live, or a word section 3.7 does not name. An attempt whose
+outcome is never written, because it was reconciled as interrupted, has no
+posture recorded and renders `not-recorded` for the same reason; nothing
+writes that word.
+
 ## Verification
 
 This spec is `status: approved`. Implementation acceptance is not run while
