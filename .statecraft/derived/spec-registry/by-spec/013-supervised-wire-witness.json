@@ -104,7 +104,7 @@
       }
     ],
     "sectionDigests": {
-      "013-supervised-wire-witness-adoption": "ba4d51dc3015ba280a536bf1519c9989f26acd47b7de248db65a4dfa50d7ca3c",
+      "013-supervised-wire-witness-adoption": "46ee3362214864aeb47fd8328a483ccdaa73e18f56c7a123a2d68f5142009521",
       "1-purpose": "e760804bcd1a589b51b603e7ea7450e0eb99d94b26444b9ba5bc032f7c47dc99",
       "2-territory": "c49da03b853bc97970e1f58889e5421423b0782ab77363f69f919b17e165e090",
       "3-1-linked-producer-adoption": "572994e602eb4e7d0063cbc5bce2ca6ee3d0ee54b0c41b51f098a5a1e0ce8736",
@@ -122,7 +122,7 @@
       "5-compatibility-and-adoption": "9083427a01e4adfe7ad215c3bcffe7b3a189f1f73da359ebfc0fd32600f30c99",
       "6-out-of-scope": "3d2cc96d427dbf41f15d964e1cabc182642403cc9030b09ef91d134437316517",
       "7-decisions-recorded-during-implementation": "b67de66ecf6213f8a04186d2dccd85ca8a548fb83731b5011b5b59db401994a0",
-      "verification": "00c8cd5cb61a207471e5a069e2e281fd20b12b842ea37387ecc9556d55b5f8eb"
+      "verification": "75f7fcb44131983cf6e09111f9058160e5bae9fa58a3287bb950086173da1a0a"
     },
     "sectionHeadings": [
       "013: Supervised wire-witness adoption",
@@ -150,6 +150,6 @@
     "summary": "Amends 003 and 004 so Statecraft may adopt wire-witness as an exact linked producer, bracket one sidecar as its own durable effect, supply one per-attempt loopback proxy endpoint to the child, and report confinement and witness posture without treating testimony as authority or creating a general sidecar host.\n",
     "title": "Supervised adoption of one wire-witness sidecar per attempt"
   },
-  "shardHash": "e4cc9426fb9ed60bcb7504586cd7ed23f6f8ddbb75491f0cc2b8ff6012583c0a",
+  "shardHash": "bee59956c5790457bcf3f9bf0082448812670ef9109f9a07793362f7b759b020",
   "specVersion": "1.9.0"
 }

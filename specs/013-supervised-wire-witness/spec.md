@@ -462,8 +462,8 @@ as `witness-failed`, and never reaches the child.
 
 ## Verification
 
-This spec is `status: approved`. Implementation acceptance is not run while
-`implementation: pending`. Review before ratification used the repository gate, code gate, coupling gate, relationship report,
+This spec is `status: approved`; implementation acceptance is not run while `implementation: pending`.
+Review before ratification used the repository gate, code gate, coupling gate, relationship report,
 and exact interface verification against wire-witness commit
 `f701a7b51e492ec98bf6b160bfd3e3f8bdf7990d`. Those checks establish corpus and
 reference consistency only.
