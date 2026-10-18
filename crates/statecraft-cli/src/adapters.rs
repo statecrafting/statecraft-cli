@@ -190,6 +190,7 @@ pub fn probe_reporting_version(
             git_writes: Vec::new(),
             provider: true,
             authenticated: false,
+            witness: false,
         },
         &executable,
         environment

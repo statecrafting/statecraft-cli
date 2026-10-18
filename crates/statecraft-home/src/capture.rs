@@ -310,6 +310,7 @@ pub fn launch(request: &Request) -> Result<Launched, Failed> {
             git_writes: vec![],
             provider: true,
             authenticated: true,
+            witness: false,
         },
         &executable,
         path,
