@@ -293,6 +293,7 @@ pub fn judge_with_diagnostic(
             git_writes: vec![],
             provider: false,
             authenticated: false,
+            witness: false,
         },
         &executable,
         &path,

@@ -81,6 +81,7 @@ pub mod spec_spine;
 pub mod startup;
 pub mod team;
 pub mod trial;
+pub mod witness;
 
 pub use flow::{Mode, Outcome, Report, Step};
 pub use home::{Layout, Personal, Tools, resolve as resolve_home};

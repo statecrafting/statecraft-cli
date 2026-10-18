@@ -42,6 +42,14 @@
           "kind": "directory",
           "path": "crates/statecraft-cli/"
         }
+      },
+      {
+        "nature": "additive",
+        "spec": "002-environment-lifecycle",
+        "unit": {
+          "kind": "directory",
+          "path": "crates/statecraft-home/"
+        }
       }
     ],
     "id": "013-supervised-wire-witness",
@@ -96,7 +104,7 @@
       }
     ],
     "sectionDigests": {
-      "013-supervised-wire-witness-adoption": "adb1e7393fc97c6b1730deb5000888a983dfec5838459b160c87281154809f70",
+      "013-supervised-wire-witness-adoption": "2bc20c76f124f7155db20ddd5e583810c9c5c8069ab128388dd0b28ce45c2638",
       "1-purpose": "e760804bcd1a589b51b603e7ea7450e0eb99d94b26444b9ba5bc032f7c47dc99",
       "2-territory": "c49da03b853bc97970e1f58889e5421423b0782ab77363f69f919b17e165e090",
       "3-1-linked-producer-adoption": "572994e602eb4e7d0063cbc5bce2ca6ee3d0ee54b0c41b51f098a5a1e0ce8736",
@@ -113,7 +121,7 @@
       "4-observable-negative-cases": "2965b5b5dd152a538905e0b65725b595b41ce62ee845d7d1fe66ba9b9c737b96",
       "5-compatibility-and-adoption": "9083427a01e4adfe7ad215c3bcffe7b3a189f1f73da359ebfc0fd32600f30c99",
       "6-out-of-scope": "3d2cc96d427dbf41f15d964e1cabc182642403cc9030b09ef91d134437316517",
-      "7-decisions-recorded-during-implementation": "4bfc6434dd2aeeecae82ad27f1c11c871d8ebb8d1716862b36f47fb4c036f4f6",
+      "7-decisions-recorded-during-implementation": "5b779b8cf266a9c71ca9c83500a08a30c11fe486938bc8aab7c016798b6ff01a",
       "verification": "00c8cd5cb61a207471e5a069e2e281fd20b12b842ea37387ecc9556d55b5f8eb"
     },
     "sectionHeadings": [
@@ -142,6 +150,6 @@
     "summary": "Amends 003 and 004 so Statecraft may adopt wire-witness as an exact linked producer, bracket one sidecar as its own durable effect, supply one per-attempt loopback proxy endpoint to the child, and report confinement and witness posture without treating testimony as authority or creating a general sidecar host.\n",
     "title": "Supervised adoption of one wire-witness sidecar per attempt"
   },
-  "shardHash": "ab4781045720c254e51cf83b434bb682d07a59fddbffe078a40384116c891779",
+  "shardHash": "264e7862075297944328f2704601f396ca1918f6d28131417b7c30ddaad31754",
   "specVersion": "1.9.0"
 }

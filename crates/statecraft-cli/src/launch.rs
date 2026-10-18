@@ -214,6 +214,7 @@ pub fn launch_attempt(
                     git_writes: vec![objects, refs, logs, admin],
                     provider: true,
                     authenticated: true,
+                    witness: false,
                 },
                 &probe_executable,
                 &path,

@@ -3,7 +3,7 @@
 use statecraft_adapter::boundary::{DataRoot, Grant, Policy, Prepared, Probe};
 use std::collections::BTreeMap;
 use std::fs::File;
-use std::net::TcpListener;
+use std::net::{SocketAddr, TcpListener};
 use std::os::fd::AsRawFd;
 use std::os::unix::net::UnixListener;
 use std::path::{Path, PathBuf};
@@ -42,6 +42,10 @@ pub struct Roots<'a> {
     /// placed in the environment, and its absence refuses (section 3.2). A
     /// version probe authenticates nothing and is given no token.
     pub authenticated: bool,
+    /// Witness capture was requested (spec 013 section 3.6.1): one
+    /// loopback endpoint is reserved and is the child's only route out of
+    /// its confinement besides the provider's own.
+    pub witness: bool,
 }
 
 /// A probe and its live sentinels. Held until the corresponding launch finishes.
@@ -63,9 +67,23 @@ pub struct Admission {
     listener: TcpListener,
     protected: File,
     probe: Probe,
+    witness: Option<SocketAddr>,
+    reserved: Option<TcpListener>,
 }
 
 impl Admission {
+    /// The reserved witness endpoint, when capture was requested.
+    #[must_use]
+    pub fn witness_endpoint(&self) -> Option<SocketAddr> {
+        self.witness
+    }
+
+    /// Give up the reservation so the sidecar can bind the endpoint. Until
+    /// the sidecar reports ready on it, a retest's connect probe fails.
+    pub fn release_witness_endpoint(&mut self) {
+        self.reserved = None;
+    }
+
     /// Apply the fixed probe again before another process uses this policy.
     pub fn retest(&self, executable: &Path) -> Result<(), String> {
         // These owned resources keep every negative probe meaningful.
@@ -113,6 +131,14 @@ pub fn admit(roots: Roots<'_>, executable: &Path, path: &str) -> Result<Admissio
         let socket_path = socket_directory.path().join("socket");
         let socket = UnixListener::bind(&socket_path)?;
         let listener = TcpListener::bind(("127.0.0.1", 0))?;
+        // Held through the self-test, whose connect probe needs a listener,
+        // and released only for the sidecar to bind.
+        let reserved = if roots.witness {
+            Some(TcpListener::bind(("127.0.0.1", 0))?)
+        } else {
+            None
+        };
+        let witness = reserved.as_ref().map(TcpListener::local_addr).transpose()?;
         let gate = roots
             .gate
             .map(Path::to_path_buf)
@@ -193,13 +219,17 @@ pub fn admit(roots: Roots<'_>, executable: &Path, path: &str) -> Result<Admissio
         };
         let mut readonly = vec![roots.target.to_path_buf()];
         readonly.extend(common_path.iter().cloned());
-        let mut boundary = Prepared::prepare(Policy {
+        let policy = Policy {
             inaccessible: vec![roots.home.into(), roots.records.into()],
             readonly,
             readable,
             writable,
             adjacent_prefixes,
-        })?;
+        };
+        let mut boundary = match witness {
+            Some(endpoint) => Prepared::prepare_witnessed(policy, endpoint)?,
+            None => Prepared::prepare(policy)?,
+        };
         for program in [executable, Path::new("/bin/sh"), Path::new("/usr/bin/git")] {
             boundary.resolve(program, path)?;
         }
@@ -247,6 +277,8 @@ pub fn admit(roots: Roots<'_>, executable: &Path, path: &str) -> Result<Admissio
             listener,
             protected,
             probe,
+            witness,
+            reserved,
         })
     }
     prepare(roots, executable, path).map_err(|e| e.to_string())

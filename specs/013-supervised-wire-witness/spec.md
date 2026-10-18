@@ -22,6 +22,9 @@ extends:
   # Section 3.6.1: the endpoint exception is measured under the real policy by
   # the fixed probe, which only the binary carries. Additive: tests only.
   - { spec: "006-command-surface", unit: { kind: directory, path: "crates/statecraft-cli/" }, nature: additive }
+  # Sections 3.1, 3.3 and 3.6: the producer's home path, the reserved child
+  # endpoint and the sidecar's admission live with the child's admission.
+  - { spec: "002-environment-lifecycle", unit: { kind: directory, path: "crates/statecraft-home/" }, nature: additive }
 depends_on:
   - "001-boundaries-and-authority"
   - "003-work-and-run-semantics"
@@ -428,6 +431,33 @@ attempt still live, or a word section 3.7 does not name. An attempt whose
 outcome is never written, because it was reconciled as interrupted, has no
 posture recorded and renders `not-recorded` for the same reason; nothing
 writes that word.
+
+**2026-10-17: the producer has one fixed home path, verified by digest only.**
+The operator places the released executable at
+`<home>/producers/wire-witness/0.1.0/<target>/wire-witness`; `locate` verifies
+that one path against the ledger and never downloads, installs, or tries
+another. An unqualified platform, an absent or non-regular file, or a foreign
+digest is `witness-unavailable` before spawn. The sidecar's policy makes that
+directory alone readable outside its area, so it can execute its producer and
+nothing else under the home.
+
+**2026-10-17: the sidecar area is `witness/` in the attempt's exchange
+directory.** Section 3.5 supplies the child the certificate path from the bound
+ready message, so the area sits in the one root the child may already read and
+never write; the sidecar's output directory, `witness/capture`, holds the
+certificate, and `witness/tmp` is its temporary directory. Both are created
+private by the supervisor before the sidecar starts, and an existing area
+refuses. The child can read what the sidecar retains there and can write none
+of it; the sidecar can write nothing else.
+
+**2026-10-17: the child's endpoint is reserved before the child is admitted.**
+The child's admission precedes the sidecar, and its self-test must connect to
+the endpoint, so a witnessed admission binds a loopback listener on an
+ephemeral port, prepares the child's boundary for that port, and holds the
+listener through the self-test. The supervisor releases it only for the sidecar
+to bind; until the sidecar reports ready on it, a retest fails. A process that
+takes the port in between makes the sidecar's bind fail, which section 4 names
+as `witness-failed`, and never reaches the child.
 
 ## Verification
 
