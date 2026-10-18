@@ -196,9 +196,15 @@ fn a_wrong_run_attempt_or_effect_is_a_subject_mismatch() {
 }
 
 #[test]
-fn an_unclosed_doubly_closed_or_ambiguous_effect_does_not_bind() {
-    let cases: [&dyn Fn(&mut Chain); 3] = [
+fn an_unclosed_orphaned_doubly_closed_or_ambiguous_effect_does_not_bind() {
+    let cases: [&dyn Fn(&mut Chain); 4] = [
         &|c| put(c, &sidecar_intent(1)),
+        // An outcome before any intent is orphaned, and stays reported even
+        // once a later bracket closes the effect.
+        &|c| {
+            put(c, &sidecar_outcome(1, json!(format!("sha256:{DIGEST}"))));
+            bracket(c, 1);
+        },
         &|c| {
             bracket(c, 1);
             put(c, &sidecar_outcome(1, json!(null)));
@@ -388,6 +394,11 @@ fn step_six_names_a_duplicate_or_a_changed_policy_by_the_prior_record() {
     assert!(matches!(
         prior(&c, &target(1), DIGEST, "p2", &s),
         Earlier::OtherPolicy(_)
+    ));
+    // The same digest written with its `sha256:` prefix is the same manifest.
+    assert!(matches!(
+        prior(&c, &target(1), &format!("sha256:{DIGEST}"), "p1", &s),
+        Earlier::Duplicate(_)
     ));
     // Another attempt never inherits this one's record.
     assert_eq!(prior(&c, &target(2), DIGEST, "p1", &s), Earlier::None);
