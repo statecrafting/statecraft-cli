@@ -4,7 +4,7 @@ title: "Supervised adoption of one wire-witness sidecar per attempt"
 status: approved
 # Ratified 2026-10-01 in 4c727ec. Implementation lands as a PR stack, and only
 # its last change moves `implementation` to complete.
-implementation: pending
+implementation: in-progress
 created: "2026-09-26"
 summary: >
   Amends 003 and 004 so Statecraft may adopt wire-witness as an exact linked
@@ -462,7 +462,7 @@ as `witness-failed`, and never reaches the child.
 
 ## Verification
 
-This spec is `status: approved`; implementation acceptance is not run while `implementation: pending`.
+This spec is `status: approved` and `implementation: in-progress`; implementation acceptance is not run until it is complete.
 Review before ratification used the repository gate, code gate, coupling gate, relationship report,
 and exact interface verification against wire-witness commit
 `f701a7b51e492ec98bf6b160bfd3e3f8bdf7990d`. Those checks establish corpus and
