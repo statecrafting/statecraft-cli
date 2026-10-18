@@ -434,6 +434,27 @@ path as `[secret-name]`, so a path cannot carry the value it reports.
 gives every completed procedure one stable reason code; refusals use the
 listed codes, and an admission uses this one.
 
+**2026-10-17: the sidecar bracket is read by its wire shape.** Step 4 reads
+spec 013's bracket from the run record as written there: subject
+`witness-sidecar`, an intent whose detail carries `binding` (`runId`,
+`attempt`, `effectId`) and `producer` (`name`, `version`,
+`executableDigest`), and an outcome whose detail may carry `captureDigest`.
+`statecraft-run` therefore needs no adapter type. When the outcome names a
+capture digest, the reference's digest must equal it, so the effect binds
+only the manifest it closed. The producer's revision is compared with the
+recorded `version` and its content digest with `executableDigest`.
+
+**2026-10-17: evidence records are their own kind.** The attempt's
+wire-evidence policy and every admission record are written as
+`Kind::Evidence`, subjects `wire-evidence-policy` and
+`wire-evidence-admission`. No earlier fold reads that kind, so a run's
+attempts, outcome, accounting and tamper evidence read exactly as before,
+and a reader that predates the kind skips the record. The policy is recorded
+once per attempt; a second one makes it ambiguous, which refuses as
+`policy-mismatch` rather than choosing one. An attempt with none recorded
+judges under the historical empty policy, which names no detector and so
+admits nothing. A duplicate names the prior record by its chain record hash.
+
 ## Verification
 
 Draft review requires `make refresh`, `make gate`, `make code`, relationship

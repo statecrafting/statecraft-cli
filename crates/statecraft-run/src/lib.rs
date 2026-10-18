@@ -27,6 +27,10 @@
 //!   path, and a change to the record while the process ran.
 //! - [`recovery`] folds the record, reconciles every intent with no outcome, and
 //!   blocks a retry it cannot resolve.
+//! - [`wire`] is spec 014's run-record half of wire-evidence admission: the
+//!   sidecar effect's binding, the attempt's wire-evidence policy, the
+//!   append-only admission records and their per-attempt projection. Added
+//!   by spec 014's additive edge.
 //! - [`session`] is one run from intent to outcome, and the fold that reads runs
 //!   back out of the record. Added by spec 006's additive edge, because a
 //!   command may not be a second implementation and a binding needs an entry
@@ -54,6 +58,7 @@ pub mod report;
 pub mod repository;
 pub mod session;
 pub mod tamper;
+pub mod wire;
 pub mod work;
 pub mod workspace;
 
