@@ -445,9 +445,10 @@ nothing else under the home.
 directory.** Section 3.5 supplies the child the certificate path from the bound
 ready message, so the area sits in the one root the child may already read and
 never write; the sidecar's output directory, `witness/capture`, holds the
-certificate, and `witness/tmp` is its temporary directory. Both are created
-private by the supervisor before the sidecar starts, and an existing area
-refuses. The child can read what the sidecar retains there and can write none
+certificate, and `witness/tmp` is its temporary directory. The supervisor
+creates `witness/` and `witness/tmp` private before the sidecar starts, and an
+existing area refuses; the sidecar creates `witness/capture` itself, because
+the protocol requires its output directory not to exist. The child can read what the sidecar retains there and can write none
 of it; the sidecar can write nothing else.
 
 **2026-10-17: the child's endpoint is reserved before the child is admitted.**
