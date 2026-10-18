@@ -418,6 +418,13 @@ fn stated(json: &Json, at: &str) -> Read<Stated<String>> {
     }
 }
 
+/// A number's exact token text. [`Json::Number`] is this crate's bounded
+/// reader's variant, which keeps the token as a `String` (never a
+/// `serde_json::Number`), so a provider's value is retained as written.
+fn number_text(text: &str) -> String {
+    text.to_string()
+}
+
 fn sorted_distinct(items: &[String]) -> bool {
     items.windows(2).all(|w| w[0] < w[1])
 }
@@ -566,7 +573,7 @@ fn exchange(json: &Json, at: &str) -> Read<Exchange> {
                     location: text(v, &at, "location")?,
                     unit: stated(member(v, &at, "unit")?, &format!("{at}.unit"))?,
                     value: match member(v, &at, "value")? {
-                        Json::Number(n) => n.clone(),
+                        Json::Number(text) => number_text(text),
                         _ => return bad(&format!("{at}.value")),
                     },
                 })
@@ -584,7 +591,7 @@ fn exchange(json: &Json, at: &str) -> Read<Exchange> {
         (None, Some("estimate")) => Stated::known(Estimate {
             label: "estimate".to_string(),
             value: match member(cost, &cost_at, "value")? {
-                Json::Number(n) => n.clone(),
+                Json::Number(text) => number_text(text),
                 _ => return bad(&format!("{cost_at}.value")),
             },
             currency: text(cost, &cost_at, "currency")?,

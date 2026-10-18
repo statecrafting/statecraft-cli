@@ -94,6 +94,13 @@ fn usage_is_testimony_an_estimate_is_labeled_and_an_absent_attester_is_unknown()
     let estimate = e.estimated_cost.value().unwrap();
     assert_eq!(estimate.label, "estimate");
     assert_eq!(estimate.method, "price-table/2026-10");
+    // The value and the usage value keep the producer's exact token text.
+    assert_eq!(estimate.value, "0.0012");
+    assert_eq!(
+        (estimate.currency.as_str(), estimate.inputs.as_slice()),
+        ("USD", &["usage:input_tokens".to_string()][..])
+    );
+    assert_eq!(e.usage.values[0].value, "3");
     assert_eq!(facts.attestation.identity.word(), "unknown");
 }
 
