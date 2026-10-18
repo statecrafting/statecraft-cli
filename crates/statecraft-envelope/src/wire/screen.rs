@@ -4,9 +4,9 @@
 //! it can be retained. Under `metadata-only` a member is prohibited when it
 //! is outside the exact v1 member set ([`super::manifest::SCHEMA`]), and a
 //! string value is prohibited when the secret detector the attempt's policy
-//! names finds a secret in it. A missing detector identity, a detector whose
-//! identity is not the one recorded, and a scan that cannot complete each
-//! refuse rather than retain.
+//! names finds a secret in it. A missing detector identity, a named detector
+//! that was not supplied, a detector whose identity is not the one recorded,
+//! and a scan that cannot complete each refuse rather than retain.
 //!
 //! A finding carries the member path, the detector identity when one fired,
 //! and a category. **It never carries the candidate value**, and a member name
@@ -82,6 +82,8 @@ pub enum Category {
     Secret,
     /// The policy names no detector.
     DetectorMissing,
+    /// The policy names a detector, and none was supplied to run.
+    DetectorUnavailable,
     /// The detector supplied is not the one the policy names.
     DetectorMismatch,
     /// The detector could not complete a scan.
@@ -122,7 +124,7 @@ pub fn screen(
         return whole(Category::DetectorMissing);
     };
     let Some(detector) = detector else {
-        return whole(Category::DetectorMissing);
+        return whole(Category::DetectorUnavailable);
     };
     if detector.identity() != expected {
         return whole(Category::DetectorMismatch);

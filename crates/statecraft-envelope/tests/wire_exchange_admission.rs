@@ -238,7 +238,7 @@ fn an_absent_mismatched_or_failing_detector_fails_closed() {
     );
     assert_eq!(
         category(screen(&m, &SCHEMA, Some(DEFAULT_DETECTOR), None)),
-        Category::DetectorMissing
+        Category::DetectorUnavailable
     );
     assert_eq!(
         category(screen(&m, &SCHEMA, Some("another-detector"), Some(&d))),
