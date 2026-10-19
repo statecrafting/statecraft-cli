@@ -14,6 +14,13 @@ summary: >
 amends: ["006-command-surface"]
 extends:
   - { spec: "006-command-surface", unit: { kind: directory, path: "crates/statecraft-cli/" }, nature: additive }
+  # Section 5, 2026-10-18: the owner's one core-crate exception, a debug-only
+  # nonce seed in launch.rs; the scratch directory confinement names is drawn
+  # from it.
+  - { spec: "002-environment-lifecycle", unit: { kind: symbol, id: "statecraft_home::launch::nonce" }, nature: additive }
+  - { spec: "002-environment-lifecycle", unit: { kind: symbol, id: "statecraft_home::launch::seeded_nonce" }, nature: additive }
+  - { spec: "002-environment-lifecycle", unit: { kind: symbol, id: "statecraft_home::launch::seeded_name" }, nature: additive }
+  - { spec: "002-environment-lifecycle", unit: { kind: symbol, id: "statecraft_home::confinement::admit" }, nature: additive }
 depends_on:
   - "002-environment-lifecycle"
   - "003-work-and-run-semantics"
@@ -227,6 +234,24 @@ the fixture may start git's background maintenance, whose transient
 other's (seen once on CI for `run`). The fixture sets `maintenance.auto` to
 `false` and `gc.auto` to `0` when it initializes the repository, so the only
 files compared are the ones the verb and the operation write.
+
+**2026-10-18: owner decision, the one core-crate exception.** Section 2's
+prohibition on core-crate changes has one exception. `statecraft-home`'s
+launch nonce and its seeded temporary names may read
+`STATECRAFT_TEST_NONCE_SEED` under `cfg(debug_assertions)` only, mirroring
+`STATECRAFT_TEST_CLOCK`; a release build never reads it. The change carries an
+extends edge on spec 002 for `crates/statecraft-home/src/launch.rs`, and this
+entry. No other core-crate change is authorized. The edge names the three
+functions in that file the seed touches, `nonce`, `seeded_nonce` and
+`seeded_name`, because a whole-file unit is in no content hash (lint L-008)
+and a symbol unit is. Given the seed, each nonce is
+the first sixteen bytes of SHA-256 over the seed, a colon and the process's
+count of nonces drawn so far, so two processes doing the same work draw the
+same ones. The confinement's scratch directory, whose path the attempt's
+posture records, is one of those seeded temporary names: `confinement.rs`
+takes its name from `launch::seeded_name`, which alone reads the variable,
+and carries its own extends edge on spec 002 for that call. Spec 004's adapter
+is not changed: the settings file it names stays random.
 
 ## Verification
 

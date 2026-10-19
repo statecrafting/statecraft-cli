@@ -118,9 +118,13 @@ pub fn admit(roots: Roots<'_>, executable: &Path, path: &str) -> Result<Admissio
         for directory in [roots.home, roots.records, roots.exchange] {
             std::fs::create_dir_all(directory)?;
         }
-        let scratch = tempfile::Builder::new()
-            .prefix("temporary-")
-            .tempdir_in(roots.exchange)?;
+        let seeded = crate::launch::seeded_name("temporary-");
+        let mut scratch = tempfile::Builder::new();
+        match &seeded {
+            Some(name) => scratch.prefix(name).rand_bytes(0),
+            None => scratch.prefix("temporary-"),
+        };
+        let scratch = scratch.tempdir_in(roots.exchange)?;
         let home_sentinel = tempfile::NamedTempFile::new_in(roots.home)?;
         let records_sentinel = tempfile::NamedTempFile::new_in(roots.records)?;
         let target_sentinel = tempfile::NamedTempFile::new_in(roots.target)?;
