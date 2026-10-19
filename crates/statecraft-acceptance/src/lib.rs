@@ -26,6 +26,8 @@
 //! - [`suite`] runs the declared acceptance and folds one run's account out of
 //!   the record. Added by spec 006's additive edge: a command may not be a
 //!   second implementation, so the entry point a binding needs lives here.
+//! - [`wire`] is spec 014's ordered wire-evidence admission and its section
+//!   3.5 acceptance requirement. Added by spec 014's additive edge.
 //!
 //! # What it does not do
 //!
@@ -59,6 +61,7 @@ pub mod outcome;
 pub mod receipt;
 pub mod suite;
 pub mod trust;
+pub mod wire;
 
 pub use absence::{Absence, Recorded, Statement};
 pub use authority::{CorpusAnswer, Declared, DeltaReport, Verdict as AuthorityVerdict};
