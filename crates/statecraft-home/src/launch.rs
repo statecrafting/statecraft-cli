@@ -937,9 +937,50 @@ pub(crate) fn fresh_nonce() -> std::io::Result<String> {
 
 fn nonce() -> std::io::Result<String> {
     use std::io::Read;
+    #[cfg(debug_assertions)]
+    if let Some(seed) = std::env::var_os("STATECRAFT_TEST_NONCE_SEED") {
+        return Ok(seeded_nonce(seed.as_encoded_bytes()));
+    }
     let mut bytes = [0u8; 16];
     std::fs::File::open("/dev/urandom")?.read_exact(&mut bytes)?;
     Ok(bytes.iter().map(|b| format!("{b:02x}")).collect())
+}
+
+/// In a debug build, `STATECRAFT_TEST_NONCE_SEED` replaces the generator
+/// with a sequence: the first sixteen bytes of SHA-256 over the seed, a colon
+/// and this process's count of nonces so far. Two processes given the same
+/// seed and doing the same work draw the same nonces, which is what spec 040's
+/// differential tests need to compare a launch byte for byte (section 5,
+/// 2026-10-18). A release build never reads the variable.
+#[cfg(debug_assertions)]
+fn seeded_nonce(seed: &[u8]) -> String {
+    use sha2::{Digest, Sha256};
+    use std::sync::atomic::{AtomicU64, Ordering};
+    static DRAWN: AtomicU64 = AtomicU64::new(0);
+    let n = DRAWN.fetch_add(1, Ordering::SeqCst);
+    let mut hash = Sha256::new();
+    hash.update(seed);
+    hash.update(format!(":{n}").as_bytes());
+    hash.finalize()[..16]
+        .iter()
+        .map(|b| format!("{b:02x}"))
+        .collect()
+}
+
+/// In a debug build given `STATECRAFT_TEST_NONCE_SEED`, a name for a
+/// temporary path drawn from the same sequence as [`seeded_nonce`], so the
+/// path is the same in two processes doing the same work; otherwise `None`,
+/// and the caller's generator names it.
+pub(crate) fn seeded_name(prefix: &str) -> Option<String> {
+    #[cfg(debug_assertions)]
+    if let Some(seed) = std::env::var_os("STATECRAFT_TEST_NONCE_SEED") {
+        return Some(format!(
+            "{prefix}{}",
+            &seeded_nonce(seed.as_encoded_bytes())[..6]
+        ));
+    }
+    let _ = prefix;
+    None
 }
 
 /// Create a file that must not already exist, whole or not at all.

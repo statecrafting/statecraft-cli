@@ -7,6 +7,8 @@
 //! fixed on both sides (the binary's through `STATECRAFT_TEST_CLOCK`, read only
 //! by a debug build), and the paths are the same paths.
 
+#![cfg(unix)]
+
 use statecraft_cli::application::{
     Context, ReconcileOperands, RecoverChoice, Response, TrialOperands, accept, override_recover,
     run, run_reconcile, startup_trial,
@@ -340,6 +342,41 @@ fn override_recover_answers_and_records_as_the_verb_does() {
             ))
         });
     }
+    // A-ADMISSION: a malformed journal is reported, and each choice made
+    // against it, including one with nothing to settle, keeps its outcome.
+    let journal_file = statecraft_run::overrides::journal_path(&f.home(), &t);
+    std::fs::create_dir_all(journal_file.parent().unwrap()).unwrap();
+    std::fs::write(&journal_file, "{ not a journal line\n").unwrap();
+    equivalent(
+        &f,
+        Verb::OverrideRecover,
+        &["override", "recover", target],
+        |ctx| Ok(override_recover(ctx, &t, None)),
+    );
+    let digest = statecraft_environment::digest::digest_bytes(b"{ not a journal line\n");
+    for (choice, journal) in [
+        ("complete-pending", digest.as_str()),
+        ("adopt-prefix", digest.as_str()),
+        ("adopt-empty", "absent"),
+        ("adopt-empty", digest.as_str()),
+    ] {
+        let args = [
+            "override", "recover", target, choice, journal, "absent", "sam", "a", "reason",
+        ];
+        equivalent(&f, Verb::OverrideRecover, &args, |ctx| {
+            Ok(override_recover(
+                ctx,
+                &t,
+                Some(RecoverChoice {
+                    choice: statecraft_run::overrides::Choice::parse(choice).unwrap(),
+                    journal,
+                    authority: "absent",
+                    operator: "sam",
+                    reason: "a reason",
+                }),
+            ))
+        });
+    }
     // Unregistered.
     let f = Fixture::new(false);
     let t = f.target();
@@ -512,4 +549,107 @@ fn startup_trial_admits_and_refuses_as_the_verb_does() {
             usage_of(startup_trial(ctx, &t, operands.borrow_mut().take()))
         });
     }
+}
+
+/// A-ADAPTER, first half: the five adapters spec 040 thinned call their one
+/// operation and render it. None of them resolves a registration, reads
+/// arming, takes a lock, opens the chain or the journal, selects a report or
+/// launches; the dispatch arms that reach them check only that a path was
+/// typed.
+#[test]
+fn the_adapters_hold_no_admission_or_orchestration() {
+    let source = include_str!("../../src/main.rs");
+    let body = |name: &str| -> &str {
+        let start = source
+            .find(&format!("\nfn {name}("))
+            .unwrap_or_else(|| panic!("main.rs defines {name}"));
+        let rest = &source[start + 1..];
+        &rest[..rest.find("\n}\n").expect("the function ends") + 3]
+    };
+    for (adapter, operation) in [
+        ("run_verb", "run_witnessed(&ctx"),
+        ("trial_verb", "startup_trial(&ctx"),
+        ("accept_verb", "accept(&ctx"),
+        ("recover_verb", "override_recover("),
+        ("reconcile_verb", "run_reconcile("),
+    ] {
+        let body = body(adapter);
+        assert!(body.contains(operation), "{adapter} calls {operation}");
+        for admission in [
+            "registered(",
+            "stored_or_typed(",
+            "registry.get",
+            ".armed",
+            "try_acquire",
+            "Chain::open",
+            "overrides::read",
+            "overrides::inspect",
+            "report_source",
+            "corpus_report",
+            "launch_attempt",
+            "Manifest::read",
+            "print!",
+        ] {
+            assert!(
+                !body.contains(admission),
+                "{adapter} performs {admission} itself"
+            );
+        }
+    }
+}
+
+/// A-ADAPTER, second half: the format a caller selects changes the rendering
+/// and nothing else. The verb with and without `--json`, and the operation,
+/// each from the same state, leave the same bytes; the human rendering is the
+/// operation's answer rendered for a human, and the exit is the same.
+#[test]
+fn format_selection_changes_no_result_or_effect() {
+    let f = Fixture::new(true);
+    let t = f.target();
+    let target = t.to_str().unwrap();
+    let args = [
+        "override",
+        "recover",
+        target,
+        "adopt-empty",
+        "absent",
+        "absent",
+        "sam",
+        "a",
+        "reason",
+    ];
+    let before = f.snapshot();
+    let pristine = f.keep();
+    let (json_code, _) = f.verb(&[&args[..], &["--json"]].concat());
+    let after_json = f.snapshot();
+    f.restore(&pristine);
+    let (human_code, human) = f.verb(&args);
+    let after_human = f.snapshot();
+    f.restore(&pristine);
+    let registry = f.registry();
+    let clock = FixedClock(AT);
+    let home = f.home();
+    let ctx = Context {
+        home: &home,
+        registry: &registry,
+        clock: &clock,
+    };
+    let answer = override_recover(
+        &ctx,
+        &t,
+        Some(RecoverChoice {
+            choice: statecraft_run::overrides::Choice::parse("adopt-empty").unwrap(),
+            journal: "absent",
+            authority: "absent",
+            operator: "sam",
+            reason: "a reason",
+        }),
+    );
+    let after_operation = f.snapshot();
+    assert_eq!(json_code, human_code);
+    assert_eq!(answer.exit.code(), human_code);
+    assert_eq!(human, answer.render(Format::Human));
+    assert_ne!(after_json, before, "the choice changed nothing");
+    assert_eq!(after_json, after_human, "the format changed an effect");
+    assert_eq!(after_json, after_operation, "the caller changed an effect");
 }

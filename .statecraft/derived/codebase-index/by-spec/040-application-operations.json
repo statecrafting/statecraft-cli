@@ -16,6 +16,14 @@
       {
         "path": "crates/statecraft-cli/",
         "source": "spec-edge"
+      },
+      {
+        "path": "crates/statecraft-home/src/confinement.rs",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/statecraft-home/src/launch.rs",
+        "source": "spec-edge"
       }
     ],
     "resolvedUnits": [
@@ -31,11 +39,79 @@
           "kind": "directory",
           "path": "crates/statecraft-cli/"
         }
+      },
+      {
+        "locations": [
+          {
+            "file": "crates/statecraft-home/src/confinement.rs",
+            "span": {
+              "endLine": 289,
+              "startLine": 112
+            }
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "id": "statecraft_home::confinement::admit",
+          "kind": "symbol"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "crates/statecraft-home/src/launch.rs",
+            "span": {
+              "endLine": 947,
+              "startLine": 938
+            }
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "id": "statecraft_home::launch::nonce",
+          "kind": "symbol"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "crates/statecraft-home/src/launch.rs",
+            "span": {
+              "endLine": 984,
+              "startLine": 974
+            }
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "id": "statecraft_home::launch::seeded_name",
+          "kind": "symbol"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "crates/statecraft-home/src/launch.rs",
+            "span": {
+              "endLine": 968,
+              "startLine": 956
+            }
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "id": "statecraft_home::launch::seeded_nonce",
+          "kind": "symbol"
+        }
       }
     ],
     "specId": "040-application-operations",
     "specStatus": "approved"
   },
   "schemaVersion": "1.2.0",
-  "shardHash": "3f28c6533c18529c402d503352ff226c438c166dc4f37484502a606a96b30675"
+  "shardHash": "821a3bcf766a4e7282d8acdcf6c9123266eeea896dad351985a6fc1c1dab5b92"
 }
