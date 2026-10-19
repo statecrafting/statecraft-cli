@@ -232,6 +232,10 @@ pub struct Terminal {
     pub finding_count: u64,
     /// The producer identity subset it repeated.
     pub producer: Value,
+    /// The producer's evidence reference, kept as it was written and never
+    /// interpreted here: spec 014 judges it, through its additive edge.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub evidence_reference: Option<Value>,
 }
 
 /// Capture completion (section 3.2). `Unknown` is this product's word for a
@@ -570,6 +574,11 @@ fn parse_terminal(message: &Map<String, Value>) -> Result<Terminal, Finding> {
         exchange_count: number_field(message, "exchange_count")?,
         finding_count: number_field(message, "finding_count")?,
         producer: message.get("producer").cloned().unwrap_or(Value::Null),
+        evidence_reference: match message.get("evidence_reference") {
+            None | Some(Value::Null) => None,
+            Some(Value::Object(reference)) => Some(Value::Object(reference.clone())),
+            Some(_) => return Err(Finding::InvalidField("evidence_reference".into())),
+        },
     };
     // A complete capture names its manifest and digest and no reason; any
     // other names a reason. The producer's parser holds the same rule.
@@ -931,6 +940,32 @@ mod tests {
     }
 
     #[test]
+    fn the_evidence_reference_is_kept_as_written_and_a_non_object_is_a_finding() {
+        let reference = json!({ "evidence_type": "statecraft/wire-exchange/v1", "sha256": "ab" });
+        let finished = |r: Value| {
+            message(
+                "finished",
+                json!({ "completeness": "complete", "capture_digest": "sha256:ab",
+                         "manifest_path": "/a/m.json", "exchange_count": 1, "finding_count": 0,
+                         "gaps": [], "reason": null, "evidence_reference": r }),
+            )
+        };
+        let mut reader = Reader::new(binding());
+        reader.read(&ready("127.0.0.1:41000", "/a/ca.pem")).unwrap();
+        reader.read(&finished(reference.clone())).unwrap();
+        assert_eq!(
+            reader.terminal().unwrap().evidence_reference,
+            Some(reference)
+        );
+        let mut reader = Reader::new(binding());
+        reader.read(&ready("127.0.0.1:41000", "/a/ca.pem")).unwrap();
+        assert_eq!(
+            reader.read(&finished(json!("not-an-object"))),
+            Err(Finding::InvalidField("evidence_reference".into()))
+        );
+    }
+
+    #[test]
     fn a_changed_binding_byte_binds_nothing() {
         let mut reader = Reader::new(binding());
         for changed in [
@@ -1141,6 +1176,7 @@ mod tests {
             exchange_count: 0,
             finding_count: 0,
             producer: Value::Null,
+            evidence_reference: None,
         }
     }
 

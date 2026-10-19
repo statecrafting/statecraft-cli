@@ -322,6 +322,35 @@ fn a_required_artifact_absent_makes_acceptance_ineligible() {
 }
 
 #[test]
+fn a_judgment_the_run_could_not_make_reads_unavailable_not_absent() {
+    let h = Homes::new();
+    let mut c = h.open();
+    put(
+        &mut c,
+        Kind::Intent,
+        1,
+        "prepare-workspace",
+        json!({}),
+        false,
+    );
+    put(
+        &mut c,
+        Kind::Outcome,
+        1,
+        "attempt",
+        json!({
+            "outcome": "completed",
+            "witnessPosture": "witnessed",
+            "witnessRequired": false,
+            "witness": { "wireEvidence": { "unavailable": "manifest: not found" } }
+        }),
+        false,
+    );
+    let e = eligibility(&h.open(), &target(1));
+    assert_eq!((e.state, e.eligible()), ("unavailable", true));
+}
+
+#[test]
 fn a_required_artifact_admitted_is_eligible_and_a_refused_one_names_its_reason() {
     let s = Scene::new(
         &base(),

@@ -719,6 +719,253 @@ pub struct RunShowView {
     pub tamper: Vec<AttemptTamperView>,
     /// Each attempt's witness posture (spec 013 section 3.7).
     pub witness: Vec<AttemptWitnessView>,
+    /// Each attempt's wire evidence (spec 014 section 3.7), folded from the
+    /// record alone.
+    pub wire_evidence: WireEvidenceView,
+}
+
+/// A run's wire evidence, as `run show` renders it (spec 014 section 3.7).
+///
+/// Folded from the run's durable record only: no network, provider,
+/// sidecar, discovery or admission work. A record carries no candidate value,
+/// so nothing rendered here can be a secret or raw traffic.
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct WireEvidenceView {
+    /// One entry per attempt.
+    pub attempts: Vec<AttemptWireView>,
+    /// Admission records that did not decode, by position; they suppress
+    /// nothing else.
+    pub malformed: Vec<statecraft_run::wire::MalformedRecord>,
+}
+
+/// One attempt's wire evidence.
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AttemptWireView {
+    /// The attempt.
+    pub attempt: u32,
+    /// `admitted`, `refused`, or the exact absence state: `not-recorded`,
+    /// `unavailable` or `unknown`.
+    pub state: String,
+    /// Whether a policy requires the artifact for this attempt.
+    pub required: bool,
+    /// Why acceptance is ineligible on this evidence, when it is.
+    pub ineligible: Option<String>,
+    /// Every admission record, in chain order, duplicates included.
+    pub admissions: Vec<statecraft_run::wire::Positioned>,
+}
+
+impl WireEvidenceView {
+    /// Fold `run_id`'s wire evidence from `chain`.
+    pub fn of_run(chain: &statecraft_run::record::Chain, run_id: &str) -> Self {
+        let projection = statecraft_run::wire::project(chain, run_id);
+        let attempts = projection
+            .attempts
+            .into_iter()
+            .map(|a| {
+                let e = statecraft_acceptance::wire::eligibility(
+                    chain,
+                    &statecraft_run::wire::Target {
+                        run_id: run_id.to_string(),
+                        attempt: a.attempt,
+                    },
+                );
+                AttemptWireView {
+                    attempt: a.attempt,
+                    state: e.state.to_string(),
+                    required: e.required,
+                    ineligible: e.ineligible.map(|r| r.word().to_string()),
+                    admissions: a.admissions,
+                }
+            })
+            .collect();
+        WireEvidenceView {
+            attempts,
+            malformed: projection.malformed,
+        }
+    }
+
+    /// The human rendering, from the same value the JSON carries.
+    pub fn describe(&self) -> String {
+        let mut out = String::new();
+        for a in &self.attempts {
+            out.push_str(&format!(
+                "attempt {} wire evidence {}{}{}\n",
+                a.attempt,
+                a.state,
+                if a.required { ", required" } else { "" },
+                a.ineligible
+                    .as_ref()
+                    .map(|r| format!(", acceptance ineligible: {r}"))
+                    .unwrap_or_default()
+            ));
+            for p in &a.admissions {
+                if let Some(r) = &p.record {
+                    out.push_str(&describe_admission(p.position, r));
+                }
+            }
+        }
+        for m in &self.malformed {
+            out.push_str(&format!(
+                "attempt {} wire evidence record at position {} is malformed\n",
+                m.attempt, m.position
+            ));
+        }
+        out
+    }
+}
+
+fn stated<T: std::fmt::Display>(s: &statecraft_envelope::wire::Stated<T>) -> String {
+    s.value()
+        .map_or_else(|| s.word().to_string(), ToString::to_string)
+}
+
+fn describe_admission(
+    position: usize,
+    r: &statecraft_envelope::wire::record::AdmissionRecord,
+) -> String {
+    use statecraft_envelope::wire::Stated;
+    let mut out = format!(
+        "  admission at position {position}: {} {} under policy {}\n",
+        r.outcome.word(),
+        r.reason.word(),
+        r.policy
+    );
+    if let Some(prior) = &r.prior {
+        out.push_str(&format!(
+            "    prior record {} ({})\n",
+            prior.record_digest,
+            prior.reason.word()
+        ));
+    }
+    match &r.artifact {
+        Stated::Known { value: a } => {
+            out.push_str(&format!(
+                "    artifact {} schema {} construction {}\n",
+                a.evidence_type, a.schema_version, a.construction
+            ));
+            out.push_str(&format!(
+                "    producer {} {} {}\n",
+                stated(&a.producer.name),
+                stated(&a.producer.revision),
+                stated(&a.producer.content_digest)
+            ));
+            out.push_str(&format!(
+                "    manifest sha256:{} {} bytes\n",
+                a.manifest_digest, a.byte_length
+            ));
+            match &a.subject {
+                Stated::Known { value: s } => out.push_str(&format!(
+                    "    subject run {} attempt {} effect {}: binding {}\n",
+                    s.run_id,
+                    s.attempt,
+                    s.sidecar_effect_id,
+                    binding_word(r.binding)
+                )),
+                other => out.push_str(&format!(
+                    "    subject {}: binding {}\n",
+                    other.word(),
+                    binding_word(r.binding)
+                )),
+            }
+        }
+        other => out.push_str(&format!("    artifact {}\n", other.word())),
+    }
+    out.push_str(&format!("    custody {}\n", r.custody.result()));
+    match &r.facts {
+        Stated::Known { value: f } => {
+            out.push_str(&format!(
+                "    completeness {} gaps {}\n",
+                serde_word(&f.completeness.state),
+                if f.completeness.gaps.is_empty() {
+                    "none".to_string()
+                } else {
+                    f.completeness.gaps.join(", ")
+                }
+            ));
+            out.push_str(&format!(
+                "    retention {} ({}); redaction {} ({}) classes {}\n",
+                serde_word(&f.retention.result),
+                stated(&f.retention.reason),
+                serde_word(&f.redaction.result),
+                stated(&f.redaction.reason),
+                f.redaction.field_classes.join(", ")
+            ));
+            for e in &f.exchanges {
+                out.push_str(&format!(
+                    "    exchange {} requested {} {} model {}; served {} {} model {}\n",
+                    e.sequence,
+                    e.requested.destination,
+                    e.requested.protocol,
+                    stated(&e.requested.model),
+                    e.served.destination,
+                    e.served.protocol,
+                    stated(&e.served.model)
+                ));
+                for u in &e.usage.values {
+                    out.push_str(&format!(
+                        "      usage ({}) {} {} {}\n",
+                        e.usage.label,
+                        u.provider_field,
+                        u.value,
+                        stated(&u.unit)
+                    ));
+                }
+                match &e.estimated_cost {
+                    Stated::Known { value: c } => out.push_str(&format!(
+                        "      estimated cost ({}) {} {} method {} inputs {}\n",
+                        c.label,
+                        c.value,
+                        c.currency,
+                        c.method,
+                        c.inputs.join(", ")
+                    )),
+                    other => out.push_str(&format!("      estimated cost {}\n", other.word())),
+                }
+            }
+            out.push_str(&format!(
+                "    attestation {}\n",
+                stated(&f.attestation.identity)
+            ));
+        }
+        other => out.push_str(&format!("    facts {}\n", other.word())),
+    }
+    let d = &r.dimensions;
+    out.push_str(&format!(
+        "    dimensions integrity {} signature {} issuerTrust {} subjectBinding {}\n",
+        serde_word(&d.integrity),
+        serde_word(&d.signature),
+        serde_word(&d.issuer_trust),
+        serde_word(&d.subject_binding)
+    ));
+    for f in &r.findings {
+        out.push_str(&format!(
+            "    finding {} at {}{}\n",
+            serde_word(&f.category),
+            f.path,
+            f.detector
+                .as_ref()
+                .map(|d| format!(" by {d}"))
+                .unwrap_or_default()
+        ));
+    }
+    if let Some(m) = &r.malformed {
+        out.push_str(&format!("    malformed: {m}\n"));
+    }
+    out
+}
+
+fn binding_word(b: statecraft_envelope::wire::record::Binding) -> String {
+    serde_word(&b)
+}
+
+/// The word a unit enum serializes as.
+fn serde_word<T: Serialize>(value: &T) -> String {
+    serde_json::to_value(value)
+        .ok()
+        .and_then(|v| v.as_str().map(str::to_string))
+        .unwrap_or_else(|| "unknown".to_string())
 }
 
 /// One attempt's witness posture. Testimony about capture, never acceptance.
@@ -835,6 +1082,7 @@ pub fn run_show_with_admissions(
     run: &Run,
     reconciliations: Vec<ReconciliationView>,
     tamper: Vec<AttemptTamperView>,
+    wire_evidence: WireEvidenceView,
 ) -> Answer<RunShowView> {
     let mut summary = account.render();
     let admissions: Vec<AttemptAdmissionView> = run
@@ -872,6 +1120,7 @@ pub fn run_show_with_admissions(
     for w in &witness {
         summary.push_str(&format!("attempt {} witness {}\n", w.attempt, w.posture));
     }
+    summary.push_str(&wire_evidence.describe());
     Answer::new(
         RunShowView {
             account,
@@ -879,6 +1128,7 @@ pub fn run_show_with_admissions(
             reconciliations,
             tamper,
             witness,
+            wire_evidence,
         },
         Exit::Ok,
         summary,
@@ -973,6 +1223,9 @@ pub fn accept_answer_with_boundary(
             NoAcceptance::SuiteDidNotRun { .. } => Exit::Finding,
             // The operation ran and found that the contract moved: a finding.
             NoAcceptance::ContractMoved { .. } => Exit::Finding,
+            // Required wire evidence is not admitted (spec 014 section 3.5):
+            // the operation ran and found it, which is a finding.
+            NoAcceptance::WireEvidenceIneligible { .. } => Exit::Finding,
         },
     };
 
@@ -1010,6 +1263,14 @@ pub fn accept_answer_with_boundary(
                 "  no acceptance: the contract the attempt was bound to is not the one the \
                  producer resolves now\n",
             );
+        }
+        Acceptance::None {
+            reason: NoAcceptance::WireEvidenceIneligible { state, evidence },
+        } => {
+            summary.push_str(&format!(
+                "  no acceptance: required wire evidence is {state} ({evidence}); the attempt \
+                 outcome is unchanged and this is not a judgment of the work\n"
+            ));
         }
         Acceptance::None { reason } => {
             summary.push_str(&format!("  {reason:?}\n"));

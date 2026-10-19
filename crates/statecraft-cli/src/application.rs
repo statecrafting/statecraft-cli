@@ -185,6 +185,29 @@ fn accept_registered(root: &Path, home: &Path, run_id: &str) -> Response {
         .erase();
     }
 
+    // Spec 014 section 3.5: where a policy requires wire evidence, anything
+    // but an admitted artifact or a permitted absence is ineligible, with its
+    // reason, before the suite runs. The attempt outcome is not rewritten.
+    let wire = statecraft_acceptance::wire::eligibility(
+        &chain,
+        &statecraft_run::wire::Target {
+            run_id: run_id.to_string(),
+            attempt: attempt.number,
+        },
+    );
+    if let Some(reason) = &wire.ineligible {
+        return slice::accept_answer_with(
+            statecraft_acceptance::outcome::Acceptance::None {
+                reason: statecraft_acceptance::judged::NoAcceptance::WireEvidenceIneligible {
+                    state: wire.state.to_string(),
+                    evidence: reason.word().to_string(),
+                },
+            },
+            Some(contract),
+        )
+        .erase();
+    }
+
     let workspace = statecraft_run::workspace::workspace_path(root, run_id);
     let context = crate::accept::Context {
         repository: root.display().to_string(),

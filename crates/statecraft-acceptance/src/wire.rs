@@ -338,11 +338,20 @@ pub fn eligibility(chain: &Chain, target: &Target) -> WireEligibility {
     } else if let Some(last) = mine.last() {
         ("refused", Some(last.reason.clone()))
     } else {
+        // A judgment the run path could not make (its manifest unreadable)
+        // is `unavailable`, never `not-recorded` (section 3.6).
+        let unjudged = outcome
+            .as_ref()
+            .and_then(|d| d.get("witness"))
+            .and_then(|w| w.get("wireEvidence"))
+            .and_then(|w| w.get("unavailable"))
+            .is_some();
         let absence = match outcome
             .as_ref()
             .and_then(|d| d.get("witnessPosture"))
             .and_then(Value::as_str)
         {
+            _ if unjudged => PermittedAbsence::Unavailable,
             Some("witness-unavailable") => PermittedAbsence::Unavailable,
             Some("witness-failed") => PermittedAbsence::Unknown,
             _ => PermittedAbsence::NotRecorded,

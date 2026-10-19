@@ -38,6 +38,14 @@
       },
       {
         "nature": "additive",
+        "spec": "004-execution-adapter",
+        "unit": {
+          "kind": "directory",
+          "path": "crates/statecraft-adapter/"
+        }
+      },
+      {
+        "nature": "additive",
         "spec": "006-command-surface",
         "unit": {
           "kind": "directory",
@@ -46,7 +54,7 @@
       }
     ],
     "id": "014-wire-evidence-admission",
-    "implementation": "pending",
+    "implementation": "complete",
     "interfaceReferences": [
       {
         "corpus": "wire-witness",
@@ -134,7 +142,7 @@
       }
     ],
     "sectionDigests": {
-      "014-admission-of-wire-exchange-evidence": "6b0f52c046bf684bfeff1866f78b93edaefd808328dfbb6f77d7c7bb13a628b3",
+      "014-admission-of-wire-exchange-evidence": "e6a34734c74ddaf40e867c1afb8db1cf4f977b8a774864a6ab02dfbfe9b45f34",
       "1-purpose": "df2f3d1dfc4957fb3d92a3697a104c0757d0edcac062fb01b30f509cc7bb3669",
       "2-territory-and-exact-inputs": "6a07f1328106300826e8c1cb7167f7cc47b3c38b78e47cab2022491d97626a59",
       "3-1-artifact-identity-and-bounded-input": "3f54e4cd3c01ff223836373106979c83188f9e19da3dfef5bc1a80ae23cf4666",
@@ -149,8 +157,8 @@
       "3-behavior": "dba9d0e8a8ca351a048c39dd3579b7363851912fe3e3757c0342910b19564e13",
       "4-observable-acceptance-and-negative-cases": "678ddddb0971632f13e908845c845db08dc8807ca45b145d15895f7bad07af66",
       "5-out-of-scope": "7e9a4b73a404ab898a07638426eab4b0a311da3457d94b188d8a1075f471509d",
-      "6-resolved-decisions": "6f48a711018a54dd90627d8d23e91798ef0bdcc8d944acf4ab28c7639a025c07",
-      "verification": "c237415ba5028fe2ca65bb39f0d012965f2067b6f606a9fa0010751143d785b4"
+      "6-resolved-decisions": "74254c150ee7452b2ad6bd71773ab43d9775cea3dc08b91288182486c6edd87a",
+      "verification": "278268c73db8db2e1a2464cffc140efb7d62135db47e4dd8b40bff2b25a20ccf"
     },
     "sectionHeadings": [
       "014: Admission of wire-exchange evidence",
@@ -176,6 +184,6 @@
     "summary": "Amends the run record, evidence envelope, and command projection so an exact statecraft/wire-exchange/v1 artifact can be bound to one run attempt and sidecar effect, judged deterministically under explicit policy, and shown without retaining secret values or confusing producer testimony with independent acceptance.\n",
     "title": "Admission of wire-exchange evidence"
   },
-  "shardHash": "b43bf52995436214c9fbc31aae6d00571a52ca18785c4b92c6e70f71343746c3",
+  "shardHash": "ae7202d3d10e106b9eae3e53dc4669f9c41720fcd06a17859eb3b38114d1582a",
   "specVersion": "1.9.0"
 }
