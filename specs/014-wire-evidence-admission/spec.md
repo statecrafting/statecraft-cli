@@ -2,7 +2,7 @@
 id: "014-wire-evidence-admission"
 title: "Admission of wire-exchange evidence"
 status: approved
-implementation: pending
+implementation: complete
 created: "2026-09-26"
 summary: >
   Amends the run record, evidence envelope, and command projection so an exact
@@ -18,6 +18,7 @@ extends:
   - { spec: "003-work-and-run-semantics", unit: { kind: directory, path: "crates/statecraft-run/" }, nature: additive }
   - { spec: "005-acceptance-and-evidence", unit: { kind: directory, path: "crates/statecraft-envelope/" }, nature: additive }
   - { spec: "005-acceptance-and-evidence", unit: { kind: directory, path: "crates/statecraft-acceptance/" }, nature: additive }
+  - { spec: "004-execution-adapter", unit: { kind: directory, path: "crates/statecraft-adapter/" }, nature: additive }
   - { spec: "006-command-surface", unit: { kind: directory, path: "crates/statecraft-cli/" }, nature: additive }
 depends_on:
   - "003-work-and-run-semantics"
@@ -470,15 +471,40 @@ admission record, its absence is `unavailable` when spec 013 recorded
 `witness-unavailable`, `unknown` when it recorded `witness-failed`, and
 otherwise `not-recorded`; a requirement may permit any of the three.
 
+**2026-10-18: implementation is authorized and the run path admits.** The
+owner directed this spec built to `implementation: complete`. Under spec 013's
+flags, `run --witness` records the policy naming the shipped detector and no
+requirement, and `run --require-witness` adds a requirement for a complete
+`statecraft/wire-exchange/v1` whose integrity and subject binding pass; both
+are recorded before the sidecar starts. Once the sidecar effect's closing
+outcome is durable, the `evidence_reference` of the producer's `finished`
+message and the manifest at its `manifest_path` are judged once and one
+record appended. The adapter keeps that reference as written and does not
+interpret it, which is this spec's only change to `statecraft-adapter`. The
+manifest is read only when spec 013's integrity check found it inside the
+sidecar area, and only to the section 3.1 bound; otherwise no admission is
+recorded and the attempt's witness detail names it `unavailable`. The run path
+registers no exact values with the detector. `accept` reads section 3.5 after
+the contract comparison and before the suite, and an ineligible attempt is
+the finding `wire-evidence-ineligible` with its state and reason, exit 1.
+
 ## Verification
 
-Draft review requires `make refresh`, `make gate`, `make code`, relationship
-inspection for spec 014, and `interface verify` against the exact wire-witness
-checkout. Those checks establish corpus consistency only.
+Implementation acceptance is the offline fixture matrix of section 4 in the
+owning crates, run through `make verify SPEC=014`. No live provider, secret,
+network capture, or metered activity is part of it. The released-producer run
+in `crates/statecraft-cli/tests/witness_run.rs` is spec 013's acceptance and
+runs only when `STATECRAFT_TEST_WIRE_WITNESS` names that release.
 
-Implementation acceptance, once separately authorized, adds the offline
-fixture matrix in section 4 to the owning crates and runs it through
-`make verify SPEC=014`. No live provider, secret, network capture, or metered
-activity is part of verification. Until that implementation and acceptance
-exist, the behavior is specified but not implemented, tested, released,
-activated, observed, admitted, or qualified.
+```verify:cli
+cargo test -p statecraft-envelope --test wire_exchange_admission
+cargo test -p statecraft-envelope --lib wire
+cargo test -p statecraft-run --test wire_evidence_projection
+cargo test -p statecraft-acceptance --test wire_evidence_policy
+cargo test -p statecraft-adapter --lib witness::protocol
+cargo test -p statecraft-cli --test wire_evidence_show
+```
+
+These establish the behavior on fixtures only. They do not release, activate,
+observe, or qualify a producer, and an admitted artifact remains testimony
+under section 3.8.

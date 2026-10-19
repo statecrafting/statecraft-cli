@@ -85,6 +85,18 @@ pub enum NoAcceptance {
         /// The comparison, naming every member involved.
         comparison: Box<crate::contract::Comparison>,
     },
+    /// A policy requires wire evidence for the attempt and it is not admitted
+    /// (spec 014 section 3.5, through its additive edge). Ineligible, not a
+    /// fail: the attempt outcome is unchanged and nothing here says the work
+    /// was wrong.
+    #[serde(rename_all = "camelCase")]
+    WireEvidenceIneligible {
+        /// The attempt's evidence state: `refused`, `not-recorded`,
+        /// `unavailable` or `unknown`.
+        state: String,
+        /// The specific reason, one of spec 014's stable codes.
+        evidence: String,
+    },
 }
 
 /// Why acceptance was not attempted for this attempt.

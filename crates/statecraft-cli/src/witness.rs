@@ -7,7 +7,14 @@
 //! preflight, and the child is given the endpoint only from a validated ready
 //! message. The sidecar is closed after the child and its objects, and the
 //! attempt records the one posture section 3.7 derives.
+//!
+//! Spec 014, through its additive edge: the attempt's wire-evidence policy is
+//! recorded before the sidecar starts, and once the effect's closing outcome
+//! is durable the producer's evidence reference and manifest are judged and
+//! one admission record is appended. The manifest is read only from the
+//! attempt's sidecar area and only within the section 3.1 bound.
 
+use statecraft_acceptance::wire::{Candidate, Unjudged};
 use statecraft_adapter::boundary::Record;
 use statecraft_adapter::supervisor::{Control, Watch};
 use statecraft_adapter::witness::ledger::VerifiedProducer;
@@ -17,10 +24,18 @@ use statecraft_adapter::witness::protocol::{
 };
 use statecraft_adapter::witness::sidecar::{Ended, Plan, Running, start_confined};
 use statecraft_adapter::witness::{WitnessPosture, effect};
+use statecraft_envelope::wire::manifest::Completeness;
+use statecraft_envelope::wire::policy::{
+    DimensionName, Requirement as WireRequirement, WirePolicy,
+};
+use statecraft_envelope::wire::record::{Custody as WireCustody, Handoff};
+use statecraft_envelope::wire::screen::{DEFAULT_DETECTOR, DefaultDetector};
+use statecraft_envelope::wire::{EVIDENCE_TYPE, Stated};
 use statecraft_home::witness::{SidecarAdmission, SidecarRoots, admit_sidecar};
 use statecraft_run::record::Chain;
 use std::collections::BTreeMap;
-use std::path::Path;
+use std::io::Read;
+use std::path::{Path, PathBuf};
 use std::time::Duration;
 
 /// The refusal guard of an attempt whose sidecar failed before the child.
@@ -55,6 +70,8 @@ pub struct Witness {
     last: Option<Ended>,
     failure: Option<String>,
     closed: bool,
+    area: Option<PathBuf>,
+    wire: Option<Result<String, String>>,
 }
 
 impl Witness {
@@ -74,6 +91,24 @@ impl Witness {
             last: None,
             failure: None,
             closed: false,
+            area: None,
+            wire: None,
+        }
+    }
+
+    /// The attempt's wire-evidence policy (spec 014 section 3.5): the shipped
+    /// detector always, and under `--require-witness` a requirement for a
+    /// complete artifact whose integrity and subject binding pass.
+    #[must_use]
+    pub fn wire_policy(&self) -> WirePolicy {
+        WirePolicy {
+            secret_detector: Some(DEFAULT_DETECTOR.to_string()),
+            requirement: self.requirement.required.then(|| WireRequirement {
+                artifact_type: EVIDENCE_TYPE.to_string(),
+                minimum_completeness: Completeness::Complete,
+                required_dimensions: vec![DimensionName::Integrity, DimensionName::SubjectBinding],
+                permitted_absence: Vec::new(),
+            }),
         }
     }
 
@@ -141,6 +176,18 @@ impl Witness {
             }
         };
         self.sidecar = Some(admission.boundary.record().clone());
+        self.area = Some(admission.output.clone());
+        // Spec 014 section 3.5: the policy is recorded once, before the
+        // sidecar starts, so admission judges under what was asked for.
+        let target = statecraft_run::wire::Target {
+            run_id: run_id.to_string(),
+            attempt,
+        };
+        if let Err(e) =
+            statecraft_run::wire::record_policy(chain, &target, &self.wire_policy(), timestamp)
+        {
+            return self.refuse(Observed::Unavailable, &format!("wire-evidence policy: {e}"));
+        }
         // Section 3.2: the intent is durable before the sidecar starts.
         if let Err(e) = effect::open(chain, &binding, &producer, timestamp) {
             return self.refuse(Observed::Unavailable, &format!("effect intent: {e}"));
@@ -253,9 +300,89 @@ impl Witness {
             self.posture(),
         );
         self.closed = true;
-        effect::close(chain, &binding, &closing, timestamp)
-            .err()
-            .map(|e| e.to_string())
+        let closed = effect::close(chain, &binding, &closing, timestamp);
+        if closed.is_ok() {
+            self.admit(chain, &binding, timestamp);
+        }
+        closed.err().map(|e| e.to_string())
+    }
+
+    /// Spec 014 section 3.6 over the producer's reference and manifest, once
+    /// the closing outcome is durable. Nothing to judge when the producer
+    /// named no manifest; an unreadable one is `unavailable` and records no
+    /// admission.
+    fn admit(&mut self, chain: &mut Chain, binding: &AttemptBinding, timestamp: &str) {
+        let Some(last) = &self.last else {
+            return;
+        };
+        let Some(terminal) = last.reader.terminal() else {
+            return;
+        };
+        let (Some(reference), Some(path)) = (&terminal.evidence_reference, &terminal.manifest_path)
+        else {
+            return;
+        };
+        // Only a manifest inside the sidecar area is read; a path elsewhere
+        // is never followed.
+        if !matches!(last.integrity, Integrity::Intact | Integrity::Mismatch) {
+            self.wire = Some(Err(format!("manifest {:?}", last.integrity)));
+            return;
+        }
+        let manifest = match self.area.as_deref().map(|area| read_bounded(area, path)) {
+            Some(Ok(bytes)) => bytes,
+            Some(Err(why)) => {
+                self.wire = Some(Err(why));
+                return;
+            }
+            None => {
+                self.wire = Some(Err("no sidecar area".into()));
+                return;
+            }
+        };
+        let reference = serde_json::to_vec(reference).unwrap_or_default();
+        let writer = match &self.producer {
+            Some(Ok(p)) => Stated::known(format!("{}@{}", p.name, p.version)),
+            _ => Stated::Unknown,
+        };
+        let candidate = Candidate {
+            reference: &reference,
+            manifest: &manifest,
+            custody: WireCustody {
+                obtained_from: Stated::known(path.clone()),
+                writer,
+                reader: Stated::known(format!(
+                    "statecraft-cli@{} pid {}",
+                    env!("CARGO_PKG_VERSION"),
+                    std::process::id()
+                )),
+                handoff: if last.termination == Termination::Finished {
+                    Handoff::Complete
+                } else {
+                    Handoff::Incomplete
+                },
+            },
+        };
+        let target = statecraft_run::wire::Target {
+            run_id: binding.run_id.clone(),
+            attempt: binding.attempt,
+        };
+        let detector = DefaultDetector::default();
+        self.wire = Some(
+            match statecraft_acceptance::wire::admit(
+                chain,
+                &target,
+                &candidate,
+                Some(&detector),
+                timestamp,
+            ) {
+                Ok(record) => Ok(format!(
+                    "{} {}",
+                    record.outcome.word(),
+                    record.reason.word()
+                )),
+                Err(Unjudged(why)) => Err(why),
+            },
+        );
     }
 
     /// `detail`, [`Witness::mark`]ed.
@@ -287,6 +414,11 @@ impl Witness {
                 },
                 "sidecarConfinement": self.sidecar,
                 "failure": self.failure,
+                "wireEvidence": match &self.wire {
+                    Some(Ok(judged)) => serde_json::json!({ "judged": judged }),
+                    Some(Err(why)) => serde_json::json!({ "unavailable": why }),
+                    None => serde_json::json!("not-recorded"),
+                },
             }),
         );
     }
@@ -308,6 +440,32 @@ impl Witness {
         self.failure = Some(why.to_string());
         Err(why.to_string())
     }
+}
+
+/// The manifest at `path`, read only when it is a regular file inside `area`
+/// and only up to one byte past spec 014's bound, so an oversized file is
+/// refused by its reference's length or its digest, never read whole.
+fn read_bounded(area: &Path, path: &str) -> Result<Vec<u8>, String> {
+    let path = Path::new(path);
+    if !path.starts_with(area)
+        || path
+            .components()
+            .any(|c| matches!(c, std::path::Component::ParentDir))
+    {
+        return Err("manifest outside the sidecar area".into());
+    }
+    let metadata = std::fs::symlink_metadata(path).map_err(|e| format!("manifest: {e}"))?;
+    if !metadata.file_type().is_file() {
+        return Err("manifest is not a regular file".into());
+    }
+    let mut bytes = Vec::new();
+    std::fs::File::open(path)
+        .and_then(|f| {
+            f.take(statecraft_envelope::wire::bounded::MAX_BYTES as u64 + 1)
+                .read_to_end(&mut bytes)
+        })
+        .map_err(|e| format!("manifest: {e}"))?;
+    Ok(bytes)
 }
 
 /// The paths a sidecar is admitted against.

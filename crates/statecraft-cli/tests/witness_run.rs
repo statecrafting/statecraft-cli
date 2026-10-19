@@ -274,4 +274,26 @@ fn the_released_producer_witnesses_a_run_end_to_end() {
         sidecar[1].detail
     );
     assert_eq!(sidecar[1].detail["posture"], "witness-incomplete");
+    // Spec 014: the policy is recorded before the sidecar's intent. With no
+    // exchange the producer hands over no manifest, so nothing is judged and
+    // the attempt's wire evidence is `not-recorded`, never an admission.
+    let entries = chain.entries();
+    let policy = entries
+        .iter()
+        .position(|e| e.subject == statecraft_run::wire::POLICY_SUBJECT)
+        .expect("the attempt's wire-evidence policy");
+    let intent = entries
+        .iter()
+        .position(|e| e.subject == "witness-sidecar")
+        .unwrap();
+    assert!(policy < intent, "the policy precedes the sidecar's intent");
+    assert_eq!(
+        detail["witness"]["wireEvidence"], "not-recorded",
+        "{detail}"
+    );
+    let show = f.run(&["run", "show", f.root(), "replay", "--json"]);
+    let shown: serde_json::Value = json_naming::from_output(&show.stdout).unwrap();
+    let wire = &shown["report"]["wireEvidence"]["attempts"][0];
+    assert_eq!(wire["state"], "not-recorded", "{shown}");
+    assert_eq!(wire["admissions"], serde_json::json!([]));
 }

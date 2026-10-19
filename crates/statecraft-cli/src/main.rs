@@ -702,6 +702,7 @@ fn slice_verb(
                             &run,
                             slice::ReconciliationView::of_run(&chain.positioned_entries(), run_id),
                             tamper,
+                            slice::WireEvidenceView::of_run(&chain, run_id),
                         ),
                         format,
                     )
