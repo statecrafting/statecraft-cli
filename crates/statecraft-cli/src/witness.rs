@@ -446,6 +446,10 @@ impl Witness {
 /// The manifest at `path`, read only when it is a regular file inside `area`
 /// and only up to one byte past spec 014's bound, so an oversized file is
 /// refused by its reference's length or its digest, never read whole.
+///
+/// `path` is the producer's testimony, so containment is judged on the
+/// resolved path: a symbolic link anywhere along it, intermediate directories
+/// included, that leads out of the area refuses the read.
 fn read_bounded(area: &Path, path: &str) -> Result<Vec<u8>, String> {
     let path = Path::new(path);
     if !path.starts_with(area)
@@ -455,12 +459,17 @@ fn read_bounded(area: &Path, path: &str) -> Result<Vec<u8>, String> {
     {
         return Err("manifest outside the sidecar area".into());
     }
-    let metadata = std::fs::symlink_metadata(path).map_err(|e| format!("manifest: {e}"))?;
+    let area = std::fs::canonicalize(area).map_err(|e| format!("sidecar area: {e}"))?;
+    let resolved = std::fs::canonicalize(path).map_err(|e| format!("manifest: {e}"))?;
+    if !resolved.starts_with(&area) {
+        return Err("manifest outside the sidecar area".into());
+    }
+    let metadata = std::fs::symlink_metadata(&resolved).map_err(|e| format!("manifest: {e}"))?;
     if !metadata.file_type().is_file() {
         return Err("manifest is not a regular file".into());
     }
     let mut bytes = Vec::new();
-    std::fs::File::open(path)
+    std::fs::File::open(&resolved)
         .and_then(|f| {
             f.take(statecraft_envelope::wire::bounded::MAX_BYTES as u64 + 1)
                 .read_to_end(&mut bytes)
@@ -525,4 +534,29 @@ fn sidecar_environment(admission: &SidecarAdmission) -> BTreeMap<String, String>
     #[cfg(target_os = "macos")]
     environment.insert("SSL_CERT_FILE".into(), SYSTEM_ROOTS.into());
     environment
+}
+
+#[cfg(test)]
+mod tests {
+    use super::read_bounded;
+
+    #[test]
+    fn a_manifest_is_read_only_through_a_path_that_stays_in_the_area() {
+        let dir = tempfile::tempdir().unwrap();
+        let area = dir.path().join("area");
+        let outside = dir.path().join("outside");
+        std::fs::create_dir_all(&area).unwrap();
+        std::fs::create_dir_all(&outside).unwrap();
+        std::fs::write(area.join("m.json"), b"inside").unwrap();
+        std::fs::write(outside.join("m.json"), b"outside").unwrap();
+        std::os::unix::fs::symlink(&outside, area.join("link")).unwrap();
+        std::os::unix::fs::symlink(outside.join("m.json"), area.join("file-link")).unwrap();
+        let at = |p: &str| area.join(p).display().to_string();
+
+        assert_eq!(read_bounded(&area, &at("m.json")).unwrap(), b"inside");
+        for escaping in ["link/m.json", "file-link", "../outside/m.json"] {
+            assert!(read_bounded(&area, &at(escaping)).is_err(), "{escaping}");
+        }
+        assert!(read_bounded(&area, &outside.join("m.json").display().to_string()).is_err());
+    }
 }
