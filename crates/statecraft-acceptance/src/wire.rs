@@ -154,17 +154,25 @@ pub fn judge(
     );
 
     // 5. The four dimensions. Nothing here is signed, and no issuer is judged.
-    record.dimensions.subject_binding = match record.binding {
-        Binding::Bound => SubjectBinding::Pass,
-        Binding::NotEvaluated => SubjectBinding::Unknown,
-        _ => SubjectBinding::Fail,
+    //    `bind` judges every candidate and never answers `not-evaluated`;
+    //    were it to, no binding is established, and the record says so in
+    //    its binding, its dimension and its reason alike.
+    if record.binding == Binding::NotEvaluated {
+        record.binding = Binding::SubjectMismatch;
+    }
+    let refusal = match record.binding {
+        Binding::Bound => None,
+        Binding::SubjectMismatch | Binding::NotEvaluated => Some(Reason::SubjectMismatch),
+        Binding::ProducerMismatch => Some(Reason::ProducerMismatch),
+        Binding::Stale => Some(Reason::Stale),
     };
-    match record.binding {
-        Binding::Bound => {}
-        Binding::SubjectMismatch => return refuse(record, Reason::SubjectMismatch),
-        Binding::ProducerMismatch => return refuse(record, Reason::ProducerMismatch),
-        Binding::Stale => return refuse(record, Reason::Stale),
-        Binding::NotEvaluated => return refuse(record, Reason::SubjectMismatch),
+    record.dimensions.subject_binding = if refusal.is_none() {
+        SubjectBinding::Pass
+    } else {
+        SubjectBinding::Fail
+    };
+    if let Some(reason) = refusal {
+        return refuse(record, reason);
     }
 
     // 6. The durable record: an ambiguous policy, an earlier judgment of the

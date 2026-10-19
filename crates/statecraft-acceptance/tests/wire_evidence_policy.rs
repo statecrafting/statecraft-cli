@@ -205,7 +205,9 @@ impl Scene {
             manifest: &self.manifest,
             custody: custody(),
         };
-        admit(&mut c, &target(attempt), &candidate, d, TS).unwrap()
+        let record = admit(&mut c, &target(attempt), &candidate, d, TS).unwrap();
+        consistent_binding(&record);
+        record
     }
 
     fn records(&self) -> Vec<AdmissionRecord> {
@@ -214,6 +216,29 @@ impl Scene {
             .filter_map(|p| p.record)
             .collect()
     }
+}
+
+/// Every record's binding, subject-binding dimension and reason agree: a
+/// bound subject passes, a binding refusal fails, and an unjudged one is
+/// `unknown` under an earlier step's reason.
+fn consistent_binding(r: &AdmissionRecord) {
+    let expected = match r.binding {
+        Binding::Bound => SubjectBinding::Pass,
+        Binding::NotEvaluated => SubjectBinding::Unknown,
+        Binding::SubjectMismatch | Binding::ProducerMismatch | Binding::Stale => {
+            SubjectBinding::Fail
+        }
+    };
+    assert_eq!(r.dimensions.subject_binding, expected, "{r:?}");
+    let binding_reason = matches!(
+        r.reason,
+        Reason::SubjectMismatch | Reason::ProducerMismatch | Reason::Stale
+    );
+    let refused_at_binding = matches!(
+        r.binding,
+        Binding::SubjectMismatch | Binding::ProducerMismatch | Binding::Stale
+    );
+    assert_eq!(binding_reason, refused_at_binding, "{r:?}");
 }
 
 fn base() -> Value {
