@@ -269,9 +269,14 @@ adapter gives the settings file appears only in the fake's own report of what
 it was handed, never in a record; and the temporary files a killed launcher
 leaves behind are compared by the shape of their random names, their
 directory and their bytes. No outcome, evidence, admission, identity, record
-order, product timestamp or hash is rewritten. The launching cases take one
-lock while they launch, so spec 004's deadlines are not measured against a
-machine the suite's other launches are loading.
+order, product timestamp or hash is rewritten. On Linux the confinement's
+ruleset, and so the digest a posture records, covers every entry of every
+directory on the path to the roots it denies; that listing is a fixture input
+controlled at its boundary. One launching fixture exists at a time, holding
+one lock from its creation to its removal, in a directory of the build's
+temporary directory no other case uses, so the path's entries are the same
+while both sides run; one launch at a time also keeps spec 004's deadlines
+from being measured against a machine other launches load.
 
 ## Verification
 

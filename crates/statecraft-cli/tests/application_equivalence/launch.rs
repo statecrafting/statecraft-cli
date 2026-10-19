@@ -42,6 +42,7 @@ const SEED: &str = "040";
 /// Set only in the re-entered process: the case it is to run.
 const CHILD: &str = "STATECRAFT_EQUIVALENCE_CASE";
 
+/// Held by each fixture from its creation to its removal: see [`Fixture`].
 static LAUNCHING: std::sync::Mutex<()> = std::sync::Mutex::new(());
 
 /// One operation a case compares, as both sides are given it.
@@ -220,10 +221,21 @@ fn closure(text: &str) -> String {
 
 /// A managed, required, registered and armed project with a fake producer
 /// and a fake provider on `PATH`: `run_startup`'s operator route.
+///
+/// On Linux the confinement's ruleset, and so the digest an attempt's
+/// posture records, covers every entry of every directory on the path to the
+/// roots it denies. So one fixture exists at a time, holding [`LAUNCHING`]
+/// from its creation to its removal, and it lives in a directory of the
+/// build's temporary directory no other case uses: what is listed on that
+/// path is the same while both sides run, rather than whatever else the
+/// machine holds in `/tmp`. One launch at a time also keeps spec 004's
+/// deadlines from being measured against a machine other launches load.
 pub struct Fixture {
     dir: tempfile::TempDir,
     /// Outside the compared tree: the pristine copy and the child's case.
     aside: tempfile::TempDir,
+    /// Released after `dir` and `aside` are removed: fields drop in order.
+    _one: std::sync::MutexGuard<'static, ()>,
 }
 
 /// One side's result: its answer, if it gave one, and the tree it left.
@@ -234,9 +246,26 @@ struct Side {
 
 impl Fixture {
     pub fn new() -> Fixture {
+        let one = LAUNCHING.lock().unwrap_or_else(|e| e.into_inner());
+        // Short names: the confinement's probe binds a Unix socket at
+        // `<root>/home/probe-XXXXXX/socket`, and a socket path has a limit.
+        let base = Path::new(env!("CARGO_TARGET_TMPDIR")).join("eq");
+        std::fs::create_dir_all(&base).unwrap();
+        let dir = tempfile::Builder::new()
+            .prefix("")
+            .rand_bytes(4)
+            .tempdir_in(&base)
+            .unwrap();
+        let socket = dir.path().join("home/probe-XXXXXX/socket");
+        assert!(
+            socket.as_os_str().len() < 100,
+            "{} is too long for a Unix socket; build with a shorter CARGO_TARGET_DIR",
+            socket.display()
+        );
         let f = Fixture {
-            dir: tempfile::tempdir().unwrap(),
+            dir,
             aside: tempfile::tempdir().unwrap(),
+            _one: one,
         };
         std::fs::create_dir_all(f.project()).unwrap();
         std::fs::create_dir_all(f.bin()).unwrap();
@@ -561,9 +590,6 @@ impl Fixture {
 
     /// One side, timed and snapshotted.
     fn side(&self, act: impl FnOnce() -> Option<(i32, String)>) -> Side {
-        // One launch at a time across this suite: spec 004's deadlines are
-        // measured against a machine the other cases are not also loading.
-        let _one = LAUNCHING.lock().unwrap_or_else(|e| e.into_inner());
         let start = now();
         let answer = act();
         let end = now();
@@ -834,9 +860,10 @@ fn agree(args: &[String], by_verb: &Side, by_operation: &Side) {
     );
 }
 
-/// `from`'s tree at `to`. `cp` copies no socket, and a killed launcher
-/// leaves its probe's socket behind, so each socket is bound again at the
-/// same path: what is compared is that the path exists, as it did.
+/// `from`'s tree at `to`. A killed launcher leaves its probe's socket
+/// behind, and BSD `cp` copies no socket, so each socket `cp` left out is
+/// bound again at the same path: what is compared is that the path exists,
+/// as it did. GNU `cp` recreates sockets itself.
 fn copy_tree(from: &Path, to: &Path) {
     use std::os::unix::fs::FileTypeExt;
     let copied = Command::new("cp")
@@ -860,10 +887,13 @@ fn copy_tree(from: &Path, to: &Path) {
             }
         }
     }
-    // `cp` exits 1 for a socket it skipped and for nothing else here.
+    // BSD `cp` exits 1 for a socket it skipped and for nothing else here.
     assert!(copied.success() || !sockets.is_empty(), "cp failed");
     for socket in sockets {
-        drop(std::os::unix::net::UnixListener::bind(to.join(socket)).unwrap());
+        let at = to.join(socket);
+        if std::fs::symlink_metadata(&at).is_err() {
+            drop(std::os::unix::net::UnixListener::bind(at).unwrap());
+        }
     }
 }
 
