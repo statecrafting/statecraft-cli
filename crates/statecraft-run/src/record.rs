@@ -35,6 +35,10 @@ pub enum Kind {
     Reconciliation,
     /// Supervisor-owned accounting the supervised process cannot reach.
     Accounting,
+    /// Evidence about an attempt that is neither an effect nor accounting:
+    /// spec 014's wire-evidence policy and admission records. No earlier
+    /// fold reads this kind, and a reader that predates it skips the record.
+    Evidence,
 }
 
 /// A validated effect identity: a non-empty string.

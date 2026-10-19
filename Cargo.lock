@@ -903,6 +903,7 @@ dependencies = [
  "rustix",
  "serde",
  "serde_json",
+ "statecraft-envelope",
  "statecraft-environment",
  "tempfile",
  "thiserror",

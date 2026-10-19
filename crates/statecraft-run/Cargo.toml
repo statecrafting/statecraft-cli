@@ -31,6 +31,9 @@ statecraft-environment = { path = "../statecraft-environment" }
 # the graph through `tempfile`; std's `File::try_lock` is newer than this
 # workspace's declared rust-version.
 rustix = { version = "1.1.5", features = ["fs", "process"] }
+# Spec 014's additive edge: an admission record carries spec 005's four
+# dimensions and the wire types, which have one owner, the envelope crate.
+statecraft-envelope = { path = "../statecraft-envelope" }
 
 [dev-dependencies]
 tempfile = "3.27.0"
