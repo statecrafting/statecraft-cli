@@ -127,6 +127,10 @@ pub fn launch_attempt(
     let mut confined_probe = None;
     let mut preparation_owned = None;
     let mut startup_refusal = None;
+    // Spec 013: the producer is located before the child's admission, which
+    // reserves the endpoint only when there is a producer to bind it.
+    let mut witness = crate::witness::Witness::resolve(home, plan.witness);
+    let reserves_witness = witness.reserves();
     let mut admission =
         |workspace: &statecraft_run::workspace::Workspace, number: u32| -> Result<(), String> {
             let identity = statecraft_home::launch::AttemptIdentity {
@@ -214,7 +218,7 @@ pub fn launch_attempt(
                     git_writes: vec![objects, refs, logs, admin],
                     provider: true,
                     authenticated: true,
-                    witness: false,
+                    witness: reserves_witness,
                 },
                 &probe_executable,
                 &path,
@@ -369,7 +373,7 @@ pub fn launch_attempt(
                     boundary_admission.as_ref(),
                     statecraft_run::attempt::Outcome::Refused,
                     &accounting,
-                    serde_json::json!({ "trialRefusal": e.to_string() }),
+                    witness.marked(serde_json::json!({ "trialRefusal": e.to_string() })),
                     unlaunched(project_manifest.is_some(), None),
                     &contract,
                     trial,
@@ -439,7 +443,8 @@ pub fn launch_attempt(
             boundary_admission.as_ref(),
             statecraft_run::attempt::Outcome::Refused,
             &accounting,
-            serde_json::json!({ "postureCoverageRefusal": why, "posture": posture }),
+            witness
+                .marked(serde_json::json!({ "postureCoverageRefusal": why, "posture": posture })),
             unlaunched(project_manifest.is_some(), None),
             &contract,
             trial,
@@ -469,7 +474,7 @@ pub fn launch_attempt(
                 boundary_admission.as_ref(),
                 statecraft_run::attempt::Outcome::Refused,
                 &accounting,
-                serde_json::json!({ "preflightRefusal": refusal.to_string(), "posture": posture }),
+                witness.marked(serde_json::json!({ "preflightRefusal": refusal.to_string(), "posture": posture })),
                 unlaunched(project_manifest.is_some(), None),
                 &contract,
                 trial,
@@ -477,7 +482,7 @@ pub fn launch_attempt(
         }
     };
 
-    let boundary_admission =
+    let mut boundary_admission =
         boundary_admission.expect("successful boundary check admitted the launch");
     let (probe, probed_version) = confined_probe.expect("admission observed the provider version");
     if let Some(t) = trial.as_mut() {
@@ -522,7 +527,9 @@ pub fn launch_attempt(
                         Some(&boundary_admission),
                         statecraft_run::attempt::Outcome::Refused,
                         &accounting,
-                        serde_json::json!({ "preflightRefusal": detail, "posture": posture }),
+                        witness.marked(
+                            serde_json::json!({ "preflightRefusal": detail, "posture": posture }),
+                        ),
                         unlaunched(true, None),
                         &contract,
                         trial,
@@ -555,6 +562,62 @@ pub fn launch_attempt(
     environment.variables.extend(git_variables);
     environment.confinement = Some(std::sync::Arc::clone(&boundary_admission.boundary));
     posture = posture.with_confinement(boundary_admission.boundary.record().clone());
+
+    // Spec 013: every preflight has passed and the attempt's intent is
+    // durable, so the sidecar's effect intent is written and the sidecar
+    // started now. A sidecar that fails after the endpoint was reserved
+    // refuses the child (sections 3.3 and 4).
+    let exchange = statecraft_home::launch::AttemptIdentity {
+        run_id: run_id.clone(),
+        attempt: session.attempt,
+    }
+    .exchange_dir(&places);
+    let started = witness.start(
+        &mut chain,
+        &statecraft_environment::time::rfc3339_utc(clock.now_unix()),
+        &crate::witness::Roots {
+            home,
+            records: &places.records,
+            target: root,
+            workspace: &session.workspace.path,
+            exchange: &exchange,
+        },
+        &run_id,
+        session.attempt,
+        &mut boundary_admission,
+        &probe_executable,
+    );
+    match started {
+        Ok(Some(variables)) => environment.variables.extend(variables),
+        Ok(None) => {}
+        Err(why) => {
+            let mut accounting = statecraft_run::refusal::Accounting::without_process();
+            accounting.observe(statecraft_run::refusal::RefusalEvent {
+                guard: crate::witness::GUARD.to_string(),
+                detail: why.clone(),
+            });
+            let timestamp = statecraft_environment::time::rfc3339_utc(clock.now_unix());
+            if let Some(error) = witness.write_outcome(&mut chain, &timestamp) {
+                accounting.observe(statecraft_run::refusal::RefusalEvent {
+                    guard: crate::witness::GUARD.to_string(),
+                    detail: format!("the witness outcome could not be written: {error}"),
+                });
+            }
+            return crate::attempt::conclude(
+                clock,
+                &mut chain,
+                &places,
+                &session,
+                Some(&boundary_admission),
+                statecraft_run::attempt::Outcome::Refused,
+                &accounting,
+                witness.marked(serde_json::json!({ "witnessRefusal": why, "posture": posture })),
+                unlaunched(project_manifest.is_some(), None),
+                &contract,
+                trial,
+            );
+        }
+    }
 
     // Spec 002 section 3.27: the floor reaches a managed session through the
     // per-session settings argument. Section 3.32 rule 25: where a revision is
@@ -612,11 +675,6 @@ pub fn launch_attempt(
     };
     // Spec 002 section 3.37 rule 2: a managed attempt's settings document is
     // written into its exchange directory, which `prepare` created.
-    let exchange = statecraft_home::launch::AttemptIdentity {
-        run_id: run_id.clone(),
-        attempt: session.attempt,
-    }
-    .exchange_dir(&places);
     let sentinel = trial.as_ref().and_then(|t| t.sentinel.clone());
     // Spec 003 section 3.5.1 rule 1, second kind: the protected files are
     // digested after the intent is durable and before the spawn, under the
@@ -633,7 +691,7 @@ pub fn launch_attempt(
                 &environment,
                 &negotiation.granted,
                 &exchange,
-                &mut kept,
+                &mut witness.custody(&mut kept),
             );
             if supervised.is_ok() {
                 kept.decide_at_end();
@@ -651,7 +709,7 @@ pub fn launch_attempt(
                 &environment,
                 &negotiation.granted,
                 &exchange,
-                w,
+                &mut witness.custody(&mut *w),
             );
             if supervised.is_ok() {
                 // A stream that ended before its decision point is decided at
@@ -666,7 +724,7 @@ pub fn launch_attempt(
             &environment,
             &negotiation.granted,
             &exchange,
-            &mut statecraft_adapter::supervisor::Unwatched,
+            &mut witness.custody(&mut statecraft_adapter::supervisor::Unwatched),
         ),
     };
     let watched = watch.map(|w| w.watched()).unwrap_or_default();
@@ -689,6 +747,8 @@ pub fn launch_attempt(
             found_at: statecraft_environment::time::rfc3339_utc(clock.now_unix()),
             changes: changes.clone(),
         };
+        // The attempt stays live, and so does the sidecar's effect.
+        witness.abort("record-change");
         let recorded =
             statecraft_run::tamper::append_audit(home, root, &finding).map_err(|e| e.to_string());
         return slice::record_changed_answer(&root.display().to_string(), finding, recorded)
@@ -767,6 +827,12 @@ pub fn launch_attempt(
                 },
                 &watched,
             );
+            if let Some(error) = witness.write_outcome(&mut chain, &now()) {
+                accounting.observe(statecraft_run::refusal::RefusalEvent {
+                    guard: crate::witness::GUARD.to_string(),
+                    detail: format!("the witness outcome could not be written: {error}"),
+                });
+            }
             return crate::attempt::conclude(
                 clock,
                 &mut chain,
@@ -775,7 +841,7 @@ pub fn launch_attempt(
                 Some(&boundary_admission),
                 statecraft_run::attempt::Outcome::Interrupted,
                 &accounting,
-                serde_json::json!({ "supervisorError": e.to_string(), "posture": posture, "startup": startup.detail }),
+                witness.marked(serde_json::json!({ "supervisorError": e.to_string(), "posture": posture, "startup": startup.detail })),
                 startup.run,
                 &contract,
                 trial,
@@ -790,6 +856,10 @@ pub fn launch_attempt(
         &run_id,
         &environment.variables,
     );
+    // Section 3.3: custody ends after the child and its objects; the object
+    // import retests the child's boundary, whose probe connects to the
+    // endpoint the sidecar still holds.
+    witness.close();
     let supervised = &execution.supervised;
     let posture = posture.with_execution(supervised);
     let mut accounting = statecraft_run::refusal::Accounting::default();
@@ -849,6 +919,12 @@ pub fn launch_attempt(
         });
     }
 
+    if let Some(why) = witness.write_outcome(&mut chain, &now()) {
+        accounting.observe(statecraft_run::refusal::RefusalEvent {
+            guard: crate::witness::GUARD.to_string(),
+            detail: format!("the witness outcome could not be written: {why}"),
+        });
+    }
     crate::attempt::conclude(
         clock,
         &mut chain,
@@ -857,7 +933,7 @@ pub fn launch_attempt(
         Some(&boundary_admission),
         execution.termination(),
         &accounting,
-        serde_json::json!({
+        witness.marked(serde_json::json!({
             "requested": negotiation
                 .granted
                 .iter()
@@ -875,7 +951,7 @@ pub fn launch_attempt(
             },
             "harnessStanding": standing.word(),
             "startup": startup.detail,
-        }),
+        })),
         startup.run,
         &contract,
         trial,

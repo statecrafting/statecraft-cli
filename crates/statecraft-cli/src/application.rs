@@ -15,6 +15,7 @@
 //! resolving it here too, so the order of refusals is the verb's.
 
 use serde_json::Value;
+use statecraft_adapter::witness::posture::Requirement;
 use statecraft_environment::registry::Registry;
 use statecraft_environment::time::Clock;
 use statecraft_run::record::Chain;
@@ -510,7 +511,18 @@ fn observed_launch_state(
 /// as the verb orders it. An unregistered or unarmed target refuses before
 /// any workspace, appended attempt or provider.
 pub fn run(ctx: &Context<'_>, path: &Path, spec_id: Option<&str>) -> Result<Response, Usage> {
-    run_from(ctx, path, spec_id, None)
+    run_from(ctx, path, spec_id, None, Requirement::DEFAULT)
+}
+
+/// [`run`], with witness capture requested or required (spec 013 section 7,
+/// 2026-10-17): `run --witness` and `run --require-witness`.
+pub fn run_witnessed(
+    ctx: &Context<'_>,
+    path: &Path,
+    spec_id: Option<&str>,
+    witness: Requirement,
+) -> Result<Response, Usage> {
+    run_from(ctx, path, spec_id, None, witness)
 }
 
 /// Where an admitted spec 027 proposal enters the run path: the commit its
@@ -533,7 +545,7 @@ pub fn run_admitted_proposal(
     spec_id: &str,
     origin: &Origin<'_>,
 ) -> Response {
-    match run_from(ctx, path, Some(spec_id), Some(origin)) {
+    match run_from(ctx, path, Some(spec_id), Some(origin), Requirement::DEFAULT) {
         Ok(answer) => answer,
         Err(Usage(detail)) => failed(&detail),
     }
@@ -544,6 +556,7 @@ fn run_from(
     path: &Path,
     spec_id: Option<&str>,
     origin: Option<&Origin<'_>>,
+    witness: Requirement,
 ) -> Result<Response, Usage> {
     let root = match registered(ctx.registry, path) {
         Ok(root) => root,
@@ -577,14 +590,17 @@ fn run_from(
     };
     let work = statecraft_run::work::select(&report, &policy, &overrides, disagreement);
     let Some(spec_id) = spec_id else {
-        return Err(Usage("usage: run <path> <spec-id>".to_string()));
+        return Err(Usage(
+            "usage: run <path> <spec-id> [--witness | --require-witness]".to_string(),
+        ));
     };
     Ok(run_admitted(
-        ctx, &root, spec_id, work, &report, held, origin,
+        ctx, &root, spec_id, work, &report, held, origin, witness,
     ))
 }
 
 /// The attempt itself, once [`run`] has admitted it.
+#[allow(clippy::too_many_arguments)]
 fn run_admitted(
     ctx: &Context<'_>,
     root: &Path,
@@ -593,6 +609,7 @@ fn run_admitted(
     report: &statecraft_run::report::CorpusReport,
     held: statecraft_run::lock::Held,
     origin: Option<&Origin<'_>>,
+    witness: Requirement,
 ) -> Response {
     // A unit of work the policy did not admit is never run, and the reason is
     // the answer (spec 003 section 3.1.1).
@@ -620,6 +637,7 @@ fn run_admitted(
     let contract =
         statecraft_run::contract::bind(&judge, root, spec_id, report.lifecycle_of(spec_id));
     let mut plan = crate::attempt::AttemptPlan::work_order(spec_id, admission, planned, held);
+    plan.witness = witness;
     if let Some(origin) = origin {
         plan.base = origin.commit.to_string();
         plan.proposal = Some(origin.proposal.to_string());

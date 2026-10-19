@@ -36,6 +36,9 @@ pub struct AttemptPlan {
     /// The spec 027 proposal whose admission this attempt is, written into
     /// the intent.
     pub proposal: Option<String>,
+    /// Whether witness capture is requested or required (spec 013 section
+    /// 3.7): `run --witness` and `run --require-witness`.
+    pub witness: statecraft_adapter::witness::posture::Requirement,
 }
 
 impl AttemptPlan {
@@ -55,6 +58,7 @@ impl AttemptPlan {
             held: Some(held),
             base: "HEAD".to_string(),
             proposal: None,
+            witness: statecraft_adapter::witness::posture::Requirement::DEFAULT,
         }
     }
 
@@ -69,6 +73,7 @@ impl AttemptPlan {
             held: None,
             base: "HEAD".to_string(),
             proposal: None,
+            witness: statecraft_adapter::witness::posture::Requirement::DEFAULT,
         }
     }
 }
