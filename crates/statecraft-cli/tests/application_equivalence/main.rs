@@ -5,9 +5,18 @@
 //! the pristine copy at the same path, runs the operation through
 //! `render::Answer`, and compares both. Nothing is normalized: the clock is
 //! fixed on both sides (the binary's through `STATECRAFT_TEST_CLOCK`, read only
-//! by a debug build), and the paths are the same paths.
+//! by a debug build), and the paths are the same paths. The cases that
+//! launch a provider are in [`launch`].
 
 #![cfg(unix)]
+
+#[path = "../support/fake_provider.rs"]
+mod fake_provider;
+
+#[path = "../support/provider_token.rs"]
+mod provider_token;
+
+mod launch;
 
 use statecraft_cli::application::{
     Context, ReconcileOperands, RecoverChoice, Response, TrialOperands, accept, override_recover,

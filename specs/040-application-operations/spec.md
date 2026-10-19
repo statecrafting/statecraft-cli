@@ -2,7 +2,7 @@
 id: "040-application-operations"
 title: "Callable application operations with unchanged envelopes and chain effects"
 status: approved
-implementation: pending
+implementation: complete
 created: "2026-10-10"
 summary: >
   Extract run, shared attempt launch, acceptance, override recovery, run
@@ -251,7 +251,32 @@ same ones. The confinement's scratch directory, whose path the attempt's
 posture records, is one of those seeded temporary names: `confinement.rs`
 takes its name from `launch::seeded_name`, which alone reads the variable,
 and carries its own extends edge on spec 002 for that call. Spec 004's adapter
-is not changed: the settings file it names stays random.
+is not changed: the settings file it names stays random (next entry).
+
+**2026-10-18: what a launching case compares, and how.** The verb runs as the
+built binary and the operation in this suite's test binary re-entered, each a
+fresh process given the same environment, clock and seed, so both draw the
+same nonces from the start. The boundary self-test re-executes the current
+executable as its probe, so the test binary answers the probe from a
+constructor before libtest's `main`, as the binary's `main` does. Five values
+neither side chooses are compared by what they stand for, each checked on its
+own side first, and everything else byte for byte: the pid the kernel gave
+the provider, in the launch records and the answer, must be the pid the fake
+reported on that side; the seconds git stamps a reflog line it adds must fall
+within that side's run; a git index is compared as the entries it stages,
+without the stat cache the filesystem fills; the random name spec 004's
+adapter gives the settings file appears only in the fake's own report of what
+it was handed, never in a record; and the temporary files a killed launcher
+leaves behind are compared by the shape of their random names, their
+directory and their bytes. No outcome, evidence, admission, identity, record
+order, product timestamp or hash is rewritten. On Linux the confinement's
+ruleset, and so the digest a posture records, covers every entry of every
+directory on the path to the roots it denies; that listing is a fixture input
+controlled at its boundary. One launching fixture exists at a time, holding
+one lock from its creation to its removal, in a directory of the build's
+temporary directory no other case uses, so the path's entries are the same
+while both sides run; one launch at a time also keeps spec 004's deadlines
+from being measured against a machine other launches load.
 
 ## Verification
 
