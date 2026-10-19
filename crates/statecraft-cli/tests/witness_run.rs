@@ -202,16 +202,24 @@ fn a_requested_witness_without_its_producer_runs_unwitnessed_as_unavailable() {
 fn a_foreign_file_at_the_producer_path_is_unavailable_and_required_is_recorded() {
     let f = fixture();
     f.arm();
-    if let Some(target) = statecraft_adapter::witness::ledger::current_target() {
-        let path = statecraft_home::witness::producer_path(f.home.path(), target);
-        std::fs::create_dir_all(path.parent().unwrap()).unwrap();
-        executable(&path, "#!/bin/sh\nexit 0\n");
-    }
+    // Off the adopted targets there is no producer path to place a file at.
+    let Some(target) = statecraft_adapter::witness::ledger::current_target() else {
+        eprintln!("skipped: no wire-witness target is adopted for this platform");
+        return;
+    };
+    let path = statecraft_home::witness::producer_path(f.home.path(), target);
+    std::fs::create_dir_all(path.parent().unwrap()).unwrap();
+    executable(&path, "#!/bin/sh\nexit 0\n");
     let output = f.run(&["run", f.root(), "replay", "--require-witness", "--json"]);
     assert_eq!(output.status.code(), Some(0), "{output:?}");
     let detail = f.last_outcome();
     assert_eq!(detail["witnessPosture"], "witness-unavailable");
     assert_eq!(detail["witnessRequired"], true);
+    // The file was read and refused by its digest, not found absent.
+    let why = detail["witness"]["producer"]["unavailable"]
+        .as_str()
+        .unwrap();
+    assert!(why.contains("not the adopted"), "{why}");
 }
 
 #[test]

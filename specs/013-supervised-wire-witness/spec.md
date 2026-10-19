@@ -455,13 +455,10 @@ of it; the sidecar can write nothing else.
 The child's admission precedes the sidecar, and its self-test must connect to
 the endpoint, so a witnessed admission binds a loopback listener on an
 ephemeral port, prepares the child's boundary for that port, and holds the
-listener through the self-test. The supervisor releases it only for the sidecar:
-the sidecar's admission self-test binds the endpoint, and then the sidecar
-does; until the sidecar reports ready on it, a retest fails. A process that
-takes the port during the sidecar's admission fails that self-test, which is
-`witness-unavailable` because no sidecar process ran; one that takes it after
-makes the sidecar's bind fail, which section 4 names as `witness-failed`.
-Neither reaches the child.
+listener through the self-test. The supervisor releases it only for the sidecar
+to bind; until the sidecar reports ready on it, a retest fails. A process that
+takes the port in between makes the sidecar's bind fail, which section 4 names
+as `witness-failed`, and never reaches the child.
 
 **2026-10-18: on macOS the sidecar reads the system's root bundle.** The
 released producer trusts only system roots for provider TLS, and its TLS
@@ -474,6 +471,16 @@ library reads instead, so no Mach service is allowed. The residual: a root an
 operator added to a keychain, or a trust setting changed there, is not honored
 by the sidecar. On Linux the library reads the system's bundle from files and
 no variable is set; that route is not yet measured with the released producer.
+
+**2026-10-18: the sidecar's admission binds the endpoint first.** This
+clarifies the 2026-10-17 entry on the child's endpoint and changes no section 4
+word. The sidecar's admission self-test binds the endpoint before the sidecar
+does, so the supervisor releases the child's listener before that admission.
+A process that takes the port during the admission fails the sidecar's
+confinement, which section 4's `witness-unavailable` row covers because no
+sidecar process ran, as the entry on a witness that cannot start already
+records; the `witness-failed` bind failure of the 2026-10-17 entry is a port
+taken after the admission. Neither reaches the child.
 
 **2026-10-17: witnessing is requested on the run.** The owner decided that
 `statecraft run <path> <spec-id> --witness` requests capture for that attempt

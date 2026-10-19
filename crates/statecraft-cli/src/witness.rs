@@ -228,8 +228,9 @@ impl Witness {
         // Section 3.3: the child's boundary is proved again against the
         // sidecar now listening on its endpoint.
         if let Err(why) = child.retest(probe_executable) {
-            self.abort("child boundary retest");
-            return Err(format!("child boundary retest: {why}"));
+            let why = format!("child boundary retest: {why}");
+            self.abort(&why);
+            return Err(why);
         }
         Ok(Some(
             statecraft_adapter_claude_code::witness::child_variables(

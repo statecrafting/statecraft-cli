@@ -61,6 +61,15 @@ mod tests {
             ["HTTPS_PROXY", "NODE_EXTRA_CA_CERTS"]
         );
         assert_eq!(variables["HTTPS_PROXY"], "http://127.0.0.1:41999");
-        assert!(!OUTBOUND_PORTS.contains(&0));
+        assert_eq!(
+            variables["NODE_EXTRA_CA_CERTS"],
+            "/x/witness/capture/ca.pem"
+        );
+    }
+
+    #[test]
+    fn the_sidecar_reaches_only_the_capture_authoritys_port() {
+        assert_eq!(OUTBOUND_PORTS, [443]);
+        assert!(CAPTURE_AUTHORITY.ends_with(":443"));
     }
 }
