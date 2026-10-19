@@ -483,7 +483,8 @@ record appended. The adapter keeps that reference as written and does not
 interpret it, which is this spec's only change to `statecraft-adapter`. The
 manifest is read only when spec 013's integrity check found it inside the
 sidecar area, and only to the section 3.1 bound; otherwise no admission is
-recorded and the attempt's witness detail names it `unavailable`. The run path
+recorded, the attempt's witness detail names it `unavailable`, and section
+3.5 and `run show` read that attempt's evidence as `unavailable`. The run path
 registers no exact values with the detector. `accept` reads section 3.5 after
 the contract comparison and before the suite, and an ineligible attempt is
 the finding `wire-evidence-ineligible` with its state and reason, exit 1.
