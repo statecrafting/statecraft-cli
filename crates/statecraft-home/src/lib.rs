@@ -34,6 +34,9 @@
 //! - [`authority`] resolves configuration with provenance; [`team`] is the solo
 //!   and team boundary and the coordination-authority seam; [`resolved`]
 //!   freezes a run's resolution so a global upgrade cannot reach into it.
+//! - [`context`] is spec 019's producer reads: a context packet assembled
+//!   and its snapshot bound by the pinned executable, decoded and its digest
+//!   reproduced by the linked library. Added by spec 019's additive edge.
 //! - [`derived`] is the one-time relocation of the compiled artifacts.
 //! - [`flow`] is the initialization; [`service`] is the typed operation
 //!   boundary the command surface and a future dashboard both call.
@@ -58,6 +61,7 @@ pub mod authority;
 pub mod bridge;
 pub mod capture;
 pub mod confinement;
+pub mod context;
 pub mod delivery;
 pub mod derived;
 pub mod flow;
