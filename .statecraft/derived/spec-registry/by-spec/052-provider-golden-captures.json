@@ -1,0 +1,82 @@
+{
+  "record": {
+    "amends": [
+      "004-execution-adapter"
+    ],
+    "created": "2026-10-21",
+    "dependsOn": [
+      "004-execution-adapter"
+    ],
+    "id": "052-provider-golden-captures",
+    "implementation": "pending",
+    "obligations": [
+      {
+        "anchor": "3-4-comparing-a-new-version",
+        "id": "I-1",
+        "kind": "invariant",
+        "text": "No provider version is qualified while a scenario's capture for it differs from that scenario's golden in a way neither the golden nor a reviewed divergence-ledger entry accounts for."
+      },
+      {
+        "anchor": "3-1-the-corpus",
+        "id": "R-1",
+        "kind": "requirement",
+        "text": "Every golden names its provider version, platform, scenario and capture date, and the comparison refuses a capture whose version or scenario does not match the golden it is compared to."
+      },
+      {
+        "anchor": "3-2-the-quarantine",
+        "id": "R-2",
+        "kind": "requirement",
+        "text": "A quarantined capture is excluded from comparison only with a recorded reason and is kept, never deleted; lifting it requires a fresh capture."
+      },
+      {
+        "anchor": "3-4-comparing-a-new-version",
+        "id": "R-3",
+        "kind": "requirement",
+        "text": "Comparison runs offline: it spawns no provider, opens no network connection and reads no credential."
+      },
+      {
+        "anchor": "verification",
+        "id": "V-1",
+        "inputs": [
+          "crates/statecraft-adapter-claude-code/testdata/stream/README.md"
+        ],
+        "kind": "verification",
+        "text": "A synthetic capture differing from its golden in a mapped field refuses qualification; the same capture with a reviewed ledger entry passes; a quarantined golden is skipped and reported; the comparison runs in CI with networking denied."
+      }
+    ],
+    "sectionDigests": {
+      "052-provider-golden-captures": "3a24121555aaf01824d7f57f0120639ac68f64fe6432ac07966c208ce0e277ed",
+      "1-purpose": "2238af5c5ad215e4baa994da4aba0fe17510a87fb83f387ff6359bcaa843f542",
+      "2-territory": "9c8f2fba0ab89f30df4c2278f7cb1b7cacad4983d9a1df53e9b09d5f0ec68d19",
+      "3-1-the-corpus": "d0f61aec2fe350940217176060fbfd93f302805c6c17fa07d6e2844a27efdee4",
+      "3-2-the-quarantine": "c69200782136f87a3f087acd4e8324c576fc8c6e1879ea23c4816b832bcf962f",
+      "3-3-the-divergence-ledger": "2d48ad5efea06733b8dcf081ddc2c28eabde569fc345455034ba18dc68086c01",
+      "3-4-comparing-a-new-version": "a97eac76b907ca8d4cbf0b9f4e2f469bd543ff7526451146657cb2487acbd250",
+      "3-5-capturing": "17d6270702cb2bf24bb6d090293612ca466db500a601dafc1f1058beb82f8e76",
+      "3-behavior": "943c20dd8aee6e25379963d0d6c41f883d37db06408fad55a2bc043fc3f9a7f7",
+      "4-out-of-scope": "00809fa37304f13e9739f8d7891d96f0ffa71fd60be68c31def6940c1dbf30b3",
+      "5-resolved-decisions": "79ae4126c87a27f4b1e5dde3becb64d988f6e0b116eebdd9c323ac985840065b",
+      "verification": "8f72177181b75c67f6c9f7daf8939dfac56bf2890261a4069e46f56f0eacb35e"
+    },
+    "sectionHeadings": [
+      "052: Provider golden captures",
+      "1. Purpose",
+      "2. Territory",
+      "3. Behavior",
+      "3.1 The corpus",
+      "3.2 The quarantine",
+      "3.3 The divergence ledger",
+      "3.4 Comparing a new version",
+      "3.5 Capturing",
+      "4. Out of scope",
+      "5. Resolved decisions",
+      "Verification"
+    ],
+    "specPath": "specs/052-provider-golden-captures/spec.md",
+    "status": "draft",
+    "summary": "Turns the Claude Code adapter's recorded streams into a governed corpus of golden captures, each pinned to a provider version and a named scenario, with a quarantine list for captures that are wrong recordings and a divergence ledger for differences a reviewer has accepted. A new provider version is compared against the goldens offline; an unreviewed divergence refuses that version's qualification. Capturing costs provider usage, so it is owner-triggered; comparison runs in CI with no provider and no network.\n",
+    "title": "Version-pinned provider captures, a quarantine and a divergence ledger gate a new provider version"
+  },
+  "shardHash": "b03a7e6c7c0fdc8e101bd2c2fb317333acfb227002a3e68ee5f3f154fe70000a",
+  "specVersion": "1.10.0"
+}
