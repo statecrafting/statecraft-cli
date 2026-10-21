@@ -2,7 +2,7 @@
 id: "019-context-packet-consumption"
 title: "Immutable context-packet consumption across repository snapshots"
 status: approved
-implementation: pending
+implementation: complete
 created: "2026-09-27"
 summary: >
   Amends Statecraft's run, adapter, acceptance, command, and governance-producer
@@ -538,12 +538,43 @@ offers no standalone validator for a continuation token, so the page chain is
 judged by each page's reproduced digest, which covers its token, and by the
 manifest's terminal structure.
 
+**2026-10-21: the command bindings.** `run <path> <spec-id> --context <file>`
+names a task file: `optionalOmission`, the section 3.8 `policy`, an optional
+`task`, and ordered `repositories`, each with `id`, `role`, `requirement`,
+`path` (relative to the file), the caller's `repository` identity, an
+optional `revision`, its `delivery`, and the producer's `request` passed
+through unread. The manifest is composed for the attempt the intent will
+append and refused before the intent, as `context-ineligible`, when its packets
+cannot be assembled or it may not execute, so a refused task appends no
+attempt. A bundle that does not match the recorded manifest concludes the
+attempt `refused` under the guard `context-bundle` before any process; a
+delivery record that cannot be written is a refusal under `context-delivery`.
+`accept <path> <run-id> --context <file>` names the current `checkouts` by
+repository id (`path`, `repository`), the claimed `citations` and the
+`evidence` admissions; without it, every check that needs a checkout or a
+claim reports its absence. An ineligible judgment is the acceptance reason
+`context-ineligible` with every reason, a finding (exit 1), before the suite
+runs. `run show` adds `contextManifest`, one entry per attempt, and `accept`
+adds `contextManifest`, the judgment; a historical attempt renders
+`not-recorded` in both.
+
 ## Verification
 
-The producer boundary is satisfied: spec-spine 0.31.0 is adopted (section 5,
-2026-10-21). The `V-1` inputs name the portable acceptance surface, and each
-lands with the part that implements it: the run record's
-`crates/statecraft-run/tests/context_manifest.rs` now, the adapter's and
-acceptance's files with their parts. Implementation acceptance is declared
-here, as `make verify SPEC=019` commands, in the change that lands the last of
-them; until then this spec's implementation stays `pending`.
+Implementation acceptance is the portable fixture matrix of section 3.10 in
+the owning crates, run through `make verify SPEC=019`. No provider runs: the
+adapter tests use a real child that reads its input, and the command test a
+fake provider that replays a recorded stream. The producer runs as the real
+pinned executable over a clone of this repository's own corpus.
+
+```verify:cli
+cargo test -p statecraft-run --test context_manifest
+cargo test -p statecraft-adapter --test context_delivery
+cargo test -p statecraft-adapter-claude-code --lib execution::tests::delivery_testimony_rides_the_providers_init_event_only
+cargo test -p statecraft-acceptance --test context_packet_acceptance
+cargo test -p statecraft-home --test context_producer
+cargo test -p statecraft-cli --test context_run
+```
+
+These establish packet custody, delivery and acceptance on fixtures. They do
+not show that a provider used a packet, that a cited member supports a claim,
+or that two repositories were compatible.

@@ -97,6 +97,14 @@ pub enum NoAcceptance {
         /// The specific reason, one of spec 014's stable codes.
         evidence: String,
     },
+    /// A context fact the attempt's recorded policy requires did not hold,
+    /// or an optional one carried an absence the policy does not permit
+    /// (spec 019 section 3.8). The attempt outcome is not rewritten.
+    #[serde(rename_all = "camelCase")]
+    ContextIneligible {
+        /// Every reason, `context-<dimension>-<state>: <subject>`.
+        reasons: Vec<String>,
+    },
 }
 
 /// Why acceptance was not attempted for this attempt.

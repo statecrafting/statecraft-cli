@@ -39,6 +39,10 @@ pub struct AttemptPlan {
     /// Whether witness capture is requested or required (spec 013 section
     /// 3.7): `run --witness` and `run --require-witness`.
     pub witness: statecraft_adapter::witness::posture::Requirement,
+    /// The spec 019 task file `run --context` names: its packets are
+    /// assembled, retained and composed into the attempt's manifest before
+    /// the intent, and delivered beside the prompt.
+    pub context: Option<std::path::PathBuf>,
 }
 
 impl AttemptPlan {
@@ -59,6 +63,7 @@ impl AttemptPlan {
             base: "HEAD".to_string(),
             proposal: None,
             witness: statecraft_adapter::witness::posture::Requirement::DEFAULT,
+            context: None,
         }
     }
 
@@ -74,6 +79,7 @@ impl AttemptPlan {
             base: "HEAD".to_string(),
             proposal: None,
             witness: statecraft_adapter::witness::posture::Requirement::DEFAULT,
+            context: None,
         }
     }
 }

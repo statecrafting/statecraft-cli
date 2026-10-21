@@ -722,6 +722,9 @@ pub struct RunShowView {
     /// Each attempt's wire evidence (spec 014 section 3.7), folded from the
     /// record alone.
     pub wire_evidence: WireEvidenceView,
+    /// Each attempt's context manifest and delivery (spec 019 section 3.9),
+    /// folded from the record alone; `not-recorded` for a historical attempt.
+    pub context_manifest: Vec<crate::context::AttemptContextView>,
 }
 
 /// A run's wire evidence, as `run show` renders it (spec 014 section 3.7).
@@ -1083,6 +1086,7 @@ pub fn run_show_with_admissions(
     reconciliations: Vec<ReconciliationView>,
     tamper: Vec<AttemptTamperView>,
     wire_evidence: WireEvidenceView,
+    context_manifest: Vec<crate::context::AttemptContextView>,
 ) -> Answer<RunShowView> {
     let mut summary = account.render();
     let admissions: Vec<AttemptAdmissionView> = run
@@ -1121,6 +1125,7 @@ pub fn run_show_with_admissions(
         summary.push_str(&format!("attempt {} witness {}\n", w.attempt, w.posture));
     }
     summary.push_str(&wire_evidence.describe());
+    summary.push_str(&crate::context::describe(&context_manifest));
     Answer::new(
         RunShowView {
             account,
@@ -1129,6 +1134,7 @@ pub fn run_show_with_admissions(
             tamper,
             witness,
             wire_evidence,
+            context_manifest,
         },
         Exit::Ok,
         summary,
@@ -1172,6 +1178,11 @@ pub struct AcceptView {
     /// Boundary preparation refusal, separate from the acceptance verdict.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub boundary: Option<crate::accept::BoundaryDiagnostic>,
+    /// Spec 019 section 3.9: the attempt's context manifest, every check's
+    /// result and eligibility under its recorded policy; `not-recorded` for
+    /// an attempt that bound no context packet.
+    #[serde(rename = "contextManifest")]
+    pub context_manifest: crate::context::Judgment,
 }
 
 /// A stale ledger at `accept`: refused before anything is judged, and nothing
@@ -1226,6 +1237,9 @@ pub fn accept_answer_with_boundary(
             // Required wire evidence is not admitted (spec 014 section 3.5):
             // the operation ran and found it, which is a finding.
             NoAcceptance::WireEvidenceIneligible { .. } => Exit::Finding,
+            // A required context fact did not hold (spec 019 section 3.8):
+            // the operation ran and found it, which is a finding.
+            NoAcceptance::ContextIneligible { .. } => Exit::Finding,
         },
     };
 
@@ -1290,6 +1304,7 @@ pub fn accept_answer_with_boundary(
             acceptance,
             contract,
             boundary,
+            context_manifest: crate::context::Judgment::NotRecorded,
         },
         exit,
         summary,
