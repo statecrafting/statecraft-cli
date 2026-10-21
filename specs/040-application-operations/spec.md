@@ -278,6 +278,26 @@ temporary directory no other case uses, so the path's entries are the same
 while both sides run; one launch at a time also keeps spec 004's deadlines
 from being measured against a machine other launches load.
 
+**2026-10-21: owner decision, the exception names its fourth symbol unit.**
+The owner decided on 2026-10-20 to amend the 2026-10-18 core-crate exception:
+it covers the call in `crates/statecraft-home/src/confinement.rs` that takes
+the scratch directory's name from `launch::seeded_name`, and names that call's
+function as the symbol unit `statecraft_home::confinement::admit`, the fourth
+`extends` edge on spec 002 beside `nonce`, `seeded_nonce` and `seeded_name`.
+The change inside `admit` is that one call and the prefix it selects; with no
+seed, the name is the random `temporary-` name it was. Nothing else widens:
+the 2026-10-18 entry's "no other core-crate change is authorized" holds for
+every other unit, and `confinement.rs` as a whole file is not claimed.
+
+**2026-10-21: owner decision, the five values compared by meaning.** The
+owner ratified on 2026-10-20 the 2026-10-18 entry on what a launching case
+compares, as an owner decision: the provider's pid, the seconds of a reflog
+line git adds, a git index's stat cache, the random settings-file name spec
+004's adapter gives, and the random names of a killed launcher's temporary
+files are compared by what they stand for, each checked on its own side
+first, and everything else byte for byte. The entry stands as written; no
+sixth value joins it without another owner decision.
+
 ## Verification
 
 These commands are required for final implementation acceptance. While
