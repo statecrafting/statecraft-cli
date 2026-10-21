@@ -1,0 +1,92 @@
+{
+  "record": {
+    "amends": [
+      "003-work-and-run-semantics",
+      "040-application-operations"
+    ],
+    "created": "2026-10-21",
+    "dependsOn": [
+      "003-work-and-run-semantics",
+      "040-application-operations"
+    ],
+    "id": "048-run-operations",
+    "implementation": "pending",
+    "obligations": [
+      {
+        "anchor": "3-4-the-record-is-the-state",
+        "id": "I-1",
+        "kind": "invariant",
+        "text": "A run's state is a fold over its run record alone: replaying the record reproduces every lease, operation outcome and attempt, and no operation state lives only in memory or in a capped table."
+      },
+      {
+        "anchor": "3-3-idempotency-and-version",
+        "id": "R-1",
+        "kind": "requirement",
+        "text": "An operation whose idempotency key the record already holds for that run, with the same operation and version, appends nothing and answers the recorded outcome; the same key with a different operation or version is refused as key-conflict."
+      },
+      {
+        "anchor": "3-3-idempotency-and-version",
+        "id": "R-2",
+        "kind": "requirement",
+        "text": "An operation whose expected version is not the run's current version is refused with exit 2 and the closed reason stale-version, and appends a refusal, never the effect."
+      },
+      {
+        "anchor": "3-2-one-controller-lease",
+        "id": "R-3",
+        "kind": "requirement",
+        "text": "An operation submitted without the run's current lease is refused with exit 2 and the closed reason lease-not-held, before any idempotency or version rule of section 3.3, so a caller without the lease learns nothing about keys."
+      },
+      {
+        "anchor": "3-1-the-three-operations",
+        "id": "R-4",
+        "kind": "requirement",
+        "text": "An abort records stop-requested when it is accepted and stop-confirmed only when the attempt's cancelled outcome is durable; neither is read as the other."
+      },
+      {
+        "anchor": "verification",
+        "id": "V-1",
+        "inputs": [
+          "crates/statecraft-run/src/record.rs"
+        ],
+        "kind": "verification",
+        "text": "A record built by a sequence of operations replays to the same state; a repeated key appends nothing; a stale version exits 2 naming stale-version; a reconnecting cursor reads exactly the events after it."
+      }
+    ],
+    "sectionDigests": {
+      "048-typed-run-operations-under-one-controller-lease": "3530b206b84467706c7634ecbce83916c5bd6023c6bea23a27399e575fd1d3f1",
+      "1-purpose": "a8cd1c1c3b85df4f5882c4d85245fe91f62c916b06e7a60cd8aa0f9aa1dbb5ac",
+      "2-territory": "56507aabb8357379d6a6d67ada7404d92ee91795cdc4ada28bbe86dced5890a9",
+      "3-1-the-three-operations": "080f7878046c185c2b5149ef6745a7dfbfb2018c457579b580c4311da54bec16",
+      "3-2-one-controller-lease": "0b6ccef7a71bb9f780ae949a4ff273e0e1a3317fede5384f1cca76e772093883",
+      "3-3-idempotency-and-version": "58466b19c71ea85f271c5155f97199639a8edce04f1086e4f1d10c4762599faa",
+      "3-4-the-record-is-the-state": "baa824a53348863dfa8984deefe38bef67515bb4f4bf2fe359d754458a52f194",
+      "3-5-the-live-slot": "bf8b88c479c4b01d540e5e8e6bb45558de5828836ccff8a80fbabbda7f62d3e3",
+      "3-6-the-event-cursor": "ba48d16f07b401e5061808ff119a975a4c931ce785475e52a61f5416626d5035",
+      "3-behavior": "fee67128fd130e86b095b5719793e47ccf412bc8c02a2a53682e524f587b8972",
+      "4-out-of-scope": "914b435926abca1405ec2d9058aa9ece80ac9b82ec1b6b6eeabdff5f9bda0818",
+      "5-resolved-decisions": "1663c5866b92b4a45bcab84e19ec36a5f5266a627889ba67e74fd5bc7bea18f6",
+      "verification": "5c1540e17b9931e9f9ec76d58f284e35adceaac66edfb180428f14a25c4877b1"
+    },
+    "sectionHeadings": [
+      "048: Typed run operations under one controller lease",
+      "1. Purpose",
+      "2. Territory",
+      "3. Behavior",
+      "3.1 The three operations",
+      "3.2 One controller lease",
+      "3.3 Idempotency and version",
+      "3.4 The record is the state",
+      "3.5 The live slot",
+      "3.6 The event cursor",
+      "4. Out of scope",
+      "5. Resolved decisions",
+      "Verification"
+    ],
+    "specPath": "specs/048-run-operations/spec.md",
+    "status": "draft",
+    "summary": "Gives a run three typed operations, attempt.retry, attempt.continue and attempt.abort, submitted by one controller holding a lease. Each carries an idempotency key and the run version it was decided against; each request and its outcome append to spec 003's hash-linked run record, durable and uncapped, so replaying the record reproduces the run's state. A reconnecting controller reads events from a cursor over the record. The one live slot of spec 003 section 3.7 is held or released explicitly by each operation.\n",
+    "title": "Typed run operations under one controller lease, recorded in the run record"
+  },
+  "shardHash": "34e524342ae61ad3618b21aa6e7c3284156fd51fb4d9abc74048dbaf678e5654",
+  "specVersion": "1.10.0"
+}
