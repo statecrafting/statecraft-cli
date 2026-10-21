@@ -1,0 +1,85 @@
+{
+  "record": {
+    "amends": [
+      "005-acceptance-and-evidence",
+      "006-command-surface"
+    ],
+    "created": "2026-10-21",
+    "dependsOn": [
+      "005-acceptance-and-evidence",
+      "006-command-surface",
+      "037-closed-admission-gate"
+    ],
+    "id": "049-admission-dry-run",
+    "implementation": "pending",
+    "obligations": [
+      {
+        "anchor": "3-2-same-evaluator-same-codes",
+        "id": "I-1",
+        "kind": "invariant",
+        "text": "For every policy and input, the dry-run's decision, refusal codes and their order equal admission::evaluate's on the same input; the dry-run calls that function rather than a copy of it."
+      },
+      {
+        "anchor": "3-3-no-side-effects",
+        "id": "I-2",
+        "kind": "invariant",
+        "text": "A dry-run writes nothing: no attestation, no run record, no journal entry and no file under the product home or the target."
+      },
+      {
+        "anchor": "3-1-the-verb",
+        "id": "R-1",
+        "kind": "requirement",
+        "text": "The answer names the policy it evaluated by its digest and says whether that digest is the one the bundle's recorded admission names, a different one, or none."
+      },
+      {
+        "anchor": "3-4-the-check-trace",
+        "id": "R-2",
+        "kind": "requirement",
+        "text": "The answer lists every registered check with its own result in registration order, and marks an allowing check as overruled when the decision is a refusal."
+      },
+      {
+        "anchor": "verification",
+        "id": "V-1",
+        "inputs": [
+          "crates/statecraft-envelope/tests/admission_differential.rs"
+        ],
+        "kind": "verification",
+        "text": "A differential test over the admission corpus finds the dry-run's decision and codes equal to evaluate's; a run with a read-only home and target succeeds and leaves both byte-identical."
+      }
+    ],
+    "sectionDigests": {
+      "049-admission-dry-run": "4ce45b0803b6c08171c5dfce7490297aae40a19f79f8360786028b6e08b024c2",
+      "1-purpose": "53dec9da049a649d3d64e466fdf0da224be4ffd716a10992210ef1a4314ccd42",
+      "2-territory": "4cc2af9576f0011e52cc8f81787235e7b1f365274eaa1b73276a38885e3aeba7",
+      "3-1-the-verb": "de22c6f475e2379c69bbcbc69253ecffd95d7d9d7afa3cba53a61e0c80d8fef8",
+      "3-2-same-evaluator-same-codes": "c294d33457bff2cdc187706e34011ada6947cd3326e97bf5cd7bae45a0b0bc32",
+      "3-3-no-side-effects": "7f74edc5d2255200128ced0990dfc3b80e784c90ba11c6eddb0bdac344f9968a",
+      "3-4-the-check-trace": "cae233867de217abd33b58bc553388b464079b96b687c88262c10297201fe2de",
+      "3-behavior": "86f54071620e3bfff7c240af80c7921735f9252a16bb578d2a8424ff73bfd913",
+      "4-out-of-scope": "b0960a7cec0e21d000021f1268eb216657be64d0a8ff891a046d9d77be879550",
+      "5-resolved-decisions": "5f755fb85f23cd2480abd9bb8a9266ff3b059719d004c8fa4139c2b21e3226b9",
+      "open-question-for-the-owner": "9b52bcaeb9b2324a9981718af712fd79f6052d1ee4ee15c2cd85ae0b4c3180cd",
+      "verification": "50db51b54481cec7c55c0b93e5eedfbf5a130bd9d14eca0aa172ce36623bcacd"
+    },
+    "sectionHeadings": [
+      "049: Admission dry-run",
+      "1. Purpose",
+      "2. Territory",
+      "3. Behavior",
+      "3.1 The verb",
+      "3.2 Same evaluator, same codes",
+      "3.3 No side effects",
+      "3.4 The check trace",
+      "4. Out of scope",
+      "5. Resolved decisions",
+      "Open question for the owner",
+      "Verification"
+    ],
+    "specPath": "specs/049-admission-dry-run/spec.md",
+    "status": "draft",
+    "summary": "Adds a verb that evaluates a revision's recorded verdicts and decisions against an admission policy through spec 037's closed evaluator and answers what admission would decide, with the same refusal codes in the same order, without writing an attestation, a record or any state. Beside the decision it reports every check's own result, so an operator previewing a policy change sees which requirements allowed and were overruled by a deny. The policy-eval/v1 claim is unchanged; whether that trace should ever enter the claim is an owner question.\n",
+    "title": "An admission dry-run evaluates a policy through the closed evaluator and writes nothing"
+  },
+  "shardHash": "9a610da7cb1c1dda85ec384b8304506c07bc23360442d7c8238f0dfd3956fb98",
+  "specVersion": "1.10.0"
+}
