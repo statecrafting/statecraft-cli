@@ -515,6 +515,29 @@ exact state is permitted. No citation or no evidence supplied is the fact
 state, in manifest order. Each reason is spelled
 `context-<dimension>-<state>: <subject>`.
 
+**2026-10-21: which producer interface answers which read.** Spec-spine
+0.31.0's library assembles a packet only over a caller-supplied snapshot, and
+its executable is what binds one, so `statecraft-home` assembles every page,
+re-asks a recorded closure and binds a current snapshot through the pinned
+executable (`spec-spine context packet ... --json`, following each
+continuation to the terminal page), and decodes and validates each page
+through the linked library (`ContextPacket`, which denies unknown fields, and
+`packet_digest`). A refusal is read from the verdict's `error.kind`. An incomplete page is
+the producer's finding (exit 1) and the page is the verdict's `report`; it is
+retained as `context_packet_document` renders it, which is byte for byte what
+a successful exit prints, so every retained page is the producer's canonical
+document. Closure
+re-submits the request the page recorded at the revision it recorded; the
+member differences are the closure members present in one producer document
+and not the other. The current snapshot is the clean working tree at HEAD,
+bound under the recorded request with the identity the caller supplies; a
+dirty tree is the producer's `dirty-tree` refusal, so it is `unverified`. A
+member is looked up, and a recorded request, revision or repository drives a
+producer call, only from a page whose digest reproduces. The release
+offers no standalone validator for a continuation token, so the page chain is
+judged by each page's reproduced digest, which covers its token, and by the
+manifest's terminal structure.
+
 ## Verification
 
 The producer boundary is satisfied: spec-spine 0.31.0 is adopted (section 5,
