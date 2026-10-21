@@ -7,16 +7,15 @@ does not restate it.
 
 ## What this repository is right now
 
-A specified corpus with the code it claims. Seven specs, eight crates and one
-binary; the product is a local environment for governed agent work; the boundary
+A specified corpus with the code it claims: the specs `registry list`
+reports, the crates the root `Cargo.toml` names, and one binary; the product is a local environment for governed agent work; the boundary
 is [README.md](README.md), the reasoning is spec `001` sections 3.8 to 3.12, and
 what is proposed versus adopted is
 [docs/decisions/00-founding-decisions.md](docs/decisions/00-founding-decisions.md).
 
-All seven specs, `000` to `006`, are `approved`. `registry list` is the
-authority on the second half: `000` and `001` carry `implementation: n-a`,
-because they own prose and no code, and each of `002` to `006` carries the
-implementation state `registry list` reports, which this file does not restate.
+`registry list` is the authority on every spec's `status` and
+`implementation`: `000` and `001` carry `implementation: n-a`, because they
+own prose and no code, and this file restates no other spec's state.
 
 **A spec may own more than one crate.** Four pairs were consolidated on
 2026-09-21 and no crate moved, so `002`, `004` and `005` own two crates each.
@@ -41,7 +40,7 @@ make verify SPEC=001       # one spec's declared acceptance
 make status                # version, lifecycle counts, what is schedulable
 ```
 
-`make code` builds, tests, lints and format-checks all eight crates; the test
+`make code` builds, tests, lints and format-checks the whole workspace; the test
 count is whatever `cargo test --workspace` reports, and no file restates it,
 because a restated count is wrong after the next test lands. Both surfaces are required
 through the `ci-gate` status check. The guard that made the cargo verbs skip on
@@ -63,7 +62,7 @@ AGENTS.md records what to do if a spec genuinely needs to claim ahead.
   `compile` and then `compile --check` in the same breath passes unconditionally
   and proves nothing.
 - **There are no forward claims left, and the gate now refuses one.** Specs `002`
-  to `005` once claimed crates that did not exist; all eight crates are written, and
+  to `005` once claimed crates that did not exist; every claimed crate is written, and
   `index check --fail-on-unresolved` is in the gate. Under every pin since 0.20.0
   (each adoption re-measures it; see `docs/adoption/spec-spine.md`) an unresolved claim exits
   **1**, the validation code, not 2: it is a corpus that
