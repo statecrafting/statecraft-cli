@@ -31,6 +31,10 @@
 //!   sidecar effect's binding, the attempt's wire-evidence policy, the
 //!   append-only admission records and their per-attempt projection. Added
 //!   by spec 014's additive edge.
+//! - [`context`] is spec 019's run-record half of context-packet
+//!   consumption: the task manifest written into the intent, the custody of
+//!   the exact packet bytes, their bounds, and intended beside
+//!   adapter-observed delivery. Added by spec 019's additive edge.
 //! - [`session`] is one run from intent to outcome, and the fold that reads runs
 //!   back out of the record. Added by spec 006's additive edge, because a
 //!   command may not be a second implementation and a binding needs an entry
@@ -46,6 +50,7 @@
 #![forbid(unsafe_code)]
 
 pub mod attempt;
+pub mod context;
 pub mod contract;
 pub mod lock;
 pub mod overrides;

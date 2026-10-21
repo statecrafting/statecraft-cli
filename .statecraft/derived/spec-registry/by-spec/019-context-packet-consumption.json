@@ -98,9 +98,9 @@
       }
     ],
     "sectionDigests": {
-      "019-immutable-context-packet-consumption-across-repository-snapshots": "d7ad97e309b7927bc8f18f43e49131111e6b93a46d75401255f1aefdb9c64aeb",
+      "019-immutable-context-packet-consumption-across-repository-snapshots": "0b2aac33dcc407227342141ccd4be57eace0fc3cef74377d948625d263e50964",
       "1-purpose": "2fc4cba21f5d09b6d9121ffb69d97f3bbaa23e9db2eda21bfe66a69e9dd968ab",
-      "2-territory-and-producer-prerequisite": "66c314faa80043fa82ed82bf537890f93fc1d9641fd4f25d356229d7b1d8e0fe",
+      "2-territory-and-producer-prerequisite": "8de65e50eee52f2a4224f73255973fda07b8f47c0865cff9e9b213e1c3294876",
       "3-1-the-multi-repository-task-manifest": "ce11b32d583023889717449bfb20a3dfee06d3981f3d7a7d87a6bcb8af4b398e",
       "3-10-observable-negative-cases": "9f97ca9fea08edfb1fdfd0e181826591b756da65f213a96bd40ce71467eaf6ce",
       "3-2-one-packet-one-snapshot-no-distributed-transaction": "0652125bb847c123fe61baa6b39f733468e5abd9cb233193f24c61e0a672ef38",
@@ -110,16 +110,16 @@
       "3-6-durable-attempt-binding-and-retry": "04b2dbfd948d14976290673320e8ef7426bb6b405ba7c165c8bbdfbd8861c09c",
       "3-7-1-packet-integrity": "eb5354a773881d946e4fe4084c45be155cbf0e6d655853f5e4226ae50184a56a",
       "3-7-2-closure": "ac795818ae971bbe290080e6571679e9f82d340a03900ffe47b519914d26f269",
-      "3-7-3-freshness": "d76d7c4e69cc9f979d6776424c347ee5481d0c911a8c767717ebbd36e3c9b10d",
+      "3-7-3-freshness": "49e47bb6d02759b3b8e81dbf46a5ff32d53305154413b3a4014c2516539341b9",
       "3-7-4-citations": "4a3b25372687085036fa05aa4b305b0f28c67bfccdee283fbdbc5b9275adc1bc",
       "3-7-5-evidence": "5911bea3446a78e22a730520896157c4e72c8e20b945ea7b1f42bb3dbe93f146",
-      "3-7-five-independent-acceptance-checks": "b41fb037fe8cb17d2449413b146c06f7b1e9f5923077f0e0c4840303039cb0b2",
+      "3-7-five-independent-acceptance-checks": "e682546d1ea1f9c1ff9c3f8ba2422f945713b01d810b25134aa4cfbc59e9f8cc",
       "3-8-acceptance-eligibility-and-disposition": "553bc782dee310161aa1e442a37978d39b28ad00d503d65943cecf5cca9fc9f8",
       "3-9-command-projections": "6918f2b00a41fedbdc546808d31f21eea55a19d5d0f13cc0398d94bd2babc106",
-      "3-behavior": "1dc5ba0014e0d33276cf845297c105f51d7a9535c476655b63f25bc4f1c44ab2",
-      "4-out-of-scope": "069a7b0c76d2226904d02b0fcf283b384223ee6351a298722b52e4d0d063063d",
-      "5-resolved-decisions": "9c5c926ea791d2af42d4451748ab441627dcac324e8eeb605764533a3dcf2ef0",
-      "verification": "5f4521b5b36abc608274c7dc34970f98f916c5ebe97104e4fe37233ea5c52658"
+      "3-behavior": "a6d9ee32f8894a8e8a6009c92ff50b0f401c383234ef93b9e00a1811e2ab753d",
+      "4-out-of-scope": "87610d02436aa6907230e1dbc9e01e0bf599f68c640d5e05a8334427567b4609",
+      "5-resolved-decisions": "ea6066bb3bbc339118398e24bdae995aa8259000211a4464778b8cc09b8f17a5",
+      "verification": "1326925b9def0baf71e63fdb0c017e2f2c55b05fbe4201fd08eeeb3f4e00c800"
     },
     "sectionHeadings": [
       "019: Immutable context-packet consumption across repository snapshots",
@@ -150,6 +150,6 @@
     "summary": "Amends Statecraft's run, adapter, acceptance, command, and governance-producer contracts so one task may bind immutable spec-spine context packets from several independently identified repository snapshots, record intended and provider-visible delivery separately, and judge packet integrity, closure, freshness, citations, and evidence without reimplementing producer-owned selectors, closures, or digests.\n",
     "title": "Immutable context-packet consumption across repository snapshots"
   },
-  "shardHash": "364c7ea6ac8ca4679c2e82bbb3f74a0fdac76d20e7d26eeadb7532e9a43668a3",
+  "shardHash": "80067d3cef3b64da6221f09f1087c0fc3f00e24a9c6e0f051e3d4692faeee309",
   "specVersion": "1.10.0"
 }
