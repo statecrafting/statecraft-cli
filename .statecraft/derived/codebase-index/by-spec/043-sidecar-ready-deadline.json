@@ -1,0 +1,16 @@
+{
+  "mapping": {
+    "amends": [
+      "013-supervised-wire-witness"
+    ],
+    "dependsOn": [
+      "004-execution-adapter",
+      "013-supervised-wire-witness"
+    ],
+    "implementingPaths": [],
+    "specId": "043-sidecar-ready-deadline",
+    "specStatus": "draft"
+  },
+  "schemaVersion": "1.3.0",
+  "shardHash": "75f9bc5af27b93bb673fb2736c2731644951e581e79e56252f387e81dbcb928b"
+}

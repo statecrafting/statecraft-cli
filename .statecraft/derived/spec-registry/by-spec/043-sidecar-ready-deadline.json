@@ -1,0 +1,68 @@
+{
+  "record": {
+    "amends": [
+      "013-supervised-wire-witness"
+    ],
+    "created": "2026-10-21",
+    "dependsOn": [
+      "004-execution-adapter",
+      "013-supervised-wire-witness"
+    ],
+    "id": "043-sidecar-ready-deadline",
+    "implementation": "pending",
+    "obligations": [
+      {
+        "anchor": "3-1-two-deadlines",
+        "id": "R-1",
+        "kind": "requirement",
+        "text": "The ready deadline is measured from an observation that the producer's own code is running, never from spawn; the time before that observation is bounded by a separate start deadline."
+      },
+      {
+        "anchor": "3-2-what-each-outcome-records",
+        "id": "R-2",
+        "kind": "requirement",
+        "text": "A sidecar that never starts, starts but never reports ready, or exits first is still refused before the child spawns, under a closing reason that names which deadline ran out."
+      },
+      {
+        "anchor": "3-3-the-start-observation",
+        "id": "R-3",
+        "kind": "requirement",
+        "text": "The start observation reads only what the supervisor already holds or the operating system reports about the process; it adds no protocol message, trusts no producer claim about time, and widens no confinement."
+      }
+    ],
+    "sectionDigests": {
+      "043-the-witness-sidecar-s-ready-deadline-starts-when-its-process-starts": "26433ff2bdc96962a1e14de803e27272c62dba85fb6e4933508d02741ccf2df2",
+      "1-purpose": "f783e5be6e9b4edde006bd6dd655cfab373cdb717e2cfa53249db0e930b40f4e",
+      "2-territory": "26d2cf161ce3a19735625b9797c9ffdead7d0d324ae37448248e48507aa8cc62",
+      "3-1-two-deadlines": "2c806e2e9390aca84fcc01998010f0255aab317a951bf1c946de0fe11fa1452c",
+      "3-2-what-each-outcome-records": "28a77284079d199fdd6f134e55a609d38e42ab5926284d792ab380abcd26232e",
+      "3-3-the-start-observation": "c1008322ca19cc3921dd19b2576f12da67ae21fee2fdddfce83a7e38e29d6bf2",
+      "3-behavior": "10caa1b9710eb471468f49b745983cc794933c406248261a50a4ed29fe7b0d74",
+      "4-observable-negative-cases": "888dcb9dfa288632db3a46d78bbc190a860b8320201e363296b8e99631316b67",
+      "5-measurements-this-spec-requires": "3f59c25de1637aa487c11dbceab6bc9eb7df860d6835cb52ac6b0a22cab81eb2",
+      "6-out-of-scope": "9376c29fe8f4549624a5b24b9a147e2d343f4b7bea2ee17cb1fb93a2ac889fa0",
+      "7-open-questions-for-the-owner": "ad041e6454e88f5e9c114b26388c7827f8e5e04ed134053fb659df11c9a2ce50",
+      "verification": "d9bd50ae0412e92778d3e225e1e1bbe2118556f7d1926c082a76795ee9be87e4"
+    },
+    "sectionHeadings": [
+      "043: The witness sidecar's ready deadline starts when its process starts",
+      "1. Purpose",
+      "2. Territory",
+      "3. Behavior",
+      "3.1 Two deadlines",
+      "3.2 What each outcome records",
+      "3.3 The start observation",
+      "4. Observable negative cases",
+      "5. Measurements this spec requires",
+      "6. Out of scope",
+      "7. Open questions for the owner",
+      "Verification"
+    ],
+    "specPath": "specs/043-sidecar-ready-deadline/spec.md",
+    "status": "draft",
+    "summary": "Amends 013 so the supervisor's ready deadline measures the producer's own startup, not the operating system's assessment of a newly placed executable. A bounded start deadline covers the time from spawn until the producer's code is observed running; the existing ready deadline runs from that observation. Closes the residual 013 records for a ready-timeout under syspolicyd load, and measures the same route on Linux.\n",
+    "title": "The witness sidecar's ready deadline starts when its process starts"
+  },
+  "shardHash": "75f9bc5af27b93bb673fb2736c2731644951e581e79e56252f387e81dbcb928b",
+  "specVersion": "1.10.0"
+}
