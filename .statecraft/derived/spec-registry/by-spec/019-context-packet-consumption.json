@@ -98,7 +98,7 @@
       }
     ],
     "sectionDigests": {
-      "019-immutable-context-packet-consumption-across-repository-snapshots": "997a514edf36298bb01c7566ce0ba8766f272cc67a04082b237acd1bdc9d51e8",
+      "019-immutable-context-packet-consumption-across-repository-snapshots": "0b2aac33dcc407227342141ccd4be57eace0fc3cef74377d948625d263e50964",
       "1-purpose": "2fc4cba21f5d09b6d9121ffb69d97f3bbaa23e9db2eda21bfe66a69e9dd968ab",
       "2-territory-and-producer-prerequisite": "8de65e50eee52f2a4224f73255973fda07b8f47c0865cff9e9b213e1c3294876",
       "3-1-the-multi-repository-task-manifest": "ce11b32d583023889717449bfb20a3dfee06d3981f3d7a7d87a6bcb8af4b398e",
@@ -118,8 +118,8 @@
       "3-9-command-projections": "6918f2b00a41fedbdc546808d31f21eea55a19d5d0f13cc0398d94bd2babc106",
       "3-behavior": "a6d9ee32f8894a8e8a6009c92ff50b0f401c383234ef93b9e00a1811e2ab753d",
       "4-out-of-scope": "87610d02436aa6907230e1dbc9e01e0bf599f68c640d5e05a8334427567b4609",
-      "5-resolved-decisions": "e68208fcebb288c4cb11e1afe515226736cbbfc10ad67ab76baf9e27dfb05d80",
-      "verification": "5f4521b5b36abc608274c7dc34970f98f916c5ebe97104e4fe37233ea5c52658"
+      "5-resolved-decisions": "ea6066bb3bbc339118398e24bdae995aa8259000211a4464778b8cc09b8f17a5",
+      "verification": "1326925b9def0baf71e63fdb0c017e2f2c55b05fbe4201fd08eeeb3f4e00c800"
     },
     "sectionHeadings": [
       "019: Immutable context-packet consumption across repository snapshots",
@@ -150,6 +150,6 @@
     "summary": "Amends Statecraft's run, adapter, acceptance, command, and governance-producer contracts so one task may bind immutable spec-spine context packets from several independently identified repository snapshots, record intended and provider-visible delivery separately, and judge packet integrity, closure, freshness, citations, and evidence without reimplementing producer-owned selectors, closures, or digests.\n",
     "title": "Immutable context-packet consumption across repository snapshots"
   },
-  "shardHash": "af04127d67a448d5cb3f81fa1c245a81c080a8b82aee9dae671a0627d2729eee",
+  "shardHash": "80067d3cef3b64da6221f09f1087c0fc3f00e24a9c6e0f051e3d4692faeee309",
   "specVersion": "1.10.0"
 }

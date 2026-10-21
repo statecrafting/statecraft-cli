@@ -831,7 +831,12 @@ pub fn retain(home: &Path, bytes: &[u8]) -> Result<String, CustodyError> {
             Ok(()) => Ok(()),
             Err(rustix::io::Errno::EXIST) => Ok(()),
             Err(rustix::io::Errno::INVAL | rustix::io::Errno::NOSYS) => {
-                std::fs::hard_link(&temporary, &path)
+                match std::fs::hard_link(&temporary, &path) {
+                    // A racing writer published first; the read-back below
+                    // decides whether it published these bytes.
+                    Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => Ok(()),
+                    other => other,
+                }
             }
             Err(e) => Err(std::io::Error::from(e)),
         }
@@ -1002,8 +1007,9 @@ fn page_state(report: &Reported, digest: &str) -> (Visibility, Option<String>) {
 /// The intended set is the manifest's and is never copied into the observed
 /// set. A report under another manifest digest binds no page and makes every
 /// page `contradictory`. Two reports that disagree on a page make it
-/// `contradictory`; two that agree are still a duplicate finding. The more
-/// favorable of two observations is never chosen.
+/// `contradictory`; two that agree are still a duplicate finding. A report
+/// beside an unreadable observation makes every page `contradictory` and is a
+/// finding of its own. The more favorable observation is never chosen.
 pub fn fold_delivery(manifest: &Manifest, observations: &[Observation]) -> Delivery {
     let mut findings = Vec::new();
     let reports: Vec<&Reported> = observations
@@ -1022,8 +1028,12 @@ pub fn fold_delivery(manifest: &Manifest, observations: &[Observation]) -> Deliv
     if foreign {
         findings.push("manifest-digest-mismatch".to_string());
     }
-    if observations.len() > 1 {
-        findings.push(format!("duplicate-observation: {}", observations.len()));
+    if reports.len() > 1 {
+        findings.push(format!("duplicate-observation: {}", reports.len()));
+    }
+    if unreadable && !reports.is_empty() {
+        findings
+            .push("contradictory-observation: a report beside an unreadable stream".to_string());
     }
     for report in &reports {
         let named = report

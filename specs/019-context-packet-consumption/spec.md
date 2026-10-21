@@ -465,13 +465,17 @@ leaves the attempt's intent to the legacy pairing), so a delivery
 observation is correlated by the attempt's own key: it is a `Kind::Evidence`
 record, subject `context-delivery`, whose binding repeats `runId`, `attempt`
 and `manifestDigest`, and a record whose binding differs does not bind. A
-report under another manifest digest makes every page `contradictory`; two
-observations are a `duplicate-observation` finding, and where they disagree
-on a page, or one is unreadable, the page is `contradictory`.
+report under another manifest digest makes every page `contradictory`. Two
+reports are a `duplicate-observation` finding, and a page they disagree on is
+`contradictory`; a report beside an unreadable observation is a
+`contradictory-observation` finding and makes every page `contradictory`.
 
 ## Verification
 
-No implementation acceptance is declared while the required spec-spine packet
-and freshness interfaces remain unreleased and unadopted. The `V-1` inputs name
-the portable acceptance surface an implementation must add after that boundary
-is satisfied.
+The producer boundary is satisfied: spec-spine 0.31.0 is adopted (section 5,
+2026-10-21). The `V-1` inputs name the portable acceptance surface, and each
+lands with the part that implements it: the run record's
+`crates/statecraft-run/tests/context_manifest.rs` now, the adapter's and
+acceptance's files with their parts. Implementation acceptance is declared
+here, as `make verify SPEC=019` commands, in the change that lands the last of
+them; until then this spec's implementation stays `pending`.

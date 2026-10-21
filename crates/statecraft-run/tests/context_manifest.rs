@@ -546,6 +546,8 @@ fn duplicate_or_contradictory_observations_are_findings() {
         ],
     );
     assert_eq!(half.observed[0].state, Visibility::Contradictory);
+    assert_eq!(half.findings.len(), 1);
+    assert!(half.findings[0].starts_with("contradictory-observation"));
 }
 
 #[test]
