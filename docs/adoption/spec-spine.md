@@ -678,7 +678,12 @@ against this release.
 *The re-index.* Every shard restamps its schema and changes in nothing else:
 53 codebase-index files move `schemaVersion` from 1.2.0 to 1.3.0, 43 registry
 files move `specVersion` from 1.9.0 to 1.10.0, and `inputs.json` changes two
-content hashes, `spec-spine.toml`'s and this file's. `make gate` passes under the new pin. The
+content hashes, `spec-spine.toml`'s and this file's. All 97 regenerated files
+are committed in this change. The AI review policy excludes
+`.statecraft/derived` from its authored-diff input, so their absence from
+that filtered list is not evidence of absence from the head; the exact-head
+governance gate establishes their presence and freshness. `make gate` passes
+under the new pin. The
 environment record moves its two pins and the `spinePin` record; every
 rendered file is unchanged.
 
