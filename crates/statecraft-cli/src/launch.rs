@@ -253,6 +253,9 @@ pub fn launch_attempt(
             posture_coverage: planning.as_ref(),
             judge: judge.as_ref(),
             proposal: plan.proposal.as_deref(),
+            // Spec 019: `run` binds no context packet until its command
+            // projection lands; the intent renders `not-recorded`.
+            context_manifest: None,
         },
         Some(&mut admission),
     ) {

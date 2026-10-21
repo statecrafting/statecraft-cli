@@ -240,6 +240,7 @@ pub fn begin_admitted(
             posture_coverage: None,
             judge: None,
             proposal: None,
+            context_manifest: None,
         },
     )
 }
@@ -262,6 +263,9 @@ pub struct IntentDetail<'a> {
     /// The spec 027 proposal whose admission caused this attempt. Written
     /// under `proposal`; an intent without it was admitted by `run`.
     pub proposal: Option<&'a str>,
+    /// The spec 019 task manifest for this attempt. Written under
+    /// `contextManifest`; an intent without it renders `not-recorded`.
+    pub context_manifest: Option<&'a crate::context::Manifest>,
 }
 
 /// [`begin_admitted`], with every part of the intent's detail named.
@@ -297,6 +301,7 @@ pub fn begin_checked(
         posture_coverage,
         judge,
         proposal,
+        context_manifest,
     } = *intent;
     for run in runs(chain) {
         if let Some(live) = run.live_attempt() {
@@ -311,6 +316,17 @@ pub fn begin_checked(
     let existing = runs(chain).into_iter().find(|r| r.id == run_id);
     let number = existing.map(|r| r.attempts.len() as u32 + 1).unwrap_or(1);
     let timestamp = rfc3339_utc(clock.now_unix());
+    // Spec 019 section 3.6: a manifest for another attempt binds nothing, so
+    // it refuses before any effect rather than being recorded.
+    if let Some(manifest) = context_manifest
+        && (manifest.run_id != run_id || manifest.attempt != number)
+    {
+        return Err(SessionError::Boundary(format!(
+            "context-manifest-binding: the manifest names run {} attempt {}, \
+             this intent is run {run_id} attempt {number}",
+            manifest.run_id, manifest.attempt
+        )));
+    }
 
     let follows = crate::reconcile::since_last_intent(chain);
     let prepared = if let Some(check) = check.as_mut() {
@@ -397,6 +413,12 @@ pub fn begin_checked(
                 // intent, before any effect.
                 if let Some(proposal) = proposal {
                     detail["proposal"] = serde_json::Value::String(proposal.to_string());
+                }
+                // Spec 019 section 3.6: the complete manifest, once, with the
+                // intent, before the adapter process exists.
+                if let Some(manifest) = context_manifest {
+                    detail[crate::context::INTENT_KEY] = serde_json::to_value(manifest)
+                        .unwrap_or_else(|e| serde_json::json!({ "unserializable": e.to_string() }));
                 }
                 detail
             },

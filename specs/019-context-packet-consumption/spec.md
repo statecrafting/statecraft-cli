@@ -96,7 +96,9 @@ existing units named by its `extends` edges:
 
 The design input is spec-spine commit
 `8451ade3823e7e0f18809a4968270387a0b1586a`, signed and carrying draft specs
-155, 156, and 157 in tree `5f411d3cb20ab63d5453cab291b39b926a2b431e`.
+then numbered 155, 156, and 157 in tree
+`5f411d3cb20ab63d5453cab291b39b926a2b431e`; the producer's current numbers
+are 155, 159 and 160 (section 5, 2026-10-21).
 That identity is planning evidence only. The contracts are draft, pending, and
 not released. Implementation is blocked until one exact released spec-spine
 identity implements their required packet and freshness interfaces and this
@@ -300,7 +302,8 @@ not recompute a tree, selector, content digest, or packet digest to reach this
 answer. It compares producer-reported identities and never infers freshness from
 equal branch names, timestamps, or a clean working tree alone.
 
-When a later documentation contract supplies a spec-157 manifest, Statecraft
+When a later documentation contract supplies a spine spec 160 documentation
+manifest, Statecraft
 records that producer's narrower typed freshness result for the manifest. It
 does not generalize that result to the raw packet or to undeclared inputs.
 
@@ -391,7 +394,7 @@ closure, digest, freshness, citation, or evidence algorithm of its own.
 
 ## 4. Out of scope
 
-- Implementing or publishing spec-spine specs 155, 156, or 157.
+- Implementing or publishing spec-spine specs 155, 159, or 160.
 - Adopting an unreleased producer, a filesystem dependency, or a moving Git
   identity.
 - Defining documentation task, result, claim, contradiction, lifecycle-grade,
@@ -422,6 +425,49 @@ other.
 membership and content identity can be checked mechanically. Whether cited
 content supports a result claim belongs to the later documentation result and
 acceptance contracts.
+
+**2026-10-21: the producer prerequisite is met, and the citations are
+re-read.** Spec-spine 0.31.0 implements the three contracts section 2 waited
+for, and this repository adopted it under spec 009 (`D-06`, pin `=0.31.0` in
+`spec-spine.toml` and the root `Cargo.toml`). The producer renumbered them:
+selected content stays spine spec 155, the repository-scoped context packet
+is now spine spec 159, and documentation manifests and their freshness are
+now spine spec 160. Its current 156 and 157 name unrelated documents, so this
+spec's earlier "156" and "157" are read as 159 and 160 and are corrected in
+sections 2, 3.7.3 and 4; no requirement changes.
+
+**2026-10-21: the run record's half is pure over producer-reported facts.**
+`statecraft-home` is the one crate that links the producer, so it decodes a
+page under the adopted schema and hands `statecraft-run` the page's exact
+bytes with the facts the page reports. `statecraft-run` applies section
+3.4's bounds to the bytes first (16 MiB and 256 pages per manifest; per page
+262,144 members, depth 64 and 4 MiB per string), then requires each
+repository's pages to repeat their schema, build, snapshot, request digest and
+closure digest, to name the adopted package and version, and to end at one
+terminal page, and lets a page digest appear once per manifest. A
+repository's completeness is its least complete page's.
+
+**2026-10-21: the manifest digest construction.** `manifestDigest` is
+`sha256:` over the bytes `statecraft/context-manifest-digest/1`, one LF, and
+the manifest's JSON with `manifestDigest` empty. Every object in the document
+is a fixed struct and every collection is ordered, so the bytes are fixed by
+the value. The document carries each page's byte length and Statecraft
+custody digest beside the producer's page digest, so the digest covers the
+retained bytes without recomputing any producer digest.
+
+**2026-10-21: where the facts are written.** The manifest is written once,
+under `contextManifest`, into the attempt's `prepare-workspace` intent, and a
+manifest naming another run or attempt refuses before any record. Retained
+bytes are kept write-once in the product home under
+`context/<custody hex>.json` and read back only when their digest matches.
+The adapter turn carries no effect identity (spec 003 section 3.3.1 clause 9
+leaves the attempt's intent to the legacy pairing), so a delivery
+observation is correlated by the attempt's own key: it is a `Kind::Evidence`
+record, subject `context-delivery`, whose binding repeats `runId`, `attempt`
+and `manifestDigest`, and a record whose binding differs does not bind. A
+report under another manifest digest makes every page `contradictory`; two
+observations are a `duplicate-observation` finding, and where they disagree
+on a page, or one is unreadable, the page is `contradictory`.
 
 ## Verification
 
