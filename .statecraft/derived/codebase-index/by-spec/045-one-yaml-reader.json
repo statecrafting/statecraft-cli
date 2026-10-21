@@ -1,0 +1,20 @@
+{
+  "mapping": {
+    "amends": [
+      "002-environment-lifecycle",
+      "012-remote-desired-state",
+      "032-external-code-profile"
+    ],
+    "dependsOn": [
+      "002-environment-lifecycle",
+      "009-governance-producer",
+      "012-remote-desired-state",
+      "032-external-code-profile"
+    ],
+    "implementingPaths": [],
+    "specId": "045-one-yaml-reader",
+    "specStatus": "draft"
+  },
+  "schemaVersion": "1.3.0",
+  "shardHash": "cfd5e81e343f535743629b008648790a77ddc3dc4e5dac69fa8752bbaeb7421e"
+}
