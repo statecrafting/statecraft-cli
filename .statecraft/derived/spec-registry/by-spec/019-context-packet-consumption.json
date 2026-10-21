@@ -151,5 +151,5 @@
     "title": "Immutable context-packet consumption across repository snapshots"
   },
   "shardHash": "364c7ea6ac8ca4679c2e82bbb3f74a0fdac76d20e7d26eeadb7532e9a43668a3",
-  "specVersion": "1.9.0"
+  "specVersion": "1.10.0"
 }

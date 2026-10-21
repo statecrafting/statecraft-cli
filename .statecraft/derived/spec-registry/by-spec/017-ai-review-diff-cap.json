@@ -50,5 +50,5 @@
     "title": "Setup profile revision 10: AI review defaults to a 3000-line diff cap"
   },
   "shardHash": "180e382e9fbda6c2720bca24f18ede42901bece812e3ad529cb8f0f19586ba08",
-  "specVersion": "1.9.0"
+  "specVersion": "1.10.0"
 }

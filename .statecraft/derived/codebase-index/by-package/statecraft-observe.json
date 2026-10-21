@@ -5,6 +5,6 @@
     "path": "crates/statecraft-observe",
     "specRef": "027-observation-and-proposals"
   },
-  "schemaVersion": "1.2.0",
+  "schemaVersion": "1.3.0",
   "shardHash": "1e9fca5a23a818652e57fd1b14cc8581b64cc9696ba4b67d9050d0198fb89d29"
 }

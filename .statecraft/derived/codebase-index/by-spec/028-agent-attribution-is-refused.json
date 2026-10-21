@@ -48,6 +48,6 @@
     "specId": "028-agent-attribution-is-refused",
     "specStatus": "approved"
   },
-  "schemaVersion": "1.2.0",
+  "schemaVersion": "1.3.0",
   "shardHash": "0724f160dbeb0cb8e0b26d5fbc99578e16fb806b5d7c83bb7f3c9ff466a0b076"
 }

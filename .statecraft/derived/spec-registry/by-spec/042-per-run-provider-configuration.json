@@ -113,5 +113,5 @@
     "title": "Per-run provider configuration and a measured Mach-service allowlist close spec 004's two open items against IX"
   },
   "shardHash": "949809fd99a20c148dfc63f1f7e9b569464c31d00c297b6ffd116774985bc13c",
-  "specVersion": "1.9.0"
+  "specVersion": "1.10.0"
 }

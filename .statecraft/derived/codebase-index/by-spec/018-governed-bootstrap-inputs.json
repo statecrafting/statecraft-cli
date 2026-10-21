@@ -69,6 +69,6 @@
     "specId": "018-governed-bootstrap-inputs",
     "specStatus": "approved"
   },
-  "schemaVersion": "1.2.0",
+  "schemaVersion": "1.3.0",
   "shardHash": "18967e896e80b29a7d65b725f92bc71de49ac21de13a81a44792932f44e827ed"
 }

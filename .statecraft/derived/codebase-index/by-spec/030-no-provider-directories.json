@@ -87,6 +87,6 @@
     "specId": "030-no-provider-directories",
     "specStatus": "approved"
   },
-  "schemaVersion": "1.2.0",
+  "schemaVersion": "1.3.0",
   "shardHash": "d7d497918811c5811bb13ea8df876354e834c99a4361bc42c2ac1cc3d6e11fbb"
 }

@@ -101,6 +101,6 @@
     "specId": "013-supervised-wire-witness",
     "specStatus": "approved"
   },
-  "schemaVersion": "1.2.0",
+  "schemaVersion": "1.3.0",
   "shardHash": "9636199d0bf48436bc0479d96aae9f13994142cca5ab748c71d3c6bd7d65adbe"
 }

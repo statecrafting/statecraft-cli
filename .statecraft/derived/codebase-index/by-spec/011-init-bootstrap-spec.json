@@ -32,6 +32,6 @@
     "specId": "011-init-bootstrap-spec",
     "specStatus": "approved"
   },
-  "schemaVersion": "1.2.0",
+  "schemaVersion": "1.3.0",
   "shardHash": "0d5d7f1c86c6b74eb1b166c7cb021ef1ca2bbb26bd1862d0f3f16c580f1fbbd4"
 }

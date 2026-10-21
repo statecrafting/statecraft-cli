@@ -83,5 +83,5 @@
     "title": "A setup profile declares remote desired state and doctor compares it without writing"
   },
   "shardHash": "c4000ef5503d9ca75565e0a4b70e300ebd11d3adb1ff884f123edf817afa0eec",
-  "specVersion": "1.9.0"
+  "specVersion": "1.10.0"
 }

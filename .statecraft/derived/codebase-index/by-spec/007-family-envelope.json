@@ -48,6 +48,6 @@
     "specId": "007-family-envelope",
     "specStatus": "approved"
   },
-  "schemaVersion": "1.2.0",
+  "schemaVersion": "1.3.0",
   "shardHash": "4a44e1b967f1f41bbe28153e8bf10d50ae9462ac54356e762d241a856854c9cc"
 }

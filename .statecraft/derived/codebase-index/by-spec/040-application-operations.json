@@ -112,6 +112,6 @@
     "specId": "040-application-operations",
     "specStatus": "approved"
   },
-  "schemaVersion": "1.2.0",
+  "schemaVersion": "1.3.0",
   "shardHash": "3638f5b2b21c3309470623e8e85c49228a58b740f8e2a4a16883b4e9d679a609"
 }

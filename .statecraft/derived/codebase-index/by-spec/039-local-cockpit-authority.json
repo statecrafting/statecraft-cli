@@ -13,6 +13,6 @@
     "specId": "039-local-cockpit-authority",
     "specStatus": "approved"
   },
-  "schemaVersion": "1.2.0",
+  "schemaVersion": "1.3.0",
   "shardHash": "d25ffeb1aaf453ee6c44be1d5edd230b903786f79fd9b361cba7c32b43a2e5c6"
 }

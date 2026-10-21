@@ -45,6 +45,6 @@
     "specId": "015-managed-session-evidence",
     "specStatus": "approved"
   },
-  "schemaVersion": "1.2.0",
+  "schemaVersion": "1.3.0",
   "shardHash": "0bace8ad953755a481df80d03793292190a10ec43b39cddb75d7bd3e0116a5fa"
 }
