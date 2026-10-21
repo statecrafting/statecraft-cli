@@ -241,6 +241,7 @@ pub fn begin_admitted(
             judge: None,
             proposal: None,
             context_manifest: None,
+            context_policy: None,
         },
     )
 }
@@ -266,6 +267,9 @@ pub struct IntentDetail<'a> {
     /// The spec 019 task manifest for this attempt. Written under
     /// `contextManifest`; an intent without it renders `not-recorded`.
     pub context_manifest: Option<&'a crate::context::Manifest>,
+    /// The spec 019 section 3.8 acceptance policy for that manifest. Written
+    /// under `contextPolicy`, with the manifest, before any effect.
+    pub context_policy: Option<&'a crate::context::ContextPolicy>,
 }
 
 /// [`begin_admitted`], with every part of the intent's detail named.
@@ -302,6 +306,7 @@ pub fn begin_checked(
         judge,
         proposal,
         context_manifest,
+        context_policy,
     } = *intent;
     for run in runs(chain) {
         if let Some(live) = run.live_attempt() {
@@ -418,6 +423,10 @@ pub fn begin_checked(
                 // intent, before the adapter process exists.
                 if let Some(manifest) = context_manifest {
                     detail[crate::context::INTENT_KEY] = serde_json::to_value(manifest)
+                        .unwrap_or_else(|e| serde_json::json!({ "unserializable": e.to_string() }));
+                }
+                if let Some(policy) = context_policy {
+                    detail[crate::context::POLICY_KEY] = serde_json::to_value(policy)
                         .unwrap_or_else(|e| serde_json::json!({ "unserializable": e.to_string() }));
                 }
                 detail

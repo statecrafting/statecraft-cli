@@ -256,6 +256,7 @@ pub fn launch_attempt(
             // Spec 019: `run` binds no context packet until its command
             // projection lands; the intent renders `not-recorded`.
             context_manifest: None,
+            context_policy: None,
         },
         Some(&mut admission),
     ) {

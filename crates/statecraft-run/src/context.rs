@@ -1194,3 +1194,118 @@ pub fn project(chain: &Chain, run_id: &str, attempt: u32) -> Projection {
         }
     }
 }
+
+/// The acceptance policy's closed schema word.
+pub const POLICY_SCHEMA: &str = "statecraft/context-acceptance-policy/1";
+/// Where the policy sits in the attempt's intent detail.
+pub const POLICY_KEY: &str = "contextPolicy";
+
+/// One of section 3.7's five checks, or delivery (section 3.8).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum Dimension {
+    /// Provider-visible delivery of the intended pages.
+    Delivery,
+    /// Section 3.7.1.
+    Integrity,
+    /// Section 3.7.2.
+    Closure,
+    /// Section 3.7.3.
+    Freshness,
+    /// Section 3.7.4.
+    Citations,
+    /// Section 3.7.5.
+    Evidence,
+}
+
+/// Whether a dimension's facts are required.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum Need {
+    /// Anything but the passing state makes acceptance ineligible.
+    Required,
+    /// A non-passing state stays visible, and coexists with acceptance only
+    /// where the policy names that exact absence.
+    Optional,
+}
+
+/// One exact non-passing state the policy permits for an optional fact.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct PermittedAbsence {
+    /// The dimension.
+    pub dimension: Dimension,
+    /// The state word, exactly as the check reports it.
+    pub state: String,
+}
+
+/// The task's context acceptance policy (section 3.8): recorded in the intent
+/// before execution and never replaced by a newer one at acceptance.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct ContextPolicy {
+    /// Always [`POLICY_SCHEMA`].
+    pub schema: String,
+    /// Delivery.
+    pub delivery: Need,
+    /// Packet integrity.
+    pub integrity: Need,
+    /// Closure.
+    pub closure: Need,
+    /// Freshness.
+    pub freshness: Need,
+    /// Citations.
+    pub citations: Need,
+    /// Evidence.
+    pub evidence: Need,
+    /// The exact absences an optional fact may carry into acceptance.
+    pub permitted_absences: Vec<PermittedAbsence>,
+}
+
+impl ContextPolicy {
+    /// What `dimension` needs under this policy.
+    pub fn need(&self, dimension: Dimension) -> Need {
+        match dimension {
+            Dimension::Delivery => self.delivery,
+            Dimension::Integrity => self.integrity,
+            Dimension::Closure => self.closure,
+            Dimension::Freshness => self.freshness,
+            Dimension::Citations => self.citations,
+            Dimension::Evidence => self.evidence,
+        }
+    }
+
+    /// Whether the policy permits `state` for an optional fact of `dimension`.
+    pub fn permits(&self, dimension: Dimension, state: &str) -> bool {
+        self.permitted_absences
+            .iter()
+            .any(|p| p.dimension == dimension && p.state == state)
+    }
+}
+
+/// The policy recorded in an attempt's intent, if its intent carries one.
+///
+/// `Err` when the intent carries a value that is not a policy: it binds
+/// nothing and is never read as absent, and no newer policy stands in.
+pub fn recorded_policy(
+    chain: &Chain,
+    run_id: &str,
+    attempt: u32,
+) -> Result<Option<ContextPolicy>, String> {
+    let entries = chain.entries();
+    let intent = entries.iter().find(|e| {
+        e.kind == Kind::Intent
+            && e.subject == INTENT_SUBJECT
+            && e.run_id == run_id
+            && e.attempt == attempt
+    });
+    let Some(value) = intent.and_then(|e| e.detail.get(POLICY_KEY)) else {
+        return Ok(None);
+    };
+    let policy: ContextPolicy =
+        serde_json::from_value(value.clone()).map_err(|e| format!("unreadable policy: {e}"))?;
+    if policy.schema != POLICY_SCHEMA {
+        return Err(format!("unsupported policy schema {}", policy.schema));
+    }
+    Ok(Some(policy))
+}

@@ -26,6 +26,10 @@
 //! - [`suite`] runs the declared acceptance and folds one run's account out of
 //!   the record. Added by spec 006's additive edge: a command may not be a
 //!   second implementation, so the entry point a binding needs lives here.
+//! - [`context`] is spec 019's context-packet acceptance: delivery and five
+//!   independent checks over the adopted producer's answers, and their
+//!   eligibility under the attempt's recorded policy. Added by spec 019's
+//!   additive edge.
 //! - [`wire`] is spec 014's ordered wire-evidence admission and its section
 //!   3.5 acceptance requirement. Added by spec 014's additive edge.
 //!
@@ -51,6 +55,7 @@
 
 pub mod absence;
 pub mod authority;
+pub mod context;
 pub mod contract;
 pub mod delta;
 pub mod dimensions;
