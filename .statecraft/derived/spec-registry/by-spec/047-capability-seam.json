@@ -1,0 +1,78 @@
+{
+  "record": {
+    "amends": [
+      "004-execution-adapter",
+      "013-supervised-wire-witness",
+      "042-per-run-provider-configuration"
+    ],
+    "created": "2026-10-21",
+    "dependsOn": [
+      "004-execution-adapter",
+      "013-supervised-wire-witness",
+      "042-per-run-provider-configuration"
+    ],
+    "id": "047-capability-seam",
+    "implementation": "pending",
+    "obligations": [
+      {
+        "anchor": "3-2-branch-on-the-declaration",
+        "id": "I-1",
+        "kind": "invariant",
+        "text": "No admission, qualification or launch decision outside an adapter's own crate compares an adapter's name; each reads a field of its capability declaration."
+      },
+      {
+        "anchor": "3-1-the-declaration",
+        "id": "R-1",
+        "kind": "requirement",
+        "text": "An adapter declares every capability field explicitly; a field it does not set is refused at registration, never defaulted to the first adapter's behaviour."
+      },
+      {
+        "anchor": "3-3-refusal",
+        "id": "R-2",
+        "kind": "requirement",
+        "text": "A run that needs a capability its adapter does not declare refuses before spawn, naming the field, exactly as a required token does under spec 004 section 3.3."
+      },
+      {
+        "anchor": "verification",
+        "id": "V-1",
+        "inputs": [
+          "crates/statecraft-adapter/tests/no_provider_names.rs"
+        ],
+        "kind": "verification",
+        "text": "A test adapter declaring no stream witness, no print-mode hooks and no sidecar is refused for a witnessed run and admitted for a plain one, through the same admission code the Claude Code adapter uses; a source check finds no adapter-name comparison outside adapter crates."
+      }
+    ],
+    "sectionDigests": {
+      "047-admission-and-qualification-read-what-an-adapter-declares": "cd08fb2c2bad904a0be6959f8b7a3006a8c8044be61b5afb4427b327de02a3be",
+      "1-purpose": "82b5b21535503179c27b7ef30f7a9a6497a489c097387863bf7e9c6c8dda77dc",
+      "2-territory": "0640edac29af18b323eb42946da6dbfda5aebb6cd83ace4c46dffd4965f5a9a0",
+      "3-1-the-declaration": "4c48a3d219d0d93066ca1245af1cf27b35d1ab8e00533120d4b2641eb4f7ba3d",
+      "3-2-branch-on-the-declaration": "2f7936ef43fb5f7047eb396f08ecd93508f8b8549d1eb61eb6ebfac01ded9905",
+      "3-3-refusal": "1c9748f71d2f8efd4d679556789aa5f61dfe4796efc71eaefe8e173a3cbbe723",
+      "3-4-the-test-adapter": "f37fd040f4ab36ab8b8a4902058ba7c1cbd631bdb5f344e6581ede742d734bb7",
+      "3-behavior": "7678eea39d33fd8e230d086fc9a36ea69b957ed10fac8d88b5a2ee11456b7e7c",
+      "4-out-of-scope": "202a7d13e21fc6b0afbcb2975831a36d7ff7c774e9f2524ac0b8b81342b432ca",
+      "5-resolved-decisions": "94b9355c080c49837618719d559017fee652d2915d55b2a47ac62f0995947efb",
+      "verification": "2ada0b9cc598e1dd02f0b706b238ca26855be5610a5abc45f1a8bca6d781601b"
+    },
+    "sectionHeadings": [
+      "047: Admission and qualification read what an adapter declares",
+      "1. Purpose",
+      "2. Territory",
+      "3. Behavior",
+      "3.1 The declaration",
+      "3.2 Branch on the declaration",
+      "3.3 Refusal",
+      "3.4 The test adapter",
+      "4. Out of scope",
+      "5. Resolved decisions",
+      "Verification"
+    ],
+    "specPath": "specs/047-capability-seam/spec.md",
+    "status": "draft",
+    "summary": "Amends spec 004's seam with a per-adapter capability declaration beside the closed six-token vocabulary: the facts admission, qualification and the witness path currently learn by naming the one adapter (a stream it can witness, hooks it honours in print mode, a wire sidecar it can route through, a per-run configuration directory). Every branch reads the declaration. A test adapter with a different declaration proves the seam. No second provider is added.\n",
+    "title": "Admission and qualification read what an adapter declares it can do, never which adapter it is"
+  },
+  "shardHash": "ce9e064e0a6bed120ef10aa1cd51bc3b1b218bc2d4f866b1f262b17ff9fcf7b1",
+  "specVersion": "1.10.0"
+}
