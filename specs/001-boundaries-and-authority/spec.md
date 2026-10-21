@@ -461,7 +461,7 @@ retrieval against one operator-named cell. Everything else `F-01` defers
 stays deferred, and `F-02` and `F-03` are unchanged.
 
 **2026-10-20: `F-02` is narrowed and `F-07` is lifted conditionally.** The
-owner decided this, as the founding decision record's section 5
+owner decided, as the founding decision record's section 5
 records, that distributing this repository's own binaries is repository
 delivery and not a product verb, so `F-02` no longer defers it while every
 publishing product verb stays deferred; and that Codex is the named second
