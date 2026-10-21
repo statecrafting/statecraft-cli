@@ -492,6 +492,29 @@ event the provider itself emits, so a provider that never starts leaves every
 page `not-reported`. A stream that breaks before any init event is
 `unreadable`.
 
+**2026-10-21: acceptance asks a producer port, and the policy is its own
+record.** `statecraft-acceptance` judges through a `Producer` trait with four
+questions (validate a page's exact bytes, answer the recorded closure request
+at the recorded snapshot, bind a caller-supplied current snapshot, and say
+what a page holds under a member identity); `statecraft-home`, the one crate
+that links the producer, answers them. Custody is compared first, so bytes
+that are not the retained bytes never reach the producer. Integrity also
+requires the producer's facts to repeat the manifest's page digest,
+snapshot, request and closure digests, schema, build, continuation position,
+omissions and warnings. A citation whose page records the member as omitted
+is `missing`; one the page neither carries nor omits, or whose span leaves
+the member's lines, is `outside-packet`. The section 3.8 policy is a closed
+`statecraft/context-acceptance-policy/1` document written once into the same
+intent under `contextPolicy`: each of delivery and the five checks is
+`required` or `optional`, plus the exact `(dimension, state)` absences an
+optional fact may carry. A fact is required only when its dimension is
+required and its repository (and, for delivery, its intended page) is
+required; every other non-passing fact makes acceptance ineligible unless its
+exact state is permitted. No citation or no evidence supplied is the fact
+`not-recorded`. An aggregate is the first required repository's non-passing
+state, in manifest order. Each reason is spelled
+`context-<dimension>-<state>: <subject>`.
+
 ## Verification
 
 The producer boundary is satisfied: spec-spine 0.31.0 is adopted (section 5,

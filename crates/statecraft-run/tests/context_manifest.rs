@@ -631,3 +631,44 @@ fn a_retry_with_the_same_pages_writes_a_new_manifest_and_leaves_the_first() {
         Some(second)
     );
 }
+
+// Section 3.8: the policy is recorded with the intent and read back exactly.
+#[test]
+fn the_acceptance_policy_is_recorded_with_the_intent_and_never_replaced() {
+    use statecraft_run::context::{ContextPolicy, Need, POLICY_SCHEMA};
+    let home = tempfile::tempdir().unwrap();
+    let target = repo();
+    let manifest = build(1, &two_repositories(), OptionalOmission::Refuse);
+    let policy = ContextPolicy {
+        schema: POLICY_SCHEMA.into(),
+        delivery: Need::Required,
+        integrity: Need::Required,
+        closure: Need::Required,
+        freshness: Need::Optional,
+        citations: Need::Optional,
+        evidence: Need::Required,
+        permitted_absences: vec![],
+    };
+    {
+        let (mut chain, _) = Chain::open(home.path(), target.path()).unwrap();
+        session::begin_with(
+            &mut chain,
+            target.path(),
+            RUN,
+            "main",
+            &FixedClock(1_790_000_000),
+            &IntentDetail {
+                context_manifest: Some(&manifest),
+                context_policy: Some(&policy),
+                ..IntentDetail::default()
+            },
+        )
+        .unwrap();
+    }
+    let (chain, _) = Chain::open(home.path(), target.path()).unwrap();
+    assert_eq!(
+        context::recorded_policy(&chain, RUN, 1).unwrap(),
+        Some(policy)
+    );
+    assert_eq!(context::recorded_policy(&chain, RUN, 2).unwrap(), None);
+}
