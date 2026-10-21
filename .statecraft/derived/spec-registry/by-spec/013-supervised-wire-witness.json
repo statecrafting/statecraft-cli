@@ -53,7 +53,7 @@
       }
     ],
     "id": "013-supervised-wire-witness",
-    "implementation": "in-progress",
+    "implementation": "complete",
     "interfaceReferences": [
       {
         "corpus": "wire-witness",
@@ -104,7 +104,7 @@
       }
     ],
     "sectionDigests": {
-      "013-supervised-wire-witness-adoption": "1c54e905786727879714d3d68d2ad140e3f3321734bf5e8a4e6e0ee4ae1f302c",
+      "013-supervised-wire-witness-adoption": "e50e4fddb3eacd37654ea8e1759e35459ad14a0d8053acbc33c8285e38d859ce",
       "1-purpose": "e760804bcd1a589b51b603e7ea7450e0eb99d94b26444b9ba5bc032f7c47dc99",
       "2-territory": "c49da03b853bc97970e1f58889e5421423b0782ab77363f69f919b17e165e090",
       "3-1-linked-producer-adoption": "572994e602eb4e7d0063cbc5bce2ca6ee3d0ee54b0c41b51f098a5a1e0ce8736",
@@ -121,8 +121,8 @@
       "4-observable-negative-cases": "2965b5b5dd152a538905e0b65725b595b41ce62ee845d7d1fe66ba9b9c737b96",
       "5-compatibility-and-adoption": "9083427a01e4adfe7ad215c3bcffe7b3a189f1f73da359ebfc0fd32600f30c99",
       "6-out-of-scope": "3d2cc96d427dbf41f15d964e1cabc182642403cc9030b09ef91d134437316517",
-      "7-decisions-recorded-during-implementation": "459ceacc2c05989e5fd8120a14caa0d5b9cff6ba3bce86eb3815e452dd10a85e",
-      "verification": "c2d408aaea92ffffe27f9bf01fc7827ed495bcfbfbca09644ae2748ce61fe71e"
+      "7-decisions-recorded-during-implementation": "f64a0b1ce575ba01fab7dfdb8795458ccec8f74e7d518c9866385d036ac73e4d",
+      "verification": "1d27b89f2f74e2a24ff12d173848e5ef62291d52fe843fa170272cf07497ac1b"
     },
     "sectionHeadings": [
       "013: Supervised wire-witness adoption",
@@ -150,6 +150,6 @@
     "summary": "Amends 003 and 004 so Statecraft may adopt wire-witness as an exact linked producer, bracket one sidecar as its own durable effect, supply one per-attempt loopback proxy endpoint to the child, and report confinement and witness posture without treating testimony as authority or creating a general sidecar host.\n",
     "title": "Supervised adoption of one wire-witness sidecar per attempt"
   },
-  "shardHash": "de4a260dd2505ef7405c9a1dff38879834f211a3ce87aac82c6d963a5a2dc943",
+  "shardHash": "9636199d0bf48436bc0479d96aae9f13994142cca5ab748c71d3c6bd7d65adbe",
   "specVersion": "1.9.0"
 }

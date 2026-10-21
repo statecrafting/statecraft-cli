@@ -2,9 +2,9 @@
 id: "013-supervised-wire-witness"
 title: "Supervised adoption of one wire-witness sidecar per attempt"
 status: approved
-# Ratified 2026-10-01 in 4c727ec. Implementation lands as a PR stack, and only
-# its last change moves `implementation` to complete.
-implementation: in-progress
+# Ratified 2026-10-01 in 4c727ec. Implementation landed as a PR stack, and
+# its last change moved `implementation` to complete.
+implementation: complete
 created: "2026-09-26"
 summary: >
   Amends 003 and 004 so Statecraft may adopt wire-witness as an exact linked
@@ -516,9 +516,72 @@ the attempt live stops the sidecar and leaves its effect open, like the
 attempt. On Linux a sidecar record without its three address and UDP
 residuals is not qualified.
 
+**2026-10-21: on Linux the sidecar reads the system's bundle from files,
+measured.** This completes the 2026-10-18 entry, which left the Linux route
+unmeasured. The released producer builds its provider trust from the system's
+roots before it reports ready and refuses an empty set, so a sidecar that
+reports ready has read at least one root. Measured with the released
+`aarch64-unknown-linux-gnu` executable of wire-witness 0.1.0 (digest equal to
+the ledger's) on Debian bookworm, kernel 7.0.14, under this product's Landlock
+ruleset with no trust variable set: `witness_run`'s released-producer test
+reached ready and finished, so the sidecar read
+`/etc/ssl/certs/ca-certificates.crt` through its confinement. No variable is
+added on Linux. The `x86_64-unknown-linux-gnu` executable is not measured
+live; hosted CI runs the same confinement with a fixture producer only.
+
+**2026-10-21: macOS and Linux qualification and rollback evidence (section
+5).** Qualification on this product's side is the verification commands below
+run on each platform with the released producer named: on macOS 26.5.1
+(`aarch64-apple-darwin`) and on Linux (`aarch64-unknown-linux-gnu`, as above),
+the admission, endpoint, sidecar-confinement and run tests passed, the
+released-producer run included, with the child and sidecar self-tests the
+section 3.6 records name. The producer's own qualification is its release
+record, cited in the 2026-10-17 adoption entry. Rollback is removing the
+adoption, since the ledger's rollback identity is `none`: a run whose producer
+is absent, foreign, or unqualified for the platform records
+`witness-unavailable` and runs the child unwitnessed, an unflagged run records
+`witness-not-requested` with no proxy, and an attempt that predates the
+contract renders `not-recorded`, each covered by the same commands. Nothing
+earlier is re-judged.
+
+**2026-10-21: owner decision, the flip carries the ready-timeout residual.**
+The owner decided on 2026-10-20 that this spec is complete with one residual
+recorded here. The supervisor allows a sidecar 20 seconds from spawn to report
+ready. On macOS, while `syspolicyd` assesses a freshly copied producer, the
+process can start late enough that the released-producer test fails with
+`ready-timeout`, and passes when run alone; the posture recorded is
+`witness-failed`, which is accurate, and nothing is weakened. A follow-up spec
+starts the timeout when the process starts rather than at spawn and measures
+the Linux route too. Until it lands, a `ready-timeout` under assessment load is
+this residual, not a defect of spec 014 or of the producer.
+
 ## Verification
 
-This spec is `status: approved` and `implementation: in-progress`; implementation acceptance is not run until it is complete.
+Implementation acceptance is the offline matrix of sections 3 and 4 in the
+owning crates, run through `make verify SPEC=013`, under the real confinement
+of the platform it runs on and with a fixture producer. No live provider,
+secret, or metered activity is part of it.
+
+```verify:cli
+cargo test -p statecraft-adapter --lib witness
+cargo test -p statecraft-adapter --test witness_sidecar
+cargo test -p statecraft-adapter-claude-code --lib witness
+cargo test -p statecraft-home --lib witness
+cargo test -p statecraft-run --lib witness_posture
+cargo test -p statecraft-cli --lib witness
+cargo test -p statecraft-cli --test witness_admission
+cargo test -p statecraft-cli --test witness_endpoint
+cargo test -p statecraft-cli --test witness_sidecar_confinement
+cargo test -p statecraft-cli --test witness_run
+```
+
+The last command also runs the released producer end to end when
+`STATECRAFT_TEST_WIRE_WITNESS` names its executable for the running target,
+and says it skipped otherwise; section 7's 2026-10-21 entries record where that
+was measured. These commands establish the supervision, the confinement and
+the posture. They do not establish that a capture proves provider use, model
+behavior, correctness or acceptance (section 6).
+
 Review before ratification used the repository gate, code gate, coupling gate, relationship report,
 and exact interface verification against wire-witness commit
 `f701a7b51e492ec98bf6b160bfd3e3f8bdf7990d`. Those checks establish corpus and
