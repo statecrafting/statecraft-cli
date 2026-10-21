@@ -414,7 +414,7 @@ row and the final column records the next governed action.
 | AA | Documentation acceptance may compare witnessed delivery when present. | Statecraft, `018-documentation-acceptance` | D, H, Z | Filed draft planned, pending | Prompt 19 comparison states; privacy analysis missing | Metadata-only default; absence does not invalidate an unwitnessed contract | File spec 018. |
 | AB | Cost and quota need policy based on measured inputs. | Statecraft, `028-cost-and-quota-policy` | Z and an authorized measured run | Proposed, deferred by F-06 | No admitted live measurement | Owner sets spend ceiling; observation never authorizes spend | Reopen on a metered run with authority. |
 | AC | Intended and observed provider delivery need comparison. | Statecraft, `018-documentation-acceptance` | D and Z | Filed draft planned, pending | Intended record and witness schema drafts; observed pilot absent | No claim of provider comprehension | File spec 018. |
-| AD | A second provider tests adapter breadth. | Statecraft, `029-second-provider` | M and owner provider choice | Proposed, deferred by F-07 | One adapter exists; second provider absent | Owner authorizes provider and spend; no lowest-common-denominator weakening | Reopen on a named second provider. |
+| AD | A second provider tests adapter breadth. | Statecraft, `029-second-provider` | M and owner provider choice | Proposed; F-07 lifted conditionally 2026-10-20 (section 5) | One adapter exists; Codex named as the second provider | Owner authorizes provider and spend; no lowest-common-denominator weakening | Spec may be drafted; crate built only after the capability-flagged adapter seam merges; admitted only by passing spec 004's full suite. |
 | AE | Open-weights portability needs a named gateway and comparison. | Statecraft, `030-open-weights-portability` | M, AB, AD | Proposed, pending | No selected gateway or model | Owner chooses infrastructure and spend; no hosted control-plane commitment | Reopen on named deployment. |
 | AF | Prompt injection needs a qualification corpus across all untrusted inputs. | Statecraft, `031-prompt-injection-qualification` | E through M | Proposed, pending | Existing authority rules; fixtures and live qualification missing | Delimiters are not a security boundary | Draft fixtures before provider qualification. |
 | AG | Distribution and release need names, installers, signatures, and consumer proof. | Statecraft, `032-distribution-and-release` | Accepted product slice and owner decisions D-01, D-08, F-02, F-03 | Proposed, deferred | No release exists | Owner decides binary name, trust, and publication; no release from green CI alone | Reopen after accepted slice. |
@@ -433,12 +433,12 @@ oversight, and reopened by a concrete consumer need rather than by availability.
 | ID | Deferred | Reopened by |
 |---|---|---|
 | F-01 | Hosted platform selection, any hosted control plane, and hqgit integration. Lifted on 2026-10-12 for spec `038`'s three acts only (login, submit, decision) against one operator-named cell; see section 5. | A hosted decision by the owner (I-04). |
-| F-02 | Publication of any kind: push, pull request, merge, release, deploy. No verb in this corpus publishes. | A first slice that is accepted and reviewed, and a separate decision. |
+| F-02 | Publication of any kind: push, pull request, merge, release, deploy. No verb in this corpus publishes. Narrowed on 2026-10-20: distributing this repository's own binaries is repository delivery, not a product verb, and is not deferred; see section 5. | A first slice that is accepted and reviewed, and a separate decision. |
 | F-03 | Signing, key custody and trust-root enrollment. Spec 005 reports every signature `unsigned` and every issuer `unknown` until then. | An external consumer that requires a signed record. |
 | F-04 | Any user-interface surface beyond command output, including a read-only web view. | A reviewable-outcome need that command output genuinely cannot serve. |
 | F-05 | Adaptive autonomy and outcome scoring (`trust-window`). | A measured need, never the library's availability. A score must never override authorization. |
 | F-06 | Cost ceilings, quota parking and model selection policy. | A run that spends against a metered resource without a floor. |
-| F-07 | Breadth across providers. One adapter boundary and one adapter first. | A second provider, admitted by passing spec 004's suite. |
+| F-07 | Breadth across providers. One adapter boundary and one adapter first. Lifted conditionally on 2026-10-20 for Codex as the named second provider; see section 5. | A second provider, admitted by passing spec 004's suite. |
 | F-08 | aicortex integration. Spec 005 describes a narrow optional one-way interface and implements none of it. | An aicortex producer contract that exists. |
 | F-09 | Operating-system enforcement of spec 004's named residuals. | Its own spec, naming the mechanism and its own residuals. |
 | F-10 | Scheduling across repositories, parallelism, and any work queue. | Two conditions. The second, **a spec-spine release carrying spec 072's collision report**, was met by `v0.20.0` on 2026-09-17 (`C-16`). The first, **a single-repository loop that works**, is **not recorded as met**. Its original supporting sentence, "specs `008` and `009` are drafts", was true when written and is stale: both are `approved` and implemented (see the 2026-09-19 entry in section 5). Whether the loop *works* is the owner's judgment and not a status field, so the deferral stands until section 5 records it met. Parallelism is reopened by consuming that report, never by inventing a local footprint format. |
@@ -713,3 +713,27 @@ changes no repository and no external system's state on the repository's
 behalf. `F-02`'s list is unchanged, and nothing here pushes, opens a pull
 request, merges, releases or deploys. `F-03` holds: the CLI submits unsigned
 evidence.
+
+
+### 2026-10-20: F-02 narrowed to product verbs
+
+The repository owner decided that distributing this repository's
+own binaries is repository delivery, not a product verb, and lifted `F-02` for
+it. A release of this repository's binaries, its installers and its
+provenance are delivery acts of this repository, specified in their own spec
+and performed by the owner's release process. `F-02` still defers every
+product verb that publishes: no verb in this corpus pushes, opens a pull
+request, merges, releases or deploys on an operator's behalf, and a spec that
+adds one needs a separate decision. `F-03` is unchanged: signing, key custody
+and trust-root enrollment for this product's records stay deferred. Row `AG`
+keeps its owner decisions on name, trust and publication.
+
+### 2026-10-20: F-07 lifted conditionally for Codex
+
+The repository owner decided that Codex is the named second
+provider. Its adapter's spec may be drafted now. Its crate is built only after
+the capability-flagged adapter seam merges, so admission and qualification
+branch on declared capabilities and never on adapter identity. It is admitted
+only by passing spec `004`'s full suite with fixtures of its own; a sibling
+adapter's pass never counts, and nothing weakens the adapter boundary to fit
+it. Every other provider stays deferred under `F-07`.

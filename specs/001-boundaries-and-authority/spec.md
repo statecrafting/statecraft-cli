@@ -460,6 +460,16 @@ no longer defers device-grant login, evidence submission and decision
 retrieval against one operator-named cell. Everything else `F-01` defers
 stays deferred, and `F-02` and `F-03` are unchanged.
 
+**2026-10-20: `F-02` is narrowed and `F-07` is lifted conditionally.** The
+owner decided, as the founding decision record's section 5
+records, that distributing this repository's own binaries is repository
+delivery and not a product verb, so `F-02` no longer defers it while every
+publishing product verb stays deferred; and that Codex is the named second
+provider under `F-07`, its spec draftable now, its crate built only after the
+capability-flagged adapter seam merges, and admitted only by passing spec
+004's full suite with no weakening of the adapter boundary. `F-03` is
+unchanged.
+
 ## Verification
 
 Each line below is one command. These assert the authored foundation, which
