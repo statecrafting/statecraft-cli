@@ -67,7 +67,7 @@
       }
     ],
     "id": "019-context-packet-consumption",
-    "implementation": "pending",
+    "implementation": "complete",
     "obligations": [
       {
         "anchor": "3-2-one-packet-one-snapshot-no-distributed-transaction",
@@ -106,7 +106,7 @@
       }
     ],
     "sectionDigests": {
-      "019-immutable-context-packet-consumption-across-repository-snapshots": "c232c8fe72cd02957fbf661533047249e74f22185c6accc7834234d2e8b1dd0e",
+      "019-immutable-context-packet-consumption-across-repository-snapshots": "b81402e9ebfe78aded86dcb1450c426df93296742b3d1b3b122208766b9f428e",
       "1-purpose": "2fc4cba21f5d09b6d9121ffb69d97f3bbaa23e9db2eda21bfe66a69e9dd968ab",
       "2-territory-and-producer-prerequisite": "a5c78a2d5cf9e27ecf457a6415ecdac355bb535e67ac45df2e2612d9bda2d10f",
       "3-1-the-multi-repository-task-manifest": "ce11b32d583023889717449bfb20a3dfee06d3981f3d7a7d87a6bcb8af4b398e",
@@ -126,8 +126,8 @@
       "3-9-command-projections": "6918f2b00a41fedbdc546808d31f21eea55a19d5d0f13cc0398d94bd2babc106",
       "3-behavior": "a6d9ee32f8894a8e8a6009c92ff50b0f401c383234ef93b9e00a1811e2ab753d",
       "4-out-of-scope": "87610d02436aa6907230e1dbc9e01e0bf599f68c640d5e05a8334427567b4609",
-      "5-resolved-decisions": "e9e7fee37e7e95ce26e0a10bd38f0f04741cc9feb25ce27e60237d24d7f76d7b",
-      "verification": "1326925b9def0baf71e63fdb0c017e2f2c55b05fbe4201fd08eeeb3f4e00c800"
+      "5-resolved-decisions": "b364fdeac4ff112b1166489b478a8a916ad248568995090ca87203efb45c0168",
+      "verification": "bf694014e80f658b68826ac218b552877c2942d1fd28cb94d69eff5221338f96"
     },
     "sectionHeadings": [
       "019: Immutable context-packet consumption across repository snapshots",
@@ -158,6 +158,6 @@
     "summary": "Amends Statecraft's run, adapter, acceptance, command, and governance-producer contracts so one task may bind immutable spec-spine context packets from several independently identified repository snapshots, record intended and provider-visible delivery separately, and judge packet integrity, closure, freshness, citations, and evidence without reimplementing producer-owned selectors, closures, or digests.\n",
     "title": "Immutable context-packet consumption across repository snapshots"
   },
-  "shardHash": "14a7b9d564bbb5c48e1ff9288c6c1a1fedeeefc74a0aee45ee16bda0563aab43",
+  "shardHash": "7800daab3c82438c957918f8f8bddfd8f8d2b4bfbf90df62a2367800108529b9",
   "specVersion": "1.10.0"
 }

@@ -103,17 +103,42 @@ fn now(clock: &dyn Clock) -> String {
 /// Registration is resolved first; a missing run id is usage only after it,
 /// as the verb orders them.
 pub fn accept(ctx: &Context<'_>, path: &Path, run_id: Option<&str>) -> Result<Response, Usage> {
+    accept_with_context(ctx, path, run_id, None)
+}
+
+/// [`accept`], with the spec 019 `accept --context` file: the current
+/// checkouts, the claimed citations and the evidence admissions the context
+/// checks read. Without one, every check that needs a checkout reports its
+/// absence and none is guessed.
+pub fn accept_with_context(
+    ctx: &Context<'_>,
+    path: &Path,
+    run_id: Option<&str>,
+    context: Option<&Path>,
+) -> Result<Response, Usage> {
     let root = match registered(ctx.registry, path) {
         Ok(root) => root,
         Err(answer) => return Ok(answer),
     };
     let Some(run_id) = run_id else {
-        return Err(Usage("usage: accept <path> <run-id>".to_string()));
+        return Err(Usage(
+            "usage: accept <path> <run-id> [--context <file>]".to_string(),
+        ));
     };
-    Ok(accept_registered(&root, ctx.home, run_id))
+    let supplied = match context.map(crate::context::read_accept_file) {
+        None => crate::context::AcceptFile::default(),
+        Some(Ok(f)) => f,
+        Some(Err(e)) => return Err(Usage(format!("accept --context: {e}"))),
+    };
+    Ok(accept_registered(&root, ctx.home, run_id, &supplied))
 }
 
-fn accept_registered(root: &Path, home: &Path, run_id: &str) -> Response {
+fn accept_registered(
+    root: &Path,
+    home: &Path,
+    run_id: &str,
+    supplied: &crate::context::AcceptFile,
+) -> Response {
     let (chain, _) = match Chain::open(home, root) {
         Ok(c) => c,
         Err(e) => return failed(&e.to_string()),
@@ -208,6 +233,21 @@ fn accept_registered(root: &Path, home: &Path, run_id: &str) -> Response {
         .erase();
     }
 
+    // Spec 019 section 3.8: the context checks under the policy the intent
+    // recorded. A required fact that does not hold is ineligible, with every
+    // reason, before the suite runs; the attempt outcome is not rewritten.
+    let judgment = crate::context::judge(root, home, &chain, run_id, attempt.number, supplied);
+    if let Some(reasons) = judgment.ineligible() {
+        let mut answer = slice::accept_answer_with(
+            statecraft_acceptance::outcome::Acceptance::None {
+                reason: statecraft_acceptance::judged::NoAcceptance::ContextIneligible { reasons },
+            },
+            Some(contract),
+        );
+        answer.value.context_manifest = judgment;
+        return answer.erase();
+    }
+
     let workspace = statecraft_run::workspace::workspace_path(root, run_id);
     let context = crate::accept::Context {
         repository: root.display().to_string(),
@@ -228,7 +268,9 @@ fn accept_registered(root: &Path, home: &Path, run_id: &str) -> Response {
         true,
         &context,
     );
-    slice::accept_answer_with_boundary(acceptance, Some(contract), boundary).erase()
+    let mut answer = slice::accept_answer_with_boundary(acceptance, Some(contract), boundary);
+    answer.value.context_manifest = judgment;
+    answer.erase()
 }
 
 // -------------------------------------------------------- override recover
@@ -534,18 +576,20 @@ fn observed_launch_state(
 /// as the verb orders it. An unregistered or unarmed target refuses before
 /// any workspace, appended attempt or provider.
 pub fn run(ctx: &Context<'_>, path: &Path, spec_id: Option<&str>) -> Result<Response, Usage> {
-    run_from(ctx, path, spec_id, None, Requirement::DEFAULT)
+    run_from(ctx, path, spec_id, None, Requirement::DEFAULT, None)
 }
 
 /// [`run`], with witness capture requested or required (spec 013 section 7,
-/// 2026-10-17): `run --witness` and `run --require-witness`.
+/// 2026-10-17): `run --witness` and `run --require-witness`; and with the
+/// spec 019 task file `run --context` names, when it names one.
 pub fn run_witnessed(
     ctx: &Context<'_>,
     path: &Path,
     spec_id: Option<&str>,
     witness: Requirement,
+    context: Option<&Path>,
 ) -> Result<Response, Usage> {
-    run_from(ctx, path, spec_id, None, witness)
+    run_from(ctx, path, spec_id, None, witness, context)
 }
 
 /// Where an admitted spec 027 proposal enters the run path: the commit its
@@ -568,7 +612,14 @@ pub fn run_admitted_proposal(
     spec_id: &str,
     origin: &Origin<'_>,
 ) -> Response {
-    match run_from(ctx, path, Some(spec_id), Some(origin), Requirement::DEFAULT) {
+    match run_from(
+        ctx,
+        path,
+        Some(spec_id),
+        Some(origin),
+        Requirement::DEFAULT,
+        None,
+    ) {
         Ok(answer) => answer,
         Err(Usage(detail)) => failed(&detail),
     }
@@ -580,6 +631,7 @@ fn run_from(
     spec_id: Option<&str>,
     origin: Option<&Origin<'_>>,
     witness: Requirement,
+    context: Option<&Path>,
 ) -> Result<Response, Usage> {
     let root = match registered(ctx.registry, path) {
         Ok(root) => root,
@@ -618,7 +670,7 @@ fn run_from(
         ));
     };
     Ok(run_admitted(
-        ctx, &root, spec_id, work, &report, held, origin, witness,
+        ctx, &root, spec_id, work, &report, held, origin, witness, context,
     ))
 }
 
@@ -633,6 +685,7 @@ fn run_admitted(
     held: statecraft_run::lock::Held,
     origin: Option<&Origin<'_>>,
     witness: Requirement,
+    context: Option<&Path>,
 ) -> Response {
     // A unit of work the policy did not admit is never run, and the reason is
     // the answer (spec 003 section 3.1.1).
@@ -661,6 +714,7 @@ fn run_admitted(
         statecraft_run::contract::bind(&judge, root, spec_id, report.lifecycle_of(spec_id));
     let mut plan = crate::attempt::AttemptPlan::work_order(spec_id, admission, planned, held);
     plan.witness = witness;
+    plan.context = context.map(Path::to_path_buf);
     if let Some(origin) = origin {
         plan.base = origin.commit.to_string();
         plan.proposal = Some(origin.proposal.to_string());

@@ -30,6 +30,17 @@ pub fn startup_record_refused(why: &str) -> Response {
     )
 }
 
+/// Spec 019 section 3.2: the context packets could not be assembled, or the
+/// manifest they compose may not execute. Refused before the intent, so no
+/// attempt was appended and nothing was launched.
+pub fn context_refused(detail: &str) -> Response {
+    Answer::new(
+        serde_json::json!({ "outcome": "refused", "reason": "context-ineligible", "detail": detail }),
+        Exit::Refused,
+        format!("statecraft: context refused: {detail}"),
+    )
+}
+
 /// The confinement could not be established: nothing was launched.
 pub fn boundary_refused(detail: &str) -> Response {
     Answer::new(
@@ -91,6 +102,22 @@ pub fn launch_attempt(
     // Spec 002 section 3.37: the attempt's launch records and its exchange
     // directory, in the product home and keyed as the chain just opened.
     let places = statecraft_home::launch::Places::of(home, root);
+    // Spec 019 sections 3.1 and 3.2: the manifest is composed for the attempt
+    // this intent will append, from packets assembled and retained now, and
+    // refused here when it may not execute, before anything is recorded.
+    let context = match &plan.context {
+        None => None,
+        Some(file) => {
+            let number = statecraft_run::session::runs(&chain)
+                .iter()
+                .find(|r| r.id == run_id)
+                .map_or(1, |r| r.attempts.len() as u32 + 1);
+            match crate::context::prepare(root, home, run_id, number, file) {
+                Ok(prepared) => Some(prepared),
+                Err(why) => return context_refused(&why),
+            }
+        }
+    };
 
     // The run id is the spec id: spec 006 section 3.1 says the operator names a
     // unit of work, and spec 003 section 3.4 makes a retry an appended attempt
@@ -253,10 +280,10 @@ pub fn launch_attempt(
             posture_coverage: planning.as_ref(),
             judge: judge.as_ref(),
             proposal: plan.proposal.as_deref(),
-            // Spec 019: `run` binds no context packet until its command
-            // projection lands; the intent renders `not-recorded`.
-            context_manifest: None,
-            context_policy: None,
+            // Spec 019 section 3.6: the manifest and its policy, once, with
+            // the intent, before the adapter process exists.
+            context_manifest: context.as_ref().map(|c| &c.manifest),
+            context_policy: context.as_ref().map(|c| &c.policy),
         },
         Some(&mut admission),
     ) {
@@ -650,8 +677,59 @@ pub fn launch_attempt(
         Ok(invocation) => invocation,
         Err(e) => return failed(&e),
     };
+    // Spec 019 section 3.5: the delivered pages, read back from custody, ride
+    // beside the prompt.
+    let bundle: Result<Option<_>, statecraft_adapter::context::BundleError> = match &context {
+        None => Ok(None),
+        Some(c) => match statecraft_adapter::context::Bundle::assemble(&c.manifest, |custody| {
+            statecraft_run::context::read_retained(home, custody)
+                .ok()
+                .flatten()
+        }) {
+            Ok(b) => Ok(b),
+            Err(e) => Err(e),
+        }
+        .map(Some),
+    };
+    // Section 3.6: the request must carry exactly the manifest the intent
+    // recorded. A refusal comes after the intent and before any process, so
+    // the attempt is concluded `refused` under the guard `context-bundle`.
+    let bundle = bundle.and_then(|b| {
+        let recorded = statecraft_run::context::recorded_manifest(&chain, &run_id, session.attempt)
+            .map_err(|why| {
+                statecraft_adapter::context::BundleError::Unexpected(format!(
+                    "the recorded manifest: {why}"
+                ))
+            })?;
+        statecraft_adapter::context::check(b.as_ref(), recorded.as_ref())?;
+        Ok(b)
+    });
+    let bundle = match bundle {
+        Ok(b) => b,
+        Err(why) => {
+            let why = why.to_string();
+            let mut accounting = statecraft_run::refusal::Accounting::without_process();
+            accounting.observe(statecraft_run::refusal::RefusalEvent {
+                guard: "context-bundle".to_string(),
+                detail: why.clone(),
+            });
+            return crate::attempt::conclude(
+                clock,
+                &mut chain,
+                &places,
+                &session,
+                Some(&boundary_admission),
+                statecraft_run::attempt::Outcome::Refused,
+                &accounting,
+                witness.marked(serde_json::json!({ "contextRefusal": why })),
+                unlaunched(project_manifest.is_some(), None),
+                &contract,
+                trial,
+            );
+        }
+    };
     let request = statecraft_adapter::protocol::Request {
-        context: None,
+        context: bundle,
         workspace: session.workspace.path.clone(),
         base_commit: session.workspace.base_commit.clone(),
         prompt: plan.prompt.clone(),
@@ -924,6 +1002,27 @@ pub fn launch_attempt(
         });
     }
 
+    // Spec 019 sections 3.5 and 3.6: the adapter's delivery testimony is
+    // appended beside the intended plan and never copied from it. A record
+    // that cannot be written is a refusal, never a silent `not-reported`.
+    if let Some(c) = &context {
+        for observation in statecraft_adapter::context::observation(
+            &supervised.events,
+            supervised.stream_error.as_ref(),
+        ) {
+            if let Err(why) = statecraft_run::context::record_delivery(
+                &mut chain,
+                &c.manifest,
+                &observation,
+                &now(),
+            ) {
+                accounting.observe(statecraft_run::refusal::RefusalEvent {
+                    guard: "context-delivery".to_string(),
+                    detail: format!("the delivery observation could not be written: {why}"),
+                });
+            }
+        }
+    }
     if let Some(why) = witness.write_outcome(&mut chain, &now()) {
         accounting.observe(statecraft_run::refusal::RefusalEvent {
             guard: crate::witness::GUARD.to_string(),

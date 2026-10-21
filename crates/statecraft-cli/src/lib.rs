@@ -58,6 +58,7 @@ pub mod application;
 pub mod attempt;
 pub mod bind;
 pub mod commands;
+pub mod context;
 pub mod coverage;
 pub mod exit;
 pub mod hosted;

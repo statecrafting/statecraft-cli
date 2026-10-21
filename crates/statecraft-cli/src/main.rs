@@ -237,7 +237,7 @@ fn run(args: &[String]) -> i32 {
                     &absolute(path),
                     &home,
                     &registry,
-                    invocation.rest.get(1).map(String::as_str),
+                    &invocation.rest[1..],
                     format,
                 );
             }
@@ -703,6 +703,7 @@ fn slice_verb(
                             slice::ReconciliationView::of_run(&chain.positioned_entries(), run_id),
                             tamper,
                             slice::WireEvidenceView::of_run(&chain, run_id),
+                            statecraft_cli::context::of_run(&chain, &run),
                         ),
                         format,
                     )
@@ -849,8 +850,21 @@ fn run_verb(
     use statecraft_cli::application::{Context, run_witnessed};
     let mut spec_id = None;
     let mut witness = Requirement::DEFAULT;
-    for arg in rest {
+    let mut context = None;
+    let mut args = rest.iter();
+    while let Some(arg) = args.next() {
         match arg.as_str() {
+            // Spec 019: the task file naming the context packets to bind.
+            "--context" => match args.next() {
+                Some(file) => context = Some(absolute(file)),
+                None => {
+                    return usage(
+                        format,
+                        "usage: run <path> <spec-id> [--witness | --require-witness] [--context <file>]"
+                            .to_string(),
+                    );
+                }
+            },
             "--witness" => witness.requested = true,
             "--require-witness" => {
                 witness.requested = true;
@@ -879,7 +893,7 @@ fn run_verb(
         registry,
         clock: clock.as_ref(),
     };
-    match run_witnessed(&ctx, path, spec_id, witness) {
+    match run_witnessed(&ctx, path, spec_id, witness, context.as_deref()) {
         Ok(answer) => emit(&answer, format),
         Err(u) => usage(format, u.0),
     }
@@ -930,17 +944,52 @@ fn accept_verb(
     path: &std::path::Path,
     home: &std::path::Path,
     registry: &Registry,
-    run_id: Option<&str>,
+    rest: &[String],
     format: Format,
 ) -> i32 {
-    use statecraft_cli::application::{Context, accept};
+    use statecraft_cli::application::{Context, accept, accept_with_context};
+    // Spec 019 section 3.9: `--context <file>` names the current checkouts,
+    // claimed citations and evidence admissions the context checks read.
+    let mut run_id = None;
+    let mut context = None;
+    let mut args = rest.iter();
+    while let Some(arg) = args.next() {
+        match arg.as_str() {
+            "--context" => match args.next() {
+                Some(file) => context = Some(absolute(file)),
+                None => {
+                    return usage(
+                        format,
+                        "usage: accept <path> <run-id> [--context <file>]".to_string(),
+                    );
+                }
+            },
+            flag if flag.starts_with("--") => {
+                return usage(
+                    format,
+                    format!("usage: accept <path> <run-id> [--context <file>]; unknown {flag}"),
+                );
+            }
+            operand if run_id.is_none() => run_id = Some(operand),
+            _ => {
+                return usage(
+                    format,
+                    "usage: accept <path> <run-id> [--context <file>]".to_string(),
+                );
+            }
+        }
+    }
     let clock = statecraft_cli::application::process_clock();
     let ctx = Context {
         home,
         registry,
         clock: clock.as_ref(),
     };
-    match accept(&ctx, path, run_id) {
+    let answer = match context.as_deref() {
+        None => accept(&ctx, path, run_id),
+        Some(file) => accept_with_context(&ctx, path, run_id, Some(file)),
+    };
+    match answer {
         Ok(answer) => emit(&answer, format),
         Err(u) => usage(format, u.0),
     }
