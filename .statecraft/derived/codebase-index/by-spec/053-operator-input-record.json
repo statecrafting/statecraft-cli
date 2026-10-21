@@ -1,0 +1,18 @@
+{
+  "mapping": {
+    "amends": [
+      "003-work-and-run-semantics",
+      "039-local-cockpit-authority"
+    ],
+    "dependsOn": [
+      "003-work-and-run-semantics",
+      "004-execution-adapter",
+      "039-local-cockpit-authority"
+    ],
+    "implementingPaths": [],
+    "specId": "053-operator-input-record",
+    "specStatus": "draft"
+  },
+  "schemaVersion": "1.3.0",
+  "shardHash": "0b4bcfe36ed1722d60f4585c562e8b116b0cfdb288808c9db66f1331394aa2ee"
+}
