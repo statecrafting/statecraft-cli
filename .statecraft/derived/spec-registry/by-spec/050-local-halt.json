@@ -1,0 +1,84 @@
+{
+  "record": {
+    "amends": [
+      "003-work-and-run-semantics",
+      "006-command-surface"
+    ],
+    "created": "2026-10-21",
+    "dependsOn": [
+      "003-work-and-run-semantics",
+      "006-command-surface"
+    ],
+    "id": "050-local-halt",
+    "implementation": "pending",
+    "obligations": [
+      {
+        "anchor": "3-3-run-consults-before-launch",
+        "id": "I-1",
+        "kind": "invariant",
+        "text": "No attempt launches while the run-admission scope is halted for its repository, and none launches when the halt record cannot be read or does not verify."
+      },
+      {
+        "anchor": "3-3-run-consults-before-launch",
+        "id": "R-1",
+        "kind": "requirement",
+        "text": "A halted scope refuses with exit 2 and the closed reason halted naming the scope, the operator and the reason; an unreadable or unverifiable record refuses with halt-state-unreadable."
+      },
+      {
+        "anchor": "3-4-stop-requested-and-stop-confirmed",
+        "id": "R-2",
+        "kind": "requirement",
+        "text": "Halting with a live attempt records stop-requested at once and stop-confirmed only when that attempt's cancelled outcome is durable; no reader reports the halt as effective on the attempt before then."
+      },
+      {
+        "anchor": "3-1-the-halt-record",
+        "id": "R-3",
+        "kind": "requirement",
+        "text": "The halt record lives in the product home, outside any target and outside the confinement, and every change to it appends to the repository's run record."
+      },
+      {
+        "anchor": "verification",
+        "id": "V-1",
+        "inputs": [
+          "crates/statecraft-run/src/record.rs"
+        ],
+        "kind": "verification",
+        "text": "A halted run-admission scope refuses run with exit 2 naming halted; a truncated, unparsable or chain-mismatched record refuses with halt-state-unreadable; a halt during a live attempt shows stop-requested until the cancelled outcome lands."
+      }
+    ],
+    "sectionDigests": {
+      "050-local-halt": "bd6a7f28e78366613c842dbed7c660efaa283ade16ec07320e740626125e87ab",
+      "1-purpose": "9b551485c1d2d2b02981982b215d26cbefd66071e3ddb144d37ff8b92aa0ad56",
+      "2-territory": "38b9659db8393adadeafac98c47515331ab553f498a4fe0253c9414bd277a6d9",
+      "3-1-the-halt-record": "9d4aa3d848aef8762a1d6112c7fd81ead3b52deca187d4ed952c6077cc5b49d8",
+      "3-2-scopes": "73694c03e7b530a550bea35ef10cb8cf56e4de7877493693e88dc797811514ca",
+      "3-3-run-consults-before-launch": "92ed7994d873609fad009851d0013d2c0b1c814f6b2300ab90a1201309d1f858",
+      "3-4-stop-requested-and-stop-confirmed": "9dc972c71a1fbb77384618432414055885bf61d526bc28f253a17b5a67ccd3bd",
+      "3-5-resume": "99799393fbe9b7f78f1b39b293a23ea85ad91b0491c6f791a0f1d4ac33a16c50",
+      "3-behavior": "cdd818261eb06f22c9b1d3b342c12cbcdb988fe36b2d3dfb93b1d58a80c81066",
+      "4-out-of-scope": "32bbaa5ecf417055deaf260b814d76af666176769eb79744dde4cb9df1ad529a",
+      "5-resolved-decisions": "acc898f5a3c6765a44def5fd500e41a56b0f63ce9960b7cc34dc35ea2c943bc6",
+      "verification": "3e68dc8c6f936e7fc0ebd465998535d21ea17e9fbfc40eb1fb859fd593b5a69e"
+    },
+    "sectionHeadings": [
+      "050: Local halt",
+      "1. Purpose",
+      "2. Territory",
+      "3. Behavior",
+      "3.1 The halt record",
+      "3.2 Scopes",
+      "3.3 Run consults before launch",
+      "3.4 Stop requested and stop confirmed",
+      "3.5 Resume",
+      "4. Out of scope",
+      "5. Resolved decisions",
+      "Verification"
+    ],
+    "specPath": "specs/050-local-halt/spec.md",
+    "status": "draft",
+    "summary": "Adds an operator-written halt record in the product home, per registered repository, with three independently halted scopes: run admission, tool effects and dispatch. run reads it before launch and refuses a halted scope with a closed reason; a halt record it cannot read or verify denies with its own reason rather than admitting. Halting with a live attempt records stop requested; stop confirmed is recorded only when that attempt's cancelled outcome is durable. The hosted tenant halt fact is not defined here; it is consumed once its own spec merges.\n",
+    "title": "A local halt record that run consults before launch, and denies when it cannot read"
+  },
+  "shardHash": "387ec11c7c9b6e2b457c490291a1ee975602213bc4aac7fc01d96ad40de2101d",
+  "specVersion": "1.10.0"
+}
