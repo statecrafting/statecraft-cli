@@ -1,0 +1,19 @@
+{
+  "mapping": {
+    "amends": [
+      "004-execution-adapter",
+      "013-supervised-wire-witness",
+      "042-per-run-provider-configuration"
+    ],
+    "dependsOn": [
+      "004-execution-adapter",
+      "013-supervised-wire-witness",
+      "042-per-run-provider-configuration"
+    ],
+    "implementingPaths": [],
+    "specId": "047-capability-seam",
+    "specStatus": "draft"
+  },
+  "schemaVersion": "1.3.0",
+  "shardHash": "ce9e064e0a6bed120ef10aa1cd51bc3b1b218bc2d4f866b1f262b17ff9fcf7b1"
+}
