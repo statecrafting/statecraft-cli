@@ -608,3 +608,99 @@ approval, publication, or machine qualification. Evidence is kept under
 
 Rejection restores both pins and the lockfile together, then regenerates the
 environment declaration and derived artifacts with the restored producer.
+
+### 2026-10-21: 0.31.0
+
+The owner approved adopting 0.31.0 under `D-06` on 2026-10-20. The CLI pin in
+`spec-spine.toml` and the linked `spec-spine-core` in the root `Cargo.toml`
+move together as one producer identity. The pin was moved through spec `033`'s
+consented route, not by hand: `init plan . --spine '=0.31.0'` with this
+change's build reported one authored value edit (bytes 1282 to 1289 of
+`spec-spine.toml`) and every managed file unchanged, under plan identity
+`spine-init:da0ab034…b51`, and `init apply` with that identity wrote it and
+recorded it in `.statecraft/environment.json`'s `spinePin`. 0.30.0 was never
+adopted here.
+
+*Identity.* Tag `v0.31.0` is annotated and signed; `git tag -v` reports a good
+ED25519 signature from the producer owner's key (`SHA256:h51+SsiQ…jEg`). It
+targets `bcd91b8f223e865fd14d51c1f836bf87c610ce68`, contained in the
+producer's `origin/main`, and the remote tag peels to the same commit.
+
+| Crate | Registry checksum (= downloaded `.crate`, = index, = `Cargo.lock`) |
+|---|---|
+| `spec-spine-cli` | `4ab4bff5…ae6e` (not in `Cargo.lock`; installed only) |
+| `spec-spine-core` | `de002551…15e2` |
+| `spec-spine-types` | `c67df467…9a1f` |
+
+Each crate records `bcd91b8f` in `.cargo_vcs_info.json` with no `dirty` flag,
+and each unpacked source equals `git archive v0.31.0`'s `crates/<crate>`, with
+`Cargo.toml.orig` equal to the tree's. `cargo install --locked` with rustc
+1.96.0, and `make tools` from the new pin, both gave `fdd1c1f9…7e0c`.
+
+*The floor.* The `DEFAULT_BYPASS_PREFIXES` definition is byte-identical at
+`v0.29.0`, `v0.30.0` and `v0.31.0`, and `couple.rs` and `cmd_config.rs`, the
+two files that name it, are unchanged between `v0.29.0` and `v0.31.0`.
+
+*Coupling.* `couple` gives the same exit code, the same checked-path count and
+the same text (apart from the version) under 0.29.0 and 0.31.0 over the twelve
+most recent merged ranges, `#273` to `#284` (5, 6, 7, 7, 5, 9, 10, 7, 4, 7, 11
+and 3 paths, in merge order). Each version ran in its own clone at `bcde936`
+with shards written by that version, in a commit that also unpins
+`spec-spine.toml`.
+
+*Exit codes and the text the hooks read.* On `check` and `check
+--fail-on-unresolved`, over a fresh, a stale, a hand-edited, an invalid (a
+malformed YAML flow sequence and an unknown status), an unresolved, a
+mismatched-pin and an invalid-configuration tree, the exit codes and the whole
+output are byte-identical under both versions apart from the version string.
+One text does change: `compile` on malformed frontmatter keeps code `V-002`
+and exit 1, but the parser's message under it is the new reader's, with a
+source excerpt on the following lines. Nothing in this product or its rendered
+scripts reads that message.
+
+*What 0.31.0 changes that a reader here had to meet.* Spine spec 196 moves
+YAML parsing off `serde_yaml` and `unsafe-libyaml` to `serde-saphyr` over
+`granit-parser`; every one of this corpus's 43 frontmatters compiles to the
+same registry content, which the re-index below shows. The registry schema
+moves to 1.10.0 and the index schema to 1.3.0 (spine 163); no reader here
+names either version, and the delta report (0.2.0) and verdict (1.1.0) schemas
+this product reads are unchanged. The release adds, as optional capabilities
+no reader here uses yet: incremental context packets, `context delta` and
+`context apply` (164), over the repository-scoped context packet (159);
+documentation manifests and their freshness (160); the selected-content
+accessor answering every resolver outcome (155, 163); the capability catalog
+(162), edit plans (165), reference pages (166) and the read-only tool
+projection (167). Spine numbers here are the producer's current ones; its old
+156 and 157 now name its profile-10 adoption and its merge-queue sweep, so
+spec `019`'s citations of 155, 156 and 157 are re-read when 019 is built
+against this release.
+
+*The re-index.* Every shard restamps its schema and changes in nothing else:
+53 codebase-index files move `schemaVersion` from 1.2.0 to 1.3.0, 43 registry
+files move `specVersion` from 1.9.0 to 1.10.0, and `inputs.json` changes two
+content hashes, `spec-spine.toml`'s and this file's. `make gate` passes under the new pin. The
+environment record moves its two pins and the `spinePin` record; every
+rendered file is unchanged.
+
+*The library.* This product links `spec-spine-core` for
+`scaffold_init_opts_json` only; between the tags `lib.rs` only gains
+exports, and the scaffold source is unchanged. The lockfile adds the new YAML
+reader and its dependencies. The declared toolchain floor stays 1.90, which
+0.31.0 declares: `cargo +1.90.0 build --workspace --locked` succeeds.
+
+*Evidence kinds, kept apart.* The producer's evidence is its signed tag and
+its release spec, spine 199. This repository's qualification is the identity,
+floor, coupling, exit, hook-text, re-index and toolchain measurements above,
+plus `make gate` against the pinned binary, the targeted tests of the pin
+route and the linked producer, and CI's `code` job for the whole workspace.
+
+*What this does not do.* It does not remove `unsafe-libyaml` from this
+workspace: `statecraft-home` depends on `serde_yaml` directly, to read
+workflow YAML, so the advisory spine 196 answers still applies here, and its
+removal is a separate dependency change. It adopts none of the new
+capabilities above; a consumer of packet deltas is spec `019`'s to specify.
+
+**Consequence if rejected.** Both pins return to `=0.29.0` through the same
+consented route (`init plan . --spine '=0.29.0'` with a build linking 0.29.0),
+`make tools` installs 0.29.0, the lockfile is restored, and the shards are
+regenerated by 0.29.0, which restamps them back.

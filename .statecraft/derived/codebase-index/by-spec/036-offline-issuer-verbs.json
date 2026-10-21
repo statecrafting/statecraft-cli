@@ -33,6 +33,6 @@
     "specId": "036-offline-issuer-verbs",
     "specStatus": "approved"
   },
-  "schemaVersion": "1.2.0",
+  "schemaVersion": "1.3.0",
   "shardHash": "cda3ecbc5837edb20547e5ff81ca79ed3c5299978b77dff034e6a739c774190b"
 }

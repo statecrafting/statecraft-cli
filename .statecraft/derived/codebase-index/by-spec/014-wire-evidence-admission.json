@@ -102,6 +102,6 @@
     "specId": "014-wire-evidence-admission",
     "specStatus": "approved"
   },
-  "schemaVersion": "1.2.0",
+  "schemaVersion": "1.3.0",
   "shardHash": "ae7202d3d10e106b9eae3e53dc4669f9c41720fcd06a17859eb3b38114d1582a"
 }

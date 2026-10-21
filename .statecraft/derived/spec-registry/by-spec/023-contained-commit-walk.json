@@ -51,5 +51,5 @@
     "title": "Setup profile revision 11: the commit walk runs a contained spec-spine"
   },
   "shardHash": "acd3b0edc58ad368b4f279fd31e07deb88ff7fff86622e18f5170e8ae597183d",
-  "specVersion": "1.9.0"
+  "specVersion": "1.10.0"
 }

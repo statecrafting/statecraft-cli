@@ -30,6 +30,6 @@
     "specId": "037-closed-admission-gate",
     "specStatus": "approved"
   },
-  "schemaVersion": "1.2.0",
+  "schemaVersion": "1.3.0",
   "shardHash": "3d8924ff147b71161aa9e03c13eb8e67b51429301b73e25e727369027002ac41"
 }

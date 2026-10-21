@@ -51,6 +51,6 @@
     "specId": "024-review-budget-and-ratification",
     "specStatus": "approved"
   },
-  "schemaVersion": "1.2.0",
+  "schemaVersion": "1.3.0",
   "shardHash": "8c1ada3332484db22a18d1072b22244b733ad72ad0d6b0a564ed4dcc3b564daa"
 }

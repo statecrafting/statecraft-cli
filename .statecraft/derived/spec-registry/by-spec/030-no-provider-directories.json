@@ -113,5 +113,5 @@
     "title": "A governed project needs no provider-specific directory, and this product writes none"
   },
   "shardHash": "d7d497918811c5811bb13ea8df876354e834c99a4361bc42c2ac1cc3d6e11fbb",
-  "specVersion": "1.9.0"
+  "specVersion": "1.10.0"
 }

@@ -2,12 +2,12 @@
   "version": 2,
   "pins": {
     "product": "0.0.0",
-    "spec_spine": "0.29.0",
+    "spec_spine": "0.31.0",
     "adapters": {},
     "producer": {
       "name": "spec-spine-core",
-      "version": "0.29.0",
-      "checksum": "7567085df32090df82182bc1449012ae12229c138f307ed425a7672d22a1e5a5"
+      "version": "0.31.0",
+      "checksum": "de002551d95919c9f136900a402f1ed5b462f6f8f7a5338cf54a2e70e89215e2"
     }
   },
   "entries": [
@@ -221,15 +221,15 @@
   },
   "spinePin": {
     "source": "0.29.0",
-    "target": "0.29.0",
+    "target": "0.31.0",
     "originalDigest": "8ed7080bf0d95cb9da05c84267518130cf7ae56b090cb3fe10e9cde62105bb71",
     "valueRange": {
       "start": 1282,
       "end": 1289
     },
-    "changes": false,
-    "planIdentity": "spine-init:611b1e3fd8538fbe0115a53f75c3cf90e8cc1886dfcbd19122ff5ef6851a1e04",
-    "outcome": "unchanged",
+    "changes": true,
+    "planIdentity": "spine-init:da0ab034e395c5dd7f4a2e11b58717d42fa9da4eed679688ab6863a6616f9b51",
+    "outcome": "written",
     "recorded": true
   }
 }

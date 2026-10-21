@@ -69,6 +69,6 @@
     "specId": "031-engine-in-bin",
     "specStatus": "approved"
   },
-  "schemaVersion": "1.2.0",
+  "schemaVersion": "1.3.0",
   "shardHash": "f443609e09799195716301cd5f199ecba6d76e141a36c48bc78356b438d22422"
 }

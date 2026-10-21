@@ -49,6 +49,6 @@
     "specId": "034-boundary-read-acceptance",
     "specStatus": "approved"
   },
-  "schemaVersion": "1.2.0",
+  "schemaVersion": "1.3.0",
   "shardHash": "143e5cb005013ceccbcc3451845d6d29c4cd7944cee852a3f03e18b09bd4d0ed"
 }

@@ -47,6 +47,6 @@
     "specId": "016-bounded-active-specs",
     "specStatus": "approved"
   },
-  "schemaVersion": "1.2.0",
+  "schemaVersion": "1.3.0",
   "shardHash": "b667a06bc44730ffd5a8aecfe01b7842b427a8b0ccbc90817b88cf695598754f"
 }

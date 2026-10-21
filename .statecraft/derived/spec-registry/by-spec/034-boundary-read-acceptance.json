@@ -62,5 +62,5 @@
     "title": "Protected boundary acceptance preserves read-only checkout access"
   },
   "shardHash": "143e5cb005013ceccbcc3451845d6d29c4cd7944cee852a3f03e18b09bd4d0ed",
-  "specVersion": "1.9.0"
+  "specVersion": "1.10.0"
 }

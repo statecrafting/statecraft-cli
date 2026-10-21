@@ -56,6 +56,6 @@
     "specId": "032-external-code-profile",
     "specStatus": "approved"
   },
-  "schemaVersion": "1.2.0",
+  "schemaVersion": "1.3.0",
   "shardHash": "5fa1e3deec945394d7bc2b354b368c55d9ef258e5471107dc47e241505d07dca"
 }

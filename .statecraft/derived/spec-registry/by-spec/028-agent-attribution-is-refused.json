@@ -62,5 +62,5 @@
     "title": "Agent attribution and agent commit identities are refused"
   },
   "shardHash": "0724f160dbeb0cb8e0b26d5fbc99578e16fb806b5d7c83bb7f3c9ff466a0b076",
-  "specVersion": "1.9.0"
+  "specVersion": "1.10.0"
 }

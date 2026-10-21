@@ -31,6 +31,6 @@
     "specId": "035-offline-issuer-contract",
     "specStatus": "approved"
   },
-  "schemaVersion": "1.2.0",
+  "schemaVersion": "1.3.0",
   "shardHash": "a051d8dbc9d8cc63deaee603cf4c12dedbc361cb2bdd02f50f90af004e163f84"
 }

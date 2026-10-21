@@ -92,5 +92,5 @@
     "title": "doctor reports a path whose recorded ownership disagrees with the transfer journal or the current rendering"
   },
   "shardHash": "dd475bd4336507d040e5152cf6be752c966bbc514df72e32dd6672435b09244c",
-  "specVersion": "1.9.0"
+  "specVersion": "1.10.0"
 }

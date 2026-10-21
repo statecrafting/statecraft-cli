@@ -114,6 +114,6 @@
     "specId": "003-work-and-run-semantics",
     "specStatus": "approved"
   },
-  "schemaVersion": "1.2.0",
+  "schemaVersion": "1.3.0",
   "shardHash": "5d03adf19ffa0574249aca460b1d6ff0c17f83f815518156db8fb032d670594c"
 }

@@ -53,5 +53,5 @@
     "title": "Initialization never scaffolds a second 000 spec and never writes an approved one"
   },
   "shardHash": "0d5d7f1c86c6b74eb1b166c7cb021ef1ca2bbb26bd1862d0f3f16c580f1fbbd4",
-  "specVersion": "1.9.0"
+  "specVersion": "1.10.0"
 }
