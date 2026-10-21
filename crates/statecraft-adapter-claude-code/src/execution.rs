@@ -3,7 +3,7 @@
 
 use crate::Invocation;
 use crate::outcome::TerminalReading;
-use crate::stream::{MapError, ProviderEvent, ResultEvent, map_stream};
+use crate::stream::{MapError, ProviderEvent, ResultEvent, map_stream_delivered};
 use statecraft_adapter::capability::Capability;
 use statecraft_adapter::environment::ChildEnvironment;
 use statecraft_adapter::protocol::{Classification, Request, StreamError};
@@ -378,7 +378,13 @@ fn supervise_watched_in(
         .err()
         .filter(|error| error.kind() != std::io::ErrorKind::NotFound)
         .map(|error| error.to_string());
-    let mut execution = map_native(native, granted, settings_cleanup_error);
+    // Spec 019 section 3.5: what this adapter wrote after the prompt is its
+    // testimony, attached to the provider's own init event.
+    let delivered = request
+        .context
+        .as_ref()
+        .map(statecraft_adapter::context::Bundle::delivered);
+    let mut execution = map_native(native, granted, delivered.as_ref(), settings_cleanup_error);
     execution.settings_written = settings_written;
     Ok(execution)
 }
@@ -392,6 +398,7 @@ fn supervise_watched_in(
 fn map_native(
     native: Supervised<(usize, ProviderEvent)>,
     granted: &[Capability],
+    delivered: Option<&statecraft_run::context::Reported>,
     settings_cleanup_error: Option<String>,
 ) -> Execution {
     let mut supervised = Supervised {
@@ -418,7 +425,7 @@ fn map_native(
     });
     let mut terminal = None;
     let mut write_requests = write_requests(&events);
-    match map_stream(&events, granted) {
+    match map_stream_delivered(&events, granted, delivered) {
         Ok(mapped) => {
             supervised.events = mapped.events;
             result = mapped.result;
@@ -519,6 +526,7 @@ mod tests {
 
     fn request(workspace: &Path) -> Request {
         Request {
+            context: None,
             workspace: workspace.to_path_buf(),
             base_commit: "fixture".into(),
             prompt: b"private stdin".to_vec(),
@@ -560,7 +568,7 @@ mod tests {
             stopped: None,
             timed_out: false,
         };
-        let execution = map_native(native, &[], None);
+        let execution = map_native(native, &[], None, None);
         assert_eq!(execution.supervised.outcome, Outcome::Interrupted);
         let refusals = statecraft_adapter::protocol::refusals(&execution.supervised.events);
         assert_eq!(refusals.len(), 1);
@@ -574,6 +582,46 @@ mod tests {
         );
         assert_eq!(execution.termination().adapter_claimed, Outcome::Completed);
         assert_eq!(execution.termination().observed, Outcome::Interrupted);
+    }
+
+    /// Spec 019 section 3.5: the production mapping attaches the delivered
+    /// pages to the provider's own init event, and to nothing when the
+    /// provider never reported one.
+    #[test]
+    fn delivery_testimony_rides_the_providers_init_event_only() {
+        let native = |lines: &[serde_json::Value]| Supervised {
+            events: lines
+                .iter()
+                .enumerate()
+                .map(|(i, l)| (i + 1, serde_json::from_value(l.clone()).unwrap()))
+                .collect(),
+            outcome: Outcome::Completed,
+            stream_error: None,
+            surviving_processes: None,
+            stopped: None,
+            timed_out: false,
+        };
+        let delivered = statecraft_run::context::Reported {
+            manifest_digest: "sha256:manifest".into(),
+            visible: vec!["sha256:page".into()],
+            withheld: vec![],
+        };
+        let init =
+            serde_json::json!({"type":"system","subtype":"init","claude_code_version":"fixture"});
+        let result = serde_json::json!({"type":"result","subtype":"success","num_turns":1});
+        let execution = map_native(native(&[init, result.clone()]), &[], Some(&delivered), None);
+        assert_eq!(
+            statecraft_adapter::context::observation(&execution.supervised.events, None),
+            vec![statecraft_run::context::Observation::Reported(
+                delivered.clone()
+            )]
+        );
+        let without = map_native(native(&[result]), &[], Some(&delivered), None);
+        assert!(
+            !statecraft_adapter::context::observation(&without.supervised.events, None)
+                .iter()
+                .any(|o| matches!(o, statecraft_run::context::Observation::Reported(_)))
+        );
     }
 
     #[test]
@@ -760,7 +808,7 @@ mod tests {
             stopped: None,
             timed_out: false,
         };
-        let execution = map_native(native, &[], None);
+        let execution = map_native(native, &[], None, None);
         assert_eq!(
             execution.session_id.as_deref(),
             Some("11111111-1111-1111-1111-111111111111")

@@ -17,6 +17,10 @@
 //!   required token refuses while a preferred one degrades.
 //! - [`protocol`] is the request, the typed event stream and the result. An
 //!   absent cost is `unknown`, never zero.
+//! - [`context`] is spec 019's bundle: the attempt's context manifest and
+//!   its delivered pages beside the prompt, the refusal before spawn when
+//!   they are not exactly the recorded manifest, and the init event's
+//!   delivery testimony. Added by spec 019's additive edge.
 //! - [`manifest`] is what an adapter declares, and what qualifies one **binary
 //!   version** and no other.
 //! - [`environment`] constructs the child's environment from an allowed set, and
@@ -40,6 +44,7 @@
 
 pub mod boundary;
 pub mod capability;
+pub mod context;
 pub mod coverage;
 pub mod environment;
 pub mod fixture;

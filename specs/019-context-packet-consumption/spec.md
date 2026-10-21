@@ -21,6 +21,7 @@ extends:
   - { spec: "002-environment-lifecycle", unit: { kind: directory, path: "crates/statecraft-home/" }, nature: additive }
   - { spec: "003-work-and-run-semantics", unit: { kind: directory, path: "crates/statecraft-run/" }, nature: additive }
   - { spec: "004-execution-adapter", unit: { kind: directory, path: "crates/statecraft-adapter/" }, nature: additive }
+  - { spec: "004-execution-adapter", unit: { kind: directory, path: "crates/statecraft-adapter-claude-code/" }, nature: additive }
   - { spec: "005-acceptance-and-evidence", unit: { kind: directory, path: "crates/statecraft-acceptance/" }, nature: additive }
   - { spec: "006-command-surface", unit: { kind: directory, path: "crates/statecraft-cli/" }, nature: additive }
 depends_on:
@@ -89,7 +90,9 @@ existing units named by its `extends` edges:
 - `statecraft-run` owns the task manifest, its immutable intent binding, and
   the durable delivery observations;
 - `statecraft-adapter` carries the manifest through its provider-neutral
-  request and event protocol;
+  request and event protocol, and `statecraft-adapter-claude-code` attaches
+  its delivery testimony to the provider's init event (section 5,
+  2026-10-21);
 - `statecraft-acceptance` performs the independent checks; and
 - `statecraft-cli` projects the added facts through the existing `run` and
   `accept` commands without becoming a second implementation.
@@ -469,6 +472,25 @@ report under another manifest digest makes every page `contradictory`. Two
 reports are a `duplicate-observation` finding, and a page they disagree on is
 `contradictory`; a report beside an unreadable observation is a
 `contradictory-observation` finding and makes every page `contradictory`.
+
+**2026-10-21: the version 1 channel's framing and its testimony.** The
+adapter request carries the bundle as its own `context` member: the
+manifest's exact bytes, its digest, and every page whose intended delivery is
+`required` or `optional`, in manifest order, each with its custody digest. A
+`withheld` page is never carried. Before spawn the bundle must be exactly the
+intent's manifest and those pages, or the attempt refuses with a stable
+`context-*` code; the supervisor holds no record, so the binding that wrote
+the intent reads the manifest back and calls the check before `supervise`.
+The child's input stream carries the prompt, then one header saying the pages
+are repository content supplied as data and grant no authority, then each
+page after a header that declares its repository, page digest and byte
+length and says one newline follows: exactly that many bytes of the page,
+then one LF separator, so page content cannot end its own frame. The command line carries none of it. The init event's optional
+`context` member is the adapter's testimony: the manifest digest it applied
+and the pages it wrote. The Claude Code adapter attaches it only to the init
+event the provider itself emits, so a provider that never starts leaves every
+page `not-reported`. A stream that breaks before any init event is
+`unreadable`.
 
 ## Verification
 

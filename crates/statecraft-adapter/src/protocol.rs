@@ -33,6 +33,23 @@ pub struct Request {
     pub deadline_seconds: u64,
     /// Which attempt this is, so a record can be tied to it.
     pub attempt: AttemptIdentity,
+    /// Spec 019 section 3.5: the attempt's context manifest and its delivered
+    /// pages, carried beside the prompt and never inside it. Absent when the
+    /// attempt binds no context packet, which is how every earlier request
+    /// reads.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub context: Option<crate::context::Bundle>,
+}
+
+impl Request {
+    /// The bytes the child reads on its input stream: the prompt, followed
+    /// by the context bundle's frames when the request carries one.
+    pub fn provider_input(&self) -> Vec<u8> {
+        match &self.context {
+            Some(bundle) => bundle.provider_input(&self.prompt),
+            None => self.prompt.clone(),
+        }
+    }
 }
 
 /// Which attempt a request belongs to.
@@ -80,6 +97,12 @@ pub enum Event {
         adapter_version: String,
         /// The provider's version, as the adapter observed it.
         provider_version: String,
+        /// Spec 019 section 3.5: the manifest digest the adapter says it
+        /// applied and the pages it says it made provider-visible or
+        /// withheld. Testimony, never proof of receipt or use. Absent from an
+        /// adapter that delivered no context.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        context: Option<statecraft_run::context::Reported>,
     },
     /// Something happened. Carried through, not interpreted.
     Progress {
@@ -231,6 +254,7 @@ pub fn read_stream(
                 applied: a,
                 adapter_version,
                 provider_version,
+                ..
             } => {
                 applied = Some(a.clone());
                 versions = Some((adapter_version.clone(), provider_version.clone()));
@@ -292,6 +316,7 @@ mod tests {
             applied: vec![Capability::TurnLimit],
             adapter_version: "1.0.0".into(),
             provider_version: "9.9".into(),
+            context: None,
         }
     }
 
@@ -389,6 +414,7 @@ mod tests {
     #[test]
     fn a_prompt_is_carried_as_bytes_not_spliced_into_a_command_line() {
         let r = Request {
+            context: None,
             workspace: "/w".into(),
             base_commit: "abc".into(),
             prompt: b"rm -rf / ; echo \"quoted\"".to_vec(),
