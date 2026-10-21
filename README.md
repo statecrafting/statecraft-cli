@@ -9,28 +9,17 @@ It runs on one machine, on one repository, with no account and no hosted service
 ## Status: specified, implemented and tested, not released
 
 Every verb the specs name is bound, and `cargo run -p statecraft-cli -- --help`
-prints each one beside the spec it answers to:
+prints each one beside the spec it answers to. That list is generated from the
+binary's own command table, so it is the authority and none is restated here.
 
-```
-project register   project list   project arm   project disarm
-project enroll   project unenroll
-env plan   env apply   env upgrade   env remove   doctor
-work list   work show   run   run list   run show   accept
-home show   home plan   home apply
-init plan   init apply   migrate plan   migrate apply
-config show   approval grant   approval show
-harness show   harness upgrade   session payload
-startup record   startup capture   startup qualify   startup show   startup trial
-```
-
-Seven specs, `000` to `006`, all `approved`; eight crates and one binary.
-`make code` runs the whole workspace suite and `make gate` requires every
+The specs and their lifecycle are what `registry list` reports, and the crates
+are what the root `Cargo.toml` names; one binary. `make code` runs the whole workspace suite and `make gate` requires every
 source file to be specifically claimed by a spec, so neither a test count nor a
 coverage figure is restated here: run them. Every spec that claims code has
 built it, and no forward claim is outstanding.
 
-Seven specs and eight crates, because **a spec may own more than one crate**.
-The corpus was eleven specs until 2026-09-21, when four pairs that each
+A spec may own more than one crate, and **a crate has exactly one owning
+spec**. The corpus was eleven specs until 2026-09-21, when four pairs that each
 described one subject across two documents were consolidated: the work, run and
 accept bindings into `006`, the shared evidence envelope into `005`, the first
 provider adapter into `004`, and the managed environment into `002`. No crate
@@ -42,7 +31,9 @@ constitution's product principles VI to XIII were ratified on 2026-09-16, three
 of them frozen as spec `000` anchors.
 
 Nothing is installed or released: the workspace is at version `0.0.0` with
-`publish = false`, and `F-02` defers publication of any kind. The way to run it
+`publish = false`, and `F-02` defers every product verb that publishes
+(narrowed on 2026-10-20 so that releasing this repository's own binaries is
+repository delivery; see the founding decisions, section 5). The way to run it
 is from a checkout.
 
 The language and the layout are decided: Rust, one Cargo workspace, one owning
@@ -236,7 +227,7 @@ replaced by another project's work. `make tools` reads the exact version from
 ```sh
 make tools       # install the pinned spec-spine into .bin
 make gate        # read-only: freshness, lint, coverage, the authored-content rules
-make code        # read-only: build, test, clippy, fmt across the eight crates
+make code        # read-only: build, test, clippy, fmt across the workspace
 make refresh     # writing: recompute the committed shard trees
 make verify SPEC=001
 ```

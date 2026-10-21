@@ -6,7 +6,9 @@ The cross-agent authority for this repository, read by Claude Code, Codex CLI an
 any other agent through the `AGENTS.md` convention. Edit this file to evolve the
 protocol.
 
-This repository holds seventeen specs, eight crates and one binary. **A crate has
+This repository holds a spec corpus, the crates it claims and one binary;
+`registry list` names the specs and the root `Cargo.toml` the crates, so no
+count is restated here. **A crate has
 exactly one owning spec, and a spec may own more than one crate**: that is `D-02`
 as amended on 2026-09-21, when four pairs of specs were consolidated and no crate
 was merged. Do not add code, a crate or a test runner without a spec that claims
@@ -81,8 +83,8 @@ carrying `implementation`, so the join stays. What `draft` withholds is
 *ratification*, which is why an unratified spec's unresolved units warn instead
 of refusing.
 
-All seventeen active specs are ratified; the owner ratified `007` and `024` on
-2026-09-27. Spec `015`'s live permission experiment was admitted on
+Every active spec is ratified except those `registry list` reports as
+`draft`; the owner ratified `007` and `024` on 2026-09-27. Spec `015`'s live permission experiment was admitted on
 2026-10-12 (Claude Code 2.1.296, macOS), which is what had kept it
 `in-progress`. Check the `status` field, not the plan output.
 
@@ -97,8 +99,8 @@ suggestion, not a work order. Do not open an implementation branch for a
 ## The gate
 
 Two surfaces, not one. `make gate` judges the **corpus** and is meaningful with
-no code at all. `make code` judges the **workspace**, which is eight crates
-today. CI runs them as separate jobs and requires both through `ci-gate`, the
+no code at all. `make code` judges the **workspace**, every crate the root
+`Cargo.toml` names. CI runs them as separate jobs and requires both through `ci-gate`, the
 single status context branch protection names. Both targets run
 `scripts/statecraft/gate.sh`, the same script CI runs, so the local and the CI
 definition cannot drift (see "Continuous integration" below).
