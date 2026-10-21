@@ -475,6 +475,21 @@ pub struct Mapped {
 /// allowlist is not observable, so [`crate::denial::ToolRestriction`] reports it
 /// as `not-recorded` rather than restating the request as the answer.
 pub fn map_stream(events: &[ProviderEvent], granted: &[Capability]) -> Result<Mapped, MapError> {
+    map_stream_delivered(events, granted, None)
+}
+
+/// [`map_stream`] for a request that carried a spec 019 context bundle.
+///
+/// `delivered` is what this adapter wrote to the provider's input, from
+/// [`statecraft_adapter::context::Bundle::delivered`]. The init event carries
+/// it as the adapter's testimony, and only once the provider has started and
+/// reported its own init; a stream with no provider init reports nothing, so
+/// its pages read `not-reported`.
+pub fn map_stream_delivered(
+    events: &[ProviderEvent],
+    granted: &[Capability],
+    delivered: Option<&statecraft_run::context::Reported>,
+) -> Result<Mapped, MapError> {
     let mut out = Vec::new();
     let mut result = None;
     let mut provider_version = None;
@@ -495,6 +510,7 @@ pub fn map_stream(events: &[ProviderEvent], granted: &[Capability]) -> Result<Ma
                             .word()
                             .to_string()
                     }),
+                    context: delivered.cloned(),
                 });
             }
             ProviderEvent::System(s) => {

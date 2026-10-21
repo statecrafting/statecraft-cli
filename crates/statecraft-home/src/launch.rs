@@ -3846,6 +3846,7 @@ mod tests {
         let invocation =
             statecraft_adapter_claude_code::Invocation::new(program.to_str().unwrap(), &[], None);
         let request = statecraft_adapter::protocol::Request {
+            context: None,
             workspace: w.workspace.clone(),
             base_commit: "0".repeat(40),
             prompt: b"the governed work".to_vec(),

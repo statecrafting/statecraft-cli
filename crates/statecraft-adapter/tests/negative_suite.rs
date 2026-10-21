@@ -36,6 +36,7 @@ fn env_for(commands: &[&str]) -> statecraft_adapter::ChildEnvironment {
 
 fn request(workspace: &Path, deadline: u64, capabilities: Requested) -> Request {
     Request {
+        context: None,
         workspace: workspace.to_path_buf(),
         base_commit: "0".repeat(40),
         prompt: b"do the work".to_vec(),

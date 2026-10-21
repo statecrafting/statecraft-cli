@@ -298,7 +298,9 @@ fn spawn_supervised(
     // which is why `args` above carries no prompt and cannot. A child that does
     // not read it must not hold the supervisor outside its deadline loop.
     let mut stdin = child.stdin.take().expect("stdin was piped");
-    let prompt = request.prompt.clone();
+    // Spec 019 section 3.5: a context bundle rides the same stream, after the
+    // prompt, in its length-declared frames.
+    let prompt = request.provider_input();
     let writer = std::thread::spawn(move || {
         use std::io::Write;
         let _ = stdin.write_all(&prompt);
@@ -1048,6 +1050,7 @@ mod tests {
         )
         .unwrap();
         let request = Request {
+            context: None,
             workspace: directory.path().to_path_buf(),
             base_commit: "0".repeat(40),
             prompt: Vec::new(),
@@ -1135,6 +1138,7 @@ mod tests {
         drop(file);
 
         let request = Request {
+            context: None,
             workspace: dir.path().to_path_buf(),
             base_commit: "0".repeat(40),
             prompt: b"fixture prompt".to_vec(),
@@ -1517,6 +1521,7 @@ mod tests {
     fn watched_in(dir: &Path, script: &str, watch: &mut Recording) -> Supervised {
         std::fs::write(dir.join("child.sh"), script).unwrap();
         let request = Request {
+            context: None,
             workspace: dir.to_path_buf(),
             base_commit: "0".repeat(40),
             prompt: b"fixture prompt".to_vec(),
