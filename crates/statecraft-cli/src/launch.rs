@@ -729,9 +729,58 @@ pub fn launch_attempt(
             );
         }
     };
+    // Spec 020 section 3.4: the request carries exactly the task the intent
+    // recorded, or none when it recorded none, and every capability the task
+    // requires is one the selected adapter declares. This path holds no pinned
+    // skill's bytes, so a task that pins one refuses here rather than spawn
+    // without it. A refusal is concluded like the context bundle's, under the
+    // guard `documentation-bundle`.
+    let documentation =
+        statecraft_run::documentation::recorded_task(&chain, &run_id, session.attempt)
+            .map_err(|why| {
+                statecraft_adapter::documentation::BundleError::Task(format!(
+                    "the recorded task: {why}"
+                ))
+            })
+            .and_then(|recorded| {
+                let b = recorded
+                    .as_ref()
+                    .map(|t| statecraft_adapter::documentation::Bundle::assemble(t, None))
+                    .transpose()?;
+                statecraft_adapter::documentation::check(
+                    b.as_ref(),
+                    recorded.as_ref(),
+                    &manifest.supports,
+                )?;
+                Ok(b)
+            });
+    let documentation = match documentation {
+        Ok(b) => b,
+        Err(why) => {
+            let why = why.to_string();
+            let mut accounting = statecraft_run::refusal::Accounting::without_process();
+            accounting.observe(statecraft_run::refusal::RefusalEvent {
+                guard: "documentation-bundle".to_string(),
+                detail: why.clone(),
+            });
+            return crate::attempt::conclude(
+                clock,
+                &mut chain,
+                &places,
+                &session,
+                Some(&boundary_admission),
+                statecraft_run::attempt::Outcome::Refused,
+                &accounting,
+                witness.marked(serde_json::json!({ "documentationRefusal": why })),
+                unlaunched(project_manifest.is_some(), None),
+                &contract,
+                trial,
+            );
+        }
+    };
     let request = statecraft_adapter::protocol::Request {
         context: bundle,
-        documentation: None,
+        documentation,
         workspace: session.workspace.path.clone(),
         base_commit: session.workspace.base_commit.clone(),
         prompt: plan.prompt.clone(),

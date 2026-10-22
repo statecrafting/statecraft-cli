@@ -416,7 +416,12 @@ length or digest is not its bytes' keeps the bytes and adds a finding. Two
 `extends` edges join section 2's list, on `statecraft-adapter-claude-code`
 (spec 004) and `statecraft-home` (spec 002), because both construct the
 request and the events literally; this change only names the new members
-there, absent.
+there, absent. The launch path runs the pre-spawn check on every attempt,
+after the context bundle's and under its own guard `documentation-bundle`:
+it reads the task the intent recorded, assembles the bundle from it, and
+checks bundle, task and the selected adapter's declared capabilities
+together. That path holds no pinned skill's bytes, so a recorded task that
+pins a skill refuses there rather than spawn without it.
 
 ## Verification
 
