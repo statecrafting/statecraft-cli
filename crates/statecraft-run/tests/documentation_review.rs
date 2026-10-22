@@ -193,6 +193,20 @@ fn a_correction_must_change_something_and_name_what_it_supersedes() {
         empty.seal().validate(),
         Err(DocumentError::Invalid(_))
     ));
+    // A claim or an artifact is changed once.
+    let mut twice = correction();
+    twice.changed_claims.push("c1".into());
+    assert!(matches!(
+        twice.seal().validate(),
+        Err(DocumentError::Duplicate(_))
+    ));
+    let mut twice = correction();
+    let again = twice.changed_artifacts[0].clone();
+    twice.changed_artifacts.push(again);
+    assert!(matches!(
+        twice.seal().validate(),
+        Err(DocumentError::Duplicate(_))
+    ));
 }
 
 // Sections 3.4 and 3.10: append-only, in record order, both kept; an

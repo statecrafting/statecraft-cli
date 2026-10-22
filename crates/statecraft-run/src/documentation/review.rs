@@ -370,6 +370,16 @@ impl Correction {
             logical_path(&a.logical_path)?;
             digest_form("changed artifact digest", &a.digest)?;
         }
+        unique(
+            "changed claim",
+            self.changed_claims.iter().map(String::as_str),
+        )?;
+        unique(
+            "changed artifact",
+            self.changed_artifacts
+                .iter()
+                .map(|a| a.logical_path.as_str()),
+        )?;
         if let Some(r) = &self.corrected_result {
             digest_form("corrected result", r)?;
         }
