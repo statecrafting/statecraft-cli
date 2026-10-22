@@ -1191,8 +1191,8 @@ pub struct AcceptView {
     #[serde(rename = "contextManifest")]
     pub context_manifest: crate::context::Judgment,
     /// Spec 020 section 3.9: the attempt's documentation task, delivery and
-    /// raw result as inputs, with documentation acceptance `not-declared`;
-    /// `not-recorded` for an attempt with no documentation task.
+    /// raw result as inputs, with acceptance judged under spec 021 when its
+    /// prerequisites exist; `not-recorded` for an attempt with no documentation task.
     pub documentation: statecraft_acceptance::documentation::Inputs,
     /// Spec 021 section 3.10: the documentation judgment, recorded, every
     /// dimension and the outcome; `not-recorded` for an attempt with no
