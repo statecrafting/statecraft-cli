@@ -1,0 +1,17 @@
+{
+  "mapping": {
+    "amends": [
+      "003-work-and-run-semantics",
+      "040-application-operations"
+    ],
+    "dependsOn": [
+      "003-work-and-run-semantics",
+      "040-application-operations"
+    ],
+    "implementingPaths": [],
+    "specId": "048-run-operations",
+    "specStatus": "draft"
+  },
+  "schemaVersion": "1.3.0",
+  "shardHash": "34e524342ae61ad3618b21aa6e7c3284156fd51fb4d9abc74048dbaf678e5654"
+}
