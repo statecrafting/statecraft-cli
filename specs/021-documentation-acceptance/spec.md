@@ -363,9 +363,10 @@ listed `unreadable`, never dropped.
 ## Verification
 
 Implementation acceptance is the deterministic fixture surface `V-1` names,
-run through `make verify SPEC=021`. This spec is `status: approved`
-(`registry list` reports it; the frontmatter is unchanged here), so its
-implementation lands in parts: the acceptance is declared one suite at a
+run through `make verify SPEC=021`. The owner ratified this spec on 2026-10-01 in
+commit `1a0d3a155da9615fb83f72f106570c2964594703`; its frontmatter has
+been `status: approved` since that commit. The former unratified-state
+placeholder was stale. Implementation lands in parts: the acceptance is declared one suite at a
 time as each part lands, and `implementation` stays `pending` until the last. Fixtures use
 retained local bytes, fixed review authorities and fixed clocks.
 
