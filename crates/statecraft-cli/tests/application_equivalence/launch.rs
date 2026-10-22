@@ -144,6 +144,9 @@ struct Case {
 /// in must answer that, as the binary's `main` does. libtest owns this
 /// binary's `main` and prints before any test runs, so the answer is given
 /// from a constructor, before `main`, and the process exits there.
+// The placement attribute is the only unsafe here; a workspace `unsafe_code`
+// lint would otherwise refuse the constructor this binary needs.
+#[allow(unsafe_code)]
 #[used]
 #[cfg_attr(target_os = "linux", unsafe(link_section = ".init_array"))]
 #[cfg_attr(target_os = "macos", unsafe(link_section = "__DATA,__mod_init_func"))]
