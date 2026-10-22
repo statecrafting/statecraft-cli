@@ -165,10 +165,16 @@ fn git_out(dir: &std::path::Path, args: &[&str]) -> Option<Vec<u8>> {
     out.status.success().then_some(out.stdout)
 }
 
+/// `id` when it is a full SHA-1 or SHA-256 object id in lower-case hex.
+fn object_id(id: &str) -> Option<&str> {
+    (matches!(id.len(), 40 | 64) && id.bytes().all(|b| matches!(b, b'0'..=b'9' | b'a'..=b'f')))
+        .then_some(id)
+}
+
 /// The candidate's paths changed against `base`, tracked and untracked;
 /// `None` when the workspace cannot answer.
 fn changed_paths(workspace: &std::path::Path, base: &str) -> Option<Vec<String>> {
-    let tracked = git_out(workspace, &["diff", "--name-only", base])?;
+    let tracked = git_out(workspace, &["diff", "--name-only", base, "--"])?;
     let untracked = git_out(workspace, &["ls-files", "--others", "--exclude-standard"])?;
     let mut out: Vec<String> = String::from_utf8_lossy(&tracked)
         .lines()
@@ -259,15 +265,17 @@ pub fn accept(
             crate::context::Judgment::Judged { result } => Some(*result),
             _ => None,
         };
-    let policy_bytes = git_out(
-        root,
-        &[
-            "show",
-            &format!("{}:{}", attempt.base_commit, da::POLICY_PATH),
-        ],
-    );
+    // The base reaches git only as a full hexadecimal object id, so no
+    // recorded value can be read as an option or a revision expression.
+    let base = object_id(&attempt.base_commit);
+    let policy_bytes =
+        base.and_then(|base| git_out(root, &["show", &format!("{base}:{}", da::POLICY_PATH)]));
     let policy = match policy_bytes {
         Some(b) => da::Policy::decode(&b),
+        None if base.is_none() => Err(format!(
+            "the trusted base {:?} is not an object id",
+            attempt.base_commit
+        )),
         None => Err(format!(
             "{} is absent at the trusted base {}",
             da::POLICY_PATH,
@@ -281,7 +289,7 @@ pub fn accept(
         .map(|b| String::from_utf8_lossy(&b).trim().to_string())
         .filter(|c| !c.is_empty())
         .ok_or_else(|| format!("no candidate revision in {}", workspace.display()));
-    let changed = changed_paths(&workspace, &attempt.base_commit);
+    let changed = base.and_then(|base| changed_paths(&workspace, base));
     let reviews = review::recorded_reviews(chain, run_id, attempt.number);
     let corrections = review::recorded_corrections(chain, run_id, attempt.number);
     let retained = |digest: &str| {
@@ -339,5 +347,27 @@ pub fn accept(
             judgment: Box::new(judgment),
         },
         Err(reason) => AcceptanceView::Unrecorded { reason },
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::object_id;
+
+    #[test]
+    fn only_a_full_hex_object_id_reaches_git() {
+        let sha1 = "a".repeat(40);
+        let sha256 = "0123456789abcdef".repeat(4);
+        assert_eq!(object_id(&sha1), Some(sha1.as_str()));
+        assert_eq!(object_id(&sha256), Some(sha256.as_str()));
+        for bad in [
+            "--output=/tmp/x",
+            "HEAD",
+            "",
+            &"A".repeat(40),
+            &"a".repeat(39),
+        ] {
+            assert_eq!(object_id(bad), None, "{bad}");
+        }
     }
 }

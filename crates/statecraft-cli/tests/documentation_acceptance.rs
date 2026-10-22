@@ -343,10 +343,10 @@ fn accept_judges_and_records_a_documentation_attempt_without_passing_absences() 
             .state
     };
     // The policy was read at the trusted base; no review exists yet.
-    assert_eq!(state("schemaValidation"), State::Pass);
-    assert_eq!(state("semanticReview"), State::NotRecorded);
+    assert_eq!(state("schema-validation"), State::Pass);
+    assert_eq!(state("semantic-review"), State::NotRecorded);
     // No documentation manifest is supplied: never fresh by absence.
-    assert_eq!(state("contextFreshness"), State::NotRecorded);
+    assert_eq!(state("context-freshness"), State::NotRecorded);
     let recorded = f
         .chain()
         .entries()
