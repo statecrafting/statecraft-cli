@@ -165,8 +165,9 @@ pub struct Inputs<'a> {
     pub repository: &'a str,
     /// The trusted base.
     pub trusted_base: &'a str,
-    /// The prepared workspace's candidate revision.
-    pub candidate: &'a str,
+    /// The prepared workspace's candidate revision; `Err` names why it could
+    /// not be read. An unread candidate is never an identity.
+    pub candidate: Result<&'a str, String>,
     /// The recorded task.
     pub task: &'a DocumentationTask,
     /// The 020 delivery fold, if recorded.
@@ -562,14 +563,22 @@ pub fn judge(i: &Inputs<'_>) -> Judgment {
         }
     };
 
+    let candidate = match &i.candidate {
+        Ok(c) => Some(*c),
+        Err(why) => {
+            reasons.push(format!("candidate-unidentified: {why}"));
+            None
+        }
+    };
+
     // Section 3.1: the core tuple, from the record alone.
-    let base_subject = match (&i.result, i.result_custody) {
-        (Ok(result), Some(custody)) if policy.is_some() => Some(CoreTuple {
+    let base_subject = match (&i.result, i.result_custody, candidate) {
+        (Ok(result), Some(custody), Some(candidate)) if policy.is_some() => Some(CoreTuple {
             repository: i.repository.to_string(),
             trusted_base: i.trusted_base.to_string(),
             run_id: task.run_id.clone(),
             attempt: task.attempt,
-            candidate: i.candidate.to_string(),
+            candidate: candidate.to_string(),
             context_manifest_digest: task.context_manifest_digest.clone(),
             task_digest: task.task_digest.clone(),
             result_custody_digest: custody.to_string(),

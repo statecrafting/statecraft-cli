@@ -114,7 +114,8 @@ fn result(t: &DocumentationTask, grade: &str) -> DocumentationResult {
             "contradictionRefs": [], "reviewDisposition": "not-reviewed"
         }],
         "unknowns": [], "contradictions": [], "unsupportedClaims": [],
-        "providerOmissions": [], "statecraftCitationFailures": [], "executionEvidence": [],
+        "providerOmissions": [], "statecraftCitationFailures": [],
+        "executionEvidence": [{"reference": "test-run-1", "purpose": "the parser suite"}],
         "providerCompletion": "claimed-complete",
         "reviewDisposition": "not-reviewed", "acceptanceResult": "not-attempted"
     });
@@ -243,6 +244,7 @@ struct Case {
     changed: Vec<String>,
     policy: (Policy, String),
     delivery_findings: Vec<String>,
+    candidate: Result<String, String>,
 }
 
 impl Case {
@@ -271,6 +273,7 @@ impl Case {
             changed: vec![],
             policy: p,
             delivery_findings: vec![],
+            candidate: Ok("c".repeat(40)),
         }
     }
 
@@ -284,7 +287,7 @@ impl Case {
         da::judge(&Inputs {
             repository: "example/app",
             trusted_base: &"b".repeat(40),
-            candidate: &"c".repeat(40),
+            candidate: self.candidate.as_deref().map_err(Clone::clone),
             task: &self.task,
             delivery: Some(&delivery),
             result_custody: Some(&d("raw")),
@@ -523,6 +526,25 @@ fn an_artifact_applied_to_the_candidate_breaks_the_publication_boundary() {
     let j = c.judge();
     assert_eq!(state(&j, Dimension::PublicationBoundary), State::Fail);
     assert_eq!(j.outcome, Outcome::Rejected);
+}
+
+// An unread candidate leaves the subject unidentified; it is never an empty
+// identity.
+#[test]
+fn an_unread_candidate_identifies_no_subject() {
+    let mut c = Case::passing();
+    c.candidate = Err("the workspace is absent".into());
+    let j = c.judge();
+    assert!(j.subject.is_none());
+    assert_eq!(state(&j, Dimension::TaskBinding), State::NotRecorded);
+    assert_ne!(j.outcome, Outcome::Accepted);
+    assert!(
+        j.reasons
+            .iter()
+            .any(|r| r == "candidate-unidentified: the workspace is absent"),
+        "{:?}",
+        j.reasons
+    );
 }
 
 // Required transport cannot be satisfied by adapter testimony.
