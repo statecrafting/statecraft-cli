@@ -1,0 +1,18 @@
+{
+  "mapping": {
+    "amends": [
+      "005-acceptance-and-evidence",
+      "024-review-budget-and-ratification"
+    ],
+    "dependsOn": [
+      "005-acceptance-and-evidence",
+      "024-review-budget-and-ratification",
+      "037-closed-admission-gate"
+    ],
+    "implementingPaths": [],
+    "specId": "054-ai-prescreen-attestation",
+    "specStatus": "draft"
+  },
+  "schemaVersion": "1.3.0",
+  "shardHash": "86ac34ddb2e013f253b03fed2c2ec7f28131903e51042109dd946eadab77873d"
+}

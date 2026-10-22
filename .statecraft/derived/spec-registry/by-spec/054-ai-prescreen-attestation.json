@@ -1,0 +1,83 @@
+{
+  "record": {
+    "amends": [
+      "005-acceptance-and-evidence",
+      "024-review-budget-and-ratification"
+    ],
+    "created": "2026-10-21",
+    "dependsOn": [
+      "005-acceptance-and-evidence",
+      "024-review-budget-and-ratification",
+      "037-closed-admission-gate"
+    ],
+    "id": "054-ai-prescreen-attestation",
+    "implementation": "pending",
+    "obligations": [
+      {
+        "anchor": "3-3-advisory-never-a-decision",
+        "id": "I-1",
+        "kind": "invariant",
+        "text": "No pre-screen attestation is counted as an approval or a change request, and no pre-screen verdict ever admits a revision; at most it refuses, and only under a policy that opts in on the fail-closed path."
+      },
+      {
+        "anchor": "3-2-what-the-record-binds",
+        "id": "I-2",
+        "kind": "invariant",
+        "text": "The prompt and guidelines a pre-screen is produced under are read from the base revision, never from the candidate the gated agent produced, and their digests are in the attestation."
+      },
+      {
+        "anchor": "3-4-forbidden",
+        "id": "R-1",
+        "kind": "requirement",
+        "text": "The verdict is read from the review's structured verdict block only; output without a valid block is an error, never a verdict, and an error never approves."
+      },
+      {
+        "anchor": "3-3-advisory-never-a-decision",
+        "id": "R-2",
+        "kind": "requirement",
+        "text": "A policy that opts in to refuse on a deny pre-screen also refuses when the pre-screen is missing, unreadable or for another revision; a policy that does not opt in evaluates exactly as spec 037 does."
+      },
+      {
+        "anchor": "verification",
+        "id": "V-1",
+        "inputs": [
+          "crates/statecraft-envelope/tests/admission_differential.rs"
+        ],
+        "kind": "verification",
+        "text": "Admission over a revision with a no-findings pre-screen and no approval refuses for the missing approval; a findings pre-screen under an opting policy refuses and under a default policy changes nothing; the spec 037 differential test still passes for every policy without the option."
+      }
+    ],
+    "sectionDigests": {
+      "054-ai-pre-screen-attestation": "3ccfff36d695eaf81a9e84c5e8a3690db5b50f7c7a9f5461e007de5e10413b7f",
+      "1-purpose": "d520cab24fe2a49d07f07555c284e2e831d14bf1798e2aed79dc8d81f944cd04",
+      "2-territory": "c56c55fba01acb89840c496e07f3629f7c6bbd8a8bf57c1cc6d706e6daff8ed0",
+      "3-1-the-predicate": "74e5eb1fdca6cf27bb982e0bfa35c6c9760e03b01ba78018e316c472cb03d97a",
+      "3-2-what-the-record-binds": "6b2d7437255026f7383f98e343cc483cbfc6fce2cf9b5ff3227c814b20ced597",
+      "3-3-advisory-never-a-decision": "bc77dbd4b8275bc2c92dd243bb00c8ca856793fce3a4638714f463ca1cb37067",
+      "3-4-forbidden": "6af0dafac5bb0cdfcf8871ab286728f783a85dacf23c1eb5ce49389b32a94d1d",
+      "3-behavior": "dd02e4f26d14db20b731f9f8de148a7c90df395743e1160fc23e0ff021d04f5f",
+      "4-out-of-scope": "d48fd67b45dc33bc7d6e3a44cdbd84c85c23672d794b77544a3caae5461bcd6d",
+      "5-resolved-decisions": "003fdfe1dcdcd9fe9696dc5d706e4bd9670bb9b1e84df03ab7473ff7686842bc",
+      "verification": "4ff6a3d0618752ceb184db690f82b66dadb4ac96d191f6b9716776d404f3d48d"
+    },
+    "sectionHeadings": [
+      "054: AI pre-screen attestation",
+      "1. Purpose",
+      "2. Territory",
+      "3. Behavior",
+      "3.1 The predicate",
+      "3.2 What the record binds",
+      "3.3 Advisory, never a decision",
+      "3.4 Forbidden",
+      "4. Out of scope",
+      "5. Resolved decisions",
+      "Verification"
+    ],
+    "specPath": "specs/054-ai-prescreen-attestation/spec.md",
+    "status": "draft",
+    "summary": "Records the managed AI review's verdict on a revision as an advisory attestation naming the model, the prompt's digest, the guidelines' digest and the structured verdict. It is shown beside statecraft/approval/v1 and is never counted as an approval. It may order a review queue. A policy may let a deny refuse admission only on a fail-closed path, where a missing or unreadable pre-screen refuses too. An AI deciding, confidence-gated auto-approval, approval on error, substring parsing of a verdict and a prompt the gated agent can influence are forbidden.\n",
+    "title": "An AI pre-screen is an advisory attestation shown beside approvals and never counted as one"
+  },
+  "shardHash": "86ac34ddb2e013f253b03fed2c2ec7f28131903e51042109dd946eadab77873d",
+  "specVersion": "1.10.0"
+}
