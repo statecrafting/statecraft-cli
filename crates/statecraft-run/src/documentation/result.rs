@@ -568,10 +568,12 @@ pub enum Projection {
         /// Why.
         reason: String,
     },
-    /// The task and its result.
+    /// The task, the adapter's delivery testimony, and the result.
     Recorded {
         /// The task's identity.
         task: TaskIdentity,
+        /// The delivery fold, or `None` when none was recorded.
+        delivery: Option<Box<super::delivery::Delivery>>,
         /// The result.
         result: ResultProjection,
     },
@@ -630,6 +632,7 @@ pub fn project(chain: &Chain, run_id: &str, attempt: u32) -> Projection {
                 task_id: task.task_id.clone(),
                 task_digest: task.task_digest.clone(),
             },
+            delivery: super::delivery::recorded_delivery(chain, &task).map(Box::new),
             result: recorded_results(chain, &task),
         },
     }

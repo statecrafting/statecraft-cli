@@ -19,6 +19,8 @@ amends:
 extends:
   - { spec: "003-work-and-run-semantics", unit: { kind: directory, path: "crates/statecraft-run/" }, nature: additive }
   - { spec: "004-execution-adapter", unit: { kind: directory, path: "crates/statecraft-adapter/" }, nature: additive }
+  - { spec: "004-execution-adapter", unit: { kind: directory, path: "crates/statecraft-adapter-claude-code/" }, nature: additive }
+  - { spec: "002-environment-lifecycle", unit: { kind: directory, path: "crates/statecraft-home/" }, nature: additive }
   - { spec: "005-acceptance-and-evidence", unit: { kind: directory, path: "crates/statecraft-acceptance/" }, nature: additive }
   - { spec: "006-command-surface", unit: { kind: directory, path: "crates/statecraft-cli/" }, nature: additive }
 depends_on:
@@ -80,6 +82,9 @@ existing units named by its `extends` edges:
 
 - `statecraft-run` owns immutable documentation tasks and retained results;
 - `statecraft-adapter` carries those bytes without learning their policy;
+- `statecraft-adapter-claude-code` and `statecraft-home` construct the
+  adapter request and its events, so they name the new members and, until a
+  provider adapter delivers a documentation task, leave them absent;
 - `statecraft-acceptance` decodes and exposes the inputs later acceptance uses;
   and
 - `statecraft-cli` projects the records through existing run and acceptance
@@ -393,6 +398,31 @@ counted as `unexplainedClaims`, so section 3.6's rule stays visible beside a
 reference to anything else refuses as outside the task, so a fabricated
 reference cannot take a claim out of that count.
 
+**2026-10-22: how the request and the events carry the documentation lane.**
+The adapter request gains a `documentation` member beside `context`: the
+exact task bytes and digest, the result-schema bytes and digest, and the
+pinned skill's bytes, framed after the prompt and any context pages, each
+in a length-declared frame. The init event gains a `documentation` report
+(task, manifest, skill or `not-required`, result-schema digests, and the
+applied capability tokens) and the terminal `result` event a `documentation`
+member carrying the raw bytes with their stated media type, length and
+custody digest. A task's `requiredCapabilities` are spec 004's capability
+tokens; one the selected adapter does not declare, or one outside that
+vocabulary, refuses before spawn as `capability-undeclared`. The run record
+keeps the fold of the init reports as one `documentation-delivery` evidence
+record: no report, more than one, or any member that differs is a finding
+and makes the attempt's result ineligible. A terminal event whose stated
+length or digest is not its bytes' keeps the bytes and adds a finding. Two
+`extends` edges join section 2's list, on `statecraft-adapter-claude-code`
+(spec 004) and `statecraft-home` (spec 002), because both construct the
+request and the events literally; this change only names the new members
+there, absent. The launch path runs the pre-spawn check on every attempt,
+after the context bundle's and under its own guard `documentation-bundle`:
+it reads the task the intent recorded, assembles the bundle from it, and
+checks bundle, task and the selected adapter's declared capabilities
+together. That path holds no pinned skill's bytes, so a recorded task that
+pins a skill refuses there rather than spawn without it.
+
 ## Verification
 
 Implementation acceptance is the portable fixture surface `V-1` names, run
@@ -404,4 +434,5 @@ runs, and every chain read is reopened from disk.
 
 ```verify:cli
 cargo test -p statecraft-run --test documentation_contract
+cargo test -p statecraft-adapter --test documentation_result
 ```

@@ -21,6 +21,10 @@
 //!   its delivered pages beside the prompt, the refusal before spawn when
 //!   they are not exactly the recorded manifest, and the init event's
 //!   delivery testimony. Added by spec 019's additive edge.
+//! - [`documentation`] is spec 020's bundle: the documentation task, its
+//!   result schema and its skill beside the prompt, the refusal before spawn
+//!   when they are not the recorded task's, and the init and terminal
+//!   events' testimony. Added by spec 020's additive edge.
 //! - [`manifest`] is what an adapter declares, and what qualifies one **binary
 //!   version** and no other.
 //! - [`environment`] constructs the child's environment from an allowed set, and
@@ -46,6 +50,7 @@ pub mod boundary;
 pub mod capability;
 pub mod context;
 pub mod coverage;
+pub mod documentation;
 pub mod environment;
 pub mod fixture;
 pub mod manifest;
