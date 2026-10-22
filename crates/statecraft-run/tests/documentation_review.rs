@@ -163,6 +163,31 @@ fn a_review_decodes_from_its_own_bytes_and_its_digest_covers_every_member() {
     ));
 }
 
+// Section 3.1: repeated evidence identities cannot form an unambiguous subject.
+#[test]
+fn reviews_and_corrections_refuse_non_adjacent_duplicate_evidence() {
+    let evidence = vec![
+        "evidence-1".into(),
+        "evidence-2".into(),
+        "evidence-1".into(),
+    ];
+    let mut r = review(Recommendation::Accept);
+    r.subject.evidence = evidence.clone();
+    let bytes = serde_json::to_vec(&r.seal()).unwrap();
+    assert!(matches!(
+        Review::decode(&bytes),
+        Err(DocumentError::Duplicate(_))
+    ));
+
+    let mut c = correction();
+    c.subject.evidence = evidence;
+    let bytes = serde_json::to_vec(&c.seal()).unwrap();
+    assert!(matches!(
+        Correction::decode(&bytes),
+        Err(DocumentError::Duplicate(_))
+    ));
+}
+
 #[test]
 fn a_review_with_a_repeated_claim_or_an_escaping_artifact_refuses() {
     let mut r = review(Recommendation::Accept);

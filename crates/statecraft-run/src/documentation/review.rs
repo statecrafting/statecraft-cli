@@ -254,6 +254,10 @@ impl CoreTuple {
         for e in &self.evidence {
             nonempty("evidence reference", e)?;
         }
+        unique(
+            "evidence reference",
+            self.evidence.iter().map(String::as_str),
+        )?;
         Ok(())
     }
 }
