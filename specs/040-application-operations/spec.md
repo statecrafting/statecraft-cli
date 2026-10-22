@@ -298,6 +298,16 @@ files are compared by what they stand for, each checked on its own side
 first, and everything else byte for byte. The entry stands as written; no
 sixth value joins it without another owner decision.
 
+**2026-10-21: the boundary-probe constructor allows `unsafe_code` on its own
+item.** The test binary answers `__boundary_probe` from a constructor placed
+with `unsafe(link_section = ...)` in
+`crates/statecraft-cli/tests/application_equivalence/launch.rs`, the only
+unsafe in that binary. A workspace `unsafe_code = "deny"` (queue item H4)
+refuses it, so the static carries `#[allow(unsafe_code)]` with a one-line
+reason, the same item-level shape as `statecraft-adapter`'s
+`#[allow(unsafe_code)] mod native;`. No behaviour changes; `cargo clippy -p
+statecraft-cli --all-targets --locked -- -D warnings -D unsafe_code` passes.
+
 ## Verification
 
 These commands are required for final implementation acceptance. While
