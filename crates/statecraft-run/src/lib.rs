@@ -35,6 +35,10 @@
 //!   consumption: the task manifest written into the intent, the custody of
 //!   the exact packet bytes, their bounds, and intended beside
 //!   adapter-observed delivery. Added by spec 019's additive edge.
+//! - [`documentation`] is spec 020's run-record half of the documentation
+//!   lane: the closed task written into the intent, the closed result kept
+//!   as raw bytes before decoding, their binding, and the `run show`
+//!   projection. Added by spec 020's additive edge.
 //! - [`session`] is one run from intent to outcome, and the fold that reads runs
 //!   back out of the record. Added by spec 006's additive edge, because a
 //!   command may not be a second implementation and a binding needs an entry
@@ -52,6 +56,7 @@
 pub mod attempt;
 pub mod context;
 pub mod contract;
+pub mod documentation;
 pub mod lock;
 pub mod overrides;
 pub mod policy;

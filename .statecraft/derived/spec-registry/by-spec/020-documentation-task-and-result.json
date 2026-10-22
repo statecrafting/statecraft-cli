@@ -89,7 +89,7 @@
       }
     ],
     "sectionDigests": {
-      "020-documentation-task-and-structured-result-contracts": "d5c24e49f57809ab49c84dd63f3ad13e93bd8b4b8639c1b1e44ae599d0fba9da",
+      "020-documentation-task-and-structured-result-contracts": "7108b74132fa5c6f12941e86db0b8085a4fe8fe3bcab01c3659ade2c974bdbb2",
       "1-purpose": "8b02f913b08663186d36ea3bcd0e8c7bbe0a31bfa9121baec73462c986d20da5",
       "2-territory-and-prerequisite": "746191492c5936ba79256a9021ca5ff97507f6338406e8da8b63dcab76fd35eb",
       "3-1-separate-documents-and-authorities": "b35f09424b454ccc5c8767a710f0c8c186a8a8f6f4c59e59b22a1fb19c52976b",
@@ -104,8 +104,8 @@
       "3-9-command-projections": "587b0364536491e447ee2ff9d07dd51c45909723d24159143fa856ca63401dc7",
       "3-behavior": "f34320cf4fb2f3d02c882a2d074430cdd11566983a378acb199f689a0e46b749",
       "4-out-of-scope": "a4a674200e255a9485679c056b3d415c22b94b7d706f9beea80fedeb3d2210ca",
-      "5-resolved-decisions": "645af635a54bdcc8dd906c05698552f56bd38f06f2b2ac0527aae295c12ae088",
-      "verification": "6d5603eb03d66a09fc046a1cc97625712654f22d4eea117148915d84a903135c"
+      "5-resolved-decisions": "ba4a8519a0cd9383eacf6f4d1e2d6a5c5e21f5dec9f9115fd65749840447f1e9",
+      "verification": "b6f52865f59bf0a77daf53deaaa758c02d56a0e0e027c8906099670de298900c"
     },
     "sectionHeadings": [
       "020: Documentation task and structured result contracts",
@@ -131,6 +131,6 @@
     "summary": "Amends Statecraft's run, adapter, acceptance, and command contracts with an immutable documentation-task document and a provider-neutral structured documentation result. It separates task authority from provider output, binds every claim to an explicit lifecycle grade and supporting references, preserves omissions and contradictions, and keeps provider completion apart from independent acceptance and publication.\n",
     "title": "Documentation task and structured result contracts"
   },
-  "shardHash": "ad9a59aa073328e7fe9675544da26e25183f58ad4cffe32bfaf22145b40b5cf2",
+  "shardHash": "921d3995272dd76377ec277db20227cd42cad0535515c88ffe789d12de011445",
   "specVersion": "1.10.0"
 }

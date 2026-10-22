@@ -242,6 +242,7 @@ pub fn begin_admitted(
             proposal: None,
             context_manifest: None,
             context_policy: None,
+            documentation_task: None,
         },
     )
 }
@@ -270,6 +271,10 @@ pub struct IntentDetail<'a> {
     /// The spec 019 section 3.8 acceptance policy for that manifest. Written
     /// under `contextPolicy`, with the manifest, before any effect.
     pub context_policy: Option<&'a crate::context::ContextPolicy>,
+    /// The spec 020 documentation task for this attempt. Written under
+    /// `documentationTask`, with the manifest it names, before any effect;
+    /// an intent without it renders `not-recorded`.
+    pub documentation_task: Option<&'a crate::documentation::DocumentationTask>,
 }
 
 /// [`begin_admitted`], with every part of the intent's detail named.
@@ -307,6 +312,7 @@ pub fn begin_checked(
         proposal,
         context_manifest,
         context_policy,
+        documentation_task,
     } = *intent;
     for run in runs(chain) {
         if let Some(live) = run.live_attempt() {
@@ -331,6 +337,30 @@ pub fn begin_checked(
              this intent is run {run_id} attempt {number}",
             manifest.run_id, manifest.attempt
         )));
+    }
+
+    // Spec 020 sections 3.2 and 3.3: a task binds only its own attempt, the
+    // manifest recorded with it, and a candidate the review policy accepts;
+    // otherwise it refuses before any effect.
+    if let Some(task) = documentation_task {
+        let refuse = |why: String| SessionError::Boundary(format!("documentation-task: {why}"));
+        task.validate().map_err(|e| refuse(e.to_string()))?;
+        if task.run_id != run_id || task.attempt != number {
+            return Err(refuse(format!(
+                "the task names run {} attempt {}, this intent is run {run_id} attempt {number}",
+                task.run_id, task.attempt
+            )));
+        }
+        let Some(manifest) = context_manifest else {
+            return Err(refuse(format!(
+                "the task names manifest {} and the intent records none",
+                task.context_manifest_digest
+            )));
+        };
+        task.check_manifest(manifest)
+            .map_err(|e| refuse(e.to_string()))?;
+        task.check_candidate(&base_commit)
+            .map_err(|e| refuse(e.to_string()))?;
     }
 
     let follows = crate::reconcile::since_last_intent(chain);
@@ -427,6 +457,12 @@ pub fn begin_checked(
                 }
                 if let Some(policy) = context_policy {
                     detail[crate::context::POLICY_KEY] = serde_json::to_value(policy)
+                        .unwrap_or_else(|e| serde_json::json!({ "unserializable": e.to_string() }));
+                }
+                // Spec 020 section 3.2: the complete task, once, with the
+                // intent, before any adapter process starts.
+                if let Some(task) = documentation_task {
+                    detail[crate::documentation::INTENT_KEY] = serde_json::to_value(task)
                         .unwrap_or_else(|e| serde_json::json!({ "unserializable": e.to_string() }));
                 }
                 detail

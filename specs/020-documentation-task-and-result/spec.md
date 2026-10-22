@@ -356,9 +356,36 @@ inferred from a weaker fact.
 authority.** The documentation lane produces reviewable bytes or patches.
 Application and publication remain later, separately authorized acts.
 
+**2026-10-22: the closed words and bounds version 1 fixes where section 3.2
+names a member but not its values.** The run-record half
+(`crates/statecraft-run/src/documentation/mod.rs`) fixes them so a task decodes
+closed: `outputFormat.format` is `markdown` or `plain-text`; `deadline` is
+`notAfter` (`YYYY-MM-DDTHH:MM:SSZ`) under the clock `supervisor-utc`;
+`costCeiling` is `no-spend` or an ISO 4217 `currency`, a
+`maximumMinorUnits` and the enforcement `stop-attempt`; `skill` is
+`not-required` or an `id`, `version` and `digest`; an artifact's
+`disposition` is `draft` (under `draft-artifact`) or `patch` (under
+`propose-patch`), and its `requiredContext` names manifest repositories and
+page digests, never more than the manifest holds. The review policy's
+`candidateDivergence` is `permitted` or `prohibited`, and its absence is the
+silent policy that prohibits divergence; the candidate is compared with the
+prepared workspace by revision. Every string is at most 16 KiB and every
+collection at most 4,096 items, checked after the raw-byte scan and before
+the closed decode. The result schema delivered before spawn is
+`crates/statecraft-run/schemas/documentation-result-1.json`, and a task
+names it by that file's `sha256:` custody digest. The raw result is kept
+write-once under its custody digest in the same product-home store as the
+spec 019 packets. A later schema version changes any of these.
+
 ## Verification
 
-No implementation acceptance is declared while spec 019 and this spec remain
-unratified. The `V-1` inputs name the portable fixture surface a later
-implementation must add. Fixtures use deterministic fake adapter results and no
-live provider, credentials, spend, network publication, or repository mutation.
+Implementation acceptance is the portable fixture surface `V-1` names, run
+through `make verify SPEC=020`. This spec is `status: approved` (`registry
+list` reports it; the frontmatter is unchanged here), so its implementation
+lands in parts: the acceptance is declared one suite at a time as each part
+lands, and `implementation` stays `pending` until the last. No provider
+runs, and every chain read is reopened from disk.
+
+```verify:cli
+cargo test -p statecraft-run --test documentation_contract
+```
