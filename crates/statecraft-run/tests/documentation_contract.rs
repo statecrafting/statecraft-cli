@@ -695,6 +695,32 @@ fn a_retry_writes_a_new_task_identity() {
 // Section 3.4: the delivery fold is recorded once and projected; a second
 // record is a finding, never a choice.
 #[test]
+fn delivery_deduplicates_non_adjacent_mismatches() {
+    use statecraft_run::documentation::delivery::{self, Reported};
+    let m = manifest(1, TASK);
+    let t = task(1, "r", &m);
+    let report = Reported {
+        task_digest: digest("wrong-task"),
+        context_manifest_digest: t.context_manifest_digest.clone(),
+        skill: delivery::SKILL_NOT_REQUIRED.into(),
+        result_schema_digest: digest("wrong-schema"),
+        capabilities: t.required_capabilities.clone(),
+    };
+    let reports = vec![report.clone(), report];
+    let folded = delivery::fold(&t, &reports);
+    assert!(!folded.eligible);
+    assert_eq!(folded.reported, reports);
+    assert_eq!(
+        folded.findings,
+        [
+            "duplicate: 2 identical reports",
+            "mismatch: resultSchemaDigest",
+            "mismatch: taskDigest",
+        ]
+    );
+}
+
+#[test]
 fn the_delivery_fold_is_recorded_and_a_second_record_is_a_finding() {
     use statecraft_run::documentation::delivery::{self, Reported};
     let home = tempfile::tempdir().unwrap();

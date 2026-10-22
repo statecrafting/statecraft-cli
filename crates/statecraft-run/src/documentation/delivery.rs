@@ -93,6 +93,7 @@ pub fn fold(task: &DocumentationTask, reported: &[Reported]) -> Delivery {
             );
         }
     }
+    findings.sort();
     findings.dedup();
     Delivery {
         reported: reported.to_vec(),
