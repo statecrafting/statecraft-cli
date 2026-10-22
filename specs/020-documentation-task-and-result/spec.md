@@ -377,6 +377,22 @@ names it by that file's `sha256:` custody digest. The raw result is kept
 write-once under its custody digest in the same product-home store as the
 spec 019 packets. A later schema version changes any of these.
 
+**2026-10-22: how the run record names what decoding a result found.** The
+result half (`crates/statecraft-run/src/documentation/result.rs`) records one
+evidence record per returned result, carrying the attempt's binding, the raw
+bytes' media type, length and custody digest, and one of three states:
+`bound` with the section 3.9 counts, `schema-invalid` with the refusal's
+code word, or `unbound` naming the first binding member the result does not
+repeat. `run show` reads those records and decodes nothing. More than one
+result for the attempt's task digest renders `duplicate` with every custody
+digest in record order, and none is chosen. A claim with neither a citation
+nor an evidence reference whose `unsupportedReason` is `not-applicable` is
+counted as `unexplainedClaims`, so section 3.6's rule stays visible beside a
+`claimed-complete` result rather than refusing the document. A claim's
+`evidenceRefs` must each name an entry of the result's `executionEvidence`; a
+reference to anything else refuses as outside the task, so a fabricated
+reference cannot take a claim out of that count.
+
 ## Verification
 
 Implementation acceptance is the portable fixture surface `V-1` names, run

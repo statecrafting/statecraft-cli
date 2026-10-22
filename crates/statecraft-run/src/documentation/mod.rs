@@ -9,9 +9,15 @@
 //!   schema, the exact version 1 operation sets and `publication:
 //!   prohibited`, and the session writes it into the attempt's intent under
 //!   [`INTENT_KEY`] before any adapter process exists.
-//! - `statecraft/documentation-result/1`, what the provider returned, is the
-//!   next change: its schema is fixed here already, because a task names it
-//!   by digest ([`RESULT_SCHEMA_BYTES`]).
+//! - [`DocumentationResult`] is `statecraft/documentation-result/1`, what the
+//!   provider returned: testimony, never acceptance. [`record_result`] keeps
+//!   the raw bytes under their custody digest before decoding them, and a
+//!   decoding failure is recorded beside the bytes, never repaired.
+//!
+//! [`project`] folds both for `run show` from the chain and nothing else.
+//!
+//! The task half is this module; the result half is [`result`], re-exported
+//! here.
 
 use std::collections::BTreeSet;
 
@@ -23,6 +29,9 @@ use statecraft_envelope::hash::sha256_hex;
 use crate::context::{self, Bounds};
 use crate::record::{Chain, Kind};
 use crate::session::INTENT_SUBJECT;
+
+pub mod result;
+pub use result::*;
 
 /// The task's closed schema word.
 pub const TASK_SCHEMA: &str = "statecraft/documentation-task/1";
