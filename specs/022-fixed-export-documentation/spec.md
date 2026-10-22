@@ -366,15 +366,42 @@ dependency on live transport, credentials, provider availability, or spend.
 test-only shortcut around task, event, custody, review, or acceptance records
 would prove a different workflow.
 
+**2026-10-22: the workflow record's shape and preparation's checks.** The
+run-record half (`crates/statecraft-run/src/documentation/workflow.rs`) fixes
+section 3.1's record: the profile, project, run, attempt and workspace
+candidate; the subjects (manifest digest, every packet page by repository,
+revision, tree, dirty state, page and custody digests, the task digest, the
+skill digest or `not-required`, the result-schema digest, the selected
+adapter and its declared capabilities, every retained event, the raw
+result's custody digest, and the review, correction and acceptance
+digests); the transitions (`prepared`, `executed`, `validated`, `reviewed`,
+`corrected`, `judged`, each with a reason and time); the findings; and a
+digest over every other member. Each transition appends a new version as an
+evidence record (`fixed-export-workflow`); the current workflow is the
+latest version. Preparation refuses a revision that is not a full object id
+(`moving-input`), a page whose bytes are not retained under its custody
+digest (`not-retained`), a task that permits spend, skill bytes that are not
+the pinned ones, a task and manifest that name different subjects, and other
+inputs for an attempt already prepared (`competing-workflow`); the same
+inputs report the existing version. Events are retained one line at a time,
+under custody, before parsing; a line that is not JSON is kept as
+`application/octet-stream`; the first `result` event is the terminal one,
+and a second terminal, an event after it, or none at all is a finding.
+
 **2026-09-27: acceptance is the end of this profile's authority.** Application
 and publication remain distinct future operations because even a fully
 accepted artifact cannot authorize mutation or an externally visible act.
 
 ## Verification
 
-No implementation acceptance is declared while the prerequisite specs and this
-spec remain unratified. The `V-1` inputs define the portable fixture surface a
-later implementation must add. Fixtures use fixed local bytes, fake adapter and
-review identities, fixed clocks, deterministic effect denials, and disposable
-workspaces. They perform no live provider call, network access, credential read,
-spend, operator-checkout mutation, remote export, or publication.
+Implementation acceptance is the portable fixture surface `V-1` names, run
+through `make verify SPEC=022`. This spec is `status: approved` (`registry
+list` reports it; the frontmatter is unchanged here), so its implementation
+lands in parts: the acceptance is declared one suite at a time as each part
+lands, and `implementation` stays `pending` until the last. Fixtures use
+fixed local bytes, fake adapter and review identities, fixed clocks and
+disposable workspaces.
+
+```verify:cli
+cargo test -p statecraft-run --test fixed_export_documentation
+```

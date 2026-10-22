@@ -33,6 +33,7 @@ use crate::session::INTENT_SUBJECT;
 pub mod delivery;
 pub mod result;
 pub mod review;
+pub mod workflow;
 pub use result::*;
 
 /// The task's closed schema word.
