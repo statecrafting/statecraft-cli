@@ -1,0 +1,85 @@
+{
+  "record": {
+    "amends": [
+      "003-work-and-run-semantics",
+      "039-local-cockpit-authority"
+    ],
+    "created": "2026-10-21",
+    "dependsOn": [
+      "003-work-and-run-semantics",
+      "004-execution-adapter",
+      "039-local-cockpit-authority"
+    ],
+    "id": "053-operator-input-record",
+    "implementation": "pending",
+    "obligations": [
+      {
+        "anchor": "3-1-the-input-record",
+        "id": "I-1",
+        "kind": "invariant",
+        "text": "No operator input reaches a child before its record, naming author, reason, kind and expiry, is durable in the run record."
+      },
+      {
+        "anchor": "3-2-states",
+        "id": "R-1",
+        "kind": "requirement",
+        "text": "An input moves only pending to delivered to acknowledged, or pending or delivered to expired; delivered is recorded by the supervisor when it places the input, and acknowledged only from the gate log, labelled child-attested."
+      },
+      {
+        "anchor": "3-4-view-only-by-default",
+        "id": "R-2",
+        "kind": "requirement",
+        "text": "A cockpit session is view-only until an operator grants it control for a stated duration; an input or operation submitted without a live grant is refused with exit 2."
+      },
+      {
+        "anchor": "3-5-local-only",
+        "id": "R-3",
+        "kind": "requirement",
+        "text": "Inputs are accepted only from the local CLI and the loopback cockpit of spec 039; no remote transport and no command authorized by a session alone without an operator's grant."
+      },
+      {
+        "anchor": "verification",
+        "id": "V-1",
+        "inputs": [
+          "crates/statecraft-run/src/record.rs"
+        ],
+        "kind": "verification",
+        "text": "A note sent during a live attempt is recorded pending, delivered at the next governed call, and expires if no call comes before its expiry; a command is refused without a control grant; the attempt's record carries every input as evidence."
+      }
+    ],
+    "sectionDigests": {
+      "053-operator-input-record": "baf96fd67ec7fa5d8c9f0e817424ecc5d671a3fe363cdc7ede1784dc6a971a7f",
+      "1-purpose": "54d386817f4591af5252ec25e3e1fc9b3e26757892b8666afc71fa50d58a3577",
+      "2-territory": "259ca4255f2ab3b167729833670c511a4a4d6be2b4f058702d6423ec5fba34a5",
+      "3-1-the-input-record": "529927f4d51e1e773d010c66ceb7067fcb97e7fe9eac74c55eec5cc211033911",
+      "3-2-states": "e243981f3103ed29e8b7fce6bff1ae33bf9da942a100c4db07106dfb88687f23",
+      "3-3-note-and-command": "2e274c074fcbd8b836b0c8e7b9a17ac521322177f715f425b3b80789b00fd505",
+      "3-4-view-only-by-default": "91e963ff079f968678cb81bfed5bc2bd3ffb5eca7487e18cac4213eb2126526f",
+      "3-5-local-only": "948a0bc4a797f9cd9c5316cf72e175655c08e006fade10d5f69a8cc1a903df13",
+      "3-behavior": "040f8a2b326bc5bf820794f7faf22473a95128b7b763fd690f1a739be36d6e65",
+      "4-out-of-scope": "45848a94f2c780f4ac51889b61ded4ed167329faf350df4c8169bf316cb4df12",
+      "5-resolved-decisions": "c119e8278ff5eddd06cd03ac1fa39d5653d2df4e3cf3a1f0575aa9fc0b401bc0",
+      "verification": "7fdc1205bfaf66c7c5f6ad2dd2a1c3dd6ca54c37b8bece20eedecb1174c049af"
+    },
+    "sectionHeadings": [
+      "053: Operator input record",
+      "1. Purpose",
+      "2. Territory",
+      "3. Behavior",
+      "3.1 The input record",
+      "3.2 States",
+      "3.3 Note and command",
+      "3.4 View-only by default",
+      "3.5 Local only",
+      "4. Out of scope",
+      "5. Resolved decisions",
+      "Verification"
+    ],
+    "specPath": "specs/053-operator-input-record/spec.md",
+    "status": "draft",
+    "summary": "Lets an operator steer a live attempt with a note, read by the agent at its next governed tool call, or a command, which starts a new turn as a spec 048 continue. Each input is written to the run record before it is delivered, carries its author, reason and expiry, and moves through pending, delivered, then acknowledged or expired. The cockpit is view-only by default and grants control for a bounded time. Localhost only; no hosted transport and no unsigned session-authorized command. An abort command ends the attempt as spec 003's cancelled.\n",
+    "title": "Operator input to a live attempt is recorded before delivery, expires, and is evidence on the attempt"
+  },
+  "shardHash": "0b4bcfe36ed1722d60f4585c562e8b116b0cfdb288808c9db66f1331394aa2ee",
+  "specVersion": "1.10.0"
+}
