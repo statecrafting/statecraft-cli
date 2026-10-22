@@ -360,6 +360,35 @@ record (`documentation-review`, `documentation-correction`), read back in
 record order; a record that does not decode or whose digest does not hold is
 listed `unreadable`, never dropped.
 
+**2026-10-22: what the judgment reads, and the choices section 3 left
+open.** `crates/statecraft-acceptance/src/documentation_acceptance.rs`
+judges over inputs it is handed and fetches nothing. The trusted-base policy
+is `statecraft/documentation-acceptance-policy/1` at
+`.statecraft/documentation-acceptance.json`, read at the trusted base: its
+reviewer grants (identity, authority, optional `notAfter`), the `quorum` of
+eligible reviews that must recommend `accept` with no requested correction,
+whether `observedTransport` is required, and `maxArtifactBytes`; its digest
+is the subject's policy digest. Optionality: `semanticReview` follows the
+recorded task's `reviewPolicy.semanticReview`, `observedTransport` follows
+the policy, and every other dimension is required. `observedTransport` is
+`not-recorded` until an adopted evidence contract supplies it. Citation
+resolution, evidence admission and packet freshness come from spec 019's
+judged facts over the claims' citations and evidence references;
+documentation-manifest freshness is the producer's `documentation manifest
+freshness` answer, `not-recorded` when no manifest is supplied. A review
+binds only when it names the effective subject, which is the result's
+artifacts with each binding correction applied in record order; a reviewer
+whose identity is the result's provider or adapter fails `authority`, and a
+reviewer with no grant, a conflicting grant, another authority or an expired
+grant is `unknown`. Artifact validation reads retained bytes by digest, and
+checks presence exactly once, digest, size, UTF-8 text and every internal
+`#anchor` link against the artifact's headings; external links are not
+checked, because the task names no link policy and this spec grants no
+network. `publicationBoundary` fails when an expected artifact path is among
+the candidate's changed paths, and is `not-recorded` when those are not
+known. A required `fail` is `rejected`; any other non-pass is
+`no-acceptance`.
+
 ## Verification
 
 Implementation acceptance is the deterministic fixture surface `V-1` names,
@@ -372,4 +401,5 @@ retained local bytes, fixed review authorities and fixed clocks.
 
 ```verify:cli
 cargo test -p statecraft-run --test documentation_review
+cargo test -p statecraft-acceptance --test documentation_acceptance
 ```
