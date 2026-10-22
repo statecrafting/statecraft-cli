@@ -100,6 +100,7 @@ fi
             invocation,
             request: Request {
                 context: None,
+                documentation: None,
                 workspace: workspace.to_path_buf(),
                 base_commit: "fixture".into(),
                 prompt: b"private prompt: ' \" $(touch injected) `echo no` ;\n\\".to_vec(),

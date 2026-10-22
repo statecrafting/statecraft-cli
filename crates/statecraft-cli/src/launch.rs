@@ -731,6 +731,7 @@ pub fn launch_attempt(
     };
     let request = statecraft_adapter::protocol::Request {
         context: bundle,
+        documentation: None,
         workspace: session.workspace.path.clone(),
         base_commit: session.workspace.base_commit.clone(),
         prompt: plan.prompt.clone(),

@@ -30,6 +30,7 @@ use crate::context::{self, Bounds};
 use crate::record::{Chain, Kind};
 use crate::session::INTENT_SUBJECT;
 
+pub mod delivery;
 pub mod result;
 pub use result::*;
 

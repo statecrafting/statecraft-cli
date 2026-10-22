@@ -423,7 +423,9 @@ fn the_intent_records_the_task_before_any_effect_and_the_projection_reads_it() {
         Some(t.clone())
     );
     match documentation::project(&chain, RUN, 1) {
-        Projection::Recorded { task: id, result } => {
+        Projection::Recorded {
+            task: id, result, ..
+        } => {
             assert_eq!(id.task_digest, t.task_digest);
             assert_eq!(result, ResultProjection::NotRecorded);
         }
@@ -688,4 +690,41 @@ fn a_retry_writes_a_new_task_identity() {
     let second = task(2, "r", &m2);
     assert_ne!(first.task_digest, second.task_digest);
     assert_eq!(first.objective, second.objective);
+}
+
+// Section 3.4: the delivery fold is recorded once and projected; a second
+// record is a finding, never a choice.
+#[test]
+fn the_delivery_fold_is_recorded_and_a_second_record_is_a_finding() {
+    use statecraft_run::documentation::delivery::{self, Reported};
+    let home = tempfile::tempdir().unwrap();
+    let target = repo();
+    let head = git(target.path(), &["rev-parse", "HEAD"]);
+    let m = manifest(1, TASK);
+    let t = task(1, &head, &m);
+    let report = Reported {
+        task_digest: t.task_digest.clone(),
+        context_manifest_digest: t.context_manifest_digest.clone(),
+        skill: delivery::SKILL_NOT_REQUIRED.into(),
+        result_schema_digest: t.result_schema.digest.clone(),
+        capabilities: t.required_capabilities.clone(),
+    };
+    let fold = delivery::fold(&t, std::slice::from_ref(&report));
+    assert!(fold.eligible, "{:?}", fold.findings);
+    {
+        let (mut chain, _) = Chain::open(home.path(), target.path()).unwrap();
+        begin(&mut chain, target.path(), Some(&m), Some(&t)).unwrap();
+        delivery::record_delivery(&mut chain, &t, &fold, "2026-10-22T00:00:00Z").unwrap();
+    }
+    let (chain, _) = Chain::open(home.path(), target.path()).unwrap();
+    match documentation::project(&chain, RUN, 1) {
+        Projection::Recorded { delivery: d, .. } => assert_eq!(d.as_deref(), Some(&fold)),
+        other => panic!("expected a recorded projection, got {other:?}"),
+    }
+    drop(chain);
+    let (mut chain, _) = Chain::open(home.path(), target.path()).unwrap();
+    delivery::record_delivery(&mut chain, &t, &fold, "2026-10-22T00:00:01Z").unwrap();
+    let again = delivery::recorded_delivery(&chain, &t).unwrap();
+    assert!(!again.eligible);
+    assert!(again.findings[0].starts_with("duplicate"));
 }

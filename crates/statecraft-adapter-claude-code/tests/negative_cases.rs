@@ -36,6 +36,7 @@ fn replay(text: &str, code: u8) -> provider::execution::Execution {
     std::fs::write(&fixture, text).unwrap();
     let request = statecraft_adapter::Request {
         context: None,
+        documentation: None,
         workspace: workspace.path().to_path_buf(),
         base_commit: "recorded".into(),
         prompt: b"prompt through stdin".to_vec(),

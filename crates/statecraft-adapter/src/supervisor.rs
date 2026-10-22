@@ -1051,6 +1051,7 @@ mod tests {
         .unwrap();
         let request = Request {
             context: None,
+            documentation: None,
             workspace: directory.path().to_path_buf(),
             base_commit: "0".repeat(40),
             prompt: Vec::new(),
@@ -1139,6 +1140,7 @@ mod tests {
 
         let request = Request {
             context: None,
+            documentation: None,
             workspace: dir.path().to_path_buf(),
             base_commit: "0".repeat(40),
             prompt: b"fixture prompt".to_vec(),
@@ -1522,6 +1524,7 @@ mod tests {
         std::fs::write(dir.join("child.sh"), script).unwrap();
         let request = Request {
             context: None,
+            documentation: None,
             workspace: dir.to_path_buf(),
             base_commit: "0".repeat(40),
             prompt: b"fixture prompt".to_vec(),
