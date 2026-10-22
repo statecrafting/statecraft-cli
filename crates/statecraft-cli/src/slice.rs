@@ -1197,6 +1197,7 @@ pub struct AcceptView {
     /// Spec 021 section 3.10: the documentation judgment, recorded, every
     /// dimension and the outcome; `not-recorded` for an attempt with no
     /// documentation task.
+    #[serde(rename = "documentationAcceptance")]
     pub documentation_acceptance: crate::documentation::AcceptanceView,
 }
 
