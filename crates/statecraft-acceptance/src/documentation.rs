@@ -24,8 +24,11 @@ use statecraft_run::record::Chain;
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "kebab-case")]
 pub enum Acceptance {
-    /// No documentation acceptance contract exists yet (spec 021).
+    /// No documentation acceptance contract judged this attempt.
     NotDeclared,
+    /// Spec 021's judgment ran; `accept` shows it under
+    /// `documentationAcceptance`.
+    Judged,
 }
 
 /// The provider result's own sentinels, labelled as the provider's.

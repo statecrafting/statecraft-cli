@@ -239,8 +239,19 @@ fn accept_registered(
     let judgment = crate::context::judge(root, home, &chain, run_id, attempt.number, supplied);
     // Spec 020 section 3.9: the documentation inputs, beside the verdict and
     // never part of it; documentation acceptance is `not-declared`.
-    let documentation =
+    let mut documentation =
         statecraft_acceptance::documentation::inputs(&chain, home, run_id, attempt.number);
+    // Spec 021 section 3.10: the independent judgment, recorded, beside the
+    // verdict and never part of it.
+    let documentation_acceptance =
+        crate::documentation::accept(root, home, &chain, &attempt, run_id, supplied);
+    if let (
+        statecraft_acceptance::documentation::Inputs::Declared(d),
+        crate::documentation::AcceptanceView::Judged { .. },
+    ) = (&mut documentation, &documentation_acceptance)
+    {
+        d.acceptance = statecraft_acceptance::documentation::Acceptance::Judged;
+    }
     if let Some(reasons) = judgment.ineligible() {
         let mut answer = slice::accept_answer_with(
             statecraft_acceptance::outcome::Acceptance::None {
@@ -250,6 +261,7 @@ fn accept_registered(
         );
         answer.value.context_manifest = judgment;
         answer.value.documentation = documentation;
+        answer.value.documentation_acceptance = documentation_acceptance;
         return answer.erase();
     }
 
@@ -276,6 +288,7 @@ fn accept_registered(
     let mut answer = slice::accept_answer_with_boundary(acceptance, Some(contract), boundary);
     answer.value.context_manifest = judgment;
     answer.value.documentation = documentation;
+    answer.value.documentation_acceptance = documentation_acceptance;
     answer.erase()
 }
 

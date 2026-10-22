@@ -2,7 +2,7 @@
 id: "021-documentation-acceptance"
 title: "Independent documentation acceptance and review"
 status: approved
-implementation: pending
+implementation: complete
 created: "2026-09-27"
 summary: >
   Amends Statecraft's run, acceptance, and command contracts with an
@@ -397,17 +397,42 @@ they stay camelCase. Where a dimension is a value, in the judgment's
 (`task-binding`, `artifact-validation`, ...), because spec 006's JSON naming
 convention makes enum values kebab-case and section 3 does not say otherwise.
 
+**2026-10-22: how `accept` and `run show` bind the judgment.** `accept`
+judges an attempt's documentation only when its intent records a spec 020
+task, beside the existing verdict and never part of it, and appends the
+judgment as one `documentation-acceptance` evidence record; an attempt with
+no task records nothing and renders `not-recorded`. It reads the policy with
+`git show <base commit>:.statecraft/documentation-acceptance.json` in the
+registered repository, the candidate as the workspace's `HEAD`, the changed
+paths as the workspace's tracked and untracked differences from the base,
+and resolves the claims' citations through spec 019's checks with the
+operator's `accept --context` checkouts and evidence admissions. Until spec
+022's workflow supplies a documentation manifest, its freshness is
+`not-recorded`, so no documentation is accepted through the command before
+then. Spec 020's `acceptance` word reads `judged` when this judgment ran.
+`run show` lists every review and correction identity, an unreadable one
+included, without judging it. No review-submission verb is added: section
+3.10 permits one only with the library operation and authority checks it
+binds, and a review record is written through `record_review` until a later
+change adds one.
+
 ## Verification
 
 Implementation acceptance is the deterministic fixture surface `V-1` names,
 run through `make verify SPEC=021`. The owner ratified this spec on 2026-10-01 in
 commit `1a0d3a155da9615fb83f72f106570c2964594703`; its frontmatter has
-been `status: approved` since that commit. The former unratified-state
-placeholder was stale. Implementation lands in parts: the acceptance is declared one suite at a
-time as each part lands, and `implementation` stays `pending` until the last. Fixtures use
-retained local bytes, fixed review authorities and fixed clocks.
+been `status: approved` since that commit. Fixtures use retained local bytes,
+fixed review authorities and fixed clocks; they make no provider call, network
+read, repository mutation, publication or spend.
 
 ```verify:cli
 cargo test -p statecraft-run --test documentation_review
 cargo test -p statecraft-acceptance --test documentation_acceptance
+cargo test -p statecraft-cli --test documentation_acceptance
 ```
+
+These establish the twelve dimensions, reviewer authority and quorum, claim
+grades as review dispositions, artifact and freshness checks, corrections
+that unbind earlier reviews, and the boundary. They do not judge whether a
+real document is good: that is a reviewer's record, and this spec only
+refuses to let anything else stand in for it.

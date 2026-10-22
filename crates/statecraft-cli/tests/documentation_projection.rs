@@ -326,7 +326,7 @@ fn run_show_and_accept_render_not_recorded_for_an_attempt_with_no_task() {
     let (value, summary) = run_show(&f);
     assert_eq!(
         value["documentation"],
-        json!([{ "attempt": 1, "state": "not-recorded" }])
+        json!([{ "attempt": 1, "state": "not-recorded", "records": [] }])
     );
     assert!(!summary.contains("documentation"));
     let answer = slice::accept_answer(Acceptance::None {

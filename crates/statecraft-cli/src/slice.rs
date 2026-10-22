@@ -1191,9 +1191,14 @@ pub struct AcceptView {
     #[serde(rename = "contextManifest")]
     pub context_manifest: crate::context::Judgment,
     /// Spec 020 section 3.9: the attempt's documentation task, delivery and
-    /// raw result as inputs, with documentation acceptance `not-declared`;
-    /// `not-recorded` for an attempt with no documentation task.
+    /// raw result as inputs, with acceptance judged under spec 021 when its
+    /// prerequisites exist; `not-recorded` for an attempt with no documentation task.
     pub documentation: statecraft_acceptance::documentation::Inputs,
+    /// Spec 021 section 3.10: the documentation judgment, recorded, every
+    /// dimension and the outcome; `not-recorded` for an attempt with no
+    /// documentation task.
+    #[serde(rename = "documentationAcceptance")]
+    pub documentation_acceptance: crate::documentation::AcceptanceView,
 }
 
 /// A stale ledger at `accept`: refused before anything is judged, and nothing
@@ -1317,6 +1322,7 @@ pub fn accept_answer_with_boundary(
             boundary,
             context_manifest: crate::context::Judgment::NotRecorded,
             documentation: statecraft_acceptance::documentation::Inputs::NotRecorded,
+            documentation_acceptance: crate::documentation::AcceptanceView::NotRecorded,
         },
         exit,
         summary,
