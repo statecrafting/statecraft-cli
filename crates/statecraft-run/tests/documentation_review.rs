@@ -1,7 +1,8 @@
 //! Spec 021's run-record half: review and correction records are closed,
-//! digest-sealed and append-only; they are read back in record order, an
-//! unreadable one stays visible, and `run show` names them without judging
-//! them (sections 3.4, 3.8 and 3.10). Every chain read is reopened from disk.
+//! digest-sealed and append-only; each type is read back in its record order.
+//! An unreadable record stays visible. The `run show` projection lists reviews
+//! before corrections without judging them (sections 3.4, 3.8 and 3.10).
+//! Every chain read is reopened from disk.
 
 use std::path::Path;
 use std::process::Command;
@@ -209,10 +210,11 @@ fn a_correction_must_change_something_and_name_what_it_supersedes() {
     ));
 }
 
-// Sections 3.4 and 3.10: append-only, in record order, both kept; an
-// unreadable record is named, never dropped.
+// Sections 3.4 and 3.10: each type retains its append order, including unreadable
+// records. The identity projection groups reviews before corrections; it does
+// not interleave the two types chronologically.
 #[test]
-fn reviews_and_corrections_are_appended_and_read_back_in_order() {
+fn each_record_type_keeps_append_order_and_identities_list_reviews_first() {
     let (home, target) = chain_with_attempt();
     let first = review(Recommendation::Revise);
     let second = review(Recommendation::Accept);
