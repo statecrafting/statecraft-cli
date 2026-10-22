@@ -342,10 +342,34 @@ evidence stays `not-recorded` until an adopted contract supplies it.
 the protected local run record. A later export needs privacy analysis because
 small or predictable identities may still disclose content through guessing.
 
+**2026-10-22: the review and correction records' closed shape.** The
+run-record half (`crates/statecraft-run/src/documentation/review.rs`) fixes
+section 3.4's members: `subject` is section 3.1's core tuple (repository,
+trusted base, run, attempt, workspace candidate, manifest, task, result
+custody and result-schema digests, every artifact's logical path and digest,
+the admitted evidence references, and the policy digest); `reviewer` is an
+identity, an `authority` of `repository-owner` or `owner-delegated-reviewer`
+and the `authoritySource` it cites; each claim and each artifact carries a
+disposition and reasons (an artifact is `acceptable`, `needs-correction`,
+`rejected` or `not-reviewed`); requested corrections name a claim id or a
+logical path. A correction names its subject, the digest it `supersedes`,
+author, reason, and at least one changed claim, changed artifact identity or
+corrected result. Both are sealed by `statecraft/documentation-record-digest/1`
+over every other member, so neither names itself. Each is one evidence
+record (`documentation-review`, `documentation-correction`), read back in
+record order; a record that does not decode or whose digest does not hold is
+listed `unreadable`, never dropped.
+
 ## Verification
 
-No implementation acceptance is declared while the prerequisite specs and this
-spec remain unratified. The `V-1` inputs name the deterministic fixture surface
-a later implementation must add. Fixtures use retained local bytes, fake review
-authorities, and fixed clocks. They perform no provider call, network read,
-repository mutation, publication, or spend.
+Implementation acceptance is the deterministic fixture surface `V-1` names,
+run through `make verify SPEC=021`. The owner ratified this spec on 2026-10-01 in
+commit `1a0d3a155da9615fb83f72f106570c2964594703`; its frontmatter has
+been `status: approved` since that commit. The former unratified-state
+placeholder was stale. Implementation lands in parts: the acceptance is declared one suite at a
+time as each part lands, and `implementation` stays `pending` until the last. Fixtures use
+retained local bytes, fixed review authorities and fixed clocks.
+
+```verify:cli
+cargo test -p statecraft-run --test documentation_review
+```

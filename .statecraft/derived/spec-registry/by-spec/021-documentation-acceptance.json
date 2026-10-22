@@ -73,7 +73,7 @@
       }
     ],
     "sectionDigests": {
-      "021-independent-documentation-acceptance-and-review": "e93c4fa7d2a8276ae68c373e02eb46b0327602fa7167a053a01108b5441ed7f8",
+      "021-independent-documentation-acceptance-and-review": "a1dd15d15843f9405540862e26ef07c9ed4724b02dd1eaa791a341936f7f87c6",
       "1-purpose": "f921d21dc2acd0050c4d2222cdaad28b04a276cffc257fdd193b8cfc92e0f49b",
       "2-territory-and-prerequisite": "5ce9c12370358e56ddc2dc688cf69763ad36ffe9a47e084e680b2c55b192cb76",
       "3-1-the-acceptance-subject": "02c89b6da6b75ec97dc28cf1d2de925a14b09344432dd798e05e0c7547063fff",
@@ -89,8 +89,8 @@
       "3-9-final-result-and-retention": "5b90126867c4d9ef214dae9621276938b5e08e5d5a352f4dd3b151c97615d7e1",
       "3-behavior": "98c1bba8b672dfa323deb787b8bbd616d4d03aa0fee71c2e22e6684966164229",
       "4-out-of-scope": "8d24d200c45d48c01db44da0d5b6f594ce2f942826371dd06d1242e1a53bdd00",
-      "5-resolved-decisions": "a4d9be4a196157555b17fa970535d66c99c243aba1ae72c3db4bc7dc0aeb8eb5",
-      "verification": "3755305d9f7bd188ed84fa3302d30b3ffdba9d177bde41902c4322bb45c3613c"
+      "5-resolved-decisions": "3f31b5c8faa4f995386a303634339b972bb29f05c11e24782ef14bc891f4fea0",
+      "verification": "4384bf8b28d555f1d67b322e66b3a164b289dcfc5af32224fa9e2f1ec43534c0"
     },
     "sectionHeadings": [
       "021: Independent documentation acceptance and review",
@@ -117,6 +117,6 @@
     "summary": "Amends Statecraft's run, acceptance, and command contracts with an independent documentation-acceptance record. It keeps intended delivery, observed transport, schema validation, citation resolution, semantic review, and acceptance as separate facts; requires claim-grade support, preserved unknowns and contradictions, valid artifacts, and a fresh context manifest; and grants no application or publication authority.\n",
     "title": "Independent documentation acceptance and review"
   },
-  "shardHash": "9ef3fdb0f45ee3f8de134d49115c5fae4b720bc9398c3827ad67c13470130957",
+  "shardHash": "7453878477ef8c685bbc45c10c550b715f496fca0d342d157b7fc001574617f4",
   "specVersion": "1.10.0"
 }
