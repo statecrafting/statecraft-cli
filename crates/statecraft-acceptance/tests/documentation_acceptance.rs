@@ -516,8 +516,9 @@ fn artifact_validation_reads_only_retained_bytes() {
         "{:?}",
         artifact_reasons(&j)
     );
-    // A fragment matches its heading regardless of case.
-    let cased = b"# Parser\n\n## Recovery\n\nSee [recovery](#Recovery).\n";
+    // A fragment matches its heading regardless of case, and emphasis
+    // underscores are not part of the slug while a word's own are.
+    let cased = b"# Parser\n\n## _Recovery_\n\n## parse_stmt\n\nSee [recovery](#Recovery) and [it](#parse_stmt).\n";
     let mut c = Case::passing();
     c.result.artifacts[0].digest = custody_digest(cased);
     c.store.insert(custody_digest(cased), cased.to_vec());

@@ -515,8 +515,14 @@ fn artifact_state(
 /// same text produces. External links are not checked here: this spec
 /// grants no network access, and the task names no link policy.
 fn missing_anchors(text: &str) -> Vec<String> {
+    // The slug is of the rendered text, so an underscore that delimits
+    // emphasis at a word's edge is dropped; one inside a word is kept.
     let slug = |h: &str| -> String {
-        h.trim()
+        h.split_whitespace()
+            .map(|w| w.trim_matches('_'))
+            .filter(|w| !w.is_empty())
+            .collect::<Vec<_>>()
+            .join(" ")
             .to_lowercase()
             .chars()
             .filter_map(|c| {
