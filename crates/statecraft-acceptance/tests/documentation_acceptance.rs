@@ -305,6 +305,15 @@ impl Case {
     }
 }
 
+fn artifact_reasons(j: &da::Judgment) -> Vec<String> {
+    j.dimensions
+        .iter()
+        .find(|d| d.dimension == Dimension::ArtifactValidation)
+        .unwrap()
+        .reasons
+        .clone()
+}
+
 fn state(j: &da::Judgment, which: Dimension) -> State {
     j.dimensions
         .iter()
@@ -474,10 +483,36 @@ fn artifact_validation_reads_only_retained_bytes() {
         State::NotRecorded
     );
     let broken = b"# Parser\n\nSee [missing](#nowhere).\n";
+    // Bytes that are not the recorded digest's fail before any anchor is read.
     let mut c = Case::passing();
     c.store.insert(custody_digest(ARTIFACT), broken.to_vec());
     let j = c.judge();
     assert_eq!(state(&j, Dimension::ArtifactValidation), State::Fail);
+    assert!(
+        artifact_reasons(&j)
+            .iter()
+            .any(|r| r.contains("docs/parser.md digest")),
+        "{:?}",
+        artifact_reasons(&j)
+    );
+    // The recorded digest is the broken bytes' own, so only the anchor fails.
+    let mut c = Case::passing();
+    c.result.artifacts[0].digest = custody_digest(broken);
+    c.store.insert(custody_digest(broken), broken.to_vec());
+    let j = c.judge();
+    assert_eq!(state(&j, Dimension::ArtifactValidation), State::Fail);
+    assert!(
+        artifact_reasons(&j)
+            .iter()
+            .any(|r| r.contains("links to a missing anchor #nowhere")),
+        "{:?}",
+        artifact_reasons(&j)
+    );
+    assert!(
+        !artifact_reasons(&j).iter().any(|r| r.contains("digest")),
+        "{:?}",
+        artifact_reasons(&j)
+    );
 }
 
 // Section 3.3 row 12: an expected artifact written into the candidate.
