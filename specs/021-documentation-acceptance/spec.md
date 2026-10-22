@@ -389,6 +389,14 @@ the candidate's changed paths, and is `not-recorded` when those are not
 known. A required `fail` is `rejected`; any other non-pass is
 `no-acceptance`.
 
+**2026-10-22: a dimension's name as a value.** Section 3.3 names each
+dimension as an identifier, and two of them, `semanticReview` and
+`observedTransport`, are also member names in the task and the policy, where
+they stay camelCase. Where a dimension is a value, in the judgment's
+`dimension` member and in its reasons, it is written in kebab-case
+(`task-binding`, `artifact-validation`, ...), because spec 006's JSON naming
+convention makes enum values kebab-case and section 3 does not say otherwise.
+
 ## Verification
 
 Implementation acceptance is the deterministic fixture surface `V-1` names,

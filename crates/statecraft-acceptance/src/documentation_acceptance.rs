@@ -101,9 +101,10 @@ pub enum State {
     NotRecorded,
 }
 
-/// Section 3.3's twelve dimensions, in its order.
+/// Section 3.3's twelve dimensions, in its order. Serialized as values, so
+/// kebab-case under spec 006 (section 5, 2026-10-22).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
+#[serde(rename_all = "kebab-case")]
 #[allow(missing_docs)]
 pub enum Dimension {
     TaskBinding,

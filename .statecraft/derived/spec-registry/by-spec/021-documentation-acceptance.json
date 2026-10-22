@@ -73,7 +73,7 @@
       }
     ],
     "sectionDigests": {
-      "021-independent-documentation-acceptance-and-review": "6c86df62d4c52adb3dce332ed170fd381200e68f41a52d555db879830961624e",
+      "021-independent-documentation-acceptance-and-review": "861c777ad3b711adbab839124b76f51aebf5c6cd9e515ee709ed003bdeaf2356",
       "1-purpose": "f921d21dc2acd0050c4d2222cdaad28b04a276cffc257fdd193b8cfc92e0f49b",
       "2-territory-and-prerequisite": "5ce9c12370358e56ddc2dc688cf69763ad36ffe9a47e084e680b2c55b192cb76",
       "3-1-the-acceptance-subject": "02c89b6da6b75ec97dc28cf1d2de925a14b09344432dd798e05e0c7547063fff",
@@ -89,7 +89,7 @@
       "3-9-final-result-and-retention": "5b90126867c4d9ef214dae9621276938b5e08e5d5a352f4dd3b151c97615d7e1",
       "3-behavior": "98c1bba8b672dfa323deb787b8bbd616d4d03aa0fee71c2e22e6684966164229",
       "4-out-of-scope": "8d24d200c45d48c01db44da0d5b6f594ce2f942826371dd06d1242e1a53bdd00",
-      "5-resolved-decisions": "fd710e8e6343a6ee6c7568d4f085742e5be80eeba743ea3a62644806c5b0682d",
+      "5-resolved-decisions": "dbcb03610dd27d6c5caaabd526a3565265982c6b9546acff641c3c16a8b85017",
       "verification": "cad52a3cacc9cac0062f39f95ffd18f546893f1ebbfe0ae423a242ce1a8e5ab5"
     },
     "sectionHeadings": [
@@ -117,6 +117,6 @@
     "summary": "Amends Statecraft's run, acceptance, and command contracts with an independent documentation-acceptance record. It keeps intended delivery, observed transport, schema validation, citation resolution, semantic review, and acceptance as separate facts; requires claim-grade support, preserved unknowns and contradictions, valid artifacts, and a fresh context manifest; and grants no application or publication authority.\n",
     "title": "Independent documentation acceptance and review"
   },
-  "shardHash": "926a844cf65857f7b1453a77074d5af5491efbf15e8753a8ee0feac360113134",
+  "shardHash": "4dedd7c1b7deef92fe78206df8b85ecd8b57db5edc14d2029d1a3fdaf1df4823",
   "specVersion": "1.10.0"
 }
