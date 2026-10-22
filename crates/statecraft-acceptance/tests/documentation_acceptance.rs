@@ -531,6 +531,64 @@ fn artifact_validation_reads_only_retained_bytes() {
     );
 }
 
+// Section 3.1: evidence identities are distinct even when claims share sources.
+#[test]
+fn shared_claim_evidence_is_bound_once_in_first_occurrence_order() {
+    let mut c = Case::passing();
+    let mut second = c.result.claims[0].clone();
+    second.claim_id = "c2".into();
+    second.evidence_refs = vec!["test-run-2".into(), "test-run-1".into()];
+    c.result.claims.push(second);
+    assert_eq!(
+        c.judge().subject.unwrap().evidence,
+        vec!["test-run-1", "test-run-2"]
+    );
+}
+
+// Section 3.6: code examples do not create anchors; both Markdown heading
+// forms do. A shorter fence or a different marker cannot close a code block.
+#[test]
+fn artifact_anchors_follow_heading_and_fence_boundaries() {
+    for (artifact, expected) in [
+        (
+            "# Parser\n\n```md\n# Hidden\n```\n[link](#hidden)\n",
+            State::Fail,
+        ),
+        (
+            "# Parser\n\n~~~~\n# Hidden\n~~~\n```\n# Still hidden\n~~~~\n[link](#still-hidden)\n",
+            State::Fail,
+        ),
+        (
+            "# Parser\n\n```md\n[example](#not-a-real-link)\n```\n",
+            State::Pass,
+        ),
+        (
+            "Parser\n======\n\nRecovery\n--------\n\n[one](#parser) [two](#recovery)\n",
+            State::Pass,
+        ),
+        (
+            "# Parser\n\n   ```md\nHidden\n======\n   ```\n[link](#hidden)\n",
+            State::Fail,
+        ),
+        (
+            "# Parser\n\n```\n# Hidden\n```\n## Visible ##\n[link](#visible)\n",
+            State::Pass,
+        ),
+    ] {
+        let mut c = Case::passing();
+        let bytes = artifact.as_bytes();
+        c.result.artifacts[0].digest = custody_digest(bytes);
+        c.store.insert(custody_digest(bytes), bytes.to_vec());
+        let judgment = c.judge();
+        assert_eq!(
+            state(&judgment, Dimension::ArtifactValidation),
+            expected,
+            "artifact: {artifact:?}; reasons: {:?}",
+            artifact_reasons(&judgment)
+        );
+    }
+}
+
 // Section 3.3 row 12: an expected artifact written into the candidate.
 #[test]
 fn an_artifact_applied_to_the_candidate_breaks_the_publication_boundary() {

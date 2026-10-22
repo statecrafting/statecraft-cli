@@ -537,13 +537,65 @@ fn missing_anchors(text: &str) -> Vec<String> {
             })
             .collect()
     };
-    let headings: BTreeSet<String> = text
-        .lines()
-        .filter_map(|l| l.trim_start().strip_prefix('#'))
-        .map(|h| slug(h.trim_start_matches('#')))
-        .collect();
+    let mut headings = BTreeSet::new();
+    let mut prose = String::new();
+    let mut paragraph = Vec::new();
+    let mut fence: Option<(char, usize)> = None;
+    for line in text.lines() {
+        let trimmed = line.trim_start_matches(' ');
+        let indent = line.len() - trimmed.len();
+        let marker = trimmed.chars().next().unwrap_or(' ');
+        let width = trimmed.chars().take_while(|c| *c == marker).count();
+        if let Some((opening, length)) = fence {
+            if indent <= 3
+                && marker == opening
+                && width >= length
+                && trimmed[width..].trim().is_empty()
+            {
+                fence = None;
+            }
+            continue;
+        }
+        if indent <= 3
+            && matches!(marker, '`' | '~')
+            && width >= 3
+            && (marker != '`' || !trimmed[width..].contains('`'))
+        {
+            fence = Some((marker, width));
+            paragraph.clear();
+            continue;
+        }
+        if indent > 3 || trimmed.starts_with('\t') || trimmed.is_empty() {
+            paragraph.clear();
+            continue;
+        }
+        prose.push_str(line);
+        prose.push('\n');
+        if matches!(marker, '=' | '-')
+            && trimmed.trim_end().chars().all(|c| c == marker)
+            && !paragraph.is_empty()
+        {
+            headings.insert(slug(&paragraph.join(" ")));
+            paragraph.clear();
+        } else if marker == '#'
+            && width <= 6
+            && (trimmed.len() == width || trimmed.as_bytes()[width].is_ascii_whitespace())
+        {
+            let heading = trimmed[width..].trim();
+            let without_closing = heading.trim_end_matches('#');
+            let heading = if without_closing.ends_with(char::is_whitespace) {
+                without_closing.trim_end()
+            } else {
+                heading
+            };
+            headings.insert(slug(heading));
+            paragraph.clear();
+        } else {
+            paragraph.push(trimmed);
+        }
+    }
     let mut missing = Vec::new();
-    let mut rest = text;
+    let mut rest = prose.as_str();
     while let Some(i) = rest.find("](#") {
         rest = &rest[i + 3..];
         let Some(end) = rest.find(')') else { break };
@@ -600,11 +652,17 @@ pub fn judge(i: &Inputs<'_>) -> Judgment {
                     digest: a.digest.clone(),
                 })
                 .collect(),
-            evidence: result
-                .claims
-                .iter()
-                .flat_map(|c| c.evidence_refs.iter().cloned())
-                .collect(),
+            evidence: {
+                // Different claims can cite the same admitted record. Bind each
+                // identity once, preserving its first occurrence in claim order.
+                let mut seen = BTreeSet::new();
+                result
+                    .claims
+                    .iter()
+                    .flat_map(|c| c.evidence_refs.iter().cloned())
+                    .filter(|reference| seen.insert(reference.clone()))
+                    .collect()
+            },
             policy_digest: policy_digest.clone(),
         }),
         _ => None,
