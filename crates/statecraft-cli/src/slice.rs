@@ -725,6 +725,10 @@ pub struct RunShowView {
     /// Each attempt's context manifest and delivery (spec 019 section 3.9),
     /// folded from the record alone; `not-recorded` for a historical attempt.
     pub context_manifest: Vec<crate::context::AttemptContextView>,
+    /// Each attempt's documentation task, delivery testimony and result
+    /// (spec 020 section 3.9), folded from the record alone; `not-recorded`
+    /// for a historical attempt.
+    pub documentation: Vec<crate::documentation::AttemptDocumentationView>,
 }
 
 /// A run's wire evidence, as `run show` renders it (spec 014 section 3.7).
@@ -1087,6 +1091,7 @@ pub fn run_show_with_admissions(
     tamper: Vec<AttemptTamperView>,
     wire_evidence: WireEvidenceView,
     context_manifest: Vec<crate::context::AttemptContextView>,
+    documentation: Vec<crate::documentation::AttemptDocumentationView>,
 ) -> Answer<RunShowView> {
     let mut summary = account.render();
     let admissions: Vec<AttemptAdmissionView> = run
@@ -1126,6 +1131,7 @@ pub fn run_show_with_admissions(
     }
     summary.push_str(&wire_evidence.describe());
     summary.push_str(&crate::context::describe(&context_manifest));
+    summary.push_str(&crate::documentation::describe(&documentation));
     Answer::new(
         RunShowView {
             account,
@@ -1135,6 +1141,7 @@ pub fn run_show_with_admissions(
             witness,
             wire_evidence,
             context_manifest,
+            documentation,
         },
         Exit::Ok,
         summary,
@@ -1183,6 +1190,15 @@ pub struct AcceptView {
     /// an attempt that bound no context packet.
     #[serde(rename = "contextManifest")]
     pub context_manifest: crate::context::Judgment,
+    /// Spec 020 section 3.9: the attempt's documentation task, delivery and
+    /// raw result as inputs, with acceptance judged under spec 021 when its
+    /// prerequisites exist; `not-recorded` for an attempt with no documentation task.
+    pub documentation: statecraft_acceptance::documentation::Inputs,
+    /// Spec 021 section 3.10: the documentation judgment, recorded, every
+    /// dimension and the outcome; `not-recorded` for an attempt with no
+    /// documentation task.
+    #[serde(rename = "documentationAcceptance")]
+    pub documentation_acceptance: crate::documentation::AcceptanceView,
 }
 
 /// A stale ledger at `accept`: refused before anything is judged, and nothing
@@ -1305,6 +1321,8 @@ pub fn accept_answer_with_boundary(
             contract,
             boundary,
             context_manifest: crate::context::Judgment::NotRecorded,
+            documentation: statecraft_acceptance::documentation::Inputs::NotRecorded,
+            documentation_acceptance: crate::documentation::AcceptanceView::NotRecorded,
         },
         exit,
         summary,

@@ -527,6 +527,7 @@ mod tests {
     fn request(workspace: &Path) -> Request {
         Request {
             context: None,
+            documentation: None,
             workspace: workspace.to_path_buf(),
             base_commit: "fixture".into(),
             prompt: b"private stdin".to_vec(),

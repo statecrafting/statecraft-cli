@@ -1,0 +1,139 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "statecraft/documentation-result/1",
+  "title": "Statecraft documentation result, version 1 (spec 020 section 3.5)",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema", "taskId", "runId", "attempt", "taskDigest", "contextManifestDigest",
+    "adapter", "provider", "artifacts", "claims", "unknowns", "contradictions",
+    "unsupportedClaims", "providerOmissions", "statecraftCitationFailures",
+    "executionEvidence", "providerCompletion", "reviewDisposition", "acceptanceResult"
+  ],
+  "properties": {
+    "schema": { "const": "statecraft/documentation-result/1" },
+    "taskId": { "$ref": "#/$defs/id" },
+    "runId": { "$ref": "#/$defs/id" },
+    "attempt": { "type": "integer", "minimum": 1 },
+    "taskDigest": { "$ref": "#/$defs/digest" },
+    "contextManifestDigest": { "$ref": "#/$defs/digest" },
+    "adapter": { "$ref": "#/$defs/identity" },
+    "provider": { "$ref": "#/$defs/identity" },
+    "artifacts": { "type": "array", "maxItems": 4096, "items": { "$ref": "#/$defs/artifact" } },
+    "claims": { "type": "array", "maxItems": 4096, "items": { "$ref": "#/$defs/claim" } },
+    "unknowns": { "type": "array", "maxItems": 4096, "items": { "$ref": "#/$defs/unknown" } },
+    "contradictions": { "type": "array", "maxItems": 4096, "items": { "$ref": "#/$defs/contradiction" } },
+    "unsupportedClaims": { "type": "array", "maxItems": 4096, "items": { "$ref": "#/$defs/unsupported" } },
+    "providerOmissions": { "type": "array", "maxItems": 4096, "items": { "$ref": "#/$defs/omission" } },
+    "statecraftCitationFailures": { "type": "array", "maxItems": 4096, "items": { "$ref": "#/$defs/citationFailure" } },
+    "executionEvidence": { "type": "array", "maxItems": 4096, "items": { "$ref": "#/$defs/evidence" } },
+    "providerCompletion": { "enum": ["claimed-complete", "claimed-incomplete", "not-reported"] },
+    "reviewDisposition": { "const": "not-reviewed" },
+    "acceptanceResult": { "const": "not-attempted" }
+  },
+  "$defs": {
+    "id": { "type": "string", "pattern": "^[A-Za-z0-9._-]{1,128}$" },
+    "digest": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
+    "text": { "type": "string", "minLength": 1, "maxLength": 16384 },
+    "identity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "version"],
+      "properties": { "name": { "$ref": "#/$defs/text" }, "version": { "$ref": "#/$defs/text" } }
+    },
+    "artifact": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["logicalPath", "mediaType", "digest", "size", "rawRef"],
+      "properties": {
+        "logicalPath": { "$ref": "#/$defs/text" },
+        "mediaType": { "$ref": "#/$defs/text" },
+        "digest": { "$ref": "#/$defs/digest" },
+        "size": { "type": "integer", "minimum": 0 },
+        "rawRef": { "$ref": "#/$defs/text" }
+      }
+    },
+    "citation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["repository", "pageDigest", "member", "contentDigest"],
+      "properties": {
+        "repository": { "$ref": "#/$defs/id" },
+        "pageDigest": { "$ref": "#/$defs/digest" },
+        "member": { "$ref": "#/$defs/text" },
+        "contentDigest": { "$ref": "#/$defs/digest" },
+        "span": { "type": "array", "minItems": 2, "prefixItems": [{ "type": "integer" }, { "type": "integer" }], "items": false }
+      }
+    },
+    "claim": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "claimId", "text", "lifecycleGrade", "citations", "evidenceRefs",
+        "unsupportedReason", "contradictionRefs", "reviewDisposition"
+      ],
+      "properties": {
+        "claimId": { "$ref": "#/$defs/id" },
+        "text": { "$ref": "#/$defs/text" },
+        "lifecycleGrade": {
+          "description": "Spec 020 section 3.6's claim table: exactly specified, approved, implemented, tested or released. A grade a claim asserts, needing support at that grade.",
+          "enum": ["specified", "approved", "implemented", "tested", "released"]
+        },
+        "citations": { "type": "array", "maxItems": 4096, "items": { "$ref": "#/$defs/citation" } },
+        "evidenceRefs": { "type": "array", "maxItems": 4096, "items": { "$ref": "#/$defs/text" } },
+        "unsupportedReason": {
+          "description": "Spec 020 section 3.6: an explicit reason, or exactly not-applicable for a supported claim. Required on every claim; the top-level unsupportedClaims collection is a separate meaning (section 3.7).",
+          "$ref": "#/$defs/text"
+        },
+        "contradictionRefs": { "type": "array", "maxItems": 4096, "items": { "$ref": "#/$defs/id" } },
+        "reviewDisposition": { "const": "not-reviewed" }
+      }
+    },
+    "unknown": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["unknownId", "question", "missingFact", "reason"],
+      "properties": {
+        "unknownId": { "$ref": "#/$defs/id" },
+        "question": { "$ref": "#/$defs/text" },
+        "missingFact": { "$ref": "#/$defs/text" },
+        "reason": { "$ref": "#/$defs/text" }
+      }
+    },
+    "contradiction": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["contradictionId", "claimRefs", "sourceRefs", "description"],
+      "properties": {
+        "contradictionId": { "$ref": "#/$defs/id" },
+        "claimRefs": { "type": "array", "maxItems": 4096, "items": { "$ref": "#/$defs/id" } },
+        "sourceRefs": { "type": "array", "maxItems": 4096, "items": { "$ref": "#/$defs/citation" } },
+        "description": { "$ref": "#/$defs/text" }
+      }
+    },
+    "unsupported": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["claimId", "missingSupport"],
+      "properties": { "claimId": { "$ref": "#/$defs/id" }, "missingSupport": { "$ref": "#/$defs/text" } }
+    },
+    "omission": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["member", "reason"],
+      "properties": { "member": { "$ref": "#/$defs/text" }, "reason": { "$ref": "#/$defs/text" } }
+    },
+    "citationFailure": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["citation", "resolution"],
+      "properties": { "citation": { "$ref": "#/$defs/citation" }, "resolution": { "$ref": "#/$defs/text" } }
+    },
+    "evidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["reference", "purpose"],
+      "properties": { "reference": { "$ref": "#/$defs/text" }, "purpose": { "$ref": "#/$defs/text" } }
+    }
+  }
+}

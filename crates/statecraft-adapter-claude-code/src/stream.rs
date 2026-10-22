@@ -511,6 +511,7 @@ pub fn map_stream_delivered(
                             .to_string()
                     }),
                     context: delivered.cloned(),
+                    documentation: None,
                 });
             }
             ProviderEvent::System(s) => {
@@ -553,6 +554,7 @@ pub fn map_stream_delivered(
                         amount,
                         unit: "USD".to_string(),
                     }),
+                    documentation: None,
                 });
                 result = Some((**r).clone());
             }

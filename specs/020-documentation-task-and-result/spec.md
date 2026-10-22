@@ -2,7 +2,7 @@
 id: "020-documentation-task-and-result"
 title: "Documentation task and structured result contracts"
 status: approved
-implementation: pending
+implementation: complete
 created: "2026-09-27"
 summary: >
   Amends Statecraft's run, adapter, acceptance, and command contracts with an
@@ -19,6 +19,8 @@ amends:
 extends:
   - { spec: "003-work-and-run-semantics", unit: { kind: directory, path: "crates/statecraft-run/" }, nature: additive }
   - { spec: "004-execution-adapter", unit: { kind: directory, path: "crates/statecraft-adapter/" }, nature: additive }
+  - { spec: "004-execution-adapter", unit: { kind: directory, path: "crates/statecraft-adapter-claude-code/" }, nature: additive }
+  - { spec: "002-environment-lifecycle", unit: { kind: directory, path: "crates/statecraft-home/" }, nature: additive }
   - { spec: "005-acceptance-and-evidence", unit: { kind: directory, path: "crates/statecraft-acceptance/" }, nature: additive }
   - { spec: "006-command-surface", unit: { kind: directory, path: "crates/statecraft-cli/" }, nature: additive }
 depends_on:
@@ -80,6 +82,9 @@ existing units named by its `extends` edges:
 
 - `statecraft-run` owns immutable documentation tasks and retained results;
 - `statecraft-adapter` carries those bytes without learning their policy;
+- `statecraft-adapter-claude-code` and `statecraft-home` construct the
+  adapter request and its events, so they name the new members and, until a
+  provider adapter delivers a documentation task, leave them absent;
 - `statecraft-acceptance` decodes and exposes the inputs later acceptance uses;
   and
 - `statecraft-cli` projects the records through existing run and acceptance
@@ -356,9 +361,100 @@ inferred from a weaker fact.
 authority.** The documentation lane produces reviewable bytes or patches.
 Application and publication remain later, separately authorized acts.
 
+**2026-10-22: the closed words and bounds version 1 fixes where section 3.2
+names a member but not its values.** The run-record half
+(`crates/statecraft-run/src/documentation/mod.rs`) fixes them so a task decodes
+closed: `outputFormat.format` is `markdown` or `plain-text`; `deadline` is
+`notAfter` (`YYYY-MM-DDTHH:MM:SSZ`) under the clock `supervisor-utc`;
+`costCeiling` is `no-spend` or an ISO 4217 `currency`, a
+`maximumMinorUnits` and the enforcement `stop-attempt`; `skill` is
+`not-required` or an `id`, `version` and `digest`; an artifact's
+`disposition` is `draft` (under `draft-artifact`) or `patch` (under
+`propose-patch`), and its `requiredContext` names manifest repositories and
+page digests, never more than the manifest holds. The review policy's
+`candidateDivergence` is `permitted` or `prohibited`, and its absence is the
+silent policy that prohibits divergence; the candidate is compared with the
+prepared workspace by revision. Every string is at most 16 KiB and every
+collection at most 4,096 items, checked after the raw-byte scan and before
+the closed decode. The result schema delivered before spawn is
+`crates/statecraft-run/schemas/documentation-result-1.json`, and a task
+names it by that file's `sha256:` custody digest. The raw result is kept
+write-once under its custody digest in the same product-home store as the
+spec 019 packets. A later schema version changes any of these.
+
+**2026-10-22: how the run record names what decoding a result found.** The
+result half (`crates/statecraft-run/src/documentation/result.rs`) records one
+evidence record per returned result, carrying the attempt's binding, the raw
+bytes' media type, length and custody digest, and one of three states:
+`bound` with the section 3.9 counts, `schema-invalid` with the refusal's
+code word, or `unbound` naming the first binding member the result does not
+repeat. `run show` reads those records and decodes nothing. More than one
+result for the attempt's task digest renders `duplicate` with every custody
+digest in record order, and none is chosen. A claim with neither a citation
+nor an evidence reference whose `unsupportedReason` is `not-applicable` is
+counted as `unexplainedClaims`, so section 3.6's rule stays visible beside a
+`claimed-complete` result rather than refusing the document. A claim's
+`evidenceRefs` must each name an entry of the result's `executionEvidence`; a
+reference to anything else refuses as outside the task, so a fabricated
+reference cannot take a claim out of that count.
+
+**2026-10-22: how the request and the events carry the documentation lane.**
+The adapter request gains a `documentation` member beside `context`: the
+exact task bytes and digest, the result-schema bytes and digest, and the
+pinned skill's bytes, framed after the prompt and any context pages, each
+in a length-declared frame. The init event gains a `documentation` report
+(task, manifest, skill or `not-required`, result-schema digests, and the
+applied capability tokens) and the terminal `result` event a `documentation`
+member carrying the raw bytes with their stated media type, length and
+custody digest. A task's `requiredCapabilities` are spec 004's capability
+tokens; one the selected adapter does not declare, or one outside that
+vocabulary, refuses before spawn as `capability-undeclared`. The run record
+keeps the fold of the init reports as one `documentation-delivery` evidence
+record: no report, more than one, or any member that differs is a finding
+and makes the attempt's result ineligible. A terminal event whose stated
+length or digest is not its bytes' keeps the bytes and adds a finding. Two
+`extends` edges join section 2's list, on `statecraft-adapter-claude-code`
+(spec 004) and `statecraft-home` (spec 002), because both construct the
+request and the events literally; this change only names the new members
+there, absent. The launch path runs the pre-spawn check on every attempt,
+after the context bundle's and under its own guard `documentation-bundle`:
+it reads the task the intent recorded, assembles the bundle from it, and
+checks bundle, task and the selected adapter's declared capabilities
+together. That path holds no pinned skill's bytes, so a recorded task that
+pins a skill refuses there rather than spawn without it.
+
+**2026-10-22: what `run show` and `accept` add, and the entry point.** `run
+show` gains a `documentation` member, one entry per attempt, folded from the
+record; its human lines label `providerCompletion` as the provider's claim.
+`accept` gains a `documentation` member beside `contextManifest`: the
+recorded task, the delivery fold, the result's record, the result decoded
+again from its retained bytes, the provider's `reviewDisposition` and
+`acceptanceResult` under `source: provider-result`, every reason the result
+is ineligible (`delivery-not-recorded`, a delivery finding,
+`result-not-recorded`, `result-duplicate`, `result-unreadable`,
+`result-schema-invalid`,
+`result-unbound`, `result-bytes-not-retained`, `result-bytes-unreadable`),
+and `acceptance:
+not-declared`. It never changes the verdict. No verb supplies a task yet:
+spec 022's workflow is the entry point, and this spec's surface is the
+record, the request and the projections that workflow will write and read.
+
 ## Verification
 
-No implementation acceptance is declared while spec 019 and this spec remain
-unratified. The `V-1` inputs name the portable fixture surface a later
-implementation must add. Fixtures use deterministic fake adapter results and no
-live provider, credentials, spend, network publication, or repository mutation.
+Implementation acceptance is the portable fixture surface `V-1` names, run
+through `make verify SPEC=020`. No provider runs: the adapter test uses a real
+child that reads its input and replays fixed events, and every other test
+reads a chain reopened from disk. Nothing is applied, written to an expected
+artifact path, or published.
+
+```verify:cli
+cargo test -p statecraft-run --test documentation_contract
+cargo test -p statecraft-adapter --test documentation_result
+cargo test -p statecraft-acceptance --test documentation_contract
+cargo test -p statecraft-cli --test documentation_projection
+```
+
+These establish the closed task and result, their binding before spawn and
+after return, the adapter's testimony as findings, and the projections. They
+do not show that a provider produced a useful document, that a citation
+supports a claim, or that a result is acceptable; acceptance is spec 021's.

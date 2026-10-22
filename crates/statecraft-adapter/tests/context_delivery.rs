@@ -193,6 +193,7 @@ fn request(workspace: &Path, bundle: Option<Bundle>) -> Request {
             number: 1,
         },
         context: bundle,
+        documentation: None,
     }
 }
 
@@ -223,6 +224,7 @@ fn init_with(report: &Reported) -> String {
         adapter_version: "1.0.0".into(),
         provider_version: "fixture".into(),
         context: Some(report.clone()),
+        documentation: None,
     })
     .unwrap()
 }

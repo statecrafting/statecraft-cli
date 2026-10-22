@@ -314,6 +314,7 @@ fn deadline_worker() {
     let deadline_seconds = if f.hangs { SHORT } else { WATCHDOG };
     let request = Request {
         context: None,
+        documentation: None,
         workspace: dir.to_path_buf(),
         base_commit: "0".repeat(40),
         prompt: if f.consumes_prompt {

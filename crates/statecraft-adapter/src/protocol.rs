@@ -39,15 +39,25 @@ pub struct Request {
     /// reads.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub context: Option<crate::context::Bundle>,
+    /// Spec 020 section 3.4: the attempt's documentation task, its result
+    /// schema and its skill, each its own member beside the prompt. Absent
+    /// when the attempt has no documentation task.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub documentation: Option<crate::documentation::Bundle>,
 }
 
 impl Request {
     /// The bytes the child reads on its input stream: the prompt, followed
-    /// by the context bundle's frames when the request carries one.
+    /// by the context bundle's frames and then the documentation bundle's,
+    /// for each the request carries.
     pub fn provider_input(&self) -> Vec<u8> {
-        match &self.context {
+        let input = match &self.context {
             Some(bundle) => bundle.provider_input(&self.prompt),
             None => self.prompt.clone(),
+        };
+        match &self.documentation {
+            Some(bundle) => bundle.provider_input(input),
+            None => input,
         }
     }
 }
@@ -103,6 +113,12 @@ pub enum Event {
         /// adapter that delivered no context.
         #[serde(default, skip_serializing_if = "Option::is_none")]
         context: Option<statecraft_run::context::Reported>,
+        /// Spec 020 section 3.4: the task, manifest, skill and result-schema
+        /// digests and the capabilities the adapter says it applied.
+        /// Testimony, never proof of receipt or use. Absent from an adapter
+        /// that ran no documentation task.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        documentation: Option<statecraft_run::documentation::delivery::Reported>,
     },
     /// Something happened. Carried through, not interpreted.
     Progress {
@@ -127,6 +143,10 @@ pub enum Event {
         ///
         /// `None` is rendered as `unknown`, **never as zero** (section 3.5.5).
         cost: Option<Cost>,
+        /// Spec 020 section 3.4: the exact raw documentation result, with the
+        /// media type, length and custody digest the adapter states.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        documentation: Option<crate::documentation::RawResult>,
     },
 }
 
@@ -262,6 +282,7 @@ pub fn read_stream(
             Event::Result {
                 classification,
                 cost,
+                ..
             } => terminal = Some((*classification, cost.clone())),
             Event::Progress { .. } | Event::Refusal { .. } => {}
         }
@@ -317,6 +338,7 @@ mod tests {
             adapter_version: "1.0.0".into(),
             provider_version: "9.9".into(),
             context: None,
+            documentation: None,
         }
     }
 
@@ -328,6 +350,7 @@ mod tests {
                 Event::Result {
                     classification: Classification::Completed,
                     cost: None,
+                    documentation: None,
                 },
             ],
             &[],
@@ -345,6 +368,7 @@ mod tests {
                 Event::Result {
                     classification: Classification::Completed,
                     cost: None,
+                    documentation: None,
                 },
             ],
             &[],
@@ -379,6 +403,7 @@ mod tests {
             &[Event::Result {
                 classification: Classification::Completed,
                 cost: None,
+                documentation: None,
             }],
             &[],
         ) {
@@ -406,6 +431,7 @@ mod tests {
             Event::Result {
                 classification: Classification::Completed,
                 cost: None,
+                documentation: None,
             },
         ];
         assert_eq!(refusals(&events).len(), 1);
@@ -415,6 +441,7 @@ mod tests {
     fn a_prompt_is_carried_as_bytes_not_spliced_into_a_command_line() {
         let r = Request {
             context: None,
+            documentation: None,
             workspace: "/w".into(),
             base_commit: "abc".into(),
             prompt: b"rm -rf / ; echo \"quoted\"".to_vec(),
