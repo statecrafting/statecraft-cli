@@ -275,9 +275,12 @@ pub fn accept(
         )),
     };
     let workspace = statecraft_run::workspace::workspace_path(root, run_id);
+    // An unread candidate is carried as its reason, never as an empty
+    // identity, so the judgment leaves the subject unidentified.
     let candidate = git_out(&workspace, &["rev-parse", "HEAD"])
         .map(|b| String::from_utf8_lossy(&b).trim().to_string())
-        .unwrap_or_default();
+        .filter(|c| !c.is_empty())
+        .ok_or_else(|| format!("no candidate revision in {}", workspace.display()));
     let changed = changed_paths(&workspace, &attempt.base_commit);
     let reviews = review::recorded_reviews(chain, run_id, attempt.number);
     let corrections = review::recorded_corrections(chain, run_id, attempt.number);
@@ -292,7 +295,7 @@ pub fn accept(
     let judgment = da::judge(&da::Inputs {
         repository: &root.display().to_string(),
         trusted_base: &attempt.base_commit,
-        candidate: &candidate,
+        candidate: candidate.as_deref().map_err(Clone::clone),
         task: &task,
         delivery: delivery.as_ref(),
         result_custody: custody.as_deref(),
