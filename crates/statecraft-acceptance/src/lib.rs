@@ -30,6 +30,10 @@
 //!   independent checks over the adopted producer's answers, and their
 //!   eligibility under the attempt's recorded policy. Added by spec 019's
 //!   additive edge.
+//! - [`documentation`] is spec 020's documentation inputs: the recorded
+//!   task, the delivery fold and the retained raw result, decoded and
+//!   explained, with acceptance `not-declared` until a contract exists.
+//!   Added by spec 020's additive edge.
 //! - [`wire`] is spec 014's ordered wire-evidence admission and its section
 //!   3.5 acceptance requirement. Added by spec 014's additive edge.
 //!
@@ -59,6 +63,7 @@ pub mod context;
 pub mod contract;
 pub mod delta;
 pub mod dimensions;
+pub mod documentation;
 pub mod evidence;
 pub mod independence;
 pub mod judged;

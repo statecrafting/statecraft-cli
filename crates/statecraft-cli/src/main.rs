@@ -704,6 +704,7 @@ fn slice_verb(
                             tamper,
                             slice::WireEvidenceView::of_run(&chain, run_id),
                             statecraft_cli::context::of_run(&chain, &run),
+                            statecraft_cli::documentation::of_run(&chain, &run),
                         ),
                         format,
                     )
