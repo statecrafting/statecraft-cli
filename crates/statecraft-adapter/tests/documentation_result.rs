@@ -293,6 +293,14 @@ fn a_real_child_receives_the_task_on_its_input_and_returns_testimony_and_raw_byt
     let received = std::fs::read(dir.path().join("received")).unwrap();
     assert_eq!(received, req.provider_input());
     assert!(received.starts_with(b"write the documentation"));
+    // Every frame header is one line: the preamble stands on its own line
+    // and the task's header begins `=== task, digest`.
+    let header = format!("\n=== task, digest {}, ", b.task_digest);
+    assert!(
+        received
+            .windows(header.len())
+            .any(|w| w == header.as_bytes())
+    );
     let framed = format!(
         "{} bytes follow, then one newline ===\n{}\n",
         b.task.len(),
