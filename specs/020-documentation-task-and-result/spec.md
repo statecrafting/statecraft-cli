@@ -433,7 +433,8 @@ again from its retained bytes, the provider's `reviewDisposition` and
 is ineligible (`delivery-not-recorded`, a delivery finding,
 `result-not-recorded`, `result-duplicate`, `result-unreadable`,
 `result-schema-invalid`,
-`result-unbound`, `result-bytes-not-retained`), and `acceptance:
+`result-unbound`, `result-bytes-not-retained`, `result-bytes-unreadable`),
+and `acceptance:
 not-declared`. It never changes the verdict. No verb supplies a task yet:
 spec 022's workflow is the entry point, and this spec's surface is the
 record, the request and the projections that workflow will write and read.
