@@ -10,8 +10,8 @@
     ],
     "implementingPaths": [],
     "specId": "044-supply-chain-profile",
-    "specStatus": "draft"
+    "specStatus": "approved"
   },
   "schemaVersion": "1.3.0",
-  "shardHash": "f79effe91ffb97611a28d0e4779c36e1db4a07c19e3db1557d76fe7eb2036117"
+  "shardHash": "ec4ab104c90f30ef3f3de5fba619276d3c953561d179c06d92975a5cf879aab1"
 }
