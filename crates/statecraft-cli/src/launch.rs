@@ -284,6 +284,7 @@ pub fn launch_attempt(
             // the intent, before the adapter process exists.
             context_manifest: context.as_ref().map(|c| &c.manifest),
             context_policy: context.as_ref().map(|c| &c.policy),
+            documentation_task: None,
         },
         Some(&mut admission),
     ) {
