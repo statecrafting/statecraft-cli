@@ -541,7 +541,9 @@ fn missing_anchors(text: &str) -> Vec<String> {
         rest = &rest[i + 3..];
         let Some(end) = rest.find(')') else { break };
         let anchor = &rest[..end];
-        if !headings.contains(anchor) && !missing.iter().any(|m| m == anchor) {
+        // Heading slugs are lower case, and a link's fragment matches one
+        // regardless of case; the anchor is reported as written.
+        if !headings.contains(&anchor.to_lowercase()) && !missing.iter().any(|m| m == anchor) {
             missing.push(anchor.to_string());
         }
         rest = &rest[end..];

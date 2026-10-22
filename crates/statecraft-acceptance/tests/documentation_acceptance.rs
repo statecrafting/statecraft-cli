@@ -516,6 +516,18 @@ fn artifact_validation_reads_only_retained_bytes() {
         "{:?}",
         artifact_reasons(&j)
     );
+    // A fragment matches its heading regardless of case.
+    let cased = b"# Parser\n\n## Recovery\n\nSee [recovery](#Recovery).\n";
+    let mut c = Case::passing();
+    c.result.artifacts[0].digest = custody_digest(cased);
+    c.store.insert(custody_digest(cased), cased.to_vec());
+    let j = c.judge();
+    assert_eq!(
+        state(&j, Dimension::ArtifactValidation),
+        State::Pass,
+        "{:?}",
+        artifact_reasons(&j)
+    );
 }
 
 // Section 3.3 row 12: an expected artifact written into the candidate.
