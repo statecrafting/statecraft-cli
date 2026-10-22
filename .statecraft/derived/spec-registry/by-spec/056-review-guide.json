@@ -1,0 +1,77 @@
+{
+  "record": {
+    "amends": [
+      "002-environment-lifecycle",
+      "041-review-authority-context"
+    ],
+    "created": "2026-10-21",
+    "dependsOn": [
+      "002-environment-lifecycle",
+      "024-review-budget-and-ratification",
+      "041-review-authority-context"
+    ],
+    "id": "056-review-guide",
+    "implementation": "pending",
+    "obligations": [
+      {
+        "anchor": "3-1-two-documents-one-managed",
+        "id": "R-1",
+        "kind": "requirement",
+        "text": "The profile delivers .statecraft/REVIEW.md as a managed file verified by digest, and the AI review's default governance context lists it and REVIEW.md, both read as base-commit blobs."
+      },
+      {
+        "anchor": "3-2-absence-and-the-candidate",
+        "id": "R-2",
+        "kind": "requirement",
+        "text": "A target with no REVIEW.md at the base reviews exactly as before apart from the managed guide, with the absence recorded; nothing substitutes the candidate's REVIEW.md."
+      },
+      {
+        "anchor": "3-3-budget",
+        "id": "R-3",
+        "kind": "requirement",
+        "text": "Both documents count against spec 041's governance-context budget whole; a guide that does not fit refuses with 2 before any provider call, as any context document does."
+      },
+      {
+        "anchor": "verification",
+        "id": "V-1",
+        "inputs": [
+          "crates/statecraft-home/src/setup.rs"
+        ],
+        "kind": "verification",
+        "text": "Rendering tests show the managed guide delivered and both paths in the default context; a review over a base without REVIEW.md records it absent; a candidate editing REVIEW.md changes nothing the review reads."
+      }
+    ],
+    "sectionDigests": {
+      "056-a-review-guide-in-the-ai-review-s-context": "2c14251fec30c846aea0db029ea96fa37afb6a30b759802e5a551f88331fe7ba",
+      "1-purpose": "27e534de57d32f05527984763e670e9e2a88857d90e2e6e4203cb6cc21f78d5d",
+      "2-territory": "32b7c5139e7c9253bc30d95bd238b0e685fa599cc3a8b316ab7f7cae6a8c3f9f",
+      "3-1-two-documents-one-managed": "598292819fe62e50e5b914b043a1962c4e147eee091343ce70a638a2fa9009b0",
+      "3-2-absence-and-the-candidate": "b3a45cda4e9377474c647542ec7017b30edc8b9c23905c2e2e170d8501729e57",
+      "3-3-budget": "49fec502bd05a968f52f56a0f217827bce9b1f4c9b0e7cee54b3b73fb6669e30",
+      "3-4-this-repository-s-guide": "5943c84032ad9a8cda52edccd5d365b8c8ecc6816e1c42a69e809033b2a6aacc",
+      "3-behavior": "24c5ebbac24d4f082ca5d09860c774ab0e20368939608d2f90bf26e59fc6ec4b",
+      "4-out-of-scope": "d2dfaa184ad880baeebb46ad3a4e1347b8e196c8599a40b1048bf5b7eeea42cc",
+      "5-resolved-decisions": "cf53bf4df31dacc6191c0bf900148dff0fd5340b3508c16e22deecdd78225d01",
+      "verification": "5b10b81ac54b5df45a4d05ac3dd9c6abe46460904e30118aba39159d30b0d8d7"
+    },
+    "sectionHeadings": [
+      "056: A review guide in the AI review's context",
+      "1. Purpose",
+      "2. Territory",
+      "3. Behavior",
+      "3.1 Two documents, one managed",
+      "3.2 Absence and the candidate",
+      "3.3 Budget",
+      "3.4 This repository's guide",
+      "4. Out of scope",
+      "5. Resolved decisions",
+      "Verification"
+    ],
+    "specPath": "specs/056-review-guide/spec.md",
+    "status": "draft",
+    "summary": "Amends spec 002's setup profile and spec 041's default governance context. The next github-actions-rust revision delivers a managed review guide at .statecraft/REVIEW.md, the reviewer's contract written once for every target, and adds it and a repository-authored REVIEW.md to the documents the AI review reads from the base commit. An absent REVIEW.md is recorded as absent, as any default document is. This repository's own REVIEW.md is an adaptation of preloop-ci's guide to Statecraft's conventions.\n",
+    "title": "Setup profile: a managed review guide and a repository's own REVIEW.md in the AI review's governance context"
+  },
+  "shardHash": "2fe2d9f5a7b305461554c72c192862a4d884069a18615456103ec66b19a130b6",
+  "specVersion": "1.10.0"
+}
