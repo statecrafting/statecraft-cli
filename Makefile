@@ -14,6 +14,7 @@
 #   make couple          the coupling gate against BASE
 #
 #   make code            build, test, clippy and fmt across the workspace
+#   make install-local   build the CLI in release mode and install it into PREFIX/bin
 #
 # `gate` and `code` are two surfaces, not one. `gate` judges the corpus and is
 # meaningful with no code at all; `code` judges the workspace and is inert until
@@ -44,7 +45,7 @@ SPEC_SPINE ?= $(if $(wildcard $(SPEC_SPINE_LOCAL)),$(SPEC_SPINE_LOCAL),spec-spin
 SPEC_SPINE_DEFAULT_BRANCH ?= $(shell git symbolic-ref --short refs/remotes/origin/HEAD 2>/dev/null | sed 's|^origin/||')
 BASE ?= origin/$(or $(SPEC_SPINE_DEFAULT_BRANCH),main)
 
-.PHONY: tools gate code build test clippy fmt refresh verify couple status help
+.PHONY: tools gate code build test clippy fmt refresh verify couple status help install-local
 
 # Every `cargo --workspace` verb refuses a virtual manifest with no members, so
 # the Rust targets are guarded on a crate existing rather than simply run. The
@@ -145,6 +146,25 @@ status:
 	$(SPEC_SPINE) registry status-report --nonzero-only
 	$(SPEC_SPINE) registry plan
 
+## Install this checkout's CLI for local use: a release build, then
+## `install -m 755` into PREFIX/bin (default ~/.local/bin). Never `cp`: on macOS
+## overwriting a signed executable in place leaves the kernel's code-signature
+## cache describing the old bytes, and the next exec is killed with SIGKILL;
+## `install` unlinks and writes a new file. The `git describe` of the build is
+## printed, not stamped into the binary: the CLI has no version verb, and adding
+## one is a command-surface amendment (spec 006), not a build change. To stop
+## anything replacing the installed copy behind your back, `chmod a-w` it after
+## installing; this target then refuses until you restore write permission.
+## There is no self-update to honour that guard; the guard is the refusal here.
+PREFIX ?= $(HOME)/.local
+INSTALL_BIN := $(PREFIX)/bin/statecraft-cli
+install-local:
+	@if [ -e "$(INSTALL_BIN)" ] && [ ! -w "$(INSTALL_BIN)" ]; then echo "$(INSTALL_BIN) is read-only (chmod a-w guard); restore write permission to replace it"; exit 2; fi
+	cargo build --release --locked -p statecraft-cli
+	install -d "$(PREFIX)/bin"
+	install -m 755 "$$(cargo metadata --format-version 1 --no-deps | sed -n 's/.*"target_directory":"\([^"]*\)".*/\1/p')/release/statecraft-cli" "$(INSTALL_BIN)"
+	@echo "installed $(INSTALL_BIN) from $$(git describe --always --dirty --tags 2>/dev/null || git rev-parse --short HEAD)"
+
 help:
 	@echo "tools    install the pinned spec-spine ($(SPEC_SPINE_VERSION)) into .bin"
 	@echo "gate     the corpus check surface: check, lint, authored content"
@@ -153,3 +173,4 @@ help:
 	@echo "verify   SPEC=<id>, one spec's declared acceptance"
 	@echo "couple   the coupling gate against BASE ($(BASE)); compares two commits"
 	@echo "status   version, lifecycle counts, schedulable set"
+	@echo "install-local  release-build the CLI and install it into PREFIX/bin ($(PREFIX)/bin)"
