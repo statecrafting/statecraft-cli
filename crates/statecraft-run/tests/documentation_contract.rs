@@ -1,5 +1,6 @@
-//! Spec 020's run-record half: the closed documentation task and the intent
-//! that records it before any effect. Every fact here is a
+//! Spec 020's run-record half: the closed documentation task and result, the
+//! intent that records the task before any effect, the raw result kept before
+//! decoding, the binding, and the `run show` projection. Every fact here is a
 //! portable fixture: no adapter, no provider, and every chain read is
 //! reopened from disk.
 
@@ -14,9 +15,10 @@ use statecraft_run::context::{
     OptionalOmission, PageFacts, Producer, ProducerBuild, Requirement, Snapshot, Task,
 };
 use statecraft_run::documentation::{
-    self, Artifact, Candidate, CandidateDivergence, ClockSource, CostCeiling, Deadline,
-    Disposition, DocumentError, DocumentationTask, Format, NotRequired, Operations, OutputFormat,
-    Publication, RequiredContext, ResultSchemaRef, ReviewPolicy, SemanticReview, Skill,
+    self, Artifact, Binding, Candidate, CandidateDivergence, ClockSource, CostCeiling, Deadline,
+    Disposition, DocumentError, DocumentationResult, DocumentationTask, Format, NotRequired,
+    Operations, OutputFormat, Party, Projection, Publication, RequiredContext, ResultProjection,
+    ResultSchemaRef, ReviewPolicy, SemanticReview, Skill, Validation,
 };
 use statecraft_run::record::Chain;
 use statecraft_run::session::{self, IntentDetail, SessionError};
@@ -151,6 +153,77 @@ fn task(attempt: u32, revision: &str, manifest: &Manifest) -> DocumentationTask 
     }
     .seal()
 }
+
+fn party(name: &str) -> Party {
+    Party {
+        name: name.into(),
+        version: "1.0.0".into(),
+    }
+}
+
+fn binding(task: &DocumentationTask) -> Binding {
+    Binding::of(task, party("fixture-adapter"), party("fixture-provider"))
+}
+
+fn result_value(task: &DocumentationTask) -> Value {
+    json!({
+        "schema": documentation::RESULT_SCHEMA,
+        "taskId": task.task_id,
+        "runId": task.run_id,
+        "attempt": task.attempt,
+        "taskDigest": task.task_digest,
+        "contextManifestDigest": task.context_manifest_digest,
+        "adapter": {"name": "fixture-adapter", "version": "1.0.0"},
+        "provider": {"name": "fixture-provider", "version": "1.0.0"},
+        "artifacts": [{
+            "logicalPath": "docs/parser.md",
+            "mediaType": "text/markdown",
+            "digest": digest("artifact"),
+            "size": 8,
+            "rawRef": "artifact-0"
+        }],
+        "claims": [{
+            "claimId": "c1",
+            "text": "The parser recovers at the next statement boundary.",
+            "lifecycleGrade": "implemented",
+            "citations": [{
+                "repository": "app",
+                "pageDigest": digest("page-1"),
+                "member": "src/parser.rs",
+                "contentDigest": digest("member")
+            }],
+            "evidenceRefs": [],
+            "unsupportedReason": "not-applicable",
+            "contradictionRefs": [],
+            "reviewDisposition": "not-reviewed"
+        }, {
+            "claimId": "c2",
+            "text": "Recovery is released.",
+            "lifecycleGrade": "released",
+            "citations": [],
+            "evidenceRefs": [],
+            "unsupportedReason": "no release evidence in the task inputs",
+            "contradictionRefs": [],
+            "reviewDisposition": "not-reviewed"
+        }],
+        "unknowns": [{
+            "unknownId": "u1",
+            "question": "Is recovery enabled by default?",
+            "missingFact": "the default configuration",
+            "reason": "no packet member holds it"
+        }],
+        "contradictions": [],
+        "unsupportedClaims": [{"claimId": "c2", "missingSupport": "release evidence"}],
+        "providerOmissions": [],
+        "statecraftCitationFailures": [],
+        "executionEvidence": [],
+        "providerCompletion": "claimed-complete",
+        "reviewDisposition": "not-reviewed",
+        "acceptanceResult": "not-attempted"
+    })
+}
+
+type Mutation = Box<dyn Fn(&mut Value)>;
 
 fn bytes(v: &Value) -> Vec<u8> {
     serde_json::to_vec(v).unwrap()
@@ -331,7 +404,7 @@ fn candidate_divergence_needs_an_explicit_permission() {
 
 // Requirement R-1: the task is in the intent before any effect.
 #[test]
-fn the_intent_records_the_task_before_any_effect() {
+fn the_intent_records_the_task_before_any_effect_and_the_projection_reads_it() {
     let home = tempfile::tempdir().unwrap();
     let target = repo();
     let head = git(target.path(), &["rev-parse", "HEAD"]);
@@ -349,6 +422,13 @@ fn the_intent_records_the_task_before_any_effect() {
         documentation::recorded_task(&chain, RUN, 1).unwrap(),
         Some(t.clone())
     );
+    match documentation::project(&chain, RUN, 1) {
+        Projection::Recorded { task: id, result } => {
+            assert_eq!(id.task_digest, t.task_digest);
+            assert_eq!(result, ResultProjection::NotRecorded);
+        }
+        other => panic!("expected a recorded projection, got {other:?}"),
+    }
 }
 
 #[test]
@@ -386,7 +466,207 @@ fn a_historical_intent_renders_not_recorded() {
     let target = repo();
     let (mut chain, _) = Chain::open(home.path(), target.path()).unwrap();
     begin(&mut chain, target.path(), None, None).unwrap();
-    assert_eq!(documentation::recorded_task(&chain, RUN, 1).unwrap(), None);
+    assert_eq!(
+        documentation::project(&chain, RUN, 1),
+        Projection::NotRecorded
+    );
+}
+
+// Requirement R-2, section 3.5: the result decodes closed, every collection
+// present, and the sentinels exactly their literals.
+#[test]
+fn the_result_schema_is_closed_and_its_sentinels_are_literals() {
+    let m = manifest(1, TASK);
+    let t = task(1, "r", &m);
+    let ok = DocumentationResult::decode(&bytes(&result_value(&t)), &t).unwrap();
+    assert_eq!(ok.claims.len(), 2);
+    let cases: Vec<(&str, Mutation)> = vec![
+        ("unknown member", Box::new(|v| v["confidence"] = json!(0.9))),
+        (
+            "missing collection",
+            Box::new(|v| {
+                v.as_object_mut().unwrap().remove("unknowns");
+            }),
+        ),
+        (
+            "review sentinel",
+            Box::new(|v| v["reviewDisposition"] = json!("approved")),
+        ),
+        (
+            "acceptance sentinel",
+            Box::new(|v| v["acceptanceResult"] = json!("accepted")),
+        ),
+        (
+            "claim sentinel",
+            Box::new(|v| v["claims"][0]["reviewDisposition"] = json!("approved")),
+        ),
+        (
+            "lifecycle",
+            Box::new(|v| v["claims"][0]["lifecycleGrade"] = json!("shipped")),
+        ),
+        (
+            "completion",
+            Box::new(|v| v["providerCompletion"] = json!("done")),
+        ),
+    ];
+    for (name, mutate) in cases {
+        let mut v = result_value(&t);
+        mutate(&mut v);
+        assert!(
+            matches!(
+                DocumentationResult::decode(&bytes(&v), &t),
+                Err(DocumentError::Malformed(_))
+            ),
+            "{name}"
+        );
+    }
+}
+
+#[test]
+fn duplicates_escapes_and_references_outside_the_task_refuse() {
+    let m = manifest(1, TASK);
+    let t = task(1, "r", &m);
+    let mut v = result_value(&t);
+    v["claims"][1]["claimId"] = json!("c1");
+    assert!(matches!(
+        DocumentationResult::decode(&bytes(&v), &t),
+        Err(DocumentError::Duplicate(_))
+    ));
+    let mut v = result_value(&t);
+    v["artifacts"][0]["logicalPath"] = json!("../escape.md");
+    assert!(matches!(
+        DocumentationResult::decode(&bytes(&v), &t),
+        Err(DocumentError::Invalid(_))
+    ));
+    let mut v = result_value(&t);
+    v["artifacts"][0]["logicalPath"] = json!("docs/unrequested.md");
+    assert!(matches!(
+        DocumentationResult::decode(&bytes(&v), &t),
+        Err(DocumentError::OutsideTask(_))
+    ));
+    let mut v = result_value(&t);
+    v["claims"][0]["citations"][0]["pageDigest"] = json!("page-one");
+    assert!(matches!(
+        DocumentationResult::decode(&bytes(&v), &t),
+        Err(DocumentError::Invalid(_))
+    ));
+    let mut v = result_value(&t);
+    v["unsupportedClaims"][0]["claimId"] = json!("c9");
+    assert!(matches!(
+        DocumentationResult::decode(&bytes(&v), &t),
+        Err(DocumentError::OutsideTask(_))
+    ));
+}
+
+// Section 3.6: a claim with no support must say why; complete does not cure it.
+#[test]
+fn an_unexplained_unsupported_claim_stays_visible_under_claimed_complete() {
+    let m = manifest(1, TASK);
+    let t = task(1, "r", &m);
+    let mut v = result_value(&t);
+    v["claims"][1]["unsupportedReason"] = json!("not-applicable");
+    let r = DocumentationResult::decode(&bytes(&v), &t).unwrap();
+    assert_eq!(r.unexplained_claims(), vec!["c2"]);
+}
+
+// Sections 3.4 and 3.10 row 3: prose is retained exactly and fails the
+// schema; the bytes are never repaired.
+#[test]
+fn prose_is_retained_before_decoding_and_recorded_as_schema_invalid() {
+    let home = tempfile::tempdir().unwrap();
+    let target = repo();
+    let (mut chain, _) = Chain::open(home.path(), target.path()).unwrap();
+    let m = manifest(1, TASK);
+    let t = task(1, "r", &m);
+    let prose = b"I wrote the docs, they are great.";
+    let v = documentation::record_result(
+        home.path(),
+        &mut chain,
+        &t,
+        &binding(&t),
+        "text/plain",
+        prose,
+        "2026-10-22T00:00:00Z",
+    )
+    .unwrap();
+    assert!(matches!(v, Validation::SchemaInvalid { .. }), "{v:?}");
+    let custody = context::custody_digest(prose);
+    assert_eq!(
+        context::read_retained(home.path(), &custody)
+            .unwrap()
+            .as_deref(),
+        Some(&prose[..])
+    );
+}
+
+// Section 3.8 and 3.10 row 1: a result naming another task digest does not
+// bind, and two terminal results are a finding with no winner.
+#[test]
+fn binding_mismatches_and_duplicates_are_findings() {
+    let home = tempfile::tempdir().unwrap();
+    let target = repo();
+    let head = git(target.path(), &["rev-parse", "HEAD"]);
+    let m = manifest(1, TASK);
+    let t = task(1, &head, &m);
+    {
+        let (mut chain, _) = Chain::open(home.path(), target.path()).unwrap();
+        begin(&mut chain, target.path(), Some(&m), Some(&t)).unwrap();
+        let mut foreign = result_value(&t);
+        foreign["taskDigest"] = json!(digest("another task"));
+        let v = documentation::record_result(
+            home.path(),
+            &mut chain,
+            &t,
+            &binding(&t),
+            "application/json",
+            &bytes(&foreign),
+            "2026-10-22T00:00:00Z",
+        )
+        .unwrap();
+        assert_eq!(
+            v,
+            Validation::Unbound {
+                field: "taskDigest".into()
+            }
+        );
+    }
+    let (chain, _) = Chain::open(home.path(), target.path()).unwrap();
+    match documentation::project(&chain, RUN, 1) {
+        Projection::Recorded {
+            result: ResultProjection::Recorded(r),
+            ..
+        } => assert!(matches!(r.validation, Validation::Unbound { .. })),
+        other => panic!("expected one unbound result, got {other:?}"),
+    }
+    drop(chain);
+    let (mut chain, _) = Chain::open(home.path(), target.path()).unwrap();
+    let good = documentation::record_result(
+        home.path(),
+        &mut chain,
+        &t,
+        &binding(&t),
+        "application/json",
+        &bytes(&result_value(&t)),
+        "2026-10-22T00:00:01Z",
+    )
+    .unwrap();
+    match good {
+        Validation::Bound { summary } => {
+            assert_eq!(summary.claims, 2);
+            assert_eq!(summary.unknowns, 1);
+            assert_eq!(summary.unsupported_claims, 1);
+        }
+        other => panic!("expected a bound result, got {other:?}"),
+    }
+    drop(chain);
+    let (chain, _) = Chain::open(home.path(), target.path()).unwrap();
+    match documentation::project(&chain, RUN, 1) {
+        Projection::Recorded {
+            result: ResultProjection::Duplicate { custody },
+            ..
+        } => assert_eq!(custody.len(), 2),
+        other => panic!("expected a duplicate finding, got {other:?}"),
+    }
 }
 
 // Section 3.8: a retry with equal semantic fields still has its own task.
