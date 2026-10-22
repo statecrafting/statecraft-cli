@@ -556,6 +556,16 @@ fn duplicates_escapes_and_references_outside_the_task_refuse() {
         DocumentationResult::decode(&bytes(&v), &t),
         Err(DocumentError::OutsideTask(_))
     ));
+    // An evidence reference must name an entry of executionEvidence; a
+    // fabricated one would otherwise hide the claim from the unexplained count.
+    let mut v = result_value(&t);
+    v["claims"][1]["evidenceRefs"] = json!(["e9"]);
+    assert!(matches!(
+        DocumentationResult::decode(&bytes(&v), &t),
+        Err(DocumentError::OutsideTask(_))
+    ));
+    v["executionEvidence"] = json!([{"reference": "e9", "purpose": "the release log"}]);
+    assert!(DocumentationResult::decode(&bytes(&v), &t).is_ok());
 }
 
 // Section 3.6: a claim with no support must say why; complete does not cure it.

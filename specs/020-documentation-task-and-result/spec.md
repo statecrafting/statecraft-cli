@@ -388,10 +388,10 @@ result for the attempt's task digest renders `duplicate` with every custody
 digest in record order, and none is chosen. A claim with neither a citation
 nor an evidence reference whose `unsupportedReason` is `not-applicable` is
 counted as `unexplainedClaims`, so section 3.6's rule stays visible beside a
-`claimed-complete` result rather than refusing the document. Adding
-`result.rs` regenerates only this spec's two `.statecraft/derived` shards
-(measured: `make refresh` leaves `codebase-index/inputs.json` unchanged), and
-`make gate` reports both indexes fresh.
+`claimed-complete` result rather than refusing the document. A claim's
+`evidenceRefs` must each name an entry of the result's `executionEvidence`; a
+reference to anything else refuses as outside the task, so a fabricated
+reference cannot take a claim out of that count.
 
 ## Verification
 

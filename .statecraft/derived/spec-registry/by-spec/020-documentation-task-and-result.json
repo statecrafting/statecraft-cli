@@ -89,7 +89,7 @@
       }
     ],
     "sectionDigests": {
-      "020-documentation-task-and-structured-result-contracts": "147d80178ba9f437b9ef5bd2b6b501740b60731d71f8b897994c7db2070880e9",
+      "020-documentation-task-and-structured-result-contracts": "420246fe5595d1bd18fc3686f28277767ff9d7e364b9934e7dcb6c138aac1194",
       "1-purpose": "8b02f913b08663186d36ea3bcd0e8c7bbe0a31bfa9121baec73462c986d20da5",
       "2-territory-and-prerequisite": "746191492c5936ba79256a9021ca5ff97507f6338406e8da8b63dcab76fd35eb",
       "3-1-separate-documents-and-authorities": "b35f09424b454ccc5c8767a710f0c8c186a8a8f6f4c59e59b22a1fb19c52976b",
@@ -104,7 +104,7 @@
       "3-9-command-projections": "587b0364536491e447ee2ff9d07dd51c45909723d24159143fa856ca63401dc7",
       "3-behavior": "f34320cf4fb2f3d02c882a2d074430cdd11566983a378acb199f689a0e46b749",
       "4-out-of-scope": "a4a674200e255a9485679c056b3d415c22b94b7d706f9beea80fedeb3d2210ca",
-      "5-resolved-decisions": "07e19e1dfc4061502422e2ebe09df0fd0ea8d2ffa9d1f125f49e084cb14c8869",
+      "5-resolved-decisions": "4376823e4226fe4eb0f0f70f553f32c62fda5494af92183b98301d8661525bd6",
       "verification": "b6f52865f59bf0a77daf53deaaa758c02d56a0e0e027c8906099670de298900c"
     },
     "sectionHeadings": [
@@ -131,6 +131,6 @@
     "summary": "Amends Statecraft's run, adapter, acceptance, and command contracts with an immutable documentation-task document and a provider-neutral structured documentation result. It separates task authority from provider output, binds every claim to an explicit lifecycle grade and supporting references, preserves omissions and contradictions, and keeps provider completion apart from independent acceptance and publication.\n",
     "title": "Documentation task and structured result contracts"
   },
-  "shardHash": "ca37dc636101f14d3cea7617c9ed3fc0ac1bc566dc12124c74a895801e92977a",
+  "shardHash": "b4520e68196bfd67abdfea6557703bae7244629e0450e1b14d002d46766490cd",
   "specVersion": "1.10.0"
 }

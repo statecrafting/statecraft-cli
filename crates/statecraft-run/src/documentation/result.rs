@@ -279,6 +279,21 @@ impl DocumentationResult {
                 }
             }
         }
+        let evidence: BTreeSet<&str> = result
+            .execution_evidence
+            .iter()
+            .map(|e| e.reference.as_str())
+            .collect();
+        for c in &result.claims {
+            for r in &c.evidence_refs {
+                if !evidence.contains(r.as_str()) {
+                    return Err(DocumentError::OutsideTask(format!(
+                        "claim {} names evidence {r}, which the result does not hold",
+                        c.claim_id
+                    )));
+                }
+            }
+        }
         for c in &result.contradictions {
             for r in &c.claim_refs {
                 if !claims.contains(r.as_str()) {
