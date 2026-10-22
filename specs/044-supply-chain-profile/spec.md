@@ -1,7 +1,7 @@
 ---
 id: "044-supply-chain-profile"
 title: "Setup profile revision 18: supply-chain, policy-isolation, workflow-lint, structural-scan and secret-scan jobs"
-status: draft
+status: approved
 implementation: pending
 created: "2026-10-21"
 summary: >
@@ -11,7 +11,8 @@ summary: >
   pull request mixing dependency or policy files with anything else, a
   workflow lint (zizmor and an offline refusal of any action not pinned by
   commit digest), an ast-grep scan where the project declares rules, and a
-  digest-verified gitleaks scan. Each is wired into ci-gate.
+  digest-verified gitleaks scan. Each is wired into ci-gate. A target needs a
+  committed deny.toml to upgrade to it.
 amends:
   - "002-environment-lifecycle"
 # No `extends` yet: the implementing change adds the edge on
@@ -28,7 +29,7 @@ obligations:
     anchor: "3-1-pinned-tools"
   - id: "R-2"
     kind: requirement
-    text: "A pull request that changes a dependency or policy file and any other file fails; the guard compares the merge base with the head and fails closed, exit 2, when it cannot decide."
+    text: "A pull request that changes a policy-class file and an other-class file fails, generated paths counting as neither; the guard compares the merge base with the head and fails closed, exit 2, when it cannot decide."
     anchor: "3-3-the-policy-isolation-guard"
   - id: "R-3"
     kind: requirement
@@ -38,9 +39,13 @@ obligations:
     kind: requirement
     text: "Each new job is a required need of ci-gate, so no job's failure or absence can leave ci-gate green."
     anchor: "3-7-ci-gate-and-the-revision"
+  - id: "R-5"
+    kind: requirement
+    text: "A target without a committed deny.toml cannot select revision 18: the plan refuses, naming the file, and the supply-chain job fails rather than passing when the file is absent."
+    anchor: "3-2-the-supply-chain-job"
   - id: "V-1"
     kind: verification
-    text: "Rendering tests show each job in a revision-18 workflow with its pinned tools, the guard's three exits on fixture histories, the pin check's refusals, and a revision-17 project upgrading in one plan."
+    text: "Rendering tests show each job in a revision-18 workflow with its pinned tools, the guard's three exits on fixture histories, the pin check's refusals, a revision-17 project with deny.toml upgrading in one plan, and one without it refused."
     anchor: "verification"
     inputs:
       - "crates/statecraft-home/tests/setup_workflows.rs"
@@ -93,13 +98,16 @@ a tool is a profile revision.
 removes any pull-request-supplied `.cargo/config.toml`, and runs, each as its
 own step whose failure fails the job:
 
-1. `cargo deny check all` when `deny.toml` exists;
+1. `cargo deny check all`, against the committed `deny.toml`;
 2. `cargo audit`, reading `.cargo/audit.toml` when it exists; and
 3. `cargo vet --locked` when `supply-chain/config.toml` exists.
 
-A step whose policy file is absent records `not-configured` in the job
-summary and passes; whether `deny.toml` may be absent is open (section 7,
-O-1). The job never edits a policy file, never writes an exemption, and
+`deny.toml` is mandatory (section 7, O-1). It is checked at upgrade: a plan
+that would select revision 18 for a target without a committed `deny.toml`
+refuses, naming the file, and writes nothing. A job that later finds it absent
+fails the deny step; it never records `not-configured` for it. The audit and
+vet steps stay optional: a step whose policy file is absent records
+`not-configured` in the job summary and passes. The job never edits a policy file, never writes an exemption, and
 treats an advisory as a failure unless the project's own committed policy
 ignores it.
 
@@ -108,20 +116,29 @@ ignores it.
 On a pull request, `governance` runs `guard-policy-files.sh <base> <head>`
 after fetching both revisions. The guard computes the merge base of the two
 and the paths changed between that merge base and the head, never between
-the two tips, so a change present on both sides cannot cancel out. A path is
-a dependency or policy file when it is `deny.toml`, `.cargo/audit.toml`, any
-path under `supply-chain/`, or any `Cargo.toml` or `Cargo.lock` at any depth.
+the two tips, so a change present on both sides cannot cancel out. Each
+changed path falls in exactly one of three classes (section 7, O-2):
+
+- **policy**: `deny.toml`, `.cargo/audit.toml`, any path under
+  `supply-chain/`, any `Cargo.toml` or `Cargo.lock` at any depth,
+  `spec-spine.toml`, and `docs/adoption/spec-spine.md`;
+- **generated**: any path under `.statecraft/derived/`, and
+  `.statecraft/environment.json`. The guard ignores these; their freshness
+  checks guard them; and
+- **other**: every remaining path.
 
 | Exit | Meaning |
 |---|---|
-| 0 | No dependency or policy file changed, or only such files changed. |
-| 1 | Both kinds changed: the pull request must be split. The message lists each kind. |
+| 0 | Policy and other paths did not both change. |
+| 1 | Both policy and other paths changed: the pull request must be split. The message lists each class's paths. |
 | 2 | The guard could not decide: bad usage, an unresolvable revision, or no merge base. A failure. |
 
 The guard never fetches, so it cannot hang or half-decide, and it classifies
-paths in linear time. A spine adoption under `D-06` moves the `Cargo.toml`
-pin with `spec-spine.toml`, the shards and the adoption record in one change;
-how that shape passes is open (section 7, O-2).
+paths in linear time. A dependency change rewrites shards under
+`.statecraft/derived/`, and a spine adoption under `D-06` moves the
+`Cargo.toml` pin with `spec-spine.toml`, the shards and the adoption record;
+both are policy plus generated, so each passes as one change and `H-3 (a)`'s
+one producer identity per change holds.
 
 ### 3.4 Workflow lint
 
@@ -156,15 +173,20 @@ Each of `supply-chain`, `workflow-lint`, `sg-scan` and `secret-scan` is a
 required need of `ci-gate`, and the guard is a step of `governance`, which
 already is one; none is marked optional, so `jobs.<name>.enabled` refuses for
 them as for `code`. The profile becomes revision 18 with a new identity. A
-revision-17 project upgrades through the ordinary plan and apply, which adds
-the two scripts and rewrites the workflow; a second plan of the same
-selection writes nothing.
+revision-17 project with a committed `deny.toml` upgrades through the
+ordinary plan and apply, which adds the two scripts and rewrites the
+workflow; a second plan of the same selection writes nothing. Without
+`deny.toml` the plan refuses (section 3.2).
 
 ## 4. Observable negative cases
 
 | Case | Required result |
 |---|---|
 | A pull request changes `Cargo.lock` and a source file | The guard exits 1, listing both. |
+| A pull request changes `Cargo.lock` and shards under `.statecraft/derived/` | The guard exits 0. |
+| A `D-06` adoption changes `Cargo.toml`, `Cargo.lock`, `spec-spine.toml`, the adoption record and the shards | The guard exits 0. |
+| A revision-17 target without `deny.toml` plans revision 18 | The plan refuses, naming `deny.toml`, and writes nothing. |
+| `deny.toml` is absent when `supply-chain` runs | The deny step fails. |
 | The base revision was never fetched | The guard exits 2. |
 | A change to `deny.toml` exists on both tips | The merge-base diff still sees it. |
 | A step uses `actions/checkout@v7` | `workflow-lint` fails, naming the line. |
@@ -192,21 +214,25 @@ each file claimed by its spec.
 - Any rule an `sgconfig.yml` would contain, and any gitleaks allowlist.
 - Writing or relaxing a project's supply-chain policy on its behalf.
 
-## 7. Open questions for the owner
+## 7. Resolved decisions
 
-- **O-1.** Whether a target without `deny.toml` passes `supply-chain` with
-  `not-configured` (section 3.2), or revision 18 requires one.
-- **O-2.** How a `D-06` spine adoption passes the guard (section 3.3): treat
-  `spec-spine.toml`, `.statecraft/derived/**` and `docs/adoption/spec-spine.md`
-  as policy-class paths, so an adoption is all policy; or split every
-  adoption into a `Cargo.toml` pull request and a corpus one, which breaks
-  `H-3 (a)`'s one producer identity per change.
+**2026-10-21: the owner ratified this spec and settled O-1 and O-2.**
+
+- **O-1. `deny.toml` is mandatory, checked at upgrade.** A target cannot
+  select revision 18 without a committed `deny.toml`; the plan refuses and
+  writes nothing (section 3.2). `.cargo/audit.toml` and `supply-chain/` stay
+  optional and record `not-configured` when absent.
+- **O-2. Three path classes, as proposed.** Policy, generated and other
+  (section 3.3); the guard exits 1 only when policy and other paths both
+  change. The measured reason for the generated class: a `Cargo.toml`-only
+  change rewrites the `.statecraft/derived/` shards (`make refresh`), so
+  without it every dependency pull request would read as mixed, and a
+  `D-06` adoption would have to split its one producer identity.
 
 ## Verification
 
-This spec is `status: draft` and declares no acceptance until it is ratified
-and built. Its acceptance will render a revision-18 workflow and assert each
+This spec declares no acceptance until it is built. Its acceptance will render a revision-18 workflow and assert each
 job's pinned tools and its place in `ci-gate`; run the guard against fixture
-histories for exits 0, 1 and 2 and the both-tips case; run the pin check
-against fixture workflows for each refusal; and upgrade a revision-17 project
-in one plan.
+histories for exits 0, 1 and 2, the both-tips case and the generated class;
+run the pin check against fixture workflows for each refusal; upgrade a
+revision-17 project with `deny.toml` in one plan; and refuse one without it.
