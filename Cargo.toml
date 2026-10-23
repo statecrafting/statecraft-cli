@@ -29,6 +29,24 @@ repository = "https://github.com/statecrafting/statecraft-cli"
 authors = ["The statecraft Authors"]
 publish = false
 
+# Owner decision, 2026-10-22: approve H4 workspace lint consolidation and
+# the new unsafe_code = "deny" policy, retaining item-level exceptions and
+# existing crate-level forbid declarations. Recorded for pull request 317
+# after the owner explicitly accepted these recommended defaults.
+# One lint policy for every member; each crate takes it with
+# `[lints] workspace = true`. `unsafe_code` is `deny`, not `forbid`, because
+# two items allow it, which `forbid` would refuse: statecraft-adapter's
+# boundary probe (`#[allow(unsafe_code)] mod native;`) and the spec 040
+# test constructor in crates/statecraft-cli/tests/application_equivalence/
+# launch.rs (pull request 312). Crates
+# that state `#![forbid(unsafe_code)]` in their root keep the stronger level.
+[workspace.lints.rust]
+unsafe_code = "deny"
+missing_docs = "warn"
+
+[workspace.lints.clippy]
+all = { level = "warn", priority = -1 }
+
 # The linked governance producer (`D-06` as amended 2026-09-24). This table is
 # the SINGLE STATED SOURCE of its version: a member takes it with
 # `spec-spine-core.workspace = true`, and a report that names the version
