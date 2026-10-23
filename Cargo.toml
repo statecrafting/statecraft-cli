@@ -29,6 +29,10 @@ repository = "https://github.com/statecrafting/statecraft-cli"
 authors = ["The statecraft Authors"]
 publish = false
 
+# Owner decision, 2026-10-22: approve H4 workspace lint consolidation and
+# the new unsafe_code = "deny" policy, retaining item-level exceptions and
+# existing crate-level forbid declarations. Recorded for pull request 317
+# after the owner explicitly accepted these recommended defaults.
 # One lint policy for every member; each crate takes it with
 # `[lints] workspace = true`. `unsafe_code` is `deny`, not `forbid`, because
 # two items allow it, which `forbid` would refuse: statecraft-adapter's
