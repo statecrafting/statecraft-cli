@@ -62,7 +62,7 @@ Queue item H5 asked for the guide to be referenced from
 review a base-commit governance context with a default path list; adding the
 guide there reaches the reviewer without a new workflow input.
 
-**Drafts this one cites:** spec 044, setup profile revision 18, on main as a
+**Drafts this one cites:** spec 044, setup profile revision 19 (renumbered from 18 when spec 058 took revision 18), on main as a
 draft since pull request 296 (its ratification is pull request 306). This spec takes the next revision after whichever
 profile revision lands before it.
 

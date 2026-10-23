@@ -35,7 +35,7 @@ use std::path::Path;
 /// The one registered profile.
 pub const PROFILE_ID: &str = "github-actions-rust";
 /// Its revision.
-pub const REVISION: u32 = 17;
+pub const REVISION: u32 = 18;
 /// Where the rendered policy document lives in the target.
 pub const POLICY_PATH: &str = ".statecraft/setup/github-actions-rust.json";
 /// The resume record, under the project's runtime state.
@@ -110,8 +110,9 @@ pub const MAX_CONTEXT_PATHS: usize = 32;
 /// a subdirectory of it.
 const WORKFLOW_DIR: &str = ".github/workflows/";
 /// The job ids the profile renders, which a declared extra job may not reuse.
-const PROFILE_JOB_IDS: [&str; 5] = [
+const PROFILE_JOB_IDS: [&str; 6] = [
     "governance",
+    "preflight",
     "code",
     "ai-review",
     "review-exception",
@@ -347,8 +348,15 @@ pub fn commands_for(p: &Parameters) -> serde_json::Value {
         ]),
         Code::External { script, .. } => serde_json::json!([[script]]),
     };
+    // Revision 18: the checks preflight orders before the expensive jobs,
+    // each of which governance or code also runs.
+    let mut preflight = vec![serde_json::json!([ENGINE, "check", "--fail-on-warn"])];
+    if matches!(p.code, Code::Rust) {
+        preflight.push(serde_json::json!(["cargo", "fmt", "--all", "--check"]));
+    }
     serde_json::json!({
         "governance": governance,
+        "preflight": preflight,
         "code": code,
     })
 }
@@ -357,6 +365,7 @@ pub fn commands_for(p: &Parameters) -> serde_json::Value {
 pub fn jobs() -> serde_json::Value {
     serde_json::json!({
         "governance": {"required": true, "optional": false, "pull_request": "required", "push": "required", "merge_group": "required"},
+        "preflight": {"required": true, "optional": false, "pull_request": "required", "push": "required", "merge_group": "required"},
         "code": {"required": true, "optional": false, "pull_request": "required", "push": "required", "merge_group": "required"},
         "ai-review": {"required": true, "optional": false, "pull_request": "required-review", "push": "inapplicable", "merge_group": "recorded-review"},
         "review-exception": {"required": true, "optional": false, "pull_request": "owner-exception", "push": "inapplicable", "merge_group": "inapplicable"},
@@ -406,6 +415,7 @@ pub fn remote_obligations() -> Vec<String> {
         "revision 15: an exact consented spec-spine pin move is reviewed with its initialization plan, and the managed installer reads that adopted pin; this changes no required remote check or branch-protection authority (spec 033)".to_string(),
         format!("revision 16: the profile renders {} (schema {}), a canonical desired-state document of what this profile expects of the remote: required checks with their App, the extra required jobs and their aggregation by ci-gate, code-owner review and the governed paths CODEOWNERS covers, the merge queue (remote.merge_queue), the exception Environment and its reviewers (remote.exception_reviewers), workflow-token defaults, secret names, and repository custom properties (remote.custom_properties). An omitted field is no claim. `doctor --remote` compares every field read-only and reports each as matching, drifted, unavailable, unauthorized, unsupported or unverified; this product never applies it, and an owner-operated applier outside this product needs its own authorization (spec 012)", crate::remote_state::PATH, crate::remote_state::SCHEMA),
         format!("revision 17: the AI review reads governance documents as Git blobs at the base commit ({} by default, absent ones recorded as absent) plus review.context_paths, at most {MAX_CONTEXT_PATHS} literal repository-relative paths read from the policy at the base, never from the candidate; the documents must fit a quarter of review.context_tokens whole or the review refuses with 2 before any provider call, every call's whole input must fit three quarters of it, the diff budget is what remains (at most half), and the evidence records each document's blob, digest and length and each call's budget (spec 041)", DEFAULT_CONTEXT_PATHS.join(", ")),
+        "revision 18: a newer push to a pull request cancels that pull request's older statecraft-ci run, including one waiting on the owner exception, while a push to the default branch and each merge-queue entry keep a concurrency group of their own; a preflight job (the pull request's base, the committed artifacts' freshness, and cargo fmt for a Rust code selection) runs before code and every declared extra job, which need it, so a stacked pull request skips them unless it carries the label statecraft:stacked-ci; every preflight check also runs in governance or code, and a base gate.sh without the verb judges nothing; the code job restores the cargo cache on every event and saves it only on a push to the default branch, with incremental compilation off and line-table debuginfo (spec 058)".to_string(),
         "a repository that already runs these checks by hand keeps them by setting governance.enforce_coverage (index coverage --fail-on-untraced), governance.authored_content (the script's path; absent or not executable refuses), governance.authored_content_text (the title, the body and every commit message), governance.gate_each_commit (each commit's tree passes the gate and cargo fmt) and governance.require_signed_commits (each commit verified as signed by GitHub) (revision 4)".to_string(),
     ]
 }
@@ -670,7 +680,7 @@ fn extra_job_text(jobs: &[ExtraJob]) -> (String, String) {
         .iter()
         .map(|e| {
             format!(
-                "\n  {job}:\n    name: {job}\n    uses: ./{wf}\n",
+                "\n  {job}:\n    name: {job}\n    needs: [preflight]\n    uses: ./{wf}\n",
                 job = e.job,
                 wf = e.workflow
             )
@@ -1698,7 +1708,7 @@ pub fn plan(inputs: &Inputs<'_>) -> Result<Plan, String> {
                 .find("  ai-review:\n")
                 .ok_or("ai-review absent from profile")?
                 + start;
-            text.replace_range(start..end, &format!("  code:\n    name: code\n    uses: ./{workflow}\n    permissions:\n      contents: read\n\n"));
+            text.replace_range(start..end, &format!("  code:\n    name: code\n    needs: [preflight]\n    uses: ./{workflow}\n    permissions:\n      contents: read\n\n"));
         }
         let bytes = text.into_bytes();
         let managed_before = inputs
