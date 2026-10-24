@@ -1,0 +1,103 @@
+{
+  "record": {
+    "amends": [
+      "002-environment-lifecycle",
+      "044-supply-chain-profile",
+      "058-ci-throughput-profile"
+    ],
+    "created": "2026-10-24",
+    "dependsOn": [
+      "002-environment-lifecycle",
+      "058-ci-throughput-profile",
+      "059-job-level-concurrency"
+    ],
+    "extends": [
+      {
+        "nature": "additive",
+        "spec": "002-environment-lifecycle",
+        "unit": {
+          "kind": "directory",
+          "path": "crates/statecraft-home/"
+        }
+      }
+    ],
+    "id": "060-ci-failure-summary",
+    "implementation": "complete",
+    "obligations": [
+      {
+        "anchor": "3-1-the-failure-summary",
+        "id": "R-1",
+        "kind": "requirement",
+        "text": "When ci-gate blocks, it lists each job of its own run attempt that ended failure, other than ci-gate, with its first failed step and at most five matching log lines, in the step summary and as at most ten error annotations."
+      },
+      {
+        "anchor": "3-1-the-failure-summary",
+        "id": "R-2",
+        "kind": "requirement",
+        "text": "The failure summary never changes ci-gate's verdict or exit code: a read that fails is reported as unavailable with its reason, and a passing gate reads nothing."
+      },
+      {
+        "anchor": "3-2-candidate-text-is-data",
+        "id": "R-3",
+        "kind": "requirement",
+        "text": "Log text from the candidate is written only to the step summary inside a fenced block it cannot close, and to annotations with %, carriage return and newline escaped, so it can issue no workflow command."
+      },
+      {
+        "anchor": "3-3-the-code-cache-holds-dependencies-only",
+        "id": "R-4",
+        "kind": "requirement",
+        "text": "Before the code job saves the cargo cache it removes the workspace members' artifacts (cargo clean -p for each member), so the saved entry holds dependencies only."
+      },
+      {
+        "anchor": "3-5-spec-044-becomes-revision-20",
+        "id": "R-5",
+        "kind": "requirement",
+        "text": "Spec 044's jobs are delivered as revision 20: wherever spec 044, or spec 058 section 3.6, names revision 19 for them it is read as revision 20, and revision 18 as the revision upgraded from is read as revision 19."
+      },
+      {
+        "anchor": "verification",
+        "id": "V-1",
+        "inputs": [
+          "crates/statecraft-home/tests/setup_workflows.rs",
+          "crates/statecraft-home/tests/setup_upgrade.rs"
+        ],
+        "kind": "verification",
+        "text": "Step tests run ci-gate.sh against a stubbed gh: a blocked run lists the failed jobs, steps and error lines, escapes annotation text and fences the summary; a failed read reports unavailable with the same exit code; a passing run reads nothing. Rendering tests show the code job's trim step, and a revision-18 project upgrades to revision 19 in one plan."
+      }
+    ],
+    "sectionDigests": {
+      "060-a-blocked-gate-names-what-failed-and-the-code-cache-holds-dependencies-only": "c902d30a38fd0088196ecc1636f89d7c3c819f087d18d8c90b34c4ceb615edad",
+      "1-purpose": "cb8985e634bba34ae1f3abe62143d97bea4cd46acf118b105dfe2a87ae6e1186",
+      "2-territory": "96753f0184c27f6df42fed99b00280e4d11a9aa64074e49b27daf88a1aa3c5a4",
+      "3-1-the-failure-summary": "63333735dcf02ae1fb85f85a4c3f7c272df99fd040c7157d7776b7e17eb8e4df",
+      "3-2-candidate-text-is-data": "1aaaa9440b73a1b0455d21e7055caabef32b133b17ec1db865c1e6e5ea5d502b",
+      "3-3-the-code-cache-holds-dependencies-only": "abc562f426556301f9361e91bbc6b96bc73056931320bc26e3e66016611969d9",
+      "3-4-the-revision": "c18594ef268fb275c668b95e53ca36aa28cf0b2f8b589ee26a078bd99a9dd68b",
+      "3-5-spec-044-becomes-revision-20": "1720301ec5dd999f85828efc3ef418c8d70ccdd2d142494a771ebfef4e4f46e8",
+      "3-behavior": "afabd4e389113359437e9bfef6ece927de013500984ebdc76bdc775491074d9b",
+      "4-out-of-scope": "36dfd906b4f23f332d63320e4d817ba25a5a353454e00201de3b8f8896581b12",
+      "5-resolved-decisions": "352a9c66a7d05700c9a594be7c706f832bff6f1690d851a3928e4b453f8ae3cb",
+      "verification": "782c8b33ef8529a0123e543494055201afc24d0cd85b92b42f1327b87f2a5214"
+    },
+    "sectionHeadings": [
+      "060: A blocked gate names what failed, and the code cache holds dependencies only",
+      "1. Purpose",
+      "2. Territory",
+      "3. Behavior",
+      "3.1 The failure summary",
+      "3.2 Candidate text is data",
+      "3.3 The code cache holds dependencies only",
+      "3.4 The revision",
+      "3.5 Spec 044 becomes revision 20",
+      "4. Out of scope",
+      "5. Resolved decisions",
+      "Verification"
+    ],
+    "specPath": "specs/060-ci-failure-summary/spec.md",
+    "status": "approved",
+    "summary": "Amends spec 002's setup profile. github-actions-rust revision 19 changes what a failure tells its reader and what the cache holds, never what judges: when ci-gate blocks, it lists every failed job of its run with the failed step and at most five error lines from that job's log, in the step summary and as annotations, on a best-effort read that never changes the verdict or the exit code. Before the code job saves the cargo cache it drops the workspace's own artifacts, which Cargo rebuilds after any checkout. Spec 044 moves from revision 19 to revision 20.\n",
+    "title": "Setup profile revision 19: a blocked ci-gate names each failed job with its first error lines, and the code job's cache leaves out workspace artifacts"
+  },
+  "shardHash": "0b1327abd7ab96fd6961ecf9f56e479a58cb5fc4012b66ecc49d0cec61952b7c",
+  "specVersion": "1.10.0"
+}
