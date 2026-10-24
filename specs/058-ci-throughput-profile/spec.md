@@ -15,11 +15,13 @@ summary: >
   it ran; ci-gate's rules are unchanged except that preflight is required.
 amends:
   - "002-environment-lifecycle"
+  - "044-supply-chain-profile"
 extends:
   - { spec: "002-environment-lifecycle", unit: { kind: directory, path: "crates/statecraft-home/" }, nature: additive }
 depends_on:
   - "002-environment-lifecycle"
   - "032-external-code-profile"
+  - "044-supply-chain-profile"
 obligations:
   - id: "R-1"
     kind: requirement
@@ -41,6 +43,10 @@ obligations:
     kind: requirement
     text: "The code job restores the cargo cache on every event and saves it only on a push, which the workflow receives only for the default branch."
     anchor: "3-4-the-cargo-cache"
+  - id: "R-6"
+    kind: requirement
+    text: "Spec 044's jobs are delivered as revision 19: wherever spec 044 names revision 18 it is read as revision 19, and revision 17 as revision 18."
+    anchor: "3-6-spec-044-becomes-revision-19"
   - id: "V-1"
     kind: verification
     text: "Rendering and step tests show the concurrency group per event, the needs on preflight, preflight in the policy and in ci-gate, the stacked refusal and its label, the adoption pass, the cache split, and a revision-17 project upgrading in one plan."
@@ -153,6 +159,15 @@ upgrades through the ordinary plan and apply. The rendered workflow and
 base's revision-17 `ci-gate`, and it needs the owner's exception once.
 Section 3.2's adoption rule keeps its own preflight from refusing it.
 
+### 3.6 Spec 044 becomes revision 19
+
+This spec amends spec 044, which was approved and not started when this
+revision was assigned. Spec 044's jobs are delivered as revision 19. Wherever
+spec 044 names revision 18, including its obligations R-5 and V-1 and its
+verification text, it is read as revision 19. Wherever it names revision 17 as
+the revision it upgrades from, it is read as revision 18. Nothing else in
+spec 044 changes, and its text is not edited.
+
 ## 4. Out of scope
 
 - Splitting or rebalancing a project's own acceptance jobs.
@@ -164,14 +179,16 @@ Section 3.2's adoption rule keeps its own preflight from refusing it.
 ## 5. Resolved decisions
 
 **2026-10-23: ratified by the owner.** After the implementation's AI review
-returned no findings, the owner ratified this spec as drafted. The
-implementation in the same pull request is its delivery, and its declared
-acceptance passes.
+returned no findings, the owner ratified this spec as drafted. Section 3.6
+then expressed the owner's renumbering of spec 044 as an amendment, after a
+review found the first form (an in-place edit of approved text) contrary to
+the amendment rule. The implementation in the same pull request is its
+delivery, and its declared acceptance passes.
 
 **2026-10-23: this spec takes revision 18, and spec 044 moves to revision 19.**
 The owner chose this numbering. Spec 044 was approved and not yet started, and
-this change is small and measured. Spec 044's text was renumbered in the same
-change, with no other edit.
+this change is small and measured. The renumbering is an amendment of spec 044
+made here (section 3.6), not an edit of its approved text.
 
 **2026-10-23: stacked validation is an explicit request.** The owner agreed
 that a stacked pull request's full matrix should be opt-in by label rather

@@ -42,8 +42,8 @@
       }
     ],
     "sectionDigests": {
-      "056-a-review-guide-in-the-ai-review-s-context": "91dfd8a4457a9bbb234b347b699d8addcaac8ee639a29bc1a65e0136c45076f7",
-      "1-purpose": "f59917b08299ae73ff06f4b5f5e34457635cafac17e7a9b47dcc1a976b80ad2b",
+      "056-a-review-guide-in-the-ai-review-s-context": "b5a131d7dd9dd1f780daff748aef18816ebf6bb8564dbd1409df7f1144d78403",
+      "1-purpose": "bc9fb7482c17a0cd0becc7affd32064e4b723f1488580590f2729e08456d1448",
       "2-territory": "32b7c5139e7c9253bc30d95bd238b0e685fa599cc3a8b316ab7f7cae6a8c3f9f",
       "3-1-two-documents-one-managed": "598292819fe62e50e5b914b043a1962c4e147eee091343ce70a638a2fa9009b0",
       "3-2-absence-and-the-candidate": "b3a45cda4e9377474c647542ec7017b30edc8b9c23905c2e2e170d8501729e57",
@@ -72,6 +72,6 @@
     "summary": "Amends spec 002's setup profile and spec 041's default governance context. The next github-actions-rust revision delivers a managed review guide at .statecraft/REVIEW.md, the reviewer's contract written once for every target, and adds it and a repository-authored REVIEW.md to the documents the AI review reads from the base commit. An absent REVIEW.md is recorded as absent, as any default document is. This repository's own REVIEW.md is an adaptation of preloop-ci's guide to Statecraft's conventions.\n",
     "title": "Setup profile: a managed review guide and a repository's own REVIEW.md in the AI review's governance context"
   },
-  "shardHash": "4d1484d9fe41af133b7e8adb457bab947e592a9ceb81961d2c9d90cbf3e1ca50",
+  "shardHash": "9db7cb71d789de3cc697081e945aacc0f046b90c707ef77cac01c0fd05984076",
   "specVersion": "1.10.0"
 }

@@ -1,11 +1,13 @@
 {
   "mapping": {
     "amends": [
-      "002-environment-lifecycle"
+      "002-environment-lifecycle",
+      "044-supply-chain-profile"
     ],
     "dependsOn": [
       "002-environment-lifecycle",
-      "032-external-code-profile"
+      "032-external-code-profile",
+      "044-supply-chain-profile"
     ],
     "implementingPaths": [
       {
@@ -32,5 +34,5 @@
     "specStatus": "approved"
   },
   "schemaVersion": "1.3.0",
-  "shardHash": "237c5cc0f595bcae9968575102f8bf8e5bd4e1dc53cb9269b71c264d17906437"
+  "shardHash": "1ea7131c9224dbe2027600860b8b5c17766fe3c8152fbdad7bcc510cb97c5ca3"
 }

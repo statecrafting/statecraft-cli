@@ -1,11 +1,11 @@
 ---
 id: "044-supply-chain-profile"
-title: "Setup profile revision 19: supply-chain, policy-isolation, workflow-lint, structural-scan and secret-scan jobs"
+title: "Setup profile revision 18: supply-chain, policy-isolation, workflow-lint, structural-scan and secret-scan jobs"
 status: approved
 implementation: pending
 created: "2026-10-21"
 summary: >
-  Amends spec 002's setup profile. github-actions-rust revision 19 adds five
+  Amends spec 002's setup profile. github-actions-rust revision 18 adds five
   required checks to every target: a supply-chain job (cargo-deny,
   cargo-audit, cargo-vet with exact tool versions), a guard that refuses a
   pull request mixing dependency or policy files with anything else, a
@@ -41,11 +41,11 @@ obligations:
     anchor: "3-7-ci-gate-and-the-revision"
   - id: "R-5"
     kind: requirement
-    text: "A target without a committed deny.toml cannot select revision 19: the plan refuses, naming the file, and the supply-chain job fails rather than passing when the file is absent."
+    text: "A target without a committed deny.toml cannot select revision 18: the plan refuses, naming the file, and the supply-chain job fails rather than passing when the file is absent."
     anchor: "3-2-the-supply-chain-job"
   - id: "V-1"
     kind: verification
-    text: "Rendering tests show each job in a revision-19 workflow with its pinned tools, the guard's three exits on fixture histories, the pin check's refusals, a revision-18 project with deny.toml upgrading in one plan, and one without it refused."
+    text: "Rendering tests show each job in a revision-18 workflow with its pinned tools, the guard's three exits on fixture histories, the pin check's refusals, a revision-17 project with deny.toml upgrading in one plan, and one without it refused."
     anchor: "verification"
     inputs:
       - "crates/statecraft-home/tests/setup_workflows.rs"
@@ -56,7 +56,7 @@ obligations:
 
 ## 1. Purpose
 
-Revision 18 judges the corpus (`governance`), the workspace (`code`) and the
+Revision 17 judges the corpus (`governance`), the workspace (`code`) and the
 review (`ai-review`, `review-exception`), and names nothing about where the
 code's dependencies come from, whether a pull request smuggled a dependency
 change inside a feature, whether the workflows themselves run mutable code,
@@ -103,7 +103,7 @@ own step whose failure fails the job:
 3. `cargo vet --locked` when `supply-chain/config.toml` exists.
 
 `deny.toml` is mandatory (section 7, O-1). It is checked at upgrade: a plan
-that would select revision 19 for a target without a committed `deny.toml`
+that would select revision 18 for a target without a committed `deny.toml`
 refuses, naming the file, and writes nothing. A job that later finds it absent
 fails the deny step; it never records `not-configured` for it. The audit and
 vet steps stay optional: a step whose policy file is absent records
@@ -172,8 +172,8 @@ the project's committed gitleaks configuration; the profile adds none.
 Each of `supply-chain`, `workflow-lint`, `sg-scan` and `secret-scan` is a
 required need of `ci-gate`, and the guard is a step of `governance`, which
 already is one; none is marked optional, so `jobs.<name>.enabled` refuses for
-them as for `code`. The profile becomes revision 19 with a new identity. A
-revision-18 project with a committed `deny.toml` upgrades through the
+them as for `code`. The profile becomes revision 18 with a new identity. A
+revision-17 project with a committed `deny.toml` upgrades through the
 ordinary plan and apply, which adds the two scripts and rewrites the
 workflow; a second plan of the same selection writes nothing. Without
 `deny.toml` the plan refuses (section 3.2).
@@ -185,7 +185,7 @@ workflow; a second plan of the same selection writes nothing. Without
 | A pull request changes `Cargo.lock` and a source file | The guard exits 1, listing both. |
 | A pull request changes `Cargo.lock` and shards under `.statecraft/derived/` | The guard exits 0. |
 | A `D-06` adoption changes `Cargo.toml`, `Cargo.lock`, `spec-spine.toml`, the adoption record and the shards | The guard exits 0. |
-| A revision-18 target without `deny.toml` plans revision 19 | The plan refuses, naming `deny.toml`, and writes nothing. |
+| A revision-17 target without `deny.toml` plans revision 18 | The plan refuses, naming `deny.toml`, and writes nothing. |
 | `deny.toml` is absent when `supply-chain` runs | The deny step fails. |
 | The base revision was never fetched | The guard exits 2. |
 | A change to `deny.toml` exists on both tips | The merge-base diff still sees it. |
@@ -200,7 +200,7 @@ workflow; a second plan of the same selection writes nothing. Without
 
 `statecraft-home` depends on `serde_yaml`, which keeps `unsafe-libyaml` in
 this workspace's lockfile, and `cargo audit` reports it (RUSTSEC-2024-0449).
-This repository adopts revision 19 only after a separate, spec-first
+This repository adopts revision 18 only after a separate, spec-first
 dependency change moves `statecraft-home` off `serde_yaml`; it does not ignore
 the advisory to pass its own check. Its `deny.toml`, `.cargo/audit.toml` and
 `supply-chain/` arrive in their own isolated pull request (queue item H3),
@@ -216,14 +216,10 @@ each file claimed by its spec.
 
 ## 7. Resolved decisions
 
-**2026-10-23: renumbered from revision 18 to revision 19.** Spec 058 took
-revision 18 by the owner's choice while this spec was approved and not yet
-started; nothing else in this spec changed.
-
 **2026-10-21: the owner ratified this spec and settled O-1 and O-2.**
 
 - **O-1. `deny.toml` is mandatory, checked at upgrade.** A target cannot
-  select revision 19 without a committed `deny.toml`; the plan refuses and
+  select revision 18 without a committed `deny.toml`; the plan refuses and
   writes nothing (section 3.2). `.cargo/audit.toml` and `supply-chain/` stay
   optional and record `not-configured` when absent.
 - **O-2. Three path classes, as proposed.** Policy, generated and other
@@ -235,8 +231,8 @@ started; nothing else in this spec changed.
 
 ## Verification
 
-This spec declares no acceptance until it is built. Its acceptance will render a revision-19 workflow and assert each
+This spec declares no acceptance until it is built. Its acceptance will render a revision-18 workflow and assert each
 job's pinned tools and its place in `ci-gate`; run the guard against fixture
 histories for exits 0, 1 and 2, the both-tips case and the generated class;
 run the pin check against fixture workflows for each refusal; upgrade a
-revision-18 project with `deny.toml` in one plan; and refuse one without it.
+revision-17 project with `deny.toml` in one plan; and refuse one without it.
