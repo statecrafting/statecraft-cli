@@ -6064,5 +6064,5 @@ fn revision_nineteen_drops_workspace_artifacts_immediately_before_cache_save() {
     );
     let run = drop["run"].as_str().unwrap();
     assert!(run.contains("cargo metadata --format-version 1 --no-deps"));
-    assert!(run.contains("sed 's/^/-p /' | xargs cargo clean"));
+    assert!(run.contains("sed 's/^/-p /' | xargs -r cargo clean"));
 }

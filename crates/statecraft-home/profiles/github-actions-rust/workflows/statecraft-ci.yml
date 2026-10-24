@@ -338,7 +338,7 @@ jobs:
       # dependencies are worth their space under the repository's limit.
       - name: Drop the workspace's own artifacts (default branch only)
         if: github.event_name == 'push' && steps.cargo-cache.outputs.cache-hit != 'true'
-        run: cargo metadata --format-version 1 --no-deps | jq -r '.packages[].name' | sed 's/^/-p /' | xargs cargo clean
+        run: cargo metadata --format-version 1 --no-deps | jq -r '.packages[].name' | sed 's/^/-p /' | xargs -r cargo clean
       - name: Save cargo registry, git and target (default branch only)
         if: github.event_name == 'push' && steps.cargo-cache.outputs.cache-hit != 'true'
         uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
