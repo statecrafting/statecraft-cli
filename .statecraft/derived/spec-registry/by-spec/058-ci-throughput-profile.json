@@ -1,0 +1,110 @@
+{
+  "record": {
+    "amends": [
+      "002-environment-lifecycle",
+      "044-supply-chain-profile"
+    ],
+    "created": "2026-10-23",
+    "dependsOn": [
+      "002-environment-lifecycle",
+      "032-external-code-profile",
+      "044-supply-chain-profile"
+    ],
+    "extends": [
+      {
+        "nature": "additive",
+        "spec": "002-environment-lifecycle",
+        "unit": {
+          "kind": "directory",
+          "path": "crates/statecraft-home/"
+        }
+      }
+    ],
+    "id": "058-ci-throughput-profile",
+    "implementation": "complete",
+    "obligations": [
+      {
+        "anchor": "3-1-superseded-runs-are-cancelled",
+        "id": "R-1",
+        "kind": "requirement",
+        "text": "A pull_request run is in a concurrency group of its pull request and cancels an older run in it; a push and a merge_group run each have a group of their own and cancel nothing."
+      },
+      {
+        "anchor": "3-2-preflight",
+        "id": "R-2",
+        "kind": "requirement",
+        "text": "code and every declared extra job need preflight; ci-gate needs preflight and the policy requires it on every event, so its failure, cancellation or skip blocks."
+      },
+      {
+        "anchor": "3-2-preflight",
+        "id": "R-3",
+        "kind": "requirement",
+        "text": "Every check preflight runs also runs in governance or code; a base gate.sh without the preflight verb makes the step pass and say so, and governance and code still judge everything."
+      },
+      {
+        "anchor": "3-3-stacked-pull-requests",
+        "id": "R-4",
+        "kind": "requirement",
+        "text": "On a pull_request whose base is not the default branch, preflight fails unless the pull request carries the label statecraft:stacked-ci; the label never changes governance's base refusal."
+      },
+      {
+        "anchor": "3-4-the-cargo-cache",
+        "id": "R-5",
+        "kind": "requirement",
+        "text": "The code job restores the cargo cache on every event and saves it only on a push, which the workflow receives only for the default branch."
+      },
+      {
+        "anchor": "3-6-spec-044-becomes-revision-19",
+        "id": "R-6",
+        "kind": "requirement",
+        "text": "Spec 044's jobs are delivered as revision 19: wherever spec 044 names revision 18 it is read as revision 19, and revision 17 as revision 18."
+      },
+      {
+        "anchor": "verification",
+        "id": "V-1",
+        "inputs": [
+          "crates/statecraft-home/tests/setup_workflows.rs",
+          "crates/statecraft-home/tests/setup_upgrade.rs"
+        ],
+        "kind": "verification",
+        "text": "Rendering and step tests show the concurrency group per event, the needs on preflight, preflight in the policy and in ci-gate, the stacked refusal and its label, the adoption pass, the cache split, and a revision-17 project upgrading in one plan."
+      }
+    ],
+    "sectionDigests": {
+      "058-ci-throughput-cancelled-superseded-runs-a-preflight-and-a-default-branch-cache": "4bb75ca0db5d6046a7debf374cf57293ee5527b1989021a68a09edf22143df10",
+      "1-purpose": "1426bc0f8b61ab0be0cc80276552badc4a08071e61f29d6206d5cd38ccbccf2e",
+      "2-territory": "64150971ebf604131d7d03d12bada48ac175e80490199317c3b5939944e032ca",
+      "3-1-superseded-runs-are-cancelled": "bd4c8a1c88d4da6ad4bdc5d895eb6e529050a58c394c3ecaff0771deff70a8ea",
+      "3-2-preflight": "404b407977613b804ea56d8c34de16bb3b7dd2089cb3100ebf19b1b29b72071b",
+      "3-3-stacked-pull-requests": "4358615b0e3ecb5405b12ae337920845836236a12c9851be4dad76bbca2c3f0e",
+      "3-4-the-cargo-cache": "08ec108371002a57503f924ddddfc6fe4c80ca5bb9be93806ee67bbe24d1f508",
+      "3-5-the-revision": "320af487235c3395e9cf408856b5f873531fc3d809fd1b7e68f7aa1f7c5d4d77",
+      "3-6-spec-044-becomes-revision-19": "560b7f0c21b97eaf6921aa2e175b29b32789086aa65492da947ce349fa0efaea",
+      "3-behavior": "ca73d0ee50e72fa47db6f2d3a06185684ea4bc07a110a601b03ba7c219844e7f",
+      "4-out-of-scope": "73149ead8b9b43f1263ecac340d9b6d99852d655c5a2706b8fa60228251a07c5",
+      "5-resolved-decisions": "62cf6880aa4f2b3ce626e30f835379dcf620c51cc8f15a219a4bd7d3feb541ce",
+      "verification": "472cb4a43d030243aed00cf8ce33ae761192ce3651702414130d6f65623df669"
+    },
+    "sectionHeadings": [
+      "058: CI throughput: cancelled superseded runs, a preflight, and a default-branch cache",
+      "1. Purpose",
+      "2. Territory",
+      "3. Behavior",
+      "3.1 Superseded runs are cancelled",
+      "3.2 Preflight",
+      "3.3 Stacked pull requests",
+      "3.4 The cargo cache",
+      "3.5 The revision",
+      "3.6 Spec 044 becomes revision 19",
+      "4. Out of scope",
+      "5. Resolved decisions",
+      "Verification"
+    ],
+    "specPath": "specs/058-ci-throughput-profile/spec.md",
+    "status": "approved",
+    "summary": "Amends spec 002's setup profile. github-actions-rust revision 18 changes when work runs, never what judges it: a newer push to a pull request cancels that pull request's older run; a preflight job (the base, the committed artifacts' freshness, formatting) runs before code and every declared extra job, so a stacked pull request skips them unless it asks for them by label; and the code job restores the cargo cache on every event but saves it only from the default branch. Every check keeps running where it ran; ci-gate's rules are unchanged except that preflight is required.\n",
+    "title": "Setup profile revision 18: superseded pull-request runs are cancelled, a preflight orders the expensive jobs, and the cargo cache is saved from the default branch only"
+  },
+  "shardHash": "1ea7131c9224dbe2027600860b8b5c17766fe3c8152fbdad7bcc510cb97c5ca3",
+  "specVersion": "1.10.0"
+}

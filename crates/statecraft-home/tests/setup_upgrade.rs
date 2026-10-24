@@ -244,11 +244,34 @@ fn revision_thirteen() -> Profile {
     p
 }
 
-/// Revision 16 of the registered profile: the review script revision 17
-/// changed (spec 041), captured byte for byte from main at 24f65ca.
-fn revision_sixteen() -> Profile {
+/// Revision 17 of the registered profile: the workflow and gate revision 18
+/// changed (spec 058), captured byte for byte from main at 6c6f394.
+fn revision_seventeen() -> Profile {
     let mut p = Profile::registered();
-    assert_eq!(p.revision, 17, "the registered profile is revision 17");
+    assert_eq!(p.revision, 18, "the registered profile is revision 18");
+    p.revision = 17;
+    for (path, old) in [
+        (
+            ".github/workflows/statecraft-ci.yml",
+            include_str!("support/profile-r17/statecraft-ci.yml"),
+        ),
+        (
+            "scripts/statecraft/gate.sh",
+            include_str!("support/profile-r17/gate.sh"),
+        ),
+    ] {
+        let t = p.templates.iter_mut().find(|t| t.path == path).unwrap();
+        assert_ne!(t.body, old, "revision 18 changed {path}");
+        t.body = old.into();
+    }
+    p
+}
+
+/// Revision 16 of the registered profile: revision 17's files, with the
+/// review script revision 17 changed (spec 041), captured byte for byte from
+/// main at 24f65ca.
+fn revision_sixteen() -> Profile {
+    let mut p = revision_seventeen();
     p.revision = 16;
     let t = p
         .templates
@@ -299,7 +322,7 @@ fn review_context_profile_upgrade_is_explicit() {
         Action::Replace
     );
     let p = policy(root);
-    assert_eq!(p["revision"], 17);
+    assert_eq!(p["revision"], setup::REVISION);
     assert_eq!(p["review"]["context_paths"], serde_json::json!([]));
     assert_eq!(
         p["review"]["default_context_paths"],
@@ -802,7 +825,8 @@ fn revision_four_keeps_the_policy_and_names_the_new_refusal() {
     assert_eq!(policy["governance"]["merge_group"], "required");
     assert_eq!(policy["code"]["merge_group"], "required");
     assert_eq!(policy["ai-review"]["merge_group"], "recorded-review");
-    assert_eq!(policy.as_object().unwrap().len(), 4);
+    // Revision 18 (spec 058) adds preflight.
+    assert_eq!(policy.as_object().unwrap().len(), 5);
     let steps = setup::remote_obligations().join("\n");
     assert!(
         steps.contains("a pull request whose base is not the default branch fails governance"),
@@ -930,7 +954,8 @@ fn revision_five_names_the_owner_approval_in_its_operator_steps() {
         assert!(steps.contains(said), "{said}: {steps}");
     }
     let policy = setup::jobs();
-    assert_eq!(policy.as_object().unwrap().len(), 4);
+    // Revision 18 (spec 058) adds preflight.
+    assert_eq!(policy.as_object().unwrap().len(), 5);
     assert_eq!(
         policy["review-exception"]["pull_request"],
         "owner-exception"
@@ -1023,7 +1048,7 @@ fn a_revision_six_project_upgrades_to_revision_seven() {
     assert!(after.contains("leave 3"), "{after}");
     let ci = std::fs::read_to_string(root.join(wf)).unwrap();
     assert!(
-        ci.contains("  deny:\n    name: deny\n    uses: ./.github/workflows/deny.yml\n"),
+        ci.contains("  deny:\n    name: deny\n    needs: [preflight]\n    uses: ./.github/workflows/deny.yml\n"),
         "{ci}"
     );
     assert!(
@@ -1522,8 +1547,9 @@ fn revision_fourteen_installer_upgrades_to_the_registered_revision_without_repla
     });
     assert!(plan_and_apply(root, &old, &mut manifest).whole());
     let next = Profile::registered();
-    // Revisions 16 (spec 012) and 17 (spec 041) change no installer byte.
-    assert_eq!(next.revision, 17);
+    // Revisions 16 (spec 012), 17 (spec 041) and 18 (spec 058) change no
+    // installer byte.
+    assert_eq!(next.revision, 18);
     let installer = "scripts/statecraft/install-spec-spine.sh";
     let upgraded = plan_and_apply(root, &next, &mut manifest);
     assert_eq!(
@@ -1551,4 +1577,52 @@ fn revision_fourteen_installer_upgrades_to_the_registered_revision_without_repla
         std::fs::read_to_string(root.join(installer)).unwrap(),
         customized
     );
+}
+
+/// Spec 058 section 3.5: a revision-17 project upgrades in one ordinary plan;
+/// the workflow and gate are replaced, preflight enters the policy's jobs and
+/// commands, and a second identical plan writes nothing.
+#[test]
+fn a_revision_seventeen_project_upgrades_to_revision_eighteen() {
+    let dir = project();
+    let root = dir.path();
+    let old = revision_seventeen();
+    let next = Profile::registered();
+    assert_ne!(old.identity(), next.identity());
+    let mut manifest = Manifest::new(Pins {
+        product: "test".into(),
+        spec_spine: "unpinned".into(),
+        adapters: Default::default(),
+        producer: None,
+    });
+    assert!(plan_and_apply(root, &old, &mut manifest).whole());
+    let workflow = ".github/workflows/statecraft-ci.yml";
+    let before = std::fs::read_to_string(root.join(workflow)).unwrap();
+    assert!(!before.contains("preflight"));
+
+    let upgraded = plan_and_apply(root, &next, &mut manifest);
+    assert!(upgraded.whole());
+    for path in [workflow, "scripts/statecraft/gate.sh"] {
+        assert_eq!(
+            upgraded
+                .files
+                .iter()
+                .find(|f| f.path == path)
+                .unwrap()
+                .action,
+            Action::Replace,
+            "{path}"
+        );
+    }
+    let after = std::fs::read_to_string(root.join(workflow)).unwrap();
+    assert!(after.contains("  preflight:\n"));
+    assert!(after.contains("cancel-in-progress:"));
+    let policy: serde_json::Value =
+        serde_json::from_str(&std::fs::read_to_string(root.join(setup::POLICY_PATH)).unwrap())
+            .unwrap();
+    assert_eq!(policy["revision"], 18);
+    assert_eq!(policy["jobs"]["preflight"]["required"], true);
+    assert_eq!(upgraded.commands, setup::commands());
+    let again = plan_and_apply(root, &next, &mut manifest);
+    assert!(again.files.iter().all(|f| !f.action.writes()));
 }

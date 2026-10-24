@@ -587,8 +587,9 @@ fn run_gate(repo: &Repo, event: &str, needs_json: &str, head_ref: &str) -> Ran {
     )
 }
 
-const ALL_OK: [(&str, &str); 4] = [
+const ALL_OK: [(&str, &str); 5] = [
     ("governance", "success"),
+    ("preflight", "success"),
     ("code", "success"),
     ("ai-review", "success"),
     ("review-exception", "skipped"),
@@ -676,7 +677,13 @@ fn gate_cases() -> Vec<(&'static str, &'static str, String, &'static str, i32)> 
             1,
         ));
     }
-    for missing in ["governance", "code", "ai-review", "review-exception"] {
+    for missing in [
+        "governance",
+        "preflight",
+        "code",
+        "ai-review",
+        "review-exception",
+    ] {
         let label: &'static str = Box::leak(format!("pr, {missing} vanished").into_boxed_str());
         let entries: Vec<(&str, &str)> = ALL_OK
             .iter()
@@ -712,6 +719,7 @@ fn gate_cases() -> Vec<(&'static str, &'static str, String, &'static str, i32)> 
             needs(
                 &[
                     ("governance", "success"),
+                    ("preflight", "success"),
                     ("code", "success"),
                     ("ai-review", "skipped"),
                     ("review-exception", "skipped"),
@@ -728,6 +736,7 @@ fn gate_cases() -> Vec<(&'static str, &'static str, String, &'static str, i32)> 
             needs(
                 &[
                     ("governance", "success"),
+                    ("preflight", "success"),
                     ("code", "success"),
                     ("ai-review", "success"),
                     ("review-exception", "skipped"),
@@ -840,6 +849,7 @@ fn ci_gate_blocks_exactly_what_the_policy_says() {
         &needs(
             &[
                 ("governance", "success"),
+                ("preflight", "success"),
                 ("code", "success"),
                 ("ai-review", "skipped"),
                 ("review-exception", "skipped"),
@@ -1228,8 +1238,9 @@ fn record(result: &str, pr: u64, head: &str) -> serde_json::Value {
     })
 }
 
-const QUEUE_OK: [(&str, &str); 4] = [
+const QUEUE_OK: [(&str, &str); 5] = [
     ("governance", "success"),
+    ("preflight", "success"),
     ("code", "success"),
     ("ai-review", "skipped"),
     ("review-exception", "skipped"),
@@ -2137,6 +2148,8 @@ struct Event<'a> {
     body: &'a str,
     group_ref: &'a str,
     head: &'a str,
+    /// Revision 18: whether the pull request carries statecraft:stacked-ci.
+    stacked_ci: &'a str,
 }
 
 fn event<'a>(name: &'a str, head: &'a str) -> Event<'a> {
@@ -2147,6 +2160,7 @@ fn event<'a>(name: &'a str, head: &'a str) -> Event<'a> {
         body: "a clean body",
         group_ref: if name == "merge_group" { QUEUE_REF } else { "" },
         head,
+        stacked_ci: "false",
     }
 }
 
@@ -2186,6 +2200,11 @@ fn gov_ctx(gov: &Gov, ev: &Event<'_>) -> BTreeMap<String, String> {
         ("github.event.merge_group.head_sha", ev.head),
         ("github.repository", "owner/fixture"),
         ("github.token", "fixture-token"),
+        // Revision 18: the preflight's explicit request for a stacked run.
+        (
+            "contains(github.event.pull_request.labels.*.name, 'statecraft:stacked-ci')",
+            ev.stacked_ci,
+        ),
     ] {
         ctx.insert(k.to_string(), v.to_string());
     }
@@ -2877,8 +2896,11 @@ fn revision_four_adds_steps_not_jobs_and_keeps_the_gate_read_only() {
         .collect();
     assert_eq!(
         jobs,
+        // Revision 18 (spec 058) adds preflight, a job ci-gate requires on
+        // every event, so a skip of it blocks as any required job's does.
         [
             "governance",
+            "preflight",
             "code",
             "ai-review",
             "review-exception",
@@ -2914,7 +2936,7 @@ fn revision_four_adds_steps_not_jobs_and_keeps_the_gate_read_only() {
     // The caches: the binary keyed on the pin, cargo on the lockfile and the
     // toolchain. The install step always runs, so a restored binary is still
     // checked against the pin.
-    for job in ["governance", "code"] {
+    for job in ["governance", "preflight", "code"] {
         let steps = wf["jobs"][job]["steps"].as_sequence().unwrap();
         let find = |name: &str| steps.iter().find(|s| s["name"].as_str() == Some(name));
         let cache = find("Cache spec-spine").unwrap_or_else(|| panic!("{job}: no cache"));
@@ -2937,7 +2959,8 @@ fn revision_four_adds_steps_not_jobs_and_keeps_the_gate_read_only() {
     let code = wf["jobs"]["code"]["steps"].as_sequence().unwrap();
     let cargo = code
         .iter()
-        .find(|s| s["name"].as_str() == Some("Cache cargo registry, git and target"))
+        // Revision 18 (spec 058): restored on every event; saved only on a push.
+        .find(|s| s["name"].as_str() == Some("Restore cargo registry, git and target"))
         .unwrap();
     assert!(
         cargo["with"]["key"]
@@ -3315,6 +3338,7 @@ fn an_authority_change_blocks_without_the_owner_exception_and_passes_with_it() {
             &needs(
                 &[
                     ("governance", "success"),
+                    ("preflight", "success"),
                     ("code", "success"),
                     ("ai-review", "skipped"),
                     ("review-exception", "skipped"),
@@ -3887,7 +3911,14 @@ fn a_declared_extra_job_is_required_like_the_profiles_own() {
         .collect();
     assert_eq!(
         needs_list,
-        ["governance", "code", "ai-review", "review-exception", EXTRA]
+        [
+            "governance",
+            "preflight",
+            "code",
+            "ai-review",
+            "review-exception",
+            EXTRA
+        ]
     );
     let policy: serde_json::Value =
         serde_json::from_str(&std::fs::read_to_string(repo.root().join(POLICY)).unwrap()).unwrap();
@@ -3921,7 +3952,7 @@ fn a_declared_extra_job_is_required_like_the_profiles_own() {
     let text =
         std::fs::read_to_string(plain.path().join(".github/workflows/statecraft-ci.yml")).unwrap();
     assert!(
-        text.contains("needs: [governance, code, ai-review, review-exception]\n"),
+        text.contains("needs: [governance, preflight, code, ai-review, review-exception]\n"),
         "{text}"
     );
 }
@@ -4352,6 +4383,7 @@ fn a_draft_owner_refuses_and_a_ratification_needs_the_owner_exception() {
     let push_ok = needs(
         &[
             ("governance", "success"),
+            ("preflight", "success"),
             ("code", "success"),
             ("ai-review", "skipped"),
             ("review-exception", "skipped"),
@@ -5495,4 +5527,278 @@ fn run_mutated(repo: &Repo, script: &str, extra: &[(&'static str, &str)]) -> Ran
             std::fs::write(stubs.join("npm-exit"), "0").unwrap();
         },
     )
+}
+
+// ------------------------------------------------------------ revision 18
+
+/// The revision-17 profile: the workflow and gate revision 18 changed (spec
+/// 058), captured byte for byte from main at 6c6f394.
+fn revision_seventeen() -> Profile {
+    let mut p = Profile::registered();
+    assert_eq!(p.revision, 18, "the registered profile is revision 18");
+    p.revision = 17;
+    for (path, old) in [
+        (
+            ".github/workflows/statecraft-ci.yml",
+            include_str!("support/profile-r17/statecraft-ci.yml"),
+        ),
+        (
+            "scripts/statecraft/gate.sh",
+            include_str!("support/profile-r17/gate.sh"),
+        ),
+    ] {
+        let t = p.templates.iter_mut().find(|t| t.path == path).unwrap();
+        assert_ne!(t.body, old, "revision 18 changed {path}");
+        t.body = old.into();
+    }
+    p
+}
+
+fn needs_of(wf: &serde_yaml::Value, job: &str) -> Vec<String> {
+    match &wf["jobs"][job]["needs"] {
+        serde_yaml::Value::Sequence(v) => {
+            v.iter().map(|n| n.as_str().unwrap().to_string()).collect()
+        }
+        serde_yaml::Value::String(n) => vec![n.clone()],
+        _ => Vec::new(),
+    }
+}
+
+/// Spec 058 R-1, R-2 and R-5 in the rendered workflow: one concurrency group
+/// per pull request that cancels only pull-request runs, preflight before
+/// code and every extra job and required by ci-gate and the policy, and the
+/// cargo cache restored everywhere but saved only on a push.
+#[test]
+fn revision_eighteen_orders_the_expensive_jobs_and_saves_the_cache_from_main() {
+    let dir = tempfile::tempdir().unwrap();
+    let root = dir.path();
+    write(
+        root,
+        ".github/workflows/extra.yml",
+        "on:\n  workflow_call:\njobs:\n  x:\n    runs-on: ubuntu-latest\n    steps:\n      - run: true\n",
+    );
+    render_with(
+        root,
+        &[(
+            "ci.extra_required_jobs",
+            serde_json::json!([{"job": "extra", "workflow": ".github/workflows/extra.yml"}]),
+        )],
+    );
+    let wf = workflow(root, "statecraft-ci.yml");
+
+    let group = wf["concurrency"]["group"].as_str().unwrap();
+    let cancel = wf["concurrency"]["cancel-in-progress"].as_str().unwrap();
+    let ctx = |event: &str| -> BTreeMap<String, String> {
+        let pr = event == "pull_request";
+        let mut c = BTreeMap::new();
+        c.insert(
+            "github.event_name == 'pull_request' && format('pr-{0}', github.event.pull_request.number) || github.run_id".into(),
+            if pr { "pr-7".into() } else { format!("run-{event}") },
+        );
+        c.insert("github.event_name == 'pull_request'".into(), pr.to_string());
+        c
+    };
+    assert_eq!(resolve(group, &ctx("pull_request")), "statecraft-ci-pr-7");
+    assert_eq!(resolve(cancel, &ctx("pull_request")), "true");
+    for event in ["push", "merge_group"] {
+        assert_eq!(
+            resolve(group, &ctx(event)),
+            format!("statecraft-ci-run-{event}")
+        );
+        assert_eq!(
+            resolve(cancel, &ctx(event)),
+            "false",
+            "{event} never cancels"
+        );
+    }
+
+    assert_eq!(needs_of(&wf, "code"), ["preflight"]);
+    assert_eq!(needs_of(&wf, "extra"), ["preflight"]);
+    assert!(
+        needs_of(&wf, "governance").is_empty(),
+        "governance never waits"
+    );
+    assert!(
+        needs_of(&wf, "ai-review").is_empty(),
+        "the review never waits"
+    );
+    assert!(needs_of(&wf, "ci-gate").contains(&"preflight".to_string()));
+    let policy: serde_json::Value =
+        serde_json::from_str(&std::fs::read_to_string(root.join(setup::POLICY_PATH)).unwrap())
+            .unwrap();
+    for event in ["pull_request", "push", "merge_group"] {
+        assert_eq!(policy["jobs"]["preflight"][event], "required", "{event}");
+    }
+    assert_eq!(policy["jobs"]["preflight"]["required"], true);
+    assert_eq!(
+        policy["commands"]["preflight"],
+        serde_json::json!([
+            [".bin/spec-spine", "check", "--fail-on-warn"],
+            ["cargo", "fmt", "--all", "--check"]
+        ])
+    );
+
+    let steps = wf["jobs"]["code"]["steps"].as_sequence().unwrap();
+    let uses = |name: &str| {
+        steps
+            .iter()
+            .find(|s| s["name"].as_str() == Some(name))
+            .unwrap_or_else(|| panic!("no step {name}"))
+    };
+    let restore = uses("Restore cargo registry, git and target");
+    assert!(
+        restore["uses"]
+            .as_str()
+            .unwrap()
+            .starts_with("actions/cache/restore@")
+    );
+    assert!(restore["if"].is_null(), "restored on every event");
+    let save = uses("Save cargo registry, git and target (default branch only)");
+    assert!(
+        save["uses"]
+            .as_str()
+            .unwrap()
+            .starts_with("actions/cache/save@")
+    );
+    assert_eq!(
+        save["if"].as_str().unwrap(),
+        "github.event_name == 'push' && steps.cargo-cache.outputs.cache-hit != 'true'"
+    );
+    assert!(
+        steps.iter().all(|s| s["uses"]
+            .as_str()
+            .is_none_or(|u| !u.starts_with("actions/cache@")
+                || s["name"].as_str() == Some("Cache spec-spine"))),
+        "no step both restores and saves the cargo cache"
+    );
+    assert_eq!(
+        wf["jobs"]["code"]["env"]["CARGO_INCREMENTAL"].as_str(),
+        Some("0")
+    );
+}
+
+/// Spec 058 R-2 for an external code selection: its call needs preflight.
+#[test]
+fn revision_eighteen_external_code_needs_preflight() {
+    let dir = tempfile::tempdir().unwrap();
+    let root = dir.path();
+    write(
+        root,
+        ".github/workflows/project-code.yml",
+        "on:\n  workflow_call:\njobs:\n  x:\n    runs-on: ubuntu-latest\n    steps:\n      - run: true\n",
+    );
+    write(root, "scripts/code.sh", "#!/bin/sh\nexit 0\n");
+    use std::os::unix::fs::PermissionsExt;
+    std::fs::set_permissions(
+        root.join("scripts/code.sh"),
+        std::fs::Permissions::from_mode(0o755),
+    )
+    .unwrap();
+    git(root, &["init", "--quiet"]);
+    git(
+        root,
+        &[
+            "add",
+            ".github/workflows/project-code.yml",
+            "scripts/code.sh",
+        ],
+    );
+    render_with(
+        root,
+        &[(
+            "ci.code",
+            serde_json::json!({"kind": "external", "workflow": ".github/workflows/project-code.yml", "script": "scripts/code.sh"}),
+        )],
+    );
+    let wf = workflow(root, "statecraft-ci.yml");
+    assert_eq!(needs_of(&wf, "code"), ["preflight"]);
+    assert!(wf["jobs"]["preflight"].is_mapping());
+}
+
+/// Spec 058 R-4: a stacked pull request fails preflight unless it asks for
+/// the full matrix by label, a push judges no base, and formatting fails it.
+#[test]
+fn revision_eighteen_preflight_refuses_a_stacked_base_unless_requested() {
+    let step = "Preflight";
+    let gov = Gov::new(&[]);
+    let head = gov.commit(&[], "empty");
+    let ran = run_gov_job(
+        &gov,
+        "preflight",
+        step,
+        &event("pull_request", &head),
+        |_| {},
+    );
+    assert_eq!(ran.exit, 0, "{}", ran.text);
+    assert!(ran.text.contains("preflight: ok"), "{}", ran.text);
+
+    let stacked = Event {
+        base_ref: "feature/below",
+        ..event("pull_request", &head)
+    };
+    let ran = run_gov_job(&gov, "preflight", step, &stacked, |_| {});
+    assert_eq!(ran.exit, 1, "{}", ran.text);
+    assert!(
+        ran.text.contains("not the default branch main"),
+        "{}",
+        ran.text
+    );
+
+    let requested = Event {
+        stacked_ci: "true",
+        ..stacked
+    };
+    let ran = run_gov_job(&gov, "preflight", step, &requested, |_| {});
+    assert_eq!(ran.exit, 0, "{}", ran.text);
+    assert!(ran.text.contains("statecraft:stacked-ci"), "{}", ran.text);
+    // The label is a scheduling request: governance still refuses the base.
+    let ran = run_gov(&gov, "The base is the default branch", &requested, |_| {});
+    assert_eq!(ran.exit, 1, "{}", ran.text);
+
+    let ran = run_gov_job(&gov, "preflight", step, &event("push", &head), |_| {});
+    assert_eq!(ran.exit, 0, "{}", ran.text);
+
+    let unformatted = gov.commit(
+        &[
+            ("Cargo.toml", Some("[package]\nname = \"fixture\"\n")),
+            ("src/unformatted.rs", Some("fn  x(){}\n")),
+        ],
+        "unformatted",
+    );
+    let ran = run_gov_job(
+        &gov,
+        "preflight",
+        step,
+        &event("pull_request", &unformatted),
+        |_| {},
+    );
+    assert_eq!(ran.exit, 1, "{}", ran.text);
+    assert!(ran.text.contains("cargo fmt did not pass"), "{}", ran.text);
+}
+
+/// Spec 058 R-3: the upgrade's own run reads a revision-17 gate at the base,
+/// which has no preflight verb; the step says so and passes.
+#[test]
+fn revision_eighteen_preflight_passes_the_adoption_and_says_so() {
+    let gov = Gov::with_profile(&revision_seventeen(), &[]);
+    // The upgrade's candidate: the revision-18 files over the base's.
+    let next = tempfile::tempdir().unwrap();
+    render(next.path());
+    for rel in [
+        ".github/workflows/statecraft-ci.yml",
+        "scripts/statecraft/gate.sh",
+    ] {
+        std::fs::copy(next.path().join(rel), gov.root().join(rel)).unwrap();
+    }
+    git(gov.root(), &["add", "-A"]);
+    let head = gov.commit(&[], "upgrade to revision 18");
+    let ran = run_gov_job(
+        &gov,
+        "preflight",
+        "Preflight",
+        &event("pull_request", &head),
+        |_| {},
+    );
+    assert_eq!(ran.exit, 0, "{}", ran.text);
+    assert!(ran.text.contains("predates revision 18"), "{}", ran.text);
 }
