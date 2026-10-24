@@ -1,0 +1,35 @@
+{
+  "mapping": {
+    "amends": [
+      "058-ci-throughput-profile"
+    ],
+    "dependsOn": [
+      "058-ci-throughput-profile"
+    ],
+    "implementingPaths": [
+      {
+        "path": "crates/statecraft-home/",
+        "source": "spec-edge"
+      }
+    ],
+    "resolvedUnits": [
+      {
+        "locations": [
+          {
+            "file": "crates/statecraft-home/"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "directory",
+          "path": "crates/statecraft-home/"
+        }
+      }
+    ],
+    "specId": "059-job-level-concurrency",
+    "specStatus": "draft"
+  },
+  "schemaVersion": "1.3.0",
+  "shardHash": "08b698508c0351e263cde9c856c24210c646d6225d2b52e75e3af9a7dd1e734a"
+}

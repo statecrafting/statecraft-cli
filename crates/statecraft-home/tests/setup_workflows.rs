@@ -5586,29 +5586,52 @@ fn revision_eighteen_orders_the_expensive_jobs_and_saves_the_cache_from_main() {
     );
     let wf = workflow(root, "statecraft-ci.yml");
 
-    let group = wf["concurrency"]["group"].as_str().unwrap();
-    let cancel = wf["concurrency"]["cancel-in-progress"].as_str().unwrap();
+    // Spec 059: job-level groups, never a workflow-level one, and none on the
+    // two jobs that can wait on the owner exception.
+    assert!(wf["concurrency"].is_null(), "no workflow-level group");
+    let expr = "github.event_name == 'pull_request' && format('pr-{0}', github.event.pull_request.number) || github.run_id";
     let ctx = |event: &str| -> BTreeMap<String, String> {
         let pr = event == "pull_request";
         let mut c = BTreeMap::new();
         c.insert(
-            "github.event_name == 'pull_request' && format('pr-{0}', github.event.pull_request.number) || github.run_id".into(),
-            if pr { "pr-7".into() } else { format!("run-{event}") },
+            expr.into(),
+            if pr {
+                "pr-7".into()
+            } else {
+                format!("run-{event}")
+            },
         );
         c.insert("github.event_name == 'pull_request'".into(), pr.to_string());
         c
     };
-    assert_eq!(resolve(group, &ctx("pull_request")), "statecraft-ci-pr-7");
-    assert_eq!(resolve(cancel, &ctx("pull_request")), "true");
-    for event in ["push", "merge_group"] {
+    for job in ["governance", "preflight", "code", "ai-review", "extra"] {
+        let group = wf["jobs"][job]["concurrency"]["group"]
+            .as_str()
+            .unwrap_or_else(|| panic!("{job}: no concurrency group"));
+        let cancel = wf["jobs"][job]["concurrency"]["cancel-in-progress"]
+            .as_str()
+            .unwrap();
         assert_eq!(
-            resolve(group, &ctx(event)),
-            format!("statecraft-ci-run-{event}")
+            resolve(group, &ctx("pull_request")),
+            format!("statecraft-ci-pr-7-{job}")
         );
-        assert_eq!(
-            resolve(cancel, &ctx(event)),
-            "false",
-            "{event} never cancels"
+        assert_eq!(resolve(cancel, &ctx("pull_request")), "true");
+        for event in ["push", "merge_group"] {
+            assert_eq!(
+                resolve(group, &ctx(event)),
+                format!("statecraft-ci-run-{event}-{job}")
+            );
+            assert_eq!(
+                resolve(cancel, &ctx(event)),
+                "false",
+                "{event} never cancels"
+            );
+        }
+    }
+    for job in ["review-exception", "ci-gate"] {
+        assert!(
+            wf["jobs"][job]["concurrency"].is_null(),
+            "{job} can wait on the owner exception and must hold no group"
         );
     }
 
@@ -5712,6 +5735,12 @@ fn revision_eighteen_external_code_needs_preflight() {
     );
     let wf = workflow(root, "statecraft-ci.yml");
     assert_eq!(needs_of(&wf, "code"), ["preflight"]);
+    assert!(
+        wf["jobs"]["code"]["concurrency"]["group"]
+            .as_str()
+            .unwrap()
+            .ends_with("-code")
+    );
     assert!(wf["jobs"]["preflight"].is_mapping());
 }
 
