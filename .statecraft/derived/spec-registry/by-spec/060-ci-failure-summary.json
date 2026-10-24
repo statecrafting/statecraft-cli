@@ -66,7 +66,7 @@
       }
     ],
     "sectionDigests": {
-      "060-a-blocked-gate-names-what-failed-and-the-code-cache-holds-dependencies-only": "c902d30a38fd0088196ecc1636f89d7c3c819f087d18d8c90b34c4ceb615edad",
+      "060-a-blocked-gate-names-what-failed-and-the-code-cache-holds-dependencies-only": "28a58c5b3bbea13da6e023326c167003e35812e73711f05a14b5550e83c6a2f5",
       "1-purpose": "cb8985e634bba34ae1f3abe62143d97bea4cd46acf118b105dfe2a87ae6e1186",
       "2-territory": "96753f0184c27f6df42fed99b00280e4d11a9aa64074e49b27daf88a1aa3c5a4",
       "3-1-the-failure-summary": "63333735dcf02ae1fb85f85a4c3f7c272df99fd040c7157d7776b7e17eb8e4df",
@@ -76,7 +76,7 @@
       "3-5-spec-044-becomes-revision-20": "1720301ec5dd999f85828efc3ef418c8d70ccdd2d142494a771ebfef4e4f46e8",
       "3-behavior": "afabd4e389113359437e9bfef6ece927de013500984ebdc76bdc775491074d9b",
       "4-out-of-scope": "36dfd906b4f23f332d63320e4d817ba25a5a353454e00201de3b8f8896581b12",
-      "5-resolved-decisions": "352a9c66a7d05700c9a594be7c706f832bff6f1690d851a3928e4b453f8ae3cb",
+      "5-resolved-decisions": "2f1cb152f9c9de9b2d43dae4254bddb6c772f9f62e3f3f86a2df7f97bae865ac",
       "verification": "782c8b33ef8529a0123e543494055201afc24d0cd85b92b42f1327b87f2a5214"
     },
     "sectionHeadings": [
@@ -98,6 +98,6 @@
     "summary": "Amends spec 002's setup profile. github-actions-rust revision 19 changes what a failure tells its reader and what the cache holds, never what judges: when ci-gate blocks, it lists every failed job of its run with the failed step and at most five error lines from that job's log, in the step summary and as annotations, on a best-effort read that never changes the verdict or the exit code. Before the code job saves the cargo cache it drops the workspace's own artifacts, which Cargo rebuilds after any checkout. Spec 044 moves from revision 19 to revision 20.\n",
     "title": "Setup profile revision 19: a blocked ci-gate names each failed job with its first error lines, and the code job's cache leaves out workspace artifacts"
   },
-  "shardHash": "0b1327abd7ab96fd6961ecf9f56e479a58cb5fc4012b66ecc49d0cec61952b7c",
+  "shardHash": "edda78b617e90f1c6a45c5a12e3c7aa76bc1fac6271db2039914f9046cebd40a",
   "specVersion": "1.10.0"
 }

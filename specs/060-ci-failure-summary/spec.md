@@ -142,6 +142,17 @@ or spec 058 changes, and their text is not edited.
 
 ## 5. Resolved decisions
 
+**2026-10-24: the trim step conforms to section 3.3 as written.** The
+first adopter's review found that an empty member list made `xargs` run a
+bare `cargo clean`, which cleans more than "each workspace member" and
+empties `target`. The template now passes the list with `xargs -r`. No
+requirement of this spec changes, so its text is not amended; it is
+`status: approved` and was ratified in pull request 324. Revision 19 keeps
+its number, as spec 059 kept 18, because no project has merged it.
+statecraft-cli's own rendered workflow is revision 17
+(`github-actions-rust@17` in `.statecraft/environment.json`) and has no
+trim step, so there is nothing of its own to re-render.
+
 **2026-10-24: ratified by the owner.** The implementation's AI review
 returned no findings. The owner directed ratification in this pull request,
 and the owner exception approved on its run is the ratification of record.
