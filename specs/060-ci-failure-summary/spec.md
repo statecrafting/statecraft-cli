@@ -1,8 +1,8 @@
 ---
 id: "060-ci-failure-summary"
 title: "Setup profile revision 19: a blocked ci-gate names each failed job with its first error lines, and the code job's cache leaves out workspace artifacts"
-status: draft
-implementation: in-progress
+status: approved
+implementation: complete
 created: "2026-10-24"
 summary: >
   Amends spec 002's setup profile. github-actions-rust revision 19 changes
@@ -141,6 +141,10 @@ or spec 058 changes, and their text is not edited.
 - Changing which jobs are required or how any rule judges.
 
 ## 5. Resolved decisions
+
+**2026-10-24: ratified by the owner.** The implementation's AI review
+returned no findings. The owner directed ratification in this pull request,
+and the owner exception approved on its run is the ratification of record.
 
 **2026-10-24: take revision 19 and move spec 044 to 20.** This follows spec
 058's precedent for an approved, unstarted spec 044. The owner authorized the

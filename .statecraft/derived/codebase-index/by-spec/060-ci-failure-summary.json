@@ -32,8 +32,8 @@
       }
     ],
     "specId": "060-ci-failure-summary",
-    "specStatus": "draft"
+    "specStatus": "approved"
   },
   "schemaVersion": "1.3.0",
-  "shardHash": "f4b724ea361ded0e638bfaa883041bf5ff95a65e76a7f8426cbd738c6069ddb8"
+  "shardHash": "0b1327abd7ab96fd6961ecf9f56e479a58cb5fc4012b66ecc49d0cec61952b7c"
 }
