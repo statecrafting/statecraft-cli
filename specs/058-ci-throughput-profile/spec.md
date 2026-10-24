@@ -1,8 +1,8 @@
 ---
 id: "058-ci-throughput-profile"
 title: "Setup profile revision 18: superseded pull-request runs are cancelled, a preflight orders the expensive jobs, and the cargo cache is saved from the default branch only"
-status: draft
-implementation: in-progress
+status: approved
+implementation: complete
 created: "2026-10-23"
 summary: >
   Amends spec 002's setup profile. github-actions-rust revision 18 changes
@@ -162,6 +162,11 @@ Section 3.2's adoption rule keeps its own preflight from refusing it.
 - Caching anything for the declared extra jobs, which their own workflows own.
 
 ## 5. Resolved decisions
+
+**2026-10-23: ratified by the owner.** After the implementation's AI review
+returned no findings, the owner ratified this spec as drafted. The
+implementation in the same pull request is its delivery, and its declared
+acceptance passes.
 
 **2026-10-23: this spec takes revision 18, and spec 044 moves to revision 19.**
 The owner chose this numbering. Spec 044 was approved and not yet started, and

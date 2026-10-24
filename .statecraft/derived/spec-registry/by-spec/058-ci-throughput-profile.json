@@ -19,7 +19,7 @@
       }
     ],
     "id": "058-ci-throughput-profile",
-    "implementation": "in-progress",
+    "implementation": "complete",
     "obligations": [
       {
         "anchor": "3-1-superseded-runs-are-cancelled",
@@ -63,7 +63,7 @@
       }
     ],
     "sectionDigests": {
-      "058-ci-throughput-cancelled-superseded-runs-a-preflight-and-a-default-branch-cache": "6364b90ee4219be9d33de8513098e9d4a19a0ff9e0fc0f66dcf73fee41dedcf9",
+      "058-ci-throughput-cancelled-superseded-runs-a-preflight-and-a-default-branch-cache": "0b5eeae22f1947efb47b9af6137254574182d31d8a59b4e8c41e83295c1d097a",
       "1-purpose": "1426bc0f8b61ab0be0cc80276552badc4a08071e61f29d6206d5cd38ccbccf2e",
       "2-territory": "64150971ebf604131d7d03d12bada48ac175e80490199317c3b5939944e032ca",
       "3-1-superseded-runs-are-cancelled": "bd4c8a1c88d4da6ad4bdc5d895eb6e529050a58c394c3ecaff0771deff70a8ea",
@@ -73,7 +73,7 @@
       "3-5-the-revision": "320af487235c3395e9cf408856b5f873531fc3d809fd1b7e68f7aa1f7c5d4d77",
       "3-behavior": "9fe7c7273efafb3e16f3bc11a0805419a677f0ed41d02d095a735029ace98cb0",
       "4-out-of-scope": "73149ead8b9b43f1263ecac340d9b6d99852d655c5a2706b8fa60228251a07c5",
-      "5-resolved-decisions": "bcccc185687896bded919bf72fd04d0017b09747425ede11fa08951bf4a534aa",
+      "5-resolved-decisions": "3ac9134ce4fd80dc14128ab9e4280d736c7d7bbbaae617262e746b3e0ada9e25",
       "verification": "472cb4a43d030243aed00cf8ce33ae761192ce3651702414130d6f65623df669"
     },
     "sectionHeadings": [
@@ -91,10 +91,10 @@
       "Verification"
     ],
     "specPath": "specs/058-ci-throughput-profile/spec.md",
-    "status": "draft",
+    "status": "approved",
     "summary": "Amends spec 002's setup profile. github-actions-rust revision 18 changes when work runs, never what judges it: a newer push to a pull request cancels that pull request's older run; a preflight job (the base, the committed artifacts' freshness, formatting) runs before code and every declared extra job, so a stacked pull request skips them unless it asks for them by label; and the code job restores the cargo cache on every event but saves it only from the default branch. Every check keeps running where it ran; ci-gate's rules are unchanged except that preflight is required.\n",
     "title": "Setup profile revision 18: superseded pull-request runs are cancelled, a preflight orders the expensive jobs, and the cargo cache is saved from the default branch only"
   },
-  "shardHash": "e4b7d343fd842be6f1aa5a9a1d1e5ef364dd96a2a90692df31fcd23a1bccaa5e",
+  "shardHash": "237c5cc0f595bcae9968575102f8bf8e5bd4e1dc53cb9269b71c264d17906437",
   "specVersion": "1.10.0"
 }
