@@ -1,8 +1,8 @@
 ---
 id: "059-job-level-concurrency"
 title: "Setup profile revision 18 cancels superseded work job by job, so a run waiting on the owner exception never blocks a newer one"
-status: draft
-implementation: in-progress
+status: approved
+implementation: complete
 created: "2026-10-24"
 summary: >
   Amends spec 058. Revision 18's single workflow-level concurrency group let
@@ -104,6 +104,10 @@ revision-17 project upgrades to this form through the ordinary plan and apply.
 - Any change to what a job judges, or to ci-gate's rules.
 
 ## 5. Resolved decisions
+
+**2026-10-24: ratified by the owner.** The implementation's AI review found
+no defect in the code; its only finding was this spec's draft status. The
+owner ratified it as drafted, and its declared acceptance passes.
 
 **2026-10-24: correct revision 18 rather than take a new number.** The flaw
 was found by the first adoption before it merged. Keeping the number avoids a

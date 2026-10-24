@@ -18,7 +18,7 @@
       }
     ],
     "id": "059-job-level-concurrency",
-    "implementation": "in-progress",
+    "implementation": "complete",
     "obligations": [
       {
         "anchor": "3-1-groups-per-job",
@@ -50,14 +50,14 @@
       }
     ],
     "sectionDigests": {
-      "059-superseded-work-is-cancelled-job-by-job": "afd6970f1c07fa24b9655f02fe00619cd5984320e9215f8b5a139f9372dadbb0",
+      "059-superseded-work-is-cancelled-job-by-job": "00661bd0a07c6e3ef58eef4f83d6e8111106eadc0ad00998263ad37115362ec3",
       "1-purpose": "268ab34b639c33059d9cfbdd2fe17c8ed7233db2f26ed91cca4ab280449fec39",
       "2-territory": "a6a451d06b496c1c04ed10d6b9d50b8d1a93d7005ebf423e033437f7e6079e9d",
       "3-1-groups-per-job": "52237904bcaff2e9d44f6611fa4cb93de81a3796231a05f2960b98fcb2536795",
       "3-2-the-revision": "4cd5375e7e5a0544c77d9a0525326bff2060e2c09b99c7f5bbfe008eba97934f",
       "3-behavior": "bdbb8f6ff548c8ed087d2721a1f9ecb46c43225f2a623449513bc1dec843cd5d",
       "4-out-of-scope": "343e43991077699c0d10ae591035116e37828f0ed5d0c28e03be1c85645c06d0",
-      "5-resolved-decisions": "6df2c9710f36271e0a9f023c81cbea423fda34d014ec639283095471e8c1ee4b",
+      "5-resolved-decisions": "bcaf7862860f1533270be48a0cb603f3f41d71dcb5085f2a04fbbeb3edf4b445",
       "verification": "283ced639ed8d036cbd9c0ec32ac7b9932442000a40d2adbb60108a45fe1b7e1"
     },
     "sectionHeadings": [
@@ -72,10 +72,10 @@
       "Verification"
     ],
     "specPath": "specs/059-job-level-concurrency/spec.md",
-    "status": "draft",
+    "status": "approved",
     "summary": "Amends spec 058. Revision 18's single workflow-level concurrency group let a run waiting on the owner-exception Environment hold the group: GitHub does not cancel such a run, so every newer push to the same pull request stayed pending behind it. Every job except review-exception and ci-gate now has a concurrency group of its pull request and job instead, and the workflow has none. Revision 18 keeps its number: no project had adopted the first form.\n",
     "title": "Setup profile revision 18 cancels superseded work job by job, so a run waiting on the owner exception never blocks a newer one"
   },
-  "shardHash": "08b698508c0351e263cde9c856c24210c646d6225d2b52e75e3af9a7dd1e734a",
+  "shardHash": "852fda2749a4c7a114c45cf7251e18c7467433f6eb0b983ec9845ab791eaee40",
   "specVersion": "1.10.0"
 }
