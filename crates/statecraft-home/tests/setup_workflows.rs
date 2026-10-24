@@ -5535,7 +5535,12 @@ fn run_mutated(repo: &Repo, script: &str, extra: &[(&'static str, &str)]) -> Ran
 /// 058), captured byte for byte from main at 6c6f394.
 fn revision_seventeen() -> Profile {
     let mut p = Profile::registered();
-    assert_eq!(p.revision, 18, "the registered profile is revision 18");
+    assert_eq!(p.revision, 19, "the registered profile is revision 19");
+    p.templates
+        .iter_mut()
+        .find(|t| t.path == "scripts/statecraft/ci-gate.sh")
+        .unwrap()
+        .body = include_str!("support/profile-r18/ci-gate.sh").into();
     p.revision = 17;
     for (path, old) in [
         (
@@ -5830,4 +5835,234 @@ fn revision_eighteen_preflight_passes_the_adoption_and_says_so() {
     );
     assert_eq!(ran.exit, 0, "{}", ran.text);
     assert!(ran.text.contains("predates revision 18"), "{}", ran.text);
+}
+
+// ------------------------------------------------------------ revision 19
+
+fn run_summary_gate(repo: &Repo, results: &str, gh: &str, missing: Option<&str>) -> Ran {
+    let bin = tempfile::tempdir().unwrap();
+    statecraft_adapter::fixture::install_script(&bin.path().join("gh"), gh, 0o755).unwrap();
+    let path = format!(
+        "{}:{}",
+        bin.path().display(),
+        std::env::var("PATH").unwrap_or_default()
+    );
+    let wf = workflow(repo.root(), "statecraft-ci.yml");
+    let (run, env) = step(&wf, "ci-gate", "Aggregate");
+    let mut extra = vec![
+        ("PATH", path.as_str()),
+        ("GITHUB_RUN_ID", "123"),
+        ("GITHUB_RUN_ATTEMPT", "2"),
+        ("REPO", "owner/fixture"),
+        ("GH_TOKEN", "fixture-token"),
+    ];
+    if let Some(key) = missing {
+        extra.push((key, ""));
+    }
+    run_step(
+        repo.root(),
+        &run,
+        &env,
+        &gate_ctx(repo, "pull_request", results, "topic"),
+        &extra,
+        |_| {},
+    )
+}
+
+const SUMMARY_GH: &str = r#"#!/bin/sh
+printf '%s\n' "$*" >> "$STUB_STATE/gh-calls"
+case "$*" in
+  'api repos/owner/fixture/actions/runs/123/attempts/2/jobs?per_page=100') cat jobs.json ;;
+  'api repos/owner/fixture/actions/jobs/'*/logs) cat job.log ;;
+  *) exit 1 ;;
+esac
+"#;
+
+#[test]
+fn revision_nineteen_blocked_gate_summarizes_only_failed_jobs_safely() {
+    let repo = Repo::new(&[POLICY, "scripts/statecraft/ci-gate.sh"], &[]);
+    let mut jobs = vec![
+        serde_json::json!({"id": 1, "name": "ci-gate", "conclusion": "failure"}),
+        serde_json::json!({"id": 2, "name": "successful-job", "conclusion": "success"}),
+    ];
+    for id in 3..25 {
+        jobs.push(serde_json::json!({
+            "id": id, "name": format!("bindings, node: {id}"), "conclusion": "failure",
+            "steps": [
+                {"name": "prepare", "conclusion": "success"},
+                {"name": "first failed step", "conclusion": "failure"},
+                {"name": "later failed step", "conclusion": "failure"}
+            ]
+        }));
+    }
+    write(
+        repo.root(),
+        "jobs.json",
+        &serde_json::json!({"jobs": jobs}).to_string(),
+    );
+    let lines = [
+        "error: candidate 50% ```` ::warning::data",
+        "error[E0001]: second",
+        "panicked at third",
+        "FAILED fourth",
+        "not ok fifth",
+        "BLOCK: sixth must be omitted",
+    ];
+    write(
+        repo.root(),
+        "job.log",
+        &format!(
+            "ordinary log line\n{}\n",
+            lines
+                .iter()
+                .map(|line| format!("2026-10-24T12:00:00.000Z {line}"))
+                .collect::<Vec<_>>()
+                .join("\n")
+        ),
+    );
+    let results = needs(
+        &as_refs(&with(("code", "failure"))),
+        Some("no-findings"),
+        false,
+    );
+    let baseline = run_summary_gate(&repo, &results, "#!/bin/sh\nexit 1\n", None);
+    let ran = run_summary_gate(&repo, &results, SUMMARY_GH, None);
+    assert_eq!(baseline.exit, 1, "{}", baseline.text);
+    assert_eq!(ran.exit, baseline.exit, "{}", ran.text);
+    let annotations: Vec<_> = ran
+        .text
+        .lines()
+        .filter(|line| line.starts_with("::error title="))
+        .collect();
+    assert_eq!(annotations.len(), 10);
+    assert!(annotations[0].starts_with("::error title=bindings%2C node%3A 3::"));
+    assert!(annotations[0].contains("50%25"));
+    for line in ran
+        .text
+        .lines()
+        .filter(|line| !line.starts_with("::error title="))
+    {
+        for log in lines {
+            assert!(!line.contains(log), "raw candidate log: {line}");
+        }
+    }
+    let summary = std::fs::read_to_string(ran.runner.path().join("summary")).unwrap();
+    let report = summary.split_once("### Failed jobs\n\n").unwrap().1;
+    let fence = report.lines().next().unwrap();
+    assert!(fence.len() > 4 && fence.chars().all(|c| c == '`'));
+    assert_eq!(summary.lines().filter(|line| *line == fence).count(), 2);
+    let fenced = report
+        .strip_prefix(fence)
+        .unwrap()
+        .split_once(fence)
+        .unwrap()
+        .0;
+    assert!(fenced.contains("job: bindings, node: 3"));
+    assert!(!summary.contains("job: ci-gate"));
+    assert!(!summary.contains("successful-job"));
+    assert!(!summary.contains("later failed step"));
+    assert!(!summary.contains("2026-10-24T"));
+    assert!(!summary.contains(lines[5]));
+    for id in 3..23 {
+        assert!(fenced.contains(&format!(
+            "job: bindings, node: {id}\nfailed step: first failed step\n"
+        )));
+    }
+    assert!(!summary.contains("job: bindings, node: 23\n"));
+    assert_eq!(summary.matches("job: bindings").count(), 20);
+    for line in &lines[..5] {
+        assert_eq!(fenced.matches(line).count(), 20);
+    }
+    let calls = std::fs::read_to_string(ran.stubs.join("gh-calls")).unwrap();
+    assert_eq!(calls.lines().count(), 21);
+    assert_eq!(
+        calls.lines().next().unwrap(),
+        "api repos/owner/fixture/actions/runs/123/attempts/2/jobs?per_page=100"
+    );
+    for id in 3..23 {
+        assert!(
+            calls
+                .lines()
+                .any(|line| line == format!("api repos/owner/fixture/actions/jobs/{id}/logs"))
+        );
+    }
+}
+
+#[test]
+fn revision_nineteen_failed_summary_read_preserves_the_blocked_exit() {
+    let repo = Repo::new(&[POLICY, "scripts/statecraft/ci-gate.sh"], &[]);
+    let results = needs(
+        &as_refs(&with(("code", "failure"))),
+        Some("no-findings"),
+        false,
+    );
+    let ran = run_summary_gate(&repo, &results, "#!/bin/sh\nexit 1\n", None);
+    assert_eq!(ran.exit, 1, "{}", ran.text);
+    assert!(
+        ran.text.contains("failure summary unavailable:"),
+        "{}",
+        ran.text
+    );
+    assert!(ran.text.contains("ci-gate: blocked"));
+}
+
+#[test]
+fn revision_nineteen_passing_gate_reads_nothing() {
+    let repo = Repo::new(&[POLICY, "scripts/statecraft/ci-gate.sh"], &[]);
+    let ran = run_summary_gate(
+        &repo,
+        &needs(&ALL_OK, Some("no-findings"), false),
+        SUMMARY_GH,
+        None,
+    );
+    assert_eq!(ran.exit, 0, "{}", ran.text);
+    assert!(!ran.stubs.join("gh-calls").exists());
+    assert!(!ran.text.contains("failure summary"));
+}
+
+#[test]
+fn revision_nineteen_missing_summary_environment_preserves_the_blocked_exit() {
+    let repo = Repo::new(&[POLICY, "scripts/statecraft/ci-gate.sh"], &[]);
+    let results = needs(
+        &as_refs(&with(("code", "failure"))),
+        Some("no-findings"),
+        false,
+    );
+    for key in ["REPO", "GH_TOKEN", "GITHUB_RUN_ID"] {
+        let ran = run_summary_gate(&repo, &results, SUMMARY_GH, Some(key));
+        assert_eq!(ran.exit, 1, "{key}: {}", ran.text);
+        assert!(
+            ran.text.contains("failure summary unavailable:"),
+            "{key}: {}",
+            ran.text
+        );
+        assert!(!ran.stubs.join("gh-calls").exists());
+    }
+}
+
+#[test]
+fn revision_nineteen_drops_workspace_artifacts_immediately_before_cache_save() {
+    let dir = tempfile::tempdir().unwrap();
+    render(dir.path());
+    let wf = workflow(dir.path(), "statecraft-ci.yml");
+    let steps = wf["jobs"]["code"]["steps"].as_sequence().unwrap();
+    let save = steps
+        .iter()
+        .position(|s| {
+            s["name"].as_str() == Some("Save cargo registry, git and target (default branch only)")
+        })
+        .unwrap();
+    let drop = &steps[save - 1];
+    assert_eq!(
+        drop["name"].as_str(),
+        Some("Drop the workspace's own artifacts (default branch only)")
+    );
+    assert_eq!(drop["if"], steps[save]["if"]);
+    assert_eq!(
+        drop["if"].as_str(),
+        Some("github.event_name == 'push' && steps.cargo-cache.outputs.cache-hit != 'true'")
+    );
+    let run = drop["run"].as_str().unwrap();
+    assert!(run.contains("cargo metadata --format-version 1 --no-deps"));
+    assert!(run.contains("sed 's/^/-p /' | xargs cargo clean"));
 }
