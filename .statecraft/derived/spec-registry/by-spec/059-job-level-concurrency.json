@@ -1,0 +1,81 @@
+{
+  "record": {
+    "amends": [
+      "058-ci-throughput-profile"
+    ],
+    "created": "2026-10-24",
+    "dependsOn": [
+      "058-ci-throughput-profile"
+    ],
+    "extends": [
+      {
+        "nature": "additive",
+        "spec": "002-environment-lifecycle",
+        "unit": {
+          "kind": "directory",
+          "path": "crates/statecraft-home/"
+        }
+      }
+    ],
+    "id": "059-job-level-concurrency",
+    "implementation": "complete",
+    "obligations": [
+      {
+        "anchor": "3-1-groups-per-job",
+        "id": "R-1",
+        "kind": "requirement",
+        "text": "The rendered statecraft-ci workflow declares no workflow-level concurrency group."
+      },
+      {
+        "anchor": "3-1-groups-per-job",
+        "id": "R-2",
+        "kind": "requirement",
+        "text": "governance, preflight, code, ai-review and every declared extra job (and an external code call) each have a group of their pull request and job, cancelled in progress only for pull_request; a push and a merge_group run's groups are named by their own run id."
+      },
+      {
+        "anchor": "3-1-groups-per-job",
+        "id": "R-3",
+        "kind": "requirement",
+        "text": "review-exception and ci-gate have no concurrency group, so a run waiting on the owner exception holds nothing a newer run needs."
+      },
+      {
+        "anchor": "verification",
+        "id": "V-1",
+        "inputs": [
+          "crates/statecraft-home/tests/setup_workflows.rs",
+          "crates/statecraft-home/tests/setup_upgrade.rs"
+        ],
+        "kind": "verification",
+        "text": "Rendering tests resolve each job's group and cancel flag per event, show no workflow-level group and none on review-exception or ci-gate, and show the extra and external code jobs carry theirs."
+      }
+    ],
+    "sectionDigests": {
+      "059-superseded-work-is-cancelled-job-by-job": "00661bd0a07c6e3ef58eef4f83d6e8111106eadc0ad00998263ad37115362ec3",
+      "1-purpose": "268ab34b639c33059d9cfbdd2fe17c8ed7233db2f26ed91cca4ab280449fec39",
+      "2-territory": "a6a451d06b496c1c04ed10d6b9d50b8d1a93d7005ebf423e033437f7e6079e9d",
+      "3-1-groups-per-job": "52237904bcaff2e9d44f6611fa4cb93de81a3796231a05f2960b98fcb2536795",
+      "3-2-the-revision": "4cd5375e7e5a0544c77d9a0525326bff2060e2c09b99c7f5bbfe008eba97934f",
+      "3-behavior": "bdbb8f6ff548c8ed087d2721a1f9ecb46c43225f2a623449513bc1dec843cd5d",
+      "4-out-of-scope": "343e43991077699c0d10ae591035116e37828f0ed5d0c28e03be1c85645c06d0",
+      "5-resolved-decisions": "bcaf7862860f1533270be48a0cb603f3f41d71dcb5085f2a04fbbeb3edf4b445",
+      "verification": "283ced639ed8d036cbd9c0ec32ac7b9932442000a40d2adbb60108a45fe1b7e1"
+    },
+    "sectionHeadings": [
+      "059: Superseded work is cancelled job by job",
+      "1. Purpose",
+      "2. Territory",
+      "3. Behavior",
+      "3.1 Groups per job",
+      "3.2 The revision",
+      "4. Out of scope",
+      "5. Resolved decisions",
+      "Verification"
+    ],
+    "specPath": "specs/059-job-level-concurrency/spec.md",
+    "status": "approved",
+    "summary": "Amends spec 058. Revision 18's single workflow-level concurrency group let a run waiting on the owner-exception Environment hold the group: GitHub does not cancel such a run, so every newer push to the same pull request stayed pending behind it. Every job except review-exception and ci-gate now has a concurrency group of its pull request and job instead, and the workflow has none. Revision 18 keeps its number: no project had adopted the first form.\n",
+    "title": "Setup profile revision 18 cancels superseded work job by job, so a run waiting on the owner exception never blocks a newer one"
+  },
+  "shardHash": "852fda2749a4c7a114c45cf7251e18c7467433f6eb0b983ec9845ab791eaee40",
+  "specVersion": "1.10.0"
+}

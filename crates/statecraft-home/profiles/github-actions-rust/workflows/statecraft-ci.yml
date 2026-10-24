@@ -15,13 +15,13 @@ on:
   # entry's pull request.
   merge_group:
 
-# Revision 18: a newer push to a pull request cancels that pull request's
-# older run, including one waiting on the owner exception. A push to the
-# default branch and a merge-queue entry each get a group of their own, so
-# neither is ever cancelled or queued behind another.
-concurrency:
-  group: statecraft-ci-${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.pull_request.number) || github.run_id }}
-  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+# Revision 18 (specs 058 and 059): a newer push to a pull request cancels the
+# work of that pull request's older run, job by job. Every job but
+# review-exception and ci-gate has a concurrency group of its pull request and
+# job; the two left out can wait on the owner exception, and a run waiting on
+# an Environment is never cancelled by a group, so a group it held would leave
+# the newer run pending behind it. A push to the default branch and a
+# merge-queue entry get groups of their own run, so neither is ever cancelled.
 
 permissions:
   contents: read
@@ -29,6 +29,9 @@ permissions:
 jobs:
   governance:
     name: governance
+    concurrency:
+      group: statecraft-ci-${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.pull_request.number) || github.run_id }}-governance
+      cancel-in-progress: ${{ github.event_name == 'pull_request' }}
     runs-on: ubuntu-latest
     # `pull-requests: read` is for the merge-queue steps, which read the
     # queued pull request's changed files, title and body. Nothing here
@@ -199,6 +202,9 @@ jobs:
   # them, and a base gate.sh without the verb (the adoption) judges nothing.
   preflight:
     name: preflight
+    concurrency:
+      group: statecraft-ci-${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.pull_request.number) || github.run_id }}-preflight
+      cancel-in-progress: ${{ github.event_name == 'pull_request' }}
     runs-on: ubuntu-latest
     steps:
       # The whole history, so the base commit the gate is read at is present.
@@ -257,6 +263,9 @@ jobs:
   code:
     name: code
     needs: [preflight]
+    concurrency:
+      group: statecraft-ci-${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.pull_request.number) || github.run_id }}-code
+      cancel-in-progress: ${{ github.event_name == 'pull_request' }}
     runs-on: ubuntu-latest
     # Revision 18: a fresh runner never reuses incremental state, and line
     # tables keep file:line in panics; both shrink the cache and the link.
@@ -336,6 +345,9 @@ jobs:
   ai-review:
     name: ai-review
     if: github.event_name == 'pull_request'
+    concurrency:
+      group: statecraft-ci-${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.pull_request.number) || github.run_id }}-ai-review
+      cancel-in-progress: ${{ github.event_name == 'pull_request' }}
     uses: ./.github/workflows/statecraft-ai-review.yml
     permissions:
       contents: read

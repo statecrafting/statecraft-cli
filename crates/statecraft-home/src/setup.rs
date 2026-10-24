@@ -415,7 +415,7 @@ pub fn remote_obligations() -> Vec<String> {
         "revision 15: an exact consented spec-spine pin move is reviewed with its initialization plan, and the managed installer reads that adopted pin; this changes no required remote check or branch-protection authority (spec 033)".to_string(),
         format!("revision 16: the profile renders {} (schema {}), a canonical desired-state document of what this profile expects of the remote: required checks with their App, the extra required jobs and their aggregation by ci-gate, code-owner review and the governed paths CODEOWNERS covers, the merge queue (remote.merge_queue), the exception Environment and its reviewers (remote.exception_reviewers), workflow-token defaults, secret names, and repository custom properties (remote.custom_properties). An omitted field is no claim. `doctor --remote` compares every field read-only and reports each as matching, drifted, unavailable, unauthorized, unsupported or unverified; this product never applies it, and an owner-operated applier outside this product needs its own authorization (spec 012)", crate::remote_state::PATH, crate::remote_state::SCHEMA),
         format!("revision 17: the AI review reads governance documents as Git blobs at the base commit ({} by default, absent ones recorded as absent) plus review.context_paths, at most {MAX_CONTEXT_PATHS} literal repository-relative paths read from the policy at the base, never from the candidate; the documents must fit a quarter of review.context_tokens whole or the review refuses with 2 before any provider call, every call's whole input must fit three quarters of it, the diff budget is what remains (at most half), and the evidence records each document's blob, digest and length and each call's budget (spec 041)", DEFAULT_CONTEXT_PATHS.join(", ")),
-        "revision 18: a newer push to a pull request cancels that pull request's older statecraft-ci run, including one waiting on the owner exception, while a push to the default branch and each merge-queue entry keep a concurrency group of their own; a preflight job (the pull request's base, the committed artifacts' freshness, and cargo fmt for a Rust code selection) runs before code and every declared extra job, which need it, so a stacked pull request skips them unless it carries the label statecraft:stacked-ci; every preflight check also runs in governance or code, and a base gate.sh without the verb judges nothing; the code job restores the cargo cache on every event and saves it only on a push to the default branch, with incremental compilation off and line-table debuginfo (spec 058)".to_string(),
+        "revision 18: a newer push to a pull request cancels the work of that pull request's older statecraft-ci run, job by job: every job but review-exception and ci-gate has a concurrency group of its pull request and job, because a run waiting on the owner exception is never cancelled by a group and would hold a workflow-level one (spec 059), while a push to the default branch and each merge-queue entry keep groups of their own run; a preflight job (the pull request's base, the committed artifacts' freshness, and cargo fmt for a Rust code selection) runs before code and every declared extra job, which need it, so a stacked pull request skips them unless it carries the label statecraft:stacked-ci; every preflight check also runs in governance or code, and a base gate.sh without the verb judges nothing; the code job restores the cargo cache on every event and saves it only on a push to the default branch, with incremental compilation off and line-table debuginfo (specs 058 and 059)".to_string(),
         "a repository that already runs these checks by hand keeps them by setting governance.enforce_coverage (index coverage --fail-on-untraced), governance.authored_content (the script's path; absent or not executable refuses), governance.authored_content_text (the title, the body and every commit message), governance.gate_each_commit (each commit's tree passes the gate and cargo fmt) and governance.require_signed_commits (each commit verified as signed by GitHub) (revision 4)".to_string(),
     ]
 }
@@ -673,6 +673,15 @@ fn extra_required_jobs(root: &Path, value: &serde_json::Value) -> Result<Vec<Ext
     Ok(out)
 }
 
+/// A job's concurrency block (revision 18, specs 058 and 059): one group per
+/// pull request and job, cancelled by a newer push; a push and a merge-queue
+/// entry get a group of their own run.
+fn job_concurrency(job: &str) -> String {
+    format!(
+        "    concurrency:\n      group: statecraft-ci-${{{{ github.event_name == 'pull_request' && format('pr-{{0}}', github.event.pull_request.number) || github.run_id }}}}-{job}\n      cancel-in-progress: ${{{{ github.event_name == 'pull_request' }}}}\n"
+    )
+}
+
 /// The rendered jobs and `needs` entries for the declared extra jobs: empty
 /// when none is declared, so a project without any renders what it did.
 fn extra_job_text(jobs: &[ExtraJob]) -> (String, String) {
@@ -680,9 +689,10 @@ fn extra_job_text(jobs: &[ExtraJob]) -> (String, String) {
         .iter()
         .map(|e| {
             format!(
-                "\n  {job}:\n    name: {job}\n    needs: [preflight]\n    uses: ./{wf}\n",
+                "\n  {job}:\n    name: {job}\n    needs: [preflight]\n{concurrency}    uses: ./{wf}\n",
                 job = e.job,
-                wf = e.workflow
+                wf = e.workflow,
+                concurrency = job_concurrency(&e.job),
             )
         })
         .collect();
@@ -1708,7 +1718,7 @@ pub fn plan(inputs: &Inputs<'_>) -> Result<Plan, String> {
                 .find("  ai-review:\n")
                 .ok_or("ai-review absent from profile")?
                 + start;
-            text.replace_range(start..end, &format!("  code:\n    name: code\n    needs: [preflight]\n    uses: ./{workflow}\n    permissions:\n      contents: read\n\n"));
+            text.replace_range(start..end, &format!("  code:\n    name: code\n    needs: [preflight]\n{}    uses: ./{workflow}\n    permissions:\n      contents: read\n\n", job_concurrency("code")));
         }
         let bytes = text.into_bytes();
         let managed_before = inputs

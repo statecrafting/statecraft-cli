@@ -1048,7 +1048,7 @@ fn a_revision_six_project_upgrades_to_revision_seven() {
     assert!(after.contains("leave 3"), "{after}");
     let ci = std::fs::read_to_string(root.join(wf)).unwrap();
     assert!(
-        ci.contains("  deny:\n    name: deny\n    needs: [preflight]\n    uses: ./.github/workflows/deny.yml\n"),
+        ci.contains("  deny:\n    name: deny\n    needs: [preflight]\n    concurrency:\n"),
         "{ci}"
     );
     assert!(
@@ -1617,6 +1617,10 @@ fn a_revision_seventeen_project_upgrades_to_revision_eighteen() {
     let after = std::fs::read_to_string(root.join(workflow)).unwrap();
     assert!(after.contains("  preflight:\n"));
     assert!(after.contains("cancel-in-progress:"));
+    assert!(
+        !after.contains("\nconcurrency:"),
+        "no workflow-level group (spec 059)"
+    );
     let policy: serde_json::Value =
         serde_json::from_str(&std::fs::read_to_string(root.join(setup::POLICY_PATH)).unwrap())
             .unwrap();
