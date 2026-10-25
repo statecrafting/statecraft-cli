@@ -285,6 +285,7 @@ impl Ran {
 const CLAUDE: &str = r#"#!/usr/bin/env bash
 here="$STUB_STATE"
 mode="$(cat "$here/claude-mode")"
+printf '%s\n' "$@" > "$here/claude-args"
 input="$(cat)"
 head="$(printf '%s\n' "$input" | sed -n 's/^head: //p' | head -n 1)"
 printf '%s\n' "$PWD" > "$here/claude-cwd"
@@ -302,6 +303,26 @@ calls="$(wc -l < "$here/claude-calls" | tr -d ' ')"
 if [ "$mode" = first-findings ]; then
   if [ "$calls" = 1 ]; then mode=findings; else mode=no-findings; fi
 fi
+printf '%s\n' '{"type":"system","subtype":"init"}'
+case "$mode" in
+  stall-twice | stall-then-no-findings)
+    if [ "$mode" = stall-twice ] || [ "$calls" = 1 ]; then
+      touch "$PWD/previous-attempt" "$HOME/previous-attempt"
+      exec sleep 30
+    fi
+    test ! -e "$PWD/previous-attempt" && test ! -e "$HOME/previous-attempt" || exit 98
+    mode=no-findings ;;
+  slow-steady)
+    for i in 1 2 3 4 5; do
+      printf '%s\n' '{"type":"stream_event"}'
+      sleep 1
+    done
+    mode=no-findings ;;
+  last-result)
+    printf '%s\n' '{"type":"result","result":"not a review"}' 'not JSON'
+    mode=no-findings ;;
+esac
+review_text() {
 case "$mode" in
   findings)
     printf 'One finding.\n\n```json\n{"head": "%s", "verdict": "findings", "findings": [{"path": "src/lib.rs", "line": 5, "summary": "two is untested"}]}\n```\n' "$head" ;;
@@ -333,6 +354,11 @@ case "$mode" in
     exit 1 ;;
   *) echo "unknown stub mode $mode" >&2; exit 99 ;;
 esac
+}
+text="$(review_text)" || exit $?
+if [ "$mode" != empty ]; then
+  jq -nc --arg result "$text" '{type:"result", subtype:"success", result:$result}'
+fi
 "#;
 
 const GH: &str = r#"#!/usr/bin/env bash
@@ -5535,7 +5561,7 @@ fn run_mutated(repo: &Repo, script: &str, extra: &[(&'static str, &str)]) -> Ran
 /// 058), captured byte for byte from main at 6c6f394.
 fn revision_seventeen() -> Profile {
     let mut p = Profile::registered();
-    assert_eq!(p.revision, 19, "the registered profile is revision 19");
+    assert_eq!(p.revision, 20, "the registered profile is revision 20");
     p.templates
         .iter_mut()
         .find(|t| t.path == "scripts/statecraft/ci-gate.sh")
@@ -6065,4 +6091,73 @@ fn revision_nineteen_drops_workspace_artifacts_immediately_before_cache_save() {
     let run = drop["run"].as_str().unwrap();
     assert!(run.contains("cargo metadata --format-version 1 --no-deps"));
     assert!(run.contains("sed 's/^/-p /' | xargs -r cargo clean"));
+}
+
+// ------------------------------------------------------------ revision 20
+
+fn revision_twenty_review(mode: &'static str, calls: usize, result: &str) -> Ran {
+    let repo = Repo::new(&["scripts/statecraft/ai-review.sh"], &[]);
+    let mut case = review_cases().remove(1);
+    case.mode = mode;
+    case.extra.push(("AI_REVIEW_STALL_SECONDS", "2".into()));
+    let ran = run_review(&repo, &case);
+    assert_eq!(ran.exit, 0, "{}", ran.text);
+    assert_eq!(ran.output("result"), result, "{}", ran.text);
+    let args = ran.stub_file("claude-args").unwrap();
+    assert!(args.contains("--output-format\nstream-json\n"));
+    assert!(args.lines().any(|arg| arg == "--verbose"));
+    assert!(args.lines().any(|arg| arg == "--include-partial-messages"));
+    assert_eq!(
+        ran.stub_file("claude-calls").unwrap().lines().count(),
+        calls
+    );
+    ran
+}
+
+#[test]
+fn revision_twenty_retries_one_stall_with_fresh_directories() {
+    let ran = revision_twenty_review("stall-then-no-findings", 2, "no-findings");
+    let inputs = ran.stub_file("claude-input").unwrap();
+    let middle = inputs.len() / 2;
+    assert_eq!(&inputs[..middle], &inputs[middle..]);
+}
+
+#[test]
+fn revision_twenty_two_stalls_skip_as_transient() {
+    let ran = revision_twenty_review("stall-twice", 2, "skipped:transient");
+    assert!(
+        ran.stub_file("gh-comments")
+            .unwrap()
+            .contains("the reviewer call stalled twice (no event for 2 seconds)")
+    );
+    let record: serde_json::Value = serde_json::from_str(
+        &std::fs::read_to_string(Path::new(ran.output("evidence")).join("ai-review-evidence.json"))
+            .unwrap(),
+    )
+    .unwrap();
+    assert_eq!(record["findings"], serde_json::json!([]));
+    assert_eq!(record["subject"]["diffDigest"].as_str().unwrap().len(), 64);
+}
+
+#[test]
+fn revision_twenty_steady_events_outlive_the_silence_limit() {
+    revision_twenty_review("slow-steady", 1, "no-findings");
+}
+
+#[test]
+fn revision_twenty_uses_the_last_result_and_ignores_non_json() {
+    revision_twenty_review("last-result", 1, "no-findings");
+}
+
+#[test]
+fn revision_twenty_workflow_timeout_and_watchdog_default() {
+    let repo = Repo::new(&[], &[]);
+    let wf = workflow(repo.root(), "statecraft-ai-review.yml");
+    assert_eq!(wf["jobs"]["review"]["timeout-minutes"].as_u64(), Some(20));
+    let text = std::fs::read_to_string(
+        repo.root()
+            .join(".github/workflows/statecraft-ai-review.yml"),
+    )
+    .unwrap();
+    assert!(!text.contains("AI_REVIEW_STALL_SECONDS"));
 }

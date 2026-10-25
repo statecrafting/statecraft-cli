@@ -244,11 +244,32 @@ fn revision_thirteen() -> Profile {
     p
 }
 
+/// Revision 19 templates changed by spec 061, captured from origin/main.
+fn revision_nineteen() -> Profile {
+    let mut p = Profile::registered();
+    assert_eq!(p.revision, 20, "the registered profile is revision 20");
+    p.revision = 19;
+    for (path, old) in [
+        (
+            "scripts/statecraft/ai-review.sh",
+            include_str!("support/profile-r19/ai-review.sh"),
+        ),
+        (
+            ".github/workflows/statecraft-ai-review.yml",
+            include_str!("support/profile-r19/statecraft-ai-review.yml"),
+        ),
+    ] {
+        let t = p.templates.iter_mut().find(|t| t.path == path).unwrap();
+        assert_ne!(t.body, old, "revision 20 changed {path}");
+        t.body = old.into();
+    }
+    p
+}
+
 /// Revision 18 templates changed by spec 060, captured byte for byte
 /// at 1d341975.
 fn revision_eighteen() -> Profile {
-    let mut p = Profile::registered();
-    assert_eq!(p.revision, 19, "the registered profile is revision 19");
+    let mut p = revision_nineteen();
     p.revision = 18;
     for (path, old) in [
         (
@@ -1569,9 +1590,8 @@ fn revision_fourteen_installer_upgrades_to_the_registered_revision_without_repla
     });
     assert!(plan_and_apply(root, &old, &mut manifest).whole());
     let next = Profile::registered();
-    // Revisions 16 (spec 012), 17 (spec 041), 18 (spec 058) and 19 (spec 060) change no
-    // installer byte.
-    assert_eq!(next.revision, 19);
+    // Revisions 16 through 20 change no installer byte.
+    assert_eq!(next.revision, 20);
     let installer = "scripts/statecraft/install-spec-spine.sh";
     let upgraded = plan_and_apply(root, &next, &mut manifest);
     assert_eq!(
@@ -1659,7 +1679,7 @@ fn a_revision_eighteen_project_upgrades_to_revision_nineteen() {
     let dir = project();
     let root = dir.path();
     let old = revision_eighteen();
-    let next = Profile::registered();
+    let next = revision_nineteen();
     assert_ne!(old.identity(), next.identity());
     let mut manifest = Manifest::new(Pins {
         product: "test".into(),
@@ -1704,6 +1724,64 @@ fn a_revision_eighteen_project_upgrades_to_revision_nineteen() {
         serde_json::from_str(&std::fs::read_to_string(root.join(setup::POLICY_PATH)).unwrap())
             .unwrap();
     assert_eq!(policy["revision"], 19);
+    let again = plan_and_apply(root, &next, &mut manifest);
+    assert!(again.files.iter().all(|f| !f.action.writes()));
+}
+
+/// Spec 061 V-1: a revision-19 project upgrades in one ordinary plan.
+#[test]
+fn a_revision_nineteen_project_upgrades_to_revision_twenty() {
+    let dir = project();
+    let root = dir.path();
+    let old = revision_nineteen();
+    let next = Profile::registered();
+    assert_ne!(old.identity(), next.identity());
+    let mut manifest = Manifest::new(Pins {
+        product: "test".into(),
+        spec_spine: "unpinned".into(),
+        adapters: Default::default(),
+        producer: None,
+    });
+    assert!(plan_and_apply(root, &old, &mut manifest).whole());
+    let paths = [
+        (
+            "scripts/statecraft/ai-review.sh",
+            "--output-format stream-json",
+        ),
+        (
+            ".github/workflows/statecraft-ai-review.yml",
+            "timeout-minutes: 20",
+        ),
+    ];
+    for (path, added) in paths {
+        assert!(
+            !std::fs::read_to_string(root.join(path))
+                .unwrap()
+                .contains(added)
+        );
+    }
+    let upgraded = plan_and_apply(root, &next, &mut manifest);
+    assert!(upgraded.whole());
+    for (path, added) in paths {
+        assert_eq!(
+            upgraded
+                .files
+                .iter()
+                .find(|f| f.path == path)
+                .unwrap()
+                .action,
+            Action::Replace
+        );
+        assert!(
+            std::fs::read_to_string(root.join(path))
+                .unwrap()
+                .contains(added)
+        );
+    }
+    let policy: serde_json::Value =
+        serde_json::from_str(&std::fs::read_to_string(root.join(setup::POLICY_PATH)).unwrap())
+            .unwrap();
+    assert_eq!(policy["revision"], 20);
     let again = plan_and_apply(root, &next, &mut manifest);
     assert!(again.files.iter().all(|f| !f.action.writes()));
 }
