@@ -1,8 +1,8 @@
 ---
 id: "061-review-call-stall"
 title: "Setup profile revision 20: a stalled AI review call is detected, retried once, and otherwise skipped as transient"
-status: draft
-implementation: pending
+status: approved
+implementation: complete
 created: "2026-10-25"
 summary: >
   Amends spec 002's setup profile and spec 024's review. github-actions-rust
@@ -64,8 +64,6 @@ obligations:
 ---
 
 # 061: A stalled AI review call is detected, retried once, and otherwise skipped as transient
-
-Draft: a proposal for the owner's ratification, not a claim about code.
 
 ## 1. Purpose
 
@@ -161,18 +159,42 @@ specs changes, and their text is not edited.
 | A call ends without a `result` event | Treated as the reviewer writing nothing, as revision 19 does. |
 | A call exits non-zero with a provider refusal | Spec 024's refusal, unchanged; not retried. |
 
-## Decisions for ratification
+## 6. Resolved decisions
 
-1. **The silence limit.** Proposed: 180 seconds. A shorter limit catches
-   hangs sooner; whether long thinking can pause partial messages that
-   long on the pinned CLI is checked in the implementation, and the limit
-   is raised in this spec if it can.
-2. **The job limit.** Proposed: 20 minutes, to fit one retry. The
-   delivery rule "when a review times out, split the pull request rather
-   than raising the limit" addresses slow reviews; this change addresses
-   calls that stop, and keeps that rule for reviews that are only slow.
-   Keeping 15 minutes still catches most stalls at 180 seconds, but a
-   retry may then not finish.
+**2026-10-25: ratified by the owner.** The owner directed that this spec
+be implemented with its ratification in the same pull request; the owner
+exception approved on that pull request's run is the ratification of
+record. Both decisions are taken as proposed: a stall is 180 seconds with
+no event, and the review job's limit is 20 minutes. The rule "when a
+review times out, split the pull request rather than raising the limit"
+stays for reviews that are only slow.
+
+**2026-10-25: the pinned CLI supports the flags (3.1.4).**
+`@anthropic-ai/claude-code@2.1.116`, the pinned `CLAUDE_CLI_VERSION`,
+lists `--include-partial-messages` (print mode with stream-json) and
+`--output-format stream-json`, so the pin does not change. Whether long
+model thinking can pause partial messages for 180 seconds was not
+measured live; the longest finished review at the first adopter was 10
+minutes of total time, and the watchdog limits silence only.
+
+## Implementation record
+
+**2026-10-25.** `ai-review.sh` runs each call as `claude -p` with
+`--output-format stream-json --verbose --include-partial-messages` in the
+background, polls its events file once a second, and stops a call whose
+file has not grown for 180 seconds (`SIGTERM`, `SIGKILL` after 10 seconds).
+A stalled call is retried once in a fresh working directory and home; a
+second stall ends the review through the transient skip with the reason
+`the reviewer call stalled twice (no event for 180 seconds)`. A call's
+review text is the `.result` of its last `result` event, non-JSON lines
+ignored; a non-zero exit keeps spec 024's classification, reading the
+events in place of the text output. `AI_REVIEW_STALL_SECONDS`, a positive
+integer, overrides the limit for tests only; the rendered workflow never
+sets it. The review job's `timeout-minutes` is 20, and the profile is
+revision 20. Revision 19's two changed templates are kept byte for byte in
+`tests/support/profile-r19/` for the upgrade tests. `cargo test -p
+statecraft-home` passes (597 tests, 1 ignored), including the five
+`revision_twenty` workflow tests and the revision 19 to 20 upgrade.
 
 ## Verification
 

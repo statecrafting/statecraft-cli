@@ -35,8 +35,8 @@
       }
     ],
     "specId": "061-review-call-stall",
-    "specStatus": "draft"
+    "specStatus": "approved"
   },
   "schemaVersion": "1.3.0",
-  "shardHash": "5157f23faeb6f7db3243cd20da110f9a2c59fd7e2cc9fc9db95ba81f34f556ee"
+  "shardHash": "81f94cc8440665e39b9a8ea51e49f3a83d1493194006171b1bf1a7b1b4cef88e"
 }

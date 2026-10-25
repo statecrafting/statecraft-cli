@@ -25,7 +25,7 @@
       }
     ],
     "id": "061-review-call-stall",
-    "implementation": "pending",
+    "implementation": "complete",
     "obligations": [
       {
         "anchor": "3-1-the-stall-watchdog",
@@ -75,7 +75,7 @@
       }
     ],
     "sectionDigests": {
-      "061-a-stalled-ai-review-call-is-detected-retried-once-and-otherwise-skipped-as-transient": "de3a4a3a9758a2abe60f6228bd7445580d649ba2b60bed1ef44bddebe15294e1",
+      "061-a-stalled-ai-review-call-is-detected-retried-once-and-otherwise-skipped-as-transient": "ca0fa749e96e799a521606e1243cc00433c4fc7e291eb33b0b4bd5f260c49ebb",
       "1-purpose": "86d29f8c36a358f0fb4ea48fe843d0ddfd975109e827459db1c328b11a96748b",
       "2-territory": "2701bc8d2f9e2de5d15292e40fd7343f3a0d29511942ceef9d049e36bf41a67f",
       "3-1-the-stall-watchdog": "bcd2004a69335b626988f0ffbacf025decc0d2ddfc59f294714f648b046d4204",
@@ -86,7 +86,8 @@
       "3-behavior": "672c5ee319ca6ffca4d478533ff9e3d269618b81cf52564627c99abdf47b1208",
       "4-out-of-scope": "c07550bfcf6fce797fd6e4ba30bc04e542219fb6ed758be98cb940965d6ed341",
       "5-observable-negative-cases": "040eff6be3b6a7ea90be25cdc7ab31353f3f20ef3d7cb0679448db169d78689f",
-      "decisions-for-ratification": "c70c5229b9b0d8b24131c0a5f295ab3de6f1c5e0e0a0dd45b210d007767b8b5e",
+      "6-resolved-decisions": "02a1efa68ef3bc8c037133ef184c2e209a39aa32c85ece28649b2b0e7bb99172",
+      "implementation-record": "9e0aa27791e1bcf174967d14e18a94202231e54b7a0136c2c9904a769ea7a2eb",
       "verification": "0b648a8421222c11783dfa56062ac98de424331b5951876c5f51049e8684940d"
     },
     "sectionHeadings": [
@@ -101,14 +102,15 @@
       "3.5 Spec 044 becomes revision 21",
       "4. Out of scope",
       "5. Observable negative cases",
-      "Decisions for ratification",
+      "6. Resolved decisions",
+      "Implementation record",
       "Verification"
     ],
     "specPath": "specs/061-review-call-stall/spec.md",
-    "status": "draft",
+    "status": "approved",
     "summary": "Amends spec 002's setup profile and spec 024's review. github-actions-rust revision 20 watches each reviewer call: the call streams its events, and a call that emits none for 180 seconds is stopped and retried once with the same input. A second stall ends the review as a visible `skipped:transient`, naming the stall, instead of running into the job's limit. The review job's limit becomes 20 minutes so that one retry fits. What the review reads, the findings it reports and how they judge are unchanged. Spec 044 moves from revision 20 to revision 21.\n",
     "title": "Setup profile revision 20: a stalled AI review call is detected, retried once, and otherwise skipped as transient"
   },
-  "shardHash": "5157f23faeb6f7db3243cd20da110f9a2c59fd7e2cc9fc9db95ba81f34f556ee",
+  "shardHash": "81f94cc8440665e39b9a8ea51e49f3a83d1493194006171b1bf1a7b1b4cef88e",
   "specVersion": "1.10.0"
 }
