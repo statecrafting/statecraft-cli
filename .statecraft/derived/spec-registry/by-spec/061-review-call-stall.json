@@ -1,0 +1,114 @@
+{
+  "record": {
+    "amends": [
+      "002-environment-lifecycle",
+      "024-review-budget-and-ratification",
+      "044-supply-chain-profile",
+      "058-ci-throughput-profile",
+      "060-ci-failure-summary"
+    ],
+    "created": "2026-10-25",
+    "dependsOn": [
+      "002-environment-lifecycle",
+      "024-review-budget-and-ratification",
+      "058-ci-throughput-profile",
+      "060-ci-failure-summary"
+    ],
+    "extends": [
+      {
+        "nature": "additive",
+        "spec": "002-environment-lifecycle",
+        "unit": {
+          "kind": "directory",
+          "path": "crates/statecraft-home/"
+        }
+      }
+    ],
+    "id": "061-review-call-stall",
+    "implementation": "pending",
+    "obligations": [
+      {
+        "anchor": "3-1-the-stall-watchdog",
+        "id": "R-1",
+        "kind": "requirement",
+        "text": "Each reviewer call runs with streamed output, partial messages included, and is stopped when it emits no event for 180 seconds; a call that keeps emitting events is never stopped by this rule."
+      },
+      {
+        "anchor": "3-2-one-retry",
+        "id": "R-2",
+        "kind": "requirement",
+        "text": "A stopped call is retried once, with the same input and a fresh working directory and home; at most one retry is made per call."
+      },
+      {
+        "anchor": "3-2-one-retry",
+        "id": "R-3",
+        "kind": "requirement",
+        "text": "A call that stalls on its retry ends the review as `skipped:transient`, posting the skip notice with the stall's reason and the diff digest as every transient skip does; a stall never yields findings, no-findings or a refusal."
+      },
+      {
+        "anchor": "3-3-what-does-not-change",
+        "id": "R-4",
+        "kind": "requirement",
+        "text": "The review text of a call is the text of its final result event; the prompt, inputs, grouping, budget, refusal and transient classification of spec 024 and the findings format are unchanged."
+      },
+      {
+        "anchor": "3-4-the-revision",
+        "id": "R-5",
+        "kind": "requirement",
+        "text": "The review job's timeout-minutes is 20."
+      },
+      {
+        "anchor": "3-5-spec-044-becomes-revision-21",
+        "id": "R-6",
+        "kind": "requirement",
+        "text": "Spec 044's jobs are delivered as revision 21: wherever spec 044, spec 058 section 3.6 or spec 060 section 3.5 names revision 20 for them it is read as revision 21, and the revision upgraded from as revision 20."
+      },
+      {
+        "anchor": "verification",
+        "id": "V-1",
+        "inputs": [
+          "crates/statecraft-home/tests/setup_workflows.rs",
+          "crates/statecraft-home/tests/setup_upgrade.rs"
+        ],
+        "kind": "verification",
+        "text": "Step tests run ai-review.sh with a stubbed claude: a call that stalls once and then answers is retried once and its review is used; a call that stalls twice ends as skipped:transient with the stall named; a call that streams slowly but steadily past 180 seconds of total time is never stopped. Rendering tests show the review job's 20-minute limit, and a revision-19 project upgrades to revision 20 in one plan."
+      }
+    ],
+    "sectionDigests": {
+      "061-a-stalled-ai-review-call-is-detected-retried-once-and-otherwise-skipped-as-transient": "de3a4a3a9758a2abe60f6228bd7445580d649ba2b60bed1ef44bddebe15294e1",
+      "1-purpose": "86d29f8c36a358f0fb4ea48fe843d0ddfd975109e827459db1c328b11a96748b",
+      "2-territory": "2701bc8d2f9e2de5d15292e40fd7343f3a0d29511942ceef9d049e36bf41a67f",
+      "3-1-the-stall-watchdog": "bcd2004a69335b626988f0ffbacf025decc0d2ddfc59f294714f648b046d4204",
+      "3-2-one-retry": "ec8842f2f60e8749559befab5e520aa2cb219dc4d78cd362adf4ec7652a5ccce",
+      "3-3-what-does-not-change": "9a59f82e311bf0675f9af3209c08abb0fbad7b252600859fb941b47c6a014cbc",
+      "3-4-the-revision": "53335df083db1bad217a286d99a11832796ded7aaaa1f47f57bcd54a650fff9d",
+      "3-5-spec-044-becomes-revision-21": "c58e783f975db501cf34a3dae4571001d2621ee287500f6a7a3a30c68cdbc69b",
+      "3-behavior": "672c5ee319ca6ffca4d478533ff9e3d269618b81cf52564627c99abdf47b1208",
+      "4-out-of-scope": "c07550bfcf6fce797fd6e4ba30bc04e542219fb6ed758be98cb940965d6ed341",
+      "5-observable-negative-cases": "040eff6be3b6a7ea90be25cdc7ab31353f3f20ef3d7cb0679448db169d78689f",
+      "decisions-for-ratification": "c70c5229b9b0d8b24131c0a5f295ab3de6f1c5e0e0a0dd45b210d007767b8b5e",
+      "verification": "0b648a8421222c11783dfa56062ac98de424331b5951876c5f51049e8684940d"
+    },
+    "sectionHeadings": [
+      "061: A stalled AI review call is detected, retried once, and otherwise skipped as transient",
+      "1. Purpose",
+      "2. Territory",
+      "3. Behavior",
+      "3.1 The stall watchdog",
+      "3.2 One retry",
+      "3.3 What does not change",
+      "3.4 The revision",
+      "3.5 Spec 044 becomes revision 21",
+      "4. Out of scope",
+      "5. Observable negative cases",
+      "Decisions for ratification",
+      "Verification"
+    ],
+    "specPath": "specs/061-review-call-stall/spec.md",
+    "status": "draft",
+    "summary": "Amends spec 002's setup profile and spec 024's review. github-actions-rust revision 20 watches each reviewer call: the call streams its events, and a call that emits none for 180 seconds is stopped and retried once with the same input. A second stall ends the review as a visible `skipped:transient`, naming the stall, instead of running into the job's limit. The review job's limit becomes 20 minutes so that one retry fits. What the review reads, the findings it reports and how they judge are unchanged. Spec 044 moves from revision 20 to revision 21.\n",
+    "title": "Setup profile revision 20: a stalled AI review call is detected, retried once, and otherwise skipped as transient"
+  },
+  "shardHash": "5157f23faeb6f7db3243cd20da110f9a2c59fd7e2cc9fc9db95ba81f34f556ee",
+  "specVersion": "1.10.0"
+}
