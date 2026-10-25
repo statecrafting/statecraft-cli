@@ -1,0 +1,42 @@
+{
+  "mapping": {
+    "amends": [
+      "002-environment-lifecycle",
+      "024-review-budget-and-ratification",
+      "044-supply-chain-profile",
+      "058-ci-throughput-profile",
+      "060-ci-failure-summary"
+    ],
+    "dependsOn": [
+      "002-environment-lifecycle",
+      "024-review-budget-and-ratification",
+      "058-ci-throughput-profile",
+      "060-ci-failure-summary"
+    ],
+    "implementingPaths": [
+      {
+        "path": "crates/statecraft-home/",
+        "source": "spec-edge"
+      }
+    ],
+    "resolvedUnits": [
+      {
+        "locations": [
+          {
+            "file": "crates/statecraft-home/"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "directory",
+          "path": "crates/statecraft-home/"
+        }
+      }
+    ],
+    "specId": "061-review-call-stall",
+    "specStatus": "draft"
+  },
+  "schemaVersion": "1.3.0",
+  "shardHash": "5157f23faeb6f7db3243cd20da110f9a2c59fd7e2cc9fc9db95ba81f34f556ee"
+}
