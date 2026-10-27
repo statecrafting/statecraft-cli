@@ -11,8 +11,8 @@
     ],
     "implementingPaths": [],
     "specId": "063-land-verbs",
-    "specStatus": "draft"
+    "specStatus": "approved"
   },
   "schemaVersion": "1.3.0",
-  "shardHash": "7e6fd7b67c7a25d7176a9b0d1e53ec5a98c296de9dd0dea726d664203f14355d"
+  "shardHash": "b0e0dbcfd82a4b7cb5bfc3b7200d254eb1db896124d0adc4280b66f0b47443e6"
 }
