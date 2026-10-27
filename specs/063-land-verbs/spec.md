@@ -2,21 +2,25 @@
 id: "063-land-verbs"
 title: "The land verbs wait for, arm, push and restack a pull request, and land status orders what is left"
 status: approved
+# Ratified by the owner on 2026-10-27 (section 7); this frontmatter is the
+# status spec-spine and the coupling gate read.
 implementation: pending
 created: "2026-10-27"
 summary: >
-  Amends spec 006's command surface. Six verbs act on a pull request's way
-  to the default branch through the operator's gh: `land wait` blocks until a
-  named event, `land arm` enables auto-merge only for a head the AI review
-  passed on a pull request based on the default branch, `land push` pushes a
-  signed head with a lease after disarming, `land restack` moves a stacked
-  pull request onto its new base and regenerates only declared generated
-  paths, and `land status` orders the open pull requests by their next
-  action, and `land cancel-superseded` cancels runs no open
-  pull request needs. The adopter's values (default branch, stack caps, generated paths
-  and their regenerators, pre-push checks) come from a `landing` block in the
-  project declaration; a value no layer supplies is refused, never defaulted.
-  Only `land arm` arms, and nothing here approves, merges or re-runs.
+  Amends spec 006's command surface; its four write verbs act under the F-02
+  narrowing of 2026-10-27 and never inside a run attempt (D-5). Six verbs
+  act on a pull request's way to the default branch through the operator's
+  gh: `land wait` blocks until a named event, `land arm` enables auto-merge
+  only for a head the AI review passed on a pull request based on the
+  default branch, `land push` pushes a signed head with a lease after
+  disarming, `land restack` moves a stacked pull request onto its new base
+  and regenerates only declared generated paths, and `land status` orders
+  the open pull requests by their next action, and `land cancel-superseded`
+  cancels runs no open pull request needs. The adopter's values (default
+  branch, stack caps, generated paths and their regenerators, pre-push
+  checks) come from a `landing` block in the project declaration; a value no
+  layer supplies is refused, never defaulted. Only `land arm` arms, and
+  nothing here approves, merges or re-runs.
 amends:
   - "006-command-surface"
 # No `extends` or `establishes` yet: the implementing changes add the edges
@@ -62,6 +66,10 @@ obligations:
     kind: requirement
     text: "`land cancel-superseded` force-cancels only pull-request runs waiting on the review-exception Environment whose head no open pull request points at, and nothing else."
     anchor: "3-7-land-cancel-superseded"
+  - id: "R-9"
+    kind: requirement
+    text: "`land arm`, `land push`, `land restack` and `land cancel-superseded` refuse (exit 2), `inside-run-attempt`, and write nothing when `STATECRAFT_RUN_ID` or `STATECRAFT_ATTEMPT` (spec 015 section 3.31 rule 17's attempt binding) is set in their environment."
+    anchor: "3-9-never-inside-a-run-attempt"
   - id: "V-1"
     kind: verification
     text: "CLI tests run every land verb against a stub gh and a scratch repository and find every outcome and exit code in sections 3 and 5, including an unsupplied policy key, a queue longer than one page, a skipped review, a stacked base, a moved head, an armed pull request pushed to, a non-generated conflict, a regenerated path, and an authored change altered by a replay."
@@ -309,6 +317,19 @@ nothing done (an unsupplied policy key and every refusal named above).
 3: usage. 4: failed, including a `gh` read classified as spec 012 section 3.5
 classifies it, from the error stream alone.
 
+### 3.9 Never inside a run attempt
+
+`land arm`, `land push`, `land restack` and `land cancel-superseded` act on
+GitHub, which founding deferral `F-02` withholds from every product verb
+except these four, lifted on 2026-10-27 (decision D-5). Each reads its
+environment before any other read or write: when `STATECRAFT_RUN_ID` or
+`STATECRAFT_ATTEMPT` is set (the attempt binding of spec 015 section 3.31
+rule 17, which a driven session carries), it refuses, exit 2,
+`inside-run-attempt`, and writes nothing. `land wait` and `land status`
+publish nothing and do not check it. The check is not a security boundary
+(constitution VIII): a driven session that holds the operator's `gh` can
+call it directly; the founding decision record names that residual.
+
 ## 4. Out of scope
 
 - Re-running a review or a failed job, and deciding that a cancellation was
@@ -373,9 +394,22 @@ explicit act.
 which this spec establishes and owns, one owning spec per crate; spec 006's
 `crates/statecraft-cli/` only binds the verbs.
 
+**D-5 (2026-10-27): the four write verbs are lifted from `F-02` and never
+run inside a run attempt.** The founding decision record (section 5,
+2026-10-27) narrows `F-02`, which defers every publishing product verb, for
+exactly `land arm`, `land push`, `land restack` and `land cancel-superseded`.
+Each checks the attempt binding of spec 015 section 3.31 rule 17 before any
+read or write and refuses, exit 2, `inside-run-attempt`, when
+`STATECRAFT_RUN_ID` or `STATECRAFT_ATTEMPT` is set (R-9). The check is not a
+security boundary (constitution VIII): a driven session holding the
+operator's `gh` can call it directly, as the record names. The read verbs
+need no lift. The implementing change of `land push` updates
+`integration_slice`'s guard against publishing verbs to name exactly this
+lift, rather than removing the guard.
+
 ## Verification
 
-This spec is `status: draft` and declares no acceptance until it is
-ratified and built. Its acceptance will run every verb against a stub `gh`
-and a scratch repository through each row of section 5 and each refusal of
-section 3.
+This spec is `status: approved` (ratified 2026-10-27, section 7) and declares
+no acceptance until it is built. Its acceptance will run every verb against a
+stub `gh` and a scratch repository through each row of section 5 and each
+refusal of section 3.

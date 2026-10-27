@@ -433,7 +433,7 @@ oversight, and reopened by a concrete consumer need rather than by availability.
 | ID | Deferred | Reopened by |
 |---|---|---|
 | F-01 | Hosted platform selection, any hosted control plane, and hqgit integration. Lifted on 2026-10-12 for spec `038`'s three acts only (login, submit, decision) against one operator-named cell; see section 5. | A hosted decision by the owner (I-04). |
-| F-02 | Publication of any kind: push, pull request, merge, release, deploy. No verb in this corpus publishes. Narrowed on 2026-10-20: distributing this repository's own binaries is repository delivery, not a product verb, and is not deferred; see section 5. | A first slice that is accepted and reviewed, and a separate decision. |
+| F-02 | Publication of any kind: push, pull request, merge, release, deploy. No verb in this corpus publishes. Narrowed on 2026-10-20: distributing this repository's own binaries is repository delivery, not a product verb, and is not deferred. Narrowed again on 2026-10-27 for spec `063`'s four landing acts only (`land arm`, `land push`, `land restack`, `land cancel-superseded`), operator-invoked and refused inside a run attempt; see section 5. | A first slice that is accepted and reviewed, and a separate decision. |
 | F-03 | Signing, key custody and trust-root enrollment. Spec 005 reports every signature `unsigned` and every issuer `unknown` until then. | An external consumer that requires a signed record. |
 | F-04 | Any user-interface surface beyond command output, including a read-only web view. | A reviewable-outcome need that command output genuinely cannot serve. |
 | F-05 | Adaptive autonomy and outcome scoring (`trust-window`). | A measured need, never the library's availability. A score must never override authorization. |
@@ -737,3 +737,30 @@ branch on declared capabilities and never on adapter identity. It is admitted
 only by passing spec `004`'s full suite with fixtures of its own; a sibling
 adapter's pass never counts, and nothing weakens the adapter boundary to fit
 it. Every other provider stays deferred under `F-07`.
+
+### 2026-10-27: F-02 narrowed for spec 063's four landing acts
+
+The repository owner decided that spec `063`'s four write verbs may act on
+an operator's own pull requests: `land arm` enables auto-merge on a head the
+AI review passed, `land push` and `land restack` push the pull request's own
+head branch with a lease, and `land cancel-superseded` force-cancels runs no
+open pull request needs. They are lifted from `F-02` on three conditions:
+
+1. **Operator-invoked only.** Each act runs through the operator's own `gh`
+   and git credentials, as `doctor --remote` reads through them; this
+   product holds no token for it.
+2. **Never inside a run attempt.** Each refuses when the attempt binding of
+   spec `015` section 3.31 rule 17 is present in its environment
+   (`STATECRAFT_RUN_ID` or `STATECRAFT_ATTEMPT`), so a driven session is
+   given no publishing verb. This is the `C-11` concern: a driven session
+   publishing around the broker.
+3. **Nothing else.** No land verb approves an Environment, merges directly,
+   opens a pull request, releases or deploys; arming leaves the merge to the
+   repository's own queue and required checks.
+
+Residual, named as constitution VIII requires: the environment check is not
+a security boundary. A driven session that removes the variables, or that
+holds the operator's `gh` and calls it directly, can still publish; spec
+`004`'s named residuals and `F-09` cover that case, and this lift does not
+widen it, because each act is one the operator's `gh` already performs.
+`F-02` still defers every other publishing product verb.
