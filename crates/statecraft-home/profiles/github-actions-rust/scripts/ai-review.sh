@@ -29,6 +29,36 @@
 set -eEuo pipefail
 trap 'echo "ai-review: a command failed (exit $?) at line ${LINENO}; reported as failed (4)" >&2; exit 4' ERR
 
+# Publication is a separate step, after the evidence artifact stands. Read the
+# record as raw text: command substitution would discard its trailing newlines.
+# statecraft-ai-review: publish-check
+if [ "${1:-}" = publish-check ]; then
+  for input in REPO HEAD_SHA EVIDENCE_DIR; do
+    if [ -z "${!input:-}" ]; then
+      echo "ai-review.sh publish-check needs ${input}" >&2
+      exit 3
+    fi
+  done
+  if [ "${HEAD_REPO:-$REPO}" != "$REPO" ]; then exit 0; fi
+  payload="$(jq -n --arg head "$HEAD_SHA" --rawfile record "$EVIDENCE_DIR/ai-review-evidence.json" '
+    ($record | fromjson) as $r |
+    ("```json\n" + $record + "\n```") as $text |
+    if ($text | length) > 65535 then
+      error("check-run output text exceeds 65535 characters; never truncated")
+    else
+      {name: "statecraft-ai-review", head_sha: $head, status: "completed",
+       conclusion: (if $r.result == "no-findings" then "success"
+         elif $r.result == "findings" then "failure"
+         elif ($r.result | startswith("skipped:")) then "neutral"
+         else error("unknown review result") end),
+       output: {title: $r.result,
+         summary: ("_Subject: \($r.subject.base)...\($r.subject.head), diff digest \($r.subject.diffDigest), \($r.review.calls // 0) call(s). An AI comment is not an approval._\nFindings: \($r.findings | length)."),
+         text: $text}}
+    end')"
+  printf '%s\n' "$payload" | gh api "repos/${REPO}/check-runs" --method POST --input -
+  exit 0
+fi
+
 for input in BASE_SHA HEAD_SHA PR_NUMBER REPO DIFF_CAP CONTEXT_TOKENS MAX_CALLS DELETION_CAP CLAUDE_CLI_VERSION PROFILE_IDENTITY; do
   if [ -z "${!input:-}" ]; then
     echo "ai-review.sh needs ${input}" >&2

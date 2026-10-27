@@ -365,6 +365,10 @@ const GH: &str = r#"#!/usr/bin/env bash
 here="$STUB_STATE"
 printf '%s\n' "$*" >> "$here/gh-calls"
 case "$1 $2" in
+  api\ repos/*/check-runs)
+    [ "$3 $4 $5 $6" = "--method POST --input -" ] || exit 98
+    cat >> "$here/check-runs"
+    if [ -f "$here/check-fails" ]; then exit 1; fi ;;
   "pr comment")
     cat > /dev/null
     code="$(cat "$here/gh-comment-exit")"
@@ -1866,14 +1870,14 @@ fn contributor_text_is_never_spliced_into_a_run_scalar() {
             "{name} is optional"
         );
     }
-    // The workflow default is read-only; the review job adds only its comment.
+    // The workflow default is read-only; the review job adds comments and checks.
     let ci = workflow(tmp.path(), "statecraft-ci.yml");
     assert_eq!(ci["permissions"]["contents"].as_str(), Some("read"));
     let review = workflow(tmp.path(), "statecraft-ai-review.yml");
     let perms = review["jobs"]["review"]["permissions"]
         .as_mapping()
         .unwrap();
-    assert_eq!(perms.len(), 2);
+    assert_eq!(perms.len(), 3);
     assert_eq!(
         review["jobs"]["review"]["permissions"]["pull-requests"].as_str(),
         Some("write")
@@ -5561,7 +5565,7 @@ fn run_mutated(repo: &Repo, script: &str, extra: &[(&'static str, &str)]) -> Ran
 /// 058), captured byte for byte from main at 6c6f394.
 fn revision_seventeen() -> Profile {
     let mut p = Profile::registered();
-    assert_eq!(p.revision, 20, "the registered profile is revision 20");
+    assert_eq!(p.revision, 21, "the registered profile is revision 21");
     p.templates
         .iter_mut()
         .find(|t| t.path == "scripts/statecraft/ci-gate.sh")
@@ -6160,4 +6164,226 @@ fn revision_twenty_workflow_timeout_and_watchdog_default() {
     )
     .unwrap();
     assert!(!text.contains("AI_REVIEW_STALL_SECONDS"));
+}
+
+// ------------------------------------------------------------ revision 21
+
+fn publish_verdict(repo: &Repo, review: &Ran, fork: bool, fail: bool) -> Ran {
+    let wf = workflow(repo.root(), "statecraft-ai-review.yml");
+    let (run, env) = step(&wf, "review", "Publish the verdict check run");
+    let mut ctx = review_ctx(repo);
+    ctx.insert(
+        "steps.review.outputs.evidence".into(),
+        review.output("evidence").into(),
+    );
+    if fork {
+        ctx.insert(
+            "github.event.pull_request.head.repo.full_name".into(),
+            "other/fork".into(),
+        );
+    }
+    let temp = review.runner.path().join("temp");
+    run_step(
+        repo.root(),
+        &run,
+        &env,
+        &ctx,
+        &[("RUNNER_TEMP", temp.to_str().unwrap())],
+        |stubs| {
+            if fail {
+                std::fs::write(stubs.join("check-fails"), "").unwrap();
+            }
+        },
+    )
+}
+
+#[test]
+fn revision_twenty_one_publishes_exact_records_and_conclusions() {
+    let repo = Repo::new(&["scripts/statecraft/ai-review.sh"], &[]);
+    for (mode, draft, result, conclusion, count) in [
+        ("no-findings", false, "no-findings", "success", 0),
+        ("findings", false, "findings", "failure", 1),
+        ("no-findings", true, "skipped:draft", "neutral", 0),
+    ] {
+        let mut case = review_cases().remove(1);
+        case.mode = mode;
+        if draft {
+            case.extra.push(("IS_DRAFT", "true".into()));
+        }
+        let review = run_review(&repo, &case);
+        assert_eq!(review.exit, 0, "{}", review.text);
+        let record = std::fs::read_to_string(
+            Path::new(review.output("evidence")).join("ai-review-evidence.json"),
+        )
+        .unwrap();
+        let evidence: serde_json::Value = serde_json::from_str(&record).unwrap();
+        // Every attempt makes a POST, including a second publication on one head.
+        for _ in 0..2 {
+            let published = publish_verdict(&repo, &review, false, false);
+            assert_eq!(published.exit, 0, "{}", published.text);
+            assert_eq!(published.stub_file("gh-calls").unwrap().lines().count(), 1);
+            let payload: serde_json::Value =
+                serde_json::from_str(&published.stub_file("check-runs").unwrap()).unwrap();
+            assert_eq!(payload["name"], "statecraft-ai-review");
+            assert_eq!(payload["head_sha"], repo.head);
+            assert_eq!(payload["status"], "completed");
+            assert_eq!(payload["conclusion"], conclusion);
+            assert_eq!(payload["output"]["title"], result);
+            assert_eq!(payload["output"]["text"], format!("```json\n{record}\n```"));
+            let subject = format!(
+                "_Subject: {}...{}, diff digest {}, {} call(s). An AI comment is not an approval._",
+                repo.base,
+                repo.head,
+                evidence["subject"]["diffDigest"].as_str().unwrap(),
+                evidence["review"]["calls"].as_u64().unwrap_or(0)
+            );
+            assert_eq!(
+                payload["output"]["summary"],
+                format!("{subject}\nFindings: {count}.")
+            );
+            if !draft {
+                assert!(review.stub_file("gh-comments").unwrap().contains(&subject));
+            }
+        }
+        let failed = publish_verdict(&repo, &review, false, true);
+        assert_eq!(failed.exit, 4, "{}", failed.text);
+        assert!(failed.text.contains("reported as failed (4)"));
+        assert_eq!(failed.stub_file("gh-calls").unwrap().lines().count(), 1);
+        let fork = publish_verdict(&repo, &review, true, false);
+        assert_eq!(fork.exit, 0, "{}", fork.text);
+        assert!(fork.stub_file("gh-calls").is_none());
+    }
+}
+
+#[test]
+fn revision_twenty_one_checks_the_fenced_text_limit_without_truncation() {
+    let repo = Repo::new(&["scripts/statecraft/ai-review.sh"], &[]);
+    let mut case = review_cases().remove(1);
+    case.extra.push(("IS_DRAFT", "true".into()));
+    let review = run_review(&repo, &case);
+    assert_eq!(review.exit, 0, "{}", review.text);
+    let path = Path::new(review.output("evidence")).join("ai-review-evidence.json");
+    let original = std::fs::read_to_string(&path).unwrap();
+    // JSON permits trailing whitespace. Include a multibyte character to
+    // prove the output limit counts characters, not UTF-8 bytes.
+    let original = original.replace("skipped:draft", "skipped:é");
+    let record = format!(
+        "{original}{}",
+        " ".repeat(65535 - 12 - original.chars().count())
+    );
+    std::fs::write(&path, &record).unwrap();
+    let exact = publish_verdict(&repo, &review, false, false);
+    assert_eq!(exact.exit, 0, "{}", exact.text);
+    let payload: serde_json::Value =
+        serde_json::from_str(&exact.stub_file("check-runs").unwrap()).unwrap();
+    assert_eq!(payload["output"]["text"], format!("```json\n{record}\n```"));
+    std::fs::write(&path, format!("{record} ")).unwrap();
+    let oversized = publish_verdict(&repo, &review, false, false);
+    assert_eq!(oversized.exit, 4, "{}", oversized.text);
+    assert!(oversized.text.contains("exceeds 65535 characters"));
+    assert!(oversized.stub_file("gh-calls").is_none());
+}
+
+#[test]
+fn revision_twenty_one_scopes_permission_and_publishes_after_upload() {
+    let repo = Repo::new(&[], &[]);
+    let wf = workflow(repo.root(), "statecraft-ai-review.yml");
+    assert_eq!(wf["permissions"]["contents"].as_str(), Some("read"));
+    assert!(wf["permissions"]["checks"].is_null());
+    assert_eq!(
+        wf["jobs"]["review"]["permissions"]["checks"].as_str(),
+        Some("write")
+    );
+    for (name, allowed_job) in [
+        ("statecraft-ci.yml", "ai-review"),
+        ("statecraft-ai-review.yml", "review"),
+    ] {
+        let rendered = workflow(repo.root(), name);
+        assert_eq!(rendered["permissions"]["contents"].as_str(), Some("read"));
+        assert!(rendered["permissions"]["checks"].is_null());
+        for (job, definition) in rendered["jobs"].as_mapping().unwrap() {
+            if job.as_str() == Some(allowed_job) {
+                assert_eq!(definition["permissions"]["checks"].as_str(), Some("write"));
+            } else {
+                assert!(
+                    definition["permissions"]["checks"].is_null(),
+                    "{name}: {job:?}"
+                );
+            }
+        }
+    }
+    let steps = wf["jobs"]["review"]["steps"].as_sequence().unwrap();
+    let upload = steps
+        .iter()
+        .position(|s| s["name"] == "Upload the evidence record")
+        .unwrap();
+    let publish = &steps[upload + 1];
+    assert_eq!(publish["name"], "Publish the verdict check run");
+    assert_eq!(
+        publish["if"],
+        "steps.review.outputs.evidence != '' && github.event.pull_request.head.repo.full_name == github.repository"
+    );
+    assert!(!publish["if"].as_str().unwrap().contains("always()"));
+}
+
+#[test]
+fn revision_twenty_one_publication_uses_the_selected_script_across_upgrade_and_adoption() {
+    for source in ["revision-20", "revision-21", "adoption"] {
+        let mut repo = Repo::new(
+            if source == "revision-21" {
+                &["scripts/statecraft/ai-review.sh"]
+            } else {
+                &[]
+            },
+            &[],
+        );
+        if source == "revision-20" {
+            repo.commit(
+                "scripts/statecraft/ai-review.sh",
+                include_str!("support/profile-r20/ai-review.sh"),
+            );
+            repo.base = repo.head.clone();
+            repo.commit("src/lib.rs", "pub fn changed() -> u32 { 3 }\n");
+            // The candidate carries revision 21, but publication must use
+            // the revision-20 script selected from the base by Review.
+            render(repo.root());
+        }
+        let mut case = review_cases().remove(1);
+        case.mode = "no-findings";
+        let review = run_review(&repo, &case);
+        assert_eq!(review.exit, 0, "{source}: {}", review.text);
+        if source == "adoption" {
+            assert!(
+                review
+                    .text
+                    .contains("the base carries none; the candidate's copy runs (adoption)")
+            );
+        } else {
+            assert!(
+                review
+                    .text
+                    .contains(&format!("ai-review.sh: read at the base {}", repo.base))
+            );
+        }
+        let published = publish_verdict(&repo, &review, false, false);
+        assert_eq!(published.exit, 0, "{source}: {}", published.text);
+        if source == "revision-20" {
+            assert_eq!(
+                published.text,
+                "ai-review.sh at the base predates revision 21: no check run is published for this head (the upgrade)\n"
+            );
+            assert!(published.stub_file("gh-calls").is_none());
+            assert_eq!(
+                std::fs::read_to_string(review.runner.path().join("temp/statecraft-ai-review.sh"))
+                    .unwrap(),
+                include_str!("support/profile-r20/ai-review.sh")
+            );
+        } else {
+            assert_eq!(published.stub_file("gh-calls").unwrap().lines().count(), 1);
+            let payload: serde_json::Value =
+                serde_json::from_str(&published.stub_file("check-runs").unwrap()).unwrap();
+            assert_eq!(payload["head_sha"], repo.head);
+            assert_eq!(payload["conclusion"], "success");
+        }
+    }
 }
