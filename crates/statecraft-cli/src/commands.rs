@@ -141,6 +141,10 @@ pub enum Verb {
     ReviewStatus,
     /// `land wait <pr>...`
     LandWait,
+    /// `land arm <pr>`
+    LandArm,
+    /// `land push <pr>`
+    LandPush,
     /// `--help`, optionally with a group or a verb as its topic.
     ///
     /// Not part of the command tree: [`Verb::all`] lists the operations, and a
@@ -165,6 +169,8 @@ impl Verb {
         match self {
             Verb::ReviewStatus => "review status",
             Verb::LandWait => "land wait",
+            Verb::LandArm => "land arm",
+            Verb::LandPush => "land push",
             Verb::ProjectRegister => "project register",
             Verb::ProjectList => "project list",
             Verb::ProjectArm => "project arm",
@@ -321,7 +327,7 @@ impl Verb {
             | Verb::ProposalAcknowledge
             | Verb::ProposalAdmit => "027-observation-and-proposals",
             Verb::ReviewStatus => "062-review-verdict-status",
-            Verb::LandWait => "063-land-verbs",
+            Verb::LandWait | Verb::LandArm | Verb::LandPush => "063-land-verbs",
             Verb::Help => "006-command-surface",
         }
     }
@@ -394,6 +400,8 @@ impl Verb {
             Verb::ProposalAdmit,
             Verb::ReviewStatus,
             Verb::LandWait,
+            Verb::LandArm,
+            Verb::LandPush,
         ]
     }
 
@@ -410,6 +418,8 @@ impl Verb {
         let second = args.get(1).map(String::as_str);
         match (first, second) {
             ("land", Some("wait")) => Some((Verb::LandWait, 2)),
+            ("land", Some("arm")) => Some((Verb::LandArm, 2)),
+            ("land", Some("push")) => Some((Verb::LandPush, 2)),
             ("review", Some("status")) => Some((Verb::ReviewStatus, 2)),
             ("project", Some("register")) => Some((Verb::ProjectRegister, 2)),
             ("project", Some("list")) => Some((Verb::ProjectList, 2)),

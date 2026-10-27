@@ -343,12 +343,19 @@ fn a_finding_a_refusal_and_a_usage_error_are_three_distinct_exit_codes() {
     assert_eq!(code(&usage), 3);
 }
 
-// Nothing in the command tree publishes.
+// Nothing in the command tree publishes, except the one spelling founding
+// deferral F-02's narrowing of 2026-10-27 lifts (already on the default
+// branch: the F-02 row and the section 5 entry "2026-10-27: F-02 narrowed for
+// spec 063's four landing acts" in docs/decisions/00-founding-decisions.md,
+// and spec 063 D-5): `land push`. Only that exact spelling is removed before the
+// check, so any other verb naming a push still fails it.
 #[test]
 fn no_verb_the_binary_offers_publishes_anything() {
     let home = tempfile::tempdir().unwrap();
     let out = run_in(home.path(), &["nonsense"]);
-    let listing = String::from_utf8_lossy(&out.stderr).to_lowercase();
+    let full = String::from_utf8_lossy(&out.stderr).to_lowercase();
+    assert!(full.contains("land push"), "{full}");
+    let listing = full.replace("land push", "");
     for forbidden in ["publish", "release", "tag", "push"] {
         assert!(
             !listing.contains(forbidden),

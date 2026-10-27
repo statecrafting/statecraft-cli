@@ -98,3 +98,59 @@ pub fn run(args: &[String], json: bool) -> i32 {
     print!("{}", Answer::new(value, exit, summary).render(format));
     code
 }
+
+/// Bind the explicit landing acts before any other environment or project read.
+pub fn act(verb: Verb, args: &[String], json: bool) -> i32 {
+    let attempt = statecraft_land::Attempt {
+        run_id: std::env::var_os("STATECRAFT_RUN_ID").is_some(),
+        attempt: std::env::var_os("STATECRAFT_ATTEMPT").is_some(),
+    };
+    let directory = std::path::Path::new(".");
+    let (value, code) = match verb {
+        Verb::LandArm => {
+            let answer = statecraft_land::arm::run(directory, args, attempt);
+            let code = answer.exit_code;
+            (
+                serde_json::to_value(answer).expect("serializable answer"),
+                code,
+            )
+        }
+        Verb::LandPush => {
+            let answer = statecraft_land::push::run(directory, args, attempt);
+            let code = answer.exit_code;
+            (
+                serde_json::to_value(answer).expect("serializable answer"),
+                code,
+            )
+        }
+        _ => unreachable!("landing act"),
+    };
+    let summary = value
+        .as_object()
+        .unwrap()
+        .iter()
+        .filter(|(_, v)| !v.is_null())
+        .map(|(k, v)| {
+            format!(
+                "{k}: {}\n",
+                v.as_str()
+                    .map(str::to_owned)
+                    .unwrap_or_else(|| v.to_string())
+            )
+        })
+        .collect::<String>();
+    let exit = match code {
+        0 => Exit::Ok,
+        1 => Exit::Finding,
+        2 => Exit::Refused,
+        3 => Exit::Usage,
+        _ => Exit::Failed,
+    };
+    let format = if json {
+        Format::Json(verb)
+    } else {
+        Format::Human
+    };
+    print!("{}", Answer::new(value, exit, summary).render(format));
+    code
+}

@@ -1,4 +1,8 @@
 //! Spec 063 increment 1: policy and read-only waits through the operator's gh.
+mod action;
+pub mod arm;
+pub mod push;
+pub use action::{Attempt, UsedPolicy};
 mod observation;
 pub mod policy;
 pub use observation::{Gh, WaitHost};
