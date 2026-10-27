@@ -1,0 +1,119 @@
+{
+  "record": {
+    "amends": [
+      "006-command-surface"
+    ],
+    "created": "2026-10-27",
+    "dependsOn": [
+      "002-environment-lifecycle",
+      "006-command-surface",
+      "012-remote-desired-state",
+      "062-review-verdict-status"
+    ],
+    "id": "063-land-verbs",
+    "implementation": "pending",
+    "obligations": [
+      {
+        "anchor": "3-1-the-landing-policy",
+        "id": "R-1",
+        "kind": "requirement",
+        "text": "Every land verb reads the adopter's values from the `landing` block of the project declaration through the configuration layers `config show` reports; a value a verb needs that no layer supplies refuses the verb (exit 2) naming the key, and no verb substitutes a default."
+      },
+      {
+        "anchor": "3-2-land-wait",
+        "id": "R-2",
+        "kind": "requirement",
+        "text": "`land wait` reads each named pull request on its own, never a page of the merge queue, writes nothing, and ends at the first named event, at `--timeout`, or on a read that keeps failing past it."
+      },
+      {
+        "anchor": "3-3-land-arm",
+        "id": "R-3",
+        "kind": "requirement",
+        "text": "`land arm` first reads whether the pull request is already armed: armed after its current head was pushed is exit 0, `already-armed`, and armed before it is refused (exit 2), `armed-before-head`; neither calls GitHub's arming and both change nothing. Otherwise it enables auto-merge only when the pull request is open and not a draft, its base is the default branch, its head is the one named by `--head` when given, `review status` at that head is `no-findings`, no required check at that head has ended in anything but success (failed, cancelled, skipped, timed out or needing action all refuse, as they fail ci-gate; one still queued or running does not), and the head is signed when the profile requires signed commits; it arms with the head pinned, and refuses (exit 2) naming the first unmet condition."
+      },
+      {
+        "anchor": "3-3-land-arm",
+        "id": "R-4",
+        "kind": "requirement",
+        "text": "No verb other than `land arm` enables auto-merge, and no land verb approves an Environment, merges, re-runs a job or comments."
+      },
+      {
+        "anchor": "3-4-land-push",
+        "id": "R-5",
+        "kind": "requirement",
+        "text": "`land push` pushes only the pull request's own head branch, only a head that is signed when the profile requires it and holds no conflict marker in a tracked file, disarms an armed pull request before the push and reports it, and pushes with a lease on the remote head the caller names; it never re-arms."
+      },
+      {
+        "anchor": "3-5-land-restack",
+        "id": "R-6",
+        "kind": "requirement",
+        "text": "`land restack` replays exactly the pull request's own commits onto the new base, resolves a conflict only on a path the `generated` list declares (by taking the base's copy and running that entry's regenerator), aborts on any other conflicted path without pushing, and refuses to push when the pull request's authored change per file differs after the replay."
+      },
+      {
+        "anchor": "3-6-land-status",
+        "id": "R-7",
+        "kind": "requirement",
+        "text": "`land status` writes nothing."
+      },
+      {
+        "anchor": "3-7-land-cancel-superseded",
+        "id": "R-8",
+        "kind": "requirement",
+        "text": "`land cancel-superseded` force-cancels only pull-request runs waiting on the review-exception Environment whose head no open pull request points at, and nothing else."
+      },
+      {
+        "anchor": "verification",
+        "id": "V-1",
+        "inputs": [
+          "crates/statecraft-cli/tests/land.rs"
+        ],
+        "kind": "verification",
+        "text": "CLI tests run every land verb against a stub gh and a scratch repository and find every outcome and exit code in sections 3 and 5, including an unsupplied policy key, a queue longer than one page, a skipped review, a stacked base, a moved head, an armed pull request pushed to, a non-generated conflict, a regenerated path, and an authored change altered by a replay."
+      }
+    ],
+    "sectionDigests": {
+      "063-the-land-verbs": "046fdf491d981556f9941a842753be14628c0dc0342ed433fcc3bf2c4ba02814",
+      "1-purpose": "833c2176d628655fefd9d6c24a26a5a6be4fd3499028c38929b4245f26a75cb6",
+      "2-territory": "0e40d53d493a147281026b2bf8b37c28fadb19e46c15e7b2af7797b628438912",
+      "3-1-the-landing-policy": "29db108b10b42eeb3d8667ed01125d4bb4fb75b883b83260a08d37ffe841713d",
+      "3-2-land-wait": "e17cc42e09f546c767f3ed139c7ad0c7114b0c7b98036f81fb2902de7d758ded",
+      "3-3-land-arm": "eb6efad081c95ff3b7926c4ce993077a02bfef6da6f382f3e7a9002c707e326e",
+      "3-4-land-push": "03dd815aae35e5e35f5277328e2d64985146733f7977f265b1c53666e7c827a9",
+      "3-5-land-restack": "2b105e2721c7c6321a212e2d1e2c399aa49f3e5b4ecdc191cb775f00c8c67cde",
+      "3-6-land-status": "08984144004b8431101f2fd811041906b84b038067a0b574fc7fc25b1ce23684",
+      "3-7-land-cancel-superseded": "36b39bc8476f05d87018eb8c281e549723c4767f37e94e653d496375aa48acd4",
+      "3-8-exit-codes": "f9b12f29bac13670c5a0891ba1b0e8c3541cd4880f757214b52a9dc329ff8b66",
+      "3-behavior": "4e4a306e7b3f1952d64db3a05dcb9784d8da06075bde6eb4053877311a73332a",
+      "4-out-of-scope": "9ff80fba70639c097e90d194af3e5a03c53da9bf54ba88981551ec70b081fad7",
+      "5-observable-negative-cases": "e0b7ca5be9cae6bf41a7546b12917fbb7c037d71a3ce2cc9f3809a2910e0c1e6",
+      "6-delivery": "60aa0d9665c57abe00610b65806896eb06e689eb84773068e279afaf2804ac2e",
+      "7-resolved-decisions": "adf0cc285a4e2f61e100de468b4a89a3f2f0051bad3c192efb50c9aa87124d20",
+      "verification": "2020e8c16600d18c497da79378d25c6de238b42d42a67802080673f12726fa0b"
+    },
+    "sectionHeadings": [
+      "063: The land verbs",
+      "1. Purpose",
+      "2. Territory",
+      "3. Behavior",
+      "3.1 The landing policy",
+      "3.2 `land wait`",
+      "3.3 `land arm`",
+      "3.4 `land push`",
+      "3.5 `land restack`",
+      "3.6 `land status`",
+      "3.7 `land cancel-superseded`",
+      "3.8 Exit codes",
+      "4. Out of scope",
+      "5. Observable negative cases",
+      "6. Delivery",
+      "7. Resolved decisions",
+      "Verification"
+    ],
+    "specPath": "specs/063-land-verbs/spec.md",
+    "status": "draft",
+    "summary": "Amends spec 006's command surface. Six verbs act on a pull request's way to the default branch through the operator's gh: `land wait` blocks until a named event, `land arm` enables auto-merge only for a head the AI review passed on a pull request based on the default branch, `land push` pushes a signed head with a lease after disarming, `land restack` moves a stacked pull request onto its new base and regenerates only declared generated paths, and `land status` orders the open pull requests by their next action, and `land cancel-superseded` cancels runs no open pull request needs. The adopter's values (default branch, stack caps, generated paths and their regenerators, pre-push checks) come from a `landing` block in the project declaration; a value no layer supplies is refused, never defaulted. Only `land arm` arms, and nothing here approves, merges or re-runs.\n",
+    "title": "The land verbs wait for, arm, push and restack a pull request, and land status orders what is left"
+  },
+  "shardHash": "7e6fd7b67c7a25d7176a9b0d1e53ec5a98c296de9dd0dea726d664203f14355d",
+  "specVersion": "1.10.0"
+}
