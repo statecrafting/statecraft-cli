@@ -72,7 +72,7 @@
       }
     ],
     "sectionDigests": {
-      "063-the-land-verbs": "046fdf491d981556f9941a842753be14628c0dc0342ed433fcc3bf2c4ba02814",
+      "063-the-land-verbs": "921fdfb54bc582ad7e1db1e676f1b4194e467b6cec38df594036b00db990deb6",
       "1-purpose": "833c2176d628655fefd9d6c24a26a5a6be4fd3499028c38929b4245f26a75cb6",
       "2-territory": "0e40d53d493a147281026b2bf8b37c28fadb19e46c15e7b2af7797b628438912",
       "3-1-the-landing-policy": "29db108b10b42eeb3d8667ed01125d4bb4fb75b883b83260a08d37ffe841713d",
@@ -87,7 +87,7 @@
       "4-out-of-scope": "9ff80fba70639c097e90d194af3e5a03c53da9bf54ba88981551ec70b081fad7",
       "5-observable-negative-cases": "e0b7ca5be9cae6bf41a7546b12917fbb7c037d71a3ce2cc9f3809a2910e0c1e6",
       "6-delivery": "60aa0d9665c57abe00610b65806896eb06e689eb84773068e279afaf2804ac2e",
-      "7-resolved-decisions": "adf0cc285a4e2f61e100de468b4a89a3f2f0051bad3c192efb50c9aa87124d20",
+      "7-resolved-decisions": "f07c03b9d0f2a3a749d2630cad1ffcddeea0e477e636400c92242341f58b2362",
       "verification": "2020e8c16600d18c497da79378d25c6de238b42d42a67802080673f12726fa0b"
     },
     "sectionHeadings": [
@@ -110,10 +110,10 @@
       "Verification"
     ],
     "specPath": "specs/063-land-verbs/spec.md",
-    "status": "draft",
+    "status": "approved",
     "summary": "Amends spec 006's command surface. Six verbs act on a pull request's way to the default branch through the operator's gh: `land wait` blocks until a named event, `land arm` enables auto-merge only for a head the AI review passed on a pull request based on the default branch, `land push` pushes a signed head with a lease after disarming, `land restack` moves a stacked pull request onto its new base and regenerates only declared generated paths, and `land status` orders the open pull requests by their next action, and `land cancel-superseded` cancels runs no open pull request needs. The adopter's values (default branch, stack caps, generated paths and their regenerators, pre-push checks) come from a `landing` block in the project declaration; a value no layer supplies is refused, never defaulted. Only `land arm` arms, and nothing here approves, merges or re-runs.\n",
     "title": "The land verbs wait for, arm, push and restack a pull request, and land status orders what is left"
   },
-  "shardHash": "7e6fd7b67c7a25d7176a9b0d1e53ec5a98c296de9dd0dea726d664203f14355d",
+  "shardHash": "b0e0dbcfd82a4b7cb5bfc3b7200d254eb1db896124d0adc4280b66f0b47443e6",
   "specVersion": "1.10.0"
 }

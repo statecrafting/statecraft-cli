@@ -1,7 +1,7 @@
 ---
 id: "063-land-verbs"
 title: "The land verbs wait for, arm, push and restack a pull request, and land status orders what is left"
-status: draft
+status: approved
 implementation: pending
 created: "2026-10-27"
 summary: >
@@ -351,7 +351,9 @@ ship before 062 without that event.
 
 ## 7. Resolved decisions
 
-The owner decided all four on 2026-10-27, before ratification.
+**2026-10-27: ratified by the owner.** The owner decided all four below and
+directed ratification in this pull request; the owner exception approved on
+its run is the ratification of record.
 
 **D-1: the policy lives in a `landing` block (3.1),** beside `setup` in the
 project declaration, not in new setup-profile parameters. The rendered CI
