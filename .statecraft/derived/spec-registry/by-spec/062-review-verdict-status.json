@@ -1,0 +1,118 @@
+{
+  "record": {
+    "amends": [
+      "002-environment-lifecycle",
+      "006-command-surface",
+      "024-review-budget-and-ratification"
+    ],
+    "created": "2026-10-27",
+    "dependsOn": [
+      "002-environment-lifecycle",
+      "006-command-surface",
+      "012-remote-desired-state",
+      "024-review-budget-and-ratification",
+      "061-review-call-stall"
+    ],
+    "id": "062-review-verdict-status",
+    "implementation": "pending",
+    "obligations": [
+      {
+        "anchor": "3-1-the-verdict-check-run",
+        "id": "R-1",
+        "kind": "requirement",
+        "text": "Every review job that ends in a review or a visible skip also creates a check run named `statecraft-ai-review` on the reviewed head, in a step after the evidence record is uploaded; its output carries the result as its title and the evidence record byte for byte."
+      },
+      {
+        "anchor": "3-1-the-verdict-check-run",
+        "id": "R-2",
+        "kind": "requirement",
+        "text": "The check run's conclusion is `success` for no-findings, `failure` for findings and `neutral` for any skipped result; it is never a required status context, and ci-gate stays the single context branch protection names."
+      },
+      {
+        "anchor": "3-1-the-verdict-check-run",
+        "id": "R-3",
+        "kind": "requirement",
+        "text": "For a head in this repository, a job that cannot create the check run fails (exit 4), as a review that cannot post its comment does today, so no such result stands without its machine-readable copy. A head in a fork is the one exception: its token cannot create check runs, the step does not run, and review status derives `skipped:fork` from the pull request itself."
+      },
+      {
+        "anchor": "3-2-which-review-counts",
+        "id": "R-4",
+        "kind": "requirement",
+        "text": "The review that counts for a pull request at a head is the newest `statecraft-ai-review` check run on that head whose embedded record names that pull request and that head; a check run naming another pull request or head is ignored, never counted."
+      },
+      {
+        "anchor": "3-3-the-review-status-verb",
+        "id": "R-5",
+        "kind": "requirement",
+        "text": "`review status <pr>` reads the pull request's current head, or checks `--head <sha>` against it, and reports exactly one outcome: no-findings, findings, skipped:<class>, pending, absent or stale; it never writes, waits, retries, arms or comments."
+      },
+      {
+        "anchor": "3-4-outcomes-and-exit-codes",
+        "id": "R-6",
+        "kind": "requirement",
+        "text": "The exit code follows spec 006 section 3.3: 0 for no-findings; 1 for findings or any skipped result; 2 for pending, absent or stale; 3 for usage; 4 when GitHub cannot be read, classified from the `gh` error stream as spec 012 section 3.5 does."
+      },
+      {
+        "anchor": "3-4-outcomes-and-exit-codes",
+        "id": "R-7",
+        "kind": "requirement",
+        "text": "`absent` names its reason: no statecraft-ci run at the head, a review job that ended cancelled (its duration reported, so a run to the job limit is visible), a review job that failed or refused, or only check runs naming another pull request or head."
+      },
+      {
+        "anchor": "3-5-what-does-not-change",
+        "id": "R-8",
+        "kind": "requirement",
+        "text": "The `## AI review` comment, the skip notices, the evidence artifact and how ci-gate reads a review are unchanged."
+      },
+      {
+        "anchor": "verification",
+        "id": "V-1",
+        "inputs": [
+          "crates/statecraft-home/tests/setup_workflows.rs",
+          "crates/statecraft-home/tests/setup_upgrade.rs",
+          "crates/statecraft-cli/tests/setup_profile.rs"
+        ],
+        "kind": "verification",
+        "text": "Step tests run ai-review.sh with a stubbed reviewer and a stubbed gh and find one check run per result, carrying the record; rendering tests show the review job's checks permission and a revision-20 project upgrading in one plan; CLI tests run review status against a stub gh and find every outcome and exit code in section 5, including a newer attempt superseding an older one on one head, a record naming another pull request, and a moved head."
+      }
+    ],
+    "sectionDigests": {
+      "062-the-ai-review-s-verdict-as-a-check-run-read-by-review-status": "65d59901935040baf3631165a73441488be7dd10b7ca731a37ff7e6b8ac0d683",
+      "1-purpose": "9f22e7fe08e3c4befca5ddf415f22ad75598e8a58b1f6e7962e509310d88f7c7",
+      "2-territory": "94b33888776ce3c7bbefe85b8cec3cf370edc40cb691fbb8ec13596a77f3e368",
+      "3-1-the-verdict-check-run": "fd870c9acfb75d24d3ac04bb6bcd2671e915583ba19a70ae6f39b73dc5cf86ac",
+      "3-2-which-review-counts": "938d3a4d66cd8d4f8d0345b485322ac80d675e38f313480fa6b3b0fd7dfe6687",
+      "3-3-the-review-status-verb": "a7207bc0209094a22744040d9efa751c8e90b037664e8e8fb79e87e67b3617b9",
+      "3-4-outcomes-and-exit-codes": "86ce34faaf8b3461afb4ce47662afc62febcbdb7ff76a149ca5c71056362ed39",
+      "3-5-what-does-not-change": "c601df741093b9b8614fe9790efe36b56426913d3eb0c1bdc9e6e3bebae7a175",
+      "3-6-the-revision": "9816a0c7c521304e3febc4ae0ce357768e24688645ec6d5f56e52d6dea95c807",
+      "3-behavior": "4dcfee0fbb78f21fe0e3332ed52e4bf24b35decfb91a92e4cdff5dc024a62fc5",
+      "4-out-of-scope": "931c5137da31e42c585f98e651549a412f786b90414fe27a7614f2b334fc3fb2",
+      "5-observable-negative-cases": "b320010998c7f6eebe04f29f4f1016f5e7cc7d7d23294c47bf742d3eba2eb593",
+      "6-resolved-decisions": "91b476d06416303f42be9c2090f626786ef1ae0d768f1245a89b81e3195dca39",
+      "verification": "bffa6e20504b295861eb3cfcd8665452a4029471aa585f4562ede59a2c76882d"
+    },
+    "sectionHeadings": [
+      "062: The AI review's verdict as a check run, read by `review status`",
+      "1. Purpose",
+      "2. Territory",
+      "3. Behavior",
+      "3.1 The verdict check run",
+      "3.2 Which review counts",
+      "3.3 The `review status` verb",
+      "3.4 Outcomes and exit codes",
+      "3.5 What does not change",
+      "3.6 The revision",
+      "4. Out of scope",
+      "5. Observable negative cases",
+      "6. Resolved decisions",
+      "Verification"
+    ],
+    "specPath": "specs/062-review-verdict-status/spec.md",
+    "status": "draft",
+    "summary": "Amends spec 002's setup profile, spec 024's review and spec 006's command surface. github-actions-rust revision 22 publishes every review result (findings, no-findings, skipped:<class>) as a check run on the reviewed head, named `statecraft-ai-review`, whose output carries the evidence record byte for byte. A new read-only verb, `statecraft-cli review status <pr> [--head <sha>] [--repo <owner/name>] [--json]`, reads it under one rule for which review counts, the rule ci-gate already uses in the merge queue, and answers with a closed outcome and spec 006's exit codes. The `## AI review` comment is unchanged. Arming, retrying and waiting are out of scope.\n",
+    "title": "Setup profile revision 22 publishes the AI review's verdict as a check run, and review status reads it"
+  },
+  "shardHash": "77d7c93023a3b473917343b8484e7f98a8d234cff08be3dc658c0f699dcf2560",
+  "specVersion": "1.10.0"
+}

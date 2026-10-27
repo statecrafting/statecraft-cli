@@ -1,0 +1,21 @@
+{
+  "mapping": {
+    "amends": [
+      "002-environment-lifecycle",
+      "006-command-surface",
+      "024-review-budget-and-ratification"
+    ],
+    "dependsOn": [
+      "002-environment-lifecycle",
+      "006-command-surface",
+      "012-remote-desired-state",
+      "024-review-budget-and-ratification",
+      "061-review-call-stall"
+    ],
+    "implementingPaths": [],
+    "specId": "062-review-verdict-status",
+    "specStatus": "draft"
+  },
+  "schemaVersion": "1.3.0",
+  "shardHash": "77d7c93023a3b473917343b8484e7f98a8d234cff08be3dc658c0f699dcf2560"
+}
