@@ -1,0 +1,379 @@
+---
+id: "063-land-verbs"
+title: "The land verbs wait for, arm, push and restack a pull request, and land status orders what is left"
+status: draft
+implementation: pending
+created: "2026-10-27"
+summary: >
+  Amends spec 006's command surface. Six verbs act on a pull request's way
+  to the default branch through the operator's gh: `land wait` blocks until a
+  named event, `land arm` enables auto-merge only for a head the AI review
+  passed on a pull request based on the default branch, `land push` pushes a
+  signed head with a lease after disarming, `land restack` moves a stacked
+  pull request onto its new base and regenerates only declared generated
+  paths, and `land status` orders the open pull requests by their next
+  action, and `land cancel-superseded` cancels runs no open
+  pull request needs. The adopter's values (default branch, stack caps, generated paths
+  and their regenerators, pre-push checks) come from a `landing` block in the
+  project declaration; a value no layer supplies is refused, never defaulted.
+  Only `land arm` arms, and nothing here approves, merges or re-runs.
+amends:
+  - "006-command-surface"
+# No `extends` or `establishes` yet: the implementing changes add the edges
+# (crates/statecraft-cli/ for 006 and the crate this spec will own) with the
+# code, so this draft claims no path while it waits for ratification.
+depends_on:
+  - "002-environment-lifecycle"
+  - "006-command-surface"
+  - "012-remote-desired-state"
+  - "062-review-verdict-status"
+# `obligations` is spec-spine's own frontmatter field, used by approved specs
+# such as 013, 014 and 018 (and 062); `make gate` lints it with --fail-on-warn.
+obligations:
+  - id: "R-1"
+    kind: requirement
+    text: "Every land verb reads the adopter's values from the `landing` block of the project declaration through the configuration layers `config show` reports; a value a verb needs that no layer supplies refuses the verb (exit 2) naming the key, and no verb substitutes a default."
+    anchor: "3-1-the-landing-policy"
+  - id: "R-2"
+    kind: requirement
+    text: "`land wait` reads each named pull request on its own, never a page of the merge queue, writes nothing, and ends at the first named event, at `--timeout`, or on a read that keeps failing past it."
+    anchor: "3-2-land-wait"
+  - id: "R-3"
+    kind: requirement
+    text: "`land arm` first reads whether the pull request is already armed: armed after its current head was pushed is exit 0, `already-armed`, and armed before it is refused (exit 2), `armed-before-head`; neither calls GitHub's arming and both change nothing. Otherwise it enables auto-merge only when the pull request is open and not a draft, its base is the default branch, its head is the one named by `--head` when given, `review status` at that head is `no-findings`, no required check at that head has ended in anything but success (failed, cancelled, skipped, timed out or needing action all refuse, as they fail ci-gate; one still queued or running does not), and the head is signed when the profile requires signed commits; it arms with the head pinned, and refuses (exit 2) naming the first unmet condition."
+    anchor: "3-3-land-arm"
+  - id: "R-4"
+    kind: requirement
+    text: "No verb other than `land arm` enables auto-merge, and no land verb approves an Environment, merges, re-runs a job or comments."
+    anchor: "3-3-land-arm"
+  - id: "R-5"
+    kind: requirement
+    text: "`land push` pushes only the pull request's own head branch, only a head that is signed when the profile requires it and holds no conflict marker in a tracked file, disarms an armed pull request before the push and reports it, and pushes with a lease on the remote head the caller names; it never re-arms."
+    anchor: "3-4-land-push"
+  - id: "R-6"
+    kind: requirement
+    text: "`land restack` replays exactly the pull request's own commits onto the new base, resolves a conflict only on a path the `generated` list declares (by taking the base's copy and running that entry's regenerator), aborts on any other conflicted path without pushing, and refuses to push when the pull request's authored change per file differs after the replay."
+    anchor: "3-5-land-restack"
+  - id: "R-7"
+    kind: requirement
+    text: "`land status` writes nothing."
+    anchor: "3-6-land-status"
+  - id: "R-8"
+    kind: requirement
+    text: "`land cancel-superseded` force-cancels only pull-request runs waiting on the review-exception Environment whose head no open pull request points at, and nothing else."
+    anchor: "3-7-land-cancel-superseded"
+  - id: "V-1"
+    kind: verification
+    text: "CLI tests run every land verb against a stub gh and a scratch repository and find every outcome and exit code in sections 3 and 5, including an unsupplied policy key, a queue longer than one page, a skipped review, a stacked base, a moved head, an armed pull request pushed to, a non-generated conflict, a regenerated path, and an authored change altered by a replay."
+    anchor: "verification"
+    inputs:
+      - "crates/statecraft-cli/tests/land.rs"
+---
+
+# 063: The land verbs
+
+## 1. Purpose
+
+Spec 062 gives the AI review's result one machine-readable place and one
+reader. What an operator does with that result (wait for it, arm the pull
+request, push a fix, move a stacked pull request after its base merges,
+decide what to do next) has no verb, so every adopter writes it.
+
+At rustev, the first adopter, those steps were written as shell scripts
+across delivery sessions between 2026-10-16 and 2026-10-27: about two dozen
+helpers and 48 copies of one restack function, kept in session scratchpads
+and a handoff directory. A second machine joining the work had none of them.
+The copies drifted, and each defect recurred in some of them:
+
+1. A wait read the first 20 merge-queue entries, so a queued pull request in
+   a longer queue read as dropped.
+2. The arming wrapper never checked the base, so it would arm a stacked pull
+   request, against the adopter's rule.
+3. One restack regenerated schemas through a build lock that skipped the
+   clean the shared build target needs, and served another worktree's
+   artifacts; another resolved conflicts by a blind union and did not check
+   the commit signature or leftover markers.
+4. The landing report hardcoded one stack cap after the owner had set
+   different caps for different chains, so it flagged nothing it should have.
+
+A verb with one owning spec fixes each of these once, for every adopter and
+every machine, and states what is policy (the adopter's values) apart from
+what is rule (this spec's).
+
+## 2. Territory
+
+Six verbs under `land` in `crates/statecraft-cli/` (spec 006's command
+tree, amended here), bound to library operations in a new crate,
+`crates/statecraft-land/`, which this spec establishes and owns (decision
+D-4), and tests in both.
+
+## 3. Behavior
+
+Every verb reads GitHub through the operator's `gh`, as `doctor --remote`
+does (spec 012), and holds no token. `--repo <owner/name>` defaults to the
+repository of the current directory's `origin`. Every verb supports
+`--json` (spec 006 section 3.4), and its JSON carries a `policy` object with
+each `landing` value it used and the layer that supplied it.
+
+### 3.1 The landing policy
+
+1. The adopter's values live in a `landing` block of the project
+   declaration, `.statecraft/environment.json`, beside `setup`. They are
+   read through the same layers `config show` reports (spec 002), so
+   `config show landing.<key>` answers where each came from.
+2. The keys:
+
+   | Key | Used by | Holds |
+   |---|---|---|
+   | `default_branch` | all | The branch pull requests land on. |
+   | `stack.depth` | `status` | The cap on unmerged pull requests beneath one pull request. |
+   | `stack.depth_by_spec` | `status` | Per-spec caps that differ from `stack.depth`, keyed by spec id. |
+   | `stack.max_stacked` | `status` | The cap on stacked pull requests in total. |
+   | `generated` | `restack` | A list of `{paths, regenerate}`: path globs and the argument vector that regenerates them. |
+   | `pre_push` | `push`, `restack` | A list of argument vectors run in the worktree before a push. |
+
+3. A verb that needs a key no layer supplies is refused with exit 2, naming
+   the key. Nothing defaults: an empty `pre_push` is a stated value, an
+   absent one is not.
+4. These are values, not rules. Which conditions arm a pull request, which
+   conflicts may be resolved and what a cap means are fixed here; the
+   adopter supplies only the numbers, paths and commands.
+5. A `generated` path should also be excluded from the AI review
+   (`review.exclude`), since it is checked against its source instead.
+   `land status` reports a `generated` path the review still reads as a
+   finding.
+
+### 3.2 `land wait`
+
+```
+statecraft-cli land wait <pr>... --until <event> --timeout <duration> [--json]
+```
+
+1. Events:
+
+   | Event | Met when a named pull request |
+   |---|---|
+   | `merged` | merged (exit 0) or closed unmerged (exit 1). |
+   | `landed` | merged, closed, or is open, not armed and not in the merge queue (`dropped`). |
+   | `queue-exit` | is no longer in the merge queue, with its state. |
+   | `reviewed` | has a `review status` (spec 062) other than `pending` at its current head. |
+   | `changed` | differs from its state at the start in any of: state, head, armed, queue state, review outcome. |
+
+2. It reads each pull request on its own, the merge-queue entry through the
+   pull request (`mergeQueueEntry`), never a page of the queue.
+3. It reads at most once a minute per pull request, and backs off on a
+   rate-limit answer.
+4. It ends at the first pull request that meets the event and reports that
+   pull request's observation. `--timeout` is required; reaching it is exit 1,
+   `timed-out`, with the last observation of each pull request.
+5. It writes nothing.
+
+### 3.3 `land arm`
+
+```
+statecraft-cli land arm <pr> [--head <sha>] [--json]
+```
+
+1. It first reads whether the pull request is already armed, before any
+   other check and before any write. Armed after its current head was
+   pushed is exit 0, `already-armed`. Armed before its current head was
+   pushed is refused, exit 2, `armed-before-head`: auto-merge stays enabled
+   across a push, so that arming did not see this head, and `land push`
+   disarms first to prevent it. In both cases GitHub's arming is not called
+   and nothing changes.
+2. Otherwise it checks, in this order, and refuses (exit 2) at the first
+   that fails, naming it:
+
+   | Condition | Refusal |
+   |---|---|
+   | The pull request is open and not a draft. | `not-open`, `draft` |
+   | Its base is `landing.default_branch`. | `stacked`, naming the base |
+   | Its head is `--head`, when given. | `stale`, naming the current head |
+   | `review status` at that head is `no-findings`. | `review-<outcome>`, for example `review-skipped:transient` |
+   | No required check at that head has ended other than in success: failed, cancelled, skipped, timed out and action required all count, as each fails ci-gate. A check still queued or in progress does not refuse; auto-merge waits for it. | `check-failed`, naming the check and its conclusion |
+   | The head is signed, when `governance.require_signed_commits` is set. | `unsigned` |
+
+3. Only when every condition holds does it enable auto-merge, with the head
+   pinned (`--match-head-commit`), by the repository's merge method; with a
+   merge queue, the queue's.
+4. It is the only verb that enables auto-merge, and only when called. No
+   land verb approves an Environment, merges, re-runs a job or comments.
+
+### 3.4 `land push`
+
+```
+statecraft-cli land push <pr> --lease <sha> [--json]
+```
+
+Run in a worktree whose branch is the pull request's head branch.
+
+1. It refuses (exit 2): another branch checked out (`wrong-branch`); an
+   unsigned head when the profile requires signed commits (`unsigned`); a
+   conflict marker in a tracked file at the head (`markers`).
+2. It runs each `landing.pre_push` vector in order and refuses at the first
+   that fails (`pre-push-failed`, naming it, with its exit code). There is
+   no flag to skip them: an adopter that wants none declares
+   `pre_push: []`, a committed value `config show` reports (constitution
+   VIII: no flag whose only effect is to remove a guard).
+3. If the pull request is armed it disarms it first and reports `disarmed`.
+4. It pushes the head with a lease on `--lease`. A refused lease is exit 2,
+   `lease-refused`, with the remote head.
+5. It never re-arms. After a push the head needs a new review (spec 062),
+   and arming it is a separate `land arm`.
+
+### 3.5 `land restack`
+
+```
+statecraft-cli land restack <pr> [--onto <branch>] [--json]
+statecraft-cli land restack --chain <pr>... [--json]
+```
+
+Run in a clean worktree whose branch is the pull request's head branch.
+
+1. The commits replayed are the pull request's own, as GitHub lists them
+   for the pull request, never a local range guess. `--onto` defaults to the
+   pull request's base, or to `landing.default_branch` when that base has
+   merged.
+2. A conflict on a path that a `generated` entry declares takes the base's
+   copy. The entry's `regenerate` vector then runs once the commit is
+   replayed. A conflict on any other path aborts the replay, restores the
+   branch, pushes nothing and is exit 1, `conflict`, listing each path. The
+   verb never merges authored text.
+3. Every replayed commit is regenerated and checked at its own tree, and the
+   regenerated output is amended into that commit, signed when the profile
+   requires signed commits (`governance.require_signed_commits`), as
+   `land push` and `land arm` require it. A repository that
+   gates every commit (`governance.gate_each_commit`) stays green commit by
+   commit.
+4. The pull request's authored change (lines added and removed per path
+   outside `generated`) must be the same after the replay as before. A
+   difference is exit 1, `authored-change-differs`, naming each path; the
+   result stays local for inspection and the original head is reported.
+   This is the rule of this repository's `scripts/resolve-shard-conflicts.sh`,
+   which takes the incoming shards and then refuses a merge that changed the
+   branch's authored lines.
+5. Then it pushes as `land push` does (pre-push checks, disarm, lease on the
+   remote head read before the replay) and retargets the pull request to
+   `--onto` if its base differs.
+6. `--chain` restacks the listed pull requests bottom first, each onto the
+   head of the one before, and stops at the first that does not exit 0.
+7. Derived artifacts (`.statecraft/derived/`) are an ordinary `generated`
+   entry whose regenerator is the repository's refresh. When the pinned
+   spec-spine provides a derived-conflict verb, the adopter names it as that
+   entry's regenerator; nothing here depends on it.
+
+### 3.6 `land status`
+
+```
+statecraft-cli land status [--json]
+```
+
+1. It reads the open pull requests, their stacks, each head's required
+   checks, `review status` (spec 062), runs waiting on the
+   `statecraft-review-exception` Environment and `spec-spine registry plan`,
+   and lists one next action per pull request, most urgent class first:
+   `retarget`, `approve` (the owner's, with the reason), `fix`, `update`,
+   `arm`, `hazard`, `running`, `merging`, `stacked`, `draft`.
+2. A pull request's depth is the number of unmerged pull requests beneath
+   it, 0 when it targets the default branch. Its cap is
+   `stack.depth_by_spec` for its spec, else `stack.depth`. Past either cap it
+   names the bottom of the stack to land first.
+3. It reports the delivery measures rustev's report carries: approval wait,
+   oldest blocked pull request, and per depth the time to land after the
+   base merged and the reviews per pull request.
+4. It writes nothing. Cancelling the runs it reports as superseded is
+   `land cancel-superseded` (3.7).
+
+### 3.7 `land cancel-superseded`
+
+```
+statecraft-cli land cancel-superseded [--json]
+```
+
+It force-cancels the pull-request runs waiting on the
+`statecraft-review-exception` Environment whose head no open pull request
+points at (a plain cancel is accepted and does nothing for a waiting run),
+and reports each run cancelled and each it could not cancel. A run of
+another event, such as a release dispatch waiting on its own Environment, is
+never cancelled. It is a separate verb so that `land status` stays a read
+(decision D-3).
+
+### 3.8 Exit codes
+
+Spec 006 section 3.3's vocabulary. 0: the verb did what was asked (a wait's
+event met, armed, pushed, restacked, a status read, the superseded runs
+cancelled). 1: a finding, nothing
+failed (closed unmerged, `timed-out`, `conflict`,
+`authored-change-differs`, a status with any `fix` or `hazard`). 2: refused,
+nothing done (an unsupplied policy key and every refusal named above).
+3: usage. 4: failed, including a `gh` read classified as spec 012 section 3.5
+classifies it, from the error stream alone.
+
+## 4. Out of scope
+
+- Re-running a review or a failed job, and deciding that a cancellation was
+  a hang. A later spec may add a `review rerun`; spec 061 already makes a
+  stalled call a visible `skipped:transient`.
+- Approving the review-exception Environment, which is the owner's act.
+- Merging, and choosing a merge method other than the repository's.
+- Running a coding agent, and the build lanes such an agent uses (spec 055
+  and later specs).
+- Any write to GitHub not named in section 3.
+
+## 5. Observable negative cases
+
+| Case | Expected |
+|---|---|
+| `landing.default_branch` supplied by no layer | Every verb refused, exit 2, naming the key. |
+| `land wait --until landed` on a pull request at position 25 of the queue | Still waiting; never `dropped`. |
+| `land arm` on a pull request whose base is another pull request's branch | Refused, `stacked`, exit 2; not armed. |
+| `land arm` when the head's review is `skipped:draft` | Refused, `review-skipped:draft`, exit 2. |
+| `land arm` when a required check at the head ended `cancelled` or `skipped` | Refused, `check-failed`, naming the check and its conclusion, exit 2. |
+| `land arm` on a pull request armed before its current head was pushed | Refused, `armed-before-head`, exit 2. |
+| `land push` on an armed pull request | Disarmed, then pushed; output names both; still disarmed. |
+| `land push` with an unsigned head where signed commits are required | Refused, `unsigned`, exit 2; nothing pushed. |
+| `land restack` with a conflict in a generated schema and in a source file | Aborted, `conflict` naming the source file, exit 1; branch restored; nothing pushed. |
+| `land restack` with a conflict only in `.statecraft/derived/` | Base copy taken, refresh run, amended signed, pushed with lease, retargeted, exit 0. |
+| A replay that drops one of the pull request's authored lines | `authored-change-differs`, exit 1, naming the path; nothing pushed. |
+| `land status` with a 041 chain two deep, `stack.depth` 1 and no 041 entry in `stack.depth_by_spec` | The chain's bottom named to land first. |
+| `land cancel-superseded` with a waiting release dispatch run | Not cancelled. |
+| `land status` with superseded runs waiting | Reported; nothing cancelled. |
+
+## 6. Delivery
+
+Four implementing pull requests, each near 1,000 reviewed lines (the AI
+review's 20-minute limit): (1) the policy block and `land wait`; (2) `land
+arm` and `land push`; (3) `land restack`; (4) `land status` and `land
+cancel-superseded`, ported from rustev's `scripts/landing/status.py`. The
+first establishes `crates/statecraft-land/`. Each claims its paths and adds its own
+acceptance. (1) depends on spec 062 for `--until reviewed` only, and can
+ship before 062 without that event.
+
+## 7. Resolved decisions
+
+The owner decided all four on 2026-10-27, before ratification.
+
+**D-1: the policy lives in a `landing` block (3.1),** beside `setup` in the
+project declaration, not in new setup-profile parameters. The rendered CI
+never reads it, so changing a cap or a regenerator is an ordinary commit,
+with no re-render and no owner exception.
+
+**D-2: `land push` runs `pre_push` (3.4).** The adopter decides what it
+holds; it is meant for the seconds-long governance checks, never the slow
+build and test, so pushes still do not wait on local builds. No flag skips
+it (constitution VIII); an empty list is the adopter's committed choice.
+
+**D-3: cancelling superseded runs is its own verb (3.7),** not a flag on
+`land status`, so the report stays strictly a read and every write is an
+explicit act.
+
+**D-4: the operations live in a new crate, `crates/statecraft-land/` (2),**
+which this spec establishes and owns, one owning spec per crate; spec 006's
+`crates/statecraft-cli/` only binds the verbs.
+
+## Verification
+
+This spec is `status: draft` and declares no acceptance until it is
+ratified and built. Its acceptance will run every verb against a stub `gh`
+and a scratch repository through each row of section 5 and each refusal of
+section 3.
