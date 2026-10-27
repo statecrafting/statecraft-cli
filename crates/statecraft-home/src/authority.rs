@@ -398,6 +398,18 @@ fn differing_keys(base: &Project, candidate: &Project) -> Vec<String> {
             }
         }
     }
+    if base.landing != candidate.landing {
+        let before = landing_entries(base);
+        let after = landing_entries(candidate);
+        for key in before.keys().chain(after.keys()) {
+            if before.get(key) != after.get(key) {
+                keys.insert(key.clone());
+            }
+        }
+        if before == after {
+            keys.insert("landing".into());
+        }
+    }
     if base.enrollment != candidate.enrollment {
         keys.insert("enrollment".to_string());
     }
@@ -407,6 +419,64 @@ fn differing_keys(base: &Project, candidate: &Project) -> Vec<String> {
     keys.into_iter().collect()
 }
 
+/// The landing block's supplied keys, resolved as project overrides.
+/// Strings stay strings; structured values use compact JSON text. The same
+/// projection feeds config show and the landing policy reader.
+pub fn landing_configuration(project: &Project) -> BTreeMap<String, Answer> {
+    let projected = with_landing(project);
+    landing_keys(project)
+        .into_iter()
+        .map(|key| {
+            let answer = answer_for(
+                &key,
+                &Personal::default(),
+                &projected,
+                &TeamAnswer::NotEnrolled,
+                &RunChoices::none(),
+            );
+            (key, answer)
+        })
+        .collect()
+}
+
+fn landing_keys(project: &Project) -> BTreeSet<String> {
+    landing_entries(project).into_keys().collect()
+}
+
+fn landing_entries(project: &Project) -> BTreeMap<String, String> {
+    let mut values = BTreeMap::new();
+    if let Some(object) = project
+        .landing
+        .as_ref()
+        .and_then(serde_json::Value::as_object)
+    {
+        for (key, value) in object {
+            if key == "stack"
+                && let Some(stack) = value.as_object()
+            {
+                for (key, value) in stack {
+                    values.insert(format!("landing.stack.{key}"), value.to_string());
+                }
+            } else {
+                values.insert(
+                    format!("landing.{key}"),
+                    value
+                        .as_str()
+                        .map(str::to_owned)
+                        .unwrap_or_else(|| value.to_string()),
+                );
+            }
+        }
+    }
+    values
+}
+
+fn with_landing(project: &Project) -> Project {
+    let mut projected = project.clone();
+    projected.overrides.extend(landing_entries(project));
+    projected
+}
+
 /// Resolve every key, with provenance.
 pub fn resolve(
     personal: &Personal,
@@ -414,7 +484,8 @@ pub fn resolve(
     team: &TeamAnswer,
     run: &RunChoices,
 ) -> Resolution {
-    let project = &trusted.project;
+    let projected = with_landing(&trusted.project);
+    let project = &projected;
     let mut keys: BTreeSet<String> = BTreeSet::new();
     keys.extend(personal.defaults.keys().cloned());
     keys.extend(project.requirements.keys().cloned());
@@ -648,6 +719,44 @@ mod tests {
             team: team.into(),
             policy: p,
         }
+    }
+
+    #[test]
+    fn landing_keys_share_project_provenance_and_compact_structured_values() {
+        let p = Project {
+            landing: Some(serde_json::json!({
+                "default_branch":"trunk", "stack":{"depth":2,"depth_by_spec":{"063":3}},
+                "generated":[], "pre_push":[["make","gate"]]
+            })),
+            ..Project::default()
+        };
+        let expected = landing_configuration(&p);
+        let result = resolve(
+            &Personal::default(),
+            &solo(p.clone()),
+            &TeamAnswer::NotEnrolled,
+            &RunChoices::none(),
+        );
+        assert_eq!(result.keys, expected);
+        for (key, value) in [
+            ("landing.default_branch", "trunk"),
+            ("landing.stack.depth", "2"),
+            ("landing.stack.depth_by_spec", r#"{"063":3}"#),
+            ("landing.generated", "[]"),
+            ("landing.pre_push", r#"[["make","gate"]]"#),
+        ] {
+            assert_eq!(
+                result.keys[key],
+                Answer::Resolved {
+                    value: value.into(),
+                    supplied_by: Layer::ProjectOverride,
+                    constrained_by: vec![]
+                }
+            );
+        }
+        assert!(!result.keys.contains_key("landing.stack.max_stacked"));
+        assert!(landing_configuration(&Project::default()).is_empty());
+        assert!(differing_keys(&Project::default(), &p).contains(&"landing.default_branch".into()));
     }
 
     #[test]

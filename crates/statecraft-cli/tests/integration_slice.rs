@@ -420,6 +420,7 @@ fn the_grown_command_tree_still_has_no_verb_that_publishes() {
     // with spec 027's `observe` and `observe show`; and four more with its
     // `proposal list`, `show`, `dismiss` and `acknowledge`; and one more
     // with `proposal admit`; and one more with spec 062's `review status`, a
-    // read that publishes nothing.
-    assert_eq!(statecraft_cli::commands::Verb::all().len(), 61);
+    // read that publishes nothing; and one more with spec 063's `land wait`,
+    // also a read that publishes nothing.
+    assert_eq!(statecraft_cli::commands::Verb::all().len(), 62);
 }

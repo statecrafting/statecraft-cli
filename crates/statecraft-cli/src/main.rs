@@ -51,6 +51,9 @@ fn run(args: &[String]) -> i32 {
             return Exit::Usage.code();
         }
     };
+    if invocation.verb == Verb::LandWait {
+        return statecraft_cli::land::run(&invocation.rest, invocation.json);
+    }
     if invocation.verb == Verb::ReviewStatus {
         return statecraft_cli::review::run(&invocation.rest, invocation.json);
     }
@@ -495,7 +498,7 @@ fn run(args: &[String]) -> i32 {
             }
             emit(&statecraft_cli::transfer::execute(&request, &home), format)
         }
-        Verb::ReviewStatus => unreachable!("dispatched before product home reads"),
+        Verb::ReviewStatus | Verb::LandWait => unreachable!("dispatched before product home reads"),
         // A help request is not an operation, so it consults nothing and
         // changes nothing. Exit 0: the question was asked and answered.
         Verb::Help => {

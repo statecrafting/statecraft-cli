@@ -139,6 +139,8 @@ pub enum Verb {
     ProposalAdmit,
     /// `review status <pr>`
     ReviewStatus,
+    /// `land wait <pr>...`
+    LandWait,
     /// `--help`, optionally with a group or a verb as its topic.
     ///
     /// Not part of the command tree: [`Verb::all`] lists the operations, and a
@@ -162,6 +164,7 @@ impl Verb {
     pub fn spelling(self) -> &'static str {
         match self {
             Verb::ReviewStatus => "review status",
+            Verb::LandWait => "land wait",
             Verb::ProjectRegister => "project register",
             Verb::ProjectList => "project list",
             Verb::ProjectArm => "project arm",
@@ -318,6 +321,7 @@ impl Verb {
             | Verb::ProposalAcknowledge
             | Verb::ProposalAdmit => "027-observation-and-proposals",
             Verb::ReviewStatus => "062-review-verdict-status",
+            Verb::LandWait => "063-land-verbs",
             Verb::Help => "006-command-surface",
         }
     }
@@ -389,14 +393,15 @@ impl Verb {
             Verb::ProposalAcknowledge,
             Verb::ProposalAdmit,
             Verb::ReviewStatus,
+            Verb::LandWait,
         ]
     }
 
     /// The groups a help topic may name.
-    pub const GROUPS: [&'static str; 21] = [
+    pub const GROUPS: [&'static str; 22] = [
         "project", "env", "work", "run", "accept", "home", "init", "migrate", "config", "approval",
         "harness", "session", "startup", "override", "transfer", "trust", "provider", "hosted",
-        "observe", "proposal", "review",
+        "observe", "proposal", "review", "land",
     ];
 
     /// Parse a verb from the leading arguments, returning how many it consumed.
@@ -404,6 +409,7 @@ impl Verb {
         let first = args.first()?.as_str();
         let second = args.get(1).map(String::as_str);
         match (first, second) {
+            ("land", Some("wait")) => Some((Verb::LandWait, 2)),
             ("review", Some("status")) => Some((Verb::ReviewStatus, 2)),
             ("project", Some("register")) => Some((Verb::ProjectRegister, 2)),
             ("project", Some("list")) => Some((Verb::ProjectList, 2)),

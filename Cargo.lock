@@ -936,6 +936,7 @@ dependencies = [
  "statecraft-environment",
  "statecraft-home",
  "statecraft-hosted",
+ "statecraft-land",
  "statecraft-observe",
  "statecraft-run",
  "tempfile",
@@ -1000,6 +1001,16 @@ dependencies = [
  "tempfile",
  "thiserror",
  "ureq",
+]
+
+[[package]]
+name = "statecraft-land"
+version = "0.0.0"
+dependencies = [
+ "serde",
+ "serde_json",
+ "statecraft-environment",
+ "statecraft-home",
 ]
 
 [[package]]

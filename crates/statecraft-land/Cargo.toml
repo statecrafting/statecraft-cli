@@ -1,0 +1,19 @@
+[package]
+name = "statecraft-land"
+description = "Read-only landing observations and adopter policy"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+publish.workspace = true
+
+[dependencies]
+statecraft-environment = { path = "../statecraft-environment" }
+serde = { version = "1.0.229", features = ["derive"] }
+serde_json = "1.0.151"
+statecraft-home = { path = "../statecraft-home" }
+
+[lints]
+workspace = true
