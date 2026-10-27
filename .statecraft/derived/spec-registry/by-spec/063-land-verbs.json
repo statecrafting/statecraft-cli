@@ -10,8 +10,40 @@
       "012-remote-desired-state",
       "062-review-verdict-status"
     ],
+    "establishes": [
+      {
+        "kind": "directory",
+        "path": "crates/statecraft-land/"
+      }
+    ],
+    "extends": [
+      {
+        "nature": "additive",
+        "spec": "002-environment-lifecycle",
+        "unit": {
+          "kind": "directory",
+          "path": "crates/statecraft-environment/"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "002-environment-lifecycle",
+        "unit": {
+          "kind": "directory",
+          "path": "crates/statecraft-home/"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "006-command-surface",
+        "unit": {
+          "kind": "directory",
+          "path": "crates/statecraft-cli/"
+        }
+      }
+    ],
     "id": "063-land-verbs",
-    "implementation": "pending",
+    "implementation": "in-progress",
     "obligations": [
       {
         "anchor": "3-1-the-landing-policy",
@@ -78,7 +110,7 @@
       }
     ],
     "sectionDigests": {
-      "063-the-land-verbs": "b810fa5533c5317b986c43e1421d272ad7c32fff6b38bd0a5052c8d6f9637ddc",
+      "063-the-land-verbs": "0e0d621e6a3acec2ae5c9109b1e27ae8e6649ab562b079fe146ac0369cca71dd",
       "1-purpose": "833c2176d628655fefd9d6c24a26a5a6be4fd3499028c38929b4245f26a75cb6",
       "2-territory": "0e40d53d493a147281026b2bf8b37c28fadb19e46c15e7b2af7797b628438912",
       "3-1-the-landing-policy": "29db108b10b42eeb3d8667ed01125d4bb4fb75b883b83260a08d37ffe841713d",
@@ -95,7 +127,8 @@
       "5-observable-negative-cases": "e0b7ca5be9cae6bf41a7546b12917fbb7c037d71a3ce2cc9f3809a2910e0c1e6",
       "6-delivery": "60aa0d9665c57abe00610b65806896eb06e689eb84773068e279afaf2804ac2e",
       "7-resolved-decisions": "44dbd91465b808bcbd651a26ff2e166cd35dec6e53c1d95cd3aece0cf75bb0da",
-      "verification": "25f7124100e8836b132b5bc9c615891addedcff7977ac8e0204965fe3060ee70"
+      "implementation-record": "b7b676e35cfd2c8bb776150c427b6214c9baff22d807db90304e9690747584b3",
+      "verification": "dd2ffce859343c7452fe3da53caaa80ca239775d557b1fac95cfd58e6febc154"
     },
     "sectionHeadings": [
       "063: The land verbs",
@@ -115,6 +148,7 @@
       "5. Observable negative cases",
       "6. Delivery",
       "7. Resolved decisions",
+      "Implementation record",
       "Verification"
     ],
     "specPath": "specs/063-land-verbs/spec.md",
@@ -122,6 +156,6 @@
     "summary": "Amends spec 006's command surface; its four write verbs act under the F-02 narrowing of 2026-10-27 and never inside a run attempt (D-5). Six verbs act on a pull request's way to the default branch through the operator's gh: `land wait` blocks until a named event, `land arm` enables auto-merge only for a head the AI review passed on a pull request based on the default branch, `land push` pushes a signed head with a lease after disarming, `land restack` moves a stacked pull request onto its new base and regenerates only declared generated paths, and `land status` orders the open pull requests by their next action, and `land cancel-superseded` cancels runs no open pull request needs. The adopter's values (default branch, stack caps, generated paths and their regenerators, pre-push checks) come from a `landing` block in the project declaration; a value no layer supplies is refused, never defaulted. Only `land arm` arms, and nothing here approves, merges or re-runs.\n",
     "title": "The land verbs wait for, arm, push and restack a pull request, and land status orders what is left"
   },
-  "shardHash": "496b75ead37096797c885b528b7bc8691511f18257ddd5bf84dce1f543f87fa5",
+  "shardHash": "3bc52b101ce4dc768f74f3814d15fa7d772d2ee0a739977e7ff5cb7e841a765b",
   "specVersion": "1.10.0"
 }

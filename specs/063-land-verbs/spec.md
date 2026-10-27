@@ -4,7 +4,7 @@ title: "The land verbs wait for, arm, push and restack a pull request, and land 
 status: approved
 # Ratified by the owner on 2026-10-27 (section 7); this frontmatter is the
 # status spec-spine and the coupling gate read.
-implementation: pending
+implementation: in-progress
 created: "2026-10-27"
 summary: >
   Amends spec 006's command surface; its four write verbs act under the F-02
@@ -23,9 +23,12 @@ summary: >
   nothing here approves, merges or re-runs.
 amends:
   - "006-command-surface"
-# No `extends` or `establishes` yet: the implementing changes add the edges
-# (crates/statecraft-cli/ for 006 and the crate this spec will own) with the
-# code, so this draft claims no path while it waits for ratification.
+establishes:
+  - { kind: directory, path: "crates/statecraft-land/" }
+extends:
+  - { spec: "002-environment-lifecycle", unit: { kind: directory, path: "crates/statecraft-environment/" }, nature: additive }
+  - { spec: "002-environment-lifecycle", unit: { kind: directory, path: "crates/statecraft-home/" }, nature: additive }
+  - { spec: "006-command-surface", unit: { kind: directory, path: "crates/statecraft-cli/" }, nature: additive }
 depends_on:
   - "002-environment-lifecycle"
   - "006-command-surface"
@@ -407,9 +410,45 @@ need no lift. The implementing change of `land push` updates
 `integration_slice`'s guard against publishing verbs to name exactly this
 lift, rather than removing the guard.
 
+## Implementation record
+
+**2026-10-27, increment 1: the policy and `land wait`.** The operations live
+in `statecraft-land` (D-4); `land wait` is a binding (006 3.2) to
+`statecraft_land::wait`, which writes nothing.
+
+- **`landing` on `Project`.** The project declaration's `Project` gains a
+  `landing` member, held as an opaque JSON value and written back as read.
+  Without it, every rewrite of `environment.json` (init apply, a transfer)
+  would drop the block, since the declaration is rewritten from its typed
+  form. `statecraft-land` validates it; `statecraft-environment` cannot
+  depend on that crate.
+- **`config show` reads it.** `statecraft-home`'s resolver projects each key
+  (`landing.default_branch`, `landing.stack.depth` and the others of 3.1) as a
+  project-layer value, strings as text and structured values as compact JSON,
+  so `config show landing.<key>` answers its value and its layer (3.1.1).
+  The same projection feeds the policy reader, so the two cannot disagree on
+  a supplied key. The values are the project declaration's alone (D-1): a
+  personal default is not landing policy, and the reader takes the committed
+  declaration at `HEAD`, so an uncommitted edit does not change what a verb
+  does.
+- **Observations are an array.** The answer's `observations` lists one
+  entry per requested pull request in the order given, each carrying its
+  `pullRequest` number, never an object keyed by number: spec 007's family
+  envelope keeps every member name a fixed camelCase identifier.
+- **The clock is injected.** Tests drive the minute interval and the
+  rate-limit backoff through a clock the library takes; the binary holds the
+  system clock, and no flag shortens a wait (constitution VIII).
+- **A `0s` timeout reads once.** Each pull request is observed one time, and
+  the answer is the event if it is already met, otherwise `timed-out`.
+
 ## Verification
 
-This spec is `status: approved` (ratified 2026-10-27, section 7) and declares
-no acceptance until it is built. Its acceptance will run every verb against a
-stub `gh` and a scratch repository through each row of section 5 and each
-refusal of section 3.
+Each line is one command. The acceptance grows with each increment of
+section 6; the verbs not yet built declare none.
+
+```verify:cli
+cargo test -p statecraft-land --locked
+cargo test -p statecraft-environment --locked --lib landing
+cargo test -p statecraft-home --locked --lib landing
+cargo test -p statecraft-cli --locked --test land
+```

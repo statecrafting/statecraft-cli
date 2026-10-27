@@ -1,0 +1,9 @@
+{
+  "package": {
+    "kind": "rust-lib",
+    "name": "statecraft-land",
+    "path": "crates/statecraft-land"
+  },
+  "schemaVersion": "1.3.0",
+  "shardHash": "d749afc534ba95e5fb4da54996c2318ee77b38322a82b7c4d4f34e01aa713861"
+}

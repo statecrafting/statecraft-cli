@@ -262,6 +262,22 @@ pub struct Project {
     /// declaration written before profiles existed is byte-identical.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub setup: Option<SetupSelection>,
+    /// Landing policy, preserved opaquely across environment rewrites.
+    /// Statecraft-land validates it; this crate cannot depend on its policy
+    /// types because their provenance belongs to statecraft-home.
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        deserialize_with = "present_landing"
+    )]
+    pub landing: Option<serde_json::Value>,
+}
+
+// Preserve explicit null as a supplied value for the policy validator.
+fn present_landing<'de, D: serde::Deserializer<'de>>(
+    deserializer: D,
+) -> Result<Option<serde_json::Value>, D::Error> {
+    serde_json::Value::deserialize(deserializer).map(Some)
 }
 
 /// A selected setup profile, as the declaration records it.
@@ -1208,6 +1224,51 @@ mod tests {
         read.write(dir.path()).unwrap();
         let again = Manifest::read(dir.path()).unwrap().unwrap();
         assert_eq!(again.project.commands, m.project.commands);
+    }
+
+    #[test]
+    fn landing_survives_read_and_write_without_changing_member_bytes() {
+        let dir = tempfile::tempdir().unwrap();
+        let mut manifest = Manifest::new(pins());
+        manifest.project.landing = Some(serde_json::json!({
+            "default_branch":"trunk", "stack":{"depth":2,"depth_by_spec":{"063":3}},
+            "generated":[{"paths":["generated/**"],"regenerate":["make","refresh"]}],
+            "pre_push":[], "future_member":{"preserved":true}
+        }));
+        manifest.write(dir.path()).unwrap();
+        let before = std::fs::read(dir.path().join(MANIFEST_PATH)).unwrap();
+        let read = Manifest::read(dir.path()).unwrap().unwrap();
+        assert_eq!(read.project.landing, manifest.project.landing);
+        read.write(dir.path()).unwrap();
+        assert_eq!(
+            std::fs::read(dir.path().join(MANIFEST_PATH)).unwrap(),
+            before
+        );
+    }
+
+    #[test]
+    fn explicit_null_landing_is_preserved_for_validation() {
+        let project: Project = serde_json::from_value(serde_json::json!({"landing":null})).unwrap();
+        assert_eq!(project.landing, Some(serde_json::Value::Null));
+        assert_eq!(
+            serde_json::to_value(project).unwrap()["landing"],
+            serde_json::Value::Null
+        );
+    }
+
+    #[test]
+    fn absent_landing_keeps_the_declaration_byte_identical() {
+        let dir = tempfile::tempdir().unwrap();
+        Manifest::new(pins()).write(dir.path()).unwrap();
+        let before = std::fs::read(dir.path().join(MANIFEST_PATH)).unwrap();
+        let read = Manifest::read(dir.path()).unwrap().unwrap();
+        assert!(read.project.landing.is_none());
+        assert!(!String::from_utf8_lossy(&before).contains("landing"));
+        read.write(dir.path()).unwrap();
+        assert_eq!(
+            std::fs::read(dir.path().join(MANIFEST_PATH)).unwrap(),
+            before
+        );
     }
 
     #[test]
