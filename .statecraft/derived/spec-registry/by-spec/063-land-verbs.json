@@ -62,6 +62,12 @@
         "text": "`land cancel-superseded` force-cancels only pull-request runs waiting on the review-exception Environment whose head no open pull request points at, and nothing else."
       },
       {
+        "anchor": "3-9-never-inside-a-run-attempt",
+        "id": "R-9",
+        "kind": "requirement",
+        "text": "`land arm`, `land push`, `land restack` and `land cancel-superseded` refuse (exit 2), `inside-run-attempt`, and write nothing when `STATECRAFT_RUN_ID` or `STATECRAFT_ATTEMPT` (spec 015 section 3.31 rule 17's attempt binding) is set in their environment."
+      },
+      {
         "anchor": "verification",
         "id": "V-1",
         "inputs": [
@@ -72,7 +78,7 @@
       }
     ],
     "sectionDigests": {
-      "063-the-land-verbs": "921fdfb54bc582ad7e1db1e676f1b4194e467b6cec38df594036b00db990deb6",
+      "063-the-land-verbs": "b810fa5533c5317b986c43e1421d272ad7c32fff6b38bd0a5052c8d6f9637ddc",
       "1-purpose": "833c2176d628655fefd9d6c24a26a5a6be4fd3499028c38929b4245f26a75cb6",
       "2-territory": "0e40d53d493a147281026b2bf8b37c28fadb19e46c15e7b2af7797b628438912",
       "3-1-the-landing-policy": "29db108b10b42eeb3d8667ed01125d4bb4fb75b883b83260a08d37ffe841713d",
@@ -83,12 +89,13 @@
       "3-6-land-status": "08984144004b8431101f2fd811041906b84b038067a0b574fc7fc25b1ce23684",
       "3-7-land-cancel-superseded": "36b39bc8476f05d87018eb8c281e549723c4767f37e94e653d496375aa48acd4",
       "3-8-exit-codes": "f9b12f29bac13670c5a0891ba1b0e8c3541cd4880f757214b52a9dc329ff8b66",
-      "3-behavior": "4e4a306e7b3f1952d64db3a05dcb9784d8da06075bde6eb4053877311a73332a",
+      "3-9-never-inside-a-run-attempt": "f9178663e9ff158fe2b81628830fbe06eb80763ed9fc0dc1b6d2a3748790a2e4",
+      "3-behavior": "7c0d5b535c4662f7ca6c9bbfc9a441c6cfde790d63d1bb82145b0633e13621e5",
       "4-out-of-scope": "9ff80fba70639c097e90d194af3e5a03c53da9bf54ba88981551ec70b081fad7",
       "5-observable-negative-cases": "e0b7ca5be9cae6bf41a7546b12917fbb7c037d71a3ce2cc9f3809a2910e0c1e6",
       "6-delivery": "60aa0d9665c57abe00610b65806896eb06e689eb84773068e279afaf2804ac2e",
-      "7-resolved-decisions": "f07c03b9d0f2a3a749d2630cad1ffcddeea0e477e636400c92242341f58b2362",
-      "verification": "2020e8c16600d18c497da79378d25c6de238b42d42a67802080673f12726fa0b"
+      "7-resolved-decisions": "44dbd91465b808bcbd651a26ff2e166cd35dec6e53c1d95cd3aece0cf75bb0da",
+      "verification": "25f7124100e8836b132b5bc9c615891addedcff7977ac8e0204965fe3060ee70"
     },
     "sectionHeadings": [
       "063: The land verbs",
@@ -103,6 +110,7 @@
       "3.6 `land status`",
       "3.7 `land cancel-superseded`",
       "3.8 Exit codes",
+      "3.9 Never inside a run attempt",
       "4. Out of scope",
       "5. Observable negative cases",
       "6. Delivery",
@@ -111,9 +119,9 @@
     ],
     "specPath": "specs/063-land-verbs/spec.md",
     "status": "approved",
-    "summary": "Amends spec 006's command surface. Six verbs act on a pull request's way to the default branch through the operator's gh: `land wait` blocks until a named event, `land arm` enables auto-merge only for a head the AI review passed on a pull request based on the default branch, `land push` pushes a signed head with a lease after disarming, `land restack` moves a stacked pull request onto its new base and regenerates only declared generated paths, and `land status` orders the open pull requests by their next action, and `land cancel-superseded` cancels runs no open pull request needs. The adopter's values (default branch, stack caps, generated paths and their regenerators, pre-push checks) come from a `landing` block in the project declaration; a value no layer supplies is refused, never defaulted. Only `land arm` arms, and nothing here approves, merges or re-runs.\n",
+    "summary": "Amends spec 006's command surface; its four write verbs act under the F-02 narrowing of 2026-10-27 and never inside a run attempt (D-5). Six verbs act on a pull request's way to the default branch through the operator's gh: `land wait` blocks until a named event, `land arm` enables auto-merge only for a head the AI review passed on a pull request based on the default branch, `land push` pushes a signed head with a lease after disarming, `land restack` moves a stacked pull request onto its new base and regenerates only declared generated paths, and `land status` orders the open pull requests by their next action, and `land cancel-superseded` cancels runs no open pull request needs. The adopter's values (default branch, stack caps, generated paths and their regenerators, pre-push checks) come from a `landing` block in the project declaration; a value no layer supplies is refused, never defaulted. Only `land arm` arms, and nothing here approves, merges or re-runs.\n",
     "title": "The land verbs wait for, arm, push and restack a pull request, and land status orders what is left"
   },
-  "shardHash": "b0e0dbcfd82a4b7cb5bfc3b7200d254eb1db896124d0adc4280b66f0b47443e6",
+  "shardHash": "496b75ead37096797c885b528b7bc8691511f18257ddd5bf84dce1f543f87fa5",
   "specVersion": "1.10.0"
 }

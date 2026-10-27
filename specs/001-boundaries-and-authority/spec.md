@@ -470,6 +470,14 @@ capability-flagged adapter seam merges, and admitted only by passing spec
 004's full suite with no weakening of the adapter boundary. `F-03` is
 unchanged.
 
+**2026-10-27: `F-02` is narrowed for spec `063`'s four landing acts.** The
+owner decided, as the founding decision record's section 5 records, that
+`land arm`, `land push`, `land restack` and `land cancel-superseded` may act
+on an operator's own pull requests: operator-invoked through the operator's
+`gh`, refused whenever a run attempt's binding is in the environment, and
+never approving, merging directly, opening a pull request, releasing or
+deploying. Every other publishing product verb stays deferred.
+
 ## Verification
 
 Each line below is one command. These assert the authored foundation, which
