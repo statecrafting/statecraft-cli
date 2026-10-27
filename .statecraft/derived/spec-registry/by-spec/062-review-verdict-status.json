@@ -77,7 +77,7 @@
       }
     ],
     "sectionDigests": {
-      "062-the-ai-review-s-verdict-as-a-check-run-read-by-review-status": "65d59901935040baf3631165a73441488be7dd10b7ca731a37ff7e6b8ac0d683",
+      "062-the-ai-review-s-verdict-as-a-check-run-read-by-review-status": "ba5a7aea45866f7df7f23b97d1375bf000d35df0d4ccb8f043468e9333e4beac",
       "1-purpose": "9f22e7fe08e3c4befca5ddf415f22ad75598e8a58b1f6e7962e509310d88f7c7",
       "2-territory": "94b33888776ce3c7bbefe85b8cec3cf370edc40cb691fbb8ec13596a77f3e368",
       "3-1-the-verdict-check-run": "fd870c9acfb75d24d3ac04bb6bcd2671e915583ba19a70ae6f39b73dc5cf86ac",
@@ -89,7 +89,7 @@
       "3-behavior": "4dcfee0fbb78f21fe0e3332ed52e4bf24b35decfb91a92e4cdff5dc024a62fc5",
       "4-out-of-scope": "931c5137da31e42c585f98e651549a412f786b90414fe27a7614f2b334fc3fb2",
       "5-observable-negative-cases": "b320010998c7f6eebe04f29f4f1016f5e7cc7d7d23294c47bf742d3eba2eb593",
-      "6-resolved-decisions": "91b476d06416303f42be9c2090f626786ef1ae0d768f1245a89b81e3195dca39",
+      "6-resolved-decisions": "5d1cdf8dce4662d0b3eaa813df6fb0f0546b7d9ceb77f9dca76209c6b51489e2",
       "verification": "bffa6e20504b295861eb3cfcd8665452a4029471aa585f4562ede59a2c76882d"
     },
     "sectionHeadings": [
@@ -109,10 +109,10 @@
       "Verification"
     ],
     "specPath": "specs/062-review-verdict-status/spec.md",
-    "status": "draft",
+    "status": "approved",
     "summary": "Amends spec 002's setup profile, spec 024's review and spec 006's command surface. github-actions-rust revision 22 publishes every review result (findings, no-findings, skipped:<class>) as a check run on the reviewed head, named `statecraft-ai-review`, whose output carries the evidence record byte for byte. A new read-only verb, `statecraft-cli review status <pr> [--head <sha>] [--repo <owner/name>] [--json]`, reads it under one rule for which review counts, the rule ci-gate already uses in the merge queue, and answers with a closed outcome and spec 006's exit codes. The `## AI review` comment is unchanged. Arming, retrying and waiting are out of scope.\n",
     "title": "Setup profile revision 22 publishes the AI review's verdict as a check run, and review status reads it"
   },
-  "shardHash": "77d7c93023a3b473917343b8484e7f98a8d234cff08be3dc658c0f699dcf2560",
+  "shardHash": "91511d0277fba96b9be71c50d7e088602fcb8d72b50e53e650bd3da327f0d5cf",
   "specVersion": "1.10.0"
 }

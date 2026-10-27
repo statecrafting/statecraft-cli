@@ -1,7 +1,7 @@
 ---
 id: "062-review-verdict-status"
 title: "Setup profile revision 22 publishes the AI review's verdict as a check run, and review status reads it"
-status: draft
+status: approved
 implementation: pending
 created: "2026-10-27"
 summary: >
@@ -256,15 +256,20 @@ which have no check run and are `absent` with reason `no-run` or
 
 ## 6. Resolved decisions
 
-None yet. Two decisions are for ratification:
+**2026-10-27: ratified by the owner.** The owner decided both open questions
+and directed ratification in this pull request; the owner exception
+approved on its run is the ratification of record.
 
-1. **The conclusion mapping (3.1.3).** `failure` for findings puts a red
-   mark on the pull request even when the owner approves the exception. The
-   alternative is `neutral` for every result, with the verdict in the title
-   only.
-2. **A failed check run fails the job (3.1.5).** The alternative records the
-   failure and lets the review stand, at the price of a verdict callers
-   cannot read.
+**D-1: the conclusion mapping stays as 3.1.3 states it:** `success` for
+no-findings, `failure` for findings, `neutral` for every skip. ci-gate
+already fails on findings, and the owner's exception overrides ci-gate, not
+the verdict, so the red mark stays true. The check run is never a required
+context, so the merge queue does not read it.
+
+**D-2: a check run that cannot be created fails the job (3.1.5),** with
+exit 4, as a comment that cannot be posted does. A review that stood without
+its machine-readable copy would be read as absent, the silent wait this
+spec removes; a transient API failure costs a re-run instead.
 
 ## Verification
 
