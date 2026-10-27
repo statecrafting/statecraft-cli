@@ -2,7 +2,7 @@
 id: "062-review-verdict-status"
 title: "Setup profile revision 21 publishes the AI review's verdict as a check run, and review status reads it"
 status: approved
-implementation: in-progress
+implementation: complete
 created: "2026-10-27"
 summary: >
   Amends spec 002's setup profile, spec 024's review and spec 006's command
@@ -22,9 +22,9 @@ amends:
   - "044-supply-chain-profile"
 extends:
   - { spec: "002-environment-lifecycle", unit: { kind: directory, path: "crates/statecraft-home/" }, nature: additive }
+  - { spec: "006-command-surface", unit: { kind: directory, path: "crates/statecraft-cli/" }, nature: additive }
 # Spec 044 is amended (renumbered, section 3.6) but not depended on, as in
-# specs 060 and 061: it is approved and unstarted. The edge on
-# crates/statecraft-cli/ (006) comes with the `review status` verb.
+# specs 060 and 061: it is approved and unstarted.
 depends_on:
   - "002-environment-lifecycle"
   - "006-command-surface"
@@ -77,6 +77,7 @@ obligations:
       - "crates/statecraft-home/tests/setup_workflows.rs"
       - "crates/statecraft-home/tests/setup_upgrade.rs"
       - "crates/statecraft-cli/tests/setup_profile.rs"
+      - "crates/statecraft-cli/tests/review_status.rs"
 ---
 
 # 062: The AI review's verdict as a check run, read by `review status`
@@ -307,13 +308,38 @@ through the base's scripts, and a change to any workflow file blocks
 most mislead a reader of `review status` (and a later `land arm`, which
 treats it as a precondition, never as the gate); it cannot merge anything.
 
-The `review status` verb follows in its own pull request.
+**2026-10-27, the verb.** `review status` is a binding (006 3.2) to
+`statecraft_home::review_status`, which reads through the existing `Host`
+over the operator's `gh`. It reads the pull request, then the head's
+`statecraft-ai-review` check runs (paginated) and counts the highest id whose
+fenced record names this pull request and head (3.2); without one, the
+head's statecraft-ci runs and the job named `ai-review / review`, the name
+the rendered caller and called job give it, held in one constant. A fork
+head is `skipped:fork` from the pull request alone. Workflow metadata is
+reported beside a counting verdict when a run exists.
+
+Its `--json` answer is spec 007's family envelope, as every verb's is
+(`family_envelope` holds them all to it): the object of 3.3 item 5 is the
+envelope's `report` for exits 0 and 1, and the `details` of an `error` whose
+kind is `refused` for pending, absent and stale (exit 2), `usage` for a
+usage error and `io` for a failed `gh` read, by spec 007's kind table. 3.3
+item 5 names the object's fields; this is where they sit.
+
+`classify_gh_failure` (spec 012's classification, in this crate) gains one
+class: HTTP 429, or 403 with "rate limit" in the error stream, is
+`unreachable`, "rate limited", where a 403 had read as unauthorized. An
+answer `gh` returns that does not parse is reported as "unparseable gh
+answer" without the parser's message, which can quote the body. Both are
+additive to `doctor --remote`, which reads through the same function.
+
 
 ## Verification
 
-This spec is `status: draft` and declares no acceptance until it is ratified
-and built. Its acceptance will run `ai-review.sh` with a stubbed reviewer and
-`gh` and find one check run per result carrying the record, render the
-revision and find the review job's `checks: write`, upgrade a revision-20
-project in one plan, and run `review status` against a stub `gh` through
-every row of section 5.
+Each line is one command.
+
+```verify:cli
+cargo test -p statecraft-home --locked --test setup_workflows revision_twenty_one
+cargo test -p statecraft-home --locked --test setup_upgrade a_revision_twenty_project_upgrades_to_revision_twenty_one
+cargo test -p statecraft-home --locked --lib review_status
+cargo test -p statecraft-cli --locked --test review_status
+```

@@ -22,10 +22,18 @@
           "kind": "directory",
           "path": "crates/statecraft-home/"
         }
+      },
+      {
+        "nature": "additive",
+        "spec": "006-command-surface",
+        "unit": {
+          "kind": "directory",
+          "path": "crates/statecraft-cli/"
+        }
       }
     ],
     "id": "062-review-verdict-status",
-    "implementation": "in-progress",
+    "implementation": "complete",
     "obligations": [
       {
         "anchor": "3-1-the-verdict-check-run",
@@ -81,14 +89,15 @@
         "inputs": [
           "crates/statecraft-home/tests/setup_workflows.rs",
           "crates/statecraft-home/tests/setup_upgrade.rs",
-          "crates/statecraft-cli/tests/setup_profile.rs"
+          "crates/statecraft-cli/tests/setup_profile.rs",
+          "crates/statecraft-cli/tests/review_status.rs"
         ],
         "kind": "verification",
         "text": "Step tests run ai-review.sh with a stubbed reviewer and a stubbed gh and find one check run per result, carrying the record; rendering tests show the review job's checks permission and a revision-20 project upgrading in one plan; CLI tests run review status against a stub gh and find every outcome and exit code in section 5, including a newer attempt superseding an older one on one head, a record naming another pull request, and a moved head."
       }
     ],
     "sectionDigests": {
-      "062-the-ai-review-s-verdict-as-a-check-run-read-by-review-status": "268ded44e44390d44717fed2a06ccc8e24fe2e8611c4ea94c588d9471826efc4",
+      "062-the-ai-review-s-verdict-as-a-check-run-read-by-review-status": "d23b63ec86426199cc79f83d91bfa467fced4cffb96413be4d08e2e31f9075f6",
       "1-purpose": "9f22e7fe08e3c4befca5ddf415f22ad75598e8a58b1f6e7962e509310d88f7c7",
       "2-territory": "94b33888776ce3c7bbefe85b8cec3cf370edc40cb691fbb8ec13596a77f3e368",
       "3-1-the-verdict-check-run": "fd870c9acfb75d24d3ac04bb6bcd2671e915583ba19a70ae6f39b73dc5cf86ac",
@@ -101,8 +110,8 @@
       "4-out-of-scope": "664580cbdaec052ce1e4c286516abd208390dc4d07aca10c16ddf000bfe27873",
       "5-observable-negative-cases": "b320010998c7f6eebe04f29f4f1016f5e7cc7d7d23294c47bf742d3eba2eb593",
       "6-resolved-decisions": "5d1cdf8dce4662d0b3eaa813df6fb0f0546b7d9ceb77f9dca76209c6b51489e2",
-      "implementation-record": "7362c6194f0e07feb5be7116032524f19909153491f9f2f5edc7756922ed1319",
-      "verification": "bffa6e20504b295861eb3cfcd8665452a4029471aa585f4562ede59a2c76882d"
+      "implementation-record": "7fff79d3deba35847bf7330cffc9497e311b2ca3a0ce5ae9e8d9d7d80aaaecbd",
+      "verification": "7ea27b4179ef671c4b18cc4638c32031e95e988cc48ce2d18ed6c6d8a1dfb962"
     },
     "sectionHeadings": [
       "062: The AI review's verdict as a check run, read by `review status`",
@@ -126,6 +135,6 @@
     "summary": "Amends spec 002's setup profile, spec 024's review and spec 006's command surface. github-actions-rust revision 21 publishes every review result (findings, no-findings, skipped:<class>) as a check run on the reviewed head, named `statecraft-ai-review`, whose output carries the evidence record byte for byte. A new read-only verb, `statecraft-cli review status <pr> [--head <sha>] [--repo <owner/name>] [--json]`, reads it under one rule for which review counts, the rule ci-gate already uses in the merge queue, and answers with a closed outcome and spec 006's exit codes. The `## AI review` comment is unchanged. Arming, retrying and waiting are out of scope. Spec 044 moves from revision 21 to revision 22.\n",
     "title": "Setup profile revision 21 publishes the AI review's verdict as a check run, and review status reads it"
   },
-  "shardHash": "c01f12dd0574ded33a92f5487e2d67d4f21b28ed0e4be309e7fa0aa78a74dc42",
+  "shardHash": "899eb725d26a57b1297a8570195c139ee935db335bc40ced0935518bb82ad922",
   "specVersion": "1.10.0"
 }
