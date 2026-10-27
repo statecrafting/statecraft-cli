@@ -2211,6 +2211,9 @@ pub fn classify_gh_failure(stderr: &str) -> HostError {
     .iter()
     .any(|m| lower.contains(m));
     match status {
+        Some(code @ ("403" | "429")) if code == "429" || lower.contains("rate limit") => {
+            HostError::Unreachable(format!("rate limited: HTTP {code}"))
+        }
         Some("404") => HostError::NotFound,
         Some(code @ ("401" | "403")) if plan => {
             HostError::Unsupported(format!("HTTP {code}, a plan limitation"))
@@ -2247,7 +2250,7 @@ impl Host for GhHost {
             .map_err(|e| HostError::Unreachable(format!("{}: {e}", self.program)))?;
         if out.status.success() {
             return serde_json::from_slice(&out.stdout)
-                .map_err(|e| HostError::Unreachable(format!("unparseable answer: {e}")));
+                .map_err(|_| HostError::Unreachable("unparseable gh answer".into()));
         }
         Err(classify_gh_failure(&String::from_utf8_lossy(&out.stderr)))
     }

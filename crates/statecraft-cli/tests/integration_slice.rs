@@ -419,6 +419,7 @@ fn the_grown_command_tree_still_has_no_verb_that_publishes() {
     // provider token verbs; four more with spec 038's hosted verbs; two more
     // with spec 027's `observe` and `observe show`; and four more with its
     // `proposal list`, `show`, `dismiss` and `acknowledge`; and one more
-    // with `proposal admit`.
-    assert_eq!(statecraft_cli::commands::Verb::all().len(), 60);
+    // with `proposal admit`; and one more with spec 062's `review status`, a
+    // read that publishes nothing.
+    assert_eq!(statecraft_cli::commands::Verb::all().len(), 61);
 }

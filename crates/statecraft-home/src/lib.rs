@@ -76,6 +76,7 @@ pub mod provider_token;
 pub mod remote_state;
 pub mod required;
 pub mod resolved;
+pub mod review_status;
 pub mod service;
 pub mod session;
 pub mod settings;
