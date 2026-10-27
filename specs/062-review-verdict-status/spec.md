@@ -1,26 +1,30 @@
 ---
 id: "062-review-verdict-status"
-title: "Setup profile revision 22 publishes the AI review's verdict as a check run, and review status reads it"
+title: "Setup profile revision 21 publishes the AI review's verdict as a check run, and review status reads it"
 status: approved
-implementation: pending
+implementation: in-progress
 created: "2026-10-27"
 summary: >
   Amends spec 002's setup profile, spec 024's review and spec 006's command
-  surface. github-actions-rust revision 22 publishes every review result
+  surface. github-actions-rust revision 21 publishes every review result
   (findings, no-findings, skipped:<class>) as a check run on
   the reviewed head, named `statecraft-ai-review`, whose output carries the
   evidence record byte for byte. A new read-only verb, `statecraft-cli review
   status <pr> [--head <sha>] [--repo <owner/name>] [--json]`, reads it under one rule for which
   review counts, the rule ci-gate already uses in the merge queue, and answers
   with a closed outcome and spec 006's exit codes. The `## AI review` comment
-  is unchanged. Arming, retrying and waiting are out of scope.
+  is unchanged. Arming, retrying and waiting are out of scope. Spec 044
+  moves from revision 21 to revision 22.
 amends:
   - "002-environment-lifecycle"
   - "006-command-surface"
   - "024-review-budget-and-ratification"
-# No `extends` yet: the implementing change adds the edges on
-# crates/statecraft-home/ (002) and crates/statecraft-cli/ (006) with the code,
-# so this draft claims no path while it waits for ratification.
+  - "044-supply-chain-profile"
+extends:
+  - { spec: "002-environment-lifecycle", unit: { kind: directory, path: "crates/statecraft-home/" }, nature: additive }
+# Spec 044 is amended (renumbered, section 3.6) but not depended on, as in
+# specs 060 and 061: it is approved and unstarted. The edge on
+# crates/statecraft-cli/ (006) comes with the `review status` verb.
 depends_on:
   - "002-environment-lifecycle"
   - "006-command-surface"
@@ -216,10 +220,10 @@ review's prompt, budget, grouping and classification (specs 024 and 061).
 
 ### 3.6 The revision
 
-The profile becomes revision 22, with a new identity. Revision 21 is spec
-044's. If spec 044 is not delivered first, the implementing change takes the
-next free number and says so, as specs 058, 060 and 061 did. A revision-20 or
-revision-21 project upgrades through the ordinary plan and apply. The upgrade
+The profile becomes revision 21, with a new identity. Spec 044, which had
+claimed revision 21, was not delivered first, so this spec takes the next
+free number, as specs 058, 060 and 061 did, and 044 moves to revision 22. A
+revision-20 project upgrades through the ordinary plan and apply. The upgrade
 pull request changes managed files, so it is an authority change judged by
 the base's `ci-gate`, and it needs the owner's exception once.
 
@@ -234,7 +238,7 @@ Each belongs to a companion draft built on this one, whose `land` verbs
 - re-running a review, or cancelling a run that waits on the owner exception;
 - waiting for a verdict, a merge or a queue exit;
 - pushing, restacking and landing order. Also out of scope: any
-change to what the review finds, and reading reviews made before revision 22,
+change to what the review finds, and reading reviews made before revision 21,
 which have no check run and are `absent` with reason `no-run` or
 `mismatched-record` as the case may be.
 
@@ -270,6 +274,40 @@ context, so the merge queue does not read it.
 exit 4, as a comment that cannot be posted does. A review that stood without
 its machine-readable copy would be read as absent, the silent wait this
 spec removes; a transient API failure costs a re-run instead.
+
+## Implementation record
+
+**2026-10-27, the profile half.** Revision 21 adds a `Publish the verdict
+check run` step to the review job, after the evidence upload, which runs
+`ai-review.sh publish-check`: it builds the check run from the evidence
+record (title the result, summary the subject line and the finding count,
+text the record byte for byte in a fenced json block, an output over 65,535
+characters refused with exit 4) and creates it with the conclusion mapping
+of 3.1.3 (D-1). A creation failure fails the job through the ERR trap (D-2).
+The step does not run for a head in a fork. The review job and its caller in
+`statecraft-ci.yml` gain `checks: write`, since a called workflow holds no
+more than its caller grants; nothing else does.
+
+The step runs the script the review ran, the base's copy (the candidate's
+only in the adoption). On the pull request that upgrades a project from
+revision 20, the base's script has no `publish-check`, so the step looks for
+the line `# statecraft-ai-review: publish-check` and, without it, publishes
+nothing and prints that the base predates revision 21. That head is then
+`absent` to `review status`, reason `no-run` or `failed` as its job ended,
+until the next head after the upgrade lands.
+
+**Residual (constitution VIII).** The step itself is part of the review
+workflow, which a pull request's own head supplies on a `pull_request`
+event, and any workflow with `checks: write` can create a check run of
+that name. A pull request that edits the workflow can therefore publish a
+check run that no review produced. The check run is information, never a
+gate: `ci-gate` remains the only required context and reads the review
+through the base's scripts, and a change to any workflow file blocks
+`ci-gate` until the owner approves the exception. Such a check run can at
+most mislead a reader of `review status` (and a later `land arm`, which
+treats it as a precondition, never as the gate); it cannot merge anything.
+
+The `review status` verb follows in its own pull request.
 
 ## Verification
 

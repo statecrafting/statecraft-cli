@@ -3,7 +3,8 @@
     "amends": [
       "002-environment-lifecycle",
       "006-command-surface",
-      "024-review-budget-and-ratification"
+      "024-review-budget-and-ratification",
+      "044-supply-chain-profile"
     ],
     "created": "2026-10-27",
     "dependsOn": [
@@ -13,8 +14,18 @@
       "024-review-budget-and-ratification",
       "061-review-call-stall"
     ],
+    "extends": [
+      {
+        "nature": "additive",
+        "spec": "002-environment-lifecycle",
+        "unit": {
+          "kind": "directory",
+          "path": "crates/statecraft-home/"
+        }
+      }
+    ],
     "id": "062-review-verdict-status",
-    "implementation": "pending",
+    "implementation": "in-progress",
     "obligations": [
       {
         "anchor": "3-1-the-verdict-check-run",
@@ -77,7 +88,7 @@
       }
     ],
     "sectionDigests": {
-      "062-the-ai-review-s-verdict-as-a-check-run-read-by-review-status": "ba5a7aea45866f7df7f23b97d1375bf000d35df0d4ccb8f043468e9333e4beac",
+      "062-the-ai-review-s-verdict-as-a-check-run-read-by-review-status": "268ded44e44390d44717fed2a06ccc8e24fe2e8611c4ea94c588d9471826efc4",
       "1-purpose": "9f22e7fe08e3c4befca5ddf415f22ad75598e8a58b1f6e7962e509310d88f7c7",
       "2-territory": "94b33888776ce3c7bbefe85b8cec3cf370edc40cb691fbb8ec13596a77f3e368",
       "3-1-the-verdict-check-run": "fd870c9acfb75d24d3ac04bb6bcd2671e915583ba19a70ae6f39b73dc5cf86ac",
@@ -85,11 +96,12 @@
       "3-3-the-review-status-verb": "a7207bc0209094a22744040d9efa751c8e90b037664e8e8fb79e87e67b3617b9",
       "3-4-outcomes-and-exit-codes": "86ce34faaf8b3461afb4ce47662afc62febcbdb7ff76a149ca5c71056362ed39",
       "3-5-what-does-not-change": "c601df741093b9b8614fe9790efe36b56426913d3eb0c1bdc9e6e3bebae7a175",
-      "3-6-the-revision": "9816a0c7c521304e3febc4ae0ce357768e24688645ec6d5f56e52d6dea95c807",
-      "3-behavior": "4dcfee0fbb78f21fe0e3332ed52e4bf24b35decfb91a92e4cdff5dc024a62fc5",
-      "4-out-of-scope": "931c5137da31e42c585f98e651549a412f786b90414fe27a7614f2b334fc3fb2",
+      "3-6-the-revision": "ae98110db2799a6c94bf6df7ea655f67d220f456d8b2f0918cd4e312fb2cb308",
+      "3-behavior": "284c8e8d4ae9cb9f1fe29a56f2caa5f5f224d21f760cd3ea61d1ccb3f1b70ad5",
+      "4-out-of-scope": "664580cbdaec052ce1e4c286516abd208390dc4d07aca10c16ddf000bfe27873",
       "5-observable-negative-cases": "b320010998c7f6eebe04f29f4f1016f5e7cc7d7d23294c47bf742d3eba2eb593",
       "6-resolved-decisions": "5d1cdf8dce4662d0b3eaa813df6fb0f0546b7d9ceb77f9dca76209c6b51489e2",
+      "implementation-record": "7362c6194f0e07feb5be7116032524f19909153491f9f2f5edc7756922ed1319",
       "verification": "bffa6e20504b295861eb3cfcd8665452a4029471aa585f4562ede59a2c76882d"
     },
     "sectionHeadings": [
@@ -106,13 +118,14 @@
       "4. Out of scope",
       "5. Observable negative cases",
       "6. Resolved decisions",
+      "Implementation record",
       "Verification"
     ],
     "specPath": "specs/062-review-verdict-status/spec.md",
     "status": "approved",
-    "summary": "Amends spec 002's setup profile, spec 024's review and spec 006's command surface. github-actions-rust revision 22 publishes every review result (findings, no-findings, skipped:<class>) as a check run on the reviewed head, named `statecraft-ai-review`, whose output carries the evidence record byte for byte. A new read-only verb, `statecraft-cli review status <pr> [--head <sha>] [--repo <owner/name>] [--json]`, reads it under one rule for which review counts, the rule ci-gate already uses in the merge queue, and answers with a closed outcome and spec 006's exit codes. The `## AI review` comment is unchanged. Arming, retrying and waiting are out of scope.\n",
-    "title": "Setup profile revision 22 publishes the AI review's verdict as a check run, and review status reads it"
+    "summary": "Amends spec 002's setup profile, spec 024's review and spec 006's command surface. github-actions-rust revision 21 publishes every review result (findings, no-findings, skipped:<class>) as a check run on the reviewed head, named `statecraft-ai-review`, whose output carries the evidence record byte for byte. A new read-only verb, `statecraft-cli review status <pr> [--head <sha>] [--repo <owner/name>] [--json]`, reads it under one rule for which review counts, the rule ci-gate already uses in the merge queue, and answers with a closed outcome and spec 006's exit codes. The `## AI review` comment is unchanged. Arming, retrying and waiting are out of scope. Spec 044 moves from revision 21 to revision 22.\n",
+    "title": "Setup profile revision 21 publishes the AI review's verdict as a check run, and review status reads it"
   },
-  "shardHash": "91511d0277fba96b9be71c50d7e088602fcb8d72b50e53e650bd3da327f0d5cf",
+  "shardHash": "c01f12dd0574ded33a92f5487e2d67d4f21b28ed0e4be309e7fa0aa78a74dc42",
   "specVersion": "1.10.0"
 }

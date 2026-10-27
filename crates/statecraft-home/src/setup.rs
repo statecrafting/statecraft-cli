@@ -35,7 +35,7 @@ use std::path::Path;
 /// The one registered profile.
 pub const PROFILE_ID: &str = "github-actions-rust";
 /// Its revision.
-pub const REVISION: u32 = 20;
+pub const REVISION: u32 = 21;
 /// Where the rendered policy document lives in the target.
 pub const POLICY_PATH: &str = ".statecraft/setup/github-actions-rust.json";
 /// The resume record, under the project's runtime state.
@@ -418,6 +418,7 @@ pub fn remote_obligations() -> Vec<String> {
         "revision 18: a newer push to a pull request cancels the work of that pull request's older statecraft-ci run, job by job: every job but review-exception and ci-gate has a concurrency group of its pull request and job, because a run waiting on the owner exception is never cancelled by a group and would hold a workflow-level one (spec 059), while a push to the default branch and each merge-queue entry keep groups of their own run; a preflight job (the pull request's base, the committed artifacts' freshness, and cargo fmt for a Rust code selection) runs before code and every declared extra job, which need it, so a stacked pull request skips them unless it carries the label statecraft:stacked-ci; every preflight check also runs in governance or code, and a base gate.sh without the verb judges nothing; the code job restores the cargo cache on every event and saves it only on a push to the default branch, with incremental compilation off and line-table debuginfo (specs 058 and 059)".to_string(),
         "revision 19: a blocked ci-gate reports failed jobs of its own run attempt, their first failed step and at most five error lines each in the step summary and as at most ten annotations; this is best effort, never changes the verdict or exit code, and fences or escapes candidate text; before saving the code job cache, the job drops workspace artifacts on the same default-branch condition (spec 060)".to_string(),
         "revision 20: reviewer calls stream partial events; 180 seconds of silence stops a call and retries it once with fresh cwd and home, a second stall skips as transient, and the review job allows 20 minutes (spec 061)".to_string(),
+        "revision 21: every review or visible skip publishes a statecraft-ai-review check run after its evidence artifact, with the exact record and a success, failure or neutral conclusion; fork heads are excluded and publication failures fail the job (spec 062; 044 moves to 22)".to_string(),
         "a repository that already runs these checks by hand keeps them by setting governance.enforce_coverage (index coverage --fail-on-untraced), governance.authored_content (the script's path; absent or not executable refuses), governance.authored_content_text (the title, the body and every commit message), governance.gate_each_commit (each commit's tree passes the gate and cargo fmt) and governance.require_signed_commits (each commit verified as signed by GitHub) (revision 4)".to_string(),
     ]
 }

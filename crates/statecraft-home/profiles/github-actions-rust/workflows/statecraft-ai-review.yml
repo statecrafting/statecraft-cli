@@ -31,6 +31,7 @@ jobs:
     permissions:
       contents: read
       pull-requests: write
+      checks: write
     outputs:
       result: ${{ steps.review.outputs.result }}
       release_candidate: ${{ steps.review.outputs.release_candidate }}
@@ -85,3 +86,18 @@ jobs:
           name: statecraft-ai-review-${{ github.event.pull_request.head.sha }}
           path: ${{ steps.review.outputs.evidence }}
           if-no-files-found: error
+      - name: Publish the verdict check run
+        if: steps.review.outputs.evidence != '' && github.event.pull_request.head.repo.full_name == github.repository
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          HEAD_REPO: ${{ github.event.pull_request.head.repo.full_name }}
+          EVIDENCE_DIR: ${{ steps.review.outputs.evidence }}
+        run: |
+          script="${RUNNER_TEMP}/statecraft-ai-review.sh"
+          if ! grep -qxF '# statecraft-ai-review: publish-check' "$script"; then
+            echo "ai-review.sh at the base predates revision 21: no check run is published for this head (the upgrade)"
+            exit 0
+          fi
+          bash "$script" publish-check
