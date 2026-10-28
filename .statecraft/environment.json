@@ -217,6 +217,31 @@
         "digest": "5dfde3de36ad98c537415413f3f685d2a6f9906f616c47c6fd0e02c04bdd35eb",
         "schema": "statecraft/remote-desired-state/1"
       }
+    },
+    "landing": {
+      "default_branch": "main",
+      "stack": {
+        "depth": 2,
+        "depth_by_spec": {},
+        "max_stacked": 4
+      },
+      "generated": [
+        {
+          "paths": [
+            ".statecraft/derived/**"
+          ],
+          "regenerate": [
+            "make",
+            "refresh"
+          ]
+        }
+      ],
+      "pre_push": [
+        [
+          "make",
+          "gate"
+        ]
+      ]
     }
   },
   "spinePin": {
