@@ -391,6 +391,32 @@ records the run policy's adapter by name and version, the only one execution
 may select, and the same computation without the append (`subjects`) lets a
 caller refuse before it writes an intent.
 
+**2026-10-28: the offline boundary and the fake.** The adapter half
+(`crates/statecraft-adapter/src/fixed_export.rs`) states section 3.3's five
+capabilities as their own closed set (`exact-task-bytes`,
+`exact-input-bytes`, `offline-input`, `result-custody`,
+`deterministic-fake`), apart from spec 004's six provider tokens, which say
+what an adapter can ask of a provider rather than what it does with the
+request. Selection takes the first available declaration whose name and
+version are exactly the workflow's, and refuses (`adapter-not-selected`,
+`capability-missing`) before any process exists. Admission refuses a
+workflow that is not `prepared`, a request for other subjects, a task that
+permits spend, and a context or documentation bundle that is not the
+recorded bytes, with spec 019's and 020's own refusal words. The pilot's fake
+(`fixed-export-fake` version `1`) writes the standard event protocol from a
+fixture script; it reaches no network, credential, repository, publication,
+shell, clock or randomness, and a scripted attempt at one goes to a denial
+boundary that refuses it, keeps it, and emits a structured refusal under the
+guard `fixed-export-boundary`. Recording keeps every line before parsing it,
+records spec 019's and 020's delivery folds, keeps the first terminal
+result's raw bytes through spec 020's `record_result`, and appends the
+`executed` and `validated` versions. The workflow names as findings each
+prohibited effect (`prohibited-effect`), each delivery finding
+(`delivery ...`), a line that is not an event (`unreadable-event`), a
+terminal event with no result (`no-result`), and a stated length, digest or
+media type that is not the bytes' (`raw-length-mismatch`,
+`raw-digest-mismatch`, `media-type`).
+
 **2026-09-27: acceptance is the end of this profile's authority.** Application
 and publication remain distinct future operations because even a fully
 accepted artifact cannot authorize mutation or an externally visible act.
@@ -407,4 +433,5 @@ disposable workspaces.
 
 ```verify:cli
 cargo test -p statecraft-run --test fixed_export_documentation
+cargo test -p statecraft-adapter --test fixed_export_adapter
 ```
