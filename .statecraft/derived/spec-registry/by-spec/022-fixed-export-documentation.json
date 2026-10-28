@@ -85,7 +85,7 @@
       }
     ],
     "sectionDigests": {
-      "022-fixed-export-documentation-workflow": "bbe7a3c9334d6cb274854a7498377babff8335897967020c4833d52fa04e2773",
+      "022-fixed-export-documentation-workflow": "0ceca388a7c0269c40421bec812737fdedb948c4abd16e194e4259d644105ed6",
       "1-purpose": "453fb6ca66e6a6bddf5ad5f36f7c78027c5d7227d5a8142ff0ca4a8e9ed98f2f",
       "2-territory-and-prerequisites": "ff51106eed5b13236a5d4bbc835102d9266d01e2ffedf2b1ff999c9e7cc6125a",
       "3-1-the-fixed-export-profile": "0a6dc2a594647bdf77ac5bc24986efc4bb0d1f595ab4779513be12306f64f289",
@@ -102,7 +102,7 @@
       "3-9-acceptance-application-and-publication": "f8f5997b1e6852f89778e522e17b62accda575923a81ea2fbc5ef516cded218a",
       "3-behavior": "0e8d97191ea291f0e3bf6d0697e3cc289e3c77127a0c32e82a8f2bc923c4e071",
       "4-out-of-scope": "363e8719654ac3628d8908bf2a89d115567a14e4a6989a2f28e8d0224e0e4324",
-      "5-resolved-decisions": "9cf59557057e78cecaf2ae2484edb53c767fd98dcef3d2eb4cbdde55dbe4d4b7",
+      "5-resolved-decisions": "d0740d4323b7547c8f1bc43e5f4e9a00f4de3e7226d5c8c20146423fd369b5be",
       "verification": "b85e94407d2e9ab1609b7c267aa4e83bd778d833ce1d13cdcc6b84a1d6e6dc82"
     },
     "sectionHeadings": [
@@ -131,6 +131,6 @@
     "summary": "Amends Statecraft's run, adapter, acceptance, and command contracts with a bounded offline documentation workflow over revision-pinned context exports. It preserves immutable task, delivery, raw result, validation, review, correction, and acceptance records as separate facts; proves the workflow with a deterministic fake adapter; and grants no live provider, repository application, remote export, or publication authority.\n",
     "title": "Fixed-export documentation workflow"
   },
-  "shardHash": "fcc7e6e583fe1443309d336b073260e4766e00e04bfe36d16e6cb6e6c4b5d5b3",
+  "shardHash": "16ac2778ed84e6cfc1f5034d27ebed35e2ec9f54a3f4b23b5ece792fafc7bf41",
   "specVersion": "1.10.0"
 }

@@ -96,7 +96,17 @@ pub struct Declaration {
 }
 
 impl Declaration {
-    /// The workflow's reference to it.
+    /// A run policy naming it, by name and version, as preparation records
+    /// it.
+    pub fn policy(&self) -> AdapterRef {
+        AdapterRef {
+            name: self.name.clone(),
+            version: self.version.clone(),
+            capabilities: Vec::new(),
+        }
+    }
+
+    /// The workflow's reference to it once selected, with what it declared.
     pub fn reference(&self) -> AdapterRef {
         AdapterRef {
             name: self.name.clone(),
@@ -147,7 +157,8 @@ pub enum Refusal {
     Spend,
 }
 
-/// Section 3.3: select exactly the adapter `policy` names from `available`.
+/// Section 3.3: select exactly the adapter `policy` names from `available`;
+/// `policy` is the prepared workflow's adapter, never the provider's word.
 /// The first exact name and version wins; nothing else is a fallback.
 pub fn select<'a>(
     policy: &AdapterRef,
@@ -169,7 +180,8 @@ pub fn select<'a>(
 }
 
 /// Section 3.3: before spawn, the workflow is prepared for exactly this
-/// manifest and task, the request carries their exact bytes, every byte
+/// manifest and task, `selected` is the adapter its run policy names, the
+/// request carries their exact bytes, every byte
 /// reference agrees with retained custody, and the task spends nothing.
 pub fn admit(
     request: &Request,
@@ -192,6 +204,17 @@ pub fn admit(
         return Err(Refusal::Workflow(
             "the request does not name the prepared subjects".into(),
         ));
+    }
+    match &workflow.subjects.adapter {
+        Some(policy) if policy.name == selected.name && policy.version == selected.version => {}
+        other => {
+            return Err(Refusal::NotSelected(format!(
+                "the workflow's policy names {:?}, the request selected {} {}",
+                other.as_ref().map(|p| format!("{} {}", p.name, p.version)),
+                selected.name,
+                selected.version
+            )));
+        }
     }
     if !matches!(task.cost_ceiling, CostCeiling::NoSpend(_)) {
         return Err(Refusal::Spend);

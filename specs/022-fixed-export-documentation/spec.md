@@ -400,7 +400,8 @@ what an adapter can ask of a provider rather than what it does with the
 request. Selection takes the first available declaration whose name and
 version are exactly the workflow's, and refuses (`adapter-not-selected`,
 `capability-missing`) before any process exists. Admission refuses a
-workflow that is not `prepared`, a request for other subjects, a task that
+workflow that is not `prepared`, an adapter other than the one its run policy
+names, a request for other subjects, a task that
 permits spend, and a context or documentation bundle that is not the
 recorded bytes, with spec 019's and 020's own refusal words. The pilot's fake
 (`fixed-export-fake` version `1`) writes the standard event protocol from a

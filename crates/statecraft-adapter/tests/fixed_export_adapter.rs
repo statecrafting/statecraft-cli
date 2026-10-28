@@ -220,6 +220,7 @@ fn prepared() -> Fixture {
         &m,
         &t,
         None,
+        &fx::fake_declaration().policy(),
         AT,
     )
     .unwrap()
@@ -310,15 +311,15 @@ fn selection_is_exact_and_a_real_provider_is_never_a_fallback() {
         supports: vec![],
     };
     let available = [real.clone(), fake.clone()];
-    assert_eq!(fx::select(&fake.reference(), &available).unwrap(), &fake);
-    let mut other_version = fake.reference();
+    assert_eq!(fx::select(&fake.policy(), &available).unwrap(), &fake);
+    let mut other_version = fake.policy();
     other_version.version = "2".into();
     assert!(matches!(
         fx::select(&other_version, &available),
         Err(Refusal::NotSelected(_))
     ));
     assert!(matches!(
-        fx::select(&fake.reference(), &[real]),
+        fx::select(&fake.policy(), &[real]),
         Err(Refusal::NotSelected(_))
     ));
 }
@@ -330,11 +331,12 @@ fn a_missing_profile_capability_refuses_selection() {
     lacking
         .profile
         .retain(|c| *c != ProfileCapability::OfflineInput);
-    let err = fx::select(&lacking.reference(), &[lacking.clone()]).unwrap_err();
+    let err = fx::select(&lacking.policy(), &[lacking.clone()]).unwrap_err();
     assert_eq!(err.to_string(), "capability-missing: offline-input");
 }
 
-// Section 3.3: every byte reference is checked before spawn.
+// Section 3.3: every byte reference is checked before spawn, and only the
+// adapter the prepared workflow names is admitted.
 #[test]
 fn admission_refuses_a_request_that_is_not_the_prepared_subjects() {
     let f = prepared();
@@ -361,6 +363,13 @@ fn admission_refuses_a_request_that_is_not_the_prepared_subjects() {
     assert!(matches!(
         fx::admit(&other, &f.prepared, &f.manifest, &f.task, &selected),
         Err(Refusal::Workflow(_))
+    ));
+
+    let mut lookalike = selected.clone();
+    lookalike.name = "installed-provider".into();
+    assert!(matches!(
+        fx::admit(&good, &f.prepared, &f.manifest, &f.task, &lookalike),
+        Err(Refusal::NotSelected(_))
     ));
 
     let mut executed = f.prepared.clone();
