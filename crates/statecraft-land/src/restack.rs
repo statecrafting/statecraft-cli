@@ -203,6 +203,7 @@ fn policy(root: &Path) -> Result<Policy, Failure> {
             default_branch: supplied.remove("default_branch"),
             generated: supplied.remove("generated"),
             pre_push: supplied.remove("pre_push"),
+            ..UsedPolicy::default()
         },
         signed,
         patterns,
@@ -459,6 +460,7 @@ fn single(
         default_branch: policy.used.default_branch.clone(),
         generated: policy.used.generated.clone(),
         pre_push: policy.used.pre_push.clone(),
+        ..UsedPolicy::default()
     };
     clean(root)?;
     let remote = Remote::new();
@@ -639,6 +641,7 @@ fn policy_for_member(root: &Path, answer: &mut Answer) -> Result<Policy, Failure
         default_branch: policy.used.default_branch.clone(),
         generated: policy.used.generated.clone(),
         pre_push: policy.used.pre_push.clone(),
+        ..UsedPolicy::default()
     };
     Ok(policy)
 }
