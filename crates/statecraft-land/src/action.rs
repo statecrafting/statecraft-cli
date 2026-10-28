@@ -1,4 +1,4 @@
-//! Shared inputs and host reads for the two explicit landing acts.
+//! Shared inputs and host reads for the explicit landing acts.
 use crate::policy::{Policy, Supplied};
 use serde::Serialize;
 use serde_json::{Value, json};
@@ -32,6 +32,9 @@ pub struct UsedPolicy {
     /// The pre-push vectors and their supplying layer, once used.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub pre_push: Option<Supplied>,
+    /// Generated paths and regenerators used by restack.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub generated: Option<Supplied>,
 }
 pub(crate) struct Arguments {
     pub pr: u64,

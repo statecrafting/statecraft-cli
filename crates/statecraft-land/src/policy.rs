@@ -130,7 +130,9 @@ impl Policy {
             else {
                 return Err(format!("{key}: {}", answer.describe()));
             };
-            let key = key.strip_prefix("landing.").expect("landing key");
+            let key = key
+                .strip_prefix("landing.")
+                .ok_or_else(|| "invalid landing configuration key".to_owned())?;
             let value = if key == "default_branch" {
                 Value::String(value)
             } else {

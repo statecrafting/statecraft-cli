@@ -427,6 +427,7 @@ fn the_grown_command_tree_still_has_no_verb_that_publishes() {
     // with `proposal admit`; and one more with spec 062's `review status`, a
     // read that publishes nothing; and one more with spec 063's `land wait`,
     // also a read that publishes nothing; two more with spec 063's `land arm`
-    // and `land push`, the two landing acts F-02's narrowing lifted.
-    assert_eq!(statecraft_cli::commands::Verb::all().len(), 64);
+    // and `land push`, the two landing acts F-02's narrowing lifted; and one
+    // more with spec 063's `land restack`, the third landing act lifted.
+    assert_eq!(statecraft_cli::commands::Verb::all().len(), 65);
 }

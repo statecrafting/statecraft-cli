@@ -477,6 +477,45 @@ after the command tree parses, so `--help` answers as for every verb.
   spelling `land push` from their guards against publishing verbs, citing
   the `F-02` narrowing (D-5); every other verb keeps them.
 
+**2026-10-28, increment 3: `land restack`.** A binding (006 3.2) to
+`statecraft_land::restack`, sharing `land push`'s pre-push runner, disarm
+and lease push, which moved into functions both verbs call.
+
+- **Order and preconditions.** The attempt binding, then usage, then
+  `default_branch`, `generated` and `pre_push`, each required. Before any
+  write the worktree must be clean (`dirty` otherwise, exit 2; 3.5 runs in
+  a clean worktree) and its `HEAD` must be the pull request's head (`stale`
+  otherwise, naming both), so the commits replayed are GitHub's list and
+  nothing local beside it.
+- **Generated paths.** Matched with git's own glob pathspecs, never a
+  matcher of this product's; a conflicted path matching an entry takes the
+  base's copy, or its absence when the base deleted it.
+- **Each replayed commit** is cherry-picked without committing, every
+  `generated` entry's regenerator runs in order, every `pre_push` vector
+  runs at that commit's tree (3.5.3: checked at its own tree), the result is
+  staged, a conflict marker refuses (`markers`), and the commit is made
+  with the original message and author, signed when required. `pre_push`
+  is therefore not run again before the push.
+- **Authored change (3.5.4).** Per path outside every `generated` pattern,
+  the sorted added and removed lines of a zero-context diff, from the
+  parent of the first listed commit to the original head and from the new
+  base to the new head, as `scripts/resolve-shard-conflicts.sh` compares
+  them.
+- **Restore.** One function serves every failure during the replay: the
+  branch returns to its original head with a clean worktree. After the
+  replay completes the branch points at the result, so `authored-change-differs`,
+  a refused lease or a failed retarget leaves it there, local and reported
+  beside `originalHead`.
+- **`--onto`.** The pull request's base, or `default_branch` when a merged
+  pull request has that base as its head branch.
+- **`--chain`** switches the clean worktree to each pull request's local
+  head branch in turn, bottom first, each onto the previous one's head
+  branch, stops at the first that does not exit 0, and returns to the
+  starting branch when the worktree is clean. Its answer lists each
+  attempted pull request in `restacks`.
+- **A merge commit** among the pull request's commits is not replayed: its
+  cherry-pick fails, the branch is restored, and the answer is exit 4.
+
 ## Verification
 
 Each line is one command. The acceptance grows with each increment of
@@ -489,4 +528,5 @@ cargo test -p statecraft-home --locked --lib landing
 cargo test -p statecraft-cli --locked --test land
 cargo test -p statecraft-cli --locked --test integration_slice the_grown_command_tree_still_has_no_verb_that_publishes
 cargo test -p statecraft-cli --locked --test negative_cases no_verb_the_binary_offers_publishes_anything
+cargo test -p statecraft-cli --locked --test land restack
 ```

@@ -145,6 +145,8 @@ pub enum Verb {
     LandArm,
     /// `land push <pr>`
     LandPush,
+    /// `land restack <pr>` or `land restack --chain <pr>...`
+    LandRestack,
     /// `--help`, optionally with a group or a verb as its topic.
     ///
     /// Not part of the command tree: [`Verb::all`] lists the operations, and a
@@ -171,6 +173,7 @@ impl Verb {
             Verb::LandWait => "land wait",
             Verb::LandArm => "land arm",
             Verb::LandPush => "land push",
+            Verb::LandRestack => "land restack",
             Verb::ProjectRegister => "project register",
             Verb::ProjectList => "project list",
             Verb::ProjectArm => "project arm",
@@ -327,7 +330,7 @@ impl Verb {
             | Verb::ProposalAcknowledge
             | Verb::ProposalAdmit => "027-observation-and-proposals",
             Verb::ReviewStatus => "062-review-verdict-status",
-            Verb::LandWait | Verb::LandArm | Verb::LandPush => "063-land-verbs",
+            Verb::LandWait | Verb::LandArm | Verb::LandPush | Verb::LandRestack => "063-land-verbs",
             Verb::Help => "006-command-surface",
         }
     }
@@ -402,6 +405,7 @@ impl Verb {
             Verb::LandWait,
             Verb::LandArm,
             Verb::LandPush,
+            Verb::LandRestack,
         ]
     }
 
@@ -420,6 +424,7 @@ impl Verb {
             ("land", Some("wait")) => Some((Verb::LandWait, 2)),
             ("land", Some("arm")) => Some((Verb::LandArm, 2)),
             ("land", Some("push")) => Some((Verb::LandPush, 2)),
+            ("land", Some("restack")) => Some((Verb::LandRestack, 2)),
             ("review", Some("status")) => Some((Verb::ReviewStatus, 2)),
             ("project", Some("register")) => Some((Verb::ProjectRegister, 2)),
             ("project", Some("list")) => Some((Verb::ProjectList, 2)),
