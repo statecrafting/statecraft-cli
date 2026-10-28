@@ -71,11 +71,11 @@ pub fn prepare(
     let project = root.display().to_string();
     let at = rfc3339_utc(clock.now_unix());
     let mut chain = open(home, root)?;
-    if workflow::current(&chain, &task.run_id, task.attempt).is_some() {
-        let candidate = workflow::current(&chain, &task.run_id, task.attempt)
-            .and_then(Result::ok)
-            .map(|w| w.candidate)
-            .unwrap_or_default();
+    if let Some(found) = workflow::current(&chain, &task.run_id, task.attempt) {
+        // An unreadable record binds nothing and is never read as absent.
+        let candidate = found
+            .map_err(|e| format!("workflow-unreadable: {e}"))?
+            .candidate;
         return workflow::prepare(
             home, &mut chain, &project, &candidate, manifest, task, skill, adapter, &at,
         )
@@ -260,21 +260,27 @@ fn policy(root: &Path, base: &str) -> Result<da::Policy, String> {
     da::Policy::decode(&bytes).map(|(p, _)| p)
 }
 
-/// The adapter and provider names the attempt's bound result repeats.
-fn result_parties(chain: &Chain, home: &Path, task: &DocumentationTask) -> Vec<String> {
+/// The adapter and provider names the attempt's bound result repeats. Fails
+/// closed: a record is reviewed only once its result can be read, so the
+/// exclusion of its provider and adapter is never skipped by an absence.
+fn result_parties(
+    chain: &Chain,
+    home: &Path,
+    task: &DocumentationTask,
+) -> Result<Vec<String>, String> {
     let Projection::Recorded {
         result: ResultProjection::Recorded(r),
         ..
     } = doc::project(chain, &task.run_id, task.attempt)
     else {
-        return Vec::new();
+        return Err("authority: the attempt has no single recorded result".into());
     };
-    context::read_retained(home, &r.raw.custody_digest)
-        .ok()
-        .flatten()
-        .and_then(|b| doc::DocumentationResult::decode(&b, task).ok())
-        .map(|r| vec![r.adapter.name, r.provider.name])
-        .unwrap_or_default()
+    let bytes = context::read_retained(home, &r.raw.custody_digest)
+        .map_err(|e| format!("authority: the result is unreadable: {e}"))?
+        .ok_or("authority: the result's bytes are not retained")?;
+    let result = doc::DocumentationResult::decode(&bytes, task)
+        .map_err(|e| format!("authority: the result does not decode: {e}"))?;
+    Ok(vec![result.adapter.name, result.provider.name])
 }
 
 /// Section 3.7: who may append a record, under the trusted-base policy.
@@ -290,7 +296,7 @@ fn authorized(
     authority: Option<review::Authority>,
     now: &str,
 ) -> Result<(), String> {
-    let mut parties = result_parties(chain, home, task);
+    let mut parties = result_parties(chain, home, task)?;
     if let Some(a) = &w.subjects.adapter {
         parties.push(a.name.clone());
     }
@@ -438,6 +444,7 @@ pub fn accept(
     run_id: &str,
     attempt: u32,
     documentation: Option<&Judgment>,
+    clock: &dyn Clock,
 ) -> AcceptanceView {
     let Ok(mut chain) = open(home, root) else {
         return AcceptanceView::Unrecorded {
@@ -473,7 +480,7 @@ pub fn accept(
             judgment: Box::new(judgment),
         };
     };
-    let now = rfc3339_utc(statecraft_environment::time::SystemClock.now_unix());
+    let now = rfc3339_utc(clock.now_unix());
     match judge::record(&mut chain, &w, &judgment, &now) {
         Ok(_) => AcceptanceView::Judged {
             judgment: Box::new(judgment),

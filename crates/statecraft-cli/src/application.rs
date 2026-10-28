@@ -263,6 +263,7 @@ fn accept_registered(
             crate::documentation::AcceptanceView::Judged { judgment } => Some(judgment),
             _ => None,
         },
+        &statecraft_environment::time::SystemClock,
     );
     if let Some(reasons) = judgment.ineligible() {
         let mut answer = slice::accept_answer_with(

@@ -560,9 +560,14 @@ fn the_pilot_runs_task_to_acceptance_across_a_corrected_generation() {
         .unwrap();
     let first = p.documentation(&t1);
     assert_ne!(first.outcome, Outcome::Accepted);
-    let AcceptanceView::Judged { judgment: j1 } =
-        cli::accept(p.target.path(), p.home.path(), RUN, 1, Some(&first))
-    else {
+    let AcceptanceView::Judged { judgment: j1 } = cli::accept(
+        p.target.path(),
+        p.home.path(),
+        RUN,
+        1,
+        Some(&first),
+        &clock(),
+    ) else {
         panic!("not judged")
     };
     assert_ne!(j1.outcome, Outcome::Accepted);
@@ -610,9 +615,14 @@ fn the_pilot_runs_task_to_acceptance_across_a_corrected_generation() {
     p.submit(&p.review(subject2, OWNER, &t2, true), 2).unwrap();
     let second = p.documentation(&t2);
     assert_eq!(second.outcome, Outcome::Accepted, "{:?}", second.reasons);
-    let AcceptanceView::Judged { judgment: j2 } =
-        cli::accept(p.target.path(), p.home.path(), RUN, 2, Some(&second))
-    else {
+    let AcceptanceView::Judged { judgment: j2 } = cli::accept(
+        p.target.path(),
+        p.home.path(),
+        RUN,
+        2,
+        Some(&second),
+        &clock(),
+    ) else {
         panic!("not judged")
     };
     assert_eq!(j2.outcome, Outcome::Accepted, "{:?}", j2.reasons);
@@ -634,6 +644,11 @@ fn the_pilot_runs_task_to_acceptance_across_a_corrected_generation() {
     assert_eq!(
         wire[1]["fixedExport"]["workflow"]["transitions"][4]["reason"],
         "accepted"
+    );
+    // The judged version is stamped by the injected clock, not the system's.
+    assert_eq!(
+        wire[1]["fixedExport"]["workflow"]["transitions"][4]["at"],
+        statecraft_environment::time::rfc3339_utc(1_790_000_000)
     );
     match &views[0].fixed_export {
         WorkflowView::Recorded { workflow, versions } => {
@@ -758,9 +773,14 @@ fn an_attempted_publication_rejects_and_the_command_path_never_accepts_by_absenc
     p.submit(&p.review(subject, OWNER, &t, true), 1).unwrap();
     let documentation = p.documentation(&t);
     assert_eq!(documentation.outcome, Outcome::Accepted);
-    let AcceptanceView::Judged { judgment } =
-        cli::accept(p.target.path(), p.home.path(), RUN, 1, Some(&documentation))
-    else {
+    let AcceptanceView::Judged { judgment } = cli::accept(
+        p.target.path(),
+        p.home.path(),
+        RUN,
+        1,
+        Some(&documentation),
+        &clock(),
+    ) else {
         panic!("not judged")
     };
     assert_eq!(judgment.outcome, Outcome::Rejected);
@@ -781,9 +801,14 @@ fn an_attempted_publication_rejects_and_the_command_path_never_accepts_by_absenc
         panic!("{view:?}")
     };
     assert_ne!(live.outcome, Outcome::Accepted);
-    let AcceptanceView::Judged { judgment } =
-        cli::accept(p.target.path(), p.home.path(), RUN, 1, Some(&live))
-    else {
+    let AcceptanceView::Judged { judgment } = cli::accept(
+        p.target.path(),
+        p.home.path(),
+        RUN,
+        1,
+        Some(&live),
+        &clock(),
+    ) else {
         panic!("not judged")
     };
     assert_ne!(judgment.outcome, Outcome::Accepted);
@@ -809,8 +834,74 @@ fn an_attempt_without_a_workflow_renders_not_recorded() {
     }
     assert_eq!(cli::view(&p.chain(), RUN, 1), WorkflowView::NotRecorded);
     assert_eq!(
-        cli::accept(p.target.path(), p.home.path(), RUN, 1, None),
+        cli::accept(p.target.path(), p.home.path(), RUN, 1, None, &clock()),
         AcceptanceView::NotRecorded
     );
     assert_eq!(cli::describe(1, &WorkflowView::NotRecorded), "");
+}
+
+// An unreadable workflow record binds nothing: preparation refuses rather
+// than substitute an empty candidate, and nothing is appended.
+#[test]
+fn an_unreadable_workflow_record_refuses_preparation() {
+    let p = pilot();
+    let m = manifest(1, "task-022-a", &"a".repeat(40));
+    let t = task(&m, "task-022-a", &p.base);
+    p.prepare(&m, &t).unwrap();
+    {
+        let mut chain = p.chain();
+        let n = chain.entries().len();
+        chain
+            .append(
+                &format!("{RUN}/1/fixed-export-workflow/{n}"),
+                NOW,
+                &statecraft_run::record::Entry {
+                    kind: statecraft_run::record::Kind::Evidence,
+                    run_id: RUN.into(),
+                    attempt: 1,
+                    subject: "fixed-export-workflow".into(),
+                    idempotency_key: None,
+                    detail: json!({ "workflow": { "schema": "garbled" } }),
+                    effect_id: statecraft_run::record::Identity::Absent,
+                },
+            )
+            .unwrap();
+    }
+    let n = p.chain().entries().len();
+    let err = p.prepare(&m, &t).unwrap_err();
+    assert!(err.starts_with("workflow-unreadable"), "{err}");
+    assert_eq!(p.chain().entries().len(), n);
+}
+
+// Section 3.7: a review before any result is readable is refused, so the
+// provider and adapter exclusion is never skipped by an absence.
+#[test]
+fn a_review_without_a_readable_result_fails_closed() {
+    let p = pilot();
+    let m = manifest(1, "task-022-a", &"a".repeat(40));
+    let t = task(&m, "task-022-a", &p.base);
+    p.prepare(&m, &t).unwrap();
+    let subject = CoreTuple {
+        repository: p.target.path().display().to_string(),
+        trusted_base: p.base.clone(),
+        run_id: RUN.into(),
+        attempt: 1,
+        candidate: p.base.clone(),
+        context_manifest_digest: m.manifest_digest.clone(),
+        task_digest: t.task_digest.clone(),
+        result_custody_digest: d("raw"),
+        result_schema_digest: t.result_schema.digest.clone(),
+        artifacts: vec![],
+        evidence: vec![],
+        policy_digest: d("policy"),
+    };
+    let n = p.chain().entries().len();
+    let err = p
+        .submit(&p.review(subject, OWNER, &t, true), 1)
+        .unwrap_err();
+    assert!(
+        err.starts_with("authority: the attempt has no single recorded result"),
+        "{err}"
+    );
+    assert_eq!(p.chain().entries().len(), n);
 }
