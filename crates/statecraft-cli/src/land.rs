@@ -131,6 +131,14 @@ pub fn act(verb: Verb, args: &[String], json: bool) -> i32 {
                 code,
             )
         }
+        Verb::LandCancelSuperseded => {
+            let answer = statecraft_land::cancel::run(directory, args, attempt);
+            let code = answer.exit_code;
+            (
+                serde_json::to_value(answer).expect("serializable answer"),
+                code,
+            )
+        }
         _ => unreachable!("landing act"),
     };
     let summary = value

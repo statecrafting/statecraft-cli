@@ -516,6 +516,22 @@ and lease push, which moved into functions both verbs call.
 - **A merge commit** among the pull request's commits is not replayed: its
   cherry-pick fails, the branch is restored, and the answer is exit 4.
 
+**2026-10-28, increment 4a: `land cancel-superseded`.** A binding (006
+3.2) to `statecraft_land::cancel`.
+
+- **Order.** The attempt binding (3.9), then usage, then a committed
+  `default_branch`; then the open pull requests and the waiting runs are
+  read in full before the first write, so a failed read cancels nothing.
+- **Which runs.** Only `pull_request` runs waiting on
+  `statecraft-review-exception`, by their pending deployment's Environment
+  name, whose head no open pull request points at; each is force-cancelled
+  once, in ascending id. A run an open pull request still points at is
+  counted in `kept` and left alone. `land status` reads the same runs
+  through the same reader, so the two agree on which are superseded.
+- **A failed cancel** does not stop the rest; each is listed in
+  `notCancelled` with its classified reason, and the answer is exit 4
+  (3.8), since something asked for was not done.
+
 ## Verification
 
 Each line is one command. The acceptance grows with each increment of
@@ -529,4 +545,5 @@ cargo test -p statecraft-cli --locked --test land
 cargo test -p statecraft-cli --locked --test integration_slice the_grown_command_tree_still_has_no_verb_that_publishes
 cargo test -p statecraft-cli --locked --test negative_cases no_verb_the_binary_offers_publishes_anything
 cargo test -p statecraft-cli --locked --test land restack
+cargo test -p statecraft-cli --locked --test land cancel
 ```

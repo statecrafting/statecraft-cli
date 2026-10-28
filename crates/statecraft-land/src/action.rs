@@ -80,7 +80,7 @@ pub(crate) fn arguments(args: &[String], push: bool) -> Result<Arguments, String
     }
     Ok(result)
 }
-fn valid_repo(repo: &str) -> bool {
+pub(crate) fn valid_repo(repo: &str) -> bool {
     let parts: Vec<_> = repo.split('/').collect();
     parts.len() == 2
         && parts.iter().all(|p| {
@@ -191,6 +191,19 @@ impl Remote {
         }
         string(pr, "headRefOid")?;
         Ok(pr.clone())
+    }
+    pub fn post(&self, path: &str) -> Result<(), HostError> {
+        let output = Command::new(&self.host.program)
+            .args(["api", "-X", "POST", path])
+            .output()
+            .map_err(|_| HostError::Unreachable("could not execute gh".into()))?;
+        if output.status.success() {
+            Ok(())
+        } else {
+            Err(classify_gh_failure(&String::from_utf8_lossy(
+                &output.stderr,
+            )))
+        }
     }
     pub fn merge(&self, repo: &str, pr: u64, flags: &[&str]) -> Result<(), HostError> {
         let output = Command::new(&self.host.program)

@@ -1,6 +1,7 @@
 //! Spec 063 increment 1: policy and read-only waits through the operator's gh.
 mod action;
 pub mod arm;
+pub mod cancel;
 pub mod push;
 pub mod restack;
 pub use action::{Attempt, UsedPolicy};
@@ -324,3 +325,6 @@ pub fn wait_with_policy(
 
 #[cfg(test)]
 mod tests;
+
+mod pulls;
+mod runs;

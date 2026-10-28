@@ -214,6 +214,8 @@ case "$1 $2" in
    if [ -f "$here/merge-failure" ]; then cat "$here/merge-failure" >&2; echo 'PRIVATE BODY'; exit 1; fi ;;
  'api graphql')
    case "$4" in
+     *'pullRequests(states:OPEN'*)
+       case "$4" in *'after:"next"'*) cat "$here/open-next.json" ;; *) cat "$here/open.json" ;; esac ;;
      *timelineItems*) cat "$here/timeline.json" ;;
      *statusCheckRollup*)
        case "$4" in *'after:"next"'*) cat "$here/checks-next.json" ;; *) cat "$here/checks.json" ;; esac ;;
@@ -223,8 +225,24 @@ case "$1 $2" in
      *) exit 93 ;;
    esac ;;
  'api -X')
+   if [ "$3" = POST ]; then
+     case "$4" in
+       */force-cancel)
+         id="${4%/force-cancel}"; id="${id##*/}"
+         if [ -f "$here/cancel-failure-$id" ]; then
+           cat "$here/cancel-failure-$id" >&2; echo 'PRIVATE BODY HTTP 404'; exit 1
+         fi
+         exit 0 ;;
+       *) exit 94 ;;
+     esac
+   fi
    [ "$3" = GET ] || exit 94
    case "$4" in
+     *pending_deployments*)
+       id="${4%/pending_deployments}"; id="${id##*/}"
+       if [ -f "$here/pending-failure-$id" ]; then cat "$here/pending-failure-$id" >&2; exit 1; fi
+       if [ -f "$here/pending-$id.json" ]; then cat "$here/pending-$id.json"; else cat "$here/pending.json"; fi ;;
+     *'actions/runs?status=waiting'*) cat "$here/waiting.json" ;;
      *check-suites*) cat "$here/suites.json" ;;
      *check-runs*) cat "$here/review.json" ;;
      *statecraft-ci.yml/runs*) cat "$here/runs.json" ;;
@@ -389,7 +407,7 @@ exec '{}' "$@"
 }
 #[test]
 fn landing_acts_refuse_attempt_presence_even_empty_before_usage_and_reads() {
-    for verb in ["arm", "push", "restack"] {
+    for verb in ["arm", "push", "restack", "cancel-superseded"] {
         for key in ["STATECRAFT_RUN_ID", "STATECRAFT_ATTEMPT"] {
             for value in ["", "attempt-1"] {
                 let f = ActionFixture::new();
@@ -862,7 +880,7 @@ fn arm_uses_suite_time_when_force_push_history_cannot_be_read() {
 }
 #[test]
 fn landing_acts_answer_help_like_every_other_verb() {
-    for verb in ["arm", "push", "restack"] {
+    for verb in ["arm", "push", "restack", "cancel-superseded"] {
         let output = Command::new(env!("CARGO_BIN_EXE_statecraft-cli"))
             .args(["land", verb, "--help"])
             .env("STATECRAFT_RUN_ID", "run-1")
@@ -1411,4 +1429,148 @@ fn restack_from_nested_directory_uses_root_and_all_regenerators_in_order() {
         f.action.git(&["log", "-2", "--format=%s"]),
         "upper two\nupper one"
     );
+}
+
+// The reads every landing report and act shares: a committed policy, one
+// open pull request at the fixture's head, and no waiting run.
+fn landing_fixture() -> ActionFixture {
+    let mut f = ActionFixture::new();
+    f.declaration(json!({"default_branch":"trunk"}), false);
+    f.record();
+    f.write("open",json!({"data":{"repository":{"pullRequests":{"nodes":[open_pr(&f,7,"trunk")],"pageInfo":{"hasNextPage":false}}}}}));
+    f.write("waiting", json!({"workflow_runs":[]}));
+    f.write(
+        "pending",
+        json!([{"environment":{"name":"statecraft-review-exception"}}]),
+    );
+    f
+}
+fn open_pr(f: &ActionFixture, number: u64, base: &str) -> Value {
+    json!({"number":number,"title":"spec(041): test","url":"https://example.invalid/pr","createdAt":"2026-10-20T00:00:00Z","isDraft":false,"baseRefName":base,"headRefName":format!("p{number}"),"headRefOid":f.head,"headRepository":{"nameWithOwner":"o/r"},"mergeStateStatus":"CLEAN","autoMergeRequest":null,"mergeQueueEntry":null})
+}
+
+fn cancel_run(id: u64, head: &str) -> Value {
+    json!({"id":id,"event":"pull_request","head_sha":head,"html_url":format!("https://example.invalid/run/{id}"),"created_at":"2026-10-27T00:00:00Z"})
+}
+fn assert_cancel_reads_only(f: &ActionFixture, posts: &[u64]) {
+    let calls = f.calls();
+    let writes: Vec<_> = calls
+        .lines()
+        .filter(|l| !l.starts_with("gh api graphql ") && !l.starts_with("gh api -X GET "))
+        .collect();
+    let expected: Vec<_> = posts
+        .iter()
+        .map(|id| format!("gh api -X POST repos/o/r/actions/runs/{id}/force-cancel"))
+        .collect();
+    assert_eq!(writes, expected);
+    assert_eq!(f.git_calls(), "show HEAD:.statecraft/environment.json\n");
+}
+#[test]
+fn cancel_usage_policy_and_missing_committed_declaration() {
+    let mut f = landing_fixture();
+    for args in [
+        vec!["7"],
+        vec!["--unknown"],
+        vec!["--repo"],
+        vec!["--repo", "bad"],
+        vec!["--repo", "o/r", "--repo", "o/r"],
+    ] {
+        f.run("cancel-superseded", &args, 3, "usage");
+        assert!(f.calls().is_empty());
+        assert!(f.git_calls().is_empty());
+    }
+    f.declaration(json!({}), false);
+    f.record();
+    let a = f.run("cancel-superseded", &["--repo", "o/r"], 2, "refused");
+    assert!(a["reason"].as_str().unwrap().contains("default_branch"));
+    assert!(f.calls().is_empty());
+    // An uncommitted value cannot supply the missing key.
+    f.declaration(json!({"default_branch":"trunk"}), false);
+    f.run("cancel-superseded", &["--repo", "o/r"], 2, "refused");
+    assert!(f.calls().is_empty());
+    std::fs::remove_file(f.path().join(".statecraft/environment.json")).unwrap();
+    f.record();
+    let a = f.run("cancel-superseded", &["--repo", "o/r"], 2, "refused");
+    assert!(
+        a["reason"]
+            .as_str()
+            .unwrap()
+            .contains("committed declaration")
+    );
+    assert!(f.calls().is_empty());
+}
+#[test]
+fn cancel_filters_orders_and_writes_only_one_force_cancel_per_id() {
+    let f = landing_fixture();
+    f.write("open",json!({"data":{"repository":{"pullRequests":{"nodes":[],"pageInfo":{"hasNextPage":true,"endCursor":"next"}}}}}));
+    f.write("open-next",json!({"data":{"repository":{"pullRequests":{"nodes":[open_pr(&f,7,"trunk")],"pageInfo":{"hasNextPage":false}}}}}));
+    f.write("waiting",json!({"workflow_runs":[cancel_run(9,"old"),json!({"id":1,"event":"workflow_dispatch"}),cancel_run(4,&f.head),cancel_run(3,"old"),cancel_run(2,"old"),cancel_run(9,"old")]}));
+    f.write("pending-2", json!([{"environment":{"name":"release"}}]));
+    let a = f.run("cancel-superseded", &["--repo", "o/r"], 0, "cancelled");
+    assert_eq!(a["exitCode"], 0);
+    assert_eq!(a["kept"], 1);
+    assert_eq!(
+        a["cancelled"],
+        json!([
+            {"id":3,"headSha":"old","url":"https://example.invalid/run/3"},
+            {"id":9,"headSha":"old","url":"https://example.invalid/run/9"}
+        ])
+    );
+    assert_eq!(a["notCancelled"], json!([]));
+    assert_eq!(
+        a["policy"]["defaultBranch"],
+        json!({"value":"trunk","layer":"project-override"})
+    );
+    let calls = f.calls();
+    assert!(!calls.contains("runs/1/pending_deployments"));
+    let last_read = calls.rfind("gh api -X GET ").unwrap();
+    assert!(last_read < calls.find("gh api -X POST ").unwrap());
+    assert_cancel_reads_only(&f, &[3, 9]);
+}
+#[test]
+fn cancel_empty_is_success_and_failed_posts_do_not_stop_the_rest() {
+    let f = landing_fixture();
+    let a = f.run("cancel-superseded", &["--repo", "o/r"], 0, "cancelled");
+    assert_eq!(a["cancelled"], json!([]));
+    assert_eq!(a["kept"], 0);
+    assert_cancel_reads_only(&f, &[]);
+    let f = landing_fixture();
+    f.write(
+        "waiting",
+        json!({"workflow_runs":[cancel_run(9,"old"),cancel_run(2,"old"),cancel_run(5,"old")]}),
+    );
+    std::fs::write(f.path().join("bin/cancel-failure-2"), "gh: HTTP 403").unwrap();
+    let a = f.run("cancel-superseded", &["--repo", "o/r"], 4, "failed");
+    assert_eq!(a["exitCode"], 4);
+    assert!(a["reason"].as_str().unwrap().contains("1 run(s)"));
+    assert_eq!(a["notCancelled"][0]["id"], 2);
+    assert!(
+        a["notCancelled"][0]["reason"]
+            .as_str()
+            .unwrap()
+            .contains("403")
+    );
+    assert_eq!(a["cancelled"][0]["id"], 5);
+    assert_eq!(a["cancelled"][1]["id"], 9);
+    assert!(!a.to_string().contains("PRIVATE"));
+    assert_cancel_reads_only(&f, &[2, 5, 9]);
+}
+#[test]
+fn cancel_failed_reads_prevent_all_posts_even_after_an_eligible_run() {
+    for failed in ["open", "waiting", "pending"] {
+        let f = landing_fixture();
+        f.write(
+            "waiting",
+            json!({"workflow_runs":[cancel_run(2,"old"),cancel_run(9,"old")]}),
+        );
+        match failed {
+            "open" => f.write("open", json!({})),
+            "waiting" => f.write("waiting", json!({})),
+            _ => std::fs::write(f.path().join("bin/pending-failure-9"), "gh: HTTP 429").unwrap(),
+        }
+        let a = f.run("cancel-superseded", &["--repo", "o/r"], 4, "failed");
+        assert_eq!(a["cancelled"], json!([]));
+        assert_eq!(a["notCancelled"], json!([]));
+        assert_cancel_reads_only(&f, &[]);
+    }
 }
