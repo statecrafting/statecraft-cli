@@ -389,7 +389,7 @@ exec '{}' "$@"
 }
 #[test]
 fn landing_acts_refuse_attempt_presence_even_empty_before_usage_and_reads() {
-    for verb in ["arm", "push"] {
+    for verb in ["arm", "push", "restack"] {
         for key in ["STATECRAFT_RUN_ID", "STATECRAFT_ATTEMPT"] {
             for value in ["", "attempt-1"] {
                 let f = ActionFixture::new();
@@ -862,7 +862,7 @@ fn arm_uses_suite_time_when_force_push_history_cannot_be_read() {
 }
 #[test]
 fn landing_acts_answer_help_like_every_other_verb() {
-    for verb in ["arm", "push"] {
+    for verb in ["arm", "push", "restack"] {
         let output = Command::new(env!("CARGO_BIN_EXE_statecraft-cli"))
             .args(["land", verb, "--help"])
             .env("STATECRAFT_RUN_ID", "run-1")
@@ -871,4 +871,544 @@ fn landing_acts_answer_help_like_every_other_verb() {
         assert_eq!(output.status.code(), Some(0), "land {verb} --help");
         assert!(String::from_utf8_lossy(&output.stdout).contains(&format!("land {verb}")));
     }
+}
+
+const RESTACK_GH: &str = r#"#!/bin/sh
+here="$(dirname "$0")"
+printf 'gh %s\n' "$*" >> "$here/calls"
+case "$1 $2" in
+ 'pr merge')
+   [ "$5" = 'o/r' ] || exit 91
+   [ "$6" = '--disable-auto' ] || exit 92
+   touch "$here/disarmed" ;;
+ 'pr edit')
+   [ ! -f "$here/edit-failure" ] || { echo 'gh: HTTP 403' >&2; exit 1; } ;;
+ 'api graphql')
+   case "$4" in
+     *'pullRequests(headRefName:"lower"'*) cat "$here/merged.json" ;;
+     *'pullRequests(headRefName:'*) echo '{"data":{"repository":{"pullRequests":{"nodes":[]}}}}' ;;
+     *'pullRequest(number:6)'*)
+       case "$4" in *'commits(first:100'*) cat "$here/6-commits.json" ;; *) cat "$here/6-pr.json" ;; esac ;;
+     *'pullRequest(number:7)'*)
+       case "$4" in
+         *'commits(first:100,after:"next"'*) cat "$here/7-next.json" ;;
+         *'commits(first:100'*) cat "$here/7-commits.json" ;;
+         *) cat "$here/7-pr.json" ;;
+       esac ;;
+     *) exit 93 ;;
+   esac ;;
+ *) exit 94 ;;
+esac
+"#;
+struct RestackFixture {
+    action: ActionFixture,
+    original: String,
+    lower: String,
+    commits: Vec<String>,
+}
+impl RestackFixture {
+    fn new(source_conflict: bool, signed: bool, merged: bool, second: bool) -> Self {
+        let f = ActionFixture::new();
+        std::fs::write(
+            f.path().join(".git/info/exclude"),
+            "bin/\nremote.git/\nno-home/\n",
+        )
+        .unwrap();
+        f.declaration(json!({"default_branch":"trunk","generated":[{"paths":[".statecraft/derived/**"],"regenerate":["./bin/regenerate"]}],"pre_push":[["./bin/preflight"]]}), signed);
+        std::fs::create_dir_all(f.path().join(".statecraft/derived")).unwrap();
+        std::fs::write(
+            f.path().join(".statecraft/derived/schema"),
+            "original schema\n",
+        )
+        .unwrap();
+        std::fs::write(f.path().join("source.txt"), "original source\n").unwrap();
+        f.git(&["add", "-A"]);
+        f.git(&["commit", "-m", "base"]);
+        f.git(&["branch", "trunk"]);
+        f.git(&["switch", "-c", "lower"]);
+        std::fs::write(f.path().join("lower.txt"), "lower change\n").unwrap();
+        f.git(&["add", "lower.txt"]);
+        f.git(&["commit", "-m", "lower"]);
+        let lower = f.git(&["rev-parse", "HEAD"]);
+        f.git(&["switch", "-C", "topic", "lower"]);
+        std::fs::write(
+            f.path().join(".statecraft/derived/schema"),
+            "upper schema\n",
+        )
+        .unwrap();
+        std::fs::write(f.path().join("source.txt"), "upper source\n").unwrap();
+        f.git(&["add", "-A"]);
+        f.git(&[
+            "commit",
+            "-m",
+            "upper one",
+            "--author",
+            "Original Author <author@example.invalid>",
+        ]);
+        let mut commits = vec![f.git(&["rev-parse", "HEAD"])];
+        if second {
+            std::fs::write(f.path().join("second.txt"), "second authored change\n").unwrap();
+            f.git(&["add", "second.txt"]);
+            f.git(&["commit", "-m", "upper two"]);
+            commits.push(f.git(&["rev-parse", "HEAD"]));
+        }
+        let original = f.git(&["rev-parse", "HEAD"]);
+        f.git(&["switch", "trunk"]);
+        if merged {
+            f.git(&["merge", "--no-ff", "lower", "-m", "merge lower"]);
+        }
+        std::fs::write(f.path().join(".statecraft/derived/schema"), "base schema\n").unwrap();
+        if source_conflict {
+            std::fs::write(f.path().join("source.txt"), "base source\n").unwrap();
+        }
+        f.git(&["add", "-A"]);
+        f.git(&["commit", "-m", "advance base"]);
+        // Seed all remote refs without networking, then restore the caller branch.
+        f.git(&[
+            "--git-dir=remote.git",
+            "fetch",
+            ".",
+            "+refs/heads/*:refs/heads/*",
+        ]);
+        f.git(&["switch", "topic"]);
+        statecraft_adapter::fixture::install_script(&f.path().join("bin/gh"), RESTACK_GH, 0o755)
+            .unwrap();
+        statecraft_adapter::fixture::install_script(
+            &f.path().join("bin/regenerate"),
+            r#"#!/bin/sh
+cat .statecraft/derived/schema >> bin/base-copies
+printf 'deterministic schema\n' > .statecraft/derived/schema
+printf 'regenerate\n' >> bin/order
+"#,
+            0o755,
+        )
+        .unwrap();
+        statecraft_adapter::fixture::install_script(
+            &f.path().join("bin/preflight"),
+            r#"#!/bin/sh
+printf 'check\n' >> bin/order
+[ ! -f bin/fail-second ] || [ ! -f second.txt ] || exit 17
+"#,
+            0o755,
+        )
+        .unwrap();
+        let real_git =
+            String::from_utf8(Command::new("which").arg("git").output().unwrap().stdout).unwrap();
+        let shim = format!(
+            r#"#!/bin/sh
+here="$(dirname "$0")"
+printf '%s\n' "$*" >> "$here/git-calls"
+case "$1" in
+ push)
+   printf 'git %s\n' "$*" >> "$here/calls"
+   if [ -f "$here/reject-lease" ]; then
+     '{}' --git-dir=remote.git update-ref refs/heads/topic refs/heads/trunk || exit 95
+   fi ;;
+esac
+# Log the required signing argument, but never use an operator's signing key.
+case "$*" in
+ '-c core.editor=true commit -C '*' --allow-empty -S')
+   exec '{}' -c core.editor=true -c commit.gpgsign=false commit -C "$5" --allow-empty ;;
+esac
+exec '{}' "$@"
+"#,
+            real_git.trim(),
+            real_git.trim(),
+            real_git.trim()
+        );
+        statecraft_adapter::fixture::install_script(&f.path().join("bin/git"), &shim, 0o755)
+            .unwrap();
+        let fixture = Self {
+            action: f,
+            original,
+            lower,
+            commits,
+        };
+        fixture.pr(7, "topic", "lower", &fixture.original);
+        fixture.pr(6, "lower", "trunk", &fixture.lower);
+        fixture.list(7, &fixture.commits, false);
+        fixture.list(6, std::slice::from_ref(&fixture.lower), false);
+        fixture.action.write("merged", json!({"data":{"repository":{"pullRequests":{"nodes":if merged { vec![json!({"number":6})] } else { vec![] }}}}}));
+        assert!(fixture.action.git(&["status", "--porcelain"]).is_empty());
+        fixture
+    }
+    fn pr(&self, number: u64, branch: &str, base: &str, head: &str) {
+        self.action.write(&format!("{number}-pr"), json!({"data":{"repository":{"pullRequest":{"state":"OPEN","isDraft":false,"baseRefName":base,"headRefName":branch,"headRefOid":head,"headRepository":{"nameWithOwner":"o/r"},"autoMergeRequest":{"enabledAt":"2026-10-27T10:00:00Z"},"mergeQueueEntry":null}}}}));
+    }
+    fn list(&self, number: u64, commits: &[String], more: bool) {
+        self.action.write(&format!("{number}-commits"), json!({"data":{"repository":{"pullRequest":{"commits":{"nodes":commits.iter().map(|oid| json!({"commit":{"oid":oid}})).collect::<Vec<_>>(),"pageInfo":{"hasNextPage":more,"endCursor":if more { json!("next") } else { Value::Null }}}}}}}));
+    }
+    fn run(&self, code: i32, outcome: &str) -> Value {
+        self.action
+            .run("restack", &["7", "--repo", "o/r"], code, outcome)
+    }
+    fn restored(&self) {
+        assert_eq!(self.action.git(&["branch", "--show-current"]), "topic");
+        assert_eq!(self.action.git(&["rev-parse", "HEAD"]), self.original);
+        assert_eq!(
+            self.action
+                .git(&["--git-dir=remote.git", "rev-parse", "topic"]),
+            self.original
+        );
+        assert!(self.action.git(&["status", "--porcelain"]).is_empty());
+        assert!(!self.action.calls().contains("git push"));
+        assert!(!self.action.calls().contains("pr merge"));
+    }
+    fn script(&self, name: &str, body: &str) {
+        statecraft_adapter::fixture::install_script(
+            &self.action.path().join(format!("bin/{name}")),
+            body,
+            0o755,
+        )
+        .unwrap();
+    }
+}
+#[test]
+fn restack_mixed_conflicts_name_authored_path_and_restore_without_push() {
+    let f = RestackFixture::new(true, false, true, false);
+    let answer = f.run(1, "conflict");
+    assert_eq!(answer["conflicts"], json!(["source.txt"]));
+    f.restored();
+    assert!(!f.action.path().join("bin/order").exists());
+}
+#[test]
+fn restack_generated_conflict_regenerates_signs_pushes_with_lease_and_retargets() {
+    let f = RestackFixture::new(false, true, true, false);
+    let answer = f.run(0, "restacked");
+    assert_eq!(answer["originalHead"], f.original);
+    assert_eq!(answer["onto"], "trunk");
+    assert_eq!(answer["replayed"], 1);
+    assert_eq!(answer["regenerated"], json!([".statecraft/derived/schema"]));
+    assert_eq!(answer["disarmed"], true);
+    assert_eq!(answer["retargeted"], true);
+    assert_eq!(
+        std::fs::read_to_string(f.action.path().join("bin/base-copies")).unwrap(),
+        "base schema\n"
+    );
+    assert_eq!(
+        std::fs::read_to_string(f.action.path().join("bin/order")).unwrap(),
+        "regenerate\ncheck\n"
+    );
+    assert_eq!(
+        f.action.git(&["show", "HEAD:.statecraft/derived/schema"]),
+        "deterministic schema"
+    );
+    assert_eq!(
+        f.action.git(&["log", "-1", "--format=%an <%ae>%n%B"]),
+        "Original Author <author@example.invalid>\nupper one"
+    );
+    let calls = f.action.calls();
+    assert!(calls.contains(&format!("--force-with-lease=topic:{}", f.original)));
+    assert!(calls.contains("pr edit 7 --repo o/r --base trunk"));
+    assert!(calls.find("--disable-auto").unwrap() < calls.find("git push").unwrap());
+    assert!(!calls.contains("--auto"));
+    assert!(
+        f.action
+            .git_calls()
+            .contains(&format!("commit -C {} --allow-empty -S", f.original))
+    );
+    assert_eq!(
+        f.action
+            .git(&["--git-dir=remote.git", "rev-parse", "topic"]),
+        answer["head"].as_str().unwrap()
+    );
+    assert!(f.action.git(&["status", "--porcelain"]).is_empty());
+}
+#[test]
+fn restack_authored_regenerator_edit_stays_local_for_inspection() {
+    let f = RestackFixture::new(false, false, true, false);
+    f.script("regenerate", "#!/bin/sh\nprintf 'regenerated\n' > .statecraft/derived/schema\nprintf 'unwanted authored edit\n' >> source.txt\n");
+    let answer = f.run(1, "authored-change-differs");
+    assert_eq!(answer["differs"], json!(["source.txt"]));
+    assert_eq!(answer["originalHead"], f.original);
+    assert_ne!(f.action.git(&["rev-parse", "HEAD"]), f.original);
+    assert_eq!(f.action.git(&["branch", "--show-current"]), "topic");
+    assert_eq!(
+        f.action
+            .git(&["--git-dir=remote.git", "rev-parse", "topic"]),
+        f.original
+    );
+    assert!(!f.action.calls().contains("git push"));
+    assert!(!f.action.calls().contains("pr merge"));
+}
+#[test]
+fn restack_preflight_at_each_paginated_commit_restores_on_second_failure() {
+    let f = RestackFixture::new(false, false, true, true);
+    f.list(7, &f.commits[..1], true);
+    f.action.write("7-next", json!({"data":{"repository":{"pullRequest":{"commits":{"nodes":[{"commit":{"oid":f.commits[1]}}],"pageInfo":{"hasNextPage":false}}}}}}));
+    std::fs::write(f.action.path().join("bin/fail-second"), "").unwrap();
+    let answer = f.run(2, "pre-push-failed");
+    assert_eq!(answer["replayed"], 1);
+    assert!(answer["reason"].as_str().unwrap().contains(&f.commits[1]));
+    assert!(answer["reason"].as_str().unwrap().contains("exit 17"));
+    assert!(
+        answer["reason"]
+            .as_str()
+            .unwrap()
+            .contains("./bin/preflight")
+    );
+    assert_eq!(
+        std::fs::read_to_string(f.action.path().join("bin/order")).unwrap(),
+        "regenerate\ncheck\nregenerate\ncheck\n"
+    );
+    assert!(f.action.calls().contains("after:\"next\""));
+    f.restored();
+}
+#[test]
+fn restack_failure_and_markers_restore_including_new_untracked_files() {
+    for (script, code, outcome) in [
+        ("#!/bin/sh\ntouch stray-file\nexit 19\n", 4, "failed"),
+        (
+            "#!/bin/sh\nprintf '<<<<<<< unresolved\n' > .statecraft/derived/schema\n",
+            2,
+            "markers",
+        ),
+    ] {
+        let f = RestackFixture::new(false, false, true, false);
+        f.script("regenerate", script);
+        let answer = f.run(code, outcome);
+        if code == 4 {
+            assert!(answer["reason"].as_str().unwrap().contains("regenerator"));
+        }
+        f.restored();
+        assert!(!f.action.path().join("stray-file").exists());
+    }
+}
+#[test]
+fn restack_local_preconditions_and_missing_policy_never_write() {
+    for case in [
+        "dirty",
+        "tracked",
+        "wrong-branch",
+        "fork",
+        "stale",
+        "generated",
+        "pre_push",
+        "malformed-pre_push",
+    ] {
+        let f = RestackFixture::new(false, false, true, false);
+        let mut expected = case;
+        match case {
+            "dirty" => std::fs::write(f.action.path().join("untracked"), "dirty").unwrap(),
+            "tracked" => {
+                std::fs::write(f.action.path().join("source.txt"), "dirty").unwrap();
+                expected = "dirty";
+            }
+            "wrong-branch" => {
+                f.action.git(&["switch", "lower"]);
+            }
+            "fork" => {
+                let path = f.action.path().join("bin/7-pr.json");
+                let mut value: Value =
+                    serde_json::from_slice(&std::fs::read(&path).unwrap()).unwrap();
+                value["data"]["repository"]["pullRequest"]["headRepository"]["nameWithOwner"] =
+                    json!("fork/r");
+                std::fs::write(path, value.to_string()).unwrap();
+                expected = "wrong-branch";
+            }
+            "stale" => {
+                f.action.git(&[
+                    "commit",
+                    "--allow-empty",
+                    "-m",
+                    "local extra not listed by GitHub",
+                ]);
+            }
+            "malformed-pre_push" => {
+                let landing = json!({"default_branch":"trunk","generated":[],"pre_push":[[]]});
+                f.action.declaration(landing, false);
+                f.action.git(&["add", ".statecraft/environment.json"]);
+                f.action.git(&["commit", "-m", "malformed policy"]);
+                expected = "refused";
+            }
+            key => {
+                let mut landing = json!({"default_branch":"trunk","generated":[],"pre_push":[]});
+                landing.as_object_mut().unwrap().remove(key);
+                f.action.declaration(landing, false);
+                f.action.git(&["add", ".statecraft/environment.json"]);
+                f.action.git(&["commit", "-m", "missing policy"]);
+                expected = "refused";
+            }
+        }
+        let answer = f.run(2, expected);
+        if case == "stale" {
+            assert!(answer["reason"].as_str().unwrap().contains(&f.original));
+            assert!(
+                answer["reason"]
+                    .as_str()
+                    .unwrap()
+                    .contains(&f.action.git(&["rev-parse", "HEAD"]))
+            );
+        }
+        if expected == "refused" {
+            assert!(answer["reason"].as_str().unwrap().contains(&format!(
+                "landing.{}",
+                case.trim_start_matches("malformed-")
+            )));
+        }
+        f.action.no_writes();
+        let calls = f.action.git_calls();
+        for write in ["fetch", "cherry-pick", "switch", "reset", "commit", "push"] {
+            assert!(
+                !calls.lines().any(|line| line.starts_with(write)),
+                "{calls}"
+            );
+        }
+    }
+}
+#[test]
+fn restack_lease_refusal_disarms_and_reports_moved_remote_head() {
+    let f = RestackFixture::new(false, false, true, false);
+    std::fs::write(f.action.path().join("bin/reject-lease"), "").unwrap();
+    let answer = f.run(2, "lease-refused");
+    assert_eq!(answer["remoteHead"], f.action.git(&["rev-parse", "trunk"]));
+    assert_eq!(answer["disarmed"], true);
+    assert_eq!(answer["retargeted"], false);
+    assert!(f.action.path().join("bin/disarmed").exists());
+    assert!(!f.action.calls().contains("--auto"));
+    assert!(!f.action.calls().contains("pr edit"));
+}
+#[test]
+fn restack_chain_is_bottom_first_returns_to_start_and_stops_on_failure() {
+    for fail in [false, true] {
+        let f = RestackFixture::new(false, false, false, false);
+        if fail {
+            f.script("preflight", "#!/bin/sh\nexit 21\n");
+        }
+        let answer = f.action.run(
+            "restack",
+            &["--chain", "6", "7", "--repo", "o/r"],
+            if fail { 2 } else { 0 },
+            if fail { "pre-push-failed" } else { "restacked" },
+        );
+        let members = answer["restacks"].as_array().unwrap();
+        assert_eq!(members.len(), if fail { 1 } else { 2 });
+        assert_eq!(members[0]["pullRequest"], 6);
+        assert_eq!(members[0]["onto"], "trunk");
+        if fail {
+            assert!(!f.action.calls().contains("pullRequest(number:7)"));
+            assert!(!f.action.calls().contains("git push"));
+        } else {
+            assert_eq!(members[1]["pullRequest"], 7);
+            assert_eq!(members[1]["onto"], "lower");
+            assert_eq!(members[1]["retargeted"], false);
+            let calls = f.action.calls();
+            assert!(
+                calls.find("--force-with-lease=lower:").unwrap()
+                    < calls.find("--force-with-lease=topic:").unwrap()
+            );
+        }
+        assert_eq!(f.action.git(&["branch", "--show-current"]), "topic");
+        assert!(f.action.git(&["status", "--porcelain"]).is_empty());
+    }
+}
+#[test]
+fn restack_explicit_onto_and_unmerged_base_do_not_use_default_branch() {
+    for explicit in [false, true] {
+        let f = RestackFixture::new(false, false, !explicit, false);
+        let args = if explicit {
+            vec!["7", "--repo", "o/r", "--onto", "lower"]
+        } else {
+            vec!["7", "--repo", "o/r"]
+        };
+        if !explicit {
+            f.action.write(
+                "merged",
+                json!({"data":{"repository":{"pullRequests":{"nodes":[]}}}}),
+            );
+        }
+        let answer = f.action.run("restack", &args, 0, "restacked");
+        assert_eq!(answer["onto"], "lower");
+        assert_eq!(answer["retargeted"], false);
+        assert!(!f.action.git_calls().contains("fetch origin trunk"));
+    }
+}
+
+#[test]
+fn restack_rejects_incomplete_or_unavailable_host_commit_lists_before_replay() {
+    for missing in [false, true] {
+        let f = RestackFixture::new(false, false, true, false);
+        if missing {
+            f.list(7, &["f".repeat(40), f.original.clone()], false);
+        } else {
+            f.list(7, std::slice::from_ref(&f.lower), false);
+        }
+        f.run(2, "stale");
+        f.restored();
+        assert!(!f.action.git_calls().contains("cherry-pick"));
+    }
+}
+#[test]
+fn restack_chain_missing_local_member_restores_starting_branch() {
+    let f = RestackFixture::new(false, false, false, false);
+    f.pr(6, "absent-local-branch", "trunk", &f.lower);
+    let answer = f.action.run(
+        "restack",
+        &["--chain", "6", "7", "--repo", "o/r"],
+        2,
+        "wrong-branch",
+    );
+    assert_eq!(answer["restacks"].as_array().unwrap().len(), 1);
+    f.restored();
+}
+#[test]
+fn restack_usage_precedes_policy_and_reads() {
+    let f = ActionFixture::new();
+    for args in [
+        vec![],
+        vec!["--chain", "7"],
+        vec!["7", "8"],
+        vec!["--chain", "7", "8", "--onto", "trunk"],
+        vec!["7", "--repo", "bad"],
+    ] {
+        f.run("restack", &args, 3, "usage");
+    }
+    assert!(f.calls().is_empty());
+    assert!(f.git_calls().is_empty());
+    let answer = f.run("restack", &["7", "--repo", "o/r"], 2, "refused");
+    assert!(
+        answer["reason"]
+            .as_str()
+            .unwrap()
+            .contains("landing.generated")
+    );
+    assert_eq!(answer["pullRequest"], 7);
+}
+#[test]
+fn restack_retarget_failure_keeps_published_head_and_disarm_evidence() {
+    let f = RestackFixture::new(false, false, true, false);
+    std::fs::write(f.action.path().join("bin/edit-failure"), "").unwrap();
+    let answer = f.run(4, "failed");
+    assert_eq!(answer["disarmed"], true);
+    assert_eq!(answer["retargeted"], false);
+    assert!(answer["reason"].as_str().unwrap().contains("403"));
+    assert_eq!(
+        answer["head"],
+        f.action
+            .git(&["--git-dir=remote.git", "rev-parse", "topic"])
+    );
+    assert_ne!(answer["head"], f.original);
+    assert_eq!(f.action.git(&["branch", "--show-current"]), "topic");
+}
+#[test]
+fn restack_from_nested_directory_uses_root_and_all_regenerators_in_order() {
+    let f = RestackFixture::new(false, false, true, true);
+    // An ignored existing directory is retained across detached replay.
+    std::fs::create_dir(f.action.path().join("bin/nested")).unwrap();
+    let output = f
+        .action
+        .command("restack", &["7", "--repo", "o/r"])
+        .current_dir(f.action.path().join("bin/nested"))
+        .output()
+        .unwrap();
+    let answer = f.action.answer("restack", output, 0, "restacked");
+    assert_eq!(answer["replayed"], 2);
+    assert_eq!(
+        std::fs::read_to_string(f.action.path().join("bin/order")).unwrap(),
+        "regenerate\ncheck\nregenerate\ncheck\n"
+    );
+    assert_eq!(
+        f.action.git(&["log", "-2", "--format=%s"]),
+        "upper two\nupper one"
+    );
 }

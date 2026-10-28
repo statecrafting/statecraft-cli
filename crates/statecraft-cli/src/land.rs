@@ -123,6 +123,14 @@ pub fn act(verb: Verb, args: &[String], json: bool) -> i32 {
                 code,
             )
         }
+        Verb::LandRestack => {
+            let answer = statecraft_land::restack::run(directory, args, attempt);
+            let code = answer.exit_code;
+            (
+                serde_json::to_value(answer).expect("serializable answer"),
+                code,
+            )
+        }
         _ => unreachable!("landing act"),
     };
     let summary = value

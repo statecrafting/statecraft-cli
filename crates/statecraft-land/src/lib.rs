@@ -2,6 +2,7 @@
 mod action;
 pub mod arm;
 pub mod push;
+pub mod restack;
 pub use action::{Attempt, UsedPolicy};
 mod observation;
 pub mod policy;
