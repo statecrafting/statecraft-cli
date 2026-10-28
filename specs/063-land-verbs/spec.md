@@ -441,6 +441,42 @@ in `statecraft-land` (D-4); `land wait` is a binding (006 3.2) to
 - **A `0s` timeout reads once.** Each pull request is observed one time, and
   the answer is the event if it is already met, otherwise `timed-out`.
 
+**2026-10-27, increment 2: `land arm` and `land push`.** Both are bindings
+(006 3.2) to `statecraft_land::arm` and `statecraft_land::push`, dispatched
+after the command tree parses, so `--help` answers as for every verb.
+
+- **Order.** Each reads the attempt binding first, present even when empty
+  (3.9, R-9), then its arguments, then `landing.default_branch`, which every
+  verb requires (section 5's first row), and only then GitHub.
+- **When the current head was pushed (3.3.1).** The `createdAt` of the
+  newest force-push event whose after-commit is the head, otherwise the
+  earliest check suite GitHub created at the head. Arming strictly later is
+  `already-armed`; arming at the same second, or a push time that cannot be
+  read, is `armed-before-head`, so an unknown order refuses and never arms.
+- **Required checks (3.3.2).** A check run or status context the head's
+  rollup marks required for this pull request; a completed check run with
+  any conclusion but success refuses, neutral, stale and startup failure
+  among them, and a status context in failure or error.
+- **Signed heads.** Read from the committed declaration's
+  `governance.require_signed_commits`. `land arm` asks GitHub whether the
+  head's signature is valid; `land push` asks git, since GitHub has not seen
+  the head yet, and refuses a head with no signature, a bad one or one made
+  by a revoked key; a signature git cannot check locally (no key, or an
+  expired one) passes, and GitHub's verification decides at `land arm`.
+- **Merge method (3.3.3).** None passed when the base has a merge queue (the
+  queue's), otherwise the viewer's default merge method for the repository.
+- **`land push` refusals (3.4.1).** `wrong-branch` also covers a pull
+  request whose head is in another repository, since the push goes to
+  `origin`. A conflict marker is a line opening with seven `<` or seven `>`;
+  a lone `=======` is a Markdown underline. `pre_push` output goes to
+  standard error, so the answer on standard output stays whole. Only git's
+  `stale info` is `lease-refused`; a hook or branch-protection rejection is
+  a failed push, exit 4.
+- **The publishing guards.** `integration_slice` (over the command tree)
+  and `negative_cases` (over the binary's verb listing) exempt exactly the
+  spelling `land push` from their guards against publishing verbs, citing
+  the `F-02` narrowing (D-5); every other verb keeps them.
+
 ## Verification
 
 Each line is one command. The acceptance grows with each increment of
@@ -451,4 +487,6 @@ cargo test -p statecraft-land --locked
 cargo test -p statecraft-environment --locked --lib landing
 cargo test -p statecraft-home --locked --lib landing
 cargo test -p statecraft-cli --locked --test land
+cargo test -p statecraft-cli --locked --test integration_slice the_grown_command_tree_still_has_no_verb_that_publishes
+cargo test -p statecraft-cli --locked --test negative_cases no_verb_the_binary_offers_publishes_anything
 ```

@@ -398,7 +398,12 @@ fn the_grown_command_tree_still_has_no_verb_that_publishes() {
         let spelling = verb.spelling();
         for forbidden in ["publish", "release", "tag", "push", "deploy"] {
             assert!(
-                !spelling.contains(forbidden),
+                // F-02 narrowed on 2026-10-27, already on the default
+                // branch: the F-02 row and the section 5 entry "2026-10-27:
+                // F-02 narrowed for spec 063's four landing acts" in
+                // docs/decisions/00-founding-decisions.md, spec 001 section
+                // 5 and spec 063 D-5. Exactly land push is lifted here.
+                !spelling.contains(forbidden) || (forbidden == "push" && spelling == "land push"),
                 "`{spelling}` contains `{forbidden}`"
             );
         }
@@ -421,6 +426,7 @@ fn the_grown_command_tree_still_has_no_verb_that_publishes() {
     // `proposal list`, `show`, `dismiss` and `acknowledge`; and one more
     // with `proposal admit`; and one more with spec 062's `review status`, a
     // read that publishes nothing; and one more with spec 063's `land wait`,
-    // also a read that publishes nothing.
-    assert_eq!(statecraft_cli::commands::Verb::all().len(), 62);
+    // also a read that publishes nothing; two more with spec 063's `land arm`
+    // and `land push`, the two landing acts F-02's narrowing lifted.
+    assert_eq!(statecraft_cli::commands::Verb::all().len(), 64);
 }

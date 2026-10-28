@@ -54,6 +54,10 @@ fn run(args: &[String]) -> i32 {
     if invocation.verb == Verb::LandWait {
         return statecraft_cli::land::run(&invocation.rest, invocation.json);
     }
+    // R-9: each act reads its attempt binding before any other read or write.
+    if matches!(invocation.verb, Verb::LandArm | Verb::LandPush) {
+        return statecraft_cli::land::act(invocation.verb, &invocation.rest, invocation.json);
+    }
     if invocation.verb == Verb::ReviewStatus {
         return statecraft_cli::review::run(&invocation.rest, invocation.json);
     }
@@ -498,7 +502,9 @@ fn run(args: &[String]) -> i32 {
             }
             emit(&statecraft_cli::transfer::execute(&request, &home), format)
         }
-        Verb::ReviewStatus | Verb::LandWait => unreachable!("dispatched before product home reads"),
+        Verb::ReviewStatus | Verb::LandWait | Verb::LandArm | Verb::LandPush => {
+            unreachable!("dispatched before product home reads")
+        }
         // A help request is not an operation, so it consults nothing and
         // changes nothing. Exit 0: the question was asked and answered.
         Verb::Help => {
