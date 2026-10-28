@@ -18,7 +18,7 @@
 //!
 //! [`record`] keeps every event line under custody before parsing it, folds
 //! the adapter's delivery testimony, keeps the first terminal result's raw
-//! bytes, and appends the `executed` and `validated` versions of the
+//! bytes and the artifact bytes it carries, and appends the `executed` and `validated` versions of the
 //! workflow. A prohibited effect, a stated length or digest that is not the
 //! bytes', and every sequence finding stay on the workflow as findings.
 
@@ -36,7 +36,7 @@ use statecraft_run::documentation::{
 use statecraft_run::record::{Chain, RecordError};
 
 use crate::capability::Capability;
-use crate::documentation::RawResult;
+use crate::documentation::{RawArtifact, RawResult};
 use crate::protocol::{Classification, Event, Request};
 
 /// What an adapter must declare to run under the profile (section 3.3).
@@ -308,6 +308,8 @@ pub enum Step {
     Attempt(Effect),
     /// A terminal event returning these exact bytes as `application/json`.
     Terminal(Vec<u8>),
+    /// The same, carrying the output artifacts' exact bytes beside it.
+    TerminalWithArtifacts(Vec<u8>, Vec<RawArtifact>),
     /// A terminal event with a stated media type, length and digest that
     /// may disagree with the bytes.
     TerminalStated(RawResult),
@@ -356,7 +358,11 @@ pub fn run_fake(
                     }));
                 }
             }
-            Step::Terminal(bytes) => {
+            Step::Terminal(bytes) | Step::TerminalWithArtifacts(bytes, _) => {
+                let artifacts = match step {
+                    Step::TerminalWithArtifacts(_, a) => a.clone(),
+                    _ => Vec::new(),
+                };
                 let text = String::from_utf8_lossy(bytes).into_owned();
                 out.push(line(&Event::Result {
                     classification: Classification::Completed,
@@ -366,6 +372,7 @@ pub fn run_fake(
                         byte_length: text.len() as u64,
                         custody_digest: custody_digest(text.as_bytes()),
                         bytes: text,
+                        artifacts,
                     }),
                 }));
             }
@@ -459,6 +466,11 @@ pub fn record(
             }
             if raw.media_type != "application/json" {
                 findings.push(format!("media-type: {}", raw.media_type));
+            }
+            // Section 3.6: every artifact is kept as an immutable blob before
+            // the result that names it is decoded.
+            for a in &raw.artifacts {
+                run_context::retain(home, a.bytes.as_bytes())?;
             }
             let v = doc::record_result(
                 home,

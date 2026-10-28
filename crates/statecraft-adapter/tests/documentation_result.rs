@@ -167,6 +167,7 @@ fn raw(bytes: &str) -> RawResult {
         byte_length: bytes.len() as u64,
         custody_digest: custody_digest(bytes.as_bytes()),
         bytes: bytes.to_string(),
+        artifacts: vec![],
     }
 }
 

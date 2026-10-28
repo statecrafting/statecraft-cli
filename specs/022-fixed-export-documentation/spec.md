@@ -2,7 +2,7 @@
 id: "022-fixed-export-documentation"
 title: "Fixed-export documentation workflow"
 status: approved
-implementation: pending
+implementation: complete
 created: "2026-09-27"
 summary: >
   Amends Statecraft's run, adapter, acceptance, and command contracts with a
@@ -438,6 +438,37 @@ judgment as one `fixed-export-acceptance` evidence record with its digest,
 then the workflow's `judged` version naming that digest, with the outcome as
 its reason.
 
+**2026-10-28: the command bindings, artifact custody, and where the pilot
+is accepted.** Section 3.11's operations are library bindings in
+`crates/statecraft-cli/src/fixed_export.rs`, and no command line verb is
+added: the only adapter that declares the profile is the pilot's fake, and a
+verb that selected it would put a test double on the product's surface.
+`prepare` refuses from the subjects alone, then writes the spec 003 intent
+with the manifest and task, then the `prepared` version; the same inputs
+report it and begin nothing. `execute` selects and admits as the adapter
+half does, runs the fake, records every output, and concludes the attempt
+`completed` with a raw result, `failed` without one, or `refused` when
+selection or admission refuses, counting each prohibited effect as a refusal
+under `fixed-export-boundary` or the refusal under `fixed-export-admission`.
+`submit_review` and `submit_correction` are spec 021's review-submission
+binding: each decodes the closed record, refuses one for another attempt or
+task, and appends only for an identity the trusted-base policy grants, under
+the authority it claims and before its `notAfter`, never for the result's
+provider or adapter; a correction's new artifact bytes are retained first,
+and every changed artifact must be among them. Each appends the workflow's
+`reviewed` or `corrected` version. `accept` judges the workflow beside spec
+021's judgment and records it under `fixedExportAcceptance`; `run show`
+renders the latest version under `fixedExport`, and every attempt outside
+the profile renders `not-recorded`. A terminal event's raw result may carry
+each artifact's exact bytes (`artifacts`, by `rawRef`), and recording keeps
+them as blobs before the result that names them is decoded; this additive
+member is how section 3.6's artifacts reach the run record at all. The
+command's own `accept` still supplies no documentation manifest, so its
+spec 021 judgment keeps context freshness `not-recorded` and accepts
+nothing; the pilot reaches `accepted` by handing the binding spec 021's
+judgment over the recorded chain with the producer's answers as fixtures,
+which is section 3.10's "stable producer answers" and qualifies no producer.
+
 **2026-09-27: acceptance is the end of this profile's authority.** Application
 and publication remain distinct future operations because even a fully
 accepted artifact cannot authorize mutation or an externally visible act.
@@ -445,15 +476,22 @@ accepted artifact cannot authorize mutation or an externally visible act.
 ## Verification
 
 Implementation acceptance is the portable fixture surface `V-1` names, run
-through `make verify SPEC=022`. This spec is `status: approved` (`registry
-list` reports it; the frontmatter is unchanged here), so its implementation
-lands in parts: the acceptance is declared one suite at a time as each part
-lands, and `implementation` stays `pending` until the last. Fixtures use
-fixed local bytes, fake adapter and review identities, fixed clocks and
-disposable workspaces.
+through `make verify SPEC=022`. Fixtures use fixed local bytes, the fake
+adapter and fixed review identities, fixed clocks, a deterministic denial
+boundary and disposable workspaces; they make no provider call, network
+read, credential read, spend, operator-checkout mutation, remote export or
+publication.
 
 ```verify:cli
 cargo test -p statecraft-run --test fixed_export_documentation
 cargo test -p statecraft-adapter --test fixed_export_adapter
 cargo test -p statecraft-acceptance --test fixed_export_acceptance
+cargo test -p statecraft-cli --test fixed_export_documentation
 ```
+
+These establish preparation from retained, pinned exports; exact selection
+and pre-spawn admission; event, result and artifact custody before
+interpretation; a workflow judgment never better than spec 021's; the
+pilot's corrected generation accepted after a first that is not; and that
+nothing is applied or published. They qualify no live adapter, provider,
+transport, reviewer, producer release, application path or publication path.
