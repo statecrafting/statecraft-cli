@@ -589,6 +589,15 @@ every verb of section 3 is built, and the implementation is complete.
   pull request are its force pushes plus one, since the review runs once
   per pushed head and this workflow amends.
 
+**2026-10-28, an unset `review.exclude` (3.1 item 5).** The section was
+silent on a project that sets no `review.exclude`. The rendered review then
+excludes the profile's default, the derived directory, so `land status`
+reads the effective value through the setup validator that renders the
+review rather than the recorded key alone. Reading the key alone
+reported `.statecraft/derived/**` as reviewed in this repository although
+the review skips it. A setup block the validator refuses fails the read
+(exit 4), naming the refusal.
+
 ## Verification
 
 Each line is one command. The acceptance grew with each increment of

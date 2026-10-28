@@ -1732,3 +1732,22 @@ fn status_generated_paths_are_findings_and_review_recognizes_forks() {
     assert_eq!(a["actions"][0]["action"], "fix");
     assert!(!f.calls().contains("check-runs"));
 }
+#[test]
+fn status_unset_review_exclude_is_the_profile_default() {
+    // The rendered review excludes the derived directory when
+    // `review.exclude` is unset, so status must not report it as reviewed.
+    let mut f = status_fixture();
+    f.declaration(json!({"default_branch":"trunk","stack":{"depth":1,"depth_by_spec":{},"max_stacked":1},"generated":[{"paths":[".statecraft/derived/**","src/?.rs"],"regenerate":["generate"]}]}),false);
+    f.record();
+    f.review("no-findings");
+    f.write("open",json!({"data":{"repository":{"pullRequests":{"nodes":[],"pageInfo":{"hasNextPage":false}}}}}));
+    let a = f.run("status", &["--repo", "o/r"], 1, "finding");
+    assert_eq!(a["generatedReviewed"], json!(["src/?.rs"]));
+    let path = f.path().join(".statecraft/environment.json");
+    let mut declaration: Value = serde_json::from_slice(&std::fs::read(&path).unwrap()).unwrap();
+    declaration["project"]["setup"]["parameters"]["review.exclude"] = json!(["/abs"]);
+    std::fs::write(path, declaration.to_string()).unwrap();
+    f.record();
+    let a = f.run("status", &["--repo", "o/r"], 4, "failed");
+    assert!(a["reason"].as_str().unwrap().contains("review.exclude"));
+}
