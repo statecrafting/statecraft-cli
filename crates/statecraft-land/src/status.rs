@@ -9,8 +9,8 @@ use crate::{
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 use statecraft_home::{
-    review_status,
-    setup::{Host, HostError},
+    project, review_status,
+    setup::{self, Host, HostError},
 };
 use std::{
     collections::{BTreeMap, BTreeSet},
@@ -689,21 +689,19 @@ pub fn run(directory: &Path, args: &[String], now: SystemTime) -> Answer {
     if used.generated.is_none() {
         answer.report["policy"]["generated"] = Value::Null;
     }
-    let excludes = if used.generated.is_some() {
-        match manifest
-            .project
-            .setup
-            .as_ref()
-            .and_then(|s| s.parameters.get("review.exclude"))
-        {
-            None => vec![],
-            Some(v) => match serde_json::from_value::<Vec<String>>(v.clone()) {
-                Ok(v) => v,
-                Err(_) => return answer.end("failed", 4, Some("malformed review.exclude".into())),
-            },
+    // The prefixes the rendered review actually excludes: the setup
+    // validator's effective value, so an unset `review.exclude` is the
+    // profile default (the derived directory), not an empty list.
+    let excludes = match manifest.project.setup.as_ref() {
+        Some(s) if used.generated.is_some() => {
+            match setup::parameters(directory, &s.parameters, project::DERIVED) {
+                Ok(p) => p.exclude,
+                Err(e) => {
+                    return answer.end("failed", 4, Some(format!("setup parameters: {e}")));
+                }
+            }
         }
-    } else {
-        vec![]
+        _ => vec![],
     };
     let repo = match repository(&args, directory) {
         Ok(r) => r,
