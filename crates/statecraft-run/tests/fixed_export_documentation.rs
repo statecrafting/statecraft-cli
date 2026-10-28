@@ -145,6 +145,14 @@ fn task(m: &Manifest, candidate: &str) -> DocumentationTask {
     .seal()
 }
 
+fn adapter() -> workflow::AdapterRef {
+    workflow::AdapterRef {
+        name: "fixed-export-fake".into(),
+        version: "1".into(),
+        capabilities: vec![],
+    }
+}
+
 struct Fixture {
     home: tempfile::TempDir,
     target: tempfile::TempDir,
@@ -194,6 +202,7 @@ impl Fixture {
             m,
             t,
             skill,
+            &adapter(),
             "2026-10-22T00:00:00Z",
         )
     }
@@ -216,6 +225,7 @@ fn preparation_records_every_subject_once_and_repeats_as_the_same_identity() {
     assert_eq!(w.subjects.manifest_digest, m.manifest_digest);
     assert_eq!(w.subjects.packets.len(), 1);
     assert_eq!(w.subjects.skill, "not-required");
+    assert_eq!(w.subjects.adapter, Some(adapter()));
     assert_eq!(w.state(), Some(WorkflowState::Prepared));
     assert_eq!(w.computed_digest(), w.workflow_digest);
 
@@ -357,4 +367,37 @@ fn transitions_append_versions_and_keep_the_earlier_ones() {
     assert_eq!(versions[1].as_ref().unwrap(), &next);
     assert_eq!(next.state(), Some(WorkflowState::Executed));
     assert_ne!(next.workflow_digest, w.workflow_digest);
+}
+
+// Section 3.3: the run policy's adapter is recorded at preparation; another
+// one for the same attempt competes, and computing the subjects alone writes
+// nothing.
+#[test]
+fn the_policy_adapter_is_part_of_the_prepared_inputs() {
+    let f = fixture();
+    let m = manifest(&"a".repeat(40));
+    let t = task(&m, &f.head);
+    f.begin(&m, &t);
+    context::retain(f.home.path(), PAGE).unwrap();
+    let before = f.chain().entries().len();
+    let s = workflow::subjects(f.home.path(), &m, &t, None, &adapter()).unwrap();
+    assert_eq!(s.adapter, Some(adapter()));
+    assert_eq!(f.chain().entries().len(), before);
+    f.prepare(&m, &t, None).unwrap();
+    let mut other = adapter();
+    other.name = "installed-provider".into();
+    assert!(matches!(
+        workflow::prepare(
+            f.home.path(),
+            &mut f.chain(),
+            "example/app",
+            &f.head,
+            &m,
+            &t,
+            None,
+            &other,
+            "2026-10-22T00:00:00Z",
+        ),
+        Err(PrepareError::Competing { .. })
+    ));
 }

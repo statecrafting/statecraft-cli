@@ -386,7 +386,10 @@ inputs for an attempt already prepared (`competing-workflow`); the same
 inputs report the existing version. Events are retained one line at a time,
 under custody, before parsing; a line that is not JSON is kept as
 `application/octet-stream`; the first `result` event is the terminal one,
-and a second terminal, an event after it, or none at all is a finding.
+and a second terminal, an event after it, or none at all is a finding. Preparation
+records the run policy's adapter by name and version, the only one execution
+may select, and the same computation without the append (`subjects`) lets a
+caller refuse before it writes an intent.
 
 **2026-09-27: acceptance is the end of this profile's authority.** Application
 and publication remain distinct future operations because even a fully

@@ -44,7 +44,9 @@ pub struct PacketRef {
     pub custody_digest: String,
 }
 
-/// The selected adapter and the capabilities it declared.
+/// An adapter by name and version: at preparation, the one the run policy
+/// names, with no capabilities; once executed, the one selected, with the
+/// capabilities it declared.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct AdapterRef {
@@ -260,19 +262,18 @@ pub struct Prepared {
     pub existing: bool,
 }
 
-/// Section 3.2: admit the attempt to the profile from retained, pinned
-/// bytes, or refuse before any adapter is selected.
-#[allow(clippy::too_many_arguments)]
-pub fn prepare(
+/// Sections 3.2 and 3.3: the subjects a preparation would record, or why
+/// it refuses. It writes nothing to the record, so a caller can refuse
+/// before it writes an intent; the pinned skill's bytes are retained.
+/// `adapter` is the run policy's adapter, by name and version, which is the
+/// only one execution may select.
+pub fn subjects(
     home: &std::path::Path,
-    chain: &mut Chain,
-    project: &str,
-    candidate: &str,
     manifest: &Manifest,
     task: &DocumentationTask,
     skill: Option<&[u8]>,
-    at: &str,
-) -> Result<Prepared, PrepareError> {
+    adapter: &AdapterRef,
+) -> Result<Subjects, PrepareError> {
     if task.context_manifest_digest != manifest.manifest_digest
         || task.run_id != manifest.run_id
         || task.attempt != manifest.attempt
@@ -322,20 +323,39 @@ pub fn prepare(
             });
         }
     }
-    let subjects = Subjects {
+    Ok(Subjects {
         manifest_digest: manifest.manifest_digest.clone(),
         packets,
         task_digest: task.task_digest.clone(),
         skill,
         result_schema_digest: task.result_schema.digest.clone(),
+        adapter: Some(adapter.clone()),
         ..Subjects::default()
-    };
+    })
+}
+
+/// Section 3.2: admit the attempt to the profile from retained, pinned
+/// bytes, or refuse before any adapter is selected.
+#[allow(clippy::too_many_arguments)]
+pub fn prepare(
+    home: &std::path::Path,
+    chain: &mut Chain,
+    project: &str,
+    candidate: &str,
+    manifest: &Manifest,
+    task: &DocumentationTask,
+    skill: Option<&[u8]>,
+    adapter: &AdapterRef,
+    at: &str,
+) -> Result<Prepared, PrepareError> {
+    let subjects = subjects(home, manifest, task, skill, adapter)?;
     if let Some(found) = current(chain, &task.run_id, task.attempt) {
         let found = found.map_err(PrepareError::Binding)?;
         let same = found.subjects.manifest_digest == subjects.manifest_digest
             && found.subjects.task_digest == subjects.task_digest
             && found.subjects.packets == subjects.packets
             && found.subjects.skill == subjects.skill
+            && found.subjects.adapter == subjects.adapter
             && found.candidate == candidate
             && found.project == project;
         return if same {
