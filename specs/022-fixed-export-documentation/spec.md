@@ -418,6 +418,26 @@ terminal event with no result (`no-result`), and a stated length, digest or
 media type that is not the bytes' (`raw-length-mismatch`,
 `raw-digest-mismatch`, `media-type`).
 
+**2026-10-28: the workflow judgment and the patch as data.** The
+acceptance half (`crates/statecraft-acceptance/src/fixed_export.rs`) takes
+spec 021's judgment of the current subject unchanged and the workflow's
+latest version, and its outcome is never better than spec 021's. It
+withholds acceptance (`no-acceptance`) when the workflow is unreadable, not
+this profile's, does not hold its digest, never reached `validated`, names
+no adapter, or names another task, manifest, raw result or attempt than the
+judged subject, and for every workflow finding; a `prohibited-effect`
+finding, or a proposed patch with a `path-escape`, rejects. A subject's
+identity is `statecraft/fixed-export-subject-digest/1` over spec 021's core
+tuple after corrections, so a corrected byte is a new subject that an
+earlier judgment does not name. A patch artifact (disposition `patch`) is
+read only as data: its `base-commit:` line or `not-recorded`, the paths its
+`---` and `+++` lines name, its digest, and whether it is binary;
+applicability is `not-recorded`, because this implementation runs no
+applicability check, and the patch is never applied. Recording appends the
+judgment as one `fixed-export-acceptance` evidence record with its digest,
+then the workflow's `judged` version naming that digest, with the outcome as
+its reason.
+
 **2026-09-27: acceptance is the end of this profile's authority.** Application
 and publication remain distinct future operations because even a fully
 accepted artifact cannot authorize mutation or an externally visible act.
@@ -435,4 +455,5 @@ disposable workspaces.
 ```verify:cli
 cargo test -p statecraft-run --test fixed_export_documentation
 cargo test -p statecraft-adapter --test fixed_export_adapter
+cargo test -p statecraft-acceptance --test fixed_export_acceptance
 ```
