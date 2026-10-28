@@ -85,7 +85,7 @@
       }
     ],
     "sectionDigests": {
-      "022-fixed-export-documentation-workflow": "6d822e1a0cf579e0269861b853fc1191d8f4ec1c81a21e445e41845dc8e2225e",
+      "022-fixed-export-documentation-workflow": "bc2862c2d14e4230ddfd17d4556cc03b96e8695e736ace64256af2730ae08e08",
       "1-purpose": "453fb6ca66e6a6bddf5ad5f36f7c78027c5d7227d5a8142ff0ca4a8e9ed98f2f",
       "2-territory-and-prerequisites": "ff51106eed5b13236a5d4bbc835102d9266d01e2ffedf2b1ff999c9e7cc6125a",
       "3-1-the-fixed-export-profile": "0a6dc2a594647bdf77ac5bc24986efc4bb0d1f595ab4779513be12306f64f289",
@@ -102,8 +102,8 @@
       "3-9-acceptance-application-and-publication": "f8f5997b1e6852f89778e522e17b62accda575923a81ea2fbc5ef516cded218a",
       "3-behavior": "0e8d97191ea291f0e3bf6d0697e3cc289e3c77127a0c32e82a8f2bc923c4e071",
       "4-out-of-scope": "363e8719654ac3628d8908bf2a89d115567a14e4a6989a2f28e8d0224e0e4324",
-      "5-resolved-decisions": "6e20f3fb6e2f8de64cd764b3156bdf2a54000cb5dc64b2eccabdfc356dc4984b",
-      "verification": "02666f6d7aa5b5d63eac803a15ee05bfde0355282aaef8a4aa173e9e5dda9427"
+      "5-resolved-decisions": "30d41163ba9fe6a091b0a61ff3e031c8305498c04dfd6e54c1b1bc2f2af452a9",
+      "verification": "a5c7687ae8c526f09edd95c61e2b17de8612b095ed714dc43538edd0e442e31b"
     },
     "sectionHeadings": [
       "022: Fixed-export documentation workflow",
@@ -131,6 +131,6 @@
     "summary": "Amends Statecraft's run, adapter, acceptance, and command contracts with a bounded offline documentation workflow over revision-pinned context exports. It preserves immutable task, delivery, raw result, validation, review, correction, and acceptance records as separate facts; proves the workflow with a deterministic fake adapter; and grants no live provider, repository application, remote export, or publication authority.\n",
     "title": "Fixed-export documentation workflow"
   },
-  "shardHash": "d3db1e8b2e70a174cbb9cc2a1437928e57642353c84a241c1c4fffea0b6d651f",
+  "shardHash": "b8af8a94f6c8c8393583e9796609387e802075d96e21b45449c5115f10d0dc51",
   "specVersion": "1.10.0"
 }
