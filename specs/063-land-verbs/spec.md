@@ -4,7 +4,7 @@ title: "The land verbs wait for, arm, push and restack a pull request, and land 
 status: approved
 # Ratified by the owner on 2026-10-27 (section 7); this frontmatter is the
 # status spec-spine and the coupling gate read.
-implementation: in-progress
+implementation: complete
 created: "2026-10-27"
 summary: >
   Amends spec 006's command surface; its four write verbs act under the F-02
@@ -574,10 +574,25 @@ write, no file. It does not read the attempt binding (3.9).
 - **Exit.** 1 when any entry is `fix` or `hazard` or `generatedReviewed` is
   not empty; else 0.
 
+**2026-10-28, increment 4c: `land status`'s measures (3.6.3).** With them
+every verb of section 3 is built, and the implementation is complete.
+
+- **Reads.** The pull requests merged in the last seven days, every page,
+  with their base changes and force pushes. One with more of those than a
+  page holds fails the read (exit 4), naming it, rather than being measured
+  from a truncated history.
+- **Measures.** The approval wait over waiting runs whose head targets the
+  default branch; the oldest pull request not `merging`, `running` or
+  `draft`; the count of superseded runs; and per depth over the merged pull
+  requests: the depth is its number of base changes, the time to land is
+  the median from its last base change to its merge, and the reviews per
+  pull request are its force pushes plus one, since the review runs once
+  per pushed head and this workflow amends.
+
 ## Verification
 
-Each line is one command. The acceptance grows with each increment of
-section 6; the verbs not yet built declare none.
+Each line is one command. The acceptance grew with each increment of
+section 6.
 
 ```verify:cli
 cargo test -p statecraft-land --locked
