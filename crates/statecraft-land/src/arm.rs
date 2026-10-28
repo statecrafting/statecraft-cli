@@ -99,14 +99,14 @@ fn armed_outcome(enabled: &str, pushed: Option<&str>) -> (&'static str, i32, Opt
         ),
     }
 }
-fn next(connection: &Value) -> Result<Option<String>, HostError> {
+pub(crate) fn next(connection: &Value) -> Result<Option<String>, HostError> {
     match connection["pageInfo"]["hasNextPage"].as_bool() {
         Some(false) => Ok(None),
         Some(true) => Ok(Some(string(&connection["pageInfo"], "endCursor")?.into())),
         None => Err(malformed()),
     }
 }
-fn after(cursor: &Option<String>) -> String {
+pub(crate) fn after(cursor: &Option<String>) -> String {
     cursor
         .as_ref()
         .map(|c| format!(",after:{}", json!(c)))
