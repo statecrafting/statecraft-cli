@@ -38,6 +38,10 @@
 //!   acceptance: twelve dimensions reported separately, reviewer authority
 //!   and quorum from the trusted-base policy, corrections, and `accepted`,
 //!   `rejected` or `no-acceptance`. Added by spec 021's additive edge.
+//! - [`fixed_export`] is spec 022's workflow judgment: spec 021's judgment
+//!   of the current subject, never bettered by the workflow, withheld by any
+//!   workflow finding, and the proposed patches read as data. Added by spec
+//!   022's additive edge.
 //! - [`wire`] is spec 014's ordered wire-evidence admission and its section
 //!   3.5 acceptance requirement. Added by spec 014's additive edge.
 //!
@@ -70,6 +74,7 @@ pub mod dimensions;
 pub mod documentation;
 pub mod documentation_acceptance;
 pub mod evidence;
+pub mod fixed_export;
 pub mod independence;
 pub mod judged;
 pub mod outcome;
