@@ -214,6 +214,7 @@ case "$1 $2" in
    if [ -f "$here/merge-failure" ]; then cat "$here/merge-failure" >&2; echo 'PRIVATE BODY'; exit 1; fi ;;
  'api graphql')
    case "$4" in
+     *'search(query:'*) cat "$here/merged.json" ;;
      *'pullRequests(states:OPEN'*)
        case "$4" in *'after:"next"'*) cat "$here/open-next.json" ;; *) cat "$here/open.json" ;; esac ;;
      *timelineItems*) cat "$here/timeline.json" ;;
@@ -1595,6 +1596,10 @@ fn status_fixture() -> ActionFixture {
         0o755,
     )
     .unwrap();
+    f.write(
+        "merged",
+        json!({"data":{"search":{"nodes":[],"pageInfo":{"hasNextPage":false}}}}),
+    );
     f.write("files", json!([]));
     f
 }
@@ -1676,6 +1681,7 @@ fn status_041_chain_caps_pagination_and_superseded_runs() {
         a["supersededRuns"],
         json!([{"id":2,"headSha":"old","url":"https://example.invalid/run/2"}])
     );
+    assert_eq!(a["measures"]["superseded"], 1);
     let calls = f.calls();
     assert!(!calls.contains("runs/1/pending_deployments"));
     for write in ["-X POST", "pr merge", "pr edit"] {

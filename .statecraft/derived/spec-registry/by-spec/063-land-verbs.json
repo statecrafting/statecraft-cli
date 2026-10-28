@@ -43,7 +43,7 @@
       }
     ],
     "id": "063-land-verbs",
-    "implementation": "in-progress",
+    "implementation": "complete",
     "obligations": [
       {
         "anchor": "3-1-the-landing-policy",
@@ -110,7 +110,7 @@
       }
     ],
     "sectionDigests": {
-      "063-the-land-verbs": "68a9e1c48a5e702cf3e67a6189156169bf06145c512aff9676d4327659f812e1",
+      "063-the-land-verbs": "fe2bfa320ca1c616df0524101c854dabbac24e0313f1abcfc513b64661dea952",
       "1-purpose": "833c2176d628655fefd9d6c24a26a5a6be4fd3499028c38929b4245f26a75cb6",
       "2-territory": "0e40d53d493a147281026b2bf8b37c28fadb19e46c15e7b2af7797b628438912",
       "3-1-the-landing-policy": "29db108b10b42eeb3d8667ed01125d4bb4fb75b883b83260a08d37ffe841713d",
@@ -127,8 +127,8 @@
       "5-observable-negative-cases": "e0b7ca5be9cae6bf41a7546b12917fbb7c037d71a3ce2cc9f3809a2910e0c1e6",
       "6-delivery": "60aa0d9665c57abe00610b65806896eb06e689eb84773068e279afaf2804ac2e",
       "7-resolved-decisions": "44dbd91465b808bcbd651a26ff2e166cd35dec6e53c1d95cd3aece0cf75bb0da",
-      "implementation-record": "0bac01511707a59377297e386a7d2c71464d526df65a0aea3e4423bd0c2ec1f4",
-      "verification": "c4eb13a37e749c318aa00384c47e2d136a45f020ec6bc89faeddbec20599e7cf"
+      "implementation-record": "19e70447a29df7bbd1f14d963bac645dc303dad0961fb1b0233ccbe1fca46417",
+      "verification": "9af54b20b36123610b6a50adbeaebfbc874cb985954d7f21ec021a9d2f0e574a"
     },
     "sectionHeadings": [
       "063: The land verbs",
@@ -156,6 +156,6 @@
     "summary": "Amends spec 006's command surface; its four write verbs act under the F-02 narrowing of 2026-10-27 and never inside a run attempt (D-5). Six verbs act on a pull request's way to the default branch through the operator's gh: `land wait` blocks until a named event, `land arm` enables auto-merge only for a head the AI review passed on a pull request based on the default branch, `land push` pushes a signed head with a lease after disarming, `land restack` moves a stacked pull request onto its new base and regenerates only declared generated paths, and `land status` orders the open pull requests by their next action, and `land cancel-superseded` cancels runs no open pull request needs. The adopter's values (default branch, stack caps, generated paths and their regenerators, pre-push checks) come from a `landing` block in the project declaration; a value no layer supplies is refused, never defaulted. Only `land arm` arms, and nothing here approves, merges or re-runs.\n",
     "title": "The land verbs wait for, arm, push and restack a pull request, and land status orders what is left"
   },
-  "shardHash": "b6a5cb268dceec8fea29eeaaa9b377072f532c7f3abbcbaa28a92f47b5dd377f",
+  "shardHash": "9aca3daa4180a4cf2f980294a3038fa6bbadcecd0e719cbc45ff3825546ce005",
   "specVersion": "1.10.0"
 }

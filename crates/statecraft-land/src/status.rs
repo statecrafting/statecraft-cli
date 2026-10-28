@@ -1,10 +1,10 @@
-//! Read-only landing priorities and stacks (spec 063 section 3.6).
+//! Read-only landing priorities, stacks and delivery measures (spec 063 section 3.6).
 use crate::{
     UsedPolicy,
     action::*,
-    arm::{Checks, read_checks, timestamp},
+    arm::{Checks, after, next, read_checks, timestamp},
     pulls::{PullRequest, open},
-    runs,
+    runs::{self, WaitingRun},
 };
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
@@ -379,11 +379,137 @@ fn seconds(stamp: &str) -> Result<i64, HostError> {
         - 1;
     Ok(days * 86400 + n(11, 13)? * 3600 + n(14, 16)? * 60 + n(17, 19)?)
 }
+fn date(now: i64) -> String {
+    let mut days = now.div_euclid(86400);
+    let mut year = 1970;
+    while days < 0 {
+        year -= 1;
+        days += if leap(year) { 366 } else { 365 };
+    }
+    while days >= if leap(year) { 366 } else { 365 } {
+        days -= if leap(year) { 366 } else { 365 };
+        year += 1;
+    }
+    let mut month = 1;
+    for length in months(year) {
+        if days < length {
+            break;
+        }
+        days -= length;
+        month += 1;
+    }
+    format!("{year:04}-{month:02}-{:02}", days + 1)
+}
 fn round(n: f64) -> f64 {
     (n * 10.0).round() / 10.0
 }
 fn hours(now: i64, stamp: &str) -> Result<f64, HostError> {
     Ok((now - seconds(stamp)?) as f64 / 3600.0)
+}
+fn median(values: &mut [f64]) -> f64 {
+    if values.is_empty() {
+        return 0.0;
+    }
+    values.sort_by(f64::total_cmp);
+    (values[(values.len() - 1) / 2] + values[values.len() / 2]) / 2.0
+}
+fn merged(remote: &Remote, repo: &str, now: i64) -> Result<Vec<Value>, HostError> {
+    let query = format!(
+        "repo:{repo} is:pr is:merged merged:>={}",
+        date(now - 7 * 86400)
+    );
+    let mut cursor = None;
+    let mut rows = Vec::new();
+    for _ in 0..100 {
+        let v = remote.graphql(&format!("query {{ search(query:{},type:ISSUE,first:100{}) {{ nodes {{ ... on PullRequest {{ number mergedAt baseRefName timelineItems(itemTypes:[BASE_REF_CHANGED_EVENT,HEAD_REF_FORCE_PUSHED_EVENT],first:100) {{ nodes {{ __typename ... on BaseRefChangedEvent {{ createdAt }} }} pageInfo {{ hasNextPage }} }} }} }} pageInfo {{ hasNextPage endCursor }} }} }}", json!(query), after(&cursor)))?;
+        let connection = &v["search"];
+        rows.extend(
+            connection["nodes"]
+                .as_array()
+                .ok_or_else(malformed)?
+                .iter()
+                .cloned(),
+        );
+        let following = next(connection)?;
+        if following.is_none() {
+            return Ok(rows);
+        }
+        if following == cursor {
+            return Err(malformed());
+        }
+        cursor = following;
+    }
+    Err(malformed())
+}
+fn by_depth(merged: &[Value]) -> Result<Vec<Value>, HostError> {
+    let mut groups: BTreeMap<usize, (usize, Vec<f64>, usize)> = BTreeMap::new();
+    for pr in merged {
+        let landed = seconds(string(pr, "mergedAt")?)?;
+        // Over one page of base changes and force pushes is reported, never
+        // measured from a truncated history.
+        match pr["timelineItems"]["pageInfo"]["hasNextPage"].as_bool() {
+            Some(false) => {}
+            Some(true) => {
+                return Err(HostError::Unreachable(format!(
+                    "merged pull request #{} has more than 100 base changes and force pushes; its measures cannot be read in full",
+                    pr["number"]
+                )));
+            }
+            None => return Err(malformed()),
+        }
+        let mut bases = Vec::new();
+        let mut reviews = 1;
+        for event in pr["timelineItems"]["nodes"]
+            .as_array()
+            .ok_or_else(malformed)?
+        {
+            match string(event, "__typename")? {
+                "BaseRefChangedEvent" => bases.push(seconds(string(event, "createdAt")?)?),
+                "HeadRefForcePushedEvent" => reviews += 1,
+                // The query asks for exactly these two item types, so any
+                // other is a malformed answer; it fails closed, as every
+                // landing read does, rather than measuring a partial history.
+                _ => return Err(malformed()),
+            }
+        }
+        let group = groups.entry(bases.len()).or_default();
+        group.0 += 1;
+        if let Some(last) = bases.iter().max() {
+            group.1.push((landed - last) as f64 / 3600.0);
+        }
+        group.2 += reviews;
+    }
+    Ok(groups.into_iter().map(|(depth, (landed, mut times, reviews))| json!({"depth":depth,"landed":landed,"hoursToLandAfterBase":if depth == 0 {None} else {Some(round(median(&mut times)))},"reviewsPerPullRequest":reviews as f64 / landed as f64})).collect())
+}
+fn measures(
+    prs: &[PullRequest],
+    actions: &[Value],
+    waiting: &[WaitingRun],
+    merged: &[Value],
+    default: &str,
+    now: i64,
+) -> Result<Value, HostError> {
+    let mut waits = Vec::new();
+    for run in waiting {
+        if prs
+            .iter()
+            .any(|p| p.head_ref_oid == run.head_sha && p.base_ref_name == default)
+        {
+            waits.push(hours(now, &run.created_at)?);
+        }
+    }
+    let mut oldest: f64 = 0.0;
+    for action in actions {
+        if !matches!(
+            action["action"].as_str(),
+            Some("merging" | "running" | "draft")
+        ) {
+            oldest = oldest.max(hours(now, string(action, "created")?)?);
+        }
+    }
+    Ok(
+        json!({"approvalWaitHours":{"count":waits.len(),"max":round(waits.iter().copied().fold(0.0,f64::max)),"median":round(median(&mut waits))},"oldestBlockedHours":round(oldest),"superseded":waiting.iter().filter(|r| r.superseded).count(),"byDepth":by_depth(merged)?}),
+    )
 }
 fn rank(actions: &mut [Value]) {
     actions.sort_by_key(|a| {
@@ -509,6 +635,14 @@ fn collect(
             .collect::<Vec<_>>()
     );
     report["generatedReviewed"] = json!(generated_reviewed(&limits.generated, excludes));
+    report["measures"] = measures(
+        &prs,
+        &actions,
+        &waiting,
+        &merged(&remote, repo, now)?,
+        default,
+        now,
+    )?;
     report["actions"] = json!(actions);
     Ok(())
 }
@@ -516,7 +650,7 @@ fn collect(
 pub fn run(directory: &Path, args: &[String], now: SystemTime) -> Answer {
     let mut answer = Answer {
         exit_code: 0,
-        report: json!({"outcome":"read","exitCode":0,"reason":null,"policy":{"generated":null},"actions":[],"stack":null,"supersededRuns":[],"generatedReviewed":[]}),
+        report: json!({"outcome":"read","exitCode":0,"reason":null,"policy":{"generated":null},"actions":[],"stack":null,"supersededRuns":[],"generatedReviewed":[],"measures":null}),
     };
     let args = match arguments(args) {
         Ok(a) => a,
@@ -714,8 +848,53 @@ mod tests {
         );
     }
     #[test]
-    fn transitive_unlocks() {
+    fn transitive_unlocks_and_measure_arithmetic() {
         let weights = unlocks(serde_json::from_value(json!({"blocked":[{"id":"002-b","blockedBy":[{"id":"001-a"}]},{"id":"003-c","blockedBy":[{"id":"002-b"},{"id":"001-a"}]}]})).unwrap());
         assert_eq!(weights["001"], 2);
+        let now = seconds("2026-10-27T12:00:00Z").unwrap();
+        assert_eq!(date(now - 7 * 86400), "2026-10-20");
+        assert_eq!(date(seconds("2000-02-29T00:00:00Z").unwrap()), "2000-02-29");
+        let merged = [
+            json!({"mergedAt":"2026-10-27T12:00:00Z","timelineItems":{"nodes":[],"pageInfo":{"hasNextPage":false}}}),
+            json!({"mergedAt":"2026-10-27T12:00:00Z","timelineItems":{"nodes":[{"__typename":"BaseRefChangedEvent","createdAt":"2026-10-27T10:00:00Z"},{"__typename":"HeadRefForcePushedEvent"}],"pageInfo":{"hasNextPage":false}}}),
+        ];
+        let groups = by_depth(&merged).unwrap();
+        let truncated = json!({"number":5,"mergedAt":"2026-10-27T12:00:00Z","timelineItems":{"nodes":[],"pageInfo":{"hasNextPage":true}}});
+        assert!(by_depth(&[truncated]).unwrap_err().reason().contains("#5"));
+        let unpaged = json!({"mergedAt":"2026-10-27T12:00:00Z","timelineItems":{"nodes":[]}});
+        assert!(by_depth(&[unpaged]).is_err());
+        assert!(groups[0]["hoursToLandAfterBase"].is_null());
+        assert_eq!(groups[1]["hoursToLandAfterBase"], 2.0);
+        assert_eq!(groups[1]["reviewsPerPullRequest"], 2.0);
+        let runs = [
+            WaitingRun {
+                id: 1,
+                head_sha: "h1".into(),
+                html_url: "url".into(),
+                created_at: "2026-10-27T09:00:00Z".into(),
+                superseded: false,
+            },
+            WaitingRun {
+                id: 2,
+                head_sha: "h1".into(),
+                html_url: "url".into(),
+                created_at: "2026-10-27T10:00:00Z".into(),
+                superseded: false,
+            },
+        ];
+        let m = measures(
+            &[pr(1, "main")],
+            &[json!({"action":"arm","created":"2026-10-27T08:00:00Z"})],
+            &runs,
+            &merged,
+            "main",
+            now,
+        )
+        .unwrap();
+        assert_eq!(
+            m["approvalWaitHours"],
+            json!({"count":2,"max":3.0,"median":2.5})
+        );
+        assert_eq!(m["oldestBlockedHours"], 4.0);
     }
 }
