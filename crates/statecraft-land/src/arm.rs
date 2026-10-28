@@ -35,7 +35,7 @@ impl Answer {
     }
 }
 // GitHub timestamps are canonical UTC. Unknown or malformed times fail closed.
-fn timestamp(s: &str) -> Option<&str> {
+pub(crate) fn timestamp(s: &str) -> Option<&str> {
     let b = s.as_bytes();
     if b.len() != 20
         || b[4] != b'-'
@@ -203,7 +203,25 @@ fn failed_check(row: &Value) -> Result<Option<String>, HostError> {
     };
     Ok(failed.then(|| format!("{name}: {result}")))
 }
+#[derive(Default)]
+pub(crate) struct Checks {
+    pub failed: Vec<String>,
+    pub pending: usize,
+}
 fn checks(remote: &Remote, repo: &str, pr: u64, head: &str) -> Result<Option<String>, HostError> {
+    Ok(read_checks(remote, repo, pr, head, true)?
+        .failed
+        .into_iter()
+        .next())
+}
+pub(crate) fn read_checks(
+    remote: &Remote,
+    repo: &str,
+    pr: u64,
+    head: &str,
+    first_failure: bool,
+) -> Result<Checks, HostError> {
+    let mut result = Checks::default();
     let mut cursor = None;
     for _ in 0..100 {
         let value = remote.query(repo, &format!("object(expression:{}) {{ ... on Commit {{ statusCheckRollup {{ contexts(first:100{}) {{ nodes {{ __typename ... on CheckRun {{ name status conclusion isRequired(pullRequestNumber:{pr}) }} ... on StatusContext {{ context state isRequired(pullRequestNumber:{pr}) }} }} pageInfo {{ hasNextPage endCursor }} }} }} }} }}", json!(head),after(&cursor)))?;
@@ -212,17 +230,30 @@ fn checks(remote: &Remote, repo: &str, pr: u64, head: &str) -> Result<Option<Str
             .filter(|v| v.is_object())
             .ok_or_else(malformed)?;
         if commit.get("statusCheckRollup") == Some(&Value::Null) {
-            return Ok(None);
+            return Ok(result);
         }
         let connection = &commit["statusCheckRollup"]["contexts"];
         for row in connection["nodes"].as_array().ok_or_else(malformed)? {
             if let Some(reason) = failed_check(row)? {
-                return Ok(Some(reason));
+                result.failed.push(reason);
+                if first_failure {
+                    return Ok(result);
+                }
+            } else if row["isRequired"] == true
+                && match row["__typename"].as_str() {
+                    Some("CheckRun") => row["status"] != "COMPLETED",
+                    Some("StatusContext") => {
+                        !matches!(row["state"].as_str(), Some("SUCCESS" | "FAILURE" | "ERROR"))
+                    }
+                    _ => false,
+                }
+            {
+                result.pending += 1;
             }
         }
         let following = next(connection)?;
         if following.is_none() {
-            return Ok(None);
+            return Ok(result);
         }
         if following == cursor {
             return Err(malformed());

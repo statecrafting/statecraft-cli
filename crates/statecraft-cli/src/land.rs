@@ -139,11 +139,20 @@ pub fn act(verb: Verb, args: &[String], json: bool) -> i32 {
                 code,
             )
         }
+        Verb::LandStatus => {
+            let now = std::time::SystemTime::now();
+            let answer = statecraft_land::status::run(directory, args, now);
+            let code = answer.exit_code;
+            (
+                serde_json::to_value(answer).expect("serializable answer"),
+                code,
+            )
+        }
         _ => unreachable!("landing act"),
     };
     let summary = value
         .as_object()
-        .unwrap()
+        .expect("landing answer is an object")
         .iter()
         .filter(|(_, v)| !v.is_null())
         .map(|(k, v)| {

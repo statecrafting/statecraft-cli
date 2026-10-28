@@ -13,6 +13,7 @@ pub(crate) struct WaitingRun {
     pub id: u64,
     pub head_sha: String,
     pub html_url: String,
+    pub created_at: String,
     #[serde(skip)]
     pub superseded: bool,
 }

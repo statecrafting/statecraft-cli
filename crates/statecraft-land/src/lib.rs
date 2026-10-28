@@ -328,3 +328,5 @@ mod tests;
 
 mod pulls;
 mod runs;
+/// Read-only landing report (spec 063 section 3.6).
+pub mod status;

@@ -29,6 +29,15 @@ pub struct UsedPolicy {
     /// The branch and its supplying layer, once resolved.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub default_branch: Option<Supplied>,
+    /// Stack depth cap and supplying layer.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub stack_depth: Option<Supplied>,
+    /// Per-spec stack depth caps and supplying layer.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub stack_depth_by_spec: Option<Supplied>,
+    /// Total stacked pull request cap and supplying layer.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub stack_max_stacked: Option<Supplied>,
     /// The pre-push vectors and their supplying layer, once used.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub pre_push: Option<Supplied>,
@@ -99,11 +108,16 @@ pub(crate) fn repository(args: &Arguments, dir: &Path) -> Result<String, String>
         .ok_or_else(|| "expected --repo owner/name or a GitHub origin".into())
 }
 pub(crate) fn declaration(dir: &Path) -> Result<(Policy, bool), String> {
+    declared_policy(&committed_declaration(dir)?)
+}
+pub(crate) fn committed_declaration(dir: &Path) -> Result<Manifest, String> {
     let output = git(dir, &["show", "HEAD:.statecraft/environment.json"])?;
     if !output.status.success() {
         return Err("cannot read committed declaration: landing.default_branch unavailable".into());
     }
-    let manifest = Manifest::parse(&output.stdout).map_err(|_| "malformed landing declaration")?;
+    Manifest::parse(&output.stdout).map_err(|_| "malformed landing declaration".into())
+}
+pub(crate) fn declared_policy(manifest: &Manifest) -> Result<(Policy, bool), String> {
     let signed = match manifest
         .project
         .setup
@@ -158,6 +172,13 @@ impl Remote {
             json!(owner),
             json!(name)
         );
+        let value = self.graphql(&query)?;
+        value["repository"]
+            .as_object()
+            .map(|_| value["repository"].clone())
+            .ok_or_else(malformed)
+    }
+    pub fn graphql(&self, query: &str) -> Result<Value, HostError> {
         let output = Command::new(&self.host.program)
             .args(["api", "graphql", "-f", &format!("query={query}")])
             .output()
@@ -174,9 +195,9 @@ impl Remote {
         {
             return Err(malformed());
         }
-        value["data"]["repository"]
+        value["data"]
             .as_object()
-            .map(|_| value["data"]["repository"].clone())
+            .map(|_| value["data"].clone())
             .ok_or_else(malformed)
     }
     pub fn pr(&self, repo: &str, pr: u64) -> Result<Value, HostError> {

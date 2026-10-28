@@ -243,6 +243,7 @@ case "$1 $2" in
        if [ -f "$here/pending-failure-$id" ]; then cat "$here/pending-failure-$id" >&2; exit 1; fi
        if [ -f "$here/pending-$id.json" ]; then cat "$here/pending-$id.json"; else cat "$here/pending.json"; fi ;;
      *'actions/runs?status=waiting'*) cat "$here/waiting.json" ;;
+     *'/files?'*) cat "$here/files.json" ;;
      *check-suites*) cat "$here/suites.json" ;;
      *check-runs*) cat "$here/review.json" ;;
      *statecraft-ci.yml/runs*) cat "$here/runs.json" ;;
@@ -1573,4 +1574,155 @@ fn cancel_failed_reads_prevent_all_posts_even_after_an_eligible_run() {
         assert_eq!(a["notCancelled"], json!([]));
         assert_cancel_reads_only(&f, &[]);
     }
+}
+
+fn status_fixture() -> ActionFixture {
+    let mut f = landing_fixture();
+    f.declaration(
+        json!({"default_branch":"trunk","stack":{"depth":1,"depth_by_spec":{},"max_stacked":1}}),
+        false,
+    );
+    f.record();
+    // The record moved the head: the open pull request points at the new one.
+    f.write("open",json!({"data":{"repository":{"pullRequests":{"nodes":[open_pr(&f,7,"trunk")],"pageInfo":{"hasNextPage":false}}}}}));
+    f.review("no-findings");
+    std::fs::create_dir(f.path().join(".bin")).unwrap();
+    statecraft_adapter::fixture::install_script(&f.path().join(".bin/spec-spine"), "#!/bin/sh\n[ \"$*\" = 'registry plan --json' ] || exit 91\nprintf '%s' '{\"blocked\":[]}'\n",0o755).unwrap();
+    // A PATH binary must not shadow the executable repository pin.
+    statecraft_adapter::fixture::install_script(
+        &f.path().join("bin/spec-spine"),
+        "#!/bin/sh\nexit 92\n",
+        0o755,
+    )
+    .unwrap();
+    f.write("files", json!([]));
+    f
+}
+#[test]
+fn status_clean_read_ignores_attempt_and_never_writes() {
+    let f = status_fixture();
+    let before = f.git(&["rev-parse", "HEAD"]);
+    let output = f
+        .command("status", &["--repo", "o/r"])
+        .env("STATECRAFT_RUN_ID", "")
+        .output()
+        .unwrap();
+    let a = f.answer("status", output, 0, "read");
+    assert_eq!(a["actions"][0]["action"], "arm");
+    assert!(a["policy"]["generated"].is_null());
+    assert_eq!(a["policy"]["stackDepth"]["value"], 1);
+    assert_eq!(before, f.git(&["rev-parse", "HEAD"]));
+    let calls = f.calls();
+    for write in ["-X POST", "pr merge", "pr edit", "git push"] {
+        assert!(!calls.contains(write), "{calls}");
+    }
+    assert!(!f.path().join("no-home").exists());
+    for line in f.git_calls().lines() {
+        assert!(
+            line.starts_with("show HEAD:") || line == "rev-parse --show-toplevel",
+            "{line}"
+        );
+    }
+}
+#[test]
+fn status_usage_missing_keys_and_failed_reads() {
+    let mut f = status_fixture();
+    for args in [
+        vec!["7"],
+        vec!["--repo", "bad"],
+        vec!["--cancel-superseded"],
+        vec!["--repo"],
+    ] {
+        f.run("status", &args, 3, "usage");
+    }
+    assert!(f.calls().is_empty());
+    for (landing, key) in [
+        (json!({}), "default_branch"),
+        (
+            json!({"default_branch":"trunk","stack":{"depth_by_spec":{},"max_stacked":1}}),
+            "stack.depth",
+        ),
+    ] {
+        f.declaration(landing, false);
+        f.record();
+        let a = f.run("status", &["--repo", "o/r"], 2, "refused");
+        assert!(a["reason"].as_str().unwrap().contains(key));
+    }
+    let f = status_fixture();
+    std::fs::write(f.path().join("bin/failure"), "HTTP 403 forbidden").unwrap();
+    let a = f.run("status", &["--repo", "o/r"], 4, "failed");
+    assert!(a["reason"].as_str().unwrap().contains("403"));
+    assert!(!a.to_string().contains("PRIVATE BODY"));
+}
+#[test]
+fn status_041_chain_caps_pagination_and_superseded_runs() {
+    let f = status_fixture();
+    f.write("open",json!({"data":{"repository":{"pullRequests":{"nodes":[open_pr(&f,7,"trunk")],"pageInfo":{"hasNextPage":true,"endCursor":"next"}}}}}));
+    f.write("open-next",json!({"data":{"repository":{"pullRequests":{"nodes":[open_pr(&f,8,"p7"),open_pr(&f,9,"p8")],"pageInfo":{"hasNextPage":false}}}}}));
+    f.write("waiting",json!({"workflow_runs":[{"id":1,"event":"workflow_dispatch"},{"id":2,"event":"pull_request","head_sha":"old","html_url":"https://example.invalid/run/2","created_at":"2026-10-27T00:00:00Z"}]}));
+    let a = f.run("status", &["--repo", "o/r"], 0, "read");
+    let top = a["actions"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|a| a["pullRequest"] == 9)
+        .unwrap();
+    assert_eq!(top["depth"], 2);
+    assert_eq!(top["cap"], 1);
+    assert_eq!(top["landFirst"], 7);
+    assert_eq!(a["stack"]["landFirst"], json!([7]));
+    assert_eq!(a["stack"]["overStacked"], true);
+    assert_eq!(
+        a["supersededRuns"],
+        json!([{"id":2,"headSha":"old","url":"https://example.invalid/run/2"}])
+    );
+    let calls = f.calls();
+    assert!(!calls.contains("runs/1/pending_deployments"));
+    for write in ["-X POST", "pr merge", "pr edit"] {
+        assert!(!calls.contains(write));
+    }
+}
+#[test]
+fn status_approval_reasons_and_findings() {
+    let f = status_fixture();
+    f.write("waiting",json!({"workflow_runs":[{"id":2,"event":"pull_request","head_sha":f.head,"html_url":"https://example.invalid/run/2","created_at":"2026-10-27T00:00:00Z"}]}));
+    f.write(
+        "files",
+        json!([{"filename":".statecraft/setup/policy.json"},{"filename":"specs/041/spec.md"}]),
+    );
+    f.review("findings");
+    let a = f.run("status", &["--repo", "o/r"], 0, "read");
+    assert_eq!(a["actions"][0]["action"], "approve");
+    assert_eq!(
+        a["actions"][0]["reason"],
+        "review findings: resolve it before approving, authority change, possible ratification (a spec.md changed)"
+    );
+    f.checks(vec![json!({"__typename":"CheckRun","isRequired":true,"name":"ci","status":"COMPLETED","conclusion":"SKIPPED"})]);
+    let a = f.run("status", &["--repo", "o/r"], 1, "finding");
+    assert_eq!(a["actions"][0]["action"], "fix");
+    assert!(
+        a["actions"][0]["detail"]
+            .as_str()
+            .unwrap()
+            .contains("owner approval is also waiting")
+    );
+}
+#[test]
+fn status_generated_paths_are_findings_and_review_recognizes_forks() {
+    let mut f = status_fixture();
+    f.declaration(json!({"default_branch":"trunk","stack":{"depth":1,"depth_by_spec":{},"max_stacked":1},"generated":[{"paths":["derived/**","src/?.rs"],"regenerate":["generate"]}]}),false);
+    let path = f.path().join(".statecraft/environment.json");
+    let mut declaration: Value = serde_json::from_slice(&std::fs::read(&path).unwrap()).unwrap();
+    declaration["project"]["setup"]["parameters"]["review.exclude"] = json!(["derived/"]);
+    std::fs::write(path, declaration.to_string()).unwrap();
+    f.record();
+    f.review("no-findings");
+    let mut pr = open_pr(&f, 7, "trunk");
+    pr["headRepository"]["nameWithOwner"] = json!("fork/r");
+    f.write("open",json!({"data":{"repository":{"pullRequests":{"nodes":[pr],"pageInfo":{"hasNextPage":false}}}}}));
+    let a = f.run("status", &["--repo", "o/r"], 1, "finding");
+    assert_eq!(a["generatedReviewed"], json!(["src/?.rs"]));
+    assert_eq!(a["actions"][0]["review"], "skipped:fork");
+    assert_eq!(a["actions"][0]["action"], "fix");
+    assert!(!f.calls().contains("check-runs"));
 }

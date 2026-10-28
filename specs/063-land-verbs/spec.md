@@ -532,6 +532,48 @@ and lease push, which moved into functions both verbs call.
   `notCancelled` with its classified reason, and the answer is exit 4
   (3.8), since something asked for was not done.
 
+**2026-10-28, increment 4b: `land status`.** A binding (006 3.2) to
+`statecraft_land::status`, which writes nothing: no git write, no GitHub
+write, no file. It does not read the attempt binding (3.9).
+
+- **Policy.** `default_branch`, `stack.depth`, `stack.depth_by_spec` and
+  `stack.max_stacked` are required (an empty `depth_by_spec` is a stated
+  value), as is a committed declaration. `generated` is read only for rule
+  3.1.5: absent, that check is not made and `policy.generated` is null.
+- **Reads.** The open pull requests, every page, through the reader `land
+  cancel-superseded` uses; each head's required checks through `land arm`'s
+  reader; `review status` (062) only where the class depends on it; the
+  waiting runs through the reader `land cancel-superseded` uses; and
+  `spec-spine registry plan --json`, run with the repository's
+  `.bin/spec-spine` when it is executable, else the one on `PATH`. Any read
+  that fails is exit 4.
+- **Classes, in order.** A base that is not the default branch: `retarget`
+  when no open pull request has it as its head, `hazard` when armed, else
+  `stacked`. Then the merge queue (`fix` when unmergeable, else `merging`),
+  a failed required check (`fix`), a waiting run at the head (`approve`),
+  `draft`, a required check not completed (`running`), the review (`pending`
+  is `running`; any other word but `no-findings` is `fix`, or `hazard` when
+  armed), armed (`merging`), `BEHIND` (`update`), else `arm`. Within a class:
+  most specs unblocked (the plan's transitive count) first, then oldest,
+  then lowest number.
+- **The approval reason** names a review word other than `no-findings`, a
+  changed path under `scripts/statecraft/`, `.github/workflows/` or
+  `.statecraft/setup/` (an authority change), and a changed `spec.md` (a
+  possible ratification).
+- **A pull request's spec** is the first `(` and three digits of its title,
+  the `spec(063): ...` convention; none, and its cap is `stack.depth`.
+- **Stacks (3.6.2).** Past its cap an entry names its stack's bottom in
+  `landFirst`; more stacked pull requests than `stack.max_stacked` names
+  every stacked bottom.
+- **Rule 3.1.5.** A `generated` glob is excluded from review when its
+  literal prefix, the text before its first `*`, `?` or `[`, starts with a
+  `review.exclude` prefix; every other glob is listed in
+  `generatedReviewed`, a finding.
+- **Superseded runs** are listed in `supersededRuns`, never cancelled
+  (section 5).
+- **Exit.** 1 when any entry is `fix` or `hazard` or `generatedReviewed` is
+  not empty; else 0.
+
 ## Verification
 
 Each line is one command. The acceptance grows with each increment of
@@ -546,4 +588,5 @@ cargo test -p statecraft-cli --locked --test integration_slice the_grown_command
 cargo test -p statecraft-cli --locked --test negative_cases no_verb_the_binary_offers_publishes_anything
 cargo test -p statecraft-cli --locked --test land restack
 cargo test -p statecraft-cli --locked --test land cancel
+cargo test -p statecraft-cli --locked --test land status
 ```
