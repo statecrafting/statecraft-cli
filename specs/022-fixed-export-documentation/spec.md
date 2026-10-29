@@ -446,13 +446,14 @@ verb that selected it would put a test double on the product's surface.
 `prepare` refuses from the subjects alone, then writes the spec 003 intent
 with the manifest and task, then the `prepared` version; the same inputs
 report it and begin nothing, and an unreadable
-record refuses (`workflow-unreadable`). `execute` selects and admits as the adapter
+record refuses (`workflow-unreadable`). `execute` runs only a live attempt with a `prepared` workflow, selects and
+admits as the adapter
 half does, runs the fake, records every output, and concludes the attempt
 `completed` with a raw result, `failed` without one, or `refused` when
 selection or admission refuses, counting each prohibited effect as a refusal
 under `fixed-export-boundary` or the refusal under `fixed-export-admission`.
 `submit_review` and `submit_correction` are spec 021's review-submission
-binding: each decodes the closed record, refuses one for another attempt or
+binding: each decodes the closed record, refuses a repeat of a recorded one and one for another attempt or
 task, and appends only for an identity the trusted-base policy grants, under
 the authority it claims and before its `notAfter` (which grants nothing unless it is exactly
 `YYYY-MM-DDTHH:MM:SSZ`), never for the result's

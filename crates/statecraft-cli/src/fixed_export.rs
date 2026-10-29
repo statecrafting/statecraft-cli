@@ -162,6 +162,25 @@ pub fn execute(
     let at = rfc3339_utc(clock.now_unix());
     let mut chain = open(home, root)?;
     let (prepared, manifest, task) = recorded(&chain, &session.run_id, session.attempt)?;
+    // An attempt executes once, while it is live: a concluded attempt, or a
+    // workflow past `prepared`, would otherwise get a second outcome.
+    if attempt_of(&chain, &session.run_id, session.attempt)?
+        .outcome
+        .is_some()
+    {
+        return Err(format!(
+            "workflow: run {} attempt {} is already concluded",
+            session.run_id, session.attempt
+        ));
+    }
+    if prepared.state() != Some(WorkflowState::Prepared) {
+        return Err(format!(
+            "workflow: run {} attempt {} is {}, not prepared",
+            session.run_id,
+            session.attempt,
+            prepared.state().map(|s| word(&s)).unwrap_or_default()
+        ));
+    }
     let refuse = |chain: &mut Chain, why: String| {
         let mut accounting = Accounting::without_process();
         accounting.observe(RefusalEvent {
@@ -365,6 +384,9 @@ pub fn submit_review(
     if r.subject.task_digest != task.task_digest {
         return Err("binding: the review names another task".into());
     }
+    if w.subjects.reviews.contains(&r.review_digest) {
+        return Err(format!("duplicate: review {} is recorded", r.review_digest));
+    }
     let a = attempt_of(&chain, run_id, attempt)?;
     authorized(
         root,
@@ -407,6 +429,15 @@ pub fn submit_correction(
     let c = Correction::decode(bytes).map_err(|e| e.to_string())?;
     if c.subject.run_id != run_id || c.subject.attempt != attempt {
         return Err("binding: the correction names another attempt".into());
+    }
+    if c.subject.task_digest != task.task_digest {
+        return Err("binding: the correction names another task".into());
+    }
+    if w.subjects.corrections.contains(&c.correction_digest) {
+        return Err(format!(
+            "duplicate: correction {} is recorded",
+            c.correction_digest
+        ));
     }
     let a = attempt_of(&chain, run_id, attempt)?;
     authorized(root, home, &chain, &a, &task, &w, &c.author, None, &at)?;

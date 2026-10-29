@@ -580,6 +580,11 @@ fn the_pilot_runs_task_to_acceptance_across_a_corrected_generation() {
     );
     p.submit(&p.review(subject.clone(), OWNER, &t1, false), 1)
         .unwrap();
+    // The same review again is refused and counts once.
+    let err = p
+        .submit(&p.review(subject.clone(), OWNER, &t1, false), 1)
+        .unwrap_err();
+    assert!(err.starts_with("duplicate: review"), "{err}");
     let first = p.documentation(&t1);
     assert_ne!(first.outcome, Outcome::Accepted);
     let AcceptanceView::Judged { judgment: j1 } = cli::accept(
@@ -731,6 +736,21 @@ fn a_missing_capability_refuses_and_concludes_the_attempt() {
     )
     .unwrap_err();
     assert_eq!(err, "capability-missing: deterministic-fake");
+    // The attempt is concluded once; executing it again writes nothing.
+    let n = p.chain().entries().len();
+    let again = cli::execute(
+        p.target.path(),
+        p.home.path(),
+        &session,
+        &[fx::fake_declaration()],
+        &script(&t, DRAFT_1, true),
+        &clock(),
+    );
+    assert_eq!(
+        again.unwrap_err(),
+        format!("workflow: run {RUN} attempt 1 is already concluded")
+    );
+    assert_eq!(p.chain().entries().len(), n);
     assert_eq!(
         p.attempt(1).outcome,
         Some(statecraft_run::attempt::Outcome::Refused)
@@ -979,4 +999,42 @@ fn a_grant_with_an_offset_expiry_grants_nothing() {
         err.starts_with("authority: the trusted-base policy grants"),
         "{err}"
     );
+}
+
+// Section 3.8: a correction binds only the attempt's own task.
+#[test]
+fn a_correction_naming_another_task_is_refused() {
+    let p = pilot();
+    let t = p.generation(1, "task-022-a", DRAFT_1, true);
+    let mut subject = p.documentation(&t).subject.unwrap();
+    subject.task_digest = d("another task");
+    let correction = Correction {
+        schema: review::CORRECTION_SCHEMA.into(),
+        subject,
+        supersedes: d(DRAFT_1),
+        author: OWNER.into(),
+        reason: "precision".into(),
+        changed_claims: vec![],
+        changed_artifacts: vec![review::ArtifactIdentity {
+            logical_path: "docs/recovery.md".into(),
+            digest: d(DRAFT_2),
+        }],
+        corrected_result: None,
+        digest_construction: String::new(),
+        correction_digest: String::new(),
+    }
+    .seal();
+    let n = p.chain().entries().len();
+    let err = cli::submit_correction(
+        p.target.path(),
+        p.home.path(),
+        RUN,
+        1,
+        &serde_json::to_vec(&correction).unwrap(),
+        &[DRAFT_2.as_bytes()],
+        &clock(),
+    )
+    .unwrap_err();
+    assert_eq!(err, "binding: the correction names another task");
+    assert_eq!(p.chain().entries().len(), n);
 }
