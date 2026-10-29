@@ -62,6 +62,7 @@ pub mod context;
 pub mod coverage;
 pub mod documentation;
 pub mod exit;
+pub mod fixed_export;
 pub mod hosted;
 pub mod judge;
 pub mod launch;

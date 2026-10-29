@@ -236,6 +236,21 @@ pub struct RawResult {
     pub custody_digest: String,
     /// The exact bytes.
     pub bytes: String,
+    /// Spec 022 section 3.6: each output artifact's exact bytes, so the run
+    /// record holds them as immutable blobs. Absent from an adapter that
+    /// returns none, which is how every earlier terminal event reads.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub artifacts: Vec<RawArtifact>,
+}
+
+/// One output artifact's exact bytes, as a terminal event carries them.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct RawArtifact {
+    /// The result's `rawRef` for it.
+    pub raw_ref: String,
+    /// The exact bytes.
+    pub bytes: String,
 }
 
 /// What the terminal event returned.

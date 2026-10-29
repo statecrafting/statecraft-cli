@@ -493,6 +493,7 @@ fn stated_custody_that_disagrees_with_the_bytes_is_a_finding() {
             byte_length: 1,
             custody_digest: context::custody_digest(b"other"),
             bytes: bytes.clone(),
+            artifacts: vec![],
         }),
     ]);
     for code in ["raw-length-mismatch", "raw-digest-mismatch", "media-type"] {
@@ -587,5 +588,29 @@ fn an_unreadable_line_is_kept_and_named() {
             .unwrap()
             .unwrap(),
         lines[1]
+    );
+}
+
+// Section 3.6: the artifacts a terminal event carries are kept as blobs in
+// the run record before the result naming them is decoded.
+#[test]
+fn artifact_bytes_are_kept_before_the_result_is_decoded() {
+    let f = prepared();
+    let artifact = "# Recovery\n";
+    f.execute(&[
+        Step::Init,
+        Step::TerminalWithArtifacts(
+            result_bytes(&f.task),
+            vec![statecraft_adapter::documentation::RawArtifact {
+                raw_ref: "a0".into(),
+                bytes: artifact.into(),
+            }],
+        ),
+    ]);
+    assert_eq!(
+        context::read_retained(f.home.path(), &context::custody_digest(artifact.as_bytes()))
+            .unwrap()
+            .unwrap(),
+        artifact.as_bytes()
     );
 }

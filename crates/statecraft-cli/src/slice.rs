@@ -1199,6 +1199,10 @@ pub struct AcceptView {
     /// documentation task.
     #[serde(rename = "documentationAcceptance")]
     pub documentation_acceptance: crate::documentation::AcceptanceView,
+    /// Spec 022 section 3.9: the fixed-export workflow's judgment, recorded;
+    /// `not-recorded` for an attempt outside the profile.
+    #[serde(rename = "fixedExportAcceptance")]
+    pub fixed_export_acceptance: crate::fixed_export::AcceptanceView,
 }
 
 /// A stale ledger at `accept`: refused before anything is judged, and nothing
@@ -1323,6 +1327,7 @@ pub fn accept_answer_with_boundary(
             context_manifest: crate::context::Judgment::NotRecorded,
             documentation: statecraft_acceptance::documentation::Inputs::NotRecorded,
             documentation_acceptance: crate::documentation::AcceptanceView::NotRecorded,
+            fixed_export_acceptance: crate::fixed_export::AcceptanceView::NotRecorded,
         },
         exit,
         summary,

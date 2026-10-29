@@ -252,6 +252,19 @@ fn accept_registered(
     {
         d.acceptance = statecraft_acceptance::documentation::Acceptance::Judged;
     }
+    // Spec 022 section 3.9: the workflow's judgment, beside spec 021's and
+    // never better than it.
+    let fixed_export_acceptance = crate::fixed_export::accept(
+        root,
+        home,
+        run_id,
+        attempt.number,
+        match &documentation_acceptance {
+            crate::documentation::AcceptanceView::Judged { judgment } => Some(judgment),
+            _ => None,
+        },
+        &statecraft_environment::time::SystemClock,
+    );
     if let Some(reasons) = judgment.ineligible() {
         let mut answer = slice::accept_answer_with(
             statecraft_acceptance::outcome::Acceptance::None {
@@ -262,6 +275,7 @@ fn accept_registered(
         answer.value.context_manifest = judgment;
         answer.value.documentation = documentation;
         answer.value.documentation_acceptance = documentation_acceptance;
+        answer.value.fixed_export_acceptance = fixed_export_acceptance;
         return answer.erase();
     }
 
@@ -289,6 +303,7 @@ fn accept_registered(
     answer.value.context_manifest = judgment;
     answer.value.documentation = documentation;
     answer.value.documentation_acceptance = documentation_acceptance;
+    answer.value.fixed_export_acceptance = fixed_export_acceptance;
     answer.erase()
 }
 

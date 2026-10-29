@@ -25,6 +25,9 @@ pub struct AttemptDocumentationView {
     /// Spec 021 section 3.10: the review and correction identities, listed
     /// without judging them.
     pub records: Vec<statecraft_run::documentation::review::Listed>,
+    /// Spec 022 section 3.11: the fixed-export workflow's latest version,
+    /// `not-recorded` for an attempt outside the profile.
+    pub fixed_export: crate::fixed_export::WorkflowView,
 }
 
 /// Every attempt's documentation for `run show`, folded from the chain alone.
@@ -35,6 +38,7 @@ pub fn of_run(chain: &Chain, run: &statecraft_run::Run) -> Vec<AttemptDocumentat
             attempt: a.number,
             projection: statecraft_run::documentation::project(chain, &run.id, a.number),
             records: statecraft_run::documentation::review::identities(chain, &run.id, a.number),
+            fixed_export: crate::fixed_export::view(chain, &run.id, a.number),
         })
         .collect()
 }
@@ -92,6 +96,7 @@ pub fn describe(views: &[AttemptDocumentationView]) -> String {
                 Listed::Unreadable { reason } => format!("  record unreadable: {reason}\n"),
             });
         }
+        out.push_str(&crate::fixed_export::describe(v.attempt, &v.fixed_export));
     }
     out
 }
@@ -155,7 +160,7 @@ pub enum AcceptanceView {
 /// The subject of a recorded documentation acceptance.
 pub const ACCEPTANCE_SUBJECT: &str = "documentation-acceptance";
 
-fn git_out(dir: &std::path::Path, args: &[&str]) -> Option<Vec<u8>> {
+pub(crate) fn git_out(dir: &std::path::Path, args: &[&str]) -> Option<Vec<u8>> {
     let out = std::process::Command::new("git")
         .arg("-C")
         .arg(dir)
@@ -166,7 +171,7 @@ fn git_out(dir: &std::path::Path, args: &[&str]) -> Option<Vec<u8>> {
 }
 
 /// `id` when it is a full SHA-1 or SHA-256 object id in lower-case hex.
-fn object_id(id: &str) -> Option<&str> {
+pub(crate) fn object_id(id: &str) -> Option<&str> {
     (matches!(id.len(), 40 | 64) && id.bytes().all(|b| matches!(b, b'0'..=b'9' | b'a'..=b'f')))
         .then_some(id)
 }
