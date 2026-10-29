@@ -475,10 +475,15 @@ pub fn accept(
         documentation.clone(),
         &retained,
     );
-    let Ok(w) = current else {
-        return AcceptanceView::Judged {
-            judgment: Box::new(judgment),
-        };
+    // A judgment is shown as `judged` only once it is recorded, and an
+    // unreadable workflow has no version to record it against.
+    let w = match current {
+        Ok(w) => w,
+        Err(e) => {
+            return AcceptanceView::Unrecorded {
+                reason: format!("workflow-unreadable: {e}"),
+            };
+        }
     };
     let now = rfc3339_utc(clock.now_unix());
     match judge::record(&mut chain, &w, &judgment, &now) {

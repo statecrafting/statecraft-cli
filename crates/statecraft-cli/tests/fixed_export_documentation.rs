@@ -399,6 +399,28 @@ impl Pilot {
         })
     }
 
+    /// Spec 021's judgment of an attempt that has no result yet.
+    fn documentation_unjudged(&self, t: &DocumentationTask) -> da::Judgment {
+        let retained = |_: &str| None;
+        da::judge(&Inputs {
+            repository: &self.target.path().display().to_string(),
+            trusted_base: &self.base,
+            candidate: Ok(&self.base),
+            task: t,
+            delivery: None,
+            result_custody: None,
+            result: Err("result-not-recorded".into()),
+            context: None,
+            manifest_freshness: ManifestFreshness::NotRecorded,
+            retained: &retained,
+            reviews: &[],
+            corrections: &[],
+            policy: Err("not read".into()),
+            changed_paths: None,
+            now: NOW,
+        })
+    }
+
     fn review(&self, subject: CoreTuple, who: &str, t: &DocumentationTask, accept: bool) -> Review {
         let claims = doc_claims(t, accept);
         Review {
@@ -870,6 +892,22 @@ fn an_unreadable_workflow_record_refuses_preparation() {
     let n = p.chain().entries().len();
     let err = p.prepare(&m, &t).unwrap_err();
     assert!(err.starts_with("workflow-unreadable"), "{err}");
+    assert_eq!(p.chain().entries().len(), n);
+    // Nor can it be judged: nothing is recorded, and the view says so.
+    let documentation = p.documentation_unjudged(&t);
+    match cli::accept(
+        p.target.path(),
+        p.home.path(),
+        RUN,
+        1,
+        Some(&documentation),
+        &clock(),
+    ) {
+        AcceptanceView::Unrecorded { reason } => {
+            assert!(reason.starts_with("workflow-unreadable"), "{reason}")
+        }
+        other => panic!("{other:?}"),
+    }
     assert_eq!(p.chain().entries().len(), n);
 }
 
