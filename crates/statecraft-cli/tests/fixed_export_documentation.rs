@@ -943,3 +943,40 @@ fn a_review_without_a_readable_result_fails_closed() {
     );
     assert_eq!(p.chain().entries().len(), n);
 }
+
+// Section 3.7: a grant whose `notAfter` is not the `Z` form grants nothing,
+// whatever instant it spells.
+#[test]
+fn a_grant_with_an_offset_expiry_grants_nothing() {
+    let p = pilot();
+    std::fs::write(
+        p.target.path().join(da::POLICY_PATH),
+        serde_json::to_vec(&json!({
+            "schema": da::POLICY_SCHEMA,
+            "reviewers": [{"identity": OWNER, "authority": "repository-owner",
+                           "notAfter": "2999-01-01T00:00:00+00:00"}],
+            "quorum": 1,
+            "observedTransport": "optional",
+            "maxArtifactBytes": 65536
+        }))
+        .unwrap(),
+    )
+    .unwrap();
+    git(
+        p.target.path(),
+        &["commit", "--quiet", "-am", "offset expiry"],
+    );
+    let p = Pilot {
+        base: git(p.target.path(), &["rev-parse", "HEAD"]),
+        ..p
+    };
+    let t = p.generation(1, "task-022-a", DRAFT_1, true);
+    let subject = p.documentation(&t).subject.unwrap();
+    let err = p
+        .submit(&p.review(subject, OWNER, &t, true), 1)
+        .unwrap_err();
+    assert!(
+        err.starts_with("authority: the trusted-base policy grants"),
+        "{err}"
+    );
+}

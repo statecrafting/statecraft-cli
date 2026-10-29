@@ -283,6 +283,21 @@ fn result_parties(
     Ok(vec![result.adapter.name, result.provider.name])
 }
 
+/// Whether `t` is exactly `YYYY-MM-DDTHH:MM:SSZ`, the one form in which two
+/// instants compare as strings. Any other spelling of a grant's `notAfter`
+/// grants nothing.
+fn utc_seconds(t: &str) -> bool {
+    let b = t.as_bytes();
+    b.len() == 20
+        && b.iter().enumerate().all(|(i, c)| match i {
+            4 | 7 => *c == b'-',
+            10 => *c == b'T',
+            13 | 16 => *c == b':',
+            19 => *c == b'Z',
+            _ => c.is_ascii_digit(),
+        })
+}
+
 /// Section 3.7: who may append a record, under the trusted-base policy.
 #[allow(clippy::too_many_arguments)]
 fn authorized(
@@ -309,7 +324,9 @@ fn authorized(
     let granted = policy.reviewers.iter().any(|g| {
         g.identity == identity
             && authority.is_none_or(|a| a == g.authority)
-            && g.not_after.as_deref().is_none_or(|n| now <= n)
+            && g.not_after
+                .as_deref()
+                .is_none_or(|n| utc_seconds(n) && now <= n)
     });
     if granted {
         Ok(())
@@ -565,6 +582,25 @@ pub fn describe(attempt: u32, view: &WorkflowView) -> String {
                 out.push_str(&format!("  judgment {a}\n"));
             }
             out
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::utc_seconds;
+
+    #[test]
+    fn only_the_z_form_of_an_instant_is_compared() {
+        assert!(utc_seconds("2026-12-31T00:00:00Z"));
+        for bad in [
+            "2026-12-31T00:00:00+00:00",
+            "2026-12-31T00:00:00.000Z",
+            "2026-12-31",
+            "",
+            "9999-99-99T99:99:99z",
+        ] {
+            assert!(!utc_seconds(bad), "{bad}");
         }
     }
 }

@@ -454,7 +454,8 @@ under `fixed-export-boundary` or the refusal under `fixed-export-admission`.
 `submit_review` and `submit_correction` are spec 021's review-submission
 binding: each decodes the closed record, refuses one for another attempt or
 task, and appends only for an identity the trusted-base policy grants, under
-the authority it claims and before its `notAfter`, never for the result's
+the authority it claims and before its `notAfter` (which grants nothing unless it is exactly
+`YYYY-MM-DDTHH:MM:SSZ`), never for the result's
 provider or adapter, and only once the attempt's single result can be read,
 so that exclusion is never skipped by an absence; a correction's new artifact bytes are retained first,
 and every changed artifact must be among them. Each appends the workflow's
