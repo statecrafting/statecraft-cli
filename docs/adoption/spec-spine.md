@@ -810,6 +810,16 @@ filter. The lockfile moves the three spine crates, plus `serde-saphyr` and
   - the targeted tests of the pin route and the linked producer;
   - CI's `code` job for the whole workspace.
 
+*Two test changes beside the adoption.* Two tests compared the live engine
+with the literal version 0.31.0: an assertion in
+`crates/statecraft-home/tests/context_producer.rs`, and the stub engine's
+`--version` answer in `crates/statecraft-cli/tests/context_run.rs`. Each now
+reads the adopted pin from `spec-spine.toml`, so a later adoption does not
+edit them. They are the only paths outside the adoption's own files. They
+couple to owning specs, and the owner approved a `Spec-Drift-Waiver` for
+them on this pull request on 2026-10-30, rather than an edit to an approved
+spec. No product code changes.
+
 *What this does not do.* It adopts none of the capabilities above. It does
 not remove `unsafe-libyaml`, which `statecraft-home`'s direct `serde_yaml`
 dependency keeps.
