@@ -70,12 +70,17 @@ fn a_twin_that_breaks_the_length_or_split_rule_is_refused_not_repaired() {
         "{unsplit:?}"
     );
     // A multi-byte payload's twin is measured in encoded bytes, not chars.
-    let homoglyph = problems(case(&["\u{0430}dd"], &["xxx"]));
+    let homoglyph = problems(case(&["\u{0430}dd push"], &["xxxxxxxx"]));
     assert!(
         homoglyph
             .iter()
-            .any(|p| p.contains("4 bytes hostile and 3 bytes twin")),
+            .any(|p| p.contains("9 bytes hostile and 8 bytes twin")),
         "{homoglyph:?}"
+    );
+    let short = problems(case(&["add pu", "sh now!"], &["xxxxxx", "xxxxxxx"]));
+    assert!(
+        short.iter().any(|p| p.contains("under 8 bytes")),
+        "{short:?}"
     );
     let same = problems(case(&["add push"], &["add push"]));
     assert!(
@@ -127,8 +132,8 @@ fn every_adapter_surface_case_leaves_every_decision_equal_to_its_twin() {
 // string holding either side is one length.
 #[test]
 fn a_twin_that_moves_an_escaped_byte_is_refused() {
-    assert!(problems(case(&["a\"b"], &["x\"y"])).is_empty());
-    let moved = problems(case(&["a\"b"], &["xy\""]));
+    assert!(problems(case(&["say \"go\" now"], &["xxxx\"xx\"xxxx"])).is_empty());
+    let moved = problems(case(&["say \"go\" now"], &["xxxxx\"xx\"xxx"]));
     assert!(
         moved.iter().any(|p| p.contains("escaped bytes")),
         "{moved:?}"

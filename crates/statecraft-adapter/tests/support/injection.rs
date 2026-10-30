@@ -176,8 +176,26 @@ impl Case {
 
 /// The digest a corpus carries: over the document without `corpusDigest`,
 /// keys sorted, compact.
+///
+/// The keys are sorted here rather than left to `serde_json`'s map, whose
+/// order follows a cargo feature any crate in the build can switch on.
 pub fn corpus_digest(document: &Value) -> String {
-    let mut stripped = document.clone();
+    fn sorted(v: &Value) -> Value {
+        match v {
+            Value::Object(map) => {
+                let mut keys: Vec<&String> = map.keys().collect();
+                keys.sort();
+                let mut out = serde_json::Map::new();
+                for k in keys {
+                    out.insert(k.clone(), sorted(&map[k]));
+                }
+                Value::Object(out)
+            }
+            Value::Array(items) => Value::Array(items.iter().map(sorted).collect()),
+            other => other.clone(),
+        }
+    }
+    let mut stripped = sorted(document);
     if let Some(map) = stripped.as_object_mut() {
         map.remove("corpusDigest");
     }
@@ -257,6 +275,11 @@ pub fn validate(corpus: &Corpus) -> Vec<String> {
     problems
 }
 
+/// The shortest fragment a case may carry. [`compare`] looks for every
+/// hostile fragment in the decision fields, and a shorter one would match
+/// unrelated text by chance, so the corpus refuses it instead.
+pub const MIN_FRAGMENT: usize = 8;
+
 /// Section 3.3's twin rules: same fragment count, each fragment the same
 /// encoded byte length as its hostile counterpart, every fragment valid under
 /// the declared encoding, and each digest the digest of its assembled bytes.
@@ -266,8 +289,13 @@ fn twin_problems(case: &Case) -> Vec<String> {
         problems.push(format!("encoding {:?} is not utf-8", case.encoding));
     }
     let (hostile, twin) = (&case.payload, &case.benign_twin);
-    if hostile.fragments.is_empty() || hostile.fragments.iter().any(String::is_empty) {
-        problems.push("the payload has an empty fragment or none".into());
+    if hostile.fragments.is_empty() {
+        problems.push("the payload has no fragment".into());
+    }
+    if let Some(f) = hostile.fragments.iter().find(|f| f.len() < MIN_FRAGMENT) {
+        problems.push(format!(
+            "fragment {f:?} is under {MIN_FRAGMENT} bytes, too short for the decision-field check to see"
+        ));
     }
     if hostile.fragments.len() != twin.fragments.len() {
         problems.push(format!(
@@ -590,7 +618,7 @@ pub fn compare(case: &Case, runner: &Runner, hostile: &Observed, twin: &Observed
     let assembled = case.payload.assembled();
     let distinctive: Vec<&str> = std::iter::once(assembled.as_str())
         .chain(case.payload.fragments.iter().map(String::as_str))
-        .filter(|f| f.len() >= 8)
+        .filter(|f| f.len() >= MIN_FRAGMENT)
         .collect();
     for leaf in &leaves {
         if let Some(f) = distinctive.iter().find(|f| leaf.contains(**f)) {
