@@ -1,0 +1,15 @@
+{
+  "mapping": {
+    "amends": [
+      "004-execution-adapter"
+    ],
+    "dependsOn": [
+      "004-execution-adapter"
+    ],
+    "implementingPaths": [],
+    "specId": "064-protected-home-entries",
+    "specStatus": "draft"
+  },
+  "schemaVersion": "1.3.0",
+  "shardHash": "978b13c619f98cb3f95969102cb2abd8206b316091192038e205855f9e5fd3ca"
+}
