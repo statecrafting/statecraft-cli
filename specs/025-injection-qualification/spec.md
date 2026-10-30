@@ -375,6 +375,35 @@ unchanged. Packet pages are recorded as the strings they decode to, so content
 a JSON page escapes is still found. `citation-target` and `wire-metadata`
 remain `surface-absent` until the acceptance runners land.
 
+**2026-10-29: the acceptance surfaces, judged by an honest producer.** The
+acceptance suite seeds `citation-target` as one cited member per fragment,
+`context-packet` as above, and the result document's claim text and an
+unknown's question on `provider-output`; it judges each with spec 019's context
+judgment over a producer that answers from the bytes it is handed, then spec
+021's judgment with the owner's independent review and without any, and spec
+022's workflow judgment. `wire-metadata` puts each fragment in one exchange's
+served model, which is provider-attributed testimony, and is admitted under
+spec 014. Admitted wire facts are recorded as data, not as a decision. A runner
+runs a case only when it carries the case's recording, so the acceptance suite
+runs the four `provider-output` cases whose content is in the result document,
+and the adapter suite runs all eight. With these runners no case is
+`surface-absent`.
+
+**2026-10-29 (owner decision): a fail-closed screen's refusal is declared, not
+a breach of section 3.1.** The suite found that a `wire-metadata` payload
+carrying a base64 run trips spec 014's secret screen, which refuses the
+evidence as `prohibited-content` and retains none of it, while the twin is
+admitted. Hostile content can so withhold evidence; it cannot expand
+authority, and the screen is a privacy control this spec does not weaken. The
+owner chose to declare it: a case may carry `expectedRefusal`, naming one
+refusal from a closed list in the harness (today only
+`014-wire-evidence-admission/prohibited-content`), the decisions it is carried
+into and the recordings it leaves empty. Those decisions must be that refusal
+on the hostile side and not refusals on the twin's, those recordings must be
+empty, any other refusal is undeclared and fails, and every other difference
+still fails. A new fail-closed control is added to the list by a change that
+names it.
+
 ## Verification
 
 No implementation acceptance is declared while this spec and its dependencies
