@@ -127,7 +127,13 @@ fn a_paged_packet_is_assembled_to_its_terminal_page_and_composes_a_manifest() {
     );
     let head = git(&repo, &["rev-parse", "HEAD"]);
     assert_eq!(pages[0].facts.snapshot.revision, head);
-    assert_eq!(pages[0].facts.producer.version, "0.31.0");
+    // The producer is the repository's own pinned engine, whichever release
+    // D-06 last adopted.
+    let pinned = statecraft_home::setup::exact_pin(
+        &std::fs::read_to_string(repo_root().join("spec-spine.toml")).unwrap(),
+    )
+    .unwrap();
+    assert_eq!(pages[0].facts.producer.version, pinned);
 
     let manifest = Manifest::build(
         "run-019",
@@ -135,7 +141,7 @@ fn a_paged_packet_is_assembled_to_its_terminal_page_and_composes_a_manifest() {
         Task::NotRecorded,
         &Producer {
             package: "spec-spine".into(),
-            version: "0.31.0".into(),
+            version: pinned.clone(),
             packet_interface: "1.1.0".into(),
         },
         &[AcceptedRepository {
