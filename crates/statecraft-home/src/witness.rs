@@ -119,24 +119,33 @@ pub fn admit_sidecar(
             .parent()
             .ok_or("the producer has no directory")?
             .to_path_buf();
-        let home_sentinel = tempfile::NamedTempFile::new_in(roots.home)?;
+        // Inside the home, under one fixed entry, so the protected roots
+        // name no per-launch file.
+        let boundary_dir = roots.home.join(crate::home::BOUNDARY_DIR);
+        std::fs::create_dir_all(&boundary_dir)?;
+        let home_sentinel = tempfile::NamedTempFile::new_in(&boundary_dir)?;
         let records_sentinel = tempfile::NamedTempFile::new_in(roots.records)?;
         let target_sentinel = tempfile::NamedTempFile::new_in(roots.target)?;
         let protected = File::open(home_sentinel.path())?;
         let socket_directory = tempfile::Builder::new()
             .prefix("probe-")
-            .tempdir_in(roots.home)?;
+            .tempdir_in(&boundary_dir)?;
         let socket_path = socket_directory.path().join("socket");
         let socket = UnixListener::bind(&socket_path)?;
         let listener = TcpListener::bind(("127.0.0.1", 0))?;
         let mut boundary = Prepared::prepare_sidecar(
             Policy {
-                inaccessible: vec![
-                    roots.home.into(),
-                    roots.records.into(),
-                    roots.target.into(),
-                    roots.workspace.into(),
-                ],
+                // Every entry of the home but the operator's (spec 004
+                // section 3.18 rule 2, as amended 2026-10-29).
+                inaccessible: {
+                    let mut protected = crate::home::protected_entries(roots.home)?;
+                    protected.extend([
+                        roots.records.into(),
+                        roots.target.into(),
+                        roots.workspace.into(),
+                    ]);
+                    protected
+                },
                 // Readable, not read-only: only a readable root is carved out
                 // of the inaccessible home.
                 readonly: Vec::new(),

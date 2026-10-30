@@ -148,6 +148,41 @@ impl Layout {
     }
 }
 
+/// The top-level entries of a product home that are the operator's and not
+/// the product's, and so are outside spec 004 section 3.18's protected set
+/// (owner decision, 2026-10-29): `worktrees/`, where task worktrees and their
+/// build directories live, and Finder's `.DS_Store`. Closed: anything else in
+/// the home is protected whether or not this product knows its name.
+pub const OPERATOR_ENTRIES: [&str; 2] = ["worktrees", ".DS_Store"];
+
+/// Where a confinement keeps the sentinel and the socket directory its
+/// self-test probes, inside the home so they are protected, and under one
+/// fixed name so the protected roots a record names do not vary by launch.
+pub const BOUNDARY_DIR: &str = "boundary";
+
+/// The protected roots a product home contributes to a confinement: every
+/// top-level entry except [`OPERATOR_ENTRIES`], in name order.
+///
+/// Protecting the entries rather than the home is what keeps an operator's
+/// build directories, whose files cargo links many times over, out of the
+/// boundary's hard-link scan. It fails closed: an entry this product adds
+/// later, or one it never wrote, is protected without being listed. Call it
+/// after creating every entry the confinement itself needs, so they are
+/// among the roots.
+pub fn protected_entries(home: &Path) -> std::io::Result<Vec<PathBuf>> {
+    let mut roots = Vec::new();
+    for entry in std::fs::read_dir(home)? {
+        let entry = entry?;
+        let name = entry.file_name();
+        if OPERATOR_ENTRIES.iter().any(|o| name.to_str() == Some(*o)) {
+            continue;
+        }
+        roots.push(entry.path());
+    }
+    roots.sort();
+    Ok(roots)
+}
+
 /// The operator's personal defaults.
 ///
 /// A default is the weakest layer in section 3.6: it supplies a value for a key
@@ -418,6 +453,29 @@ pub fn presence(layout: &Layout) -> Presence {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    // Spec 004 section 3.18 rule 2, as amended 2026-10-29: every entry is
+    // protected except the operator's worktrees and Finder's metadata, and an
+    // entry this product never named is protected too.
+    #[test]
+    fn every_home_entry_but_the_operators_is_protected() {
+        let home = tempfile::tempdir().unwrap();
+        for d in ["records", "worktrees", "sealed", "an-unknown-entry"] {
+            std::fs::create_dir(home.path().join(d)).unwrap();
+        }
+        for f in ["home.json", ".DS_Store"] {
+            std::fs::write(home.path().join(f), b"{}").unwrap();
+        }
+        let names: Vec<String> = protected_entries(home.path())
+            .unwrap()
+            .iter()
+            .map(|p| p.file_name().unwrap().to_string_lossy().into_owned())
+            .collect();
+        assert_eq!(
+            names,
+            ["an-unknown-entry", "home.json", "records", "sealed"]
+        );
+    }
 
     #[test]
     fn an_absent_home_reads_as_empty_rather_than_failing() {

@@ -45,7 +45,7 @@
           {
             "file": "crates/statecraft-home/src/confinement.rs",
             "span": {
-              "endLine": 289,
+              "endLine": 300,
               "startLine": 112
             }
           }
@@ -113,5 +113,5 @@
     "specStatus": "approved"
   },
   "schemaVersion": "1.3.0",
-  "shardHash": "ebcb053acf7104105b712f385257cf5bbfd2325bfcea4f45dff6bcbcbbf04b5a"
+  "shardHash": "33a7102adc18be93489fb07ebabecdfb2ecf2277c00af126cd43706b0b6f385b"
 }

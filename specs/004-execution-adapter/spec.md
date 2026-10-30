@@ -675,7 +675,10 @@ same way and is a supervised process too.
 supervised process in:
 
 - the product home, except the harness store (readable and executable) and the
-  attempt's exchange directory (rule 5);
+  attempt's exchange directory (rule 5); *amended 2026-10-29:* the protected
+  roots are the home's top-level entries, every one except the operator's
+  `worktrees/` and Finder's `.DS_Store`, so an entry this product never named
+  is protected too;
 - every attempt's launch records (spec `002` section 3.37);
 - the target's working tree (the operator's checkout) and every other attempt's
   workspace, which the child may read and not write;
@@ -1020,6 +1023,22 @@ an attempt's boundary record names the measured provider version and says
 that with another version both items are unmeasured, as rule 11 requires. The listener, connected-socket and
 child-attested gate-log residuals are not items against completion and stay
 recorded.
+
+**2026-10-29 (owner decision): the operator's worktrees are outside the
+protected set.** Operators keep task worktrees under the product home, at
+`~/.statecraft/worktrees/`, and the build directories there hold files cargo
+links many times over. The alias scan of rule 2 walked the whole home and
+refused every launch on the first multiply linked file, about 2.6 million on
+the machine that reported it, which blocked a downstream profile upgrade. The
+owner chose to narrow the protected roots to the product's own entries and to
+fail closed: `statecraft_home::home::protected_entries` returns every
+top-level entry of the home except a closed operator list (`worktrees`,
+`.DS_Store`), so an unknown or later entry is protected without being listed,
+and the confinement and the witness sidecar use it in place of the home. The
+self-test's sentinel and socket directory move into one fixed protected entry,
+`boundary/`, so the roots a record names do not vary by launch. A multiply
+linked file in a protected entry still refuses. The cost, accepted: a confined
+child may read the operator's worktrees, which hold no evidence or authority.
 
 ## Verification
 
