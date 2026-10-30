@@ -144,6 +144,10 @@ pub fn admit_sidecar(
                         roots.target.into(),
                         roots.workspace.into(),
                     ]);
+                    // Each of these may live outside the home; one inside it
+                    // is one of its entries already, and is not named twice.
+                    protected.sort();
+                    protected.dedup();
                     protected
                 },
                 // Readable, not read-only: only a readable root is carved out

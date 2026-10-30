@@ -232,8 +232,13 @@ pub fn admit(roots: Roots<'_>, executable: &Path, path: &str) -> Result<Admissio
             // entry of the home but the operator's, after the sentinel and
             // probe directory above are created in it.
             inaccessible: {
+                // The records are named as well, because they may live outside
+                // the home; inside it, they are one of its entries already,
+                // and the duplicate is dropped here.
                 let mut protected = crate::home::protected_entries(roots.home)?;
                 protected.push(roots.records.into());
+                protected.sort();
+                protected.dedup();
                 protected
             },
             readonly,
