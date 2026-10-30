@@ -782,7 +782,7 @@ versions, apart from the version string.
   - `registry list --implementation` and `--has-acceptance` (spine 207).
 
 *The re-index.* All 66 registry shards move `specVersion` from 1.10.0 to
-1.11.0, and 51 of them gain `declaresAcceptance: true`. They change in
+1.11.0, and 52 of them gain `declaresAcceptance: true`. They change in
 nothing else. The codebase index keeps schema 1.3.0, and its `inputs.json`
 changes two content hashes: `spec-spine.toml`'s and this file's. Every
 regenerated file is committed in this change. The AI review policy leaves
