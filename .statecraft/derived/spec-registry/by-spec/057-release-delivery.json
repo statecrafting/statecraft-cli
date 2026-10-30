@@ -75,5 +75,5 @@
     "title": "Releasing this repository's binaries is repository delivery: cargo-dist archives, installers, SBOM and build provenance"
   },
   "shardHash": "3d8aa5545f3d99f4bd27a9133bbfcfed3551eea72452ea26f733a186615d2bc2",
-  "specVersion": "1.10.0"
+  "specVersion": "1.11.0"
 }

@@ -5,6 +5,7 @@
       "044-supply-chain-profile"
     ],
     "created": "2026-10-23",
+    "declaresAcceptance": true,
     "dependsOn": [
       "002-environment-lifecycle",
       "032-external-code-profile",
@@ -106,5 +107,5 @@
     "title": "Setup profile revision 18: superseded pull-request runs are cancelled, a preflight orders the expensive jobs, and the cargo cache is saved from the default branch only"
   },
   "shardHash": "1ea7131c9224dbe2027600860b8b5c17766fe3c8152fbdad7bcc510cb97c5ca3",
-  "specVersion": "1.10.0"
+  "specVersion": "1.11.0"
 }

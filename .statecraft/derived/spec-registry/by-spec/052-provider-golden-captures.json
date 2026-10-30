@@ -78,5 +78,5 @@
     "title": "Version-pinned provider captures, a quarantine and a divergence ledger gate a new provider version"
   },
   "shardHash": "b03a7e6c7c0fdc8e101bd2c2fb317333acfb227002a3e68ee5f3f154fe70000a",
-  "specVersion": "1.10.0"
+  "specVersion": "1.11.0"
 }

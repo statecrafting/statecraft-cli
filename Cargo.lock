@@ -458,9 +458,9 @@ checksum = "e4eba85ea1d0a966a983acd07deee566e67395d2d96b6fb39e62b5a833f1eb0b"
 
 [[package]]
 name = "granit-parser"
-version = "1.3.0"
+version = "2.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e20f99e46474f56bd905c56e817ebddcf377a611f94c53ac4649e4d3fa3c0cd0"
+checksum = "da55feca5d1625466bae068f9fd4b87892caeae70c3fe671ddb0f50d41aebf37"
 dependencies = [
  "arraydeque",
  "smallvec",
@@ -720,9 +720,9 @@ dependencies = [
 
 [[package]]
 name = "serde-saphyr"
-version = "1.3.0"
+version = "2.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b8050abb251097357e24aff63ba2c52a6309ecb7d23a5474023df960a02694d8"
+checksum = "a253edfdea34032da21af84e16fcc94f4c7a6ba237f9f3bc2dbf43cea8535c44"
 dependencies = [
  "annotate-snippets",
  "encoding_rs_io",
@@ -844,9 +844,9 @@ checksum = "5b3dc8af474f516a851ff4bd12db780f948b9250ad37211e4eec0bccea54e01b"
 
 [[package]]
 name = "spec-spine-core"
-version = "0.31.0"
+version = "0.32.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "de002551d95919c9f136900a402f1ed5b462f6f8f7a5338cf54a2e70e89215e2"
+checksum = "973e77cfb443aa4de15fd98149a34ebd10756b8818f8aef0490e5eeb03f257e0"
 dependencies = [
  "glob",
  "serde",
@@ -859,9 +859,9 @@ dependencies = [
 
 [[package]]
 name = "spec-spine-types"
-version = "0.31.0"
+version = "0.32.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c67df4672853fe6de40bb98a76dbeceed417e866a70034bf2c80b6b62b539a1f"
+checksum = "e89445735afeb05e83b670e7ea20c146ebf281a92c119ffdfafc60417b980e3c"
 dependencies = [
  "serde",
  "serde-saphyr",

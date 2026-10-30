@@ -4,6 +4,7 @@
       "002-environment-lifecycle"
     ],
     "created": "2026-10-21",
+    "declaresAcceptance": true,
     "dependsOn": [
       "002-environment-lifecycle",
       "024-review-budget-and-ratification",
@@ -113,5 +114,5 @@
     "title": "Setup profile revision 18: supply-chain, policy-isolation, workflow-lint, structural-scan and secret-scan jobs"
   },
   "shardHash": "3e05d7f3c76d1d9a7f1a62837469b5a4fa59d9d39c1e83ad06ea00117dcbd447",
-  "specVersion": "1.10.0"
+  "specVersion": "1.11.0"
 }

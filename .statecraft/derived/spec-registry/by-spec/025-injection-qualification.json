@@ -6,6 +6,7 @@
       "021-documentation-acceptance"
     ],
     "created": "2026-09-27",
+    "declaresAcceptance": true,
     "dependsOn": [
       "003-work-and-run-semantics",
       "004-execution-adapter",
@@ -137,5 +138,5 @@
     "title": "Prompt-injection qualification: untrusted content never expands authority"
   },
   "shardHash": "e5de2692dd7a56ce38eb1344e0d9a22fbb0f8733057169776d895d47f80d60ba",
-  "specVersion": "1.10.0"
+  "specVersion": "1.11.0"
 }

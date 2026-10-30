@@ -8,6 +8,7 @@
       "060-ci-failure-summary"
     ],
     "created": "2026-10-25",
+    "declaresAcceptance": true,
     "dependsOn": [
       "002-environment-lifecycle",
       "024-review-budget-and-ratification",
@@ -112,5 +113,5 @@
     "title": "Setup profile revision 20: a stalled AI review call is detected, retried once, and otherwise skipped as transient"
   },
   "shardHash": "81f94cc8440665e39b9a8ea51e49f3a83d1493194006171b1bf1a7b1b4cef88e",
-  "specVersion": "1.10.0"
+  "specVersion": "1.11.0"
 }

@@ -64,5 +64,5 @@
     "title": "The witness sidecar's ready deadline starts when its process starts"
   },
   "shardHash": "75f9bc5af27b93bb673fb2736c2731644951e581e79e56252f387e81dbcb928b",
-  "specVersion": "1.10.0"
+  "specVersion": "1.11.0"
 }

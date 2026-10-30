@@ -6,6 +6,7 @@
       "058-ci-throughput-profile"
     ],
     "created": "2026-10-24",
+    "declaresAcceptance": true,
     "dependsOn": [
       "002-environment-lifecycle",
       "058-ci-throughput-profile",
@@ -99,5 +100,5 @@
     "title": "Setup profile revision 19: a blocked ci-gate names each failed job with its first error lines, and the code job's cache leaves out workspace artifacts"
   },
   "shardHash": "edda78b617e90f1c6a45c5a12e3c7aa76bc1fac6271db2039914f9046cebd40a",
-  "specVersion": "1.10.0"
+  "specVersion": "1.11.0"
 }

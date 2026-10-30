@@ -4,6 +4,7 @@
       "002-environment-lifecycle"
     ],
     "created": "2026-09-27",
+    "declaresAcceptance": true,
     "dependsOn": [
       "002-environment-lifecycle",
       "006-command-surface"
@@ -92,5 +93,5 @@
     "title": "doctor reports a path whose recorded ownership disagrees with the transfer journal or the current rendering"
   },
   "shardHash": "dd475bd4336507d040e5152cf6be752c966bbc514df72e32dd6672435b09244c",
-  "specVersion": "1.10.0"
+  "specVersion": "1.11.0"
 }

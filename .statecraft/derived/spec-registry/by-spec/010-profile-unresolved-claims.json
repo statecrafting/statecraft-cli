@@ -4,6 +4,7 @@
       "002-environment-lifecycle"
     ],
     "created": "2026-09-25",
+    "declaresAcceptance": true,
     "dependsOn": [
       "001-boundaries-and-authority",
       "002-environment-lifecycle",
@@ -61,5 +62,5 @@
     "title": "Setup profile revision 9: a project decides whether governance refuses an unresolved claim"
   },
   "shardHash": "86cd929d18ca4c56efde47690141da379af17a10ca24bfa486536ec8b286288f",
-  "specVersion": "1.10.0"
+  "specVersion": "1.11.0"
 }

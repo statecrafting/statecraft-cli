@@ -4,6 +4,7 @@
       "006-command-surface"
     ],
     "created": "2026-09-25",
+    "declaresAcceptance": true,
     "dependsOn": [
       "001-boundaries-and-authority",
       "006-command-surface"
@@ -60,5 +61,5 @@
     "title": "The family envelope: every --json answer in the exit and JSON contract spec-spine speaks"
   },
   "shardHash": "4a44e1b967f1f41bbe28153e8bf10d50ae9462ac54356e762d241a856854c9cc",
-  "specVersion": "1.10.0"
+  "specVersion": "1.11.0"
 }

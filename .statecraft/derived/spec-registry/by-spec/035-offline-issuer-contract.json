@@ -4,6 +4,7 @@
       "005-acceptance-and-evidence"
     ],
     "created": "2026-10-03",
+    "declaresAcceptance": true,
     "dependsOn": [
       "001-boundaries-and-authority",
       "005-acceptance-and-evidence"
@@ -102,5 +103,5 @@
     "title": "Offline issuer authorization: three fixed domains, detached owner signatures and the pinned RootSetV2"
   },
   "shardHash": "a051d8dbc9d8cc63deaee603cf4c12dedbc361cb2bdd02f50f90af004e163f84",
-  "specVersion": "1.10.0"
+  "specVersion": "1.11.0"
 }

@@ -4,6 +4,7 @@
       "058-ci-throughput-profile"
     ],
     "created": "2026-10-24",
+    "declaresAcceptance": true,
     "dependsOn": [
       "058-ci-throughput-profile"
     ],
@@ -77,5 +78,5 @@
     "title": "Setup profile revision 18 cancels superseded work job by job, so a run waiting on the owner exception never blocks a newer one"
   },
   "shardHash": "852fda2749a4c7a114c45cf7251e18c7467433f6eb0b983ec9845ab791eaee40",
-  "specVersion": "1.10.0"
+  "specVersion": "1.11.0"
 }

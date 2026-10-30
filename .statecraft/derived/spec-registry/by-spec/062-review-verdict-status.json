@@ -7,6 +7,7 @@
       "044-supply-chain-profile"
     ],
     "created": "2026-10-27",
+    "declaresAcceptance": true,
     "dependsOn": [
       "002-environment-lifecycle",
       "006-command-surface",
@@ -136,5 +137,5 @@
     "title": "Setup profile revision 21 publishes the AI review's verdict as a check run, and review status reads it"
   },
   "shardHash": "899eb725d26a57b1297a8570195c139ee935db335bc40ced0935518bb82ad922",
-  "specVersion": "1.10.0"
+  "specVersion": "1.11.0"
 }

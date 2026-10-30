@@ -4,6 +4,7 @@
       "006-command-surface"
     ],
     "created": "2026-10-03",
+    "declaresAcceptance": true,
     "dependsOn": [
       "001-boundaries-and-authority",
       "006-command-surface",
@@ -88,5 +89,5 @@
     "title": "The offline issuer verbs: trust root-generate, trust issuer-sign and trust issuer-verify"
   },
   "shardHash": "cda3ecbc5837edb20547e5ff81ca79ed3c5299978b77dff034e6a739c774190b",
-  "specVersion": "1.10.0"
+  "specVersion": "1.11.0"
 }

@@ -5,6 +5,7 @@
       "024-review-budget-and-ratification"
     ],
     "created": "2026-10-10",
+    "declaresAcceptance": true,
     "dependsOn": [
       "001-boundaries-and-authority",
       "002-environment-lifecycle",
@@ -76,5 +77,5 @@
     "title": "Base-commit governance context for managed AI review"
   },
   "shardHash": "b20cb11255f6729168d6778305ca4771201efeb8670b2acb7fc5812f43627c0f",
-  "specVersion": "1.10.0"
+  "specVersion": "1.11.0"
 }

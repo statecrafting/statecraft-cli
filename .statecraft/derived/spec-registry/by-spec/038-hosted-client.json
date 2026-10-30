@@ -4,6 +4,7 @@
       "006-command-surface"
     ],
     "created": "2026-10-10",
+    "declaresAcceptance": true,
     "dependsOn": [
       "001-boundaries-and-authority",
       "005-acceptance-and-evidence",
@@ -76,5 +77,5 @@
     "title": "The hosted client: device-grant login, submit and decision against one Statecraft cell"
   },
   "shardHash": "6541241f013933310e037786986db73225085e951c4ea0b8350a5131d19948a1",
-  "specVersion": "1.10.0"
+  "specVersion": "1.11.0"
 }

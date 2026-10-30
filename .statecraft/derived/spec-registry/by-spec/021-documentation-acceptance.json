@@ -6,6 +6,7 @@
       "006-command-surface"
     ],
     "created": "2026-09-27",
+    "declaresAcceptance": true,
     "dependsOn": [
       "003-work-and-run-semantics",
       "005-acceptance-and-evidence",
@@ -118,5 +119,5 @@
     "title": "Independent documentation acceptance and review"
   },
   "shardHash": "ea48202819d31276ab40e976e8677203532d4e8b3d33795c2a86e7a1d5b2c808",
-  "specVersion": "1.10.0"
+  "specVersion": "1.11.0"
 }

@@ -5,6 +5,7 @@
       "004-execution-adapter"
     ],
     "created": "2026-09-26",
+    "declaresAcceptance": true,
     "dependsOn": [
       "001-boundaries-and-authority",
       "003-work-and-run-semantics",
@@ -151,5 +152,5 @@
     "title": "Supervised adoption of one wire-witness sidecar per attempt"
   },
   "shardHash": "9636199d0bf48436bc0479d96aae9f13994142cca5ab748c71d3c6bd7d65adbe",
-  "specVersion": "1.10.0"
+  "specVersion": "1.11.0"
 }

@@ -4,6 +4,7 @@
       "006-command-surface"
     ],
     "created": "2026-10-10",
+    "declaresAcceptance": true,
     "dependsOn": [
       "002-environment-lifecycle",
       "003-work-and-run-semantics",
@@ -107,5 +108,5 @@
     "title": "Callable application operations with unchanged envelopes and chain effects"
   },
   "shardHash": "90831a1f6ccc4bf2644480460652024e85a6987dcf05512983c8a1b257cf97a0",
-  "specVersion": "1.10.0"
+  "specVersion": "1.11.0"
 }

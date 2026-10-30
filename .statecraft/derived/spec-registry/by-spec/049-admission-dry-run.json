@@ -81,5 +81,5 @@
     "title": "An admission dry-run evaluates a policy through the closed evaluator and writes nothing"
   },
   "shardHash": "9a610da7cb1c1dda85ec384b8304506c07bc23360442d7c8238f0dfd3956fb98",
-  "specVersion": "1.10.0"
+  "specVersion": "1.11.0"
 }

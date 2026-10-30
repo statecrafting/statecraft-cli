@@ -5,6 +5,7 @@
       "002-environment-lifecycle"
     ],
     "created": "2026-10-10",
+    "declaresAcceptance": true,
     "dependsOn": [
       "001-boundaries-and-authority",
       "002-environment-lifecycle",
@@ -62,5 +63,5 @@
     "title": "Reopen F-04 for a local same-origin cockpit over the existing operations"
   },
   "shardHash": "d25ffeb1aaf453ee6c44be1d5edd230b903786f79fd9b361cba7c32b43a2e5c6",
-  "specVersion": "1.10.0"
+  "specVersion": "1.11.0"
 }

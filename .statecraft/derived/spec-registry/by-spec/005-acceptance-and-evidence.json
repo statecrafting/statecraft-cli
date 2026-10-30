@@ -1,6 +1,7 @@
 {
   "record": {
     "created": "2026-09-16",
+    "declaresAcceptance": true,
     "dependsOn": [
       "000-bootstrap",
       "001-boundaries-and-authority",
@@ -101,5 +102,5 @@
     "title": "Independent acceptance, the receipt, the separately reported evidence dimensions, and the envelope two products exchange"
   },
   "shardHash": "5f8b04d7f4d60caeee94ef0dd0d0e953ab3ec5d8b237eb4b8ba820fde62924d7",
-  "specVersion": "1.10.0"
+  "specVersion": "1.11.0"
 }

@@ -8,6 +8,7 @@
       "009-governance-producer"
     ],
     "created": "2026-09-27",
+    "declaresAcceptance": true,
     "dependsOn": [
       "002-environment-lifecycle",
       "003-work-and-run-semantics",
@@ -159,5 +160,5 @@
     "title": "Immutable context-packet consumption across repository snapshots"
   },
   "shardHash": "7800daab3c82438c957918f8f8bddfd8f8d2b4bfbf90df62a2367800108529b9",
-  "specVersion": "1.10.0"
+  "specVersion": "1.11.0"
 }

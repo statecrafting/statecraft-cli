@@ -4,6 +4,7 @@
       "006-command-surface"
     ],
     "created": "2026-09-16",
+    "declaresAcceptance": true,
     "dependsOn": [
       "000-bootstrap",
       "001-boundaries-and-authority"
@@ -120,5 +121,5 @@
     "title": "Project registration and the Statecraft-managed environment: one global home, one project area, one initialization flow, and where authority comes from"
   },
   "shardHash": "45eedd002e812b324dd66b1f9bae18b2bc329d92feb905d670d1488400c620c6",
-  "specVersion": "1.10.0"
+  "specVersion": "1.11.0"
 }

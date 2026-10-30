@@ -6,6 +6,7 @@
       "006-command-surface"
     ],
     "created": "2026-09-26",
+    "declaresAcceptance": true,
     "dependsOn": [
       "003-work-and-run-semantics",
       "005-acceptance-and-evidence",
@@ -185,5 +186,5 @@
     "title": "Admission of wire-exchange evidence"
   },
   "shardHash": "ae7202d3d10e106b9eae3e53dc4669f9c41720fcd06a17859eb3b38114d1582a",
-  "specVersion": "1.10.0"
+  "specVersion": "1.11.0"
 }
