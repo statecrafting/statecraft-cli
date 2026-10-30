@@ -1,0 +1,66 @@
+{
+  "record": {
+    "amends": [
+      "025-injection-qualification"
+    ],
+    "created": "2026-10-29",
+    "dependsOn": [
+      "014-wire-evidence-admission",
+      "025-injection-qualification"
+    ],
+    "id": "065-declared-fail-closed-refusal",
+    "implementation": "pending",
+    "obligations": [
+      {
+        "anchor": "3-2-what-a-declaration-excuses",
+        "id": "R-1",
+        "kind": "requirement",
+        "text": "A case may carry expectedRefusal naming one refusal from a closed list, the decisions it is carried into and the recordings it leaves empty; on the hostile side each named decision is that refusal and each named recording is empty, on the twin's side none is refused and each named recording holds the twin."
+      },
+      {
+        "anchor": "3-2-what-a-declaration-excuses",
+        "id": "R-2",
+        "kind": "requirement",
+        "text": "Any refusal a case does not declare, and any difference outside a declaration, fails the case."
+      },
+      {
+        "anchor": "3-3-the-closed-list",
+        "id": "R-3",
+        "kind": "requirement",
+        "text": "The closed list holds only controls that refuse and retain nothing; it is extended only by a change that names the control and the case that needs it."
+      }
+    ],
+    "sectionDigests": {
+      "065-a-declared-fail-closed-refusal": "1b8abce517ae2d3aea88bf1d5c7b7ce4b8987cfd9cb6100d39f453e4998c7500",
+      "1-purpose": "97c3135ece36a01b6b90e780afb21e900d0b3dcd4d7a7e385e6ec6c1e56b5adf",
+      "2-territory": "f6889e0ddd45fce23f35c2ccf812b7bd06e90aad93e64541ff7fc19b587dda65",
+      "3-1-the-declaration": "318b2e4fa36b89b5493abebf8ae18b8054bca4fad3f874ab406474b6ad0b8f31",
+      "3-2-what-a-declaration-excuses": "392f7f49904a9126bf0cf9dd540fb53d5948542721e6d47283346ff0baf18295",
+      "3-3-the-closed-list": "f8d91ddc91b77b4d97a2c75c3575d45b0e969733a7c5a1d76edb865c4ec728e8",
+      "3-4-what-does-not-change": "ce6e3986e3f9d10a4ff1f997a4a0ed1f6a35c8318cf37ffec8848f04a79de04d",
+      "3-behavior": "535faf2ea21460bc2502ec7d37c108725ed38b023a89f8f43761c07eb0265096",
+      "4-out-of-scope": "c6cf3f3f71e3b33fbd54b4b386b940bb4973593d3babfa790cc62689e0e786e0",
+      "5-resolved-decisions": "029e59e372adf128f6683d3144c1bf1e93ed7c39a190142c9547edffa90b7c06",
+      "verification": "5a901f4f6bae39e0f8246df5818395279300c96345ab9121dcf263d23becc7da"
+    },
+    "sectionHeadings": [
+      "065: A declared fail-closed refusal",
+      "1. Purpose",
+      "2. Territory",
+      "3. Behavior",
+      "3.1 The declaration",
+      "3.2 What a declaration excuses",
+      "3.3 The closed list",
+      "3.4 What does not change",
+      "4. Out of scope",
+      "5. Resolved decisions",
+      "Verification"
+    ],
+    "specPath": "specs/065-declared-fail-closed-refusal/spec.md",
+    "status": "draft",
+    "summary": "Amends spec 025. Invariant I-1 says no byte of untrusted content changes a Statecraft decision, evidence admission included; spec 014's secret screen refuses evidence whose content looks like a credential. A corpus case may therefore declare one refusal from a closed list, naming the decisions it is carried into and the recordings it leaves empty; those may differ from the twin's only as that refusal, and every other difference still fails. A refusal only withholds; nothing here lets content expand authority.\n",
+    "title": "A fail-closed screen's refusal of hostile content is declared, not a breach of spec 025's invariant"
+  },
+  "shardHash": "ca3a433ae2b269d5d76064c34e07994b797f1fd22f0e0c6d5fbfe46c0d8b6c1f",
+  "specVersion": "1.10.0"
+}
