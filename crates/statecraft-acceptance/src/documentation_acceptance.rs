@@ -24,7 +24,9 @@ use statecraft_run::documentation::review::{
     ArtifactDisposition, ArtifactIdentity, Authority, ClaimDisposition, CoreTuple, Correction,
     Read, Recommendation, Review,
 };
-use statecraft_run::documentation::{DocumentationResult, DocumentationTask, SemanticReview};
+use statecraft_run::documentation::{
+    DocumentationResult, DocumentationTask, SemanticReview, SuspectedInjection,
+};
 
 use crate::context::{CitationState, ContextResult, FreshnessState};
 
@@ -214,6 +216,12 @@ pub struct Judgment {
     pub reasons: Vec<String>,
     /// Section 3.9's boundary, repeated.
     pub notice: &'static str,
+    /// Spec 025 section 3.6: the result's suspected injections, each labelled
+    /// with its source and presented as testimony for review. Nothing above
+    /// is derived from them: no claim disposition, no recommendation and no
+    /// dimension reads this, and an empty list proves nothing.
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub suspected_injections: Vec<SuspectedInjection>,
 }
 
 /// `fail` dominates; otherwise the weaker state of the two.
@@ -1039,5 +1047,11 @@ pub fn judge(i: &Inputs<'_>) -> Judgment {
         outcome,
         reasons,
         notice: BOUNDARY_NOTICE,
+        suspected_injections: i
+            .result
+            .as_ref()
+            .ok()
+            .and_then(|r| r.suspected_injections.clone())
+            .unwrap_or_default(),
     }
 }

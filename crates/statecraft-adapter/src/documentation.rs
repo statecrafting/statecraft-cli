@@ -20,7 +20,7 @@ use serde::{Deserialize, Serialize};
 
 use statecraft_run::context::custody_digest;
 use statecraft_run::documentation::delivery::{Reported, SKILL_NOT_REQUIRED};
-use statecraft_run::documentation::{DocumentError, DocumentationTask, RESULT_SCHEMA_BYTES, Skill};
+use statecraft_run::documentation::{DocumentError, DocumentationTask, Skill, result_schema_bytes};
 
 use crate::capability::Capability;
 use crate::protocol::Event;
@@ -94,12 +94,14 @@ impl Bundle {
                     .map_err(|_| BundleError::Skill("the skill is not UTF-8 text".into()))?,
             }),
         };
+        // The schema the task pins, by identity: version 1 or version 2.
+        let schema =
+            result_schema_bytes(&task.result_schema.id).ok_or(BundleError::ResultSchema)?;
         Ok(Bundle {
             task: String::from_utf8(task.to_bytes()).expect("JSON is UTF-8"),
             task_digest: task.task_digest.clone(),
-            result_schema: String::from_utf8(RESULT_SCHEMA_BYTES.to_vec())
-                .expect("the schema is UTF-8"),
-            result_schema_digest: custody_digest(RESULT_SCHEMA_BYTES),
+            result_schema: String::from_utf8(schema.to_vec()).expect("the schema is UTF-8"),
+            result_schema_digest: custody_digest(schema),
             skill,
         })
     }
@@ -180,7 +182,7 @@ pub fn check(
             "not the recorded task's exact bytes".into(),
         ));
     }
-    if bundle.result_schema.as_bytes() != RESULT_SCHEMA_BYTES
+    if result_schema_bytes(&task.result_schema.id) != Some(bundle.result_schema.as_bytes())
         || bundle.result_schema_digest != task.result_schema.digest
         || custody_digest(bundle.result_schema.as_bytes()) != task.result_schema.digest
     {

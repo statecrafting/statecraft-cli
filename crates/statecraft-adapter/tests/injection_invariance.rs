@@ -366,3 +366,32 @@ fn the_comparison_holds_a_declared_refusal_to_exactly_its_terms() {
             .any(|p| p.contains("not a declared fail-closed refusal"))
     );
 }
+
+// Section 3.6: a task pinning result schema version 2 is delivered version
+// 2's exact bytes, and a bundle carrying version 1's refuses before spawn.
+#[test]
+fn a_version_two_task_carries_version_two_schema_bytes() {
+    use statecraft_adapter::documentation::{self as adapter_doc, Bundle, BundleError};
+    use statecraft_run::documentation::{self as doc, NotRequired, ResultSchemaRef, Skill};
+    let m = injection::fixtures::manifest(&[b"{\"page\":1}".to_vec()]);
+    let mut t = injection::fixtures::task(
+        &m,
+        &"c".repeat(40),
+        Skill::NotRequired(NotRequired::NotRequired),
+    );
+    t.result_schema = ResultSchemaRef {
+        id: doc::RESULT_SCHEMA_V2.into(),
+        digest: statecraft_run::context::custody_digest(doc::RESULT_SCHEMA_V2_BYTES),
+    };
+    let t = t.seal();
+    let b = Bundle::assemble(&t, None).unwrap();
+    assert_eq!(b.result_schema.as_bytes(), doc::RESULT_SCHEMA_V2_BYTES);
+    adapter_doc::check(Some(&b), Some(&t), &[]).unwrap();
+    let mut stale = b.clone();
+    stale.result_schema = String::from_utf8(doc::RESULT_SCHEMA_BYTES.to_vec()).unwrap();
+    stale.result_schema_digest = doc::result_schema_digest();
+    assert_eq!(
+        adapter_doc::check(Some(&stale), Some(&t), &[]),
+        Err(BundleError::ResultSchema)
+    );
+}

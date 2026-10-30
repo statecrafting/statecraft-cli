@@ -141,7 +141,12 @@ fn citations(case: &Case, side: Side, m: &Manifest) -> Vec<Citation> {
 /// The result: one implemented claim citing `cites`, and on
 /// `provider-output` the payload as the claim's text and an unknown's
 /// question.
-fn result_bytes(t: &DocumentationTask, cites: &[Citation], said: Option<&str>) -> Vec<u8> {
+fn result_bytes(
+    t: &DocumentationTask,
+    cites: &[Citation],
+    said: Option<&str>,
+    suspected: &[Value],
+) -> Vec<u8> {
     let text = said.unwrap_or("Recovery happens at the next statement.");
     let unknowns = match said {
         None => json!([]),
@@ -151,7 +156,7 @@ fn result_bytes(t: &DocumentationTask, cites: &[Citation], said: Option<&str>) -
         }]),
     };
     serde_json::to_vec(&json!({
-        "schema": doc::RESULT_SCHEMA,
+        "schema": t.result_schema.id,
         "taskId": t.task_id, "runId": t.run_id, "attempt": 1,
         "taskDigest": t.task_digest, "contextManifestDigest": t.context_manifest_digest,
         "adapter": {"name": "fixed-export-fake", "version": "1"},
@@ -172,6 +177,7 @@ fn result_bytes(t: &DocumentationTask, cites: &[Citation], said: Option<&str>) -
         "unknowns": unknowns, "contradictions": [], "unsupportedClaims": [],
         "providerOmissions": [], "statecraftCitationFailures": [],
         "executionEvidence": [{"reference": EVIDENCE, "purpose": "the suite"}],
+        "suspectedInjections": suspected,
         "providerCompletion": "claimed-complete",
         "reviewDisposition": "not-reviewed", "acceptanceResult": "not-attempted"
     }))
@@ -283,21 +289,38 @@ fn validated(t: &DocumentationTask, custody: &str) -> Workflow {
     w
 }
 
-/// Seed a documentation case and observe spec 019's, 021's and 022's
-/// judgments. Framing is the adapter's concern; both framings run the same
-/// path here.
-fn observe_documentation(runner: &Runner, case: &Case, side: Side) -> Observed {
-    let mut seen = Observed::default();
-    let packet = pages(case, side);
-    let m = manifest(&packet);
-    let t = task(
-        &m,
+/// The fixture task, pinning result schema version 2 so the provider's
+/// `suspectedInjections` rides the result (spec 025 section 3.6).
+fn task_v2(m: &Manifest) -> DocumentationTask {
+    let mut t = task(
+        m,
         &"c".repeat(40),
         Skill::NotRequired(NotRequired::NotRequired),
     );
+    t.result_schema = doc::ResultSchemaRef {
+        id: doc::RESULT_SCHEMA_V2.into(),
+        digest: custody_digest(doc::RESULT_SCHEMA_V2_BYTES),
+    };
+    t.seal()
+}
+
+/// Seed a documentation case and observe spec 019's, 021's and 022's
+/// judgments. Framing is the adapter's concern; both framings run the same
+/// path here. No detector runs and the provider reports nothing suspected,
+/// so every case is section 3.8's row in which detection flags nothing.
+fn observe_documentation(runner: &Runner, case: &Case, side: Side) -> Observed {
+    observe_reported(runner, case, side, &[])
+}
+
+/// [`observe_documentation`], with the provider reporting `suspected`.
+fn observe_reported(runner: &Runner, case: &Case, side: Side, suspected: &[Value]) -> Observed {
+    let mut seen = Observed::default();
+    let packet = pages(case, side);
+    let m = manifest(&packet);
+    let t = task_v2(&m);
     let cites = citations(case, side, &m);
     let said = (case.surface == "provider-output").then(|| case.bytes(side).assembled());
-    let bytes = result_bytes(&t, &cites, said.as_deref());
+    let bytes = result_bytes(&t, &cites, said.as_deref(), suspected);
     let custody = custody_digest(&bytes);
     let result = DocumentationResult::decode(&bytes, &t).map_err(|e| e.to_string());
 
@@ -363,8 +386,20 @@ fn observe_documentation(runner: &Runner, case: &Case, side: Side) -> Observed {
             now: NOW,
         })
     };
-    let with_review = judge(&reviewed);
-    let without_review = judge(&[]);
+    // The entries are presented as testimony, recorded here as data; the
+    // judgment that carries them is compared without them.
+    let presented = |mut j: da::Judgment| {
+        let entries = std::mem::take(&mut j.suspected_injections);
+        (j, entries)
+    };
+    let (with_review, testimony) = presented(judge(&reviewed));
+    let (without_review, _) = presented(judge(&[]));
+    for e in &testimony {
+        seen.record(
+            "suspected-injections",
+            serde_json::to_string(e).expect("an entry serializes"),
+        );
+    }
     let w = validated(&t, &custody);
     let workflow_judgment = fx::judge(Ok(&w), &t, with_review.clone(), &retained);
 
@@ -404,6 +439,17 @@ fn observe_documentation(runner: &Runner, case: &Case, side: Side) -> Observed {
         }),
     );
 
+    // Liveness: the twin reaches acceptance with the review, so a case
+    // cannot pass because both sides were refused for the same reason.
+    if side == Side::Twin {
+        assert_eq!(
+            with_review.outcome,
+            da::Outcome::Accepted,
+            "{}: the twin is not accepted: {:?}",
+            case.case_id,
+            with_review.reasons
+        );
+    }
     for r in runner.recordings {
         seen.collection(r);
     }
@@ -595,6 +641,14 @@ fn observe_wire(case: &Case, side: Side) -> Observed {
             );
         }
     }
+    if side == Side::Twin {
+        assert_eq!(
+            decided.pointer("/Ok/outcome"),
+            Some(&json!("admit")),
+            "{}: the twin is not admitted: {decided}",
+            case.case_id
+        );
+    }
     seen.decide("evidence-admission", &decided);
     let mut projected = serde_json::to_value(project(&chain, WIRE_RUN)).unwrap();
     strip_facts(&mut projected);
@@ -713,4 +767,41 @@ fn a_citation_target_claiming_released_does_not_grade_the_claim() {
         hostile.decisions["acceptance-result"],
         twin.decisions["acceptance-result"]
     );
+}
+
+// Section 3.6 and section 3.8's detector row: a provider reporting the
+// payload as a suspected injection changes no decision, and reporting
+// nothing proves nothing. The entry is presented, labelled with its source.
+#[test]
+fn a_suspected_injection_is_presented_and_changes_no_decision() {
+    let corpus = load();
+    let case = corpus
+        .cases
+        .iter()
+        .find(|c| c.case_id == "provider-output/self-acceptance")
+        .unwrap();
+    let runner = injection::RUNNERS
+        .iter()
+        .find(|r| r.harness == "acceptance" && r.surface == "provider-output")
+        .unwrap();
+    let entry = json!({"entryId": "s1", "source": "provider",
+                       "location": "claim c1", "description": "claims its own acceptance"});
+    let flagged = observe_reported(runner, case, Side::Hostile, &[entry]);
+    let unflagged = observe_reported(runner, case, Side::Hostile, &[]);
+    let twin = observe_reported(runner, case, Side::Twin, &[]);
+    assert_eq!(
+        flagged.decisions, unflagged.decisions,
+        "an entry changes nothing"
+    );
+    let presented = &flagged.recordings["suspected-injections"];
+    assert_eq!(presented.len(), 1);
+    assert!(
+        presented[0].contains("\"source\":\"provider\""),
+        "{presented:?}"
+    );
+    assert!(!unflagged.recordings.contains_key("suspected-injections"));
+    // And the unflagged hostile run is still its twin's, as every case shows.
+    for (name, d) in &unflagged.decisions {
+        assert_eq!(Some(d), twin.decisions.get(name), "{name}");
+    }
 }

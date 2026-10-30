@@ -2,7 +2,7 @@
 id: "025-injection-qualification"
 title: "Prompt-injection qualification: untrusted content never expands authority"
 status: approved
-implementation: pending
+implementation: complete
 created: "2026-09-27"
 summary: >
   Amends the adapter negative suite and the documentation lane with a
@@ -404,9 +404,44 @@ empty, any other refusal is undeclared and fails, and every other difference
 still fails. A new fail-closed control is added to the list by a change that
 names it.
 
+**2026-10-29: `suspectedInjections` is result schema version 2, beside version
+1.** Section 3.6 was written while version 1 was unimplemented; spec 020
+shipped version 1 first, so by section 3.6's own rule the member is a new
+version. `statecraft/documentation-result/2`
+(`crates/statecraft-run/schemas/documentation-result-2.json`) is version 1 plus
+the required `suspectedInjections`; version 1's bytes, identity and decoding
+are unchanged, a task pins one of the two by identity and digest, and a result
+decodes only under the version its task pins. An entry carries `entryId`,
+`source`, `location` and `description`. The raw result is the provider's
+immutable document, so its only source is `provider`: an entry claiming
+Statecraft as its source refuses. Statecraft has no detector, so it records
+no hit. `run show`'s summary and spec 021's judgment present the entries
+labelled with their source, and no disposition, recommendation or dimension
+reads them.
+
+**2026-10-29: liveness.** Each runner asserts that the twin reaches its
+positive outcome (a bound result, a recorded manifest, a prepared workspace,
+an accepted judgment, an admitted wire record), so a case cannot pass because
+both sides were refused for the same reason.
+
 ## Verification
 
-No implementation acceptance is declared while this spec and its dependencies
-remain unratified. The `V-1` inputs name the portable fixture surface a later
-implementation must add. Fixtures use the fixture adapter's hostile modes and no
-live provider, credentials, spend, network access or repository mutation.
+Implementation acceptance is the portable fixture surface `V-1` names, run
+through `make verify SPEC=025`. Every case in corpus version 1 runs against
+its benign twin through the fixture adapter's hostile mode, spec 022's offline
+workflow, the run record and the acceptance judgments, with framing intact
+and, for the two framing classes, removed. No live provider, network,
+credential, spend or repository mutation is involved.
+
+```verify:cli
+cargo test -p statecraft-adapter --test injection_invariance
+cargo test -p statecraft-adapter --test negative_suite
+cargo test -p statecraft-run --test injection_invariance
+cargo test -p statecraft-acceptance --test injection_invariance
+```
+
+These establish the corpus's validity and coverage, that every case leaves
+every decision its twin's except the raw-content digests and recordings it
+declares and the one declared fail-closed refusal, negative-suite row 9 under
+suite label `025.3.5`, and result schema version 2. They measure no provider's
+susceptibility (section 3.7), which needs its own authority.

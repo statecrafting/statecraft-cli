@@ -9,8 +9,8 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
 use super::{
-    DocumentError, DocumentationTask, RESULT_BOUNDS, RESULT_SCHEMA, RESULT_SUBJECT, decode_closed,
-    digest_form, logical_path, nonempty, recorded_task, safe_id, unique,
+    DocumentError, DocumentationTask, RESULT_BOUNDS, RESULT_SCHEMA_V2, RESULT_SUBJECT,
+    decode_closed, digest_form, logical_path, nonempty, recorded_task, safe_id, unique,
 };
 use crate::context::{self, CustodyError};
 use crate::record::{Chain, Entry, Identity as RecordIdentity, Kind, RecordError};
@@ -164,8 +164,34 @@ pub enum ProviderCompletion {
     NotReported,
 }
 
-/// One `statecraft/documentation-result/1` document (section 3.5). Every
-/// collection is required, even when empty.
+/// Who reported a suspected injection. A provider's document can only carry
+/// its own testimony: an entry claiming Statecraft as its source refuses.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum InjectionSource {
+    /// The provider, about content it believes is hostile.
+    Provider,
+}
+
+/// One entry of version 2's `suspectedInjections` (spec 025 section 3.6):
+/// testimony that informs review and never changes authority. Its absence
+/// proves nothing.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct SuspectedInjection {
+    /// The entry's identifier, unique in the document.
+    pub entry_id: String,
+    /// Who reports it.
+    pub source: InjectionSource,
+    /// Where the content was, as the reporter names it.
+    pub location: String,
+    /// What the reporter believes it is.
+    pub description: String,
+}
+
+/// One `statecraft/documentation-result/1` or `/2` document (section 3.5).
+/// Every collection is required, even when empty; version 2 adds
+/// `suspectedInjections`, which version 1 does not carry.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 #[allow(missing_docs)]
@@ -186,6 +212,9 @@ pub struct DocumentationResult {
     pub provider_omissions: Vec<Omission>,
     pub statecraft_citation_failures: Vec<CitationFailure>,
     pub execution_evidence: Vec<EvidenceRef>,
+    /// Version 2 only, and required there (spec 025 section 3.6).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub suspected_injections: Option<Vec<SuspectedInjection>>,
     pub provider_completion: ProviderCompletion,
     pub review_disposition: NotReviewed,
     pub acceptance_result: NotAttempted,
@@ -198,11 +227,38 @@ impl DocumentationResult {
     /// reference outside the task all refuse.
     pub fn decode(bytes: &[u8], task: &DocumentationTask) -> Result<Self, DocumentError> {
         let result: Self = decode_closed(bytes, &RESULT_BOUNDS)?;
-        if result.schema != RESULT_SCHEMA {
+        // The task pins the version; a result in another version answers
+        // another task.
+        let pinned = task.result_schema.id.as_str();
+        if result.schema != pinned {
             return Err(DocumentError::Malformed(format!(
-                "schema {:?} is not {RESULT_SCHEMA}",
+                "schema {:?} is not {pinned}",
                 result.schema
             )));
+        }
+        match (pinned, &result.suspected_injections) {
+            (RESULT_SCHEMA_V2, None) => {
+                return Err(DocumentError::Malformed(
+                    "suspectedInjections is required in version 2".into(),
+                ));
+            }
+            (RESULT_SCHEMA_V2, Some(entries)) => {
+                for e in entries {
+                    safe_id("suspected injection id", &e.entry_id)?;
+                    nonempty("suspected injection location", &e.location)?;
+                    nonempty("suspected injection description", &e.description)?;
+                }
+                unique(
+                    "suspected injection",
+                    entries.iter().map(|e| e.entry_id.as_str()),
+                )?;
+            }
+            (_, Some(_)) => {
+                return Err(DocumentError::Malformed(
+                    "suspectedInjections is not a version 1 member".into(),
+                ));
+            }
+            (_, None) => {}
         }
         safe_id("task id", &result.task_id)?;
         safe_id("run id", &result.run_id)?;
@@ -414,6 +470,11 @@ pub struct Summary {
     pub statecraft_citation_failures: usize,
     /// Claims with no support and no stated reason.
     pub unexplained_claims: usize,
+    /// Version 2's suspected injections, each labelled with its source and
+    /// shown as testimony beside the counts (spec 025 section 3.6). Absent
+    /// from a version 1 result and from every summary recorded before it.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub suspected_injections: Vec<SuspectedInjection>,
 }
 
 impl Summary {
@@ -428,6 +489,7 @@ impl Summary {
             provider_omissions: result.provider_omissions.len(),
             statecraft_citation_failures: result.statecraft_citation_failures.len(),
             unexplained_claims: result.unexplained_claims().len(),
+            suspected_injections: result.suspected_injections.clone().unwrap_or_default(),
         }
     }
 }
