@@ -1,5 +1,5 @@
 //! Spec 025's adapter-crate runner: one case seeded on the `provider-output`,
-//! `tool-facing` or `skill-content` surface, run end to end through a real
+//! `tool-facing`, `skill-content` or `context-packet` surface, run end to end through a real
 //! child and spec 022's offline workflow, and observed as decisions.
 //!
 //! The child is the fixture adapter's hostile mode ([`fixture::Hostile`]).
@@ -13,7 +13,6 @@
 
 use std::collections::BTreeMap;
 use std::path::Path;
-use std::process::Command;
 
 use serde_json::{Value, json};
 
@@ -30,154 +29,21 @@ use statecraft_adapter::protocol::{
 };
 use statecraft_adapter::supervisor::supervise;
 use statecraft_environment::time::FixedClock;
-use statecraft_run::context::{
-    self, AcceptedPage, AcceptedRepository, Completeness, DeliveryPolicy, Intended, Manifest,
-    OptionalOmission, PageFacts, Producer, ProducerBuild, Requirement, Snapshot, Task,
-};
+use statecraft_run::context;
 use statecraft_run::documentation::review::{self, Read};
 use statecraft_run::documentation::workflow;
 use statecraft_run::documentation::{
-    self as doc, Artifact, Binding, Candidate, ClockSource, CostCeiling, Deadline, Disposition,
-    DocumentationResult, DocumentationTask, Format, NoSpend, NotRequired, Operations, OutputFormat,
-    Publication, ResultSchemaRef, ReviewPolicy, SemanticReview, Skill, SkillIdentity,
+    self as doc, Binding, DocumentationResult, DocumentationTask, NotRequired, Skill, SkillIdentity,
 };
 use statecraft_run::record::Chain;
 use statecraft_run::session::{self, IntentDetail};
 
+use super::injection::fixtures::{AT, RUN, git, manifest, pages, repo, task};
 use super::injection::{Case, Framing, Observed, Runner, Side};
 
-const RUN: &str = "run-025";
-const PAGE: &[u8] = b"{\"page\":1}";
-const AT: &str = "2026-10-29T00:00:00Z";
 const PROMPT: &[u8] = b"Describe recovery.";
 const SKILL_HEADER: &str = "# documentation skill\n\n";
 const SHIMMED: [&str; 8] = ["curl", "wget", "git", "gh", "nc", "ssh", "scp", "cargo"];
-
-fn git(dir: &Path, args: &[&str]) -> String {
-    let out = Command::new("git")
-        .args(args)
-        .current_dir(dir)
-        // A fixed identity and clock, so the twin's commit is the hostile
-        // run's commit and a revision compares by content.
-        .env("GIT_AUTHOR_DATE", "2026-10-29T00:00:00Z")
-        .env("GIT_COMMITTER_DATE", "2026-10-29T00:00:00Z")
-        .env("GIT_CONFIG_GLOBAL", "/dev/null")
-        .env("GIT_CONFIG_NOSYSTEM", "1")
-        .output()
-        .unwrap();
-    assert!(out.status.success(), "git {args:?}");
-    String::from_utf8(out.stdout).unwrap().trim().to_string()
-}
-
-fn repo(dir: &Path) {
-    std::fs::create_dir_all(dir).unwrap();
-    for args in [
-        &["init", "--quiet", "--initial-branch=main"][..],
-        &["config", "user.email", "test@example.invalid"],
-        &["config", "user.name", "test"],
-        &["config", "commit.gpgsign", "false"],
-    ] {
-        git(dir, args);
-    }
-    std::fs::write(dir.join("README.md"), b"x").unwrap();
-    git(dir, &["add", "."]);
-    git(dir, &["commit", "--quiet", "-m", "one"]);
-}
-
-fn manifest() -> Manifest {
-    let d = |t: &str| context::custody_digest(t.as_bytes());
-    Manifest::build(
-        RUN,
-        1,
-        Task::Id("task-025".into()),
-        &Producer {
-            package: "spec-spine".into(),
-            version: "0.31.0".into(),
-            packet_interface: "1.1.0".into(),
-        },
-        &[AcceptedRepository {
-            id: "app".into(),
-            role: "source".into(),
-            requirement: Requirement::Required,
-            pages: vec![AcceptedPage {
-                bytes: PAGE.to_vec(),
-                source_operation: "context_packet_pages".into(),
-                facts: PageFacts {
-                    schema_version: "1.1.0".into(),
-                    producer: ProducerBuild {
-                        package: "spec-spine".into(),
-                        version: "0.31.0".into(),
-                        build: "unverified".into(),
-                    },
-                    snapshot: Snapshot {
-                        repository: "example/app".into(),
-                        revision: "a".repeat(40),
-                        tree: "t".repeat(40),
-                        dirty_state: "clean-export".into(),
-                    },
-                    request_digest: d("request"),
-                    closure_digest: d("closure"),
-                    packet_digest: d("page-1"),
-                    completeness: Completeness::Complete,
-                    continues: false,
-                    omissions: vec![],
-                    warnings: vec![],
-                },
-                delivery: Intended::Required,
-            }],
-        }],
-        DeliveryPolicy::new(OptionalOmission::Refuse),
-    )
-    .unwrap()
-}
-
-fn task(m: &Manifest, candidate: &str, skill: Skill) -> DocumentationTask {
-    DocumentationTask {
-        schema: doc::TASK_SCHEMA.into(),
-        task_id: "task-025".into(),
-        run_id: RUN.into(),
-        attempt: 1,
-        candidate: Candidate {
-            repository: "app".into(),
-            revision: candidate.into(),
-            tree: "tree".into(),
-        },
-        context_manifest_digest: m.manifest_digest.clone(),
-        objective: "Describe recovery.".into(),
-        audiences: vec!["operators".into()],
-        output_format: OutputFormat {
-            format: Format::Markdown,
-            version: "commonmark-0.31.2".into(),
-        },
-        operations: Operations::v1(),
-        required_capabilities: vec![],
-        skill,
-        result_schema: ResultSchemaRef {
-            id: doc::RESULT_SCHEMA.into(),
-            digest: doc::result_schema_digest(),
-        },
-        deadline: Deadline {
-            not_after: "2026-12-31T00:00:00Z".into(),
-            clock: ClockSource::SupervisorUtc,
-        },
-        cost_ceiling: CostCeiling::NoSpend(NoSpend::NoSpend),
-        artifacts: vec![Artifact {
-            path: "docs/recovery.md".into(),
-            disposition: Disposition::Draft,
-            required_context: vec![],
-        }],
-        review_policy: ReviewPolicy {
-            reviewers: vec!["owner".into()],
-            semantic_review: SemanticReview::Required,
-            acceptance_route: "accept".into(),
-            candidate_divergence: None,
-        },
-        publication: Publication::Prohibited,
-        digest_construction: String::new(),
-        task_digest: String::new(),
-    }
-    .seal()
-}
 
 /// A bound result; on `provider-output` the payload rides an unknown's
 /// question, which is free text the schema keeps as data.
@@ -322,7 +188,7 @@ pub fn observe_with(
     std::fs::create_dir_all(&home).unwrap();
     std::fs::create_dir_all(&fixture_dir).unwrap();
     std::fs::write(&trace, b"").unwrap();
-    repo(&target);
+    repo(&target, &[]);
     shims(&bin, &trace);
     let payload = case.bytes(side);
     let mut seen = Observed::rooted_at(&[root.path()]);
@@ -340,7 +206,8 @@ pub fn observe_with(
     }
 
     let head = git(&target, &["rev-parse", "HEAD"]);
-    let m = manifest();
+    let packet = pages(case, side);
+    let m = manifest(&packet);
     let skill = match &skill_bytes {
         None => Skill::NotRequired(NotRequired::NotRequired),
         Some(b) => Skill::Pinned(SkillIdentity {
@@ -350,7 +217,9 @@ pub fn observe_with(
         }),
     };
     let t = task(&m, &head, skill);
-    context::retain(&home, PAGE).unwrap();
+    for p in &packet {
+        context::retain(&home, p).unwrap();
+    }
     let (mut chain, _) = Chain::open(&home, &target).unwrap();
     session::begin_with(
         &mut chain,
@@ -604,6 +473,14 @@ pub fn observe_with(
         if let Ok(r) = &decoded {
             for u in &r.unknowns {
                 seen.record("result-document", u.question.clone());
+            }
+        }
+    }
+    if runner.recordings.contains(&"packet-pages") {
+        seen.collection("packet-pages");
+        for (_, page) in m.pages() {
+            if let Some(b) = read(&page.custody_digest) {
+                seen.record_json("packet-pages", &b);
             }
         }
     }

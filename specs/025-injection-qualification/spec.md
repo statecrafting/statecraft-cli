@@ -362,6 +362,19 @@ acceptance runners are registered, every case on `repository-text`,
 `context-packet`, `citation-target` and `wire-metadata` is `surface-absent`,
 and the suite as a whole makes no qualification claim.
 
+**2026-10-29: the packet and repository surfaces, and where each is seeded.**
+A `context-packet` case puts each fragment in its own page, as a member name, a
+member path and a member text; the producer's page digest names the page's
+ordinal and is producer testimony, so only Statecraft's custody digests bind
+the bytes. It runs twice: end to end in the adapter suite, and in the run suite
+over the recorded intent, manifest, policy, task binding and workflow
+subjects. A `repository-text` case commits each fragment in its own file, and
+the run suite compares the recorded intent, the task's candidate check and the
+workspace prepared from the recorded base, with the operator's checkout
+unchanged. Packet pages are recorded as the strings they decode to, so content
+a JSON page escapes is still found. `citation-target` and `wire-metadata`
+remain `surface-absent` until the acceptance runners land.
+
 ## Verification
 
 No implementation acceptance is declared while this spec and its dependencies
