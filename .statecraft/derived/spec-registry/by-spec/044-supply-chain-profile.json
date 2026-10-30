@@ -17,10 +17,18 @@
           "kind": "directory",
           "path": "crates/statecraft-home/"
         }
+      },
+      {
+        "nature": "additive",
+        "spec": "006-command-surface",
+        "unit": {
+          "kind": "directory",
+          "path": "crates/statecraft-cli/"
+        }
       }
     ],
     "id": "044-supply-chain-profile",
-    "implementation": "pending",
+    "implementation": "complete",
     "obligations": [
       {
         "anchor": "3-1-pinned-tools",
@@ -64,7 +72,7 @@
       }
     ],
     "sectionDigests": {
-      "044-supply-chain-policy-isolation-workflow-lint-structural-scan-and-secret-scan-jobs": "d827c90bf9c9a13f835ba7828e98c32bb7f540d61e3ce82930898718f02b0edb",
+      "044-supply-chain-policy-isolation-workflow-lint-structural-scan-and-secret-scan-jobs": "db45663e5199eced0013affe8530b59b95e90a98199f5336eb183a49883dea3b",
       "1-purpose": "d501641863dfca72cd05cf37034d00bbb60235ac0ae9440ca3ba8d315a5e82e3",
       "2-territory": "192410a9f1af2fdadebe60aaca7fedf66e9e4ac5c9d63701102e68c89983a542",
       "3-1-pinned-tools": "911cf49bb7cc12f81014bd72b3e5a481a29849e8f2e3ceec5100ca2e0b1f5fc6",
@@ -78,8 +86,8 @@
       "4-observable-negative-cases": "818eae62daddd219a0d1366715339ada0c7a0d54db2224240f837e46da8b23a9",
       "5-this-repository-s-own-adoption": "5c0bf4f6f3f3dbae400fd1cae61d629c18e569dc77fc34fb808a19bb1b4e6269",
       "6-out-of-scope": "9423400f8e03e68509956af59b8db4748d1e02ae002bd68c160e524c06ac0072",
-      "7-resolved-decisions": "cf12516f25d225bb8f6196520baeafde0bf456770ee6c0abb0d5555c3f96376a",
-      "verification": "f209b832f474d678462ca26345789ecac134e4ebba11e9d3c5b761544e9f1988"
+      "7-resolved-decisions": "a2ac94894d6daa492f12d6248142a145e47fada2448e8f42d588bc15e13e6d84",
+      "verification": "dbdb2d7770697dfda88b724861dcc511a98c56d78fdb2d171c46831218d2217c"
     },
     "sectionHeadings": [
       "044: Supply-chain, policy-isolation, workflow-lint, structural-scan and secret-scan jobs",
@@ -104,6 +112,6 @@
     "summary": "Amends spec 002's setup profile. github-actions-rust revision 18 adds five required checks to every target: a supply-chain job (cargo-deny, cargo-audit, cargo-vet with exact tool versions), a guard that refuses a pull request mixing dependency or policy files with anything else, a workflow lint (zizmor and an offline refusal of any action not pinned by commit digest), an ast-grep scan where the project declares rules, and a digest-verified gitleaks scan. Each is wired into ci-gate. A target needs a committed deny.toml to upgrade to it.\n",
     "title": "Setup profile revision 18: supply-chain, policy-isolation, workflow-lint, structural-scan and secret-scan jobs"
   },
-  "shardHash": "fb7e75c08d32b1d3f6658e85d6b411ccd7b58030fde5949885165e60fea585be",
+  "shardHash": "3e05d7f3c76d1d9a7f1a62837469b5a4fa59d9d39c1e83ad06ea00117dcbd447",
   "specVersion": "1.10.0"
 }

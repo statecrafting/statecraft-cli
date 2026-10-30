@@ -26,12 +26,14 @@ fn project() -> tempfile::TempDir {
         ("spec-spine.toml", TOML),
         ("rust-toolchain.toml", "[toolchain]\nchannel = \"1.96.0\"\n"),
         ("Cargo.lock", "version = 4\n"),
+        // Revision 22 (spec 044): the committed dependency policy.
+        ("deny.toml", "[advisories]\n"),
     ] {
         std::fs::write(dir.path().join(rel), text).unwrap();
     }
     for args in [
         &["init", "--quiet"][..],
-        &["add", "rust-toolchain.toml", "Cargo.lock"],
+        &["add", "rust-toolchain.toml", "Cargo.lock", "deny.toml"],
     ] {
         let out = std::process::Command::new("git")
             .args(args)

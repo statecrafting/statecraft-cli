@@ -134,6 +134,16 @@ fn exact_pin(pin: &Pin<'_>) -> Prerequisite {
     prerequisite("an exact spec-spine pin", observed, met, owner, &remedy)
 }
 
+/// Spec 044 section 3.2, O-1: the committed dependency policy the
+/// supply-chain job checks against. Statecraft never writes one.
+pub fn dependency_policy(root: &Path) -> Prerequisite {
+    tracked_file(
+        root,
+        "deny.toml",
+        "Statecraft never writes a supply-chain policy: commit the project's deny.toml (cargo-deny's configuration) before selecting revision 22",
+    )
+}
+
 /// A regular file the git index tracks: what CI checks out is what the gate
 /// runs with.
 fn tracked_file(root: &Path, rel: &str, remedy: &str) -> Prerequisite {

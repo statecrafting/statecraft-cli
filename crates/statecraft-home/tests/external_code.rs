@@ -35,7 +35,9 @@ fn project() -> tempfile::TempDir {
     std::fs::write(root.join(WORKFLOW), "on:\n  workflow_call:\njobs:\n  check:\n    runs-on: ubuntu-latest\n    steps:\n      - run: scripts/project-code.sh\n").unwrap();
     std::fs::write(root.join(SCRIPT), "#!/bin/sh\nexit 0\n").unwrap();
     std::fs::set_permissions(root.join(SCRIPT), std::fs::Permissions::from_mode(0o755)).unwrap();
-    git(root, &["add", WORKFLOW, SCRIPT]);
+    // Revision 22 (spec 044): the committed dependency policy.
+    std::fs::write(root.join("deny.toml"), "[advisories]\n").unwrap();
+    git(root, &["add", WORKFLOW, SCRIPT, "deny.toml"]);
     dir
 }
 
