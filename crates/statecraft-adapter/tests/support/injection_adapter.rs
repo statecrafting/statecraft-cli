@@ -457,6 +457,20 @@ pub fn observe_with(
         }),
     );
 
+    // Liveness: the twin's result is recorded and bound, so a case cannot
+    // pass because both sides failed the same way.
+    if side == Side::Twin {
+        let state = seen.decisions["attempt-record"]
+            .pointer("/documentation/result/validation/state")
+            .cloned();
+        assert_eq!(
+            state,
+            Some(json!("bound")),
+            "{}: the twin's result is not bound",
+            case.case_id
+        );
+    }
+
     // Content kept as data.
     for e in &run.events {
         match e {

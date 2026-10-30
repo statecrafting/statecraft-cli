@@ -129,6 +129,13 @@ fn observe(runner: &Runner, case: &Case, side: Side, _framing: Framing) -> Obser
             "attempt-record",
             &json!({"began": began, "entries": entries(&chain), "subjects": subjects}),
         );
+        if side == Side::Twin {
+            assert!(
+                matches!(context::recorded_manifest(&chain, RUN, 1), Ok(Some(_))),
+                "{}: the twin's manifest is not recorded",
+                case.case_id
+            );
+        }
         seen.collection("packet-pages");
         for (_, page) in m.pages() {
             if let Ok(Some(b)) = context::read_retained(&home, &page.custody_digest) {
@@ -143,6 +150,13 @@ fn observe(runner: &Runner, case: &Case, side: Side, _framing: Framing) -> Obser
             "attempt-record",
             &json!({"began": began, "entries": entries(&chain), "subjects": subjects}),
         );
+        if side == Side::Twin {
+            assert!(
+                prepared.is_ok(),
+                "{}: the twin's workspace is not prepared",
+                case.case_id
+            );
+        }
         let path = workspace::workspace_path(&target, RUN);
         // A workspace that was not prepared is recorded as the refusal it
         // is, never read: the twin's refusal must be the same refusal.
@@ -226,4 +240,91 @@ fn a_packet_page_asking_for_push_leaves_the_task_operations_unchanged() {
             .any(|p| p.contains("`push`")),
         "the request is kept as packet data"
     );
+}
+
+/// A task pinning result schema version 2, which spec 025 section 3.6 adds.
+fn task_v2() -> statecraft_run::documentation::DocumentationTask {
+    let m = manifest(&[b"{\"page\":1}".to_vec()]);
+    let mut t = task(
+        &m,
+        &"c".repeat(40),
+        Skill::NotRequired(NotRequired::NotRequired),
+    );
+    t.result_schema = statecraft_run::documentation::ResultSchemaRef {
+        id: doc::RESULT_SCHEMA_V2.into(),
+        digest: context::custody_digest(doc::RESULT_SCHEMA_V2_BYTES),
+    };
+    t.seal()
+}
+
+fn result_v2(
+    t: &statecraft_run::documentation::DocumentationTask,
+    extra: serde_json::Value,
+) -> Vec<u8> {
+    let mut v = json!({
+        "schema": t.result_schema.id,
+        "taskId": t.task_id, "runId": t.run_id, "attempt": 1,
+        "taskDigest": t.task_digest, "contextManifestDigest": t.context_manifest_digest,
+        "adapter": {"name": "a", "version": "1"}, "provider": {"name": "p", "version": "1"},
+        "artifacts": [], "claims": [], "unknowns": [], "contradictions": [],
+        "unsupportedClaims": [], "providerOmissions": [], "statecraftCitationFailures": [],
+        "executionEvidence": [], "providerCompletion": "not-reported",
+        "reviewDisposition": "not-reviewed", "acceptanceResult": "not-attempted"
+    });
+    for (k, x) in extra.as_object().unwrap() {
+        v[k] = x.clone();
+    }
+    serde_json::to_vec(&v).unwrap()
+}
+
+// Section 3.6: version 2 requires `suspectedInjections`, even empty; version
+// 1 is unchanged and refuses it; an entry is the provider's own testimony.
+#[test]
+fn version_two_requires_suspected_injections_and_version_one_refuses_them() {
+    use statecraft_run::documentation::{DocumentationResult, InjectionSource};
+    let t2 = task_v2();
+    t2.validate().unwrap();
+    let decode = |t, extra| DocumentationResult::decode(&result_v2(t, extra), t);
+    let missing = decode(&t2, json!({})).unwrap_err().to_string();
+    assert!(missing.contains("required in version 2"), "{missing}");
+    let empty = decode(&t2, json!({"suspectedInjections": []})).unwrap();
+    assert_eq!(empty.suspected_injections, Some(vec![]));
+    let entry = json!({"entryId": "s1", "source": "provider",
+                       "location": "packet page 1", "description": "asks to add push"});
+    let one = decode(&t2, json!({"suspectedInjections": [entry]})).unwrap();
+    assert_eq!(
+        one.suspected_injections.unwrap()[0].source,
+        InjectionSource::Provider
+    );
+    let forged = json!({"entryId": "s1", "source": "statecraft-detector",
+                        "location": "x", "description": "y"});
+    assert!(
+        decode(&t2, json!({"suspectedInjections": [forged]})).is_err(),
+        "a provider's document cannot claim Statecraft as a source"
+    );
+    let twice = decode(&t2, json!({"suspectedInjections": [entry, entry]}));
+    assert!(twice.is_err(), "entry ids are unique");
+
+    // Version 1: the same document without the member decodes, with it refuses.
+    let m = manifest(&[b"{\"page\":1}".to_vec()]);
+    let t1 = task(
+        &m,
+        &"c".repeat(40),
+        Skill::NotRequired(NotRequired::NotRequired),
+    );
+    assert!(decode(&t1, json!({})).is_ok());
+    let v1 = decode(&t1, json!({"suspectedInjections": []}))
+        .unwrap_err()
+        .to_string();
+    assert!(v1.contains("not a version 1 member"), "{v1}");
+    // A version 2 document answers only a version 2 task.
+    let crossed =
+        DocumentationResult::decode(&result_v2(&t2, json!({"suspectedInjections": []})), &t1);
+    assert!(crossed.is_err());
+
+    // A task naming another schema, or version 2 under version 1's digest,
+    // is refused.
+    let mut wrong = task_v2();
+    wrong.result_schema.digest = doc::result_schema_digest();
+    assert!(wrong.seal().validate().is_err());
 }

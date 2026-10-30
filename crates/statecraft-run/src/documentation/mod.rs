@@ -55,6 +55,26 @@ pub fn result_schema_digest() -> String {
     context::custody_digest(RESULT_SCHEMA_BYTES)
 }
 
+/// Version 2 of the result's closed schema word: version 1 plus the
+/// required `suspectedInjections` collection (spec 025 section 3.6). A
+/// member added after version 1 shipped is a new version, so version 1 is
+/// unchanged and a task pins one or the other.
+pub const RESULT_SCHEMA_V2: &str = "statecraft/documentation-result/2";
+
+/// The exact bytes of the version 2 result schema.
+pub const RESULT_SCHEMA_V2_BYTES: &[u8] =
+    include_bytes!("../../schemas/documentation-result-2.json");
+
+/// The schema bytes a task's pinned result schema names, by identity:
+/// `None` for an identity this product does not deliver.
+pub fn result_schema_bytes(id: &str) -> Option<&'static [u8]> {
+    match id {
+        RESULT_SCHEMA => Some(RESULT_SCHEMA_BYTES),
+        RESULT_SCHEMA_V2 => Some(RESULT_SCHEMA_V2_BYTES),
+        _ => None,
+    }
+}
+
 /// Raw-byte limits on a task, applied before anything decodes it.
 pub const TASK_BOUNDS: Bounds = Bounds {
     total_bytes: 1024 * 1024,
@@ -637,17 +657,17 @@ impl DocumentationTask {
             nonempty("skill version", &s.version)?;
             digest_form("skill digest", &s.digest)?;
         }
-        if self.result_schema.id != RESULT_SCHEMA {
+        let Some(schema_bytes) = result_schema_bytes(&self.result_schema.id) else {
             return Err(DocumentError::ResultSchema(format!(
-                "{:?} is not {RESULT_SCHEMA}",
+                "{:?} is not {RESULT_SCHEMA} or {RESULT_SCHEMA_V2}",
                 self.result_schema.id
             )));
-        }
-        if self.result_schema.digest != result_schema_digest() {
+        };
+        let delivered = context::custody_digest(schema_bytes);
+        if self.result_schema.digest != delivered {
             return Err(DocumentError::ResultSchema(format!(
-                "digest {:?} is not the delivered schema's {}",
+                "digest {:?} is not the delivered schema's {delivered}",
                 self.result_schema.digest,
-                result_schema_digest()
             )));
         }
         if !timestamp(&self.deadline.not_after) {
