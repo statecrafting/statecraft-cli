@@ -2,7 +2,7 @@
 id: "064-protected-home-entries"
 title: "The protected set is the product home's entries, not the operator's worktrees"
 status: approved
-implementation: pending
+implementation: complete
 created: "2026-10-29"
 summary: >
   Amends spec 004 section 3.18 rule 2. The protected roots a confinement
@@ -13,8 +13,9 @@ summary: >
   entry. A multiply linked file in a protected entry still refuses.
 amends:
   - "004-execution-adapter"
-# No `extends` yet: the implementing change adds the edges on
-# crates/statecraft-home/ (002) and crates/statecraft-cli/ (006) with the code.
+extends:
+  - { spec: "002-environment-lifecycle", unit: { kind: directory, path: "crates/statecraft-home/" }, nature: additive }
+  - { spec: "006-command-surface", unit: { kind: directory, path: "crates/statecraft-cli/" }, nature: additive }
 depends_on:
   - "004-execution-adapter"
 obligations:
@@ -99,8 +100,17 @@ operator list fails closed without either cost.
 
 ## Verification
 
-Ratified by the owner on 2026-10-29. Acceptance is declared by the
-implementing change, which will show that the whole home refuses on cargo's
-links while its entries do not, that a link inside a protected entry still
-refuses, that an unknown entry is protected, and that a launch's confinement
+Ratified by the owner on 2026-10-29. Acceptance is run through
+`make verify SPEC=064`, against fixture homes and the platform boundary,
+with no provider.
+
+```verify:cli
+cargo test -p statecraft-home --lib home::tests::every_home_entry_but_the_operators_is_protected
+cargo test -p statecraft-cli --test protected_boundary
+cargo test -p statecraft-cli --test application_equivalence
+```
+
+These show that an unknown entry is protected and the operator's are not,
+that the whole home refuses on cargo's links while its entries do not, that a
+link inside a protected entry still refuses, and that a launch's confinement
 record is identical across launches.

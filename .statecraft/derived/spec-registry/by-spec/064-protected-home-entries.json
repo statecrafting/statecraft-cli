@@ -7,8 +7,26 @@
     "dependsOn": [
       "004-execution-adapter"
     ],
+    "extends": [
+      {
+        "nature": "additive",
+        "spec": "002-environment-lifecycle",
+        "unit": {
+          "kind": "directory",
+          "path": "crates/statecraft-home/"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "006-command-surface",
+        "unit": {
+          "kind": "directory",
+          "path": "crates/statecraft-cli/"
+        }
+      }
+    ],
     "id": "064-protected-home-entries",
-    "implementation": "pending",
+    "implementation": "complete",
     "obligations": [
       {
         "anchor": "3-1-the-protected-roots",
@@ -30,7 +48,7 @@
       }
     ],
     "sectionDigests": {
-      "064-the-protected-set-is-the-product-home-s-entries": "9bd22d2731e8de8a687d188136f42a6ffb9bee94993bb5f9a55254667a8a9ef9",
+      "064-the-protected-set-is-the-product-home-s-entries": "6df1b3717c32e70e6dafdb28528d0695fdd6b20a476c23a2574e9d5d67427162",
       "1-purpose": "0240c780df9f7569bcd13f7725bb2cf779150bfaec947a00cd3cc2413b943959",
       "2-territory": "bba4da006b9feacf6f758c9e18af97c4f003caf6103fb680f7cfac6abd2f7e6e",
       "3-1-the-protected-roots": "2b7aee73ca9b53d789992be2a4923f9a593dcc7e08314b15102c61e27714c2eb",
@@ -40,7 +58,7 @@
       "3-behavior": "e5f57df109817a2d79f9a3cb86cf89dd44cfda7345e78726bac0b137a1b08c54",
       "4-out-of-scope": "8032a181bf88c5148ac20ff1a48bc26a75f49ccab1f95e0d0f680be96c99f406",
       "5-resolved-decisions": "32e156bfe41f60bdd6dc920eeb524baad825bde20e3801c75214ee7788444388",
-      "verification": "ced6182450797bfd54ada23607944c0ac4369dbe8e80cd952b32c118b99ee446"
+      "verification": "448c12136a28984a4d71508042f3e7c8113a3ee47ff601b681bc9046640d589d"
     },
     "sectionHeadings": [
       "064: The protected set is the product home's entries",
@@ -60,6 +78,6 @@
     "summary": "Amends spec 004 section 3.18 rule 2. The protected roots a confinement takes from the product home are the home's top-level entries, every one except a closed operator list (worktrees and Finder's .DS_Store), rather than the home as one root. An unknown or later entry is still protected. The self-test's sentinel and socket directory live in one fixed protected entry. A multiply linked file in a protected entry still refuses.\n",
     "title": "The protected set is the product home's entries, not the operator's worktrees"
   },
-  "shardHash": "beb39d2c308ded7de69a4b3270a063888c718df1e0b6a0349c22654f1bd78271",
+  "shardHash": "a130c798a58e833dd24d89f9e67387d2694fecf92f2c6c08da576c690f88dc9b",
   "specVersion": "1.10.0"
 }
