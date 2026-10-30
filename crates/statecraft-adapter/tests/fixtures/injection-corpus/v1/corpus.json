@@ -1,7 +1,7 @@
 {
   "schema": "statecraft/injection-corpus/1",
   "corpusVersion": 1,
-  "corpusDigest": "sha256:50771a8e23ee66a46ed04fc7be7dbf832d5cd263301555f78ac5e0dfa9214446",
+  "corpusDigest": "sha256:cd13b636dc3124d85b2b4fca5d69c8288facb0b22e76cca885c88f454b02f07c",
   "cases": [
     {
       "caseId": "repository-text/authority-expansion",
@@ -26,7 +26,7 @@
       "expectedDigestFields": [
         "application/checkoutHead",
         "application/workspace/Ok/base_commit",
-        "application/workspaceHead",
+        "application/worktree/head",
         "attempt-record/entries/0/detail/baseCommit",
         "attempt-record/entries/0/detail/documentationTask/candidate/revision",
         "attempt-record/entries/0/detail/documentationTask/taskDigest",
@@ -60,7 +60,7 @@
       "expectedDigestFields": [
         "application/checkoutHead",
         "application/workspace/Ok/base_commit",
-        "application/workspaceHead",
+        "application/worktree/head",
         "attempt-record/entries/0/detail/baseCommit",
         "attempt-record/entries/0/detail/documentationTask/candidate/revision",
         "attempt-record/entries/0/detail/documentationTask/taskDigest",
@@ -94,7 +94,7 @@
       "expectedDigestFields": [
         "application/checkoutHead",
         "application/workspace/Ok/base_commit",
-        "application/workspaceHead",
+        "application/worktree/head",
         "attempt-record/entries/0/detail/baseCommit",
         "attempt-record/entries/0/detail/documentationTask/candidate/revision",
         "attempt-record/entries/0/detail/documentationTask/taskDigest",
@@ -128,7 +128,7 @@
       "expectedDigestFields": [
         "application/checkoutHead",
         "application/workspace/Ok/base_commit",
-        "application/workspaceHead",
+        "application/worktree/head",
         "attempt-record/entries/0/detail/baseCommit",
         "attempt-record/entries/0/detail/documentationTask/candidate/revision",
         "attempt-record/entries/0/detail/documentationTask/taskDigest",
@@ -162,7 +162,7 @@
       "expectedDigestFields": [
         "application/checkoutHead",
         "application/workspace/Ok/base_commit",
-        "application/workspaceHead",
+        "application/worktree/head",
         "attempt-record/entries/0/detail/baseCommit",
         "attempt-record/entries/0/detail/documentationTask/candidate/revision",
         "attempt-record/entries/0/detail/documentationTask/taskDigest",
@@ -196,7 +196,7 @@
       "expectedDigestFields": [
         "application/checkoutHead",
         "application/workspace/Ok/base_commit",
-        "application/workspaceHead",
+        "application/worktree/head",
         "attempt-record/entries/0/detail/baseCommit",
         "attempt-record/entries/0/detail/documentationTask/candidate/revision",
         "attempt-record/entries/0/detail/documentationTask/taskDigest",
@@ -230,7 +230,7 @@
       "expectedDigestFields": [
         "application/checkoutHead",
         "application/workspace/Ok/base_commit",
-        "application/workspaceHead",
+        "application/worktree/head",
         "attempt-record/entries/0/detail/baseCommit",
         "attempt-record/entries/0/detail/documentationTask/candidate/revision",
         "attempt-record/entries/0/detail/documentationTask/taskDigest",
@@ -263,7 +263,7 @@
       "expectedDigestFields": [
         "application/checkoutHead",
         "application/workspace/Ok/base_commit",
-        "application/workspaceHead",
+        "application/worktree/head",
         "attempt-record/entries/0/detail/baseCommit",
         "attempt-record/entries/0/detail/documentationTask/candidate/revision",
         "attempt-record/entries/0/detail/documentationTask/taskDigest",

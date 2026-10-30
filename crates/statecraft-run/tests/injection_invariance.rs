@@ -144,21 +144,30 @@ fn observe(runner: &Runner, case: &Case, side: Side, _framing: Framing) -> Obser
             &json!({"began": began, "entries": entries(&chain), "subjects": subjects}),
         );
         let path = workspace::workspace_path(&target, RUN);
+        // A workspace that was not prepared is recorded as the refusal it
+        // is, never read: the twin's refusal must be the same refusal.
+        let worktree = prepared.as_ref().ok().map(|_| {
+            json!({
+                "head": git(&path, &["rev-parse", "HEAD"]),
+                "status": git(&path, &["status", "--porcelain"]),
+            })
+        });
         seen.decide(
             "application",
             &json!({
                 "workspace": prepared,
-                "workspaceHead": git(&path, &["rev-parse", "HEAD"]),
-                "workspaceStatus": git(&path, &["status", "--porcelain"]),
+                "worktree": worktree,
                 "checkoutHead": git(&target, &["rev-parse", "HEAD"]),
                 "checkoutStatus": git(&target, &["status", "--porcelain", "--ignored"]),
                 "branches": git(&target, &["for-each-ref", "--format=%(refname)"]),
             }),
         );
         seen.collection("repository-files");
-        for (name, _) in &files {
-            let text = std::fs::read_to_string(path.join(name)).unwrap_or_default();
-            seen.record("repository-files", text);
+        if prepared.is_ok() {
+            for (name, _) in &files {
+                let text = std::fs::read_to_string(path.join(name)).unwrap_or_default();
+                seen.record("repository-files", text);
+            }
         }
     }
     seen
