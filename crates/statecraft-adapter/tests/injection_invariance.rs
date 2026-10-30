@@ -351,6 +351,9 @@ fn the_comparison_holds_a_declared_refusal_to_exactly_its_terms() {
         .decisions
         .insert("attempt-record".into(), "other".into());
     failing(&changed, &twin, "decision attempt-record differs");
+    let mut empty_twin = twin.clone();
+    empty_twin.recordings.insert("wire-facts".into(), vec![]);
+    failing(&hostile, &empty_twin, "does not hold the twin");
     let mut kept = hostile.clone();
     kept.record("wire-facts", c.payload.assembled());
     failing(&kept, &twin, "holds content the refusal did not retain");

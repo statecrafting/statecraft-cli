@@ -766,6 +766,11 @@ pub fn compare(case: &Case, runner: &Runner, hostile: &Observed, twin: &Observed
                     "recording {name} holds content the refusal did not retain"
                 ));
             }
+            // The twin is admitted, so its content is kept: an empty twin
+            // would mean the recording keeps nothing, refusal or not.
+            if !holds(t, &case.benign_twin) {
+                failures.push(format!("recording {name} does not hold the twin"));
+            }
             continue;
         }
         if case.expected_recording.as_deref() == Some(*name) {
