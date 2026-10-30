@@ -218,7 +218,7 @@ fn existing_hardlink_to_protected_bytes_refuses_before_launch() {
     assert_eq!(refusal.step, "hardlink");
 }
 
-// Spec 004 section 3.18 rule 2, as amended 2026-10-29: the operator's
+// Spec 064 section 3.1, amending spec 004 section 3.18 rule 2: the operator's
 // worktrees under the product home are not protected, so the build
 // directories there, whose files cargo links many times over, no longer
 // refuse every launch; a multiply linked file in a protected entry still does.

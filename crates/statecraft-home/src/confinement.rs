@@ -228,7 +228,7 @@ pub fn admit(roots: Roots<'_>, executable: &Path, path: &str) -> Result<Admissio
         let mut readonly = vec![roots.target.to_path_buf()];
         readonly.extend(common_path.iter().cloned());
         let policy = Policy {
-            // Spec 004 section 3.18 rule 2, as amended 2026-10-29: every
+            // Spec 064 section 3.1, amending spec 004 section 3.18 rule 2: every
             // entry of the home but the operator's, after the sentinel and
             // probe directory above are created in it.
             inaccessible: {

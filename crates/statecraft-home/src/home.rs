@@ -150,7 +150,7 @@ impl Layout {
 
 /// The top-level entries of a product home that are the operator's and not
 /// the product's, and so are outside spec 004 section 3.18's protected set
-/// (owner decision, 2026-10-29): `worktrees/`, where task worktrees and their
+/// (spec 064 section 3.1): `worktrees/`, where task worktrees and their
 /// build directories live, and Finder's `.DS_Store`. Closed: anything else in
 /// the home is protected whether or not this product knows its name.
 pub const OPERATOR_ENTRIES: [&str; 2] = ["worktrees", ".DS_Store"];
@@ -454,7 +454,7 @@ pub fn presence(layout: &Layout) -> Presence {
 mod tests {
     use super::*;
 
-    // Spec 004 section 3.18 rule 2, as amended 2026-10-29: every entry is
+    // Spec 064 section 3.1, amending spec 004 section 3.18 rule 2: every entry is
     // protected except the operator's worktrees and Finder's metadata, and an
     // entry this product never named is protected too.
     #[test]

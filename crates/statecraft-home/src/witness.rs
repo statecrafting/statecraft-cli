@@ -135,8 +135,8 @@ pub fn admit_sidecar(
         let listener = TcpListener::bind(("127.0.0.1", 0))?;
         let mut boundary = Prepared::prepare_sidecar(
             Policy {
-                // Every entry of the home but the operator's (spec 004
-                // section 3.18 rule 2, as amended 2026-10-29).
+                // Every entry of the home but the operator's (spec 064
+                // section 3.1, amending spec 004 section 3.18 rule 2).
                 inaccessible: {
                     let mut protected = crate::home::protected_entries(roots.home)?;
                     protected.extend([
