@@ -217,3 +217,44 @@ fn existing_hardlink_to_protected_bytes_refuses_before_launch() {
     .unwrap();
     assert_eq!(refusal.step, "hardlink");
 }
+
+// Spec 064 section 3.1, amending spec 004 section 3.18 rule 2: the operator's
+// worktrees under the product home are not protected, so the build
+// directories there, whose files cargo links many times over, no longer
+// refuse every launch; a multiply linked file in a protected entry still does.
+#[test]
+fn hardlinked_build_output_under_the_operators_worktrees_does_not_refuse() {
+    let fixture = tempfile::tempdir().unwrap();
+    let home = fixture.path().join("home");
+    let target = home.join("worktrees/repo/target/debug/deps");
+    let workspace = fixture.path().join("workspace");
+    for d in [&target, &home.join("records"), &workspace] {
+        fs::create_dir_all(d).unwrap();
+    }
+    fs::write(target.join("lib.rcgu.o"), b"object").unwrap();
+    fs::hard_link(target.join("lib.rcgu.o"), target.join("lib-copy.rcgu.o")).unwrap();
+    fs::write(home.join("records/record"), b"authority").unwrap();
+    let policy = |inaccessible| Policy {
+        inaccessible,
+        readonly: vec![],
+        readable: vec![],
+        writable: vec![Grant {
+            path: workspace.clone(),
+            directory: true,
+        }],
+        adjacent_prefixes: vec![],
+    };
+
+    // The whole home, as before the amendment, refuses on cargo's links.
+    let before = Prepared::prepare(policy(vec![home.clone()])).err().unwrap();
+    assert_eq!(before.step, "hardlink");
+
+    let entries = statecraft_home::home::protected_entries(&home).unwrap();
+    assert_eq!(entries, [home.join("records")]);
+    Prepared::prepare(policy(entries.clone())).expect("the worktrees are not scanned");
+
+    // A link inside a protected entry still refuses.
+    fs::hard_link(home.join("records/record"), workspace.join("alias")).unwrap();
+    let after = Prepared::prepare(policy(entries)).err().unwrap();
+    assert_eq!(after.step, "hardlink");
+}
