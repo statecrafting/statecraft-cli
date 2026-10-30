@@ -6387,3 +6387,306 @@ fn revision_twenty_one_publication_uses_the_selected_script_across_upgrade_and_a
         }
     }
 }
+
+// ------------------------- the policy guard and the pin check (spec 044)
+
+/// A profile script as the profile ships it.
+fn profile_script(name: &str) -> PathBuf {
+    Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("profiles/github-actions-rust/scripts")
+        .join(name)
+}
+
+/// A repository with one root commit on `main`, for the guard's histories.
+fn guard_repo() -> tempfile::TempDir {
+    let dir = tempfile::tempdir().unwrap();
+    let root = dir.path();
+    for args in [
+        &["init", "--quiet", "--initial-branch=main"][..],
+        &["config", "user.email", "fixture@example.invalid"],
+        &["config", "user.name", "fixture"],
+        &["config", "commit.gpgsign", "false"],
+    ] {
+        git(root, args);
+    }
+    write(root, "README.md", "fixture\n");
+    write(root, "deny.toml", "[advisories]\n");
+    git(root, &["add", "-A"]);
+    git(root, &["commit", "--quiet", "-m", "root"]);
+    dir
+}
+
+/// Commit `files` on the current branch.
+fn commit_files(root: &Path, files: &[(&str, &str)]) {
+    for (rel, text) in files {
+        write(root, rel, text);
+    }
+    git(root, &["add", "-A"]);
+    git(root, &["commit", "--quiet", "-m", "change"]);
+}
+
+/// Run `script` with `args` in `root`: its exit code and its whole output.
+fn run_script(root: &Path, script: &str, args: &[&str]) -> (i32, String) {
+    let out = Command::new("/bin/sh")
+        .arg(profile_script(script))
+        .args(args)
+        .current_dir(root)
+        .output()
+        .unwrap();
+    let text = format!(
+        "{}{}",
+        String::from_utf8_lossy(&out.stdout),
+        String::from_utf8_lossy(&out.stderr)
+    );
+    (out.status.code().unwrap_or(-1), text)
+}
+
+/// Spec 044 section 3.3 and section 4: the guard's three exits on fixture
+/// histories. A dependency change beside a source change must be split; a
+/// dependency change with its regenerated shards, and a `D-06` adoption, is
+/// one change; an undecidable comparison fails closed with 2.
+#[test]
+fn the_policy_guard_exits_by_its_three_classes() {
+    let guard = "guard-policy-files.sh";
+
+    // Cargo.lock and a source file: exit 1, each class's paths listed.
+    let repo = guard_repo();
+    let root = repo.path();
+    git(root, &["checkout", "--quiet", "-b", "mixed"]);
+    commit_files(
+        root,
+        &[("Cargo.lock", "version = 4\n"), ("src/lib.rs", "\n")],
+    );
+    let (code, out) = run_script(root, guard, &["main", "mixed"]);
+    assert_eq!(code, 1, "{out}");
+    assert!(out.contains("policy:\n  Cargo.lock\n"), "{out}");
+    assert!(out.contains("other:\n  src/lib.rs\n"), "{out}");
+
+    // Cargo.lock and the shards it rewrites: exit 0, generated ignored.
+    git(root, &["checkout", "--quiet", "-b", "lock", "main"]);
+    commit_files(
+        root,
+        &[
+            ("Cargo.lock", "version = 4\n"),
+            (".statecraft/derived/codebase-index/by-spec/x.json", "{}\n"),
+            (".statecraft/environment.json", "{}\n"),
+        ],
+    );
+    let (code, out) = run_script(root, guard, &["main", "lock"]);
+    assert_eq!(code, 0, "{out}");
+    assert!(
+        out.contains("1 policy, 2 generated (ignored), 0 other"),
+        "{out}"
+    );
+
+    // A D-06 adoption: the pin in Cargo.toml, the lock, spec-spine.toml, the
+    // adoption record and the shards are one producer identity: exit 0.
+    git(root, &["checkout", "--quiet", "-b", "adoption", "main"]);
+    commit_files(
+        root,
+        &[
+            ("Cargo.toml", "[workspace]\n"),
+            ("crates/a/Cargo.toml", "[package]\n"),
+            ("Cargo.lock", "version = 4\n"),
+            ("spec-spine.toml", TOML),
+            ("docs/adoption/spec-spine.md", "# adoption\n"),
+            (".statecraft/derived/spec-registry/by-spec/x.json", "{}\n"),
+        ],
+    );
+    let (code, out) = run_script(root, guard, &["main", "adoption"]);
+    assert_eq!(code, 0, "{out}");
+    assert!(
+        out.contains("5 policy, 1 generated (ignored), 0 other"),
+        "{out}"
+    );
+
+    // Every policy path at once beside one other path: each is policy.
+    git(root, &["checkout", "--quiet", "-b", "every", "main"]);
+    commit_files(
+        root,
+        &[
+            ("deny.toml", "[bans]\n"),
+            (".cargo/audit.toml", "[advisories]\n"),
+            ("supply-chain/config.toml", "\n"),
+            ("supply-chain/audits.toml", "\n"),
+            ("docs/notes.md", "\n"),
+        ],
+    );
+    let (code, out) = run_script(root, guard, &["main", "every"]);
+    assert_eq!(code, 1, "{out}");
+    assert!(
+        out.contains("4 policy, 0 generated (ignored), 1 other"),
+        "{out}"
+    );
+
+    // Other paths only: exit 0.
+    git(root, &["checkout", "--quiet", "-b", "feature", "main"]);
+    commit_files(root, &[("src/main.rs", "fn main() {}\n")]);
+    let (code, out) = run_script(root, guard, &["main", "feature"]);
+    assert_eq!(code, 0, "{out}");
+
+    // A change to deny.toml on both tips: a tip-to-tip diff would not see
+    // it, the merge-base diff does.
+    git(root, &["checkout", "--quiet", "-b", "both", "main"]);
+    commit_files(root, &[("deny.toml", "[licenses]\n"), ("src/x.rs", "\n")]);
+    git(root, &["checkout", "--quiet", "main"]);
+    commit_files(root, &[("deny.toml", "[licenses]\n")]);
+    let tips = git(root, &["diff", "--name-only", "main", "both"]);
+    assert_eq!(tips, "src/x.rs", "the two tips agree on deny.toml");
+    let (code, out) = run_script(root, guard, &["main", "both"]);
+    assert_eq!(code, 1, "{out}");
+    assert!(out.contains("policy:\n  deny.toml\n"), "{out}");
+
+    // A rename out of a policy path counts on both sides.
+    git(root, &["checkout", "--quiet", "-b", "moved", "main"]);
+    git(root, &["mv", "deny.toml", "notes.toml"]);
+    git(root, &["commit", "--quiet", "-m", "move"]);
+    let (code, out) = run_script(root, guard, &["main", "moved"]);
+    assert_eq!(code, 1, "{out}");
+    assert!(out.contains("other:\n  notes.toml\n"), "{out}");
+
+    // The base revision was never fetched: exit 2.
+    let unknown = "0123456789abcdef0123456789abcdef01234567";
+    let (code, out) = run_script(root, guard, &[unknown, "feature"]);
+    assert_eq!(code, 2, "{out}");
+    assert!(out.contains("does not resolve"), "{out}");
+
+    // No merge base: exit 2.
+    git(root, &["checkout", "--quiet", "--orphan", "orphan"]);
+    commit_files(root, &[("other.txt", "\n")]);
+    let (code, out) = run_script(root, guard, &["main", "orphan"]);
+    assert_eq!(code, 2, "{out}");
+    assert!(out.contains("no merge base"), "{out}");
+
+    // Bad usage: exit 2, every undecidable case is one refusal.
+    for args in [
+        &[][..],
+        &["main"],
+        &["main", "feature", "x"],
+        &["-p", "main"],
+    ] {
+        let (code, out) = run_script(root, guard, args);
+        assert_eq!(code, 2, "{args:?}: {out}");
+        assert!(out.contains("usage"), "{args:?}: {out}");
+    }
+
+    // Outside a work tree: exit 2.
+    let bare = tempfile::tempdir().unwrap();
+    let (code, out) = run_script(bare.path(), guard, &["main", "feature"]);
+    assert_eq!(code, 2, "{out}");
+}
+
+/// Spec 044 section 3.4 and section 4: the pin check's refusals, each naming
+/// the file and line, decided from the workflow text alone; the profile's own
+/// rendered workflows pass it.
+#[test]
+fn the_pin_check_refuses_every_unpinned_use() {
+    let pins = "verify-action-pins.sh";
+    let digest = "9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0";
+    let image = "a".repeat(64);
+    let dir = tempfile::tempdir().unwrap();
+    let root = dir.path();
+    let ok = [
+        format!("      - uses: actions/checkout@{digest} # v7.0.0"),
+        format!("      - uses: \"actions/cache/restore@{digest}\" # v6.1.0"),
+        format!("      - uses: owner/repo/sub/path@{digest} # main"),
+        format!("      - uses: docker://alpine@sha256:{image}"),
+        "      - uses: ./local-action".to_string(),
+        "    uses: ./.github/workflows/called.yml".to_string(),
+    ];
+    write(
+        root,
+        ".github/workflows/ok.yml",
+        &format!("jobs:\n  a:\n    steps:\n{}\n", ok.join("\n")),
+    );
+    let (code, out) = run_script(root, pins, &[]);
+    assert_eq!(code, 0, "{out}");
+
+    let bad = [
+        ("      - uses: actions/checkout@v7", "pinned by `v7`"),
+        (
+            "      - uses: actions/checkout@main # main",
+            "pinned by `main`",
+        ),
+        (
+            "      - uses: actions/checkout@9c091bb # v7",
+            "pinned by `9c091bb`",
+        ),
+        (
+            "      - uses: actions/checkout@9C091BB21B7C1C1D1991BB908D89E4E9DDDFE3E0 # v7",
+            "not by a 40-hex commit digest",
+        ),
+        (
+            "      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0",
+            "needs a `# <ref>` comment",
+        ),
+        ("      - uses: docker://alpine:3", "@sha256:<64 hex>"),
+        (
+            "      - uses: docker://alpine@sha256:abc",
+            "@sha256:<64 hex>",
+        ),
+        ("      - uses: checkout", "not owner/repo[/path]@<ref>"),
+    ];
+    let body: Vec<&str> = bad.iter().map(|(l, _)| *l).collect();
+    write(
+        root,
+        ".github/workflows/bad.yaml",
+        &format!("jobs:\n  a:\n    steps:\n{}\n", body.join("\n")),
+    );
+    let (code, out) = run_script(root, pins, &[]);
+    assert_eq!(code, 1, "{out}");
+    for (i, (_, why)) in bad.iter().enumerate() {
+        let at = format!(".github/workflows/bad.yaml:{}: ", i + 4);
+        let line = out
+            .lines()
+            .find(|l| l.starts_with(&at))
+            .unwrap_or_else(|| panic!("no finding at {at}: {out}"));
+        assert!(line.contains(why), "{line}");
+    }
+    assert!(!out.contains("ok.yml"), "{out}");
+
+    // An explicit directory, an absent one, and bad usage.
+    let (code, out) = run_script(root, pins, &["absent"]);
+    assert_eq!(code, 2, "{out}");
+    let (code, out) = run_script(root, pins, &["a", "b"]);
+    assert_eq!(code, 3, "{out}");
+
+    // The registered profile's own workflows are pinned.
+    let project = tempfile::tempdir().unwrap();
+    write(project.path(), "spec-spine.toml", TOML);
+    render(project.path());
+    let (code, out) = run_script(project.path(), pins, &[]);
+    assert_eq!(code, 0, "{out}");
+}
+
+/// Revision 7's family contract holds for the two spec 044 scripts: each
+/// carries the net that turns a broken command into 4, and every exit it
+/// states is in the contract.
+#[test]
+fn the_spec_044_scripts_exit_in_the_family_contract() {
+    for name in ["guard-policy-files.sh", "verify-action-pins.sh"] {
+        let text = std::fs::read_to_string(profile_script(name)).unwrap();
+        assert!(text.starts_with("#!/bin/sh\n"), "{name}");
+        assert!(text.contains("\nset -eu\n"), "{name}");
+        let trap = text
+            .lines()
+            .find(|l| l.starts_with("trap ") && l.ends_with(" EXIT"))
+            .unwrap_or_else(|| panic!("{name}: no EXIT trap"));
+        assert!(trap.contains("exit 4"), "{name}: {trap}");
+        assert!(
+            text.contains("MIT License"),
+            "{name}: the adapted part's notice"
+        );
+        let lines: Vec<&str> = text.lines().collect();
+        let stated = exits::exit_statements(&text);
+        assert!(stated.len() >= 5, "{name}: {stated:?}");
+        for e in stated {
+            let at = format!("{name}:{}: {}", e.line, lines[e.line - 1].trim());
+            if CONTRACT.contains(&e.code.as_str()) {
+                continue;
+            }
+            assert_eq!((e.verb, e.code.as_str()), ("exit", "\"$1\""), "{at}");
+            assert_eq!(lines[e.line - 2].trim(), "trap - EXIT", "{at}");
+        }
+    }
+}

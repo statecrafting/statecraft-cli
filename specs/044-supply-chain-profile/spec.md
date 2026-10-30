@@ -15,9 +15,8 @@ summary: >
   committed deny.toml to upgrade to it.
 amends:
   - "002-environment-lifecycle"
-# No `extends` yet: the implementing change adds the edge on
-# crates/statecraft-home/ (002) with the code, because the gate counts an
-# extender as an owner.
+extends:
+  - { spec: "002-environment-lifecycle", unit: { kind: directory, path: "crates/statecraft-home/" }, nature: additive }
 depends_on:
   - "002-environment-lifecycle"
   - "024-review-budget-and-ratification"

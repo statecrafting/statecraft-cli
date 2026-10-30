@@ -9,6 +9,16 @@
       "024-review-budget-and-ratification",
       "031-engine-in-bin"
     ],
+    "extends": [
+      {
+        "nature": "additive",
+        "spec": "002-environment-lifecycle",
+        "unit": {
+          "kind": "directory",
+          "path": "crates/statecraft-home/"
+        }
+      }
+    ],
     "id": "044-supply-chain-profile",
     "implementation": "pending",
     "obligations": [
@@ -94,6 +104,6 @@
     "summary": "Amends spec 002's setup profile. github-actions-rust revision 18 adds five required checks to every target: a supply-chain job (cargo-deny, cargo-audit, cargo-vet with exact tool versions), a guard that refuses a pull request mixing dependency or policy files with anything else, a workflow lint (zizmor and an offline refusal of any action not pinned by commit digest), an ast-grep scan where the project declares rules, and a digest-verified gitleaks scan. Each is wired into ci-gate. A target needs a committed deny.toml to upgrade to it.\n",
     "title": "Setup profile revision 18: supply-chain, policy-isolation, workflow-lint, structural-scan and secret-scan jobs"
   },
-  "shardHash": "ec4ab104c90f30ef3f3de5fba619276d3c953561d179c06d92975a5cf879aab1",
+  "shardHash": "fb7e75c08d32b1d3f6658e85d6b411ccd7b58030fde5949885165e60fea585be",
   "specVersion": "1.10.0"
 }
