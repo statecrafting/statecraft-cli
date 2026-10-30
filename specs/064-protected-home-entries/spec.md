@@ -1,7 +1,7 @@
 ---
 id: "064-protected-home-entries"
 title: "The protected set is the product home's entries, not the operator's worktrees"
-status: draft
+status: approved
 implementation: pending
 created: "2026-10-29"
 summary: >
@@ -99,8 +99,8 @@ operator list fails closed without either cost.
 
 ## Verification
 
-This spec is `status: draft` and declares no acceptance until it is ratified
-and built. Its acceptance will show that the whole home refuses on cargo's
+Ratified by the owner on 2026-10-29. Acceptance is declared by the
+implementing change, which will show that the whole home refuses on cargo's
 links while its entries do not, that a link inside a protected entry still
 refuses, that an unknown entry is protected, and that a launch's confinement
 record is identical across launches.
