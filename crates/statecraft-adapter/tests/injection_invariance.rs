@@ -1,8 +1,9 @@
 //! Spec 025's product-invariance suite, adapter half: every corpus case on
-//! the `provider-output`, `tool-facing` and `skill-content` surfaces runs
-//! with its payload and with its benign twin through a real fixture child and
-//! spec 022's offline workflow, and the two decision records are equal
-//! except where the case declares (sections 3.1, 3.4 and 3.6).
+//! the `provider-output`, `tool-facing`, `skill-content` and `context-packet`
+//! surfaces runs with its payload and with its benign twin through a real
+//! fixture child and spec 022's offline workflow, and the two decision
+//! records are equal except where the case declares (sections 3.1, 3.4 and
+//! 3.6).
 //!
 //! The corpus itself is validated here too, because this crate owns it:
 //! the closed schema, the twin rules of section 3.3, full surface and class
@@ -125,7 +126,7 @@ fn every_adapter_surface_case_leaves_every_decision_equal_to_its_twin() {
         .collect();
     assert!(failed.is_empty(), "{}\n{}", ran(&corpus), failed.join("\n"));
     let passed = statuses.values().filter(|s| **s == Status::Passed).count();
-    assert_eq!(passed, 24, "three surfaces of eight classes each");
+    assert_eq!(passed, 32, "four surfaces of eight classes each");
 }
 
 // Section 3.3: a twin keeps the bytes a carrier escapes in place, so a JSON

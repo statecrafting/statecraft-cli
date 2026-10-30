@@ -99,6 +99,24 @@ pub const RUNNERS: &[Runner] = &[
         decisions: ADAPTER_DECISIONS,
         recordings: &["skill-bytes"],
     },
+    Runner {
+        harness: "adapter",
+        surface: "context-packet",
+        decisions: ADAPTER_DECISIONS,
+        recordings: &["packet-pages"],
+    },
+    Runner {
+        harness: "run",
+        surface: "context-packet",
+        decisions: &["task", "context-delivery", "attempt-record"],
+        recordings: &["packet-pages"],
+    },
+    Runner {
+        harness: "run",
+        surface: "repository-text",
+        decisions: &["task", "attempt-record", "application"],
+        recordings: &["repository-files"],
+    },
 ];
 
 /// Where the corpus lives, from any crate under `crates/`.
@@ -501,6 +519,23 @@ impl Observed {
             .push(item);
     }
 
+    /// Record a retained JSON document as data: every member name and string
+    /// it holds, decoded, so escaped content reads as what it says. Bytes that
+    /// are not JSON are recorded as they are.
+    pub fn record_json(&mut self, name: &str, bytes: &[u8]) {
+        match serde_json::from_slice::<Value>(bytes) {
+            Ok(v) => {
+                let mut out = Vec::new();
+                strings(&v, &mut out);
+                for s in out {
+                    self.record(name, s);
+                }
+            }
+            Err(_) => self.record(name, String::from_utf8_lossy(bytes).into_owned()),
+        }
+        self.collection(name);
+    }
+
     /// Make sure a collection exists even when it is empty.
     pub fn collection(&mut self, name: &str) {
         self.recordings.entry(name.to_string()).or_default();
@@ -727,4 +762,200 @@ pub fn ran(corpus: &Corpus) -> String {
         "{CORPUS_SCHEMA} version {} digest {}",
         corpus.corpus_version, corpus.corpus_digest
     )
+}
+
+/// The fixtures every runner shares, so a seeded surface is the only thing
+/// that differs between one crate's run and another's.
+pub mod fixtures {
+    use std::path::Path;
+    use std::process::Command;
+
+    use serde_json::json;
+
+    use statecraft_run::context::{
+        self, AcceptedPage, AcceptedRepository, Completeness, DeliveryPolicy, Intended, Manifest,
+        OptionalOmission, PageFacts, Producer, ProducerBuild, Requirement, Snapshot, Task,
+    };
+    use statecraft_run::documentation::{
+        self as doc, Artifact, Candidate, ClockSource, CostCeiling, Deadline, Disposition,
+        DocumentationTask, Format, NoSpend, Operations, OutputFormat, Publication, ResultSchemaRef,
+        ReviewPolicy, SemanticReview, Skill,
+    };
+
+    use super::{Case, Side};
+
+    /// The run every fixture binds.
+    pub const RUN: &str = "run-025";
+    /// The task every fixture binds.
+    pub const TASK: &str = "task-025";
+    /// When every record is written.
+    pub const AT: &str = "2026-10-29T00:00:00Z";
+    /// The one benign page an unseeded packet carries.
+    pub const PAGE: &[u8] = b"{\"page\":1}";
+
+    /// Run git in `dir` with a fixed identity and clock, so the twin's commit
+    /// is the hostile run's commit whenever their trees agree.
+    pub fn git(dir: &Path, args: &[&str]) -> String {
+        let out = Command::new("git")
+            .args(args)
+            .current_dir(dir)
+            .env("GIT_AUTHOR_DATE", "2026-10-29T00:00:00Z")
+            .env("GIT_COMMITTER_DATE", "2026-10-29T00:00:00Z")
+            .env("GIT_CONFIG_GLOBAL", "/dev/null")
+            .env("GIT_CONFIG_NOSYSTEM", "1")
+            .output()
+            .unwrap();
+        assert!(
+            out.status.success(),
+            "git {args:?}: {}",
+            String::from_utf8_lossy(&out.stderr)
+        );
+        String::from_utf8(out.stdout).unwrap().trim().to_string()
+    }
+
+    /// A repository at `dir` with `files` committed beside a README.
+    pub fn repo(dir: &Path, files: &[(String, String)]) {
+        std::fs::create_dir_all(dir).unwrap();
+        for args in [
+            &["init", "--quiet", "--initial-branch=main"][..],
+            &["config", "user.email", "test@example.invalid"],
+            &["config", "user.name", "test"],
+            &["config", "commit.gpgsign", "false"],
+        ] {
+            git(dir, args);
+        }
+        std::fs::write(dir.join("README.md"), b"x").unwrap();
+        for (path, text) in files {
+            let p = dir.join(path);
+            std::fs::create_dir_all(p.parent().unwrap()).unwrap();
+            std::fs::write(p, text).unwrap();
+        }
+        git(dir, &["add", "."]);
+        git(dir, &["commit", "--quiet", "-m", "one"]);
+    }
+
+    /// The packet pages for `case` on `side`: on `context-packet`, one page
+    /// per fragment carrying it as a member name, a member path and a member
+    /// text; on any other surface, the one benign page.
+    pub fn pages(case: &Case, side: Side) -> Vec<Vec<u8>> {
+        if case.surface != "context-packet" {
+            return vec![PAGE.to_vec()];
+        }
+        case.bytes(side)
+            .fragments
+            .iter()
+            .enumerate()
+            .map(|(i, f)| {
+                let mut members = serde_json::Map::new();
+                members.insert(f.clone(), json!({"path": format!("docs/{f}"), "text": f}));
+                json!({"page": i + 1, "members": members})
+                    .to_string()
+                    .into_bytes()
+            })
+            .collect()
+    }
+
+    /// A manifest of one repository whose pages are `pages`, in order.
+    pub fn manifest(pages: &[Vec<u8>]) -> Manifest {
+        let d = |t: &str| context::custody_digest(t.as_bytes());
+        let n = pages.len();
+        Manifest::build(
+            RUN,
+            1,
+            Task::Id(TASK.into()),
+            &Producer {
+                package: "spec-spine".into(),
+                version: "0.31.0".into(),
+                packet_interface: "1.1.0".into(),
+            },
+            &[AcceptedRepository {
+                id: "app".into(),
+                role: "source".into(),
+                requirement: Requirement::Required,
+                pages: pages
+                    .iter()
+                    .enumerate()
+                    .map(|(i, bytes)| AcceptedPage {
+                        bytes: bytes.clone(),
+                        source_operation: "context_packet_pages".into(),
+                        facts: PageFacts {
+                            schema_version: "1.1.0".into(),
+                            producer: ProducerBuild {
+                                package: "spec-spine".into(),
+                                version: "0.31.0".into(),
+                                build: "unverified".into(),
+                            },
+                            snapshot: Snapshot {
+                                repository: "example/app".into(),
+                                revision: "a".repeat(40),
+                                tree: "t".repeat(40),
+                                dirty_state: "clean-export".into(),
+                            },
+                            request_digest: d("request"),
+                            closure_digest: d("closure"),
+                            // The producer's page digest names the page's
+                            // ordinal, not its bytes: it is producer testimony.
+                            packet_digest: d(&format!("page-{}", i + 1)),
+                            completeness: Completeness::Complete,
+                            continues: i + 1 < n,
+                            omissions: vec![],
+                            warnings: vec![],
+                        },
+                        delivery: Intended::Required,
+                    })
+                    .collect(),
+            }],
+            DeliveryPolicy::new(OptionalOmission::Refuse),
+        )
+        .unwrap()
+    }
+
+    /// The documentation task every fixture binds.
+    pub fn task(m: &Manifest, candidate: &str, skill: Skill) -> DocumentationTask {
+        DocumentationTask {
+            schema: doc::TASK_SCHEMA.into(),
+            task_id: TASK.into(),
+            run_id: RUN.into(),
+            attempt: 1,
+            candidate: Candidate {
+                repository: "app".into(),
+                revision: candidate.into(),
+                tree: "tree".into(),
+            },
+            context_manifest_digest: m.manifest_digest.clone(),
+            objective: "Describe recovery.".into(),
+            audiences: vec!["operators".into()],
+            output_format: OutputFormat {
+                format: Format::Markdown,
+                version: "commonmark-0.31.2".into(),
+            },
+            operations: Operations::v1(),
+            required_capabilities: vec![],
+            skill,
+            result_schema: ResultSchemaRef {
+                id: doc::RESULT_SCHEMA.into(),
+                digest: doc::result_schema_digest(),
+            },
+            deadline: Deadline {
+                not_after: "2026-12-31T00:00:00Z".into(),
+                clock: ClockSource::SupervisorUtc,
+            },
+            cost_ceiling: CostCeiling::NoSpend(NoSpend::NoSpend),
+            artifacts: vec![Artifact {
+                path: "docs/recovery.md".into(),
+                disposition: Disposition::Draft,
+                required_context: vec![],
+            }],
+            review_policy: ReviewPolicy {
+                reviewers: vec!["owner".into()],
+                semantic_review: SemanticReview::Required,
+                acceptance_route: "accept".into(),
+                candidate_divergence: None,
+            },
+            publication: Publication::Prohibited,
+            digest_construction: String::new(),
+            task_digest: String::new(),
+        }
+        .seal()
+    }
 }
