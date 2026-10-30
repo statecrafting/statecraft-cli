@@ -141,6 +141,8 @@ impl Fixture {
         std::fs::write(p.join("spec-spine.toml"), pinned_toml()).unwrap();
         std::fs::write(p.join(".gitignore"), "/target\n").unwrap();
         std::fs::write(p.join("README.md"), "# demo\n").unwrap();
+        // Revision 22 (spec 044): the committed dependency policy.
+        std::fs::write(p.join("deny.toml"), "[advisories]\n").unwrap();
         let lock = Command::new("cargo")
             .args(["generate-lockfile", "--offline"])
             .current_dir(&p)

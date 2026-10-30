@@ -279,7 +279,7 @@ fn a_fresh_repository_without_toolchain_files_is_planned_and_applied_honestly() 
 
     // 3.4: each project-owned prerequisite is reported with its owner, and
     // any unmet one withholds the whole profile.
-    for name in ["rust-toolchain.toml", "Cargo.lock"] {
+    for name in ["rust-toolchain.toml", "Cargo.lock", "deny.toml"] {
         let p = prerequisite(plan, name);
         assert_eq!(p["met"], false, "{p}");
         assert_eq!(p["owner"], "target project", "{p}");
@@ -322,7 +322,13 @@ fn a_fresh_repository_without_toolchain_files_is_planned_and_applied_honestly() 
         statecraft_home::producer::PRODUCER_VERSION
     );
     // I-2: nothing the project owns is invented, and no resolver ran.
-    for absent in ["rust-toolchain.toml", "Cargo.lock", "Cargo.toml", CHECKER] {
+    for absent in [
+        "rust-toolchain.toml",
+        "Cargo.lock",
+        "deny.toml",
+        "Cargo.toml",
+        CHECKER,
+    ] {
         assert!(!f.at(absent).exists(), "{absent} was created");
     }
     assert!(!f.at(".github/workflows/statecraft-ci.yml").exists());
@@ -374,6 +380,7 @@ fn once_the_project_supplies_its_prerequisites_the_profile_applies_and_converges
     )
     .unwrap();
     std::fs::write(f.at("Cargo.lock"), "version = 4\n").unwrap();
+    std::fs::write(f.at("deny.toml"), "[advisories]\n").unwrap();
     std::fs::create_dir_all(f.at("scripts")).unwrap();
     std::fs::write(f.at(CHECKER), "#!/bin/sh\nexit 0\n").unwrap();
     std::fs::set_permissions(f.at(CHECKER), std::fs::Permissions::from_mode(0o755)).unwrap();

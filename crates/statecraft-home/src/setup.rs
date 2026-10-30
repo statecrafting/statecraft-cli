@@ -35,7 +35,7 @@ use std::path::Path;
 /// The one registered profile.
 pub const PROFILE_ID: &str = "github-actions-rust";
 /// Its revision.
-pub const REVISION: u32 = 21;
+pub const REVISION: u32 = 22;
 /// Where the rendered policy document lives in the target.
 pub const POLICY_PATH: &str = ".statecraft/setup/github-actions-rust.json";
 /// The resume record, under the project's runtime state.
@@ -109,11 +109,21 @@ pub const MAX_CONTEXT_PATHS: usize = 32;
 /// 7): GitHub calls a reusable workflow only from this directory, never from
 /// a subdirectory of it.
 const WORKFLOW_DIR: &str = ".github/workflows/";
+/// The revision whose supply-chain job needs a committed `deny.toml` (spec
+/// 044).
+pub const SUPPLY_CHAIN_SINCE: u32 = 22;
+/// The first line of the supply-chain job's comment in the rendered workflow,
+/// where an external code selection's replacement of the code job ends.
+const SUPPLY_CHAIN_MARK: &str = "  # Revision 22 (spec 044 section 3.2)";
 /// The job ids the profile renders, which a declared extra job may not reuse.
-const PROFILE_JOB_IDS: [&str; 6] = [
+const PROFILE_JOB_IDS: [&str; 10] = [
     "governance",
     "preflight",
     "code",
+    "supply-chain",
+    "workflow-lint",
+    "sg-scan",
+    "secret-scan",
     "ai-review",
     "review-exception",
     "ci-gate",
@@ -213,6 +223,18 @@ impl Profile {
                     "scripts/statecraft/ai-review.sh",
                     Role::Script,
                     "scripts/ai-review.sh",
+                    false
+                ),
+                template!(
+                    "scripts/statecraft/guard-policy-files.sh",
+                    Role::Script,
+                    "scripts/guard-policy-files.sh",
+                    false
+                ),
+                template!(
+                    "scripts/statecraft/verify-action-pins.sh",
+                    Role::Script,
+                    "scripts/verify-action-pins.sh",
                     false
                 ),
                 template!("Makefile", Role::Makefile, "Makefile", true),
@@ -367,6 +389,11 @@ pub fn jobs() -> serde_json::Value {
         "governance": {"required": true, "optional": false, "pull_request": "required", "push": "required", "merge_group": "required"},
         "preflight": {"required": true, "optional": false, "pull_request": "required", "push": "required", "merge_group": "required"},
         "code": {"required": true, "optional": false, "pull_request": "required", "push": "required", "merge_group": "required"},
+        // Revision 22 (spec 044 section 3.7): none of the four is optional.
+        "supply-chain": {"required": true, "optional": false, "pull_request": "required", "push": "required", "merge_group": "required"},
+        "workflow-lint": {"required": true, "optional": false, "pull_request": "required", "push": "required", "merge_group": "required"},
+        "sg-scan": {"required": true, "optional": false, "pull_request": "required", "push": "required", "merge_group": "required"},
+        "secret-scan": {"required": true, "optional": false, "pull_request": "required", "push": "required", "merge_group": "required"},
         "ai-review": {"required": true, "optional": false, "pull_request": "required-review", "push": "inapplicable", "merge_group": "recorded-review"},
         "review-exception": {"required": true, "optional": false, "pull_request": "owner-exception", "push": "inapplicable", "merge_group": "inapplicable"},
     })
@@ -419,6 +446,7 @@ pub fn remote_obligations() -> Vec<String> {
         "revision 19: a blocked ci-gate reports failed jobs of its own run attempt, their first failed step and at most five error lines each in the step summary and as at most ten annotations; this is best effort, never changes the verdict or exit code, and fences or escapes candidate text; before saving the code job cache, the job drops workspace artifacts on the same default-branch condition (spec 060)".to_string(),
         "revision 20: reviewer calls stream partial events; 180 seconds of silence stops a call and retries it once with fresh cwd and home, a second stall skips as transient, and the review job allows 20 minutes (spec 061)".to_string(),
         "revision 21: every review or visible skip publishes a statecraft-ai-review check run after its evidence artifact, with the exact record and a success, failure or neutral conclusion; fork heads are excluded and publication failures fail the job (spec 062; 044 moves to 22)".to_string(),
+        "revision 22: four more required jobs, each a need of ci-gate and none optional: supply-chain (cargo deny against the committed deny.toml, cargo audit when .cargo/audit.toml exists, cargo vet --locked when supply-chain/config.toml exists, each tool a digest-verified release at an exact version, with the candidate's .cargo/config.toml removed first), workflow-lint (zizmor offline over .github/workflows, then verify-action-pins.sh: every action by 40-hex commit digest with a `# <ref>` comment, a docker image by sha256, or a local path), sg-scan (ast-grep scan when sgconfig.yml exists) and secret-scan (gitleaks, digest-verified, over the change's commits, reporting rule and location and never the value). On a pull request governance runs guard-policy-files.sh: a change to deny.toml, .cargo/audit.toml, supply-chain/, any Cargo.toml or Cargo.lock, spec-spine.toml or docs/adoption/spec-spine.md beside any other path, apart from the generated .statecraft/derived/ and .statecraft/environment.json, fails and must be split, so an upgrade that also moves the spec-spine pin is two pull requests. A target needs a committed deny.toml to select this revision; the plan withholds the profile without one (spec 044)".to_string(),
         "a repository that already runs these checks by hand keeps them by setting governance.enforce_coverage (index coverage --fail-on-untraced), governance.authored_content (the script's path; absent or not executable refuses), governance.authored_content_text (the title, the body and every commit message), governance.gate_each_commit (each commit's tree passes the gate and cargo fmt) and governance.require_signed_commits (each commit verified as signed by GitHub) (revision 4)".to_string(),
     ]
 }
@@ -692,7 +720,7 @@ fn extra_job_text(jobs: &[ExtraJob]) -> (String, String) {
         .iter()
         .map(|e| {
             format!(
-                "\n  {job}:\n    name: {job}\n    needs: [preflight]\n{concurrency}    uses: ./{wf}\n",
+                "\n  {job}:\n    name: {job}\n    needs: [preflight]\n{concurrency}    uses: ./{wf} # zizmor: ignore[self-repository]\n",
                 job = e.job,
                 wf = e.workflow,
                 concurrency = job_concurrency(&e.job),
@@ -1566,7 +1594,7 @@ pub fn plan(inputs: &Inputs<'_>) -> Result<Plan, String> {
 
     // Prerequisites, observed (S-4: the exact pin is required; spec 018
     // section 3.4: each with its owner and consequence).
-    let prerequisites = crate::prerequisite::observe(
+    let mut prerequisites = crate::prerequisite::observe(
         root,
         &crate::prerequisite::Pin {
             text: inputs.spec_spine_toml,
@@ -1575,6 +1603,11 @@ pub fn plan(inputs: &Inputs<'_>) -> Result<Plan, String> {
         },
         &params,
     );
+    // Spec 044 section 3.2, O-1: the supply-chain job judges against a
+    // committed deny.toml, so a revision that runs it is withheld without one.
+    if profile.revision >= SUPPLY_CHAIN_SINCE {
+        prerequisites.push(crate::prerequisite::dependency_policy(root));
+    }
     let unmet: Vec<String> = prerequisites
         .iter()
         .filter(|p| !p.met)
@@ -1717,11 +1750,13 @@ pub fn plan(inputs: &Inputs<'_>) -> Result<Plan, String> {
             let start = text
                 .find("  code:\n")
                 .ok_or("code job absent from profile")?;
+            // The code job ends where revision 22's supply-chain job and its
+            // comment begin (spec 044).
             let end = text[start..]
-                .find("  ai-review:\n")
-                .ok_or("ai-review absent from profile")?
+                .find(SUPPLY_CHAIN_MARK)
+                .ok_or("supply-chain absent from profile")?
                 + start;
-            text.replace_range(start..end, &format!("  code:\n    name: code\n    needs: [preflight]\n{}    uses: ./{workflow}\n    permissions:\n      contents: read\n\n", job_concurrency("code")));
+            text.replace_range(start..end, &format!("  code:\n    name: code\n    needs: [preflight]\n{}    uses: ./{workflow} # zizmor: ignore[self-repository]\n    permissions:\n      contents: read\n\n", job_concurrency("code")));
         }
         let bytes = text.into_bytes();
         let managed_before = inputs

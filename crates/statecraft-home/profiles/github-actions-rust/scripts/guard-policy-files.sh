@@ -93,6 +93,8 @@ printf '%s\n' "$changed" | awk '
       class = "other"
     }
     count[class]++
+    # Listed exactly as git printed it, quoted where git quoted it, so a
+    # name with a newline or a control character cannot forge a line here.
     list[class] = list[class] "  " $0 "\n"
   }
   END {

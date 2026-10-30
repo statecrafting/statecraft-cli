@@ -65,6 +65,8 @@ fn render_profile(root: &Path, profile: &Profile, extra: &[(&str, serde_json::Va
     for (rel, text) in [
         ("rust-toolchain.toml", "[toolchain]\nchannel = \"1.96.0\"\n"),
         ("Cargo.lock", "version = 4\n"),
+        // Revision 22 (spec 044): the committed dependency policy.
+        ("deny.toml", "[advisories]\n"),
     ] {
         if !root.join(rel).exists() {
             write(root, rel, text);
@@ -75,7 +77,10 @@ fn render_profile(root: &Path, profile: &Profile, extra: &[(&str, serde_json::Va
     if !root.join(".git").exists() {
         git(root, &["init", "--quiet"]);
     }
-    git(root, &["add", "rust-toolchain.toml", "Cargo.lock"]);
+    git(
+        root,
+        &["add", "rust-toolchain.toml", "Cargo.lock", "deny.toml"],
+    );
     let manifest = Manifest::new(Pins {
         product: "0.0.0".into(),
         spec_spine: "unpinned".into(),
@@ -617,10 +622,14 @@ fn run_gate(repo: &Repo, event: &str, needs_json: &str, head_ref: &str) -> Ran {
     )
 }
 
-const ALL_OK: [(&str, &str); 5] = [
+const ALL_OK: [(&str, &str); 9] = [
     ("governance", "success"),
     ("preflight", "success"),
     ("code", "success"),
+    ("supply-chain", "success"),
+    ("workflow-lint", "success"),
+    ("sg-scan", "success"),
+    ("secret-scan", "success"),
     ("ai-review", "success"),
     ("review-exception", "skipped"),
 ];
@@ -711,6 +720,10 @@ fn gate_cases() -> Vec<(&'static str, &'static str, String, &'static str, i32)> 
         "governance",
         "preflight",
         "code",
+        "supply-chain",
+        "workflow-lint",
+        "sg-scan",
+        "secret-scan",
         "ai-review",
         "review-exception",
     ] {
@@ -751,6 +764,10 @@ fn gate_cases() -> Vec<(&'static str, &'static str, String, &'static str, i32)> 
                     ("governance", "success"),
                     ("preflight", "success"),
                     ("code", "success"),
+                    ("supply-chain", "success"),
+                    ("workflow-lint", "success"),
+                    ("sg-scan", "success"),
+                    ("secret-scan", "success"),
                     ("ai-review", "skipped"),
                     ("review-exception", "skipped"),
                 ],
@@ -768,6 +785,10 @@ fn gate_cases() -> Vec<(&'static str, &'static str, String, &'static str, i32)> 
                     ("governance", "success"),
                     ("preflight", "success"),
                     ("code", "success"),
+                    ("supply-chain", "success"),
+                    ("workflow-lint", "success"),
+                    ("sg-scan", "success"),
+                    ("secret-scan", "success"),
                     ("ai-review", "success"),
                     ("review-exception", "skipped"),
                 ],
@@ -881,6 +902,10 @@ fn ci_gate_blocks_exactly_what_the_policy_says() {
                 ("governance", "success"),
                 ("preflight", "success"),
                 ("code", "success"),
+                ("supply-chain", "success"),
+                ("workflow-lint", "success"),
+                ("sg-scan", "success"),
+                ("secret-scan", "success"),
                 ("ai-review", "skipped"),
                 ("review-exception", "skipped"),
             ],
@@ -1268,10 +1293,14 @@ fn record(result: &str, pr: u64, head: &str) -> serde_json::Value {
     })
 }
 
-const QUEUE_OK: [(&str, &str); 5] = [
+const QUEUE_OK: [(&str, &str); 9] = [
     ("governance", "success"),
     ("preflight", "success"),
     ("code", "success"),
+    ("supply-chain", "success"),
+    ("workflow-lint", "success"),
+    ("sg-scan", "success"),
+    ("secret-scan", "success"),
     ("ai-review", "skipped"),
     ("review-exception", "skipped"),
 ];
@@ -2927,11 +2956,16 @@ fn revision_four_adds_steps_not_jobs_and_keeps_the_gate_read_only() {
     assert_eq!(
         jobs,
         // Revision 18 (spec 058) adds preflight, a job ci-gate requires on
-        // every event, so a skip of it blocks as any required job's does.
+        // every event, so a skip of it blocks as any required job's does;
+        // revision 22 (spec 044) adds the four supply-chain jobs.
         [
             "governance",
             "preflight",
             "code",
+            "supply-chain",
+            "workflow-lint",
+            "sg-scan",
+            "secret-scan",
             "ai-review",
             "review-exception",
             "ci-gate"
@@ -3370,6 +3404,10 @@ fn an_authority_change_blocks_without_the_owner_exception_and_passes_with_it() {
                     ("governance", "success"),
                     ("preflight", "success"),
                     ("code", "success"),
+                    ("supply-chain", "success"),
+                    ("workflow-lint", "success"),
+                    ("sg-scan", "success"),
+                    ("secret-scan", "success"),
                     ("ai-review", "skipped"),
                     ("review-exception", "skipped"),
                 ],
@@ -3945,6 +3983,10 @@ fn a_declared_extra_job_is_required_like_the_profiles_own() {
             "governance",
             "preflight",
             "code",
+            "supply-chain",
+            "workflow-lint",
+            "sg-scan",
+            "secret-scan",
             "ai-review",
             "review-exception",
             EXTRA
@@ -3982,7 +4024,7 @@ fn a_declared_extra_job_is_required_like_the_profiles_own() {
     let text =
         std::fs::read_to_string(plain.path().join(".github/workflows/statecraft-ci.yml")).unwrap();
     assert!(
-        text.contains("needs: [governance, preflight, code, ai-review, review-exception]\n"),
+        text.contains("needs: [governance, preflight, code, supply-chain, workflow-lint, sg-scan, secret-scan, ai-review, review-exception]\n"),
         "{text}"
     );
 }
@@ -4415,6 +4457,10 @@ fn a_draft_owner_refuses_and_a_ratification_needs_the_owner_exception() {
             ("governance", "success"),
             ("preflight", "success"),
             ("code", "success"),
+            ("supply-chain", "success"),
+            ("workflow-lint", "success"),
+            ("sg-scan", "success"),
+            ("secret-scan", "success"),
             ("ai-review", "skipped"),
             ("review-exception", "skipped"),
         ],
@@ -5565,7 +5611,14 @@ fn run_mutated(repo: &Repo, script: &str, extra: &[(&'static str, &str)]) -> Ran
 /// 058), captured byte for byte from main at 6c6f394.
 fn revision_seventeen() -> Profile {
     let mut p = Profile::registered();
-    assert_eq!(p.revision, 21, "the registered profile is revision 21");
+    assert_eq!(p.revision, 22, "the registered profile is revision 22");
+    // Revision 22 (spec 044) added two scripts revision 17 did not have.
+    p.templates.retain(|t| {
+        !matches!(
+            t.path.as_str(),
+            "scripts/statecraft/guard-policy-files.sh" | "scripts/statecraft/verify-action-pins.sh"
+        )
+    });
     p.templates
         .iter_mut()
         .find(|t| t.path == "scripts/statecraft/ci-gate.sh")
@@ -6558,6 +6611,21 @@ fn the_policy_guard_exits_by_its_three_classes() {
     assert_eq!(code, 2, "{out}");
     assert!(out.contains("no merge base"), "{out}");
 
+    // A name git quotes is listed as git printed it, and still classified
+    // by its final component: a newline cannot forge a listed line.
+    git(root, &["checkout", "--quiet", "-b", "quoted", "main"]);
+    commit_files(
+        root,
+        &[("dir\nother/Cargo.lock", "\n"), ("caf\u{e9}/x.rs", "\n")],
+    );
+    let (code, out) = run_script(root, guard, &["main", "quoted"]);
+    assert_eq!(code, 1, "{out}");
+    assert!(
+        out.contains("policy:\n  \"dir\\nother/Cargo.lock\"\n"),
+        "{out}"
+    );
+    assert!(out.contains("other:\n  \"caf\\303\\251/x.rs\"\n"), "{out}");
+
     // Bad usage: exit 2, every undecidable case is one refusal.
     for args in [
         &[][..],
@@ -6688,5 +6756,157 @@ fn the_spec_044_scripts_exit_in_the_family_contract() {
             assert_eq!((e.verb, e.code.as_str()), ("exit", "\"$1\""), "{at}");
             assert_eq!(lines[e.line - 2].trim(), "trap - EXIT", "{at}");
         }
+    }
+}
+
+/// Spec 044 sections 3.1 to 3.7 and V-1: the revision-22 workflow carries
+/// each new job with its tools at exact versions verified by digest, the
+/// guard as a governance step on a pull request, and every new job as a
+/// need of ci-gate; none can be disabled.
+#[test]
+fn revision_twenty_two_renders_the_supply_chain_jobs_with_pinned_tools() {
+    let tmp = tempfile::tempdir().unwrap();
+    write(tmp.path(), "spec-spine.toml", TOML);
+    render(tmp.path());
+    let wf = workflow(tmp.path(), "statecraft-ci.yml");
+    let jobs = &wf["jobs"];
+    let runs = |job: &str| -> String {
+        jobs[job]["steps"]
+            .as_sequence()
+            .unwrap()
+            .iter()
+            .filter_map(|s| s["run"].as_str())
+            .collect::<Vec<_>>()
+            .join("\n")
+    };
+    // Each archive by exact version, refused unless its digest matches.
+    let tools = [
+        (
+            "supply-chain",
+            "cargo-deny/releases/download/0.20.2/",
+            "9f12ed4c49936e09b48bf862b595cde2fe64fcbd9d74dfacac6131ca824c8d5f",
+        ),
+        (
+            "supply-chain",
+            "rustsec/releases/download/cargo-audit%2Fv0.22.2/",
+            "7fb9497f8594b389e5fce5ef9b92db08432996895b2e0c5a0167a69ed445c428",
+        ),
+        (
+            "supply-chain",
+            "cargo-vet/releases/download/v0.10.3/",
+            "e83878b80913fbe43629c28768e14ab51f4e86a4ba8f9dd08cc25b8dbc503c19",
+        ),
+        (
+            "workflow-lint",
+            "zizmor/releases/download/v1.31.1/",
+            "d185f726bdaf92df78273217dfdd24ebcd6b0ef48cf3ce776ff5762b6e138c99",
+        ),
+        (
+            "sg-scan",
+            "ast-grep/releases/download/0.51.0/",
+            "a7eead5552d3a8daad70f5d50d935da44bd0c138e946b5b0a96b1d38169fa639",
+        ),
+        (
+            "secret-scan",
+            "gitleaks/releases/download/v8.30.1/",
+            "551f6fc83ea457d62a0d98237cbad105af8d557003051f41f3e7ca7b3f2470eb",
+        ),
+    ];
+    for (job, release, digest) in tools {
+        let text = runs(job);
+        assert!(text.contains(release), "{job}: {release}");
+        assert!(text.contains(digest), "{job}: {digest}");
+    }
+    for job in ["supply-chain", "workflow-lint", "sg-scan", "secret-scan"] {
+        let text = runs(job);
+        assert!(
+            text.matches("sha256sum -c -").count() >= 1,
+            "{job} verifies what it downloads"
+        );
+        assert!(
+            !text.contains("latest"),
+            "{job} resolves no floating version"
+        );
+        assert!(!text.contains("cargo install"), "{job}");
+        // Spec 059: every job but review-exception and ci-gate is grouped.
+        assert!(
+            jobs[job]["concurrency"]["group"]
+                .as_str()
+                .unwrap()
+                .ends_with(&format!("-{job}")),
+            "{job}"
+        );
+        let first = &jobs[job]["steps"][0];
+        assert_eq!(first["with"]["persist-credentials"], false, "{job}");
+    }
+
+    // 3.2: deny.toml is mandatory, audit and vet are optional, and the
+    // candidate's cargo configuration is removed first.
+    let supply = runs("supply-chain");
+    assert!(supply.contains("rm -f .cargo/config.toml .cargo/config"));
+    assert!(supply.contains("cargo deny --locked check all"));
+    assert!(supply.contains("deny.toml is absent"));
+    assert!(!supply.contains("cargo-deny 0.20.2: not-configured"));
+    assert!(supply.contains("cargo-audit 0.22.2: not-configured"));
+    assert!(supply.contains("cargo vet --locked"));
+    assert!(supply.contains("cargo-vet 0.10.3: not-configured"));
+    assert_eq!(jobs["supply-chain"]["steps"][0]["with"]["fetch-depth"], 0);
+
+    // 3.3: the guard is a governance step on a pull request, read at the base.
+    let guard = jobs["governance"]["steps"]
+        .as_sequence()
+        .unwrap()
+        .iter()
+        .find(|s| s["name"] == "Policy isolation")
+        .expect("the guard step");
+    assert_eq!(guard["if"], "github.event_name == 'pull_request'");
+    let run = guard["run"].as_str().unwrap();
+    assert!(run.contains("git show \"${BASE_SHA}:scripts/statecraft/guard-policy-files.sh\""));
+    assert!(run.contains("sh \"$guard\" \"$BASE_SHA\" \"$HEAD_SHA\""));
+
+    // 3.4: zizmor offline, then the pin check read at the base.
+    let lint = runs("workflow-lint");
+    assert!(lint.contains("zizmor --offline --format plain .github/workflows"));
+    assert!(lint.contains("git show \"${BASE_SHA}:scripts/statecraft/verify-action-pins.sh\""));
+
+    // 3.5: not-configured without sgconfig.yml.
+    assert!(runs("sg-scan").contains("ast-grep 0.51.0: not-configured"));
+
+    // 3.6: the change's commits, the value never printed.
+    let leaks = runs("secret-scan");
+    assert!(leaks.contains("gitleaks git --no-banner --no-color --redact --verbose"));
+    assert!(leaks.contains("range=\"${merge_base}..${HEAD_SHA}\""));
+    assert_eq!(jobs["secret-scan"]["steps"][0]["with"]["fetch-depth"], 0);
+
+    // 3.7: each is a need of ci-gate.
+    let needs: Vec<&str> = jobs["ci-gate"]["needs"]
+        .as_sequence()
+        .unwrap()
+        .iter()
+        .map(|n| n.as_str().unwrap())
+        .collect();
+    for job in ["supply-chain", "workflow-lint", "sg-scan", "secret-scan"] {
+        assert!(needs.contains(&job), "{job}: {needs:?}");
+    }
+    let manifest = Manifest::new(Pins {
+        product: "test".into(),
+        spec_spine: "unpinned".into(),
+        adapters: Default::default(),
+        producer: None,
+    });
+    for job in ["supply-chain", "workflow-lint", "sg-scan", "secret-scan"] {
+        let block: BTreeMap<String, serde_json::Value> =
+            [(format!("jobs.{job}.enabled"), serde_json::json!(false))].into();
+        let err = setup::plan(&Inputs {
+            root: tmp.path(),
+            profile: &Profile::registered(),
+            block: &block,
+            manifest: &manifest,
+            spec_spine_toml: Some(TOML),
+            derived_dir: ".statecraft/derived",
+            bound: &statecraft_home::setup_input::Bound::with_producer("0.26.0"),
+        })
+        .unwrap_err();
+        assert!(err.contains("is not optional in revision 22"), "{err}");
     }
 }

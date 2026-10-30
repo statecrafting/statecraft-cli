@@ -177,6 +177,8 @@ fn rust_and_external_checks_survive_the_explicit_pin_move_and_drift_stays_withhe
         source(&s);
         let j = Judge::new(&s);
         let mut req = request();
+        // Revision 22 (spec 044): the committed dependency policy.
+        s.write("deny.toml", "[advisories]\n");
         if external {
             s.write(".github/workflows/project-code.yml", "on: workflow_call\njobs:\n  code:\n    runs-on: ubuntu-latest\n    steps:\n      - run: scripts/project-code.sh\n");
             s.write("scripts/project-code.sh", "#!/bin/sh\nexit 0\n");

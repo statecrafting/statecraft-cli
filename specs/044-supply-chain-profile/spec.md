@@ -2,7 +2,7 @@
 id: "044-supply-chain-profile"
 title: "Setup profile revision 18: supply-chain, policy-isolation, workflow-lint, structural-scan and secret-scan jobs"
 status: approved
-implementation: pending
+implementation: complete
 created: "2026-10-21"
 summary: >
   Amends spec 002's setup profile. github-actions-rust revision 18 adds five
@@ -17,6 +17,7 @@ amends:
   - "002-environment-lifecycle"
 extends:
   - { spec: "002-environment-lifecycle", unit: { kind: directory, path: "crates/statecraft-home/" }, nature: additive }
+  - { spec: "006-command-surface", unit: { kind: directory, path: "crates/statecraft-cli/" }, nature: additive }
 depends_on:
   - "002-environment-lifecycle"
   - "024-review-budget-and-ratification"
@@ -228,10 +229,49 @@ each file claimed by its spec.
   without it every dependency pull request would read as mixed, and a
   `D-06` adoption would have to split its one producer identity.
 
+**2026-10-30: choices made in implementing this spec, which the text left
+open.** Spec 062 moved this spec's jobs to revision 22, upgraded from 21.
+
+- **Tool versions and digests.** cargo-deny 0.20.2, cargo-audit 0.22.2,
+  cargo-vet 0.10.3, zizmor 1.31.1, ast-grep 0.51.0 and gitleaks 8.30.1, each
+  the Linux x86-64 release archive, with the SHA-256 of the downloaded bytes
+  in the workflow. Each digest equals the release's published checksum where
+  one is published (cargo-deny, cargo-vet, gitleaks). Every archive was
+  installed and run at its version on Ubuntu 24.04 x86-64 before this change.
+- **The audit step's advisory classes.** `cargo audit --deny unmaintained
+  --deny unsound`, so an informational advisory fails as a vulnerability
+  does (section 3.2), while a yanked crate stays a warning.
+- **A committed `deny.toml`** is a regular file the git index tracks, read
+  the way spec 018 reads `Cargo.lock`. An absent or untracked one is an
+  unmet prerequisite that withholds the whole profile. The plan names the
+  file and the apply writes nothing.
+- **zizmor and a call in the same repository.** zizmor 1.31.1 reports every
+  `uses: ./` job call (`self-repository`, low). The profile marks its own
+  such lines, the review call, a declared extra job and an external code
+  selection, with `# zizmor: ignore[self-repository]`. A project's other
+  workflows are judged by every audit. With the marks, the rendered
+  revision-22 workflows report no finding, and they pass the pin check.
+- **The guard's exits.** Every undecidable comparison, bad usage included, is
+  2, per section 3.3's table. A command that breaks after the comparison is
+  decided is 4, under revision 7's family contract. Neither is ever 0.
+- **The pin check's exits.** An absent workflow directory is 2 (nothing was
+  checked) and bad usage is 3, under the family contract.
+
 ## Verification
 
-This spec declares no acceptance until it is built. Its acceptance will render a revision-18 workflow and assert each
-job's pinned tools and its place in `ci-gate`; run the guard against fixture
-histories for exits 0, 1 and 2, the both-tips case and the generated class;
-run the pin check against fixture workflows for each refusal; upgrade a
-revision-17 project with `deny.toml` in one plan; and refuse one without it.
+Ratified by the owner on 2026-10-21. Acceptance is run through
+`make verify SPEC=044`, against fixture histories, workflows and projects,
+with no host and no network.
+
+```verify:cli
+cargo test -p statecraft-home --test setup_workflows -- the_policy_guard_exits_by_its_three_classes the_pin_check_refuses_every_unpinned_use the_spec_044_scripts_exit_in_the_family_contract revision_twenty_two_renders_the_supply_chain_jobs_with_pinned_tools
+cargo test -p statecraft-home --test setup_upgrade -- a_revision_twenty_one_project_upgrades_to_revision_twenty_two a_target_without_a_committed_deny_toml_cannot_select_revision_twenty_two
+```
+
+These render a revision-22 workflow and assert each job's pinned tools and
+its place in `ci-gate`, and that none can be disabled. They run the guard
+against fixture histories for exits 0, 1 and 2, the both-tips case, a rename
+and the generated class. They run the pin check against fixture workflows
+for each refusal, and against the profile's own workflows. They upgrade a
+revision-21 project with `deny.toml` in one plan, and refuse one without it
+or with an untracked one.

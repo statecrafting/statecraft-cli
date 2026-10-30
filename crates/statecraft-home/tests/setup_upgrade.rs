@@ -21,6 +21,8 @@ fn project() -> tempfile::TempDir {
         ("spec-spine.toml", TOML),
         ("rust-toolchain.toml", "[toolchain]\nchannel = \"1.96.0\"\n"),
         ("Cargo.lock", "version = 4\n"),
+        // Revision 22 (spec 044): the committed dependency policy.
+        ("deny.toml", "[advisories]\n"),
     ] {
         std::fs::write(dir.path().join(rel), text).unwrap();
     }
@@ -28,7 +30,7 @@ fn project() -> tempfile::TempDir {
     // prerequisites, as a checkout would carry them.
     for args in [
         &["init", "--quiet"][..],
-        &["add", "rust-toolchain.toml", "Cargo.lock"],
+        &["add", "rust-toolchain.toml", "Cargo.lock", "deny.toml"],
     ] {
         let out = std::process::Command::new("git")
             .args(args)
@@ -244,10 +246,31 @@ fn revision_thirteen() -> Profile {
     p
 }
 
+/// Revision 21 of the registered profile: the caller workflow revision 22
+/// changed (spec 044), captured byte for byte from main at 55d76127, and
+/// without the two scripts revision 22 added.
+fn revision_twenty_one() -> Profile {
+    let mut p = Profile::registered();
+    assert_eq!(p.revision, 22, "the registered profile is revision 22");
+    p.revision = 21;
+    let added = [
+        "scripts/statecraft/guard-policy-files.sh",
+        "scripts/statecraft/verify-action-pins.sh",
+    ];
+    let before = p.templates.len();
+    p.templates.retain(|t| !added.contains(&t.path.as_str()));
+    assert_eq!(p.templates.len(), before - added.len());
+    let path = ".github/workflows/statecraft-ci.yml";
+    let old = include_str!("support/profile-r21/statecraft-ci.yml");
+    let t = p.templates.iter_mut().find(|t| t.path == path).unwrap();
+    assert_ne!(t.body, old, "revision 22 changed {path}");
+    t.body = old.into();
+    p
+}
+
 /// Revision 20 templates changed by spec 062, captured before this revision.
 fn revision_twenty() -> Profile {
-    let mut p = Profile::registered();
-    assert_eq!(p.revision, 21, "the registered profile is revision 21");
+    let mut p = revision_twenty_one();
     p.revision = 20;
     // Revision 21 adds only this permission to the caller template.
     let caller = p
@@ -897,8 +920,9 @@ fn revision_four_keeps_the_policy_and_names_the_new_refusal() {
     assert_eq!(policy["governance"]["merge_group"], "required");
     assert_eq!(policy["code"]["merge_group"], "required");
     assert_eq!(policy["ai-review"]["merge_group"], "recorded-review");
-    // Revision 18 (spec 058) adds preflight.
-    assert_eq!(policy.as_object().unwrap().len(), 5);
+    // Revision 18 (spec 058) adds preflight, and revision 22 (spec 044)
+    // supply-chain, workflow-lint, sg-scan and secret-scan.
+    assert_eq!(policy.as_object().unwrap().len(), 9);
     let steps = setup::remote_obligations().join("\n");
     assert!(
         steps.contains("a pull request whose base is not the default branch fails governance"),
@@ -1026,8 +1050,9 @@ fn revision_five_names_the_owner_approval_in_its_operator_steps() {
         assert!(steps.contains(said), "{said}: {steps}");
     }
     let policy = setup::jobs();
-    // Revision 18 (spec 058) adds preflight.
-    assert_eq!(policy.as_object().unwrap().len(), 5);
+    // Revision 18 (spec 058) adds preflight, and revision 22 (spec 044)
+    // supply-chain, workflow-lint, sg-scan and secret-scan.
+    assert_eq!(policy.as_object().unwrap().len(), 9);
     assert_eq!(
         policy["review-exception"]["pull_request"],
         "owner-exception"
@@ -1619,8 +1644,8 @@ fn revision_fourteen_installer_upgrades_to_the_registered_revision_without_repla
     });
     assert!(plan_and_apply(root, &old, &mut manifest).whole());
     let next = Profile::registered();
-    // Revisions 16 through 21 change no installer byte.
-    assert_eq!(next.revision, 21);
+    // Revisions 16 through 22 change no installer byte.
+    assert_eq!(next.revision, 22);
     let installer = "scripts/statecraft/install-spec-spine.sh";
     let upgraded = plan_and_apply(root, &next, &mut manifest);
     assert_eq!(
@@ -1821,7 +1846,7 @@ fn a_revision_twenty_project_upgrades_to_revision_twenty_one() {
     let dir = project();
     let root = dir.path();
     let old = revision_twenty();
-    let next = Profile::registered();
+    let next = revision_twenty_one();
     assert_ne!(old.identity(), next.identity());
     let mut manifest = Manifest::new(Pins {
         product: "test".into(),
@@ -1869,4 +1894,142 @@ fn a_revision_twenty_project_upgrades_to_revision_twenty_one() {
     assert_eq!(policy["revision"], 21);
     let again = plan_and_apply(root, &next, &mut manifest);
     assert!(again.files.iter().all(|f| !f.action.writes()));
+}
+
+/// Spec 044 section 3.7 and V-1: a revision-21 project with a committed
+/// deny.toml upgrades in one ordinary plan. The caller workflow is replaced,
+/// the two scripts are added, the four jobs enter the policy as required and
+/// not optional, and a second identical plan writes nothing.
+#[test]
+fn a_revision_twenty_one_project_upgrades_to_revision_twenty_two() {
+    let dir = project();
+    let root = dir.path();
+    let old = revision_twenty_one();
+    let next = Profile::registered();
+    assert_eq!(next.revision, 22);
+    assert_ne!(old.identity(), next.identity());
+    let mut manifest = Manifest::new(Pins {
+        product: "test".into(),
+        spec_spine: "unpinned".into(),
+        adapters: Default::default(),
+        producer: None,
+    });
+    assert!(plan_and_apply(root, &old, &mut manifest).whole());
+    let workflow = ".github/workflows/statecraft-ci.yml";
+    let scripts = [
+        "scripts/statecraft/guard-policy-files.sh",
+        "scripts/statecraft/verify-action-pins.sh",
+    ];
+    assert!(
+        !std::fs::read_to_string(root.join(workflow))
+            .unwrap()
+            .contains("supply-chain")
+    );
+    for path in scripts {
+        assert!(!root.join(path).exists(), "{path}");
+    }
+
+    let upgraded = plan_and_apply(root, &next, &mut manifest);
+    assert!(upgraded.whole(), "{:?}", upgraded.withheld);
+    let deny = upgraded
+        .prerequisites
+        .iter()
+        .find(|p| p.name == "deny.toml")
+        .expect("revision 22 observes deny.toml");
+    assert!(deny.met, "{deny:?}");
+    let action = |path: &str| {
+        upgraded
+            .files
+            .iter()
+            .find(|f| f.path == path)
+            .unwrap()
+            .action
+            .clone()
+    };
+    assert_eq!(action(workflow), Action::Replace);
+    for path in scripts {
+        assert_eq!(action(path), Action::Write, "{path}");
+    }
+    let after = std::fs::read_to_string(root.join(workflow)).unwrap();
+    for job in ["supply-chain", "workflow-lint", "sg-scan", "secret-scan"] {
+        assert!(
+            after.contains(&format!("\n  {job}:\n    name: {job}\n")),
+            "{job}"
+        );
+    }
+    let policy: serde_json::Value =
+        serde_json::from_str(&std::fs::read_to_string(root.join(setup::POLICY_PATH)).unwrap())
+            .unwrap();
+    assert_eq!(policy["revision"], 22);
+    for job in ["supply-chain", "workflow-lint", "sg-scan", "secret-scan"] {
+        assert_eq!(policy["jobs"][job]["required"], true, "{job}");
+        assert_eq!(policy["jobs"][job]["optional"], false, "{job}");
+        for event in ["pull_request", "push", "merge_group"] {
+            assert_eq!(policy["jobs"][job][event], "required", "{job} {event}");
+        }
+    }
+    let again = plan_and_apply(root, &next, &mut manifest);
+    assert!(again.files.iter().all(|f| !f.action.writes()));
+}
+
+/// Spec 044 section 3.2, R-5 and section 4: a revision-21 target without a
+/// committed deny.toml cannot select revision 22. The plan names the file and
+/// withholds the profile, and applying it writes nothing; an untracked
+/// deny.toml is not committed and is refused the same way.
+#[test]
+fn a_target_without_a_committed_deny_toml_cannot_select_revision_twenty_two() {
+    let dir = project();
+    let root = dir.path();
+    let status = std::process::Command::new("git")
+        .args(["rm", "--quiet", "--cached", "deny.toml"])
+        .current_dir(root)
+        .status()
+        .unwrap();
+    assert!(status.success());
+    std::fs::remove_file(root.join("deny.toml")).unwrap();
+    let mut manifest = Manifest::new(Pins {
+        product: "test".into(),
+        spec_spine: "unpinned".into(),
+        adapters: Default::default(),
+        producer: None,
+    });
+    // Revision 21 asks for no deny.toml.
+    assert!(plan_and_apply(root, &revision_twenty_one(), &mut manifest).whole());
+    let snapshot = |root: &Path| {
+        let mut out = Vec::new();
+        for path in [
+            ".github/workflows/statecraft-ci.yml",
+            setup::POLICY_PATH,
+            "scripts/statecraft/gate.sh",
+        ] {
+            out.push(std::fs::read(root.join(path)).unwrap());
+        }
+        out
+    };
+    let before = snapshot(root);
+    let next = Profile::registered();
+    for untracked in [false, true] {
+        if untracked {
+            std::fs::write(root.join("deny.toml"), "[advisories]\n").unwrap();
+        }
+        let plan = plan_and_apply(root, &next, &mut manifest);
+        let why = plan.withheld.clone().expect("the profile is withheld");
+        assert!(why.contains("deny.toml"), "{why}");
+        let deny = plan
+            .prerequisites
+            .iter()
+            .find(|p| p.name == "deny.toml")
+            .unwrap();
+        assert!(!deny.met, "{deny:?}");
+        assert!(
+            deny.consequence.contains("commit the project's deny.toml"),
+            "{deny:?}"
+        );
+        assert_eq!(snapshot(root), before, "nothing was written");
+        assert!(
+            !root
+                .join("scripts/statecraft/guard-policy-files.sh")
+                .exists()
+        );
+    }
 }
