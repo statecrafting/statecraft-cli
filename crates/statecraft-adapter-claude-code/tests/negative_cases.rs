@@ -456,7 +456,7 @@ fn a_refusal_that_must_be_evidence_may_not_be_expressed_as_tool_set_removal() {
 fn a_provider_version_the_record_does_not_name_is_unqualified_and_still_runs() {
     let record = provider::record(
         provider::MEASURED_PROVIDER_VERSION,
-        "008.3.9",
+        statecraft_adapter::manifest::SUITE_VERSION,
         "2026-09-17T00:00:00Z",
     );
     let manifest = provider::manifest();

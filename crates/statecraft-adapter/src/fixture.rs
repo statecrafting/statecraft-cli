@@ -154,6 +154,65 @@ echo '{{"event":"result","classification":"completed","cost":null}}'
     Ok(path)
 }
 
+/// Spec 025 section 3.4's hostile mode: a fixture that emits a case's payload
+/// on the `provider-output` and `tool-facing` surfaces.
+///
+/// The child reads its input stream, writes its actual environment where the
+/// suite asks, reads each workspace file in `reads` back as a provider reads
+/// tool output, and then emits `lines` exactly. The lines are rendered by the
+/// suite and written to a data file beside the script, so no payload byte is
+/// ever spliced into shell source: the script is the same for a hostile case
+/// and its benign twin, and only the data differs.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct Hostile {
+    /// The event lines the child prints, in order, each without its newline.
+    pub lines: Vec<String>,
+    /// Workspace-relative files the child reads back before it prints.
+    pub reads: Vec<String>,
+    /// Where the child writes its own environment, one `NAME=value` a line.
+    pub environment: Option<PathBuf>,
+}
+
+/// Write the hostile fixture into `dir` and return its path.
+///
+/// Refuses a path or a read that would need quoting beyond single quotes,
+/// rather than quote it: every such path is the suite's own.
+pub fn write_hostile(dir: &Path, hostile: &Hostile) -> std::io::Result<PathBuf> {
+    let quoted = |p: &str| -> std::io::Result<String> {
+        if p.contains('\'') || p.contains('\n') {
+            return Err(std::io::Error::other(format!(
+                "a hostile fixture path must not need quoting: {p:?}"
+            )));
+        }
+        Ok(format!("'{p}'"))
+    };
+    let data = dir.join("fixture-events.jsonl");
+    let mut events = String::new();
+    for line in &hostile.lines {
+        events.push_str(line);
+        events.push('\n');
+    }
+    std::fs::write(&data, events)?;
+
+    let mut script = String::from("#!/bin/sh\ncat > /dev/null\n");
+    if let Some(env) = &hostile.environment {
+        script.push_str(&format!("env > {}\n", quoted(&env.to_string_lossy())?));
+    }
+    for read in &hostile.reads {
+        if read.starts_with('/') || read.split('/').any(|c| c == "..") {
+            return Err(std::io::Error::other(format!(
+                "a hostile fixture reads inside the workspace only: {read:?}"
+            )));
+        }
+        script.push_str(&format!("cat -- {} > /dev/null\n", quoted(read)?));
+    }
+    script.push_str(&format!("cat -- {}\n", quoted(&data.to_string_lossy())?));
+
+    let path = dir.join("fixture-adapter.sh");
+    install_script(&path, script, 0o755)?;
+    Ok(path)
+}
+
 /// Install an executable script at `path` without this process ever holding
 /// `path` open for writing.
 ///

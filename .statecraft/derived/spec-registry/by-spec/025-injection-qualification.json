@@ -35,6 +35,22 @@
       },
       {
         "nature": "additive",
+        "spec": "004-execution-adapter",
+        "unit": {
+          "kind": "directory",
+          "path": "crates/statecraft-adapter-claude-code/"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "006-command-surface",
+        "unit": {
+          "kind": "directory",
+          "path": "crates/statecraft-cli/"
+        }
+      },
+      {
+        "nature": "additive",
         "spec": "005-acceptance-and-evidence",
         "unit": {
           "kind": "directory",
@@ -82,7 +98,7 @@
       }
     ],
     "sectionDigests": {
-      "025-prompt-injection-qualification": "3835da714d224e9eec3593e8cfe8b1bc6cdccc30d155a71b2322deb8a8a7a11b",
+      "025-prompt-injection-qualification": "7320332308e1b4e5a6a486592b947221cac55611d29460a6a47b4b267e5534bb",
       "1-purpose": "ae4f59c78635c11226697b8f6e61946584f48bcfd52c1b96e5650144e943626e",
       "2-territory-and-prerequisite": "7f6c48c2147a5250ccea93252e2d72e583b3be602c0b46c59f42245b2110bc9c",
       "3-1-the-invariant-and-where-it-lives": "5ff2393c247b5e5414e9da2a8342407a6c69fd338cb95c58b119c88b7d5cee25",
@@ -95,7 +111,7 @@
       "3-8-observable-negative-cases": "ffa822e1ae9ea96ee70c0b40b0a0daf9a9a2e33959b28effd00bb289cacb3805",
       "3-behavior": "491738ed204303957f3e0df2aa09360b871fb4fdfa9eeb9acd8d9b50642c745f",
       "4-out-of-scope": "02fc79b48e0d62caa900326f855d82de473f52e7a1cdcb75112fc84a6634a5b1",
-      "5-resolved-decisions": "f55fdd5f48c3971143e447b70b3c8cef17a53ad769561575a71319265e6a48e7",
+      "5-resolved-decisions": "c47cd009924665a09776bb081259c5cec313e455939784c18c0382725f39013e",
       "verification": "2fe04ef540a0e9c60d506eb26c4d69cdac6f05e51c2525056ad60d79b35eed6b"
     },
     "sectionHeadings": [
@@ -120,6 +136,6 @@
     "summary": "Amends the adapter negative suite and the documentation lane with a versioned hostile-content corpus and a deterministic product-invariance suite. Every surface that carries repository, packet, citation, provider, wire or tool-facing text is exercised with hostile payloads, and the suite proves by construction that Statecraft's decisions are unchanged: no authority expands, no credential is disclosed, no forbidden capability is invoked, no review or acceptance is bypassed. Provider susceptibility is a separate, later measurement that is recorded as testimony and is never the boundary. Delimiters and detectors are not security controls.\n",
     "title": "Prompt-injection qualification: untrusted content never expands authority"
   },
-  "shardHash": "7f7fe4b0e9b9a546df4046ac2d0a3dd6f759dbeac57e888e6d0cfd24ef5a3b03",
+  "shardHash": "f4effaeb022b323a16fe8002786258a0b866b88f80e436fe1b573726b83af3a5",
   "specVersion": "1.10.0"
 }

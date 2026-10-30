@@ -30,6 +30,17 @@ pub struct Manifest {
     pub requires_commands: Vec<String>,
 }
 
+/// The negative suite's label, which every qualification record names.
+///
+/// The suite qualified against before was recorded as `008.3.9`, minted from
+/// the section that then held it. Spec 025 section 3.5 adds row 9 (hostile
+/// provider output changes no decision), and a suite revision mints a new
+/// label from the section that revised it rather than retitling the old one.
+/// A record stays valid only for the label it names: a record naming
+/// `008.3.9` no longer qualifies its binary, the same binary is rerun to earn
+/// a record naming this label, and until then it runs labelled `unqualified`.
+pub const SUITE_VERSION: &str = "025.3.5";
+
 /// A recorded pass of the negative suite.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct QualificationRecord {
@@ -65,13 +76,16 @@ impl Qualification {
 
 /// Decide an adapter binary's qualification from the records on hand.
 ///
-/// Matching is on adapter name **and** binary version. A record for a different
-/// version does not transfer, and neither does a sibling adapter's pass, however
-/// similar its prompts, skills or configuration files.
+/// Matching is on adapter name, binary version **and** [`SUITE_VERSION`]. A
+/// record for a different version does not transfer, and neither does a
+/// sibling adapter's pass, however similar its prompts, skills or
+/// configuration files, nor a pass of an earlier suite (spec 025 section 3.5).
 pub fn qualification(manifest: &Manifest, records: &[QualificationRecord]) -> Qualification {
-    let found = records
-        .iter()
-        .any(|r| r.adapter == manifest.adapter && r.binary_version == manifest.version);
+    let found = records.iter().any(|r| {
+        r.adapter == manifest.adapter
+            && r.binary_version == manifest.version
+            && r.suite_version == SUITE_VERSION
+    });
     if found {
         Qualification::Qualified
     } else {
@@ -144,7 +158,7 @@ mod tests {
         QualificationRecord {
             adapter: adapter.into(),
             binary_version: version.into(),
-            suite_version: "1".into(),
+            suite_version: SUITE_VERSION.into(),
             date: "2026-09-16T00:00:00Z".into(),
         }
     }
@@ -172,6 +186,22 @@ mod tests {
         assert_eq!(
             qualification(&manifest("1.0.1"), &[record("fixture", "1.0.0")]),
             Qualification::Unqualified
+        );
+    }
+
+    // Spec 025 section 3.5: the bump does not rewrite an earlier record, and
+    // that record names a suite this binary has not passed.
+    #[test]
+    fn a_record_naming_an_earlier_suite_version_does_not_qualify() {
+        let mut earlier = record("fixture", "1.0.0");
+        earlier.suite_version = "008.3.9".into();
+        assert_eq!(
+            qualification(&manifest("1.0.0"), &[earlier.clone()]),
+            Qualification::Unqualified
+        );
+        assert_eq!(
+            earlier.suite_version, "008.3.9",
+            "the record is not rewritten"
         );
     }
 

@@ -1,4 +1,6 @@
-//! Spec 004 section 3.5, the negative suite, plus section 3.8's rows.
+//! Spec 004 section 3.5, the negative suite, plus section 3.8's rows, and
+//! row 9, which spec 025 section 3.5 adds and which makes this suite version
+//! [`SUITE_VERSION`].
 //!
 //! The suite runs against the fixture adapter, which ships with it so the table
 //! can be run with no real provider installed. The fixture is a real child
@@ -11,7 +13,7 @@ use statecraft_adapter::environment::{
 };
 use statecraft_adapter::fixture::{self, Behavior};
 use statecraft_adapter::manifest::{
-    Qualification, QualificationRecord, discrepancy, qualification,
+    Qualification, QualificationRecord, SUITE_VERSION, discrepancy, qualification,
 };
 use statecraft_adapter::posture::Posture;
 use statecraft_adapter::protocol::{
@@ -22,6 +24,13 @@ use statecraft_adapter::supervisor::{SpawnRefusal, preflight, supervise};
 use statecraft_run::attempt::Outcome;
 use statecraft_run::refusal::{Accounting, decide};
 use std::path::Path;
+
+#[cfg(unix)]
+#[path = "support/injection.rs"]
+mod injection;
+#[cfg(unix)]
+#[path = "support/injection_adapter.rs"]
+mod injection_adapter;
 
 fn env_for(commands: &[&str]) -> statecraft_adapter::ChildEnvironment {
     let mut b = Blueprint::empty().allowing("PATH", "/usr/bin:/bin");
@@ -313,6 +322,41 @@ fn suite_8_a_posture_omitting_a_command_the_check_suite_invokes_is_refused_at_pl
     ));
 }
 
+// Suite row 9 (spec 025 section 3.5): hostile provider output changes no
+// decision. Every corpus case on the provider-output surface runs through the
+// fixture's hostile mode beside its benign twin, and the attempt record,
+// posture and outcome are the twin's. The full comparison, every surface and
+// both framings, is `tests/injection_invariance.rs`.
+#[cfg(unix)]
+#[test]
+fn suite_9_hostile_provider_output_changes_no_decision() {
+    let corpus = injection::load();
+    let runner = injection::RUNNERS
+        .iter()
+        .find(|r| r.harness == "adapter" && r.surface == "provider-output")
+        .expect("the provider-output runner");
+    let mut ran = 0;
+    for case in corpus
+        .cases
+        .iter()
+        .filter(|c| c.surface == "provider-output")
+    {
+        let side = |s| injection_adapter::observe(runner, case, s, injection::Framing::Intact);
+        let (hostile, twin) = (side(injection::Side::Hostile), side(injection::Side::Twin));
+        for decision in ["attempt-record", "posture", "attempt-outcome"] {
+            assert_eq!(
+                hostile.decisions[decision], twin.decisions[decision],
+                "{}: {decision}",
+                case.case_id
+            );
+        }
+        let failures = injection::compare(case, runner, &hostile, &twin);
+        assert!(failures.is_empty(), "{}: {failures:?}", case.case_id);
+        ran += 1;
+    }
+    assert_eq!(ran, 8, "one case per payload class");
+}
+
 // Section 3.8: an adapter binary with no qualification record runs, labelled.
 #[test]
 fn an_unqualified_binary_runs_and_is_labelled_in_posture_attempt_and_outcome() {
@@ -346,7 +390,7 @@ fn a_record_for_another_version_of_the_same_adapter_leaves_the_binary_unqualifie
     let stale = QualificationRecord {
         adapter: "fixture".into(),
         binary_version: "0.9.0".into(),
-        suite_version: "1".into(),
+        suite_version: SUITE_VERSION.into(),
         date: "2026-09-16T00:00:00Z".into(),
     };
     assert_eq!(
