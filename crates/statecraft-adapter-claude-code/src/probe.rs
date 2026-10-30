@@ -195,6 +195,7 @@ pub const fn adapter_name() -> &'static str {
 mod tests {
     use super::*;
     use crate::qualification::record;
+    use statecraft_adapter::manifest::SUITE_VERSION;
 
     fn child_with_claude(dir: &Path) -> BTreeMap<String, String> {
         let exe = dir.join("claude");
@@ -227,7 +228,11 @@ mod tests {
         let probe =
             ConstructedEnvironmentProbe::from_child_environment(&child_with_claude(dir.path()))
                 .observing_provider_version("2.1.268")
-                .with_records(vec![record("2.1.267", "008.3.9", "2026-09-17T00:00:00Z")]);
+                .with_records(vec![record(
+                    "2.1.267",
+                    SUITE_VERSION,
+                    "2026-09-17T00:00:00Z",
+                )]);
         assert!(!probe.prerequisite_satisfied(HARNESS, QUALIFICATION_RECORD));
         assert_eq!(probe.qualification(), Qualification::Unqualified);
     }
@@ -238,7 +243,11 @@ mod tests {
         let probe =
             ConstructedEnvironmentProbe::from_child_environment(&child_with_claude(dir.path()))
                 .observing_provider_version("2.1.267")
-                .with_records(vec![record("2.1.267", "008.3.9", "2026-09-17T00:00:00Z")]);
+                .with_records(vec![record(
+                    "2.1.267",
+                    SUITE_VERSION,
+                    "2026-09-17T00:00:00Z",
+                )]);
         assert!(probe.prerequisite_satisfied(HARNESS, QUALIFICATION_RECORD));
     }
 

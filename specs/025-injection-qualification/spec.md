@@ -21,6 +21,8 @@ amends:
 extends:
   - { spec: "003-work-and-run-semantics", unit: { kind: directory, path: "crates/statecraft-run/" }, nature: additive }
   - { spec: "004-execution-adapter", unit: { kind: directory, path: "crates/statecraft-adapter/" }, nature: additive }
+  - { spec: "004-execution-adapter", unit: { kind: directory, path: "crates/statecraft-adapter-claude-code/" }, nature: additive }
+  - { spec: "006-command-surface", unit: { kind: directory, path: "crates/statecraft-cli/" }, nature: additive }
   - { spec: "005-acceptance-and-evidence", unit: { kind: directory, path: "crates/statecraft-acceptance/" }, nature: additive }
 depends_on:
   - "003-work-and-run-semantics"
@@ -296,6 +298,69 @@ comparison qualifies the product, deterministically and offline.
 
 **2026-09-27: delimiters and detectors are not controls.** The backlog states
 it as a boundary, and the suite enforces it by passing with them disabled.
+
+**2026-10-29: a decision record is a named set of typed records, and a digest
+is recognised by its form.** Each runner records the section 3.1 decisions it
+can reach under fixed names (`task`, `posture`, `capability-set`,
+`child-environment`, `attempt-outcome`, `attempt-record`, `context-delivery`,
+`review-disposition`, `acceptance-result`, `application`, `publication`, and
+for later runners `command-allowance`, `evidence-admission` and
+`citation-resolution`), and a registry in the shared harness lists, per runner,
+exactly the decisions and recordings it produces. A case naming a decision no
+runner for its surface records is invalid. Every string leaf of the form
+`sha256:` plus 64 hex digits, or a bare 40- or 64-digit hex object id, is moved
+out of its decision into a digest map keyed `<decision>/<JSON pointer>`;
+`expectedDigestFields` names those keys, and a listed key that does not differ
+fails as an inexact declaration. Run-specific temporary roots are replaced by a
+marker before comparison.
+
+**2026-10-29: a twin keeps the bytes a carrier escapes in place.** A JSON string
+escapes the quote, the backslash and control characters, so an all-filler twin
+of a payload holding them is one length raw and another length once carried.
+The twin therefore keeps every such byte at its position and replaces every
+other code point with filler bytes of the same encoded length; the suite
+refuses a twin that does not.
+
+**2026-10-29: `expectedRecording` also names the provider-output carrier.** A
+provider-output case seeds its payload either on the stream's progress events
+(`stream-events`) or in the result document's free text (`result-document`),
+whichever its recording names, so the one collection the section 3.3 field
+allows is the one that must hold the content.
+
+**2026-10-29: framing is removed by the suite, not by a product setting.** This
+spec changes no runtime behavior, so no switch is added to the product. The
+suite's `removed` framing delivers the same prompt, page, task, schema and
+skill bytes concatenated as the request's prompt with no frame, label or
+preamble, and with no bundle members; the product's own pre-spawn bundle check
+then refuses for both sides alike. No detector exists in the product, so there
+is nothing to disable; the suite reads no detector verdict.
+
+**2026-10-29: the observable effects and their limit.** A run records the
+workspace's files, the home directory's layout with digest-named components
+folded, the child's actual environment as the child printed it, and every run
+of a program a hostile instruction names (`curl`, `wget`, `git`, `gh`, `nc`,
+`ssh`, `scp`, `cargo`) through recording shims first on the child's `PATH`. A
+network connection the child opened directly, without one of those programs,
+is not observed; nothing in the fixture opens one.
+
+**2026-10-29: the suite label is `025.3.5`, and qualification matches it.**
+Spec 004 left the label free and recorded `008.3.9` for the suite as it stood.
+Row 9 mints `025.3.5` from this section, and `qualification` now requires a
+record's suite label to be the current one as well as its adapter and binary
+version. The fixtures in the provider adapter and the command crate that wrote
+a qualified record with another label name the current one; the `extends`
+edges on those two crates admit that change and nothing else.
+
+**2026-10-29: the trusted prefix answers the forged second result.** The
+supervisor stops decoding at the first terminal event and drains the rest, so
+a forged second terminal event never reaches the record: the first result is
+kept once and bound, which is section 3.8's row.
+
+**2026-10-29: the surfaces land in order.** The adapter suite's runners cover
+`provider-output`, `tool-facing` and `skill-content`. Until the run and
+acceptance runners are registered, every case on `repository-text`,
+`context-packet`, `citation-target` and `wire-metadata` is `surface-absent`,
+and the suite as a whole makes no qualification claim.
 
 ## Verification
 

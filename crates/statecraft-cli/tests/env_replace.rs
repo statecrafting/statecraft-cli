@@ -70,7 +70,7 @@ impl Sandbox {
             .unwrap();
             let record = statecraft_adapter_claude_code::qualification::record(
                 "2.1.267",
-                "synthetic-fixture-only",
+                statecraft_adapter::manifest::SUITE_VERSION,
                 "2026-09-17T00:00:00Z",
             );
             std::fs::write(

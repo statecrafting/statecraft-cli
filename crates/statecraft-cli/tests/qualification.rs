@@ -11,6 +11,7 @@ mod json_naming;
 mod provider_token;
 
 use serde_json::Value;
+use statecraft_adapter::manifest::SUITE_VERSION;
 use statecraft_adapter_claude_code::qualification::{PairedRecord, record};
 use std::path::Path;
 use std::process::Command;
@@ -210,7 +211,7 @@ if [ "$1" = --version ]; then /bin/cat "$(dirname "$0")/version"; exit 0; fi
 }
 
 fn fixture_record() -> PairedRecord {
-    record("2.1.267", "synthetic-fixture-only", "2026-09-17T00:00:00Z")
+    record("2.1.267", SUITE_VERSION, "2026-09-17T00:00:00Z")
 }
 
 #[test]

@@ -95,9 +95,14 @@ pub fn qualification_for_pair(
 mod tests {
     use super::*;
     use crate::capabilities::manifest as adapter_manifest;
+    use statecraft_adapter::manifest::SUITE_VERSION;
 
     fn measured_record() -> PairedRecord {
-        record(MEASURED_PROVIDER_VERSION, "008.3.9", "2026-09-17T00:00:00Z")
+        record(
+            MEASURED_PROVIDER_VERSION,
+            SUITE_VERSION,
+            "2026-09-17T00:00:00Z",
+        )
     }
 
     #[test]
