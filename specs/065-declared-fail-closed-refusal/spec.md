@@ -1,8 +1,8 @@
 ---
 id: "065-declared-fail-closed-refusal"
 title: "A fail-closed screen's refusal of hostile content is declared, not a breach of spec 025's invariant"
-status: draft
-implementation: pending
+status: approved
+implementation: complete
 created: "2026-10-29"
 summary: >
   Amends spec 025. Invariant I-1 says no byte of untrusted content changes a
@@ -46,7 +46,7 @@ weakening it to pass the suite is not an option. The owner decided on
 
 This spec carries that decision as an amendment. Spec 025's section 5 entry
 of the same date recorded it in place, which is not how an approved spec is
-amended; that entry is withdrawn when this spec is ratified.
+amended; that entry was withdrawn when this spec was ratified.
 
 ## 2. Territory
 
@@ -101,7 +101,13 @@ exactly its terms by the comparison and a self-test.
 
 ## Verification
 
-This spec is `status: draft` and declares no acceptance until it is ratified.
-Its acceptance is spec 025's: the acceptance suite's
-`wire-metadata/encoding-evasion` case passes only as the declared refusal, and
-the adapter suite's self-test fails each departure from a declaration's terms.
+Ratified by the owner on 2026-10-30. Its acceptance is spec 025's, run
+through `make verify SPEC=065`: the acceptance suite's
+`wire-metadata/encoding-evasion` case passes only as the declared refusal,
+and the adapter suite's self-test fails each departure from a declaration's
+terms.
+
+```verify:cli
+cargo test -p statecraft-acceptance --test injection_invariance
+cargo test -p statecraft-adapter --test injection_invariance the_comparison
+```
