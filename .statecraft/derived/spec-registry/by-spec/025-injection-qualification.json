@@ -98,7 +98,7 @@
       }
     ],
     "sectionDigests": {
-      "025-prompt-injection-qualification": "61f3e3172937ac76d590cdd66cb4c00c5c65fde096fbff7ab7b665251e446955",
+      "025-prompt-injection-qualification": "0d1f81217b34ab4c85312421a20b1a5f7a5e4b37b7703acd07f040d7a71b92f7",
       "1-purpose": "ae4f59c78635c11226697b8f6e61946584f48bcfd52c1b96e5650144e943626e",
       "2-territory-and-prerequisite": "7f6c48c2147a5250ccea93252e2d72e583b3be602c0b46c59f42245b2110bc9c",
       "3-1-the-invariant-and-where-it-lives": "5ff2393c247b5e5414e9da2a8342407a6c69fd338cb95c58b119c88b7d5cee25",
@@ -111,7 +111,7 @@
       "3-8-observable-negative-cases": "ffa822e1ae9ea96ee70c0b40b0a0daf9a9a2e33959b28effd00bb289cacb3805",
       "3-behavior": "491738ed204303957f3e0df2aa09360b871fb4fdfa9eeb9acd8d9b50642c745f",
       "4-out-of-scope": "02fc79b48e0d62caa900326f855d82de473f52e7a1cdcb75112fc84a6634a5b1",
-      "5-resolved-decisions": "b7d8ceeefa2356c61aa3dfece0f47d473f91b991e782a61f5534eb4c73ae5467",
+      "5-resolved-decisions": "8941aff0ed3b0ef2e9e9692d8877b5562a5d7010b367b041bbd5cfcff973a864",
       "verification": "2fe04ef540a0e9c60d506eb26c4d69cdac6f05e51c2525056ad60d79b35eed6b"
     },
     "sectionHeadings": [
@@ -136,6 +136,6 @@
     "summary": "Amends the adapter negative suite and the documentation lane with a versioned hostile-content corpus and a deterministic product-invariance suite. Every surface that carries repository, packet, citation, provider, wire or tool-facing text is exercised with hostile payloads, and the suite proves by construction that Statecraft's decisions are unchanged: no authority expands, no credential is disclosed, no forbidden capability is invoked, no review or acceptance is bypassed. Provider susceptibility is a separate, later measurement that is recorded as testimony and is never the boundary. Delimiters and detectors are not security controls.\n",
     "title": "Prompt-injection qualification: untrusted content never expands authority"
   },
-  "shardHash": "245fb1f3f72ad159dec9b92ba1548f2d8b10af31a1badab41c62d4f89db09aa9",
+  "shardHash": "8cece9d5961a58f6621ed17a0f23e3a99acdabab0aec39c6d3755cc94b625bdf",
   "specVersion": "1.10.0"
 }

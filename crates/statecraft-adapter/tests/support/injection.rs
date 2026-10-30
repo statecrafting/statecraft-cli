@@ -117,7 +117,62 @@ pub const RUNNERS: &[Runner] = &[
         decisions: &["task", "attempt-record", "application"],
         recordings: &["repository-files"],
     },
+    Runner {
+        harness: "acceptance",
+        surface: "citation-target",
+        decisions: ACCEPTANCE_DECISIONS,
+        recordings: &["citation-text"],
+    },
+    Runner {
+        harness: "acceptance",
+        surface: "context-packet",
+        decisions: ACCEPTANCE_DECISIONS,
+        recordings: &["packet-pages"],
+    },
+    Runner {
+        harness: "acceptance",
+        surface: "provider-output",
+        decisions: ACCEPTANCE_DECISIONS,
+        recordings: &["result-document"],
+    },
+    Runner {
+        harness: "acceptance",
+        surface: "wire-metadata",
+        decisions: &["evidence-admission", "attempt-record", "acceptance-result"],
+        recordings: &["wire-facts"],
+    },
 ];
+
+/// The decisions an acceptance-crate run records: spec 019's judgment of the
+/// claims' citations and evidence, and spec 021's and spec 022's judgments
+/// with and without an independent review.
+const ACCEPTANCE_DECISIONS: &[&str] = &[
+    "citation-resolution",
+    "evidence-admission",
+    "review-disposition",
+    "acceptance-result",
+];
+
+/// Whether `runner` can run `case`: it seeds the case's surface and carries
+/// the collection the case's content must be recorded in.
+pub fn carries(runner: &Runner, case: &Case) -> bool {
+    runner.surface == case.surface
+        && case
+            .expected_recording
+            .as_deref()
+            .is_none_or(|r| runner.recordings.contains(&r))
+}
+
+/// Every case no registered runner can run: `surface-absent` wherever it is
+/// counted.
+pub fn absent(corpus: &Corpus) -> Vec<String> {
+    corpus
+        .cases
+        .iter()
+        .filter(|c| !RUNNERS.iter().any(|r| carries(r, c)))
+        .map(|c| c.case_id.clone())
+        .collect()
+}
 
 /// Where the corpus lives, from any crate under `crates/`.
 pub fn corpus_path() -> PathBuf {
@@ -152,7 +207,32 @@ pub struct Case {
     /// Each entry is `<decision>/<JSON pointer>` into that decision's record.
     pub expected_digest_fields: Vec<String>,
     pub expected_recording: Option<String>,
+    /// A fail-closed refusal the payload is expected to cause, and what it
+    /// may change. Absent from almost every case.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub expected_refusal: Option<ExpectedRefusal>,
 }
+
+/// A refusal a payload may cause because a control refuses content that
+/// looks like what it guards against (owner decision, 2026-10-29). It only
+/// ever withholds: the decisions it names must be refusals on the hostile
+/// side for exactly the declared reason and not refusals on the twin's, the
+/// recordings it names must be empty on the hostile side because the refused
+/// content is not retained, and every other difference still fails.
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct ExpectedRefusal {
+    /// The control, as `<owning spec>/<reason>`, from [`FAIL_CLOSED`].
+    pub refusal: String,
+    /// The decisions the refusal is carried into.
+    pub decisions: Vec<String>,
+    /// The recordings that stay empty because the content was not retained.
+    pub recordings: Vec<String>,
+}
+
+/// The fail-closed refusals a case may declare. Closed: another needs this
+/// list, a runner that reports it, and a case that names it.
+pub const FAIL_CLOSED: [&str; 1] = ["014-wire-evidence-admission/prohibited-content"];
 
 /// Exact payload bytes, as one fragment or several declared split fragments,
 /// with the digest of the assembled bytes.
@@ -389,6 +469,32 @@ fn declaration_problems(case: &Case) -> Vec<String> {
             ));
         }
     }
+    if let Some(r) = &case.expected_refusal {
+        if !FAIL_CLOSED.contains(&r.refusal.as_str()) {
+            problems.push(format!(
+                "expectedRefusal {:?} is not a declared fail-closed refusal",
+                r.refusal
+            ));
+        }
+        if r.decisions.is_empty() {
+            problems.push("expectedRefusal names no decision".into());
+        }
+        for d in &r.decisions {
+            if !runners.iter().any(|x| x.decisions.contains(&d.as_str())) {
+                problems.push(format!(
+                    "expectedRefusal decision {d:?} is recorded by no {} runner",
+                    case.surface
+                ));
+            }
+        }
+        if case
+            .expected_recording
+            .as_ref()
+            .is_some_and(|x| r.recordings.contains(x))
+        {
+            problems.push("expectedRecording is a recording the refusal leaves empty".into());
+        }
+    }
     if let Some(r) = &case.expected_recording
         && !runners.iter().any(|x| x.recordings.contains(&r.as_str()))
     {
@@ -414,6 +520,9 @@ pub struct Observed {
     /// network attempts the run's observers saw, and the child's actual
     /// environment.
     pub effects: BTreeMap<String, Value>,
+    /// Each decision that is a fail-closed refusal, with its
+    /// `<owning spec>/<reason>`, as the runner read it from the record.
+    pub refused: BTreeMap<String, String>,
     /// Run-specific roots, such as temporary directories, replaced by
     /// [`ROOT_MARKER`] wherever they appear, so two runs compare by content.
     pub roots: Vec<String>,
@@ -584,7 +693,38 @@ pub fn compare(case: &Case, runner: &Runner, hostile: &Observed, twin: &Observed
             ));
         }
     }
+    let refusal = case.expected_refusal.as_ref();
+    let refused_decision =
+        |name: &str| refusal.is_some_and(|r| r.decisions.iter().any(|d| d == name));
+    if let Some(r) = refusal {
+        for d in &r.decisions {
+            if hostile.refused.get(d) != Some(&r.refusal) {
+                failures.push(format!(
+                    "decision {d} is not the declared refusal {}: {:?}",
+                    r.refusal,
+                    hostile.refused.get(d)
+                ));
+            }
+            if twin.refused.contains_key(d) {
+                failures.push(format!(
+                    "the twin's {d} is refused too, so the payload is not the cause"
+                ));
+            }
+        }
+    }
+    for (label, o) in [("hostile", hostile), ("twin", twin)] {
+        for (d, why) in &o.refused {
+            if !refused_decision(d) {
+                failures.push(format!(
+                    "the {label} run's {d} is an undeclared refusal: {why}"
+                ));
+            }
+        }
+    }
     for (name, h) in &hostile.decisions {
+        if refused_decision(name) {
+            continue;
+        }
         if twin.decisions.get(name) != Some(h) {
             failures.push(format!(
                 "decision {name} differs:\n  hostile {h}\n  twin    {}",
@@ -602,6 +742,9 @@ pub fn compare(case: &Case, runner: &Runner, hostile: &Observed, twin: &Observed
         .collect();
     let keys: BTreeSet<&String> = hostile.digests.keys().chain(twin.digests.keys()).collect();
     for key in keys {
+        if refused_decision(key.split('/').next().unwrap_or_default()) {
+            continue;
+        }
         let (h, t) = (hostile.digests.get(key), twin.digests.get(key));
         match (expected.contains(key.as_str()), h == t) {
             (false, false) => failures.push(format!("digest {key} differs and is not declared")),
@@ -617,6 +760,14 @@ pub fn compare(case: &Case, runner: &Runner, hostile: &Observed, twin: &Observed
             hostile.recordings.get(*name).unwrap_or(&empty),
             twin.recordings.get(*name).unwrap_or(&empty),
         );
+        if refusal.is_some_and(|r| r.recordings.iter().any(|x| x == name)) {
+            if !h.is_empty() {
+                failures.push(format!(
+                    "recording {name} holds content the refusal did not retain"
+                ));
+            }
+            continue;
+        }
         if case.expected_recording.as_deref() == Some(*name) {
             if !holds(h, &case.payload) {
                 failures.push(format!(
@@ -694,10 +845,7 @@ pub fn run_suite(
 ) -> BTreeMap<String, Status> {
     let mut statuses = BTreeMap::new();
     for case in &corpus.cases {
-        let all: Vec<&Runner> = RUNNERS
-            .iter()
-            .filter(|r| r.surface == case.surface)
-            .collect();
+        let all: Vec<&Runner> = RUNNERS.iter().filter(|r| carries(r, case)).collect();
         if all.is_empty() {
             statuses.insert(case.case_id.clone(), Status::SurfaceAbsent);
             continue;
@@ -790,8 +938,6 @@ pub mod fixtures {
     pub const TASK: &str = "task-025";
     /// When every record is written.
     pub const AT: &str = "2026-10-29T00:00:00Z";
-    /// The one benign page an unseeded packet carries.
-    pub const PAGE: &[u8] = b"{\"page\":1}";
 
     /// Run git in `dir` with a fixed identity and clock, so the twin's commit
     /// is the hostile run's commit whenever their trees agree.
@@ -834,20 +980,52 @@ pub mod fixtures {
         git(dir, &["commit", "--quiet", "-m", "one"]);
     }
 
-    /// The packet pages for `case` on `side`: on `context-packet`, one page
-    /// per fragment carrying it as a member name, a member path and a member
-    /// text; on any other surface, the one benign page.
-    pub fn pages(case: &Case, side: Side) -> Vec<Vec<u8>> {
-        if case.surface != "context-packet" {
-            return vec![PAGE.to_vec()];
+    /// The member every claim cites when its case seeds no citation target.
+    pub const CITED: &str = "src/recovery.rs";
+    /// That member's text.
+    pub const CITED_TEXT: &str = "Recovery happens at the next statement.";
+
+    /// The members `case` adds on `side`, by page: on `context-packet` one
+    /// page per fragment, each carrying it as a member name, a member path and
+    /// a member text; on `citation-target` one member per fragment on the
+    /// first page, each a text a claim cites.
+    fn seeded(case: &Case, side: Side) -> Vec<Vec<(String, serde_json::Value)>> {
+        let fragments = &case.bytes(side).fragments;
+        match case.surface.as_str() {
+            "context-packet" => fragments
+                .iter()
+                .map(|f| vec![(f.clone(), json!({"path": format!("docs/{f}"), "text": f}))])
+                .collect(),
+            "citation-target" => vec![
+                fragments
+                    .iter()
+                    .enumerate()
+                    .map(|(i, f)| (cited(i), json!({"path": cited(i), "text": f})))
+                    .collect(),
+            ],
+            _ => vec![vec![]],
         }
-        case.bytes(side)
-            .fragments
-            .iter()
+    }
+
+    /// The name of the `i`th seeded citation target.
+    pub fn cited(i: usize) -> String {
+        format!("src/cited-{i}.rs")
+    }
+
+    /// The packet pages for `case` on `side`. The first page always carries
+    /// [`CITED`]; a seeded surface adds its members.
+    pub fn pages(case: &Case, side: Side) -> Vec<Vec<u8>> {
+        seeded(case, side)
+            .into_iter()
             .enumerate()
-            .map(|(i, f)| {
+            .map(|(i, extra)| {
                 let mut members = serde_json::Map::new();
-                members.insert(f.clone(), json!({"path": format!("docs/{f}"), "text": f}));
+                if i == 0 {
+                    members.insert(CITED.into(), json!({"path": CITED, "text": CITED_TEXT}));
+                }
+                for (name, member) in extra {
+                    members.insert(name, member);
+                }
                 json!({"page": i + 1, "members": members})
                     .to_string()
                     .into_bytes()
@@ -855,9 +1033,36 @@ pub mod fixtures {
             .collect()
     }
 
+    /// The producer facts of page `ordinal` (from 1) of `n`.
+    pub fn facts(ordinal: usize, n: usize) -> PageFacts {
+        let d = |t: &str| context::custody_digest(t.as_bytes());
+        PageFacts {
+            schema_version: "1.1.0".into(),
+            producer: ProducerBuild {
+                package: "spec-spine".into(),
+                version: "0.31.0".into(),
+                build: "unverified".into(),
+            },
+            snapshot: Snapshot {
+                repository: "example/app".into(),
+                revision: "a".repeat(40),
+                tree: "t".repeat(40),
+                dirty_state: "clean-export".into(),
+            },
+            request_digest: d("request"),
+            closure_digest: d("closure"),
+            // The producer's page digest names the page's ordinal, not its
+            // bytes: it is producer testimony.
+            packet_digest: d(&format!("page-{ordinal}")),
+            completeness: Completeness::Complete,
+            continues: ordinal < n,
+            omissions: vec![],
+            warnings: vec![],
+        }
+    }
+
     /// A manifest of one repository whose pages are `pages`, in order.
     pub fn manifest(pages: &[Vec<u8>]) -> Manifest {
-        let d = |t: &str| context::custody_digest(t.as_bytes());
         let n = pages.len();
         Manifest::build(
             RUN,
@@ -878,29 +1083,7 @@ pub mod fixtures {
                     .map(|(i, bytes)| AcceptedPage {
                         bytes: bytes.clone(),
                         source_operation: "context_packet_pages".into(),
-                        facts: PageFacts {
-                            schema_version: "1.1.0".into(),
-                            producer: ProducerBuild {
-                                package: "spec-spine".into(),
-                                version: "0.31.0".into(),
-                                build: "unverified".into(),
-                            },
-                            snapshot: Snapshot {
-                                repository: "example/app".into(),
-                                revision: "a".repeat(40),
-                                tree: "t".repeat(40),
-                                dirty_state: "clean-export".into(),
-                            },
-                            request_digest: d("request"),
-                            closure_digest: d("closure"),
-                            // The producer's page digest names the page's
-                            // ordinal, not its bytes: it is producer testimony.
-                            packet_digest: d(&format!("page-{}", i + 1)),
-                            completeness: Completeness::Complete,
-                            continues: i + 1 < n,
-                            omissions: vec![],
-                            warnings: vec![],
-                        },
+                        facts: facts(i + 1, n),
                         delivery: Intended::Required,
                     })
                     .collect(),

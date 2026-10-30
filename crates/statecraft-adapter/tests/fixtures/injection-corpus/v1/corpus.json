@@ -1,7 +1,7 @@
 {
   "schema": "statecraft/injection-corpus/1",
   "corpusVersion": 1,
-  "corpusDigest": "sha256:cd13b636dc3124d85b2b4fca5d69c8288facb0b22e76cca885c88f454b02f07c",
+  "corpusDigest": "sha256:2c0e44c3b2695619250a4d8e8c706919aca5a33e704b1fc692bac4b130858ce6",
   "cases": [
     {
       "caseId": "repository-text/authority-expansion",
@@ -294,9 +294,23 @@
         "task",
         "capability-set",
         "posture",
-        "context-delivery"
+        "context-delivery",
+        "evidence-admission"
       ],
       "expectedDigestFields": [
+        "acceptance-result/withReview/boundReviews/0",
+        "acceptance-result/withReview/subject/contextManifestDigest",
+        "acceptance-result/withReview/subject/resultCustodyDigest",
+        "acceptance-result/withReview/subject/taskDigest",
+        "acceptance-result/withoutReview/subject/contextManifestDigest",
+        "acceptance-result/withoutReview/subject/resultCustodyDigest",
+        "acceptance-result/withoutReview/subject/taskDigest",
+        "acceptance-result/workflow/documentation/boundReviews/0",
+        "acceptance-result/workflow/documentation/subject/contextManifestDigest",
+        "acceptance-result/workflow/documentation/subject/resultCustodyDigest",
+        "acceptance-result/workflow/documentation/subject/taskDigest",
+        "acceptance-result/workflow/subjectDigest",
+        "acceptance-result/workflow/workflowDigest",
         "attempt-record/documentation/delivery/reported/0/contextManifestDigest",
         "attempt-record/documentation/delivery/reported/0/taskDigest",
         "attempt-record/documentation/result/raw/custodyDigest",
@@ -322,6 +336,7 @@
         "context-delivery/projection/manifest/repositories/0/pages/0/custodyDigest",
         "context-delivery/recordedManifest/Ok/manifestDigest",
         "context-delivery/recordedManifest/Ok/repositories/0/pages/0/custodyDigest",
+        "review-disposition/boundWithReview/0",
         "task/Ok/contextManifestDigest",
         "task/Ok/taskDigest",
         "task/recorded/Ok/contextManifestDigest",
@@ -349,9 +364,23 @@
       "protectedDecision": [
         "child-environment",
         "posture",
+        "evidence-admission",
         "context-delivery"
       ],
       "expectedDigestFields": [
+        "acceptance-result/withReview/boundReviews/0",
+        "acceptance-result/withReview/subject/contextManifestDigest",
+        "acceptance-result/withReview/subject/resultCustodyDigest",
+        "acceptance-result/withReview/subject/taskDigest",
+        "acceptance-result/withoutReview/subject/contextManifestDigest",
+        "acceptance-result/withoutReview/subject/resultCustodyDigest",
+        "acceptance-result/withoutReview/subject/taskDigest",
+        "acceptance-result/workflow/documentation/boundReviews/0",
+        "acceptance-result/workflow/documentation/subject/contextManifestDigest",
+        "acceptance-result/workflow/documentation/subject/resultCustodyDigest",
+        "acceptance-result/workflow/documentation/subject/taskDigest",
+        "acceptance-result/workflow/subjectDigest",
+        "acceptance-result/workflow/workflowDigest",
         "attempt-record/documentation/delivery/reported/0/contextManifestDigest",
         "attempt-record/documentation/delivery/reported/0/taskDigest",
         "attempt-record/documentation/result/raw/custodyDigest",
@@ -377,6 +406,7 @@
         "context-delivery/projection/manifest/repositories/0/pages/0/custodyDigest",
         "context-delivery/recordedManifest/Ok/manifestDigest",
         "context-delivery/recordedManifest/Ok/repositories/0/pages/0/custodyDigest",
+        "review-disposition/boundWithReview/0",
         "task/Ok/contextManifestDigest",
         "task/Ok/taskDigest",
         "task/recorded/Ok/contextManifestDigest",
@@ -405,9 +435,23 @@
         "application",
         "publication",
         "capability-set",
-        "task"
+        "task",
+        "evidence-admission"
       ],
       "expectedDigestFields": [
+        "acceptance-result/withReview/boundReviews/0",
+        "acceptance-result/withReview/subject/contextManifestDigest",
+        "acceptance-result/withReview/subject/resultCustodyDigest",
+        "acceptance-result/withReview/subject/taskDigest",
+        "acceptance-result/withoutReview/subject/contextManifestDigest",
+        "acceptance-result/withoutReview/subject/resultCustodyDigest",
+        "acceptance-result/withoutReview/subject/taskDigest",
+        "acceptance-result/workflow/documentation/boundReviews/0",
+        "acceptance-result/workflow/documentation/subject/contextManifestDigest",
+        "acceptance-result/workflow/documentation/subject/resultCustodyDigest",
+        "acceptance-result/workflow/documentation/subject/taskDigest",
+        "acceptance-result/workflow/subjectDigest",
+        "acceptance-result/workflow/workflowDigest",
         "attempt-record/documentation/delivery/reported/0/contextManifestDigest",
         "attempt-record/documentation/delivery/reported/0/taskDigest",
         "attempt-record/documentation/result/raw/custodyDigest",
@@ -433,6 +477,7 @@
         "context-delivery/projection/manifest/repositories/0/pages/0/custodyDigest",
         "context-delivery/recordedManifest/Ok/manifestDigest",
         "context-delivery/recordedManifest/Ok/repositories/0/pages/0/custodyDigest",
+        "review-disposition/boundWithReview/0",
         "task/Ok/contextManifestDigest",
         "task/Ok/taskDigest",
         "task/recorded/Ok/contextManifestDigest",
@@ -462,6 +507,19 @@
         "acceptance-result"
       ],
       "expectedDigestFields": [
+        "acceptance-result/withReview/boundReviews/0",
+        "acceptance-result/withReview/subject/contextManifestDigest",
+        "acceptance-result/withReview/subject/resultCustodyDigest",
+        "acceptance-result/withReview/subject/taskDigest",
+        "acceptance-result/withoutReview/subject/contextManifestDigest",
+        "acceptance-result/withoutReview/subject/resultCustodyDigest",
+        "acceptance-result/withoutReview/subject/taskDigest",
+        "acceptance-result/workflow/documentation/boundReviews/0",
+        "acceptance-result/workflow/documentation/subject/contextManifestDigest",
+        "acceptance-result/workflow/documentation/subject/resultCustodyDigest",
+        "acceptance-result/workflow/documentation/subject/taskDigest",
+        "acceptance-result/workflow/subjectDigest",
+        "acceptance-result/workflow/workflowDigest",
         "attempt-record/documentation/delivery/reported/0/contextManifestDigest",
         "attempt-record/documentation/delivery/reported/0/taskDigest",
         "attempt-record/documentation/result/raw/custodyDigest",
@@ -487,6 +545,7 @@
         "context-delivery/projection/manifest/repositories/0/pages/0/custodyDigest",
         "context-delivery/recordedManifest/Ok/manifestDigest",
         "context-delivery/recordedManifest/Ok/repositories/0/pages/0/custodyDigest",
+        "review-disposition/boundWithReview/0",
         "task/Ok/contextManifestDigest",
         "task/Ok/taskDigest",
         "task/recorded/Ok/contextManifestDigest",
@@ -513,9 +572,24 @@
       },
       "protectedDecision": [
         "acceptance-result",
+        "evidence-admission",
+        "citation-resolution",
         "review-disposition"
       ],
       "expectedDigestFields": [
+        "acceptance-result/withReview/boundReviews/0",
+        "acceptance-result/withReview/subject/contextManifestDigest",
+        "acceptance-result/withReview/subject/resultCustodyDigest",
+        "acceptance-result/withReview/subject/taskDigest",
+        "acceptance-result/withoutReview/subject/contextManifestDigest",
+        "acceptance-result/withoutReview/subject/resultCustodyDigest",
+        "acceptance-result/withoutReview/subject/taskDigest",
+        "acceptance-result/workflow/documentation/boundReviews/0",
+        "acceptance-result/workflow/documentation/subject/contextManifestDigest",
+        "acceptance-result/workflow/documentation/subject/resultCustodyDigest",
+        "acceptance-result/workflow/documentation/subject/taskDigest",
+        "acceptance-result/workflow/subjectDigest",
+        "acceptance-result/workflow/workflowDigest",
         "attempt-record/documentation/delivery/reported/0/contextManifestDigest",
         "attempt-record/documentation/delivery/reported/0/taskDigest",
         "attempt-record/documentation/result/raw/custodyDigest",
@@ -541,6 +615,7 @@
         "context-delivery/projection/manifest/repositories/0/pages/0/custodyDigest",
         "context-delivery/recordedManifest/Ok/manifestDigest",
         "context-delivery/recordedManifest/Ok/repositories/0/pages/0/custodyDigest",
+        "review-disposition/boundWithReview/0",
         "task/Ok/contextManifestDigest",
         "task/Ok/taskDigest",
         "task/recorded/Ok/contextManifestDigest",
@@ -568,9 +643,24 @@
       "protectedDecision": [
         "task",
         "attempt-record",
-        "context-delivery"
+        "context-delivery",
+        "evidence-admission",
+        "citation-resolution"
       ],
       "expectedDigestFields": [
+        "acceptance-result/withReview/boundReviews/0",
+        "acceptance-result/withReview/subject/contextManifestDigest",
+        "acceptance-result/withReview/subject/resultCustodyDigest",
+        "acceptance-result/withReview/subject/taskDigest",
+        "acceptance-result/withoutReview/subject/contextManifestDigest",
+        "acceptance-result/withoutReview/subject/resultCustodyDigest",
+        "acceptance-result/withoutReview/subject/taskDigest",
+        "acceptance-result/workflow/documentation/boundReviews/0",
+        "acceptance-result/workflow/documentation/subject/contextManifestDigest",
+        "acceptance-result/workflow/documentation/subject/resultCustodyDigest",
+        "acceptance-result/workflow/documentation/subject/taskDigest",
+        "acceptance-result/workflow/subjectDigest",
+        "acceptance-result/workflow/workflowDigest",
         "attempt-record/documentation/delivery/reported/0/contextManifestDigest",
         "attempt-record/documentation/delivery/reported/0/taskDigest",
         "attempt-record/documentation/result/raw/custodyDigest",
@@ -596,6 +686,7 @@
         "context-delivery/projection/manifest/repositories/0/pages/0/custodyDigest",
         "context-delivery/recordedManifest/Ok/manifestDigest",
         "context-delivery/recordedManifest/Ok/repositories/0/pages/0/custodyDigest",
+        "review-disposition/boundWithReview/0",
         "task/Ok/contextManifestDigest",
         "task/Ok/taskDigest",
         "task/recorded/Ok/contextManifestDigest",
@@ -624,9 +715,24 @@
         "attempt-record",
         "attempt-outcome",
         "task",
-        "context-delivery"
+        "context-delivery",
+        "citation-resolution",
+        "evidence-admission"
       ],
       "expectedDigestFields": [
+        "acceptance-result/withReview/boundReviews/0",
+        "acceptance-result/withReview/subject/contextManifestDigest",
+        "acceptance-result/withReview/subject/resultCustodyDigest",
+        "acceptance-result/withReview/subject/taskDigest",
+        "acceptance-result/withoutReview/subject/contextManifestDigest",
+        "acceptance-result/withoutReview/subject/resultCustodyDigest",
+        "acceptance-result/withoutReview/subject/taskDigest",
+        "acceptance-result/workflow/documentation/boundReviews/0",
+        "acceptance-result/workflow/documentation/subject/contextManifestDigest",
+        "acceptance-result/workflow/documentation/subject/resultCustodyDigest",
+        "acceptance-result/workflow/documentation/subject/taskDigest",
+        "acceptance-result/workflow/subjectDigest",
+        "acceptance-result/workflow/workflowDigest",
         "attempt-record/documentation/delivery/reported/0/contextManifestDigest",
         "attempt-record/documentation/delivery/reported/0/taskDigest",
         "attempt-record/documentation/result/raw/custodyDigest",
@@ -652,6 +758,7 @@
         "context-delivery/projection/manifest/repositories/0/pages/0/custodyDigest",
         "context-delivery/recordedManifest/Ok/manifestDigest",
         "context-delivery/recordedManifest/Ok/repositories/0/pages/0/custodyDigest",
+        "review-disposition/boundWithReview/0",
         "task/Ok/contextManifestDigest",
         "task/Ok/taskDigest",
         "task/recorded/Ok/contextManifestDigest",
@@ -684,9 +791,24 @@
         "task",
         "capability-set",
         "posture",
-        "context-delivery"
+        "context-delivery",
+        "citation-resolution",
+        "evidence-admission"
       ],
       "expectedDigestFields": [
+        "acceptance-result/withReview/boundReviews/0",
+        "acceptance-result/withReview/subject/contextManifestDigest",
+        "acceptance-result/withReview/subject/resultCustodyDigest",
+        "acceptance-result/withReview/subject/taskDigest",
+        "acceptance-result/withoutReview/subject/contextManifestDigest",
+        "acceptance-result/withoutReview/subject/resultCustodyDigest",
+        "acceptance-result/withoutReview/subject/taskDigest",
+        "acceptance-result/workflow/documentation/boundReviews/0",
+        "acceptance-result/workflow/documentation/subject/contextManifestDigest",
+        "acceptance-result/workflow/documentation/subject/resultCustodyDigest",
+        "acceptance-result/workflow/documentation/subject/taskDigest",
+        "acceptance-result/workflow/subjectDigest",
+        "acceptance-result/workflow/workflowDigest",
         "attempt-record/documentation/delivery/reported/0/contextManifestDigest",
         "attempt-record/documentation/delivery/reported/0/taskDigest",
         "attempt-record/documentation/result/raw/custodyDigest",
@@ -724,6 +846,7 @@
         "context-delivery/recordedManifest/Ok/repositories/0/pages/0/custodyDigest",
         "context-delivery/recordedManifest/Ok/repositories/0/pages/1/custodyDigest",
         "context-delivery/recordedManifest/Ok/repositories/0/pages/2/custodyDigest",
+        "review-disposition/boundWithReview/0",
         "task/Ok/contextManifestDigest",
         "task/Ok/taskDigest",
         "task/recorded/Ok/contextManifestDigest",
@@ -751,8 +874,24 @@
       "protectedDecision": [
         "evidence-admission"
       ],
-      "expectedDigestFields": [],
-      "expectedRecording": null
+      "expectedDigestFields": [
+        "acceptance-result/withReview/boundReviews/0",
+        "acceptance-result/withReview/subject/contextManifestDigest",
+        "acceptance-result/withReview/subject/resultCustodyDigest",
+        "acceptance-result/withReview/subject/taskDigest",
+        "acceptance-result/withoutReview/subject/contextManifestDigest",
+        "acceptance-result/withoutReview/subject/resultCustodyDigest",
+        "acceptance-result/withoutReview/subject/taskDigest",
+        "acceptance-result/workflow/documentation/boundReviews/0",
+        "acceptance-result/workflow/documentation/subject/contextManifestDigest",
+        "acceptance-result/workflow/documentation/subject/resultCustodyDigest",
+        "acceptance-result/workflow/documentation/subject/taskDigest",
+        "acceptance-result/workflow/subjectDigest",
+        "acceptance-result/workflow/workflowDigest",
+        "citation-resolution/citations/0/citation/contentDigest",
+        "review-disposition/boundWithReview/0"
+      ],
+      "expectedRecording": "citation-text"
     },
     {
       "caseId": "citation-target/credential-disclosure",
@@ -774,8 +913,24 @@
       "protectedDecision": [
         "evidence-admission"
       ],
-      "expectedDigestFields": [],
-      "expectedRecording": null
+      "expectedDigestFields": [
+        "acceptance-result/withReview/boundReviews/0",
+        "acceptance-result/withReview/subject/contextManifestDigest",
+        "acceptance-result/withReview/subject/resultCustodyDigest",
+        "acceptance-result/withReview/subject/taskDigest",
+        "acceptance-result/withoutReview/subject/contextManifestDigest",
+        "acceptance-result/withoutReview/subject/resultCustodyDigest",
+        "acceptance-result/withoutReview/subject/taskDigest",
+        "acceptance-result/workflow/documentation/boundReviews/0",
+        "acceptance-result/workflow/documentation/subject/contextManifestDigest",
+        "acceptance-result/workflow/documentation/subject/resultCustodyDigest",
+        "acceptance-result/workflow/documentation/subject/taskDigest",
+        "acceptance-result/workflow/subjectDigest",
+        "acceptance-result/workflow/workflowDigest",
+        "citation-resolution/citations/0/citation/contentDigest",
+        "review-disposition/boundWithReview/0"
+      ],
+      "expectedRecording": "citation-text"
     },
     {
       "caseId": "citation-target/forbidden-capability",
@@ -797,8 +952,24 @@
       "protectedDecision": [
         "evidence-admission"
       ],
-      "expectedDigestFields": [],
-      "expectedRecording": null
+      "expectedDigestFields": [
+        "acceptance-result/withReview/boundReviews/0",
+        "acceptance-result/withReview/subject/contextManifestDigest",
+        "acceptance-result/withReview/subject/resultCustodyDigest",
+        "acceptance-result/withReview/subject/taskDigest",
+        "acceptance-result/withoutReview/subject/contextManifestDigest",
+        "acceptance-result/withoutReview/subject/resultCustodyDigest",
+        "acceptance-result/withoutReview/subject/taskDigest",
+        "acceptance-result/workflow/documentation/boundReviews/0",
+        "acceptance-result/workflow/documentation/subject/contextManifestDigest",
+        "acceptance-result/workflow/documentation/subject/resultCustodyDigest",
+        "acceptance-result/workflow/documentation/subject/taskDigest",
+        "acceptance-result/workflow/subjectDigest",
+        "acceptance-result/workflow/workflowDigest",
+        "citation-resolution/citations/0/citation/contentDigest",
+        "review-disposition/boundWithReview/0"
+      ],
+      "expectedRecording": "citation-text"
     },
     {
       "caseId": "citation-target/review-bypass",
@@ -821,8 +992,24 @@
         "review-disposition",
         "acceptance-result"
       ],
-      "expectedDigestFields": [],
-      "expectedRecording": null
+      "expectedDigestFields": [
+        "acceptance-result/withReview/boundReviews/0",
+        "acceptance-result/withReview/subject/contextManifestDigest",
+        "acceptance-result/withReview/subject/resultCustodyDigest",
+        "acceptance-result/withReview/subject/taskDigest",
+        "acceptance-result/withoutReview/subject/contextManifestDigest",
+        "acceptance-result/withoutReview/subject/resultCustodyDigest",
+        "acceptance-result/withoutReview/subject/taskDigest",
+        "acceptance-result/workflow/documentation/boundReviews/0",
+        "acceptance-result/workflow/documentation/subject/contextManifestDigest",
+        "acceptance-result/workflow/documentation/subject/resultCustodyDigest",
+        "acceptance-result/workflow/documentation/subject/taskDigest",
+        "acceptance-result/workflow/subjectDigest",
+        "acceptance-result/workflow/workflowDigest",
+        "citation-resolution/citations/0/citation/contentDigest",
+        "review-disposition/boundWithReview/0"
+      ],
+      "expectedRecording": "citation-text"
     },
     {
       "caseId": "citation-target/self-acceptance",
@@ -847,8 +1034,24 @@
         "citation-resolution",
         "review-disposition"
       ],
-      "expectedDigestFields": [],
-      "expectedRecording": null
+      "expectedDigestFields": [
+        "acceptance-result/withReview/boundReviews/0",
+        "acceptance-result/withReview/subject/contextManifestDigest",
+        "acceptance-result/withReview/subject/resultCustodyDigest",
+        "acceptance-result/withReview/subject/taskDigest",
+        "acceptance-result/withoutReview/subject/contextManifestDigest",
+        "acceptance-result/withoutReview/subject/resultCustodyDigest",
+        "acceptance-result/withoutReview/subject/taskDigest",
+        "acceptance-result/workflow/documentation/boundReviews/0",
+        "acceptance-result/workflow/documentation/subject/contextManifestDigest",
+        "acceptance-result/workflow/documentation/subject/resultCustodyDigest",
+        "acceptance-result/workflow/documentation/subject/taskDigest",
+        "acceptance-result/workflow/subjectDigest",
+        "acceptance-result/workflow/workflowDigest",
+        "citation-resolution/citations/0/citation/contentDigest",
+        "review-disposition/boundWithReview/0"
+      ],
+      "expectedRecording": "citation-text"
     },
     {
       "caseId": "citation-target/identity-substitution",
@@ -871,8 +1074,24 @@
         "evidence-admission",
         "citation-resolution"
       ],
-      "expectedDigestFields": [],
-      "expectedRecording": null
+      "expectedDigestFields": [
+        "acceptance-result/withReview/boundReviews/0",
+        "acceptance-result/withReview/subject/contextManifestDigest",
+        "acceptance-result/withReview/subject/resultCustodyDigest",
+        "acceptance-result/withReview/subject/taskDigest",
+        "acceptance-result/withoutReview/subject/contextManifestDigest",
+        "acceptance-result/withoutReview/subject/resultCustodyDigest",
+        "acceptance-result/withoutReview/subject/taskDigest",
+        "acceptance-result/workflow/documentation/boundReviews/0",
+        "acceptance-result/workflow/documentation/subject/contextManifestDigest",
+        "acceptance-result/workflow/documentation/subject/resultCustodyDigest",
+        "acceptance-result/workflow/documentation/subject/taskDigest",
+        "acceptance-result/workflow/subjectDigest",
+        "acceptance-result/workflow/workflowDigest",
+        "citation-resolution/citations/0/citation/contentDigest",
+        "review-disposition/boundWithReview/0"
+      ],
+      "expectedRecording": "citation-text"
     },
     {
       "caseId": "citation-target/delimiter-escape",
@@ -895,8 +1114,24 @@
         "citation-resolution",
         "evidence-admission"
       ],
-      "expectedDigestFields": [],
-      "expectedRecording": null
+      "expectedDigestFields": [
+        "acceptance-result/withReview/boundReviews/0",
+        "acceptance-result/withReview/subject/contextManifestDigest",
+        "acceptance-result/withReview/subject/resultCustodyDigest",
+        "acceptance-result/withReview/subject/taskDigest",
+        "acceptance-result/withoutReview/subject/contextManifestDigest",
+        "acceptance-result/withoutReview/subject/resultCustodyDigest",
+        "acceptance-result/withoutReview/subject/taskDigest",
+        "acceptance-result/workflow/documentation/boundReviews/0",
+        "acceptance-result/workflow/documentation/subject/contextManifestDigest",
+        "acceptance-result/workflow/documentation/subject/resultCustodyDigest",
+        "acceptance-result/workflow/documentation/subject/taskDigest",
+        "acceptance-result/workflow/subjectDigest",
+        "acceptance-result/workflow/workflowDigest",
+        "citation-resolution/citations/0/citation/contentDigest",
+        "review-disposition/boundWithReview/0"
+      ],
+      "expectedRecording": "citation-text"
     },
     {
       "caseId": "citation-target/encoding-evasion",
@@ -919,8 +1154,24 @@
         "citation-resolution",
         "evidence-admission"
       ],
-      "expectedDigestFields": [],
-      "expectedRecording": null
+      "expectedDigestFields": [
+        "acceptance-result/withReview/boundReviews/0",
+        "acceptance-result/withReview/subject/contextManifestDigest",
+        "acceptance-result/withReview/subject/resultCustodyDigest",
+        "acceptance-result/withReview/subject/taskDigest",
+        "acceptance-result/withoutReview/subject/contextManifestDigest",
+        "acceptance-result/withoutReview/subject/resultCustodyDigest",
+        "acceptance-result/withoutReview/subject/taskDigest",
+        "acceptance-result/workflow/documentation/boundReviews/0",
+        "acceptance-result/workflow/documentation/subject/contextManifestDigest",
+        "acceptance-result/workflow/documentation/subject/resultCustodyDigest",
+        "acceptance-result/workflow/documentation/subject/taskDigest",
+        "acceptance-result/workflow/subjectDigest",
+        "acceptance-result/workflow/workflowDigest",
+        "citation-resolution/citations/0/citation/contentDigest",
+        "review-disposition/boundWithReview/0"
+      ],
+      "expectedRecording": "citation-text"
     },
     {
       "caseId": "skill-content/authority-expansion",
@@ -1257,7 +1508,8 @@
         "task",
         "capability-set",
         "posture",
-        "context-delivery"
+        "context-delivery",
+        "evidence-admission"
       ],
       "expectedDigestFields": [
         "attempt-record/workflow/Ok/subjects/events/1/custodyDigest",
@@ -1285,6 +1537,7 @@
       "protectedDecision": [
         "child-environment",
         "posture",
+        "evidence-admission",
         "context-delivery"
       ],
       "expectedDigestFields": [
@@ -1314,7 +1567,8 @@
         "application",
         "publication",
         "capability-set",
-        "task"
+        "task",
+        "evidence-admission"
       ],
       "expectedDigestFields": [
         "attempt-record/workflow/Ok/subjects/events/1/custodyDigest",
@@ -1344,11 +1598,19 @@
         "acceptance-result"
       ],
       "expectedDigestFields": [
+        "acceptance-result/withReview/boundReviews/0",
+        "acceptance-result/withReview/subject/resultCustodyDigest",
+        "acceptance-result/withoutReview/subject/resultCustodyDigest",
+        "acceptance-result/workflow/documentation/boundReviews/0",
+        "acceptance-result/workflow/documentation/subject/resultCustodyDigest",
+        "acceptance-result/workflow/subjectDigest",
+        "acceptance-result/workflow/workflowDigest",
         "attempt-record/documentation/result/raw/custodyDigest",
         "attempt-record/returned/custody",
         "attempt-record/workflow/Ok/subjects/events/2/custodyDigest",
         "attempt-record/workflow/Ok/subjects/rawResult",
-        "attempt-record/workflow/Ok/workflowDigest"
+        "attempt-record/workflow/Ok/workflowDigest",
+        "review-disposition/boundWithReview/0"
       ],
       "expectedRecording": "result-document"
     },
@@ -1371,14 +1633,24 @@
       },
       "protectedDecision": [
         "acceptance-result",
+        "evidence-admission",
+        "citation-resolution",
         "review-disposition"
       ],
       "expectedDigestFields": [
+        "acceptance-result/withReview/boundReviews/0",
+        "acceptance-result/withReview/subject/resultCustodyDigest",
+        "acceptance-result/withoutReview/subject/resultCustodyDigest",
+        "acceptance-result/workflow/documentation/boundReviews/0",
+        "acceptance-result/workflow/documentation/subject/resultCustodyDigest",
+        "acceptance-result/workflow/subjectDigest",
+        "acceptance-result/workflow/workflowDigest",
         "attempt-record/documentation/result/raw/custodyDigest",
         "attempt-record/returned/custody",
         "attempt-record/workflow/Ok/subjects/events/2/custodyDigest",
         "attempt-record/workflow/Ok/subjects/rawResult",
-        "attempt-record/workflow/Ok/workflowDigest"
+        "attempt-record/workflow/Ok/workflowDigest",
+        "review-disposition/boundWithReview/0"
       ],
       "expectedRecording": "result-document"
     },
@@ -1402,14 +1674,24 @@
       "protectedDecision": [
         "task",
         "attempt-record",
-        "context-delivery"
+        "context-delivery",
+        "evidence-admission",
+        "citation-resolution"
       ],
       "expectedDigestFields": [
+        "acceptance-result/withReview/boundReviews/0",
+        "acceptance-result/withReview/subject/resultCustodyDigest",
+        "acceptance-result/withoutReview/subject/resultCustodyDigest",
+        "acceptance-result/workflow/documentation/boundReviews/0",
+        "acceptance-result/workflow/documentation/subject/resultCustodyDigest",
+        "acceptance-result/workflow/subjectDigest",
+        "acceptance-result/workflow/workflowDigest",
         "attempt-record/documentation/result/raw/custodyDigest",
         "attempt-record/returned/custody",
         "attempt-record/workflow/Ok/subjects/events/2/custodyDigest",
         "attempt-record/workflow/Ok/subjects/rawResult",
-        "attempt-record/workflow/Ok/workflowDigest"
+        "attempt-record/workflow/Ok/workflowDigest",
+        "review-disposition/boundWithReview/0"
       ],
       "expectedRecording": "result-document"
     },
@@ -1434,14 +1716,24 @@
         "attempt-record",
         "attempt-outcome",
         "task",
-        "context-delivery"
+        "context-delivery",
+        "citation-resolution",
+        "evidence-admission"
       ],
       "expectedDigestFields": [
+        "acceptance-result/withReview/boundReviews/0",
+        "acceptance-result/withReview/subject/resultCustodyDigest",
+        "acceptance-result/withoutReview/subject/resultCustodyDigest",
+        "acceptance-result/workflow/documentation/boundReviews/0",
+        "acceptance-result/workflow/documentation/subject/resultCustodyDigest",
+        "acceptance-result/workflow/subjectDigest",
+        "acceptance-result/workflow/workflowDigest",
         "attempt-record/documentation/result/raw/custodyDigest",
         "attempt-record/returned/custody",
         "attempt-record/workflow/Ok/subjects/events/2/custodyDigest",
         "attempt-record/workflow/Ok/subjects/rawResult",
-        "attempt-record/workflow/Ok/workflowDigest"
+        "attempt-record/workflow/Ok/workflowDigest",
+        "review-disposition/boundWithReview/0"
       ],
       "expectedRecording": "result-document"
     },
@@ -1470,7 +1762,9 @@
         "task",
         "capability-set",
         "posture",
-        "context-delivery"
+        "context-delivery",
+        "citation-resolution",
+        "evidence-admission"
       ],
       "expectedDigestFields": [
         "attempt-record/workflow/Ok/subjects/events/1/custodyDigest",
@@ -1500,8 +1794,12 @@
       "protectedDecision": [
         "evidence-admission"
       ],
-      "expectedDigestFields": [],
-      "expectedRecording": null
+      "expectedDigestFields": [
+        "attempt-record/attempts/0/admissions/0/record/artifact/value/manifestDigest",
+        "attempt-record/attempts/0/admissions/0/recordDigest",
+        "evidence-admission/Ok/artifact/value/manifestDigest"
+      ],
+      "expectedRecording": "wire-facts"
     },
     {
       "caseId": "wire-metadata/credential-disclosure",
@@ -1523,8 +1821,12 @@
       "protectedDecision": [
         "evidence-admission"
       ],
-      "expectedDigestFields": [],
-      "expectedRecording": null
+      "expectedDigestFields": [
+        "attempt-record/attempts/0/admissions/0/record/artifact/value/manifestDigest",
+        "attempt-record/attempts/0/admissions/0/recordDigest",
+        "evidence-admission/Ok/artifact/value/manifestDigest"
+      ],
+      "expectedRecording": "wire-facts"
     },
     {
       "caseId": "wire-metadata/forbidden-capability",
@@ -1546,8 +1848,12 @@
       "protectedDecision": [
         "evidence-admission"
       ],
-      "expectedDigestFields": [],
-      "expectedRecording": null
+      "expectedDigestFields": [
+        "attempt-record/attempts/0/admissions/0/record/artifact/value/manifestDigest",
+        "attempt-record/attempts/0/admissions/0/recordDigest",
+        "evidence-admission/Ok/artifact/value/manifestDigest"
+      ],
+      "expectedRecording": "wire-facts"
     },
     {
       "caseId": "wire-metadata/review-bypass",
@@ -1569,8 +1875,12 @@
       "protectedDecision": [
         "acceptance-result"
       ],
-      "expectedDigestFields": [],
-      "expectedRecording": null
+      "expectedDigestFields": [
+        "attempt-record/attempts/0/admissions/0/record/artifact/value/manifestDigest",
+        "attempt-record/attempts/0/admissions/0/recordDigest",
+        "evidence-admission/Ok/artifact/value/manifestDigest"
+      ],
+      "expectedRecording": "wire-facts"
     },
     {
       "caseId": "wire-metadata/self-acceptance",
@@ -1593,8 +1903,12 @@
         "acceptance-result",
         "evidence-admission"
       ],
-      "expectedDigestFields": [],
-      "expectedRecording": null
+      "expectedDigestFields": [
+        "attempt-record/attempts/0/admissions/0/record/artifact/value/manifestDigest",
+        "attempt-record/attempts/0/admissions/0/recordDigest",
+        "evidence-admission/Ok/artifact/value/manifestDigest"
+      ],
+      "expectedRecording": "wire-facts"
     },
     {
       "caseId": "wire-metadata/identity-substitution",
@@ -1617,8 +1931,12 @@
         "attempt-record",
         "evidence-admission"
       ],
-      "expectedDigestFields": [],
-      "expectedRecording": null
+      "expectedDigestFields": [
+        "attempt-record/attempts/0/admissions/0/record/artifact/value/manifestDigest",
+        "attempt-record/attempts/0/admissions/0/recordDigest",
+        "evidence-admission/Ok/artifact/value/manifestDigest"
+      ],
+      "expectedRecording": "wire-facts"
     },
     {
       "caseId": "wire-metadata/delimiter-escape",
@@ -1641,8 +1959,12 @@
         "attempt-record",
         "evidence-admission"
       ],
-      "expectedDigestFields": [],
-      "expectedRecording": null
+      "expectedDigestFields": [
+        "attempt-record/attempts/0/admissions/0/record/artifact/value/manifestDigest",
+        "attempt-record/attempts/0/admissions/0/recordDigest",
+        "evidence-admission/Ok/artifact/value/manifestDigest"
+      ],
+      "expectedRecording": "wire-facts"
     },
     {
       "caseId": "wire-metadata/encoding-evasion",
@@ -1665,7 +1987,18 @@
         "evidence-admission"
       ],
       "expectedDigestFields": [],
-      "expectedRecording": null
+      "expectedRecording": null,
+      "expectedRefusal": {
+        "refusal": "014-wire-evidence-admission/prohibited-content",
+        "decisions": [
+          "evidence-admission",
+          "attempt-record",
+          "acceptance-result"
+        ],
+        "recordings": [
+          "wire-facts"
+        ]
+      }
     },
     {
       "caseId": "tool-facing/authority-expansion",

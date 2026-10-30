@@ -287,3 +287,79 @@ fn a_forged_fence_and_second_result_bind_only_the_first() {
     let failures = compare(case, runner, &hostile, &twin);
     assert!(failures.is_empty(), "{failures:?}");
 }
+
+/// A declared fail-closed refusal (owner decision, 2026-10-29) excuses only
+/// what it names: the named decisions refused for exactly the declared
+/// reason on the hostile side alone, and the named recordings left empty.
+#[test]
+fn the_comparison_holds_a_declared_refusal_to_exactly_its_terms() {
+    use injection::{ExpectedRefusal, Observed, Runner, compare};
+    const SCREEN: &str = "014-wire-evidence-admission/prohibited-content";
+    let runner = Runner {
+        harness: "self-test",
+        surface: "wire-metadata",
+        decisions: &["evidence-admission", "attempt-record"],
+        recordings: &["wire-facts"],
+    };
+    let mut c = load().cases.remove(0);
+    c.surface = "wire-metadata".into();
+    c.expected_digest_fields.clear();
+    c.expected_recording = None;
+    c.expected_refusal = Some(ExpectedRefusal {
+        refusal: SCREEN.into(),
+        decisions: vec!["evidence-admission".into()],
+        recordings: vec!["wire-facts".into()],
+    });
+    let twin = {
+        let mut o = Observed::default();
+        o.decide("evidence-admission", &"admit");
+        o.decide("attempt-record", &"same");
+        o.record("wire-facts", c.benign_twin.assembled());
+        o
+    };
+    let hostile = {
+        let mut o = Observed::default();
+        o.decide("evidence-admission", &"refuse");
+        o.decide("attempt-record", &"same");
+        o.collection("wire-facts");
+        o.refused.insert("evidence-admission".into(), SCREEN.into());
+        o
+    };
+    assert_eq!(compare(&c, &runner, &hostile, &twin), Vec::<String>::new());
+
+    let failing = |h: &Observed, t: &Observed, why: &str| {
+        let f = compare(&c, &runner, h, t);
+        assert!(f.iter().any(|x| x.contains(why)), "{why}: {f:?}");
+    };
+    let mut other = hostile.clone();
+    other.refused.insert(
+        "evidence-admission".into(),
+        "014-wire-evidence-admission/malformed".into(),
+    );
+    failing(&other, &twin, "is not the declared refusal");
+    let mut both = twin.clone();
+    both.refused
+        .insert("evidence-admission".into(), SCREEN.into());
+    failing(&hostile, &both, "the payload is not the cause");
+    let mut spread = hostile.clone();
+    spread
+        .refused
+        .insert("attempt-record".into(), SCREEN.into());
+    failing(&spread, &twin, "undeclared refusal");
+    let mut changed = hostile.clone();
+    changed
+        .decisions
+        .insert("attempt-record".into(), "other".into());
+    failing(&changed, &twin, "decision attempt-record differs");
+    let mut kept = hostile.clone();
+    kept.record("wire-facts", c.payload.assembled());
+    failing(&kept, &twin, "holds content the refusal did not retain");
+
+    let mut unknown = c.clone();
+    unknown.expected_refusal.as_mut().unwrap().refusal = "025/anything".into();
+    assert!(
+        problems(unknown)
+            .iter()
+            .any(|p| p.contains("not a declared fail-closed refusal"))
+    );
+}
