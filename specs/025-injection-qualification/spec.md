@@ -389,21 +389,6 @@ runs the four `provider-output` cases whose content is in the result document,
 and the adapter suite runs all eight. With these runners no case is
 `surface-absent`.
 
-**2026-10-29 (owner decision): a fail-closed screen's refusal is declared, not
-a breach of section 3.1.** The suite found that a `wire-metadata` payload
-carrying a base64 run trips spec 014's secret screen, which refuses the
-evidence as `prohibited-content` and retains none of it, while the twin is
-admitted. Hostile content can so withhold evidence; it cannot expand
-authority, and the screen is a privacy control this spec does not weaken. The
-owner chose to declare it: a case may carry `expectedRefusal`, naming one
-refusal from a closed list in the harness (today only
-`014-wire-evidence-admission/prohibited-content`), the decisions it is carried
-into and the recordings it leaves empty. Those decisions must be that refusal
-on the hostile side and not refusals on the twin's, those recordings must be
-empty, any other refusal is undeclared and fails, and every other difference
-still fails. A new fail-closed control is added to the list by a change that
-names it.
-
 **2026-10-29: `suspectedInjections` is result schema version 2, beside version
 1.** Section 3.6 was written while version 1 was unimplemented; spec 020
 shipped version 1 first, so by section 3.6's own rule the member is a new

@@ -9,7 +9,7 @@
       "025-injection-qualification"
     ],
     "id": "065-declared-fail-closed-refusal",
-    "implementation": "pending",
+    "implementation": "complete",
     "obligations": [
       {
         "anchor": "3-2-what-a-declaration-excuses",
@@ -31,8 +31,8 @@
       }
     ],
     "sectionDigests": {
-      "065-a-declared-fail-closed-refusal": "1b8abce517ae2d3aea88bf1d5c7b7ce4b8987cfd9cb6100d39f453e4998c7500",
-      "1-purpose": "97c3135ece36a01b6b90e780afb21e900d0b3dcd4d7a7e385e6ec6c1e56b5adf",
+      "065-a-declared-fail-closed-refusal": "9ff6e6877bbcfb82dfb89253b94bba1781df1f27ffc679f0d925927a0f121588",
+      "1-purpose": "f6b7d29e9a0860b84e0f56e6003abbe39b6bce88e5f65f53617d2f752fa0981d",
       "2-territory": "f6889e0ddd45fce23f35c2ccf812b7bd06e90aad93e64541ff7fc19b587dda65",
       "3-1-the-declaration": "318b2e4fa36b89b5493abebf8ae18b8054bca4fad3f874ab406474b6ad0b8f31",
       "3-2-what-a-declaration-excuses": "392f7f49904a9126bf0cf9dd540fb53d5948542721e6d47283346ff0baf18295",
@@ -41,7 +41,7 @@
       "3-behavior": "535faf2ea21460bc2502ec7d37c108725ed38b023a89f8f43761c07eb0265096",
       "4-out-of-scope": "c6cf3f3f71e3b33fbd54b4b386b940bb4973593d3babfa790cc62689e0e786e0",
       "5-resolved-decisions": "029e59e372adf128f6683d3144c1bf1e93ed7c39a190142c9547edffa90b7c06",
-      "verification": "5a901f4f6bae39e0f8246df5818395279300c96345ab9121dcf263d23becc7da"
+      "verification": "a6365a92697759c451ad31d782354a3f9f89d481c9ea6f7d8088dd8768bac181"
     },
     "sectionHeadings": [
       "065: A declared fail-closed refusal",
@@ -57,10 +57,10 @@
       "Verification"
     ],
     "specPath": "specs/065-declared-fail-closed-refusal/spec.md",
-    "status": "draft",
+    "status": "approved",
     "summary": "Amends spec 025. Invariant I-1 says no byte of untrusted content changes a Statecraft decision, evidence admission included; spec 014's secret screen refuses evidence whose content looks like a credential. A corpus case may therefore declare one refusal from a closed list, naming the decisions it is carried into and the recordings it leaves empty; those may differ from the twin's only as that refusal, and every other difference still fails. A refusal only withholds; nothing here lets content expand authority.\n",
     "title": "A fail-closed screen's refusal of hostile content is declared, not a breach of spec 025's invariant"
   },
-  "shardHash": "ca3a433ae2b269d5d76064c34e07994b797f1fd22f0e0c6d5fbfe46c0d8b6c1f",
+  "shardHash": "8209f4057d91bb5dafa5e2f646c077ce9de413892ee9c1d510dedad3e1c8c6cd",
   "specVersion": "1.10.0"
 }
