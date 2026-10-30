@@ -68,5 +68,5 @@
     "title": "statecraft-home reads YAML through the adopted producer's one reader"
   },
   "shardHash": "cfd5e81e343f535743629b008648790a77ddc3dc4e5dac69fa8752bbaeb7421e",
-  "specVersion": "1.10.0"
+  "specVersion": "1.11.0"
 }

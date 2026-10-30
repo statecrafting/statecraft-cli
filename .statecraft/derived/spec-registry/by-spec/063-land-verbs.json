@@ -4,6 +4,7 @@
       "006-command-surface"
     ],
     "created": "2026-10-27",
+    "declaresAcceptance": true,
     "dependsOn": [
       "002-environment-lifecycle",
       "006-command-surface",
@@ -157,5 +158,5 @@
     "title": "The land verbs wait for, arm, push and restack a pull request, and land status orders what is left"
   },
   "shardHash": "291294685154eb6374302beb5c650cad26c052cbf073082c5d97f93c2cf5e755",
-  "specVersion": "1.10.0"
+  "specVersion": "1.11.0"
 }

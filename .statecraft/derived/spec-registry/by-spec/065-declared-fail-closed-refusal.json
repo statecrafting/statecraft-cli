@@ -4,6 +4,7 @@
       "025-injection-qualification"
     ],
     "created": "2026-10-29",
+    "declaresAcceptance": true,
     "dependsOn": [
       "014-wire-evidence-admission",
       "025-injection-qualification"
@@ -62,5 +63,5 @@
     "title": "A fail-closed screen's refusal of hostile content is declared, not a breach of spec 025's invariant"
   },
   "shardHash": "8209f4057d91bb5dafa5e2f646c077ce9de413892ee9c1d510dedad3e1c8c6cd",
-  "specVersion": "1.10.0"
+  "specVersion": "1.11.0"
 }

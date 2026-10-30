@@ -4,6 +4,7 @@
       "005-acceptance-and-evidence"
     ],
     "created": "2026-10-07",
+    "declaresAcceptance": true,
     "dependsOn": [
       "005-acceptance-and-evidence"
     ],
@@ -73,5 +74,5 @@
     "title": "Envelope admission evaluates through action-gate's closed mode, with identical decisions and bytes"
   },
   "shardHash": "3d8924ff147b71161aa9e03c13eb8e67b51429301b73e25e727369027002ac41",
-  "specVersion": "1.10.0"
+  "specVersion": "1.11.0"
 }

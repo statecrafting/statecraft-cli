@@ -7,6 +7,7 @@
       "006-command-surface"
     ],
     "created": "2026-09-27",
+    "declaresAcceptance": true,
     "dependsOn": [
       "003-work-and-run-semantics",
       "004-execution-adapter",
@@ -132,5 +133,5 @@
     "title": "Fixed-export documentation workflow"
   },
   "shardHash": "81368f7f877d5434511549a693ff901b858ec3893b90c8a851fa507c9a1f3b3b",
-  "specVersion": "1.10.0"
+  "specVersion": "1.11.0"
 }

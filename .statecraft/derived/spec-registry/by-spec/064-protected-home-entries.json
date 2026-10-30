@@ -4,6 +4,7 @@
       "004-execution-adapter"
     ],
     "created": "2026-10-29",
+    "declaresAcceptance": true,
     "dependsOn": [
       "004-execution-adapter"
     ],
@@ -79,5 +80,5 @@
     "title": "The protected set is the product home's entries, not the operator's worktrees"
   },
   "shardHash": "a130c798a58e833dd24d89f9e67387d2694fecf92f2c6c08da576c690f88dc9b",
-  "specVersion": "1.10.0"
+  "specVersion": "1.11.0"
 }

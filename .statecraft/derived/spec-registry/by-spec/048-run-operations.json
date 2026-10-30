@@ -88,5 +88,5 @@
     "title": "Typed run operations under one controller lease, recorded in the run record"
   },
   "shardHash": "34e524342ae61ad3618b21aa6e7c3284156fd51fb4d9abc74048dbaf678e5654",
-  "specVersion": "1.10.0"
+  "specVersion": "1.11.0"
 }

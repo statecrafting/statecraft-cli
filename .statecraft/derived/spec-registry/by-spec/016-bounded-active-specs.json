@@ -7,6 +7,7 @@
       "5"
     ],
     "created": "2026-09-26",
+    "declaresAcceptance": true,
     "dependsOn": [
       "001-boundaries-and-authority"
     ],
@@ -60,5 +61,5 @@
     "title": "Active specifications stay bounded and historical journals stay outside the corpus"
   },
   "shardHash": "b667a06bc44730ffd5a8aecfe01b7842b427a8b0ccbc90817b88cf695598754f",
-  "specVersion": "1.10.0"
+  "specVersion": "1.11.0"
 }

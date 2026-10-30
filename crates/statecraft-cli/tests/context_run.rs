@@ -84,7 +84,7 @@ fn fixture() -> Fixture {
         r#"#!/bin/sh
 case "$1" in context) exec '{}' "$@" ;; esac
 case "$*" in
-  --version) echo 'spec-spine 0.31.0' ;;
+  --version) echo 'spec-spine {}' ;;
   check|'check --help') exit 0 ;;
   'registry plan --json') echo '{{"ready":[{{"id":"replay","title":"recorded stream"}}]}}' ;;
   'registry list --json') echo '{{"items":[{{"id":"replay","status":"approved","implementation":"pending"}}]}}' ;;
@@ -92,7 +92,13 @@ case "$*" in
   *) exit 3 ;;
 esac
 "#,
-        real_spec_spine().display()
+        real_spec_spine().display(),
+        // The stub answers as the repository's own pinned engine, whichever
+        // release D-06 last adopted.
+        statecraft_home::setup::exact_pin(
+            &std::fs::read_to_string(repo_root().join("spec-spine.toml")).unwrap()
+        )
+        .unwrap()
     );
     statecraft_adapter::fixture::install_script(&f.bin.path().join("spec-spine"), spine, 0o755)
         .unwrap();

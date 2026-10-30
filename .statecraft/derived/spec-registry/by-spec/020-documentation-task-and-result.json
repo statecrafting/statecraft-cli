@@ -7,6 +7,7 @@
       "006-command-surface"
     ],
     "created": "2026-09-27",
+    "declaresAcceptance": true,
     "dependsOn": [
       "003-work-and-run-semantics",
       "004-execution-adapter",
@@ -148,5 +149,5 @@
     "title": "Documentation task and structured result contracts"
   },
   "shardHash": "316be75a977c9d7d9379e0773ff0fea3459f23754a2a2532cedfc268a8d0b2ef",
-  "specVersion": "1.10.0"
+  "specVersion": "1.11.0"
 }

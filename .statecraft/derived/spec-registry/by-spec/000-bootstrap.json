@@ -1,6 +1,7 @@
 {
   "record": {
     "created": "2026-09-16",
+    "declaresAcceptance": true,
     "establishes": [
       {
         "kind": "file",
@@ -74,5 +75,5 @@
     ]
   },
   "shardHash": "6ec63eaef0c26b8019b5e4cbec079323aec352b8b02c64309953d81dcb96b80c",
-  "specVersion": "1.10.0"
+  "specVersion": "1.11.0"
 }

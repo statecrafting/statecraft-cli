@@ -80,5 +80,5 @@
     "title": "A local halt record that run consults before launch, and denies when it cannot read"
   },
   "shardHash": "387ec11c7c9b6e2b457c490291a1ee975602213bc4aac7fc01d96ad40de2101d",
-  "specVersion": "1.10.0"
+  "specVersion": "1.11.0"
 }

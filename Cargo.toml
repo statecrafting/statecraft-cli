@@ -56,4 +56,4 @@ all = { level = "warn", priority = -1 }
 # test refuses a difference. Changing it is an
 # authority change (AGENTS.md, Source ownership).
 [workspace.dependencies]
-spec-spine-core = { version = "=0.31.0", default-features = false }
+spec-spine-core = { version = "=0.32.0", default-features = false }

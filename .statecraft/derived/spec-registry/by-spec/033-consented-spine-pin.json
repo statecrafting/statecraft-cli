@@ -7,6 +7,7 @@
       "029-one-resolved-judge"
     ],
     "created": "2026-10-02",
+    "declaresAcceptance": true,
     "dependsOn": [
       "002-environment-lifecycle",
       "006-command-surface",
@@ -100,5 +101,5 @@
     "title": "A reviewed initialization plan may explicitly move the adopted spec-spine pin"
   },
   "shardHash": "5c48eac4edbfbf14f9887674f0a885929bea4db40630c4c67c5910f667b2f995",
-  "specVersion": "1.10.0"
+  "specVersion": "1.11.0"
 }

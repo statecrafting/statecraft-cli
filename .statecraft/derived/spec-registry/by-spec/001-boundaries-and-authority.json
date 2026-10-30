@@ -1,6 +1,7 @@
 {
   "record": {
     "created": "2026-09-16",
+    "declaresAcceptance": true,
     "dependsOn": [
       "000-bootstrap"
     ],
@@ -114,5 +115,5 @@
     "title": "The product boundary, the component owners, and the separation of authority"
   },
   "shardHash": "7c33686aae95d2aec4fb3f080c2be202ec2342f929d604a397d6eb001da67a35",
-  "specVersion": "1.10.0"
+  "specVersion": "1.11.0"
 }

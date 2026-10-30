@@ -81,5 +81,5 @@
     "title": "Operator input to a live attempt is recorded before delivery, expires, and is evidence on the attempt"
   },
   "shardHash": "0b4bcfe36ed1722d60f4585c562e8b116b0cfdb288808c9db66f1331394aa2ee",
-  "specVersion": "1.10.0"
+  "specVersion": "1.11.0"
 }

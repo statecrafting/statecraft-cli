@@ -8,6 +8,7 @@
       "024-review-budget-and-ratification"
     ],
     "created": "2026-09-30",
+    "declaresAcceptance": true,
     "dependsOn": [
       "002-environment-lifecycle",
       "024-review-budget-and-ratification"
@@ -103,5 +104,5 @@
     "title": "Setup profile revision 13: the repository-local engine lives in .bin/"
   },
   "shardHash": "f443609e09799195716301cd5f199ecba6d76e141a36c48bc78356b438d22422",
-  "specVersion": "1.10.0"
+  "specVersion": "1.11.0"
 }

@@ -4,6 +4,7 @@
       "004-execution-adapter"
     ],
     "created": "2026-10-12",
+    "declaresAcceptance": true,
     "dependsOn": [
       "002-environment-lifecycle",
       "003-work-and-run-semantics",
@@ -113,5 +114,5 @@
     "title": "Per-run provider configuration and a measured Mach-service allowlist close spec 004's two open items against IX"
   },
   "shardHash": "949809fd99a20c148dfc63f1f7e9b569464c31d00c297b6ffd116774985bc13c",
-  "specVersion": "1.10.0"
+  "specVersion": "1.11.0"
 }

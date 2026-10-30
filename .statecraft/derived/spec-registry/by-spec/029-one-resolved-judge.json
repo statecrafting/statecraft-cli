@@ -4,6 +4,7 @@
       "008-harness-delivery"
     ],
     "created": "2026-09-30",
+    "declaresAcceptance": true,
     "dependsOn": [
       "002-environment-lifecycle",
       "003-work-and-run-semantics",
@@ -136,5 +137,5 @@
     "title": "One resolved judge: every spec-spine call this product makes runs the executable one resolution selected"
   },
   "shardHash": "6efc4065eb8f549d2ce6a7ca74ca2b4cf5660efc9dac42d5fb62ba952b4087d9",
-  "specVersion": "1.10.0"
+  "specVersion": "1.11.0"
 }
