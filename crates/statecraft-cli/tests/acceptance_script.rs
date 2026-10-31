@@ -37,7 +37,15 @@ struct Run {
 
 impl Run {
     fn new() -> Self {
-        let dir = tempfile::tempdir().expect("a temporary directory");
+        // Rooted at /tmp, not the platform temporary directory: on macOS that
+        // is a long /var/folders path, and the boundary's self-test socket
+        // under `$ACC/home/boundary/probe-*/socket` (spec 064) then exceeds
+        // the 104-byte Unix socket path limit, so every launch refuses with
+        // "path must be shorter than SUN_LEN" before the stage under test.
+        let dir = tempfile::Builder::new()
+            .prefix("sc-acc-")
+            .tempdir_in("/tmp")
+            .expect("a temporary directory");
         // Linux grants the provider's configuration file in place only, so
         // it must already exist (spec 004 section 3.18).
         std::fs::write(dir.path().join(".claude.json"), b"{}").expect("a configuration file");
