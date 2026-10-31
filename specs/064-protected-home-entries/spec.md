@@ -98,6 +98,18 @@ launch on a home that holds entries no current code writes (`archive/`,
 `evidence/`, `releases/`, `runners/`). Protecting everything but a closed
 operator list fails closed without either cost.
 
+**2026-10-31: the acceptance script's tests root their run directory at
+`/tmp`.** The fixed `boundary` entry adds nine bytes to the self-test socket
+path, `<home>/boundary/probe-XXXXXX/socket`. Under macOS's long `/var/folders`
+temporary directory, that path in `acceptance_script.rs` reached 110 bytes. The
+Unix socket path limit is 104 bytes on macOS and 108 on Linux, so every launch
+refused with "path must be shorter than SUN_LEN", and 12 of 13 tests failed
+locally while Linux CI stayed green. The tests now create their directory
+under `/tmp` and keep the special-character `ACC` name. The launch still
+fails closed, with a refusal, whenever a home's path is too long for the socket
+(more than 74 bytes on macOS). This section does not decide whether that limit
+is acceptable for the product.
+
 ## Verification
 
 Ratified by the owner on 2026-10-29. Acceptance is run through
