@@ -2,7 +2,7 @@
 id: "066-short-probe-socket"
 title: "The boundary self-test's probe socket lives under a short fixed directory, so a long home path cannot refuse a launch"
 status: approved
-implementation: pending
+implementation: complete
 created: "2026-10-31"
 summary: >
   Amends spec 064 section 3.3. The self-test's listening Unix socket moves
@@ -14,9 +14,9 @@ summary: >
   3.18 still decides whether the probe's connect is refused.
 amends:
   - "064-protected-home-entries"
-# No `extends` yet: the implementing change adds the edge on
-# crates/statecraft-home/ (002) and crates/statecraft-cli/ (006) with the
-# code, because the gate counts an extender as an owner.
+extends:
+  - { spec: "002-environment-lifecycle", unit: { kind: directory, path: "crates/statecraft-home/" }, nature: additive }
+  - { spec: "006-command-surface", unit: { kind: directory, path: "crates/statecraft-cli/" }, nature: additive }
 depends_on:
   - "004-execution-adapter"
   - "064-protected-home-entries"
@@ -117,8 +117,18 @@ writable roots.
 
 ## Verification
 
-Ratified by the owner on 2026-10-31. Acceptance is declared by the
-implementing change, which will run a launch with a product home whose path is
-over 100 bytes on each platform, show the self-test passing with `unixDenied`,
-and compare a confinement record's protected roots and digest with the ones
-spec 064's tests record.
+Ratified by the owner on 2026-10-31. Acceptance is run through
+`make verify SPEC=066`, against fixture homes and the platform boundary, with
+no provider.
+
+```verify:cli
+cargo test -p statecraft-cli --test protected_boundary
+cargo test -p statecraft-cli --test witness_admission
+cargo test -p statecraft-cli --test application_equivalence
+```
+
+The first admits a launch with a product home whose path is over 100 bytes
+and shows the self-test passing with `unixDenied` and the record naming no
+root under `/tmp`; the second admits the sidecar through the same directory;
+the third is spec 064's own comparison of a confinement record's protected
+roots and digest across launches, unchanged.

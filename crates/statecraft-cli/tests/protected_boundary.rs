@@ -258,3 +258,69 @@ fn hardlinked_build_output_under_the_operators_worktrees_does_not_refuse() {
     let after = Prepared::prepare(policy(entries)).err().unwrap();
     assert_eq!(after.step, "hardlink");
 }
+
+/// Spec 066 sections 3.1 to 3.3: the probe socket lives under a short fixed
+/// directory, so a home whose path is over 100 bytes (longer than any
+/// `sun_path` allows for spec 064's `<home>/boundary/probe-XXXXXX/socket`)
+/// is admitted, the probe still reports `unixDenied`, and the record names
+/// the same protected roots with the same digest across launches, none of
+/// them under `/tmp`.
+#[test]
+fn a_home_path_over_100_bytes_is_admitted_with_the_probe_socket_under_tmp() {
+    use statecraft_home::confinement::{Roots, admit};
+
+    let fixture = tempfile::tempdir().unwrap();
+    let root = fs::canonicalize(fixture.path()).unwrap();
+    let mut home = root.clone();
+    while home.as_os_str().len() <= 100 {
+        home.push("a-long-segment-of-the-product-home");
+    }
+    assert!(home.as_os_str().len() > 100);
+    let records = home.join("records/k.startup");
+    let exchange = home.join("exchange/k/runs/r/1");
+    let target = root.join("target");
+    let workspace = root.join("workspace");
+    for d in [&records, &exchange, &target, &workspace] {
+        fs::create_dir_all(d).unwrap();
+    }
+    fs::write(target.join("checkout"), b"operator").unwrap();
+    let roots = || Roots {
+        home: &home,
+        target: &target,
+        workspace: &workspace,
+        exchange: &exchange,
+        records: &records,
+        gate: None,
+        git_writes: Vec::new(),
+        provider: false,
+        authenticated: false,
+        witness: false,
+    };
+    let executable = Path::new(env!("CARGO_BIN_EXE_statecraft-cli"));
+
+    let first = admit(roots(), executable, "/usr/bin:/bin").expect("a long home is admitted");
+    let record = first.boundary.record().clone();
+    assert_eq!(record.self_test.get("unixDenied"), Some(&true));
+    let tmp = Path::new("/tmp");
+    let private_tmp = Path::new("/private/tmp");
+    for protected in record
+        .policy
+        .inaccessible
+        .iter()
+        .chain(record.policy.readonly.iter())
+    {
+        assert!(
+            !protected.starts_with(tmp) && !protected.starts_with(private_tmp),
+            "the probe directory is not a protected root: {}",
+            protected.display()
+        );
+    }
+    // The socket's path is an input to the self-test, not a recorded root:
+    // a second launch names the same protected roots. (The digest's identity
+    // across seeded launches is spec 064's application_equivalence suite.)
+    drop(first);
+    let second = admit(roots(), executable, "/usr/bin:/bin").unwrap();
+    let again = second.boundary.record();
+    assert_eq!(again.policy.inaccessible, record.policy.inaccessible);
+    assert_eq!(again.policy.readonly, record.policy.readonly);
+}
