@@ -33,6 +33,9 @@
     "README.md": {
       "contentHash": "2797f672bea0ab751d4e566cdaf4213704ad9cdefad8b2db47cba2e82fadbefe"
     },
+    "REVIEW.md": {
+      "contentHash": "eb5275f06380c78f21965396f67931046eb8121a77ae2b4408d2c4573729b989"
+    },
     "docs/adoption/042-provider-measurements.md": {
       "contentHash": "0ee637834a5c349f77c61309af601c36b06720284c06b7ab184f0c3e030a025c"
     },
@@ -94,7 +97,7 @@
       "contentHash": "87dd98d56ec17251d0cb2ed1152d3b63f816e6e8ae0a9d4df3e7325bc950bbaa"
     },
     "spec-spine.toml": {
-      "contentHash": "791170eb68d4c68c654b855b45b9d272c7b5c638413fd8c6645409eb08e6c9d0"
+      "contentHash": "b8c3722b38f5ba6a052a97bc074efef105c50f38754ddb2bd7d3a155aadde187"
     },
     "standards/spec/constitution.md": {
       "contentHash": "27d45bf3ade1274e0469c340aa8f3988ab537c5c4b1f24345cd1fb473c365bb0"

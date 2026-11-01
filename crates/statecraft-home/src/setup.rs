@@ -35,7 +35,7 @@ use std::path::Path;
 /// The one registered profile.
 pub const PROFILE_ID: &str = "github-actions-rust";
 /// Its revision.
-pub const REVISION: u32 = 22;
+pub const REVISION: u32 = 23;
 /// Where the rendered policy document lives in the target.
 pub const POLICY_PATH: &str = ".statecraft/setup/github-actions-rust.json";
 /// The resume record, under the project's runtime state.
@@ -97,12 +97,19 @@ const DELETION_CAP_RANGE: (u64, u64) = (1_000, 200_000);
 const DEFAULT_RELEASE_PATTERN: &str = "release/*";
 /// Revision 17 (spec 041 section 3.1): the governance documents every review
 /// reads from the base commit, recorded as absent when a base lacks one.
-pub const DEFAULT_CONTEXT_PATHS: [&str; 4] = [
+/// Revision 23 (spec 056 section 3.1) adds the managed review guide and the
+/// repository's own `REVIEW.md`, in this order.
+pub const DEFAULT_CONTEXT_PATHS: [&str; 6] = [
     "AGENTS.md",
     ".statecraft/AGENTS.md",
+    GUIDE_PATH,
+    "REVIEW.md",
     "standards/spec/constitution.md",
     "standards/spec/contract.md",
 ];
+/// Revision 23 (spec 056 section 3.1): where the managed review guide is
+/// rendered. The reviewer's contract, identical in every target.
+pub const GUIDE_PATH: &str = ".statecraft/REVIEW.md";
 /// The most additional paths `review.context_paths` may select.
 pub const MAX_CONTEXT_PATHS: usize = 32;
 /// Where a declared extra required job's reusable workflow lives (revision
@@ -145,6 +152,9 @@ pub enum Role {
     Codeowners,
     /// The remote desired-state document (revision 16, spec 012).
     RemoteState,
+    /// The managed review guide the AI review reads as governance context
+    /// from the base commit (revision 23, spec 056).
+    Guide,
 }
 
 /// One template of a profile.
@@ -237,6 +247,10 @@ impl Profile {
                     "scripts/verify-action-pins.sh",
                     false
                 ),
+                // Revision 23 (spec 056 section 3.1): the reviewer's contract,
+                // rendered identically in every target and read as governance
+                // context from the base commit.
+                template!(GUIDE_PATH, Role::Guide, "REVIEW.md", false),
                 template!("Makefile", Role::Makefile, "Makefile", true),
                 template!(".github/CODEOWNERS", Role::Codeowners, "CODEOWNERS", true),
             ],
@@ -441,12 +455,13 @@ pub fn remote_obligations() -> Vec<String> {
         "revision 14: external code selection runs the project-owned reusable workflow and script behind the required code job; that script joins the trusted-base authority set, and failed, cancelled or skipped code still blocks ci-gate (spec 032)".to_string(),
         "revision 15: an exact consented spec-spine pin move is reviewed with its initialization plan, and the managed installer reads that adopted pin; this changes no required remote check or branch-protection authority (spec 033)".to_string(),
         format!("revision 16: the profile renders {} (schema {}), a canonical desired-state document of what this profile expects of the remote: required checks with their App, the extra required jobs and their aggregation by ci-gate, code-owner review and the governed paths CODEOWNERS covers, the merge queue (remote.merge_queue), the exception Environment and its reviewers (remote.exception_reviewers), workflow-token defaults, secret names, and repository custom properties (remote.custom_properties). An omitted field is no claim. `doctor --remote` compares every field read-only and reports each as matching, drifted, unavailable, unauthorized, unsupported or unverified; this product never applies it, and an owner-operated applier outside this product needs its own authorization (spec 012)", crate::remote_state::PATH, crate::remote_state::SCHEMA),
-        format!("revision 17: the AI review reads governance documents as Git blobs at the base commit ({} by default, absent ones recorded as absent) plus review.context_paths, at most {MAX_CONTEXT_PATHS} literal repository-relative paths read from the policy at the base, never from the candidate; the documents must fit a quarter of review.context_tokens whole or the review refuses with 2 before any provider call, every call's whole input must fit three quarters of it, the diff budget is what remains (at most half), and the evidence records each document's blob, digest and length and each call's budget (spec 041)", DEFAULT_CONTEXT_PATHS.join(", ")),
+        format!("revision 17: the AI review reads governance documents as Git blobs at the base commit (AGENTS.md, .statecraft/AGENTS.md, standards/spec/constitution.md, standards/spec/contract.md by default, absent ones recorded as absent) plus review.context_paths, at most {MAX_CONTEXT_PATHS} literal repository-relative paths read from the policy at the base, never from the candidate; the documents must fit a quarter of review.context_tokens whole or the review refuses with 2 before any provider call, every call's whole input must fit three quarters of it, the diff budget is what remains (at most half), and the evidence records each document's blob, digest and length and each call's budget (spec 041)"),
         "revision 18: a newer push to a pull request cancels the work of that pull request's older statecraft-ci run, job by job: every job but review-exception and ci-gate has a concurrency group of its pull request and job, because a run waiting on the owner exception is never cancelled by a group and would hold a workflow-level one (spec 059), while a push to the default branch and each merge-queue entry keep groups of their own run; a preflight job (the pull request's base, the committed artifacts' freshness, and cargo fmt for a Rust code selection) runs before code and every declared extra job, which need it, so a stacked pull request skips them unless it carries the label statecraft:stacked-ci; every preflight check also runs in governance or code, and a base gate.sh without the verb judges nothing; the code job restores the cargo cache on every event and saves it only on a push to the default branch, with incremental compilation off and line-table debuginfo (specs 058 and 059)".to_string(),
         "revision 19: a blocked ci-gate reports failed jobs of its own run attempt, their first failed step and at most five error lines each in the step summary and as at most ten annotations; this is best effort, never changes the verdict or exit code, and fences or escapes candidate text; before saving the code job cache, the job drops workspace artifacts on the same default-branch condition (spec 060)".to_string(),
         "revision 20: reviewer calls stream partial events; 180 seconds of silence stops a call and retries it once with fresh cwd and home, a second stall skips as transient, and the review job allows 20 minutes (spec 061)".to_string(),
         "revision 21: every review or visible skip publishes a statecraft-ai-review check run after its evidence artifact, with the exact record and a success, failure or neutral conclusion; fork heads are excluded and publication failures fail the job (spec 062; 044 moves to 22)".to_string(),
         "revision 22: four more required jobs, each a need of ci-gate and none optional: supply-chain (cargo deny against the committed deny.toml, cargo audit when .cargo/audit.toml exists, cargo vet --locked when supply-chain/config.toml exists, each tool a digest-verified release at an exact version, with the candidate's .cargo/config.toml removed first), workflow-lint (zizmor offline over .github/workflows, then verify-action-pins.sh: every action by 40-hex commit digest with a `# <ref>` comment, a docker image by sha256, or a local path), sg-scan (ast-grep scan when sgconfig.yml exists) and secret-scan (gitleaks, digest-verified, over the change's commits, reporting rule and location and never the value). On a pull request governance runs guard-policy-files.sh: a change to deny.toml, .cargo/audit.toml, supply-chain/, any Cargo.toml or Cargo.lock, spec-spine.toml or docs/adoption/spec-spine.md beside any other path, apart from the generated .statecraft/derived/ and .statecraft/environment.json, fails and must be split, so an upgrade that also moves the spec-spine pin is two pull requests. A target needs a committed deny.toml to select this revision; the plan withholds the profile without one (spec 044)".to_string(),
+        format!("revision 23: the profile renders {GUIDE_PATH}, the reviewer's contract, as a managed file verified by digest and identical in every target, and the AI review's default governance context becomes {} in that order: the managed guide and the repository's own REVIEW.md are read as blobs at the base commit, an absent REVIEW.md is recorded as absent, a candidate's edit to either is review data read as context only once it is on the base, and both count whole against the context's quarter of review.context_tokens, so a guide that does not fit refuses with 2 before any provider call (spec 056)", DEFAULT_CONTEXT_PATHS.join(", ")),
         "a repository that already runs these checks by hand keeps them by setting governance.enforce_coverage (index coverage --fail-on-untraced), governance.authored_content (the script's path; absent or not executable refuses), governance.authored_content_text (the title, the body and every commit message), governance.gate_each_commit (each commit's tree passes the gate and cargo fmt) and governance.require_signed_commits (each commit verified as signed by GitHub) (revision 4)".to_string(),
     ]
 }
@@ -1800,9 +1815,12 @@ pub fn plan(inputs: &Inputs<'_>) -> Result<Plan, String> {
         .then(|| format!("{INTENDED_DIR}/{path}.intended"));
         before.insert(path.clone(), current.clone());
         files.push(FilePlan {
+            // Revision 23 (spec 056): the guide is listed in the policy's
+            // files, which ci-gate.sh reads as the authority set, so it is
+            // reported as a member here as well.
             authority_set: matches!(
                 t.role,
-                Role::Workflow | Role::Script | Role::Policy | Role::Codeowners
+                Role::Workflow | Role::Script | Role::Policy | Role::Codeowners | Role::Guide
             ),
             path,
             role: t.role,
