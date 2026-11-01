@@ -352,3 +352,25 @@ fn every_rendered_review_workflow_keeps_its_verdicts() {
         );
     }
 }
+
+/// Spec 045 R-1: the crate depends on no YAML parser but the producer's.
+/// The manifest names none, and the workspace lockfile carries neither
+/// `serde_yaml` nor its `unsafe-libyaml`, so RUSTSEC-2024-0449 no longer
+/// applies to this workspace.
+#[test]
+fn no_yaml_parser_but_the_producers_is_linked() {
+    let manifest =
+        std::fs::read_to_string(concat!(env!("CARGO_MANIFEST_DIR"), "/Cargo.toml")).unwrap();
+    assert!(
+        !manifest.contains("serde_yaml") && !manifest.contains("serde-saphyr"),
+        "statecraft-home names a YAML parser directly"
+    );
+    let lock =
+        std::fs::read_to_string(concat!(env!("CARGO_MANIFEST_DIR"), "/../../Cargo.lock")).unwrap();
+    for package in ["serde_yaml", "unsafe-libyaml"] {
+        assert!(
+            !lock.contains(&format!("name = \"{package}\"")),
+            "the lockfile still carries {package}"
+        );
+    }
+}

@@ -2,7 +2,7 @@
 id: "045-one-yaml-reader"
 title: "statecraft-home reads YAML through the adopted producer's one reader"
 status: approved
-implementation: pending
+implementation: complete
 created: "2026-10-21"
 summary: >
   Amends specs 002, 012 and 032 so every YAML document statecraft-home
@@ -110,7 +110,14 @@ configuration at the next adoption. Reading through
 
 ## Verification
 
-Ratified by the owner on 2026-10-31. Acceptance is declared by the
-implementing change, which will run the setup and external-code suites with
-their assertions unchanged, plus a parity test over each fixture workflow
-those suites read, under the new reader.
+Ratified by the owner on 2026-10-31. Acceptance is run through
+`make verify SPEC=045`: the setup and external-code suites with their
+assertions unchanged, the parity test over every fixture workflow they read,
+whose last test reads the manifest and the lockfile and finds no YAML parser
+but the producer's.
+
+```verify:cli
+cargo test -p statecraft-home --locked --test setup_workflows
+cargo test -p statecraft-home --locked --test external_code
+cargo test -p statecraft-home --locked --test yaml_reader_parity
+```
