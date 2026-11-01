@@ -127,9 +127,9 @@ pub fn admit_sidecar(
         let records_sentinel = tempfile::NamedTempFile::new_in(roots.records)?;
         let target_sentinel = tempfile::NamedTempFile::new_in(roots.target)?;
         let protected = File::open(home_sentinel.path())?;
-        let socket_directory = tempfile::Builder::new()
-            .prefix("probe-")
-            .tempdir_in(&boundary_dir)?;
+        // Spec 066 section 3.1: under /tmp, not under the home, so the
+        // home's path length cannot refuse the sidecar's self-test.
+        let socket_directory = crate::confinement::probe_socket_directory()?;
         let socket_path = socket_directory.path().join("socket");
         let socket = UnixListener::bind(&socket_path)?;
         let listener = TcpListener::bind(("127.0.0.1", 0))?;
