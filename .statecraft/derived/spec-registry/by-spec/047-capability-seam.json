@@ -43,7 +43,7 @@
       }
     ],
     "sectionDigests": {
-      "047-admission-and-qualification-read-what-an-adapter-declares": "cd08fb2c2bad904a0be6959f8b7a3006a8c8044be61b5afb4427b327de02a3be",
+      "047-admission-and-qualification-read-what-an-adapter-declares": "552adc05869a9a30b34fa39ec9d0edab1561df3e045130459eafa74a74983bab",
       "1-purpose": "82b5b21535503179c27b7ef30f7a9a6497a489c097387863bf7e9c6c8dda77dc",
       "2-territory": "0640edac29af18b323eb42946da6dbfda5aebb6cd83ace4c46dffd4965f5a9a0",
       "3-1-the-declaration": "4c48a3d219d0d93066ca1245af1cf27b35d1ab8e00533120d4b2641eb4f7ba3d",
@@ -53,7 +53,7 @@
       "3-behavior": "7678eea39d33fd8e230d086fc9a36ea69b957ed10fac8d88b5a2ee11456b7e7c",
       "4-out-of-scope": "202a7d13e21fc6b0afbcb2975831a36d7ff7c774e9f2524ac0b8b81342b432ca",
       "5-resolved-decisions": "94b9355c080c49837618719d559017fee652d2915d55b2a47ac62f0995947efb",
-      "verification": "2ada0b9cc598e1dd02f0b706b238ca26855be5610a5abc45f1a8bca6d781601b"
+      "verification": "085c8288c75f8156004415853a1f487f99c19d4c4f07dd67988481acbc6012a4"
     },
     "sectionHeadings": [
       "047: Admission and qualification read what an adapter declares",
@@ -69,10 +69,10 @@
       "Verification"
     ],
     "specPath": "specs/047-capability-seam/spec.md",
-    "status": "draft",
+    "status": "approved",
     "summary": "Amends spec 004's seam with a per-adapter capability declaration beside the closed six-token vocabulary: the facts admission, qualification and the witness path currently learn by naming the one adapter (a stream it can witness, hooks it honours in print mode, a wire sidecar it can route through, a per-run configuration directory). Every branch reads the declaration. A test adapter with a different declaration proves the seam. No second provider is added.\n",
     "title": "Admission and qualification read what an adapter declares it can do, never which adapter it is"
   },
-  "shardHash": "ce9e064e0a6bed120ef10aa1cd51bc3b1b218bc2d4f866b1f262b17ff9fcf7b1",
+  "shardHash": "757ffb5b75c5b7eab7e10c8974673eafd3381c6b8b8fa84049b4646f40512dfb",
   "specVersion": "1.11.0"
 }

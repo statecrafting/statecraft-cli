@@ -1,7 +1,7 @@
 ---
 id: "047-capability-seam"
 title: "Admission and qualification read what an adapter declares it can do, never which adapter it is"
-status: draft
+status: approved
 implementation: pending
 created: "2026-10-21"
 summary: >
@@ -123,7 +123,7 @@ accident, so an unset field refuses.
 
 ## Verification
 
-This spec is `status: draft` and declares no acceptance until it is ratified
-and built. Its acceptance will run the test adapter through admission for a
+Ratified by the owner on 2026-10-31. Acceptance is declared by the
+implementing change, which will run the test adapter through admission for a
 witnessed and a plain run, the Claude Code adapter's suites unchanged, and the
 extended source check.
