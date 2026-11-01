@@ -12,6 +12,16 @@
       "012-remote-desired-state",
       "032-external-code-profile"
     ],
+    "extends": [
+      {
+        "nature": "additive",
+        "spec": "002-environment-lifecycle",
+        "unit": {
+          "kind": "directory",
+          "path": "crates/statecraft-home/"
+        }
+      }
+    ],
     "id": "045-one-yaml-reader",
     "implementation": "pending",
     "obligations": [
@@ -67,6 +77,6 @@
     "summary": "Amends specs 002, 012 and 032 so every YAML document statecraft-home parses (a project's reusable code workflow, and the default branch's CI workflow the remote-state comparison reads) is read by spec-spine's one YAML reader, which this product already links, and removes the direct serde_yaml dependency. The workspace then carries no unsafe-libyaml, and RUSTSEC-2024-0449 no longer applies here.\n",
     "title": "statecraft-home reads YAML through the adopted producer's one reader"
   },
-  "shardHash": "cb5179e4b103b27650a2c7a0a9c868388f54012d3cd8824367080907f450339f",
+  "shardHash": "f86bbb6c5feb1189ee504a812c67394e5a9cf42b0e282229f7311a0552702156",
   "specVersion": "1.11.0"
 }
