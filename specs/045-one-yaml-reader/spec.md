@@ -1,7 +1,7 @@
 ---
 id: "045-one-yaml-reader"
 title: "statecraft-home reads YAML through the adopted producer's one reader"
-status: draft
+status: approved
 implementation: pending
 created: "2026-10-21"
 summary: >
@@ -108,7 +108,7 @@ configuration at the next adoption. Reading through
 
 ## Verification
 
-This spec is `status: draft` and declares no acceptance until it is ratified
-and built. Its acceptance will run the setup and external-code suites with
+Ratified by the owner on 2026-10-31. Acceptance is declared by the
+implementing change, which will run the setup and external-code suites with
 their assertions unchanged, plus a parity test over each fixture workflow
 those suites read, under the new reader.
