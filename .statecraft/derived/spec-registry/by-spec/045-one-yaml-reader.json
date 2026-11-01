@@ -39,7 +39,7 @@
       }
     ],
     "sectionDigests": {
-      "045-statecraft-home-reads-yaml-through-the-adopted-producer-s-one-reader": "e345807279310dca493dc45b5627649cad9bc836ab5cc287eabf22038c264007",
+      "045-statecraft-home-reads-yaml-through-the-adopted-producer-s-one-reader": "2f3977dfd2c7141ff4d28f9d7411f91c62d9dc978666e57793ba7cc380465bcb",
       "1-purpose": "a516dd11dc967ed115c472d05fcb830949d427453c01cb785839a6982f4402f0",
       "2-territory": "cba83a30fb38f0cffefc13d16740a1c5dc50da433db0510b86b33d478fa30182",
       "3-1-one-reader": "7c147cab3534ff19903a9e56973735ce82c901c4ef9301bc70fb5331afd3e31d",
@@ -48,7 +48,7 @@
       "3-behavior": "fac1ae03a5c10d5da6391e6f94ec250419f679f52152553a0f429d361c873ba2",
       "4-out-of-scope": "2d5b0f863f853c5f57e59ebbbf4cb0c1cf90c7c19067e0dc41481c65a8dedb38",
       "5-resolved-decisions": "cac457e2cab72a7f51983aef8d52e00c89e1df7442eb2d367de3f6dcb1ad8542",
-      "verification": "0f8e47f8029f8c33f8c28db5dd45053ca0dadb20e9a7843db16f02768038fbbe"
+      "verification": "aaf70c066dd718e171275729cefcb24e44fe374654c2e659fc3dfe297d39b266"
     },
     "sectionHeadings": [
       "045: statecraft-home reads YAML through the adopted producer's one reader",
@@ -63,10 +63,10 @@
       "Verification"
     ],
     "specPath": "specs/045-one-yaml-reader/spec.md",
-    "status": "draft",
+    "status": "approved",
     "summary": "Amends specs 002, 012 and 032 so every YAML document statecraft-home parses (a project's reusable code workflow, and the default branch's CI workflow the remote-state comparison reads) is read by spec-spine's one YAML reader, which this product already links, and removes the direct serde_yaml dependency. The workspace then carries no unsafe-libyaml, and RUSTSEC-2024-0449 no longer applies here.\n",
     "title": "statecraft-home reads YAML through the adopted producer's one reader"
   },
-  "shardHash": "cfd5e81e343f535743629b008648790a77ddc3dc4e5dac69fa8752bbaeb7421e",
+  "shardHash": "cb5179e4b103b27650a2c7a0a9c868388f54012d3cd8824367080907f450339f",
   "specVersion": "1.11.0"
 }
