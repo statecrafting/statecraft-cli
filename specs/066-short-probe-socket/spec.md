@@ -1,7 +1,7 @@
 ---
 id: "066-short-probe-socket"
 title: "The boundary self-test's probe socket lives under a short fixed directory, so a long home path cannot refuse a launch"
-status: draft
+status: approved
 implementation: pending
 created: "2026-10-31"
 summary: >
@@ -117,8 +117,8 @@ writable roots.
 
 ## Verification
 
-This spec is `status: draft` and declares no acceptance until it is ratified
-and built. Its acceptance will run a launch with a product home whose path is
+Ratified by the owner on 2026-10-31. Acceptance is declared by the
+implementing change, which will run a launch with a product home whose path is
 over 100 bytes on each platform, show the self-test passing with `unixDenied`,
 and compare a confinement record's protected roots and digest with the ones
 spec 064's tests record.
