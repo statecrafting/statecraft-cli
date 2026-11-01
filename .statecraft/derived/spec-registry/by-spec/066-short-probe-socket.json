@@ -1,0 +1,73 @@
+{
+  "record": {
+    "amends": [
+      "064-protected-home-entries"
+    ],
+    "created": "2026-10-31",
+    "dependsOn": [
+      "004-execution-adapter",
+      "064-protected-home-entries"
+    ],
+    "id": "066-short-probe-socket",
+    "implementation": "pending",
+    "obligations": [
+      {
+        "anchor": "3-1-where-the-socket-lives",
+        "id": "R-1",
+        "kind": "requirement",
+        "text": "The launch confinement and the witness sidecar each bind the self-test's probe socket in a fresh directory created under /tmp with mode 0700, whose path does not depend on the product home's path, and remove it when the self-test's owner is dropped."
+      },
+      {
+        "anchor": "3-2-what-does-not-move",
+        "id": "R-2",
+        "kind": "requirement",
+        "text": "The home sentinel stays inside the boundary entry, and the protected roots a confinement record names, and its digest, are the same as under spec 064."
+      },
+      {
+        "anchor": "3-3-what-a-long-home-now-does",
+        "id": "R-3",
+        "kind": "requirement",
+        "text": "A launch whose product home path is longer than the platform's socket path limit allows under spec 064 is no longer refused at the self-test's socket bind."
+      },
+      {
+        "anchor": "verification",
+        "id": "V-1",
+        "inputs": [
+          "crates/statecraft-cli/tests/protected_boundary.rs"
+        ],
+        "kind": "verification",
+        "text": "A launch with a product home whose path is over 100 bytes passes the self-test on macOS and Linux, the probe still reports unixDenied, and a confinement record's protected roots and digest equal the ones spec 064's tests record."
+      }
+    ],
+    "sectionDigests": {
+      "066-a-short-probe-socket": "e8cc8810cd124a95b67c3618e8daa1540cc267aa7702fb189216051018db97a5",
+      "1-purpose": "f39030072c6d649f3c8e411f85954ef17b4d737a8c6bacda66a333c752ec64ec",
+      "2-territory": "339c9a5a19de1f4d5b55c7a2018056d93d10508ec7894e459e08cb05e47101eb",
+      "3-1-where-the-socket-lives": "15df9ceb2a18a7b96e7d63971ab27a4e019601c665a8d2ed63f532310d1a22bd",
+      "3-2-what-does-not-move": "abb4e1725cfb9288abad67d468b8df44aedca90fe49ceec06ace870478a25d71",
+      "3-3-what-a-long-home-now-does": "6fb1e219c1a1c35e8c179d490dab4b138cde8b8dd6be5444fe945382218b7ce6",
+      "3-behavior": "cd509b985d96608e0823e145c0e20b6d6bc8be43521677869f52377e863d0c4a",
+      "4-out-of-scope": "04c908e364150e4df036612bc335c0ae6b25a9dfeaed9c8d7a3b48f77f44ceb1",
+      "5-resolved-decisions": "bacc84a6979ebbd198258d78c708de7f7cb7ef89635652a601d786738ded21f5",
+      "verification": "59d318668b0144635f8525db20f09541af84c7f304b52a6d2ffd0432f4b74814"
+    },
+    "sectionHeadings": [
+      "066: A short probe socket",
+      "1. Purpose",
+      "2. Territory",
+      "3. Behavior",
+      "3.1 Where the socket lives",
+      "3.2 What does not move",
+      "3.3 What a long home now does",
+      "4. Out of scope",
+      "5. Resolved decisions",
+      "Verification"
+    ],
+    "specPath": "specs/066-short-probe-socket/spec.md",
+    "status": "draft",
+    "summary": "Amends spec 064 section 3.3. The self-test's listening Unix socket moves from a directory under the product home's boundary entry to a private directory under /tmp, so its path no longer grows with the home's path and stays within the platform's socket path limit (104 bytes on macOS, 108 on Linux). The sentinel stays in boundary/, the protected roots and the confinement record are unchanged, and rule 6 of spec 004 section 3.18 still decides whether the probe's connect is refused.\n",
+    "title": "The boundary self-test's probe socket lives under a short fixed directory, so a long home path cannot refuse a launch"
+  },
+  "shardHash": "34b2d79f72d57f88c5467234aa3550f22cbe405c9cc0192cd491cded11b85fd5",
+  "specVersion": "1.11.0"
+}
