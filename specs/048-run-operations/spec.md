@@ -1,7 +1,7 @@
 ---
 id: "048-run-operations"
 title: "Typed run operations under one controller lease, recorded in the run record"
-status: draft
+status: approved
 implementation: pending
 created: "2026-10-21"
 summary: >
@@ -176,8 +176,8 @@ provider session.
 
 ## Verification
 
-This spec is `status: draft` and declares no acceptance until it is ratified
-and built. Its acceptance will build a record from a sequence of operations
+Ratified by the owner on 2026-10-31. Acceptance is declared by the
+implementing change, which will build a record from a sequence of operations
 and replay it to the same state, repeat a key and find nothing appended,
 submit a stale version and see exit 2 naming `stale-version`, and resume a
 cursor after a dropped connection with no event missed or repeated.
