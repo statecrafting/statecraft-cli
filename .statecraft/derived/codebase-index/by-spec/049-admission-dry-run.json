@@ -11,8 +11,8 @@
     ],
     "implementingPaths": [],
     "specId": "049-admission-dry-run",
-    "specStatus": "draft"
+    "specStatus": "approved"
   },
   "schemaVersion": "1.3.0",
-  "shardHash": "9a610da7cb1c1dda85ec384b8304506c07bc23360442d7c8238f0dfd3956fb98"
+  "shardHash": "0e1cbd2609d5d8bc5dbb363fed7ad507d902acdce786909af4f999e3126562b6"
 }
