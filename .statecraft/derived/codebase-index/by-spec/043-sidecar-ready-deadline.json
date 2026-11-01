@@ -7,10 +7,47 @@
       "004-execution-adapter",
       "013-supervised-wire-witness"
     ],
-    "implementingPaths": [],
+    "implementingPaths": [
+      {
+        "path": "crates/statecraft-adapter/",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/statecraft-cli/",
+        "source": "spec-edge"
+      }
+    ],
+    "resolvedUnits": [
+      {
+        "locations": [
+          {
+            "file": "crates/statecraft-adapter/"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "directory",
+          "path": "crates/statecraft-adapter/"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "crates/statecraft-cli/"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "directory",
+          "path": "crates/statecraft-cli/"
+        }
+      }
+    ],
     "specId": "043-sidecar-ready-deadline",
     "specStatus": "approved"
   },
   "schemaVersion": "1.3.0",
-  "shardHash": "7f63dd923cdecaa7e3cf23e46174850b8a2e03c9d35b8064153ce2dce589dfe4"
+  "shardHash": "7ea26e5af9a2ca20d4c8fa04b7848b93e6a324091e76a3b1ddeefd2c0590afb6"
 }

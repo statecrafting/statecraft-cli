@@ -13,9 +13,9 @@ summary: >
   syspolicyd load, and measures the same route on Linux.
 amends:
   - "013-supervised-wire-witness"
-# No `extends` yet: the implementing change adds the edges on
-# crates/statecraft-adapter/ (004) and crates/statecraft-cli/ (006) with the
-# code, because the gate counts an extender as an owner.
+extends:
+  - { spec: "004-execution-adapter", unit: { kind: directory, path: "crates/statecraft-adapter/" }, nature: additive }
+  - { spec: "006-command-surface", unit: { kind: directory, path: "crates/statecraft-cli/" }, nature: additive }
 depends_on:
   - "004-execution-adapter"
   - "013-supervised-wire-witness"
@@ -173,10 +173,56 @@ from spawn, and records that here with the measurement.
 posture it already reads and shows a reason word it does not know as recorded;
 section 3.2 already forbids inferring success from either.
 
+**2026-10-31: the adopted observation, on macOS and Linux, is the start line
+consumed, read from a retained read end.** The supervisor makes the producer's
+stdin pipe itself, keeps a duplicate of its read end through the start phase,
+writes the start line, and asks the kernel how many of its bytes remain unread
+(`FIONREAD` on that end); fewer than it wrote is the observation. The write
+end's own count is not used, because on macOS it reports that end's own empty
+buffer. Nothing that runs before the producer's code (the kernel creating the
+process, the confinement wrapper, the loader, the assessment of a newly placed
+file) reads that pipe, which M-3's fixture, a producer that sleeps before
+reading its input, shows in `witness_sidecar` on both platforms. The second
+candidate of section 3.3 is not adopted: the fixture producer is a script run
+by `/bin/sh`, whose process image never becomes the producer's, so M-3 cannot
+show it, and the first candidate suffices. A kernel that declines the query
+leaves that attempt on 013's single deadline from spawn, and the supervisor
+records the observation as unavailable; neither platform has shown that.
+
+**2026-10-31: the deadline word is the closing outcome's no-digest reason.**
+The run path writes `start-timeout` or `ready-timeout` as the sidecar
+effect's `noDigestReason` when the sidecar was refused for that deadline, in
+place of `sidecar-exited-before-ready`; every other refusal keeps 013's words,
+and the attempt's `witness.failure` carries the same word as before. The
+protocol module is unchanged.
+
+**2026-10-31: provisional values until M-1 and M-2 are recorded here.**
+`START_TIMEOUT` is 60 seconds and `READY_TIMEOUT` keeps 013's 20 seconds, in
+`crates/statecraft-cli/src/witness.rs`. The supervisor exposes both intervals
+of M-1 and M-2 (spawn to the observation, the observation to `ready`) as the
+sidecar's `Timing`, so the measurements read them rather than the wall clock.
+This spec stays `implementation: pending` until those measurements and the
+values they set are entered here.
+
 ## Verification
 
-Ratified by the owner on 2026-10-31. Acceptance is declared by the
-implementing change, which will run the sidecar suites of 013 with a fixture
-producer that delays before reading its input, on both platforms, and the
-measurements of section 5 are recorded with the change that adopts the
-deadlines.
+Ratified by the owner on 2026-10-31. Acceptance is run through
+`make verify SPEC=043`, with M-3's fixture producer under the platform it runs
+on and no provider; the measurements of section 5 are recorded in section 7
+with the change that sets the deadlines.
+
+```verify:cli
+cargo test -p statecraft-adapter --test witness_sidecar
+cargo test -p statecraft-cli --lib witness
+cargo test -p statecraft-cli --test witness_admission
+cargo test -p statecraft-cli --test witness_sidecar_confinement
+cargo test -p statecraft-cli --test witness_run
+```
+
+These show that a producer blocked before reading its input is not observed
+started and still reaches `ready` past the ready deadline, that each deadline
+refuses under its own word with the posture `witness-failed`, that a
+producer's claim about its start is ignored for timing, that the start
+deadline is the longer and the ready deadline keeps 013's value, and that the
+sidecar suites of 013 still pass under the two deadlines, the confined ones
+included.

@@ -1,4 +1,6 @@
-//! Spec 013 sections 3.2 to 3.5 and section 4, against a fake sidecar.
+//! Spec 013 sections 3.2 to 3.5 and section 4, against a fake sidecar, and
+//! spec 043's two deadlines and start observation (its sections 3 and 4,
+//! measurement M-3) against a fake that blocks before reading its input.
 //!
 //! The fake is a shell script run as `/bin/sh <script> sidecar`, so the test
 //! never executes a file it has just written (the Linux ETXTBSY race). It
@@ -10,7 +12,7 @@ use statecraft_adapter::witness::posture::Observed;
 use statecraft_adapter::witness::protocol::{
     AttemptBinding, Authority, Integrity, Limits, Start, Termination,
 };
-use statecraft_adapter::witness::sidecar::{Plan, start};
+use statecraft_adapter::witness::sidecar::{Plan, StartObservation, start};
 use std::collections::BTreeMap;
 use std::net::SocketAddr;
 use std::path::{Path, PathBuf};
@@ -38,11 +40,17 @@ fn binding_json() -> String {
 /// `body` runs after the start line is consumed and the area exists;
 /// `$OUT` is the area, `$B` the binding JSON.
 fn fixture(body: &str) -> Fixture {
+    fixture_blocking("", body)
+}
+
+/// A producer whose code runs but reads nothing before `before` has run:
+/// spec 043's M-3 fixture. The start line is read only after it.
+fn fixture_blocking(before: &str, body: &str) -> Fixture {
     let dir = tempfile::tempdir().unwrap();
     let area = dir.path().join("witness");
     let script = dir.path().join("fake-sidecar.sh");
     let text = format!(
-        "OUT='{out}'\nB='{b}'\nP='\"protocol\":\"wire-witness.sidecar/1\"'\nread -r start\nmkdir -m 700 \"$OUT\"\nprintf 'cert' > \"$OUT/ca.pem\"\n{body}\n",
+        "OUT='{out}'\nB='{b}'\nP='\"protocol\":\"wire-witness.sidecar/1\"'\n{before}\nread -r start\nmkdir -m 700 \"$OUT\"\nprintf 'cert' > \"$OUT/ca.pem\"\n{body}\n",
         out = area.display(),
         b = binding_json(),
     );
@@ -100,9 +108,18 @@ fn plan(fixture: &Fixture) -> Plan {
         },
         wrapper: vec!["/bin/sh".into()],
         environment: BTreeMap::from([("PATH".into(), "/bin:/usr/bin".into())]),
+        start_timeout: Duration::from_secs(60),
         ready_timeout: Duration::from_secs(20),
         grace: Duration::from_secs(5),
     }
+}
+
+/// `plan` with spec 043's two deadlines set for one test.
+fn deadlines(fixture: &Fixture, start_timeout: u64, ready_timeout: u64) -> Plan {
+    let mut p = plan(fixture);
+    p.start_timeout = Duration::from_secs(start_timeout);
+    p.ready_timeout = Duration::from_secs(ready_timeout);
+    p
 }
 
 #[test]
@@ -232,6 +249,121 @@ fn an_incomplete_terminal_is_incomplete_and_a_wrong_digest_is_not_intact() {
     assert_eq!(ended.termination, Termination::Finished);
     assert_eq!(ended.observed(true), Observed::Incomplete);
     assert_eq!(ended.reader.terminal().unwrap().gaps, ["deadline-reached"]);
+}
+
+// Spec 043 (M-3, R-3, section 4 row 4): the start observation is not
+// satisfied before the producer's code reads its input. The shell is running
+// throughout the two seconds, so a wrapper or loader activity alone, or the
+// kernel having created the process, would have been observed at once.
+#[test]
+fn a_producer_blocked_before_reading_its_input_is_not_observed_started() {
+    let f = fixture_blocking(
+        "sleep 2",
+        &format!("{READY}\ncat >/dev/null\n{}", finished()),
+    );
+    let running = start(&deadlines(&f, 60, 20)).expect("ready");
+    let timing = running.timing();
+    assert_eq!(timing.observation, StartObservation::StartLineConsumed);
+    let started_after = timing.started_after.expect("start observed");
+    assert!(started_after >= Duration::from_secs(2), "{started_after:?}");
+    let ready_after = timing.ready_after.expect("ready observed");
+    assert!(ready_after < started_after, "{ready_after:?}");
+    assert_eq!(running.close().termination, Termination::Finished);
+}
+
+// Spec 043 (R-1, section 4 row 1): blocked past the ready deadline but inside
+// the start deadline still reaches ready, because the ready deadline runs
+// from the start observation, not from spawn.
+#[test]
+fn a_producer_blocked_past_the_ready_deadline_still_reaches_ready() {
+    let f = fixture_blocking(
+        "sleep 2",
+        &format!("{READY}\ncat >/dev/null\n{}", finished()),
+    );
+    let began = Instant::now();
+    let running = start(&deadlines(&f, 20, 1)).expect("ready");
+    assert!(began.elapsed() >= Duration::from_secs(2));
+    assert_eq!(
+        running.ready().endpoint,
+        RESERVED.parse::<SocketAddr>().unwrap()
+    );
+    let ended = running.close();
+    assert_eq!(ended.termination, Termination::Finished);
+    assert_eq!(
+        ended.observed(true),
+        Observed::Complete {
+            intact: true,
+            qualified: true
+        }
+    );
+}
+
+// Spec 043 (R-2, section 4 row 2): blocked past the start deadline is
+// `start-timeout`, `witness-failed`, and the child never spawns.
+#[test]
+fn a_producer_blocked_past_the_start_deadline_is_start_timeout() {
+    let f = fixture_blocking("sleep 30", READY);
+    let began = Instant::now();
+    let ended = *start(&deadlines(&f, 1, 1)).unwrap_err().unwrap_err();
+    assert_eq!(ended.refusal.as_deref(), Some("start-timeout"));
+    assert_eq!(ended.termination, Termination::Killed);
+    assert_eq!(ended.observed(true), Observed::Failed);
+    assert_eq!(ended.timing.started_after, None);
+    assert!(ended.reader.terminal().is_none());
+    assert!(began.elapsed() < Duration::from_secs(20));
+}
+
+// Spec 043 (R-2, section 4 row 3): started but silent is `ready-timeout`
+// after the ready deadline from the start observation.
+#[test]
+fn a_started_producer_that_never_reports_ready_is_ready_timeout() {
+    let f = fixture("sleep 30");
+    let began = Instant::now();
+    let ended = *start(&deadlines(&f, 20, 1)).unwrap_err().unwrap_err();
+    assert_eq!(ended.refusal.as_deref(), Some("ready-timeout"));
+    assert_eq!(ended.termination, Termination::Killed);
+    assert_eq!(ended.observed(true), Observed::Failed);
+    assert_eq!(
+        ended.timing.observation,
+        StartObservation::StartLineConsumed
+    );
+    assert!(ended.timing.started_after.is_some());
+    assert_eq!(ended.timing.ready_after, None);
+    assert!(began.elapsed() >= Duration::from_secs(1));
+    assert!(began.elapsed() < Duration::from_secs(20));
+}
+
+// Spec 043 (R-2, section 3.2): an exit before ready in the start phase keeps
+// 013's word, as the ready-phase exit above does.
+#[test]
+fn an_exit_before_reading_the_start_line_is_exited_before_ready() {
+    let f = fixture_blocking("exit 3", READY);
+    let ended = *start(&deadlines(&f, 60, 20)).unwrap_err().unwrap_err();
+    assert_eq!(
+        ended.refusal.as_deref(),
+        Some("sidecar-exited-before-ready")
+    );
+    assert_eq!(ended.timing.started_after, None);
+    assert_eq!(ended.observed(true), Observed::Failed);
+}
+
+// Spec 043 (R-3, section 4 row 5): a producer message claiming a start time
+// is ignored for timing. The claim arrives before the producer reads its
+// input and the ready deadline would have run out had the claim started it;
+// the message itself is a protocol finding, as 013 already requires.
+#[test]
+fn a_producer_claim_about_its_start_is_ignored_for_timing() {
+    let claim = r#"printf '{%s,"type":"started","binding":%s,"started_at":"1970-01-01T00:00:00Z"}\n' "$P" "$B""#;
+    let f = fixture_blocking(
+        &format!("{claim}\nsleep 2"),
+        &format!("{READY}\ncat >/dev/null\n{}", finished()),
+    );
+    let running = start(&deadlines(&f, 20, 1)).expect("ready");
+    let started_after = running.timing().started_after.expect("start observed");
+    assert!(started_after >= Duration::from_secs(2), "{started_after:?}");
+    let ended = running.close();
+    assert_eq!(ended.termination, Termination::Finished);
+    assert_eq!(ended.reader.findings().len(), 1);
 }
 
 #[test]

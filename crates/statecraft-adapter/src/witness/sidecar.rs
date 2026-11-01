@@ -11,6 +11,17 @@
 //! discarded, because diagnostics are not protocol evidence and this crate
 //! does not redact them. The process handle is retained for supervision from
 //! spawn to exit, and a child can neither request nor replace it.
+//!
+//! The wait for `ready` runs two deadlines in sequence (spec 043 section
+//! 3.1): a start deadline from spawn until the producer's own code is
+//! observed running, and the ready deadline from that observation. The
+//! observation (section 3.3) is that the producer has consumed the start
+//! line: the supervisor keeps a duplicate of the read end of the pipe it wrote
+//! the line to and asks the kernel how many bytes remain unread. Nothing the
+//! operating system does before the producer runs, the confinement wrapper
+//! and the loader included, reads that pipe, and the producer sends nothing
+//! the supervisor would have to trust. Where the kernel cannot answer, 013's
+//! single deadline from spawn stands.
 
 use crate::witness::ledger::VerifiedProducer;
 use crate::witness::posture::Observed;
@@ -20,11 +31,21 @@ use crate::witness::protocol::{
 };
 use std::collections::BTreeMap;
 use std::ffi::OsString;
-use std::io::{BufRead, BufReader, Read, Write};
+use std::io::{BufRead, BufReader, PipeReader, PipeWriter, Read, Write};
 use std::path::PathBuf;
-use std::process::{Child, ChildStdin, Command, Stdio};
+use std::process::{Child, Command, Stdio};
 use std::sync::mpsc::{self, Receiver, RecvTimeoutError};
 use std::time::{Duration, Instant};
+
+/// The closing reason of a sidecar whose code was not observed running
+/// before the start deadline (spec 043 section 3.2).
+pub const START_TIMEOUT: &str = "start-timeout";
+/// The closing reason of a started sidecar that reported no valid `ready`
+/// before the ready deadline.
+pub const READY_TIMEOUT: &str = "ready-timeout";
+
+/// How often the start observation is re-read while the start deadline runs.
+const START_POLL: Duration = Duration::from_millis(10);
 
 /// Everything needed to start one sidecar.
 #[derive(Debug, Clone)]
@@ -38,10 +59,43 @@ pub struct Plan {
     pub wrapper: Vec<OsString>,
     /// The sidecar's whole environment; nothing is inherited.
     pub environment: BTreeMap<String, String>,
-    /// How long to wait for `ready`.
+    /// The start deadline: how long after spawn the producer's code must be
+    /// observed running (spec 043 section 3.1). Longer than `ready_timeout`.
+    pub start_timeout: Duration,
+    /// The ready deadline: how long the started producer has to report a
+    /// valid `ready`, from the start observation.
     pub ready_timeout: Duration,
     /// How long the sidecar has to finish after its stdin closes.
     pub grace: Duration,
+}
+
+/// How the supervisor observed the producer's start (spec 043 section 3.3).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum StartObservation {
+    /// The producer read from the pipe holding the start line.
+    StartLineConsumed,
+    /// The kernel could not report the pipe's unread bytes, so no observation
+    /// was available and 013's single deadline ran from spawn.
+    Unavailable,
+}
+
+/// When the sidecar started and reported ready, for spec 043 section 5.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Timing {
+    /// Which observation applied.
+    pub observation: StartObservation,
+    /// Spawn to the start observation; `None` when it never came.
+    pub started_after: Option<Duration>,
+    /// The start observation (spawn, when none was available) to the
+    /// validated `ready`; `None` when none came.
+    pub ready_after: Option<Duration>,
+}
+
+/// Which deadline is running.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Phase {
+    Starting,
+    Started,
 }
 
 enum Line {
@@ -53,13 +107,14 @@ enum Line {
 #[derive(Debug)]
 pub struct Running {
     child: Child,
-    stdin: Option<ChildStdin>,
+    stdin: Option<PipeWriter>,
     lines: Receiver<Line>,
     reader: Reader,
     ready: ValidatedReady,
     area: PathBuf,
     eof: bool,
     grace: Duration,
+    timing: Timing,
 }
 
 /// What one sidecar left behind, whether it reached `ready` or not.
@@ -73,6 +128,8 @@ pub struct Ended {
     pub integrity: Integrity,
     /// Why the child must not be spawned, when it was refused before.
     pub refusal: Option<String>,
+    /// When the producer started and reported ready.
+    pub timing: Timing,
 }
 
 impl Ended {
@@ -161,16 +218,27 @@ fn argv(plan: &Plan) -> Vec<OsString> {
 
 fn spawn(plan: &Plan, mut command: Command) -> Result<Running, Result<SpawnFailed, Box<Ended>>> {
     let area = plan.start.output_directory.clone();
+    // The supervisor makes the stdin pipe itself and keeps a duplicate of
+    // its read end, which is the start observation's whole instrument. Both
+    // ends are close-on-exec; the child receives the read end as its stdin
+    // only, and an extra read end never withholds EOF: that follows the last
+    // write end, which `Running::close` drops.
+    let (reader, mut stdin) = std::io::pipe().map_err(|e| Ok(SpawnFailed(e.to_string())))?;
+    let probe = reader
+        .try_clone()
+        .map_err(|e| Ok(SpawnFailed(e.to_string())))?;
     command
         .env_clear()
         .envs(&plan.environment)
-        .stdin(Stdio::piped())
+        .stdin(Stdio::from(reader))
         .stdout(Stdio::piped())
         .stderr(Stdio::null());
     let mut child = command
         .spawn()
         .map_err(|e| Ok(SpawnFailed(e.to_string())))?;
-    let (Some(mut stdin), Some(stdout)) = (child.stdin.take(), child.stdout.take()) else {
+    let spawned = Instant::now();
+    drop(command);
+    let Some(stdout) = child.stdout.take() else {
         let _ = child.kill();
         let _ = child.wait();
         return Err(Ok(SpawnFailed("stdio unavailable".into())));
@@ -188,19 +256,55 @@ fn spawn(plan: &Plan, mut command: Command) -> Result<Running, Result<SpawnFaile
         area,
         eof: false,
         grace: plan.grace,
+        timing: Timing {
+            observation: StartObservation::StartLineConsumed,
+            started_after: None,
+            ready_after: None,
+        },
     };
-    if stdin
-        .write_all(&plan.start.line())
-        .and_then(|()| stdin.flush())
-        .is_err()
-    {
+    let line = plan.start.line();
+    if stdin.write_all(&line).and_then(|()| stdin.flush()).is_err() {
         return Err(Err(Box::new(running.abort("start-not-delivered"))));
     }
     running.stdin = Some(stdin);
 
-    let deadline = Instant::now() + plan.ready_timeout;
+    // Section 3.1: the start deadline runs until the observation, then the
+    // ready deadline runs from it. With no observation available, the ready
+    // deadline runs from spawn (section 3.3, last paragraph).
+    let mut phase = Phase::Starting;
+    let mut deadline = spawned + plan.start_timeout;
+    let mut observed_at = spawned;
+    let mut probe = Some(probe);
+    if unread(probe.as_ref()).is_none() {
+        running.timing.observation = StartObservation::Unavailable;
+        probe = None;
+        phase = Phase::Started;
+        deadline = spawned + plan.ready_timeout;
+    }
     loop {
-        let wait = deadline.saturating_duration_since(Instant::now());
+        let now = Instant::now();
+        if phase == Phase::Starting {
+            match unread(probe.as_ref()) {
+                Some(remaining) if remaining < line.len() => {
+                    observed_at = now;
+                    running.timing.started_after = Some(now - spawned);
+                    probe = None;
+                    phase = Phase::Started;
+                    deadline = now + plan.ready_timeout;
+                }
+                Some(_) => {}
+                None => {
+                    running.timing.observation = StartObservation::Unavailable;
+                    probe = None;
+                    phase = Phase::Started;
+                    deadline = spawned + plan.ready_timeout;
+                }
+            }
+        }
+        let mut wait = deadline.saturating_duration_since(now);
+        if phase == Phase::Starting {
+            wait = wait.min(START_POLL);
+        }
         match running.lines.recv_timeout(wait) {
             Ok(Line::Bytes(bytes)) => match running.reader.read(&bytes) {
                 Ok(Notice::Ready(ready)) => {
@@ -211,6 +315,7 @@ fn spawn(plan: &Plan, mut command: Command) -> Result<Running, Result<SpawnFaile
                     ) {
                         Ok(validated) => {
                             running.ready = validated;
+                            running.timing.ready_after = Some(observed_at.elapsed());
                             Ok(running)
                         }
                         Err(refusal) => Err(Err(Box::new(running.refuse(&refusal)))),
@@ -226,11 +331,36 @@ fn spawn(plan: &Plan, mut command: Command) -> Result<Running, Result<SpawnFaile
                 running.eof = true;
                 return Err(Err(Box::new(running.abort("sidecar-exited-before-ready"))));
             }
+            Err(RecvTimeoutError::Timeout) if Instant::now() < deadline => {}
             Err(RecvTimeoutError::Timeout) => {
-                return Err(Err(Box::new(running.abort("ready-timeout"))));
+                let why = match phase {
+                    Phase::Starting => START_TIMEOUT,
+                    Phase::Started => READY_TIMEOUT,
+                };
+                return Err(Err(Box::new(running.abort(why))));
             }
         }
     }
+}
+
+/// How many bytes written to the pipe `probe` reads from are still unread,
+/// or `None` where the kernel does not answer. The query reads the pipe's
+/// state only; it consumes nothing and the producer takes no part in it.
+#[cfg(any(target_os = "linux", target_os = "macos"))]
+#[allow(unsafe_code)]
+fn unread(probe: Option<&PipeReader>) -> Option<usize> {
+    use std::os::fd::AsRawFd;
+    let probe = probe?;
+    let mut count: libc::c_int = 0;
+    // SAFETY: FIONREAD writes one `c_int` through the pointer it is given,
+    // and `probe` owns the descriptor for the duration of the call.
+    let rc = unsafe { libc::ioctl(probe.as_raw_fd(), libc::FIONREAD, &raw mut count) };
+    (rc == 0).then(|| usize::try_from(count).unwrap_or(0))
+}
+
+#[cfg(not(any(target_os = "linux", target_os = "macos")))]
+fn unread(_probe: Option<&PipeReader>) -> Option<usize> {
+    None
 }
 
 impl Running {
@@ -238,6 +368,12 @@ impl Running {
     #[must_use]
     pub fn ready(&self) -> &ValidatedReady {
         &self.ready
+    }
+
+    /// When the producer started and reported ready.
+    #[must_use]
+    pub fn timing(&self) -> Timing {
+        self.timing
     }
 
     /// Read whatever the sidecar has sent without blocking. Returns the
@@ -286,6 +422,7 @@ impl Running {
             termination,
             integrity,
             refusal: None,
+            timing: self.timing,
         }
     }
 
@@ -305,6 +442,7 @@ impl Running {
             termination,
             integrity: Integrity::Missing,
             refusal: Some(why.to_string()),
+            timing: self.timing,
         }
     }
 

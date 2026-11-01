@@ -4,9 +4,28 @@
       "013-supervised-wire-witness"
     ],
     "created": "2026-10-21",
+    "declaresAcceptance": true,
     "dependsOn": [
       "004-execution-adapter",
       "013-supervised-wire-witness"
+    ],
+    "extends": [
+      {
+        "nature": "additive",
+        "spec": "004-execution-adapter",
+        "unit": {
+          "kind": "directory",
+          "path": "crates/statecraft-adapter/"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "006-command-surface",
+        "unit": {
+          "kind": "directory",
+          "path": "crates/statecraft-cli/"
+        }
+      }
     ],
     "id": "043-sidecar-ready-deadline",
     "implementation": "pending",
@@ -31,7 +50,7 @@
       }
     ],
     "sectionDigests": {
-      "043-the-witness-sidecar-s-ready-deadline-starts-when-its-process-starts": "65a58d338c4831ebc7b771a4f4530c561b242b788ef5604c433d67994d18f356",
+      "043-the-witness-sidecar-s-ready-deadline-starts-when-its-process-starts": "9318117d699bb7e919c6e43cb109297b3dd506690e02a1538eec8e983b3704bf",
       "1-purpose": "f783e5be6e9b4edde006bd6dd655cfab373cdb717e2cfa53249db0e930b40f4e",
       "2-territory": "26d2cf161ce3a19735625b9797c9ffdead7d0d324ae37448248e48507aa8cc62",
       "3-1-two-deadlines": "2c806e2e9390aca84fcc01998010f0255aab317a951bf1c946de0fe11fa1452c",
@@ -41,8 +60,8 @@
       "4-observable-negative-cases": "888dcb9dfa288632db3a46d78bbc190a860b8320201e363296b8e99631316b67",
       "5-measurements-this-spec-requires": "3f59c25de1637aa487c11dbceab6bc9eb7df860d6835cb52ac6b0a22cab81eb2",
       "6-out-of-scope": "9376c29fe8f4549624a5b24b9a147e2d343f4b7bea2ee17cb1fb93a2ac889fa0",
-      "7-resolved-decisions": "62d520bc330e45c2cfb0bf5d528fb6bd3dbd0bbbeb2df4a83f89bdd33b9891af",
-      "verification": "a66ca15a4315ecc5d0b178872010e74e14a12e2ee78d4d5ed0b86cd70cb93056"
+      "7-resolved-decisions": "fc94c4de6bb0b78cbe77cd81e322da5455795ef2b988a6e6c694d4c4932a0154",
+      "verification": "57fb007d903de517e9703b43a68f0ceefb78186abb46b15b9d624e970c7f645c"
     },
     "sectionHeadings": [
       "043: The witness sidecar's ready deadline starts when its process starts",
@@ -63,6 +82,6 @@
     "summary": "Amends 013 so the supervisor's ready deadline measures the producer's own startup, not the operating system's assessment of a newly placed executable. A bounded start deadline covers the time from spawn until the producer's code is observed running; the existing ready deadline runs from that observation. Closes the residual 013 records for a ready-timeout under syspolicyd load, and measures the same route on Linux.\n",
     "title": "The witness sidecar's ready deadline starts when its process starts"
   },
-  "shardHash": "7f63dd923cdecaa7e3cf23e46174850b8a2e03c9d35b8064153ce2dce589dfe4",
+  "shardHash": "7ea26e5af9a2ca20d4c8fa04b7848b93e6a324091e76a3b1ddeefd2c0590afb6",
   "specVersion": "1.11.0"
 }
