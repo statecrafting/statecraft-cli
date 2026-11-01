@@ -9,8 +9,8 @@
     ],
     "implementingPaths": [],
     "specId": "066-short-probe-socket",
-    "specStatus": "draft"
+    "specStatus": "approved"
   },
   "schemaVersion": "1.3.0",
-  "shardHash": "34b2d79f72d57f88c5467234aa3550f22cbe405c9cc0192cd491cded11b85fd5"
+  "shardHash": "eaa232b289d93cb6b115a9444c5906e33b01d653ee3224381ba813dde023304b"
 }
