@@ -1,0 +1,69 @@
+# Supply-chain policy for the statecraft-cli workspace, checked by the
+# setup profile's supply-chain job (spec 044 section 3.2) as
+# `cargo deny check all`. The job never edits this file or writes an
+# exemption; a change here is a reviewed change to this repository's policy.
+
+[graph]
+all-features = true
+
+[advisories]
+# A vulnerability, an unmaintained crate anywhere in the tree, or a yanked
+# version fails the check. An entry in `ignore` names the advisory and the
+# reason it cannot reach this product, and is removed when the fix lands.
+version = 2
+unmaintained = "all"
+yanked = "deny"
+ignore = []
+
+[licenses]
+# Permissive licences compatible with this repository's distribution. A crate
+# under anything else fails until this list changes in a reviewed change that
+# names the crate and the reason.
+version = 2
+allow = [
+  "Apache-2.0",
+  "MIT",
+  "BSD-2-Clause",
+  "BSD-3-Clause",
+  "ISC",
+  "Zlib",
+  "Unicode-3.0",
+  "MIT-0",
+  # webpki-roots: the Mozilla root store as data, a permissive data licence.
+  "CDLA-Permissive-2.0",
+]
+confidence-threshold = 0.8
+unused-allowed-license = "allow"
+
+[bans]
+# Duplicate versions are reported everywhere and refused for the
+# cryptographic and TLS stacks, where two copies mean two sets of behaviour
+# to audit and two places a fix has to land.
+multiple-versions = "warn"
+wildcards = "deny"
+# The workspace crates depend on one another by path without a version
+# (they are not published); a registry wildcard is still refused.
+allow-wildcard-paths = true
+highlight = "all"
+deny = [
+  { crate = "ring", deny-multiple-versions = true },
+  { crate = "rustls", deny-multiple-versions = true },
+  { crate = "aws-lc-rs", deny-multiple-versions = true },
+  { crate = "ed25519-dalek", deny-multiple-versions = true },
+  { crate = "rustls-webpki", deny-multiple-versions = true },
+]
+# A duplicate in a refused stack is skipped by exact version, never by crate,
+# so the entry lapses when the tree converges. statecraft-envelope signs with
+# ed25519-dalek 2 while attest-ledger-core 0.2 (under statecraft-run and
+# statecraft-observe) takes 3; the move to 3 is a change to spec 005's
+# crate and removes this entry.
+skip = [
+  { crate = "ed25519-dalek@2.2.0", reason = "statecraft-envelope pins 2; attest-ledger-core 0.2 takes 3; lapses when the envelope moves to 3" },
+]
+
+[sources]
+# The registry only: no other index and no git source.
+unknown-registry = "deny"
+unknown-git = "deny"
+allow-registry = ["https://github.com/rust-lang/crates.io-index"]
+allow-git = []
