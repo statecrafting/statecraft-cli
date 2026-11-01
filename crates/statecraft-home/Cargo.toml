@@ -71,6 +71,10 @@ rustix = { version = "1.1.5", features = ["fs"] }
 # tree-sitter grammars. build.rs reads what the lock resolved.
 spec-spine-core.workspace = true
 
+# Spec 046 section 3.3: the provider token is held in the one secret type from
+# the moment it is read until it is dropped.
+statecraft-secret = { path = "../statecraft-secret" }
+
 tempfile = "3.27.0"
 
 [lints]

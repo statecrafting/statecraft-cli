@@ -11,8 +11,14 @@
 //! product never falls back to the operator's own login, which a per-run
 //! configuration directory cannot reach and which a refresh by the child
 //! could rotate.
+//!
+//! The token is a [`SecretString`] (spec 046 section 3.3) from the moment it
+//! is validated: redacted when shown, zeroed when dropped, read only through
+//! `expose`, which the confinement calls once at the point it places the
+//! token in the child's environment.
 
 use crate::home::Layout;
+use statecraft_secret::SecretString;
 use std::path::Path;
 
 /// The environment name the provider reads its token from.
@@ -49,7 +55,7 @@ pub enum TokenError {
 }
 
 /// The token's text, trimmed of surrounding whitespace, validated.
-fn validate(input: &[u8]) -> Result<String, TokenError> {
+fn validate(input: &[u8]) -> Result<SecretString, TokenError> {
     let text = std::str::from_utf8(input).map_err(|_| TokenError::Malformed("not UTF-8"))?;
     let token = text.trim();
     if token.is_empty() {
@@ -63,7 +69,7 @@ fn validate(input: &[u8]) -> Result<String, TokenError> {
             "contains whitespace or a non-printable byte",
         ));
     }
-    Ok(token.to_string())
+    Ok(SecretString::from(token))
 }
 
 /// Store `input` as the provider token: owner-only, in an owner-only
@@ -95,7 +101,7 @@ pub fn set(home: &Path, input: &[u8]) -> Result<(), TokenError> {
             .custom_flags(libc::O_NOFOLLOW)
             .open(staged.path())
             .map_err(io)?;
-        f.write_all(token.as_bytes()).map_err(io)?;
+        f.write_all(token.expose().as_bytes()).map_err(io)?;
         f.sync_all().map_err(io)?;
     }
     staged.persist_noclobber(&target).map(|_| ()).map_err(|e| {
@@ -122,7 +128,7 @@ pub fn present(home: &Path) -> bool {
 }
 
 /// The stored token. Absent, not owner-only, or malformed refuses.
-pub fn read(home: &Path) -> Result<String, TokenError> {
+pub fn read(home: &Path) -> Result<SecretString, TokenError> {
     use std::io::Read;
     use std::os::unix::fs::{OpenOptionsExt, PermissionsExt};
     let path = Layout::new(home).provider_token_file();
@@ -157,7 +163,7 @@ mod tests {
     #[test]
     fn a_token_is_stored_owner_only_once_and_read_back() {
         let home = tempfile::tempdir().unwrap();
-        assert_eq!(read(home.path()), Err(TokenError::Absent));
+        assert_eq!(read(home.path()).map(|_| ()), Err(TokenError::Absent));
         assert!(!present(home.path()));
         set(home.path(), b"  sk-ant-oat01-example\n").unwrap();
         assert!(present(home.path()));
@@ -174,14 +180,19 @@ mod tests {
                 & 0o777,
             0o700
         );
-        assert_eq!(read(home.path()).unwrap(), "sk-ant-oat01-example");
+        let token = read(home.path()).unwrap();
+        assert_eq!(token.expose(), "sk-ant-oat01-example");
+        // Spec 046 R-1 and V-1: the holder renders no value.
+        assert_eq!(format!("{token:?}"), "[redacted]");
+        assert_eq!(format!("{token}"), "[redacted]");
+        assert_eq!(format!("{:?}", read(home.path())), "Ok([redacted])");
         assert_eq!(set(home.path(), b"another"), Err(TokenError::Exists));
-        assert_eq!(read(home.path()).unwrap(), "sk-ant-oat01-example");
+        assert_eq!(read(home.path()).unwrap().expose(), "sk-ant-oat01-example");
         std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o644)).unwrap();
-        assert_eq!(read(home.path()), Err(TokenError::Unsafe));
+        assert_eq!(read(home.path()).map(|_| ()), Err(TokenError::Unsafe));
         assert!(clear(home.path()).unwrap());
         assert!(!clear(home.path()).unwrap());
-        assert_eq!(read(home.path()), Err(TokenError::Absent));
+        assert_eq!(read(home.path()).map(|_| ()), Err(TokenError::Absent));
     }
 
     #[test]
@@ -206,6 +217,6 @@ mod tests {
         let elsewhere = home.path().join("elsewhere");
         std::fs::write(&elsewhere, b"linked-token").unwrap();
         std::os::unix::fs::symlink(&elsewhere, &path).unwrap();
-        assert_eq!(read(home.path()), Err(TokenError::Unsafe));
+        assert_eq!(read(home.path()).map(|_| ()), Err(TokenError::Unsafe));
     }
 }
