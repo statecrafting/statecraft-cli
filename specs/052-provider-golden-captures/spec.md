@@ -1,7 +1,7 @@
 ---
 id: "052-provider-golden-captures"
 title: "Version-pinned provider captures, a quarantine and a divergence ledger gate a new provider version"
-status: draft
+status: approved
 implementation: pending
 created: "2026-10-21"
 summary: >
@@ -137,8 +137,8 @@ two new verbs are the capture and the compare.
 
 ## Verification
 
-This spec is `status: draft` and declares no acceptance until it is ratified
-and built. Its acceptance will compare a synthetic capture that differs from
+Ratified by the owner on 2026-10-31. Acceptance is declared by the
+implementing change, which will compare a synthetic capture that differs from
 its golden in a mapped field and see qualification refused, add a reviewed
 ledger entry and see it pass, skip and report a quarantined golden, and run
 the comparison in CI with networking denied.
