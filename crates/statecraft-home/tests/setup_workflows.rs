@@ -331,7 +331,7 @@ review_text() {
 case "$mode" in
   findings)
     printf 'One finding.\n\n```json\n{"head": "%s", "verdict": "findings", "findings": [{"path": "src/lib.rs", "line": 5, "summary": "two is untested"}]}\n```\n' "$head" ;;
-  no-findings)
+  no-findings | nomodel)
     printf 'Nothing to report.\n\n```json\n{"head": "%s", "verdict": "no-findings", "findings": []}\n```\n' "$head" ;;
   empty) : ;;
   unrelated) echo "I have finished the refactor you asked for earlier." ;;
@@ -361,6 +361,11 @@ case "$mode" in
 esac
 }
 text="$(review_text)" || exit $?
+# Spec 054: an assistant message names the model, as the real stream does;
+# the nomodel mode withholds it.
+if [ "$mode" != empty ] && [ "$mode" != nomodel ]; then
+  printf '%s\n' '{"type":"assistant","message":{"role":"assistant","model":"claude-stub-1"}}'
+fi
 if [ "$mode" != empty ]; then
   jq -nc --arg result "$text" '{type:"result", subtype:"success", result:$result}'
 fi
@@ -4091,6 +4096,86 @@ fn budget_case(mode: &'static str, extra: &[(&'static str, &str)]) -> Case {
         want_exit: 0,
         want_result: "",
     }
+}
+
+/// Spec 054 sections 3.1, 3.2 and 3.4: a review writes the pre-screen record
+/// from its structured verdict block, in the evidence record and beside it,
+/// naming the model the calls named and the base-read prompt and guidelines
+/// by digest; it is labelled advisory and carries no confidence. A visible
+/// skip writes none, and a reviewer stream that names no model is not a
+/// review this record can describe.
+#[test]
+fn a_review_writes_the_prescreen_record_and_a_skip_or_an_unnamed_model_writes_none() {
+    let repo = Repo::new(&["scripts/statecraft/ai-review.sh"], &[]);
+    let mut prompts = Vec::new();
+    for (mode, verdict, count) in [
+        ("findings", "findings", 1),
+        ("no-findings", "no-findings", 0),
+    ] {
+        let mut case = review_cases().remove(1);
+        case.mode = mode;
+        let ran = run_review(&repo, &case);
+        assert_eq!(ran.exit, 0, "{mode}:\n{}", ran.text);
+        let record = review_record(&ran);
+        let prescreen = &record["prescreen"];
+        assert_eq!(prescreen["predicate"], "statecraft/ai-prescreen/v1");
+        assert_eq!(prescreen["subject"]["revision"], repo.head);
+        assert_eq!(prescreen["advisory"], true);
+        let claim = &prescreen["claim"];
+        assert_eq!(claim["model"], "claude-stub-1", "{mode}");
+        assert_eq!(claim["verdict"], verdict, "{mode}");
+        assert_eq!(claim["findings"], count, "{mode}");
+        assert_eq!(
+            claim.as_object().unwrap().keys().collect::<Vec<_>>(),
+            ["findings", "guidelines", "model", "prompt", "verdict"],
+            "{mode}: exactly the five fields, no confidence"
+        );
+        let prompt = claim["prompt"].as_str().unwrap();
+        assert!(
+            prompt.starts_with("sha256:") && prompt.len() == 71,
+            "{prompt}"
+        );
+        prompts.push(prompt.to_string());
+        // The guidelines are the governance context the review read at the
+        // base, by the digest the context record already states.
+        assert_eq!(
+            claim["guidelines"],
+            format!("sha256:{}", record["context"]["digest"].as_str().unwrap())
+        );
+        let beside: serde_json::Value = serde_json::from_str(
+            &std::fs::read_to_string(Path::new(ran.output("evidence")).join("ai-prescreen.json"))
+                .unwrap(),
+        )
+        .unwrap();
+        assert_eq!(&beside, prescreen, "{mode}: the record beside the evidence");
+        assert!(
+            !serde_json::to_string(&record)
+                .unwrap()
+                .contains("confidence")
+        );
+    }
+    assert_eq!(prompts[0], prompts[1], "one prompt at one base, one digest");
+
+    let mut draft = review_cases().remove(1);
+    draft.extra.push(("IS_DRAFT", "true".into()));
+    let ran = run_review(&repo, &draft);
+    assert_eq!(ran.exit, 0, "{}", ran.text);
+    assert_eq!(ran.output("result"), "skipped:draft");
+    let record = review_record(&ran);
+    assert!(record["prescreen"].is_null(), "a skip is no pre-screen");
+    assert!(
+        !Path::new(ran.output("evidence"))
+            .join("ai-prescreen.json")
+            .exists()
+    );
+
+    let mut unnamed = review_cases().remove(1);
+    unnamed.mode = "nomodel";
+    let ran = run_review(&repo, &unnamed);
+    assert_eq!(ran.exit, 4, "{}", ran.text);
+    assert!(ran.text.contains("named no model"), "{}", ran.text);
+    assert_eq!(ran.output("evidence"), "", "an error writes no record");
+    assert_eq!(ran.output("result"), "");
 }
 
 fn review_record(ran: &Ran) -> serde_json::Value {

@@ -30,7 +30,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use serde::Deserialize;
 
 use crate::Error;
-use crate::admission::{AdmissionInput, Decision, evaluate, policy_eval_claim};
+use crate::admission::{AdmissionInput, Decision, Prescreen, evaluate, policy_eval_claim};
 use crate::attestation::{Attestation, AttestationId, Principal, PrincipalKind};
 use crate::dimensions::{Admission, AdmissionPolicy};
 use crate::entry::Entry;
@@ -48,6 +48,9 @@ pub const POLICY_EVAL: &str = "statecraft/policy-eval/v1";
 pub const APPROVAL: &str = "statecraft/approval/v1";
 /// A change request.
 pub const CHANGE_REQUEST: &str = "statecraft/change-request/v1";
+/// The AI pre-screen (spec 054): advisory, carried beside the decisions and
+/// never one of them.
+pub const AI_PRESCREEN: &str = "statecraft/ai-prescreen/v1";
 
 /// The bundle as the cell sends it.
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
@@ -88,6 +91,22 @@ pub struct NamedDecision {
     pub reviewer: Principal,
 }
 
+/// The AI pre-screen the bundle carries for the revision, as read (spec 054
+/// section 3.3): shown beside the decisions, labelled advisory, and counted
+/// as none of them. `state` is `no-findings`, `findings`, `unreadable` or
+/// `other-revision`; a bundle without one reports no record at all.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct NamedPrescreen {
+    /// The attestation id.
+    pub id: Hash,
+    /// The state word.
+    pub state: String,
+    /// The model the review called, when the record was readable.
+    pub model: Option<String>,
+    /// The findings count, when the record was readable.
+    pub findings: Option<u64>,
+}
+
 /// What became of the admission.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum AdmissionCheck {
@@ -124,6 +143,9 @@ pub struct Verification {
     pub tombstoned: Vec<String>,
     /// The decisions named.
     pub decisions: Vec<NamedDecision>,
+    /// The AI pre-screen, advisory (spec 054); none when the bundle carries
+    /// no `statecraft/ai-prescreen/v1` attestation.
+    pub prescreen: Option<NamedPrescreen>,
     /// The admission.
     pub admission: AdmissionCheck,
 }
@@ -216,6 +238,7 @@ pub fn verify(
         divergence: None,
         tombstoned: Vec::new(),
         decisions: Vec::new(),
+        prescreen: None,
         admission: AdmissionCheck::NotReproduced("the bundle did not verify".into()),
     };
     let mut reader = Reader {
@@ -226,8 +249,9 @@ pub fn verify(
         tombstoned: BTreeSet::new(),
     };
     match walk(&mut reader, policy) {
-        Ok((decisions, admission)) => {
+        Ok((decisions, prescreen, admission)) => {
             out.decisions = decisions;
+            out.prescreen = prescreen;
             out.admission = admission;
         }
         Err(why) => out.divergence = Some(why),
@@ -236,7 +260,69 @@ pub fn verify(
     out
 }
 
-type Walked = (Vec<NamedDecision>, AdmissionCheck);
+type Walked = (Vec<NamedDecision>, Option<NamedPrescreen>, AdmissionCheck);
+
+/// The pre-screen the scope carries (spec 054 section 3.3). One about the
+/// revision wins over one about another; among several the latest by the
+/// issuer's clock is the record. Its claim is read, never trusted: a
+/// tombstoned or malformed one is `unreadable`, which the opt-in refuses and
+/// a default policy ignores.
+fn prescreen_of(
+    r: &mut Reader<'_>,
+    attestations: &BTreeMap<Hash, Attestation>,
+) -> Result<Prescreen, String> {
+    let revision = r.bundle.revision;
+    let mut candidates: Vec<&Attestation> = attestations
+        .values()
+        .filter(|a| a.body.predicate.0 == AI_PRESCREEN)
+        .collect();
+    candidates.sort_by_key(|a| (a.body.subject == revision, a.body.at));
+    let Some(a) = candidates.pop() else {
+        return Ok(Prescreen::Missing);
+    };
+    let id = AttestationId(a.id().0);
+    if a.body.subject != revision {
+        return Ok(Prescreen::OtherRevision {
+            id,
+            subject: a.body.subject,
+        });
+    }
+    let what = format!("pre-screen {}", id.0.to_hex());
+    let claim = match r.object(&a.body.claim, &what)? {
+        Some(bytes) => match crate::cbor::decode(bytes) {
+            Ok(v) => v,
+            Err(e) => {
+                return Ok(Prescreen::Unreadable {
+                    id,
+                    reason: format!("the claim does not decode: {e}"),
+                });
+            }
+        },
+        None => {
+            return Ok(Prescreen::Unreadable {
+                id,
+                reason: "the claim is tombstoned".into(),
+            });
+        }
+    };
+    Ok(Prescreen::read(revision, id, a.body.subject, &claim))
+}
+
+fn named(p: &Prescreen) -> Option<NamedPrescreen> {
+    let id = p.id()?.0;
+    let (model, findings) = match p {
+        Prescreen::Read {
+            model, findings, ..
+        } => (Some(model.clone()), Some(*findings)),
+        _ => (None, None),
+    };
+    Some(NamedPrescreen {
+        id,
+        state: p.state().into(),
+        model,
+        findings,
+    })
+}
 
 fn walk(r: &mut Reader<'_>, policy: Option<&AdmissionPolicy>) -> Result<Walked, String> {
     for (key, bytes) in &r.bundle.objects {
@@ -396,9 +482,14 @@ fn walk(r: &mut Reader<'_>, policy: Option<&AdmissionPolicy>) -> Result<Walked, 
         });
     }
 
+    // The pre-screen (spec 054): read before the admission so it is listed
+    // beside the decisions whether or not an admission was recorded.
+    let prescreen = prescreen_of(r, &attestations)?;
+    let shown = named(&prescreen);
+
     // The admission.
     let Some(admission_id) = r.bundle.admission else {
-        return Ok((decisions, AdmissionCheck::None));
+        return Ok((decisions, shown, AdmissionCheck::None));
     };
     let a = attestations
         .get(&admission_id)
@@ -422,6 +513,7 @@ fn walk(r: &mut Reader<'_>, policy: Option<&AdmissionPolicy>) -> Result<Walked, 
     let Some(policy) = policy else {
         return Ok((
             decisions,
+            shown,
             AdmissionCheck::NotReproduced("no pinned admission policy was given".into()),
         ));
     };
@@ -429,6 +521,7 @@ fn walk(r: &mut Reader<'_>, policy: Option<&AdmissionPolicy>) -> Result<Walked, 
     if text(rm, "policy") != Some(policy_digest.to_hex().as_str()) {
         return Ok((
             decisions,
+            shown,
             AdmissionCheck::NotReproduced(format!(
                 "the admission was evaluated under policy {}, not the pinned {}",
                 text(rm, "policy").unwrap_or("(none)"),
@@ -439,6 +532,7 @@ fn walk(r: &mut Reader<'_>, policy: Option<&AdmissionPolicy>) -> Result<Walked, 
     let Some(submitter) = submitter else {
         return Ok((
             decisions,
+            shown,
             AdmissionCheck::NotReproduced("the revision names no submitter".into()),
         ));
     };
@@ -451,6 +545,7 @@ fn walk(r: &mut Reader<'_>, policy: Option<&AdmissionPolicy>) -> Result<Walked, 
         let Some(claim) = claim_of(r, &att, &what)? else {
             return Ok((
                 decisions,
+                shown,
                 AdmissionCheck::NotReproduced(format!("{what} is tombstoned")),
             ));
         };
@@ -473,6 +568,7 @@ fn walk(r: &mut Reader<'_>, policy: Option<&AdmissionPolicy>) -> Result<Walked, 
             verdicts: &verdicts,
             decisions: &counted,
             submitter: &submitter,
+            prescreen,
         },
     );
     let expected = policy_eval_claim(policy_digest, &[], &reproduced);
@@ -485,6 +581,7 @@ fn walk(r: &mut Reader<'_>, policy: Option<&AdmissionPolicy>) -> Result<Walked, 
     if rm.get("decision") != em.get("decision") || rm.get("reasons") != em.get("reasons") {
         return Ok((
             decisions,
+            shown,
             AdmissionCheck::Diverged {
                 recorded: recorded_decision,
                 reproduced: reproduced_word,
@@ -493,6 +590,7 @@ fn walk(r: &mut Reader<'_>, policy: Option<&AdmissionPolicy>) -> Result<Walked, 
     }
     Ok((
         decisions,
+        shown,
         AdmissionCheck::Reproduced {
             decision: reproduced_word,
         },

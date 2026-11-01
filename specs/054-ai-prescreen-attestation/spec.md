@@ -2,7 +2,7 @@
 id: "054-ai-prescreen-attestation"
 title: "An AI pre-screen is an advisory attestation shown beside approvals and never counted as one"
 status: approved
-implementation: pending
+implementation: complete
 created: "2026-10-21"
 summary: >
   Records the managed AI review's verdict on a revision as an advisory
@@ -16,9 +16,10 @@ summary: >
 amends:
   - "005-acceptance-and-evidence"
   - "024-review-budget-and-ratification"
-# No `extends` yet: the implementing change adds the edges on
-# crates/statecraft-envelope/ (005) and the managed review profile under
-# crates/statecraft-home/ (002) with the code.
+extends:
+  - { spec: "005-acceptance-and-evidence", unit: { kind: directory, path: "crates/statecraft-envelope/" }, nature: additive }
+  - { spec: "002-environment-lifecycle", unit: { kind: directory, path: "crates/statecraft-home/" }, nature: additive }
+  - { spec: "006-command-surface", unit: { kind: directory, path: "crates/statecraft-cli/" }, nature: additive }
 depends_on:
   - "005-acceptance-and-evidence"
   - "024-review-budget-and-ratification"
@@ -127,12 +128,51 @@ evaluation, codes and claim bytes are exactly spec 037's.
 that admitted when the review was missing would reward breaking the review.
 The only form offered refuses on both.
 
+**2026-10-31: one closed reason, naming the state.** The opt-in refuses with
+`prescreen-refused`, whose one field `prescreen` is `findings`, `missing`,
+`unreadable` or `other-revision`. One code keeps a reader's rule simple (any
+`prescreen-refused` is the pre-screen check) while the state stays visible.
+The check is registered last, after `approval-count`, so every reason order
+spec 037 fixed is unchanged.
+
+**2026-10-31: what the record's words are.** `prompt` and `guidelines` are
+text digests as the producer computes them, `sha256:` followed by the hex, so
+a reader compares them and never recomputes under a guessed algorithm. The
+guidelines are the governance context the review already reads at the base
+(spec 041), whose digest the evidence record already states. `model` is the
+identifier the reviewer's own stream names for its calls; a stream that names
+none is not a review the record can describe and fails with 4, like output
+without a verdict block. `findings` is a non-negative integer that agrees with
+the word; a claim where it does not is unreadable.
+
+**2026-10-31: which pre-screen a bundle reads.** Among the bundle's
+`statecraft/ai-prescreen/v1` attestations, one whose subject is the revision
+outranks one about another, and among those the latest by the issuer's clock
+is the record. A tombstoned or undecodable claim is `unreadable`, not a
+divergence of the bundle: under a default policy it changes nothing, as
+section 3.3 requires, and under the opt-in it refuses.
+
 ## Verification
 
-Ratified by the owner on 2026-10-31. Acceptance is declared by the
-implementing change, which will evaluate a revision with a `no-findings`
-pre-screen and no approval and see the missing approval refuse; evaluate a
-`findings` pre-screen under an opting policy and see it refuse, and under a
-default policy see nothing change; refuse a missing pre-screen under the
-opting policy; and keep spec 037's differential test passing for every policy
-without the option.
+Ratified by the owner on 2026-10-31. Acceptance is run through
+`make verify SPEC=054`, with no provider: the envelope's pre-screen tests, the
+spec 037 differential, the bundle reader, and the profile's review script
+against stub reviewers.
+
+```verify:cli
+cargo test -p statecraft-envelope --test ai_prescreen
+cargo test -p statecraft-envelope --test admission_differential
+cargo test -p statecraft-envelope --test decision_bundle
+cargo test -p statecraft-envelope --lib admission::tests
+cargo test -p statecraft-home --test setup_workflows a_review_writes_the_prescreen_record
+```
+
+These evaluate a revision with a `no-findings` pre-screen and no approval and
+see the missing approval refuse; evaluate a `findings` pre-screen under an
+opting policy and see it refuse, and under a default policy see nothing
+change, down to the claim bytes; refuse a missing, unreadable and
+other-revision pre-screen under the opting policy, in memory and from a
+bundle; keep spec 037's differential passing for every policy without the
+option while the evaluator is fed every pre-screen state; and show the
+review script writing the record from its structured block, labelled
+advisory, and writing none for a skip or a stream that names no model.

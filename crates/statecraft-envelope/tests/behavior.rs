@@ -2,7 +2,7 @@
 
 use std::collections::BTreeMap;
 
-use statecraft_envelope::admission::{AdmissionInput, Decision, evaluate};
+use statecraft_envelope::admission::{AdmissionInput, Decision, Prescreen, evaluate};
 use statecraft_envelope::attestation::{
     APPROVAL, ARTIFACT, AttestationId, PredicateRegistry, PredicateType, Principal, PrincipalKind,
     UnsignedAttestation,
@@ -210,6 +210,7 @@ fn unsigned_receipt_under_two_policies_admits_or_refuses_and_is_never_trusted() 
         verdicts: &verdicts,
         decisions: &[],
         submitter: &submitter,
+        prescreen: Prescreen::Missing,
     };
     let allow = AdmissionPolicy {
         require_integrity: true,
@@ -530,6 +531,7 @@ fn admission_counts_approvals_by_predicate_and_refuses_the_submitter() {
         verdicts: &[],
         decisions: &[],
         submitter: &sam,
+        prescreen: Prescreen::Missing,
     };
     assert!(matches!(
         evaluate(&policy, &input),
@@ -547,6 +549,7 @@ fn admission_counts_approvals_by_predicate_and_refuses_the_submitter() {
         verdicts: &[],
         decisions: &by_sam,
         submitter: &sam,
+        prescreen: Prescreen::Missing,
     };
     match evaluate(&policy, &input) {
         Admission::Refuse { reasons, .. } => {
@@ -571,6 +574,7 @@ fn admission_counts_approvals_by_predicate_and_refuses_the_submitter() {
         verdicts: &[],
         decisions: &by_dana,
         submitter: &sam,
+        prescreen: Prescreen::Missing,
     };
     assert_eq!(
         evaluate(&policy, &input),

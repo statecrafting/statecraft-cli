@@ -12,6 +12,14 @@
 # release_candidate (true | false), evidence (a directory, when one was made).
 # Exit 0 is a review or a visible skip; anything else blocks.
 #
+# The pre-screen record (spec 054): a review, and only a review, writes the
+# claim of a statecraft/ai-prescreen/v1 attestation about the head into the
+# evidence record (`prescreen`) and beside it (ai-prescreen.json): the model
+# the calls named, the digests of the prompt and of the governance context,
+# both read at the base, the verdict word from the structured block and the
+# findings count. It is advisory; it is never an approval, and a skip, an
+# error or a timeout writes none.
+#
 # The credential (revision 8): ANTHROPIC_API_KEY when it is non-empty, else
 # CLAUDE_CODE_OAUTH_TOKEN; the one not chosen is unset before the reviewer
 # runs, and the class chosen (api-key or oauth, never the value) is in the job
@@ -84,6 +92,8 @@ credential_class=none
 review_json=null
 # The governance context (revision 17, spec 041), once it is selected.
 context_json=null
+# The pre-screen record (spec 054), once a verdict stands; null for a skip.
+prescreen_json=null
 
 out() { printf '%s=%s\n' "$1" "$2" >> "$GITHUB_OUTPUT"; }
 note() {
@@ -121,11 +131,16 @@ evidence() {
     --arg credential "$credential_class" \
     --argjson review "$review_json" \
     --argjson context "$context_json" \
+    --argjson prescreen "$prescreen_json" \
     '{profile: {id: "github-actions-rust", identity: $identity},
       tool: {name: "claude-code", version: $version, credential: $credential},
       subject: {repository: $repo, pullRequest: ($pr | tonumber), base: $base, head: $head, diffDigest: $digest},
-      result: $result, findings: $findings, review: $review, context: $context, startedAt: $started, finishedAt: $finished}' \
+      result: $result, findings: $findings, review: $review, context: $context, prescreen: $prescreen,
+      startedAt: $started, finishedAt: $finished}' \
     > "$EVIDENCE_DIR/ai-review-evidence.json"
+  if [ "$prescreen_json" != null ]; then
+    printf '%s\n' "$prescreen_json" > "$EVIDENCE_DIR/ai-prescreen.json"
+  fi
   out evidence "$EVIDENCE_DIR"
 }
 
@@ -552,6 +567,7 @@ review_cwd="$TMPD/ai-review-cwd"
 review_home="$TMPD/ai-review-home"
 echo '[]' > "$TMPD/merged-findings.json"
 : > "$TMPD/review.md"
+: > "$TMPD/models"
 g=1
 while [ "$g" -le "$calls" ]; do
   cp "$TMPD/review-input-${g}.txt" "$TMPD/review-input.txt"
@@ -657,6 +673,12 @@ while [ "$g" -le "$calls" ]; do
     grep -qxF -- "$cited" "$TMPD/changed-paths" || refuse "a finding cites '${cited}', which this diff does not change"
   done < <(jq -r '(.findings // [])[].path' "$TMPD/verdict.json")
 
+  # Spec 054: the model the call named, from the stream it wrote (each
+  # assistant message names it; the result's modelUsage keys do too), for the
+  # pre-screen record. Collected here, required once every call is in.
+  jq -Rr '[fromjson? | objects | (select(.type == "assistant") | .message.model? // empty), (select(.type == "result") | (.modelUsage? // {}) | keys[])] | .[] | strings' \
+    "$events" >> "$TMPD/models" 2> /dev/null || true
+
   # Merged: the union of every group's findings (3.4).
   jq -c --slurpfile v "$TMPD/verdict.json" '. + ($v[0].findings // [])' "$TMPD/merged-findings.json" > "$TMPD/merged.next"
   mv "$TMPD/merged.next" "$TMPD/merged-findings.json"
@@ -680,6 +702,23 @@ current="$(gh api "repos/${REPO}/pulls/${PR_NUMBER}" --jq .head.sha)" || refuse 
 if [ "$current" != "$HEAD_SHA" ]; then
   refuse "stale subject: the head moved to ${current} before publication" 2
 fi
+
+# Spec 054 sections 3.1 and 3.2: the pre-screen record. The prompt is this
+# script's, read at the base by the workflow; the guidelines are the
+# governance context, read at the base above; the verdict and the count are
+# the structured block's, never a reading of the prose. A review whose calls
+# named no model cannot be recorded and is not a review.
+model="$(LC_ALL=C sort -u "$TMPD/models" | awk 'NF' | paste -sd, -)"
+if [ -z "$model" ]; then
+  refuse "the reviewer named no model; the pre-screen record cannot say what it called"
+fi
+prompt_digest="$(printf '%s' "$PROMPT" | sha256sum | cut -d' ' -f1)"
+prescreen_json="$(jq -n -c \
+  --arg head "$HEAD_SHA" --arg model "$model" \
+  --arg prompt "sha256:${prompt_digest}" --arg guidelines "sha256:${context_digest}" \
+  --arg verdict "$verdict" --argjson findings "$(jq 'length' "$TMPD/merged-findings.json")" \
+  '{predicate: "statecraft/ai-prescreen/v1", subject: {revision: $head}, advisory: true,
+    claim: {model: $model, prompt: $prompt, guidelines: $guidelines, verdict: $verdict, findings: $findings}}')"
 
 evidence "$verdict" "$(cat "$TMPD/merged-findings.json")" "$diff_digest"
 {

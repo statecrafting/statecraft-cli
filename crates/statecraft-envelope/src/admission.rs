@@ -5,8 +5,15 @@
 //! The combinator is action-gate's closed evaluation mode (spec 037): one gate
 //! per evaluation, every check required, every deny reported in order. What
 //! a policy requires, what a refusal is called and how it serializes stay here.
+//!
+//! The AI pre-screen (spec 054) is an input here and never a decision: a
+//! [`Prescreen`] is counted as neither an approval nor a change request, a
+//! `no-findings` verdict admits nothing, and the one check it can add is
+//! registered only under `refuse_on_prescreen_findings`, where it refuses on
+//! `findings` and equally on a pre-screen that is missing, unreadable or about
+//! another revision (section 3.3).
 
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 use std::sync::Arc;
 
 use action_gate_core::{ActionContext, Check, Decision as GateDecision, Gate, Outcome};
@@ -31,6 +38,141 @@ pub struct Decision {
     pub reviewer: Principal,
 }
 
+/// The two words a pre-screen verdict may be (spec 054 section 3.1).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum PrescreenVerdict {
+    /// The review reported findings.
+    Findings,
+    /// It reported none. This admits nothing.
+    NoFindings,
+}
+
+impl PrescreenVerdict {
+    /// The wire word.
+    pub fn as_str(self) -> &'static str {
+        match self {
+            PrescreenVerdict::Findings => "findings",
+            PrescreenVerdict::NoFindings => "no-findings",
+        }
+    }
+    /// The word, exactly; nothing else is a verdict (section 3.4).
+    fn parse(s: &str) -> Option<Self> {
+        match s {
+            "findings" => Some(PrescreenVerdict::Findings),
+            "no-findings" => Some(PrescreenVerdict::NoFindings),
+            _ => None,
+        }
+    }
+}
+
+/// The AI pre-screen as admission sees it (spec 054 section 3.3): advisory
+/// in every state, and under the opt-in only [`Prescreen::Read`] with
+/// [`PrescreenVerdict::NoFindings`] is satisfied.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum Prescreen {
+    /// No `statecraft/ai-prescreen/v1` attestation names the revision.
+    Missing,
+    /// One does, but its claim is not a pre-screen record.
+    Unreadable {
+        /// The attestation.
+        id: AttestationId,
+        /// Why.
+        reason: String,
+    },
+    /// One exists, about another revision.
+    OtherRevision {
+        /// The attestation.
+        id: AttestationId,
+        /// What it is about.
+        subject: Hash,
+    },
+    /// A record about the revision, read from the structured claim.
+    Read {
+        /// The attestation.
+        id: AttestationId,
+        /// The model identifier the review called.
+        model: String,
+        /// The verdict word.
+        verdict: PrescreenVerdict,
+        /// How many findings; the findings themselves stay in the review.
+        findings: u64,
+    },
+}
+
+impl Prescreen {
+    /// Read an attestation's claim as a pre-screen of `revision`.
+    ///
+    /// The subject decides first: a record about another revision is
+    /// [`Prescreen::OtherRevision`] whatever its claim says. Then the claim is
+    /// read as section 3.1's map, the `verdict` being exactly `findings` or
+    /// `no-findings` with a count that agrees with it (section 3.4: a text
+    /// that contains a verdict word is not a verdict); anything else is
+    /// [`Prescreen::Unreadable`], with the first reason found.
+    pub fn read(revision: Hash, id: AttestationId, subject: Hash, claim: &Value) -> Prescreen {
+        if subject != revision {
+            return Prescreen::OtherRevision { id, subject };
+        }
+        match Self::parse(claim) {
+            Ok((model, verdict, findings)) => Prescreen::Read {
+                id,
+                model,
+                verdict,
+                findings,
+            },
+            Err(reason) => Prescreen::Unreadable { id, reason },
+        }
+    }
+
+    fn parse(claim: &Value) -> Result<(String, PrescreenVerdict, u64), String> {
+        fn text<'m>(m: &'m BTreeMap<String, Value>, k: &str) -> Result<&'m str, String> {
+            m.get(k)
+                .ok_or_else(|| format!("the claim has no {k:?}"))?
+                .as_text()
+                .filter(|t| !t.is_empty())
+                .ok_or_else(|| format!("the claim's {k:?} is not a non-empty text"))
+        }
+        let m = claim.as_map().ok_or("the claim is not a map")?;
+        let model = text(m, "model")?.to_string();
+        text(m, "prompt")?;
+        text(m, "guidelines")?;
+        let word = text(m, "verdict")?;
+        let verdict = PrescreenVerdict::parse(word)
+            .ok_or_else(|| format!("the verdict {word:?} is neither findings nor no-findings"))?;
+        let findings = match m.get("findings") {
+            Some(Value::Int(n)) if *n >= 0 => *n as u64,
+            _ => return Err("the claim's \"findings\" is not a count".into()),
+        };
+        match (verdict, findings) {
+            (PrescreenVerdict::Findings, 0) => Err("a findings verdict with no findings".into()),
+            (PrescreenVerdict::NoFindings, n) if n > 0 => {
+                Err("a no-findings verdict that counts findings".into())
+            }
+            _ => Ok((model, verdict, findings)),
+        }
+    }
+
+    /// The one word for the state: `no-findings`, `findings`, `missing`,
+    /// `unreadable` or `other-revision`.
+    pub fn state(&self) -> &'static str {
+        match self {
+            Prescreen::Missing => "missing",
+            Prescreen::Unreadable { .. } => "unreadable",
+            Prescreen::OtherRevision { .. } => "other-revision",
+            Prescreen::Read { verdict, .. } => verdict.as_str(),
+        }
+    }
+
+    /// The attestation, when there is one.
+    pub fn id(&self) -> Option<AttestationId> {
+        match self {
+            Prescreen::Missing => None,
+            Prescreen::Unreadable { id, .. }
+            | Prescreen::OtherRevision { id, .. }
+            | Prescreen::Read { id, .. } => Some(*id),
+        }
+    }
+}
+
 /// The inputs.
 #[derive(Debug, Clone)]
 pub struct AdmissionInput<'a> {
@@ -40,6 +182,9 @@ pub struct AdmissionInput<'a> {
     pub decisions: &'a [Decision],
     /// Who submitted.
     pub submitter: &'a Principal,
+    /// The AI pre-screen (spec 054). Advisory: read by exactly one check, and
+    /// that check only under `refuse_on_prescreen_findings`.
+    pub prescreen: Prescreen,
 }
 
 /// What a policy requires of a signature, from the CLI booleans plus the extension.
@@ -103,6 +248,11 @@ enum Requirement {
         approvers: Arc<Vec<Principal>>,
         submitter: Principal,
     },
+    /// `refuse_on_prescreen_findings` (spec 054 section 3.3): registered only
+    /// when set, and satisfied only by a readable `no-findings` pre-screen
+    /// about this revision. It never admits: a satisfied check is one deny
+    /// fewer, and the approval checks still stand.
+    Prescreen { state: &'static str },
 }
 
 fn not_passed(dimension: &str, value: &str) -> Option<RefusalCode> {
@@ -191,6 +341,11 @@ impl Requirement {
                     counted.count() as u32
                 };
                 (have < *need).then_some(RefusalCode::ApprovalsInsufficient { have, need: *need })
+            }
+            Requirement::Prescreen { state } => {
+                (*state != "no-findings").then(|| RefusalCode::PrescreenRefused {
+                    prescreen: (*state).into(),
+                })
             }
         }
     }
@@ -311,6 +466,16 @@ fn gate(policy: &AdmissionPolicy, input: &AdmissionInput<'_>) -> Gate {
             submitter: input.submitter.clone(),
         },
     );
+    // Spec 054: a policy without the option registers nothing here, so its
+    // checks, codes and claim bytes are exactly spec 037's.
+    if policy.refuse_on_prescreen_findings {
+        add(
+            "prescreen".into(),
+            Requirement::Prescreen {
+                state: input.prescreen.state(),
+            },
+        );
+    }
 
     let ids: Vec<String> = checks.iter().map(|c| c.id.clone()).collect();
     checks
@@ -381,6 +546,33 @@ pub fn policy_eval_claim(
         .unwrap()
 }
 
+/// The claim of a `statecraft/ai-prescreen/v1` attestation (spec 054 section
+/// 3.1): the model called, the digests of the prompt and the guidelines as
+/// read at the base, the verdict word and the count. No confidence, no
+/// decision: the record is advisory and carries nothing a reader could gate on.
+pub fn ai_prescreen_claim(
+    model: &str,
+    prompt_digest: &str,
+    guidelines_digest: &str,
+    verdict: PrescreenVerdict,
+    findings: u64,
+) -> Value {
+    Value::map()
+        .with("model", Value::text(model))
+        .unwrap()
+        .with("prompt", Value::text(prompt_digest))
+        .unwrap()
+        .with("guidelines", Value::text(guidelines_digest))
+        .unwrap()
+        .with("verdict", Value::text(verdict.as_str()))
+        .unwrap()
+        .with(
+            "findings",
+            Value::int(i64::try_from(findings).expect("a count")).expect("portable"),
+        )
+        .unwrap()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -408,6 +600,7 @@ mod tests {
             verdicts: &verdicts,
             decisions: &[],
             submitter: &sam,
+            prescreen: Prescreen::Missing,
         };
         let gate = gate(&policy, &input);
         assert_eq!(gate.mode(), Mode::Closed);
@@ -432,6 +625,35 @@ mod tests {
         registered.sort_unstable();
         assert_eq!(gate.required_ids(), registered);
         assert!(gate.unregistered_required().is_empty());
+    }
+
+    /// Spec 054 section 3.3: the pre-screen check exists only under the
+    /// option, is registered last and is required like every other.
+    #[test]
+    fn the_prescreen_check_is_registered_only_under_the_option() {
+        let sam = Principal::new(PrincipalKind::Human, "sam");
+        let input = AdmissionInput {
+            verdicts: &[],
+            decisions: &[],
+            submitter: &sam,
+            prescreen: Prescreen::Missing,
+        };
+        let without = gate(&AdmissionPolicy::permissive(), &input);
+        assert_eq!(
+            without.check_ids(),
+            ["approver-is-submitter", "approval-count"]
+        );
+        let opting = AdmissionPolicy {
+            refuse_on_prescreen_findings: true,
+            ..AdmissionPolicy::permissive()
+        };
+        let with = gate(&opting, &input);
+        assert_eq!(
+            with.check_ids(),
+            ["approver-is-submitter", "approval-count", "prescreen"]
+        );
+        assert_eq!(with.mode(), Mode::Closed);
+        assert!(with.required_ids().contains(&"prescreen"));
     }
 
     #[test]

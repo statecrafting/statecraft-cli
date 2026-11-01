@@ -5,13 +5,40 @@
       "024-review-budget-and-ratification"
     ],
     "created": "2026-10-21",
+    "declaresAcceptance": true,
     "dependsOn": [
       "005-acceptance-and-evidence",
       "024-review-budget-and-ratification",
       "037-closed-admission-gate"
     ],
+    "extends": [
+      {
+        "nature": "additive",
+        "spec": "005-acceptance-and-evidence",
+        "unit": {
+          "kind": "directory",
+          "path": "crates/statecraft-envelope/"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "002-environment-lifecycle",
+        "unit": {
+          "kind": "directory",
+          "path": "crates/statecraft-home/"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "006-command-surface",
+        "unit": {
+          "kind": "directory",
+          "path": "crates/statecraft-cli/"
+        }
+      }
+    ],
     "id": "054-ai-prescreen-attestation",
-    "implementation": "pending",
+    "implementation": "complete",
     "obligations": [
       {
         "anchor": "3-3-advisory-never-a-decision",
@@ -48,7 +75,7 @@
       }
     ],
     "sectionDigests": {
-      "054-ai-pre-screen-attestation": "7d53fe57bf90f4b26aad36ef0ceadd801a2525007a90389882f7446993055ec6",
+      "054-ai-pre-screen-attestation": "448fc8faca5d13f5bcf5c38c4267707b0bcc1ba5e35e94a7e6af20e5e6e7bf8e",
       "1-purpose": "d520cab24fe2a49d07f07555c284e2e831d14bf1798e2aed79dc8d81f944cd04",
       "2-territory": "c56c55fba01acb89840c496e07f3629f7c6bbd8a8bf57c1cc6d706e6daff8ed0",
       "3-1-the-predicate": "74e5eb1fdca6cf27bb982e0bfa35c6c9760e03b01ba78018e316c472cb03d97a",
@@ -57,8 +84,8 @@
       "3-4-forbidden": "6af0dafac5bb0cdfcf8871ab286728f783a85dacf23c1eb5ce49389b32a94d1d",
       "3-behavior": "dd02e4f26d14db20b731f9f8de148a7c90df395743e1160fc23e0ff021d04f5f",
       "4-out-of-scope": "d48fd67b45dc33bc7d6e3a44cdbd84c85c23672d794b77544a3caae5461bcd6d",
-      "5-resolved-decisions": "003fdfe1dcdcd9fe9696dc5d706e4bd9670bb9b1e84df03ab7473ff7686842bc",
-      "verification": "62c4e41f52ebf7cdcadd357ad8a8a2ccd8823582c37a4e5b3dbbb96ff96fc534"
+      "5-resolved-decisions": "b7d7bfeefe0aa07a534235d995ba65ad44b724f1e1b5b780b7049a2f337d6223",
+      "verification": "c3fdb3a4325ab8d8db8c47bd1134e62a84d95fea425e533b71039084b3e206f4"
     },
     "sectionHeadings": [
       "054: AI pre-screen attestation",
@@ -78,6 +105,6 @@
     "summary": "Records the managed AI review's verdict on a revision as an advisory attestation naming the model, the prompt's digest, the guidelines' digest and the structured verdict. It is shown beside statecraft/approval/v1 and is never counted as an approval. It may order a review queue. A policy may let a deny refuse admission only on a fail-closed path, where a missing or unreadable pre-screen refuses too. An AI deciding, confidence-gated auto-approval, approval on error, substring parsing of a verdict and a prompt the gated agent can influence are forbidden.\n",
     "title": "An AI pre-screen is an advisory attestation shown beside approvals and never counted as one"
   },
-  "shardHash": "46054b2103bd552bbc32b3981cba31981900b097541b66f4bb3c57333f8ea241",
+  "shardHash": "15b407515caef5f330f9413464db447130683bc00d6c80d0d5f8faba3317a8e8",
   "specVersion": "1.11.0"
 }

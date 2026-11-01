@@ -10,12 +10,19 @@
 //! against every decision sequence of up to three), and a seeded sweep of
 //! mixed inputs, which then proves its own coverage: every refusal code
 //! appears alone and inside a multi-refusal, and admissions occur.
+//!
+//! Spec 054 (V-1): every policy here leaves `refuse_on_prescreen_findings`
+//! unset, and the seeded sweep feeds the evaluator a pre-screen in every
+//! state while the oracle, which predates the field, sees none. Agreement
+//! proves that a policy without the option evaluates exactly as spec 037 does.
 
 mod admission_oracle;
 
 use std::collections::BTreeMap;
 
-use statecraft_envelope::admission::{AdmissionInput, Decision, evaluate, policy_eval_claim};
+use statecraft_envelope::admission::{
+    AdmissionInput, Decision, Prescreen, PrescreenVerdict, evaluate, policy_eval_claim,
+};
 use statecraft_envelope::attestation::{AttestationId, Principal, PrincipalKind};
 use statecraft_envelope::cbor::encode;
 use statecraft_envelope::dimensions::{
@@ -98,6 +105,7 @@ fn kind(r: &RefusalCode) -> &'static str {
         RefusalCode::ApproverIsSubmitter => "approver-is-submitter",
         RefusalCode::MissingRequiredArtifact { .. } => "missing-required-artifact",
         RefusalCode::DimensionUnknown { .. } => "dimension-unknown",
+        RefusalCode::PrescreenRefused { .. } => "prescreen-refused",
         RefusalCode::AmbiguousJson => "ambiguous-json",
         RefusalCode::NoPolicy => "no-policy",
         RefusalCode::Unknown(_) => "unknown",
@@ -113,7 +121,9 @@ struct Seen {
     among: BTreeMap<&'static str, usize>,
 }
 
-/// Evaluate with both and require the same value, bytes and claim.
+/// Evaluate with both and require the same value, bytes and claim. The named
+/// cases and the exhaustive sweeps see no pre-screen; the seeded sweep varies
+/// it through [`agree_with`].
 fn agree(
     seen: &mut Seen,
     policy: &AdmissionPolicy,
@@ -121,10 +131,33 @@ fn agree(
     decisions: &[Decision],
     submitter: &Principal,
 ) -> Admission {
+    agree_with(
+        seen,
+        policy,
+        verdicts,
+        decisions,
+        submitter,
+        Prescreen::Missing,
+    )
+}
+
+fn agree_with(
+    seen: &mut Seen,
+    policy: &AdmissionPolicy,
+    verdicts: &[(AttestationId, EvidenceVerdict)],
+    decisions: &[Decision],
+    submitter: &Principal,
+    prescreen: Prescreen,
+) -> Admission {
+    assert!(
+        !policy.refuse_on_prescreen_findings,
+        "the oracle predates spec 054; the differential covers policies without the option"
+    );
     let input = AdmissionInput {
         verdicts,
         decisions,
         submitter,
+        prescreen,
     };
     let old = admission_oracle::evaluate(policy, &input);
     let new = evaluate(policy, &input);
@@ -489,6 +522,7 @@ fn seeded_mixed_inputs_agree() {
                 .map(|_| TYPES[rng.below(3)].to_string())
                 .collect(),
             policy_version: rng.flip().then_some(1),
+            refuse_on_prescreen_findings: false,
         };
         let verdicts: Vec<(AttestationId, EvidenceVerdict)> = ids(rng.below(5))
             .map(|id| {
@@ -507,7 +541,33 @@ fn seeded_mixed_inputs_agree() {
             .map(|n| decision(n, people[rng.below(3)], rng.below(4) != 0))
             .collect();
         let submitter = principal(people[rng.below(3)]);
-        agree(&mut seen, &policy, &verdicts, &decisions, &submitter);
+        let id = AttestationId(Hash::of(b"prescreen"));
+        let prescreen = match rng.below(5) {
+            0 => Prescreen::Missing,
+            1 => Prescreen::Unreadable {
+                id,
+                reason: "not a map".into(),
+            },
+            2 => Prescreen::OtherRevision {
+                id,
+                subject: Hash::of(b"another revision"),
+            },
+            3 => Prescreen::Read {
+                id,
+                model: "m".into(),
+                verdict: PrescreenVerdict::Findings,
+                findings: 1 + rng.below(3) as u64,
+            },
+            _ => Prescreen::Read {
+                id,
+                model: "m".into(),
+                verdict: PrescreenVerdict::NoFindings,
+                findings: 0,
+            },
+        };
+        agree_with(
+            &mut seen, &policy, &verdicts, &decisions, &submitter, prescreen,
+        );
     }
     assert_covered(&seen);
 }

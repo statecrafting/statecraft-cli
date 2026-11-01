@@ -136,6 +136,9 @@ pub const POLICY_EVAL: &str = "statecraft/policy-eval/v1";
 pub const APPROVAL: &str = "statecraft/approval/v1";
 /// A request for changes, its own predicate.
 pub const CHANGE_REQUEST: &str = "statecraft/change-request/v1";
+/// The managed AI review's verdict on a revision: an advisory attestation,
+/// never an approval or a change request (spec 054 section 3.1).
+pub const AI_PRESCREEN: &str = "statecraft/ai-prescreen/v1";
 
 /// The hash of an attestation's canonical bytes, signature included.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
@@ -391,6 +394,15 @@ impl PredicateRegistry {
             Box::new(Keys {
                 required: &["revision", "reviewer", "basis"],
                 forbidden: &["decision", "verdict"],
+            }),
+        );
+        // Spec 054 section 3.4: the record carries no confidence and is no
+        // decision, so a claim that tries to be one is not a pre-screen.
+        r.register(
+            AI_PRESCREEN,
+            Box::new(Keys {
+                required: &["model", "prompt", "guidelines", "verdict", "findings"],
+                forbidden: &["confidence", "decision", "approves", "basis"],
             }),
         );
         r
