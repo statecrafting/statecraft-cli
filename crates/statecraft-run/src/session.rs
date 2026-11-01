@@ -48,6 +48,11 @@ use std::path::Path;
 pub fn runs(chain: &Chain) -> Vec<Run> {
     let mut out: Vec<Run> = Vec::new();
     for entry in chain.entries() {
+        // Spec 050: a halt entry is about the repository, not a run, and the
+        // halt fold is its only reader.
+        if entry.kind == Kind::Halt {
+            continue;
+        }
         let run = match out.iter_mut().find(|r| r.id == entry.run_id) {
             Some(r) => r,
             None => {
@@ -168,6 +173,11 @@ pub enum SessionError {
     /// for it.
     #[error(transparent)]
     Record(#[from] crate::record::RecordError),
+    /// Spec 050 section 3.3: the run-admission scope is halted, or the halt
+    /// record cannot be read or verified. A refusal with its closed reason,
+    /// decided before any intent is appended.
+    #[error(transparent)]
+    Halted(#[from] crate::halt::Refusal),
 }
 
 /// A run that has begun: its workspace exists and its intent is durable.
@@ -314,6 +324,10 @@ pub fn begin_checked(
         context_policy,
         documentation_task,
     } = *intent;
+    // Spec 050 section 3.3: the halt state is folded from the chain the caller
+    // opened under the lock, every time, before anything is appended. A halted
+    // run-admission scope and an unreadable record both refuse here.
+    crate::halt::admit(chain)?;
     for run in runs(chain) {
         if let Some(live) = run.live_attempt() {
             return Err(SessionError::LiveAttempt {
@@ -618,6 +632,18 @@ pub fn conclude_observed(
             ),
         },
     )?;
+
+    // Spec 050 section 3.4: a stop asked of this attempt is confirmed only now,
+    // after its `cancelled` outcome is durable, and never for another outcome.
+    if decided == Outcome::Cancelled {
+        crate::halt::confirm_stop(chain, &session.run_id, session.attempt, &timestamp).map_err(
+            |e| match e {
+                crate::halt::HaltError::Record(r) => SessionError::Record(r),
+                crate::halt::HaltError::Unreadable(r) => SessionError::Halted(r),
+                crate::halt::HaltError::Refused(why) => SessionError::Boundary(why),
+            },
+        )?;
+    }
 
     Ok(Concluded {
         run_id: session.run_id.clone(),

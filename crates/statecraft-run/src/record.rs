@@ -39,6 +39,10 @@ pub enum Kind {
     /// spec 014's wire-evidence policy and admission records. No earlier
     /// fold reads this kind, and a reader that predates it skips the record.
     Evidence,
+    /// Spec 050's halt record: an operator's halt, resume or stop
+    /// confirmation. Not about any effect; the run fold skips it, and the
+    /// halt fold reads nothing else.
+    Halt,
 }
 
 /// A validated effect identity: a non-empty string.

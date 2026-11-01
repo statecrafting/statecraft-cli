@@ -151,6 +151,10 @@ pub enum Verb {
     LandStatus,
     /// `land cancel-superseded`
     LandCancelSuperseded,
+    /// `halt <path> [--scope <scope>]... <operator> <reason...>`
+    Halt,
+    /// `resume <path> [--scope <scope>]... <operator> <reason...>`
+    Resume,
     /// `--help`, optionally with a group or a verb as its topic.
     ///
     /// Not part of the command tree: [`Verb::all`] lists the operations, and a
@@ -180,6 +184,8 @@ impl Verb {
             Verb::LandRestack => "land restack",
             Verb::LandStatus => "land status",
             Verb::LandCancelSuperseded => "land cancel-superseded",
+            Verb::Halt => "halt",
+            Verb::Resume => "resume",
             Verb::ProjectRegister => "project register",
             Verb::ProjectList => "project list",
             Verb::ProjectArm => "project arm",
@@ -337,6 +343,7 @@ impl Verb {
             | Verb::ProposalAdmit => "027-observation-and-proposals",
             Verb::ReviewStatus => "062-review-verdict-status",
             Verb::LandWait | Verb::LandArm | Verb::LandPush | Verb::LandRestack | Verb::LandStatus | Verb::LandCancelSuperseded => "063-land-verbs",
+            Verb::Halt | Verb::Resume => "050-local-halt",
             Verb::Help => "006-command-surface",
         }
     }
@@ -414,14 +421,16 @@ impl Verb {
             Verb::LandRestack,
             Verb::LandStatus,
             Verb::LandCancelSuperseded,
+            Verb::Halt,
+            Verb::Resume,
         ]
     }
 
     /// The groups a help topic may name.
-    pub const GROUPS: [&'static str; 22] = [
+    pub const GROUPS: [&'static str; 24] = [
         "project", "env", "work", "run", "accept", "home", "init", "migrate", "config", "approval",
         "harness", "session", "startup", "override", "transfer", "trust", "provider", "hosted",
-        "observe", "proposal", "review", "land",
+        "observe", "proposal", "review", "land", "halt", "resume",
     ];
 
     /// Parse a verb from the leading arguments, returning how many it consumed.
@@ -447,6 +456,9 @@ impl Verb {
             ("env", Some("upgrade")) => Some((Verb::EnvUpgrade, 2)),
             ("env", Some("remove")) => Some((Verb::EnvRemove, 2)),
             ("doctor", _) => Some((Verb::Doctor, 1)),
+            // Spec 050: one-word verbs, as `doctor` is.
+            ("halt", _) => Some((Verb::Halt, 1)),
+            ("resume", _) => Some((Verb::Resume, 1)),
             ("work", Some("list")) => Some((Verb::WorkList, 2)),
             ("work", Some("show")) => Some((Verb::WorkShow, 2)),
             // `list`, `show` and `reconcile` are reserved after `run`, so a run id may not
