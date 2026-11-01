@@ -212,7 +212,13 @@ pub fn admit(roots: Roots<'_>, executable: &Path, path: &str) -> Result<Admissio
                 scratch.path().display().to_string(),
             ));
             if let Some(token) = token {
-                provider_variables.push((crate::provider_token::VARIABLE.to_string(), token));
+                // Spec 046 section 3.3: the one exposure, at the point the
+                // token becomes the child's environment copy; the secret is
+                // dropped, and zeroed, when this block ends.
+                provider_variables.push((
+                    crate::provider_token::VARIABLE.to_string(),
+                    token.expose().to_string(),
+                ));
             }
         }
         let harness = crate::home::Layout::new(roots.home).harness_dir();

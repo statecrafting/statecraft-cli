@@ -2,7 +2,7 @@
 id: "046-secret-type"
 title: "One secret type: redacted when shown, cleared when dropped, exposed only by name"
 status: approved
-implementation: pending
+implementation: complete
 created: "2026-10-21"
 summary: >
   Adds a small crate owning one secret-string type whose Debug and Display
@@ -15,9 +15,12 @@ amends:
   - "002-environment-lifecycle"
   - "038-hosted-client"
   - "042-per-run-provider-configuration"
-# No `extends` yet, and the new crate is claimed by this spec's `establishes`
-# only when the implementation creates it: the gate refuses a claim on a path
-# that does not exist.
+establishes:
+  - { kind: directory, path: "crates/statecraft-secret/" }
+extends:
+  - { spec: "002-environment-lifecycle", unit: { kind: directory, path: "crates/statecraft-home/" }, nature: additive }
+  - { spec: "038-hosted-client", unit: { kind: directory, path: "crates/statecraft-hosted/" }, nature: additive }
+  - { spec: "006-command-surface", unit: { kind: directory, path: "crates/statecraft-cli/" }, nature: additive }
 depends_on:
   - "002-environment-lifecycle"
   - "038-hosted-client"
@@ -147,9 +150,27 @@ token is in `statecraft-home` and the credential in `statecraft-hosted`, which
 does not depend on home; a type in either would make one depend on the other.
 A leaf crate with one type is the smallest owner both can use.
 
+**2026-10-31: the holder is not comparable either.** Section 3.1 withholds
+equality from the value, so `Credential` drops its derived `PartialEq` and
+`Eq` rather than hand-writing one that compares exposed values; the one test
+that compared two credentials compares their fields, each token through
+`expose`. The zeroing hook of V-1 is a `cfg(test)` thread-local in the crate
+that records each dropped buffer after its first zeroing pass, so a unit test
+observes the zeros without unsafe code; the second pass clears the spare
+capacity. `zeroize` is stated once, in the root manifest's workspace
+dependencies, and `statecraft-cli` takes it from there.
+
 ## Verification
 
-Ratified by the owner on 2026-10-31. Acceptance is declared by the
-implementing change, which will run the crate's unit tests and the two migrated
-holders' existing suites with their assertions unchanged. The rules' fixtures
-and tree run join it with the section 3.5 follow-up.
+Ratified by the owner on 2026-10-31. Acceptance is the crate's unit and
+documentation tests (the latter hold the two `compile_fail` cases: no
+`Serialize`, no equality) and the two migrated holders' suites, run with no
+provider and no cell.
+
+```verify:cli
+cargo test -p statecraft-secret --locked
+cargo test -p statecraft-home --locked --lib provider_token
+cargo test -p statecraft-hosted --locked --test hosted
+```
+
+The rules' fixtures and tree run join it with the section 3.5 follow-up.

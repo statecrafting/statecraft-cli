@@ -1,0 +1,32 @@
+# Spec: specs/046-secret-type/spec.md
+#
+# One secret-string type and nothing else (spec 046 section 2): redacted when
+# shown, cleared when dropped, exposed only by name. A leaf crate so that
+# statecraft-hosted, which depends on no other statecraft crate, can hold its
+# credential in the same type statecraft-home holds the provider token in.
+[package]
+name = "statecraft-secret"
+description = "One secret-string type: redacted when shown, zeroed when dropped, exposed only by an explicit call"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+publish.workspace = true
+
+[package.metadata.spec-spine]
+spec = "046-secret-type"
+
+[dependencies]
+# Deserialize only: a credential file is read into the type, and nothing
+# serializes one (section 3.1).
+serde = "1.0.229"
+zeroize.workspace = true
+
+[dev-dependencies]
+serde = { version = "1.0.229", features = ["derive"] }
+serde_json = "1.0.151"
+
+[lints]
+workspace = true

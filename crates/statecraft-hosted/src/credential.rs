@@ -4,22 +4,29 @@
 //! mode `0600` in a `0700` directory, written by a rename so a reader never
 //! sees half of one. Never inside a repository or a worktree, on any
 //! platform (O-2). A file another user could read is refused, not used.
+//!
+//! The tokens are [`SecretString`]s (spec 046 section 3.3): the derived
+//! `Debug` redacts them by type, nothing serializes a [`Credential`], and
+//! [`Store::save`] exposes each token once to write the file. The on-disk
+//! format is unchanged.
 
 use crate::{Error, Origin};
 use serde::{Deserialize, Serialize};
+use statecraft_secret::SecretString;
 use std::path::{Path, PathBuf};
 
-/// A held credential.
-#[derive(Clone, PartialEq, Eq, Serialize, Deserialize)]
+/// A held credential. Not comparable: equality is not implemented on a
+/// secret, so it is not implemented on its holder.
+#[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct Credential {
     /// The cell.
     pub origin: String,
     /// The access token.
-    pub access_token: String,
+    pub access_token: SecretString,
     /// The refresh token, when the issuer gave one.
     #[serde(default)]
-    pub refresh_token: Option<String>,
+    pub refresh_token: Option<SecretString>,
     /// `expires_in` as the token response carried it, in seconds.
     pub expires_in: u64,
     /// When the token response arrived, in seconds since the Unix epoch.
@@ -29,20 +36,17 @@ pub struct Credential {
     pub scope: Option<String>,
 }
 
-impl std::fmt::Debug for Credential {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("Credential")
-            .field("origin", &self.origin)
-            .field("access_token", &"<redacted>")
-            .field(
-                "refresh_token",
-                &self.refresh_token.as_ref().map(|_| "<redacted>"),
-            )
-            .field("expires_in", &self.expires_in)
-            .field("issued_at", &self.issued_at)
-            .field("scope", &self.scope)
-            .finish()
-    }
+/// The file's shape: the same fields in the same order as [`Credential`],
+/// with each token exposed once, here, by the one site that persists it.
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct OnDisk<'a> {
+    origin: &'a str,
+    access_token: &'a str,
+    refresh_token: Option<&'a str>,
+    expires_in: u64,
+    issued_at: u64,
+    scope: Option<&'a str>,
 }
 
 impl Credential {
@@ -90,7 +94,15 @@ impl Store {
             .create(&self.dir)
             .map_err(io)?;
         std::fs::set_permissions(&self.dir, std::fs::Permissions::from_mode(0o700)).map_err(io)?;
-        let bytes = serde_json::to_vec(credential).expect("serializable");
+        let on_disk = OnDisk {
+            origin: &credential.origin,
+            access_token: credential.access_token.expose(),
+            refresh_token: credential.refresh_token.as_ref().map(SecretString::expose),
+            expires_in: credential.expires_in,
+            issued_at: credential.issued_at,
+            scope: credential.scope.as_deref(),
+        };
+        let bytes = serde_json::to_vec(&on_disk).expect("serializable");
         // A uniquely named staging file, created owner-only, so concurrent
         // saves never share one; the rename replaces the held credential.
         let mut staged = tempfile::Builder::new()

@@ -108,7 +108,7 @@ pub fn register_revision(
     let reply = http.send(
         REGISTER,
         &origin.url(&format!("/api/repositories/{repository}/revisions")),
-        Some(&credential.access_token),
+        Some(credential.access_token.expose()),
         &[("Accept", "application/json")],
         Body::Bytes {
             content_type: "application/json",
@@ -192,7 +192,7 @@ pub fn submit(
     let reply = http.send(
         SUBMIT,
         &origin.url("/api/evidence/submissions"),
-        Some(&credential.access_token),
+        Some(credential.access_token.expose()),
         &[("Accept", "application/json"), ("Idempotency-Key", &key)],
         Body::Bytes {
             content_type: &content_type,
@@ -271,7 +271,7 @@ pub fn decision(
         &origin.url(&format!(
             "/api/repositories/{repository}/revisions/{revision}/decision"
         )),
-        Some(&credential.access_token),
+        Some(credential.access_token.expose()),
         &[("Accept", "application/json")],
         Body::None,
     )?;

@@ -7,6 +7,7 @@ use crate::http::{Body, Http, Reply, Route};
 use crate::{Clock, Error, Origin};
 use base64::Engine;
 use serde::Deserialize;
+use statecraft_secret::SecretString;
 
 const DEVICE: Route = Route {
     method: "POST",
@@ -177,13 +178,15 @@ pub fn poll(
     }
 }
 
+/// The token response, its tokens held in the secret type from the moment
+/// they are read (spec 046 R-1).
 #[derive(Deserialize)]
 struct TokenResponse {
-    access_token: String,
+    access_token: SecretString,
     token_type: String,
     expires_in: u64,
     #[serde(default)]
-    refresh_token: Option<String>,
+    refresh_token: Option<SecretString>,
     #[serde(default)]
     scope: Option<String>,
 }
@@ -220,7 +223,7 @@ pub fn accept(origin: &Origin, body: &[u8], now: u64) -> Result<Credential, Erro
     if t.expires_in == 0 {
         return Err(refuse("its expires_in is zero"));
     }
-    let mut parts = t.access_token.split('.');
+    let mut parts = t.access_token.expose().split('.');
     let (Some(header), Some(claims), Some(_sig), None) =
         (parts.next(), parts.next(), parts.next(), parts.next())
     else {
@@ -268,7 +271,7 @@ pub fn refresh(
     credential: &Credential,
     clock: &dyn Clock,
 ) -> Result<Credential, Error> {
-    let Some(refresh_token) = credential.refresh_token.as_deref() else {
+    let Some(refresh_token) = credential.refresh_token.as_ref() else {
         return Err(Error::LoginRequired(origin.to_string()));
     };
     let not_before = credential.refresh_not_before();
@@ -284,7 +287,7 @@ pub fn refresh(
         &[("Accept", "application/json")],
         Body::Form(&[
             ("grant_type", "refresh_token"),
-            ("refresh_token", refresh_token),
+            ("refresh_token", refresh_token.expose()),
             ("client_id", client_id),
         ]),
     )?;
@@ -313,9 +316,9 @@ pub fn revoke(http: &Http, origin: &Origin, credential: &Credential) -> Revocati
     match http.send(
         REVOKE,
         &origin.url("/session/token/revoke"),
-        Some(&credential.access_token),
+        Some(credential.access_token.expose()),
         &[],
-        Body::Form(&[("token", &credential.access_token)]),
+        Body::Form(&[("token", credential.access_token.expose())]),
     ) {
         Ok(r) if (200..300).contains(&r.status) => Revocation::Confirmed,
         Ok(r) => Revocation::NotConfirmed(r.status),
