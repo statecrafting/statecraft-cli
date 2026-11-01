@@ -48,21 +48,20 @@
       }
     ],
     "sectionDigests": {
-      "055-codex-adapter": "8407fc8fa095885a6714e328966afbcc4070f15129b7f8dc42399cd1e4b3913f",
+      "055-codex-adapter": "3ba43c7a69e50d5dfc41402814e611366ea215de9ab0161500024239b58f952b",
       "1-purpose": "6a4f005f9808852cca4ba75fbafa0e740eba3bc704fd2d777dfa22c7ded386d7",
       "2-territory": "8276594af303e1f3bef47e9eaed0929e79045f764644c9a9fc6bfbcfd0c804ba",
       "3-1-what-is-spawned": "fe1c7b63244076dddd9756078170566b5d598ead08ce7c5cb5fde45ec24c39d1",
       "3-2-the-stream-and-the-outcome-mapping": "91ef1cf019067f5f16ad006b647c6caf2b7f5d5f45acfe794d8c46ca47a4ad69",
       "3-3-per-run-configuration": "a77e785a52d715960fdf607fc6f54e86ae2ac66bfe29d3f45746017a6e56d176",
-      "3-4-the-gate-hook": "e7140d3b2a6dcb826ba55aba9a85d5467f1542fccf9c34c6e4c40f8ad6cdcec4",
+      "3-4-the-gate-hook": "960602b33bfe3770f190e94e589c371171fcfc57067a60db5746a4fd144346d8",
       "3-5-qualification": "98a48dca587a9d14128d6259e3862209be36267b71a9a5d820ea807a1a959695",
       "3-6-declared-capabilities": "15048d90ead9ee81d0d9ef2e230f57f83403729aff871bb52c8f4310685b0474",
-      "3-behavior": "3c0cabefe98f3c4d0a9576d337424d81075a1d92b6d48c48bceb6903e1457a69",
+      "3-behavior": "a1190ad613e5133fab9574d6e66938f5acd50fae6211e5018d3c239a31ae667c",
       "4-out-of-scope": "c3555e5aa9d1b68a154974a682f95c496c6322ab491a2c8b6b9930b0712c2087",
-      "5-resolved-decisions": "ddfd1cf114f269ee20876608ac70ffb47252fde4e5d3f2697aa6bf7c3a156f65",
-      "6-open-question-for-the-owner": "b92f5428d25aa1e050e0029ff8786b54b99c7906d8efecf1d21169f4be6bede3",
+      "5-resolved-decisions": "28fd96d0f80f8ee8e06b2817e46abf22b61683b2b359b93d4585a935617ee09f",
       "appendix-a-other-harnesses-reference-only": "a39b9295d2aa85a10216b7807fc641cc76bacf038e9964811db5976c981057e7",
-      "verification": "cb65f5152c8a2b3a26b86443f40c12b3b171ce86ab658980cf36cef88753026e"
+      "verification": "546a4735a0b679958c053c4da04a8d23ef1cb18656f8dff4a68ee2094e598c84"
     },
     "sectionHeadings": [
       "055: Codex adapter",
@@ -77,15 +76,14 @@
       "3.6 Declared capabilities",
       "4. Out of scope",
       "5. Resolved decisions",
-      "6. Open question for the owner",
       "Appendix A: other harnesses (reference only)",
       "Verification"
     ],
     "specPath": "specs/055-codex-adapter/spec.md",
-    "status": "draft",
+    "status": "approved",
     "summary": "Proposes statecraft-adapter-codex, the second provider adapter under the conditional F-07 lift of 2026-10-20. It mirrors the Claude Code adapter's shape: codex exec's JSONL stream mapped to spec 003's closed outcomes, a constructed environment, a per-run CODEX_HOME in the spirit of spec 042, and harness delivery under spec 008 without touching the user's own Codex configuration. It declares its capabilities through the seam proposed as spec 047 and is built only after that seam merges. It is qualified only by its own pass of spec 004's negative suite on fixtures recorded from a named Codex version. An appendix records preloop's facts on other harnesses as reference for later adapters; no code.\n",
     "title": "A Codex adapter, built on the capability seam and admitted only by its own pass of spec 004's suite"
   },
-  "shardHash": "2c4b7082cce5f54d9cec0224368ca4bf44f2200f9fa9484afd4d234671fd6360",
+  "shardHash": "078c18e44e2c1b0c8789faff72b6962c2f2e4793fdf9565574b90f3913eb24c8",
   "specVersion": "1.11.0"
 }
