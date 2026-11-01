@@ -5240,7 +5240,9 @@ fn review_context_rejects_invalid_selections() {
         paths,
         [
             ".statecraft/AGENTS.md",
+            ".statecraft/REVIEW.md",
             "AGENTS.md",
+            "REVIEW.md",
             "docs/review.md",
             "standards/spec/constitution.md",
             "standards/spec/contract.md",
@@ -7135,7 +7137,7 @@ fn review_refuses_an_oversized_review_guide_before_the_provider() {
         .unwrap()
         .iter()
         .find(|d| d["path"] == "REVIEW.md")
-        .unwrap();
+        .unwrap_or_else(|| panic!("REVIEW.md is not in the manifest: {ctx}"));
     assert_eq!(review["status"], "present");
     assert_eq!(review["bytes"], big.len());
 
