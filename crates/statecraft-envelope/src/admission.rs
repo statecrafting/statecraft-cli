@@ -10,6 +10,7 @@ use std::collections::BTreeSet;
 use std::sync::Arc;
 
 use action_gate_core::{ActionContext, Check, Decision as GateDecision, Gate, Outcome};
+use serde::Serialize;
 
 use crate::attestation::{AttestationId, Principal};
 use crate::dimensions::{
@@ -226,9 +227,9 @@ impl Check for AdmissionCheck {
     }
 }
 
-/// The closed gate for one evaluation (spec 037): one required check per
-/// requirement, registered in the order the refusals are reported.
-fn gate(policy: &AdmissionPolicy, input: &AdmissionInput<'_>) -> Gate {
+/// The checks one evaluation registers (spec 037): one required check per
+/// requirement, in the order the refusals are reported.
+fn checks(policy: &AdmissionPolicy, input: &AdmissionInput<'_>) -> Vec<AdmissionCheck> {
     let mut checks = Vec::new();
     let mut add =
         |id: String, requirement: Requirement| checks.push(AdmissionCheck { id, requirement });
@@ -312,12 +313,22 @@ fn gate(policy: &AdmissionPolicy, input: &AdmissionInput<'_>) -> Gate {
         },
     );
 
+    checks
+}
+
+/// The closed gate over `checks`, every one of them required.
+fn gate_of(checks: Vec<AdmissionCheck>) -> Gate {
     let ids: Vec<String> = checks.iter().map(|c| c.id.clone()).collect();
     checks
         .into_iter()
         .fold(Gate::builder(), |b, c| b.check(c))
         .require_all(ids)
         .build()
+}
+
+/// The closed gate for one evaluation.
+fn gate(policy: &AdmissionPolicy, input: &AdmissionInput<'_>) -> Gate {
+    gate_of(checks(policy, input))
 }
 
 /// The refusal a deny names. Every check here always decides and writes its
@@ -340,6 +351,76 @@ pub fn evaluate(policy: &AdmissionPolicy, input: &AdmissionInput<'_>) -> Admissi
     } else {
         Admission::refuse(evaluation.denials.iter().map(refusal_of).collect())
     }
+}
+
+/// One check's own result in a dry-run's trace (spec 049 section 3.4).
+///
+/// Serialized with the result word under `result` and, for a deny, the
+/// refusal under `code` in exactly the form [`Admission`] writes it.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[serde(tag = "result", rename_all = "kebab-case")]
+pub enum CheckOutcome {
+    /// Satisfied, and the decision admits.
+    Allow,
+    /// Satisfied, but the decision is a refusal: another check denied.
+    Overruled,
+    /// Denied, with the refusal admission reports for it.
+    Deny {
+        /// The refusal code.
+        code: RefusalCode,
+    },
+    /// The check made no decision. Every admission check decides, so this is
+    /// the closed gate's vocabulary kept complete, never an expected answer.
+    Undecided,
+}
+
+/// One registered check and what it decided on its own.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CheckResult {
+    /// The check's gate id, such as `verdict/0/integrity`.
+    pub id: String,
+    /// Its own result.
+    #[serde(flatten)]
+    pub outcome: CheckOutcome,
+}
+
+/// What a dry-run answers (spec 049): [`evaluate`]'s decision, and beside it
+/// every check's own result.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TracedAdmission {
+    /// Exactly [`evaluate`] on the same policy and input.
+    pub admission: Admission,
+    /// Every registered check, in registration order. An allowing check is
+    /// `Overruled` exactly when the decision is a refusal.
+    pub checks: Vec<CheckResult>,
+}
+
+/// Evaluate and trace (spec 049 sections 3.2 and 3.4).
+///
+/// The decision is [`evaluate`]'s, called here rather than recomputed: the
+/// refusal codes, their order and their serialized form are admission's. The
+/// trace asks each registered check for its own answer on the same input; the
+/// checks are pure, so the trace's denies are the decision's reasons.
+pub fn evaluate_traced(policy: &AdmissionPolicy, input: &AdmissionInput<'_>) -> TracedAdmission {
+    let admission = evaluate(policy, input);
+    let ctx = ActionContext::new(ACTION);
+    let refused = !admission.is_admit();
+    let checks = checks(policy, input)
+        .iter()
+        .map(|check| CheckResult {
+            id: check.id.clone(),
+            outcome: match check.evaluate(&ctx) {
+                None => CheckOutcome::Undecided,
+                Some(d) if d.outcome == Outcome::Deny => CheckOutcome::Deny {
+                    code: refusal_of(&d),
+                },
+                Some(_) if refused => CheckOutcome::Overruled,
+                Some(_) => CheckOutcome::Allow,
+            },
+        })
+        .collect();
+    TracedAdmission { admission, checks }
 }
 
 /// The claim of the `statecraft/policy-eval/v1` attestation recording an evaluation.

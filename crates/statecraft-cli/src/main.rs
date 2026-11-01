@@ -87,6 +87,14 @@ fn run(args: &[String]) -> i32 {
             "--spine is accepted only by init plan and init apply".into(),
         );
     }
+    // Spec 049: the admission dry-run reads two files and writes nothing, so
+    // it too is dispatched before the product home is consulted.
+    if invocation.verb == Verb::AdmissionDryRun {
+        return match statecraft_cli::admission::dry_run(&invocation.rest) {
+            Ok(answer) => emit(&answer, format),
+            Err(message) => usage(format, message),
+        };
+    }
     // Spec 036: the offline trust verbs read no product home and no
     // registered project, so they are dispatched before either is consulted.
     if matches!(

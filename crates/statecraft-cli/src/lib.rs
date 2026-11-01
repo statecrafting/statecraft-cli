@@ -54,6 +54,7 @@
 
 pub mod accept;
 pub mod adapters;
+pub mod admission;
 pub mod application;
 pub mod attempt;
 pub mod bind;
