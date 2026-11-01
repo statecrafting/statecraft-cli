@@ -11,8 +11,8 @@
     ],
     "implementingPaths": [],
     "specId": "055-codex-adapter",
-    "specStatus": "draft"
+    "specStatus": "approved"
   },
   "schemaVersion": "1.3.0",
-  "shardHash": "2c4b7082cce5f54d9cec0224368ca4bf44f2200f9fa9484afd4d234671fd6360"
+  "shardHash": "078c18e44e2c1b0c8789faff72b6962c2f2e4793fdf9565574b90f3913eb24c8"
 }
