@@ -1,7 +1,7 @@
 ---
 id: "054-ai-prescreen-attestation"
 title: "An AI pre-screen is an advisory attestation shown beside approvals and never counted as one"
-status: draft
+status: approved
 implementation: pending
 created: "2026-10-21"
 summary: >
@@ -129,8 +129,8 @@ The only form offered refuses on both.
 
 ## Verification
 
-This spec is `status: draft` and declares no acceptance until it is ratified
-and built. Its acceptance will evaluate a revision with a `no-findings`
+Ratified by the owner on 2026-10-31. Acceptance is declared by the
+implementing change, which will evaluate a revision with a `no-findings`
 pre-screen and no approval and see the missing approval refuse; evaluate a
 `findings` pre-screen under an opting policy and see it refuse, and under a
 default policy see nothing change; refuse a missing pre-screen under the
