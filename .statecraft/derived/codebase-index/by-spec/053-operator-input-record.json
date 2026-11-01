@@ -11,8 +11,8 @@
     ],
     "implementingPaths": [],
     "specId": "053-operator-input-record",
-    "specStatus": "draft"
+    "specStatus": "approved"
   },
   "schemaVersion": "1.3.0",
-  "shardHash": "0b4bcfe36ed1722d60f4585c562e8b116b0cfdb288808c9db66f1331394aa2ee"
+  "shardHash": "2fd552f2b5c0f910c9622fbad78f0055f916a6c6e3a32724e8ae81bae2b01712"
 }

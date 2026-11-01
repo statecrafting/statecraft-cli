@@ -48,7 +48,7 @@
       }
     ],
     "sectionDigests": {
-      "053-operator-input-record": "baf96fd67ec7fa5d8c9f0e817424ecc5d671a3fe363cdc7ede1784dc6a971a7f",
+      "053-operator-input-record": "dd596ecd45e4d34865351e1b7f73c3502fd72829a01ea87aef174ff308f4a299",
       "1-purpose": "54d386817f4591af5252ec25e3e1fc9b3e26757892b8666afc71fa50d58a3577",
       "2-territory": "259ca4255f2ab3b167729833670c511a4a4d6be2b4f058702d6423ec5fba34a5",
       "3-1-the-input-record": "529927f4d51e1e773d010c66ceb7067fcb97e7fe9eac74c55eec5cc211033911",
@@ -59,7 +59,7 @@
       "3-behavior": "040f8a2b326bc5bf820794f7faf22473a95128b7b763fd690f1a739be36d6e65",
       "4-out-of-scope": "45848a94f2c780f4ac51889b61ded4ed167329faf350df4c8169bf316cb4df12",
       "5-resolved-decisions": "c119e8278ff5eddd06cd03ac1fa39d5653d2df4e3cf3a1f0575aa9fc0b401bc0",
-      "verification": "7fdc1205bfaf66c7c5f6ad2dd2a1c3dd6ca54c37b8bece20eedecb1174c049af"
+      "verification": "ab393a6924cca93a0848b2fb2433b7ba18c4fcabafbdb1bf80faade11e072c89"
     },
     "sectionHeadings": [
       "053: Operator input record",
@@ -76,10 +76,10 @@
       "Verification"
     ],
     "specPath": "specs/053-operator-input-record/spec.md",
-    "status": "draft",
+    "status": "approved",
     "summary": "Lets an operator steer a live attempt with a note, read by the agent at its next governed tool call, or a command, which starts a new turn as a spec 048 continue. Each input is written to the run record before it is delivered, carries its author, reason and expiry, and moves through pending, delivered, then acknowledged or expired. The cockpit is view-only by default and grants control for a bounded time. Localhost only; no hosted transport and no unsigned session-authorized command. An abort command ends the attempt as spec 003's cancelled.\n",
     "title": "Operator input to a live attempt is recorded before delivery, expires, and is evidence on the attempt"
   },
-  "shardHash": "0b4bcfe36ed1722d60f4585c562e8b116b0cfdb288808c9db66f1331394aa2ee",
+  "shardHash": "2fd552f2b5c0f910c9622fbad78f0055f916a6c6e3a32724e8ae81bae2b01712",
   "specVersion": "1.11.0"
 }
