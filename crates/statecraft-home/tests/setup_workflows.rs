@@ -20,6 +20,7 @@
 
 #![cfg(unix)]
 
+use spec_spine_core::types::yaml::{self, YamlValue};
 use statecraft_environment::manifest::{Manifest, Pins};
 use statecraft_home::setup::{self, Inputs, Profile};
 use std::collections::BTreeMap;
@@ -218,13 +219,185 @@ impl Repo {
     }
 }
 
-fn workflow(root: &Path, name: &str) -> serde_yaml::Value {
+/// A rendered workflow, read through the producer's one YAML reader (spec
+/// 045 section 3.1) and viewed through [`Yaml`].
+fn workflow(root: &Path, name: &str) -> Yaml {
     let text = std::fs::read_to_string(root.join(".github/workflows").join(name)).unwrap();
-    serde_yaml::from_str(&text).unwrap()
+    Yaml::from(&yaml::parse(&text).unwrap())
+}
+
+/// An index-friendly view of a value the one YAML reader parsed:
+/// `wf["jobs"][job]["steps"][0]` reads as every assertion in this file is
+/// written, and a key or an index the document lacks is `Null`, never a
+/// panic. It is built from the reader's value and parses nothing itself.
+#[derive(Debug, Clone, PartialEq)]
+enum Yaml {
+    Null,
+    Bool(bool),
+    Int(i64),
+    UInt(u64),
+    Float(f64),
+    String(String),
+    Sequence(Vec<Yaml>),
+    Mapping(Mapping),
+}
+
+/// A mapping in authored order, with the lookups the assertions use.
+#[derive(Debug, Clone, PartialEq)]
+struct Mapping(Vec<(Yaml, Yaml)>);
+
+static NULL: Yaml = Yaml::Null;
+
+impl From<&YamlValue> for Yaml {
+    fn from(v: &YamlValue) -> Yaml {
+        match v {
+            YamlValue::Null => Yaml::Null,
+            YamlValue::Bool(b) => Yaml::Bool(*b),
+            YamlValue::Int(i) => Yaml::Int(*i),
+            YamlValue::UInt(u) => Yaml::UInt(*u),
+            YamlValue::Float(f) => Yaml::Float(*f),
+            YamlValue::String(s) => Yaml::String(s.clone()),
+            YamlValue::Sequence(items) => Yaml::Sequence(items.iter().map(Yaml::from).collect()),
+            YamlValue::Mapping(entries) => Yaml::Mapping(Mapping(
+                entries
+                    .iter()
+                    .map(|(k, v)| (Yaml::from(k), Yaml::from(v)))
+                    .collect(),
+            )),
+        }
+    }
+}
+
+impl Yaml {
+    fn as_str(&self) -> Option<&str> {
+        match self {
+            Yaml::String(s) => Some(s),
+            _ => None,
+        }
+    }
+
+    fn as_bool(&self) -> Option<bool> {
+        match self {
+            Yaml::Bool(b) => Some(*b),
+            _ => None,
+        }
+    }
+
+    fn as_u64(&self) -> Option<u64> {
+        match self {
+            Yaml::UInt(u) => Some(*u),
+            Yaml::Int(i) => u64::try_from(*i).ok(),
+            _ => None,
+        }
+    }
+
+    fn as_sequence(&self) -> Option<&Vec<Yaml>> {
+        match self {
+            Yaml::Sequence(s) => Some(s),
+            _ => None,
+        }
+    }
+
+    fn as_mapping(&self) -> Option<&Mapping> {
+        match self {
+            Yaml::Mapping(m) => Some(m),
+            _ => None,
+        }
+    }
+
+    fn is_null(&self) -> bool {
+        matches!(self, Yaml::Null)
+    }
+
+    fn is_mapping(&self) -> bool {
+        matches!(self, Yaml::Mapping(_))
+    }
+}
+
+impl Mapping {
+    fn len(&self) -> usize {
+        self.0.len()
+    }
+
+    fn contains_key(&self, key: &str) -> bool {
+        self.0.iter().any(|(k, _)| k.as_str() == Some(key))
+    }
+
+    fn keys(&self) -> impl Iterator<Item = &Yaml> {
+        self.0.iter().map(|(k, _)| k)
+    }
+
+    fn iter(&self) -> impl Iterator<Item = (&Yaml, &Yaml)> {
+        self.0.iter().map(|(k, v)| (k, v))
+    }
+}
+
+impl<'a> IntoIterator for &'a Mapping {
+    type Item = (&'a Yaml, &'a Yaml);
+    type IntoIter = std::iter::Map<
+        std::slice::Iter<'a, (Yaml, Yaml)>,
+        fn(&'a (Yaml, Yaml)) -> (&'a Yaml, &'a Yaml),
+    >;
+    fn into_iter(self) -> Self::IntoIter {
+        let split: fn(&'a (Yaml, Yaml)) -> (&'a Yaml, &'a Yaml) = |(k, v)| (k, v);
+        self.0.iter().map(split)
+    }
+}
+
+impl std::ops::Index<&str> for Mapping {
+    type Output = Yaml;
+    fn index(&self, key: &str) -> &Yaml {
+        self.0
+            .iter()
+            .find(|(k, _)| k.as_str() == Some(key))
+            .map_or(&NULL, |(_, v)| v)
+    }
+}
+
+impl std::ops::Index<&str> for Yaml {
+    type Output = Yaml;
+    fn index(&self, key: &str) -> &Yaml {
+        self.as_mapping().map_or(&NULL, |m| &m[key])
+    }
+}
+
+impl std::ops::Index<usize> for Yaml {
+    type Output = Yaml;
+    fn index(&self, i: usize) -> &Yaml {
+        self.as_sequence().and_then(|s| s.get(i)).unwrap_or(&NULL)
+    }
+}
+
+impl PartialEq<str> for Yaml {
+    fn eq(&self, other: &str) -> bool {
+        self.as_str() == Some(other)
+    }
+}
+
+impl PartialEq<&str> for Yaml {
+    fn eq(&self, other: &&str) -> bool {
+        self.as_str() == Some(*other)
+    }
+}
+
+impl PartialEq<bool> for Yaml {
+    fn eq(&self, other: &bool) -> bool {
+        self.as_bool() == Some(*other)
+    }
+}
+
+impl PartialEq<i64> for Yaml {
+    fn eq(&self, other: &i64) -> bool {
+        match self {
+            Yaml::Int(i) => i == other,
+            Yaml::UInt(u) => i64::try_from(*u).ok() == Some(*other),
+            _ => false,
+        }
+    }
 }
 
 /// A named step of a job: its `run:` scalar and its `env:` map, raw.
-fn step(wf: &serde_yaml::Value, job: &str, name: &str) -> (String, Vec<(String, String)>) {
+fn step(wf: &Yaml, job: &str, name: &str) -> (String, Vec<(String, String)>) {
     let steps = wf["jobs"][job]["steps"].as_sequence().unwrap();
     let s = steps
         .iter()
@@ -237,9 +410,11 @@ fn step(wf: &serde_yaml::Value, job: &str, name: &str) -> (String, Vec<(String, 
             m.iter()
                 .map(|(k, v)| {
                     let v = match v {
-                        serde_yaml::Value::String(s) => s.clone(),
-                        serde_yaml::Value::Number(n) => n.to_string(),
-                        serde_yaml::Value::Bool(b) => b.to_string(),
+                        Yaml::String(s) => s.clone(),
+                        Yaml::Int(n) => n.to_string(),
+                        Yaml::UInt(n) => n.to_string(),
+                        Yaml::Float(n) => n.to_string(),
+                        Yaml::Bool(b) => b.to_string(),
                         other => panic!("unsupported env value {other:?}"),
                     };
                     (k.as_str().unwrap().to_string(), v)
@@ -1071,10 +1246,7 @@ fn ci_gate_needs_every_job_the_policy_requires() {
     // Revision 3: the queue is judged, and the gate job only reads.
     // `merge_group:` has no value, so the key's presence is the trigger.
     assert!(
-        wf["on"]
-            .as_mapping()
-            .unwrap()
-            .contains_key(serde_yaml::Value::from("merge_group")),
+        wf["on"].as_mapping().unwrap().contains_key("merge_group"),
         "a merge_group trigger"
     );
     let perms = &wf["jobs"]["ci-gate"]["permissions"];
@@ -5642,12 +5814,10 @@ fn revision_seventeen() -> Profile {
     p
 }
 
-fn needs_of(wf: &serde_yaml::Value, job: &str) -> Vec<String> {
+fn needs_of(wf: &Yaml, job: &str) -> Vec<String> {
     match &wf["jobs"][job]["needs"] {
-        serde_yaml::Value::Sequence(v) => {
-            v.iter().map(|n| n.as_str().unwrap().to_string()).collect()
-        }
-        serde_yaml::Value::String(n) => vec![n.clone()],
+        Yaml::Sequence(v) => v.iter().map(|n| n.as_str().unwrap().to_string()).collect(),
+        Yaml::String(n) => vec![n.clone()],
         _ => Vec::new(),
     }
 }

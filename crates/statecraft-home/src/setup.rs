@@ -25,6 +25,7 @@
 //!   verification `doctor --remote` asks for.
 
 use serde::{Deserialize, Serialize};
+use spec_spine_core::types::yaml::{self, YamlValue};
 use statecraft_environment::digest::digest_bytes;
 use statecraft_environment::manifest::{
     Class, Entry, Manifest, SetupSelection, Source, SourceKind,
@@ -587,22 +588,32 @@ fn code_selection(root: &Path, value: &serde_json::Value) -> Result<Code, String
                     .zip(root.canonicalize().ok())
                     .is_some_and(|(p, r)| p.starts_with(r));
             if contained {
-                let yaml: serde_yaml::Value = serde_yaml::from_slice(
-                    &std::fs::read(root.join(workflow))
-                        .map_err(|e| format!("ci.code.workflow unreadable: {e}"))?,
-                )
-                .map_err(|e| format!("ci.code.workflow invalid YAML: {e}"))?;
-                let call = match &yaml["on"] {
-                    serde_yaml::Value::String(name) => name == "workflow_call",
-                    serde_yaml::Value::Sequence(names) => names
+                // Spec 045 section 3.1: the one YAML reader the adopted
+                // producer carries. Bytes that are not UTF-8 are as invalid
+                // as they were to the previous reader, under the same refusal.
+                let bytes = std::fs::read(root.join(workflow))
+                    .map_err(|e| format!("ci.code.workflow unreadable: {e}"))?;
+                let text = String::from_utf8(bytes)
+                    .map_err(|e| format!("ci.code.workflow invalid YAML: {e}"))?;
+                let document = yaml::parse(&text)
+                    .map_err(|e| format!("ci.code.workflow invalid YAML: {e}"))?;
+                // Spec 045 section 3.2: `workflow_call` as a string, a
+                // sequence entry or a mapping key; an absent `on` or a
+                // non-mapping document declares nothing.
+                let call = match document.get("on") {
+                    Some(YamlValue::String(name)) => name == "workflow_call",
+                    Some(YamlValue::Sequence(names)) => names
                         .iter()
                         .any(|name| name.as_str() == Some("workflow_call")),
-                    serde_yaml::Value::Mapping(events) => {
-                        events.contains_key(serde_yaml::Value::String("workflow_call".into()))
-                    }
+                    Some(on @ YamlValue::Mapping(_)) => on.get("workflow_call").is_some(),
                     _ => false,
                 };
-                if !call || yaml["jobs"].as_mapping().is_none_or(|jobs| jobs.is_empty()) {
+                if !call
+                    || document
+                        .get("jobs")
+                        .and_then(YamlValue::as_mapping)
+                        .is_none_or(|jobs| jobs.is_empty())
+                {
                     return Err(
                         "ci.code.workflow needs structured on: workflow_call and nonempty jobs"
                             .into(),

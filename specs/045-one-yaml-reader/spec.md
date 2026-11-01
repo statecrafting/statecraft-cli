@@ -15,9 +15,11 @@ amends:
   - "002-environment-lifecycle"
   - "012-remote-desired-state"
   - "032-external-code-profile"
-# No `extends` yet: the implementing change adds the edge on
-# crates/statecraft-home/ (002) with the code, because the gate counts an
-# extender as an owner.
+# The implementing change adds this edge with the code, because the gate
+# counts an extender as an owner; the parity test under
+# crates/statecraft-home/tests/ is covered by the same directory unit.
+extends:
+  - { spec: "002-environment-lifecycle", unit: { kind: directory, path: "crates/statecraft-home/" }, nature: additive }
 depends_on:
   - "002-environment-lifecycle"
   - "009-governance-producer"
