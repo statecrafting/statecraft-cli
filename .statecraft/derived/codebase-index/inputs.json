@@ -12,6 +12,9 @@
     ".claude/settings.json": {
       "contentHash": "bc1c52409e2958785b357aac8b911f32875308d9ec1682cb0f1145b981e42180"
     },
+    ".github/workflows/release.yml": {
+      "contentHash": "c5fcf929736651deaaf4482dbdfa1f2832b9613f9de7722f8a9b72c1344bdd46"
+    },
     ".github/workflows/statecraft-ai-review.yml": {
       "contentHash": "35676b9f4c20fe495fbdf4ef5a2a7944503d2002af96c92da34e0b7a1f2e4150"
     },
@@ -77,6 +80,18 @@
     },
     "scripts/check-spec-corpus.sh": {
       "contentHash": "d4482680aa448a517701da28bf172da652b2a42a540b68abf10f5a832a3444b6"
+    },
+    "scripts/release/check-config.sh": {
+      "contentHash": "33d424cffff308d372519766d532dde1f236c621512f1f0df64787243fa3385a"
+    },
+    "scripts/release/harden-installer.sh": {
+      "contentHash": "52a94b448d0edfe99df98ebc8eb3b2b3c8dec15347a12b9bbbb22372dff63303"
+    },
+    "scripts/release/install-dist.sh": {
+      "contentHash": "c3f60386a63ff85397abd9a83a655b06d93a17c0a3db69a4c0e6f6f118acdca9"
+    },
+    "scripts/release/verify-set.sh": {
+      "contentHash": "9c2ff1c29c50fc75a816a17084936cc7bf1d077afcfbb39e73113fedf88e2a0a"
     },
     "scripts/resolve-shard-conflicts.sh": {
       "contentHash": "50138ae38377c0ff14f4f37ecdeed3cfd6500b50f91e5f7019232a11883ffdc3"
