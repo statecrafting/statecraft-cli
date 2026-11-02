@@ -486,8 +486,9 @@ impl Corpus {
             .iter()
             .filter(|g| g.capture.scenario == scenario)
             .max_by(|a, b| {
-                (&a.capture.captured, &a.capture.provider_version)
-                    .cmp(&(&b.capture.captured, &b.capture.provider_version))
+                a.capture.captured.cmp(&b.capture.captured).then_with(|| {
+                    version_order(&a.capture.provider_version, &b.capture.provider_version)
+                })
             })
     }
 
@@ -496,6 +497,31 @@ impl Corpus {
         self.quarantine
             .iter()
             .find(|q| q.scenario == scenario && q.lifted_by.is_none())
+    }
+}
+
+/// Order two provider versions by their dot-separated components, each
+/// numeric component as a number, so `2.1.9` precedes `2.1.308`. A component
+/// that is not a number compares as text; a version that is a prefix of the
+/// other precedes it.
+fn version_order(a: &str, b: &str) -> std::cmp::Ordering {
+    let mut left = a.split('.');
+    let mut right = b.split('.');
+    loop {
+        match (left.next(), right.next()) {
+            (None, None) => return std::cmp::Ordering::Equal,
+            (None, Some(_)) => return std::cmp::Ordering::Less,
+            (Some(_), None) => return std::cmp::Ordering::Greater,
+            (Some(x), Some(y)) => {
+                let order = match (x.parse::<u64>(), y.parse::<u64>()) {
+                    (Ok(m), Ok(n)) => m.cmp(&n),
+                    _ => x.cmp(y),
+                };
+                if order.is_ne() {
+                    return order;
+                }
+            }
+        }
     }
 }
 
@@ -709,6 +735,38 @@ mod tests {
             .collect();
         let (_, m) = meaning(&truncated).unwrap();
         assert_eq!(m["outcome"], "malformed");
+    }
+
+    #[test]
+    fn a_date_tie_is_broken_by_the_numerically_later_provider_version() {
+        let golden = |version: &str| Recorded {
+            capture: Capture {
+                scenario: "success".to_string(),
+                provider_version: version.to_string(),
+                platform: "macos".to_string(),
+                invocation: "claude -p".to_string(),
+                captured: "2026-11-01".to_string(),
+                file: format!("{version}.jsonl"),
+                redactions: Vec::new(),
+            },
+            meaning: Meaning::new(),
+        };
+        for goldens in [
+            vec![golden("2.1.308"), golden("2.1.9")],
+            vec![golden("2.1.9"), golden("2.1.308")],
+        ] {
+            let corpus = Corpus {
+                goldens,
+                quarantine: Vec::new(),
+                ledger: Vec::new(),
+            };
+            let chosen = corpus.golden("success").unwrap();
+            assert_eq!(chosen.capture.provider_version, "2.1.308");
+        }
+        assert!(version_order("2.1.9", "2.1.308").is_lt());
+        assert!(version_order("2.10.0", "2.9.9").is_gt());
+        assert!(version_order("2.1", "2.1.0").is_lt());
+        assert!(version_order("2.1.9", "2.1.9").is_eq());
     }
 
     #[test]

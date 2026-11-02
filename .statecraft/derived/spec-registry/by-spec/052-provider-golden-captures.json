@@ -64,7 +64,7 @@
       }
     ],
     "sectionDigests": {
-      "052-provider-golden-captures": "0f7812d4c938c7578286e1ec894251bed57135fb6ce8f656da181ecf726591e0",
+      "052-provider-golden-captures": "6af9c43c982b4fe61032194de50b5b67da997cb9332b6b6c342cd7eb4fec31ce",
       "1-purpose": "2238af5c5ad215e4baa994da4aba0fe17510a87fb83f387ff6359bcaa843f542",
       "2-territory": "9c8f2fba0ab89f30df4c2278f7cb1b7cacad4983d9a1df53e9b09d5f0ec68d19",
       "3-1-the-corpus": "d0f61aec2fe350940217176060fbfd93f302805c6c17fa07d6e2844a27efdee4",
@@ -75,7 +75,7 @@
       "3-behavior": "943c20dd8aee6e25379963d0d6c41f883d37db06408fad55a2bc043fc3f9a7f7",
       "4-out-of-scope": "00809fa37304f13e9739f8d7891d96f0ffa71fd60be68c31def6940c1dbf30b3",
       "5-resolved-decisions": "a479e86ba374c9fdedf67197512b1b1aaa034a289da35afc89273411f34bd472",
-      "verification": "8907925316f03612ff1294cc5b36ff40fb82ec683a0fd92b6faa21c1786b4ea2"
+      "verification": "b413cf58a7b34c9865351e0e332af626cb52b10051b3a6eb3354d9a9eb06ba51"
     },
     "sectionHeadings": [
       "052: Provider golden captures",
@@ -96,6 +96,6 @@
     "summary": "Turns the Claude Code adapter's recorded streams into a governed corpus of golden captures, each pinned to a provider version and a named scenario, with a quarantine list for captures that are wrong recordings and a divergence ledger for differences a reviewer has accepted. A new provider version is compared against the goldens offline; an unreviewed divergence refuses that version's qualification. Capturing costs provider usage, so it is owner-triggered; comparison runs in CI with no provider and no network.\n",
     "title": "Version-pinned provider captures, a quarantine and a divergence ledger gate a new provider version"
   },
-  "shardHash": "9142eab257c2789395eb9fb3aa45a21ae27671445e54e6a2f569032dc8f1230e",
+  "shardHash": "0656546f7cb03758f52ae27f4086d0369e4d4a0ce0a3f2f908ccb9a0566c62d3",
   "specVersion": "1.11.0"
 }

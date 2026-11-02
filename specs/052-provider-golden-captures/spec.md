@@ -181,12 +181,11 @@ namespace on Linux, with an empty environment, and fails when neither starts.
 ## Verification
 
 Ratified by the owner on 2026-10-31. Acceptance is declared by the
-implementing change, which will compare a synthetic capture that differs from
-its golden in a mapped field and see qualification refused, add a reviewed
-ledger entry and see it pass, skip and report a quarantined golden, and run
-the comparison in CI with networking denied.
-
-Each line is one command.
+implementing change, as the commands below: they compare a synthetic capture
+that differs from its golden in a mapped field and see qualification refused,
+add a reviewed ledger entry and see it pass, skip and report a quarantined
+golden, and run the comparison in CI with networking denied. Each line is one
+command.
 
 ```verify:cli
 cargo test -p statecraft-adapter-claude-code --locked --test golden_captures
