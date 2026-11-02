@@ -814,19 +814,30 @@ pub fn launch_attempt(
     // digested after the intent is durable and before the spawn, under the
     // repository lock this process holds throughout.
     let before = statecraft_run::tamper::Snapshot::take(home, root);
+    // Spec 053: a managed attempt's operator input is delivered by this
+    // supervisor, between events, through the chain it holds under the lock.
+    // How another process's submission reaches it is the owner's decision,
+    // so its inbox is empty until then.
+    let mut inbox = statecraft_run::input::NoInbox;
+    let mut steering = crate::input::Steering::default();
+    let attempt_of = (run_id.as_str(), session.attempt);
     let supervised = match (watch.as_mut(), &sentinel) {
         // Spec 002 section 3.33 rule 34: the trial keeps a timeline beside
         // the attempt's own watch, which it forwards to unchanged.
         (Some(w), Some(sentinel)) => {
             let mut kept = statecraft_home::trial::TrialWatch::new(w, sentinel);
+            let mut steered = crate::input::Steered::new(
+                &mut kept, &mut chain, &mut inbox, clock, home, root, &exchange, attempt_of,
+            );
             let supervised = statecraft_adapter_claude_code::execution::supervise_with_in(
                 &invocation,
                 &request,
                 &environment,
                 &negotiation.granted,
                 &exchange,
-                &mut witness.custody(&mut kept),
+                &mut witness.custody(&mut steered),
             );
+            steering = steered.close();
             if supervised.is_ok() {
                 kept.decide_at_end();
             }
@@ -837,14 +848,18 @@ pub fn launch_attempt(
             supervised
         }
         (Some(w), None) => {
+            let mut steered = crate::input::Steered::new(
+                &mut *w, &mut chain, &mut inbox, clock, home, root, &exchange, attempt_of,
+            );
             let supervised = statecraft_adapter_claude_code::execution::supervise_with_in(
                 &invocation,
                 &request,
                 &environment,
                 &negotiation.granted,
                 &exchange,
-                &mut witness.custody(&mut *w),
+                &mut witness.custody(&mut steered),
             );
+            steering = steered.close();
             if supervised.is_ok() {
                 // A stream that ended before its decision point is decided at
                 // its end.
@@ -862,13 +877,17 @@ pub fn launch_attempt(
         ),
     };
     let watched = watch.map(|w| w.watched()).unwrap_or_default();
+    // Spec 053: what the desk appended while the child ran is this
+    // supervisor's own write, compared with the bytes it must have left.
+    let mut wrote = watched.wrote.clone();
+    wrote.extend(steering.wrote.take());
     // ... and again once the process has ended, before anything is appended.
     // The chain appends from the head it read at opening, so a change found
     // here ends the attempt's writes: it stays live (rule 2).
     let record_change = before
         .and_then(|before| {
             statecraft_run::tamper::Snapshot::take(home, root)
-                .map(|after| after.changes_since(&before, &watched.wrote))
+                .map(|after| after.changes_since(&before, &wrote))
         })
         .map_err(|e| format!("the record could not be digested: {e}"));
     if let Ok(changes) = &record_change

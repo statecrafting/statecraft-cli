@@ -37,6 +37,10 @@
 //! - [`context`] is spec 019's producer reads: a context packet assembled
 //!   and its snapshot bound by the pinned executable, decoded and its digest
 //!   reproduced by the linked library. Added by spec 019's additive edge.
+//! - [`input`] is spec 053's placement of an operator note in a live
+//!   attempt's exchange directory, where the admission gate returns it as
+//!   context, and the reading of the gate log that says it did. Added by spec
+//!   053's additive edge.
 //! - [`derived`] is the one-time relocation of the compiled artifacts.
 //! - [`flow`] is the initialization; [`service`] is the typed operation
 //!   boundary the command surface and a future dashboard both call.
@@ -68,6 +72,7 @@ pub mod flow;
 pub mod harness;
 pub mod home;
 pub mod ignore;
+pub mod input;
 pub mod launch;
 pub mod prerequisite;
 pub mod producer;

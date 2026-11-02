@@ -43,6 +43,10 @@
 //!   back out of the record. Added by spec 006's additive edge, because a
 //!   command may not be a second implementation and a binding needs an entry
 //!   point.
+//! - [`input`] is spec 053's operator input record: a note or command written
+//!   to the run record before delivery, its states, the cockpit's control
+//!   grants, and the supervisor's desk that delivers and expires notes. Added
+//!   by spec 053's additive edge.
 //!
 //! # What it does not do
 //!
@@ -57,6 +61,7 @@ pub mod attempt;
 pub mod context;
 pub mod contract;
 pub mod documentation;
+pub mod input;
 pub mod lock;
 pub mod overrides;
 pub mod policy;

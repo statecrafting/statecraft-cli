@@ -64,6 +64,7 @@ pub mod documentation;
 pub mod exit;
 pub mod fixed_export;
 pub mod hosted;
+pub mod input;
 pub mod judge;
 pub mod launch;
 pub mod manage;

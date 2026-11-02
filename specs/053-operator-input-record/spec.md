@@ -16,9 +16,15 @@ summary: >
 amends:
   - "003-work-and-run-semantics"
   - "039-local-cockpit-authority"
-# No `extends` yet: the implementing change adds the edges on
-# crates/statecraft-run/ (003), crates/statecraft-home/ (002) and
-# crates/statecraft-cli/ (006) with the code.
+extends:
+  # The input record, its fold, the control grants and the supervisor's desk
+  # (`input.rs`), and the run fold skipping a grant (`session.rs`).
+  - { spec: "003-work-and-run-semantics", unit: { kind: directory, path: "crates/statecraft-run/" }, nature: additive }
+  # The note's placement in the exchange directory (`input.rs`) and the
+  # admission gate returning it as context (`launch.rs`).
+  - { spec: "002-environment-lifecycle", unit: { kind: directory, path: "crates/statecraft-home/" }, nature: additive }
+  # The desk wrapped around a managed attempt's watch (`input.rs`, `launch.rs`).
+  - { spec: "006-command-surface", unit: { kind: directory, path: "crates/statecraft-cli/" }, nature: additive }
 depends_on:
   - "003-work-and-run-semantics"
   - "004-execution-adapter"
@@ -145,6 +151,45 @@ does not sit in the model request path (spec 013's witness reads it as
 untrusted testimony and never rewrites it), so a note goes through the gate
 the child already executes, and a command becomes a new attempt.
 
+**2026-11-01: an input is evidence in the run record, not an effect
+bracket.** Section 3.1's intent and outcomes are written as spec 003 records
+of kind `evidence`: the first under the subject `operator-input`, holding the
+whole submission and an identity `input-NNNNNN`, and each later state under
+`operator-input-state`. The order is the one section 3.1 requires, durable
+before anything else happens; the kind is not `intent`, because an input has
+up to three later states where an effect has one outcome, and an input is not
+an effect on the target, so the effect fold and reconciliation never read one
+and a pending input never blocks a retry. The fold applies only the moves R-1
+names and reports any other record as a defect.
+
+**2026-11-01: a note is a file the gate prints whole, one per governed
+call.** The supervisor writes the provider's complete `PreToolUse` answer,
+with the note as `additionalContext`, to `notes/<id>.<expires-at>.json` in
+the exchange directory by a no-replace rename, so the gate never quotes
+operator text in shell. On an `admitted` decision the gate prints the first
+such file, by name, that is unexpired and that its log does not already name,
+appends `note <id>` to the log and exits 0; that line is what `acknowledged`
+is read from. A note withdrawn, acknowledged or expired is removed. The
+supervisor runs its desk after each event of the attempt's stream, so a note
+submitted while no event arrives is placed at the next one.
+
+**2026-11-01: a control grant belongs to the repository.** A grant names a
+cockpit session, the operator, a reason and its end, at most 3600 seconds
+after it is given, and is recorded in the run record under `control-grant`; a
+revocation under `control-revoke`. Neither belongs to a run, and the run fold
+skips both. The live grant is the latest one for the session that has not
+ended and was not revoked after it.
+
+**2026-11-01: how a submission reaches a live attempt's supervisor is not
+decided here.** The supervisor holds the repository lock from the intent to
+the outcome (spec 003 section 3.1.4 rule 7), so no other process can append a
+`pending` record while the attempt runs. The supervisor's desk takes
+submissions from an inbox, records each `pending` before placing it, and its
+inbox is empty until the owner decides the channel; the `input note` and
+`input command` verbs, and acting on a command through spec 048's continue
+and abort, follow that decision. Until then a command is recorded and left
+`pending`.
+
 ## Verification
 
 Ratified by the owner on 2026-10-31. Acceptance is declared by the
@@ -152,3 +197,21 @@ implementing change, which will send a note during a live attempt and see it
 recorded pending, then delivered at the next governed call, and expired when
 no call comes before its expiry; refuse a cockpit command without a control
 grant; and find every input, with author and reason, in the attempt's record.
+
+```verify:cli
+cargo test -p statecraft-run --test operator_input
+cargo test -p statecraft-home --test operator_input
+```
+
+The first records a note `pending` and finds the record on disk before the
+note is placed, then `delivered` and `acknowledged` labelled child-attested,
+and expires a note when no call reads it before its expiry and when its
+attempt ends; refuses a cockpit note and command without a live grant with
+`control-not-granted`, and after the grant ends or is revoked; refuses a
+grant longer than an hour; applies only the moves R-1 names; and folds every
+input, with author and reason, from the attempt's record. The second runs the
+admission gate as a program and sees it return a placed note once as the
+call's context, never past its expiry, and never on a refused decision.
+Delivering a submission made by another process, and the two verbs, wait on
+the channel decision in section 5, which is why `implementation` is still
+`pending`.

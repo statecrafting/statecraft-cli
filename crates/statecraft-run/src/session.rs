@@ -47,7 +47,9 @@ use std::path::Path;
 /// than a promise in prose.
 pub fn runs(chain: &Chain) -> Vec<Run> {
     let mut out: Vec<Run> = Vec::new();
-    for entry in chain.entries() {
+    // Spec 053: a control grant belongs to the repository, not to a run.
+    let entries = chain.entries().into_iter();
+    for entry in entries.filter(|e| !crate::input::is_repository_record(e)) {
         let run = match out.iter_mut().find(|r| r.id == entry.run_id) {
             Some(r) => r,
             None => {
