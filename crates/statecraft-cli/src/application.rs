@@ -820,8 +820,15 @@ fn locked_or_busy(ctx: &Context<'_>, path: &Path) -> Result<Locked, Response> {
         Ok((chain, _)) => chain,
         Err(e) => return Err(failed(&e.to_string())),
     };
-    if let Err(e) = statecraft_run::operation::apply_pending(&mut chain, ctx.home, &root) {
-        return Err(failed(&e.to_string()));
+    match statecraft_run::operation::apply_pending(&mut chain, ctx.home, &root) {
+        // A file that does not read stops nothing: it is reported here and
+        // left in place for an operator (section 5, 2026-11-02).
+        Ok(drained) => {
+            for why in drained.unreadable {
+                eprintln!("warning: {why}; it is left in place and was not applied");
+            }
+        }
+        Err(e) => return Err(failed(&e.to_string())),
     }
     Ok(Locked::Held(root, held, chain))
 }

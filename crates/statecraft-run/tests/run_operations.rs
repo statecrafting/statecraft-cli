@@ -629,7 +629,9 @@ fn a_queued_abort_is_decided_by_the_same_rules_and_applied_twice_appends_once() 
         operation::requests_dir(f.home.path(), f.target.path()).parent()
     );
 
-    let applied = operation::apply_pending(&mut chain, f.home.path(), f.target.path()).unwrap();
+    let applied = operation::apply_pending(&mut chain, f.home.path(), f.target.path())
+        .unwrap()
+        .applied;
     assert_eq!(applied.len(), 1);
     assert_eq!(applied[0].answer["outcome"]["result"], "stop-requested");
     assert!(!file.exists());
@@ -672,19 +674,31 @@ fn a_queued_break_left_behind_is_not_recorded_again_over_a_newer_lease() {
 }
 
 #[test]
-fn a_queued_request_that_does_not_read_is_left_in_place_and_applies_nothing() {
+fn a_queued_request_that_does_not_read_is_left_in_place_and_stops_nothing() {
     let f = Fixture::new();
     let mut chain = f.chain();
     start(&mut chain, RUN, 1);
     let dir = operation::requests_dir(f.home.path(), f.target.path());
     std::fs::create_dir_all(&dir).unwrap();
+    // Sorts first, so a request behind it must still be applied.
     let bad = dir.join("0-torn.json");
     std::fs::write(&bad, b"{\"request\":\"abort\",\"run").unwrap();
-    let records = chain.records().len();
-    match operation::apply_pending(&mut chain, f.home.path(), f.target.path()) {
-        Err(operation::QueueError::Unreadable { .. }) => {}
-        other => panic!("expected an unreadable request, got {other:?}"),
-    }
-    assert!(bad.exists());
-    assert_eq!(chain.records().len(), records);
+    let good = operation::queue(
+        f.home.path(),
+        f.target.path(),
+        &operation::Queued::LeaseAcquire {
+            run_id: RUN.to_string(),
+            controller: "cockpit".to_string(),
+            pid: std::process::id(),
+            at: AT.to_string(),
+        },
+    )
+    .unwrap();
+    let drained = operation::apply_pending(&mut chain, f.home.path(), f.target.path()).unwrap();
+    assert_eq!(drained.unreadable.len(), 1, "{:?}", drained.unreadable);
+    assert!(drained.unreadable[0].contains("0-torn.json"));
+    assert_eq!(drained.applied.len(), 1);
+    assert!(bad.exists(), "an unreadable request is left in place");
+    assert!(!good.exists());
+    assert!(operation::fold(&chain, RUN).lease.is_some());
 }

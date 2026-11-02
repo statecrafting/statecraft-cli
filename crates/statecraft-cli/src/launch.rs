@@ -1285,9 +1285,6 @@ struct HaltPoller<'c> {
     expected: Option<Vec<u8>>,
     polled: HaltPolled,
     done: bool,
-    /// A queued operation request did not read: the operation queue is not
-    /// read again this attempt, and the halt queue still is.
-    operations_unreadable: bool,
 }
 
 impl<'c> HaltPoller<'c> {
@@ -1311,7 +1308,6 @@ impl<'c> HaltPoller<'c> {
             expected,
             polled: HaltPolled::default(),
             done: false,
-            operations_unreadable: false,
         }
     }
 
@@ -1337,19 +1333,20 @@ impl<'c> HaltPoller<'c> {
             Err(refusal) => return self.fail(refusal.to_string()),
         };
         // Spec 048 section 5, 2026-11-02: an abort or lease request queued
-        // while this run holds the lock. One that does not read is reported
-        // and left for an operator; it stops nothing, since a halt is the
-        // operator's stop and an abort that cannot be read was never decided.
-        let operations = if self.operations_unreadable {
-            Vec::new()
-        } else {
-            match statecraft_run::operation::pending(self.home, self.root) {
-                Ok(queued) => queued,
-                Err(e) => {
-                    self.operations_unreadable = true;
-                    self.polled.operation_failure = Some(e.to_string());
-                    Vec::new()
+        // while this run holds the lock. A file that does not read is
+        // reported and left for an operator; it stops nothing, since a halt is
+        // the operator's stop and an abort that cannot be read was never
+        // decided.
+        let operations = match statecraft_run::operation::pending(self.home, self.root) {
+            Ok(pending) => {
+                if let Some(why) = pending.unreadable.into_iter().next() {
+                    self.polled.operation_failure = Some(why);
                 }
+                pending.requests
+            }
+            Err(e) => {
+                self.polled.operation_failure = Some(e.to_string());
+                Vec::new()
             }
         };
         if halts.is_empty() && operations.is_empty() {
@@ -1374,7 +1371,7 @@ impl<'c> HaltPoller<'c> {
             halt::apply_pending(self.chain, self.home, self.root)
         };
         let operated = if operations.is_empty() {
-            Ok(Vec::new())
+            Ok(statecraft_run::operation::Drained::default())
         } else {
             statecraft_run::operation::apply_pending(self.chain, self.home, self.root)
         };
@@ -1395,7 +1392,7 @@ impl<'c> HaltPoller<'c> {
             Err(e) => return self.fail(e.to_string()),
         }
         match operated {
-            Ok(done) => self.polled.operations.extend(done),
+            Ok(drained) => self.polled.operations.extend(drained.applied),
             Err(statecraft_run::operation::QueueError::Record(e)) => {
                 return self.fail(e.to_string());
             }

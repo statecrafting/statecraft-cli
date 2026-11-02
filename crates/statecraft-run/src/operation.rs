@@ -1120,22 +1120,37 @@ pub fn queue(
         .map_err(|(path, e)| io_error(&path, "queued")(e))
 }
 
-/// Every queued request, oldest first.
-pub fn pending(
-    home: &std::path::Path,
-    target: &std::path::Path,
-) -> Result<Vec<(std::path::PathBuf, Queued)>, QueueError> {
+/// The queued requests, oldest first, and the files that did not read.
+#[derive(Debug, Default)]
+pub struct Pending {
+    /// Every request that reads, oldest first.
+    pub requests: Vec<(std::path::PathBuf, Queued)>,
+    /// Why each file that does not read was skipped. It is left in place and
+    /// stops nothing (section 5, 2026-11-02).
+    pub unreadable: Vec<String>,
+}
+
+/// Every queued request, oldest first. A file that cannot be read or does not
+/// parse is skipped and named in [`Pending::unreadable`]; only a queue
+/// directory that cannot be listed is an error.
+pub fn pending(home: &std::path::Path, target: &std::path::Path) -> Result<Pending, QueueError> {
     let dir = requests_dir(home, target);
     let paths = crate::halt::listed_requests(&dir).map_err(io_error(&dir, "read"))?;
-    let mut out = Vec::new();
+    let mut out = Pending::default();
     for path in paths {
-        let bytes = std::fs::read(&path).map_err(io_error(&path, "read"))?;
-        let queued =
-            serde_json::from_slice::<Queued>(&bytes).map_err(|e| QueueError::Unreadable {
-                path: path.display().to_string(),
-                why: e.to_string(),
-            })?;
-        out.push((path, queued));
+        let read = std::fs::read(&path)
+            .map_err(|e| e.to_string())
+            .and_then(|bytes| serde_json::from_slice::<Queued>(&bytes).map_err(|e| e.to_string()));
+        match read {
+            Ok(queued) => out.requests.push((path, queued)),
+            Err(why) => out.unreadable.push(
+                QueueError::Unreadable {
+                    path: path.display().to_string(),
+                    why,
+                }
+                .to_string(),
+            ),
+        }
     }
     Ok(out)
 }
@@ -1249,24 +1264,38 @@ pub fn apply(chain: &mut Chain, request: &Queued) -> Result<Value, RecordError> 
     })
 }
 
+/// What [`apply_pending`] did: each request applied, and each file skipped.
+#[derive(Debug, Default)]
+pub struct Drained {
+    /// Each request applied, oldest first.
+    pub applied: Vec<Applied>,
+    /// Why each file that does not read was skipped and left in place.
+    pub unreadable: Vec<String>,
+}
+
 /// Apply every queued request, oldest first, and remove each file once what
 /// it appended is durable. The caller holds the repository lock: the
 /// supervisor of a live attempt at each poll, or `run op` and `run lease`
 /// before their own write, so a request no supervisor lived to apply is not
-/// lost. A request that does not read stops the call and is left in place.
+/// lost. A file that does not read is skipped, left in place and reported;
+/// it stops nothing, and the requests after it are still applied.
 pub fn apply_pending(
     chain: &mut Chain,
     home: &std::path::Path,
     target: &std::path::Path,
-) -> Result<Vec<Applied>, QueueError> {
-    let mut applied = Vec::new();
-    for (path, request) in pending(home, target)? {
+) -> Result<Drained, QueueError> {
+    let pending = pending(home, target)?;
+    let mut drained = Drained {
+        applied: Vec::new(),
+        unreadable: pending.unreadable,
+    };
+    for (path, request) in pending.requests {
         let answer = apply(chain, &request)?;
-        applied.push(Applied { request, answer });
+        drained.applied.push(Applied { request, answer });
         crate::halt::remove_request(&path)
             .map_err(io_error(&path, "removed after it was applied"))?;
     }
-    Ok(applied)
+    Ok(drained)
 }
 
 /// The abort whose stop is requested of this attempt and not yet confirmed,
