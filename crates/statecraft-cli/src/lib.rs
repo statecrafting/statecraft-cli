@@ -58,6 +58,7 @@ pub mod admission;
 pub mod application;
 pub mod attempt;
 pub mod bind;
+pub mod capture;
 pub mod commands;
 pub mod context;
 pub mod coverage;
