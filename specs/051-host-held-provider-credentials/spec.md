@@ -1,7 +1,7 @@
 ---
 id: "051-host-held-provider-credentials"
 title: "The supervisor holds the provider token behind a loopback gateway; the child holds only a per-attempt token"
-status: draft
+status: approved
 implementation: pending
 created: "2026-10-21"
 summary: >
@@ -119,9 +119,8 @@ If the gateway cannot bind, cannot read the operator's token, or the adapter
 declares no gateway route, the launch refuses with exit 2 and starts nothing.
 No path places the operator's token in the child's environment instead: for
 an unwitnessed attempt, spec 042 rule 2's delivery is withdrawn, not kept as a
-fallback. A witnessed attempt keeps spec 042's delivery until the open
-question in section 5 is answered, and its record says which delivery it
-used.
+fallback. A witnessed attempt keeps spec 042's delivery, as section 5
+resolves, and its record says which delivery it used.
 
 ## 4. Out of scope
 
@@ -129,7 +128,7 @@ used.
   (spec 047).
 - Rotating or refreshing the operator's token (spec 042 section 4 keeps it out
   of scope).
-- Composition with spec 013's wire witness: see the open question.
+- Composition with spec 013's wire witness: a later amendment (section 5).
 
 ## 5. Resolved decisions
 
@@ -145,19 +144,18 @@ token it must swap. The same measurement under this product's confinement, on
 macOS and Linux, is part of acceptance, and the gateway must answer the
 `HEAD /api/hello` preflight.
 
-## 6. Open question for the owner
-
-**O-1.** With both the gateway and spec 013's witness, the child's traffic
-reaches the gateway in plain HTTP and leaves it over TLS. Should the witness
-capture between the gateway and the provider (the gateway routes through the
-sidecar), or should a witnessed attempt keep spec 042's delivery until a
-later amendment composes the two? This draft takes neither and leaves
-witnessed runs unchanged until answered.
+**2026-10-31: a witnessed attempt keeps spec 042's delivery.** With both the
+gateway and spec 013's witness, the child's traffic reaches the gateway in
+plain HTTP and leaves it over TLS, so the two compose only if the gateway
+routes through the sidecar and the capture sits between gateway and provider.
+That composition is a later amendment to both specs; until it lands, a run
+with `--witness` is delivered as 042 rule 2 delivers it, and its record says
+so.
 
 ## Verification
 
-This spec is `status: draft` and declares no acceptance until it is ratified
-and built. Its acceptance will scan the child's environment, its per-run
+Ratified by the owner on 2026-10-31. Acceptance is declared by the
+implementing change, which will scan the child's environment, its per-run
 directory and every file the attempt leaves for the provider token's bytes,
 replay a request with a revoked token and with another attempt's token and see
 both refused, refuse a launch whose gateway cannot bind, and repeat the

@@ -42,7 +42,7 @@
       }
     ],
     "sectionDigests": {
-      "056-a-review-guide-in-the-ai-review-s-context": "b5a131d7dd9dd1f780daff748aef18816ebf6bb8564dbd1409df7f1144d78403",
+      "056-a-review-guide-in-the-ai-review-s-context": "5af0c7299d326db1419fd4ed666fc81c581d3232b69a0e914f04b14e77e732ae",
       "1-purpose": "bc9fb7482c17a0cd0becc7affd32064e4b723f1488580590f2729e08456d1448",
       "2-territory": "32b7c5139e7c9253bc30d95bd238b0e685fa599cc3a8b316ab7f7cae6a8c3f9f",
       "3-1-two-documents-one-managed": "598292819fe62e50e5b914b043a1962c4e147eee091343ce70a638a2fa9009b0",
@@ -52,7 +52,7 @@
       "3-behavior": "24c5ebbac24d4f082ca5d09860c774ab0e20368939608d2f90bf26e59fc6ec4b",
       "4-out-of-scope": "d2dfaa184ad880baeebb46ad3a4e1347b8e196c8599a40b1048bf5b7eeea42cc",
       "5-resolved-decisions": "cf53bf4df31dacc6191c0bf900148dff0fd5340b3508c16e22deecdd78225d01",
-      "verification": "5b10b81ac54b5df45a4d05ac3dd9c6abe46460904e30118aba39159d30b0d8d7"
+      "verification": "7f1f18fc1b8153bcc3c2526f091923affff8c4d0030893f5d64848e188f34db9"
     },
     "sectionHeadings": [
       "056: A review guide in the AI review's context",
@@ -68,10 +68,10 @@
       "Verification"
     ],
     "specPath": "specs/056-review-guide/spec.md",
-    "status": "draft",
+    "status": "approved",
     "summary": "Amends spec 002's setup profile and spec 041's default governance context. The next github-actions-rust revision delivers a managed review guide at .statecraft/REVIEW.md, the reviewer's contract written once for every target, and adds it and a repository-authored REVIEW.md to the documents the AI review reads from the base commit. An absent REVIEW.md is recorded as absent, as any default document is. This repository's own REVIEW.md is an adaptation of preloop-ci's guide to Statecraft's conventions.\n",
     "title": "Setup profile: a managed review guide and a repository's own REVIEW.md in the AI review's governance context"
   },
-  "shardHash": "9db7cb71d789de3cc697081e945aacc0f046b90c707ef77cac01c0fd05984076",
+  "shardHash": "3c84d60bd5a2986fffed6da0ac554940d39d1bf79e22e50f9ac9889c440146a7",
   "specVersion": "1.11.0"
 }

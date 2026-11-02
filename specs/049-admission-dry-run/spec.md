@@ -1,7 +1,7 @@
 ---
 id: "049-admission-dry-run"
 title: "An admission dry-run evaluates a policy through the closed evaluator and writes nothing"
-status: draft
+status: approved
 implementation: pending
 created: "2026-10-21"
 summary: >
@@ -120,7 +120,8 @@ reasons.
 - Writing or signing any attestation from a dry-run.
 - Evaluating anything but admission: run-time tool policy and confinement
   admission (spec 002) are not this evaluator.
-- Changing `policy-eval/v1` (see the open question).
+- Changing `policy-eval/v1`; the trace is never recorded in a real admission
+  (section 5).
 
 ## 5. Resolved decisions
 
@@ -133,17 +134,16 @@ writes no claim at all, so the trace has nowhere in the claim to go without an
 amendment to 037 and 005. This draft keeps the trace in the answer and leaves
 the claim to the owner's answer below.
 
-### Open question for the owner
-
-**O-1.** Should the per-check trace (or only the overruled checks) be recorded
-in real admissions? If yes, it needs either a new optional claim field, which
-amends spec 037 R-2 and spec 005's claim, or a `policy-eval/v2` predicate
-beside v1. If no, this spec stands as drafted.
+**2026-10-31: the trace stays out of real admissions.** Spec 037 R-2's
+byte-equal claim and spec 005's claim shape are kept. Recording overruled
+checks in an admission would be a new amending spec with a `policy-eval/v2`
+predicate beside v1, proposed on its own if an operator ever needs it. This
+spec stands as drafted: the trace is the dry-run's answer and nothing else.
 
 ## Verification
 
-This spec is `status: draft` and declares no acceptance until it is ratified
-and built. Its acceptance will run a differential test over the admission
+Ratified by the owner on 2026-10-31. Acceptance is declared by the
+implementing change, which will run a differential test over the admission
 test corpus comparing the dry-run's decision and codes with `evaluate`'s, run
 the verb against a read-only home and target and compare both trees before and
 after, and check that the trace marks allowing checks `overruled` exactly when

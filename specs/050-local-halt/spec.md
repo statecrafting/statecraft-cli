@@ -1,7 +1,7 @@
 ---
 id: "050-local-halt"
 title: "A local halt record that run consults before launch, and denies when it cannot read"
-status: draft
+status: approved
 implementation: pending
 created: "2026-10-21"
 summary: >
@@ -144,8 +144,8 @@ refusals read alike if both are adopted. The local refusal is `halted`, not
 
 ## Verification
 
-This spec is `status: draft` and declares no acceptance until it is ratified
-and built. Its acceptance will refuse `run` under a halted `run-admission`
+Ratified by the owner on 2026-10-31. Acceptance is declared by the
+implementing change, which will refuse `run` under a halted `run-admission`
 scope, refuse it with `halt-state-unreadable` against a truncated, unparsable
 and a chain-mismatched record, admit it after `resume`, and show
 `stop-requested` then `stop-confirmed` across a halt during a live attempt.

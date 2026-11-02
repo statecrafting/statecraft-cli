@@ -1,7 +1,7 @@
 ---
 id: "055-codex-adapter"
 title: "A Codex adapter, built on the capability seam and admitted only by its own pass of spec 004's suite"
-status: draft
+status: approved
 implementation: pending
 created: "2026-10-21"
 summary: >
@@ -138,8 +138,8 @@ same per-run `CODEX_HOME` (section 3.3), working directory and executable
 the turn will use, never the operator's `~/.codex` and never an inherited
 `CODEX_HOME`, so the hooks it lists are the hooks that turn will run. A query
 that cannot be made in that environment refuses the attempt. It never writes
-a trust entry itself. How a per-run `CODEX_HOME` obtains trust is the open
-question in section 6.
+a trust entry itself. How a per-run `CODEX_HOME` obtains trust is resolved
+in section 5.
 
 ### 3.5 Qualification
 
@@ -171,14 +171,15 @@ order asked for a reference document of preloop's facts on other harnesses.
 facts belong beside the adapter that will use them first, as an appendix that
 specifies nothing.
 
-## 6. Open question for the owner
-
-**O-1.** A per-run `CODEX_HOME` holds a hooks file Codex has never trusted, and
-this adapter must not write trust itself. Two routes keep that rule:
-administrator-managed hook policy (Codex reports `managed`), installed once by
-the operator, or a one-time operator trust of the gate's exact command
-carried into each per-run directory by Codex's own mechanism. Which route,
-or should the adapter refuse until one is measured?
+**2026-10-31: administrator-managed hook policy, installed once by the
+operator.** A per-run `CODEX_HOME` holds a hooks file Codex has never trusted,
+and the adapter never writes trust. Of the two routes that keep that rule, the
+adapter takes the managed one: it reads whether Codex reports its hook policy
+as `managed` for the per-run `CODEX_HOME` and refuses the attempt with a named
+code when it does not. Carrying a one-time operator trust into each per-run
+directory would make every run carry a trust entry this product copied. The
+operator's one-time installation is documented beside the adapter, performed
+by no verb.
 
 ## Appendix A: other harnesses (reference only)
 
@@ -196,8 +197,8 @@ these providers is admitted.
 
 ## Verification
 
-This spec is `status: draft` and declares no acceptance until it is ratified,
-spec 047 has merged, and the crate is built. Its acceptance will run spec
+Ratified by the owner on 2026-10-31. Acceptance is declared by the
+implementing change, after spec 047 is built, which will run spec
 004's full negative suite against this adapter on fixtures recorded from a
 named Codex version, extend the provider-name source check to Codex, refuse a
 launch whose gate hook Codex does not report trusted, and compare the user's

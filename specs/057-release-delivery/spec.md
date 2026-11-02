@@ -1,7 +1,7 @@
 ---
 id: "057-release-delivery"
 title: "Releasing this repository's binaries is repository delivery: cargo-dist archives, installers, SBOM and build provenance"
-status: draft
+status: approved
 implementation: pending
 created: "2026-10-21"
 summary: >
@@ -19,7 +19,7 @@ summary: >
 amends:
   - "006-command-surface"
 # No `extends` and no claim: the release workflow and the dist configuration
-# are unclaimed authority files under AGENTS.md (section 2, O-4).
+# are unclaimed authority files under AGENTS.md (sections 2 and 5, O-4).
 depends_on:
   - "001-boundaries-and-authority"
   - "006-command-surface"
@@ -70,8 +70,7 @@ This spec claims none of those files. `AGENTS.md`'s source-ownership table
 keeps `.github/workflows/**` and the root `Cargo.toml` claimed by no spec,
 because a spec that owned them would own the rules it is judged by
 (constitution VII), so each lands as its own authority change, decided by the
-owner. Whether the owner prefers an exception for the release workflow alone
-is open question O-4; until it is answered, the table holds.
+owner. Section 5 resolves O-4: the table holds.
 
 ## 3. Behavior
 
@@ -97,7 +96,8 @@ request 296; ratification in pull request 306) would refuse otherwise.
   SHA-256 and installs with `install -m 755`, never `cp` (the macOS
   code-signature cache; the `make install-local` target of pull request 305
   records the same reason).
-- A Homebrew formula in a tap the owner names (open question O-2).
+- A Homebrew formula, published to a tap once the owner names it (section 5,
+  O-2).
 
 ### 3.4 SBOM and provenance
 
@@ -126,27 +126,22 @@ any other registry, and nothing is pushed back to the repository.
 profile renders what every target runs; only this repository ships this
 binary.
 
-## 6. Open questions for the owner
-
-Row `AG` of the founding decisions keeps the binary's name, trust and
-publication with the owner.
-
-- **O-1.** The installed binary's name: `statecraft-cli`, as built today, or
-  another.
-- **O-2.** The Homebrew tap's repository.
-- **O-3.** The version scheme: the workspace is `0.0.0`; what the first tag is
-  and how the workspace version follows tags.
-- **O-4.** Section 2's claims. `AGENTS.md` lists `.github/workflows/**` and
-  the root `Cargo.toml` as deliberately claimed by no spec, each change to
-  them an authority change. Either the release workflow and the dist
-  configuration stay unclaimed authority files, landed on their own, or this
-  spec claims the release workflow alone and the source-ownership table
-  names that exception.
+**2026-10-31: the four questions, resolved within row `AG`.** Row `AG` of the
+founding decisions keeps the binary's name, trust and publication with the
+owner; each answer below stays inside it. O-1: the installed binary is
+`statecraft-cli`, as built and installed today. O-2: the formula is generated
+with every release but published to no tap until the owner names its
+repository; the archives and the shell installer are the release until then.
+O-3: tags are `vMAJOR.MINOR.PATCH`, the first is `v0.1.0`, the release commit
+sets the workspace version to the tag's, and the workflow refuses a tag whose
+version the manifest does not carry. O-4: the source-ownership table holds;
+the release workflow and the dist configuration stay unclaimed authority files,
+each landed as its own change the owner decides, and this spec claims none.
 
 ## Verification
 
-This spec is `status: draft` and declares no acceptance until it is ratified
-and built. Its acceptance will run the workflow against a test tag in dry-run
+Ratified by the owner on 2026-10-31. Acceptance is declared by the
+implementing change, which will run the workflow against a test tag in dry-run
 mode and find four archives with sidecars, a shell installer, a formula, four
 SBOMs with components and four attestations that `gh attestation verify`
 accepts, with nothing published.

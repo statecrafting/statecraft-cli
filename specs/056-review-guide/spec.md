@@ -1,7 +1,7 @@
 ---
 id: "056-review-guide"
 title: "Setup profile: a managed review guide and a repository's own REVIEW.md in the AI review's governance context"
-status: draft
+status: approved
 implementation: pending
 created: "2026-10-21"
 summary: >
@@ -130,8 +130,8 @@ input would need its own.
 
 ## Verification
 
-This spec is `status: draft` and declares no acceptance until it is ratified
-and built. Its acceptance will render the revision and find the managed guide
+Ratified by the owner on 2026-10-31. Acceptance is declared by the
+implementing change, which will render the revision and find the managed guide
 and both default paths, review over a base with no `REVIEW.md` and find it
 recorded absent, and review a candidate that edits `REVIEW.md` and find the
 base's version (or its absence) in the evidence.

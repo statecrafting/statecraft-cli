@@ -53,7 +53,7 @@
       }
     ],
     "sectionDigests": {
-      "048-typed-run-operations-under-one-controller-lease": "3530b206b84467706c7634ecbce83916c5bd6023c6bea23a27399e575fd1d3f1",
+      "048-typed-run-operations-under-one-controller-lease": "fcabb37c7ec9092ed8c4c0841258798f17e2035ba003c64ba1591c68fbc52ae5",
       "1-purpose": "a8cd1c1c3b85df4f5882c4d85245fe91f62c916b06e7a60cd8aa0f9aa1dbb5ac",
       "2-territory": "56507aabb8357379d6a6d67ada7404d92ee91795cdc4ada28bbe86dced5890a9",
       "3-1-the-three-operations": "080f7878046c185c2b5149ef6745a7dfbfb2018c457579b580c4311da54bec16",
@@ -65,7 +65,7 @@
       "3-behavior": "fee67128fd130e86b095b5719793e47ccf412bc8c02a2a53682e524f587b8972",
       "4-out-of-scope": "914b435926abca1405ec2d9058aa9ece80ac9b82ec1b6b6eeabdff5f9bda0818",
       "5-resolved-decisions": "1663c5866b92b4a45bcab84e19ec36a5f5266a627889ba67e74fd5bc7bea18f6",
-      "verification": "5c1540e17b9931e9f9ec76d58f284e35adceaac66edfb180428f14a25c4877b1"
+      "verification": "681aa0c9faaf4a0021f2b9e9ea4b3e40d4d7eed1c52ba5cc5d13ebcfa74fd838"
     },
     "sectionHeadings": [
       "048: Typed run operations under one controller lease",
@@ -83,10 +83,10 @@
       "Verification"
     ],
     "specPath": "specs/048-run-operations/spec.md",
-    "status": "draft",
+    "status": "approved",
     "summary": "Gives a run three typed operations, attempt.retry, attempt.continue and attempt.abort, submitted by one controller holding a lease. Each carries an idempotency key and the run version it was decided against; each request and its outcome append to spec 003's hash-linked run record, durable and uncapped, so replaying the record reproduces the run's state. A reconnecting controller reads events from a cursor over the record. The one live slot of spec 003 section 3.7 is held or released explicitly by each operation.\n",
     "title": "Typed run operations under one controller lease, recorded in the run record"
   },
-  "shardHash": "34e524342ae61ad3618b21aa6e7c3284156fd51fb4d9abc74048dbaf678e5654",
+  "shardHash": "892502ef9a8620919f0c8aa4fb7227d2727a54ed563bbf156f6a622b6a87bbea",
   "specVersion": "1.11.0"
 }

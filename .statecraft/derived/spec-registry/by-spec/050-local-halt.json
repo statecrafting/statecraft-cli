@@ -47,7 +47,7 @@
       }
     ],
     "sectionDigests": {
-      "050-local-halt": "bd6a7f28e78366613c842dbed7c660efaa283ade16ec07320e740626125e87ab",
+      "050-local-halt": "73167c9f4d185b72100111dd14fc49aef9a69f9c76a6923e77c9ecca623cbfe2",
       "1-purpose": "9b551485c1d2d2b02981982b215d26cbefd66071e3ddb144d37ff8b92aa0ad56",
       "2-territory": "38b9659db8393adadeafac98c47515331ab553f498a4fe0253c9414bd277a6d9",
       "3-1-the-halt-record": "9d4aa3d848aef8762a1d6112c7fd81ead3b52deca187d4ed952c6077cc5b49d8",
@@ -58,7 +58,7 @@
       "3-behavior": "cdd818261eb06f22c9b1d3b342c12cbcdb988fe36b2d3dfb93b1d58a80c81066",
       "4-out-of-scope": "32bbaa5ecf417055deaf260b814d76af666176769eb79744dde4cb9df1ad529a",
       "5-resolved-decisions": "acc898f5a3c6765a44def5fd500e41a56b0f63ce9960b7cc34dc35ea2c943bc6",
-      "verification": "3e68dc8c6f936e7fc0ebd465998535d21ea17e9fbfc40eb1fb859fd593b5a69e"
+      "verification": "cfca8f7f1a4aa21e9d67cf7ad28c11d041946900cb25995f32f6c9729614ab15"
     },
     "sectionHeadings": [
       "050: Local halt",
@@ -75,10 +75,10 @@
       "Verification"
     ],
     "specPath": "specs/050-local-halt/spec.md",
-    "status": "draft",
+    "status": "approved",
     "summary": "Adds an operator-written halt record in the product home, per registered repository, with three independently halted scopes: run admission, tool effects and dispatch. run reads it before launch and refuses a halted scope with a closed reason; a halt record it cannot read or verify denies with its own reason rather than admitting. Halting with a live attempt records stop requested; stop confirmed is recorded only when that attempt's cancelled outcome is durable. The hosted tenant halt fact is not defined here; it is consumed once its own spec merges.\n",
     "title": "A local halt record that run consults before launch, and denies when it cannot read"
   },
-  "shardHash": "387ec11c7c9b6e2b457c490291a1ee975602213bc4aac7fc01d96ad40de2101d",
+  "shardHash": "5352a12240d8fee698b11ad1d5c66384500c7822c65b20d405d334ccc087e608",
   "specVersion": "1.11.0"
 }
