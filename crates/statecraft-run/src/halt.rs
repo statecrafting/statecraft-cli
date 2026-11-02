@@ -542,7 +542,6 @@ pub fn queue(
     change: &str,
     request: &Request<'_>,
 ) -> Result<PathBuf, HaltError> {
-    use std::io::Write;
     check(request)?;
     if change != HALT_SUBJECT && change != RESUME_SUBJECT {
         return Err(HaltError::Refused(format!(
@@ -556,13 +555,26 @@ pub fn queue(
         reason: request.reason.to_string(),
         at: request.at.to_string(),
     };
-    let dir = requests_dir(home, target);
-    std::fs::create_dir_all(&dir).map_err(queue_error(&dir, "queued"))?;
-    if let Some(parent) = dir.parent() {
-        sync_dir(parent).map_err(queue_error(&dir, "queued"))?;
-    }
     let mut bytes = serde_json::to_vec(&queued).unwrap_or_default();
     bytes.push(b'\n');
+    publish_request(&requests_dir(home, target), &bytes)
+        .map_err(|(path, e)| queue_error(&path, "queued")(e))
+}
+
+/// Publish one request file in `dir`, named so that names sort in the order
+/// requests were made, without replacing anything: written and synced under a
+/// hidden name, then linked to its final name, which fails rather than
+/// replaces. Returns its path once it and its directory entry are durable, or
+/// the path that failed and why. Shared by the halt queue and spec 048's.
+pub(crate) fn publish_request(
+    dir: &Path,
+    bytes: &[u8],
+) -> Result<PathBuf, (PathBuf, std::io::Error)> {
+    use std::io::Write;
+    std::fs::create_dir_all(dir).map_err(|e| (dir.to_path_buf(), e))?;
+    if let Some(parent) = dir.parent() {
+        sync_dir(parent).map_err(|e| (dir.to_path_buf(), e))?;
+    }
     let nanos = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
         .map_or(0, |d| d.as_nanos());
@@ -573,12 +585,12 @@ pub fn queue(
             .write(true)
             .create_new(true)
             .open(&hidden)?;
-        file.write_all(&bytes)?;
+        file.write_all(bytes)?;
         file.sync_all()
     })();
     if let Err(e) = written {
         let _ = std::fs::remove_file(&hidden);
-        return Err(queue_error(&hidden, "queued")(e));
+        return Err((hidden, e));
     }
     let mut published = None;
     for n in 0..64u32 {
@@ -591,19 +603,51 @@ pub fn queue(
             Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => continue,
             Err(e) => {
                 let _ = std::fs::remove_file(&hidden);
-                return Err(queue_error(&name, "queued")(e));
+                return Err((name, e));
             }
         }
     }
     let _ = std::fs::remove_file(&hidden);
     let Some(path) = published else {
-        return Err(queue_error(&dir, "queued")(std::io::Error::new(
-            std::io::ErrorKind::AlreadyExists,
-            "every candidate name is taken",
-        )));
+        return Err((
+            dir.to_path_buf(),
+            std::io::Error::new(
+                std::io::ErrorKind::AlreadyExists,
+                "every candidate name is taken",
+            ),
+        ));
     };
-    sync_dir(&dir).map_err(queue_error(&dir, "queued"))?;
+    sync_dir(dir).map_err(|e| (dir.to_path_buf(), e))?;
     Ok(path)
+}
+
+/// The request files in `dir`, oldest first; none when it does not exist.
+/// Hidden names are a request still being written, and are not yet requests.
+pub(crate) fn listed_requests(dir: &Path) -> std::io::Result<Vec<PathBuf>> {
+    let entries = match std::fs::read_dir(dir) {
+        Ok(entries) => entries,
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(Vec::new()),
+        Err(e) => return Err(e),
+    };
+    let mut paths = Vec::new();
+    for entry in entries {
+        let entry = entry?;
+        if entry.file_name().to_string_lossy().starts_with('.') {
+            continue;
+        }
+        paths.push(entry.path());
+    }
+    paths.sort();
+    Ok(paths)
+}
+
+/// Remove an applied request and make the removal durable.
+pub(crate) fn remove_request(path: &Path) -> std::io::Result<()> {
+    std::fs::remove_file(path)?;
+    if let Some(dir) = path.parent() {
+        sync_dir(dir)?;
+    }
+    Ok(())
 }
 
 /// Every queued request, oldest first. A request that cannot be read is
@@ -612,27 +656,9 @@ pub fn queue(
 /// being written, and are not yet requests.
 pub fn pending(home: &Path, target: &Path) -> Result<Vec<(PathBuf, Queued)>, Refusal> {
     let dir = requests_dir(home, target);
-    let entries = match std::fs::read_dir(&dir) {
-        Ok(entries) => entries,
-        Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(Vec::new()),
-        Err(e) => {
-            return Err(Refusal::Unreadable {
-                detail: format!("the halt requests at {} cannot be read: {e}", dir.display()),
-            });
-        }
-    };
-    let mut paths = Vec::new();
-    for entry in entries {
-        let entry = entry.map_err(|e| Refusal::Unreadable {
-            detail: format!("the halt requests at {} cannot be read: {e}", dir.display()),
-        })?;
-        let name = entry.file_name();
-        if name.to_string_lossy().starts_with('.') {
-            continue;
-        }
-        paths.push(entry.path());
-    }
-    paths.sort();
+    let paths = listed_requests(&dir).map_err(|e| Refusal::Unreadable {
+        detail: format!("the halt requests at {} cannot be read: {e}", dir.display()),
+    })?;
     let mut out = Vec::new();
     for path in paths {
         let queued = std::fs::read(&path)
@@ -713,10 +739,7 @@ pub fn apply_pending(
                 resume(chain, &request)?
             });
         }
-        std::fs::remove_file(&path).map_err(queue_error(&path, "removed after it was appended"))?;
-        if let Some(dir) = path.parent() {
-            sync_dir(dir).map_err(queue_error(&path, "removed after it was appended"))?;
-        }
+        remove_request(&path).map_err(queue_error(&path, "removed after it was appended"))?;
     }
     Ok(applied)
 }
