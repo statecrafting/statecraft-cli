@@ -999,7 +999,9 @@ pub fn run_operation(ctx: &Context<'_>, op: &OperationOperands<'_>) -> Result<Re
                 // (rule 2). The answer says so instead of a bare failure.
                 Err(e) => {
                     return Ok(failed(&format!(
-                        "{} under key {} for run {} launched (exit {}), but the record could                          not be reopened to append its outcome, so the operation stays                          accepted with no outcome: {e}",
+                        "{} under key {} for run {} launched (exit {}), but the record could \
+                         not be reopened to append its outcome, so the operation stays \
+                         accepted with no outcome: {e}",
                         operation.word(),
                         accepted.key,
                         op.run_id,
