@@ -188,9 +188,10 @@ section 3.3.1's identity fold pairs it and the legacy pairing never sees it.
 A lease is an `Accounting` record under `operation-lease`, a recorded refusal
 one under `operation-refused`, an abort's confirmation one under
 `operation-stop-confirmed`. The readers that took a run's last outcome or
-accounting record (the reviewable fold, `accept`'s refusal count, the tamper
-view) and spec 003 section 3.6.1's "since the last intent" skip these
-subjects, so none is read as an attempt's.
+accounting record skip these subjects, so none is read as an attempt's: this
+change fixes spec 005's reviewable fold (and with it `accept`'s refusal count)
+and spec 003 section 3.6.1's "since the last intent"; the CLI's attempt tamper
+view is fixed in the change that adds the verbs.
 
 **2026-11-01: a lease is named by its record's position, and only
 `stale-version` is recorded.** An operation presents the position of the

@@ -590,19 +590,17 @@ pub fn submit(chain: &mut Chain, request: &Request<'_>) -> Result<Submitted, Rec
 fn precondition(chain: &Chain, state: &RunState, operation: Operation) -> Option<Refusal> {
     let run_id = &state.run_id;
     let latest = state.attempts.last();
-    if operation == Operation::Continue {
+    match operation {
         // Section 3.1: a capability, never an adapter name. Spec 047's
         // declaration names no resume capability, so none declares it, and
         // the refusal is the same whatever state the run or repository is in.
-        return Some(Refusal::closed(
+        Operation::Continue => Some(Refusal::closed(
             Reason::CapabilityUndeclared,
             "no adapter declares that it can resume a provider session, so \
              attempt.continue is refused for every adapter"
                 .to_string(),
-        ));
-    }
-    match operation {
-        Operation::Retry | Operation::Continue => {
+        )),
+        Operation::Retry => {
             let Some(latest) = latest else {
                 return Some(Refusal::precondition(format!(
                     "the record holds no attempt of run {run_id}"

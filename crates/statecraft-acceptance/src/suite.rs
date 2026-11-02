@@ -424,6 +424,56 @@ mod tests {
     }
 
     #[test]
+    fn an_operations_records_are_neither_the_attempts_outcome_nor_its_refusal_count() {
+        use statecraft_run::operation::{LEASE_SUBJECT, OPERATION_SUBJECT, REFUSED_SUBJECT};
+        // Spec 048: a retry's outcome, a lease and a recorded refusal land
+        // after the attempt's own records, and the fold must still read the
+        // attempt's.
+        let entries = vec![
+            entry(
+                Kind::Outcome,
+                "r1",
+                1,
+                "attempt",
+                json!({"outcome": "refused"}),
+            ),
+            entry(Kind::Accounting, "r1", 1, "refusals", json!({"count": 3})),
+            entry(
+                Kind::Accounting,
+                "r1",
+                1,
+                LEASE_SUBJECT,
+                json!({"state": "acquired", "count": 9}),
+            ),
+            entry(
+                Kind::Accounting,
+                "r1",
+                1,
+                REFUSED_SUBJECT,
+                json!({"reason": "stale-version", "count": 9}),
+            ),
+            entry(
+                Kind::Outcome,
+                "r1",
+                1,
+                OPERATION_SUBJECT,
+                json!({"outcome": "completed", "result": "launched"}),
+            ),
+        ];
+        let account = fold("r1", &entries);
+        match &account.acceptance.value {
+            Acceptance::NotAttempted {
+                reason,
+                refusal_count,
+            } => {
+                assert_eq!(reason.word(), "attempt-refused");
+                assert_eq!(*refusal_count, Some(3));
+            }
+            other => panic!("expected not-attempted, got {other:?}"),
+        }
+    }
+
+    #[test]
     fn an_intent_with_no_outcome_shows_the_reconciliation_state_and_never_infers_one() {
         let entries = vec![entry(
             Kind::Intent,
