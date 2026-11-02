@@ -1370,17 +1370,11 @@ impl<'c> HaltPoller<'c> {
         } else {
             halt::apply_pending(self.chain, self.home, self.root)
         };
-        let operated = if operations.is_empty() {
-            Ok(statecraft_run::operation::Drained::default())
-        } else {
-            statecraft_run::operation::apply_pending(self.chain, self.home, self.root)
-        };
-        if let Ok(bytes) = std::fs::read(&chain_path) {
-            if Some(&bytes) != self.expected.as_ref() {
-                self.polled.wrote = vec![(chain_path.clone(), bytes.clone())];
-            }
-            self.expected = Some(bytes);
-        }
+        // The halt result is decided before any operation request is applied:
+        // a halt that cannot be appended stops the attempt as interrupted, and
+        // an abort applied in the same poll would then be recorded as
+        // stop-requested with no `cancelled` outcome to confirm it. Left
+        // queued, it is applied by the next writer instead.
         match applied {
             Ok(_) => {}
             // The entry is durable and only its file was left behind. The
@@ -1389,8 +1383,17 @@ impl<'c> HaltPoller<'c> {
             Err(e @ statecraft_run::halt::HaltError::Queue { .. }) => {
                 self.polled.failure = Some(e.to_string());
             }
-            Err(e) => return self.fail(e.to_string()),
+            Err(e) => {
+                self.remember_bytes(&chain_path);
+                return self.fail(e.to_string());
+            }
         }
+        let operated = if operations.is_empty() {
+            Ok(statecraft_run::operation::Drained::default())
+        } else {
+            statecraft_run::operation::apply_pending(self.chain, self.home, self.root)
+        };
+        self.remember_bytes(&chain_path);
         match operated {
             Ok(drained) => self.polled.operations.extend(drained.applied),
             Err(statecraft_run::operation::QueueError::Record(e)) => {
@@ -1437,6 +1440,17 @@ impl<'c> HaltPoller<'c> {
         );
         self.polled.abort = Some(abort);
         Control::Stop(why)
+    }
+
+    /// Record the chain's bytes as this supervisor's appends left them, for
+    /// the tamper comparison and the next poll's check.
+    fn remember_bytes(&mut self, chain_path: &std::path::Path) {
+        if let Ok(bytes) = std::fs::read(chain_path) {
+            if Some(&bytes) != self.expected.as_ref() {
+                self.polled.wrote = vec![(chain_path.to_path_buf(), bytes.clone())];
+            }
+            self.expected = Some(bytes);
+        }
     }
 
     fn fail(&mut self, why: String) -> statecraft_adapter::supervisor::Control {
