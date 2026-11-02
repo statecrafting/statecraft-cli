@@ -5,13 +5,32 @@
       "006-command-surface"
     ],
     "created": "2026-10-21",
+    "declaresAcceptance": true,
     "dependsOn": [
       "005-acceptance-and-evidence",
       "006-command-surface",
       "037-closed-admission-gate"
     ],
+    "extends": [
+      {
+        "nature": "additive",
+        "spec": "005-acceptance-and-evidence",
+        "unit": {
+          "kind": "directory",
+          "path": "crates/statecraft-envelope/"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "006-command-surface",
+        "unit": {
+          "kind": "directory",
+          "path": "crates/statecraft-cli/"
+        }
+      }
+    ],
     "id": "049-admission-dry-run",
-    "implementation": "pending",
+    "implementation": "complete",
     "obligations": [
       {
         "anchor": "3-2-same-evaluator-same-codes",
@@ -48,17 +67,17 @@
       }
     ],
     "sectionDigests": {
-      "049-admission-dry-run": "7e0a62b661acdd95103b46fbac6af43b6a6697b08f5906eed39ac187095f9d6a",
+      "049-admission-dry-run": "968da3b785ffde780484a35ac6bc74e0a39f7ed7ceb2ae6ba1082668f00c34b8",
       "1-purpose": "53dec9da049a649d3d64e466fdf0da224be4ffd716a10992210ef1a4314ccd42",
-      "2-territory": "4cc2af9576f0011e52cc8f81787235e7b1f365274eaa1b73276a38885e3aeba7",
+      "2-territory": "99717b89601d87419174ad2c38b743f9f97b0d66393b70b3458c504a1202fcf7",
       "3-1-the-verb": "de22c6f475e2379c69bbcbc69253ecffd95d7d9d7afa3cba53a61e0c80d8fef8",
       "3-2-same-evaluator-same-codes": "c294d33457bff2cdc187706e34011ada6947cd3326e97bf5cd7bae45a0b0bc32",
       "3-3-no-side-effects": "7f74edc5d2255200128ced0990dfc3b80e784c90ba11c6eddb0bdac344f9968a",
       "3-4-the-check-trace": "cae233867de217abd33b58bc553388b464079b96b687c88262c10297201fe2de",
       "3-behavior": "86f54071620e3bfff7c240af80c7921735f9252a16bb578d2a8424ff73bfd913",
       "4-out-of-scope": "bd8bf9678d6de2eb82fa14bd71071c360994fb6d76527ee7d52f13d2a3b894d0",
-      "5-resolved-decisions": "dbf2189923b4cbcbd00ee543fe07ab33342129e237ca07ee06c907175a8d697e",
-      "verification": "e88fbfab185443119b879787e9f9fee17fe858a61de2177ff154c98ed672e354"
+      "5-resolved-decisions": "9921016535c15a35fc255169ae6abf401569274da1c1cecc9563af0c0216a2b1",
+      "verification": "24e5ce82ed3567b33ea9cca3a07b9aa455cec8f4c3cdd34fd3b558e37f8fd493"
     },
     "sectionHeadings": [
       "049: Admission dry-run",
@@ -78,6 +97,6 @@
     "summary": "Adds a verb that evaluates a revision's recorded verdicts and decisions against an admission policy through spec 037's closed evaluator and answers what admission would decide, with the same refusal codes in the same order, without writing an attestation, a record or any state. Beside the decision it reports every check's own result, so an operator previewing a policy change sees which requirements allowed and were overruled by a deny. The policy-eval/v1 claim is unchanged; whether that trace should ever enter the claim is an owner question.\n",
     "title": "An admission dry-run evaluates a policy through the closed evaluator and writes nothing"
   },
-  "shardHash": "0e1cbd2609d5d8bc5dbb363fed7ad507d902acdce786909af4f999e3126562b6",
+  "shardHash": "1f30d0826a85c7507b0f1732c8e016271e39eb2447e434b9e260ca46ecdaa920",
   "specVersion": "1.11.0"
 }

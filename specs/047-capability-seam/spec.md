@@ -2,7 +2,7 @@
 id: "047-capability-seam"
 title: "Admission and qualification read what an adapter declares it can do, never which adapter it is"
 status: approved
-implementation: pending
+implementation: complete
 created: "2026-10-21"
 summary: >
   Amends spec 004's seam with a per-adapter capability declaration beside the
@@ -16,9 +16,11 @@ amends:
   - "004-execution-adapter"
   - "013-supervised-wire-witness"
   - "042-per-run-provider-configuration"
-# No `extends` yet: the implementing change adds the edges on
-# crates/statecraft-adapter/ (004), crates/statecraft-home/ (002) and
-# crates/statecraft-cli/ (006) with the code.
+extends:
+  - { spec: "004-execution-adapter", unit: { kind: directory, path: "crates/statecraft-adapter/" }, nature: additive }
+  - { spec: "004-execution-adapter", unit: { kind: directory, path: "crates/statecraft-adapter-claude-code/" }, nature: additive }
+  - { spec: "002-environment-lifecycle", unit: { kind: directory, path: "crates/statecraft-home/" }, nature: additive }
+  - { spec: "006-command-surface", unit: { kind: directory, path: "crates/statecraft-cli/" }, nature: additive }
 depends_on:
   - "004-execution-adapter"
   - "013-supervised-wire-witness"
@@ -121,9 +123,53 @@ to its first backend's behaviour so existing providers need no change. Here
 the first adapter's behaviour is exactly what a second must not inherit by
 accident, so an unset field refuses.
 
+**2026-11-01: an adapter's own declaration is a struct literal; data goes
+through `register`.** There is no `Default`, so a declaration written in Rust
+with a field left out does not compile, and one supplied as data is refused by
+`register`, naming the first unset field; an explicit `null` version field is
+set to none, an absent one is unset.
+
+**2026-11-01: what each caller needs.** `run` requires `per_run_config_dir`
+and `settings_file_transport` on every launch, `print_mode_hooks` on a managed
+one, and `stream_witness` with `wire_sidecar` under `--require-witness`; under
+`--witness` alone those two are preferred, and when undeclared the sidecar is
+not started and the outcome records `capabilityDegraded`. The refusal is
+concluded beside spec 004's token preflight, under the guard
+`capability-undeclared`. The qualification admission's launching operation
+requires `print_mode_hooks`, `settings_file_transport` and `version_field`,
+and its incomplete-init refusal names the declared version field.
+
+**2026-11-01: the source check reads adapter names, not harness identities.**
+A comparison against a literal opening with a provider name, or against an
+adapter-name constant, in any crate's `src/` other than the adapter crates and
+before its unit-test module, is a finding. Spec 002's harness identity is a
+separate name and stays outside this check.
+
+
+**2026-11-01: a field named in JSON is spelled by the naming convention.**
+Where a refusal or a degraded outcome lists the fields it lacked, each is a
+string enum value and so kebab-case under spec 006's JSON naming convention:
+`stream_witness` is written `stream-witness`. Messages name a field as this
+spec spells it.
 ## Verification
 
 Ratified by the owner on 2026-10-31. Acceptance is declared by the
 implementing change, which will run the test adapter through admission for a
 witnessed and a plain run, the Claude Code adapter's suites unchanged, and the
 extended source check.
+
+```verify:cli
+cargo test -p statecraft-adapter --test capability_seam
+cargo test -p statecraft-adapter --test no_provider_names
+cargo test -p statecraft-adapter --lib capabilities
+cargo test -p statecraft-adapter-claude-code
+cargo test -p statecraft-home --lib admission
+cargo test -p statecraft-cli --lib adapters
+```
+
+The first runs the fixture adapter through `Needs::launch` and `fit`, the code
+`run` reads: a witnessed run is refused naming `stream_witness`, a plain one is
+admitted, and a declaration with a field unset is refused at registration. The
+second is the extended source check; the fourth is the Claude Code adapter's
+suites, its declaration included; the last two show that adapter's
+declaration fits every launch it ran before.

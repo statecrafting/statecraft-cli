@@ -283,9 +283,43 @@ fn the_credential_is_owner_only_under_the_home_and_never_rendered() {
             & 0o777,
         0o700
     );
-    assert_eq!(store.load(&origin).unwrap(), Some(c.clone()));
-    let shown = format!("{c:?}");
-    assert!(!shown.contains("access-secret-value") && !shown.contains("refresh-secret-value"));
+    // Spec 046: a credential is not comparable, so the round trip is checked
+    // field by field, each token through its one named accessor.
+    let loaded = store.load(&origin).unwrap().unwrap();
+    assert_eq!(loaded.origin, c.origin);
+    assert_eq!(loaded.access_token.expose(), "access-secret-value");
+    assert_eq!(
+        loaded.refresh_token.as_ref().map(|t| t.expose()),
+        Some("refresh-secret-value")
+    );
+    assert_eq!(
+        (loaded.expires_in, loaded.issued_at, loaded.scope.as_deref()),
+        (600, 5, None)
+    );
+    // The file's shape is unchanged: the same keys, the tokens in the clear
+    // exactly there and nowhere else.
+    let file: serde_json::Value = serde_json::from_slice(&std::fs::read(&path).unwrap()).unwrap();
+    assert_eq!(
+        file,
+        json!({
+            "origin": "https://cell.example",
+            "accessToken": "access-secret-value",
+            "refreshToken": "refresh-secret-value",
+            "expiresIn": 600,
+            "issuedAt": 5,
+            "scope": null,
+        })
+    );
+    // Spec 046 V-1: the holder renders no value, by type, through the derived
+    // Debug, with a clone and a renewed credential alike.
+    for shown in [
+        format!("{c:?}"),
+        format!("{:?}", c.clone()),
+        format!("{loaded:#?}"),
+    ] {
+        assert!(!shown.contains("access-secret-value") && !shown.contains("refresh-secret-value"));
+        assert!(shown.contains("[redacted]"), "{shown}");
+    }
     // A file another user could read is refused, not used.
     std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o640)).unwrap();
     assert!(store.load(&origin).is_err());

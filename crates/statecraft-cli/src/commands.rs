@@ -115,6 +115,8 @@ pub enum Verb {
     ProviderTokenClear,
     /// `provider token show`
     ProviderTokenShow,
+    /// `provider compare <captures-dir> --corpus <corpus-dir>`
+    ProviderCompare,
     /// `hosted login <path> [--cell <origin>]`
     HostedLogin,
     /// `hosted logout <path> [--cell <origin>]`
@@ -151,6 +153,18 @@ pub enum Verb {
     LandStatus,
     /// `land cancel-superseded`
     LandCancelSuperseded,
+    /// `run lease <path> <run-id> <acquire|release|break> ...`
+    RunLease,
+    /// `run op <path> <run-id> <retry|continue|abort> <controller> <lease> <key> <version> [<reason...>]`
+    RunOp,
+    /// `run events <path> <run-id> [--after <cursor>]`
+    RunEvents,
+    /// `halt <path> [--scope <scope>]... <operator> <reason...>`
+    Halt,
+    /// `resume <path> [--scope <scope>]... <operator> <reason...>`
+    Resume,
+    /// `admission dry-run --bundle <file> --policy <file>`
+    AdmissionDryRun,
     /// `--help`, optionally with a group or a verb as its topic.
     ///
     /// Not part of the command tree: [`Verb::all`] lists the operations, and a
@@ -180,6 +194,11 @@ impl Verb {
             Verb::LandRestack => "land restack",
             Verb::LandStatus => "land status",
             Verb::LandCancelSuperseded => "land cancel-superseded",
+            Verb::RunLease => "run lease",
+            Verb::RunOp => "run op",
+            Verb::RunEvents => "run events",
+            Verb::Halt => "halt",
+            Verb::Resume => "resume",
             Verb::ProjectRegister => "project register",
             Verb::ProjectList => "project list",
             Verb::ProjectArm => "project arm",
@@ -229,6 +248,7 @@ impl Verb {
             Verb::ProviderTokenSet => "provider token set",
             Verb::ProviderTokenClear => "provider token clear",
             Verb::ProviderTokenShow => "provider token show",
+            Verb::ProviderCompare => "provider compare",
             Verb::HostedLogin => "hosted login",
             Verb::HostedLogout => "hosted logout",
             Verb::HostedSubmit => "hosted submit",
@@ -240,6 +260,7 @@ impl Verb {
             Verb::ProposalDismiss => "proposal dismiss",
             Verb::ProposalAcknowledge => "proposal acknowledge",
             Verb::ProposalAdmit => "proposal admit",
+            Verb::AdmissionDryRun => "admission dry-run",
             Verb::Help => "--help",
         }
     }
@@ -321,6 +342,9 @@ impl Verb {
             Verb::ProviderTokenSet | Verb::ProviderTokenClear | Verb::ProviderTokenShow => {
                 "042-per-run-provider-configuration"
             }
+            // Spec 052 section 3.4: the golden comparison, in the adapter's
+            // crate, reached through 052's edge on this crate.
+            Verb::ProviderCompare => "052-provider-golden-captures",
             // Spec 038: the hosted client, amending 006; HTTP and custody in
             // its own crate, the bundle reader in the envelope crate.
             Verb::HostedLogin | Verb::HostedLogout | Verb::HostedSubmit | Verb::HostedDecision => {
@@ -337,6 +361,12 @@ impl Verb {
             | Verb::ProposalAdmit => "027-observation-and-proposals",
             Verb::ReviewStatus => "062-review-verdict-status",
             Verb::LandWait | Verb::LandArm | Verb::LandPush | Verb::LandRestack | Verb::LandStatus | Verb::LandCancelSuperseded => "063-land-verbs",
+            Verb::RunLease | Verb::RunOp | Verb::RunEvents => "048-run-operations",
+            Verb::Halt | Verb::Resume => "050-local-halt",
+            // Spec 049: the admission dry-run, amending 006; the evaluator and
+            // the bundle reading are the envelope crate's, the verb writes
+            // nothing.
+            Verb::AdmissionDryRun => "049-admission-dry-run",
             Verb::Help => "006-command-surface",
         }
     }
@@ -396,6 +426,7 @@ impl Verb {
             Verb::ProviderTokenSet,
             Verb::ProviderTokenClear,
             Verb::ProviderTokenShow,
+            Verb::ProviderCompare,
             Verb::HostedLogin,
             Verb::HostedLogout,
             Verb::HostedSubmit,
@@ -414,14 +445,42 @@ impl Verb {
             Verb::LandRestack,
             Verb::LandStatus,
             Verb::LandCancelSuperseded,
+            Verb::RunLease,
+            Verb::RunOp,
+            Verb::RunEvents,
+            Verb::Halt,
+            Verb::Resume,
+            Verb::AdmissionDryRun,
         ]
     }
 
     /// The groups a help topic may name.
-    pub const GROUPS: [&'static str; 22] = [
-        "project", "env", "work", "run", "accept", "home", "init", "migrate", "config", "approval",
-        "harness", "session", "startup", "override", "transfer", "trust", "provider", "hosted",
-        "observe", "proposal", "review", "land",
+    pub const GROUPS: [&'static str; 25] = [
+        "project",
+        "env",
+        "work",
+        "run",
+        "accept",
+        "home",
+        "init",
+        "migrate",
+        "config",
+        "approval",
+        "harness",
+        "session",
+        "startup",
+        "override",
+        "transfer",
+        "trust",
+        "provider",
+        "hosted",
+        "observe",
+        "proposal",
+        "review",
+        "land",
+        "halt",
+        "resume",
+        "admission",
     ];
 
     /// Parse a verb from the leading arguments, returning how many it consumed.
@@ -436,6 +495,7 @@ impl Verb {
             ("land", Some("status")) => Some((Verb::LandStatus, 2)),
             ("land", Some("restack")) => Some((Verb::LandRestack, 2)),
             ("review", Some("status")) => Some((Verb::ReviewStatus, 2)),
+            ("admission", Some("dry-run")) => Some((Verb::AdmissionDryRun, 2)),
             ("project", Some("register")) => Some((Verb::ProjectRegister, 2)),
             ("project", Some("list")) => Some((Verb::ProjectList, 2)),
             ("project", Some("arm")) => Some((Verb::ProjectArm, 2)),
@@ -447,12 +507,19 @@ impl Verb {
             ("env", Some("upgrade")) => Some((Verb::EnvUpgrade, 2)),
             ("env", Some("remove")) => Some((Verb::EnvRemove, 2)),
             ("doctor", _) => Some((Verb::Doctor, 1)),
+            // Spec 050: one-word verbs, as `doctor` is.
+            ("halt", _) => Some((Verb::Halt, 1)),
+            ("resume", _) => Some((Verb::Resume, 1)),
             ("work", Some("list")) => Some((Verb::WorkList, 2)),
             ("work", Some("show")) => Some((Verb::WorkShow, 2)),
             // `list`, `show` and `reconcile` are reserved after `run`, so a run id may not
             // be spelled either of them. Stated here rather than discovered:
             // the alternative is an id that silently becomes a subcommand.
+            // Spec 048 reserves `lease`, `op` and `events` the same way.
             ("run", Some("list")) => Some((Verb::RunList, 2)),
+            ("run", Some("lease")) => Some((Verb::RunLease, 2)),
+            ("run", Some("op")) => Some((Verb::RunOp, 2)),
+            ("run", Some("events")) => Some((Verb::RunEvents, 2)),
             ("run", Some("show")) => Some((Verb::RunShow, 2)),
             ("run", Some("reconcile")) => Some((Verb::RunReconcile, 2)),
             ("run", _) => Some((Verb::Run, 1)),
@@ -497,6 +564,7 @@ impl Verb {
             ("proposal", Some("dismiss")) => Some((Verb::ProposalDismiss, 2)),
             ("proposal", Some("acknowledge")) => Some((Verb::ProposalAcknowledge, 2)),
             ("proposal", Some("admit")) => Some((Verb::ProposalAdmit, 2)),
+            ("provider", Some("compare")) => Some((Verb::ProviderCompare, 2)),
             // The one three-word group: `provider token <act>` (spec 042).
             ("provider", Some("token")) => match args.get(2).map(String::as_str) {
                 Some("set") => Some((Verb::ProviderTokenSet, 3)),
@@ -660,7 +728,9 @@ pub fn help_text(topic: &[String]) -> String {
          Initialization stops after registering and qualifying: arming and running\n\
          are separate explicit acts.\n\
          The `trust` verbs are offline: every path is an explicit option, they read\n\
-         no home or project, and `issuer-sign` signs only with `--confirm <digest>`.\n",
+         no home or project, and `issuer-sign` signs only with `--confirm <digest>`.\n\
+         `admission dry-run` evaluates a bundle under a policy from two files and\n\
+         writes nothing; a refusal is its answer, exit 1, not a failure.\n",
     );
     out
 }

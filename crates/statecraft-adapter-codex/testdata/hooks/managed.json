@@ -1,0 +1,1 @@
+{"id":1,"result":{"hooks":[{"eventName":"PreToolUse","handlerType":"command","command":"/statecraft/home/harness/hooks/gate","matcher":null,"async":false,"enabled":true,"trustStatus":"managed"},{"eventName":"PostToolUse","handlerType":"command","command":"/usr/local/bin/other","matcher":"Bash","async":true,"enabled":true,"trustStatus":"untrusted"}]}}

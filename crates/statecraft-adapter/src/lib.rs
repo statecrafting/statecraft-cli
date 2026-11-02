@@ -15,6 +15,10 @@
 //!
 //! - [`capability`] is the closed six-token vocabulary, and the rule that a
 //!   required token refuses while a preferred one degrades.
+//! - [`capabilities`] is spec 047's per-adapter declaration beside the
+//!   tokens: the facts admission, qualification and launch decide on, read
+//!   from a field rather than from which adapter it is, with nothing
+//!   defaulted and an undeclared required field refused before spawn.
 //! - [`protocol`] is the request, the typed event stream and the result. An
 //!   absent cost is `unknown`, never zero.
 //! - [`context`] is spec 019's bundle: the attempt's context manifest and
@@ -51,6 +55,7 @@
 #![deny(unsafe_code)]
 
 pub mod boundary;
+pub mod capabilities;
 pub mod capability;
 pub mod context;
 pub mod coverage;

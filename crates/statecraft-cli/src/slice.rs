@@ -323,6 +323,8 @@ pub fn session_error_answer(e: &SessionError) -> Answer<String> {
         SessionError::Workspace(_) | SessionError::Boundary(_) => Exit::Refused,
         // A record that could not be written is nobody's request.
         SessionError::Record(_) => Exit::Failed,
+        // Spec 050 section 3.3: halted, or a halt record that does not read.
+        SessionError::Halted(_) => Exit::Refused,
     };
     Answer::new(e.to_string(), exit, e.to_string())
 }
@@ -508,7 +510,12 @@ impl AttemptTamperView {
         use statecraft_run::tamper::{Answer, Checked, checked};
         let mut out: Vec<Self> = Vec::new();
         for e in entries {
-            if e.run_id != run_id || e.kind != statecraft_run::record::Kind::Accounting {
+            // Spec 048: a lease or an operation refusal is not an attempt's
+            // accounting and carries no tamper answers.
+            if e.run_id != run_id
+                || e.kind != statecraft_run::record::Kind::Accounting
+                || statecraft_run::operation::is_operation_record(e)
+            {
                 continue;
             }
             let view = match checked(&e.detail)? {
@@ -592,6 +599,20 @@ impl AttemptTamperView {
 pub struct RunListView {
     /// One row per run.
     pub runs: Vec<RunRowView>,
+    /// The repository's halt state (spec 050), folded from the same record.
+    pub halt: HaltStateView,
+}
+
+/// The halt state as `run list` renders it (spec 050 sections 3.1 and 3.4):
+/// each halted scope with who halted it and why, or the reason the record
+/// could not be read, in which case nothing is claimed about any scope.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct HaltStateView {
+    /// Each scope currently halted.
+    pub halted: Vec<statecraft_run::halt::Halted>,
+    /// `halt-state-unreadable` detail, where the fold failed closed.
+    pub unreadable: Option<String>,
 }
 
 /// One run's attempts, as the JSON contract carries it.
@@ -624,6 +645,10 @@ pub struct AttemptRowView {
     /// Its witness posture (spec 013 section 3.7); `not-recorded` for an
     /// attempt whose outcome predates that section or that has none yet.
     pub witness_posture: String,
+    /// `stop-requested` while a halt has asked this attempt to stop,
+    /// `stop-confirmed` once its `cancelled` outcome is durable (spec 050
+    /// section 3.4), or `null` when no halt named it.
+    pub stop: Option<String>,
 }
 
 /// An attempt's witness posture word, `not-recorded` where none is recorded
@@ -643,8 +668,19 @@ pub fn witness_posture_word(attempt: &statecraft_run::Attempt) -> &'static str {
 ///
 /// A fold of the record and nothing else (spec 006 section 3.9). An empty
 /// register of runs is 0, for the same reason an empty ready set is.
-pub fn run_list_answer(runs: Vec<Run>) -> Answer<RunListView> {
+pub fn run_list_answer(
+    runs: Vec<Run>,
+    halt: Result<statecraft_run::halt::HaltState, statecraft_run::halt::Refusal>,
+) -> Answer<RunListView> {
+    let (state, unreadable) = match halt {
+        Ok(state) => (state, None),
+        Err(e) => (Default::default(), Some(e.to_string())),
+    };
     let view = RunListView {
+        halt: HaltStateView {
+            halted: state.halted.clone(),
+            unreadable,
+        },
         runs: runs
             .iter()
             .map(|r| RunRowView {
@@ -659,12 +695,25 @@ pub fn run_list_answer(runs: Vec<Run>) -> Answer<RunListView> {
                         admission: a.admission.clone(),
                         reconciliation: a.reconciliation.clone(),
                         witness_posture: witness_posture_word(a).to_string(),
+                        stop: state.stop_of(&r.id, a.number).map(|s| s.word().to_string()),
                     })
                     .collect(),
             })
             .collect(),
     };
     let mut summary = String::new();
+    if let Some(why) = &view.halt.unreadable {
+        summary.push_str(&format!("halt state: {why}\n"));
+    }
+    for h in &view.halt.halted {
+        summary.push_str(&format!(
+            "halted {:<14} by {} at {}: {}\n",
+            h.scope.word(),
+            h.operator,
+            h.at,
+            h.reason
+        ));
+    }
     if view.runs.is_empty() {
         summary.push_str("no runs recorded\n");
     }
@@ -684,9 +733,125 @@ pub fn run_list_answer(runs: Vec<Run>) -> Answer<RunListView> {
                 summary.push_str(&format!("{:<20}   {}\n", "", r.describe()));
             }
             summary.push_str(&format!("{:<20}   witness {}\n", "", a.witness_posture));
+            if let Some(stop) = &a.stop {
+                summary.push_str(&format!("{:<20}   {stop}\n", ""));
+            }
         }
     }
     Answer::new(view, Exit::Ok, summary)
+}
+
+/// `run` refused before launch by spec 050 section 3.3: a halted
+/// run-admission scope, naming the scope, the operator and the reason, or a
+/// halt record that could not be read or verified. A precondition, so 2 with
+/// kind `refused`, and nothing was appended, prepared or launched.
+pub fn halt_refused_answer(r: &statecraft_run::halt::Refusal) -> Answer<serde_json::Value> {
+    use statecraft_run::halt::Refusal;
+    let mut value = serde_json::json!({
+        "outcome": "refused",
+        "reason": r.reason(),
+        "detail": r.to_string(),
+    });
+    if let Refusal::Halted(h) = r {
+        value["halt"] = serde_json::to_value(h).unwrap_or_default();
+    }
+    Answer::new(value, Exit::Refused, format!("refused: {r}\n")).with_kind(ErrorKind::Refused)
+}
+
+/// `halt` / `resume` (spec 050), from what the record returned. `earlier`
+/// is what was queued before this change and appended first (section 5,
+/// 2026-11-01), reported so a leftover request is never applied silently.
+pub fn halt_change_answer(
+    earlier: &[statecraft_run::halt::Applied],
+    result: Result<statecraft_run::halt::Applied, statecraft_run::halt::HaltError>,
+) -> Answer<serde_json::Value> {
+    use statecraft_run::halt::HaltError;
+    match result {
+        Ok(applied) => {
+            let mut answer = applied_answer(applied);
+            if !earlier.is_empty() {
+                answer.value["appliedFromQueue"] =
+                    serde_json::to_value(earlier).unwrap_or_default();
+                let mut summary = String::new();
+                for e in earlier {
+                    let scopes: Vec<&str> = e.detail.scopes.iter().map(|s| s.word()).collect();
+                    summary.push_str(&format!(
+                        "applied a queued {} of {} by {} at {}: {}\n",
+                        e.change,
+                        scopes.join(", "),
+                        e.detail.operator,
+                        e.detail.at,
+                        e.detail.reason
+                    ));
+                }
+                answer.summary = format!("{summary}{}", answer.summary);
+            }
+            answer
+        }
+        Err(HaltError::Unreadable(r)) => halt_refused_answer(&r),
+        // Spec 050 closes `reason` to `halted` and `halt-state-unreadable`,
+        // so an empty operator or reason is refused with neither, only why.
+        Err(HaltError::Refused(why)) => Answer::new(
+            serde_json::json!({ "outcome": "refused", "detail": why }),
+            Exit::Refused,
+            format!("refused: {why}\n"),
+        )
+        .with_kind(ErrorKind::Refused),
+        Err(e @ (HaltError::Record(_) | HaltError::Queue { .. })) => Answer::new(
+            serde_json::json!({ "failed": e.to_string() }),
+            Exit::Failed,
+            format!("failed: {e}\n"),
+        ),
+    }
+}
+
+/// `halt` / `resume` while a `run` holds the repository lock (spec 050
+/// section 5, 2026-11-01): the change is queued for that supervisor, which
+/// appends it at its next poll; nothing is in the record yet.
+pub fn halt_queued_answer(
+    change: &str,
+    result: Result<std::path::PathBuf, statecraft_run::halt::HaltError>,
+) -> Answer<serde_json::Value> {
+    match result {
+        Ok(path) => Answer::new(
+            serde_json::json!({ "queued": change, "request": path }),
+            Exit::Ok,
+            format!(
+                "{change} queued for the run holding this repository's lock: {}\n\
+                 it is recorded when that run's supervisor next polls, or by the next halt, \
+                 resume, run or run reconcile; run list shows it once recorded\n",
+                path.display()
+            ),
+        ),
+        Err(e) => halt_change_answer(&[], Err(e)),
+    }
+}
+
+fn applied_answer(applied: statecraft_run::halt::Applied) -> Answer<serde_json::Value> {
+    let scopes: Vec<&str> = applied.detail.scopes.iter().map(|s| s.word()).collect();
+    let mut summary = format!(
+        "{} {} by {} at {}: {}\n",
+        applied.change,
+        scopes.join(", "),
+        applied.detail.operator,
+        applied.detail.at,
+        applied.detail.reason
+    );
+    if let Some(stop) = &applied.detail.stop_requested {
+        summary.push_str(&format!(
+            "stop-requested for run {} attempt {}; it is confirmed only when that \
+             attempt's cancelled outcome is durable\n",
+            stop.run_id, stop.attempt
+        ));
+    }
+    if applied.change == "resume" {
+        summary.push_str("nothing was restarted; a later run is a new act\n");
+    }
+    Answer::new(
+        serde_json::to_value(&applied).unwrap_or_default(),
+        Exit::Ok,
+        summary,
+    )
 }
 
 /// `run show <path> <run>`
@@ -1552,7 +1717,7 @@ mod tests {
             attempt.outcome = Some(statecraft_run::Outcome::Completed);
             attempt.witness_posture = recorded.map(str::to_string);
         }
-        let a = run_list_answer(vec![run]);
+        let a = run_list_answer(vec![run], Ok(Default::default()));
         let words: Vec<_> = a.value.runs[0]
             .attempts
             .iter()
@@ -1573,7 +1738,7 @@ mod tests {
     fn a_live_attempt_shows_as_live_and_never_as_an_outcome() {
         let mut run = Run::new("r1");
         run.append_attempt("abc");
-        let a = run_list_answer(vec![run]);
+        let a = run_list_answer(vec![run], Ok(Default::default()));
         assert_eq!(a.value.runs[0].attempts[0].outcome, None);
         assert!(a.summary.contains("live"));
     }
