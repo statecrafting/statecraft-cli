@@ -40,19 +40,18 @@
       }
     ],
     "sectionDigests": {
-      "057-release-delivery": "369300c1ad43bfcadf912c9e5305d78d5ef3818833859fe6a78b14b96d8b3a17",
+      "057-release-delivery": "b45aeca5d2478663d5381a992912573638c65c7040db2260004c8c44bc19836d",
       "1-purpose": "54a39c53634ec7febdd011d7c3e5089ed9a9ce738370ab48e4eba68e797fa967",
-      "2-territory": "5d935d4fb53489927b1a07a124449d7987638e154146dfb6e03df07535a3f14d",
+      "2-territory": "6ff5ca9ac7365e4b7ffd69cf55982a06d549efcff2b531743069893be9fb0257",
       "3-1-what-starts-a-release": "dd5cf8cf99617d3e7cc4f9debcceedadcec2d17233ea0d05a1ff2738b2969100",
       "3-2-the-archives": "654784b4ec29889552ca2ce9e428193e223dd0378f33aa8d6efb748183cd902c",
-      "3-3-installers": "498ceac4d4331eee0aaa29d7946cf6050475c35bdb957f1c56dde69890477896",
+      "3-3-installers": "975ba46aff2549f5a91243479f901f60babed6e48a2b25150065f54a7aaed8fa",
       "3-4-sbom-and-provenance": "3b1801c3b86681c44e38a0e3fa6b4f10c5b513e686bfa5efe6e51b8c06ef66f0",
       "3-5-what-is-not-published": "8ef4d74e4dca8919b19bad700556ffaeb1465a81f5b33d32fb9c02822a10f4a2",
-      "3-behavior": "b5d746b629eae81ac41d90da142549ffa8d60ac76bac4b5459b379d5790bf498",
+      "3-behavior": "2beed41f2404504d948f3d98470f6ab82e0713a84383bf925baefb632745ca62",
       "4-out-of-scope": "234bc4451c369a83fc1d96407af6ac26830abe5b7625a5f8e28e478ea49ca6d8",
-      "5-resolved-decisions": "8d10b84cf661e71708ae1b8afe09dcb882bb1d2ed5ace68c821bf77bbb69b359",
-      "6-open-questions-for-the-owner": "1fab9b096c158ae2c71ffd1a327f8e281668d8e9fa8fd8db0b8d5e2b79028be8",
-      "verification": "b83d1e34b7377ff6b1bdf44818013c7a3f4ae493c78d9d24524a0aca4b5f7ea9"
+      "5-resolved-decisions": "da144b4092f099de7bb03eca5183dc5607370fd3793c304965f547463028c118",
+      "verification": "3af5dc31c666cc7249d2fc8a136a4a3bddc9cc3b69db20d385178d90fb727fe2"
     },
     "sectionHeadings": [
       "057: Release delivery",
@@ -66,14 +65,13 @@
       "3.5 What is not published",
       "4. Out of scope",
       "5. Resolved decisions",
-      "6. Open questions for the owner",
       "Verification"
     ],
     "specPath": "specs/057-release-delivery/spec.md",
-    "status": "draft",
+    "status": "approved",
     "summary": "Specifies how this repository delivers its own binaries, under the F-02 narrowing of 2026-10-20: a tag the owner pushes builds macOS and Linux archives for aarch64 and x86_64 with cargo-dist at an exact version, a shell installer and a Homebrew formula, a CycloneDX SBOM per archive that refuses to ship empty, and a keyless build-provenance attestation per archive. It adds no verb, and no verb in this corpus publishes. The binary's name, the Homebrew tap and the version scheme are the owner's decisions.\n",
     "title": "Releasing this repository's binaries is repository delivery: cargo-dist archives, installers, SBOM and build provenance"
   },
-  "shardHash": "3d8aa5545f3d99f4bd27a9133bbfcfed3551eea72452ea26f733a186615d2bc2",
+  "shardHash": "76429b5b309104b0fa73b36eeda51e31e4be0157c042079ff555a9f8d17e08a9",
   "specVersion": "1.11.0"
 }

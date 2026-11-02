@@ -1,7 +1,7 @@
 ---
 id: "043-sidecar-ready-deadline"
 title: "The witness sidecar's ready deadline starts when its process starts"
-status: draft
+status: approved
 implementation: pending
 created: "2026-10-21"
 summary: >
@@ -159,18 +159,24 @@ If no observation satisfies this section on a platform, that platform keeps
 - Retrying a sidecar, or running a child unwitnessed after a requested witness
   failed to start (013 section 7, 2026-10-17).
 
-## 7. Open questions for the owner
+## 7. Resolved decisions
 
-- **O-1.** Section 3.3: an observation of the running process, or one
-  confined execution of the producer at `locate` so the attempt keeps one
-  deadline.
-- **O-2.** Whether a `start-timeout` reason word needs a reader change in
-  `run show`, or rendering the posture alone is enough.
+**2026-10-31: an observation first, the pre-assessed producer as the fallback,
+per platform.** The first two candidates of section 3.3 keep the two deadlines
+and leave when the operator's machine assesses the file unchanged. The
+implementation measures them (M-3) and adopts the first that is not satisfied
+before the producer's code runs. Where neither can be shown on a platform, that
+platform adopts the confined execution at `locate`, keeps 013's single deadline
+from spawn, and records that here with the measurement.
+
+**2026-10-31: `start-timeout` needs no reader change.** `run show` renders the
+posture it already reads and shows a reason word it does not know as recorded;
+section 3.2 already forbids inferring success from either.
 
 ## Verification
 
-This spec is `status: draft` and declares no acceptance until it is ratified
-and built. Its acceptance will run the sidecar suites of 013 with a fixture
+Ratified by the owner on 2026-10-31. Acceptance is declared by the
+implementing change, which will run the sidecar suites of 013 with a fixture
 producer that delays before reading its input, on both platforms, and the
 measurements of section 5 are recorded with the change that adopts the
 deadlines.

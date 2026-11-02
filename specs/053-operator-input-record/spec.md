@@ -1,7 +1,7 @@
 ---
 id: "053-operator-input-record"
 title: "Operator input to a live attempt is recorded before delivery, expires, and is evidence on the attempt"
-status: draft
+status: approved
 implementation: pending
 created: "2026-10-21"
 summary: >
@@ -147,8 +147,8 @@ the child already executes, and a command becomes a new attempt.
 
 ## Verification
 
-This spec is `status: draft` and declares no acceptance until it is ratified
-and built. Its acceptance will send a note during a live attempt and see it
+Ratified by the owner on 2026-10-31. Acceptance is declared by the
+implementing change, which will send a note during a live attempt and see it
 recorded pending, then delivered at the next governed call, and expired when
 no call comes before its expiry; refuse a cockpit command without a control
 grant; and find every input, with author and reason, in the attempt's record.

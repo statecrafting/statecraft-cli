@@ -1,8 +1,8 @@
 ---
 id: "045-one-yaml-reader"
 title: "statecraft-home reads YAML through the adopted producer's one reader"
-status: draft
-implementation: pending
+status: approved
+implementation: complete
 created: "2026-10-21"
 summary: >
   Amends specs 002, 012 and 032 so every YAML document statecraft-home
@@ -15,9 +15,11 @@ amends:
   - "002-environment-lifecycle"
   - "012-remote-desired-state"
   - "032-external-code-profile"
-# No `extends` yet: the implementing change adds the edge on
-# crates/statecraft-home/ (002) with the code, because the gate counts an
-# extender as an owner.
+# The implementing change adds this edge with the code, because the gate
+# counts an extender as an owner; the parity test under
+# crates/statecraft-home/tests/ is covered by the same directory unit.
+extends:
+  - { spec: "002-environment-lifecycle", unit: { kind: directory, path: "crates/statecraft-home/" }, nature: additive }
 depends_on:
   - "002-environment-lifecycle"
   - "009-governance-producer"
@@ -108,7 +110,14 @@ configuration at the next adoption. Reading through
 
 ## Verification
 
-This spec is `status: draft` and declares no acceptance until it is ratified
-and built. Its acceptance will run the setup and external-code suites with
-their assertions unchanged, plus a parity test over each fixture workflow
-those suites read, under the new reader.
+Ratified by the owner on 2026-10-31. Acceptance is run through
+`make verify SPEC=045`: the setup and external-code suites with their
+assertions unchanged, the parity test over every fixture workflow they read,
+whose last test reads the manifest and the lockfile and finds no YAML parser
+but the producer's.
+
+```verify:cli
+cargo test -p statecraft-home --locked --test setup_workflows
+cargo test -p statecraft-home --locked --test external_code
+cargo test -p statecraft-home --locked --test yaml_reader_parity
+```
