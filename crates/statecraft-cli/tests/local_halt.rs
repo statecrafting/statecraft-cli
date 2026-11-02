@@ -296,6 +296,17 @@ fn halt_and_resume_need_a_path_an_operator_and_a_reason() {
         assert_eq!(exit, 3, "{args:?}: {v}");
         assert_eq!(v["error"]["kind"], "usage");
     }
+    // An operator or a reason that is only whitespace passes the parser and
+    // is refused like every other refusal: exit 2, kind refused.
+    for args in [
+        vec!["halt", root, "  ", "r"],
+        vec!["halt", root, "bart", " \t"],
+    ] {
+        let (exit, v) = f.json(&args);
+        assert_eq!(exit, 2, "{args:?}: {v}");
+        assert_eq!(v["error"]["kind"], "refused", "{args:?}: {v}");
+        assert_eq!(v["error"]["details"]["outcome"], "refused", "{args:?}: {v}");
+    }
     let unregistered = tempfile::tempdir().unwrap();
     let (exit, v) = f.json(&["halt", unregistered.path().to_str().unwrap(), "bart", "r"]);
     assert_eq!(exit, 2, "{v}");

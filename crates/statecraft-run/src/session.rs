@@ -640,7 +640,11 @@ pub fn conclude_observed(
             |e| match e {
                 crate::halt::HaltError::Record(r) => SessionError::Record(r),
                 crate::halt::HaltError::Unreadable(r) => SessionError::Halted(r),
-                crate::halt::HaltError::Refused(why) => SessionError::Boundary(why),
+                // `Refused` is the empty operator or reason of a halt or
+                // resume request; confirm_stop takes no request.
+                crate::halt::HaltError::Refused(why) => {
+                    unreachable!("confirm_stop validates no request, yet refused: {why}")
+                }
             },
         )?;
     }

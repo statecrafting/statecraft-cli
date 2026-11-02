@@ -786,11 +786,14 @@ pub fn halt_change_answer(
             )
         }
         Err(HaltError::Unreadable(r)) => halt_refused_answer(&r),
+        // Spec 050 closes `reason` to `halted` and `halt-state-unreadable`,
+        // so an empty operator or reason is refused with neither, only why.
         Err(HaltError::Refused(why)) => Answer::new(
-            serde_json::json!({ "refused": why }),
+            serde_json::json!({ "outcome": "refused", "detail": why }),
             Exit::Refused,
             format!("refused: {why}\n"),
-        ),
+        )
+        .with_kind(ErrorKind::Refused),
         Err(e @ HaltError::Record(_)) => Answer::new(
             serde_json::json!({ "failed": e.to_string() }),
             Exit::Failed,
