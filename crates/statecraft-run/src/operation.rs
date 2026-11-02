@@ -465,6 +465,14 @@ fn effect_of(key: &str) -> Identity {
 ///
 /// The caller holds the repository lock, as for every write to the record.
 pub fn submit(chain: &mut Chain, request: &Request<'_>) -> Result<Submitted, RecordError> {
+    // A request without a key is malformed, not decided: no rule can apply to
+    // it, and rule 3's recorded refusal holds its key, which an empty key
+    // cannot be. It is refused before any rule, and nothing is appended.
+    if request.key.is_empty() {
+        return Ok(Submitted::Refused(Refusal::precondition(
+            "an operation needs a non-empty idempotency key".to_string(),
+        )));
+    }
     let state = fold(chain, request.run_id);
     let run_id = request.run_id;
 
@@ -503,11 +511,6 @@ pub fn submit(chain: &mut Chain, request: &Request<'_>) -> Result<Submitted, Rec
         return Ok(Submitted::Replayed(held.clone()));
     }
 
-    if request.key.is_empty() {
-        return Ok(Submitted::Refused(Refusal::precondition(
-            "an operation needs a non-empty idempotency key".to_string(),
-        )));
-    }
     let attempt = state.attempts.last().map_or(0, |a| a.number);
 
     // Rule 3: the refusal is recorded, holding its key; the effect is not.
