@@ -20,8 +20,9 @@ extends:
   # stop-confirmed call after a cancelled outcome in `session.rs`, and the
   # operation intent skipped by `reconcile::since_last_intent`.
   - { spec: "003-work-and-run-semantics", unit: { kind: directory, path: "crates/statecraft-run/" }, nature: additive }
-  # The edge on crates/statecraft-cli/ (spec 006) lands with the verbs, in
-  # the change that adds them.
+  # The typed operations in the application layer (spec 040), their three
+  # verbs, and the repository lock shared with the launch a retry runs.
+  - { spec: "006-command-surface", unit: { kind: directory, path: "crates/statecraft-cli/" }, nature: additive }
   # The reviewable fold skips an operation's records (section 5, 2026-11-01).
   - { spec: "005-acceptance-and-evidence", unit: { kind: directory, path: "crates/statecraft-acceptance/" }, nature: additive }
 depends_on:
@@ -224,11 +225,11 @@ cursor after a dropped connection with no event missed or repeated.
 
 ```verify:cli
 cargo test -p statecraft-run --test run_operations
+cargo test -p statecraft-cli --test run_operations
 ```
 
-It replays every prefix of a record built by a lease, a retry, a stale
+The first replays every prefix of a record built by a lease, a retry, a stale
 refusal, an abort, its cancelled outcome and a release from a fresh home to the
-state seen at that point. The verbs and their binary suite land in the change
-that adds them to `statecraft-cli`, which also adds that suite here: it refuses
-a stale version with exit 2 naming `stale-version` through the binary, answers
-a repeated key with nothing appended, and resumes `run events` from a cursor.
+state seen at that point; the second refuses a stale version with exit 2 naming
+`stale-version` through the binary, answers a repeated key with nothing
+appended, and resumes `run events` from a cursor.

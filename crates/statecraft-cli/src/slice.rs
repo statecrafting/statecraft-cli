@@ -510,7 +510,12 @@ impl AttemptTamperView {
         use statecraft_run::tamper::{Answer, Checked, checked};
         let mut out: Vec<Self> = Vec::new();
         for e in entries {
-            if e.run_id != run_id || e.kind != statecraft_run::record::Kind::Accounting {
+            // Spec 048: a lease or an operation refusal is not an attempt's
+            // accounting and carries no tamper answers.
+            if e.run_id != run_id
+                || e.kind != statecraft_run::record::Kind::Accounting
+                || statecraft_run::operation::is_operation_record(e)
+            {
                 continue;
             }
             let view = match checked(&e.detail)? {

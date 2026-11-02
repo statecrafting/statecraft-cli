@@ -21,6 +21,14 @@
       },
       {
         "nature": "additive",
+        "spec": "006-command-surface",
+        "unit": {
+          "kind": "directory",
+          "path": "crates/statecraft-cli/"
+        }
+      },
+      {
+        "nature": "additive",
         "spec": "005-acceptance-and-evidence",
         "unit": {
           "kind": "directory",
@@ -72,7 +80,7 @@
       }
     ],
     "sectionDigests": {
-      "048-typed-run-operations-under-one-controller-lease": "8b5096a7134eedbf338d6218b9e501e6fd9a621a5b33ee375c21486c5c923190",
+      "048-typed-run-operations-under-one-controller-lease": "a074f992da5209c34f1f037c5d4c4decf14daa52b9b58cb104acea7f7a2c4db5",
       "1-purpose": "a8cd1c1c3b85df4f5882c4d85245fe91f62c916b06e7a60cd8aa0f9aa1dbb5ac",
       "2-territory": "56507aabb8357379d6a6d67ada7404d92ee91795cdc4ada28bbe86dced5890a9",
       "3-1-the-three-operations": "080f7878046c185c2b5149ef6745a7dfbfb2018c457579b580c4311da54bec16",
@@ -84,7 +92,7 @@
       "3-behavior": "fee67128fd130e86b095b5719793e47ccf412bc8c02a2a53682e524f587b8972",
       "4-out-of-scope": "914b435926abca1405ec2d9058aa9ece80ac9b82ec1b6b6eeabdff5f9bda0818",
       "5-resolved-decisions": "fd3ed1d6ccd1f3c36da3db5abe8e66739f0645cd64c8b61856c5d889773ad4bc",
-      "verification": "bf744129b40757b5abb8b8914c8356344e9f7e44d7239e6718f6335d577b0702"
+      "verification": "3bdbafdc23ef66032837edf8b4656105735bd8d3190fca2bb65f16f443b51811"
     },
     "sectionHeadings": [
       "048: Typed run operations under one controller lease",
@@ -106,6 +114,6 @@
     "summary": "Gives a run three typed operations, attempt.retry, attempt.continue and attempt.abort, submitted by one controller holding a lease. Each carries an idempotency key and the run version it was decided against; each request and its outcome append to spec 003's hash-linked run record, durable and uncapped, so replaying the record reproduces the run's state. A reconnecting controller reads events from a cursor over the record. The one live slot of spec 003 section 3.7 is held or released explicitly by each operation.\n",
     "title": "Typed run operations under one controller lease, recorded in the run record"
   },
-  "shardHash": "8da034209134daf51d8a3f1e170bb6b423c6df592bb80696e3acd7894367d0dc",
+  "shardHash": "216abfc2189298d72b336aab2fe482fa466b1624d30b20887a5ef5f0f76855b9",
   "specVersion": "1.11.0"
 }

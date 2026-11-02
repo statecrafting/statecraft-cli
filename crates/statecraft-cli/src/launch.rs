@@ -88,7 +88,7 @@ pub fn launch_attempt(
     let _held = match plan.held {
         Some(held) => held,
         None => match statecraft_run::lock::try_acquire(home, root) {
-            Ok(held) => held,
+            Ok(held) => std::sync::Arc::new(held),
             Err(e @ statecraft_run::lock::LockError::Busy { .. }) => {
                 return slice::lock_busy_answer(&e.to_string()).erase();
             }
