@@ -450,3 +450,40 @@ fn a_request_with_no_operator_or_reason_is_not_queued() {
     ));
     assert!(!halt::requests_dir(home.path(), target.path()).exists());
 }
+
+#[test]
+fn a_request_appended_but_not_removed_is_removed_and_never_appended_again() {
+    let home = tempfile::tempdir().unwrap();
+    let target = repo();
+    let (mut chain, _) = Chain::open(home.path(), target.path()).unwrap();
+    let halted = halt::queue(
+        home.path(),
+        target.path(),
+        "halt",
+        &request(&[Scope::Dispatch], "t1"),
+    )
+    .unwrap();
+    // A writer appended the halt and then failed to remove its file.
+    halt::halt(&mut chain, &request(&[Scope::Dispatch], "t1")).unwrap();
+    let resumed = halt::queue(
+        home.path(),
+        target.path(),
+        "resume",
+        &request(&[Scope::Dispatch], "t2"),
+    )
+    .unwrap();
+    let before = chain.records().len();
+
+    let applied = halt::apply_pending(&mut chain, home.path(), target.path()).unwrap();
+    // Only the resume is appended; the stale halt is not replayed over it.
+    assert_eq!(
+        applied
+            .iter()
+            .map(|a| a.change.as_str())
+            .collect::<Vec<_>>(),
+        ["resume"]
+    );
+    assert_eq!(chain.records().len(), before + 1);
+    assert!(!halted.exists() && !resumed.exists());
+    assert!(halt::fold(&chain).unwrap().halted.is_empty());
+}

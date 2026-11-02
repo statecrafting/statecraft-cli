@@ -655,6 +655,33 @@ pub fn pending(home: &Path, target: &Path) -> Result<Vec<(PathBuf, Queued)>, Ref
     Ok(out)
 }
 
+/// Whether the record's last halt or resume entry is `change` with this
+/// request's scopes, operator, reason and time.
+fn last_change_is(chain: &Chain, change: &str, request: &Request<'_>) -> bool {
+    let scopes = scopes_of(request);
+    for record in chain.records().iter().rev() {
+        if record.payload.get("kind").and_then(|k| k.as_str()) != Some("halt") {
+            continue;
+        }
+        let Ok(entry) = serde_json::from_value::<Entry>(record.payload.clone()) else {
+            // fold, which every writer runs first, refuses an unreadable one.
+            return false;
+        };
+        if entry.subject != HALT_SUBJECT && entry.subject != RESUME_SUBJECT {
+            continue;
+        }
+        let Ok(detail) = serde_json::from_value::<HaltDetail>(entry.detail) else {
+            return false;
+        };
+        return entry.subject == change
+            && detail.scopes == scopes
+            && detail.operator == request.operator
+            && detail.reason == request.reason
+            && detail.at == request.at;
+    }
+    false
+}
+
 /// Append every queued request, oldest first, as the entry it asked for, and
 /// remove each file only once its entry is durable. The caller holds the
 /// repository lock: the supervisor of a live attempt, or `halt`, `resume`,
@@ -674,11 +701,18 @@ pub fn apply_pending(
             reason: &q.reason,
             at: &q.at,
         };
-        applied.push(if q.change == HALT_SUBJECT {
-            halt(chain, &request)?
-        } else {
-            resume(chain, &request)?
-        });
+        // A request whose entry is already the record's last halt or resume
+        // was appended by a writer that could not then remove its file. Every
+        // writer applies queued requests in order before its own, so such a
+        // file is always the oldest queued, and appending it again would
+        // replay it over what followed. It is only removed.
+        if !last_change_is(chain, &q.change, &request) {
+            applied.push(if q.change == HALT_SUBJECT {
+                halt(chain, &request)?
+            } else {
+                resume(chain, &request)?
+            });
+        }
         std::fs::remove_file(&path).map_err(queue_error(&path, "removed after it was appended"))?;
         if let Some(dir) = path.parent() {
             sync_dir(dir).map_err(queue_error(&path, "removed after it was appended"))?;
