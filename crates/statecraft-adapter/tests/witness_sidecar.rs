@@ -347,10 +347,6 @@ fn an_exit_before_reading_the_start_line_is_exited_before_ready() {
     assert_eq!(ended.observed(true), Observed::Failed);
 }
 
-// Spec 043 (R-3, section 4 row 5): a producer message claiming a start time
-// is ignored for timing. The claim arrives before the producer reads its
-// input and the ready deadline would have run out had the claim started it;
-// the message itself is a protocol finding, as 013 already requires.
 /// Spec 043 section 5 (found measuring M-1): a producer that reads its start
 /// line and reports `ready` before the supervisor's next start-phase poll is
 /// still observed started, by the same retained read end asked when its line
@@ -370,6 +366,10 @@ fn a_producer_that_answers_between_two_polls_is_still_observed_started() {
     }
 }
 
+// Spec 043 (R-3, section 4 row 5): a producer message claiming a start time
+// is ignored for timing. The claim arrives before the producer reads its
+// input and the ready deadline would have run out had the claim started it;
+// the message itself is a protocol finding, as 013 already requires.
 #[test]
 fn a_producer_claim_about_its_start_is_ignored_for_timing() {
     let claim = r#"printf '{%s,"type":"started","binding":%s,"started_at":"1970-01-01T00:00:00Z"}\n' "$P" "$B""#;
