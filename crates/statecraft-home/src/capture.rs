@@ -19,6 +19,7 @@ use crate::admission::{
     self, ALLOWED_COMMAND, Capture, Control, Invocation, Launch, Measurement, Origin, ProcessEnd,
     REFUSED_COMMAND, REFUSED_COMMAND_ABSENT_PATH,
 };
+use statecraft_adapter::capabilities::AdapterCapabilities;
 use statecraft_environment::digest::{digest_bytes, digest_file};
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
@@ -214,6 +215,14 @@ fn utf8(bytes: Vec<u8>, name: &str, undecodable: &mut Vec<String>) -> String {
     }
 }
 
+/// The refusal a declaration earns before any control launches (spec 047
+/// section 3.3): `None` when it declares every field the controls need.
+fn undeclared(declared: &AdapterCapabilities) -> Option<Refused> {
+    statecraft_adapter::capabilities::fit(declared, &admission::needs())
+        .refusal(statecraft_adapter_claude_code::ADAPTER_NAME)
+        .map(|undeclared| Refused::CapabilityUndeclared(undeclared.to_string()))
+}
+
 /// Launch one control and record it.
 ///
 /// The record is written whether or not the session completed: a timeout, a
@@ -223,11 +232,8 @@ pub fn launch(request: &Request) -> Result<Launched, Failed> {
     let control = request.control;
     // Spec 047 section 3.3: judged first, before anything is created, from
     // the adapter's declaration rather than from which adapter it is.
-    let declared = admission::capabilities();
-    if let Some(undeclared) = statecraft_adapter::capabilities::fit(&declared, &admission::needs())
-        .refusal(statecraft_adapter_claude_code::ADAPTER_NAME)
-    {
-        return Err(Refused::CapabilityUndeclared(undeclared.to_string()).into());
+    if let Some(refused) = undeclared(&admission::capabilities()) {
+        return Err(refused.into());
     }
     let root = request.root.canonicalize().map_err(|e| Refused::Root {
         path: request.root.display().to_string(),
@@ -492,6 +498,30 @@ pub fn record_path(directory: &Path, control: Control) -> PathBuf {
 
 #[cfg(test)]
 mod tests {
+
+    // Spec 047 section 3.3: a declaration without print-mode hooks, settings
+    // file transport or a version field is refused before anything is
+    // created, with the stable reason and the missing field named.
+    #[test]
+    fn a_declaration_missing_a_needed_field_is_refused_before_launch() {
+        assert!(undeclared(&admission::capabilities()).is_none());
+        for strip in [
+            |d: &mut AdapterCapabilities| d.print_mode_hooks = false,
+            |d: &mut AdapterCapabilities| d.settings_file_transport = false,
+            |d: &mut AdapterCapabilities| d.version_field = None,
+        ] {
+            let mut declared = admission::capabilities();
+            strip(&mut declared);
+            let refused = undeclared(&declared).expect("refused");
+            let Refused::CapabilityUndeclared(why) = &refused else {
+                panic!("{refused:?}");
+            };
+            assert!(
+                why.contains(statecraft_adapter::capabilities::REASON),
+                "{why}"
+            );
+        }
+    }
     use super::*;
 
     #[test]
