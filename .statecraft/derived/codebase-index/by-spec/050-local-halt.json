@@ -8,10 +8,47 @@
       "003-work-and-run-semantics",
       "006-command-surface"
     ],
-    "implementingPaths": [],
+    "implementingPaths": [
+      {
+        "path": "crates/statecraft-cli/",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/statecraft-run/",
+        "source": "spec-edge"
+      }
+    ],
+    "resolvedUnits": [
+      {
+        "locations": [
+          {
+            "file": "crates/statecraft-cli/"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "directory",
+          "path": "crates/statecraft-cli/"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "crates/statecraft-run/"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "directory",
+          "path": "crates/statecraft-run/"
+        }
+      }
+    ],
     "specId": "050-local-halt",
     "specStatus": "approved"
   },
   "schemaVersion": "1.3.0",
-  "shardHash": "5352a12240d8fee698b11ad1d5c66384500c7822c65b20d405d334ccc087e608"
+  "shardHash": "fe385ef1617654a1b62a3e2fe45940f2aa3c4cd92437075d67edd768162e9031"
 }

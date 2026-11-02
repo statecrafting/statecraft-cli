@@ -493,6 +493,12 @@ fn run(args: &[String]) -> i32 {
         Verb::OverrideRecover => recover_verb(&invocation.rest, &registry, &home, format),
         // Spec 006 section 3.11.6: the reconciliation of 003 section 3.6.1.
         Verb::RunReconcile => reconcile_verb(&invocation.rest, &registry, &home, format),
+        // Spec 050: the local halt record. A registered target, as for the
+        // override verbs; the record is the product's own state, so arming is
+        // not required to halt or resume it.
+        Verb::Halt | Verb::Resume => {
+            halt_verb(invocation.verb, &invocation.rest, &registry, &home, format)
+        }
         // Spec 006 section 3.11.7: the transfer verbs of 002 section 3.35. A
         // registered target, as for the environment verbs whose manifest they
         // change; usage is 3, everything else is the library's answer.
@@ -697,8 +703,14 @@ fn slice_verb(
             )
         }
         Verb::RunList => match Chain::open(home, root) {
+            // Spec 050: the halt state is folded from the same record and
+            // rendered beside the runs; a fold that fails closed is shown as
+            // such rather than as "nothing halted".
             Ok((chain, _)) => emit(
-                &slice::run_list_answer(statecraft_run::session::runs(&chain)),
+                &slice::run_list_answer(
+                    statecraft_run::session::runs(&chain),
+                    statecraft_run::halt::fold(&chain),
+                ),
                 format,
             ),
             Err(e) => fail(&e.to_string(), format),
@@ -742,6 +754,94 @@ fn slice_verb(
         }
         _ => Exit::Usage.code(),
     }
+}
+
+/// `halt <path> [--scope <scope>]... <operator> <reason...>` and
+/// `resume <path> [--scope <scope>]... <operator> <reason...>` (spec 050).
+///
+/// No scope halts or lifts all three. The entry is appended to the
+/// repository's run record under its lock (section 3.1); the library decides
+/// what it records, including the live attempt a halt asks to stop (section
+/// 3.4). A record that cannot be read is a refusal, never an empty state.
+fn halt_verb(
+    verb: Verb,
+    rest: &[String],
+    registry: &Registry,
+    home: &std::path::Path,
+    format: Format,
+) -> i32 {
+    use statecraft_run::halt::{self, Scope};
+    let show_usage = || {
+        usage(
+            format,
+            format!(
+                "usage: {} <path> [--scope <run-admission|tool-effects|dispatch>]... <operator> <reason...>",
+                verb.spelling()
+            ),
+        )
+    };
+    let Some(path) = rest.first() else {
+        return show_usage();
+    };
+    let mut scopes = Vec::new();
+    let mut words = Vec::new();
+    let mut operands = rest[1..].iter();
+    while let Some(arg) = operands.next() {
+        let word = if let Some(word) = arg.strip_prefix("--scope=") {
+            Some(word.to_string())
+        } else if arg == "--scope" {
+            operands.next().cloned()
+        } else {
+            words.push(arg.clone());
+            continue;
+        };
+        match word.as_deref().and_then(Scope::parse) {
+            Some(scope) => scopes.push(scope),
+            None => return show_usage(),
+        }
+    }
+    let (Some(operator), Some(_)) = (words.first(), words.get(1)) else {
+        return show_usage();
+    };
+    let reason = words[1..].join(" ");
+    let root = match registered(registry, &absolute(path)) {
+        Ok(root) => root,
+        Err(answer) => return emit(&answer, format),
+    };
+    // Spec 003 section 3.1.4 rule 7: every write to the run record takes the
+    // repository lock and refuses while another process holds it.
+    let _held = match statecraft_run::lock::try_acquire(home, &root) {
+        Ok(held) => held,
+        Err(e @ statecraft_run::lock::LockError::Busy { .. }) => {
+            return emit(&slice::lock_busy_answer(&e.to_string()), format);
+        }
+        Err(e) => return fail(&e.to_string(), format),
+    };
+    let (mut chain, _) = match Chain::open(home, &root) {
+        Ok(c) => c,
+        Err(e) => {
+            return emit(
+                &slice::halt_refused_answer(&statecraft_run::halt::Refusal::from(e)),
+                format,
+            );
+        }
+    };
+    let at =
+        statecraft_environment::time::rfc3339_utc(statecraft_environment::time::Clock::now_unix(
+            statecraft_cli::application::process_clock().as_ref(),
+        ));
+    let request = halt::Request {
+        scopes: &scopes,
+        operator: operator.as_str(),
+        reason: &reason,
+        at: &at,
+    };
+    let result = if verb == Verb::Halt {
+        halt::halt(&mut chain, &request)
+    } else {
+        halt::resume(&mut chain, &request)
+    };
+    emit(&slice::halt_change_answer(result), format)
 }
 
 /// `override recover <path> [<choice> <journal-digest> <authority-digest> <operator> <reason...>]`

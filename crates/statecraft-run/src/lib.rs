@@ -43,6 +43,9 @@
 //!   back out of the record. Added by spec 006's additive edge, because a
 //!   command may not be a second implementation and a binding needs an entry
 //!   point.
+//! - [`halt`] is spec 050's local halt record: the halt and resume entries in
+//!   the run record, their fold, and the pre-launch check that fails closed.
+//!   Added by spec 050's additive edge.
 //!
 //! # What it does not do
 //!
@@ -57,6 +60,7 @@ pub mod attempt;
 pub mod context;
 pub mod contract;
 pub mod documentation;
+pub mod halt;
 pub mod lock;
 pub mod overrides;
 pub mod policy;
