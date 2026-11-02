@@ -129,6 +129,7 @@ cargo test -p statecraft-cli --test application_equivalence
 
 The first admits a launch with a product home whose path is over 100 bytes
 and shows the self-test passing with `unixDenied` and the record naming no
-root under `/tmp`; the second admits the sidecar through the same directory;
+root inside a `statecraft-probe-` directory (the fixture may itself be under
+`/tmp`, as on Linux); the second admits the sidecar through the same directory;
 the third is spec 064's own comparison of a confinement record's protected
 roots and digest across launches, unchanged.

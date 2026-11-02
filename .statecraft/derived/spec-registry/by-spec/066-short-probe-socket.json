@@ -59,7 +59,7 @@
       }
     ],
     "sectionDigests": {
-      "066-a-short-probe-socket": "41dae60fa4b6d967bf0d6452f9a7102006c4159895ffb5f40f91a11e474e5526",
+      "066-a-short-probe-socket": "5aa536ed37600f994673daf7371fdd67e2505cb77634fe6cedc04fdc7928a0f6",
       "1-purpose": "f39030072c6d649f3c8e411f85954ef17b4d737a8c6bacda66a333c752ec64ec",
       "2-territory": "339c9a5a19de1f4d5b55c7a2018056d93d10508ec7894e459e08cb05e47101eb",
       "3-1-where-the-socket-lives": "15df9ceb2a18a7b96e7d63971ab27a4e019601c665a8d2ed63f532310d1a22bd",
@@ -68,7 +68,7 @@
       "3-behavior": "cd509b985d96608e0823e145c0e20b6d6bc8be43521677869f52377e863d0c4a",
       "4-out-of-scope": "04c908e364150e4df036612bc335c0ae6b25a9dfeaed9c8d7a3b48f77f44ceb1",
       "5-resolved-decisions": "bacc84a6979ebbd198258d78c708de7f7cb7ef89635652a601d786738ded21f5",
-      "verification": "99fa824af5f7caf7cadd92d1d457083be4ad57805ce1fadc6579d15683f420a4"
+      "verification": "12b640276d39e28c7e77b96fac78694be511efb0f818ed575105b8dab888694b"
     },
     "sectionHeadings": [
       "066: A short probe socket",
@@ -87,6 +87,6 @@
     "summary": "Amends spec 064 section 3.3. The self-test's listening Unix socket moves from a directory under the product home's boundary entry to a private directory under /tmp, so its path no longer grows with the home's path and stays within the platform's socket path limit (104 bytes on macOS, 108 on Linux). The sentinel stays in boundary/, the protected roots and the confinement record are unchanged, and rule 6 of spec 004 section 3.18 still decides whether the probe's connect is refused.\n",
     "title": "The boundary self-test's probe socket lives under a short fixed directory, so a long home path cannot refuse a launch"
   },
-  "shardHash": "7e751d0895e5ec023f411349649657d430680be6dbc8a088c6d29a02c7f5cb82",
+  "shardHash": "34892dfa46e220efac26e98cccbf3cc421eb4849e7964d8efe15a1e31a0da532",
   "specVersion": "1.11.0"
 }

@@ -264,7 +264,7 @@ fn hardlinked_build_output_under_the_operators_worktrees_does_not_refuse() {
 /// `sun_path` allows for spec 064's `<home>/boundary/probe-XXXXXX/socket`)
 /// is admitted, the probe still reports `unixDenied`, and the record names
 /// the same protected roots with the same digest across launches, none of
-/// them under `/tmp`.
+/// them the probe directory.
 #[test]
 fn a_home_path_over_100_bytes_is_admitted_with_the_probe_socket_under_tmp() {
     use statecraft_home::confinement::{Roots, admit};
@@ -301,8 +301,9 @@ fn a_home_path_over_100_bytes_is_admitted_with_the_probe_socket_under_tmp() {
     let first = admit(roots(), executable, "/usr/bin:/bin").expect("a long home is admitted");
     let record = first.boundary.record().clone();
     assert_eq!(record.self_test.get("unixDenied"), Some(&true));
-    let tmp = Path::new("/tmp");
-    let private_tmp = Path::new("/private/tmp");
+    // The fixture itself may live under `/tmp` (it does on Linux), so the
+    // property is stated about the probe directory, not about `/tmp`: no
+    // recorded root is, or lies inside, a `statecraft-probe-` directory.
     for protected in record
         .policy
         .inaccessible
@@ -310,7 +311,10 @@ fn a_home_path_over_100_bytes_is_admitted_with_the_probe_socket_under_tmp() {
         .chain(record.policy.readonly.iter())
     {
         assert!(
-            !protected.starts_with(tmp) && !protected.starts_with(private_tmp),
+            !protected.components().any(|c| c
+                .as_os_str()
+                .to_string_lossy()
+                .starts_with("statecraft-probe-")),
             "the probe directory is not a protected root: {}",
             protected.display()
         );
