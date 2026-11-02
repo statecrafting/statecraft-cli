@@ -95,6 +95,14 @@ fn run(args: &[String]) -> i32 {
     ) {
         return trust_verb(invocation.verb, &invocation.rest, format);
     }
+    // Spec 052 section 3.4: the golden comparison reads two named
+    // directories and nothing else, so it consults no home either.
+    if invocation.verb == Verb::ProviderCompare {
+        return match statecraft_cli::golden::compare_verb(&invocation.rest) {
+            Ok(answer) => emit(&answer, format),
+            Err(message) => usage(format, message),
+        };
+    }
     let home = product_home();
     let mut registry = match Registry::read(&home) {
         Ok(r) => r,
@@ -529,6 +537,7 @@ fn run(args: &[String]) -> i32 {
         Verb::TrustRootGenerate | Verb::TrustIssuerSign | Verb::TrustIssuerVerify => {
             trust_verb(invocation.verb, &invocation.rest, format)
         }
+        Verb::ProviderCompare => unreachable!("dispatched before product home reads"),
         Verb::ProviderTokenSet | Verb::ProviderTokenClear | Verb::ProviderTokenShow => {
             let outcome = match invocation.verb {
                 Verb::ProviderTokenSet => {

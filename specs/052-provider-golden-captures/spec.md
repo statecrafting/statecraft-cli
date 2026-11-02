@@ -14,9 +14,9 @@ summary: >
   is owner-triggered; comparison runs in CI with no provider and no network.
 amends:
   - "004-execution-adapter"
-# No `extends` yet: the implementing change adds the edges on
-# crates/statecraft-adapter-claude-code/ (004) and crates/statecraft-cli/ (006)
-# with the code.
+extends:
+  - { spec: "004-execution-adapter", unit: { kind: directory, path: "crates/statecraft-adapter-claude-code/" }, nature: additive }
+  - { spec: "006-command-surface", unit: { kind: directory, path: "crates/statecraft-cli/" }, nature: additive }
 depends_on:
   - "004-execution-adapter"
 # `obligations` is spec-spine's own frontmatter field, used by approved specs
@@ -135,6 +135,49 @@ version. The version gate already exists as spec 004 section 3.4's
 per-version qualification, so the comparison is a precondition there and the
 two new verbs are the capture and the compare.
 
+**2026-11-01: the corpus stays where it is.** Section 2's governed fixtures
+directory is `crates/statecraft-adapter-claude-code/testdata/stream/` itself:
+V-1's input names its README and specs 004, 015 and 034 cite the path, so
+nothing moves. `corpus.json`, `quarantine.json`, `ledger.json` and
+`quarantine/` sit beside the five recordings, and a version's captures are a
+directory with a `captures.json` of `corpus.json`'s shape.
+
+**2026-11-01: meaning is ten mapped fields.** `golden::MAPPED_FIELDS`: the
+mapped outcome and the provider's claim (3.13), `subtype`, `is_error` and
+`terminal_reason`, the denied tools of `permission_denials` and of the
+mid-stream notifications (3.11), whether a cost was reported and whether hook
+events occurred (3.10), and which of the seven verbatim tool names the init
+event applied (3.12). The tool count and every other tool name are ignored,
+because the goldens' names are count-preserving placeholders; so are
+`num_turns`, `model`, tool inputs and prose, beside the ids, timestamps and
+costs section 3.4 names (`golden::IGNORED_FIELDS`).
+
+**2026-11-01: what R-1 matches.** A capture's entry must name the version its
+own init event reports, a capture set names one version, and a capture of a
+scenario no golden or quarantine entry names is refused. The platform is
+recorded and reported, not matched. A scenario is compared with its latest
+golden by capture date.
+
+**2026-11-01: quarantine and ledger rules.** An active quarantine entry makes
+its scenario `quarantined` in every comparison until `liftedBy` names a golden
+of that scenario captured after the quarantine date. A ledger entry covers a
+divergence when its scenario and version match and it lists every differing
+field; append-only is checked as dates that never decrease.
+
+**2026-11-01: the precondition, and the order of the verbs.**
+`qualification::record_compared` is section 3.4's refusal: it writes the
+record for the compared version only when no scenario diverges unreviewed or
+is missing, and names those that do. The compare verb is
+`provider compare <captures-dir> --corpus <dir>`, exit 1 when not
+qualifiable. The capture verb (3.5) follows in its own change, because its
+scenario prompts and redaction are the owner's to review before any provider
+usage is spent.
+
+**2026-11-01: networking is denied by the test.** The CI workflow is a
+rendered, managed file, so the acceptance runs the binary under
+`sandbox-exec` with `(deny network*)` on macOS and in a fresh network
+namespace on Linux, with an empty environment, and fails when neither starts.
+
 ## Verification
 
 Ratified by the owner on 2026-10-31. Acceptance is declared by the
@@ -142,3 +185,12 @@ implementing change, which will compare a synthetic capture that differs from
 its golden in a mapped field and see qualification refused, add a reviewed
 ledger entry and see it pass, skip and report a quarantined golden, and run
 the comparison in CI with networking denied.
+
+Each line is one command.
+
+```verify:cli
+cargo test -p statecraft-adapter-claude-code --locked --test golden_captures
+cargo test -p statecraft-adapter-claude-code --locked --lib golden
+cargo test -p statecraft-adapter-claude-code --locked --lib qualification
+cargo test -p statecraft-cli --locked --test provider_compare
+```
