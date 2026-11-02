@@ -13,9 +13,9 @@ summary: >
   syspolicyd load, and measures the same route on Linux.
 amends:
   - "013-supervised-wire-witness"
-# No `extends` yet: the implementing change adds the edges on
-# crates/statecraft-adapter/ (004) and crates/statecraft-cli/ (006) with the
-# code, because the gate counts an extender as an owner.
+extends:
+  - { spec: "004-execution-adapter", unit: { kind: directory, path: "crates/statecraft-adapter/" }, nature: additive }
+  - { spec: "006-command-surface", unit: { kind: directory, path: "crates/statecraft-cli/" }, nature: additive }
 depends_on:
   - "004-execution-adapter"
   - "013-supervised-wire-witness"
@@ -173,10 +173,92 @@ from spawn, and records that here with the measurement.
 posture it already reads and shows a reason word it does not know as recorded;
 section 3.2 already forbids inferring success from either.
 
+**2026-10-31: the adopted observation, on macOS and Linux, is the start line
+consumed, read from a retained read end.** The supervisor makes the producer's
+stdin pipe itself, keeps a duplicate of its read end through the start phase,
+writes the start line, and asks the kernel how many of its bytes remain unread
+(`FIONREAD` on that end); fewer than it wrote is the observation. The write
+end's own count is not used, because on macOS it reports that end's own empty
+buffer. Nothing that runs before the producer's code (the kernel creating the
+process, the confinement wrapper, the loader, the assessment of a newly placed
+file) reads that pipe, which M-3's fixture, a producer that sleeps before
+reading its input, shows in `witness_sidecar` on both platforms. The second
+candidate of section 3.3 is not adopted: the fixture producer is a script run
+by `/bin/sh`, whose process image never becomes the producer's, so M-3 cannot
+show it, and the first candidate suffices. A kernel that declines the query
+leaves that attempt on 013's single deadline from spawn, and the supervisor
+records the observation as unavailable; neither platform has shown that.
+
+**2026-10-31: the deadline word is the closing outcome's no-digest reason.**
+The run path writes `start-timeout` or `ready-timeout` as the sidecar
+effect's `noDigestReason` when the sidecar was refused for that deadline, in
+place of `sidecar-exited-before-ready`; every other refusal keeps 013's words,
+and the attempt's `witness.failure` carries the same word as before. The
+protocol module is unchanged.
+
+**2026-10-31: provisional values until M-1 and M-2 are recorded here.**
+`START_TIMEOUT` is 60 seconds and `READY_TIMEOUT` keeps 013's 20 seconds, in
+`crates/statecraft-cli/src/witness.rs`. The supervisor exposes both intervals
+of M-1 and M-2 (spawn to the observation, the observation to `ready`) as the
+sidecar's `Timing`, so the measurements read them rather than the wall clock.
+This spec stays `implementation: pending` until those measurements and the
+values they set are entered here.
+
+**2026-11-01: M-1 and the aarch64 half of M-2, measured; x86_64 is not.**
+`crates/statecraft-cli/tests/witness_start_measurement.rs` (ignored; run with
+`--ignored --nocapture` and `STATECRAFT_M_PRODUCER` naming the producer) runs
+the wire-witness 0.1.0 release through the product's own route: placed at its
+home path and digest-checked by `locate`, confined by `admit_sidecar`, started
+by `start_confined`, with both intervals read from the sidecar's `Timing`.
+"Fresh" places a new copy in a new home every attempt; "warm" reuses one
+already executed copy after one discarded attempt; "loaded" adds eight
+busy-loop processes and two that keep copying and executing the producer. Each
+case is 20 attempts; every attempt reached `ready`, none was refused and the
+observation was available in every one. Milliseconds, median / p95 / max:
+
+| Platform | Case | Spawn to observation | Observation to `ready` |
+|---|---|---|---|
+| macOS 26.5.1, aarch64 (M1 Max, 10 cores) | fresh, idle | 235 / 243 / 245 | 3.1 / 11.6 / 29.6 |
+| | warm, idle | 41 / 44 / 44 | 3.0 / 8.3 / 9.5 |
+| | fresh, loaded | 458 / 497 / 619 | 16.8 / 29.6 / 52.5 |
+| | warm, loaded | 54 / 70 / 72 | 4.5 / 15.1 / 17.7 |
+| Linux 7.0.14, aarch64 (Docker, 6 CPUs), Landlock | fresh, idle | 31 / 33 / 34 | 3.2 / 5.2 / 12.5 |
+| | warm, idle | 31 / 33 / 34 | 2.3 / 3.5 / 3.6 |
+| | fresh, loaded | 72 / 104 / 106 | 17.5 / 56.5 / 104 |
+| | warm, loaded | 73 / 122 / 134 | 19.6 / 47.6 / 49.3 |
+
+The macOS assessment of a newly placed producer is visible (fresh exceeds
+warm by about 200 ms idle and 400 ms loaded) and is two orders of magnitude
+inside `START_TIMEOUT`; Linux shows no such difference, and the observation
+works under Landlock. The measuring found one defect, fixed with it: a
+producer that read its start line and answered between two start-phase polls
+reached `ready` with no observation recorded and its ready interval counted
+from spawn; the retained read end is now also asked when a line arrives in
+that phase (`a_producer_that_answers_between_two_polls_is_still_observed_started`).
+The values stay 60 and 20 seconds: the largest observed interval is 0.62
+seconds. `x86_64-unknown-linux-gnu` is not measured: this host can run it
+only emulated, which is not that platform, so `implementation` stays
+`pending` until a native x86_64 run is entered here.
+
 ## Verification
 
-Ratified by the owner on 2026-10-31. Acceptance is declared by the
-implementing change, which will run the sidecar suites of 013 with a fixture
-producer that delays before reading its input, on both platforms, and the
-measurements of section 5 are recorded with the change that adopts the
-deadlines.
+Ratified by the owner on 2026-10-31. Acceptance is run through
+`make verify SPEC=043`, with M-3's fixture producer under the platform it runs
+on and no provider; the measurements of section 5 are recorded in section 7
+with the change that sets the deadlines.
+
+```verify:cli
+cargo test -p statecraft-adapter --test witness_sidecar
+cargo test -p statecraft-cli --lib witness
+cargo test -p statecraft-cli --test witness_admission
+cargo test -p statecraft-cli --test witness_sidecar_confinement
+cargo test -p statecraft-cli --test witness_run
+```
+
+These show that a producer blocked before reading its input is not observed
+started and still reaches `ready` past the ready deadline, that each deadline
+refuses under its own word with the posture `witness-failed`, that a
+producer's claim about its start is ignored for timing, that the start
+deadline is the longer and the ready deadline keeps 013's value, and that the
+sidecar suites of 013 still pass under the two deadlines, the confined ones
+included.
