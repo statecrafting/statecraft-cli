@@ -462,6 +462,15 @@ pub fn run_reconcile(ctx: &Context<'_>, op: &ReconcileOperands<'_>) -> Result<Re
         Ok(c) => c,
         Err(e) => return Ok(failed(&e.to_string())),
     };
+    // Spec 050 section 5, 2026-11-01: a halt request a supervisor did not
+    // live to apply is appended before this write; one that does not read
+    // refuses it, since it may be a halt.
+    if let Err(e) = statecraft_run::halt::apply_pending(&mut chain, home, &root) {
+        return Ok(match e {
+            statecraft_run::halt::HaltError::Unreadable(r) => slice::halt_refused_answer(&r),
+            other => failed(&other.to_string()),
+        });
+    }
 
     // Rule 2: read the launch records; never launch, signal or replay.
     // Rule 3: the attempt's gate log is read whatever the manifest says, and a

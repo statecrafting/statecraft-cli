@@ -642,9 +642,10 @@ pub fn conclude_observed(
                 crate::halt::HaltError::Record(r) => SessionError::Record(r),
                 crate::halt::HaltError::Unreadable(r) => SessionError::Halted(r),
                 // `Refused` is the empty operator or reason of a halt or
-                // resume request; confirm_stop takes no request.
-                crate::halt::HaltError::Refused(why) => {
-                    unreachable!("confirm_stop validates no request, yet refused: {why}")
+                // resume request, and `Queue` a request file; confirm_stop
+                // takes no request and touches no queue.
+                e @ (crate::halt::HaltError::Refused(_) | crate::halt::HaltError::Queue { .. }) => {
+                    unreachable!("confirm_stop validates no request and queues none, yet: {e}")
                 }
             },
         )?;

@@ -6,9 +6,14 @@
     ],
     "dependsOn": [
       "003-work-and-run-semantics",
+      "004-execution-adapter",
       "006-command-surface"
     ],
     "implementingPaths": [
+      {
+        "path": "crates/statecraft-adapter/",
+        "source": "spec-edge"
+      },
       {
         "path": "crates/statecraft-cli/",
         "source": "spec-edge"
@@ -19,6 +24,19 @@
       }
     ],
     "resolvedUnits": [
+      {
+        "locations": [
+          {
+            "file": "crates/statecraft-adapter/"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "directory",
+          "path": "crates/statecraft-adapter/"
+        }
+      },
       {
         "locations": [
           {
@@ -50,5 +68,5 @@
     "specStatus": "approved"
   },
   "schemaVersion": "1.3.0",
-  "shardHash": "fe385ef1617654a1b62a3e2fe45940f2aa3c4cd92437075d67edd768162e9031"
+  "shardHash": "505eb1448f12e084db6a606ef9dfe20a547afc7a5ba3caa0f8af91a141eec2f9"
 }

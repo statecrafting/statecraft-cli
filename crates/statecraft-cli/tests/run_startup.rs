@@ -2271,3 +2271,229 @@ fn a_shared_run_branch_that_cannot_be_moved_refuses_the_launch() {
         "{references:?}"
     );
 }
+
+// ---- Spec 050: a halt reaching a live supervisor (section 5, 2026-11-01) ----
+
+/// Wait for the launcher a guard holds to exit by itself, then mark the fake
+/// released so the guard does not signal a group that is already gone.
+fn wait_for_launcher(f: &Fixture, guard: &mut Unblock) {
+    let launcher = guard.launcher.as_mut().expect("a launcher");
+    let started = std::time::Instant::now();
+    while launcher.try_wait().unwrap().is_none() {
+        assert!(
+            started.elapsed() < std::time::Duration::from_secs(60),
+            "the supervisor never acted on the queued halt: {:?}",
+            f.order()
+        );
+        std::thread::sleep(std::time::Duration::from_millis(20));
+    }
+    std::fs::write(f.bin().join("release"), "").unwrap();
+}
+
+/// The attempt's entries in the run record, in order, read through the
+/// library: the halt, the outcome and the stop confirmation.
+fn halt_entries(f: &Fixture) -> Vec<statecraft_run::record::Entry> {
+    let (chain, _) = statecraft_run::record::Chain::open(&f.home(), &f.project()).unwrap();
+    chain.entries()
+}
+
+fn entry_at(
+    entries: &[statecraft_run::record::Entry],
+    found: impl Fn(&statecraft_run::record::Entry) -> bool,
+) -> usize {
+    entries
+        .iter()
+        .position(found)
+        .unwrap_or_else(|| panic!("not in the record: {entries:?}"))
+}
+
+/// R-2 end to end: `halt` while a `run` holds the lock is queued, the
+/// supervisor appends it with stop-requested, cancels the attempt as an
+/// operator cancellation, and stop-confirmed follows the durable outcome.
+#[test]
+fn local_halt_of_a_live_attempt_is_queued_applied_by_its_supervisor_and_cancels_it() {
+    use statecraft_run::record::Kind;
+    let f = Fixture::new();
+    let mut guard = run_until_blocked(&f, "block");
+    let root = f.root();
+
+    let out = f.cli(&[
+        "halt",
+        &root,
+        "--scope",
+        "run-admission",
+        "alice",
+        "incident",
+        "review",
+        "--json",
+    ]);
+    assert_eq!(code(&out), 0, "{}", text(&out));
+    let queued = json_naming::payload(&json(&out)).clone();
+    assert_eq!(queued["queued"], "halt", "{queued}");
+    let request = PathBuf::from(queued["request"].as_str().unwrap());
+    assert!(request.starts_with(f.home().join("records")), "{queued}");
+    assert!(!request.starts_with(f.project()));
+
+    wait_for_launcher(&f, &mut guard);
+    assert!(!request.exists(), "an appended request is removed");
+    assert!(
+        !f.order().iter().any(|l| l.contains("sentinel-after")),
+        "the cancelled attempt reached its next tool call: {:?}",
+        f.order()
+    );
+
+    let entries = halt_entries(&f);
+    let halted = entry_at(&entries, |e| e.kind == Kind::Halt && e.subject == "halt");
+    let outcome = entry_at(&entries, |e| {
+        e.kind == Kind::Outcome && e.subject == statecraft_run::session::OUTCOME_SUBJECT
+    });
+    let confirmed = entry_at(&entries, |e| e.subject == "stop-confirmed");
+    assert!(halted < outcome && outcome < confirmed, "{entries:?}");
+    assert_eq!(entries[halted].detail["stopRequested"]["attempt"], 1);
+    assert_eq!(entries[outcome].detail["outcome"], "cancelled");
+    assert_eq!(entries[outcome].detail["halt"]["stop"]["operator"], "alice");
+
+    let listed = json(&f.cli(&["run", "list", &root, "--json"]));
+    let report = json_naming::payload(&listed);
+    let attempt = &report["runs"][0]["attempts"][0];
+    assert_eq!(attempt["outcome"], "cancelled", "{report}");
+    assert_eq!(attempt["stop"], "stop-confirmed", "{report}");
+    assert_eq!(report["halt"]["halted"][0]["scope"], "run-admission");
+    assert_eq!(report["halt"]["halted"][0]["operator"], "alice");
+
+    // The halt stands: the next run is refused before it launches.
+    let again = f.run();
+    assert_eq!(code(&again), 2, "{}", text(&again));
+    assert_eq!(json_naming::payload(&json(&again))["reason"], "halted");
+    assert_eq!(f.launches(), 1);
+}
+
+/// Section 3.2's tool-effects scope: the supervisor writes the halted
+/// decision into the exchange directory, and the gate refuses the next
+/// governed call; the gate log it appends is the child's side, not the proof.
+#[test]
+fn local_halt_of_tool_effects_writes_the_halted_decision_and_the_gate_refuses() {
+    let f = Fixture::new();
+    let mut guard = run_until_blocked(&f, "block");
+    let root = f.root();
+    let out = f.cli(&[
+        "halt",
+        &root,
+        "--scope",
+        "tool-effects",
+        "bob",
+        "suspicious",
+        "writes",
+        "--json",
+    ]);
+    assert_eq!(code(&out), 0, "{}", text(&out));
+    wait_for_launcher(&f, &mut guard);
+
+    let decision = std::fs::read_to_string(f.exchange_dir(1).join("admission.json")).unwrap();
+    let decision: serde_json::Value = serde_json::from_str(&decision).unwrap();
+    assert_eq!(decision["decision"], "halted", "{decision}");
+    assert_eq!(decision["scope"], "tool-effects");
+    assert_eq!(decision["operator"], "bob");
+
+    let gate = Command::new("/bin/sh")
+        .arg(f.exchange_dir(1).join("admission-gate"))
+        .arg("1")
+        .stdin(std::process::Stdio::null())
+        .output()
+        .unwrap();
+    assert_eq!(gate.status.code(), Some(2), "{}", text(&gate));
+    let log = std::fs::read_to_string(f.exchange_dir(1).join("gate.log")).unwrap();
+    assert_eq!(log.lines().last(), Some("refused"), "{log}");
+
+    let listed = json(&f.cli(&["run", "list", &root, "--json"]));
+    let report = json_naming::payload(&listed);
+    let attempt = &report["runs"][0]["attempts"][0];
+    assert_eq!(attempt["outcome"], "cancelled", "{report}");
+    assert_eq!(attempt["stop"], "stop-confirmed", "{report}");
+    let entries = halt_entries(&f);
+    let outcome = entry_at(&entries, |e| {
+        e.subject == statecraft_run::session::OUTCOME_SUBJECT
+            && e.kind == statecraft_run::record::Kind::Outcome
+    });
+    assert_eq!(
+        entries[outcome].detail["halt"]["toolEffectsDecision"],
+        "written"
+    );
+}
+
+/// A request left queued when no supervisor lived to apply it is applied by
+/// the next appending write under the lock, in order, and reported; the
+/// attempt that never reached an outcome keeps its stop requested, never
+/// confirmed.
+#[test]
+fn local_halt_request_left_by_a_crashed_supervisor_is_applied_by_the_next_write() {
+    let f = Fixture::new();
+    let (pid, _unblock) = crash_mid_session(&f, "block");
+    let root = f.root();
+    let left = statecraft_run::halt::queue(
+        &f.home(),
+        &f.project(),
+        "halt",
+        &statecraft_run::halt::Request {
+            scopes: &[statecraft_run::halt::Scope::RunAdmission],
+            operator: "carol",
+            reason: "left behind",
+            at: "2026-11-01T00:00:00Z",
+        },
+    )
+    .unwrap();
+
+    let out = f.cli(&[
+        "halt", &root, "--scope", "dispatch", "dave", "second", "--json",
+    ]);
+    assert_eq!(code(&out), 0, "{}", text(&out));
+    let report = json_naming::payload(&json(&out)).clone();
+    assert_eq!(
+        report["appliedFromQueue"][0]["detail"]["operator"], "carol",
+        "{report}"
+    );
+    assert!(!left.exists(), "an applied request is removed");
+
+    let listed = json(&f.cli(&["run", "list", &root, "--json"]));
+    let listed = json_naming::payload(&listed);
+    let scopes: Vec<_> = listed["halt"]["halted"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|h| (h["scope"].clone(), h["operator"].clone()))
+        .collect();
+    assert_eq!(
+        scopes,
+        vec![
+            ("run-admission".into(), "carol".into()),
+            ("dispatch".into(), "dave".into()),
+        ]
+    );
+    assert_eq!(
+        listed["runs"][0]["attempts"][0]["stop"], "stop-requested",
+        "{listed}"
+    );
+    release(&f, &pid);
+}
+
+/// An attempt no halt reaches is supervised and recorded as before: no halt
+/// detail, no queue, and its own outcome.
+#[test]
+fn local_halt_absent_leaves_an_attempt_unchanged() {
+    let f = Fixture::new();
+    let out = f.run();
+    assert_eq!(code(&out), 0, "{}", text(&out));
+    let entries = halt_entries(&f);
+    let outcome = entry_at(&entries, |e| {
+        e.subject == statecraft_run::session::OUTCOME_SUBJECT
+            && e.kind == statecraft_run::record::Kind::Outcome
+    });
+    assert_eq!(entries[outcome].detail["outcome"], "completed");
+    assert!(entries[outcome].detail.get("halt").is_none());
+    assert!(
+        entries
+            .iter()
+            .all(|e| e.kind != statecraft_run::record::Kind::Halt)
+    );
+    assert!(!statecraft_run::halt::requests_dir(&f.home(), &f.project()).exists());
+}

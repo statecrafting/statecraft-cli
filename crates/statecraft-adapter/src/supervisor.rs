@@ -95,6 +95,16 @@ pub trait Watch<E> {
 
     /// One decoded event, in stream order, before the next is read.
     fn event(&mut self, event: &E) -> Control;
+
+    /// Called on every turn of the supervision loop, whether or not an event
+    /// arrived, so a watch can act on something outside the stream (spec 050
+    /// section 5, 2026-11-01: the halt record). The loop turns about every
+    /// 10 ms, so a watch that reads anything throttles itself. `Stop` is
+    /// handled as a stop at an event is. The default never stops, so a watch
+    /// that does not override it supervises exactly as before.
+    fn poll(&mut self) -> Control {
+        Control::Continue
+    }
 }
 
 /// The watch a caller that supplies none gets: it confirms every spawn and
@@ -439,6 +449,13 @@ fn read_supervised<E: Send + 'static, R: Read + Send + 'static>(
         // without blocking on wait or join. The exit code is not a verdict on
         // the work.
         if ended && child.try_wait()?.is_some() && reader.is_finished() && writer.is_finished() {
+            break;
+        }
+        // Between events, and after the stream has ended while a process is
+        // still running: the watch's own poll may stop the group. As at an
+        // event, what is still in the pipe was not read and is not waited for.
+        if let Control::Stop(reason) = watch.poll() {
+            stopped = Some(reason);
             break;
         }
         let interval = remaining.min(Duration::from_millis(10));
@@ -1636,6 +1653,93 @@ mod tests {
         assert_eq!(run.stream_error, None, "a stop is not a transport failure");
         // Release the child's next effect. A child still running would take
         // it within one poll.
+        std::fs::write(dir.path().join("go"), "").unwrap();
+        std::thread::sleep(Duration::from_millis(500));
+        assert!(
+            !dir.path().join("effect").exists(),
+            "the effect ran after the stop"
+        );
+        let pid = std::fs::read_to_string(dir.path().join("pid")).unwrap();
+        assert!(dead(&pid));
+    }
+
+    /// Spec 050 section 5, 2026-11-01: a watch's poll stops the group between
+    /// events, with no event to stop at, and keeps what was read before it.
+    #[test]
+    fn a_watch_that_stops_at_its_poll_kills_the_group_between_events() {
+        struct Polling {
+            dir: std::path::PathBuf,
+            seen: usize,
+        }
+        impl Watch<Event> for Polling {
+            fn spawned(&mut self, _pid: u32) -> Result<(), String> {
+                Ok(())
+            }
+            fn event(&mut self, _event: &Event) -> Control {
+                self.seen += 1;
+                Control::Continue
+            }
+            fn poll(&mut self) -> Control {
+                if self.dir.join("halt").exists() {
+                    Control::Stop("halted at a poll".into())
+                } else {
+                    Control::Continue
+                }
+            }
+        }
+        let dir = tempfile::tempdir().unwrap();
+        let script = format!(
+            "cat > /dev/null\necho $$ > pid\nprintf '%s\\n' '{INIT}'\n\
+             while [ ! -f go ]; do sleep 0.05; done\ntouch effect\nprintf '%s\\n' '{RESULT}'\n"
+        );
+        std::fs::write(dir.path().join("child.sh"), &script).unwrap();
+        let halt = dir.path().join("halt");
+        let pid_file = dir.path().join("pid");
+        let setter = std::thread::spawn(move || {
+            let started = Instant::now();
+            while !pid_file.exists() && started.elapsed() < Duration::from_secs(20) {
+                std::thread::sleep(Duration::from_millis(20));
+            }
+            std::thread::sleep(Duration::from_millis(200));
+            std::fs::write(halt, "").unwrap();
+        });
+        let mut watch = Polling {
+            dir: dir.path().to_path_buf(),
+            seen: 0,
+        };
+        let request = Request {
+            context: None,
+            documentation: None,
+            workspace: dir.path().to_path_buf(),
+            base_commit: "0".repeat(40),
+            prompt: b"fixture prompt".to_vec(),
+            capabilities: Requested::none(),
+            deadline_seconds: 30,
+            attempt: AttemptIdentity {
+                run_id: "polled".into(),
+                number: 1,
+            },
+        };
+        let environment = construct(
+            &Blueprint::empty().allowing("PATH", "/usr/bin:/bin"),
+            &CheckSuiteCommands(vec![]),
+        );
+        let run = supervise_watched(
+            Path::new("/bin/sh"),
+            &["child.sh"],
+            &request,
+            &environment,
+            parse_event,
+            |event| matches!(event, Event::Result { .. }),
+            &mut watch,
+        )
+        .unwrap();
+        setter.join().unwrap();
+        assert_eq!(run.outcome, Outcome::Interrupted);
+        assert_eq!(run.stopped.as_deref(), Some("halted at a poll"));
+        assert!(!run.timed_out);
+        assert_eq!(run.stream_error, None, "a stop is not a transport failure");
+        assert!(run.events.iter().any(|e| matches!(e, Event::Init { .. })));
         std::fs::write(dir.path().join("go"), "").unwrap();
         std::thread::sleep(Duration::from_millis(500));
         assert!(

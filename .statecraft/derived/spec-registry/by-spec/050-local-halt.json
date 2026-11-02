@@ -8,6 +8,7 @@
     "declaresAcceptance": true,
     "dependsOn": [
       "003-work-and-run-semantics",
+      "004-execution-adapter",
       "006-command-surface"
     ],
     "extends": [
@@ -26,10 +27,18 @@
           "kind": "directory",
           "path": "crates/statecraft-cli/"
         }
+      },
+      {
+        "nature": "additive",
+        "spec": "004-execution-adapter",
+        "unit": {
+          "kind": "directory",
+          "path": "crates/statecraft-adapter/"
+        }
       }
     ],
     "id": "050-local-halt",
-    "implementation": "pending",
+    "implementation": "complete",
     "obligations": [
       {
         "anchor": "3-3-run-consults-before-launch",
@@ -66,9 +75,9 @@
       }
     ],
     "sectionDigests": {
-      "050-local-halt": "205f3f836f595cef5595b869bc97822d999619cb571f58a3d7a890264761c060",
+      "050-local-halt": "4f46bbe1fafc92ad4bbd8fef34099110fc09a4d46a2a22aad880ab1a5596c428",
       "1-purpose": "9b551485c1d2d2b02981982b215d26cbefd66071e3ddb144d37ff8b92aa0ad56",
-      "2-territory": "38b9659db8393adadeafac98c47515331ab553f498a4fe0253c9414bd277a6d9",
+      "2-territory": "65e10b27a3a25a9f9107e2fbdeff9d48495d38145bad4fe62edbc60f7f51a47d",
       "3-1-the-halt-record": "9d4aa3d848aef8762a1d6112c7fd81ead3b52deca187d4ed952c6077cc5b49d8",
       "3-2-scopes": "73694c03e7b530a550bea35ef10cb8cf56e4de7877493693e88dc797811514ca",
       "3-3-run-consults-before-launch": "92ed7994d873609fad009851d0013d2c0b1c814f6b2300ab90a1201309d1f858",
@@ -76,8 +85,8 @@
       "3-5-resume": "99799393fbe9b7f78f1b39b293a23ea85ad91b0491c6f791a0f1d4ac33a16c50",
       "3-behavior": "cdd818261eb06f22c9b1d3b342c12cbcdb988fe36b2d3dfb93b1d58a80c81066",
       "4-out-of-scope": "32bbaa5ecf417055deaf260b814d76af666176769eb79744dde4cb9df1ad529a",
-      "5-resolved-decisions": "a04331c8820248c6fd48ea1a37564d4e6fa49d654a1bad7476e27ae7a2a7bcda",
-      "verification": "c2115ba19b5170a77299627cf1dff42e8962d2f472984a7cbdd3eb06221cd9d7"
+      "5-resolved-decisions": "7d9d8b7b4834d5febe440235544f5a88c8bb694a57f7b8e8d47d39722625dc2e",
+      "verification": "38cf621b15bd7ab43479a5aed137a204297f9adf36fb74b21873d82ce32d0a9f"
     },
     "sectionHeadings": [
       "050: Local halt",
@@ -98,6 +107,6 @@
     "summary": "Adds an operator-written halt record in the product home, per registered repository, with three independently halted scopes: run admission, tool effects and dispatch. run reads it before launch and refuses a halted scope with a closed reason; a halt record it cannot read or verify denies with its own reason rather than admitting. Halting with a live attempt records stop requested; stop confirmed is recorded only when that attempt's cancelled outcome is durable. The hosted tenant halt fact is not defined here; it is consumed once its own spec merges.\n",
     "title": "A local halt record that run consults before launch, and denies when it cannot read"
   },
-  "shardHash": "fe385ef1617654a1b62a3e2fe45940f2aa3c4cd92437075d67edd768162e9031",
+  "shardHash": "505eb1448f12e084db6a606ef9dfe20a547afc7a5ba3caa0f8af91a141eec2f9",
   "specVersion": "1.11.0"
 }

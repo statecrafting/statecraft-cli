@@ -758,37 +758,35 @@ pub fn halt_refused_answer(r: &statecraft_run::halt::Refusal) -> Answer<serde_js
     Answer::new(value, Exit::Refused, format!("refused: {r}\n")).with_kind(ErrorKind::Refused)
 }
 
-/// `halt` / `resume` (spec 050), from what the record returned.
+/// `halt` / `resume` (spec 050), from what the record returned. `earlier`
+/// is what was queued before this change and appended first (section 5,
+/// 2026-11-01), reported so a leftover request is never applied silently.
 pub fn halt_change_answer(
+    earlier: &[statecraft_run::halt::Applied],
     result: Result<statecraft_run::halt::Applied, statecraft_run::halt::HaltError>,
 ) -> Answer<serde_json::Value> {
     use statecraft_run::halt::HaltError;
     match result {
         Ok(applied) => {
-            let scopes: Vec<&str> = applied.detail.scopes.iter().map(|s| s.word()).collect();
-            let mut summary = format!(
-                "{} {} by {} at {}: {}\n",
-                applied.change,
-                scopes.join(", "),
-                applied.detail.operator,
-                applied.detail.at,
-                applied.detail.reason
-            );
-            if let Some(stop) = &applied.detail.stop_requested {
-                summary.push_str(&format!(
-                    "stop-requested for run {} attempt {}; it is confirmed only when that \
-                     attempt's cancelled outcome is durable\n",
-                    stop.run_id, stop.attempt
-                ));
+            let mut answer = applied_answer(applied);
+            if !earlier.is_empty() {
+                answer.value["appliedFromQueue"] =
+                    serde_json::to_value(earlier).unwrap_or_default();
+                let mut summary = String::new();
+                for e in earlier {
+                    let scopes: Vec<&str> = e.detail.scopes.iter().map(|s| s.word()).collect();
+                    summary.push_str(&format!(
+                        "applied a queued {} of {} by {} at {}: {}\n",
+                        e.change,
+                        scopes.join(", "),
+                        e.detail.operator,
+                        e.detail.at,
+                        e.detail.reason
+                    ));
+                }
+                answer.summary = format!("{summary}{}", answer.summary);
             }
-            if applied.change == "resume" {
-                summary.push_str("nothing was restarted; a later run is a new act\n");
-            }
-            Answer::new(
-                serde_json::to_value(&applied).unwrap_or_default(),
-                Exit::Ok,
-                summary,
-            )
+            answer
         }
         Err(HaltError::Unreadable(r)) => halt_refused_answer(&r),
         // Spec 050 closes `reason` to `halted` and `halt-state-unreadable`,
@@ -799,12 +797,61 @@ pub fn halt_change_answer(
             format!("refused: {why}\n"),
         )
         .with_kind(ErrorKind::Refused),
-        Err(e @ HaltError::Record(_)) => Answer::new(
+        Err(e @ (HaltError::Record(_) | HaltError::Queue { .. })) => Answer::new(
             serde_json::json!({ "failed": e.to_string() }),
             Exit::Failed,
             format!("failed: {e}\n"),
         ),
     }
+}
+
+/// `halt` / `resume` while a `run` holds the repository lock (spec 050
+/// section 5, 2026-11-01): the change is queued for that supervisor, which
+/// appends it at its next poll; nothing is in the record yet.
+pub fn halt_queued_answer(
+    change: &str,
+    result: Result<std::path::PathBuf, statecraft_run::halt::HaltError>,
+) -> Answer<serde_json::Value> {
+    match result {
+        Ok(path) => Answer::new(
+            serde_json::json!({ "queued": change, "request": path }),
+            Exit::Ok,
+            format!(
+                "{change} queued for the run holding this repository's lock: {}\n\
+                 it is recorded when that run's supervisor next polls, or by the next halt, \
+                 resume, run or run reconcile; run list shows it once recorded\n",
+                path.display()
+            ),
+        ),
+        Err(e) => halt_change_answer(&[], Err(e)),
+    }
+}
+
+fn applied_answer(applied: statecraft_run::halt::Applied) -> Answer<serde_json::Value> {
+    let scopes: Vec<&str> = applied.detail.scopes.iter().map(|s| s.word()).collect();
+    let mut summary = format!(
+        "{} {} by {} at {}: {}\n",
+        applied.change,
+        scopes.join(", "),
+        applied.detail.operator,
+        applied.detail.at,
+        applied.detail.reason
+    );
+    if let Some(stop) = &applied.detail.stop_requested {
+        summary.push_str(&format!(
+            "stop-requested for run {} attempt {}; it is confirmed only when that \
+             attempt's cancelled outcome is durable\n",
+            stop.run_id, stop.attempt
+        ));
+    }
+    if applied.change == "resume" {
+        summary.push_str("nothing was restarted; a later run is a new act\n");
+    }
+    Answer::new(
+        serde_json::to_value(&applied).unwrap_or_default(),
+        Exit::Ok,
+        summary,
+    )
 }
 
 /// `run show <path> <run>`

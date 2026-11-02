@@ -822,12 +822,33 @@ fn halt_verb(
         Ok(root) => root,
         Err(answer) => return emit(&answer, format),
     };
+    let at =
+        statecraft_environment::time::rfc3339_utc(statecraft_environment::time::Clock::now_unix(
+            statecraft_cli::application::process_clock().as_ref(),
+        ));
+    let request = halt::Request {
+        scopes: &scopes,
+        operator: operator.as_str(),
+        reason: &reason,
+        at: &at,
+    };
+    let change = if verb == Verb::Halt {
+        halt::HALT_SUBJECT
+    } else {
+        halt::RESUME_SUBJECT
+    };
     // Spec 003 section 3.1.4 rule 7: every write to the run record takes the
-    // repository lock and refuses while another process holds it.
+    // repository lock and refuses while another process holds it. Spec 050
+    // section 5, 2026-11-01: a run holding it is supervising an attempt, so
+    // the change is queued for that supervisor, which appends it under its
+    // own lock at its next poll, rather than refused.
     let _held = match statecraft_run::lock::try_acquire(home, &root) {
         Ok(held) => held,
-        Err(e @ statecraft_run::lock::LockError::Busy { .. }) => {
-            return emit(&slice::lock_busy_answer(&e.to_string()), format);
+        Err(statecraft_run::lock::LockError::Busy { .. }) => {
+            return emit(
+                &slice::halt_queued_answer(change, halt::queue(home, &root, change, &request)),
+                format,
+            );
         }
         Err(e) => return fail(&e.to_string(), format),
     };
@@ -840,22 +861,18 @@ fn halt_verb(
             );
         }
     };
-    let at =
-        statecraft_environment::time::rfc3339_utc(statecraft_environment::time::Clock::now_unix(
-            statecraft_cli::application::process_clock().as_ref(),
-        ));
-    let request = halt::Request {
-        scopes: &scopes,
-        operator: operator.as_str(),
-        reason: &reason,
-        at: &at,
+    // A request a supervisor did not live to apply is appended first, in the
+    // order it was made, and reported (section 5, 2026-11-01).
+    let earlier = match halt::apply_pending(&mut chain, home, &root) {
+        Ok(earlier) => earlier,
+        Err(e) => return emit(&slice::halt_change_answer(&[], Err(e)), format),
     };
     let result = if verb == Verb::Halt {
         halt::halt(&mut chain, &request)
     } else {
         halt::resume(&mut chain, &request)
     };
-    emit(&slice::halt_change_answer(result), format)
+    emit(&slice::halt_change_answer(&earlier, result), format)
 }
 
 /// `override recover <path> [<choice> <journal-digest> <authority-digest> <operator> <reason...>]`
