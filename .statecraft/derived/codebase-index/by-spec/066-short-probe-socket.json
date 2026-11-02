@@ -7,10 +7,47 @@
       "004-execution-adapter",
       "064-protected-home-entries"
     ],
-    "implementingPaths": [],
+    "implementingPaths": [
+      {
+        "path": "crates/statecraft-cli/",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/statecraft-home/",
+        "source": "spec-edge"
+      }
+    ],
+    "resolvedUnits": [
+      {
+        "locations": [
+          {
+            "file": "crates/statecraft-cli/"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "directory",
+          "path": "crates/statecraft-cli/"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "crates/statecraft-home/"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "directory",
+          "path": "crates/statecraft-home/"
+        }
+      }
+    ],
     "specId": "066-short-probe-socket",
     "specStatus": "approved"
   },
   "schemaVersion": "1.3.0",
-  "shardHash": "eaa232b289d93cb6b115a9444c5906e33b01d653ee3224381ba813dde023304b"
+  "shardHash": "34892dfa46e220efac26e98cccbf3cc421eb4849e7964d8efe15a1e31a0da532"
 }
