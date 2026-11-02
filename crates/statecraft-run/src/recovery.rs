@@ -430,8 +430,8 @@ pub fn fold_effects(chain: &Chain) -> EffectFold {
                     // Clause 9: no reconciliation record carries an identity,
                     // and nothing here decides what one would mean. Accounting
                     // is the supervisor's ledger, not a bracket. Neither opens
-                    // nor closes an effect.
-                    Kind::Reconciliation | Kind::Accounting | Kind::Evidence => {}
+                    // nor closes an effect. A halt (spec 050) names no effect.
+                    Kind::Reconciliation | Kind::Accounting | Kind::Evidence | Kind::Halt => {}
                 }
             }
         }

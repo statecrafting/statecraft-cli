@@ -47,6 +47,9 @@
 //!   the idempotency key and version rules, their brackets in the record, the
 //!   fold that reads them back and the event cursor. Added by spec 048's
 //!   additive edge.
+//! - [`halt`] is spec 050's local halt record: the halt and resume entries in
+//!   the run record, their fold, and the pre-launch check that fails closed.
+//!   Added by spec 050's additive edge.
 //!
 //! # What it does not do
 //!
@@ -61,6 +64,7 @@ pub mod attempt;
 pub mod context;
 pub mod contract;
 pub mod documentation;
+pub mod halt;
 pub mod lock;
 pub mod operation;
 pub mod overrides;
