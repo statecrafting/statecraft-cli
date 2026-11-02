@@ -330,7 +330,9 @@ pub fn since_last_intent(chain: &Chain) -> Vec<serde_json::Value> {
     let entries = chain.entries();
     let start = entries
         .iter()
-        .rposition(|e| e.kind == Kind::Intent)
+        // Spec 048: an operation's intent is not an attempt's, so it neither
+        // names the reconciliations before it nor hides them from the next.
+        .rposition(|e| e.kind == Kind::Intent && e.subject != crate::operation::OPERATION_SUBJECT)
         .map_or(0, |i| i + 1);
     entries[start..]
         .iter()

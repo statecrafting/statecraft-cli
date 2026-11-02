@@ -5,9 +5,36 @@
       "040-application-operations"
     ],
     "created": "2026-10-21",
+    "declaresAcceptance": true,
     "dependsOn": [
       "003-work-and-run-semantics",
       "040-application-operations"
+    ],
+    "extends": [
+      {
+        "nature": "additive",
+        "spec": "003-work-and-run-semantics",
+        "unit": {
+          "kind": "directory",
+          "path": "crates/statecraft-run/"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "006-command-surface",
+        "unit": {
+          "kind": "directory",
+          "path": "crates/statecraft-cli/"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "005-acceptance-and-evidence",
+        "unit": {
+          "kind": "directory",
+          "path": "crates/statecraft-acceptance/"
+        }
+      }
     ],
     "id": "048-run-operations",
     "implementation": "pending",
@@ -53,7 +80,7 @@
       }
     ],
     "sectionDigests": {
-      "048-typed-run-operations-under-one-controller-lease": "fcabb37c7ec9092ed8c4c0841258798f17e2035ba003c64ba1591c68fbc52ae5",
+      "048-typed-run-operations-under-one-controller-lease": "1481ff382489fa790785f1171011ab717321b2226ccd8d447d37223c5d18538c",
       "1-purpose": "a8cd1c1c3b85df4f5882c4d85245fe91f62c916b06e7a60cd8aa0f9aa1dbb5ac",
       "2-territory": "56507aabb8357379d6a6d67ada7404d92ee91795cdc4ada28bbe86dced5890a9",
       "3-1-the-three-operations": "080f7878046c185c2b5149ef6745a7dfbfb2018c457579b580c4311da54bec16",
@@ -64,8 +91,8 @@
       "3-6-the-event-cursor": "ba48d16f07b401e5061808ff119a975a4c931ce785475e52a61f5416626d5035",
       "3-behavior": "fee67128fd130e86b095b5719793e47ccf412bc8c02a2a53682e524f587b8972",
       "4-out-of-scope": "914b435926abca1405ec2d9058aa9ece80ac9b82ec1b6b6eeabdff5f9bda0818",
-      "5-resolved-decisions": "1663c5866b92b4a45bcab84e19ec36a5f5266a627889ba67e74fd5bc7bea18f6",
-      "verification": "681aa0c9faaf4a0021f2b9e9ea4b3e40d4d7eed1c52ba5cc5d13ebcfa74fd838"
+      "5-resolved-decisions": "0152686bb3ce6bbc8551a4f6c0ae2bb5c15e6b5b8adbc187071e925bb56ded41",
+      "verification": "3bdbafdc23ef66032837edf8b4656105735bd8d3190fca2bb65f16f443b51811"
     },
     "sectionHeadings": [
       "048: Typed run operations under one controller lease",
@@ -87,6 +114,6 @@
     "summary": "Gives a run three typed operations, attempt.retry, attempt.continue and attempt.abort, submitted by one controller holding a lease. Each carries an idempotency key and the run version it was decided against; each request and its outcome append to spec 003's hash-linked run record, durable and uncapped, so replaying the record reproduces the run's state. A reconnecting controller reads events from a cursor over the record. The one live slot of spec 003 section 3.7 is held or released explicitly by each operation.\n",
     "title": "Typed run operations under one controller lease, recorded in the run record"
   },
-  "shardHash": "892502ef9a8620919f0c8aa4fb7227d2727a54ed563bbf156f6a622b6a87bbea",
+  "shardHash": "0a3086c46c9721fc2a5a4efa5a13fa4eb6db6af4d096a3059d12e22dba920116",
   "specVersion": "1.11.0"
 }

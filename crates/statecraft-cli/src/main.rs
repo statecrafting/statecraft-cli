@@ -493,6 +493,11 @@ fn run(args: &[String]) -> i32 {
         Verb::OverrideRecover => recover_verb(&invocation.rest, &registry, &home, format),
         // Spec 006 section 3.11.6: the reconciliation of 003 section 3.6.1.
         Verb::RunReconcile => reconcile_verb(&invocation.rest, &registry, &home, format),
+        // Spec 048: the typed run operations, their lease and their cursor,
+        // each a binding on its application operation.
+        Verb::RunLease | Verb::RunOp | Verb::RunEvents => {
+            run_operation_verb(invocation.verb, &invocation.rest, &registry, &home, format)
+        }
         // Spec 006 section 3.11.7: the transfer verbs of 002 section 3.35. A
         // registered target, as for the environment verbs whose manifest they
         // change; usage is 3, everything else is the library's answer.
@@ -859,6 +864,81 @@ fn reconcile_verb(
             evidence: &evidence,
         },
     ) {
+        Ok(answer) => emit(&answer, format),
+        Err(u) => usage(format, u.0),
+    }
+}
+
+/// `run lease`, `run op` and `run events` (spec 048), through spec 040's
+/// callable operations. A controller's process, for a lease, is the process
+/// that invoked this verb: its parent.
+fn run_operation_verb(
+    verb: Verb,
+    rest: &[String],
+    registry: &Registry,
+    home: &std::path::Path,
+    format: Format,
+) -> i32 {
+    use statecraft_cli::application::{
+        Context, LeaseOperands, OperationOperands, run_events, run_lease, run_operation,
+    };
+    let shape = match verb {
+        Verb::RunLease => {
+            "usage: run lease <path> <run-id> (acquire <controller> | release <controller> \
+             <lease> | break <operator> <reason...>)"
+        }
+        Verb::RunOp => {
+            "usage: run op <path> <run-id> <retry|continue|abort> <controller> <lease> <key> \
+             <version> [<reason...>]"
+        }
+        _ => "usage: run events <path> <run-id> [--after <cursor>]",
+    };
+    let (Some(path), Some(run_id)) = (rest.first(), rest.get(1)) else {
+        return usage(format, shape.to_string());
+    };
+    let path = absolute(path);
+    let words = &rest[2..];
+    let clock = statecraft_cli::application::process_clock();
+    let ctx = Context {
+        home,
+        registry,
+        clock: clock.as_ref(),
+    };
+    let answer = match verb {
+        Verb::RunLease => run_lease(
+            &ctx,
+            &LeaseOperands {
+                path: &path,
+                run_id,
+                words,
+                pid: std::os::unix::process::parent_id(),
+            },
+        ),
+        Verb::RunOp => match words {
+            [operation, controller, lease, key, version, reason @ ..] => run_operation(
+                &ctx,
+                &OperationOperands {
+                    path: &path,
+                    run_id,
+                    operation,
+                    controller,
+                    lease,
+                    key,
+                    version,
+                    reason: &reason.join(" "),
+                },
+            ),
+            _ => return usage(format, shape.to_string()),
+        },
+        _ => match words {
+            [] => run_events(&ctx, &path, run_id, None),
+            [flag, cursor] if flag == "--after" => {
+                run_events(&ctx, &path, run_id, Some(cursor.as_str()))
+            }
+            _ => return usage(format, shape.to_string()),
+        },
+    };
+    match answer {
         Ok(answer) => emit(&answer, format),
         Err(u) => usage(format, u.0),
     }

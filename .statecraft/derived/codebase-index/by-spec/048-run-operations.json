@@ -8,10 +8,64 @@
       "003-work-and-run-semantics",
       "040-application-operations"
     ],
-    "implementingPaths": [],
+    "implementingPaths": [
+      {
+        "path": "crates/statecraft-acceptance/",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/statecraft-cli/",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/statecraft-run/",
+        "source": "spec-edge"
+      }
+    ],
+    "resolvedUnits": [
+      {
+        "locations": [
+          {
+            "file": "crates/statecraft-acceptance/"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "directory",
+          "path": "crates/statecraft-acceptance/"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "crates/statecraft-cli/"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "directory",
+          "path": "crates/statecraft-cli/"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "crates/statecraft-run/"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "directory",
+          "path": "crates/statecraft-run/"
+        }
+      }
+    ],
     "specId": "048-run-operations",
     "specStatus": "approved"
   },
   "schemaVersion": "1.3.0",
-  "shardHash": "892502ef9a8620919f0c8aa4fb7227d2727a54ed563bbf156f6a622b6a87bbea"
+  "shardHash": "0a3086c46c9721fc2a5a4efa5a13fa4eb6db6af4d096a3059d12e22dba920116"
 }

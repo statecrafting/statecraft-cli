@@ -151,6 +151,12 @@ pub enum Verb {
     LandStatus,
     /// `land cancel-superseded`
     LandCancelSuperseded,
+    /// `run lease <path> <run-id> <acquire|release|break> ...`
+    RunLease,
+    /// `run op <path> <run-id> <retry|continue|abort> <controller> <lease> <key> <version> [<reason...>]`
+    RunOp,
+    /// `run events <path> <run-id> [--after <cursor>]`
+    RunEvents,
     /// `--help`, optionally with a group or a verb as its topic.
     ///
     /// Not part of the command tree: [`Verb::all`] lists the operations, and a
@@ -180,6 +186,9 @@ impl Verb {
             Verb::LandRestack => "land restack",
             Verb::LandStatus => "land status",
             Verb::LandCancelSuperseded => "land cancel-superseded",
+            Verb::RunLease => "run lease",
+            Verb::RunOp => "run op",
+            Verb::RunEvents => "run events",
             Verb::ProjectRegister => "project register",
             Verb::ProjectList => "project list",
             Verb::ProjectArm => "project arm",
@@ -337,6 +346,7 @@ impl Verb {
             | Verb::ProposalAdmit => "027-observation-and-proposals",
             Verb::ReviewStatus => "062-review-verdict-status",
             Verb::LandWait | Verb::LandArm | Verb::LandPush | Verb::LandRestack | Verb::LandStatus | Verb::LandCancelSuperseded => "063-land-verbs",
+            Verb::RunLease | Verb::RunOp | Verb::RunEvents => "048-run-operations",
             Verb::Help => "006-command-surface",
         }
     }
@@ -414,6 +424,9 @@ impl Verb {
             Verb::LandRestack,
             Verb::LandStatus,
             Verb::LandCancelSuperseded,
+            Verb::RunLease,
+            Verb::RunOp,
+            Verb::RunEvents,
         ]
     }
 
@@ -452,7 +465,11 @@ impl Verb {
             // `list`, `show` and `reconcile` are reserved after `run`, so a run id may not
             // be spelled either of them. Stated here rather than discovered:
             // the alternative is an id that silently becomes a subcommand.
+            // Spec 048 reserves `lease`, `op` and `events` the same way.
             ("run", Some("list")) => Some((Verb::RunList, 2)),
+            ("run", Some("lease")) => Some((Verb::RunLease, 2)),
+            ("run", Some("op")) => Some((Verb::RunOp, 2)),
+            ("run", Some("events")) => Some((Verb::RunEvents, 2)),
             ("run", Some("show")) => Some((Verb::RunShow, 2)),
             ("run", Some("reconcile")) => Some((Verb::RunReconcile, 2)),
             ("run", _) => Some((Verb::Run, 1)),
