@@ -18,6 +18,7 @@
 //! and spec 004 section 4 puts it out of scope deliberately.
 
 use crate::stream::SystemEvent;
+use statecraft_adapter::capabilities::AdapterCapabilities;
 use statecraft_adapter::capability::Capability;
 use statecraft_adapter::manifest::Manifest;
 
@@ -60,6 +61,34 @@ pub fn manifest() -> Manifest {
         version: env!("CARGO_PKG_VERSION").to_string(),
         supports: supported(),
         requires_commands: REQUIRES_COMMANDS.iter().map(|c| (*c).to_string()).collect(),
+    }
+}
+
+/// The init field this provider reports its version in.
+pub const VERSION_FIELD: &str = "claude_code_version";
+
+/// This adapter's capability declaration (spec 047 section 3.1).
+///
+/// It states today's behaviour and changes none of it (section 4):
+///
+/// - `stream_witness` and `wire_sidecar`: spec 013's sidecar captures this
+///   provider's API authority and the child is routed through the reserved
+///   endpoint by [`crate::witness::child_variables`].
+/// - `print_mode_hooks`: spec 002 section 3.32's startup hook and admission
+///   gate run in a `--print` session, admitted live by spec 015.
+/// - `per_run_config_dir`: spec 042 section 3.1's configuration directory.
+/// - `settings_file_transport`: `--settings <path>` ([`crate::spawn`]).
+/// - `version_field`: [`VERSION_FIELD`] on the init event.
+///
+/// A struct literal, so a field left out does not compile.
+pub fn declared() -> AdapterCapabilities {
+    AdapterCapabilities {
+        stream_witness: true,
+        print_mode_hooks: true,
+        wire_sidecar: true,
+        per_run_config_dir: true,
+        settings_file_transport: true,
+        version_field: Some(VERSION_FIELD.to_string()),
     }
 }
 
@@ -127,6 +156,16 @@ mod tests {
         assert_eq!(before, [Capability::TurnLimit]);
         let after = applied(&granted, &init(&["Bash"]), true);
         assert_eq!(after, granted);
+    }
+
+    // Spec 047 R-1: the declaration sets every field, so it registers when
+    // supplied as data, and every field it declares is today's behaviour.
+    #[test]
+    fn the_declaration_sets_every_field_and_registers() {
+        use statecraft_adapter::capabilities::{Field, register};
+        let value = serde_json::to_value(declared()).unwrap();
+        assert_eq!(register(&value), Ok(declared()));
+        assert!(Field::ALL.iter().all(|f| declared().declares(*f)));
     }
 
     #[test]

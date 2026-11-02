@@ -60,7 +60,9 @@ pub mod spawn;
 pub mod stream;
 pub mod witness;
 
-pub use capabilities::{ADAPTER_NAME, MEASURED_PROVIDER_VERSION, manifest, supported};
+pub use capabilities::{
+    ADAPTER_NAME, MEASURED_PROVIDER_VERSION, VERSION_FIELD, declared, manifest, supported,
+};
 pub use denial::{DenialMechanism, ToolRestriction};
 pub use environment::{
     CREDENTIAL_PATH, PROVIDER_EXECUTABLE, QUALIFICATION_RECORD, UNEXPRESSIBLE, declaration,
