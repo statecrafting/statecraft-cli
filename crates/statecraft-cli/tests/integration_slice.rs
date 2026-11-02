@@ -431,6 +431,10 @@ fn the_grown_command_tree_still_has_no_verb_that_publishes() {
     // more with spec 063's `land restack`, the third landing act lifted; and
     // one more with spec 063's `land cancel-superseded`, the fourth; and one
     // more with spec 063's `land status`, a read that publishes nothing; and
-    // one more with spec 049's `admission dry-run`, which writes nothing.
-    assert_eq!(statecraft_cli::commands::Verb::all().len(), 68);
+    // one more with spec 052's `provider compare`, an offline read; and
+    // two more with spec 050's `halt` and `resume`, and three more with spec
+    // 048's `run lease`, `run op` and `run events`, all of which write only the
+    // product's own run record; and one more with spec 049's
+    // `admission dry-run`, which writes nothing.
+    assert_eq!(statecraft_cli::commands::Verb::all().len(), 74);
 }

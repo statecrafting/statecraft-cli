@@ -1,0 +1,79 @@
+{
+  "captures": [
+    {
+      "scenario": "success",
+      "providerVersion": "2.1.267",
+      "platform": "darwin",
+      "invocation": "claude --print --output-format stream-json --verbose, in a scratch git work tree; plain",
+      "captured": "2026-09-17",
+      "file": "success.jsonl",
+      "redactions": [
+        "dropped: system events of subtype thinking_tokens, and rate_limit_event events",
+        "dropped: assistant events whose only content block is thinking",
+        "fixed values: session_id, uuid, hook_id, timestamp",
+        "placeholder path: cwd, memory_paths, messaging_socket_path; plugins emptied",
+        "count-preserving placeholders: names in tools, skills, agents, slash_commands, terminal_slash_commands, mcp_servers, except Bash, Read, Edit, Write, Glob, Grep, Task"
+      ]
+    },
+    {
+      "scenario": "denied",
+      "providerVersion": "2.1.267",
+      "platform": "darwin",
+      "invocation": "claude --print --output-format stream-json --verbose, in a scratch git work tree; settings permissions.deny [\"Bash(echo:*)\"]",
+      "captured": "2026-09-17",
+      "file": "denied.jsonl",
+      "redactions": [
+        "dropped: system events of subtype thinking_tokens, and rate_limit_event events",
+        "dropped: assistant events whose only content block is thinking",
+        "fixed values: session_id, uuid, hook_id, timestamp",
+        "placeholder path: cwd, memory_paths, messaging_socket_path; plugins emptied",
+        "count-preserving placeholders: names in tools, skills, agents, slash_commands, terminal_slash_commands, mcp_servers, except Bash, Read, Edit, Write, Glob, Grep, Task"
+      ]
+    },
+    {
+      "scenario": "max-turns",
+      "providerVersion": "2.1.267",
+      "platform": "darwin",
+      "invocation": "claude --print --output-format stream-json --verbose, in a scratch git work tree; --max-turns 1, on a prompt needing three tool calls",
+      "captured": "2026-09-17",
+      "file": "max-turns.jsonl",
+      "redactions": [
+        "dropped: system events of subtype thinking_tokens, and rate_limit_event events",
+        "dropped: assistant events whose only content block is thinking",
+        "fixed values: session_id, uuid, hook_id, timestamp",
+        "placeholder path: cwd, memory_paths, messaging_socket_path; plugins emptied",
+        "count-preserving placeholders: names in tools, skills, agents, slash_commands, terminal_slash_commands, mcp_servers, except Bash, Read, Edit, Write, Glob, Grep, Task"
+      ]
+    },
+    {
+      "scenario": "tool-removed",
+      "providerVersion": "2.1.267",
+      "platform": "darwin",
+      "invocation": "claude --print --output-format stream-json --verbose, in a scratch git work tree; --disallowedTools Bash",
+      "captured": "2026-09-17",
+      "file": "tool-removed.jsonl",
+      "redactions": [
+        "dropped: system events of subtype thinking_tokens, and rate_limit_event events",
+        "dropped: assistant events whose only content block is thinking",
+        "fixed values: session_id, uuid, hook_id, timestamp",
+        "placeholder path: cwd, memory_paths, messaging_socket_path; plugins emptied",
+        "count-preserving placeholders: names in tools, skills, agents, slash_commands, terminal_slash_commands, mcp_servers, except Bash, Read, Edit, Write, Glob, Grep, Task"
+      ]
+    },
+    {
+      "scenario": "api-error",
+      "providerVersion": "2.1.267",
+      "platform": "darwin",
+      "invocation": "claude --print --output-format stream-json --verbose, in a scratch git work tree; plain, in a constructed environment carrying only PATH",
+      "captured": "2026-09-17",
+      "file": "api-error.jsonl",
+      "redactions": [
+        "dropped: system events of subtype thinking_tokens, and rate_limit_event events",
+        "dropped: assistant events whose only content block is thinking",
+        "fixed values: session_id, uuid, hook_id, timestamp",
+        "placeholder path: cwd, memory_paths, messaging_socket_path; plugins emptied",
+        "count-preserving placeholders: names in tools, skills, agents, slash_commands, terminal_slash_commands, mcp_servers, except Bash, Read, Edit, Write, Glob, Grep, Task"
+      ]
+    }
+  ]
+}

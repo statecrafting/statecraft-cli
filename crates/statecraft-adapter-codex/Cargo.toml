@@ -1,0 +1,37 @@
+# Spec: specs/055-codex-adapter/spec.md
+#
+# The second provider adapter, under the conditional F-07 lift of 2026-10-20.
+# This is the ONE crate in the workspace permitted to name Codex (spec 055
+# section 2), and it names no other provider.
+#
+# Its stream mapping is written against the event names spec 055 section 3.2
+# lists, measured from codex-cli 0.163.0 on 2026-10-21. The fixtures under
+# testdata/ are SYNTHETIC until the owner records a real capture; see each
+# directory's README.md. Until then the adapter runs labelled `unqualified`.
+[package]
+name = "statecraft-adapter-codex"
+description = "The second provider adapter: Codex's JSONL stream, a per-run CODEX_HOME and its gate hook"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+publish.workspace = true
+
+[package.metadata.spec-spine]
+spec = "055-codex-adapter"
+
+[dependencies]
+serde = { version = "1.0.229", features = ["derive"] }
+serde_json = "1.0.151"
+thiserror = "2.0.20"
+statecraft-adapter = { path = "../statecraft-adapter" }
+statecraft-run = { path = "../statecraft-run" }
+statecraft-secret = { path = "../statecraft-secret" }
+
+[dev-dependencies]
+tempfile = "3.27.0"
+
+[lints]
+workspace = true
