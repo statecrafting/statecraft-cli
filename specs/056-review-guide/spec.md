@@ -2,7 +2,7 @@
 id: "056-review-guide"
 title: "Setup profile: a managed review guide and a repository's own REVIEW.md in the AI review's governance context"
 status: approved
-implementation: pending
+implementation: complete
 created: "2026-10-21"
 summary: >
   Amends spec 002's setup profile and spec 041's default governance context.
@@ -15,8 +15,10 @@ summary: >
 amends:
   - "002-environment-lifecycle"
   - "041-review-authority-context"
-# No `extends` yet: the implementing change adds the edge on
-# crates/statecraft-home/ (002) with the code.
+establishes:
+  - { kind: file, path: "REVIEW.md" }
+extends:
+  - { spec: "002-environment-lifecycle", unit: { kind: directory, path: "crates/statecraft-home/" }, nature: additive }
 depends_on:
   - "002-environment-lifecycle"
   - "024-review-budget-and-ratification"
@@ -128,10 +130,33 @@ workflow file. Spec 041's base-commit context already carries provenance,
 budget and absence rules for exactly this kind of document, and a workflow
 input would need its own.
 
+**2026-10-31: the guide is revision 23, a `guide` role, and a member of the
+authority set.** The implementing change found revision 22 (spec 044) on
+main, so the guide is profile revision 23. It is rendered under a role of its
+own, `guide`, because it is neither a workflow, a script nor the policy, and
+it is listed in the policy's `files` like every managed file: that list is
+what `ci-gate.sh` reads as the authority set and what the review's
+managed-file rule verifies by digest, so the guide is in the authority set and
+a target's edit to it needs the owner exception, as a re-render does. No
+template body changed, so revision 22 is reconstructed in the tests without a
+fixture copy.
+
 ## Verification
 
-Ratified by the owner on 2026-10-31. Acceptance is declared by the
-implementing change, which will render the revision and find the managed guide
-and both default paths, review over a base with no `REVIEW.md` and find it
-recorded absent, and review a candidate that edits `REVIEW.md` and find the
-base's version (or its absence) in the evidence.
+Ratified by the owner on 2026-10-31. Acceptance is run through
+`make verify SPEC=056`, against rendered fixture repositories with a stubbed
+reviewer and no provider.
+
+```verify:cli
+cargo test -p statecraft-home --test setup_upgrade a_revision_twenty_two_project_upgrades_to_revision_twenty_three
+cargo test -p statecraft-home --test setup_workflows revision_twenty_three_renders_the_review_guide_and_both_default_paths
+cargo test -p statecraft-home --test setup_workflows review_reads_the_guide_and_the_repository_review_from_the_base_only
+cargo test -p statecraft-home --test setup_workflows review_refuses_an_oversized_review_guide_before_the_provider
+```
+
+These render the revision and find the managed guide, its digest in the
+policy and both default paths in order; review over a base with no
+`REVIEW.md` and find it recorded absent; review a candidate that edits
+`REVIEW.md` and the guide and find the base's version (or its absence) in the
+context and the edits in the diff; and refuse an oversized guide with 2
+before any provider call.

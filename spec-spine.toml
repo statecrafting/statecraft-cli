@@ -79,6 +79,7 @@ extra_hashed_inputs = [
   "scripts/**/*",
   "README.md",
   "AGENTS.md",
+  "REVIEW.md",
   "CLAUDE.md",
   "Makefile",
   ".gitignore",
