@@ -85,7 +85,7 @@
       "contentHash": "52a94b448d0edfe99df98ebc8eb3b2b3c8dec15347a12b9bbbb22372dff63303"
     },
     "scripts/release/install-dist.sh": {
-      "contentHash": "c3f60386a63ff85397abd9a83a655b06d93a17c0a3db69a4c0e6f6f118acdca9"
+      "contentHash": "f3174cba20cb7c9b0b8731273b6b893ec83990c88973024666e2317c803fcc58"
     },
     "scripts/release/verify-set.sh": {
       "contentHash": "9c2ff1c29c50fc75a816a17084936cc7bf1d077afcfbb39e73113fedf88e2a0a"

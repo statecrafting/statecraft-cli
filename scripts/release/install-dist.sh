@@ -13,8 +13,16 @@ host=${1:?usage: install-dist.sh <host-triple> <bin-dir>}
 bindir=${2:?usage: install-dist.sh <host-triple> <bin-dir>}
 : "${DIST_VERSION:?DIST_VERSION is not set}"
 
-var="DIST_SHA256_$(printf '%s' "$host" | tr 'a-z-' 'A-Z_')"
-want=$(eval "printf '%s' \"\${$var:-}\"")
+# The host is one of the four section 3.2 names, each read from its own
+# variable by name; any other argument refuses before anything is read or
+# fetched, and nothing from the argument is evaluated.
+case "$host" in
+  aarch64-apple-darwin) var=DIST_SHA256_AARCH64_APPLE_DARWIN want=${DIST_SHA256_AARCH64_APPLE_DARWIN:-} ;;
+  x86_64-apple-darwin) var=DIST_SHA256_X86_64_APPLE_DARWIN want=${DIST_SHA256_X86_64_APPLE_DARWIN:-} ;;
+  aarch64-unknown-linux-gnu) var=DIST_SHA256_AARCH64_UNKNOWN_LINUX_GNU want=${DIST_SHA256_AARCH64_UNKNOWN_LINUX_GNU:-} ;;
+  x86_64-unknown-linux-gnu) var=DIST_SHA256_X86_64_UNKNOWN_LINUX_GNU want=${DIST_SHA256_X86_64_UNKNOWN_LINUX_GNU:-} ;;
+  *) echo "install-dist: $host is not one of the four release hosts" >&2; exit 1 ;;
+esac
 printf '%s' "$want" | grep -E -q '^[0-9a-f]{64}$' \
   || { echo "install-dist: no pinned SHA-256 for $host (\$$var)" >&2; exit 1; }
 
