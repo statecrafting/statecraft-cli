@@ -1,7 +1,7 @@
 ---
 id: "046-secret-type"
 title: "One secret type: redacted when shown, cleared when dropped, exposed only by name"
-status: draft
+status: approved
 implementation: pending
 created: "2026-10-21"
 summary: >
@@ -149,7 +149,7 @@ A leaf crate with one type is the smallest owner both can use.
 
 ## Verification
 
-This spec is `status: draft` and declares no acceptance until it is ratified
-and built. Its acceptance will run the crate's unit tests and the two migrated
+Ratified by the owner on 2026-10-31. Acceptance is declared by the
+implementing change, which will run the crate's unit tests and the two migrated
 holders' existing suites with their assertions unchanged. The rules' fixtures
 and tree run join it with the section 3.5 follow-up.

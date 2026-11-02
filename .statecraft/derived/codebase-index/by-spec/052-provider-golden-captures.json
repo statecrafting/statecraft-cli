@@ -8,8 +8,8 @@
     ],
     "implementingPaths": [],
     "specId": "052-provider-golden-captures",
-    "specStatus": "draft"
+    "specStatus": "approved"
   },
   "schemaVersion": "1.3.0",
-  "shardHash": "b03a7e6c7c0fdc8e101bd2c2fb317333acfb227002a3e68ee5f3f154fe70000a"
+  "shardHash": "0ed69b4ce45370a95096dac302519afe6c6c7bce2cb42559cc4645a2b722e5ab"
 }

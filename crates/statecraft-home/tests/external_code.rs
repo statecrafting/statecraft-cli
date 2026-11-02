@@ -1,6 +1,7 @@
 //! Spec 032: applicability and plan consent for required external code.
 #![cfg(unix)]
 
+use spec_spine_core::types::yaml::{self, YamlValue};
 use statecraft_environment::manifest::{Manifest, Pins};
 use statecraft_home::setup::{self, Inputs, Profile};
 use statecraft_home::setup_input::Bound;
@@ -102,11 +103,17 @@ fn an_external_project_needs_real_checks_and_no_invented_rust_inputs() {
         "{owners}"
     );
     assert!(owners.contains(&format!("/{SCRIPT} @bartekus")), "{owners}");
-    let wf = std::fs::read(root.join(".github/workflows/statecraft-ci.yml")).unwrap();
-    let parsed: serde_yaml::Value = serde_yaml::from_slice(&wf).unwrap();
-    assert_eq!(parsed["jobs"]["code"]["uses"], format!("./{WORKFLOW}"));
-    assert!(parsed["jobs"]["code"]["if"].is_null());
-    assert!(parsed["jobs"]["code"]["secrets"].is_null());
+    let wf = std::fs::read_to_string(root.join(".github/workflows/statecraft-ci.yml")).unwrap();
+    // Spec 045: the rendered workflow is read through the producer's one
+    // YAML reader, as the product itself reads it.
+    let parsed = yaml::parse(&wf).unwrap();
+    let code = parsed.get("jobs").and_then(|j| j.get("code")).unwrap();
+    assert_eq!(
+        code.get("uses").and_then(YamlValue::as_str),
+        Some(format!("./{WORKFLOW}").as_str())
+    );
+    assert!(code.get("if").is_none_or(YamlValue::is_null));
+    assert!(code.get("secrets").is_none_or(YamlValue::is_null));
     let policy: serde_json::Value =
         serde_json::from_slice(&std::fs::read(root.join(setup::POLICY_PATH)).unwrap()).unwrap();
     for event in ["pull_request", "push", "merge_group"] {
@@ -114,10 +121,13 @@ fn an_external_project_needs_real_checks_and_no_invented_rust_inputs() {
     }
     assert_eq!(policy["jobs"]["code"]["required"], true);
     assert!(
-        parsed["jobs"]["ci-gate"]["needs"]
-            .as_sequence()
+        parsed
+            .get("jobs")
+            .and_then(|j| j.get("ci-gate"))
+            .and_then(|g| g.get("needs"))
+            .and_then(YamlValue::as_sequence)
             .unwrap()
-            .contains(&serde_yaml::Value::String("code".into()))
+            .contains(&YamlValue::String("code".into()))
     );
 }
 

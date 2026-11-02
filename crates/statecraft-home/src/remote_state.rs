@@ -15,6 +15,7 @@
 
 use crate::setup::{Host, HostError};
 use serde::{Deserialize, Serialize};
+use spec_spine_core::types::yaml::{self, YamlValue};
 use std::collections::{BTreeMap, BTreeSet};
 
 /// The document's schema version.
@@ -1149,7 +1150,9 @@ fn extra_job_leaves(doc: &DesiredState, reads: &Reads<'_>, out: &mut Vec<FieldRe
         .map(|t| serde_json::from_str::<serde_json::Value>(&t).unwrap_or_default());
     let workflow = reads
         .file(".github/workflows/statecraft-ci.yml", branch)
-        .map(|t| serde_yaml::from_str::<serde_yaml::Value>(&t).unwrap_or_default());
+        // Spec 045 section 3.1: the producer's one reader. A document it
+        // refuses reads as no document, as an unparseable one did before.
+        .map(|t| yaml::parse(&t).unwrap_or(YamlValue::Null));
     let aggregate = &doc.extra_required_jobs.aggregate;
     for j in &doc.extra_required_jobs.jobs {
         let field = format!("extraRequiredJobs.{}", j.job);
@@ -1171,10 +1174,15 @@ fn extra_job_leaves(doc: &DesiredState, reads: &Reads<'_>, out: &mut Vec<FieldRe
                 && p["jobs"][j.job.as_str()]["workflow"] == json!(j.workflow)
         });
         let needs = workflow.is_some_and(|w| {
-            let n = &w["jobs"][aggregate.as_str()]["needs"];
+            // Spec 045 section 3.2: a `needs` written as a string or a
+            // sequence; a missing step on the path is no aggregation.
+            let n = w
+                .get("jobs")
+                .and_then(|jobs| jobs.get(aggregate.as_str()))
+                .and_then(|a| a.get("needs"));
             match n {
-                serde_yaml::Value::String(s) => *s == j.job,
-                serde_yaml::Value::Sequence(list) => {
+                Some(YamlValue::String(s)) => *s == j.job,
+                Some(YamlValue::Sequence(list)) => {
                     list.iter().any(|x| x.as_str() == Some(j.job.as_str()))
                 }
                 _ => false,

@@ -48,7 +48,7 @@
       }
     ],
     "sectionDigests": {
-      "054-ai-pre-screen-attestation": "3ccfff36d695eaf81a9e84c5e8a3690db5b50f7c7a9f5461e007de5e10413b7f",
+      "054-ai-pre-screen-attestation": "7d53fe57bf90f4b26aad36ef0ceadd801a2525007a90389882f7446993055ec6",
       "1-purpose": "d520cab24fe2a49d07f07555c284e2e831d14bf1798e2aed79dc8d81f944cd04",
       "2-territory": "c56c55fba01acb89840c496e07f3629f7c6bbd8a8bf57c1cc6d706e6daff8ed0",
       "3-1-the-predicate": "74e5eb1fdca6cf27bb982e0bfa35c6c9760e03b01ba78018e316c472cb03d97a",
@@ -58,7 +58,7 @@
       "3-behavior": "dd02e4f26d14db20b731f9f8de148a7c90df395743e1160fc23e0ff021d04f5f",
       "4-out-of-scope": "d48fd67b45dc33bc7d6e3a44cdbd84c85c23672d794b77544a3caae5461bcd6d",
       "5-resolved-decisions": "003fdfe1dcdcd9fe9696dc5d706e4bd9670bb9b1e84df03ab7473ff7686842bc",
-      "verification": "4ff6a3d0618752ceb184db690f82b66dadb4ac96d191f6b9716776d404f3d48d"
+      "verification": "62c4e41f52ebf7cdcadd357ad8a8a2ccd8823582c37a4e5b3dbbb96ff96fc534"
     },
     "sectionHeadings": [
       "054: AI pre-screen attestation",
@@ -74,10 +74,10 @@
       "Verification"
     ],
     "specPath": "specs/054-ai-prescreen-attestation/spec.md",
-    "status": "draft",
+    "status": "approved",
     "summary": "Records the managed AI review's verdict on a revision as an advisory attestation naming the model, the prompt's digest, the guidelines' digest and the structured verdict. It is shown beside statecraft/approval/v1 and is never counted as an approval. It may order a review queue. A policy may let a deny refuse admission only on a fail-closed path, where a missing or unreadable pre-screen refuses too. An AI deciding, confidence-gated auto-approval, approval on error, substring parsing of a verdict and a prompt the gated agent can influence are forbidden.\n",
     "title": "An AI pre-screen is an advisory attestation shown beside approvals and never counted as one"
   },
-  "shardHash": "86ac34ddb2e013f253b03fed2c2ec7f28131903e51042109dd946eadab77873d",
+  "shardHash": "46054b2103bd552bbc32b3981cba31981900b097541b66f4bb3c57333f8ea241",
   "specVersion": "1.11.0"
 }
