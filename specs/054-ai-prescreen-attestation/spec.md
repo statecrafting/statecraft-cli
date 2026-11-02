@@ -152,6 +152,12 @@ is the record. A tombstoned or undecodable claim is `unreadable`, not a
 divergence of the bundle: under a default policy it changes nothing, as
 section 3.3 requires, and under the opt-in it refuses.
 
+
+**2026-11-01: the review script's record ships in profile revision 23.** The
+profile's `scripts/ai-review.sh` writes the pre-screen record as part of
+revision 23, the revision spec 056 opens for the managed review guide, and
+revision 23's remote obligation names both. Neither spec has been adopted by a
+target at revision 23, so no rendered file changes under an existing identity.
 ## Verification
 
 Ratified by the owner on 2026-10-31. Acceptance is run through
