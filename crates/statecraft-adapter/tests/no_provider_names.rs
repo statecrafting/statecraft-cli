@@ -156,3 +156,49 @@ fn the_caller_check_recognises_a_comparison() {
     assert!(!compares_an_adapter_name(r#"let name = "codex";"#));
     assert!(!compares_an_adapter_name("if a.harness == b.harness {"));
 }
+
+/// Every `.rs` and `.toml` file under `dir` that contains one of `names`.
+fn naming(dir: &Path, names: &[&str], findings: &mut Vec<String>) {
+    for entry in std::fs::read_dir(dir).expect("readable") {
+        let path = entry.expect("entry").path();
+        if path.is_dir() {
+            naming(&path, names, findings);
+            continue;
+        }
+        if path.extension().is_none_or(|e| e != "rs" && e != "toml") {
+            continue;
+        }
+        let lower = std::fs::read_to_string(&path)
+            .unwrap_or_default()
+            .to_lowercase();
+        for name in names.iter().filter(|n| lower.contains(*n)) {
+            findings.push(format!("{} contains `{name}`", path.display()));
+        }
+    }
+}
+
+// Spec 055 V-1: the Codex adapter's crate is the only adapter crate that
+// names Codex, and it names no other provider. The caller check above
+// already covers every crate that is not an adapter's.
+#[test]
+fn each_adapter_crate_names_only_its_own_provider() {
+    let crates = Path::new(env!("CARGO_MANIFEST_DIR"))
+        .parent()
+        .expect("the crates directory");
+    let mut findings = Vec::new();
+    naming(
+        &crates.join("statecraft-adapter-codex"),
+        &["claude", "anthropic", "gemini", "copilot", "cursor"],
+        &mut findings,
+    );
+    naming(
+        &crates.join("statecraft-adapter-claude-code"),
+        &["codex"],
+        &mut findings,
+    );
+    assert!(
+        findings.is_empty(),
+        "an adapter crate names another adapter's provider (spec 055 section 2):\n{}",
+        findings.join("\n")
+    );
+}
