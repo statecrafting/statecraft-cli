@@ -118,6 +118,13 @@ fn run(scenario: &Scenario, program: &Path, path: &str) -> Result<String, String
     if scenario.only_path {
         command.env_clear().env("PATH", path);
     }
+    // Its own process group, so the deadline ends everything the provider
+    // started, as spec 004's supervisor does.
+    #[cfg(unix)]
+    {
+        use std::os::unix::process::CommandExt;
+        command.process_group(0);
+    }
     let mut child = command
         .spawn()
         .map_err(|e| format!("{} could not be spawned: {e}", program.display()))?;
@@ -138,6 +145,14 @@ fn run(scenario: &Scenario, program: &Path, path: &str) -> Result<String, String
         match child.try_wait() {
             Ok(Some(_)) => break false,
             Ok(None) if started.elapsed() >= DEADLINE => {
+                // The group, then the child: `-s KILL -- -PID`, with the `--`
+                // that keeps a negative pid from reading as an option under
+                // both the BSD and the procps `kill` (spec 004's supervisor
+                // records why).
+                #[cfg(unix)]
+                let _ = Command::new("kill")
+                    .args(["-s", "KILL", "--", &format!("-{}", child.id())])
+                    .output();
                 let _ = child.kill();
                 let _ = child.wait();
                 break true;
