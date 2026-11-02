@@ -62,6 +62,10 @@ pub struct Request {
 /// Why nothing was launched.
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
 pub enum Refused {
+    /// The adapter does not declare a capability field the controls need
+    /// (spec 047 section 3.3), naming it.
+    #[error("{0}")]
+    CapabilityUndeclared(String),
     /// No provider may start without an exact OS boundary.
     #[error("boundary unavailable: {0}")]
     Boundary(String),
@@ -217,6 +221,14 @@ fn utf8(bytes: Vec<u8>, name: &str, undecodable: &mut Vec<String>) -> String {
 /// which. Only a refusal before launch writes nothing.
 pub fn launch(request: &Request) -> Result<Launched, Failed> {
     let control = request.control;
+    // Spec 047 section 3.3: judged first, before anything is created, from
+    // the adapter's declaration rather than from which adapter it is.
+    let declared = admission::capabilities();
+    if let Some(undeclared) = statecraft_adapter::capabilities::fit(&declared, &admission::needs())
+        .refusal(statecraft_adapter_claude_code::ADAPTER_NAME)
+    {
+        return Err(Refused::CapabilityUndeclared(undeclared.to_string()).into());
+    }
     let root = request.root.canonicalize().map_err(|e| Refused::Root {
         path: request.root.display().to_string(),
         detail: e.to_string(),

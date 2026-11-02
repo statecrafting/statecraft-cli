@@ -156,8 +156,20 @@ pub fn launch_attempt(
     let mut startup_refusal = None;
     // Spec 013: the producer is located before the child's admission, which
     // reserves the endpoint only when there is a producer to bind it.
-    let mut witness = crate::witness::Witness::resolve(home, plan.witness);
+    // Spec 047 sections 3.2 and 3.3: what this launch needs is read from the
+    // selected adapter's declaration. A witness only requested of an adapter
+    // that cannot carry one is not started and the degradation is recorded;
+    // a required field it does not declare refuses below, before spawn.
+    let declared = adapters::capabilities();
+    let fitted = statecraft_adapter::capabilities::fit(
+        &declared,
+        &statecraft_adapter::capabilities::Needs::launch(plan.witness, project_manifest.is_some()),
+    );
+    let mut witness =
+        crate::witness::Witness::resolve(home, fitted.witness_requirement(plan.witness))
+            .degraded(&fitted.degraded);
     let reserves_witness = witness.reserves();
+    let per_run_config_dir = declared.per_run_config_dir;
     let mut admission =
         |workspace: &statecraft_run::workspace::Workspace, number: u32| -> Result<(), String> {
             let identity = statecraft_home::launch::AttemptIdentity {
@@ -243,7 +255,7 @@ pub fn launch_attempt(
                     records: &places.records,
                     gate: gated.then_some(gate.as_path()),
                     git_writes: vec![objects, refs, logs, admin],
-                    provider: true,
+                    provider: per_run_config_dir,
                     authenticated: true,
                     witness: reserves_witness,
                 },
@@ -513,6 +525,34 @@ pub fn launch_attempt(
             );
         }
     };
+
+    // Spec 047 section 3.3: a required capability field the adapter does not
+    // declare refuses before spawn, naming the field, concluded the way a
+    // missing required token is above.
+    if let Some(undeclared) = fitted.refusal(&manifest.adapter) {
+        let mut accounting = statecraft_run::refusal::Accounting::without_process();
+        accounting.observe(statecraft_run::refusal::RefusalEvent {
+            guard: statecraft_adapter::capabilities::REASON.to_string(),
+            detail: undeclared.to_string(),
+        });
+        return crate::attempt::conclude(
+            clock,
+            &mut chain,
+            &places,
+            &session,
+            boundary_admission.as_ref(),
+            statecraft_run::attempt::Outcome::Refused,
+            &accounting,
+            witness.marked(serde_json::json!({
+                "capabilityRefusal": undeclared.to_string(),
+                "undeclared": undeclared.fields,
+                "posture": posture,
+            })),
+            unlaunched(project_manifest.is_some(), None),
+            &contract,
+            trial,
+        );
+    }
 
     let mut boundary_admission =
         boundary_admission.expect("successful boundary check admitted the launch");

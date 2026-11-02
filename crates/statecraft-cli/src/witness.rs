@@ -72,6 +72,7 @@ pub struct Witness {
     closed: bool,
     area: Option<PathBuf>,
     wire: Option<Result<String, String>>,
+    degraded: Vec<statecraft_adapter::capabilities::Field>,
 }
 
 impl Witness {
@@ -93,7 +94,17 @@ impl Witness {
             closed: false,
             area: None,
             wire: None,
+            degraded: Vec::new(),
         }
+    }
+
+    /// Record the capability fields the run preferred and the adapter does
+    /// not declare (spec 047 section 3.3): the run proceeds, degraded, and
+    /// every outcome detail says so.
+    #[must_use]
+    pub fn degraded(mut self, fields: &[statecraft_adapter::capabilities::Field]) -> Self {
+        self.degraded = fields.to_vec();
+        self
     }
 
     /// The attempt's wire-evidence policy (spec 014 section 3.5): the shipped
@@ -401,6 +412,12 @@ impl Witness {
         };
         map.insert("witnessPosture".into(), self.posture().word().into());
         map.insert("witnessRequired".into(), self.requirement.required.into());
+        if !self.degraded.is_empty() {
+            map.insert(
+                "capabilityDegraded".into(),
+                serde_json::to_value(&self.degraded).unwrap_or_default(),
+            );
+        }
         if !self.requirement.requested {
             return;
         }
