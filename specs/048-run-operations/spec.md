@@ -20,9 +20,8 @@ extends:
   # stop-confirmed call after a cancelled outcome in `session.rs`, and the
   # operation intent skipped by `reconcile::since_last_intent`.
   - { spec: "003-work-and-run-semantics", unit: { kind: directory, path: "crates/statecraft-run/" }, nature: additive }
-  # The typed operations in the application layer (spec 040), their three
-  # verbs, and the repository lock shared with the launch a retry runs.
-  - { spec: "006-command-surface", unit: { kind: directory, path: "crates/statecraft-cli/" }, nature: additive }
+  # The edge on crates/statecraft-cli/ (spec 006) lands with the verbs, in
+  # the change that adds them.
   # The reviewable fold skips an operation's records (section 5, 2026-11-01).
   - { spec: "005-acceptance-and-evidence", unit: { kind: directory, path: "crates/statecraft-acceptance/" }, nature: additive }
 depends_on:

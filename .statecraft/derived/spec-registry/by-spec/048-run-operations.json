@@ -21,14 +21,6 @@
       },
       {
         "nature": "additive",
-        "spec": "006-command-surface",
-        "unit": {
-          "kind": "directory",
-          "path": "crates/statecraft-cli/"
-        }
-      },
-      {
-        "nature": "additive",
         "spec": "005-acceptance-and-evidence",
         "unit": {
           "kind": "directory",
@@ -114,6 +106,6 @@
     "summary": "Gives a run three typed operations, attempt.retry, attempt.continue and attempt.abort, submitted by one controller holding a lease. Each carries an idempotency key and the run version it was decided against; each request and its outcome append to spec 003's hash-linked run record, durable and uncapped, so replaying the record reproduces the run's state. A reconnecting controller reads events from a cursor over the record. The one live slot of spec 003 section 3.7 is held or released explicitly by each operation.\n",
     "title": "Typed run operations under one controller lease, recorded in the run record"
   },
-  "shardHash": "e314a40ce5dbce6e6235f590ab0c51b577ee4219b31c840eef31b57d13e4856b",
+  "shardHash": "c419833cad9eb5cdb5a9e38262a54e3c7b5b9cdf23625f5c8cc39e3a4a6969c8",
   "specVersion": "1.11.0"
 }
