@@ -22,9 +22,14 @@
 //! whether Codex then reports the gate as `managed` for the per-run
 //! `CODEX_HOME`.
 //!
-//! **The response's field spelling is synthetic** (`testdata/hooks/README.md`)
-//! until the owner records a real `hooks/list` answer. A response this module
-//! cannot read refuses; nothing here reads an unreadable answer as admitted.
+//! **The response's shape is recorded** from codex-cli 0.166.0
+//! (`testdata/hooks/README.md`): `result.data` holds one entry per working
+//! directory, each with its `hooks`; the event is spelled `preToolUse`; and
+//! a hook's trust is `isManaged`, beside a `trustStatus` that names what
+//! Codex would otherwise require. A managed answer is not recorded yet, since
+//! it needs the operator's one-time installation, so `isManaged: true` is read
+//! from the field the recording shows. A response this module cannot read
+//! refuses; nothing here reads an unreadable answer as admitted.
 
 use crate::home::{CODEX_HOME, RunHome};
 use serde::{Deserialize, Serialize};
@@ -43,7 +48,7 @@ pub const QUERY_DEADLINE_SECONDS: u64 = 30;
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ListedHook {
-    /// The hook event, `PreToolUse` for the gate.
+    /// The hook event, `preToolUse` for the gate.
     pub event_name: String,
     /// The handler type, `command` for the gate.
     pub handler_type: String,
@@ -58,9 +63,16 @@ pub struct ListedHook {
     pub asynchronous: bool,
     /// Whether it is enabled.
     pub enabled: bool,
-    /// Where its trust comes from; the gate needs `managed`.
-    pub trust_status: String,
+    /// Whether an administrator-managed policy installed it: the gate needs
+    /// `true` (section 5, 2026-10-31).
+    pub is_managed: bool,
+    /// The trust Codex reports beside it, named in a refusal.
+    #[serde(default)]
+    pub trust_status: Option<String>,
 }
+
+/// The event spelling `hooks/list` reports for `PreToolUse`.
+pub const GATE_EVENT: &str = "preToolUse";
 
 /// The gate hook, admitted.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -106,7 +118,9 @@ pub enum HookRefusal {
         matcher: String,
     },
     /// Listed, and its trust is not `managed`.
-    #[error("codex-gate-hook-not-managed: the gate hook's trust is `{trust}`, not `managed`")]
+    #[error(
+        "codex-gate-hook-not-managed: the gate hook is not managed; Codex reports its trust as `{trust}`"
+    )]
     NotManaged {
         /// The trust Codex reported.
         trust: String,
@@ -146,9 +160,12 @@ fn check(hook: &ListedHook) -> Result<(), HookRefusal> {
             matcher: m.to_string(),
         });
     }
-    if hook.trust_status != "managed" {
+    if !hook.is_managed {
         return Err(HookRefusal::NotManaged {
-            trust: hook.trust_status.clone(),
+            trust: hook
+                .trust_status
+                .clone()
+                .unwrap_or_else(|| "unreported".to_string()),
         });
     }
     Ok(())
@@ -166,20 +183,29 @@ pub fn judge(response: &serde_json::Value, gate_command: &str) -> Result<Admitte
             detail: error.to_string(),
         });
     }
-    let hooks: Vec<ListedHook> = response
-        .pointer("/result/hooks")
-        .cloned()
+    let entries = response
+        .pointer("/result/data")
+        .and_then(serde_json::Value::as_array)
         .ok_or_else(|| HookRefusal::Unreadable {
-            detail: "no `result.hooks`".into(),
-        })
-        .and_then(|v| {
-            serde_json::from_value(v).map_err(|e| HookRefusal::Unreadable {
-                detail: e.to_string(),
-            })
+            detail: "no `result.data` list".into(),
         })?;
+    let mut hooks: Vec<ListedHook> = Vec::new();
+    for entry in entries {
+        let listed = entry
+            .get("hooks")
+            .cloned()
+            .ok_or_else(|| HookRefusal::Unreadable {
+                detail: "a `result.data` entry has no `hooks`".into(),
+            })?;
+        let listed: Vec<ListedHook> =
+            serde_json::from_value(listed).map_err(|e| HookRefusal::Unreadable {
+                detail: e.to_string(),
+            })?;
+        hooks.extend(listed);
+    }
     let mut first = None;
     for hook in hooks.into_iter().filter(|h| {
-        h.event_name == "PreToolUse"
+        h.event_name == GATE_EVENT
             && h.handler_type == "command"
             && h.command.as_deref() == Some(gate_command)
     }) {

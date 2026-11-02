@@ -156,15 +156,26 @@ fn only_a_managed_synchronous_enabled_unrestricted_gate_is_admitted() {
     );
     let with = |field: &str, value: serde_json::Value| {
         let mut a = answer("managed.json");
-        a["result"]["hooks"][0][field] = value;
+        a["result"]["data"][0]["hooks"][0][field] = value;
         judge(&a, GATE).unwrap_err().to_string()
     };
     assert!(with("enabled", false.into()).starts_with("codex-gate-hook-disabled"));
     assert!(with("async", true.into()).starts_with("codex-gate-hook-asynchronous"));
     assert!(with("matcher", "Bash".into()).starts_with("codex-gate-hook-matcher-restricted"));
-    assert!(with("eventName", "PostToolUse".into()).starts_with("codex-gate-hook-absent"));
+    assert!(with("eventName", "postToolUse".into()).starts_with("codex-gate-hook-absent"));
+    // The recorded spelling is the only one read as the gate's event.
+    assert!(with("eventName", "PreToolUse".into()).starts_with("codex-gate-hook-absent"));
+    assert!(with("isManaged", false.into()).starts_with("codex-gate-hook-not-managed"));
     assert!(with("command", "/elsewhere".into()).starts_with("codex-gate-hook-absent"));
-    assert!(with("trustStatus", serde_json::Value::Null).starts_with("codex-hook-list-unreadable"));
+    assert!(with("isManaged", serde_json::Value::Null).starts_with("codex-hook-list-unreadable"));
+    let mut flat = answer("managed.json");
+    flat["result"] = serde_json::json!({"hooks": []});
+    assert!(
+        judge(&flat, GATE)
+            .unwrap_err()
+            .to_string()
+            .starts_with("codex-hook-list-unreadable")
+    );
     let failed = judge(
         &serde_json::json!({"id": 1, "error": {"code": -32601}}),
         GATE,
