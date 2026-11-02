@@ -308,7 +308,7 @@ fn prescreen_of(
     Ok(Prescreen::read(revision, id, a.body.subject, &claim))
 }
 
-fn named(p: &Prescreen) -> Option<NamedPrescreen> {
+fn named_prescreen(p: &Prescreen) -> Option<NamedPrescreen> {
     let id = p.id()?.0;
     let (model, findings) = match p {
         Prescreen::Read {
@@ -485,7 +485,7 @@ fn walk(r: &mut Reader<'_>, policy: Option<&AdmissionPolicy>) -> Result<Walked, 
     // The pre-screen (spec 054): read before the admission so it is listed
     // beside the decisions whether or not an admission was recorded.
     let prescreen = prescreen_of(r, &attestations)?;
-    let shown = named(&prescreen);
+    let shown = named_prescreen(&prescreen);
 
     // The admission.
     let Some(admission_id) = r.bundle.admission else {

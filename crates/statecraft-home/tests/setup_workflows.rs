@@ -1738,6 +1738,9 @@ fn review_cases() -> Vec<Case> {
             "",
         ),
         c("an unclassified failure", "unclassified", 4, ""),
+        // Spec 054: a review whose calls named no model cannot write the
+        // pre-screen record and is not a review.
+        c("a reviewer that names no model", "nomodel", 4, ""),
     ];
     let mut missing = c("a missing credential", "no-findings", 2, "");
     missing
@@ -1793,6 +1796,7 @@ fn review_reason(label: &str) -> &'static str {
         "a verdict that is neither" => "is neither findings nor no-findings",
         "an explicit refusal" | "a refusal outranks a transient signal" => "the provider refused",
         "an unclassified failure" => "no recognized transient signal",
+        "a reviewer that names no model" => "named no model",
         "a missing credential" => {
             "neither ANTHROPIC_API_KEY nor CLAUDE_CODE_OAUTH_TOKEN is set for this repository"
         }
