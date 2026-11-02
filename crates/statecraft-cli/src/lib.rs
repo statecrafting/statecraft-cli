@@ -63,6 +63,7 @@ pub mod coverage;
 pub mod documentation;
 pub mod exit;
 pub mod fixed_export;
+pub mod golden;
 pub mod hosted;
 pub mod judge;
 pub mod launch;
