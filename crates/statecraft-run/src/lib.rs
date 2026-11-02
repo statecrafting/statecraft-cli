@@ -43,6 +43,10 @@
 //!   back out of the record. Added by spec 006's additive edge, because a
 //!   command may not be a second implementation and a binding needs an entry
 //!   point.
+//! - [`operation`] is spec 048's typed run operations: the controller lease,
+//!   the idempotency key and version rules, their brackets in the record, the
+//!   fold that reads them back and the event cursor. Added by spec 048's
+//!   additive edge.
 //!
 //! # What it does not do
 //!
@@ -58,6 +62,7 @@ pub mod context;
 pub mod contract;
 pub mod documentation;
 pub mod lock;
+pub mod operation;
 pub mod overrides;
 pub mod policy;
 pub mod reconcile;
