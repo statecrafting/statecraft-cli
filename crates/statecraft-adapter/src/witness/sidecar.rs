@@ -72,7 +72,11 @@ pub struct Plan {
 /// How the supervisor observed the producer's start (spec 043 section 3.3).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum StartObservation {
-    /// The producer read from the pipe holding the start line.
+    /// The adopted observation was in force: the producer's read of the pipe
+    /// holding the start line is what marks its start. Whether that read came
+    /// is `Timing::started_after`; an attempt that ended before it (the start
+    /// line undelivered, the producer exited, the start deadline passed) keeps
+    /// this mechanism with `started_after` `None`.
     StartLineConsumed,
     /// The kernel could not report the pipe's unread bytes, so no observation
     /// was available and 013's single deadline ran from spawn.

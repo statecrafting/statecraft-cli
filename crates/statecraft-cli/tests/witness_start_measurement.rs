@@ -40,9 +40,8 @@ use std::time::Duration;
 
 /// The run path's values (`crates/statecraft-cli/src/witness.rs`), which are
 /// private to the binary.
-const START_TIMEOUT: Duration = Duration::from_secs(60);
-const READY_TIMEOUT: Duration = Duration::from_secs(20);
-const GRACE: Duration = Duration::from_secs(10);
+// The run path's own deadlines, so a measurement never runs stale copies.
+use statecraft_cli::witness::{GRACE, READY_TIMEOUT, START_TIMEOUT};
 
 fn probe_executable() -> &'static Path {
     Path::new(env!("CARGO_BIN_EXE_statecraft-cli"))

@@ -46,10 +46,13 @@ pub const GUARD: &str = "witness";
 /// producer's code is observed running and covers the operating system's
 /// assessment of a newly placed executable; the ready deadline runs from that
 /// observation and keeps 013's value. Both values are provisional until the
-/// measurements of 043 section 5 are recorded in its section 7.
-const START_TIMEOUT: Duration = Duration::from_secs(60);
-const READY_TIMEOUT: Duration = Duration::from_secs(20);
-const GRACE: Duration = Duration::from_secs(10);
+/// measurements of 043 section 5 are recorded in its section 7. Public so
+/// the measurement harness runs the run path's own values, not copies.
+pub const START_TIMEOUT: Duration = Duration::from_secs(60);
+/// See [`START_TIMEOUT`].
+pub const READY_TIMEOUT: Duration = Duration::from_secs(20);
+/// See [`START_TIMEOUT`].
+pub const GRACE: Duration = Duration::from_secs(10);
 
 /// The Linux residuals a sidecar record must name; without them no posture
 /// is qualified (section 4).
