@@ -39,6 +39,14 @@ pub fn declarations() -> Vec<Declaration> {
     vec![provider::environment::declaration()]
 }
 
+/// The selected adapter's capability declaration (spec 047 section 3.1).
+///
+/// Launch and witness decisions read its fields; none asks which adapter it
+/// is (section 3.2).
+pub fn capabilities() -> statecraft_adapter::capabilities::AdapterCapabilities {
+    provider::declared()
+}
+
 /// The ratified adapter set as it applies to one target.
 ///
 /// Spec 030 section 3.2: the adapter's pointer is the last link of the delivery
@@ -288,6 +296,27 @@ mod tests {
         let set = declarations();
         assert_eq!(set.len(), 1);
         assert_eq!(set[0].harness, provider::environment::HARNESS);
+    }
+
+    // Spec 047: the selected adapter fits every launch `run` can ask for,
+    // through the same code the seam's fixture adapter is refused by, so
+    // declaring today's behaviour changes no run.
+    #[test]
+    fn the_selected_adapter_fits_every_launch_it_ran_before() {
+        use statecraft_adapter::capabilities::{Needs, fit};
+        use statecraft_adapter::witness::posture::Requirement;
+        for (requested, required) in [(false, false), (true, false), (true, true)] {
+            for managed in [false, true] {
+                let witness = Requirement {
+                    requested,
+                    required,
+                };
+                let fitted = fit(&capabilities(), &Needs::launch(witness, managed));
+                assert!(!fitted.refuses(), "{fitted:?}");
+                assert!(fitted.degraded.is_empty(), "{fitted:?}");
+                assert_eq!(fitted.witness_requirement(witness), witness);
+            }
+        }
     }
 
     #[test]
