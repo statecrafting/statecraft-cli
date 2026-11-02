@@ -207,6 +207,16 @@ class used (`api-key` or `oauth`), never the value. A `findings` verdict blocks
 Environment for that run. In the merge queue the review is not re-run: `ci-gate`
 reads the verdict recorded for the entry's pull-request head.
 
+**The review never sees `.statecraft/derived/`.** The workflow passes it as
+`EXCLUDE`, so a change's regenerated shards are in neither the diff the
+reviewer reads nor its list of changed paths. Their freshness is not the
+review's to judge: the `governance` job runs `gate.sh governance` on the
+head, whose `spec-spine check` and `index check` fail a tree whose shards are
+stale. A
+review must not report a spec edit, a `spec-spine.toml` change or a newly
+claimed file as missing its regenerated shards because none appear in the
+diff; that absence is the exclusion, not the omission.
+
 **A pull request never judges itself with its own gate** (revisions 5 and 6):
 `gate.sh`, `install-spec-spine.sh`, `ci-gate.sh` and the authored-content
 script run as they exist on `main`. **Any change to the CI's own files (every

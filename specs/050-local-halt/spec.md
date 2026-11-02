@@ -2,7 +2,7 @@
 id: "050-local-halt"
 title: "A local halt record that run consults before launch, and denies when it cannot read"
 status: approved
-implementation: pending
+implementation: complete
 created: "2026-10-21"
 summary: >
   Adds an operator-written halt record in the product home, per registered
@@ -16,10 +16,13 @@ summary: >
 amends:
   - "003-work-and-run-semantics"
   - "006-command-surface"
-# No `extends` yet: the implementing change adds the edges on
-# crates/statecraft-run/ (003) and crates/statecraft-cli/ (006) with the code.
+extends:
+  - { spec: "003-work-and-run-semantics", unit: { kind: directory, path: "crates/statecraft-run/" }, nature: additive }
+  - { spec: "006-command-surface", unit: { kind: directory, path: "crates/statecraft-cli/" }, nature: additive }
+  - { spec: "004-execution-adapter", unit: { kind: directory, path: "crates/statecraft-adapter/" }, nature: additive }
 depends_on:
   - "003-work-and-run-semantics"
+  - "004-execution-adapter"
   - "006-command-surface"
 # `obligations` is spec-spine's own frontmatter field, used by approved specs
 # such as 013, 014 and 018; `make gate` lints it with --fail-on-warn.
@@ -74,7 +77,9 @@ and makes this record also consult it.
 `runs`. The tool-effects scope reaches a live attempt through the admission
 gate the child already executes (spec 002 section 3.32 rule 26) and the
 exchange directory it reads (spec 004 section 3.18 rule 5); the gate script's
-contracts are unchanged.
+contracts are unchanged. `statecraft-adapter`'s supervision loop gains a poll
+on which a watch may stop the attempt, which is how a live supervisor acts on
+a halt (section 5, 2026-11-01).
 
 ## 3. Behavior
 
@@ -142,10 +147,87 @@ same way a tampered record is.
 refusals read alike if both are adopted. The local refusal is `halted`, not
 `tenant-halted`, because there is no tenant here.
 
+**2026-10-31: a halt entry is its own record kind, and "truncated" means a
+torn tail.** Halt, resume and stop-confirmed entries are written under the
+record kind `halt`, which the run fold skips and the halt fold alone reads,
+strictly: an entry with an unknown scope, subject or field is unreadable, not
+half-read. A chain that ends mid-entry is unreadable too, because the fold
+cannot know what the torn bytes would have said; the next appending write
+(`halt`, `resume`, `run reconcile`) reports and clears the tail as spec 003
+section 3.8 already has it. `stop-confirmed` is appended by the supervisor
+that concluded the attempt, after its `cancelled` outcome record, so the two
+facts are two records in order.
+
+**2026-11-01: the supervisor polls the halt record (owner decision).** The
+owner: "approved 050 recommendation; supervisor polls the halt record". A live
+attempt's supervising process reads for halts on its own cadence; no signal,
+process id or other channel reaches it. When a halt of `run-admission` or
+`tool-effects` asks its attempt to stop, it stops the process group and
+concludes the attempt `cancelled` as an operator cancellation (spec 003
+section 3.4), not `interrupted`, after which `stop-confirmed` follows as
+section 3.4 says. For `tool-effects` it first replaces the exchange copy of
+the decision with `{"decision":"halted",...}` naming the scope, the operator
+and the reason, written beside and renamed over, so the gate refuses the next
+governed call with no change to the gate script. Only a published decision is
+replaced: before one exists the gate already holds every call, and the
+launcher's own copy is written once. A `dispatch` halt or a resume is recorded
+and stops nothing. The cadence is 250 ms: well inside the time an operator
+takes to look at `runs` after `halt`, and one directory listing in every
+twenty-five turns of a loop that turns every 10 ms. An attempt whose
+accounting already counts a refusal stays `refused`, as spec 003 section 3.5
+decides any outcome.
+
+**2026-11-01: a halt reaches a live supervisor through a request file (owner
+decision).** The owner, choosing among the routes the previous entry needed:
+"Request file (Recommended)". This amends section 3.1's single-record rule for
+the live case only. A `run` supervising an attempt holds the repository lock
+until its outcome is durable (spec 003 section 3.1.4 rule 7), and the chain
+appends from the head it read, so `halt` and `resume` cannot append while one
+runs. Finding the lock held, they write the change as a request file in
+`<home>/records/<key>.halt-requests/`, beside the chain and keyed as it is,
+outside any target and the confinement: one file per request, written and
+synced under a hidden name, then linked to a name that sorts in request order,
+which fails rather than replaces, and the directory synced. They answer 0 that
+the change is queued, not that the lock is busy. A request is not the halt
+state: until appended, nothing reads it as one, and `runs` does not show it.
+The supervisor holding the lock, at each poll, appends every queued request in
+order as the entry it asked for (its operator, reason and time), then removes
+the file once the entry is durable. Its own appends are compared with the bytes
+it left, as its launch records are (spec 003 section 3.5.1), and it appends
+nothing to a record that changed under it. A request that does not read might
+be a halt, so it fails closed: the supervisor stops the attempt as
+`interrupted` with `halt-state-unreadable`, and every later writer refuses with
+that reason until an operator removes the file. A request no supervisor lived
+to apply is never lost: `halt`, `resume`, `run` and `run reconcile`, having
+taken the lock, append what is queued before their own write, and `halt` and
+`resume` report what they appended. An attempt that never reached an outcome
+keeps that stop requested, never confirmed.
+
 ## Verification
 
-Ratified by the owner on 2026-10-31. Acceptance is declared by the
-implementing change, which will refuse `run` under a halted `run-admission`
-scope, refuse it with `halt-state-unreadable` against a truncated, unparsable
-and a chain-mismatched record, admit it after `resume`, and show
-`stop-requested` then `stop-confirmed` across a halt during a live attempt.
+Ratified by the owner on 2026-10-31. Acceptance is run through
+`make verify SPEC=050`, against fixture homes and a stub spec-spine, with no
+provider.
+
+```verify:cli
+cargo test -p statecraft-run --test local_halt
+cargo test -p statecraft-cli --test local_halt
+cargo test -p statecraft-cli --test run_startup local_halt_
+cargo test -p statecraft-adapter --lib a_watch_that_stops_at_its_poll
+```
+
+These refuse `run` under a halted `run-admission` scope with exit 2 and
+`halted` naming the scope, the operator and the reason; refuse it with
+`halt-state-unreadable` against a truncated, an unparsable and a
+chain-mismatched record; admit it after `resume`; show the halt state in `run
+list`; and show `stop-requested` across a halt of a live attempt until its
+`cancelled` outcome is durable, then `stop-confirmed`, and never confirmed for
+any other outcome. Against a live fixture attempt whose `run` holds the
+lock, they queue a `halt`, and show the supervisor append it with
+`stop-requested`, cancel the attempt, and the record carry the halt, the
+`cancelled` outcome and `stop-confirmed` in that order; for `tool-effects`,
+the halted decision in the exchange directory and the gate refusing the next
+call; a request no supervisor applied appended and reported by the next
+`halt`, its attempt left `stop-requested`; an attempt no halt reaches
+unchanged; and a supervision loop whose watch stops at its poll killing the
+group between events.

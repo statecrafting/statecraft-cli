@@ -145,7 +145,12 @@ impl SuiteSource for SpecSpineVerify {
 /// Reads the chain's entries and nothing else. `run_id` selects; everything else
 /// comes from the entries, each value naming the record it was folded from.
 pub fn fold(run_id: &str, entries: &[Entry]) -> ReviewableOutcome {
-    let mine: Vec<&Entry> = entries.iter().filter(|e| e.run_id == run_id).collect();
+    // Spec 048: an operation's records (its outcome, a lease, a refusal) are
+    // neither the attempt's outcome nor its accounting, so they are skipped.
+    let mine: Vec<&Entry> = entries
+        .iter()
+        .filter(|e| e.run_id == run_id && !statecraft_run::operation::is_operation_record(e))
+        .collect();
     let outcome_entry = mine.iter().rev().find(|e| e.kind == Kind::Outcome).copied();
     let accounting_entry = mine
         .iter()
@@ -416,6 +421,56 @@ mod tests {
             other => panic!("expected not-attempted, got {other:?}"),
         }
         assert_eq!(account.refusals.value, ["permission-deny-rule/Bash"]);
+    }
+
+    #[test]
+    fn an_operations_records_are_neither_the_attempts_outcome_nor_its_refusal_count() {
+        use statecraft_run::operation::{LEASE_SUBJECT, OPERATION_SUBJECT, REFUSED_SUBJECT};
+        // Spec 048: a retry's outcome, a lease and a recorded refusal land
+        // after the attempt's own records, and the fold must still read the
+        // attempt's.
+        let entries = vec![
+            entry(
+                Kind::Outcome,
+                "r1",
+                1,
+                "attempt",
+                json!({"outcome": "refused"}),
+            ),
+            entry(Kind::Accounting, "r1", 1, "refusals", json!({"count": 3})),
+            entry(
+                Kind::Accounting,
+                "r1",
+                1,
+                LEASE_SUBJECT,
+                json!({"state": "acquired", "count": 9}),
+            ),
+            entry(
+                Kind::Accounting,
+                "r1",
+                1,
+                REFUSED_SUBJECT,
+                json!({"reason": "stale-version", "count": 9}),
+            ),
+            entry(
+                Kind::Outcome,
+                "r1",
+                1,
+                OPERATION_SUBJECT,
+                json!({"outcome": "completed", "result": "launched"}),
+            ),
+        ];
+        let account = fold("r1", &entries);
+        match &account.acceptance.value {
+            Acceptance::NotAttempted {
+                reason,
+                refusal_count,
+            } => {
+                assert_eq!(reason.word(), "attempt-refused");
+                assert_eq!(*refusal_count, Some(3));
+            }
+            other => panic!("expected not-attempted, got {other:?}"),
+        }
     }
 
     #[test]
