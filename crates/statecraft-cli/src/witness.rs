@@ -539,6 +539,10 @@ impl<E> Watch<E> for Custody<'_, E> {
         }
         self.inner.event(event)
     }
+
+    fn poll(&mut self) -> Control {
+        self.inner.poll()
+    }
 }
 
 /// The sidecar's whole environment.

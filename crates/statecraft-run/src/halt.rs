@@ -17,9 +17,19 @@
 //! Stopping a live attempt is two facts, not one (section 3.4): `stop-requested`
 //! is written by the halt, `stop-confirmed` only once that attempt's
 //! `cancelled` outcome is durable. The fold reports exactly what is recorded.
+//!
+//! A halt or resume made while a `run` holds the repository lock cannot be
+//! appended by the operator's process (spec 003 section 3.1.4 rule 7), so it
+//! is **queued** as a request file beside the chain, and the supervisor
+//! holding the lock appends it ([`queue`], [`apply_pending`]; section 5,
+//! 2026-11-01). A request is not the halt state: the record is, once the
+//! request is appended. Every writer that takes the lock to append a halt,
+//! a resume, an attempt or a reconciliation applies what is queued first, so
+//! a request a crashed supervisor left behind is applied, never lost.
 
 use crate::record::{Chain, Entry, Identity, Kind, RecordError};
 use serde::{Deserialize, Serialize};
+use std::path::{Path, PathBuf};
 
 /// The three scopes a halt names (section 3.2). Each is halted and resumed
 /// independently; a halt with no scope halts all three.
@@ -330,6 +340,16 @@ pub enum HaltError {
     /// The record could not be written.
     #[error(transparent)]
     Record(#[from] RecordError),
+    /// A request could not be queued, or an applied one could not be removed.
+    #[error("the halt request {path} could not be {what}: {source}")]
+    Queue {
+        /// The request file, or its directory.
+        path: String,
+        /// `queued` or `removed after it was appended`.
+        what: &'static str,
+        /// Why.
+        source: std::io::Error,
+    },
 }
 
 /// What a halt or resume did.
@@ -472,4 +492,197 @@ pub fn confirm_stop(
         },
     )?;
     Ok(true)
+}
+
+// ---------------------------------------------------------------------------
+// Requests queued for a live supervisor (section 5, 2026-11-01).
+// ---------------------------------------------------------------------------
+
+/// Where halt and resume requests wait for the supervisor holding the lock:
+/// beside the chain, in the product home's run records, keyed as the chain is,
+/// so outside any target and outside the confinement (section 3.1).
+#[must_use]
+pub fn requests_dir(home: &Path, target: &Path) -> PathBuf {
+    crate::record::chain_path(home, target).with_extension("halt-requests")
+}
+
+/// One queued request: what `halt` or `resume` would have appended.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct Queued {
+    /// `halt` or `resume`.
+    pub change: String,
+    /// The scopes, resolved: never empty.
+    pub scopes: Vec<Scope>,
+    /// Who asked.
+    pub operator: String,
+    /// Why.
+    pub reason: String,
+    /// When the operator asked, RFC 3339 UTC; the entry carries this time.
+    pub at: String,
+}
+
+fn queue_error(path: &Path, what: &'static str) -> impl FnOnce(std::io::Error) -> HaltError {
+    let path = path.display().to_string();
+    move |source| HaltError::Queue { path, what, source }
+}
+
+fn sync_dir(dir: &Path) -> std::io::Result<()> {
+    std::fs::File::open(dir)?.sync_all()
+}
+
+/// Queue a halt or resume for the supervisor holding the lock. One file per
+/// request, named so that names sort in the order requests were made, and
+/// published without replacing anything: written and synced under a hidden
+/// name, then linked to its final name, which fails rather than replaces.
+/// Returns the request's path once it and its directory entry are durable.
+pub fn queue(
+    home: &Path,
+    target: &Path,
+    change: &str,
+    request: &Request<'_>,
+) -> Result<PathBuf, HaltError> {
+    use std::io::Write;
+    check(request)?;
+    if change != HALT_SUBJECT && change != RESUME_SUBJECT {
+        return Err(HaltError::Refused(format!(
+            "`{change}` is not a halt change"
+        )));
+    }
+    let queued = Queued {
+        change: change.to_string(),
+        scopes: scopes_of(request),
+        operator: request.operator.to_string(),
+        reason: request.reason.to_string(),
+        at: request.at.to_string(),
+    };
+    let dir = requests_dir(home, target);
+    std::fs::create_dir_all(&dir).map_err(queue_error(&dir, "queued"))?;
+    if let Some(parent) = dir.parent() {
+        sync_dir(parent).map_err(queue_error(&dir, "queued"))?;
+    }
+    let mut bytes = serde_json::to_vec(&queued).unwrap_or_default();
+    bytes.push(b'\n');
+    let nanos = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map_or(0, |d| d.as_nanos());
+    let pid = std::process::id();
+    let hidden = dir.join(format!(".{nanos:024}-{pid}.partial"));
+    let written = (|| {
+        let mut file = std::fs::OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .open(&hidden)?;
+        file.write_all(&bytes)?;
+        file.sync_all()
+    })();
+    if let Err(e) = written {
+        let _ = std::fs::remove_file(&hidden);
+        return Err(queue_error(&hidden, "queued")(e));
+    }
+    let mut published = None;
+    for n in 0..64u32 {
+        let name = dir.join(format!("{nanos:024}-{pid}-{n:02}.json"));
+        match std::fs::hard_link(&hidden, &name) {
+            Ok(()) => {
+                published = Some(name);
+                break;
+            }
+            Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => continue,
+            Err(e) => {
+                let _ = std::fs::remove_file(&hidden);
+                return Err(queue_error(&name, "queued")(e));
+            }
+        }
+    }
+    let _ = std::fs::remove_file(&hidden);
+    let Some(path) = published else {
+        return Err(queue_error(&dir, "queued")(std::io::Error::new(
+            std::io::ErrorKind::AlreadyExists,
+            "every candidate name is taken",
+        )));
+    };
+    sync_dir(&dir).map_err(queue_error(&dir, "queued"))?;
+    Ok(path)
+}
+
+/// Every queued request, oldest first. A request that cannot be read is
+/// `halt-state-unreadable`, like an entry that does not parse: it might be a
+/// halt, so nothing reads it as absent. Hidden names are a request still
+/// being written, and are not yet requests.
+pub fn pending(home: &Path, target: &Path) -> Result<Vec<(PathBuf, Queued)>, Refusal> {
+    let dir = requests_dir(home, target);
+    let entries = match std::fs::read_dir(&dir) {
+        Ok(entries) => entries,
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(Vec::new()),
+        Err(e) => {
+            return Err(Refusal::Unreadable {
+                detail: format!("the halt requests at {} cannot be read: {e}", dir.display()),
+            });
+        }
+    };
+    let mut paths = Vec::new();
+    for entry in entries {
+        let entry = entry.map_err(|e| Refusal::Unreadable {
+            detail: format!("the halt requests at {} cannot be read: {e}", dir.display()),
+        })?;
+        let name = entry.file_name();
+        if name.to_string_lossy().starts_with('.') {
+            continue;
+        }
+        paths.push(entry.path());
+    }
+    paths.sort();
+    let mut out = Vec::new();
+    for path in paths {
+        let queued = std::fs::read(&path)
+            .map_err(|e| e.to_string())
+            .and_then(|bytes| serde_json::from_slice::<Queued>(&bytes).map_err(|e| e.to_string()))
+            .and_then(|q| {
+                if q.change != HALT_SUBJECT && q.change != RESUME_SUBJECT {
+                    Err(format!("the unknown change `{}`", q.change))
+                } else if q.scopes.is_empty() {
+                    Err("no scope".to_string())
+                } else {
+                    Ok(q)
+                }
+            })
+            .map_err(|why| Refusal::Unreadable {
+                detail: format!("the halt request {} does not read: {why}", path.display()),
+            })?;
+        out.push((path, queued));
+    }
+    Ok(out)
+}
+
+/// Append every queued request, oldest first, as the entry it asked for, and
+/// remove each file only once its entry is durable. The caller holds the
+/// repository lock: the supervisor of a live attempt, or `halt`, `resume`,
+/// `run` or `run reconcile` before its own write. A request that does not
+/// read refuses the whole call and is left in place, appending nothing.
+pub fn apply_pending(
+    chain: &mut Chain,
+    home: &Path,
+    target: &Path,
+) -> Result<Vec<Applied>, HaltError> {
+    let queued = pending(home, target)?;
+    let mut applied = Vec::new();
+    for (path, q) in queued {
+        let request = Request {
+            scopes: &q.scopes,
+            operator: &q.operator,
+            reason: &q.reason,
+            at: &q.at,
+        };
+        applied.push(if q.change == HALT_SUBJECT {
+            halt(chain, &request)?
+        } else {
+            resume(chain, &request)?
+        });
+        std::fs::remove_file(&path).map_err(queue_error(&path, "removed after it was appended"))?;
+        if let Some(dir) = path.parent() {
+            sync_dir(dir).map_err(queue_error(&path, "removed after it was appended"))?;
+        }
+    }
+    Ok(applied)
 }

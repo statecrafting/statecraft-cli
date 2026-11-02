@@ -334,3 +334,119 @@ fn an_attempt_that_ends_any_other_way_leaves_the_stop_requested_never_confirmed(
     let dispatch = halt::halt(&mut chain, &request(&[Scope::Dispatch], "t3")).unwrap();
     assert!(dispatch.detail.stop_requested.is_none());
 }
+
+// ---- Requests queued for a live supervisor (section 5, 2026-11-01) ----
+
+#[test]
+fn a_queued_request_is_outside_the_record_until_applied_then_appended_in_order_and_removed() {
+    let home = tempfile::tempdir().unwrap();
+    let target = repo();
+    let (mut chain, _) = Chain::open(home.path(), target.path()).unwrap();
+    let session = begin(&mut chain, target.path(), "r1", 0).unwrap();
+
+    let first = halt::queue(
+        home.path(),
+        target.path(),
+        "halt",
+        &request(&[Scope::ToolEffects], "t1"),
+    )
+    .unwrap();
+    let second = halt::queue(
+        home.path(),
+        target.path(),
+        "resume",
+        &request(&[Scope::Dispatch], "t2"),
+    )
+    .unwrap();
+    // Beside the chain, in the product home, never in the target.
+    assert_eq!(
+        first.parent().unwrap(),
+        halt::requests_dir(home.path(), target.path())
+    );
+    assert!(first.starts_with(home.path()));
+    assert_eq!(
+        chain_path(home.path(), target.path()).parent(),
+        halt::requests_dir(home.path(), target.path()).parent()
+    );
+    // A request is not the halt state: the record says nothing yet.
+    assert!(halt::fold(&chain).unwrap().halted.is_empty());
+    let pending = halt::pending(home.path(), target.path()).unwrap();
+    assert_eq!(
+        pending.iter().map(|(p, _)| p.clone()).collect::<Vec<_>>(),
+        vec![first.clone(), second.clone()]
+    );
+
+    let applied = halt::apply_pending(&mut chain, home.path(), target.path()).unwrap();
+    assert_eq!(
+        applied
+            .iter()
+            .map(|a| a.change.as_str())
+            .collect::<Vec<_>>(),
+        ["halt", "resume"]
+    );
+    assert!(!first.exists() && !second.exists());
+    assert!(
+        halt::pending(home.path(), target.path())
+            .unwrap()
+            .is_empty()
+    );
+    let state = halt::fold(&chain).unwrap();
+    let h = state
+        .of(Scope::ToolEffects)
+        .expect("the queued halt is recorded");
+    assert_eq!((h.operator.as_str(), h.at.as_str()), ("bart", "t1"));
+    // Applied while the attempt was live, so it asked that attempt to stop.
+    assert_eq!(state.stop_of("r1", 1).unwrap().word(), "stop-requested");
+    // Durable in the record: a fresh open reads the same state.
+    let (reopened, _) = Chain::open(home.path(), target.path()).unwrap();
+    assert_eq!(halt::fold(&reopened).unwrap(), state);
+    drop(session);
+}
+
+#[test]
+fn a_request_that_does_not_read_refuses_with_halt_state_unreadable_and_appends_nothing() {
+    let home = tempfile::tempdir().unwrap();
+    let target = repo();
+    let (mut chain, _) = Chain::open(home.path(), target.path()).unwrap();
+    let good = halt::queue(
+        home.path(),
+        target.path(),
+        "halt",
+        &request(&[Scope::RunAdmission], "t1"),
+    )
+    .unwrap();
+    let bad = halt::requests_dir(home.path(), target.path()).join("0-torn.json");
+    std::fs::write(&bad, b"{\"change\":\"halt\",\"scop").unwrap();
+    let before = chain.records().len();
+    match halt::apply_pending(&mut chain, home.path(), target.path()) {
+        Err(HaltError::Unreadable(r)) => assert_eq!(r.reason(), "halt-state-unreadable"),
+        other => panic!("expected halt-state-unreadable, got {other:?}"),
+    }
+    assert_eq!(chain.records().len(), before, "nothing was appended");
+    assert!(good.exists() && bad.exists(), "nothing was removed");
+    // A hidden name is a request still being written, not a request.
+    std::fs::remove_file(&bad).unwrap();
+    std::fs::write(
+        halt::requests_dir(home.path(), target.path()).join(".partial"),
+        b"",
+    )
+    .unwrap();
+    assert_eq!(halt::pending(home.path(), target.path()).unwrap().len(), 1);
+}
+
+#[test]
+fn a_request_with_no_operator_or_reason_is_not_queued() {
+    let home = tempfile::tempdir().unwrap();
+    let target = repo();
+    let empty = Request {
+        scopes: &[],
+        operator: " ",
+        reason: "why",
+        at: "t1",
+    };
+    assert!(matches!(
+        halt::queue(home.path(), target.path(), "halt", &empty),
+        Err(HaltError::Refused(_))
+    ));
+    assert!(!halt::requests_dir(home.path(), target.path()).exists());
+}

@@ -110,6 +110,15 @@ pub fn launch_attempt(
         }
         Err(e) => return slice::halt_refused_answer(&statecraft_run::halt::Refusal::from(e)),
     };
+    // Spec 050 section 5, 2026-11-01: a request queued while another run
+    // held the lock, and left behind when that supervisor ended without
+    // applying it, is appended first, so a queued halt refuses this launch.
+    if let Err(e) = statecraft_run::halt::apply_pending(&mut chain, home, root) {
+        return match e {
+            statecraft_run::halt::HaltError::Unreadable(r) => slice::halt_refused_answer(&r),
+            other => failed(&other.to_string()),
+        };
+    }
     if let Err(refusal) = statecraft_run::halt::admit(&chain) {
         return slice::halt_refused_answer(&refusal);
     }
@@ -871,6 +880,11 @@ pub fn launch_attempt(
     // digested after the intent is durable and before the spawn, under the
     // repository lock this process holds throughout.
     let before = statecraft_run::tamper::Snapshot::take(home, root);
+    // Spec 050 section 5, 2026-11-01: while the attempt runs, its supervisor
+    // polls for halt requests queued while it holds the lock, appends them,
+    // and stops the attempt a halt asks to stop. It borrows the chain for the
+    // supervision only.
+    let mut poller = HaltPoller::new(&mut chain, home, root, &exchange, &run_id, session.attempt);
     let supervised = match (watch.as_mut(), &sentinel) {
         // Spec 002 section 3.33 rule 34: the trial keeps a timeline beside
         // the attempt's own watch, which it forwards to unchanged.
@@ -882,7 +896,10 @@ pub fn launch_attempt(
                 &environment,
                 &negotiation.granted,
                 &exchange,
-                &mut witness.custody(&mut kept),
+                &mut witness.custody(&mut Polled {
+                    inner: &mut kept,
+                    poller: &mut poller,
+                }),
             );
             if supervised.is_ok() {
                 kept.decide_at_end();
@@ -900,7 +917,10 @@ pub fn launch_attempt(
                 &environment,
                 &negotiation.granted,
                 &exchange,
-                &mut witness.custody(&mut *w),
+                &mut witness.custody(&mut Polled {
+                    inner: &mut *w,
+                    poller: &mut poller,
+                }),
             );
             if supervised.is_ok() {
                 // A stream that ended before its decision point is decided at
@@ -915,17 +935,25 @@ pub fn launch_attempt(
             &environment,
             &negotiation.granted,
             &exchange,
-            &mut witness.custody(&mut statecraft_adapter::supervisor::Unwatched),
+            &mut witness.custody(&mut Polled {
+                inner: &mut statecraft_adapter::supervisor::Unwatched,
+                poller: &mut poller,
+            }),
         ),
     };
+    let halted = poller.finish();
     let watched = watch.map(|w| w.watched()).unwrap_or_default();
     // ... and again once the process has ended, before anything is appended.
     // The chain appends from the head it read at opening, so a change found
     // here ends the attempt's writes: it stays live (rule 2).
     let record_change = before
         .and_then(|before| {
+            // The supervisor's own halt appends are compared with the bytes
+            // it left, as its own launch records are (section 5, 2026-11-01).
+            let mut wrote = watched.wrote.clone();
+            wrote.extend(halted.wrote.clone());
             statecraft_run::tamper::Snapshot::take(home, root)
-                .map(|after| after.changes_since(&before, &watched.wrote))
+                .map(|after| after.changes_since(&before, &wrote))
         })
         .map_err(|e| format!("the record could not be digested: {e}"));
     if let Ok(changes) = &record_change
@@ -1137,15 +1165,14 @@ pub fn launch_attempt(
             detail: format!("the witness outcome could not be written: {why}"),
         });
     }
-    crate::attempt::conclude(
-        clock,
-        &mut chain,
-        &places,
-        &session,
-        Some(&boundary_admission),
-        execution.termination(),
-        &accounting,
-        witness.marked(serde_json::json!({
+    // Spec 050 section 3.4 and spec 003 section 3.4: an attempt a halt
+    // stopped was cancelled by an operator, not interrupted; the provider's
+    // own claim is kept beside it unchanged.
+    let mut termination = execution.termination();
+    if halted.stop.is_some() {
+        termination.observed = statecraft_run::attempt::Outcome::Cancelled;
+    }
+    let mut detail = serde_json::json!({
             "requested": negotiation
                 .granted
                 .iter()
@@ -1163,9 +1190,273 @@ pub fn launch_attempt(
             },
             "harnessStanding": standing.word(),
             "startup": startup.detail,
-        })),
+    });
+    if let Some(evidence) = halted.evidence() {
+        detail["halt"] = evidence;
+    }
+    crate::attempt::conclude(
+        clock,
+        &mut chain,
+        &places,
+        &session,
+        Some(&boundary_admission),
+        termination,
+        &accounting,
+        witness.marked(detail),
         startup.run,
         &contract,
         trial,
     )
+}
+
+/// How often a supervisor reads the halt requests queued for it (spec 050
+/// section 5, 2026-11-01): a quarter second, well under the time a person
+/// takes to look at `run list` after `halt`, and a directory listing that
+/// rarely holds anything, so the cost on a supervision loop that turns every
+/// 10 ms is one listing in twenty-five turns.
+pub const HALT_POLL: std::time::Duration = std::time::Duration::from_millis(250);
+
+/// The halted decision the admission gate reads in place of the startup
+/// decision once `tool-effects` is halted (spec 050 section 3.2). Anything but
+/// `admitted` refuses, so the gate script is unchanged.
+pub const HALTED_DECISION: &str = "halted";
+
+/// What the supervisor's halt poll did, once the supervision has ended.
+#[derive(Debug, Default)]
+struct HaltPolled {
+    /// The stop a halt asked of this attempt, which this supervisor acted on.
+    stop: Option<statecraft_run::halt::Stop>,
+    /// Whether `tool-effects` was halted, and what writing the halted
+    /// decision into the exchange directory came to.
+    tool_effects: Option<Result<(), String>>,
+    /// Why polling ended without a halt: a request that does not read, a
+    /// record that could not be written, or a record changed underneath.
+    failure: Option<String>,
+    /// The record's bytes as the supervisor's own appends left them, for the
+    /// tamper comparison.
+    wrote: Vec<(std::path::PathBuf, Vec<u8>)>,
+}
+
+impl HaltPolled {
+    /// The outcome record's `halt` detail, where the poll did anything.
+    fn evidence(&self) -> Option<serde_json::Value> {
+        if self.stop.is_none() && self.failure.is_none() && self.wrote.is_empty() {
+            return None;
+        }
+        Some(serde_json::json!({
+            "stop": self.stop,
+            "toolEffectsDecision": self.tool_effects.as_ref().map(|r| match r {
+                Ok(()) => serde_json::json!("written"),
+                Err(why) => serde_json::json!({ "failed": why }),
+            }),
+            "failure": self.failure,
+        }))
+    }
+}
+
+/// The supervisor's halt poll (spec 050 section 5, 2026-11-01). Holds the
+/// attempt's chain for the length of the supervision; the repository lock is
+/// held by the caller throughout.
+struct HaltPoller<'c> {
+    chain: &'c mut Chain,
+    home: &'c std::path::Path,
+    root: &'c std::path::Path,
+    exchange: &'c std::path::Path,
+    run_id: &'c str,
+    attempt: u32,
+    last: Option<std::time::Instant>,
+    /// The record's bytes as this supervisor last saw or left them. A record
+    /// that differs is not appended to: the tamper comparison reports it.
+    expected: Option<Vec<u8>>,
+    polled: HaltPolled,
+    done: bool,
+}
+
+impl<'c> HaltPoller<'c> {
+    fn new(
+        chain: &'c mut Chain,
+        home: &'c std::path::Path,
+        root: &'c std::path::Path,
+        exchange: &'c std::path::Path,
+        run_id: &'c str,
+        attempt: u32,
+    ) -> Self {
+        let expected = std::fs::read(statecraft_run::record::chain_path(home, root)).ok();
+        Self {
+            chain,
+            home,
+            root,
+            exchange,
+            run_id,
+            attempt,
+            last: None,
+            expected,
+            polled: HaltPolled::default(),
+            done: false,
+        }
+    }
+
+    fn poll(&mut self) -> statecraft_adapter::supervisor::Control {
+        use statecraft_adapter::supervisor::Control;
+        use statecraft_run::halt;
+        if self.done {
+            return Control::Continue;
+        }
+        let now = std::time::Instant::now();
+        if self
+            .last
+            .is_some_and(|last| now.duration_since(last) < HALT_POLL)
+        {
+            return Control::Continue;
+        }
+        self.last = Some(now);
+        match halt::pending(self.home, self.root) {
+            Ok(queued) if queued.is_empty() => return Control::Continue,
+            Ok(_) => {}
+            // A request that does not read may be a halt: the attempt is not
+            // let run past it (section 3.3's fail-closed rule), and it is
+            // stopped as interrupted, since no halt is recorded.
+            Err(refusal) => return self.fail(refusal.to_string()),
+        }
+        let chain_path = statecraft_run::record::chain_path(self.home, self.root);
+        if std::fs::read(&chain_path).ok() != self.expected {
+            // Not appended to: the record changed under this supervisor, and
+            // the comparison after the process ends reports it. The request
+            // stays queued for the next writer.
+            self.done = true;
+            self.polled.failure = Some(
+                "the run record changed during the attempt, so the queued halt request was not                  appended and stays queued"
+                    .to_string(),
+            );
+            return Control::Continue;
+        }
+        let applied = halt::apply_pending(self.chain, self.home, self.root);
+        if let Ok(bytes) = std::fs::read(&chain_path) {
+            if Some(&bytes) != self.expected.as_ref() {
+                self.polled.wrote = vec![(chain_path.clone(), bytes.clone())];
+            }
+            self.expected = Some(bytes);
+        }
+        if let Err(e) = applied {
+            return self.fail(e.to_string());
+        }
+        let state = match halt::fold(self.chain) {
+            Ok(state) => state,
+            Err(refusal) => return self.fail(refusal.to_string()),
+        };
+        let Some(stop) = state
+            .stop_of(self.run_id, self.attempt)
+            .filter(|s| s.confirmed_at.is_none())
+            .cloned()
+        else {
+            // A dispatch halt, or a resume: recorded, and nothing to stop.
+            return Control::Continue;
+        };
+        self.done = true;
+        if let Some(h) = state.of(halt::Scope::ToolEffects) {
+            self.polled.tool_effects = Some(write_halted_decision(self.exchange, h));
+        }
+        let why = format!(
+            "halted by {} at {}: {}; the attempt is cancelled",
+            stop.operator, stop.requested_at, stop.reason
+        );
+        self.polled.stop = Some(stop);
+        Control::Stop(why)
+    }
+
+    fn fail(&mut self, why: String) -> statecraft_adapter::supervisor::Control {
+        self.done = true;
+        self.polled.failure = Some(why.clone());
+        statecraft_adapter::supervisor::Control::Stop(why)
+    }
+
+    fn finish(self) -> HaltPolled {
+        self.polled
+    }
+}
+
+/// Replace the exchange copy of the decision with the halted one (spec 050
+/// section 3.2; spec 004 section 3.18 rule 5: the child reads the exchange
+/// directory and creates nothing in it). Written beside and renamed over, so
+/// the gate reads the old decision or the new one, never a torn one. Only a
+/// gated attempt whose decision is already published has a copy to replace:
+/// before it, the gate holds every call anyway, and the launcher's own copy
+/// is written once and refuses a file it did not write.
+fn write_halted_decision(
+    exchange: &std::path::Path,
+    halted: &statecraft_run::halt::Halted,
+) -> Result<(), String> {
+    use std::io::Write;
+    let copy = exchange.join(statecraft_home::launch::files::ADMISSION);
+    if !exchange
+        .join(statecraft_home::launch::files::GATE)
+        .is_file()
+    {
+        return Err("no admission gate reads this attempt's exchange directory".to_string());
+    }
+    if !copy.is_file() {
+        return Err(
+            "no decision was published yet, so the gate already holds every tool call".to_string(),
+        );
+    }
+    let line = format!(
+        "{}\n",
+        serde_json::json!({
+            "decision": HALTED_DECISION,
+            "scope": halted.scope,
+            "operator": halted.operator,
+            "reason": halted.reason,
+            "at": halted.at,
+        })
+    );
+    let partial = exchange.join(format!(".statecraft-halted-{}", std::process::id()));
+    let written = (|| {
+        let mut file = std::fs::OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .open(&partial)?;
+        file.write_all(line.as_bytes())?;
+        file.sync_all()?;
+        std::fs::rename(&partial, &copy)?;
+        std::fs::File::open(exchange)?.sync_all()
+    })();
+    if written.is_err() {
+        let _ = std::fs::remove_file(&partial);
+    }
+    written.map_err(|e| e.to_string())
+}
+
+/// The attempt's watch with the halt poll beside it: every call is forwarded
+/// unchanged, and the poll runs after the inner watch's own.
+struct Polled<'a, 'c> {
+    inner: &'a mut dyn statecraft_adapter::supervisor::Watch<(
+        usize,
+        statecraft_adapter_claude_code::stream::ProviderEvent,
+    )>,
+    poller: &'a mut HaltPoller<'c>,
+}
+
+impl
+    statecraft_adapter::supervisor::Watch<(
+        usize,
+        statecraft_adapter_claude_code::stream::ProviderEvent,
+    )> for Polled<'_, '_>
+{
+    fn spawned(&mut self, pid: u32) -> Result<(), String> {
+        self.inner.spawned(pid)
+    }
+
+    fn event(
+        &mut self,
+        event: &(usize, statecraft_adapter_claude_code::stream::ProviderEvent),
+    ) -> statecraft_adapter::supervisor::Control {
+        self.inner.event(event)
+    }
+
+    fn poll(&mut self) -> statecraft_adapter::supervisor::Control {
+        match self.inner.poll() {
+            statecraft_adapter::supervisor::Control::Continue => self.poller.poll(),
+            stop => stop,
+        }
+    }
 }
