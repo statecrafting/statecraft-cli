@@ -537,10 +537,9 @@ fn run(args: &[String]) -> i32 {
         Verb::TrustRootGenerate | Verb::TrustIssuerSign | Verb::TrustIssuerVerify => {
             trust_verb(invocation.verb, &invocation.rest, format)
         }
-        Verb::AdmissionDryRun => match statecraft_cli::admission::dry_run(&invocation.rest) {
-            Ok(answer) => emit(&answer, format),
-            Err(message) => usage(format, message),
-        },
+        // Dispatched above, before the product home is read (spec 049
+        // section 3.3); the match stays exhaustive without a second route.
+        Verb::AdmissionDryRun => unreachable!("admission dry-run returns before the home is read"),
         Verb::ProviderTokenSet | Verb::ProviderTokenClear | Verb::ProviderTokenShow => {
             let outcome = match invocation.verb {
                 Verb::ProviderTokenSet => {
