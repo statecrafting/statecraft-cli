@@ -903,6 +903,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "statecraft-adapter-codex"
+version = "0.0.0"
+dependencies = [
+ "serde",
+ "serde_json",
+ "statecraft-adapter",
+ "statecraft-run",
+ "statecraft-secret",
+ "tempfile",
+ "thiserror",
+]
+
+[[package]]
 name = "statecraft-cli"
 version = "0.0.0"
 dependencies = [

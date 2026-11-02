@@ -43,6 +43,10 @@
 //!   back out of the record. Added by spec 006's additive edge, because a
 //!   command may not be a second implementation and a binding needs an entry
 //!   point.
+//! - [`operation`] is spec 048's typed run operations: the controller lease,
+//!   the idempotency key and version rules, their brackets in the record, the
+//!   fold that reads them back and the event cursor. Added by spec 048's
+//!   additive edge.
 //! - [`halt`] is spec 050's local halt record: the halt and resume entries in
 //!   the run record, their fold, and the pre-launch check that fails closed.
 //!   Added by spec 050's additive edge.
@@ -62,6 +66,7 @@ pub mod contract;
 pub mod documentation;
 pub mod halt;
 pub mod lock;
+pub mod operation;
 pub mod overrides;
 pub mod policy;
 pub mod reconcile;

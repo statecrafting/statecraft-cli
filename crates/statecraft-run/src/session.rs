@@ -633,8 +633,9 @@ pub fn conclude_observed(
         },
     )?;
 
-    // Spec 050 section 3.4: a stop asked of this attempt is confirmed only now,
-    // after its `cancelled` outcome is durable, and never for another outcome.
+    // Spec 050 section 3.4 and spec 048 section 3.1: a stop asked of this
+    // attempt, by a halt or by an abort, is confirmed only now, after its
+    // `cancelled` outcome is durable, and never for another outcome.
     if decided == Outcome::Cancelled {
         crate::halt::confirm_stop(chain, &session.run_id, session.attempt, &timestamp).map_err(
             |e| match e {
@@ -647,6 +648,7 @@ pub fn conclude_observed(
                 }
             },
         )?;
+        crate::operation::confirm_stop(chain, &session.run_id, session.attempt, &timestamp)?;
     }
 
     Ok(Concluded {
