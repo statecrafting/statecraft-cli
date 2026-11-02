@@ -2497,3 +2497,148 @@ fn local_halt_absent_leaves_an_attempt_unchanged() {
     );
     assert!(!statecraft_run::halt::requests_dir(&f.home(), &f.project()).exists());
 }
+
+// ---- Spec 048: an abort reaching a live supervisor (section 5, 2026-11-02) ----
+
+/// Wait until the record holds a lease for the run, and return it with the
+/// run's version: what a controller reads from `run events` before it acts.
+fn wait_for_lease(f: &Fixture) -> (u64, u64) {
+    let started = std::time::Instant::now();
+    loop {
+        let (chain, _) = statecraft_run::record::Chain::open(&f.home(), &f.project()).unwrap();
+        let state = statecraft_run::operation::fold(&chain, RUN);
+        if let Some(lease) = state.lease {
+            return (lease.id, state.version);
+        }
+        assert!(
+            started.elapsed() < std::time::Duration::from_secs(60),
+            "the supervisor never applied the queued lease: {:?}",
+            f.order()
+        );
+        std::thread::sleep(std::time::Duration::from_millis(20));
+    }
+}
+
+/// Section 3.1 end to end while a `run` holds the lock: the lease and the
+/// abort are queued, the supervisor applies both by section 3.3's rules,
+/// stop-requested precedes the attempt's `cancelled` outcome and
+/// stop-confirmed follows it.
+#[test]
+fn run_operations_abort_of_a_live_attempt_is_queued_applied_by_its_supervisor_and_cancels_it() {
+    use statecraft_run::record::Kind;
+    let f = Fixture::new();
+    let mut guard = run_until_blocked(&f, "block");
+    let root = f.root();
+
+    let out = f.cli(&["run", "lease", &root, RUN, "acquire", "ctl", "--json"]);
+    assert_eq!(code(&out), 0, "{}", text(&out));
+    let queued = json_naming::payload(&json(&out)).clone();
+    assert_eq!(queued["queued"], true, "{queued}");
+    assert_eq!(queued["request"]["request"], "lease-acquire", "{queued}");
+    let (lease, version) = wait_for_lease(&f);
+
+    let out = f.cli(&[
+        "run",
+        "op",
+        &root,
+        RUN,
+        "abort",
+        "ctl",
+        &lease.to_string(),
+        "k-abort",
+        &version.to_string(),
+        "operator",
+        "stop",
+        "--json",
+    ]);
+    assert_eq!(code(&out), 0, "{}", text(&out));
+    let queued = json_naming::payload(&json(&out)).clone();
+    assert_eq!(queued["request"]["request"], "abort", "{queued}");
+    let request = PathBuf::from(queued["file"].as_str().unwrap());
+    assert!(request.starts_with(f.home().join("records")), "{queued}");
+    assert!(!request.starts_with(f.project()));
+
+    wait_for_launcher(&f, &mut guard);
+    assert!(!request.exists(), "an applied request is removed");
+
+    let entries = halt_entries(&f);
+    let intent = entry_at(&entries, |e| {
+        e.kind == Kind::Intent
+            && e.subject == statecraft_run::operation::OPERATION_SUBJECT
+            && e.idempotency_key.as_deref() == Some("k-abort")
+    });
+    let requested = entry_at(&entries, |e| {
+        e.kind == Kind::Outcome
+            && e.subject == statecraft_run::operation::OPERATION_SUBJECT
+            && e.detail["result"] == "stop-requested"
+    });
+    let outcome = entry_at(&entries, |e| {
+        e.kind == Kind::Outcome && e.subject == statecraft_run::session::OUTCOME_SUBJECT
+    });
+    let confirmed = entry_at(&entries, |e| {
+        e.subject == statecraft_run::operation::STOP_CONFIRMED_SUBJECT
+    });
+    assert!(
+        intent < requested && requested < outcome && outcome < confirmed,
+        "{entries:?}"
+    );
+    assert_eq!(entries[outcome].detail["outcome"], "cancelled");
+    assert_eq!(entries[outcome].detail["halt"]["abort"]["key"], "k-abort");
+
+    // The same request again, now with the lock free, replays: nothing is
+    // appended under a key the record holds.
+    let before = halt_entries(&f).len();
+    let again = f.cli(&[
+        "run",
+        "op",
+        &root,
+        RUN,
+        "abort",
+        "ctl",
+        &lease.to_string(),
+        "k-abort",
+        &version.to_string(),
+        "operator",
+        "stop",
+        "--json",
+    ]);
+    assert_eq!(code(&again), 0, "{}", text(&again));
+    assert_eq!(json_naming::payload(&json(&again))["replayed"], true);
+    assert_eq!(halt_entries(&f).len(), before);
+}
+
+/// A request no supervisor lived to apply is applied by the next `run op` or
+/// `run lease`, under its lock, before its own write.
+#[test]
+fn run_operations_request_left_behind_is_applied_by_the_next_lease_verb() {
+    let f = Fixture::new();
+    let first = f.run();
+    assert_eq!(code(&first), 0, "{}", text(&first));
+    let request = statecraft_run::operation::queue(
+        &f.home(),
+        &f.project(),
+        &statecraft_run::operation::Queued::LeaseAcquire {
+            run_id: RUN.to_string(),
+            controller: "left".to_string(),
+            pid: std::process::id(),
+            at: "2026-11-02T00:00:00Z".to_string(),
+        },
+    )
+    .unwrap();
+    let root = f.root();
+    let out = f.cli(&["run", "lease", &root, RUN, "acquire", "left", "--json"]);
+    assert_eq!(code(&out), 0, "{}", text(&out));
+    assert!(
+        !request.exists(),
+        "the left request was applied and removed"
+    );
+    let (chain, _) = statecraft_run::record::Chain::open(&f.home(), &f.project()).unwrap();
+    let lease = statecraft_run::operation::fold(&chain, RUN)
+        .lease
+        .expect("a lease");
+    assert_eq!(lease.controller, "left");
+    assert_eq!(
+        lease.at, "2026-11-02T00:00:00Z",
+        "the queued request took it"
+    );
+}

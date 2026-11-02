@@ -1165,11 +1165,11 @@ pub fn launch_attempt(
             detail: format!("the witness outcome could not be written: {why}"),
         });
     }
-    // Spec 050 section 3.4 and spec 003 section 3.4: an attempt a halt
-    // stopped was cancelled by an operator, not interrupted; the provider's
-    // own claim is kept beside it unchanged.
+    // Spec 050 section 3.4, spec 048 section 3.1 and spec 003 section 3.4: an
+    // attempt a halt or an abort stopped was cancelled by an operator, not
+    // interrupted; the provider's own claim is kept beside it unchanged.
     let mut termination = execution.termination();
-    if halted.stop.is_some() {
+    if halted.stop.is_some() || halted.abort.is_some() {
         termination.observed = statecraft_run::attempt::Outcome::Cancelled;
     }
     let mut detail = serde_json::json!({
@@ -1235,12 +1235,24 @@ struct HaltPolled {
     /// The record's bytes as the supervisor's own appends left them, for the
     /// tamper comparison.
     wrote: Vec<(std::path::PathBuf, Vec<u8>)>,
+    /// Spec 048: the abort of this attempt the supervisor acted on.
+    abort: Option<statecraft_run::operation::Recorded>,
+    /// Spec 048: every queued abort or lease request applied.
+    operations: Vec<statecraft_run::operation::Applied>,
+    /// Spec 048: a queued request that did not read or was left behind.
+    operation_failure: Option<String>,
 }
 
 impl HaltPolled {
     /// The outcome record's `halt` detail, where the poll did anything.
     fn evidence(&self) -> Option<serde_json::Value> {
-        if self.stop.is_none() && self.failure.is_none() && self.wrote.is_empty() {
+        if self.stop.is_none()
+            && self.failure.is_none()
+            && self.wrote.is_empty()
+            && self.abort.is_none()
+            && self.operations.is_empty()
+            && self.operation_failure.is_none()
+        {
             return None;
         }
         Some(serde_json::json!({
@@ -1250,6 +1262,9 @@ impl HaltPolled {
                 Err(why) => serde_json::json!({ "failed": why }),
             }),
             "failure": self.failure,
+            "abort": self.abort,
+            "operations": self.operations,
+            "operationFailure": self.operation_failure,
         }))
     }
 }
@@ -1270,6 +1285,9 @@ struct HaltPoller<'c> {
     expected: Option<Vec<u8>>,
     polled: HaltPolled,
     done: bool,
+    /// A queued operation request did not read: the operation queue is not
+    /// read again this attempt, and the halt queue still is.
+    operations_unreadable: bool,
 }
 
 impl<'c> HaltPoller<'c> {
@@ -1293,6 +1311,7 @@ impl<'c> HaltPoller<'c> {
             expected,
             polled: HaltPolled::default(),
             done: false,
+            operations_unreadable: false,
         }
     }
 
@@ -1310,13 +1329,31 @@ impl<'c> HaltPoller<'c> {
             return Control::Continue;
         }
         self.last = Some(now);
-        match halt::pending(self.home, self.root) {
-            Ok(queued) if queued.is_empty() => return Control::Continue,
-            Ok(_) => {}
+        let halts = match halt::pending(self.home, self.root) {
+            Ok(queued) => queued,
             // A request that does not read may be a halt: the attempt is not
             // let run past it (section 3.3's fail-closed rule), and it is
             // stopped as interrupted, since no halt is recorded.
             Err(refusal) => return self.fail(refusal.to_string()),
+        };
+        // Spec 048 section 5, 2026-11-02: an abort or lease request queued
+        // while this run holds the lock. One that does not read is reported
+        // and left for an operator; it stops nothing, since a halt is the
+        // operator's stop and an abort that cannot be read was never decided.
+        let operations = if self.operations_unreadable {
+            Vec::new()
+        } else {
+            match statecraft_run::operation::pending(self.home, self.root) {
+                Ok(queued) => queued,
+                Err(e) => {
+                    self.operations_unreadable = true;
+                    self.polled.operation_failure = Some(e.to_string());
+                    Vec::new()
+                }
+            }
+        };
+        if halts.is_empty() && operations.is_empty() {
+            return Control::Continue;
         }
         let chain_path = statecraft_run::record::chain_path(self.home, self.root);
         if std::fs::read(&chain_path).ok() != self.expected {
@@ -1325,13 +1362,22 @@ impl<'c> HaltPoller<'c> {
             // stays queued for the next writer.
             self.done = true;
             self.polled.failure = Some(
-                "the run record changed during the attempt, so the queued halt request was not \
+                "the run record changed during the attempt, so the queued request was not \
                  appended and stays queued"
                     .to_string(),
             );
             return Control::Continue;
         }
-        let applied = halt::apply_pending(self.chain, self.home, self.root);
+        let applied = if halts.is_empty() {
+            Ok(Vec::new())
+        } else {
+            halt::apply_pending(self.chain, self.home, self.root)
+        };
+        let operated = if operations.is_empty() {
+            Ok(Vec::new())
+        } else {
+            statecraft_run::operation::apply_pending(self.chain, self.home, self.root)
+        };
         if let Ok(bytes) = std::fs::read(&chain_path) {
             if Some(&bytes) != self.expected.as_ref() {
                 self.polled.wrote = vec![(chain_path.clone(), bytes.clone())];
@@ -1348,27 +1394,51 @@ impl<'c> HaltPoller<'c> {
             }
             Err(e) => return self.fail(e.to_string()),
         }
+        match operated {
+            Ok(done) => self.polled.operations.extend(done),
+            Err(statecraft_run::operation::QueueError::Record(e)) => {
+                return self.fail(e.to_string());
+            }
+            // A file left behind once applied, or one that does not read: what
+            // was applied stands, and a second application is harmless (the
+            // request's key replays). Reported, not fatal.
+            Err(e) => self.polled.operation_failure = Some(e.to_string()),
+        }
         let state = match halt::fold(self.chain) {
             Ok(state) => state,
             Err(refusal) => return self.fail(refusal.to_string()),
         };
-        let Some(stop) = state
+        if let Some(stop) = state
             .stop_of(self.run_id, self.attempt)
             .filter(|s| s.confirmed_at.is_none())
             .cloned()
+        {
+            self.done = true;
+            if let Some(h) = state.of(halt::Scope::ToolEffects) {
+                self.polled.tool_effects = Some(write_halted_decision(self.exchange, h));
+            }
+            let why = format!(
+                "halted by {} at {}: {}; the attempt is cancelled",
+                stop.operator, stop.requested_at, stop.reason
+            );
+            self.polled.stop = Some(stop);
+            return Control::Stop(why);
+        }
+        // Spec 048 section 3.1: an accepted abort of this attempt stops it,
+        // and it ends `cancelled`; its `stop-confirmed` follows that outcome.
+        let Some(abort) =
+            statecraft_run::operation::stop_requested_of(self.chain, self.run_id, self.attempt)
         else {
-            // A dispatch halt, or a resume: recorded, and nothing to stop.
+            // A dispatch halt, a resume or a lease change: recorded, and
+            // nothing to stop.
             return Control::Continue;
         };
         self.done = true;
-        if let Some(h) = state.of(halt::Scope::ToolEffects) {
-            self.polled.tool_effects = Some(write_halted_decision(self.exchange, h));
-        }
         let why = format!(
-            "halted by {} at {}: {}; the attempt is cancelled",
-            stop.operator, stop.requested_at, stop.reason
+            "aborted by controller {} under key {}; the attempt is cancelled",
+            abort.controller, abort.key
         );
-        self.polled.stop = Some(stop);
+        self.polled.abort = Some(abort);
         Control::Stop(why)
     }
 

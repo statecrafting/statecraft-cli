@@ -2,7 +2,7 @@
 id: "048-run-operations"
 title: "Typed run operations under one controller lease, recorded in the run record"
 status: approved
-implementation: pending
+implementation: complete
 created: "2026-10-21"
 summary: >
   Gives a run three typed operations, attempt.retry, attempt.continue and
@@ -215,6 +215,31 @@ the run's unit of work under the lock the operation already holds; its
 outcome records whether an attempt was appended and the exit that path
 answered.
 
+**2026-11-02: an abort reaches a live supervisor through a request file
+(owner decision).** The owner, asked whether this spec reuses spec 050's
+channel: "Reuse 050's request file (Recommended)". A `run` supervising an
+attempt holds the repository lock until its outcome is durable (spec 003
+section 3.1.4 rule 7), so `run op` and `run lease` cannot append while one
+runs, and an abort could never reach the attempt it names. Finding the lock
+held, `run op ... abort` and every `run lease` act write their request as a
+file in `<home>/records/<key>.operation-requests/`, beside the chain and the
+halt queue and published the way spec 050's are, and answer 0 that the
+request is queued. A retry or continue needs the slot the live attempt
+holds, so it is still answered `lock-busy`. The supervisor, at each of spec
+050's polls, applies every queued request in order by the same functions the
+verbs call, so section 3.3's rules decide it as they would under the verb: an
+accepted abort appends its intent and its `stop-requested` outcome, the
+supervisor stops the attempt, the attempt concludes `cancelled` as an
+operator cancellation, and `stop-confirmed` follows that outcome. A request no
+supervisor lived to apply is applied by the next `run op` or `run lease`
+before its own write. A request applied twice, its file left behind, is
+harmless: its key replays (rule 2), a second acquire by the holder is
+`already-held`, a second release is `lease-not-held`, and a break already in
+the record is not recorded again. A request that does not read is left in
+place and reported, and stops nothing: an abort that cannot be read was never
+decided, and a halt is the operator's stop. A controller reads the lease a
+queued acquire took, and the run's version, from `run events`.
+
 ## Verification
 
 Ratified by the owner on 2026-10-31. Acceptance is declared by the
@@ -226,10 +251,13 @@ cursor after a dropped connection with no event missed or repeated.
 ```verify:cli
 cargo test -p statecraft-run --test run_operations
 cargo test -p statecraft-cli --test run_operations
+cargo test -p statecraft-cli --test run_startup run_operations_
 ```
 
 The first replays every prefix of a record built by a lease, a retry, a stale
 refusal, an abort, its cancelled outcome and a release from a fresh home to the
 state seen at that point; the second refuses a stale version with exit 2 naming
 `stale-version` through the binary, answers a repeated key with nothing
-appended, and resumes `run events` from a cursor.
+appended, and resumes `run events` from a cursor; the third queues a lease
+and an abort while a `run` holds the lock and sees the supervisor apply both,
+the attempt end `cancelled` and `stop-confirmed` follow its outcome.
