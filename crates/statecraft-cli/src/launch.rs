@@ -95,10 +95,24 @@ pub fn launch_attempt(
             Err(e) => return failed(&e.to_string()),
         },
     };
+    // Spec 050 section 3.3: a chain that cannot be read or verified is a halt
+    // state that cannot be read, and it refuses rather than admitting; the
+    // halt state is then folded from the chain just opened, under the lock,
+    // before anything about the attempt is prepared. `begin_checked` folds it
+    // again before the intent, so no launch path skips it.
+    // A chain filed under another spelling of the repository's path keeps
+    // its own refusal and guidance (spec 003); it is not a record that failed
+    // to read.
     let (mut chain, _) = match Chain::open(home, root) {
         Ok(c) => c,
-        Err(e) => return failed(&e.to_string()),
+        Err(e @ statecraft_run::record::RecordError::FiledElsewhere { .. }) => {
+            return failed(&e.to_string());
+        }
+        Err(e) => return slice::halt_refused_answer(&statecraft_run::halt::Refusal::from(e)),
     };
+    if let Err(refusal) = statecraft_run::halt::admit(&chain) {
+        return slice::halt_refused_answer(&refusal);
+    }
     // Spec 002 section 3.37: the attempt's launch records and its exchange
     // directory, in the product home and keyed as the chain just opened.
     let places = statecraft_home::launch::Places::of(home, root);
@@ -393,6 +407,9 @@ pub fn launch_attempt(
                     audit,
                 )
                 .erase();
+            }
+            if let statecraft_run::session::SessionError::Halted(refusal) = &e {
+                return slice::halt_refused_answer(refusal);
             }
             return slice::session_error_answer(&e).erase();
         }

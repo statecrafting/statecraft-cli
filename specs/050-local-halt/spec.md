@@ -16,8 +16,9 @@ summary: >
 amends:
   - "003-work-and-run-semantics"
   - "006-command-surface"
-# No `extends` yet: the implementing change adds the edges on
-# crates/statecraft-run/ (003) and crates/statecraft-cli/ (006) with the code.
+extends:
+  - { spec: "003-work-and-run-semantics", unit: { kind: directory, path: "crates/statecraft-run/" }, nature: additive }
+  - { spec: "006-command-surface", unit: { kind: directory, path: "crates/statecraft-cli/" }, nature: additive }
 depends_on:
   - "003-work-and-run-semantics"
   - "006-command-surface"
@@ -142,10 +143,34 @@ same way a tampered record is.
 refusals read alike if both are adopted. The local refusal is `halted`, not
 `tenant-halted`, because there is no tenant here.
 
+**2026-10-31: a halt entry is its own record kind, and "truncated" means a
+torn tail.** Halt, resume and stop-confirmed entries are written under the
+record kind `halt`, which the run fold skips and the halt fold alone reads,
+strictly: an entry with an unknown scope, subject or field is unreadable, not
+half-read. A chain that ends mid-entry is unreadable too, because the fold
+cannot know what the torn bytes would have said; the next appending write
+(`halt`, `resume`, `run reconcile`) reports and clears the tail as spec 003
+section 3.8 already has it. `stop-confirmed` is appended by the supervisor
+that concluded the attempt, after its `cancelled` outcome record, so the two
+facts are two records in order.
+
 ## Verification
 
-Ratified by the owner on 2026-10-31. Acceptance is declared by the
-implementing change, which will refuse `run` under a halted `run-admission`
-scope, refuse it with `halt-state-unreadable` against a truncated, unparsable
-and a chain-mismatched record, admit it after `resume`, and show
-`stop-requested` then `stop-confirmed` across a halt during a live attempt.
+Ratified by the owner on 2026-10-31. Acceptance is run through
+`make verify SPEC=050`, against fixture homes and a stub spec-spine, with no
+provider.
+
+```verify:cli
+cargo test -p statecraft-run --test local_halt
+cargo test -p statecraft-cli --test local_halt
+```
+
+These refuse `run` under a halted `run-admission` scope with exit 2 and
+`halted` naming the scope, the operator and the reason; refuse it with
+`halt-state-unreadable` against a truncated, an unparsable and a
+chain-mismatched record; admit it after `resume`; show the halt state in `run
+list`; and show `stop-requested` across a halt of a live attempt until its
+`cancelled` outcome is durable, then `stop-confirmed`, and never confirmed for
+any other outcome. Asking a supervising process to cancel its live attempt,
+and the tool-effects decision in the exchange directory, are not yet
+implemented, which is why `implementation` is still `pending`.
