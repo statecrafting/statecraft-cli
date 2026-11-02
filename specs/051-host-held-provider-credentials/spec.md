@@ -176,6 +176,14 @@ An authenticated record without `gatewayEndpoint` used spec 042's delivery.
 The token is revoked when the attempt concludes, and the gateway stops when
 the admission is dropped.
 
+**2026-11-02: the TLS client is the one the hosted client already resolves.**
+The gateway forwards over TLS (section 3.1) and the spec names no client. It
+is `rustls` with the `ring` provider and the bundled `webpki-roots`, at the
+versions and features spec 033's hosted client already resolves through
+`ureq`, so the lockfile gains no package and no system trust store or native
+TLS is linked. It landed as its own dependency change before the gateway,
+because spec 044's guard keeps a dependency change out of a feature.
+
 ## Verification
 
 Ratified by the owner on 2026-10-31. Acceptance is declared by the

@@ -28,8 +28,10 @@ pub struct AttemptPlan {
     /// `not-applicable`.
     pub planned: Option<statecraft_adapter::coverage::Coverage>,
     /// The repository lock `run` took before it read the override journal
-    /// (spec 003 section 3.1.5 rule 8). The trial takes its own.
-    pub held: Option<statecraft_run::lock::Held>,
+    /// (spec 003 section 3.1.5 rule 8). The trial takes its own. Shared, so
+    /// a spec 048 operation that launches keeps holding it after the launch
+    /// until its own outcome is durable.
+    pub held: Option<std::sync::Arc<statecraft_run::lock::Held>>,
     /// The revision the workspace is prepared at: `HEAD`, or for an admitted
     /// spec 027 proposal the commit its fresh observation read.
     pub base: String,
@@ -51,7 +53,7 @@ impl AttemptPlan {
         spec_id: &str,
         admission: statecraft_run::work::Admission,
         planned: statecraft_adapter::coverage::Coverage,
-        held: statecraft_run::lock::Held,
+        held: std::sync::Arc<statecraft_run::lock::Held>,
     ) -> Self {
         Self {
             prompt: format!("Implement {spec_id} in this workspace.").into_bytes(),

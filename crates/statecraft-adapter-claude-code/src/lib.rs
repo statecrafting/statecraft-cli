@@ -20,7 +20,10 @@
 //! See that directory's `README.md` for what was captured and what was redacted.
 //! **A fixture is evidence of what the provider emitted on a named version. It
 //! is not evidence that the provider still emits it**, and nothing here claims
-//! otherwise.
+//! otherwise. Spec 052 makes them a governed corpus: [`golden`] compares a
+//! new provider version's captures with them by meaning, and
+//! [`qualification::record_compared`] refuses that version's record while a
+//! scenario diverges unreviewed or is missing.
 //!
 //! # The load-bearing finding
 //!
@@ -54,6 +57,7 @@ pub mod denial;
 pub mod environment;
 pub mod execution;
 pub mod gateway;
+pub mod golden;
 pub mod outcome;
 pub mod probe;
 pub mod qualification;
@@ -61,14 +65,19 @@ pub mod spawn;
 pub mod stream;
 pub mod witness;
 
-pub use capabilities::{ADAPTER_NAME, MEASURED_PROVIDER_VERSION, manifest, supported};
+pub use capabilities::{
+    ADAPTER_NAME, MEASURED_PROVIDER_VERSION, VERSION_FIELD, declared, manifest, supported,
+};
 pub use denial::{DenialMechanism, ToolRestriction};
 pub use environment::{
     CREDENTIAL_PATH, PROVIDER_EXECUTABLE, QUALIFICATION_RECORD, UNEXPRESSIBLE, declaration,
 };
+pub use golden::{CaptureSet, Comparison, Corpus, GoldenError, Status, compare};
 pub use outcome::{TerminalReading, UnmappedTerminalState, outcome};
 pub use probe::{ConstructedEnvironmentProbe, observe_provider_version};
-pub use qualification::{PairedRecord, ProviderPair, qualification_for_pair, record};
+pub use qualification::{
+    NotQualifiable, PairedRecord, ProviderPair, qualification_for_pair, record, record_compared,
+};
 pub use spawn::{Invocation, SETTINGS_DENY_KEY};
 pub use stream::{
     MessageEvent, PermissionDenial, ProviderEvent, ResultEvent, SystemEvent, TRAILER_SUBTYPES,

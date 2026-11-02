@@ -52,12 +52,31 @@
 
 use crate::settings::DENY_FLOOR;
 use serde::{Deserialize, Serialize};
+use statecraft_adapter::capabilities::{AdapterCapabilities, Field, Needs};
 use statecraft_adapter_claude_code::{
     PermissionDenial, ProviderEvent, ResultEvent, ToolResult, ToolUse, read_jsonl,
     task_summary_trailer,
 };
 use statecraft_environment::digest::digest_bytes;
 use std::collections::{BTreeMap, BTreeSet};
+
+/// The declaration of the adapter this admission measures (spec 047 section
+/// 3.2): the launching operation and the version check read its fields, not
+/// which adapter it is.
+pub fn capabilities() -> AdapterCapabilities {
+    statecraft_adapter_claude_code::declared()
+}
+
+/// What the three controls need of the adapter's declaration (spec 047
+/// section 3.3). The refusal control measures a blocked action reported as a
+/// hook event in a `--print` session, the payload reaches it as a settings
+/// file, and the observation is version specific, so all three are required.
+pub fn needs() -> Needs {
+    Needs::none()
+        .requiring(Field::PrintModeHooks)
+        .requiring(Field::SettingsFileTransport)
+        .requiring(Field::VersionField)
+}
 
 /// The tool the floor's entries govern. Every entry is `Bash(...)`.
 pub const GOVERNED_TOOL: &str = "Bash";
@@ -705,7 +724,7 @@ pub enum NotAdmitted {
         /// Which control.
         control: &'static str,
         /// Which field.
-        field: &'static str,
+        field: String,
     },
     /// The capture reports a version other than the claimed one.
     #[error(
@@ -1191,13 +1210,17 @@ fn read(control: Control, capture: &Capture) -> Result<Stream, NotAdmitted> {
     let Some(terminal) = terminal else {
         return Err(NotAdmitted::NoTerminalResult { control: c });
     };
-    let version = version.ok_or(NotAdmitted::IncompleteInit {
+    // Spec 047: the field is the one the adapter declares it reports the
+    // version in.
+    let version = version.ok_or_else(|| NotAdmitted::IncompleteInit {
         control: c,
-        field: "claude_code_version",
+        field: capabilities()
+            .version_field
+            .unwrap_or_else(|| Field::VersionField.name().to_string()),
     })?;
     let cwd = cwd.ok_or(NotAdmitted::IncompleteInit {
         control: c,
-        field: "cwd",
+        field: "cwd".to_string(),
     })?;
 
     // One session, named by every event that can name one.
@@ -1930,6 +1953,15 @@ pub fn load(directory: &std::path::Path) -> Result<Evidence, NotRead> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    // Spec 047: the controls' needs are read from the declaration, and the
+    // measured adapter's declaration fits them, so no launch changes.
+    #[test]
+    fn the_measured_adapter_declares_what_the_controls_need() {
+        let fitted = statecraft_adapter::capabilities::fit(&capabilities(), &needs());
+        assert!(!fitted.refuses(), "{fitted:?}");
+        assert!(capabilities().version_field.is_some());
+    }
 
     #[test]
     fn the_experiments_commands_stand_where_the_floor_puts_them() {

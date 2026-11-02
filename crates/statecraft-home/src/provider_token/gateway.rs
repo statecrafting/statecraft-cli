@@ -28,6 +28,7 @@ use std::thread::JoinHandle;
 use std::time::Duration;
 
 use statecraft_adapter_claude_code::gateway::Route;
+use statecraft_secret::SecretString;
 
 /// The attempt token's file name inside the per-run configuration directory.
 pub const TOKEN_FILE: &str = "gateway-token";
@@ -77,62 +78,75 @@ pub trait Upstream: Send + Sync {
     fn connect(&self) -> io::Result<Box<dyn Stream>>;
 }
 
-/// The production upstream for `route`: TLS to `route.host:route.port`.
-///
-/// Not yet built: the TLS client lands with its own dependency change
-/// (`rustls` and `webpki-roots` in this crate), and until then every forward
-/// is answered 502. The gateway, its token check and the child's delivery
-/// are complete without it; only the provider never answers.
+/// The production upstream for `route`: TLS to `route.host:route.port`,
+/// verified against the bundled web PKI roots with the `ring` provider (spec
+/// 051 section 5, 2026-11-02). No system trust store is read, so what the
+/// gateway trusts does not depend on the host it runs on.
 #[must_use]
 pub fn provider_upstream(route: &Route) -> Arc<dyn Upstream> {
-    Arc::new(Unbuilt { host: route.host })
+    Arc::new(Tls {
+        host: route.host,
+        port: route.port,
+        config: tls_config(),
+    })
 }
 
-struct Unbuilt {
+fn tls_config() -> Option<Arc<rustls::ClientConfig>> {
+    let mut roots = rustls::RootCertStore::empty();
+    roots.extend(webpki_roots::TLS_SERVER_ROOTS.iter().cloned());
+    let provider = Arc::new(rustls::crypto::ring::default_provider());
+    rustls::ClientConfig::builder_with_provider(provider)
+        .with_safe_default_protocol_versions()
+        .ok()
+        .map(|builder| Arc::new(builder.with_root_certificates(roots).with_no_client_auth()))
+}
+
+struct Tls {
     host: &'static str,
+    port: u16,
+    /// `None` only if the provider offers no safe protocol version, which
+    /// the bundled `ring` provider always does; every forward then fails.
+    config: Option<Arc<rustls::ClientConfig>>,
 }
 
-impl Upstream for Unbuilt {
+impl Upstream for Tls {
     fn host(&self) -> &str {
         self.host
     }
     fn connect(&self) -> io::Result<Box<dyn Stream>> {
-        Err(io::Error::other(
-            "the gateway's TLS upstream is not built in this revision",
-        ))
+        let config = self
+            .config
+            .clone()
+            .ok_or_else(|| io::Error::other("no TLS protocol version is available"))?;
+        let name = rustls::pki_types::ServerName::try_from(self.host)
+            .map_err(io::Error::other)?
+            .to_owned();
+        let connection = rustls::ClientConnection::new(config, name).map_err(io::Error::other)?;
+        let tcp = TcpStream::connect((self.host, self.port))?;
+        tcp.set_read_timeout(Some(UPSTREAM_TIMEOUT))?;
+        tcp.set_write_timeout(Some(UPSTREAM_TIMEOUT))?;
+        Ok(Box::new(rustls::StreamOwned::new(connection, tcp)))
     }
 }
 
-/// A token held in memory only. Its `Debug` is redacted and its bytes are
-/// overwritten when it drops.
-struct Held(Vec<u8>);
+/// A token held in memory only, as spec 046's one secret type: redacted when
+/// shown, zeroed when dropped, and read only through `expose`.
+#[derive(Debug)]
+struct Held(SecretString);
 
 impl Held {
-    fn new(value: String) -> Self {
-        Self(value.into_bytes())
+    fn new(value: SecretString) -> Self {
+        Self(value)
     }
     fn matches(&self, presented: &[u8]) -> bool {
+        let held = self.0.expose().as_bytes();
         // Constant time in the presented token's content.
-        self.0.len() == presented.len()
-            && self
-                .0
+        held.len() == presented.len()
+            && held
                 .iter()
                 .zip(presented)
                 .fold(0u8, |acc, (a, b)| acc | (a ^ b))
                 == 0
-    }
-}
-
-impl std::fmt::Debug for Held {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_str("Held(<redacted>)")
-    }
-}
-
-impl Drop for Held {
-    fn drop(&mut self) {
-        self.0.iter_mut().for_each(|byte| *byte = 0);
-        std::hint::black_box(&self.0);
     }
 }
 
@@ -171,7 +185,7 @@ impl State {
 /// token, stops accepting and waits for the acceptor.
 pub struct Gateway {
     address: SocketAddr,
-    attempt_token: String,
+    attempt_token: SecretString,
     token_file: PathBuf,
     state: Arc<State>,
     acceptor: Option<JoinHandle<()>>,
@@ -192,24 +206,18 @@ impl Gateway {
     /// that fails writes nothing.
     pub fn open(
         route: &Route,
-        operator: String,
+        operator: SecretString,
         configuration: &Path,
         upstream: Arc<dyn Upstream>,
     ) -> Result<Self, GatewayError> {
-        Self::open_at(
-            SocketAddr::from(([127, 0, 0, 1], 0)),
-            route,
-            operator,
-            configuration,
-            upstream,
-        )
+        Self::open_at(loopback(), route, operator, configuration, upstream)
     }
 
     /// [`Gateway::open`] at an exact address, which must be loopback.
     pub fn open_at(
         address: SocketAddr,
         route: &Route,
-        operator: String,
+        operator: SecretString,
         configuration: &Path,
         upstream: Arc<dyn Upstream>,
     ) -> Result<Self, GatewayError> {
@@ -222,9 +230,10 @@ impl Gateway {
         let address = listener
             .local_addr()
             .map_err(|e| GatewayError::Bind(e.kind().to_string()))?;
-        let attempt_token = mint().map_err(|e| GatewayError::Token(e.kind().to_string()))?;
+        let attempt_token =
+            SecretString::new(mint().map_err(|e| GatewayError::Token(e.kind().to_string()))?);
         let token_file = configuration.join(TOKEN_FILE);
-        write_token_file(&token_file, &attempt_token)
+        write_token_file(&token_file, attempt_token.expose())
             .map_err(|e| GatewayError::Token(e.kind().to_string()))?;
         let state = Arc::new(State {
             preflight: route.preflight,
@@ -262,7 +271,7 @@ impl Gateway {
     /// The attempt's token: the child's, and worth nothing once revoked.
     #[must_use]
     pub fn attempt_token(&self) -> &str {
-        &self.attempt_token
+        self.attempt_token.expose()
     }
 
     /// The owner-only file the attempt's token was written to.
@@ -291,15 +300,32 @@ impl Drop for Gateway {
     }
 }
 
-/// A random attempt token: 32 bytes from the system's random source, hex.
+/// A random attempt token: 32 bytes from the system's random source, hex,
+/// drawn as two of the launch's nonces. In a debug build given
+/// `STATECRAFT_TEST_NONCE_SEED` they come from that sequence, so spec 040's
+/// differential tests see the same token on both sides; a release build
+/// never reads the variable.
 fn mint() -> io::Result<String> {
-    let mut bytes = [0u8; 32];
-    std::fs::File::open("/dev/urandom")?.read_exact(&mut bytes)?;
-    let mut token = String::from(TOKEN_PREFIX);
-    for byte in bytes {
-        token.push_str(&format!("{byte:02x}"));
+    Ok(format!(
+        "{TOKEN_PREFIX}{}{}",
+        crate::launch::fresh_nonce()?,
+        crate::launch::fresh_nonce()?
+    ))
+}
+
+/// Where [`Gateway::open`] binds: a fresh `127.0.0.1` port, or in a debug
+/// build the port `STATECRAFT_TEST_GATEWAY_PORT` names, so spec 040's
+/// differential tests see the same endpoint, and so the same confinement
+/// digest, on both sides. A release build never reads the variable.
+fn loopback() -> SocketAddr {
+    #[cfg(debug_assertions)]
+    if let Some(port) = std::env::var("STATECRAFT_TEST_GATEWAY_PORT")
+        .ok()
+        .and_then(|p| p.parse::<u16>().ok())
+    {
+        return SocketAddr::from(([127, 0, 0, 1], port));
     }
-    Ok(token)
+    SocketAddr::from(([127, 0, 0, 1], 0))
 }
 
 fn write_token_file(path: &Path, token: &str) -> io::Result<()> {
@@ -421,7 +447,7 @@ impl Request {
             }
         }
         head.extend_from_slice(b"Authorization: Bearer ");
-        head.extend_from_slice(&operator.0);
+        head.extend_from_slice(operator.0.expose().as_bytes());
         head.extend_from_slice(b"\r\n");
         match self.framing {
             Framing::None => {}
@@ -599,6 +625,16 @@ mod tests {
     use std::sync::mpsc;
 
     const OPERATOR: &str = "operator-token-0051";
+
+    #[test]
+    fn the_production_upstream_is_tls_to_the_routes_one_authority_with_bundled_roots() {
+        let upstream = provider_upstream(&ROUTE);
+        assert_eq!(upstream.host(), "api.anthropic.com");
+        // The ring provider offers a safe protocol version, so a config is
+        // built, from the bundled roots alone.
+        assert!(tls_config().is_some());
+        assert!(!webpki_roots::TLS_SERVER_ROOTS.is_empty());
+    }
 
     /// A plain-TCP stand-in for the provider: records each request it
     /// receives and answers with `answer`. Test-only: production forwards
@@ -802,7 +838,18 @@ mod tests {
     }
 
     #[test]
-    fn a_gateway_that_cannot_bind_writes_nothing_and_an_unbuilt_upstream_answers_502() {
+    fn a_gateway_that_cannot_bind_writes_nothing_and_an_unreachable_upstream_answers_502() {
+        // An upstream that cannot be reached, with no network: a 502, and the
+        // operator's token in no answer.
+        struct Unreachable;
+        impl Upstream for Unreachable {
+            fn host(&self) -> &str {
+                "provider.invalid"
+            }
+            fn connect(&self) -> io::Result<Box<dyn Stream>> {
+                Err(io::Error::other("unreachable"))
+            }
+        }
         let occupied = TcpListener::bind("127.0.0.1:0").unwrap();
         let configuration = tempfile::tempdir().unwrap();
         for address in [
@@ -823,7 +870,7 @@ mod tests {
             &ROUTE,
             OPERATOR.into(),
             configuration.path(),
-            provider_upstream(&ROUTE),
+            Arc::new(Unreachable),
         )
         .unwrap();
         let answer = exchange(
@@ -834,6 +881,7 @@ mod tests {
             ),
         );
         assert!(answer.starts_with("HTTP/1.1 502 "), "{answer}");
+        assert!(!answer.contains(OPERATOR), "{answer}");
         for e in [
             GatewayError::Bind("x".into()).to_string(),
             GatewayError::Token("x".into()).to_string(),

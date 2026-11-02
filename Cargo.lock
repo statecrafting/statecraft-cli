@@ -903,6 +903,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "statecraft-adapter-codex"
+version = "0.0.0"
+dependencies = [
+ "serde",
+ "serde_json",
+ "statecraft-adapter",
+ "statecraft-run",
+ "statecraft-secret",
+ "tempfile",
+ "thiserror",
+]
+
+[[package]]
 name = "statecraft-cli"
 version = "0.0.0"
 dependencies = [
@@ -959,6 +972,7 @@ version = "0.0.0"
 dependencies = [
  "libc",
  "rustix",
+ "rustls",
  "serde",
  "serde_json",
  "sha2 0.11.0",
@@ -967,8 +981,10 @@ dependencies = [
  "statecraft-adapter-claude-code",
  "statecraft-environment",
  "statecraft-run",
+ "statecraft-secret",
  "tempfile",
  "thiserror",
+ "webpki-roots",
 ]
 
 [[package]]
@@ -979,6 +995,7 @@ dependencies = [
  "serde",
  "serde_json",
  "sha2 0.11.0",
+ "statecraft-secret",
  "tempfile",
  "thiserror",
  "ureq",
@@ -1019,6 +1036,15 @@ dependencies = [
  "statecraft-environment",
  "tempfile",
  "thiserror",
+]
+
+[[package]]
+name = "statecraft-secret"
+version = "0.0.0"
+dependencies = [
+ "serde",
+ "serde_json",
+ "zeroize",
 ]
 
 [[package]]

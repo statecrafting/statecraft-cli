@@ -249,7 +249,12 @@ pub fn admit(roots: Roots<'_>, executable: &Path, path: &str) -> Result<Admissio
                 // Spec 051 section 5: a witnessed attempt keeps spec 042's
                 // delivery, and its record names no gateway endpoint.
                 Some(token) if roots.witness => {
-                    provider_variables.push((crate::provider_token::VARIABLE.to_string(), token));
+                    // Spec 046 section 3.3: the one exposure, at the point the token
+                    // becomes the child's environment copy.
+                    provider_variables.push((
+                        crate::provider_token::VARIABLE.to_string(),
+                        token.expose().to_string(),
+                    ));
                 }
                 // Spec 051 sections 3.1 to 3.4: the operator's token stays
                 // in this process behind a loopback gateway, and the child

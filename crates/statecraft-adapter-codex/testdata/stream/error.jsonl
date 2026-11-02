@@ -1,0 +1,4 @@
+{"type":"thread.started","thread_id":"00000000-0000-0000-0000-000000000003"}
+{"type":"turn.started"}
+{"type":"error","message":"synthetic: stream disconnected before completion"}
+{"type":"turn.failed","error":{"message":"synthetic: stream disconnected before completion"}}

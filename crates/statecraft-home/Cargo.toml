@@ -42,6 +42,13 @@ statecraft-adapter-claude-code = { path = "../statecraft-adapter-claude-code" }
 # wrong. Acyclic for the same reason as the line above.
 statecraft-adapter = { path = "../statecraft-adapter" }
 
+# Spec 051's gateway forwards to the one provider authority over TLS. The same
+# rustls (ring provider, TLS 1.2 and 1.3) and bundled web PKI roots spec 033's
+# hosted client already resolves through ureq, so the lockfile gains no
+# package, and no system trust store or native TLS is linked.
+rustls = { version = "=0.23.46", default-features = false, features = ["ring", "logging", "std", "tls12"] }
+webpki-roots = "=1.0.11"
+
 # Spec 002 section 3.37 rule 1: an attempt's launch records live in the product
 # home, keyed as the run record is keyed. The key is the run record's own
 # (`statecraft_run::record::chain_path`), read from the crate that owns it
@@ -69,6 +76,10 @@ rustix = { version = "1.1.5", features = ["fs"] }
 # default features, because the scaffolder needs none of spec-spine's
 # tree-sitter grammars. build.rs reads what the lock resolved.
 spec-spine-core.workspace = true
+
+# Spec 046 section 3.3: the provider token is held in the one secret type from
+# the moment it is read until it is dropped.
+statecraft-secret = { path = "../statecraft-secret" }
 
 tempfile = "3.27.0"
 

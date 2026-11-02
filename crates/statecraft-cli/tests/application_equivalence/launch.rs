@@ -237,6 +237,8 @@ pub struct Fixture {
     dir: tempfile::TempDir,
     /// Outside the compared tree: the pristine copy and the child's case.
     aside: tempfile::TempDir,
+    /// The loopback port both sides' gateways bind, free when chosen.
+    gateway_port: u16,
     /// Released after `dir` and `aside` are removed: fields drop in order.
     _one: std::sync::MutexGuard<'static, ()>,
 }
@@ -268,6 +270,10 @@ impl Fixture {
         let f = Fixture {
             dir,
             aside: tempfile::tempdir().unwrap(),
+            gateway_port: std::net::TcpListener::bind("127.0.0.1:0")
+                .and_then(|l| l.local_addr())
+                .map(|a| a.port())
+                .unwrap(),
             _one: one,
         };
         std::fs::create_dir_all(f.project()).unwrap();
@@ -385,6 +391,12 @@ impl Fixture {
             .env("USER", "fixture-operator")
             .env("STATECRAFT_TEST_CLOCK", AT.to_string())
             .env("STATECRAFT_TEST_NONCE_SEED", SEED)
+            // Spec 051's gateway binds a loopback port the kernel would
+            // otherwise choose; both sides bind this one, in turn.
+            .env(
+                "STATECRAFT_TEST_GATEWAY_PORT",
+                self.gateway_port.to_string(),
+            )
             .current_dir(self.root());
     }
 
