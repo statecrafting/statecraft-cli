@@ -914,15 +914,25 @@ fn run_operation_verb(
         clock: clock.as_ref(),
     };
     let answer = match verb {
-        Verb::RunLease => run_lease(
-            &ctx,
-            &LeaseOperands {
-                path: &path,
-                run_id,
-                words,
-                pid: std::os::unix::process::parent_id(),
-            },
-        ),
+        Verb::RunLease => match controller_pid() {
+            Some(pid) => run_lease(
+                &ctx,
+                &LeaseOperands {
+                    path: &path,
+                    run_id,
+                    words,
+                    pid,
+                },
+            ),
+            None => Ok(Answer::new(
+                serde_json::Value::Null,
+                Exit::Refused,
+                "refused: run lease names its controller by the parent process, which this \
+                 platform does not expose\n",
+            )
+            .with_kind(statecraft_cli::render::ErrorKind::Refused)
+            .erase()),
+        },
         Verb::RunOp => match words {
             [operation, controller, lease, key, version, reason @ ..] => run_operation(
                 &ctx,
@@ -951,6 +961,20 @@ fn run_operation_verb(
         Ok(answer) => emit(&answer, format),
         Err(u) => usage(format, u.0),
     }
+}
+
+/// The controller a lease names is the process that ran this one (spec 048
+/// section 3.2): its parent, which only unix exposes.
+#[cfg(unix)]
+fn controller_pid() -> Option<u32> {
+    Some(std::os::unix::process::parent_id())
+}
+
+/// Not exposed here, so `run lease` refuses rather than naming the wrong
+/// process.
+#[cfg(not(unix))]
+fn controller_pid() -> Option<u32> {
+    None
 }
 
 /// `run <path> <spec-id> [--witness | --require-witness]`, through spec

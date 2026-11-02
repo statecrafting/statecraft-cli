@@ -991,7 +991,21 @@ pub fn run_operation(ctx: &Context<'_>, op: &OperationOperands<'_>) -> Result<Re
             };
             chain = match Chain::open(ctx.home, &root) {
                 Ok((chain, _)) => chain,
-                Err(e) => return Ok(failed(&e.to_string())),
+                // The launch ran and its own records are durable, but the
+                // record cannot be reopened to append this operation's
+                // outcome. Nothing can be written without it, so the intent
+                // stays as the fold shows one no outcome followed, and a
+                // re-presented key replays it rather than launching again
+                // (rule 2). The answer says so instead of a bare failure.
+                Err(e) => {
+                    return Ok(failed(&format!(
+                        "{} under key {} for run {} launched (exit {}), but the record could                          not be reopened to append its outcome, so the operation stays                          accepted with no outcome: {e}",
+                        operation.word(),
+                        accepted.key,
+                        op.run_id,
+                        answer.exit.code()
+                    )));
+                }
             };
             (answer.exit, Some((before, answer)))
         }
