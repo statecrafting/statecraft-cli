@@ -1338,8 +1338,15 @@ impl<'c> HaltPoller<'c> {
             }
             self.expected = Some(bytes);
         }
-        if let Err(e) = applied {
-            return self.fail(e.to_string());
+        match applied {
+            Ok(_) => {}
+            // The entry is durable and only its file was left behind. The
+            // next writer removes it without appending it again, so the halt
+            // stands and is acted on here; the leftover file is reported.
+            Err(e @ statecraft_run::halt::HaltError::Queue { .. }) => {
+                self.polled.failure = Some(e.to_string());
+            }
+            Err(e) => return self.fail(e.to_string()),
         }
         let state = match halt::fold(self.chain) {
             Ok(state) => state,
