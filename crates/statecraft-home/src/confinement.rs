@@ -5,6 +5,7 @@ use std::collections::BTreeMap;
 use std::fs::File;
 use std::net::{SocketAddr, TcpListener};
 use std::os::fd::AsRawFd;
+use std::os::unix::fs::PermissionsExt;
 use std::os::unix::net::UnixListener;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
@@ -107,6 +108,19 @@ impl Admission {
         result
     }
 }
+/// The directory the self-test's probe socket is bound in (spec 066 section
+/// 3.1, amending spec 064 section 3.3): fresh, mode `0700`, under the fixed
+/// `/tmp` rather than the home's `boundary/` entry or the platform temporary
+/// directory, so its path stays under 40 bytes whatever the home's path and
+/// never exceeds `sun_path` (104 bytes on macOS, 108 on Linux). The socket's
+/// path is an input to the self-test and is not recorded, so the protected
+/// roots and the digest are unchanged. Removed when the owning value drops.
+pub(crate) fn probe_socket_directory() -> std::io::Result<tempfile::TempDir> {
+    tempfile::Builder::new()
+        .prefix("statecraft-probe-")
+        .permissions(std::fs::Permissions::from_mode(0o700))
+        .tempdir_in("/tmp")
+}
 
 /// Admit a launch. No provider process or attempt record is created here.
 pub fn admit(roots: Roots<'_>, executable: &Path, path: &str) -> Result<Admission, String> {
@@ -133,9 +147,7 @@ pub fn admit(roots: Roots<'_>, executable: &Path, path: &str) -> Result<Admissio
         let records_sentinel = tempfile::NamedTempFile::new_in(roots.records)?;
         let target_sentinel = tempfile::NamedTempFile::new_in(roots.target)?;
         let protected = File::open(home_sentinel.path())?;
-        let socket_directory = tempfile::Builder::new()
-            .prefix("probe-")
-            .tempdir_in(&boundary_dir)?;
+        let socket_directory = probe_socket_directory()?;
         let socket_path = socket_directory.path().join("socket");
         let socket = UnixListener::bind(&socket_path)?;
         let listener = TcpListener::bind(("127.0.0.1", 0))?;
