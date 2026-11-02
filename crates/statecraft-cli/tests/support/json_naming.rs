@@ -264,6 +264,10 @@ pub const GRANDFATHERED: &[Grandfathered] = &[
             "verdict_version",
             "verified_under",
             "incomplete-evidence",
+            "required-dimension-not-passed",
+            "approvals-insufficient",
+            "missing-required-artifact",
+            "dimension-unknown",
         ],
     },
 ];
