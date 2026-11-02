@@ -9,10 +9,47 @@
       "024-review-budget-and-ratification",
       "041-review-authority-context"
     ],
-    "implementingPaths": [],
+    "implementingPaths": [
+      {
+        "path": "REVIEW.md",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/statecraft-home/",
+        "source": "spec-edge"
+      }
+    ],
+    "resolvedUnits": [
+      {
+        "locations": [
+          {
+            "file": "REVIEW.md"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "kind": "file",
+          "path": "REVIEW.md"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "crates/statecraft-home/"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "directory",
+          "path": "crates/statecraft-home/"
+        }
+      }
+    ],
     "specId": "056-review-guide",
     "specStatus": "approved"
   },
   "schemaVersion": "1.3.0",
-  "shardHash": "3c84d60bd5a2986fffed6da0ac554940d39d1bf79e22e50f9ac9889c440146a7"
+  "shardHash": "5ecbcf6b4476d782a86038227e18330f7f40381f734afe1d2a9b2c97c4330481"
 }
