@@ -22,7 +22,7 @@ use statecraft_adapter::witness::posture::{Observed, Requirement, derive};
 use statecraft_adapter::witness::protocol::{
     AttemptBinding, Closing, Integrity, Limits, Reader, Start, Termination,
 };
-use statecraft_adapter::witness::sidecar::{Ended, Plan, Running, start_confined};
+use statecraft_adapter::witness::sidecar::{self, Ended, Plan, Running, start_confined};
 use statecraft_adapter::witness::{WitnessPosture, effect};
 use statecraft_envelope::wire::manifest::Completeness;
 use statecraft_envelope::wire::policy::{
@@ -41,7 +41,13 @@ use std::time::Duration;
 /// The refusal guard of an attempt whose sidecar failed before the child.
 pub const GUARD: &str = "witness";
 
-/// How long the sidecar has to report ready, and to finish once stdin closes.
+/// The two deadlines of spec 043 section 3.1, and the grace the sidecar has
+/// to finish once stdin closes. The start deadline runs from spawn until the
+/// producer's code is observed running and covers the operating system's
+/// assessment of a newly placed executable; the ready deadline runs from that
+/// observation and keeps 013's value. Both values are provisional until the
+/// measurements of 043 section 5 are recorded in its section 7.
+const START_TIMEOUT: Duration = Duration::from_secs(60);
 const READY_TIMEOUT: Duration = Duration::from_secs(20);
 const GRACE: Duration = Duration::from_secs(10);
 
@@ -208,6 +214,7 @@ impl Witness {
             producer,
             wrapper: Vec::new(),
             environment: sidecar_environment(&admission),
+            start_timeout: START_TIMEOUT,
             ready_timeout: READY_TIMEOUT,
             grace: GRACE,
         };
@@ -292,13 +299,17 @@ impl Witness {
             Some(Ok(p)) => (format!("{}@{}", p.name, p.version), p.interface.clone()),
             _ => (String::new(), String::new()),
         };
-        let closing = Closing::assemble(
+        let mut closing = Closing::assemble(
             &reader,
             termination,
             integrity,
             &producer.0,
             &producer.1,
             self.posture(),
+        );
+        name_deadline(
+            &mut closing,
+            self.last.as_ref().and_then(|last| last.refusal.as_deref()),
         );
         self.closed = true;
         let closed = effect::close(chain, &binding, &closing, timestamp);
@@ -443,6 +454,20 @@ impl Witness {
     }
 }
 
+/// Spec 043 section 3.2: a sidecar refused because a deadline ran out closes
+/// under the reason that names which one. Every other refusal keeps 013's
+/// closing words, and a closing that carries a digest is left alone.
+fn name_deadline(closing: &mut Closing, refusal: Option<&str>) {
+    if closing.capture_digest.is_some() {
+        return;
+    }
+    if let Some(deadline) =
+        refusal.filter(|r| [sidecar::START_TIMEOUT, sidecar::READY_TIMEOUT].contains(r))
+    {
+        closing.no_digest_reason = Some(deadline.to_string());
+    }
+}
+
 /// The manifest at `path`, read only when it is a regular file inside `area`
 /// and only up to one byte past spec 014's bound, so an oversized file is
 /// refused by its reference's length or its digest, never read whole.
@@ -538,7 +563,59 @@ fn sidecar_environment(admission: &SidecarAdmission) -> BTreeMap<String, String>
 
 #[cfg(test)]
 mod tests {
-    use super::read_bounded;
+    use super::{READY_TIMEOUT, START_TIMEOUT, name_deadline, read_bounded};
+    use statecraft_adapter::witness::WitnessPosture;
+    use statecraft_adapter::witness::protocol::{
+        AttemptBinding, Closing, Integrity, Reader, Termination,
+    };
+
+    /// Spec 043 section 3.1: the start deadline is longer than the ready
+    /// deadline, and the ready deadline keeps 013's value.
+    #[test]
+    fn the_start_deadline_is_longer_than_the_ready_deadline() {
+        assert!(START_TIMEOUT > READY_TIMEOUT);
+        assert_eq!(READY_TIMEOUT, std::time::Duration::from_secs(20));
+    }
+
+    /// Spec 043 section 3.2: a deadline refusal names its deadline in the
+    /// closing outcome; other refusals keep 013's words.
+    #[test]
+    fn a_deadline_refusal_names_which_deadline_ran_out() {
+        let binding = AttemptBinding::new("043-run", 1, "043-run/1/witness-sidecar").unwrap();
+        let assemble = || {
+            Closing::assemble(
+                &Reader::new(binding.clone()),
+                Termination::Killed,
+                Integrity::Missing,
+                "wire-witness@0.1.0",
+                "wire-witness.sidecar/1",
+                WitnessPosture::WitnessFailed,
+            )
+        };
+        for deadline in ["start-timeout", "ready-timeout"] {
+            let mut closing = assemble();
+            name_deadline(&mut closing, Some(deadline));
+            assert_eq!(closing.no_digest_reason.as_deref(), Some(deadline));
+            assert_eq!(closing.posture, WitnessPosture::WitnessFailed);
+        }
+        for other in [
+            Some("sidecar-exited-before-ready"),
+            Some("custody-violation"),
+            None,
+        ] {
+            let mut closing = assemble();
+            name_deadline(&mut closing, other);
+            assert_eq!(
+                closing.no_digest_reason.as_deref(),
+                Some("sidecar-exited-before-ready")
+            );
+        }
+        let mut digested = assemble();
+        digested.capture_digest = Some("sha256:00".into());
+        digested.no_digest_reason = None;
+        name_deadline(&mut digested, Some("start-timeout"));
+        assert_eq!(digested.no_digest_reason, None);
+    }
 
     #[test]
     fn a_manifest_is_read_only_through_a_path_that_stays_in_the_area() {
