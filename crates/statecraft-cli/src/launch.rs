@@ -1418,13 +1418,17 @@ fn write_halted_decision(
             .open(&partial)?;
         file.write_all(line.as_bytes())?;
         file.sync_all()?;
-        std::fs::rename(&partial, &copy)?;
-        std::fs::File::open(exchange)?.sync_all()
+        std::fs::rename(&partial, &copy)
     })();
-    if written.is_err() {
+    if let Err(e) = written {
         let _ = std::fs::remove_file(&partial);
+        return Err(e.to_string());
     }
-    written.map_err(|e| e.to_string())
+    // Once renamed, the gate reads the halted decision on its next call. The
+    // directory sync only keeps the rename across a host crash, which no live
+    // attempt survives, so its failure does not undo what is already in force.
+    let _ = std::fs::File::open(exchange).and_then(|d| d.sync_all());
+    Ok(())
 }
 
 /// The attempt's watch with the halt poll beside it: every call is forwarded
