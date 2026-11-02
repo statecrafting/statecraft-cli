@@ -619,6 +619,12 @@ pub fn conclude_observed(
         },
     )?;
 
+    // Spec 048 section 3.1: an abort's stop is confirmed only now, after the
+    // attempt's `cancelled` outcome is durable, and never for another outcome.
+    if decided == Outcome::Cancelled {
+        crate::operation::confirm_stop(chain, &session.run_id, session.attempt, &timestamp)?;
+    }
+
     Ok(Concluded {
         run_id: session.run_id.clone(),
         attempt: session.attempt,

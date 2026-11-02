@@ -15,8 +15,16 @@ summary: >
 amends:
   - "003-work-and-run-semantics"
   - "040-application-operations"
-# No `extends` yet: the implementing change adds the edges on
-# crates/statecraft-run/ (003) and crates/statecraft-cli/ (006) with the code.
+extends:
+  # The lease, the operation fold and the cursor (`operation.rs`), the
+  # stop-confirmed call after a cancelled outcome in `session.rs`, and the
+  # operation intent skipped by `reconcile::since_last_intent`.
+  - { spec: "003-work-and-run-semantics", unit: { kind: directory, path: "crates/statecraft-run/" }, nature: additive }
+  # The typed operations in the application layer (spec 040), their three
+  # verbs, and the repository lock shared with the launch a retry runs.
+  - { spec: "006-command-surface", unit: { kind: directory, path: "crates/statecraft-cli/" }, nature: additive }
+  # The reviewable fold skips an operation's records (section 5, 2026-11-01).
+  - { spec: "005-acceptance-and-evidence", unit: { kind: directory, path: "crates/statecraft-acceptance/" }, nature: additive }
 depends_on:
   - "003-work-and-run-semantics"
   - "040-application-operations"
@@ -174,6 +182,38 @@ paused job in place. An attempt here has no paused state, and spec 003 forbids
 editing a concluded attempt, so continuing is a new attempt that resumes the
 provider session.
 
+**2026-11-01: an operation's records are named by subject, and folds that
+read "the last" skip them.** An accepted operation is bracketed under the
+subject `operation` with the effect identity `operation/<key>`, so spec 003
+section 3.3.1's identity fold pairs it and the legacy pairing never sees it.
+A lease is an `Accounting` record under `operation-lease`, a recorded refusal
+one under `operation-refused`, an abort's confirmation one under
+`operation-stop-confirmed`. The readers that took a run's last outcome or
+accounting record (the reviewable fold, `accept`'s refusal count, the tamper
+view) and spec 003 section 3.6.1's "since the last intent" skip these
+subjects, so none is read as an attempt's.
+
+**2026-11-01: a lease is named by its record's position, and only
+`stale-version` is recorded.** An operation presents the position of the
+record that acquired the lease, so a lease taken again after a release is a
+different lease. A controller's process is the one that invoked the verb, its
+parent; a typed caller states its own. A lease whose holder's process has
+ended, on a run with no live attempt, is recorded `expired` when the next
+controller acquires, so the fold observes nothing. Only rule 3's refusal is
+appended, and it holds its key; `lease-not-held`, `key-conflict`,
+`lease-held`, `capability-undeclared` and an unmet precondition append
+nothing, so a caller without the lease cannot move the version. An unmet
+precondition of section 3.1's table carries no closed reason, only what was
+found.
+
+**2026-11-01: `continue` stays refused, and the verbs are `run lease`, `run
+op` and `run events`.** Spec 047 is ratified and its declaration names no
+capability to resume a provider session, so `attempt.continue` is
+`capability-undeclared` for every adapter. A retry runs `run`'s own path for
+the run's unit of work under the lock the operation already holds; its
+outcome records whether an attempt was appended and the exit that path
+answered.
+
 ## Verification
 
 Ratified by the owner on 2026-10-31. Acceptance is declared by the
@@ -181,3 +221,14 @@ implementing change, which will build a record from a sequence of operations
 and replay it to the same state, repeat a key and find nothing appended,
 submit a stale version and see exit 2 naming `stale-version`, and resume a
 cursor after a dropped connection with no event missed or repeated.
+
+```verify:cli
+cargo test -p statecraft-run --test run_operations
+```
+
+It replays every prefix of a record built by a lease, a retry, a stale
+refusal, an abort, its cancelled outcome and a release from a fresh home to the
+state seen at that point. The verbs and their binary suite land in the change
+that adds them to `statecraft-cli`, which also adds that suite here: it refuses
+a stale version with exit 2 naming `stale-version` through the binary, answers
+a repeated key with nothing appended, and resumes `run events` from a cursor.

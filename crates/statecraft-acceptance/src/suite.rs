@@ -145,7 +145,12 @@ impl SuiteSource for SpecSpineVerify {
 /// Reads the chain's entries and nothing else. `run_id` selects; everything else
 /// comes from the entries, each value naming the record it was folded from.
 pub fn fold(run_id: &str, entries: &[Entry]) -> ReviewableOutcome {
-    let mine: Vec<&Entry> = entries.iter().filter(|e| e.run_id == run_id).collect();
+    // Spec 048: an operation's records (its outcome, a lease, a refusal) are
+    // neither the attempt's outcome nor its accounting, so they are skipped.
+    let mine: Vec<&Entry> = entries
+        .iter()
+        .filter(|e| e.run_id == run_id && !statecraft_run::operation::is_operation_record(e))
+        .collect();
     let outcome_entry = mine.iter().rev().find(|e| e.kind == Kind::Outcome).copied();
     let accounting_entry = mine
         .iter()
