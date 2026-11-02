@@ -1011,12 +1011,10 @@ pub fn run_operation(ctx: &Context<'_>, op: &OperationOperands<'_>) -> Result<Re
             };
             (answer.exit, Some((before, answer)))
         }
-        // Submit refuses it for every adapter (section 3.1), so no intent
-        // for it is ever accepted; there is no launch path to take.
+        // Submit refuses it for every adapter before any intent is appended
+        // (section 3.1), so no accepted intent exists here to complete.
         Operation::Continue => {
-            return Ok(failed(
-                "attempt.continue was accepted, and no launch path resumes a provider session",
-            ));
+            unreachable!("submit refuses attempt.continue for every adapter, yet accepted it")
         }
     };
     let state = operation::fold(&chain, op.run_id);
