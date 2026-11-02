@@ -53,6 +53,7 @@ pub mod capabilities;
 pub mod denial;
 pub mod environment;
 pub mod execution;
+pub mod gateway;
 pub mod outcome;
 pub mod probe;
 pub mod qualification;

@@ -365,6 +365,9 @@ pub fn launch(request: &Request) -> Result<Launched, Failed> {
         Duration::from_secs(request.deadline_seconds),
         &admission.boundary,
     )?;
+    // Spec 051 section 3.2: the process tree has exited, so the attempt has
+    // an outcome and its gateway token is refused from here on.
+    admission.revoke_provider_gateway();
 
     // The file as the provider left it, read as data: never through a link,
     // never a pipe, and bounded. Its digest is the record's; its bytes are

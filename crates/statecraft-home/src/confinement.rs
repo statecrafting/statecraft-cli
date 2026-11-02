@@ -39,9 +39,12 @@ pub struct Roots<'a> {
     /// A provider process: a per-run configuration directory (spec 042
     /// section 3.1).
     pub provider: bool,
-    /// A provider session that authenticates: the provisioned token is
-    /// placed in the environment, and its absence refuses (section 3.2). A
-    /// version probe authenticates nothing and is given no token.
+    /// A provider session that authenticates: its absence refuses (section
+    /// 3.2). Unwitnessed, the provisioned token stays in the supervisor
+    /// behind a loopback gateway and the child gets a per-attempt token
+    /// (spec 051); witnessed, it is placed in the environment (spec 051
+    /// section 5). A version probe authenticates nothing and is given no
+    /// token.
     pub authenticated: bool,
     /// Witness capture was requested (spec 013 section 3.6.1): one
     /// loopback endpoint is reserved and is the child's only route out of
@@ -70,6 +73,7 @@ pub struct Admission {
     probe: Probe,
     witness: Option<SocketAddr>,
     reserved: Option<TcpListener>,
+    gateway: Option<crate::provider_token::gateway::Gateway>,
 }
 
 impl Admission {
@@ -77,6 +81,23 @@ impl Admission {
     #[must_use]
     pub fn witness_endpoint(&self) -> Option<SocketAddr> {
         self.witness
+    }
+
+    /// The provider gateway's loopback endpoint, when the operator's token is
+    /// held by the supervisor for this attempt (spec 051 section 3.1).
+    #[must_use]
+    pub fn gateway_endpoint(&self) -> Option<SocketAddr> {
+        self.gateway
+            .as_ref()
+            .map(crate::provider_token::gateway::Gateway::address)
+    }
+
+    /// The attempt has an outcome: the gateway refuses its token from now
+    /// on (spec 051 section 3.2). Dropping the admission does the same.
+    pub fn revoke_provider_gateway(&self) {
+        if let Some(gateway) = &self.gateway {
+            gateway.revoke();
+        }
     }
 
     /// Give up the reservation so the sidecar can bind the endpoint. Until
@@ -197,6 +218,7 @@ pub fn admit(roots: Roots<'_>, executable: &Path, path: &str) -> Result<Admissio
         // outside the confinement (004 section 3.18 rule 12).
         let adjacent_prefixes = Vec::new();
         let mut provider_variables = Vec::new();
+        let mut gateway = None;
         if roots.provider {
             // Section 3.2: refused before anything is prepared for a child.
             let token = if roots.authenticated {
@@ -223,8 +245,33 @@ pub fn admit(roots: Roots<'_>, executable: &Path, path: &str) -> Result<Admissio
                 TMPDIR_VARIABLE.to_string(),
                 scratch.path().display().to_string(),
             ));
-            if let Some(token) = token {
-                provider_variables.push((crate::provider_token::VARIABLE.to_string(), token));
+            match token {
+                // Spec 051 section 5: a witnessed attempt keeps spec 042's
+                // delivery, and its record names no gateway endpoint.
+                Some(token) if roots.witness => {
+                    provider_variables.push((crate::provider_token::VARIABLE.to_string(), token));
+                }
+                // Spec 051 sections 3.1 to 3.4: the operator's token stays
+                // in this process behind a loopback gateway, and the child
+                // gets the gateway's address and a token minted for this
+                // attempt. No route, or no gateway, refuses; nothing falls
+                // back to the environment delivery.
+                Some(token) => {
+                    use crate::provider_token::gateway::{Gateway, provider_upstream};
+                    let route = statecraft_adapter_claude_code::gateway::route().ok_or(
+                        "the provider adapter declares no gateway route (spec 051 section 3.4)",
+                    )?;
+                    let opened =
+                        Gateway::open(&route, token, &configuration, provider_upstream(&route))?;
+                    provider_variables
+                        .push((route.base_url_variable.to_string(), opened.base_url()));
+                    provider_variables.push((
+                        route.token_variable.to_string(),
+                        opened.attempt_token().to_string(),
+                    ));
+                    gateway = Some(opened);
+                }
+                None => {}
             }
         }
         let harness = crate::home::Layout::new(roots.home).harness_dir();
@@ -258,9 +305,14 @@ pub fn admit(roots: Roots<'_>, executable: &Path, path: &str) -> Result<Admissio
             writable,
             adjacent_prefixes,
         };
-        let mut boundary = match witness {
-            Some(endpoint) => Prepared::prepare_witnessed(policy, endpoint)?,
-            None => Prepared::prepare(policy)?,
+        let gateway_endpoint = gateway
+            .as_ref()
+            .map(crate::provider_token::gateway::Gateway::address);
+        let mut boundary = match (witness, gateway_endpoint) {
+            (Some(endpoint), _) => Prepared::prepare_witnessed(policy, endpoint)?,
+            // Spec 051 section 3.3: exactly the gateway's endpoint is added.
+            (None, Some(endpoint)) => Prepared::prepare_gatewayed(policy, endpoint)?,
+            (None, None) => Prepared::prepare(policy)?,
         };
         for program in [executable, Path::new("/bin/sh"), Path::new("/usr/bin/git")] {
             boundary.resolve(program, path)?;
@@ -311,6 +363,7 @@ pub fn admit(roots: Roots<'_>, executable: &Path, path: &str) -> Result<Admissio
             probe,
             witness,
             reserved,
+            gateway,
         })
     }
     prepare(roots, executable, path).map_err(|e| e.to_string())
@@ -360,6 +413,10 @@ pub fn import_objects(
     // The provider's token and configuration directory are the provider's
     // alone (spec 042 section 3.2); the object producer is not given them.
     producer_environment.remove(crate::provider_token::VARIABLE);
+    if let Some(route) = statecraft_adapter_claude_code::gateway::route() {
+        producer_environment.remove(route.base_url_variable);
+        producer_environment.remove(route.token_variable);
+    }
     producer_environment.remove(CONFIG_DIR_VARIABLE);
     producer_environment.remove(TMPDIR_VARIABLE);
     producer_environment.insert("GIT_CONFIG_NOSYSTEM".into(), "1".into());

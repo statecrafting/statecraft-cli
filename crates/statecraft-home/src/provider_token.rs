@@ -11,9 +11,17 @@
 //! product never falls back to the operator's own login, which a per-run
 //! configuration directory cannot reach and which a refresh by the child
 //! could rotate.
+//!
+//! Spec 051 amends the delivery: for an unwitnessed attempt the token stays
+//! in the supervisor's memory behind the loopback [`gateway`], and the child
+//! is given only a token minted for its attempt. A witnessed attempt keeps
+//! the environment delivery above until the gateway composes with the
+//! witness (spec 051 section 5).
 
 use crate::home::Layout;
 use std::path::Path;
+
+pub mod gateway;
 
 /// The environment name the provider reads its token from.
 pub const VARIABLE: &str = "CLAUDE_CODE_OAUTH_TOKEN";

@@ -90,6 +90,7 @@ if [ "$1" = --version ]; then echo '2.1.267'; exit 0; fi
 /bin/cat > /dev/null
 printf '%s' "$CLAUDE_CONFIG_DIR" > child-config-dir
 if [ "$CLAUDE_CODE_OAUTH_TOKEN" = {token} ]; then echo yes > child-token-matches; fi
+printf '%s' "$ANTHROPIC_BASE_URL" > child-base-url
 echo provider-state > "$CLAUDE_CONFIG_DIR/.claude.json" && echo yes > child-wrote-own-config
 echo '{{"hooks": "attacker"}}' > {operator}/.claude/settings.json 2>/dev/null && echo yes > child-wrote-settings
 echo '{{"attacker": true}}' > {operator}/.claude.json 2>/dev/null && echo yes > child-wrote-config
@@ -184,8 +185,11 @@ fn a_confined_child_gets_its_own_configuration_and_never_the_operators() {
         config_dir.display()
     );
 
-    // 3.2: the provisioned token arrived in the environment.
-    assert_eq!(read("child-token-matches").as_deref(), Some("yes\n"));
+    // 3.2 as spec 051 amends it: the provisioned token is held by the
+    // supervisor, and the child is pointed at its loopback gateway instead.
+    assert_eq!(read("child-token-matches"), None);
+    let base_url = read("child-base-url").unwrap_or_default();
+    assert!(base_url.starts_with("http://127.0.0.1:"), "{base_url}");
 
     // Rule 12: the operator's provider configuration was not writable.
     assert!(read("child-wrote-settings").is_none());

@@ -317,6 +317,11 @@ pub fn conclude(
     contract: &statecraft_run::contract::Binding,
     trial: Option<TrialRun>,
 ) -> Response {
+    // Spec 051 section 3.2: the attempt has an outcome, so a copy of its
+    // gateway token the child made is refused from here on.
+    if let Some(boundary) = boundary {
+        boundary.revoke_provider_gateway();
+    }
     let mut accounting = accounting.clone();
     // Spec 013 section 3.7: every attempt records exactly one witness
     // posture. A caller that started no sidecar leaves it to the default,
