@@ -163,6 +163,8 @@ pub enum Verb {
     Halt,
     /// `resume <path> [--scope <scope>]... <operator> <reason...>`
     Resume,
+    /// `admission dry-run --bundle <file> --policy <file>`
+    AdmissionDryRun,
     /// `--help`, optionally with a group or a verb as its topic.
     ///
     /// Not part of the command tree: [`Verb::all`] lists the operations, and a
@@ -258,6 +260,7 @@ impl Verb {
             Verb::ProposalDismiss => "proposal dismiss",
             Verb::ProposalAcknowledge => "proposal acknowledge",
             Verb::ProposalAdmit => "proposal admit",
+            Verb::AdmissionDryRun => "admission dry-run",
             Verb::Help => "--help",
         }
     }
@@ -360,6 +363,10 @@ impl Verb {
             Verb::LandWait | Verb::LandArm | Verb::LandPush | Verb::LandRestack | Verb::LandStatus | Verb::LandCancelSuperseded => "063-land-verbs",
             Verb::RunLease | Verb::RunOp | Verb::RunEvents => "048-run-operations",
             Verb::Halt | Verb::Resume => "050-local-halt",
+            // Spec 049: the admission dry-run, amending 006; the evaluator and
+            // the bundle reading are the envelope crate's, the verb writes
+            // nothing.
+            Verb::AdmissionDryRun => "049-admission-dry-run",
             Verb::Help => "006-command-surface",
         }
     }
@@ -443,14 +450,37 @@ impl Verb {
             Verb::RunEvents,
             Verb::Halt,
             Verb::Resume,
+            Verb::AdmissionDryRun,
         ]
     }
 
     /// The groups a help topic may name.
-    pub const GROUPS: [&'static str; 24] = [
-        "project", "env", "work", "run", "accept", "home", "init", "migrate", "config", "approval",
-        "harness", "session", "startup", "override", "transfer", "trust", "provider", "hosted",
-        "observe", "proposal", "review", "land", "halt", "resume",
+    pub const GROUPS: [&'static str; 25] = [
+        "project",
+        "env",
+        "work",
+        "run",
+        "accept",
+        "home",
+        "init",
+        "migrate",
+        "config",
+        "approval",
+        "harness",
+        "session",
+        "startup",
+        "override",
+        "transfer",
+        "trust",
+        "provider",
+        "hosted",
+        "observe",
+        "proposal",
+        "review",
+        "land",
+        "halt",
+        "resume",
+        "admission",
     ];
 
     /// Parse a verb from the leading arguments, returning how many it consumed.
@@ -465,6 +495,7 @@ impl Verb {
             ("land", Some("status")) => Some((Verb::LandStatus, 2)),
             ("land", Some("restack")) => Some((Verb::LandRestack, 2)),
             ("review", Some("status")) => Some((Verb::ReviewStatus, 2)),
+            ("admission", Some("dry-run")) => Some((Verb::AdmissionDryRun, 2)),
             ("project", Some("register")) => Some((Verb::ProjectRegister, 2)),
             ("project", Some("list")) => Some((Verb::ProjectList, 2)),
             ("project", Some("arm")) => Some((Verb::ProjectArm, 2)),
@@ -697,7 +728,9 @@ pub fn help_text(topic: &[String]) -> String {
          Initialization stops after registering and qualifying: arming and running\n\
          are separate explicit acts.\n\
          The `trust` verbs are offline: every path is an explicit option, they read\n\
-         no home or project, and `issuer-sign` signs only with `--confirm <digest>`.\n",
+         no home or project, and `issuer-sign` signs only with `--confirm <digest>`.\n\
+         `admission dry-run` evaluates a bundle under a policy from two files and\n\
+         writes nothing; a refusal is its answer, exit 1, not a failure.\n",
     );
     out
 }

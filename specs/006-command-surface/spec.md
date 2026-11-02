@@ -671,6 +671,20 @@ absent (spec 004 section 3.14), so the adapter is unavailable and that is the
 one finding, and the test asserts exactly that. This spec binds the verbs
 other specs define and accounts for no part of Constitution IX of its own.
 
+**2026-11-02: four admission refusal codes join the spec 005 exemption entry
+(owner decision).** The owner, asked whether spec 049's dry-run trace may
+extend the naming exemption list: "Extend the exemption (Recommended)". The
+trace renders a `deny`'s code in admission's own serialized form (spec 049
+section 5, 2026-10-31), and spec 005's `RefusalCode` keys its variants with
+data by their kebab-case word. `incomplete-evidence` was already exempt;
+`required-dimension-not-passed`, `approvals-insufficient`,
+`missing-required-artifact` and `dimension-unknown` are the same enum's other
+keyed variants, never rendered under the naming test until the dry-run. They
+join that entry. Renaming them would change the wire form of admissions
+already signed, a spec 005 schema change no spec proposes. The list still
+shrinks only by the rule it states; this is the one addition, and it is this
+decision.
+
 ## Verification
 
 Each line is one command. §3.7's rows are integration tests that **spawn the
