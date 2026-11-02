@@ -92,7 +92,10 @@ impl Drop for SecretString {
     /// Section 3.2: the buffer is overwritten with zeros, through `zeroize`
     /// (which the compiler may not elide), before it is freed. The buffer is
     /// taken as bytes so its length survives the first pass; the test hook
-    /// observes it there, and the second pass clears the spare capacity.
+    /// observes it there, and the second pass clears the spare capacity:
+    /// `Vec::<u8>::zeroize` (zeroize 1.9.0, the locked version) zeroes the
+    /// elements, calls `clear()`, then zeroes `spare_capacity_mut()`, which
+    /// after `clear()` is the whole allocation, bytes beyond `len` included.
     fn drop(&mut self) {
         let mut bytes = std::mem::take(&mut self.0).into_bytes();
         bytes.as_mut_slice().zeroize();
