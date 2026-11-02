@@ -1,0 +1,1 @@
+{"id":1,"result":{"hooks":[{"eventName":"PreToolUse","handlerType":"command","command":"/statecraft/home/harness/hooks/gate","matcher":"*","async":false,"enabled":true,"trustStatus":"untrusted"}]}}
