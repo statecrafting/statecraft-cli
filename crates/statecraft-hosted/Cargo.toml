@@ -23,6 +23,10 @@ base64 = "0.22.1"
 serde = { version = "1.0.229", features = ["derive"] }
 serde_json = "1.0.151"
 sha2 = "0.11.0"
+# Spec 046 section 3.3: the access and refresh tokens are held in the one
+# secret type. A leaf crate, so this crate still depends on no other
+# statecraft crate that speaks for a verb or a home.
+statecraft-secret = { path = "../statecraft-secret" }
 tempfile = "3.27.0"
 thiserror = "2.0.20"
 ureq = { version = "=3.4.2", default-features = false, features = ["rustls"] }
