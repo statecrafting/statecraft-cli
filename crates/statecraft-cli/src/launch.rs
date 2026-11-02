@@ -1325,7 +1325,8 @@ impl<'c> HaltPoller<'c> {
             // stays queued for the next writer.
             self.done = true;
             self.polled.failure = Some(
-                "the run record changed during the attempt, so the queued halt request was not                  appended and stays queued"
+                "the run record changed during the attempt, so the queued halt request was not \
+                 appended and stays queued"
                     .to_string(),
             );
             return Control::Continue;
