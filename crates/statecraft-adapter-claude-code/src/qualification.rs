@@ -18,6 +18,7 @@
 //! names a provider can say that a provider version is part of the record.
 
 use crate::capabilities::{ADAPTER_NAME, MEASURED_PROVIDER_VERSION};
+use crate::golden::Comparison;
 use serde::{Deserialize, Serialize};
 use statecraft_adapter::manifest::{Manifest, Qualification, QualificationRecord, qualification};
 
@@ -69,6 +70,40 @@ pub fn record(provider_version: &str, suite_version: &str, date: &str) -> Paired
         },
         provider_version: provider_version.to_string(),
     }
+}
+
+/// Why a provider version's record is refused (spec 052 section 3.4, I-1).
+#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
+#[error(
+    "provider {provider_version} is not qualifiable: scenario(s) {} diverge unreviewed from \
+     their goldens or were not captured",
+    .scenarios.join(", ")
+)]
+pub struct NotQualifiable {
+    /// The version whose record is refused.
+    pub provider_version: String,
+    /// The `diverges-unreviewed` and `missing` scenarios.
+    pub scenarios: Vec<String>,
+}
+
+/// The record a suite pass would write for the compared provider version,
+/// refused while any scenario diverges unreviewed or is missing.
+///
+/// Spec 052 section 3.4 makes the golden comparison a precondition of spec
+/// 004 section 3.4's record: the version recorded is the one compared, so a
+/// record cannot name a version the comparison did not judge.
+pub fn record_compared(
+    comparison: &Comparison,
+    suite_version: &str,
+    date: &str,
+) -> Result<PairedRecord, NotQualifiable> {
+    if !comparison.qualifiable {
+        return Err(NotQualifiable {
+            provider_version: comparison.provider_version.clone(),
+            scenarios: comparison.blocking.clone(),
+        });
+    }
+    Ok(record(&comparison.provider_version, suite_version, date))
 }
 
 /// Whether this adapter is qualified against the provider in front of it.
