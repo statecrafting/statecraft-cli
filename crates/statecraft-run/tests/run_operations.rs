@@ -596,3 +596,109 @@ fn operation_records_do_not_change_the_attempts_spec_003_folds() {
             .all(|u| u.subject == INTENT_SUBJECT)
     );
 }
+
+// ---- Section 5, 2026-11-02: requests queued while a live run holds the lock ----
+
+fn queued_abort(lease: u64, version: u64) -> operation::Queued {
+    operation::Queued::Abort {
+        run_id: RUN.to_string(),
+        controller: "cockpit".to_string(),
+        lease,
+        key: "k-queued".to_string(),
+        version,
+        reason: "fixture".to_string(),
+        at: AT.to_string(),
+    }
+}
+
+#[test]
+fn a_queued_abort_is_decided_by_the_same_rules_and_applied_twice_appends_once() {
+    let f = Fixture::new();
+    let mut chain = f.chain();
+    start(&mut chain, RUN, 1);
+    let held = lease(&mut chain);
+    let request = queued_abort(held, version(&chain));
+    let file = operation::queue(f.home.path(), f.target.path(), &request).unwrap();
+    // Beside the chain, in the product home, never in the target.
+    assert_eq!(
+        file.parent().unwrap(),
+        operation::requests_dir(f.home.path(), f.target.path())
+    );
+    assert_eq!(
+        chain_path(f.home.path(), f.target.path()).parent(),
+        operation::requests_dir(f.home.path(), f.target.path()).parent()
+    );
+
+    let applied = operation::apply_pending(&mut chain, f.home.path(), f.target.path())
+        .unwrap()
+        .applied;
+    assert_eq!(applied.len(), 1);
+    assert_eq!(applied[0].answer["outcome"]["result"], "stop-requested");
+    assert!(!file.exists());
+    let stop = operation::stop_requested_of(&chain, RUN, 1).expect("the abort asks the stop");
+    assert_eq!(
+        (stop.key.as_str(), stop.stop),
+        ("k-queued", Some(Stop::StopRequested))
+    );
+
+    // A writer that appended it and could not remove its file: applying it
+    // again replays the key and appends nothing.
+    let records = chain.records().len();
+    let answer = operation::apply(&mut chain, &request).unwrap();
+    assert!(answer.get("replayed").is_some(), "{answer}");
+    assert_eq!(chain.records().len(), records);
+}
+
+#[test]
+fn a_queued_break_left_behind_is_not_recorded_again_over_a_newer_lease() {
+    let f = Fixture::new();
+    let mut chain = f.chain();
+    start(&mut chain, RUN, 1);
+    lease(&mut chain);
+    let request = operation::Queued::LeaseBreak {
+        run_id: RUN.to_string(),
+        operator: "alice".to_string(),
+        reason: "stuck".to_string(),
+        at: AT.to_string(),
+    };
+    let answer = operation::apply(&mut chain, &request).unwrap();
+    assert_eq!(answer["lease"]["change"], "broken", "{answer}");
+    // A newer lease is taken, then the left file is applied again.
+    let newer = lease(&mut chain);
+    let answer = operation::apply(&mut chain, &request).unwrap();
+    assert_eq!(answer["alreadyApplied"], true, "{answer}");
+    assert_eq!(
+        operation::fold(&chain, RUN).lease.map(|l| l.id),
+        Some(newer)
+    );
+}
+
+#[test]
+fn a_queued_request_that_does_not_read_is_left_in_place_and_stops_nothing() {
+    let f = Fixture::new();
+    let mut chain = f.chain();
+    start(&mut chain, RUN, 1);
+    let dir = operation::requests_dir(f.home.path(), f.target.path());
+    std::fs::create_dir_all(&dir).unwrap();
+    // Sorts first, so a request behind it must still be applied.
+    let bad = dir.join("0-torn.json");
+    std::fs::write(&bad, b"{\"request\":\"abort\",\"run").unwrap();
+    let good = operation::queue(
+        f.home.path(),
+        f.target.path(),
+        &operation::Queued::LeaseAcquire {
+            run_id: RUN.to_string(),
+            controller: "cockpit".to_string(),
+            pid: std::process::id(),
+            at: AT.to_string(),
+        },
+    )
+    .unwrap();
+    let drained = operation::apply_pending(&mut chain, f.home.path(), f.target.path()).unwrap();
+    assert_eq!(drained.unreadable.len(), 1, "{:?}", drained.unreadable);
+    assert!(drained.unreadable[0].contains("0-torn.json"));
+    assert_eq!(drained.applied.len(), 1);
+    assert!(bad.exists(), "an unreadable request is left in place");
+    assert!(!good.exists());
+    assert!(operation::fold(&chain, RUN).lease.is_some());
+}
