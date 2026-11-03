@@ -12,6 +12,9 @@
     ".claude/settings.json": {
       "contentHash": "bc1c52409e2958785b357aac8b911f32875308d9ec1682cb0f1145b981e42180"
     },
+    ".github/workflows/release.yml": {
+      "contentHash": "c5fcf929736651deaaf4482dbdfa1f2832b9613f9de7722f8a9b72c1344bdd46"
+    },
     ".github/workflows/statecraft-ai-review.yml": {
       "contentHash": "2312937dd0d14b500c3ca5d15c64fc33a59de4c66fd0bba199f343631ff3f116"
     },
@@ -79,7 +82,7 @@
       "contentHash": "d4482680aa448a517701da28bf172da652b2a42a540b68abf10f5a832a3444b6"
     },
     "scripts/release/check-config.sh": {
-      "contentHash": "6c8c816e85f2f92418dba84cdbe354a91f5ed2ba7856f7182045343efeb4f8d6"
+      "contentHash": "33d424cffff308d372519766d532dde1f236c621512f1f0df64787243fa3385a"
     },
     "scripts/release/harden-installer.sh": {
       "contentHash": "52a94b448d0edfe99df98ebc8eb3b2b3c8dec15347a12b9bbbb22372dff63303"

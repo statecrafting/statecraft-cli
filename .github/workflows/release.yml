@@ -1,0 +1,308 @@
+name: release
+
+# Spec 057: releasing this repository's binaries is repository delivery. This
+# file is the repository's own, not a profile file (section 5, 2026-10-21),
+# and it is an unclaimed authority file (O-4): it changes only by its own
+# change, decided by the owner.
+#
+# What starts it (section 3.1): the owner pushing a signed annotated tag on a
+# commit of main, and nothing else. There is no branch, pull-request, schedule
+# or dispatch trigger. Two tag forms run:
+#
+#   v<MAJOR>.<MINOR>.<PATCH>          a release: build, attest, verify, publish
+#   dry-run/v<MAJOR>.<MINOR>.<PATCH>  the V-1 dry run: the same jobs, and the
+#                                     publish job is skipped
+#
+# Both forms are refused before any build when the tag is unsigned or
+# lightweight, its commit is not on main, or its version is not the
+# workspace's (O-3).
+#
+# What it makes (sections 3.2 to 3.4), per target: a cargo-dist archive with a
+# .sha256 sidecar, a CycloneDX SBOM from the committed Cargo.lock that is
+# refused when it has no components, and a keyless build-provenance
+# attestation over the archive whose Sigstore bundle travels beside it. Once:
+# the shell installer, hardened by scripts/release/harden-installer.sh, and
+# the Homebrew formula, which is a release asset and is pushed to no tap
+# (O-2). Nothing is published to any registry and nothing is pushed back to
+# this repository (section 3.5).
+#
+# Every `uses:` is pinned by a 40-hex commit digest (section 3.2, spec 044),
+# and cargo-dist is a release archive at the exact version the root
+# Cargo.toml names, verified by SHA-256 before it runs.
+
+on:
+  push:
+    tags:
+      - "v[0-9]+.[0-9]+.[0-9]+"
+      - "dry-run/v[0-9]+.[0-9]+.[0-9]+"
+
+permissions: {}
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  CARGO_TERM_COLOR: always
+  # The exact cargo-dist release, and the SHA-256 of each host archive the
+  # jobs below download, from the release's own .sha256 sidecars. It equals
+  # `cargo-dist-version` in the root Cargo.toml; scripts/release/check-config.sh
+  # refuses a difference.
+  DIST_VERSION: "0.32.0"
+  DIST_SHA256_X86_64_UNKNOWN_LINUX_GNU: "eb52f9fae0d0506774e9f1801c1168f87fa2c87a45e2d64d3ae7c89401929946"
+  DIST_SHA256_AARCH64_UNKNOWN_LINUX_GNU: "d29bcffeb3f8b0c517b4ce0dd2470926ed5cb0bb29d78c6bdd5f88d76ee14a6a"
+  DIST_SHA256_AARCH64_APPLE_DARWIN: "aa343b2ff78ec2981f17a65140250c5ad6062c74072163f68c5c2686d94763a7"
+
+jobs:
+  # Section 3.1 and O-3: refuse before any build.
+  admit:
+    name: admit the tag
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+    outputs:
+      version: ${{ steps.admit.outputs.version }}
+      mode: ${{ steps.admit.outputs.mode }}
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Refuse a tag that is unsigned, off main, or not the workspace version
+        id: admit
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          TAG: ${{ github.ref_name }}
+          REF_TYPE: ${{ github.ref_type }}
+          COMMIT: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          refuse() { echo "::error title=release refused::$1"; exit 1; }
+          [ "$REF_TYPE" = tag ] || refuse "the release runs on a tag only, not $REF_TYPE"
+          case "$TAG" in
+            dry-run/v*) mode=dry-run; version="${TAG#dry-run/v}" ;;
+            v*)         mode=release; version="${TAG#v}" ;;
+            *)          refuse "unrecognised tag $TAG" ;;
+          esac
+          printf '%s\n' "$version" | grep -E -q '^[0-9]+\.[0-9]+\.[0-9]+$' \
+            || refuse "tag $TAG is not vMAJOR.MINOR.PATCH (O-3)"
+
+          # Signed and annotated: the ref must name a tag object, the tag
+          # object must name this commit, and GitHub must verify its signature
+          # against a key on the tagger's account.
+          ref_type="$(gh api "repos/$REPO/git/ref/tags/$TAG" --jq .object.type)"
+          [ "$ref_type" = tag ] || refuse "tag $TAG is lightweight; a release tag is signed and annotated"
+          tag_sha="$(gh api "repos/$REPO/git/ref/tags/$TAG" --jq .object.sha)"
+          target="$(gh api "repos/$REPO/git/tags/$tag_sha" --jq .object.sha)"
+          [ "$target" = "$COMMIT" ] || refuse "tag $TAG names $target, not the commit this run built ($COMMIT)"
+          verified="$(gh api "repos/$REPO/git/tags/$tag_sha" --jq .verification.verified)"
+          reason="$(gh api "repos/$REPO/git/tags/$tag_sha" --jq .verification.reason)"
+          [ "$verified" = true ] || refuse "tag $TAG signature does not verify ($reason)"
+
+          # On main.
+          git fetch --no-tags origin +refs/heads/main:refs/remotes/origin/main
+          git merge-base --is-ancestor "$COMMIT" origin/main \
+            || refuse "commit $COMMIT is not on main"
+
+          # O-3: the release commit sets the workspace version to the tag's.
+          manifest="$(awk '
+            /^\[/ { section = $0 }
+            section == "[workspace.package]" && $1 == "version" { gsub(/"/, "", $3); print $3; exit }
+          ' Cargo.toml)"
+          [ "$manifest" = "$version" ] \
+            || refuse "tag $TAG is version $version but the workspace version is ${manifest:-absent} (O-3)"
+
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "mode=$mode" >> "$GITHUB_OUTPUT"
+          echo "admitted $TAG: version $version, mode $mode, commit $COMMIT"
+      - name: Check the release configuration offline
+        run: scripts/release/check-config.sh
+
+  # Section 3.2 and 3.4: one archive per target, its SBOM and its attestation.
+  build:
+    name: build ${{ matrix.target }}
+    needs: admit
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { target: x86_64-unknown-linux-gnu,  os: ubuntu-22.04,     host: x86_64-unknown-linux-gnu }
+          - { target: aarch64-unknown-linux-gnu, os: ubuntu-22.04-arm, host: aarch64-unknown-linux-gnu }
+          - { target: aarch64-apple-darwin,      os: macos-14,         host: aarch64-apple-darwin }
+          # Cross-compiled on the Apple Silicon runner; Xcode ships the x86_64 SDK.
+          - { target: x86_64-apple-darwin,       os: macos-14,         host: aarch64-apple-darwin }
+    runs-on: ${{ matrix.os }}
+    # id-token and attestations are for the build-provenance attestation only;
+    # nothing in this job writes repository contents.
+    permissions:
+      contents: read
+      id-token: write
+      attestations: write
+    env:
+      TARGET: ${{ matrix.target }}
+      HOST: ${{ matrix.host }}
+      VERSION: ${{ needs.admit.outputs.version }}
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
+      - name: Install cargo-dist at the exact version, verified by SHA-256
+        run: scripts/release/install-dist.sh "$HOST" "$RUNNER_TEMP/dist-bin"
+      - name: Install the pinned toolchain and the target
+        run: |
+          set -euo pipefail
+          channel="$(awk -F'"' '$1 ~ /^channel/ { print $2 }' rust-toolchain.toml)"
+          rustup toolchain install "$channel" --profile minimal
+          rustup target add --toolchain "$channel" "$TARGET"
+      - name: Fetch dependencies from the committed lockfile (--locked)
+        run: cargo fetch --locked
+      - name: Build the archive with cargo-dist
+        env:
+          # cargo-dist does not pass --locked; offline after the locked fetch,
+          # cargo cannot resolve anything the lockfile does not already name,
+          # and the diff below proves the lockfile was not rewritten.
+          CARGO_NET_OFFLINE: "true"
+        run: |
+          set -euo pipefail
+          "$RUNNER_TEMP/dist-bin/dist" build --tag "v$VERSION" --artifacts=local \
+            --target "$TARGET" --output-format=json > "dist-manifest-$TARGET.json"
+          git diff --exit-code -- Cargo.lock
+          archive="target/distrib/statecraft-cli-$TARGET.tar.xz"
+          [ -s "$archive" ] || { echo "::error::cargo-dist made no $archive"; ls -la target/distrib; exit 1; }
+          [ -s "$archive.sha256" ] || { echo "::error::no SHA-256 sidecar for $archive"; exit 1; }
+          echo "ARCHIVE=$archive" >> "$GITHUB_ENV"
+          echo "SBOM=target/distrib/statecraft-cli-$TARGET.cdx.json" >> "$GITHUB_ENV"
+      - name: Generate the CycloneDX SBOM from the committed Cargo.lock
+        uses: anchore/sbom-action@66cbf4bc1f1c0d2edc94016e65bc221b6bb0ad6c # v0.24.3
+        with:
+          path: .
+          format: cyclonedx-json
+          output-file: ${{ env.SBOM }}
+          upload-artifact: false
+      - name: Refuse an SBOM with zero components
+        run: |
+          set -euo pipefail
+          n="$(jq '(.components // []) | length' "$SBOM")"
+          echo "SBOM components: $n"
+          [ "$n" -gt 0 ] || { echo "::error title=empty SBOM::refusing to ship $SBOM with zero components"; exit 1; }
+      - name: Require an OIDC token, so the archive can be attested
+        run: |
+          if [ -z "${ACTIONS_ID_TOKEN_REQUEST_URL:-}" ] || [ -z "${ACTIONS_ID_TOKEN_REQUEST_TOKEN:-}" ]; then
+            echo "::error title=attestation unavailable::no OIDC token; refusing to release an unattested archive"
+            exit 1
+          fi
+      - name: Attest build provenance for the archive
+        id: attest
+        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        with:
+          subject-path: ${{ env.ARCHIVE }}
+      - name: Stage the attestation bundle beside its archive
+        env:
+          BUNDLE_PATH: ${{ steps.attest.outputs.bundle-path }}
+        run: |
+          set -euo pipefail
+          [ -n "${BUNDLE_PATH:-}" ] && [ -s "$BUNDLE_PATH" ] \
+            || { echo "::error title=no attestation::no bundle for $ARCHIVE"; exit 1; }
+          cp "$BUNDLE_PATH" "$ARCHIVE.intoto.jsonl"
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: archive-${{ matrix.target }}
+          path: |
+            target/distrib/statecraft-cli-${{ matrix.target }}.tar.xz
+            target/distrib/statecraft-cli-${{ matrix.target }}.tar.xz.sha256
+            target/distrib/statecraft-cli-${{ matrix.target }}.tar.xz.intoto.jsonl
+            target/distrib/statecraft-cli-${{ matrix.target }}.cdx.json
+          if-no-files-found: error
+
+  # Section 3.3: the shell installer and the formula, from the four archives,
+  # so each carries their checksums.
+  installers:
+    name: installers
+    needs: [admit, build]
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+    env:
+      VERSION: ${{ needs.admit.outputs.version }}
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
+      - name: Install cargo-dist at the exact version, verified by SHA-256
+        run: scripts/release/install-dist.sh x86_64-unknown-linux-gnu "$RUNNER_TEMP/dist-bin"
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          path: target/distrib
+          pattern: archive-*
+          merge-multiple: true
+      - name: Generate the installer and the formula with cargo-dist
+        env:
+          CARGO_NET_OFFLINE: "true"
+        run: |
+          set -euo pipefail
+          "$RUNNER_TEMP/dist-bin/dist" build --tag "v$VERSION" --artifacts=global \
+            --output-format=json > dist-manifest-global.json
+          [ -s target/distrib/statecraft-cli-installer.sh ] || { echo "::error::no shell installer"; exit 1; }
+          [ -s target/distrib/statecraft-cli.rb ] || { echo "::error::no Homebrew formula"; exit 1; }
+      - name: Harden the shell installer (install -m 755, SHA-256 required)
+        run: |
+          set -euo pipefail
+          scripts/release/harden-installer.sh target/distrib/statecraft-cli-installer.sh
+          ( cd target/distrib && sha256sum statecraft-cli-installer.sh > statecraft-cli-installer.sh.sha256 )
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: installers
+          path: |
+            target/distrib/statecraft-cli-installer.sh
+            target/distrib/statecraft-cli-installer.sh.sha256
+            target/distrib/statecraft-cli.rb
+          if-no-files-found: error
+
+  # R-2 and V-1: nothing publishes unless every archive, sidecar, SBOM,
+  # attestation, the installer and the formula verify.
+  verify:
+    name: verify the release set
+    needs: [admit, build, installers]
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      attestations: read
+    env:
+      GH_TOKEN: ${{ github.token }}
+      REPO: ${{ github.repository }}
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          path: release
+          merge-multiple: true
+      - name: Verify every asset
+        run: scripts/release/verify-set.sh release "$REPO"
+
+  publish:
+    name: publish the GitHub Release
+    needs: [admit, verify]
+    if: needs.admit.outputs.mode == 'release'
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      REPO: ${{ github.repository }}
+      TAG: ${{ github.ref_name }}
+    steps:
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          path: release
+          merge-multiple: true
+      - name: Create the release from the verified set
+        # --verify-tag refuses to create a tag: the owner's signed tag is the
+        # only one, and nothing is pushed back to the repository.
+        run: |
+          set -euo pipefail
+          ls -la release
+          gh release create "$TAG" --repo "$REPO" --verify-tag \
+            --title "statecraft-cli $TAG" --generate-notes release/*
