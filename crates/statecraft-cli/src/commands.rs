@@ -117,6 +117,8 @@ pub enum Verb {
     ProviderTokenShow,
     /// `provider compare <captures-dir> --corpus <corpus-dir>`
     ProviderCompare,
+    /// `provider capture <out-dir>`, which spends provider usage
+    ProviderCapture,
     /// `hosted login <path> [--cell <origin>]`
     HostedLogin,
     /// `hosted logout <path> [--cell <origin>]`
@@ -249,6 +251,7 @@ impl Verb {
             Verb::ProviderTokenClear => "provider token clear",
             Verb::ProviderTokenShow => "provider token show",
             Verb::ProviderCompare => "provider compare",
+            Verb::ProviderCapture => "provider capture",
             Verb::HostedLogin => "hosted login",
             Verb::HostedLogout => "hosted logout",
             Verb::HostedSubmit => "hosted submit",
@@ -342,9 +345,10 @@ impl Verb {
             Verb::ProviderTokenSet | Verb::ProviderTokenClear | Verb::ProviderTokenShow => {
                 "042-per-run-provider-configuration"
             }
-            // Spec 052 section 3.4: the golden comparison, in the adapter's
-            // crate, reached through 052's edge on this crate.
-            Verb::ProviderCompare => "052-provider-golden-captures",
+            // Spec 052 sections 3.4 and 3.5: the golden comparison and the
+            // capture, in the adapter's crate, reached through 052's edge on
+            // this crate.
+            Verb::ProviderCompare | Verb::ProviderCapture => "052-provider-golden-captures",
             // Spec 038: the hosted client, amending 006; HTTP and custody in
             // its own crate, the bundle reader in the envelope crate.
             Verb::HostedLogin | Verb::HostedLogout | Verb::HostedSubmit | Verb::HostedDecision => {
@@ -427,6 +431,7 @@ impl Verb {
             Verb::ProviderTokenClear,
             Verb::ProviderTokenShow,
             Verb::ProviderCompare,
+            Verb::ProviderCapture,
             Verb::HostedLogin,
             Verb::HostedLogout,
             Verb::HostedSubmit,
@@ -565,6 +570,7 @@ impl Verb {
             ("proposal", Some("acknowledge")) => Some((Verb::ProposalAcknowledge, 2)),
             ("proposal", Some("admit")) => Some((Verb::ProposalAdmit, 2)),
             ("provider", Some("compare")) => Some((Verb::ProviderCompare, 2)),
+            ("provider", Some("capture")) => Some((Verb::ProviderCapture, 2)),
             // The one three-word group: `provider token <act>` (spec 042).
             ("provider", Some("token")) => match args.get(2).map(String::as_str) {
                 Some("set") => Some((Verb::ProviderTokenSet, 3)),
