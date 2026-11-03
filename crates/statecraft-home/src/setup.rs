@@ -36,7 +36,7 @@ use std::path::Path;
 /// The one registered profile.
 pub const PROFILE_ID: &str = "github-actions-rust";
 /// Its revision.
-pub const REVISION: u32 = 23;
+pub const REVISION: u32 = 24;
 /// Where the rendered policy document lives in the target.
 pub const POLICY_PATH: &str = ".statecraft/setup/github-actions-rust.json";
 /// The resume record, under the project's runtime state.
@@ -120,6 +120,24 @@ const WORKFLOW_DIR: &str = ".github/workflows/";
 /// The revision whose supply-chain job needs a committed `deny.toml` (spec
 /// 044).
 pub const SUPPLY_CHAIN_SINCE: u32 = 22;
+/// The revision whose push to the default branch, where the merge queue is
+/// required, runs only the cache steps and ci-gate (spec 067).
+pub const POST_MERGE_SINCE: u32 = 24;
+/// The input a declared extra job's or an external code selection's reusable
+/// workflow declares, so it can skip its expensive steps on a post-merge push
+/// (spec 067 section 3.4).
+pub const POST_MERGE_INPUT: &str = "post_merge";
+/// The jobs that judge, skipped on a post-merge push (spec 067 section 3.1);
+/// code keeps its cache steps.
+const POST_MERGE_JOBS: [&str; 7] = [
+    "governance",
+    "preflight",
+    "code",
+    "supply-chain",
+    "workflow-lint",
+    "sg-scan",
+    "secret-scan",
+];
 /// The first line of the supply-chain job's comment in the rendered workflow,
 /// where an external code selection's replacement of the code job ends.
 const SUPPLY_CHAIN_MARK: &str = "  # Revision 22 (spec 044 section 3.2)";
@@ -463,6 +481,7 @@ pub fn remote_obligations() -> Vec<String> {
         "revision 21: every review or visible skip publishes a statecraft-ai-review check run after its evidence artifact, with the exact record and a success, failure or neutral conclusion; fork heads are excluded and publication failures fail the job (spec 062; 044 moves to 22)".to_string(),
         "revision 22: four more required jobs, each a need of ci-gate and none optional: supply-chain (cargo deny against the committed deny.toml, cargo audit when .cargo/audit.toml exists, cargo vet --locked when supply-chain/config.toml exists, each tool a digest-verified release at an exact version, with the candidate's .cargo/config.toml removed first), workflow-lint (zizmor offline over .github/workflows, then verify-action-pins.sh: every action by 40-hex commit digest with a `# <ref>` comment, a docker image by sha256, or a local path), sg-scan (ast-grep scan when sgconfig.yml exists) and secret-scan (gitleaks, digest-verified, over the change's commits, reporting rule and location and never the value). On a pull request governance runs guard-policy-files.sh: a change to deny.toml, .cargo/audit.toml, supply-chain/, any Cargo.toml or Cargo.lock, spec-spine.toml or docs/adoption/spec-spine.md beside any other path, apart from the generated .statecraft/derived/ and .statecraft/environment.json, fails and must be split, so an upgrade that also moves the spec-spine pin is two pull requests. A target needs a committed deny.toml to select this revision; the plan withholds the profile without one (spec 044)".to_string(),
         format!("revision 23: the profile renders {GUIDE_PATH}, the reviewer's contract, as a managed file verified by digest and identical in every target, and the AI review's default governance context becomes {} in that order: the managed guide and the repository's own REVIEW.md are read as blobs at the base commit, an absent REVIEW.md is recorded as absent, a candidate's edit to either is review data read as context only once it is on the base, and both count whole against the context's quarter of review.context_tokens, so a guide that does not fit refuses with 2 before any provider call (spec 056)", DEFAULT_CONTEXT_PATHS.join(", ")),
+        format!("revision 24: where remote.merge_queue.required is true, a push to the default branch is a post-merge push, because the queue already judged that exact commit and GitHub fast-forwards the branch to it: governance, preflight, supply-chain, workflow-lint, sg-scan and secret-scan are skipped, code runs only its cache steps (the spec-spine cache, a lookup of the cargo key, and on a miss the build that fills it and the save), and ci-gate admits them by the policy's post-merge rule only when the pushed commit passed ci-gate in a completed merge-queue run of statecraft-ci, so a push that bypassed the queue blocks and ci-gate still reports a check run on the pushed commit. A declared extra job's workflow, and an external code selection's, must declare the boolean workflow_call input {POST_MERGE_INPUT}, which the profile passes as true on such a push so it can skip its expensive steps; the plan refuses a workflow that does not declare it. The push of the upgrade's own merge commit is judged by the base's revision-23 rules and blocks once; without a required queue, push behaviour is unchanged (spec 067)"),
         "a repository that already runs these checks by hand keeps them by setting governance.enforce_coverage (index coverage --fail-on-untraced), governance.authored_content (the script's path; absent or not executable refuses), governance.authored_content_text (the title, the body and every commit message), governance.gate_each_commit (each commit's tree passes the gate and cargo fmt) and governance.require_signed_commits (each commit verified as signed by GitHub) (revision 4)".to_string(),
     ]
 }
@@ -730,6 +749,36 @@ fn extra_required_jobs(root: &Path, value: &serde_json::Value) -> Result<Vec<Ext
     Ok(out)
 }
 
+/// Revision 24 (spec 067): whether a push to the default branch is a
+/// post-merge push, the queue being required by the declared parameters.
+pub fn post_merge_push(profile: &Profile, params: &Parameters) -> bool {
+    profile.revision >= POST_MERGE_SINCE
+        && params
+            .remote
+            .merge_queue
+            .as_ref()
+            .is_some_and(|q| q.required)
+}
+
+/// Whether the reusable workflow at `workflow` declares the boolean
+/// `post_merge` input under `on: workflow_call` (spec 067 section 3.4).
+fn declares_post_merge(root: &Path, workflow: &str) -> bool {
+    let Some(document) = std::fs::read_to_string(root.join(workflow))
+        .ok()
+        .and_then(|text| yaml::parse(&text).ok())
+    else {
+        return false;
+    };
+    document
+        .get("on")
+        .and_then(|on| on.get("workflow_call"))
+        .and_then(|call| call.get("inputs"))
+        .and_then(|inputs| inputs.get(POST_MERGE_INPUT))
+        .and_then(|input| input.get("type"))
+        .and_then(YamlValue::as_str)
+        == Some("boolean")
+}
+
 /// A job's concurrency block (revision 18, specs 058 and 059): one group per
 /// pull request and job, cancelled by a newer push; a push and a merge-queue
 /// entry get a group of their own run.
@@ -739,17 +788,30 @@ fn job_concurrency(job: &str) -> String {
     )
 }
 
+/// Revision 24 (spec 067): a job that needs preflight still runs on a
+/// post-merge push, where preflight is skipped.
+const AFTER_PREFLIGHT_IF: &str = "    if: ${{ !cancelled() && (needs.preflight.result == 'success' || github.event_name == 'push') }}\n";
+
+/// Revision 24 (spec 067): the input a called workflow receives, true on a
+/// post-merge push.
+fn post_merge_with() -> String {
+    format!("    with:\n      {POST_MERGE_INPUT}: ${{{{ github.event_name == 'push' }}}}\n")
+}
+
 /// The rendered jobs and `needs` entries for the declared extra jobs: empty
 /// when none is declared, so a project without any renders what it did.
-fn extra_job_text(jobs: &[ExtraJob]) -> (String, String) {
+/// Under a post-merge push (revision 24) each is called with `post_merge`.
+fn extra_job_text(jobs: &[ExtraJob], post_merge: bool) -> (String, String) {
     let defs = jobs
         .iter()
         .map(|e| {
             format!(
-                "\n  {job}:\n    name: {job}\n    needs: [preflight]\n{concurrency}    uses: ./{wf} # zizmor: ignore[self-repository]\n",
+                "\n  {job}:\n    name: {job}\n    needs: [preflight]\n{when}{concurrency}    uses: ./{wf} # zizmor: ignore[self-repository]\n{with}",
                 job = e.job,
                 wf = e.workflow,
                 concurrency = job_concurrency(&e.job),
+                when = if post_merge { AFTER_PREFLIGHT_IF } else { "" },
+                with = if post_merge { post_merge_with() } else { String::new() },
             )
         })
         .collect();
@@ -1615,6 +1677,23 @@ pub fn plan(inputs: &Inputs<'_>) -> Result<Plan, String> {
     let profile = inputs.profile;
     let block = effective_block(root, profile, inputs.manifest, inputs.block);
     let params = parameters(root, &block, inputs.derived_dir)?;
+    if post_merge_push(profile, &params) {
+        let called = params
+            .extra_required_jobs
+            .iter()
+            .map(|e| ("ci.extra_required_jobs", e.workflow.as_str()))
+            .chain(match &params.code {
+                Code::External { workflow, .. } => Some(("ci.code.workflow", workflow.as_str())),
+                Code::Rust => None,
+            });
+        for (key, workflow) in called {
+            if !declares_post_merge(root, workflow) {
+                return Err(format!(
+                    "{key}: `{workflow}` must declare the boolean workflow_call input `{POST_MERGE_INPUT}` (on: workflow_call: inputs: {POST_MERGE_INPUT}: type: boolean), because revision {POST_MERGE_SINCE} passes it where the merge queue is required (spec 067)"
+                ));
+            }
+        }
+    }
     let identity = profile.identity();
     let source = profile.source_identity();
 
@@ -1691,7 +1770,26 @@ pub fn plan(inputs: &Inputs<'_>) -> Result<Plan, String> {
             Code::External { script, .. } => script.clone(),
         },
     );
-    let (extra_jobs, extra_needs) = extra_job_text(&params.extra_required_jobs);
+    // Revision 24 (spec 067): what a post-merge push renders, or nothing.
+    let post_merge = post_merge_push(profile, &params);
+    for (name, line) in [
+        (
+            "ci.post_merge.skip",
+            "    if: github.event_name != 'push'\n",
+        ),
+        ("ci.post_merge.after_preflight", AFTER_PREFLIGHT_IF),
+        (
+            "ci.post_merge.lookup",
+            "          lookup-only: ${{ github.event_name == 'push' }}\n",
+        ),
+        (
+            "ci.post_merge.fill",
+            "        if: github.event_name != 'push' || steps.cargo-cache.outputs.cache-hit != 'true'\n",
+        ),
+    ] {
+        values.insert(name, if post_merge { line } else { "" }.to_string());
+    }
+    let (extra_jobs, extra_needs) = extra_job_text(&params.extra_required_jobs, post_merge);
     values.insert("ci.extra_jobs", extra_jobs);
     values.insert("ci.extra_needs", extra_needs);
     let mut owned_paths: Vec<&str> = profile
@@ -1782,7 +1880,7 @@ pub fn plan(inputs: &Inputs<'_>) -> Result<Plan, String> {
                 .find(SUPPLY_CHAIN_MARK)
                 .ok_or("supply-chain absent from profile")?
                 + start;
-            text.replace_range(start..end, &format!("  code:\n    name: code\n    needs: [preflight]\n{}    uses: ./{workflow} # zizmor: ignore[self-repository]\n    permissions:\n      contents: read\n\n", job_concurrency("code")));
+            text.replace_range(start..end, &format!("  code:\n    name: code\n    needs: [preflight]\n{}{}    uses: ./{workflow} # zizmor: ignore[self-repository]\n{}    permissions:\n      contents: read\n\n", if post_merge { AFTER_PREFLIGHT_IF } else { "" }, job_concurrency("code"), if post_merge { post_merge_with() } else { String::new() }));
         }
         let bytes = text.into_bytes();
         let managed_before = inputs
@@ -1922,6 +2020,20 @@ pub fn plan(inputs: &Inputs<'_>) -> Result<Plan, String> {
             "pull_request": "required",
             "push": "required",
             "merge_group": "required",
+        });
+    }
+    // Revision 24 (spec 067): with a required queue, a push to the default
+    // branch judges by the post-merge rule.
+    if post_merge {
+        let mut judged: Vec<String> = POST_MERGE_JOBS.iter().map(|j| j.to_string()).collect();
+        judged.extend(params.extra_required_jobs.iter().map(|e| e.job.clone()));
+        for job in judged {
+            policy["jobs"][job.as_str()]["push"] = serde_json::json!("post-merge");
+        }
+        policy["post_merge_rule"] = serde_json::json!({
+            "applies": "a push to the default branch while remote.merge_queue.required is true",
+            "requires": "every post-merge job skipped or succeeded, and the pushed commit's completed merge-queue run of statecraft-ci with ci-gate success",
+            "input": POST_MERGE_INPUT,
         });
     }
     policy["files"] = serde_json::json!(

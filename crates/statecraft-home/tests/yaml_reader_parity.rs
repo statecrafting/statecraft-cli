@@ -157,6 +157,11 @@ fn render(body: &str, extras: bool) -> String {
             }
             "ci.extra_needs" if extras => ", extra",
             "ci.extra_jobs" | "ci.extra_needs" => "",
+            // Revision 24 (spec 067): the form without a required queue.
+            "ci.post_merge.skip"
+            | "ci.post_merge.after_preflight"
+            | "ci.post_merge.lookup"
+            | "ci.post_merge.fill" => "",
             "default_branch" => "main",
             "profile.revision" => "22",
             "profile.identity" => "0123456789abcdef",
