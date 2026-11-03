@@ -16,9 +16,12 @@ summary: >
 amends:
   - "003-work-and-run-semantics"
   - "039-local-cockpit-authority"
-# No `extends` yet: the implementing change adds the edges on
-# crates/statecraft-run/ (003), crates/statecraft-home/ (002) and
-# crates/statecraft-cli/ (006) with the code.
+extends:
+  # The input record, its fold, the control grants and the supervisor's desk
+  # (`input.rs`), and the run fold skipping a grant (`session.rs`). The edges
+  # on crates/statecraft-home/ (002) and crates/statecraft-cli/ (006) land
+  # with the delivery and the verbs.
+  - { spec: "003-work-and-run-semantics", unit: { kind: directory, path: "crates/statecraft-run/" }, nature: additive }
 depends_on:
   - "003-work-and-run-semantics"
   - "004-execution-adapter"
@@ -145,6 +148,38 @@ does not sit in the model request path (spec 013's witness reads it as
 untrusted testimony and never rewrites it), so a note goes through the gate
 the child already executes, and a command becomes a new attempt.
 
+**2026-11-01: an input is evidence in the run record, not an effect
+bracket.** Section 3.1's intent and outcomes are written as spec 003 records
+of kind `evidence`: the first under the subject `operator-input`, holding the
+whole submission and an identity `input-NNNNNN`, and each later state under
+`operator-input-state`. The order is the one section 3.1 requires, durable
+before anything else happens; the kind is not `intent`, because an input has
+up to three later states where an effect has one outcome, and an input is not
+an effect on the target, so the effect fold and reconciliation never read one
+and a pending input never blocks a retry. The fold applies only the moves R-1
+names and reports any other record as a defect.
+
+**2026-11-01: a control grant belongs to the repository.** A grant names a
+cockpit session, the operator, a reason and its end, at most 3600 seconds
+after it is given, and is recorded in the run record under `control-grant`; a
+revocation under `control-revoke`. Neither belongs to a run, and the run fold
+skips both. The live grant is the latest one for the session that has not
+ended and was not revoked after it.
+
+**2026-11-02: an input reaches a live supervisor through a request file
+(owner decision).** The owner, asked whether this spec reuses spec 050's
+channel: "Reuse 050's request file (Recommended)". The supervisor holds the
+repository lock from the intent to the outcome (spec 003 section 3.1.4 rule
+7), so no other process can append while the attempt runs. Finding the lock
+held, `input note` and `input command` write the submission as a request file
+in the product home, published as spec 050's are, and the supervisor, at each
+of its polls, records it `pending` and only then places it. This amends
+section 3.2's table for the live case only: `pending` is recorded by the
+supervisor, on the verb's behalf, when a live run holds the lock, and by the
+verb otherwise. A request no supervisor lived to apply is recorded by the next
+writer. This change builds the record and its fold; the delivery, the verbs
+and the request file follow in the next.
+
 ## Verification
 
 Ratified by the owner on 2026-10-31. Acceptance is declared by the
@@ -152,3 +187,17 @@ implementing change, which will send a note during a live attempt and see it
 recorded pending, then delivered at the next governed call, and expired when
 no call comes before its expiry; refuse a cockpit command without a control
 grant; and find every input, with author and reason, in the attempt's record.
+
+```verify:cli
+cargo test -p statecraft-run --test operator_input
+```
+
+It records a note `pending` and finds the record on disk before the note is
+placed, then `delivered` and `acknowledged` labelled child-attested, and
+expires a note when no call reads it before its expiry and when its attempt
+ends; refuses a cockpit note and command without a live grant with
+`control-not-granted`, and after the grant ends or is revoked; refuses a
+grant longer than an hour; applies only the moves R-1 names; and folds every
+input, with author and reason, from the attempt's record. The delivery, the
+gate's return of a note, the request file and the two verbs follow in the
+next change, which is why `implementation` is still `pending`.

@@ -49,8 +49,8 @@ pub fn runs(chain: &Chain) -> Vec<Run> {
     let mut out: Vec<Run> = Vec::new();
     for entry in chain.entries() {
         // Spec 050: a halt entry is about the repository, not a run, and the
-        // halt fold is its only reader.
-        if entry.kind == Kind::Halt {
+        // halt fold is its only reader. Spec 053: so is a control grant.
+        if entry.kind == Kind::Halt || crate::input::is_repository_record(&entry) {
             continue;
         }
         let run = match out.iter_mut().find(|r| r.id == entry.run_id) {
