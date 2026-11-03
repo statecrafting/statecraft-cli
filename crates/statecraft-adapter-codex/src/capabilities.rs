@@ -2,8 +2,9 @@
 //!
 //! Spec 055 section 3.6: the declaration is measured, not copied from the
 //! first adapter's, and a field nobody has measured is declared `false`.
-//! Nothing below has a recorded measurement yet (the fixtures are synthetic),
-//! so every token is absent and every field is `false`:
+//! The 2026-11-02 recordings (`testdata/`) measure the stream and the hook
+//! listing, not these fields, so every token is still absent and every field
+//! is still `false`:
 //!
 //! | Field | Declared | Why |
 //! |---|---|---|
@@ -26,7 +27,7 @@ use statecraft_adapter::manifest::Manifest;
 pub const ADAPTER_NAME: &str = "codex";
 
 /// The provider version section 3.1 measured the invocation against.
-pub const MEASURED_PROVIDER_VERSION: &str = "0.163.0";
+pub const MEASURED_PROVIDER_VERSION: &str = "0.166.0";
 
 /// The commands the constructed environment must carry (spec 004 section
 /// 3.5.8): `codex` is this adapter's own; `git` is spec 003's workspace.
