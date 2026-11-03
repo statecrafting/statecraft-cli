@@ -1183,6 +1183,237 @@ pub fn run_events(
     Ok(Answer::new(events, Exit::Ok, summary).erase())
 }
 
+// ---------------------------------------------------------- operator input
+
+/// What `input note` or `input command` was told (spec 053 section 3).
+pub struct InputOperands<'a> {
+    /// The target.
+    pub path: &'a Path,
+    /// The run.
+    pub run_id: &'a str,
+    /// Note or command.
+    pub kind: statecraft_run::input::InputKind,
+    /// Who sends it.
+    pub author: &'a str,
+    /// Why.
+    pub reason: &'a str,
+    /// How long it stands, in seconds from now.
+    pub expires_in: &'a str,
+    /// The steering text, or the command.
+    pub body: &'a str,
+    /// A command's spec 048 operands: controller, lease, key and version.
+    pub operation: Option<[&'a str; 4]>,
+    /// The CLI, or a loopback cockpit session, which needs a live grant.
+    pub origin: statecraft_run::input::Origin,
+}
+
+/// An input refused before or by its record: exit 2, the closed reason.
+fn input_refused(reason: &str, detail: &str) -> Response {
+    let value = serde_json::json!({ "reason": reason, "detail": detail, "outcome": "refused" });
+    Answer::new(
+        value,
+        Exit::Refused,
+        format!("refused: {reason}: {detail}\n"),
+    )
+    .with_kind(crate::render::ErrorKind::Refused)
+}
+
+/// The attempt an input is for: the run's latest. A note is then refused
+/// unless it is live, by the record (section 3.3).
+fn input_attempt(chain: &Chain, run_id: &str) -> Option<u32> {
+    statecraft_run::session::runs(chain)
+        .into_iter()
+        .find(|r| r.id == run_id)
+        .and_then(|r| r.attempts.last().map(|a| a.number))
+}
+
+/// `input note <path> <run-id> <author> <reason> <expires-in-seconds>
+/// <body...>` and `input command <path> <run-id> <controller> <lease> <key>
+/// <version> <author> <reason> <expires-in-seconds> <body...>` (spec 053
+/// sections 3.1 to 3.4, operands chosen in section 5, 2026-11-02).
+///
+/// With the repository lock free the input is recorded `pending` here, and a
+/// command is then decided by spec 048: `abort` is its `attempt.abort` with
+/// the input as the reason, and any other command its `attempt.continue`,
+/// refused `capability-undeclared` for every adapter. With a live run holding
+/// the lock the request is queued for that run's supervisor, which records
+/// it and places it, and the answer is 0 as queued. A cockpit session with no
+/// live control grant is refused `control-not-granted` either way.
+pub fn input_submit(ctx: &Context<'_>, op: &InputOperands<'_>) -> Result<Response, Usage> {
+    use statecraft_run::input::{self, InputKind, Operands, Origin, Request, Submission};
+    let usage = || {
+        Usage(match op.kind {
+            InputKind::Note => {
+                "usage: input note <path> <run-id> <author> <reason> <expires-in-seconds> \
+                 <body...>"
+                    .to_string()
+            }
+            InputKind::Command => {
+                "usage: input command <path> <run-id> <controller> <lease> <key> <version> \
+                 <author> <reason> <expires-in-seconds> <body...>"
+                    .to_string()
+            }
+        })
+    };
+    let Ok(seconds) = op.expires_in.parse::<i64>() else {
+        return Err(usage());
+    };
+    if seconds <= 0 || op.body.trim().is_empty() {
+        return Err(usage());
+    }
+    let at = now(ctx.clock);
+    let operation = match (op.kind, op.operation) {
+        (InputKind::Note, None) => None,
+        (InputKind::Command, Some([controller, lease, key, version])) => {
+            let (Ok(lease), Ok(version)) = (lease.parse::<u64>(), version.parse::<u64>()) else {
+                return Err(usage());
+            };
+            if controller.is_empty() || key.is_empty() {
+                return Err(usage());
+            }
+            Some(Operands {
+                controller: controller.to_string(),
+                lease,
+                key: key.to_string(),
+                version,
+                at: at.clone(),
+            })
+        }
+        _ => return Err(usage()),
+    };
+    let now_unix = ctx.clock.now_unix();
+    let request = |attempt: u32| Request {
+        submission: Submission {
+            kind: op.kind,
+            body: op.body.to_string(),
+            author: op.author.to_string(),
+            reason: op.reason.to_string(),
+            run_id: op.run_id.to_string(),
+            attempt,
+            expires_at: now_unix + seconds,
+            origin: op.origin.clone(),
+        },
+        operation: operation.clone(),
+    };
+    let no_run = || {
+        input_refused(
+            "no-such-attempt",
+            &format!("the record holds no attempt of run {}", op.run_id),
+        )
+    };
+    // Section 3.4: a cockpit session submits nothing without a live grant,
+    // and learns that before anything else.
+    let ungranted = |chain: &Chain| match &op.origin {
+        Origin::Cockpit { session } if input::live_grant(chain, session, now_unix).is_none() => {
+            let e = input::InputError::ControlNotGranted {
+                session: session.clone(),
+            };
+            Some(input_refused(e.reason(), &e.to_string()))
+        }
+        _ => None,
+    };
+    let (root, _held, mut chain) = match locked_or_busy(ctx, op.path) {
+        Ok(Locked::Held(root, held, chain)) => (root, held, chain),
+        Ok(Locked::Busy(root, busy)) => {
+            // Read, not written: the supervisor holding the lock appends.
+            let chain = match Chain::open(ctx.home, &root) {
+                Ok((chain, _)) => chain,
+                Err(e) => return Ok(failed(&e.to_string())),
+            };
+            if let Some(refused) = ungranted(&chain) {
+                return Ok(refused);
+            }
+            let Some(attempt) = input_attempt(&chain, op.run_id) else {
+                return Ok(no_run());
+            };
+            let request = request(attempt);
+            let file = match input::queue(ctx.home, &root, &request) {
+                Ok(file) => file,
+                Err(e) => return Ok(failed(&e.to_string())),
+            };
+            let value = serde_json::json!({
+                "queued": true,
+                "request": request,
+                "file": file.display().to_string(),
+            });
+            let queued = format!(
+                "queued for the supervisor of the live run that holds the lock ({busy}); it \
+                 records the input pending before anything else, and `run events` shows it\n"
+            );
+            // Section 3.3: no state lets a continue be accepted, so the answer
+            // is known; the supervisor records the input and decides it.
+            if op.kind == InputKind::Command && !input::is_abort(op.body) {
+                let mut answer = input_refused(
+                    "capability-undeclared",
+                    "no adapter declares that it can resume a provider session, so \
+                     attempt.continue is refused for every adapter; the input itself is queued",
+                );
+                answer.value["queued"] = value;
+                return Ok(answer);
+            }
+            return Ok(Answer::new(value, Exit::Ok, queued).erase());
+        }
+        Err(answer) => return Ok(answer),
+    };
+    // A request no supervisor lived to take is taken before this one.
+    match input::apply_pending(&mut chain, ctx.home, &root, now_unix, &at) {
+        Ok(drained) => {
+            for why in drained.unreadable {
+                eprintln!("warning: {why}; it is left in place and was not applied");
+            }
+        }
+        Err(e) => return Ok(failed(&e.to_string())),
+    }
+    if let Some(refused) = ungranted(&chain) {
+        return Ok(refused);
+    }
+    let Some(attempt) = input_attempt(&chain, op.run_id) else {
+        return Ok(no_run());
+    };
+    let request = request(attempt);
+    let taken = match input::take(&mut chain, &request, now_unix, &at) {
+        Ok(taken) => taken,
+        Err(e) => return Ok(failed(&e.to_string())),
+    };
+    if let Some(refused) = &taken.refused {
+        let reason = refused["reason"].as_str().unwrap_or("invalid-input");
+        let detail = refused["detail"].as_str().unwrap_or_default();
+        return Ok(input_refused(reason, detail));
+    }
+    let id = taken.id.clone().unwrap_or_default();
+    let mut summary = format!(
+        "{} {id} recorded pending for run {} attempt {attempt}\n",
+        match op.kind {
+            InputKind::Note => "note",
+            InputKind::Command => "command",
+        },
+        op.run_id
+    );
+    let mut value = serde_json::json!({ "queued": false, "input": taken });
+    if let Some(decided) = &taken.operation {
+        if let Some(refusal) = decided.get("refused").or_else(|| {
+            decided
+                .get("replayed")
+                .and_then(|r| r.get("refusal"))
+                .filter(|r| !r.is_null())
+        }) {
+            let mut answer = input_refused(
+                refusal["reason"].as_str().unwrap_or("precondition"),
+                refusal["detail"].as_str().unwrap_or_default(),
+            );
+            answer.value["input"] = value["input"].take();
+            return Ok(answer);
+        }
+        summary.push_str(if decided.get("replayed").is_some() {
+            "its abort is already recorded under that key; nothing more was appended\n"
+        } else {
+            "abort accepted: stop-requested; the attempt ends cancelled\n"
+        });
+        value["operation"] = decided.clone();
+    }
+    Ok(Answer::new(value, Exit::Ok, summary).erase())
+}
+
 // ----------------------------------------------------------- startup trial
 
 /// What `startup trial` was told: the origins the operator stated (exactly

@@ -2,7 +2,7 @@
 id: "053-operator-input-record"
 title: "Operator input to a live attempt is recorded before delivery, expires, and is evidence on the attempt"
 status: approved
-implementation: pending
+implementation: complete
 created: "2026-10-21"
 summary: >
   Lets an operator steer a live attempt with a note, read by the agent at its
@@ -18,10 +18,16 @@ amends:
   - "039-local-cockpit-authority"
 extends:
   # The input record, its fold, the control grants and the supervisor's desk
-  # (`input.rs`), and the run fold skipping a grant (`session.rs`). The edges
-  # on crates/statecraft-home/ (002) and crates/statecraft-cli/ (006) land
-  # with the delivery and the verbs.
+  # (`input.rs`), its request file (`input.rs`, `halt.rs`), and the run fold
+  # skipping a grant (`session.rs`).
   - { spec: "003-work-and-run-semantics", unit: { kind: directory, path: "crates/statecraft-run/" }, nature: additive }
+  # The note's placement in the exchange directory (`input.rs`) and the
+  # admission gate returning it as context (`launch.rs`).
+  - { spec: "002-environment-lifecycle", unit: { kind: directory, path: "crates/statecraft-home/" }, nature: additive }
+  # The supervisor's poll taking queued input and running the desk
+  # (`launch.rs`), and the `input note` and `input command` verbs
+  # (`application.rs`, `commands.rs`, `main.rs`).
+  - { spec: "006-command-surface", unit: { kind: directory, path: "crates/statecraft-cli/" }, nature: additive }
 depends_on:
   - "003-work-and-run-semantics"
   - "004-execution-adapter"
@@ -159,6 +165,17 @@ an effect on the target, so the effect fold and reconciliation never read one
 and a pending input never blocks a retry. The fold applies only the moves R-1
 names and reports any other record as a defect.
 
+**2026-11-01: a note is a file the gate prints whole, one per governed
+call.** The supervisor writes the provider's complete `PreToolUse` answer,
+with the note as `additionalContext`, to `notes/<id>.<expires-at>.json` in
+the exchange directory by a no-replace rename, so the gate never quotes
+operator text in shell. On an `admitted` decision the gate prints the first
+such file, by name, that is unexpired and that its log does not already name,
+appends `note <id>` to the log and exits 0; that line is what `acknowledged`
+is read from. A note withdrawn, acknowledged or expired is removed. The
+supervisor runs its desk at each poll of section 5's request file while
+anything is open, and once more after the process ends.
+
 **2026-11-01: a control grant belongs to the repository.** A grant names a
 cockpit session, the operator, a reason and its end, at most 3600 seconds
 after it is given, and is recorded in the run record under `control-grant`; a
@@ -177,8 +194,21 @@ of its polls, records it `pending` and only then places it. This amends
 section 3.2's table for the live case only: `pending` is recorded by the
 supervisor, on the verb's behalf, when a live run holds the lock, and by the
 verb otherwise. A request no supervisor lived to apply is recorded by the next
-writer. This change builds the record and its fold; the delivery, the verbs
-and the request file follow in the next.
+writer.
+
+**2026-11-02: the verbs' operands, and a request's identity.** `input note
+<path> <run-id> <author> <reason> <expires-in-seconds> <body...>` and `input
+command <path> <run-id> <controller> <lease> <key> <version> <author> <reason>
+<expires-in-seconds> <body...>`: section 3.1's fields, and for a command the
+lease, key and version section 3.3 decides it under. The attempt is the run's
+latest; the reason is one word or one quoted operand, the body the rest. The
+command's spec 048 reason is `operator input <id> from <author>: <reason>`,
+and it is decided against the version its controller read plus one, since
+the input's own `pending` record, appended first, is a record about the run.
+A request is identified by its whole submission, expiry to the second: one
+the record already holds is not recorded again, and its command replays
+under its key. Queued, a command other than `abort` is answered
+`capability-undeclared` at once, since no state admits a continue.
 
 ## Verification
 
@@ -190,6 +220,9 @@ grant; and find every input, with author and reason, in the attempt's record.
 
 ```verify:cli
 cargo test -p statecraft-run --test operator_input
+cargo test -p statecraft-home --test operator_input
+cargo test -p statecraft-cli --test run_startup operator_input_
+cargo test -p statecraft-cli --test run_operations operator_input_
 ```
 
 It records a note `pending` and finds the record on disk before the note is
@@ -198,6 +231,17 @@ expires a note when no call reads it before its expiry and when its attempt
 ends; refuses a cockpit note and command without a live grant with
 `control-not-granted`, and after the grant ends or is revoked; refuses a
 grant longer than an hour; applies only the moves R-1 names; and folds every
-input, with author and reason, from the attempt's record. The delivery, the
-gate's return of a note, the request file and the two verbs follow in the
-next change, which is why `implementation` is still `pending`.
+input, with author and reason, from the attempt's record; and takes a queued
+request once, recording nothing again when its file is left behind, and
+skips and reports one that does not read. The second runs the admission gate
+as a program and sees it return a placed note once as the call's context,
+never past its expiry, and never on a refused decision. The third drives a
+live attempt through the binary: a note sent while it runs is queued,
+recorded `pending` by its supervisor, then `delivered`, returned by the gate
+at the next governed call and recorded `acknowledged`; a note no call reads
+before its expiry is `expired` and withdrawn; and an `abort` command is
+recorded before spec 048's abort, which cancels the attempt with the input as
+its reason. The fourth records a note and a command with the lock free,
+refuses a continue `capability-undeclared` after recording it, and refuses a
+cockpit note and command without a live grant `control-not-granted`,
+appending nothing.

@@ -565,7 +565,8 @@ pub fn queue(
 /// requests were made, without replacing anything: written and synced under a
 /// hidden name, then linked to its final name, which fails rather than
 /// replaces. Returns its path once it and its directory entry are durable, or
-/// the path that failed and why. Shared by the halt queue and spec 048's.
+/// the path that failed and why. Shared by the halt queue, spec 048's and
+/// spec 053's.
 pub(crate) fn publish_request(
     dir: &Path,
     bytes: &[u8],

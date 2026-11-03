@@ -19,10 +19,26 @@
           "kind": "directory",
           "path": "crates/statecraft-run/"
         }
+      },
+      {
+        "nature": "additive",
+        "spec": "002-environment-lifecycle",
+        "unit": {
+          "kind": "directory",
+          "path": "crates/statecraft-home/"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "006-command-surface",
+        "unit": {
+          "kind": "directory",
+          "path": "crates/statecraft-cli/"
+        }
       }
     ],
     "id": "053-operator-input-record",
-    "implementation": "pending",
+    "implementation": "complete",
     "obligations": [
       {
         "anchor": "3-1-the-input-record",
@@ -59,7 +75,7 @@
       }
     ],
     "sectionDigests": {
-      "053-operator-input-record": "f3de7c4c47261801b819b898fbe2e786d17b7608047afe0de49e35623dc25772",
+      "053-operator-input-record": "d3626f10dcaae63ba9ca9bc1421882eb0c7f011d96528046682021ed2248b3a3",
       "1-purpose": "54d386817f4591af5252ec25e3e1fc9b3e26757892b8666afc71fa50d58a3577",
       "2-territory": "259ca4255f2ab3b167729833670c511a4a4d6be2b4f058702d6423ec5fba34a5",
       "3-1-the-input-record": "529927f4d51e1e773d010c66ceb7067fcb97e7fe9eac74c55eec5cc211033911",
@@ -69,8 +85,8 @@
       "3-5-local-only": "948a0bc4a797f9cd9c5316cf72e175655c08e006fade10d5f69a8cc1a903df13",
       "3-behavior": "040f8a2b326bc5bf820794f7faf22473a95128b7b763fd690f1a739be36d6e65",
       "4-out-of-scope": "45848a94f2c780f4ac51889b61ded4ed167329faf350df4c8169bf316cb4df12",
-      "5-resolved-decisions": "a49ae369a0e2e70fdf6526fb7962a2d5c285148072c01106686f8a8f6487316c",
-      "verification": "f29f99cf601f768559ac111ec9c4c0ea02cbe77071c90a1ae7a99d7bdde69442"
+      "5-resolved-decisions": "b0fd6f2a22c775cada50cab9032eea960e0d782613dfd0700c9d435f9bcdee91",
+      "verification": "311188f45f23ef873c4596792e5c0fb8c14e76212385f8e41fe2b5e46a4217aa"
     },
     "sectionHeadings": [
       "053: Operator input record",
@@ -91,6 +107,6 @@
     "summary": "Lets an operator steer a live attempt with a note, read by the agent at its next governed tool call, or a command, which starts a new turn as a spec 048 continue. Each input is written to the run record before it is delivered, carries its author, reason and expiry, and moves through pending, delivered, then acknowledged or expired. The cockpit is view-only by default and grants control for a bounded time. Localhost only; no hosted transport and no unsigned session-authorized command. An abort command ends the attempt as spec 003's cancelled.\n",
     "title": "Operator input to a live attempt is recorded before delivery, expires, and is evidence on the attempt"
   },
-  "shardHash": "8070ce832399ddb4d5f11fbfe3bf3bbde325b785eb47db8d545fe42ef06b8a20",
+  "shardHash": "f39b15dea1de6f8049e9dece4e6891d1211f4acc7d51e953af51cd7d0617cb13",
   "specVersion": "1.11.0"
 }

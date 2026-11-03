@@ -50,7 +50,7 @@ gate_cmd="$(command_for PreToolUse)"
 tool() {
   rc=0
   if [ -n "$gate_cmd" ] && [ "$mode" != ignores-hooks ]; then
-    printf '{"tool_name":"Bash","tool_input":{"command":"touch %s"}}' "$1" | /bin/sh -c "$gate_cmd" 2>> "$output/gate-stderr"
+    printf '{"tool_name":"Bash","tool_input":{"command":"touch %s"}}' "$1" | /bin/sh -c "$gate_cmd" >> "$output/gate-stdout" 2>> "$output/gate-stderr"
     rc=$?
   fi
   log "gate $1 exit=$rc"

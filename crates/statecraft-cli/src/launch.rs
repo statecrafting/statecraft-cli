@@ -883,8 +883,17 @@ pub fn launch_attempt(
     // Spec 050 section 5, 2026-11-01: while the attempt runs, its supervisor
     // polls for halt requests queued while it holds the lock, appends them,
     // and stops the attempt a halt asks to stop. It borrows the chain for the
-    // supervision only.
-    let mut poller = HaltPoller::new(&mut chain, home, root, &exchange, &run_id, session.attempt);
+    // supervision only. Spec 053 section 5, 2026-11-02: the same poll records
+    // queued operator input `pending` and then places it.
+    let mut poller = HaltPoller::new(
+        &mut chain,
+        clock,
+        home,
+        root,
+        &exchange,
+        &run_id,
+        session.attempt,
+    );
     let supervised = match (watch.as_mut(), &sentinel) {
         // Spec 002 section 3.33 rule 34: the trial keeps a timeline beside
         // the attempt's own watch, which it forwards to unchanged.
@@ -1241,6 +1250,11 @@ struct HaltPolled {
     operations: Vec<statecraft_run::operation::Applied>,
     /// Spec 048: a queued request that did not read or was left behind.
     operation_failure: Option<String>,
+    /// Spec 053: every queued operator input taken, and what it came to.
+    inputs: Vec<statecraft_run::input::Applied>,
+    /// Spec 053: a queued input that did not read or was left behind, a
+    /// submission the desk refused, and a note it could not place.
+    input_failures: Vec<String>,
 }
 
 impl HaltPolled {
@@ -1252,6 +1266,8 @@ impl HaltPolled {
             && self.abort.is_none()
             && self.operations.is_empty()
             && self.operation_failure.is_none()
+            && self.inputs.is_empty()
+            && self.input_failures.is_empty()
         {
             return None;
         }
@@ -1265,6 +1281,8 @@ impl HaltPolled {
             "abort": self.abort,
             "operations": self.operations,
             "operationFailure": self.operation_failure,
+            "inputs": self.inputs,
+            "inputFailures": self.input_failures,
         }))
     }
 }
@@ -1274,6 +1292,7 @@ impl HaltPolled {
 /// held by the caller throughout.
 struct HaltPoller<'c> {
     chain: &'c mut Chain,
+    clock: &'c dyn Clock,
     home: &'c std::path::Path,
     root: &'c std::path::Path,
     exchange: &'c std::path::Path,
@@ -1285,11 +1304,16 @@ struct HaltPoller<'c> {
     expected: Option<Vec<u8>>,
     polled: HaltPolled,
     done: bool,
+    /// Spec 053: the attempt's operator-input desk, and where it places a
+    /// note for the gate.
+    desk: statecraft_run::input::Desk,
+    placement: statecraft_home::input::ExchangePlacement,
 }
 
 impl<'c> HaltPoller<'c> {
     fn new(
         chain: &'c mut Chain,
+        clock: &'c dyn Clock,
         home: &'c std::path::Path,
         root: &'c std::path::Path,
         exchange: &'c std::path::Path,
@@ -1299,6 +1323,7 @@ impl<'c> HaltPoller<'c> {
         let expected = std::fs::read(statecraft_run::record::chain_path(home, root)).ok();
         Self {
             chain,
+            clock,
             home,
             root,
             exchange,
@@ -1308,6 +1333,8 @@ impl<'c> HaltPoller<'c> {
             expected,
             polled: HaltPolled::default(),
             done: false,
+            desk: statecraft_run::input::Desk::new(run_id, attempt),
+            placement: statecraft_home::input::ExchangePlacement::new(exchange),
         }
     }
 
@@ -1349,7 +1376,20 @@ impl<'c> HaltPoller<'c> {
                 Vec::new()
             }
         };
-        if halts.is_empty() && operations.is_empty() {
+        // Spec 053 section 5, 2026-11-02: operator input queued while this
+        // run holds the lock. Like an operation request, a file that does not
+        // read is reported, left in place, and stops nothing.
+        let inputs = match statecraft_run::input::pending(self.home, self.root) {
+            Ok(pending) => {
+                self.polled.input_failures.extend(pending.unreadable);
+                pending.requests
+            }
+            Err(e) => {
+                self.polled.input_failures.push(e.to_string());
+                Vec::new()
+            }
+        };
+        if halts.is_empty() && operations.is_empty() && inputs.is_empty() && !self.desk.is_open() {
             return Control::Continue;
         }
         let chain_path = statecraft_run::record::chain_path(self.home, self.root);
@@ -1393,10 +1433,10 @@ impl<'c> HaltPoller<'c> {
         } else {
             statecraft_run::operation::apply_pending(self.chain, self.home, self.root)
         };
-        self.remember_bytes(&chain_path);
         match operated {
             Ok(drained) => self.polled.operations.extend(drained.applied),
             Err(statecraft_run::operation::QueueError::Record(e)) => {
+                self.remember_bytes(&chain_path);
                 return self.fail(e.to_string());
             }
             // A file left behind once applied, or one that does not read: what
@@ -1404,6 +1444,45 @@ impl<'c> HaltPoller<'c> {
             // request's key replays). Reported, not fatal.
             Err(e) => self.polled.operation_failure = Some(e.to_string()),
         }
+        // Spec 053: after the halt and operation requests, each queued input
+        // is recorded `pending` (and a command decided by spec 048) before the
+        // desk places anything; then the desk places pending notes, records
+        // what the gate log says it returned, and expires what is due.
+        let now = self.clock.now_unix();
+        let timestamp = statecraft_environment::time::rfc3339_utc(now);
+        if !inputs.is_empty() {
+            match statecraft_run::input::apply_pending(
+                self.chain, self.home, self.root, now, &timestamp,
+            ) {
+                Ok(drained) => {
+                    if drained.recorded > 0 {
+                        self.desk.wake();
+                    }
+                    self.polled.inputs.extend(drained.applied);
+                }
+                Err(statecraft_run::input::QueueError::Record(e)) => {
+                    self.remember_bytes(&chain_path);
+                    return self.fail(e.to_string());
+                }
+                // A file left behind once taken: taking it again appends
+                // nothing. Reported, not fatal.
+                Err(e) => {
+                    self.desk.wake();
+                    self.polled.input_failures.push(e.to_string());
+                }
+            }
+        }
+        if self.desk.is_open() {
+            let tick = self.desk.tick(
+                self.chain,
+                &mut self.placement,
+                &mut statecraft_run::input::NoInbox,
+                now,
+                &timestamp,
+            );
+            self.polled.input_failures.extend(tick.failures);
+        }
+        self.remember_bytes(&chain_path);
         let state = match halt::fold(self.chain) {
             Ok(state) => state,
             Err(refusal) => return self.fail(refusal.to_string()),
@@ -1459,7 +1538,23 @@ impl<'c> HaltPoller<'c> {
         statecraft_adapter::supervisor::Control::Stop(why)
     }
 
-    fn finish(self) -> HaltPolled {
+    /// The poll's last act, once the process has ended and before the record
+    /// is digested again: the desk's closing pass acknowledges what the gate
+    /// returned and expires every other note (spec 053 section 3.2). Not
+    /// appended to a record that changed under this supervisor.
+    fn finish(mut self) -> HaltPolled {
+        let chain_path = statecraft_run::record::chain_path(self.home, self.root);
+        if std::fs::read(&chain_path).ok() == self.expected {
+            let now = self.clock.now_unix();
+            let tick = self.desk.close(
+                self.chain,
+                &mut self.placement,
+                now,
+                &statecraft_environment::time::rfc3339_utc(now),
+            );
+            self.polled.input_failures.extend(tick.failures);
+            self.remember_bytes(&chain_path);
+        }
         self.polled
     }
 }
