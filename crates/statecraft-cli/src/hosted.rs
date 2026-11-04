@@ -477,6 +477,14 @@ pub fn decision(home: &Path, rest: &[String]) -> Outcome {
             "approves": x.approves,
             "reviewer": x.reviewer.id,
         })).collect::<Vec<_>>(),
+        // Spec 054 section 3.3: beside the decisions, advisory, never one.
+        "prescreen": v.prescreen.as_ref().map(|p| json!({
+            "id": p.id.to_hex(),
+            "state": p.state,
+            "model": p.model,
+            "findings": p.findings,
+            "advisory": true,
+        })),
         "admission": admission,
     });
     let mut summary = String::new();
@@ -508,6 +516,13 @@ pub fn decision(home: &Path, rest: &[String]) -> Outcome {
             } else {
                 "request changes"
             }
+        ));
+    }
+    if let Some(p) = &v.prescreen {
+        summary.push_str(&format!(
+            "pre-screen {} (advisory, not an approval): {}\n",
+            p.id.to_hex(),
+            p.state
         ));
     }
     let exit = if v.passes() { Exit::Ok } else { Exit::Finding };

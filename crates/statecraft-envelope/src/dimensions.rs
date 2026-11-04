@@ -171,6 +171,14 @@ pub enum RefusalCode {
         /// Which.
         dimension: String,
     },
+    /// The policy opts in to `refuse_on_prescreen_findings` and the AI
+    /// pre-screen (spec 054 section 3.3) is `findings`, `missing`,
+    /// `unreadable` or `other-revision`: the one closed reason, fail-closed.
+    PrescreenRefused {
+        /// What the pre-screen was: `findings`, `missing`, `unreadable` or
+        /// `other-revision`.
+        prescreen: String,
+    },
     /// The input could not be bound unambiguously.
     AmbiguousJson,
     /// No policy is pinned.
@@ -200,6 +208,9 @@ impl Serialize for RefusalCode {
             }
             RefusalCode::DimensionUnknown { dimension } => {
                 json!({ "dimension-unknown": { "dimension": dimension } })
+            }
+            RefusalCode::PrescreenRefused { prescreen } => {
+                json!({ "prescreen-refused": { "prescreen": prescreen } })
             }
             RefusalCode::AmbiguousJson => json!("ambiguous-json"),
             RefusalCode::NoPolicy => json!("no-policy"),
@@ -263,6 +274,10 @@ impl<'de> Deserialize<'de> for RefusalCode {
                     },
                     "dimension-unknown" => match s(inner, "dimension") {
                         Some(dimension) => RefusalCode::DimensionUnknown { dimension },
+                        None => RefusalCode::Unknown(v),
+                    },
+                    "prescreen-refused" => match s(inner, "prescreen") {
+                        Some(prescreen) => RefusalCode::PrescreenRefused { prescreen },
                         None => RefusalCode::Unknown(v),
                     },
                     _ => RefusalCode::Unknown(v),
@@ -362,6 +377,12 @@ pub struct AdmissionPolicy {
     /// The submitter may not approve (added).
     #[serde(default, skip_serializing_if = "is_false")]
     pub approver_may_not_be_submitter: bool,
+    /// Refuse on an AI pre-screen that is `findings`, and equally on one
+    /// that is missing, unreadable or about another revision (spec 054
+    /// section 3.3, added). The option exists only in that fail-closed form;
+    /// unset, no check is registered and the evaluation is spec 037's.
+    #[serde(default, skip_serializing_if = "is_false")]
+    pub refuse_on_prescreen_findings: bool,
 }
 
 fn is_false(b: &bool) -> bool {
