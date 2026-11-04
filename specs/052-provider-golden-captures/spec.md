@@ -178,6 +178,20 @@ rendered, managed file, so the acceptance runs the binary under
 `sandbox-exec` with `(deny network*)` on macOS and in a fresh network
 namespace on Linux, with an empty environment, and fails when neither starts.
 
+**2026-11-02: the capture verb, its table and its redaction.** The verb is
+`provider capture <out-dir>`: it refuses a directory that is not empty and a
+`PATH` with no `claude`, runs the five scenarios in `corpus.json`'s order,
+each in a fresh scratch git work tree, with the prompt on standard input,
+and writes one redacted `<scenario>.jsonl` per scenario and a `captures.json`
+that `provider compare` reads as it is. The scenario prompts, flags,
+settings and recorded invocation strings are one table,
+`capture::SCENARIOS` in the adapter's crate, beside `golden.rs`; spawning
+stays in `statecraft-cli`. Redaction is `capture::redact`, a pure function
+from raw stream lines to redacted lines implementing the stream README's
+list and no other rule, with the goldens' placeholder spellings; the
+`timestamp` fixed value is the capture date at midnight, as the goldens'
+is theirs. Its tests run a fake `claude`; no verify line runs a provider.
+
 ## Verification
 
 Ratified by the owner on 2026-10-31. Acceptance is declared by the
@@ -192,4 +206,6 @@ cargo test -p statecraft-adapter-claude-code --locked --test golden_captures
 cargo test -p statecraft-adapter-claude-code --locked --lib golden
 cargo test -p statecraft-adapter-claude-code --locked --lib qualification
 cargo test -p statecraft-cli --locked --test provider_compare
+cargo test -p statecraft-adapter-claude-code --locked --lib capture
+cargo test -p statecraft-cli --locked --test provider_capture
 ```

@@ -190,11 +190,15 @@ repository lock from the intent to the outcome (spec 003 section 3.1.4 rule
 7), so no other process can append while the attempt runs. Finding the lock
 held, `input note` and `input command` write the submission as a request file
 in the product home, published as spec 050's are, and the supervisor, at each
-of its polls, records it `pending` and only then places it. This amends
-section 3.2's table for the live case only: `pending` is recorded by the
-supervisor, on the verb's behalf, when a live run holds the lock, and by the
-verb otherwise. A request no supervisor lived to apply is recorded by the next
-writer.
+of its polls, records it `pending` and only then places it. So, for the
+live case only, `pending` in section 3.2's table is recorded by the
+supervisor on the verb's behalf, and by the verb otherwise. The owner was
+offered that change either as this dated entry or as a separate amending spec
+to ratify first ("Reuse it, but 053 as a new spec"), and chose this entry: it
+is the owner's amendment, recorded where the owner put it, as spec 050's
+equivalent change is in its own section 5 (2026-11-01). A request no supervisor lived to apply is recorded by the next
+writer. This change builds the record and its fold; the delivery, the verbs
+and the request file follow in the next.
 
 **2026-11-02: the verbs' operands, and a request's identity.** `input note
 <path> <run-id> <author> <reason> <expires-in-seconds> <body...>` and `input

@@ -194,6 +194,7 @@ printf '{{%s,"type":"finished","binding":%s,"completeness":"absent","reason":"no
             ("EP".into(), endpoint.to_string()),
             ("TMPDIR".into(), admission.temporary.display().to_string()),
         ]),
+        start_timeout: Duration::from_secs(60),
         ready_timeout: Duration::from_secs(20),
         grace: Duration::from_secs(5),
     };

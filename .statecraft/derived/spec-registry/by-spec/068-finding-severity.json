@@ -1,0 +1,65 @@
+{
+  "record": {
+    "amends": [
+      "024-review-budget-and-ratification",
+      "062-review-verdict-status"
+    ],
+    "created": "2026-11-02",
+    "dependsOn": [
+      "024-review-budget-and-ratification",
+      "062-review-verdict-status"
+    ],
+    "id": "068-finding-severity",
+    "implementation": "pending",
+    "obligations": [
+      {
+        "anchor": "3-1-severity-and-category",
+        "id": "R-1",
+        "kind": "requirement",
+        "text": "Every finding in the review's evidence record carries a severity, one of `low`, `medium` or `high`, and a category, one of `correctness`, `security`, `authority`, `ratification` or `other`; a finding without either is read as `high`."
+      },
+      {
+        "anchor": "3-2-an-answered-low-finding",
+        "id": "R-2",
+        "kind": "requirement",
+        "text": "ci-gate passes a head whose findings are all `low` and `other`, each answered by a review note for that head, without the review exception; any other finding, or one left unanswered, keeps the exception required."
+      },
+      {
+        "anchor": "3-3-known-false-positives",
+        "id": "R-3",
+        "kind": "requirement",
+        "text": "A known false positive is answered only by an entry in the project's list as it stands at the base commit, never by the candidate's copy."
+      }
+    ],
+    "sectionDigests": {
+      "068-finding-severity-and-answered-low-findings": "e996bc34f64abced26334a428ed29813e45255a0442e067be6bff6e97156f3d0",
+      "1-purpose": "28e6dd4c0cb104a7b3431671911613e881f5da83c586829f6c292109d444f908",
+      "2-territory": "d605422fb21cf38b47d66414ab1099cb5feaf2ad9b8c29523c93a49b9c67bea3",
+      "3-1-severity-and-category": "22635a1fa3f741c87f2c633e6bbc863b3e4c1361aebb9f7afc89e924ec787f4f",
+      "3-2-an-answered-low-finding": "874e8465406d8eaac0c08fa61f33e719565528b64d06e91d9b1a4ccb30e0426c",
+      "3-3-known-false-positives": "7da82438679813676d60b4ff70ccdb35bdf6b8a96a819cf10d0b0fadefe2267a",
+      "3-behavior": "d3016d22efa6f7b9e5082c45f6d3045b2594c2d52487dcf09137f2d7bde34c51",
+      "4-out-of-scope": "c27d46157a116e7a5726446935fadb1393ac2d4161b9018a1601478cd68bc572",
+      "5-resolved-decisions": "644e22af9584d3a78504d7083d5c788555225660c66401c7c1a403ddeddc3801",
+      "verification": "1b641032e7db64b00d6be631ff00b4b5ab0077aca7c394ddb64308c3eab2f3ea"
+    },
+    "sectionHeadings": [
+      "068: finding severity and answered low findings",
+      "1. Purpose",
+      "2. Territory",
+      "3. Behavior",
+      "3.1 Severity and category",
+      "3.2 An answered low finding",
+      "3.3 Known false positives",
+      "4. Out of scope",
+      "5. Resolved decisions",
+      "Verification"
+    ],
+    "specPath": "specs/068-finding-severity/spec.md",
+    "status": "draft",
+    "summary": "Amends spec 024's review and the ci-gate rule of spec 062. Each AI review finding carries a severity (`low`, `medium`, `high`) and a category. A head whose findings are all `low`, each answered by a review note naming the head, passes ci-gate without the owner's review exception; a finding of any other severity, and any change that touches correctness, security, authority or ratification, still needs it. Optionally, a project list of known false positives, read at the base, answers a matching finding.\n",
+    "title": "AI review findings carry a severity, and an answered low finding passes ci-gate without the owner exception"
+  },
+  "shardHash": "c9fa26971d63ffd9c1a3526f7c9be71324efdfffd3243947adb9f8defd97c957",
+  "specVersion": "1.11.0"
+}

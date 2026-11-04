@@ -111,6 +111,14 @@ fn run(args: &[String]) -> i32 {
             Err(message) => usage(format, message),
         };
     }
+    // Spec 052 section 3.5: the capture spends provider usage, so it runs
+    // only when invoked by name; it writes only the directory it is given.
+    if invocation.verb == Verb::ProviderCapture {
+        return match statecraft_cli::capture::capture_verb(&invocation.rest) {
+            Ok(answer) => emit(&answer, format),
+            Err(message) => usage(format, message),
+        };
+    }
     let home = product_home();
     let mut registry = match Registry::read(&home) {
         Ok(r) => r,
@@ -562,7 +570,9 @@ fn run(args: &[String]) -> i32 {
         Verb::TrustRootGenerate | Verb::TrustIssuerSign | Verb::TrustIssuerVerify => {
             trust_verb(invocation.verb, &invocation.rest, format)
         }
-        Verb::ProviderCompare => unreachable!("dispatched before product home reads"),
+        Verb::ProviderCompare | Verb::ProviderCapture => {
+            unreachable!("dispatched before product home reads")
+        }
         // Dispatched above, before the product home is read (spec 049
         // section 3.3); the match stays exhaustive without a second route.
         Verb::AdmissionDryRun => unreachable!("admission dry-run returns before the home is read"),

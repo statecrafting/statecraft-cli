@@ -187,6 +187,7 @@ printf '{{%s,"type":"finished","binding":%s,"completeness":"absent","reason":"no
         },
         wrapper: vec!["/bin/sh".into()],
         environment: BTreeMap::from([("PATH".into(), "/bin:/usr/bin".into())]),
+        start_timeout: Duration::from_secs(60),
         ready_timeout: Duration::from_secs(20),
         grace: Duration::from_secs(5),
     };
@@ -240,6 +241,7 @@ fn the_child_boundary_is_not_the_sidecar_boundary() {
             },
             wrapper: Vec::new(),
             environment: BTreeMap::new(),
+            start_timeout: Duration::from_secs(1),
             ready_timeout: Duration::from_secs(1),
             grace: Duration::from_secs(1),
         },

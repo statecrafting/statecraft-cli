@@ -140,7 +140,7 @@ pub fn dependency_policy(root: &Path) -> Prerequisite {
     tracked_file(
         root,
         "deny.toml",
-        "Statecraft never writes a supply-chain policy: commit the project's deny.toml (cargo-deny's configuration) before selecting revision 22",
+        "Statecraft never writes a supply-chain policy: commit the project's deny.toml (cargo-deny's configuration) before selecting revision 22 or later",
     )
 }
 
