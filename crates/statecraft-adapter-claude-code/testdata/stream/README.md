@@ -87,3 +87,9 @@ a version's captures, named by a `captures.json` of the same shape as
 (`golden::MAPPED_FIELDS`), never by bytes. It runs offline. A version with a
 `diverges-unreviewed` or `missing` scenario is not qualifiable, and
 `qualification::record_compared` refuses its record naming the scenarios.
+
+`statecraft-cli provider capture <out-dir>` writes such a directory for the
+installed provider. It **spends provider usage**, so only an operator runs
+it: each scenario's prompt and flags are `capture::SCENARIOS`, and every
+stream passes through `capture::redact`, which applies the rules above,
+before it is written. Its captures are reviewed before they are committed.
