@@ -1,0 +1,17 @@
+{
+  "mapping": {
+    "amends": [
+      "024-review-budget-and-ratification",
+      "062-review-verdict-status"
+    ],
+    "dependsOn": [
+      "024-review-budget-and-ratification",
+      "062-review-verdict-status"
+    ],
+    "implementingPaths": [],
+    "specId": "068-finding-severity",
+    "specStatus": "draft"
+  },
+  "schemaVersion": "1.3.0",
+  "shardHash": "c9fa26971d63ffd9c1a3526f7c9be71324efdfffd3243947adb9f8defd97c957"
+}

@@ -798,21 +798,64 @@ fn operation_refused(r: &statecraft_run::operation::Refusal) -> Response {
 
 /// Resolve the stored root, take the repository lock and open the chain, as
 /// every write to the run record does (spec 003 section 3.1.4 rule 7).
-fn locked_chain(
-    ctx: &Context<'_>,
-    path: &Path,
-) -> Result<(PathBuf, statecraft_run::lock::Held, Chain), Response> {
+/// The repository lock for a spec 048 verb, or, when a live `run` holds it,
+/// the target and why, so the verb can queue its request for that run's
+/// supervisor (section 5, 2026-11-02). Held, a request no supervisor lived to
+/// apply is applied first, so the verb's own write follows it.
+enum Locked {
+    Held(PathBuf, statecraft_run::lock::Held, Chain),
+    Busy(PathBuf, String),
+}
+
+fn locked_or_busy(ctx: &Context<'_>, path: &Path) -> Result<Locked, Response> {
     let root = registered(ctx.registry, path)?;
     let held = match statecraft_run::lock::try_acquire(ctx.home, &root) {
         Ok(held) => held,
         Err(e @ statecraft_run::lock::LockError::Busy { .. }) => {
-            return Err(slice::lock_busy_answer(&e.to_string()).erase());
+            return Ok(Locked::Busy(root, e.to_string()));
         }
         Err(e) => return Err(failed(&e.to_string())),
     };
-    match Chain::open(ctx.home, &root) {
-        Ok((chain, _)) => Ok((root, held, chain)),
-        Err(e) => Err(failed(&e.to_string())),
+    let mut chain = match Chain::open(ctx.home, &root) {
+        Ok((chain, _)) => chain,
+        Err(e) => return Err(failed(&e.to_string())),
+    };
+    match statecraft_run::operation::apply_pending(&mut chain, ctx.home, &root) {
+        // A file that does not read stops nothing: it is reported here and
+        // left in place for an operator (section 5, 2026-11-02).
+        Ok(drained) => {
+            for why in drained.unreadable {
+                eprintln!("warning: {why}; it is left in place and was not applied");
+            }
+        }
+        Err(e) => return Err(failed(&e.to_string())),
+    }
+    Ok(Locked::Held(root, held, chain))
+}
+
+/// A request queued for the supervisor of the live run that holds the lock:
+/// exit 0, the change is queued, not done. Its effect is read back from the
+/// record (`run events`) once the supervisor applies it.
+fn queued_answer(
+    ctx: &Context<'_>,
+    root: &Path,
+    busy: &str,
+    request: &statecraft_run::operation::Queued,
+) -> Response {
+    match statecraft_run::operation::queue(ctx.home, root, request) {
+        Ok(file) => {
+            let summary = format!(
+                "queued for the supervisor of the live run that holds the lock ({busy}); \
+                 `run events` shows it once applied\n"
+            );
+            let value = serde_json::json!({
+                "queued": true,
+                "request": request,
+                "file": file.display().to_string(),
+            });
+            Answer::new(value, Exit::Ok, summary).erase()
+        }
+        Err(e) => failed(&e.to_string()),
     }
 }
 
@@ -856,12 +899,36 @@ pub fn run_lease(ctx: &Context<'_>, op: &LeaseOperands<'_>) -> Result<Response, 
         }
         _ => return Err(usage()),
     };
-    let (_root, _held, mut chain) = match locked_chain(ctx, op.path) {
-        Ok(locked) => locked,
-        Err(answer) => return Ok(answer),
-    };
     let at = now(ctx.clock);
     let run_id = op.run_id;
+    let (_held, mut chain) = match locked_or_busy(ctx, op.path) {
+        Ok(Locked::Held(_root, held, chain)) => (held, chain),
+        Ok(Locked::Busy(root, busy)) => {
+            use statecraft_run::operation::Queued;
+            let request = match act {
+                Act::Acquire(name) => Queued::LeaseAcquire {
+                    run_id: run_id.to_string(),
+                    controller: name.to_string(),
+                    pid: op.pid,
+                    at,
+                },
+                Act::Release(controller, lease) => Queued::LeaseRelease {
+                    run_id: run_id.to_string(),
+                    controller: controller.to_string(),
+                    lease,
+                    at,
+                },
+                Act::Break(operator, reason) => Queued::LeaseBreak {
+                    run_id: run_id.to_string(),
+                    operator: operator.to_string(),
+                    reason,
+                    at,
+                },
+            };
+            return Ok(queued_answer(ctx, &root, &busy, &request));
+        }
+        Err(answer) => return Ok(answer),
+    };
     let result = match act {
         Act::Acquire(name) => {
             operation::acquire(&mut chain, run_id, &Controller { name, pid: op.pid }, &at)
@@ -913,8 +980,9 @@ pub struct OperationOperands<'a> {
 /// makes the intent durable. A retry then runs `run`'s own path for the run's
 /// unit of work, under the lock this operation already holds (section 3.5),
 /// and its outcome is appended only after that path returns. An abort's
-/// effect is its `stop-requested` point; it is written under the lock, so a
-/// supervisor that holds the lock is answered `lock-busy` like any writer.
+/// effect is its `stop-requested` point. While a live run holds the lock, an
+/// abort is queued for that run's supervisor and answered 0 as queued, and a
+/// retry or continue is answered `lock-busy` (section 5, 2026-11-02).
 pub fn run_operation(ctx: &Context<'_>, op: &OperationOperands<'_>) -> Result<Response, Usage> {
     use statecraft_run::operation::{self, Completion, Operation, Request, Submitted};
     let usage = || {
@@ -941,14 +1009,30 @@ pub fn run_operation(ctx: &Context<'_>, op: &OperationOperands<'_>) -> Result<Re
     {
         return Ok(bind::unarmed_answer(&root).erase());
     }
-    let (root, held, mut chain) = match locked_chain(ctx, op.path) {
-        Ok(locked) => locked,
+    let at = now(ctx.clock);
+    let (root, held, mut chain) = match locked_or_busy(ctx, op.path) {
+        Ok(Locked::Held(root, held, chain)) => (root, held, chain),
+        // Section 5, 2026-11-02: a live run holds the lock, so an abort is
+        // queued for its supervisor, which decides it by the same rules. A
+        // retry or continue needs the slot that live attempt holds.
+        Ok(Locked::Busy(root, busy)) if operation == Operation::Abort => {
+            let request = statecraft_run::operation::Queued::Abort {
+                run_id: op.run_id.to_string(),
+                controller: op.controller.to_string(),
+                lease,
+                key: op.key.to_string(),
+                version,
+                reason: op.reason.to_string(),
+                at,
+            };
+            return Ok(queued_answer(ctx, &root, &busy, &request));
+        }
+        Ok(Locked::Busy(_, busy)) => return Ok(slice::lock_busy_answer(&busy).erase()),
         Err(answer) => return Ok(answer),
     };
     // Shared with a launch, and held here until this operation's outcome is
     // durable (section 3.5).
     let held = Arc::new(held);
-    let at = now(ctx.clock);
     let request = Request {
         run_id: op.run_id,
         controller: op.controller,

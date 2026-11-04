@@ -81,6 +81,18 @@
     "scripts/check-spec-corpus.sh": {
       "contentHash": "d4482680aa448a517701da28bf172da652b2a42a540b68abf10f5a832a3444b6"
     },
+    "scripts/release/check-config.sh": {
+      "contentHash": "6c8c816e85f2f92418dba84cdbe354a91f5ed2ba7856f7182045343efeb4f8d6"
+    },
+    "scripts/release/harden-installer.sh": {
+      "contentHash": "52a94b448d0edfe99df98ebc8eb3b2b3c8dec15347a12b9bbbb22372dff63303"
+    },
+    "scripts/release/install-dist.sh": {
+      "contentHash": "f3174cba20cb7c9b0b8731273b6b893ec83990c88973024666e2317c803fcc58"
+    },
+    "scripts/release/verify-set.sh": {
+      "contentHash": "9c2ff1c29c50fc75a816a17084936cc7bf1d077afcfbb39e73113fedf88e2a0a"
+    },
     "scripts/resolve-shard-conflicts.sh": {
       "contentHash": "50138ae38377c0ff14f4f37ecdeed3cfd6500b50f91e5f7019232a11883ffdc3"
     },

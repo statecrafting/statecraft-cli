@@ -982,3 +982,328 @@ pub fn events(chain: &Chain, run_id: &str, after: Option<u64>) -> Events {
         next,
     }
 }
+
+// ---------------------------------------------------------------------------
+// Requests queued while a live run holds the lock (section 5, 2026-11-02).
+// ---------------------------------------------------------------------------
+
+/// Where `run op abort` and `run lease` requests wait while a live `run`
+/// holds the repository lock: beside the chain and the halt queue, in the
+/// product home, keyed as the chain is, so outside any target and the
+/// confinement.
+#[must_use]
+pub fn requests_dir(home: &std::path::Path, target: &std::path::Path) -> std::path::PathBuf {
+    crate::record::chain_path(home, target).with_extension("operation-requests")
+}
+
+/// One queued request: what `run op abort` or `run lease` would have done
+/// under the lock. Only these are queued: a retry or continue needs the slot,
+/// which a live attempt holds, so it is answered `lock-busy` as before.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(
+    tag = "request",
+    rename_all = "kebab-case",
+    rename_all_fields = "camelCase",
+    deny_unknown_fields
+)]
+pub enum Queued {
+    /// `run op <path> <run-id> abort ...`.
+    Abort {
+        /// The run.
+        run_id: String,
+        /// The controller submitting it.
+        controller: String,
+        /// The lease it presents.
+        lease: u64,
+        /// Its idempotency key.
+        key: String,
+        /// The run version it was decided against.
+        version: u64,
+        /// Why.
+        reason: String,
+        /// When it was asked, RFC 3339 UTC; its records carry this time.
+        at: String,
+    },
+    /// `run lease <path> <run-id> acquire <controller>`.
+    LeaseAcquire {
+        /// The run.
+        run_id: String,
+        /// The controller.
+        controller: String,
+        /// The controller's process.
+        pid: u32,
+        /// When it was asked.
+        at: String,
+    },
+    /// `run lease <path> <run-id> release <controller> <lease>`.
+    LeaseRelease {
+        /// The run.
+        run_id: String,
+        /// The holder.
+        controller: String,
+        /// The lease it presents.
+        lease: u64,
+        /// When it was asked.
+        at: String,
+    },
+    /// `run lease <path> <run-id> break <operator> <reason...>`.
+    LeaseBreak {
+        /// The run.
+        run_id: String,
+        /// The operator.
+        operator: String,
+        /// Why.
+        reason: String,
+        /// When it was asked.
+        at: String,
+    },
+}
+
+impl Queued {
+    /// The run it names.
+    #[must_use]
+    pub fn run_id(&self) -> &str {
+        match self {
+            Queued::Abort { run_id, .. }
+            | Queued::LeaseAcquire { run_id, .. }
+            | Queued::LeaseRelease { run_id, .. }
+            | Queued::LeaseBreak { run_id, .. } => run_id,
+        }
+    }
+}
+
+/// Why a request could not be queued, read or applied.
+#[derive(Debug, thiserror::Error)]
+pub enum QueueError {
+    /// A request file, or its directory, could not be written, read or
+    /// removed.
+    #[error("the operation request {path} could not be {what}: {source}")]
+    Io {
+        /// The file or directory.
+        path: String,
+        /// `queued`, `read` or `removed after it was applied`.
+        what: &'static str,
+        /// Why.
+        source: std::io::Error,
+    },
+    /// A request file that does not parse. It is left in place.
+    #[error("the operation request {path} does not read: {why}")]
+    Unreadable {
+        /// The file.
+        path: String,
+        /// Why.
+        why: String,
+    },
+    /// The record could not be written.
+    #[error(transparent)]
+    Record(#[from] RecordError),
+}
+
+fn io_error(
+    path: &std::path::Path,
+    what: &'static str,
+) -> impl FnOnce(std::io::Error) -> QueueError {
+    let path = path.display().to_string();
+    move |source| QueueError::Io { path, what, source }
+}
+
+/// Queue a request for the supervisor holding the lock. Returns the request's
+/// path once it and its directory entry are durable.
+pub fn queue(
+    home: &std::path::Path,
+    target: &std::path::Path,
+    request: &Queued,
+) -> Result<std::path::PathBuf, QueueError> {
+    let mut bytes = serde_json::to_vec(request).unwrap_or_default();
+    bytes.push(b'\n');
+    crate::halt::publish_request(&requests_dir(home, target), &bytes)
+        .map_err(|(path, e)| io_error(&path, "queued")(e))
+}
+
+/// The queued requests, oldest first, and the files that did not read.
+#[derive(Debug, Default)]
+pub struct Pending {
+    /// Every request that reads, oldest first.
+    pub requests: Vec<(std::path::PathBuf, Queued)>,
+    /// Why each file that does not read was skipped. It is left in place and
+    /// stops nothing (section 5, 2026-11-02).
+    pub unreadable: Vec<String>,
+}
+
+/// Every queued request, oldest first. A file that cannot be read or does not
+/// parse is skipped and named in [`Pending::unreadable`]; only a queue
+/// directory that cannot be listed is an error.
+pub fn pending(home: &std::path::Path, target: &std::path::Path) -> Result<Pending, QueueError> {
+    let dir = requests_dir(home, target);
+    let paths = crate::halt::listed_requests(&dir).map_err(io_error(&dir, "read"))?;
+    let mut out = Pending::default();
+    for path in paths {
+        let read = std::fs::read(&path)
+            .map_err(|e| e.to_string())
+            .and_then(|bytes| serde_json::from_slice::<Queued>(&bytes).map_err(|e| e.to_string()));
+        match read {
+            Ok(queued) => out.requests.push((path, queued)),
+            Err(why) => out.unreadable.push(
+                QueueError::Unreadable {
+                    path: path.display().to_string(),
+                    why,
+                }
+                .to_string(),
+            ),
+        }
+    }
+    Ok(out)
+}
+
+/// What applying one queued request came to.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Applied {
+    /// The request.
+    pub request: Queued,
+    /// What it answered: `accepted` with the abort's `stop-requested`
+    /// outcome, `replayed`, `refused`, or the lease change; `already-applied`
+    /// when a writer applied it and could not then remove its file.
+    pub answer: Value,
+}
+
+/// Whether a lease break with this operator, reason and time is already in
+/// the record: applied by a writer that could not remove its file. Breaking
+/// again could end a lease taken since.
+fn break_recorded(chain: &Chain, run_id: &str, operator: &str, reason: &str, at: &str) -> bool {
+    chain.records().iter().any(|r| {
+        serde_json::from_value::<Entry>(r.payload.clone()).is_ok_and(|e| {
+            e.run_id == run_id
+                && e.subject == LEASE_SUBJECT
+                && e.detail.get("lease").and_then(Value::as_str) == Some("broken")
+                && e.detail.get("operator").and_then(Value::as_str) == Some(operator)
+                && e.detail.get("reason").and_then(Value::as_str) == Some(reason)
+                && e.detail.get("at").and_then(Value::as_str) == Some(at)
+        })
+    })
+}
+
+fn lease_answer(result: Result<LeaseChange, Refusal>) -> Value {
+    match result {
+        Ok(change) => json!({ "lease": change }),
+        Err(refusal) => json!({ "refused": refusal }),
+    }
+}
+
+/// Apply one request under the lock, as its verb would have.
+///
+/// An abort is decided by [`submit`] exactly as `run op` decides it, and an
+/// accepted one gets its `stop-requested` outcome at once, so the abort's two
+/// recorded points are the ones section 3.1 names whoever applies it. A
+/// request applied twice (its file left behind) is harmless: the same key and
+/// version replay (rule 2), a second acquire by the holder is `already-held`,
+/// a second release is `lease-not-held`, and a break already recorded is not
+/// recorded again.
+pub fn apply(chain: &mut Chain, request: &Queued) -> Result<Value, RecordError> {
+    Ok(match request {
+        Queued::Abort {
+            run_id,
+            controller,
+            lease,
+            key,
+            version,
+            reason,
+            at,
+        } => {
+            let req = Request {
+                run_id,
+                controller,
+                lease: *lease,
+                key,
+                version: *version,
+                operation: Operation::Abort,
+                reason,
+                at,
+            };
+            match submit(chain, &req)? {
+                Submitted::Accepted(accepted) => {
+                    let outcome = complete(chain, &accepted, Completion::StopRequested, at)?;
+                    json!({ "accepted": accepted, "outcome": outcome })
+                }
+                Submitted::Replayed(recorded) => json!({ "replayed": recorded }),
+                Submitted::Refused(refusal) => json!({ "refused": refusal }),
+            }
+        }
+        Queued::LeaseAcquire {
+            run_id,
+            controller,
+            pid,
+            at,
+        } => lease_answer(acquire(
+            chain,
+            run_id,
+            &Controller {
+                name: controller,
+                pid: *pid,
+            },
+            at,
+        )?),
+        Queued::LeaseRelease {
+            run_id,
+            controller,
+            lease,
+            at,
+        } => lease_answer(release(chain, run_id, controller, *lease, at)?),
+        Queued::LeaseBreak {
+            run_id,
+            operator,
+            reason,
+            at,
+        } => {
+            if break_recorded(chain, run_id, operator, reason, at) {
+                json!({ "alreadyApplied": true })
+            } else {
+                lease_answer(break_lease(chain, run_id, operator, reason, at)?)
+            }
+        }
+    })
+}
+
+/// What [`apply_pending`] did: each request applied, and each file skipped.
+#[derive(Debug, Default)]
+pub struct Drained {
+    /// Each request applied, oldest first.
+    pub applied: Vec<Applied>,
+    /// Why each file that does not read was skipped and left in place.
+    pub unreadable: Vec<String>,
+}
+
+/// Apply every queued request, oldest first, and remove each file once what
+/// it appended is durable. The caller holds the repository lock: the
+/// supervisor of a live attempt at each poll, or `run op` and `run lease`
+/// before their own write, so a request no supervisor lived to apply is not
+/// lost. A file that does not read is skipped, left in place and reported;
+/// it stops nothing, and the requests after it are still applied.
+pub fn apply_pending(
+    chain: &mut Chain,
+    home: &std::path::Path,
+    target: &std::path::Path,
+) -> Result<Drained, QueueError> {
+    let pending = pending(home, target)?;
+    let mut drained = Drained {
+        applied: Vec::new(),
+        unreadable: pending.unreadable,
+    };
+    for (path, request) in pending.requests {
+        let answer = apply(chain, &request)?;
+        drained.applied.push(Applied { request, answer });
+        crate::halt::remove_request(&path)
+            .map_err(io_error(&path, "removed after it was applied"))?;
+    }
+    Ok(drained)
+}
+
+/// The abort whose stop is requested of this attempt and not yet confirmed,
+/// if any: what a supervisor stops the attempt for.
+#[must_use]
+pub fn stop_requested_of(chain: &Chain, run_id: &str, attempt: u32) -> Option<Recorded> {
+    fold(chain, run_id)
+        .operations
+        .into_iter()
+        .find(|o| o.attempt == attempt && o.stop == Some(Stop::StopRequested))
+}

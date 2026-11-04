@@ -18,8 +18,15 @@ summary: >
 # 001 is only used, not amended.
 amends:
   - "006-command-surface"
-# No `extends` and no claim: the release workflow and the dist configuration
-# are unclaimed authority files under AGENTS.md (sections 2 and 5, O-4).
+# No `extends`, and no claim on the release workflow or the dist
+# configuration: they are unclaimed authority files under AGENTS.md (sections
+# 2 and 5, O-4). The scripts the workflow runs are this spec's (section 5,
+# 2026-11-01), under the `scripts/**` rule of AGENTS.md's ownership table.
+establishes:
+  - "scripts/release/check-config.sh"
+  - "scripts/release/install-dist.sh"
+  - "scripts/release/harden-installer.sh"
+  - "scripts/release/verify-set.sh"
 depends_on:
   - "001-boundaries-and-authority"
   - "006-command-surface"
@@ -138,6 +145,55 @@ version the manifest does not carry. O-4: the source-ownership table holds;
 the release workflow and the dist configuration stay unclaimed authority files,
 each landed as its own change the owner decides, and this spec claims none.
 
+**2026-11-01: the scripts the release workflow runs are this spec's.** The
+workflow and the dist table stay unclaimed (O-4); the checks they run live in
+`scripts/release/`, so the coupling gate holds them to this spec and each runs
+offline under `--self-test`. `check-config.sh` judges the dist table and the
+workflow from their text, and the workflow's admission job runs it on the
+tagged tree before any build.
+
+**2026-11-01: the V-1 test tag is `dry-run/vMAJOR.MINOR.PATCH`.** It runs the
+same workflow under the same section 3.1 refusals (signed, annotated, on
+`main`, the workspace's version), builds, attests and verifies the full set,
+and skips only the publish job. The attestations it makes are V-1's evidence,
+not a release.
+
+**2026-11-01: cargo-dist 0.32.0, from its release archive.** The workflow
+downloads the cargo-dist archive for the runner's host at the version
+`cargo-dist-version` names and refuses it unless its SHA-256 equals the digest
+the workflow pins. cargo-dist does not pass `--locked` to cargo, so each build
+runs `cargo fetch --locked`, then builds offline, then fails on any change to
+`Cargo.lock`. The workflow is written for this repository, not generated, so
+the dist table sets `allow-dirty = ["ci"]`.
+
+**2026-11-01: the generated installer is hardened, and fails closed on drift.**
+cargo-dist 0.32.0's shell installer places the binary with `mv` and `chmod`
+and skips the SHA-256 check when `sha256sum` is absent or no checksum is
+embedded. `harden-installer.sh` rewrites those lines: the binary is written by
+`install -m 755`, SHA-256 falls back to `shasum -a 256`, and a missing tool,
+checksum or style refuses the install. Every rewrite must match exactly once,
+so a template change under a newer cargo-dist stops the release.
+
+**2026-11-01: the signature check is GitHub's tag verification.** The
+admission job refuses a lightweight tag, a tag object that does not name the
+built commit, and one whose `verification.verified` is not true, so the owner's
+signing key must be registered on the tagger's GitHub account.
+
+**2026-11-01: the SBOM is syft's CycloneDX over the committed lockfile.** It
+uses `anchore/sbom-action`, as spec-spine's release does, and so lists every
+package `Cargo.lock` names, not only the binary's dependency closure; each
+archive gets its own copy under its own name.
+
+**2026-11-02: the five release choices above are the owner's.** The owner,
+asked to approve the test tag, the hardened installer, GitHub's tag
+verification as the signature check, the lockfile-wide SBOM and Linux builds
+on `ubuntu-22.04`: "Approve all five (Recommended)". They land in three
+changes in dependency order: these scripts, then the dist table of the root
+`Cargo.toml` (a policy file, on its own under spec 044's guard), then the
+release workflow, which also adds `check-config.sh`, over the committed tree
+and under `--self-test`, to the verification below: both read the files the
+last two changes add. Nothing is released until the owner pushes a tag.
+
 ## Verification
 
 Ratified by the owner on 2026-10-31. Acceptance is declared by the
@@ -145,3 +201,12 @@ implementing change, which will run the workflow against a test tag in dry-run
 mode and find four archives with sidecars, a shell installer, a formula, four
 SBOMs with components and four attestations that `gh attestation verify`
 accepts, with nothing published.
+
+The implementing change also declares the offline checks of the
+configuration. Each line is one command; none needs the network, cargo or
+cargo-dist. The dry run above stays the acceptance of V-1.
+
+```verify:cli
+scripts/release/harden-installer.sh --self-test
+scripts/release/verify-set.sh --self-test
+```
