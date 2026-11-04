@@ -454,7 +454,11 @@ impl Prepared {
         if !sidecar && endpoint.is_some_and(|endpoint| endpoint.port() == probe.loopback_port) {
             return Err(Refused::at(
                 "probe-input",
-                "the denied loopback port is the witness endpoint",
+                if self.record.witness_endpoint.is_some() {
+                    "the denied loopback port is the witness endpoint"
+                } else {
+                    "the denied loopback port is the gateway endpoint"
+                },
             ));
         }
         let encoded = serde_json::to_string(&ProbeInput {
