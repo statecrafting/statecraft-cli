@@ -9,10 +9,30 @@
       "004-execution-adapter",
       "039-local-cockpit-authority"
     ],
-    "implementingPaths": [],
+    "implementingPaths": [
+      {
+        "path": "crates/statecraft-run/",
+        "source": "spec-edge"
+      }
+    ],
+    "resolvedUnits": [
+      {
+        "locations": [
+          {
+            "file": "crates/statecraft-run/"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "directory",
+          "path": "crates/statecraft-run/"
+        }
+      }
+    ],
     "specId": "053-operator-input-record",
     "specStatus": "approved"
   },
   "schemaVersion": "1.3.0",
-  "shardHash": "2fd552f2b5c0f910c9622fbad78f0055f916a6c6e3a32724e8ae81bae2b01712"
+  "shardHash": "800d21a7ba2f9e4a3d7320ff3aed906a14d2ad5bcb87d640a218b60a7fbc0007"
 }

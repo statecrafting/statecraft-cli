@@ -57,3 +57,49 @@ all = { level = "warn", priority = -1 }
 # authority change (AGENTS.md, Source ownership).
 [workspace.dependencies]
 spec-spine-core = { version = "=0.32.0", default-features = false }
+# Spec 046 section 3.5: the one stated version of the zeroing primitive, taken
+# by statecraft-secret for its type and by statecraft-cli for its random buffers.
+zeroize = "1.9.0"
+
+# Spec 057 (release delivery): the cargo-dist configuration. This table is
+# read only by cargo-dist; Cargo ignores `[workspace.metadata]`. It is an
+# unclaimed authority file (spec 057 section 5, O-4), so this table is changed
+# only by its own change, decided by the owner.
+#
+# - `cargo-dist-version` is the exact release the release workflow installs
+#   and verifies by digest; the two move together, and
+#   scripts/release/check-config.sh refuses a difference.
+# - `dist = true` at the workspace level overrides `publish = false` for
+#   distribution only: nothing is published to crates.io (section 3.5). The one
+#   package with a binary is statecraft-cli, whose `[[bin]]` name is spec 006
+#   section 3.5's (O-1), so no crate manifest changes.
+# - `installers` makes the shell installer and the Homebrew formula; `tap` and
+#   `publish-jobs` are deliberately absent, so the formula is a release asset
+#   and is pushed to no tap until the owner names one (O-2).
+# - `allow-dirty = ["ci"]`: the release workflow is written for this
+#   repository (admission, SBOM, attestation, verification) rather than
+#   generated, so cargo-dist must not regenerate or judge it.
+[workspace.metadata.dist]
+cargo-dist-version = "0.32.0"
+dist = true
+ci = "github"
+allow-dirty = ["ci"]
+hosting = "github"
+installers = ["shell", "homebrew"]
+targets = [
+  "aarch64-apple-darwin",
+  "x86_64-apple-darwin",
+  "aarch64-unknown-linux-gnu",
+  "x86_64-unknown-linux-gnu",
+]
+checksum = "sha256"
+unix-archive = ".tar.xz"
+install-path = "CARGO_HOME"
+install-updater = false
+pr-run-mode = "skip"
+
+# The profile cargo-dist builds with (`cargo build --profile dist`). It is the
+# release profile plus thin LTO, the value `dist init` writes.
+[profile.dist]
+inherits = "release"
+lto = "thin"

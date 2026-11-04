@@ -15,13 +15,19 @@
 //! unset, and the seeded sweep feeds the evaluator a pre-screen in every
 //! state while the oracle, which predates the field, sees none. Agreement
 //! proves that a policy without the option evaluates exactly as spec 037 does.
+//!
+//! Spec 049 (I-1, R-2, V-1) rides the same corpus: on every case the dry-run's
+//! [`evaluate_traced`] must return `evaluate`'s decision, its trace's denies
+//! must be the decision's codes in the same order and serialized form, and an
+//! allowing check must read `overruled` exactly when the decision refuses.
 
 mod admission_oracle;
 
 use std::collections::BTreeMap;
 
 use statecraft_envelope::admission::{
-    AdmissionInput, Decision, Prescreen, PrescreenVerdict, evaluate, policy_eval_claim,
+    AdmissionInput, CheckOutcome, Decision, Prescreen, PrescreenVerdict, evaluate, evaluate_traced,
+    policy_eval_claim,
 };
 use statecraft_envelope::attestation::{AttestationId, Principal, PrincipalKind};
 use statecraft_envelope::cbor::encode;
@@ -178,6 +184,37 @@ fn agree_with(
     assert_eq!(c_new, c_old, "policy-eval claim");
     assert_eq!(encode(&c_new), encode(&c_old), "policy-eval claim bytes");
 
+    // Spec 049: the dry-run on the same input.
+    let traced = evaluate_traced(policy, &input);
+    assert_eq!(traced.admission, new, "dry-run decision, policy {policy:?}");
+    let denied: Vec<&RefusalCode> = traced
+        .checks
+        .iter()
+        .filter_map(|c| match &c.outcome {
+            CheckOutcome::Deny { code } => Some(code),
+            _ => None,
+        })
+        .collect();
+    assert_eq!(denied, new.reasons(), "dry-run codes and their order");
+    assert_eq!(
+        serde_json::to_vec(&denied).unwrap(),
+        serde_json::to_vec(&new.reasons()).unwrap(),
+        "dry-run codes' serialized form"
+    );
+    assert_eq!(
+        traced.checks.len(),
+        policy.require_artifacts.len() + 4 * verdicts.len() + 2,
+        "one check per requirement, every one reported"
+    );
+    for c in &traced.checks {
+        match &c.outcome {
+            CheckOutcome::Allow => assert!(new.is_admit(), "{} allows on a refusal", c.id),
+            CheckOutcome::Overruled => assert!(!new.is_admit(), "{} overruled on an admit", c.id),
+            CheckOutcome::Deny { .. } => assert!(!new.is_admit(), "{} denies on an admit", c.id),
+            CheckOutcome::Undecided => panic!("{} undecided: every admission check decides", c.id),
+        }
+    }
+
     seen.cases += 1;
     let reasons = new.reasons();
     match reasons.len() {
@@ -194,6 +231,89 @@ fn agree_with(
 
 fn ids(n: usize) -> impl Iterator<Item = AttestationId> {
     (0..n).map(|i| AttestationId(Hash::of(format!("v{i}").as_bytes())))
+}
+
+/// Spec 049 section 3.4, on one named case: the ids in registration order,
+/// the one deny with its code, the satisfied checks overruled, and the JSON a
+/// check renders as.
+#[test]
+fn the_trace_names_each_check_in_order_with_its_own_result() {
+    let sam = principal("sam");
+    let policy = AdmissionPolicy {
+        require_artifacts: vec!["a".into()],
+        min_approvals: 1,
+        ..AdmissionPolicy::default()
+    };
+    let verdicts = vec![(
+        ids(1).next().unwrap(),
+        verdict(
+            Some("a"),
+            Integrity::Pass,
+            Signature::Pass,
+            IssuerTrust::Pass,
+            SubjectBinding::Pass,
+        ),
+    )];
+    let input = AdmissionInput {
+        verdicts: &verdicts,
+        decisions: &[],
+        submitter: &sam,
+        prescreen: Prescreen::Missing,
+    };
+    let traced = evaluate_traced(&policy, &input);
+    assert_eq!(
+        traced.admission,
+        Admission::refuse(vec![RefusalCode::ApprovalsInsufficient {
+            have: 0,
+            need: 1
+        }])
+    );
+    let ids: Vec<&str> = traced.checks.iter().map(|c| c.id.as_str()).collect();
+    assert_eq!(
+        ids,
+        [
+            "artifact/0",
+            "verdict/0/integrity",
+            "verdict/0/signature",
+            "verdict/0/issuer-trust",
+            "verdict/0/subject-binding",
+            "approver-is-submitter",
+            "approval-count",
+        ]
+    );
+    for c in &traced.checks[..6] {
+        assert_eq!(c.outcome, CheckOutcome::Overruled, "{}", c.id);
+    }
+    assert_eq!(
+        serde_json::to_value(&traced.checks[6]).unwrap(),
+        serde_json::json!({
+            "id": "approval-count",
+            "result": "deny",
+            "code": {"approvals-insufficient": {"have": 0, "need": 1}},
+        })
+    );
+    assert_eq!(
+        serde_json::to_value(&traced.checks[0]).unwrap(),
+        serde_json::json!({"id": "artifact/0", "result": "overruled"})
+    );
+    // With the approval present, the same checks allow and none is overruled.
+    let d = [decision(0, "dana", true)];
+    let admitted = evaluate_traced(
+        &policy,
+        &AdmissionInput {
+            verdicts: &verdicts,
+            decisions: &d,
+            submitter: &sam,
+            prescreen: Prescreen::Missing,
+        },
+    );
+    assert_eq!(admitted.admission, Admission::Admit);
+    assert!(
+        admitted
+            .checks
+            .iter()
+            .all(|c| c.outcome == CheckOutcome::Allow)
+    );
 }
 
 #[test]

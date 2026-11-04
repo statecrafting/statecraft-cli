@@ -43,6 +43,17 @@
 //!   back out of the record. Added by spec 006's additive edge, because a
 //!   command may not be a second implementation and a binding needs an entry
 //!   point.
+//! - [`operation`] is spec 048's typed run operations: the controller lease,
+//!   the idempotency key and version rules, their brackets in the record, the
+//!   fold that reads them back and the event cursor. Added by spec 048's
+//!   additive edge.
+//! - [`halt`] is spec 050's local halt record: the halt and resume entries in
+//!   the run record, their fold, and the pre-launch check that fails closed.
+//!   Added by spec 050's additive edge.
+//! - [`input`] is spec 053's operator input record: a note or command written
+//!   to the run record before delivery, its states, the cockpit's control
+//!   grants, and the supervisor's desk that delivers and expires notes. Added
+//!   by spec 053's additive edge.
 //!
 //! # What it does not do
 //!
@@ -57,7 +68,10 @@ pub mod attempt;
 pub mod context;
 pub mod contract;
 pub mod documentation;
+pub mod halt;
+pub mod input;
 pub mod lock;
+pub mod operation;
 pub mod overrides;
 pub mod policy;
 pub mod reconcile;

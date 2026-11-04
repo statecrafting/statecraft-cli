@@ -9,10 +9,51 @@
       "042-per-run-provider-configuration",
       "047-capability-seam"
     ],
-    "implementingPaths": [],
+    "implementingPaths": [
+      {
+        "path": "crates/statecraft-adapter-codex",
+        "source": "manifest-metadata"
+      },
+      {
+        "path": "crates/statecraft-adapter-codex/",
+        "source": "spec-edge"
+      },
+      {
+        "path": "crates/statecraft-adapter/",
+        "source": "spec-edge"
+      }
+    ],
+    "resolvedUnits": [
+      {
+        "locations": [
+          {
+            "file": "crates/statecraft-adapter-codex/"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "kind": "directory",
+          "path": "crates/statecraft-adapter-codex/"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "crates/statecraft-adapter/"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "directory",
+          "path": "crates/statecraft-adapter/"
+        }
+      }
+    ],
     "specId": "055-codex-adapter",
     "specStatus": "approved"
   },
   "schemaVersion": "1.3.0",
-  "shardHash": "078c18e44e2c1b0c8789faff72b6962c2f2e4793fdf9565574b90f3913eb24c8"
+  "shardHash": "6767558f3d0d0862f61117f0c9e4b1289154a730bee1c1bbb7f098fb69983d76"
 }

@@ -87,6 +87,14 @@ fn run(args: &[String]) -> i32 {
             "--spine is accepted only by init plan and init apply".into(),
         );
     }
+    // Spec 049: the admission dry-run reads two files and writes nothing, so
+    // it too is dispatched before the product home is consulted.
+    if invocation.verb == Verb::AdmissionDryRun {
+        return match statecraft_cli::admission::dry_run(&invocation.rest) {
+            Ok(answer) => emit(&answer, format),
+            Err(message) => usage(format, message),
+        };
+    }
     // Spec 036: the offline trust verbs read no product home and no
     // registered project, so they are dispatched before either is consulted.
     if matches!(
@@ -94,6 +102,22 @@ fn run(args: &[String]) -> i32 {
         Verb::TrustRootGenerate | Verb::TrustIssuerSign | Verb::TrustIssuerVerify
     ) {
         return trust_verb(invocation.verb, &invocation.rest, format);
+    }
+    // Spec 052 section 3.4: the golden comparison reads two named
+    // directories and nothing else, so it consults no home either.
+    if invocation.verb == Verb::ProviderCompare {
+        return match statecraft_cli::golden::compare_verb(&invocation.rest) {
+            Ok(answer) => emit(&answer, format),
+            Err(message) => usage(format, message),
+        };
+    }
+    // Spec 052 section 3.5: the capture spends provider usage, so it runs
+    // only when invoked by name; it writes only the directory it is given.
+    if invocation.verb == Verb::ProviderCapture {
+        return match statecraft_cli::capture::capture_verb(&invocation.rest) {
+            Ok(answer) => emit(&answer, format),
+            Err(message) => usage(format, message),
+        };
     }
     let home = product_home();
     let mut registry = match Registry::read(&home) {
@@ -493,6 +517,17 @@ fn run(args: &[String]) -> i32 {
         Verb::OverrideRecover => recover_verb(&invocation.rest, &registry, &home, format),
         // Spec 006 section 3.11.6: the reconciliation of 003 section 3.6.1.
         Verb::RunReconcile => reconcile_verb(&invocation.rest, &registry, &home, format),
+        // Spec 048: the typed run operations, their lease and their cursor,
+        // each a binding on its application operation.
+        Verb::RunLease | Verb::RunOp | Verb::RunEvents => {
+            run_operation_verb(invocation.verb, &invocation.rest, &registry, &home, format)
+        }
+        // Spec 050: the local halt record. A registered target, as for the
+        // override verbs; the record is the product's own state, so arming is
+        // not required to halt or resume it.
+        Verb::Halt | Verb::Resume => {
+            halt_verb(invocation.verb, &invocation.rest, &registry, &home, format)
+        }
         // Spec 006 section 3.11.7: the transfer verbs of 002 section 3.35. A
         // registered target, as for the environment verbs whose manifest they
         // change; usage is 3, everything else is the library's answer.
@@ -529,6 +564,12 @@ fn run(args: &[String]) -> i32 {
         Verb::TrustRootGenerate | Verb::TrustIssuerSign | Verb::TrustIssuerVerify => {
             trust_verb(invocation.verb, &invocation.rest, format)
         }
+        Verb::ProviderCompare | Verb::ProviderCapture => {
+            unreachable!("dispatched before product home reads")
+        }
+        // Dispatched above, before the product home is read (spec 049
+        // section 3.3); the match stays exhaustive without a second route.
+        Verb::AdmissionDryRun => unreachable!("admission dry-run returns before the home is read"),
         Verb::ProviderTokenSet | Verb::ProviderTokenClear | Verb::ProviderTokenShow => {
             let outcome = match invocation.verb {
                 Verb::ProviderTokenSet => {
@@ -697,8 +738,14 @@ fn slice_verb(
             )
         }
         Verb::RunList => match Chain::open(home, root) {
+            // Spec 050: the halt state is folded from the same record and
+            // rendered beside the runs; a fold that fails closed is shown as
+            // such rather than as "nothing halted".
             Ok((chain, _)) => emit(
-                &slice::run_list_answer(statecraft_run::session::runs(&chain)),
+                &slice::run_list_answer(
+                    statecraft_run::session::runs(&chain),
+                    statecraft_run::halt::fold(&chain),
+                ),
                 format,
             ),
             Err(e) => fail(&e.to_string(), format),
@@ -742,6 +789,111 @@ fn slice_verb(
         }
         _ => Exit::Usage.code(),
     }
+}
+
+/// `halt <path> [--scope <scope>]... <operator> <reason...>` and
+/// `resume <path> [--scope <scope>]... <operator> <reason...>` (spec 050).
+///
+/// No scope halts or lifts all three. The entry is appended to the
+/// repository's run record under its lock (section 3.1); the library decides
+/// what it records, including the live attempt a halt asks to stop (section
+/// 3.4). A record that cannot be read is a refusal, never an empty state.
+fn halt_verb(
+    verb: Verb,
+    rest: &[String],
+    registry: &Registry,
+    home: &std::path::Path,
+    format: Format,
+) -> i32 {
+    use statecraft_run::halt::{self, Scope};
+    let show_usage = || {
+        usage(
+            format,
+            format!(
+                "usage: {} <path> [--scope <run-admission|tool-effects|dispatch>]... <operator> <reason...>",
+                verb.spelling()
+            ),
+        )
+    };
+    let Some(path) = rest.first() else {
+        return show_usage();
+    };
+    let mut scopes = Vec::new();
+    let mut words = Vec::new();
+    let mut operands = rest[1..].iter();
+    while let Some(arg) = operands.next() {
+        let word = if let Some(word) = arg.strip_prefix("--scope=") {
+            Some(word.to_string())
+        } else if arg == "--scope" {
+            operands.next().cloned()
+        } else {
+            words.push(arg.clone());
+            continue;
+        };
+        match word.as_deref().and_then(Scope::parse) {
+            Some(scope) => scopes.push(scope),
+            None => return show_usage(),
+        }
+    }
+    let (Some(operator), Some(_)) = (words.first(), words.get(1)) else {
+        return show_usage();
+    };
+    let reason = words[1..].join(" ");
+    let root = match registered(registry, &absolute(path)) {
+        Ok(root) => root,
+        Err(answer) => return emit(&answer, format),
+    };
+    let at =
+        statecraft_environment::time::rfc3339_utc(statecraft_environment::time::Clock::now_unix(
+            statecraft_cli::application::process_clock().as_ref(),
+        ));
+    let request = halt::Request {
+        scopes: &scopes,
+        operator: operator.as_str(),
+        reason: &reason,
+        at: &at,
+    };
+    let change = if verb == Verb::Halt {
+        halt::HALT_SUBJECT
+    } else {
+        halt::RESUME_SUBJECT
+    };
+    // Spec 003 section 3.1.4 rule 7: every write to the run record takes the
+    // repository lock and refuses while another process holds it. Spec 050
+    // section 5, 2026-11-01: a run holding it is supervising an attempt, so
+    // the change is queued for that supervisor, which appends it under its
+    // own lock at its next poll, rather than refused.
+    let _held = match statecraft_run::lock::try_acquire(home, &root) {
+        Ok(held) => held,
+        Err(statecraft_run::lock::LockError::Busy { .. }) => {
+            return emit(
+                &slice::halt_queued_answer(change, halt::queue(home, &root, change, &request)),
+                format,
+            );
+        }
+        Err(e) => return fail(&e.to_string(), format),
+    };
+    let (mut chain, _) = match Chain::open(home, &root) {
+        Ok(c) => c,
+        Err(e) => {
+            return emit(
+                &slice::halt_refused_answer(&statecraft_run::halt::Refusal::from(e)),
+                format,
+            );
+        }
+    };
+    // A request a supervisor did not live to apply is appended first, in the
+    // order it was made, and reported (section 5, 2026-11-01).
+    let earlier = match halt::apply_pending(&mut chain, home, &root) {
+        Ok(earlier) => earlier,
+        Err(e) => return emit(&slice::halt_change_answer(&[], Err(e)), format),
+    };
+    let result = if verb == Verb::Halt {
+        halt::halt(&mut chain, &request)
+    } else {
+        halt::resume(&mut chain, &request)
+    };
+    emit(&slice::halt_change_answer(&earlier, result), format)
 }
 
 /// `override recover <path> [<choice> <journal-digest> <authority-digest> <operator> <reason...>]`
@@ -862,6 +1014,105 @@ fn reconcile_verb(
         Ok(answer) => emit(&answer, format),
         Err(u) => usage(format, u.0),
     }
+}
+
+/// `run lease`, `run op` and `run events` (spec 048), through spec 040's
+/// callable operations. A controller's process, for a lease, is the process
+/// that invoked this verb: its parent.
+fn run_operation_verb(
+    verb: Verb,
+    rest: &[String],
+    registry: &Registry,
+    home: &std::path::Path,
+    format: Format,
+) -> i32 {
+    use statecraft_cli::application::{
+        Context, LeaseOperands, OperationOperands, run_events, run_lease, run_operation,
+    };
+    let shape = match verb {
+        Verb::RunLease => {
+            "usage: run lease <path> <run-id> (acquire <controller> | release <controller> \
+             <lease> | break <operator> <reason...>)"
+        }
+        Verb::RunOp => {
+            "usage: run op <path> <run-id> <retry|continue|abort> <controller> <lease> <key> \
+             <version> [<reason...>]"
+        }
+        _ => "usage: run events <path> <run-id> [--after <cursor>]",
+    };
+    let (Some(path), Some(run_id)) = (rest.first(), rest.get(1)) else {
+        return usage(format, shape.to_string());
+    };
+    let path = absolute(path);
+    let words = &rest[2..];
+    let clock = statecraft_cli::application::process_clock();
+    let ctx = Context {
+        home,
+        registry,
+        clock: clock.as_ref(),
+    };
+    let answer = match verb {
+        Verb::RunLease => match controller_pid() {
+            Some(pid) => run_lease(
+                &ctx,
+                &LeaseOperands {
+                    path: &path,
+                    run_id,
+                    words,
+                    pid,
+                },
+            ),
+            None => Ok(Answer::new(
+                serde_json::Value::Null,
+                Exit::Refused,
+                "refused: run lease names its controller by the parent process, which this \
+                 platform does not expose\n",
+            )
+            .with_kind(statecraft_cli::render::ErrorKind::Refused)
+            .erase()),
+        },
+        Verb::RunOp => match words {
+            [operation, controller, lease, key, version, reason @ ..] => run_operation(
+                &ctx,
+                &OperationOperands {
+                    path: &path,
+                    run_id,
+                    operation,
+                    controller,
+                    lease,
+                    key,
+                    version,
+                    reason: &reason.join(" "),
+                },
+            ),
+            _ => return usage(format, shape.to_string()),
+        },
+        _ => match words {
+            [] => run_events(&ctx, &path, run_id, None),
+            [flag, cursor] if flag == "--after" => {
+                run_events(&ctx, &path, run_id, Some(cursor.as_str()))
+            }
+            _ => return usage(format, shape.to_string()),
+        },
+    };
+    match answer {
+        Ok(answer) => emit(&answer, format),
+        Err(u) => usage(format, u.0),
+    }
+}
+
+/// The controller a lease names is the process that ran this one (spec 048
+/// section 3.2): its parent, which only unix exposes.
+#[cfg(unix)]
+fn controller_pid() -> Option<u32> {
+    Some(std::os::unix::process::parent_id())
+}
+
+/// Not exposed here, so `run lease` refuses rather than naming the wrong
+/// process.
+#[cfg(not(unix))]
+fn controller_pid() -> Option<u32> {
+    None
 }
 
 /// `run <path> <spec-id> [--witness | --require-witness]`, through spec

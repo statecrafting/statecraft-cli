@@ -60,3 +60,36 @@ Everything else is verbatim, including every field spec 004 sections 3.9 to 3.13
 rest on: `claude_code_version`, `model`, `permissionMode`, `apiKeySource`,
 `subtype`, `is_error`, `terminal_reason`, `stop_reason`, `num_turns`,
 `total_cost_usd`, `usage`, `modelUsage` and `permission_denials`.
+
+## The governed corpus (spec 052)
+
+This directory is the governed fixtures directory spec 052 section 2 names,
+and the five recordings above are its first five scenarios at 2.1.267:
+`success`, `denied`, `max-turns`, `tool-removed` and `api-error`.
+
+- `corpus.json` names each golden's scenario, provider version, platform,
+  invocation, capture date, file and redactions (section 3.1). The loader
+  refuses a golden whose stream's `claude_code_version` differs from its entry.
+- `quarantine.json` names each capture that is a wrong recording, with a
+  reason, the evidence and a date. The recording is kept under `quarantine/`,
+  never deleted, and the scenario is reported `quarantined` and skipped until
+  an entry's `liftedBy` names a fresh golden of that scenario captured after
+  the quarantine date (section 3.2). It is empty today.
+- `ledger.json` records each accepted divergence: the scenario, the version,
+  the mapped fields that differ, why the outcome mapping is unchanged (or the
+  amendment that changed it) and the reviewer. It is append-only; a later
+  version that diverges the same way needs its own entry (section 3.3). It is
+  empty today.
+
+`statecraft-cli provider compare <captures-dir> --corpus <this-dir>` compares
+a version's captures, named by a `captures.json` of the same shape as
+`corpus.json`, with these goldens by meaning over the mapped fields
+(`golden::MAPPED_FIELDS`), never by bytes. It runs offline. A version with a
+`diverges-unreviewed` or `missing` scenario is not qualifiable, and
+`qualification::record_compared` refuses its record naming the scenarios.
+
+`statecraft-cli provider capture <out-dir>` writes such a directory for the
+installed provider. It **spends provider usage**, so only an operator runs
+it: each scenario's prompt and flags are `capture::SCENARIOS`, and every
+stream passes through `capture::redact`, which applies the rules above,
+before it is written. Its captures are reviewed before they are committed.

@@ -167,7 +167,9 @@ impl Verification {
 
 struct Reader<'a> {
     bundle: &'a DecisionBundle,
-    pinned: &'a VerifiedRootSet,
+    /// The operator's pinned set. `None` reads the bundle without verifying
+    /// any signature, which only the admission dry-run (spec 049) does.
+    pinned: Option<&'a VerifiedRootSet>,
     scope: &'a str,
     tombstones: TombstoneSet,
     tombstoned: BTreeSet<String>,
@@ -197,14 +199,19 @@ impl Reader<'_> {
         }
     }
 
+    /// The key a signature is checked with, or `None` when no set is pinned
+    /// and nothing is checked.
     fn key_for(
         &self,
         key: &crate::hash::KeyId,
         at: crate::hlc::Hlc,
-    ) -> Result<crate::sign::PublicKey, String> {
-        match self.pinned.eligibility(key, at, self.scope) {
+    ) -> Result<Option<crate::sign::PublicKey>, String> {
+        let Some(pinned) = self.pinned else {
+            return Ok(None);
+        };
+        match pinned.eligibility(key, at, self.scope) {
             IssuerEligibility::Eligible { .. } => {
-                self.pinned.issuer_public_key(key).ok_or_else(|| {
+                pinned.issuer_public_key(key).map(Some).ok_or_else(|| {
                     "the pinned root set holds no key for an eligible issuer".to_string()
                 })
             }
@@ -214,6 +221,16 @@ impl Reader<'_> {
             IssuerEligibility::Unknown => {
                 Err("the signing key is unknown to the pinned root set".to_string())
             }
+        }
+    }
+
+    /// An attestation's claim, decoded; `None` when it is tombstoned.
+    fn claim_of(&mut self, a: &Attestation, what: &str) -> Result<Option<Value>, String> {
+        match self.object(&a.body.claim, what)? {
+            Some(bytes) => crate::cbor::decode(bytes)
+                .map(Some)
+                .map_err(|e| format!("{what}: the claim does not decode: {e}")),
+            None => Ok(None),
         }
     }
 }
@@ -243,7 +260,7 @@ pub fn verify(
     };
     let mut reader = Reader {
         bundle,
-        pinned,
+        pinned: Some(pinned),
         scope,
         tombstones: TombstoneSet::default(),
         tombstoned: BTreeSet::new(),
@@ -260,7 +277,290 @@ pub fn verify(
     out
 }
 
+/// What the admission is evaluated over, as the bundle records it (spec 049
+/// section 3.1): the collection [`verify`] makes before it re-evaluates, made
+/// without a pinned root set. No signature is verified here, so this is a
+/// reading of what the bundle says and not a verification of it.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct AdmissionInputs {
+    /// `registeredBy` of the revision, when the fact names one.
+    pub submitter: Option<String>,
+    /// The decisions the bundle names, resolved.
+    pub decisions: Vec<NamedDecision>,
+    /// Every evidence verdict about the revision, with its attestation id.
+    pub verdicts: Vec<(AttestationId, EvidenceVerdict)>,
+    /// The admission the bundle names, when it names one.
+    pub recorded: Option<RecordedAdmission>,
+    /// The AI pre-screen the bundle carries (spec 054), read as [`verify`]
+    /// reads it, so a dry-run under `refuse_on_prescreen_findings` evaluates
+    /// what the verification would.
+    pub prescreen: Prescreen,
+}
+
+/// What the bundle's recorded admission claim says, as written.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RecordedAdmission {
+    /// The policy digest the claim names.
+    pub policy: Option<String>,
+    /// `admit` or `refuse`.
+    pub decision: String,
+}
+
+/// Collect `bundle`'s admission inputs without a pinned root set. The first
+/// thing that does not resolve is the error; a tombstoned verdict is one.
+pub fn admission_inputs(bundle: &DecisionBundle) -> Result<AdmissionInputs, String> {
+    let mut r = Reader {
+        bundle,
+        pinned: None,
+        scope: "",
+        tombstones: TombstoneSet::default(),
+        tombstoned: BTreeSet::new(),
+    };
+    let resolved = resolve(&mut r)?;
+    let prescreen = prescreen_of(&mut r, &resolved.attestations)?;
+    let recorded = admission_claim(&mut r, &resolved)?.map(|rm| RecordedAdmission {
+        policy: text(&rm, "policy").map(str::to_string),
+        decision: text(&rm, "decision").unwrap_or("").to_string(),
+    });
+    let verdicts = match verdicts(&mut r, &resolved)? {
+        Verdicts::Collected(v) => v,
+        Verdicts::Tombstoned(what) => return Err(format!("{what} is tombstoned")),
+    };
+    Ok(AdmissionInputs {
+        submitter: resolved.submitter,
+        decisions: resolved.decisions,
+        verdicts,
+        recorded,
+        prescreen,
+    })
+}
+
 type Walked = (Vec<NamedDecision>, Option<NamedPrescreen>, AdmissionCheck);
+
+/// What the entries commit to, once every one of them is read.
+struct Resolved {
+    attestations: BTreeMap<Hash, Attestation>,
+    submitter: Option<String>,
+    decisions: Vec<NamedDecision>,
+}
+
+/// The objects, the entry chain, the tombstones, the attestations, the
+/// submitter and the decisions named, in that order; the first divergence is
+/// the error.
+fn resolve(r: &mut Reader<'_>) -> Result<Resolved, String> {
+    for (key, bytes) in &r.bundle.objects {
+        let cid = parse_object_key(key)
+            .ok_or_else(|| format!("object {key}: not an object identifier"))?;
+        if Hash::of(bytes) != cid.hash {
+            return Err(format!(
+                "object {key}: the bytes do not hash to the identifier"
+            ));
+        }
+    }
+    if r.bundle.entries.is_empty() {
+        return Err("the bundle holds no entries; it must begin at revision.registered".into());
+    }
+    // First every entry's chain and signature, so the payloads they commit to
+    // are known before anything is resolved.
+    let mut entries: Vec<Entry> = Vec::new();
+    let mut previous: Option<Entry> = None;
+    for (i, bytes) in r.bundle.entries.iter().enumerate() {
+        let entry = Entry::decode(bytes).map_err(|e| format!("entry {i} does not decode: {e}"))?;
+        if let Some(p) = &previous {
+            if entry.body.parents.len() != 1 || entry.body.parents[0] != p.hash() {
+                return Err(format!("entry {i}: its parent is not the previous entry"));
+            }
+            if entry.body.hlc <= p.body.hlc {
+                return Err(format!("entry {i}: its clock is not after its parent's"));
+            }
+        }
+        if let Some(key) = r
+            .key_for(&entry.body.issuer, entry.body.hlc)
+            .map_err(|e| format!("entry {i}: {e}"))?
+        {
+            entry
+                .verify_signature(&key)
+                .map_err(|_| format!("entry {i}: the signature does not recompute"))?;
+        }
+        previous = Some(entry.clone());
+        entries.push(entry);
+    }
+    // A tombstone is trusted only when a verified entry commits to it: one the
+    // bundle merely carries could hide a missing object.
+    let committed: BTreeSet<Cid> = entries.iter().map(|e| e.body.payload).collect();
+    for (i, bytes) in r.bundle.tombstones.iter().enumerate() {
+        let fact = FactEnvelope::decode(bytes)
+            .map_err(|e| format!("tombstone {i} does not decode: {e}"))?;
+        if !committed.contains(&fact.cid()) {
+            return Err(format!(
+                "tombstone {i} is not recorded by any entry in the bundle"
+            ));
+        }
+        let t = Tombstone::from_fact(&fact).map_err(|e| format!("tombstone {i}: {e}"))?;
+        r.tombstones.add(t);
+    }
+    let mut attestations: BTreeMap<Hash, Attestation> = BTreeMap::new();
+    let mut submitter: Option<String> = None;
+    for (i, entry) in entries.iter().enumerate() {
+        let Some(payload) = r.object(&entry.body.payload, &format!("entry {i} payload"))? else {
+            // The revision is identified by its first fact; erased, it cannot
+            // be checked, and nothing after it can be bound to it.
+            if i == 0 {
+                return Err("entry 0's revision.registered fact is tombstoned; the revision id cannot be checked".into());
+            }
+            continue;
+        };
+        let fact = FactEnvelope::decode(payload)
+            .map_err(|e| format!("entry {i}: the payload does not decode: {e}"))?;
+        if i == 0 {
+            if fact.kind != "revision.registered" {
+                return Err("entry 0 is not revision.registered".into());
+            }
+            if Hash::of(payload) != r.bundle.revision {
+                return Err(
+                    "the revision id is not the hash of its revision.registered fact".into(),
+                );
+            }
+            submitter = text(&fact.body, "registeredBy").map(str::to_string);
+        }
+        if fact.kind == "attestation.issued" {
+            let Some(Value::Link(cid)) = fact.body.get("attestation") else {
+                return Err(format!(
+                    "entry {i}: attestation.issued names no attestation"
+                ));
+            };
+            let cid = *cid;
+            if let Some(abytes) = r.object(&cid, &format!("entry {i} attestation"))? {
+                let a = Attestation::decode(abytes)
+                    .map_err(|e| format!("entry {i}: the attestation does not decode: {e}"))?;
+                if let Some(akey) = r
+                    .key_for(&a.issuer_key, a.body.at)
+                    .map_err(|e| format!("entry {i} attestation: {e}"))?
+                {
+                    a.verify_signature(&akey).map_err(|_| {
+                        format!("entry {i}: the attestation's signature does not recompute")
+                    })?;
+                }
+                attestations.insert(a.id().0, a);
+            }
+        }
+    }
+
+    // The decisions named.
+    let mut decisions = Vec::new();
+    let mut named = BTreeSet::new();
+    for id in &r.bundle.decisions {
+        // A decision is counted once: a repeated id would count it twice.
+        if !named.insert(*id) {
+            return Err(format!("decision {} is named twice", id.to_hex()));
+        }
+        let a = attestations
+            .get(id)
+            .ok_or_else(|| {
+                format!(
+                    "decision {} is not an attestation in the bundle",
+                    id.to_hex()
+                )
+            })?
+            .clone();
+        if a.body.subject != r.bundle.revision {
+            return Err(format!(
+                "decision {} is about another revision",
+                id.to_hex()
+            ));
+        }
+        let approves = match a.body.predicate.0.as_str() {
+            APPROVAL => true,
+            CHANGE_REQUEST => false,
+            other => {
+                return Err(format!(
+                    "decision {} has the predicate {other}",
+                    id.to_hex()
+                ));
+            }
+        };
+        let what = format!("decision {}", id.to_hex());
+        let claim = r
+            .claim_of(&a, &what)?
+            .ok_or_else(|| format!("{what}: its claim is tombstoned"))?;
+        let m = claim
+            .as_map()
+            .ok_or_else(|| format!("{what}: the claim is not a map"))?;
+        if text(m, "revision") != Some(r.bundle.revision.to_hex().as_str()) {
+            return Err(format!("{what} names another revision"));
+        }
+        let reviewer = m
+            .get("reviewer")
+            .ok_or_else(|| format!("{what} names no reviewer"))
+            .and_then(|v| Principal::from_value(v).map_err(|e| format!("{what}: {e}")))?;
+        decisions.push(NamedDecision {
+            id: *id,
+            approves,
+            reviewer,
+        });
+    }
+    Ok(Resolved {
+        attestations,
+        submitter,
+        decisions,
+    })
+}
+
+/// The recorded admission's claim, as a map; `None` when the bundle names no
+/// admission. An admission that does not resolve is the error.
+fn admission_claim(
+    r: &mut Reader<'_>,
+    resolved: &Resolved,
+) -> Result<Option<BTreeMap<String, Value>>, String> {
+    let Some(admission_id) = r.bundle.admission else {
+        return Ok(None);
+    };
+    let a = resolved
+        .attestations
+        .get(&admission_id)
+        .ok_or_else(|| "the admission is not an attestation in the bundle".to_string())?
+        .clone();
+    if a.body.subject != r.bundle.revision {
+        return Err("the admission is about another revision".into());
+    }
+    if a.body.predicate.0 != POLICY_EVAL {
+        return Err(format!(
+            "the admission has the predicate {}",
+            a.body.predicate.0
+        ));
+    }
+    let recorded = r
+        .claim_of(&a, "the admission")?
+        .ok_or("the admission's claim is tombstoned")?;
+    let rm = recorded
+        .as_map()
+        .ok_or("the admission's claim is not a map")?;
+    Ok(Some(rm.clone()))
+}
+
+/// The evidence verdicts about the revision, or the first one that is
+/// tombstoned, which is not a divergence.
+enum Verdicts {
+    Collected(Vec<(AttestationId, EvidenceVerdict)>),
+    Tombstoned(String),
+}
+
+fn verdicts(r: &mut Reader<'_>, resolved: &Resolved) -> Result<Verdicts, String> {
+    let mut verdicts: Vec<(AttestationId, EvidenceVerdict)> = Vec::new();
+    for (id, att) in &resolved.attestations {
+        if att.body.predicate.0 != EVIDENCE_VERDICT || att.body.subject != r.bundle.revision {
+            continue;
+        }
+        let what = format!("verdict {}", id.to_hex());
+        let Some(claim) = r.claim_of(att, &what)? else {
+            return Ok(Verdicts::Tombstoned(what));
+        };
+        let verdict: EvidenceVerdict = serde_json::from_value(claim.to_json())
+            .map_err(|e| format!("{what}: the claim is not a verdict: {e}"))?;
+        verdicts.push((AttestationId(*id), verdict));
+    }
+    Ok(Verdicts::Collected(verdicts))
+}
 
 /// The pre-screen the scope carries (spec 054 section 3.3). One about the
 /// revision wins over one about another; among several the latest by the
@@ -325,234 +625,52 @@ fn named_prescreen(p: &Prescreen) -> Option<NamedPrescreen> {
 }
 
 fn walk(r: &mut Reader<'_>, policy: Option<&AdmissionPolicy>) -> Result<Walked, String> {
-    for (key, bytes) in &r.bundle.objects {
-        let cid = parse_object_key(key)
-            .ok_or_else(|| format!("object {key}: not an object identifier"))?;
-        if Hash::of(bytes) != cid.hash {
-            return Err(format!(
-                "object {key}: the bytes do not hash to the identifier"
-            ));
-        }
-    }
-    if r.bundle.entries.is_empty() {
-        return Err("the bundle holds no entries; it must begin at revision.registered".into());
-    }
-    // First every entry's chain and signature, so the payloads they commit to
-    // are known before anything is resolved.
-    let mut entries: Vec<Entry> = Vec::new();
-    let mut previous: Option<Entry> = None;
-    for (i, bytes) in r.bundle.entries.iter().enumerate() {
-        let entry = Entry::decode(bytes).map_err(|e| format!("entry {i} does not decode: {e}"))?;
-        if let Some(p) = &previous {
-            if entry.body.parents.len() != 1 || entry.body.parents[0] != p.hash() {
-                return Err(format!("entry {i}: its parent is not the previous entry"));
-            }
-            if entry.body.hlc <= p.body.hlc {
-                return Err(format!("entry {i}: its clock is not after its parent's"));
-            }
-        }
-        let key = r
-            .key_for(&entry.body.issuer, entry.body.hlc)
-            .map_err(|e| format!("entry {i}: {e}"))?;
-        entry
-            .verify_signature(&key)
-            .map_err(|_| format!("entry {i}: the signature does not recompute"))?;
-        previous = Some(entry.clone());
-        entries.push(entry);
-    }
-    // A tombstone is trusted only when a verified entry commits to it: one the
-    // bundle merely carries could hide a missing object.
-    let committed: BTreeSet<Cid> = entries.iter().map(|e| e.body.payload).collect();
-    for (i, bytes) in r.bundle.tombstones.iter().enumerate() {
-        let fact = FactEnvelope::decode(bytes)
-            .map_err(|e| format!("tombstone {i} does not decode: {e}"))?;
-        if !committed.contains(&fact.cid()) {
-            return Err(format!(
-                "tombstone {i} is not recorded by any entry in the bundle"
-            ));
-        }
-        let t = Tombstone::from_fact(&fact).map_err(|e| format!("tombstone {i}: {e}"))?;
-        r.tombstones.add(t);
-    }
-    let mut attestations: BTreeMap<Hash, Attestation> = BTreeMap::new();
-    let mut submitter: Option<String> = None;
-    for (i, entry) in entries.iter().enumerate() {
-        let Some(payload) = r.object(&entry.body.payload, &format!("entry {i} payload"))? else {
-            // The revision is identified by its first fact; erased, it cannot
-            // be checked, and nothing after it can be bound to it.
-            if i == 0 {
-                return Err("entry 0's revision.registered fact is tombstoned; the revision id cannot be checked".into());
-            }
-            continue;
-        };
-        let fact = FactEnvelope::decode(payload)
-            .map_err(|e| format!("entry {i}: the payload does not decode: {e}"))?;
-        if i == 0 {
-            if fact.kind != "revision.registered" {
-                return Err("entry 0 is not revision.registered".into());
-            }
-            if Hash::of(payload) != r.bundle.revision {
-                return Err(
-                    "the revision id is not the hash of its revision.registered fact".into(),
-                );
-            }
-            submitter = text(&fact.body, "registeredBy").map(str::to_string);
-        }
-        if fact.kind == "attestation.issued" {
-            let Some(Value::Link(cid)) = fact.body.get("attestation") else {
-                return Err(format!(
-                    "entry {i}: attestation.issued names no attestation"
-                ));
-            };
-            let cid = *cid;
-            if let Some(abytes) = r.object(&cid, &format!("entry {i} attestation"))? {
-                let a = Attestation::decode(abytes)
-                    .map_err(|e| format!("entry {i}: the attestation does not decode: {e}"))?;
-                let akey = r
-                    .key_for(&a.issuer_key, a.body.at)
-                    .map_err(|e| format!("entry {i} attestation: {e}"))?;
-                a.verify_signature(&akey).map_err(|_| {
-                    format!("entry {i}: the attestation's signature does not recompute")
-                })?;
-                attestations.insert(a.id().0, a);
-            }
-        }
-    }
-
-    let claim_of =
-        |r: &mut Reader<'_>, a: &Attestation, what: &str| -> Result<Option<Value>, String> {
-            match r.object(&a.body.claim, what)? {
-                Some(bytes) => crate::cbor::decode(bytes)
-                    .map(Some)
-                    .map_err(|e| format!("{what}: the claim does not decode: {e}")),
-                None => Ok(None),
-            }
-        };
-
-    // The decisions named.
-    let mut decisions = Vec::new();
-    let mut named = BTreeSet::new();
-    for id in &r.bundle.decisions {
-        // A decision is counted once: a repeated id would count it twice.
-        if !named.insert(*id) {
-            return Err(format!("decision {} is named twice", id.to_hex()));
-        }
-        let a = attestations
-            .get(id)
-            .ok_or_else(|| {
-                format!(
-                    "decision {} is not an attestation in the bundle",
-                    id.to_hex()
-                )
-            })?
-            .clone();
-        if a.body.subject != r.bundle.revision {
-            return Err(format!(
-                "decision {} is about another revision",
-                id.to_hex()
-            ));
-        }
-        let approves = match a.body.predicate.0.as_str() {
-            APPROVAL => true,
-            CHANGE_REQUEST => false,
-            other => {
-                return Err(format!(
-                    "decision {} has the predicate {other}",
-                    id.to_hex()
-                ));
-            }
-        };
-        let what = format!("decision {}", id.to_hex());
-        let claim =
-            claim_of(r, &a, &what)?.ok_or_else(|| format!("{what}: its claim is tombstoned"))?;
-        let m = claim
-            .as_map()
-            .ok_or_else(|| format!("{what}: the claim is not a map"))?;
-        if text(m, "revision") != Some(r.bundle.revision.to_hex().as_str()) {
-            return Err(format!("{what} names another revision"));
-        }
-        let reviewer = m
-            .get("reviewer")
-            .ok_or_else(|| format!("{what} names no reviewer"))
-            .and_then(|v| Principal::from_value(v).map_err(|e| format!("{what}: {e}")))?;
-        decisions.push(NamedDecision {
-            id: *id,
-            approves,
-            reviewer,
-        });
-    }
-
+    let resolved = resolve(r)?;
     // The pre-screen (spec 054): read before the admission so it is listed
     // beside the decisions whether or not an admission was recorded.
-    let prescreen = prescreen_of(r, &attestations)?;
+    let prescreen = prescreen_of(r, &resolved.attestations)?;
     let shown = named_prescreen(&prescreen);
-
-    // The admission.
-    let Some(admission_id) = r.bundle.admission else {
-        return Ok((decisions, shown, AdmissionCheck::None));
+    let Some(rm) = admission_claim(r, &resolved)? else {
+        return Ok((resolved.decisions, shown, AdmissionCheck::None));
     };
-    let a = attestations
-        .get(&admission_id)
-        .ok_or_else(|| "the admission is not an attestation in the bundle".to_string())?
-        .clone();
-    if a.body.subject != r.bundle.revision {
-        return Err("the admission is about another revision".into());
-    }
-    if a.body.predicate.0 != POLICY_EVAL {
-        return Err(format!(
-            "the admission has the predicate {}",
-            a.body.predicate.0
-        ));
-    }
-    let recorded =
-        claim_of(r, &a, "the admission")?.ok_or("the admission's claim is tombstoned")?;
-    let rm = recorded
-        .as_map()
-        .ok_or("the admission's claim is not a map")?;
-    let recorded_decision = text(rm, "decision").unwrap_or("").to_string();
+    let recorded_decision = text(&rm, "decision").unwrap_or("").to_string();
     let Some(policy) = policy else {
         return Ok((
-            decisions,
+            resolved.decisions,
             shown,
             AdmissionCheck::NotReproduced("no pinned admission policy was given".into()),
         ));
     };
     let policy_digest = policy_digest(policy);
-    if text(rm, "policy") != Some(policy_digest.to_hex().as_str()) {
+    if text(&rm, "policy") != Some(policy_digest.to_hex().as_str()) {
         return Ok((
-            decisions,
+            resolved.decisions,
             shown,
             AdmissionCheck::NotReproduced(format!(
                 "the admission was evaluated under policy {}, not the pinned {}",
-                text(rm, "policy").unwrap_or("(none)"),
+                text(&rm, "policy").unwrap_or("(none)"),
                 policy_digest.to_hex()
             )),
         ));
     }
-    let Some(submitter) = submitter else {
+    let Some(submitter) = resolved.submitter.clone() else {
         return Ok((
-            decisions,
+            resolved.decisions,
             shown,
             AdmissionCheck::NotReproduced("the revision names no submitter".into()),
         ));
     };
-    let mut verdicts: Vec<(AttestationId, EvidenceVerdict)> = Vec::new();
-    for (id, att) in attestations.clone() {
-        if att.body.predicate.0 != EVIDENCE_VERDICT || att.body.subject != r.bundle.revision {
-            continue;
-        }
-        let what = format!("verdict {}", id.to_hex());
-        let Some(claim) = claim_of(r, &att, &what)? else {
+    let verdicts = match verdicts(r, &resolved)? {
+        Verdicts::Collected(v) => v,
+        Verdicts::Tombstoned(what) => {
             return Ok((
-                decisions,
+                resolved.decisions,
                 shown,
                 AdmissionCheck::NotReproduced(format!("{what} is tombstoned")),
             ));
-        };
-        let verdict: EvidenceVerdict = serde_json::from_value(claim.to_json())
-            .map_err(|e| format!("{what}: the claim is not a verdict: {e}"))?;
-        verdicts.push((AttestationId(id), verdict));
-    }
+        }
+    };
+    let decisions = resolved.decisions;
     let counted: Vec<Decision> = decisions
         .iter()
         .map(|d| Decision {

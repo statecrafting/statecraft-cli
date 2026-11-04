@@ -79,6 +79,11 @@ extra_hashed_inputs = [
   "scripts/**/*",
   "README.md",
   "AGENTS.md",
+  # Claimed by spec 056 as the repository's own review guide; the file
+  # lands with that spec's implementation, after this line, which profile
+  # revision 22's policy guard keeps in a pull request of its own. The
+  # regenerated .statecraft/derived/codebase-index/inputs.json is in the
+  # same change; the AI review excludes that tree, and preflight checks it.
   "REVIEW.md",
   "CLAUDE.md",
   "Makefile",

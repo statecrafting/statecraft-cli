@@ -1,0 +1,10 @@
+{
+  "package": {
+    "kind": "rust-lib",
+    "name": "statecraft-adapter-codex",
+    "path": "crates/statecraft-adapter-codex",
+    "specRef": "055-codex-adapter"
+  },
+  "schemaVersion": "1.3.0",
+  "shardHash": "728a89f34e62e4bd522daa3034c45c236d91a4d75d6582a1384332eecb7ae481"
+}

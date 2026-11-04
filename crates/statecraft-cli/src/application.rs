@@ -20,6 +20,7 @@ use statecraft_environment::registry::Registry;
 use statecraft_environment::time::Clock;
 use statecraft_run::record::Chain;
 use std::path::{Path, PathBuf};
+use std::sync::Arc;
 
 use crate::exit::Exit;
 use crate::render::Answer;
@@ -171,7 +172,11 @@ fn accept_registered(
             .entries()
             .iter()
             .rev()
-            .find(|e| e.run_id == run_id && e.kind == statecraft_run::record::Kind::Accounting)
+            .find(|e| {
+                e.run_id == run_id
+                    && e.kind == statecraft_run::record::Kind::Accounting
+                    && !statecraft_run::operation::is_operation_record(e)
+            })
             .and_then(|e| e.detail.get("count"))
             .and_then(|v| v.as_u64())
             .map(|c| c as u32);
@@ -457,6 +462,15 @@ pub fn run_reconcile(ctx: &Context<'_>, op: &ReconcileOperands<'_>) -> Result<Re
         Ok(c) => c,
         Err(e) => return Ok(failed(&e.to_string())),
     };
+    // Spec 050 section 5, 2026-11-01: a halt request a supervisor did not
+    // live to apply is appended before this write; one that does not read
+    // refuses it, since it may be a halt.
+    if let Err(e) = statecraft_run::halt::apply_pending(&mut chain, home, &root) {
+        return Ok(match e {
+            statecraft_run::halt::HaltError::Unreadable(r) => slice::halt_refused_answer(&r),
+            other => failed(&other.to_string()),
+        });
+    }
 
     // Rule 2: read the launch records; never launch, signal or replay.
     // Rule 3: the attempt's gate log is read whatever the manifest says, and a
@@ -676,24 +690,39 @@ fn run_from(
         return Ok(bind::unarmed_answer(&root).erase());
     }
     let held = match statecraft_run::lock::try_acquire(ctx.home, &root) {
-        Ok(held) => held,
+        Ok(held) => Arc::new(held),
         Err(e @ statecraft_run::lock::LockError::Busy { .. }) => {
             return Ok(slice::lock_busy_answer(&e.to_string()).erase());
         }
         Err(e) => return Ok(failed(&e.to_string())),
     };
-    let report = match crate::judge::report_source(&root).and_then(|cli| {
+    run_held(ctx, &root, spec_id, held, origin, witness, context)
+}
+
+/// [`run_from`] once registration, arming and the repository lock are
+/// decided: the report, the policy and the journal read under that lock, and
+/// the attempt. Spec 048 section 3.5 enters here, holding the lock already.
+fn run_held(
+    ctx: &Context<'_>,
+    root: &Path,
+    spec_id: Option<&str>,
+    held: Arc<statecraft_run::lock::Held>,
+    origin: Option<&Origin<'_>>,
+    witness: Requirement,
+    context: Option<&Path>,
+) -> Result<Response, Usage> {
+    let report = match crate::judge::report_source(root).and_then(|cli| {
         use statecraft_run::report::ReportSource;
-        cli.corpus_report(&root)
+        cli.corpus_report(root)
     }) {
         Ok(report) => report,
         Err(e) => return Ok(slice::report_error_answer(&e).erase()),
     };
     let (policy, disagreement) =
-        statecraft_run::policy::resolve(&root, &statecraft_run::policy::NoDeclarationFiled, None);
+        statecraft_run::policy::resolve(root, &statecraft_run::policy::NoDeclarationFiled, None);
     // Spec 003 section 3.1.4 rule 3 and 3.1.5 rule 3: a journal that does not
     // read or verify is a failure, never an empty set of overrides.
-    let overrides = match statecraft_run::overrides::read_held(ctx.home, &root, &held) {
+    let overrides = match statecraft_run::overrides::read_held(ctx.home, root, &held) {
         Ok(journal) => journal.overrides(),
         Err(e) => return Ok(slice::journal_error_answer(&e).erase()),
     };
@@ -704,7 +733,7 @@ fn run_from(
         ));
     };
     Ok(run_admitted(
-        ctx, &root, spec_id, work, &report, held, origin, witness, context,
+        ctx, root, spec_id, work, &report, held, origin, witness, context,
     ))
 }
 
@@ -716,7 +745,7 @@ fn run_admitted(
     spec_id: &str,
     work: statecraft_run::work::WorkList,
     report: &statecraft_run::report::CorpusReport,
-    held: statecraft_run::lock::Held,
+    held: Arc<statecraft_run::lock::Held>,
     origin: Option<&Origin<'_>>,
     witness: Requirement,
     context: Option<&Path>,
@@ -754,6 +783,404 @@ fn run_admitted(
         plan.proposal = Some(origin.proposal.to_string());
     }
     crate::launch::launch_attempt(ctx.clock, root, ctx.home, spec_id, plan, contract, None)
+}
+
+// ---------------------------------------------------------- run operations
+
+/// A spec 048 refusal: exit 2, kind `refused`, the closed reason where it has
+/// one. Only a `stale-version` refusal was recorded.
+fn operation_refused(r: &statecraft_run::operation::Refusal) -> Response {
+    let mut value = serde_json::to_value(r).unwrap_or_default();
+    value["outcome"] = Value::from("refused");
+    Answer::new(value, Exit::Refused, format!("refused: {r}\n"))
+        .with_kind(crate::render::ErrorKind::Refused)
+}
+
+/// Resolve the stored root, take the repository lock and open the chain, as
+/// every write to the run record does (spec 003 section 3.1.4 rule 7).
+/// The repository lock for a spec 048 verb, or, when a live `run` holds it,
+/// the target and why, so the verb can queue its request for that run's
+/// supervisor (section 5, 2026-11-02). Held, a request no supervisor lived to
+/// apply is applied first, so the verb's own write follows it.
+enum Locked {
+    Held(PathBuf, statecraft_run::lock::Held, Chain),
+    Busy(PathBuf, String),
+}
+
+fn locked_or_busy(ctx: &Context<'_>, path: &Path) -> Result<Locked, Response> {
+    let root = registered(ctx.registry, path)?;
+    let held = match statecraft_run::lock::try_acquire(ctx.home, &root) {
+        Ok(held) => held,
+        Err(e @ statecraft_run::lock::LockError::Busy { .. }) => {
+            return Ok(Locked::Busy(root, e.to_string()));
+        }
+        Err(e) => return Err(failed(&e.to_string())),
+    };
+    let mut chain = match Chain::open(ctx.home, &root) {
+        Ok((chain, _)) => chain,
+        Err(e) => return Err(failed(&e.to_string())),
+    };
+    match statecraft_run::operation::apply_pending(&mut chain, ctx.home, &root) {
+        // A file that does not read stops nothing: it is reported here and
+        // left in place for an operator (section 5, 2026-11-02).
+        Ok(drained) => {
+            for why in drained.unreadable {
+                eprintln!("warning: {why}; it is left in place and was not applied");
+            }
+        }
+        Err(e) => return Err(failed(&e.to_string())),
+    }
+    Ok(Locked::Held(root, held, chain))
+}
+
+/// A request queued for the supervisor of the live run that holds the lock:
+/// exit 0, the change is queued, not done. Its effect is read back from the
+/// record (`run events`) once the supervisor applies it.
+fn queued_answer(
+    ctx: &Context<'_>,
+    root: &Path,
+    busy: &str,
+    request: &statecraft_run::operation::Queued,
+) -> Response {
+    match statecraft_run::operation::queue(ctx.home, root, request) {
+        Ok(file) => {
+            let summary = format!(
+                "queued for the supervisor of the live run that holds the lock ({busy}); \
+                 `run events` shows it once applied\n"
+            );
+            let value = serde_json::json!({
+                "queued": true,
+                "request": request,
+                "file": file.display().to_string(),
+            });
+            Answer::new(value, Exit::Ok, summary).erase()
+        }
+        Err(e) => failed(&e.to_string()),
+    }
+}
+
+/// What `run lease` was told (spec 048 section 3.2).
+pub struct LeaseOperands<'a> {
+    /// The target.
+    pub path: &'a Path,
+    /// The run.
+    pub run_id: &'a str,
+    /// `acquire <controller>`, `release <controller> <lease>` or
+    /// `break <operator> <reason...>`.
+    pub words: &'a [String],
+    /// The controller's process, for `acquire`: the verb's caller.
+    pub pid: u32,
+}
+
+/// `run lease <path> <run-id> <acquire|release|break> ...` (spec 048 section
+/// 3.2): acquire, release or break the run's one controller lease.
+pub fn run_lease(ctx: &Context<'_>, op: &LeaseOperands<'_>) -> Result<Response, Usage> {
+    use statecraft_run::operation::{self, Controller};
+    let usage = || {
+        Usage(
+            "usage: run lease <path> <run-id> (acquire <controller> | release <controller> \
+             <lease> | break <operator> <reason...>)"
+                .to_string(),
+        )
+    };
+    enum Act<'w> {
+        Acquire(&'w str),
+        Release(&'w str, u64),
+        Break(&'w str, String),
+    }
+    let act = match op.words {
+        [a, controller] if a == "acquire" => Act::Acquire(controller),
+        [a, controller, lease] if a == "release" => match lease.parse::<u64>() {
+            Ok(lease) => Act::Release(controller, lease),
+            Err(_) => return Err(usage()),
+        },
+        [a, operator, reason @ ..] if a == "break" && !reason.is_empty() => {
+            Act::Break(operator, reason.join(" "))
+        }
+        _ => return Err(usage()),
+    };
+    let at = now(ctx.clock);
+    let run_id = op.run_id;
+    let (_held, mut chain) = match locked_or_busy(ctx, op.path) {
+        Ok(Locked::Held(_root, held, chain)) => (held, chain),
+        Ok(Locked::Busy(root, busy)) => {
+            use statecraft_run::operation::Queued;
+            let request = match act {
+                Act::Acquire(name) => Queued::LeaseAcquire {
+                    run_id: run_id.to_string(),
+                    controller: name.to_string(),
+                    pid: op.pid,
+                    at,
+                },
+                Act::Release(controller, lease) => Queued::LeaseRelease {
+                    run_id: run_id.to_string(),
+                    controller: controller.to_string(),
+                    lease,
+                    at,
+                },
+                Act::Break(operator, reason) => Queued::LeaseBreak {
+                    run_id: run_id.to_string(),
+                    operator: operator.to_string(),
+                    reason,
+                    at,
+                },
+            };
+            return Ok(queued_answer(ctx, &root, &busy, &request));
+        }
+        Err(answer) => return Ok(answer),
+    };
+    let result = match act {
+        Act::Acquire(name) => {
+            operation::acquire(&mut chain, run_id, &Controller { name, pid: op.pid }, &at)
+        }
+        Act::Release(controller, lease) => {
+            operation::release(&mut chain, run_id, controller, lease, &at)
+        }
+        Act::Break(operator, reason) => {
+            operation::break_lease(&mut chain, run_id, operator, &reason, &at)
+        }
+    };
+    Ok(match result {
+        Err(e) => failed(&e.to_string()),
+        Ok(Err(refusal)) => operation_refused(&refusal),
+        Ok(Ok(change)) => {
+            let summary = format!(
+                "{} lease {} of run {run_id} for controller {}; the run is at version {}\n",
+                change.change, change.lease.id, change.lease.controller, change.version
+            );
+            Answer::new(change, Exit::Ok, summary).erase()
+        }
+    })
+}
+
+/// What `run op` was told (spec 048 section 3.3).
+pub struct OperationOperands<'a> {
+    /// The target.
+    pub path: &'a Path,
+    /// The run.
+    pub run_id: &'a str,
+    /// `retry`, `continue` or `abort`, or their dotted names.
+    pub operation: &'a str,
+    /// The controller submitting it.
+    pub controller: &'a str,
+    /// The lease it presents.
+    pub lease: &'a str,
+    /// Its idempotency key.
+    pub key: &'a str,
+    /// The run version it was decided against.
+    pub version: &'a str,
+    /// Why.
+    pub reason: &'a str,
+}
+
+/// `run op <path> <run-id> <retry|continue|abort> <controller> <lease> <key>
+/// <version> [<reason...>]` (spec 048 sections 3.1 to 3.5).
+///
+/// The library decides by section 3.3's rules under the repository lock and
+/// makes the intent durable. A retry then runs `run`'s own path for the run's
+/// unit of work, under the lock this operation already holds (section 3.5),
+/// and its outcome is appended only after that path returns. An abort's
+/// effect is its `stop-requested` point. While a live run holds the lock, an
+/// abort is queued for that run's supervisor and answered 0 as queued, and a
+/// retry or continue is answered `lock-busy` (section 5, 2026-11-02).
+pub fn run_operation(ctx: &Context<'_>, op: &OperationOperands<'_>) -> Result<Response, Usage> {
+    use statecraft_run::operation::{self, Completion, Operation, Request, Submitted};
+    let usage = || {
+        Usage(
+            "usage: run op <path> <run-id> <retry|continue|abort> <controller> <lease> <key> \
+             <version> [<reason...>]"
+                .to_string(),
+        )
+    };
+    let Some(operation) = Operation::parse(op.operation) else {
+        return Err(usage());
+    };
+    let (Ok(lease), Ok(version)) = (op.lease.parse::<u64>(), op.version.parse::<u64>()) else {
+        return Err(usage());
+    };
+    if op.key.is_empty() || op.controller.is_empty() {
+        return Err(usage());
+    }
+    // Section 3.5: an operation that launches is admitted as `run` is, and
+    // `run` refuses an unarmed target before it takes the lock.
+    if operation.launches()
+        && let Ok(root) = registered(ctx.registry, op.path)
+        && !ctx.registry.get(&root).is_some_and(|r| r.armed)
+    {
+        return Ok(bind::unarmed_answer(&root).erase());
+    }
+    let at = now(ctx.clock);
+    let (root, held, mut chain) = match locked_or_busy(ctx, op.path) {
+        Ok(Locked::Held(root, held, chain)) => (root, held, chain),
+        // Section 5, 2026-11-02: a live run holds the lock, so an abort is
+        // queued for its supervisor, which decides it by the same rules. A
+        // retry or continue needs the slot that live attempt holds.
+        Ok(Locked::Busy(root, busy)) if operation == Operation::Abort => {
+            let request = statecraft_run::operation::Queued::Abort {
+                run_id: op.run_id.to_string(),
+                controller: op.controller.to_string(),
+                lease,
+                key: op.key.to_string(),
+                version,
+                reason: op.reason.to_string(),
+                at,
+            };
+            return Ok(queued_answer(ctx, &root, &busy, &request));
+        }
+        Ok(Locked::Busy(_, busy)) => return Ok(slice::lock_busy_answer(&busy).erase()),
+        Err(answer) => return Ok(answer),
+    };
+    // Shared with a launch, and held here until this operation's outcome is
+    // durable (section 3.5).
+    let held = Arc::new(held);
+    let request = Request {
+        run_id: op.run_id,
+        controller: op.controller,
+        lease,
+        key: op.key,
+        version,
+        operation,
+        reason: op.reason,
+        at: &at,
+    };
+    let accepted = match operation::submit(&mut chain, &request) {
+        Err(e) => return Ok(failed(&e.to_string())),
+        Ok(Submitted::Refused(refusal)) => return Ok(operation_refused(&refusal)),
+        Ok(Submitted::Replayed(recorded)) => {
+            // Rule 2: nothing appended; the answer is what the key holds.
+            if let Some(refusal) = &recorded.refusal {
+                return Ok(operation_refused(refusal));
+            }
+            let summary = format!(
+                "key {} is already recorded for run {} as {} at version {}; nothing was \
+                 appended\n",
+                recorded.key,
+                op.run_id,
+                recorded.operation.word(),
+                recorded.version
+            );
+            let value = serde_json::json!({ "replayed": true, "operation": recorded });
+            return Ok(Answer::new(value, Exit::Ok, summary).erase());
+        }
+        Ok(Submitted::Accepted(accepted)) => accepted,
+    };
+
+    let (completion_exit, launch) = match operation {
+        Operation::Abort => (Exit::Ok, None),
+        Operation::Retry => {
+            let before = operation::fold(&chain, op.run_id).attempts.len();
+            drop(chain);
+            let answer = match run_held(
+                ctx,
+                &root,
+                Some(op.run_id),
+                Arc::clone(&held),
+                None,
+                Requirement::DEFAULT,
+                None,
+            ) {
+                Ok(answer) => answer,
+                Err(Usage(detail)) => failed(&detail),
+            };
+            chain = match Chain::open(ctx.home, &root) {
+                Ok((chain, _)) => chain,
+                // The launch ran and its own records are durable, but the
+                // record cannot be reopened to append this operation's
+                // outcome. Nothing can be written without it, so the intent
+                // stays as the fold shows one no outcome followed, and a
+                // re-presented key replays it rather than launching again
+                // (rule 2). The answer says so instead of a bare failure.
+                Err(e) => {
+                    return Ok(failed(&format!(
+                        "{} under key {} for run {} launched (exit {}), but the record could \
+                         not be reopened to append its outcome, so the operation stays \
+                         accepted with no outcome: {e}",
+                        operation.word(),
+                        accepted.key,
+                        op.run_id,
+                        answer.exit.code()
+                    )));
+                }
+            };
+            (answer.exit, Some((before, answer)))
+        }
+        // Submit refuses it for every adapter before any intent is appended
+        // (section 3.1), so no accepted intent exists here to complete.
+        Operation::Continue => {
+            unreachable!("submit refuses attempt.continue for every adapter, yet accepted it")
+        }
+    };
+    let state = operation::fold(&chain, op.run_id);
+    let completion = match &launch {
+        None => Completion::StopRequested,
+        Some((before, answer)) => Completion::Launched {
+            attempt: state.attempts.get(*before),
+            exit: answer.exit.code(),
+        },
+    };
+    let detail = match operation::complete(&mut chain, &accepted, completion, &at) {
+        Ok(detail) => detail,
+        Err(e) => return Ok(failed(&e.to_string())),
+    };
+    let mut summary = format!(
+        "{} accepted for run {} under key {} at version {}: {}\n",
+        operation.word(),
+        op.run_id,
+        accepted.key,
+        accepted.version,
+        detail["result"].as_str().unwrap_or_default()
+    );
+    let mut value = serde_json::json!({
+        "replayed": false,
+        "accepted": accepted,
+        "outcome": detail,
+    });
+    if let Some((_, answer)) = launch {
+        summary.push_str(&answer.summary);
+        value["run"] = answer.value;
+    } else {
+        summary.push_str(
+            "stop-requested; stop-confirmed is recorded only when the attempt's cancelled \
+             outcome is durable\n",
+        );
+    }
+    Ok(Answer::new(value, completion_exit, summary).erase())
+}
+
+/// `run events <path> <run-id> [--after <cursor>]` (spec 048 section 3.6): the
+/// run's records after a cursor, with the next cursor. A read: no lease, no
+/// lock, nothing written.
+pub fn run_events(
+    ctx: &Context<'_>,
+    path: &Path,
+    run_id: &str,
+    after: Option<&str>,
+) -> Result<Response, Usage> {
+    let after = match after.map(str::parse::<u64>) {
+        None => None,
+        Some(Ok(cursor)) => Some(cursor),
+        Some(Err(_)) => {
+            return Err(Usage(
+                "usage: run events <path> <run-id> [--after <cursor>]".to_string(),
+            ));
+        }
+    };
+    let root = match registered(ctx.registry, path) {
+        Ok(root) => root,
+        Err(answer) => return Ok(answer),
+    };
+    let chain = match Chain::open(ctx.home, &root) {
+        Ok((chain, _)) => chain,
+        Err(e) => return Ok(failed(&e.to_string())),
+    };
+    let events = statecraft_run::operation::events(&chain, run_id, after);
+    let summary = format!(
+        "{} record(s) of run {run_id} after {}; next cursor {}\n",
+        events.events.len(),
+        after.map_or("the start".to_string(), |c| c.to_string()),
+        events.next.map_or("none".to_string(), |c| c.to_string())
+    );
+    Ok(Answer::new(events, Exit::Ok, summary).erase())
 }
 
 // ----------------------------------------------------------- startup trial

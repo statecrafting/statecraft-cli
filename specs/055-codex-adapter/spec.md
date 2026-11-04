@@ -21,8 +21,12 @@ summary: >
 # are additive), so it is a dependency, not an amendment.
 amends:
   - "004-execution-adapter"
-# No `extends` and no crate claim yet: the crate is written only after spec
-# 047 merges and this spec is ratified, and the implementing change claims it.
+# The implementing change claims the crate, and extends spec 004's seam crate
+# only to add the Codex half of its provider-name source check.
+establishes:
+  - { kind: directory, path: "crates/statecraft-adapter-codex/" }
+extends:
+  - { spec: "004-execution-adapter", unit: { kind: directory, path: "crates/statecraft-adapter/" }, nature: additive }
 depends_on:
   - "004-execution-adapter"
   - "008-harness-delivery"
@@ -181,6 +185,62 @@ directory would make every run carry a trust entry this product copied. The
 operator's one-time installation is documented beside the adapter, performed
 by no verb.
 
+**2026-11-01: nothing is declared before a recorded capture.** The fixtures
+under `testdata/` are synthetic, labelled so in each directory's README, until
+the owner records them from a named Codex version. Section 3.6 then leaves no
+field measured, so every spec 047 field is `false`, `version_field` is none
+and no token is declared; `run`, which requires `per_run_config_dir` and
+`settings_file_transport` (spec 047), refuses this adapter with
+`capability-undeclared` until a measurement flips them. Suite rows 1 and 6
+are therefore met as an adapter with no structured refusals and no tokens: no
+refusal is invented, a preferred refusal account is labelled unverifiable, and
+the init applies nothing, so a token declared without a measurement would fail.
+
+**2026-11-01: the stream is read to its end.** The seam's supervisor stops
+decoding at its first terminal line, which would hide a second terminal turn.
+This adapter gives it no terminal line, so a clean end of stream returns as
+the supervisor's `NoResult` and section 3.2's reading of the whole stream
+replaces that one diagnostic; a malformed line, a read failure, the deadline
+or a stopped watch still stands, and the attempt stays `interrupted`. The
+provider version is a probe's, because `thread.started` carries none.
+
+**2026-11-01: the hook query is a supervised child, and its answer's shape is
+provisional.** `codex app-server` is run through the seam's supervisor with the
+attempt's request, deadline capped at 30 seconds, and `initialize`,
+`initialized` and `hooks/list` as its standard input; an environment whose
+`CODEX_HOME` is not the attempt's refuses before spawn. The field names read
+from the answer are an assumption until a recorded answer replaces the
+synthetic one, and an answer that cannot be read refuses. Each refusal has a
+stable `codex-` code.
+
+**2026-11-01: the credential is a document the caller supplies.** The per-run
+directory is `codex-home` inside the attempt's scratch root, mode `0700`,
+holding the hooks document and the credential written verbatim as
+`auth.json`, mode `0600`; it is removed when the attempt drops it. How the
+operator provisions that credential, and `run` selecting this adapter, are
+not in this crate: the crate is a library until a later change wires it.
+
+**2026-11-02: the streams and the hook listing are recorded from codex-cli
+0.166.0 (owner decision).** The owner, asked whether to record real captures
+on the ChatGPT sign-in: "Record now (Recommended)". `completed.jsonl`,
+`error.jsonl` and `hooks/untrusted.json` under `testdata/` are recordings,
+made with section 3.1's invocation in a scratch git work tree and a per-run
+`CODEX_HOME` holding only the hooks document and the credential, and
+redacted as each README lists; `turn-failed.jsonl` stays synthetic and
+`hooks/managed.json` is derived from the recording, because a managed answer
+needs the operator's one-time installation. The recording settles the
+`hooks/list` shape, so `ListedHook` follows it, as the README said it would:
+hooks are listed under `result.data[].hooks`, the event is spelled
+`preToolUse`, and a hook's trust is `isManaged`, beside a `trustStatus` that
+a refusal names. The completed turn's usage carries
+`cache_write_input_tokens` and `reasoning_output_tokens` beside the fields
+the mapping reads, and an error turn opens with an `error` item before the
+`error` event; the mapping reads both as it did. `MEASURED_PROVIDER_VERSION`
+is 0.166.0. No spec 047 field is flipped: these recordings measure the stream
+and the hook listing, not a declared field, so the adapter stays
+`unqualified` and `run` still refuses it until section 3.6's measurements and
+the managed policy exist.
+
 ## Appendix A: other harnesses (reference only)
 
 Recorded from preloop at revision
@@ -203,3 +263,16 @@ implementing change, after spec 047 is built, which will run spec
 named Codex version, extend the provider-name source check to Codex, refuse a
 launch whose gate hook Codex does not report trusted, and compare the user's
 Codex directory before and after a run.
+
+```verify:cli
+cargo test -p statecraft-adapter-codex
+cargo test -p statecraft-adapter --test no_provider_names
+```
+
+The first runs this adapter's own pass of spec 004's suite and section 3.2's
+outcome rows (`tests/negative_suite.rs`), the per-run `CODEX_HOME` and gate
+hook checks (`tests/configuration.rs`) and the unit tests, on the synthetic
+fixtures; a pass is not a qualification record until the fixtures are
+recorded from a named Codex version. The second is the source check, which
+now also finds no other provider named in this crate and no Codex name in the
+other adapter's.
