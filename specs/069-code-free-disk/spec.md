@@ -115,8 +115,10 @@ the other parameters.
 ### 3.6 The revision
 
 The profile becomes revision 25 with a new identity. A revision-24 project
-upgrades through the ordinary plan and apply. Only `statecraft-ci.yml`
-changes, and only a project that sets the parameter gets the new step. The
+upgrades through the ordinary plan and apply. Every rendered file names
+the revision in its header and is rewritten for it; apart from that line,
+only `statecraft-ci.yml` changes, and only a project that sets the parameter
+gets the new step. The
 upgrade pull request is an authority change and needs the owner's
 exception once.
 
