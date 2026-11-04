@@ -220,6 +220,27 @@ holding the hooks document and the credential written verbatim as
 operator provisions that credential, and `run` selecting this adapter, are
 not in this crate: the crate is a library until a later change wires it.
 
+**2026-11-02: the streams and the hook listing are recorded from codex-cli
+0.166.0 (owner decision).** The owner, asked whether to record real captures
+on the ChatGPT sign-in: "Record now (Recommended)". `completed.jsonl`,
+`error.jsonl` and `hooks/untrusted.json` under `testdata/` are recordings,
+made with section 3.1's invocation in a scratch git work tree and a per-run
+`CODEX_HOME` holding only the hooks document and the credential, and
+redacted as each README lists; `turn-failed.jsonl` stays synthetic and
+`hooks/managed.json` is derived from the recording, because a managed answer
+needs the operator's one-time installation. The recording settles the
+`hooks/list` shape, so `ListedHook` follows it, as the README said it would:
+hooks are listed under `result.data[].hooks`, the event is spelled
+`preToolUse`, and a hook's trust is `isManaged`, beside a `trustStatus` that
+a refusal names. The completed turn's usage carries
+`cache_write_input_tokens` and `reasoning_output_tokens` beside the fields
+the mapping reads, and an error turn opens with an `error` item before the
+`error` event; the mapping reads both as it did. `MEASURED_PROVIDER_VERSION`
+is 0.166.0. No spec 047 field is flipped: these recordings measure the stream
+and the hook listing, not a declared field, so the adapter stays
+`unqualified` and `run` still refuses it until section 3.6's measurements and
+the managed policy exist.
+
 ## Appendix A: other harnesses (reference only)
 
 Recorded from preloop at revision

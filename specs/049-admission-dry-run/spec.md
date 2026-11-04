@@ -2,7 +2,7 @@
 id: "049-admission-dry-run"
 title: "An admission dry-run evaluates a policy through the closed evaluator and writes nothing"
 status: approved
-implementation: pending
+implementation: complete
 created: "2026-10-21"
 summary: >
   Adds a verb that evaluates a revision's recorded verdicts and decisions
@@ -16,9 +16,12 @@ summary: >
 amends:
   - "005-acceptance-and-evidence"
   - "006-command-surface"
-# No `extends` yet: the implementing change adds the edges on
-# crates/statecraft-envelope/ (005) and crates/statecraft-cli/ (006) with the
-# code.
+# A new module inside an extended crate is reached through that crate's
+# edge, as specs 036, 040 and 043 do; a file claim there is in no content
+# hash and lint L-008 refuses it.
+extends:
+  - { spec: "005-acceptance-and-evidence", unit: { kind: directory, path: "crates/statecraft-envelope/" }, nature: additive }
+  - { spec: "006-command-surface", unit: { kind: directory, path: "crates/statecraft-cli/" }, nature: additive }
 depends_on:
   - "005-acceptance-and-evidence"
   - "006-command-surface"
@@ -66,9 +69,13 @@ requirement is checked and none outranks another.
 ## 2. Territory
 
 `statecraft-envelope` gains a function that returns `admission::evaluate`'s
-`Admission` together with each check's own result; `statecraft-cli` gains the
-verb that reads its inputs, calls it, and renders the answer through the
-family envelope (spec 007). No new crate and no new dependency.
+`Admission` together with each check's own result (`admission::evaluate_traced`)
+and the bundle reading `verify` makes, offered without a pinned root set
+(`bundle::admission_inputs`); `statecraft-cli` gains the verb that reads its
+inputs, calls it, and renders the answer through the family envelope (spec
+007), in the module `crates/statecraft-cli/src/admission.rs` with its suite
+`crates/statecraft-cli/tests/admission_dry_run.rs`, both in spec 006's
+directory, extended by this spec. No new crate and no new dependency.
 
 ## 3. Behavior
 
@@ -140,11 +147,37 @@ checks in an admission would be a new amending spec with a `policy-eval/v2`
 predicate beside v1, proposed on its own if an operator ever needs it. This
 spec stands as drafted: the trace is the dry-run's answer and nothing else.
 
+**2026-10-31: the bundle is read, not verified.** The verb takes a bundle and
+a policy and no pinned root set, so it resolves the bundle as `bundle::verify`
+does (object hashes, the entry chain, every claim) and checks no signature;
+`hosted decision` remains the verification. A bundle that does not resolve is
+refused with the `validation` kind, a file that does not parse with `schema`,
+and a path that names nothing with `not-found`. The trace renders each check
+as `{id, result, code?}` with the result words `allow`, `overruled`, `deny`
+and `undecided`; a `deny`'s `code` and the answer's `reasons` are the refusal
+codes in admission's own serialized form, so their kebab-case keys join the
+spec 005 entry of the JSON naming exemption list beside `incomplete-evidence`.
+
 ## Verification
 
-Ratified by the owner on 2026-10-31. Acceptance is declared by the
-implementing change, which will run a differential test over the admission
-test corpus comparing the dry-run's decision and codes with `evaluate`'s, run
-the verb against a read-only home and target and compare both trees before and
-after, and check that the trace marks allowing checks `overruled` exactly when
-the decision is a refusal.
+Ratified by the owner on 2026-10-31. Acceptance is run through
+`make verify SPEC=049`, with no provider, no cell and no network.
+
+```verify:cli
+cargo test -p statecraft-envelope --test admission_differential
+cargo test -p statecraft-envelope --test decision_bundle
+cargo test -p statecraft-cli --test admission_dry_run
+cargo test -p statecraft-cli --test family_envelope
+```
+
+The differential suite evaluates every case of the admission corpus through
+`evaluate` and `evaluate_traced` and requires the same decision, the same codes
+in the same order and serialized form, and `overruled` on an allowing check
+exactly when the decision refuses (I-1, R-2). The bundle suite shows
+`bundle::verify` unchanged by the shared reading. The binary suite runs the
+verb against assembled bundles: the digest and its relation to the recorded
+admission (R-1), the trace through the envelope (R-2), the codes against
+`evaluate`'s (I-1), a run against a read-only home and target that leaves both
+byte-identical (I-2, V-1), the refusal kinds, and the usage answers. The
+envelope suite shows the verb answers the family envelope under its dotted
+name.

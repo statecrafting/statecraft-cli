@@ -5,10 +5,21 @@
       "039-local-cockpit-authority"
     ],
     "created": "2026-10-21",
+    "declaresAcceptance": true,
     "dependsOn": [
       "003-work-and-run-semantics",
       "004-execution-adapter",
       "039-local-cockpit-authority"
+    ],
+    "extends": [
+      {
+        "nature": "additive",
+        "spec": "003-work-and-run-semantics",
+        "unit": {
+          "kind": "directory",
+          "path": "crates/statecraft-run/"
+        }
+      }
     ],
     "id": "053-operator-input-record",
     "implementation": "pending",
@@ -48,7 +59,7 @@
       }
     ],
     "sectionDigests": {
-      "053-operator-input-record": "dd596ecd45e4d34865351e1b7f73c3502fd72829a01ea87aef174ff308f4a299",
+      "053-operator-input-record": "070b8eeb309f8febae694b2ff91d52e6e19c254c26da9bd3681b2c22c12086eb",
       "1-purpose": "54d386817f4591af5252ec25e3e1fc9b3e26757892b8666afc71fa50d58a3577",
       "2-territory": "259ca4255f2ab3b167729833670c511a4a4d6be2b4f058702d6423ec5fba34a5",
       "3-1-the-input-record": "529927f4d51e1e773d010c66ceb7067fcb97e7fe9eac74c55eec5cc211033911",
@@ -58,8 +69,8 @@
       "3-5-local-only": "948a0bc4a797f9cd9c5316cf72e175655c08e006fade10d5f69a8cc1a903df13",
       "3-behavior": "040f8a2b326bc5bf820794f7faf22473a95128b7b763fd690f1a739be36d6e65",
       "4-out-of-scope": "45848a94f2c780f4ac51889b61ded4ed167329faf350df4c8169bf316cb4df12",
-      "5-resolved-decisions": "c119e8278ff5eddd06cd03ac1fa39d5653d2df4e3cf3a1f0575aa9fc0b401bc0",
-      "verification": "ab393a6924cca93a0848b2fb2433b7ba18c4fcabafbdb1bf80faade11e072c89"
+      "5-resolved-decisions": "02ea373b707cfed80d69901e5853e85178d7c6cb8f0d8410437bd8e8a4030612",
+      "verification": "f29f99cf601f768559ac111ec9c4c0ea02cbe77071c90a1ae7a99d7bdde69442"
     },
     "sectionHeadings": [
       "053: Operator input record",
@@ -80,6 +91,6 @@
     "summary": "Lets an operator steer a live attempt with a note, read by the agent at its next governed tool call, or a command, which starts a new turn as a spec 048 continue. Each input is written to the run record before it is delivered, carries its author, reason and expiry, and moves through pending, delivered, then acknowledged or expired. The cockpit is view-only by default and grants control for a bounded time. Localhost only; no hosted transport and no unsigned session-authorized command. An abort command ends the attempt as spec 003's cancelled.\n",
     "title": "Operator input to a live attempt is recorded before delivery, expires, and is evidence on the attempt"
   },
-  "shardHash": "2fd552f2b5c0f910c9622fbad78f0055f916a6c6e3a32724e8ae81bae2b01712",
+  "shardHash": "800d21a7ba2f9e4a3d7320ff3aed906a14d2ad5bcb87d640a218b60a7fbc0007",
   "specVersion": "1.11.0"
 }

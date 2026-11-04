@@ -7,10 +7,81 @@
       "001-boundaries-and-authority",
       "006-command-surface"
     ],
-    "implementingPaths": [],
+    "implementingPaths": [
+      {
+        "path": "scripts/release/check-config.sh",
+        "source": "spec-edge"
+      },
+      {
+        "path": "scripts/release/harden-installer.sh",
+        "source": "spec-edge"
+      },
+      {
+        "path": "scripts/release/install-dist.sh",
+        "source": "spec-edge"
+      },
+      {
+        "path": "scripts/release/verify-set.sh",
+        "source": "spec-edge"
+      }
+    ],
+    "resolvedUnits": [
+      {
+        "locations": [
+          {
+            "file": "scripts/release/check-config.sh"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "kind": "file",
+          "path": "scripts/release/check-config.sh"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "scripts/release/harden-installer.sh"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "kind": "file",
+          "path": "scripts/release/harden-installer.sh"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "scripts/release/install-dist.sh"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "kind": "file",
+          "path": "scripts/release/install-dist.sh"
+        }
+      },
+      {
+        "locations": [
+          {
+            "file": "scripts/release/verify-set.sh"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "establishes",
+        "unit": {
+          "kind": "file",
+          "path": "scripts/release/verify-set.sh"
+        }
+      }
+    ],
     "specId": "057-release-delivery",
     "specStatus": "approved"
   },
   "schemaVersion": "1.3.0",
-  "shardHash": "76429b5b309104b0fa73b36eeda51e31e4be0157c042079ff555a9f8d17e08a9"
+  "shardHash": "bdfbe3b12f484defa0176920f4e452dcff213b6ec8d4d06fc71c24162ddf7068"
 }

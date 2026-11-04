@@ -8,11 +8,13 @@
 //! # What is measured and what is not
 //!
 //! The invocation (section 3.1) and the event names the mapping reads (section
-//! 3.2) were taken from `codex-cli 0.163.0` on 2026-10-21. **The recorded
-//! streams under `testdata/` are synthetic** until the owner records a real
-//! capture from a named version; each directory's `README.md` says so. So the
-//! adapter is `unqualified` (section 3.5), and its spec 047 declaration sets
-//! every field nobody has measured to `false` (section 3.6).
+//! 3.2) were taken from `codex-cli 0.163.0` on 2026-10-21, and recorded again
+//! from `codex-cli 0.166.0` on 2026-11-02: `testdata/stream/completed.jsonl`,
+//! `error.jsonl` and `testdata/hooks/untrusted.json` are those recordings, and
+//! each directory's `README.md` names what is still synthetic or derived. The
+//! adapter is still `unqualified` (section 3.5): a managed hook answer needs
+//! the operator's one-time installation. Its spec 047 declaration sets every
+//! field nobody has measured to `false` (section 3.6).
 //!
 //! # The shape of it
 //!

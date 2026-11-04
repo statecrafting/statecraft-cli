@@ -434,6 +434,8 @@ fn the_grown_command_tree_still_has_no_verb_that_publishes() {
     // one more with spec 052's `provider compare`, an offline read; and
     // two more with spec 050's `halt` and `resume`, and three more with spec
     // 048's `run lease`, `run op` and `run events`, all of which write only the
-    // product's own run record.
-    assert_eq!(statecraft_cli::commands::Verb::all().len(), 73);
+    // product's own run record; and one more with spec 049's
+    // `admission dry-run`, which writes nothing; and one more with spec 052's
+    // `provider capture`, which writes only the directory it is given.
+    assert_eq!(statecraft_cli::commands::Verb::all().len(), 75);
 }

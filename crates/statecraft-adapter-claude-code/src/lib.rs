@@ -23,7 +23,8 @@
 //! otherwise. Spec 052 makes them a governed corpus: [`golden`] compares a
 //! new provider version's captures with them by meaning, and
 //! [`qualification::record_compared`] refuses that version's record while a
-//! scenario diverges unreviewed or is missing.
+//! scenario diverges unreviewed or is missing. [`capture`] holds the scenario
+//! prompts and the redaction a fresh capture is written through.
 //!
 //! # The load-bearing finding
 //!
@@ -53,6 +54,7 @@
 #![forbid(unsafe_code)]
 
 pub mod capabilities;
+pub mod capture;
 pub mod denial;
 pub mod environment;
 pub mod execution;

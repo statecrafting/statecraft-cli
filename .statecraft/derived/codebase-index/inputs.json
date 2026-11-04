@@ -22,7 +22,7 @@
       "contentHash": "5823bcab2aa6a978d056ae2d5da426fde28dc9ed4f6f14e200b4056d98f241f9"
     },
     "AGENTS.md": {
-      "contentHash": "2096642a8345291b8599e9e2dfee089feb7abdf73852be6b94ab0596cf1fcf7d"
+      "contentHash": "c1f842e50fdad4a0b7e951de53b6d96fd71dcdc966e9c8ddf9e1fae40b64afa8"
     },
     "CLAUDE.md": {
       "contentHash": "91201e4cf012d924ba3462d1d49842438503ad685a7cf7e25f1ccdb37649d59a"
@@ -32,6 +32,9 @@
     },
     "README.md": {
       "contentHash": "2797f672bea0ab751d4e566cdaf4213704ad9cdefad8b2db47cba2e82fadbefe"
+    },
+    "REVIEW.md": {
+      "contentHash": "eb5275f06380c78f21965396f67931046eb8121a77ae2b4408d2c4573729b989"
     },
     "docs/adoption/042-provider-measurements.md": {
       "contentHash": "0ee637834a5c349f77c61309af601c36b06720284c06b7ab184f0c3e030a025c"
@@ -78,6 +81,18 @@
     "scripts/check-spec-corpus.sh": {
       "contentHash": "d4482680aa448a517701da28bf172da652b2a42a540b68abf10f5a832a3444b6"
     },
+    "scripts/release/check-config.sh": {
+      "contentHash": "6c8c816e85f2f92418dba84cdbe354a91f5ed2ba7856f7182045343efeb4f8d6"
+    },
+    "scripts/release/harden-installer.sh": {
+      "contentHash": "52a94b448d0edfe99df98ebc8eb3b2b3c8dec15347a12b9bbbb22372dff63303"
+    },
+    "scripts/release/install-dist.sh": {
+      "contentHash": "f3174cba20cb7c9b0b8731273b6b893ec83990c88973024666e2317c803fcc58"
+    },
+    "scripts/release/verify-set.sh": {
+      "contentHash": "9c2ff1c29c50fc75a816a17084936cc7bf1d077afcfbb39e73113fedf88e2a0a"
+    },
     "scripts/resolve-shard-conflicts.sh": {
       "contentHash": "50138ae38377c0ff14f4f37ecdeed3cfd6500b50f91e5f7019232a11883ffdc3"
     },
@@ -100,7 +115,7 @@
       "contentHash": "88c83716a93b0f0d2972497f9e155c85ccd9dd92b1428932a5658906f0349976"
     },
     "spec-spine.toml": {
-      "contentHash": "791170eb68d4c68c654b855b45b9d272c7b5c638413fd8c6645409eb08e6c9d0"
+      "contentHash": "af59e17ab20a93f015369890a862b58e96577009d2b5a98d5d256c55ef067c42"
     },
     "standards/spec/constitution.md": {
       "contentHash": "27d45bf3ade1274e0469c340aa8f3988ab537c5c4b1f24345cd1fb473c365bb0"
