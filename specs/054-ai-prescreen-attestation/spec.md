@@ -158,6 +158,15 @@ profile's `scripts/ai-review.sh` writes the pre-screen record as part of
 revision 23, the revision spec 056 opens for the managed review guide, and
 revision 23's remote obligation names both. Neither spec has been adopted by a
 target at revision 23, so no rendered file changes under an existing identity.
+**2026-11-04: spec 049's dry-run reads the pre-screen as verification does.**
+Spec 049's `admission dry-run` landed first and evaluates the bundle's
+admission inputs without a pinned root set. Its `AdmissionInputs` now carries
+the pre-screen read by the same `prescreen_of` the verification uses, and the
+dry-run passes it to `evaluate_traced`. Without it, a policy that sets
+`refuse_on_prescreen_findings` would dry-run against a missing pre-screen and
+refuse where the verification admits. A policy without the option evaluates
+exactly as before, which the differential suite holds.
+
 ## Verification
 
 Ratified by the owner on 2026-10-31. Acceptance is run through
