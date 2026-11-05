@@ -297,6 +297,9 @@ impl Drop for Gateway {
         if let Some(acceptor) = self.acceptor.take() {
             let _ = acceptor.join();
         }
+        // The attempt token dies with the gateway, so its file goes too,
+        // whatever owns the directory it is in.
+        let _ = std::fs::remove_file(&self.token_file);
     }
 }
 
