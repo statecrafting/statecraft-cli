@@ -236,8 +236,11 @@ queue_judged() {
     block "post-merge push: ${HEAD_SHA} is the head of no completed merge-queue run of statecraft-ci, so it was judged nowhere"
     return 0
   fi
-  gate="$(gh api "repos/${REPO:-}/actions/runs/${run}/jobs?per_page=100" 2> /dev/null \
-    | jq -r '[.jobs[]? | select(.name == "ci-gate")][0].conclusion // "absent"' 2> /dev/null || echo absent)"
+  if ! gh api "repos/${REPO:-}/actions/runs/${run}/jobs?per_page=100" > "$work/queue-jobs.json" 2> "$work/queue-jobs.err"; then
+    block "post-merge push: cannot read the jobs of merge-queue run ${run}: $(cat "$work/queue-jobs.err")"
+    return 0
+  fi
+  gate="$(jq -r '[.jobs[]? | select(.name == "ci-gate")][0].conclusion // "absent"' "$work/queue-jobs.json" 2> /dev/null || echo unreadable)"
   if [ "$gate" != success ]; then
     block "post-merge push: ci-gate in merge-queue run ${run} at ${HEAD_SHA} ended '${gate}'"
     return 0
