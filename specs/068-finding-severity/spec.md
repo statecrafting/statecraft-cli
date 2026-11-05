@@ -1,7 +1,7 @@
 ---
 id: "068-finding-severity"
 title: "AI review findings carry a severity, and an answered low finding passes ci-gate without the owner exception"
-status: draft
+status: approved
 implementation: pending
 created: "2026-11-02"
 summary: >
@@ -136,9 +136,15 @@ list. A note names the finding's id rather than its path, because an id
 derived from the review's output cannot be written before the review runs,
 which a path or a head can.
 
+**2026-11-04: ratified by the owner.** The owner, on 2026-11-04, authorized
+ratifying this spec as drafted. The open question of section 5 is answered
+by the text as ratified: a `medium` finding never passes without the
+exception.
+
 ## Verification
 
-Declared by the implementing change once ratified: a rendered workflow
+Ratified by the owner on 2026-11-04. Acceptance is declared by the
+implementing change: a rendered workflow
 whose review returns only answered `low` findings passes ci-gate with no
 exception run; one `medium`, an unanswered `low`, a note for another head,
 a note naming another finding's id, or a candidate-added false-positive
