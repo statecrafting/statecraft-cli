@@ -30,6 +30,10 @@ on:
 # a declared extra job is called with the input post_merge true, so it can
 # skip its own expensive steps; and ci-gate admits the skips by the
 # post-merge rule only when the commit passed ci-gate in the merge queue.
+#
+# Revision 25 (spec 069): where the setup parameter ci.code.free_disk is
+# true, the code job removes the runner's unused preinstalled toolchains
+# before it builds, and reports the free space before and after.
 
 permissions:
   contents: read
@@ -356,7 +360,7 @@ jobs:
           key: cargo-${{ runner.os }}-${{ hashFiles('Cargo.lock', 'rust-toolchain.toml') }}
           restore-keys: |
             cargo-${{ runner.os }}-
-{{sc:ci.post_merge.lookup}}      - name: Build, test, clippy, fmt
+{{sc:ci.post_merge.lookup}}{{sc:ci.code.free_disk}}      - name: Build, test, clippy, fmt
 {{sc:ci.post_merge.fill}}        run: sh "${STATECRAFT_GATE:?}" code
       # Revision 19 (spec 060): Cargo fingerprints a path dependency by its
       # sources' modification times, which a fresh checkout resets, so the

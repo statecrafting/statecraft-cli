@@ -5,14 +5,25 @@
       "058-ci-throughput-profile"
     ],
     "created": "2026-11-04",
+    "declaresAcceptance": true,
     "dependsOn": [
       "002-environment-lifecycle",
       "032-external-code-profile",
       "058-ci-throughput-profile",
       "067-post-merge-push"
     ],
+    "extends": [
+      {
+        "nature": "additive",
+        "spec": "002-environment-lifecycle",
+        "unit": {
+          "kind": "directory",
+          "path": "crates/statecraft-home/"
+        }
+      }
+    ],
     "id": "069-code-free-disk",
-    "implementation": "pending",
+    "implementation": "complete",
     "obligations": [
       {
         "anchor": "3-1-the-parameter",
@@ -43,10 +54,28 @@
         "id": "R-5",
         "kind": "requirement",
         "text": "With ci.code.free_disk absent or false, the rendered workflow is revision 24's, apart from the revision, the identity and the comment describing this revision."
+      },
+      {
+        "anchor": "verification",
+        "id": "V-1",
+        "inputs": [
+          "crates/statecraft-home/tests/setup_workflows.rs"
+        ],
+        "kind": "verification",
+        "text": "Rendering tests show the step only under the parameter, immediately after the cache restore and before the build, with the fixed command between two df lines and the build's condition on a queued project; a non-boolean value and the external combination each refuse the plan."
+      },
+      {
+        "anchor": "verification",
+        "id": "V-2",
+        "inputs": [
+          "crates/statecraft-home/tests/setup_upgrade.rs"
+        ],
+        "kind": "verification",
+        "text": "A revision-24 project upgrades to revision 25 in one plan, with and without the parameter, queued or not; apart from each file's revision and identity header only the workflow changes, and a second plan writes nothing."
       }
     ],
     "sectionDigests": {
-      "069-the-managed-code-job-can-free-runner-disk-before-it-builds": "3a0e5d76c5dc956c41d49050e3226f6bc40a7255a75acc649604d88a69ee6654",
+      "069-the-managed-code-job-can-free-runner-disk-before-it-builds": "a1a14d9a79a770acd99548a80b212f2b33ef4807ac58c9a9132d942d87454137",
       "1-purpose": "c526beb90d100156da9ef670f3cc20f4261a91ee934bd43079150f7b481da0dc",
       "2-territory": "0f028503a73d7e39a8ba59e8242d1e1c744f15377520f2e14ca5193c28c9162e",
       "3-1-the-parameter": "2b23574a8363807d7ed5d297ad10c154ea9b3148b12b21c30edd2fd78a23db53",
@@ -57,8 +86,8 @@
       "3-6-the-revision": "d240c8656bfa7f5104535afebd6126fee6dcf791fce9d5054267ecf634c1317d",
       "3-behavior": "a1cb30c2e69d0c06dc935e8bf09b64230f5b1a306bb0b36fc97c4dab092dc1c1",
       "4-out-of-scope": "85a56925b6780c3e2c61df1810cbdc33d32e0d7a116c2a37dc5e0cdeb333e196",
-      "5-resolved-decisions": "5bfbef53cad1df63a67d79309f94c596d712855d057d02525fa1112eec64c451",
-      "verification": "eb25035e2647e96e9a6d6b1cd187180628c474865743590b028817056a6d163c"
+      "5-resolved-decisions": "254b622a16fe209817ed58d7cda26cf5e4dcdd5c73a92917129077d0df6bb08d",
+      "verification": "e6cf1e1566d1171f97ac445ae2245a2cfbf95c35e68393eed44c2798ba432a2b"
     },
     "sectionHeadings": [
       "069: The managed code job can free runner disk before it builds",
@@ -76,10 +105,10 @@
       "Verification"
     ],
     "specPath": "specs/069-code-free-disk/spec.md",
-    "status": "draft",
+    "status": "approved",
     "summary": "Amends spec 002's setup profile and spec 058's code job. A new boolean parameter, ci.code.free_disk, off by default, renders one step in the managed code job before the build: it removes the runner's unused preinstalled toolchains and reports the free space before and after. Off, the rendered workflow is revision 24's. An external code selection refuses the parameter, because its job is the project's own.\n",
     "title": "Setup profile revision 25: the managed code job can free runner disk before it builds"
   },
-  "shardHash": "d134f3a4ec6e781d2e87db5106f21ac6fb94f32813bb291f11cb901eb12a48b5",
+  "shardHash": "ddfca69fb0af2b51997b70fcb2a88db546256bb9f176b6ad25843d0e164264d1",
   "specVersion": "1.11.0"
 }

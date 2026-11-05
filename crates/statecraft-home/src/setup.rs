@@ -36,7 +36,7 @@ use std::path::Path;
 /// The one registered profile.
 pub const PROFILE_ID: &str = "github-actions-rust";
 /// Its revision.
-pub const REVISION: u32 = 24;
+pub const REVISION: u32 = 25;
 /// Where the rendered policy document lives in the target.
 pub const POLICY_PATH: &str = ".statecraft/setup/github-actions-rust.json";
 /// The resume record, under the project's runtime state.
@@ -127,6 +127,12 @@ pub const POST_MERGE_SINCE: u32 = 24;
 /// workflow declares, so it can skip its expensive steps on a post-merge push
 /// (spec 067 section 3.4).
 pub const POST_MERGE_INPUT: &str = "post_merge";
+/// The revision whose managed code job can free runner disk before it builds
+/// (spec 069).
+pub const FREE_DISK_SINCE: u32 = 25;
+/// What `ci.code.free_disk` removes: preinstalled toolchains a Rust build
+/// never reads (spec 069 section 3.2). Fixed by the profile.
+pub const FREE_DISK_COMMAND: &str = "sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /usr/local/.ghcup /opt/hostedtoolcache/CodeQL || true";
 /// The jobs that judge, skipped on a post-merge push (spec 067 section 3.1);
 /// code keeps its cache steps.
 const POST_MERGE_JOBS: [&str; 7] = [
@@ -482,6 +488,7 @@ pub fn remote_obligations() -> Vec<String> {
         "revision 22: four more required jobs, each a need of ci-gate and none optional: supply-chain (cargo deny against the committed deny.toml, cargo audit when .cargo/audit.toml exists, cargo vet --locked when supply-chain/config.toml exists, each tool a digest-verified release at an exact version, with the candidate's .cargo/config.toml removed first), workflow-lint (zizmor offline over .github/workflows, then verify-action-pins.sh: every action by 40-hex commit digest with a `# <ref>` comment, a docker image by sha256, or a local path), sg-scan (ast-grep scan when sgconfig.yml exists) and secret-scan (gitleaks, digest-verified, over the change's commits, reporting rule and location and never the value). On a pull request governance runs guard-policy-files.sh: a change to deny.toml, .cargo/audit.toml, supply-chain/, any Cargo.toml or Cargo.lock, spec-spine.toml or docs/adoption/spec-spine.md beside any other path, apart from the generated .statecraft/derived/ and .statecraft/environment.json, fails and must be split, so an upgrade that also moves the spec-spine pin is two pull requests. A target needs a committed deny.toml to select this revision; the plan withholds the profile without one (spec 044)".to_string(),
         format!("revision 23: the profile renders {GUIDE_PATH}, the reviewer's contract, as a managed file verified by digest and identical in every target, and the AI review's default governance context becomes {} in that order: the managed guide and the repository's own REVIEW.md are read as blobs at the base commit, an absent REVIEW.md is recorded as absent, a candidate's edit to either is review data read as context only once it is on the base, and both count whole against the context's quarter of review.context_tokens, so a guide that does not fit refuses with 2 before any provider call (spec 056); a review, and only a review, also writes the advisory statecraft/ai-prescreen/v1 claim about the head into its evidence record and beside it as ai-prescreen.json, naming the model, the prompt and governance-context digests read at the base, the verdict word and the findings count, never an approval (spec 054)", DEFAULT_CONTEXT_PATHS.join(", ")),
         format!("revision 24: where remote.merge_queue.required is true, a push to the default branch is a post-merge push, because the queue already judged that exact commit and GitHub fast-forwards the branch to it: governance, preflight, supply-chain, workflow-lint, sg-scan and secret-scan are skipped, code runs only its cache steps (the spec-spine cache, a lookup of the cargo key, and on a miss the build that fills it and the save), and ci-gate admits them by the policy's post-merge rule only when the pushed commit passed ci-gate in a completed merge-queue run of statecraft-ci, so a push that bypassed the queue blocks and ci-gate still reports a check run on the pushed commit. A declared extra job's workflow, and an external code selection's, must declare the boolean workflow_call input {POST_MERGE_INPUT}, which the profile passes as true on such a push so it can skip its expensive steps; the plan refuses a workflow that does not declare it. The push of the upgrade's own merge commit is judged by the base's revision-23 rules and blocks once; without a required queue, push behaviour is unchanged (spec 067)"),
+        format!("revision 25: the setup parameter ci.code.free_disk, a boolean and false by default, renders one step in the managed code job before the build that prints df -h /, runs `{FREE_DISK_COMMAND}` and prints df -h / again, never failing the job; on a post-merge push it runs only when the cargo key missed; beside an external ci.code it refuses the plan, and off, the workflow is revision 24's (spec 069)"),
         "a repository that already runs these checks by hand keeps them by setting governance.enforce_coverage (index coverage --fail-on-untraced), governance.authored_content (the script's path; absent or not executable refuses), governance.authored_content_text (the title, the body and every commit message), governance.gate_each_commit (each commit's tree passes the gate and cargo fmt) and governance.require_signed_commits (each commit verified as signed by GitHub) (revision 4)".to_string(),
     ]
 }
@@ -540,6 +547,11 @@ pub struct Parameters {
     /// `governance.require_ratified`: the coupling steps refuse a changed
     /// path a `draft` spec owns (revision 12, spec 024).
     pub require_ratified: bool,
+    /// `ci.code.free_disk`: the managed code job frees runner disk before it
+    /// builds (revision 25, spec 069). Named in camelCase in JSON, as spec
+    /// 006's convention asks of a new key.
+    #[serde(rename = "freeDisk")]
+    pub free_disk: bool,
     /// `ci.extra_required_jobs`: jobs beyond the profile's that ci-gate
     /// requires, each a call of the project's own reusable workflow
     /// (revision 7).
@@ -798,6 +810,20 @@ fn post_merge_with() -> String {
     format!("    with:\n      {POST_MERGE_INPUT}: ${{{{ github.event_name == 'push' }}}}\n")
 }
 
+/// Revision 25 (spec 069): the managed code job's free-disk step, rendered
+/// before the build. It never fails the job; the two `df` lines are the
+/// evidence of what it freed.
+fn free_disk_step(post_merge: bool) -> String {
+    let when = if post_merge {
+        "        if: github.event_name != 'push' || steps.cargo-cache.outputs.cache-hit != 'true'\n"
+    } else {
+        ""
+    };
+    format!(
+        "      - name: Free runner disk\n{when}        run: |\n          df -h /\n          {FREE_DISK_COMMAND}\n          df -h /\n"
+    )
+}
+
 /// The rendered jobs and `needs` entries for the declared extra jobs: empty
 /// when none is declared, so a project without any renders what it did.
 /// Under a post-merge push (revision 24) each is called with `post_merge`.
@@ -840,6 +866,7 @@ impl Parameters {
             require_default_base: true,
             fail_on_unresolved: true,
             require_ratified: true,
+            free_disk: false,
             extra_required_jobs: Vec::new(),
             remote: crate::remote_state::RemoteParameters::default(),
         }
@@ -927,6 +954,7 @@ pub fn parameters(
             "review.max_calls" => p.max_calls = bounded(key, value, MAX_CALLS_RANGE)?,
             "review.deletion_cap" => p.deletion_cap = bounded(key, value, DELETION_CAP_RANGE)?,
             "ci.code" => p.code = code_selection(root, value)?,
+            "ci.code.free_disk" => p.free_disk = flag(key, value)?,
             "ci.extra_required_jobs" => p.extra_required_jobs = extra_required_jobs(root, value)?,
             "remote.merge_queue" => {
                 p.remote.merge_queue = Some(crate::remote_state::merge_queue(value)?)
@@ -1068,6 +1096,11 @@ pub fn parameters(
                 return Err(format!("unknown setup parameter `{other}`"));
             }
         }
+    }
+    if p.free_disk && matches!(p.code, Code::External { .. }) {
+        return Err(
+            "ci.code.free_disk applies to the managed code job, which an external ci.code replaces: free disk in the project's own workflow (spec 069)".to_string(),
+        );
     }
     if p.authored_content_text && p.authored_content.is_none() {
         return Err(
@@ -1789,6 +1822,16 @@ pub fn plan(inputs: &Inputs<'_>) -> Result<Plan, String> {
     ] {
         values.insert(name, if post_merge { line } else { "" }.to_string());
     }
+    // Revision 25 (spec 069): the free-disk step, or nothing. On a post-merge
+    // push it carries the build's condition, so a key that hit removes nothing.
+    values.insert(
+        "ci.code.free_disk",
+        if params.free_disk {
+            free_disk_step(post_merge)
+        } else {
+            String::new()
+        },
+    );
     let (extra_jobs, extra_needs) = extra_job_text(&params.extra_required_jobs, post_merge);
     values.insert("ci.extra_jobs", extra_jobs);
     values.insert("ci.extra_needs", extra_needs);

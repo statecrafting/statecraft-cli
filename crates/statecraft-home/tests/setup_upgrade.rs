@@ -254,22 +254,40 @@ fn cut(body: &mut String, from: &str, to: &str) {
     body.replace_range(start..end, "");
 }
 
+fn body<'a>(p: &'a mut Profile, path: &str) -> &'a mut String {
+    &mut p
+        .templates
+        .iter_mut()
+        .find(|t| t.path == path)
+        .unwrap()
+        .body
+}
+
+/// Revision 24 of the registered profile: revision 25 (spec 069) only
+/// inserted a comment and one placeholder into the workflow template, so
+/// revision 24 is the registered profile with both cut.
+fn revision_twenty_four() -> Profile {
+    let mut p = Profile::registered();
+    assert_eq!(p.revision, 25, "the registered profile is revision 25");
+    p.revision = 24;
+    let ci = body(&mut p, ".github/workflows/statecraft-ci.yml");
+    cut(ci, "#\n# Revision 25 (spec 069)", "before and after.\n");
+    let token = "{{sc:ci.code.free_disk}}";
+    assert_eq!(ci.matches(token).count(), 1);
+    *ci = ci.replace(token, "");
+    for t in &p.templates {
+        assert!(!t.body.contains("free_disk"), "{}", t.path);
+    }
+    p
+}
+
 /// Revision 23 of the registered profile: revision 24 (spec 067) only
-/// inserted text into two templates, so revision 23 is the registered
-/// profile with those insertions cut. Measured once against the templates at
+/// inserted text into two templates, so revision 23 is revision 24 with
+/// those insertions cut. Measured once against the templates at
 /// origin/056-impl (3fbc1ea5): both bodies are byte for byte equal.
 fn revision_twenty_three() -> Profile {
-    let mut p = Profile::registered();
-    assert_eq!(p.revision, 24, "the registered profile is revision 24");
+    let mut p = revision_twenty_four();
     p.revision = 23;
-    fn body<'a>(p: &'a mut Profile, path: &str) -> &'a mut String {
-        &mut p
-            .templates
-            .iter_mut()
-            .find(|t| t.path == path)
-            .unwrap()
-            .body
-    }
     let ci = body(&mut p, ".github/workflows/statecraft-ci.yml");
     cut(
         ci,
@@ -1709,8 +1727,8 @@ fn revision_fourteen_installer_upgrades_to_the_registered_revision_without_repla
     });
     assert!(plan_and_apply(root, &old, &mut manifest).whole());
     let next = Profile::registered();
-    // Revisions 16 through 24 change no installer byte.
-    assert_eq!(next.revision, 24);
+    // Revisions 16 through 25 change no installer byte.
+    assert_eq!(next.revision, 25);
     let installer = "scripts/statecraft/install-spec-spine.sh";
     let upgraded = plan_and_apply(root, &next, &mut manifest);
     assert_eq!(
@@ -2226,7 +2244,7 @@ fn a_revision_twenty_three_project_upgrades_to_revision_twenty_four() {
             BTreeMap::new()
         };
         let old = revision_twenty_three();
-        let next = Profile::registered();
+        let next = revision_twenty_four();
         assert_eq!(next.revision, 24);
         assert_ne!(old.identity(), next.identity());
         let mut manifest = Manifest::new(Pins {
@@ -2274,5 +2292,83 @@ fn a_revision_twenty_three_project_upgrades_to_revision_twenty_four() {
         setup::remote_obligations()
             .join("\n")
             .contains("revision 24: where remote.merge_queue.required is true")
+    );
+}
+
+/// Spec 069 section 3.6: a revision-24 project upgrades to revision 25 in one
+/// ordinary plan, with and without `ci.code.free_disk`, queued or not.
+/// Apart from each file's revision header only the workflow changes, only a
+/// project that sets the parameter gets the step, and a second identical plan
+/// writes nothing.
+#[test]
+fn a_revision_twenty_four_project_upgrades_to_revision_twenty_five() {
+    for (free, queued) in [(false, false), (true, false), (true, true)] {
+        let dir = project();
+        let root = dir.path();
+        let mut block = if queued {
+            queue_block()
+        } else {
+            BTreeMap::new()
+        };
+        let old = revision_twenty_four();
+        let next = Profile::registered();
+        assert_eq!(next.revision, 25);
+        assert_ne!(old.identity(), next.identity());
+        let mut manifest = Manifest::new(Pins {
+            product: "test".into(),
+            spec_spine: "unpinned".into(),
+            adapters: Default::default(),
+            producer: None,
+        });
+        assert!(plan_and_apply_with(root, &old, &mut manifest, &block).whole());
+        let workflow = ".github/workflows/statecraft-ci.yml";
+        let read = |rel: &str| std::fs::read_to_string(root.join(rel)).unwrap();
+        assert!(!read(workflow).contains("Free runner disk"));
+        let before: BTreeMap<String, String> = old
+            .templates
+            .iter()
+            .filter(|t| t.path != workflow && root.join(&t.path).is_file())
+            .map(|t| (t.path.clone(), read(&t.path)))
+            .collect();
+
+        if free {
+            block.insert("ci.code.free_disk".to_string(), serde_json::json!(true));
+        }
+        let upgraded = plan_and_apply_with(root, &next, &mut manifest, &block);
+        assert!(upgraded.whole(), "{:?}", upgraded.withheld);
+        let written: Vec<&str> = upgraded
+            .files
+            .iter()
+            .filter(|f| f.action.writes())
+            .map(|f| f.path.as_str())
+            .collect();
+        assert!(written.contains(&workflow), "{written:?}");
+        // Every rendered file names the revision and the identity in its
+        // header; apart from those, only the workflow changes.
+        for (path, was) in &before {
+            let now = read(path);
+            assert_eq!(
+                now.replace("revision 25", "revision 24")
+                    .replace(&next.identity(), &old.identity()),
+                *was,
+                "{path} {free} {queued}"
+            );
+        }
+        let after = read(workflow);
+        assert_eq!(
+            after.contains("      - name: Free runner disk\n"),
+            free,
+            "{after}"
+        );
+        assert!(after.contains("# Revision 25 (spec 069)"));
+        let policy: serde_json::Value = serde_json::from_str(&read(setup::POLICY_PATH)).unwrap();
+        assert_eq!(policy["revision"], 25);
+        let again = plan_and_apply_with(root, &next, &mut manifest, &block);
+        assert!(again.files.iter().all(|f| !f.action.writes()));
+    }
+    assert!(
+        setup::remote_obligations()
+            .join("\n")
+            .contains("revision 25: the setup parameter ci.code.free_disk")
     );
 }

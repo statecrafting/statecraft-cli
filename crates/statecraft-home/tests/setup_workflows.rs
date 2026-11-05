@@ -5897,7 +5897,7 @@ fn run_mutated(repo: &Repo, script: &str, extra: &[(&'static str, &str)]) -> Ran
 /// 058), captured byte for byte from main at 6c6f394.
 fn revision_seventeen() -> Profile {
     let mut p = Profile::registered();
-    assert_eq!(p.revision, 24, "the registered profile is revision 24");
+    assert_eq!(p.revision, 25, "the registered profile is revision 25");
     // Revision 22 (spec 044) added two scripts, and revision 23 (spec 056)
     // the review guide, that revision 17 did not have.
     p.templates.retain(|t| {
@@ -7859,4 +7859,115 @@ fn ci_gate_judges_a_post_merge_push_by_the_queue_run_at_its_commit() {
         ran.text
     );
     assert!(!ran.text.contains("post-merge"), "{}", ran.text);
+}
+
+// ------------------------------------------------------------ revision 25
+
+/// The step's position in the code job, and the step.
+fn free_disk_step(wf: &Yaml) -> Option<(usize, &Yaml)> {
+    let steps = wf["jobs"]["code"]["steps"].as_sequence().unwrap();
+    steps
+        .iter()
+        .enumerate()
+        .find(|(_, s)| s["name"].as_str() == Some("Free runner disk"))
+}
+
+/// Spec 069 sections 3.1 to 3.3 and 3.5, R-1, R-2, R-3 and R-5: the step is
+/// rendered only under `ci.code.free_disk: true`, immediately before the
+/// build, with the fixed command between two `df -h /` lines; on a queued
+/// project it carries the build's condition. Absent or false, nothing of it
+/// is rendered.
+#[test]
+fn revision_twenty_five_renders_the_free_disk_step_only_under_the_parameter() {
+    for extra in [
+        vec![],
+        vec![("ci.code.free_disk", serde_json::json!(false))],
+    ] {
+        let tmp = tempfile::tempdir().unwrap();
+        write(tmp.path(), "spec-spine.toml", TOML);
+        render_with(tmp.path(), &extra);
+        let text = std::fs::read_to_string(tmp.path().join(".github/workflows/statecraft-ci.yml"))
+            .unwrap();
+        assert!(!text.contains("Free runner disk"), "{extra:?}");
+        assert!(!text.contains("rm -rf"), "{extra:?}");
+        assert!(!text.contains("{{sc:"), "{extra:?}");
+    }
+    for queued in [false, true] {
+        let tmp = tempfile::tempdir().unwrap();
+        write(tmp.path(), "spec-spine.toml", TOML);
+        let mut extra = vec![("ci.code.free_disk", serde_json::json!(true))];
+        if queued {
+            extra.push(queue_param());
+        }
+        render_with(tmp.path(), &extra);
+        let wf = workflow(tmp.path(), "statecraft-ci.yml");
+        let (at, step) = free_disk_step(&wf).expect("the step is rendered");
+        let steps = wf["jobs"]["code"]["steps"].as_sequence().unwrap();
+        assert_eq!(
+            steps[at + 1]["name"].as_str(),
+            Some("Build, test, clippy, fmt"),
+            "the step runs immediately before the build"
+        );
+        assert_eq!(
+            steps[at - 1]["name"].as_str(),
+            Some("Restore cargo registry, git and target"),
+            "and after the cache restore"
+        );
+        assert_eq!(
+            step["run"].as_str(),
+            Some(format!("df -h /\n{}\ndf -h /\n", setup::FREE_DISK_COMMAND).as_str())
+        );
+        assert!(setup::FREE_DISK_COMMAND.ends_with(" || true"));
+        let build = &steps[at + 1];
+        assert_eq!(step["if"], build["if"], "{queued}");
+        assert_eq!(step["if"].is_null(), !queued, "{queued}");
+    }
+}
+
+/// Spec 069 sections 3.1 and 3.4, R-1 and R-4: a non-boolean value refuses
+/// the plan, and so does the parameter beside an external code selection,
+/// naming both parameters.
+#[test]
+fn revision_twenty_five_refuses_a_non_boolean_and_an_external_code_selection() {
+    let tmp = tempfile::tempdir().unwrap();
+    write(tmp.path(), "spec-spine.toml", TOML);
+    let err = plan_profile(
+        tmp.path(),
+        &Profile::registered(),
+        &[("ci.code.free_disk", serde_json::json!("yes"))],
+    )
+    .unwrap_err();
+    assert!(
+        err.contains("ci.code.free_disk must be true or false"),
+        "{err}"
+    );
+
+    let tmp = tempfile::tempdir().unwrap();
+    write(tmp.path(), "spec-spine.toml", TOML);
+    let workflow = ".github/workflows/project-code.yml";
+    let script = "scripts/project-code.sh";
+    write(tmp.path(), workflow, REUSABLE_POST_MERGE);
+    write(tmp.path(), script, "#!/bin/sh\nexit 0\n");
+    let external = (
+        "ci.code",
+        serde_json::json!({"kind":"external", "workflow":workflow, "script":script}),
+    );
+    assert!(
+        plan_profile(
+            tmp.path(),
+            &Profile::registered(),
+            std::slice::from_ref(&external)
+        )
+        .is_ok()
+    );
+    let err = plan_profile(
+        tmp.path(),
+        &Profile::registered(),
+        &[external, ("ci.code.free_disk", serde_json::json!(true))],
+    )
+    .unwrap_err();
+    assert!(
+        err.contains("ci.code.free_disk") && err.contains("external ci.code"),
+        "{err}"
+    );
 }
