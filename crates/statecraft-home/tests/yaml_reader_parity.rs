@@ -162,6 +162,10 @@ fn render(body: &str, extras: bool) -> String {
             | "ci.post_merge.after_preflight"
             | "ci.post_merge.lookup"
             | "ci.post_merge.fill" => "",
+            // Revision 25 (spec 069): the step the parameter renders when on.
+            "ci.code.free_disk" => {
+                "      - name: Free runner disk\n        run: |\n          df -h /\n          sudo rm -rf /opt/ghc || true\n          df -h /\n"
+            }
             "default_branch" => "main",
             "profile.revision" => "22",
             "profile.identity" => "0123456789abcdef",
