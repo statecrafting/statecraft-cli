@@ -6,6 +6,7 @@
     ],
     "created": "2026-11-04",
     "dependsOn": [
+      "002-environment-lifecycle",
       "032-external-code-profile",
       "058-ci-throughput-profile",
       "067-post-merge-push"
@@ -45,7 +46,7 @@
       }
     ],
     "sectionDigests": {
-      "069-the-managed-code-job-can-free-runner-disk-before-it-builds": "3cb737ef84b6b8ef90a371155323c36ec6efe68c2cae083955e0aa15655a8fdc",
+      "069-the-managed-code-job-can-free-runner-disk-before-it-builds": "3a0e5d76c5dc956c41d49050e3226f6bc40a7255a75acc649604d88a69ee6654",
       "1-purpose": "c526beb90d100156da9ef670f3cc20f4261a91ee934bd43079150f7b481da0dc",
       "2-territory": "0f028503a73d7e39a8ba59e8242d1e1c744f15377520f2e14ca5193c28c9162e",
       "3-1-the-parameter": "2b23574a8363807d7ed5d297ad10c154ea9b3148b12b21c30edd2fd78a23db53",
@@ -53,8 +54,8 @@
       "3-3-on-a-post-merge-push": "bbdc4bf95abbe1a1b09542cb0662c571b65a1ea5f7fbee8a13ac59d638847d99",
       "3-4-an-external-code-selection": "6ee4e4a8df99cc8dfcaf5ade1d176863210710d4e4649bc15db1a15085db28a3",
       "3-5-off-by-default": "1884a282662a7ad24c18505c91fc5517fb6ee90e3e704f20756e941831480304",
-      "3-6-the-revision": "27649283f78a8b3ab5a964ffefeaabaaf5f784e8aa1898dd6043e4246fe9d7f5",
-      "3-behavior": "71b5b17e18d4275df0318f5fad1db7bfe22693711e668071a0370100a2b17f59",
+      "3-6-the-revision": "d240c8656bfa7f5104535afebd6126fee6dcf791fce9d5054267ecf634c1317d",
+      "3-behavior": "a1cb30c2e69d0c06dc935e8bf09b64230f5b1a306bb0b36fc97c4dab092dc1c1",
       "4-out-of-scope": "85a56925b6780c3e2c61df1810cbdc33d32e0d7a116c2a37dc5e0cdeb333e196",
       "5-resolved-decisions": "5bfbef53cad1df63a67d79309f94c596d712855d057d02525fa1112eec64c451",
       "verification": "eb25035e2647e96e9a6d6b1cd187180628c474865743590b028817056a6d163c"
@@ -79,6 +80,6 @@
     "summary": "Amends spec 002's setup profile and spec 058's code job. A new boolean parameter, ci.code.free_disk, off by default, renders one step in the managed code job before the build: it removes the runner's unused preinstalled toolchains and reports the free space before and after. Off, the rendered workflow is revision 24's. An external code selection refuses the parameter, because its job is the project's own.\n",
     "title": "Setup profile revision 25: the managed code job can free runner disk before it builds"
   },
-  "shardHash": "160cd01cdf66dd5efba2f44261f3f85c94b8c7ce4776266840ffb098065425cf",
+  "shardHash": "d134f3a4ec6e781d2e87db5106f21ac6fb94f32813bb291f11cb901eb12a48b5",
   "specVersion": "1.11.0"
 }

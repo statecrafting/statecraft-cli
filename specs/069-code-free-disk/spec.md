@@ -15,6 +15,7 @@ amends:
   - "002-environment-lifecycle"
   - "058-ci-throughput-profile"
 depends_on:
+  - "002-environment-lifecycle"
   - "032-external-code-profile"
   - "058-ci-throughput-profile"
   - "067-post-merge-push"
@@ -116,8 +117,8 @@ the other parameters.
 
 The profile becomes revision 25 with a new identity. A revision-24 project
 upgrades through the ordinary plan and apply. Every rendered file names
-the revision in its header and is rewritten for it; apart from that line,
-only `statecraft-ci.yml` changes, and only a project that sets the parameter
+the revision and the identity in its header and is rewritten for them;
+apart from those, only `statecraft-ci.yml` changes, and only a project that sets the parameter
 gets the new step. The
 upgrade pull request is an authority change and needs the owner's
 exception once.
