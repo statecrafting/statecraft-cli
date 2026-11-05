@@ -207,6 +207,8 @@ configuration. Each line is one command; none needs the network, cargo or
 cargo-dist. The dry run above stays the acceptance of V-1.
 
 ```verify:cli
+scripts/release/check-config.sh
+scripts/release/check-config.sh --self-test
 scripts/release/harden-installer.sh --self-test
 scripts/release/verify-set.sh --self-test
 ```
