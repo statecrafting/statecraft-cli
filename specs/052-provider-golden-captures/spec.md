@@ -203,8 +203,8 @@ operator's own directories, from the operator's settings), and a tool's
 `file_path` names the work tree, which the goldens had hidden by hand. The
 README's list gains one rule, which `capture::redact` implements:
 `original_cwd` becomes the placeholder path, the work tree becomes it wherever
-a string names it, and `additional_directories` is emptied. A capture is
-taken again with the rule before one is committed.
+a string names it, and `additional_directories` is emptied, so a capture
+committed for 2.1.318 or later carries none of the operator's paths.
 
 ## Verification
 
