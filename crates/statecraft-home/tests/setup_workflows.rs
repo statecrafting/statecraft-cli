@@ -7104,7 +7104,9 @@ fn revision_twenty_two_renders_the_supply_chain_jobs_with_pinned_tools() {
             bound: &statecraft_home::setup_input::Bound::with_producer("0.26.0"),
         })
         .unwrap_err();
-        assert!(err.contains("is not optional in revision 24"), "{err}");
+        // The refusal names the registered revision, whichever it is.
+        let says = format!("is not optional in revision {}", setup::REVISION);
+        assert!(err.contains(&says), "{err}");
     }
 }
 
@@ -7123,12 +7125,13 @@ fn revision_twenty_three_renders_the_review_guide_and_both_default_paths() {
     render(tmp.path());
     let root = tmp.path();
     let guide = std::fs::read_to_string(root.join(setup::GUIDE_PATH)).unwrap();
-    assert!(
-        guide.starts_with(
-            "# Review guide\n\nRendered by Statecraft from profile github-actions-rust revision 24.\n"
-        ),
-        "{guide}"
+    // Revision 23 introduced the guide; its header names the registered
+    // revision, which every later revision advances.
+    let header = format!(
+        "# Review guide\n\nRendered by Statecraft from profile github-actions-rust revision {}.\n",
+        setup::REVISION
     );
+    assert!(guide.starts_with(&header), "{guide}");
     assert!(!guide.contains("{{sc:"), "{guide}");
     for said in [
         "Judge the change against its intent",
@@ -7239,9 +7242,13 @@ fn review_reads_the_guide_and_the_repository_review_from_the_base_only() {
         .unwrap();
     let guide_doc = format!("----- BEGIN DOCUMENT .statecraft/REVIEW.md (blob {guide_blob}, ");
     let review_doc = format!("----- BEGIN DOCUMENT REVIEW.md (blob {review_blob}, ");
+    let rendered = format!(
+        "Rendered by Statecraft from profile github-actions-rust revision {}.",
+        setup::REVISION
+    );
     for want in [
         guide_doc.as_str(),
-        "Rendered by Statecraft from profile github-actions-rust revision 24.",
+        rendered.as_str(),
         "Judge the change against its intent",
         review_doc.as_str(),
         "base repository guide: weigh the ledger first",
