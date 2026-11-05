@@ -586,6 +586,7 @@ case "$1 $2" in
       *) echo "gh stub: unsupported $*" >&2; exit 98 ;;
     esac ;;
   api\ repos/*/actions/runs/*/jobs*)
+    if [ -f "$here/gh-jobs-fails" ]; then echo "HTTP 502: Bad Gateway" >&2; exit 1; fi
     cat "$here/gh-jobs" 2> /dev/null || echo '{"jobs": []}' ;;
   api\ repos/*/actions/runs*)
     if [ -f "$here/gh-runs-fails" ]; then echo "HTTP 502: Bad Gateway" >&2; exit 1; fi
@@ -7666,6 +7667,7 @@ struct PostMerge {
     needs_json: String,
     runs: serde_json::Value,
     runs_fail: bool,
+    jobs_fail: bool,
     gate: &'static str,
     want: i32,
     why: &'static str,
@@ -7701,6 +7703,7 @@ fn post_merge_cases(head: &str) -> Vec<PostMerge> {
         needs_json: post_merge_needs(None),
         runs: runs.clone(),
         runs_fail: false,
+        jobs_fail: false,
         gate: "success",
         want,
         why,
@@ -7766,6 +7769,14 @@ fn post_merge_cases(head: &str) -> Vec<PostMerge> {
                 "cannot read the merge-queue runs",
             )
         },
+        PostMerge {
+            jobs_fail: true,
+            ..ok(
+                "post-merge, the queue run's jobs cannot be read",
+                1,
+                "cannot read the jobs of merge-queue run",
+            )
+        },
     ]
 }
 
@@ -7777,6 +7788,9 @@ fn run_post_merge(repo: &Repo, event: &str, c: &PostMerge) -> Ran {
         std::fs::write(state.join("gh-runs"), c.runs.to_string()).unwrap();
         if c.runs_fail {
             std::fs::write(state.join("gh-runs-fails"), "").unwrap();
+        }
+        if c.jobs_fail {
+            std::fs::write(state.join("gh-jobs-fails"), "").unwrap();
         }
         let jobs = serde_json::json!({"jobs": [
             {"name": "code", "conclusion": "success"},
