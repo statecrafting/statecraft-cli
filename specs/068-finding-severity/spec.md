@@ -85,17 +85,28 @@ a head without the exception when every finding is `low` and `other` and
 each has a review note for that head naming its id. A note cannot be
 written before its finding exists, because the id it must name is derived
 from the review's output; a body prepared ahead of the review answers
-nothing. Only the body's state when ci-gate runs counts. A finding of any
-other severity or category, a finding without a note, a note for another
-head or naming another id, and any change that spec 062 already routes to
-the exception (an authority change, a ratification) keep the exception required. The gate records which notes it read.
+nothing. Only the body's state when ci-gate runs counts, and only when its
+author, or its last editor if it was edited, is the pull request's author or
+has write access to the repository; a body edited by anyone else answers no
+finding.
+
+ci-gate reads the latest evidence record for the head. A rerun of the
+review writes a new record whose summaries, and so whose ids, may differ; a
+note naming an id the latest record does not hold answers nothing, so after
+such a rerun the exception stays required until the notes are rewritten.
+
+A finding of any other severity or category, a finding without a note, a
+note for another head or naming another id, and any change that spec 062
+already routes to the exception (an authority change, a ratification) keep
+the exception required. The gate records which notes it read.
 
 ### 3.3 Known false positives
 
 Known false positives are handled through `review.context_paths` (spec
 041): the project names a document of them among the context paths, and the
-reviewer reads it at the base commit with the other governance context, so
-the finding is not raised. A change cannot add the entry that answers its
+reviewer reads it at the base commit with the other governance context and
+can recognize the finding as known. The document informs the reviewer and
+relaxes no rule: a finding the reviewer raises anyway is gated as any other. A change cannot add the entry that answers its
 own finding, because the candidate's copy is never read. No separate list
 or matching rule is added.
 
