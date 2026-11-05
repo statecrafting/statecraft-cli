@@ -17,9 +17,14 @@ summary: >
 amends:
   - "004-execution-adapter"
   - "042-per-run-provider-configuration"
-# No `extends` yet: the implementing change adds the edges on
-# crates/statecraft-home/ (002), crates/statecraft-adapter-claude-code/ (004)
-# and crates/statecraft-cli/ (006) with the code.
+# The gateway and the per-attempt token live in statecraft-home (002); the
+# route is the Claude Code adapter's and the single-endpoint network role is
+# the boundary's (004); the outcome revokes the token in statecraft-cli (006).
+extends:
+  - { spec: "002-environment-lifecycle", unit: { kind: directory, path: "crates/statecraft-home/" }, nature: additive }
+  - { spec: "004-execution-adapter", unit: { kind: directory, path: "crates/statecraft-adapter/" }, nature: additive }
+  - { spec: "004-execution-adapter", unit: { kind: directory, path: "crates/statecraft-adapter-claude-code/" }, nature: additive }
+  - { spec: "006-command-surface", unit: { kind: directory, path: "crates/statecraft-cli/" }, nature: additive }
 depends_on:
   - "004-execution-adapter"
   - "013-supervised-wire-witness"
@@ -152,6 +157,33 @@ That composition is a later amendment to both specs; until it lands, a run
 with `--witness` is delivered as 042 rule 2 delivers it, and its record says
 so.
 
+**2026-11-01: the gateway's wire behaviour.** It forwards one origin-form
+request per connection, with `Connection: close` both ways, and answers 400
+to `CONNECT`, an absolute or `//` target, or a body framed by both
+`Content-Length` and `Transfer-Encoding`. It drops the child's `Host`,
+`Authorization`, `x-api-key` and hop-by-hop headers and sets its own. It
+answers the `HEAD /api/hello` preflight itself, 200 with the attempt's token
+and 401 without, and forwards it nowhere. The attempt token is 32 bytes from
+`/dev/urandom`, hex, prefixed `statecraft-attempt-`; it is written to
+`gateway-token` in the per-run directory and also given in
+`CLAUDE_CODE_OAUTH_TOKEN`, the measured route, until a helper-command route
+is measured.
+
+**2026-11-01: how the record and the outcome carry it.** The boundary record
+names the gateway as `gatewayEndpoint`, never as a witness endpoint; the same
+single-endpoint self-test probes run against it under their existing keys.
+An authenticated record without `gatewayEndpoint` used spec 042's delivery.
+The token is revoked when the attempt concludes, and the gateway stops when
+the admission is dropped.
+
+**2026-11-02: the TLS client is the one the hosted client already resolves.**
+The gateway forwards over TLS (section 3.1) and the spec names no client. It
+is `rustls` with the `ring` provider and the bundled `webpki-roots`, at the
+versions and features spec 033's hosted client already resolves through
+`ureq`, so the lockfile gains no package and no system trust store or native
+TLS is linked. It landed as its own dependency change before the gateway,
+because spec 044's guard keeps a dependency change out of a feature.
+
 ## Verification
 
 Ratified by the owner on 2026-10-31. Acceptance is declared by the
@@ -160,3 +192,20 @@ directory and every file the attempt leaves for the provider token's bytes,
 replay a request with a revoked token and with another attempt's token and see
 both refused, refuse a launch whose gateway cannot bind, and repeat the
 section 5 measurement under confinement on macOS and Linux.
+
+```verify:cli
+cargo test -p statecraft-home --locked --lib provider_token
+cargo test -p statecraft-adapter-claude-code --locked --lib gateway
+cargo test -p statecraft-cli --locked --test host_held_provider_credentials
+cargo test -p statecraft-cli --locked --test per_run_provider_configuration
+cargo test -p statecraft-cli --locked --test witness_admission
+cargo test -p statecraft-cli --locked --test witness_endpoint
+```
+
+The first runs the gateway against a recording stand-in for the provider:
+the operator's token replaces the attempt's, a missing, wrong, revoked or
+other attempt's token is refused with nothing forwarded, and a gateway that
+cannot bind writes nothing. The third admits real launches and scans the
+child's environment, its per-run directory and every file left for the
+token's bytes, and has a confined `curl` reach the gateway. The section 5
+measurement under confinement needs the provider and is the owner's to run.

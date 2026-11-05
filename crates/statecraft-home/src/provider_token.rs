@@ -16,10 +16,18 @@
 //! is validated: redacted when shown, zeroed when dropped, read only through
 //! `expose`, which the confinement calls once at the point it places the
 //! token in the child's environment.
+//!
+//! Spec 051 amends the delivery: for an unwitnessed attempt the token stays
+//! in the supervisor's memory behind the loopback [`gateway`], and the child
+//! is given only a token minted for its attempt. A witnessed attempt keeps
+//! the environment delivery above until the gateway composes with the
+//! witness (spec 051 section 5).
 
 use crate::home::Layout;
 use statecraft_secret::SecretString;
 use std::path::Path;
+
+pub mod gateway;
 
 /// The environment name the provider reads its token from.
 pub const VARIABLE: &str = "CLAUDE_CODE_OAUTH_TOKEN";

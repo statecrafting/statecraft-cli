@@ -58,6 +58,7 @@ pub mod capture;
 pub mod denial;
 pub mod environment;
 pub mod execution;
+pub mod gateway;
 pub mod golden;
 pub mod outcome;
 pub mod probe;

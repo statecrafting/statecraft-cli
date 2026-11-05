@@ -90,6 +90,13 @@ pub struct Record {
     /// endpoint above is then the one it may bind, not connect to.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub sidecar_outbound_ports: Option<Vec<u16>>,
+    /// Spec 051 section 3.3: the one loopback authentication gateway the
+    /// child may connect to, when the provider's token is held by the
+    /// supervisor. Absent on every other record, which therefore stays
+    /// byte-identical; a record of an authenticated launch without it used
+    /// spec 042's environment delivery.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub gateway_endpoint: Option<SocketAddr>,
 }
 
 /// The network role an admitted policy is compiled for.
@@ -212,6 +219,21 @@ impl Prepared {
         Self::prepare_with(policy, Network::Child(endpoint))
     }
 
+    /// [`Prepared::prepare_witnessed`]'s network role for spec 051 section
+    /// 3.3's gateway: TCP connect to the exact per-attempt gateway endpoint
+    /// beside the fixed 443, nothing else on loopback, and no listener. The
+    /// record names the endpoint as `gateway_endpoint`, not as a witness
+    /// endpoint, so no record claims a capture that was never requested. The
+    /// self-test's single-endpoint probes are the same ones, keyed by the
+    /// network role rather than by its purpose.
+    pub fn prepare_gatewayed(policy: Policy, endpoint: SocketAddr) -> Result<Self, Refused> {
+        check_endpoint(endpoint)?;
+        let mut prepared = Self::prepare_with(policy, Network::Child(endpoint))?;
+        prepared.record.witness_endpoint = None;
+        prepared.record.gateway_endpoint = Some(endpoint);
+        Ok(prepared)
+    }
+
     /// The witness sidecar's own confinement, spec 013 section 3.6.2: the
     /// filesystem policy the caller supplies (its output area and temporary
     /// directory writable, the evidence and authority roots inaccessible),
@@ -330,6 +352,7 @@ impl Prepared {
             open_items,
             witness_endpoint: endpoint,
             sidecar_outbound_ports,
+            gateway_endpoint: None,
         };
         Ok(Self { native, record })
     }
@@ -422,20 +445,25 @@ impl Prepared {
         probe: &Probe,
     ) -> Result<BTreeMap<String, bool>, Refused> {
         let sidecar = self.record.sidecar_outbound_ports.is_some();
-        if !sidecar
-            && self
-                .record
-                .witness_endpoint
-                .is_some_and(|endpoint| endpoint.port() == probe.loopback_port)
-        {
+        // The one endpoint a child may connect to: a witness's or, for spec
+        // 051, a gateway's. Both compile to the same network role.
+        let endpoint = self
+            .record
+            .witness_endpoint
+            .or(self.record.gateway_endpoint);
+        if !sidecar && endpoint.is_some_and(|endpoint| endpoint.port() == probe.loopback_port) {
             return Err(Refused::at(
                 "probe-input",
-                "the denied loopback port is the witness endpoint",
+                if self.record.witness_endpoint.is_some() {
+                    "the denied loopback port is the witness endpoint"
+                } else {
+                    "the denied loopback port is the gateway endpoint"
+                },
             ));
         }
         let encoded = serde_json::to_string(&ProbeInput {
             probe: probe.clone(),
-            witness_endpoint: self.record.witness_endpoint,
+            witness_endpoint: endpoint,
             sidecar,
         })
         .map_err(|e| Refused::at("probe-input", e))?;
@@ -516,7 +544,7 @@ impl Prepared {
         // `loopbackDenied` is the refusal on another loopback port. On macOS
         // the same port at a non-loopback address is refused too; Linux cannot
         // prove that, which the record's residual says.
-        if self.record.witness_endpoint.is_some() && !sidecar {
+        if endpoint.is_some() && !sidecar {
             required.push("witnessEndpointConnect");
             required.push("witnessListenerDenied");
             #[cfg(target_os = "macos")]
