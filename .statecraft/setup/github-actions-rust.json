@@ -92,53 +92,58 @@
   },
   "files": [
     {
-      "digest": "e69f4d701b19c7b3457c781fb3a1e2951b84e3c8fdb0845c3e81ecb431364c30",
+      "digest": "e1bc2f26d7e6d04a9d2f4ef366f2eb372e10cd637f828e335f3812c4e3c25717",
       "path": ".github/workflows/statecraft-ci.yml",
       "role": "workflow"
     },
     {
-      "digest": "1ffbbe2e0b6501c126134f0a5ab1a722fc4de76eb5d9549f25dcf15a91c0b31f",
+      "digest": "1086cab81d0129bd3e132313ba0cadebbba6b9f80f3421d71ff86c3d000fe9fb",
       "path": ".github/workflows/statecraft-ai-review.yml",
       "role": "workflow"
     },
     {
-      "digest": "4540145e5f07b68b4d8f8c8fd521aff1084fc6c4425330ed0866f7cd04bea405",
+      "digest": "bd0d4c18a3328cbee58ade411f37fd49457794f362965e0f757337a81eee6091",
       "path": "scripts/statecraft/install-spec-spine.sh",
       "role": "script"
     },
     {
-      "digest": "e8cf1e1214829d7dc24b376af69ce313fdcef507fce0d2b3a61da6923b57d894",
+      "digest": "d534e0c664e44c2c657e333ce71103b0901d4ba95cba887ce67d66d626973dc6",
       "path": "scripts/statecraft/gate.sh",
       "role": "script"
     },
     {
-      "digest": "12c6115f2ee77d8eed14048ad7030588ffd7ad80141c5e5e671ff83c7de1d859",
+      "digest": "35bfc682c69110d8c61bc365e5f3bfd358af0459fbce6cfb48e69766092d1e41",
       "path": "scripts/statecraft/ci-gate.sh",
       "role": "script"
     },
     {
-      "digest": "fde72e83a50a87a3d5da7e452e4a1965e655d6297485c5ff5eac4350af0c876c",
+      "digest": "2ac3e5ff12ec4356f40887df2b9ec6ac0b9ed014d973bfce907c43c01bc63ca1",
       "path": "scripts/statecraft/ai-review.sh",
       "role": "script"
     },
     {
-      "digest": "c8ad2c3453812bd67f568832f5553685cfb8f0cb60a49f13821c5dc01465e562",
+      "digest": "81dd194218a8faa04cbe02902c772530d6ff80ce6c7ac473120cf2730e46c70c",
       "path": "scripts/statecraft/guard-policy-files.sh",
       "role": "script"
     },
     {
-      "digest": "880de81106bf2415f3a3e59fd99f986064e1b36b1b9f1676c38c51138a25422d",
+      "digest": "67e79ad90bdf432e5d4f5f04feb827ef38c874a98e9ba2498a5cc2239c137f55",
       "path": "scripts/statecraft/verify-action-pins.sh",
       "role": "script"
     },
     {
-      "digest": "631472409ee12090b7eecc300e351858ee3a289947a23b2e8e96c3c473d728b8",
+      "digest": "c77e40ec8d1b82c6d397f2fb8766c29edf356454eeb7db3bdddef5d847789f1d",
+      "path": ".statecraft/REVIEW.md",
+      "role": "guide"
+    },
+    {
+      "digest": "c34651dee810f543de4af09d181f7cb9df951858e13fe94972723f35d796fc4a",
       "path": ".statecraft/setup/github-actions-rust.remote.json",
       "role": "remote-state"
     }
   ],
   "id": "github-actions-rust",
-  "identity": "6da3ede78368133fe8f463ac341a8ea0ce8e959c0c059066f50c8a89253a4c88",
+  "identity": "39e2a7a244759e35b35b089449054b69062d619d9d418b94a6e83a2accdd3b88",
   "jobs": {
     "ai-review": {
       "merge_group": "recorded-review",
@@ -227,6 +232,7 @@
     ],
     "extra_required_jobs": [],
     "fail_on_unresolved": true,
+    "freeDisk": false,
     "gate_each_commit": true,
     "max_calls": 4,
     "release_branch_pattern": "release/*",
@@ -268,6 +274,10 @@
     "revision 20: reviewer calls stream partial events; 180 seconds of silence stops a call and retries it once with fresh cwd and home, a second stall skips as transient, and the review job allows 20 minutes (spec 061)",
     "revision 21: every review or visible skip publishes a statecraft-ai-review check run after its evidence artifact, with the exact record and a success, failure or neutral conclusion; fork heads are excluded and publication failures fail the job (spec 062; 044 moves to 22)",
     "revision 22: four more required jobs, each a need of ci-gate and none optional: supply-chain (cargo deny against the committed deny.toml, cargo audit when .cargo/audit.toml exists, cargo vet --locked when supply-chain/config.toml exists, each tool a digest-verified release at an exact version, with the candidate's .cargo/config.toml removed first), workflow-lint (zizmor offline over .github/workflows, then verify-action-pins.sh: every action by 40-hex commit digest with a `# <ref>` comment, a docker image by sha256, or a local path), sg-scan (ast-grep scan when sgconfig.yml exists) and secret-scan (gitleaks, digest-verified, over the change's commits, reporting rule and location and never the value). On a pull request governance runs guard-policy-files.sh: a change to deny.toml, .cargo/audit.toml, supply-chain/, any Cargo.toml or Cargo.lock, spec-spine.toml or docs/adoption/spec-spine.md beside any other path, apart from the generated .statecraft/derived/ and .statecraft/environment.json, fails and must be split, so an upgrade that also moves the spec-spine pin is two pull requests. A target needs a committed deny.toml to select this revision; the plan withholds the profile without one (spec 044)",
+    "revision 23: the profile renders .statecraft/REVIEW.md, the reviewer's contract, as a managed file verified by digest and identical in every target, and the AI review's default governance context becomes AGENTS.md, .statecraft/AGENTS.md, .statecraft/REVIEW.md, REVIEW.md, standards/spec/constitution.md, standards/spec/contract.md in that order: the managed guide and the repository's own REVIEW.md are read as blobs at the base commit, an absent REVIEW.md is recorded as absent, a candidate's edit to either is review data read as context only once it is on the base, and both count whole against the context's quarter of review.context_tokens, so a guide that does not fit refuses with 2 before any provider call (spec 056); a review, and only a review, also writes the advisory statecraft/ai-prescreen/v1 claim about the head into its evidence record and beside it as ai-prescreen.json, naming the model, the prompt and governance-context digests read at the base, the verdict word and the findings count, never an approval (spec 054)",
+    "revision 24: where remote.merge_queue.required is true, a push to the default branch is a post-merge push, because the queue already judged that exact commit and GitHub fast-forwards the branch to it: governance, preflight, supply-chain, workflow-lint, sg-scan and secret-scan are skipped, code runs only its cache steps (the spec-spine cache, a lookup of the cargo key, and on a miss the build that fills it and the save), and ci-gate admits them by the policy's post-merge rule only when the pushed commit passed ci-gate in a completed merge-queue run of statecraft-ci, so a push that bypassed the queue blocks and ci-gate still reports a check run on the pushed commit. A declared extra job's workflow, and an external code selection's, must declare the boolean workflow_call input post_merge, which the profile passes as true on such a push so it can skip its expensive steps; the plan refuses a workflow that does not declare it. The push of the upgrade's own merge commit is judged by the base's revision-23 rules and blocks once; without a required queue, push behaviour is unchanged (spec 067)",
+    "revision 25: the setup parameter ci.code.free_disk, a boolean and false by default, renders one step in the managed code job before the build that prints df -h /, runs `sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /usr/local/.ghcup /opt/hostedtoolcache/CodeQL || true` and prints df -h / again, never failing the job; on a post-merge push it runs only when the cargo key missed; beside an external ci.code it refuses the plan, and off, the workflow is revision 24's (spec 069)",
+    "revision 26: every finding of the AI review carries a severity (low, medium or high) and a category (correctness, security, authority, ratification or other), a missing or unknown one read as high, and an id, the first twelve hex digits of the sha256 of its path, line and summary; a pull request whose findings are all low and other, each answered by a `Review note (<sha8>): <id>` line of its body for that head, last edited by its author or by someone with write access, needs no owner exception, in the pull request and in the merge queue; statecraft-ci also runs on an edited pull request, and keeps the review recorded for that head, base and pull request rather than reviewing again (spec 068)",
     "a repository that already runs these checks by hand keeps them by setting governance.enforce_coverage (index coverage --fail-on-untraced), governance.authored_content (the script's path; absent or not executable refuses), governance.authored_content_text (the title, the body and every commit message), governance.gate_each_commit (each commit's tree passes the gate and cargo fmt) and governance.require_signed_commits (each commit verified as signed by GitHub) (revision 4)"
   ],
   "review": {
@@ -279,6 +289,8 @@
     "default_context_paths": [
       "AGENTS.md",
       ".statecraft/AGENTS.md",
+      ".statecraft/REVIEW.md",
+      "REVIEW.md",
       "standards/spec/constitution.md",
       "standards/spec/contract.md"
     ],
@@ -302,5 +314,5 @@
     "tool": "claude-code",
     "tool_version": "2.1.116"
   },
-  "revision": 22
+  "revision": 26
 }

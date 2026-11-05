@@ -1,5 +1,5 @@
 #!/bin/sh
-# Rendered by Statecraft from profile github-actions-rust revision 22.
+# Rendered by Statecraft from profile github-actions-rust revision 26.
 # The policy-isolation guard (spec 044 section 3.3): a pull request that
 # changes a dependency or supply-chain policy file and anything else must be
 # split, so a dependency change is never reviewed inside a feature.
