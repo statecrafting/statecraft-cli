@@ -26,7 +26,7 @@ obligations:
     anchor: "3-1-severity-and-category"
   - id: "R-2"
     kind: requirement
-    text: "ci-gate passes a head whose findings are all `low` and `other`, each answered by a `Review note (<sha8>):` line for that head in the pull request's body, without the review exception; any other finding, or one left unanswered, keeps the exception required."
+    text: "ci-gate passes a head whose findings are all `low` and `other`, each answered by a `Review note (<sha8>): <finding id>` line for that head in the pull request's body, where the id is derived from the finding as the review recorded it, without the review exception; any other finding, or one left unanswered, keeps the exception required."
     anchor: "3-2-an-answered-low-finding"
   - id: "R-3"
     kind: requirement
@@ -73,15 +73,22 @@ such an input is `medium` or `high`, whatever its category.
 
 ### 3.2 An answered low finding
 
+Each finding has an id: the first twelve hex digits of the sha256 of its
+path, line and summary as the evidence record holds them. The record lists
+the id with the finding, so the id exists only once the review of that head
+has run, and its summary is the reviewer's own words.
+
 A review note is a line of the pull request's body that begins
-`Review note (<sha8>): <finding path>` and goes on with the answer, where
+`Review note (<sha8>): <finding id>` and goes on with the answer, where
 `<sha8>` is the first eight characters of the reviewed head. ci-gate passes
 a head without the exception when every finding is `low` and `other` and
-each has a review note for that head. The body is the author's, and only
-its state when ci-gate runs counts. A finding of any other severity or category, a
-finding without a note, a note for another head, and any change that spec
-062 already routes to the exception (an authority change, a ratification)
-keep the exception required. The gate records which notes it read.
+each has a review note for that head naming its id. A note cannot be
+written before its finding exists, because the id it must name is derived
+from the review's output; a body prepared ahead of the review answers
+nothing. Only the body's state when ci-gate runs counts. A finding of any
+other severity or category, a finding without a note, a note for another
+head or naming another id, and any change that spec 062 already routes to
+the exception (an authority change, a ratification) keep the exception required. The gate records which notes it read.
 
 ### 3.3 Known false positives
 
@@ -108,17 +115,19 @@ ratification changes still need it. Optionally, a project list of known
 false positives read at the base." Open questions for the owner: whether
 `medium` should ever pass.
 
-**2026-11-04: updated from the owner's rustev handoff, still a draft.** The
-handoff (rustev m1 2026-11-02, item C) settles three points, folded into
-section 3. A low-only head passes when the pull request's body has a
-`Review note (<sha8>):` line for each finding, so a note is a body line and
-not a comment. `low` covers wording, style, redundancy and hypothetical
-misuse. False positives are handled through `review.context_paths`, so no
-separate list is built.
+**2026-11-04: a review note is a body line that names the finding's id.**
+The owner's rustev handoff (m1 2026-11-02, item C) decides three points. A
+note is a `Review note (<sha8>):` line of the pull request's body, not a
+comment. `low` covers wording, style, redundancy and hypothetical misuse.
+Known false positives go through `review.context_paths`, not a separate
+list. A note names the finding's id rather than its path, because an id
+derived from the review's output cannot be written before the review runs,
+which a path or a head can.
 
 ## Verification
 
 Declared by the implementing change once ratified: a rendered workflow
 whose review returns only answered `low` findings passes ci-gate with no
 exception run; one `medium`, an unanswered `low`, a note for another head,
-or a candidate-added false-positive entry each keeps the exception required.
+a note naming another finding's id, or a candidate-added false-positive
+entry each keeps the exception required.
