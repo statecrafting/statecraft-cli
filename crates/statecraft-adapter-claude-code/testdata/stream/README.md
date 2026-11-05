@@ -51,6 +51,11 @@ public repository and the operator's machine is not part of the measurement:
 - `session_id`, `uuid`, `hook_id` and `timestamp` replaced with fixed values;
 - `cwd`, `memory_paths` and `messaging_socket_path` replaced with a placeholder
   path, and `plugins` emptied;
+- `original_cwd` replaced with the placeholder path, the scenario's work tree
+  (an `init` event's `cwd` or `original_cwd`, in either macOS spelling,
+  `/private/var/...` or `/var/...`) replaced with it wherever a string names
+  it, as a tool's `file_path` does, and `additional_directories` emptied,
+  because Claude Code 2.1.318 reports the operator's own directories there;
 - the **names** inside `tools`, `skills`, `agents`, `slash_commands`,
   `terminal_slash_commands` and `mcp_servers` replaced with placeholders that
   **preserve the counts**, except the tool names the measurements rest on

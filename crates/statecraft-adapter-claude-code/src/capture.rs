@@ -102,13 +102,15 @@ pub const SCRATCH_FILES: [(&str, &str); 3] = [
     ("three.txt", "three\n"),
 ];
 
-/// What every capture's manifest entry lists as redacted, exactly as
-/// `corpus.json` lists it for the five goldens.
-pub const REDACTIONS: [&str; 5] = [
+/// What every capture's manifest entry lists as redacted: `corpus.json`'s
+/// list for the five goldens, then the rule Claude Code 2.1.318's `init`
+/// fields made necessary (the stream README).
+pub const REDACTIONS: [&str; 6] = [
     "dropped: system events of subtype thinking_tokens, and rate_limit_event events",
     "dropped: assistant events whose only content block is thinking",
     "fixed values: session_id, uuid, hook_id, timestamp",
     "placeholder path: cwd, memory_paths, messaging_socket_path; plugins emptied",
+    "placeholder path: original_cwd, and the scenario's work tree wherever a string names it; additional_directories emptied",
     "count-preserving placeholders: names in tools, skills, agents, slash_commands, terminal_slash_commands, mcp_servers, except Bash, Read, Edit, Write, Glob, Grep, Task",
 ];
 
@@ -199,6 +201,7 @@ pub struct RedactError {
 /// field is verbatim.
 pub fn redact(raw: &str, captured: &str) -> Result<String, RedactError> {
     let timestamp = format!("{captured}T00:00:00.000Z");
+    let roots = work_trees(raw);
     let mut out = String::new();
     for (index, line) in raw.lines().enumerate() {
         if line.trim().is_empty() {
@@ -221,7 +224,7 @@ pub fn redact(raw: &str, captured: &str) -> Result<String, RedactError> {
             }
         }
         let mut event = Ordered::Object(event);
-        fixed(&mut event, &timestamp);
+        fixed(&mut event, &timestamp, &roots);
         out.push_str(&serde_json::to_string(&event).map_err(|e| error(e.to_string()))?);
         out.push('\n');
     }
@@ -261,8 +264,51 @@ fn dropped(event: &[(String, Ordered)]) -> bool {
     }
 }
 
+/// The scenario's work tree as the stream names it: every `cwd` and
+/// `original_cwd` of an `init` event, each also in its other spelling on
+/// macOS (`/private/var/...` and `/var/...` name the same directory), longest
+/// first so a longer spelling is replaced before a shorter one inside it. A
+/// root that is not absolute, or is `/` itself, is not taken, because
+/// replacing it would rewrite text that names no path.
+fn work_trees(raw: &str) -> Vec<String> {
+    let mut roots: Vec<String> = Vec::new();
+    for line in raw.lines() {
+        let Ok(Ordered::Object(event)) = serde_json::from_str::<Ordered>(line) else {
+            continue;
+        };
+        if !is_str(field(&event, "subtype"), "init") {
+            continue;
+        }
+        for key in ["cwd", "original_cwd"] {
+            let Some(Ordered::String(path)) = field(&event, key) else {
+                continue;
+            };
+            let path = path.trim_end_matches('/');
+            if !path.starts_with('/') || path.len() < 2 {
+                continue;
+            }
+            let other = match path.strip_prefix("/private") {
+                Some(rest) if rest.starts_with("/var/") || rest.starts_with("/tmp/") => {
+                    rest.to_string()
+                }
+                _ if path.starts_with("/var/") || path.starts_with("/tmp/") => {
+                    format!("/private{path}")
+                }
+                _ => String::new(),
+            };
+            for root in [path.to_string(), other] {
+                if !root.is_empty() && root != PLACEHOLDER_CWD && !roots.contains(&root) {
+                    roots.push(root);
+                }
+            }
+        }
+    }
+    roots.sort_by_key(|r| std::cmp::Reverse(r.len()));
+    roots
+}
+
 /// The fixed values and placeholder paths, at every depth of an event.
-fn fixed(value: &mut Ordered, timestamp: &str) {
+fn fixed(value: &mut Ordered, timestamp: &str, roots: &[String]) {
     match value {
         Ordered::Object(fields) => {
             for (key, value) in fields.iter_mut() {
@@ -270,17 +316,24 @@ fn fixed(value: &mut Ordered, timestamp: &str) {
                     "session_id" => *value = Ordered::String(FIXED_SESSION_ID.into()),
                     "uuid" | "hook_id" => *value = Ordered::String(FIXED_ID.into()),
                     "timestamp" => *value = Ordered::String(timestamp.into()),
-                    "cwd" => *value = Ordered::String(PLACEHOLDER_CWD.into()),
+                    "cwd" | "original_cwd" => *value = Ordered::String(PLACEHOLDER_CWD.into()),
                     "messaging_socket_path" => {
                         *value = Ordered::String(PLACEHOLDER_SOCKET.into());
                     }
                     "memory_paths" => memory(value),
-                    "plugins" => *value = Ordered::Array(Vec::new()),
-                    _ => fixed(value, timestamp),
+                    "plugins" | "additional_directories" => *value = Ordered::Array(Vec::new()),
+                    _ => fixed(value, timestamp, roots),
                 }
             }
         }
-        Ordered::Array(items) => items.iter_mut().for_each(|v| fixed(v, timestamp)),
+        Ordered::Array(items) => items.iter_mut().for_each(|v| fixed(v, timestamp, roots)),
+        Ordered::String(text) => {
+            for root in roots {
+                if text.contains(root.as_str()) {
+                    *text = text.replace(root.as_str(), PLACEHOLDER_CWD);
+                }
+            }
+        }
         _ => {}
     }
 }
@@ -488,6 +541,39 @@ mod tests {
         // An empty memory_paths stays empty, as the goldens carry it.
         let empty = redact(r#"{"type":"system","memory_paths":{}}"#, DATE).unwrap();
         assert_eq!(lines(&empty)[0]["memory_paths"], json!({}));
+    }
+
+    #[test]
+    fn the_work_tree_is_a_placeholder_wherever_a_string_names_it() {
+        let raw = [
+            r#"{"type":"system","subtype":"init","cwd":"/private/var/folders/xy/T/statecraft-capture-AbC","original_cwd":"/private/var/folders/xy/T/statecraft-capture-AbC","additional_directories":["/Users/someone/work","/Users/someone/dev"]}"#,
+            r#"{"type":"assistant","message":{"content":[{"type":"tool_use","name":"Read","input":{"file_path":"/private/var/folders/xy/T/statecraft-capture-AbC/one.txt"}}]}}"#,
+            r#"{"type":"user","tool_use_result":{"filePath":"/var/folders/xy/T/statecraft-capture-AbC/two.txt","content":"read /private/var/folders/xy/T/statecraft-capture-AbC/three.txt"}}"#,
+            r#"{"type":"result","result":"/varied text stays","is_error":false}"#,
+        ]
+        .join("\n");
+        let out = redact(&raw, DATE).unwrap();
+        assert!(
+            !out.contains("someone") && !out.contains("folders") && !out.contains("AbC"),
+            "{out}"
+        );
+        let v = lines(&out);
+        assert_eq!(v[0]["cwd"], PLACEHOLDER_CWD);
+        assert_eq!(v[0]["original_cwd"], PLACEHOLDER_CWD);
+        assert_eq!(v[0]["additional_directories"], json!([]));
+        assert_eq!(
+            v[1]["message"]["content"][0]["input"]["file_path"],
+            format!("{PLACEHOLDER_CWD}/one.txt")
+        );
+        assert_eq!(
+            v[2]["tool_use_result"]["filePath"],
+            format!("{PLACEHOLDER_CWD}/two.txt")
+        );
+        assert_eq!(
+            v[2]["tool_use_result"]["content"],
+            format!("read {PLACEHOLDER_CWD}/three.txt")
+        );
+        assert_eq!(v[3]["result"], "/varied text stays");
     }
 
     #[test]

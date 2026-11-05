@@ -192,6 +192,20 @@ list and no other rule, with the goldens' placeholder spellings; the
 `timestamp` fixed value is the capture date at midnight, as the goldens'
 is theirs. Its tests run a fake `claude`; no verify line runs a provider.
 
+**2026-11-04: the first live capture, and the redaction it needed.** The
+owner authorized the live capture run on 2026-11-04. `provider capture` against
+Claude Code 2.1.318 on macOS captured all five scenarios, and
+`provider compare` found each `matches` against the 2.1.267 goldens: the
+version is qualifiable. The captures were not committed, because 2.1.318's
+`init` event carries two fields the README's list did not name,
+`original_cwd` (the scratch work tree) and `additional_directories` (the
+operator's own directories, from the operator's settings), and a tool's
+`file_path` names the work tree, which the goldens had hidden by hand. The
+README's list gains one rule, which `capture::redact` implements:
+`original_cwd` becomes the placeholder path, the work tree becomes it wherever
+a string names it, and `additional_directories` is emptied, so a capture
+committed for 2.1.318 or later carries none of the operator's paths.
+
 ## Verification
 
 Ratified by the owner on 2026-10-31. Acceptance is declared by the
