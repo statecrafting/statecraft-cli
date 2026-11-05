@@ -23,7 +23,7 @@
         "anchor": "3-2-an-answered-low-finding",
         "id": "R-2",
         "kind": "requirement",
-        "text": "ci-gate passes a head whose findings are all `low` and `other`, each answered by a `Review note (<sha8>): <finding id>` line for that head in the pull request's body, where the id is derived from the finding as the review recorded it, without the review exception; any other finding, or one left unanswered, keeps the exception required."
+        "text": "ci-gate passes a head whose findings are all `low` and `other`, each answered by a `Review note (<sha8>): <finding id>` line for that head in the pull request's body, where the id is derived from the finding as the review recorded it and the body counts only when its author, or its last editor, is the pull request's author or has write access, without the review exception; any other finding, or one left unanswered, keeps the exception required."
       },
       {
         "anchor": "3-3-known-false-positives",
@@ -33,13 +33,13 @@
       }
     ],
     "sectionDigests": {
-      "068-finding-severity-and-answered-low-findings": "367d3c7cd0c3c4c7d0d7ca784fa5f571ec7e3629afef739fcefb89963543a7a7",
+      "068-finding-severity-and-answered-low-findings": "e5ad85e26509e9ace228a59f3b46bc9b32dbf0597c5922728af2875612b5288c",
       "1-purpose": "28e6dd4c0cb104a7b3431671911613e881f5da83c586829f6c292109d444f908",
       "2-territory": "d605422fb21cf38b47d66414ab1099cb5feaf2ad9b8c29523c93a49b9c67bea3",
       "3-1-severity-and-category": "23704a5a85a39c1c8dc8c40aa7f1b75ee18bcd43d864ad41f78b67625a29b282",
-      "3-2-an-answered-low-finding": "11f506696b86b2ae0f217dffd24bc9a7664046d2ec258e748b23c0378c06d32e",
+      "3-2-an-answered-low-finding": "5868f27e16b6b3b9fb6f41765eb267fb83cfd73f3267f55fcb970e590c00e714",
       "3-3-known-false-positives": "02c9e51ff2f69d11ca2067be0725c8f9dd2e39d3099ebee6b8d0244a554173d7",
-      "3-behavior": "eb937f273a173981f528c7459006b307f6fddf4f64ef1509e7ed9d134e5a9dc3",
+      "3-behavior": "48f6de47ff12ea4731e1dab069d7d175b3b76de080b5946096267a7616129153",
       "4-out-of-scope": "c27d46157a116e7a5726446935fadb1393ac2d4161b9018a1601478cd68bc572",
       "5-resolved-decisions": "cf7d1b34e48f0229a064a813f64cb2c7bb14b2a313e9b52b275fa83bd2324d31",
       "verification": "e5114f282b8d0837aeaabd6fd8c5486fd6eadec667fb97be1ebbcec782df9543"
@@ -61,6 +61,6 @@
     "summary": "Amends spec 024's review and the ci-gate rule of spec 062. Each AI review finding carries a severity (`low`, `medium`, `high`) and a category. A head whose findings are all `low`, each answered by a `Review note (<sha8>):` line in the pull request's body, passes ci-gate without the owner's review exception; a finding of any other severity, and any change that touches correctness, security, authority or ratification, still needs it. Known false positives are handled through review.context_paths.\n",
     "title": "AI review findings carry a severity, and an answered low finding passes ci-gate without the owner exception"
   },
-  "shardHash": "11f52e087c39f2f8db3ead5c89d1c1088f604e723bc78e3de16b020dc75a60fb",
+  "shardHash": "d1764c474b75ac52c70f2aee196c730b50ee3f6145a56665c2ef8253c88ea002",
   "specVersion": "1.11.0"
 }

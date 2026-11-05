@@ -26,7 +26,7 @@ obligations:
     anchor: "3-1-severity-and-category"
   - id: "R-2"
     kind: requirement
-    text: "ci-gate passes a head whose findings are all `low` and `other`, each answered by a `Review note (<sha8>): <finding id>` line for that head in the pull request's body, where the id is derived from the finding as the review recorded it, without the review exception; any other finding, or one left unanswered, keeps the exception required."
+    text: "ci-gate passes a head whose findings are all `low` and `other`, each answered by a `Review note (<sha8>): <finding id>` line for that head in the pull request's body, where the id is derived from the finding as the review recorded it and the body counts only when its author, or its last editor, is the pull request's author or has write access, without the review exception; any other finding, or one left unanswered, keeps the exception required."
     anchor: "3-2-an-answered-low-finding"
   - id: "R-3"
     kind: requirement
@@ -74,7 +74,8 @@ such an input is `medium` or `high`, whatever its category.
 ### 3.2 An answered low finding
 
 Each finding has an id: the first twelve hex digits of the sha256 of its
-path, line and summary as the evidence record holds them. The record lists
+path, line and summary as the evidence record holds them, joined by a
+newline, with a line the record leaves null written as the empty string. The record lists
 the id with the finding, so the id exists only once the review of that head
 has run, and its summary is the reviewer's own words.
 
