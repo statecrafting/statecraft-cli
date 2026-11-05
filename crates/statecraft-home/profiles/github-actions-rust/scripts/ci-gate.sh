@@ -120,6 +120,9 @@ if [ -n "$pattern" ] && [ -n "$HEAD_REF" ]; then
 fi
 
 review_result="$(printf '%s' "$NEEDS_JSON" | jq -r '.["ai-review"].outputs.result // ""')"
+# Revision 26 (spec 068): true only when the review job read a review note for
+# this head naming every finding, each low and other.
+review_answered="$(printf '%s' "$NEEDS_JSON" | jq -r '.["ai-review"].outputs.answered // ""')"
 
 # The authority set is the base's, and the candidate's changes are read from
 # its fork point: three dots, as coupling reads them. Two would also list
@@ -215,8 +218,9 @@ recorded_review() {
     return 1
   fi
   recorded_result="$(jq -r '.result // ""' "$work/record/ai-review-evidence.json")"
-  recorded_exception="$(gh api "repos/${REPO}/actions/runs/${run}/jobs?per_page=100" 2> /dev/null \
-    | jq -r '[.jobs[]? | select(.name == "review-exception")][0].conclusion // "absent"' 2> /dev/null || echo absent)"
+  gh api "repos/${REPO}/actions/runs/${run}/jobs?per_page=100" > "$work/recorded-jobs.json" 2> /dev/null || echo '{}' > "$work/recorded-jobs.json"
+  recorded_exception="$(jq -r '[.jobs[]? | select(.name == "review-exception")][0].conclusion // "absent"' "$work/recorded-jobs.json" 2> /dev/null || echo absent)"
+  recorded_gate="$(jq -r '[.jobs[]? | select(.name == "ci-gate")][0].conclusion // "absent"' "$work/recorded-jobs.json" 2> /dev/null || echo absent)"
   say "recorded review: #${pr} at ${pr_head}, run ${run}: ${recorded_result} (exception: ${recorded_exception})"
 }
 
@@ -265,12 +269,16 @@ while IFS=$'\t' read -r job rule; do
       skipped:*)
         if [ "$release_candidate" = yes ]; then rule=required; else rule=inapplicable; fi ;;
       findings)
-        if [ "$exception_rule" = owner-exception ]; then rule=required; else rule=inapplicable; fi ;;
+        if [ "$exception_rule" = owner-exception ] && [ "$review_answered" != true ]; then rule=required; else rule=inapplicable; fi ;;
       *) rule=inapplicable ;;
     esac
+    if [ "$exception_rule" = owner-exception ] && [ "$review_result" = findings ] && [ "$review_answered" = true ]; then
+      say "review: findings, every one low and other and answered by a review note for this head (spec 068)"
+    fi
     # A findings verdict is the final approver's refusal: only the owner's
-    # exception, approved for this run, lets the head through.
-    if [ "$exception_rule" = owner-exception ] && [ "$review_result" = findings ] && [ "$result" != success ]; then
+    # exception, approved for this run, lets the head through, unless every
+    # finding is low and other and answered (revision 26, spec 068).
+    if [ "$exception_rule" = owner-exception ] && [ "$review_result" = findings ] && [ "$review_answered" != true ] && [ "$result" != success ]; then
       block "the AI review returned findings and the owner exception '${job}' was not approved for this run (it ended '${result}')"
       continue
     fi
@@ -333,9 +341,15 @@ while IFS=$'\t' read -r job rule; do
       case "$recorded_result" in
         no-findings) ;;
         findings)
+          # Revision 26 (spec 068): the pull request's own ci-gate passed
+          # with the exception skipped only when every finding was answered.
           if [ "$recorded_exception" != success ]; then
-            block "the review recorded for #${pr} returned findings and its owner exception was not approved (it ended '${recorded_exception}')"
-            continue
+            if [ "$recorded_exception" = skipped ] && [ "$recorded_gate" = success ]; then
+              say "the review recorded for #${pr} returned findings, every one answered by a review note when its ci-gate passed (spec 068)"
+            else
+              block "the review recorded for #${pr} returned findings and its owner exception was not approved (it ended '${recorded_exception}')"
+              continue
+            fi
           fi ;;
         skipped:draft | skipped:fork | skipped:dependabot | skipped:oversized | skipped:transient)
           if [ "$entry_rc" = yes ] && [ "$recorded_exception" != success ]; then

@@ -263,12 +263,126 @@ fn body<'a>(p: &'a mut Profile, path: &str) -> &'a mut String {
         .body
 }
 
+/// Replace `new` with `old`, once.
+fn swap(body: &mut String, new: &str, old: &str) {
+    assert_eq!(body.matches(new).count(), 1, "{new}");
+    *body = body.replacen(new, old, 1);
+}
+
+/// Revision 25 of the registered profile: revision 26 (spec 068) inserted
+/// text into the review script, the gate script and both workflows and
+/// changed a few lines in place, so revision 25 is the registered profile with
+/// each insertion cut and each changed line put back.
+fn revision_twenty_five() -> Profile {
+    let mut p = Profile::registered();
+    assert_eq!(p.revision, 26, "the registered profile is revision 26");
+    p.revision = 25;
+    let review = body(&mut p, "scripts/statecraft/ai-review.sh");
+    cut(
+        review,
+        "\n# Spec 068 section 3.2: whether every finding",
+        "answered=true\\n' >> \"$GITHUB_OUTPUT\"\n  exit 0\nfi\n",
+    );
+    cut(
+        review,
+        "\n# Spec 068 section 3.2: a pull request whose body was edited",
+        "  rm -f \"$EVIDENCE_DIR/ai-review-evidence.json\"\nfi\n",
+    );
+    cut(
+        review,
+        "# Spec 068 section 3.1: a finding whose severity",
+        "mv \"$TMPD/identified.json\" \"$TMPD/merged-findings.json\"\n\n",
+    );
+    swap(
+        review,
+        r#""line": <number or null>, "severity": "low" or "medium" or "high", "category": "correctness" or "security" or "authority" or "ratification" or "other", "summary""#,
+        r#""line": <number or null>, "summary""#,
+    );
+    cut(review, " Give every finding a severity", "lifecycle.");
+    let gate = body(&mut p, "scripts/statecraft/ci-gate.sh");
+    cut(
+        gate,
+        "# Revision 26 (spec 068): true only when",
+        "outputs.answered // \"\"')\"\n",
+    );
+    swap(
+        gate,
+        r#"if [ "$exception_rule" = owner-exception ] && [ "$review_answered" != true ]; then rule=required;"#,
+        r#"if [ "$exception_rule" = owner-exception ]; then rule=required;"#,
+    );
+    cut(
+        gate,
+        "    if [ \"$exception_rule\" = owner-exception ] && [ \"$review_result\" = findings ] && [ \"$review_answered\" = true ]; then\n",
+        "    fi\n",
+    );
+    swap(
+        gate,
+        "lets the head through, unless every\n    # finding is low and other and answered (revision 26, spec 068).\n",
+        "lets the head through.\n",
+    );
+    swap(
+        gate,
+        r#" && [ "$review_answered" != true ] && [ "$result" != success ]"#,
+        r#" && [ "$result" != success ]"#,
+    );
+    swap(
+        gate,
+        "          # Revision 26 (spec 068): the pull request's own ci-gate passed\n          # with the exception skipped only when every finding was answered.\n          if [ \"$recorded_exception\" != success ]; then\n            if [ \"$recorded_exception\" = skipped ] && [ \"$recorded_gate\" = success ]; then\n              say \"the review recorded for #${pr} returned findings, every one answered by a review note when its ci-gate passed (spec 068)\"\n            else\n              block \"the review recorded for #${pr} returned findings and its owner exception was not approved (it ended '${recorded_exception}')\"\n              continue\n            fi\n          fi ;;",
+        "          if [ \"$recorded_exception\" != success ]; then\n            block \"the review recorded for #${pr} returned findings and its owner exception was not approved (it ended '${recorded_exception}')\"\n            continue\n          fi ;;",
+    );
+    swap(
+        gate,
+        "  gh api \"repos/${REPO}/actions/runs/${run}/jobs?per_page=100\" > \"$work/recorded-jobs.json\" 2> /dev/null || echo '{}' > \"$work/recorded-jobs.json\"\n  recorded_exception=\"$(jq -r '[.jobs[]? | select(.name == \"review-exception\")][0].conclusion // \"absent\"' \"$work/recorded-jobs.json\" 2> /dev/null || echo absent)\"\n  recorded_gate=\"$(jq -r '[.jobs[]? | select(.name == \"ci-gate\")][0].conclusion // \"absent\"' \"$work/recorded-jobs.json\" 2> /dev/null || echo absent)\"",
+        "  recorded_exception=\"$(gh api \"repos/${REPO}/actions/runs/${run}/jobs?per_page=100\" 2> /dev/null \\\n    | jq -r '[.jobs[]? | select(.name == \"review-exception\")][0].conclusion // \"absent\"' 2> /dev/null || echo absent)\"",
+    );
+    let flow = body(&mut p, ".github/workflows/statecraft-ai-review.yml");
+    cut(
+        flow,
+        "      answered:\n        description: true when",
+        "jobs.review.outputs.answered }}\n",
+    );
+    cut(
+        flow,
+        "      answered: ${{ steps.answered",
+        "outputs.answered }}\n",
+    );
+    cut(flow, "          REUSE_RECORDED:", "'edited' }}\n");
+    cut(
+        flow,
+        "      # Revision 26 (spec 068): whether every finding",
+        "bash \"$script\" answered\n",
+    );
+    let ci = body(&mut p, ".github/workflows/statecraft-ci.yml");
+    cut(ci, "#\n# Revision 26 (spec 068)", "the ones read.\n");
+    swap(ci, "ready_for_review, edited]", "ready_for_review]");
+    swap(
+        ci,
+        "|| (needs.ai-review.outputs.result == 'findings' && needs.ai-review.outputs.answered != 'true'))",
+        "|| needs.ai-review.outputs.result == 'findings')",
+    );
+    swap(
+        ci,
+        " Revision 26\n    # (spec 068): findings that are all low and answered need none.",
+        "",
+    );
+    for t in &p.templates {
+        assert!(
+            !t.body.contains("spec 068")
+                && !t.body.contains("review_answered")
+                && !t.body.contains("REUSE_RECORDED"),
+            "{}",
+            t.path
+        );
+    }
+    p
+}
+
 /// Revision 24 of the registered profile: revision 25 (spec 069) only
 /// inserted a comment and one placeholder into the workflow template, so
-/// revision 24 is the registered profile with both cut.
+/// revision 24 is revision 25 with both cut.
 fn revision_twenty_four() -> Profile {
-    let mut p = Profile::registered();
-    assert_eq!(p.revision, 25, "the registered profile is revision 25");
+    let mut p = revision_twenty_five();
+    assert_eq!(p.revision, 25);
     p.revision = 24;
     let ci = body(&mut p, ".github/workflows/statecraft-ci.yml");
     cut(ci, "#\n# Revision 25 (spec 069)", "before and after.\n");
@@ -1727,8 +1841,8 @@ fn revision_fourteen_installer_upgrades_to_the_registered_revision_without_repla
     });
     assert!(plan_and_apply(root, &old, &mut manifest).whole());
     let next = Profile::registered();
-    // Revisions 16 through 25 change no installer byte.
-    assert_eq!(next.revision, 25);
+    // Revisions 16 through 26 change no installer byte.
+    assert_eq!(next.revision, 26);
     let installer = "scripts/statecraft/install-spec-spine.sh";
     let upgraded = plan_and_apply(root, &next, &mut manifest);
     assert_eq!(
@@ -2311,7 +2425,7 @@ fn a_revision_twenty_four_project_upgrades_to_revision_twenty_five() {
             BTreeMap::new()
         };
         let old = revision_twenty_four();
-        let next = Profile::registered();
+        let next = revision_twenty_five();
         assert_eq!(next.revision, 25);
         assert_ne!(old.identity(), next.identity());
         let mut manifest = Manifest::new(Pins {
@@ -2370,5 +2484,79 @@ fn a_revision_twenty_four_project_upgrades_to_revision_twenty_five() {
         setup::remote_obligations()
             .join("\n")
             .contains("revision 25: the setup parameter ci.code.free_disk")
+    );
+}
+
+/// Spec 068: a revision-25 project upgrades to revision 26 in one ordinary
+/// plan, queued or not. Apart from each file's revision header only the
+/// review script, the gate script and the two workflows change, and a second
+/// identical plan writes nothing.
+#[test]
+fn a_revision_twenty_five_project_upgrades_to_revision_twenty_six() {
+    for queued in [false, true] {
+        let dir = project();
+        let root = dir.path();
+        let block = if queued {
+            queue_block()
+        } else {
+            BTreeMap::new()
+        };
+        let old = revision_twenty_five();
+        let next = Profile::registered();
+        assert_eq!(next.revision, setup::ANSWERED_SINCE);
+        assert_ne!(old.identity(), next.identity());
+        let mut manifest = Manifest::new(Pins {
+            product: "test".into(),
+            spec_spine: "unpinned".into(),
+            adapters: Default::default(),
+            producer: None,
+        });
+        assert!(plan_and_apply_with(root, &old, &mut manifest, &block).whole());
+        let changed = [
+            ".github/workflows/statecraft-ci.yml",
+            ".github/workflows/statecraft-ai-review.yml",
+            "scripts/statecraft/ai-review.sh",
+            "scripts/statecraft/ci-gate.sh",
+        ];
+        let read = |rel: &str| std::fs::read_to_string(root.join(rel)).unwrap();
+        let before: BTreeMap<String, String> = old
+            .templates
+            .iter()
+            .filter(|t| !changed.contains(&t.path.as_str()) && root.join(&t.path).is_file())
+            .map(|t| (t.path.clone(), read(&t.path)))
+            .collect();
+        let upgraded = plan_and_apply_with(root, &next, &mut manifest, &block);
+        assert!(upgraded.whole(), "{:?}", upgraded.withheld);
+        let written: Vec<&str> = upgraded
+            .files
+            .iter()
+            .filter(|f| f.action.writes())
+            .map(|f| f.path.as_str())
+            .collect();
+        for path in changed {
+            assert!(written.contains(&path), "{path} {written:?}");
+        }
+        for (path, was) in &before {
+            let now = read(path);
+            assert_eq!(
+                now.replace("revision 26", "revision 25")
+                    .replace(&next.identity(), &old.identity()),
+                *was,
+                "{path} {queued}"
+            );
+        }
+        assert!(
+            read("scripts/statecraft/ai-review.sh").contains("# statecraft-ai-review: answered")
+        );
+        assert!(read(".github/workflows/statecraft-ci.yml").contains("ready_for_review, edited]"));
+        let policy: serde_json::Value = serde_json::from_str(&read(setup::POLICY_PATH)).unwrap();
+        assert_eq!(policy["revision"], 26);
+        let again = plan_and_apply_with(root, &next, &mut manifest, &block);
+        assert!(again.files.iter().all(|f| !f.action.writes()));
+    }
+    assert!(
+        setup::remote_obligations()
+            .join("\n")
+            .contains("revision 26: every finding of the AI review carries a severity")
     );
 }

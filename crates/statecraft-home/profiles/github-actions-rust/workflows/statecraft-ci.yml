@@ -7,7 +7,7 @@ name: statecraft-ci
 
 on:
   pull_request:
-    types: [opened, synchronize, reopened, ready_for_review]
+    types: [opened, synchronize, reopened, ready_for_review, edited]
   push:
     branches: [{{sc:default_branch}}]
   # Revision 3: a required merge queue judges each queued entry here. The
@@ -34,6 +34,12 @@ on:
 # Revision 25 (spec 069): where the setup parameter ci.code.free_disk is
 # true, the code job removes the runner's unused preinstalled toolchains
 # before it builds, and reports the free space before and after.
+#
+# Revision 26 (spec 068): a finding carries a severity, a category and an id.
+# A pull request whose findings are all low and other, each answered by a
+# `Review note (<sha8>): <id>` line of its body for that head, needs no owner
+# exception. An edited pull request runs again and keeps the review recorded
+# for its head, so the ids its notes name are the ones read.
 
 permissions:
   contents: read
@@ -584,8 +590,9 @@ jobs:
     # The owner exception (S-1): a release candidate whose review was skipped,
     # (revision 2, R2-1) any pull request whose review returned findings, and
     # (revision 5, rule 2) any pull request that changes the authority set,
-    # and (revision 12) any pull request that ratifies a spec.
-    if: always() && github.event_name == 'pull_request' && (needs.governance.outputs.authority_change == 'true' || needs.governance.outputs.ratification == 'true' || (needs.ai-review.outputs.release_candidate == 'true' && startsWith(needs.ai-review.outputs.result, 'skipped:')) || needs.ai-review.outputs.result == 'findings')
+    # and (revision 12) any pull request that ratifies a spec. Revision 26
+    # (spec 068): findings that are all low and answered need none.
+    if: always() && github.event_name == 'pull_request' && (needs.governance.outputs.authority_change == 'true' || needs.governance.outputs.ratification == 'true' || (needs.ai-review.outputs.release_candidate == 'true' && startsWith(needs.ai-review.outputs.result, 'skipped:')) || (needs.ai-review.outputs.result == 'findings' && needs.ai-review.outputs.answered != 'true'))
     runs-on: ubuntu-latest
     environment: statecraft-review-exception
     steps:
