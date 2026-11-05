@@ -2642,3 +2642,207 @@ fn run_operations_request_left_behind_is_applied_by_the_next_lease_verb() {
         "the queued request took it"
     );
 }
+
+// ---- Spec 053: operator input reaching a live supervisor (section 5, 2026-11-02) ----
+
+/// The record's inputs, folded through the library.
+fn inputs(f: &Fixture) -> Vec<statecraft_run::input::Input> {
+    let (chain, _) = statecraft_run::record::Chain::open(&f.home(), &f.project()).unwrap();
+    let fold = statecraft_run::input::fold(&chain);
+    assert!(fold.defects.is_empty(), "{:?}", fold.defects);
+    fold.inputs
+}
+
+/// Wait until the record's first input reaches `state`.
+fn wait_for_input(f: &Fixture, state: statecraft_run::input::State) {
+    let started = std::time::Instant::now();
+    while inputs(f).first().map(|i| i.state) != Some(state) {
+        assert!(
+            started.elapsed() < std::time::Duration::from_secs(60),
+            "the supervisor never recorded the input {}: {:?}",
+            state.word(),
+            inputs(f)
+        );
+        std::thread::sleep(std::time::Duration::from_millis(20));
+    }
+}
+
+/// Release the blocked fake and wait for its supervisor to finish.
+fn release_and_wait(f: &Fixture, guard: &mut Unblock) {
+    std::fs::write(f.bin().join("release"), "").unwrap();
+    let launcher = guard.launcher.as_mut().expect("a launcher");
+    let started = std::time::Instant::now();
+    while launcher.try_wait().unwrap().is_none() {
+        assert!(
+            started.elapsed() < std::time::Duration::from_secs(60),
+            "the attempt never ended: {:?}",
+            f.order()
+        );
+        std::thread::sleep(std::time::Duration::from_millis(20));
+    }
+}
+
+fn note_args<'a>(root: &'a str, expires: &'a str) -> Vec<&'a str> {
+    vec![
+        "input",
+        "note",
+        root,
+        RUN,
+        "alice",
+        "wrong module",
+        expires,
+        "the",
+        "fix",
+        "is",
+        "in",
+        "the",
+        "parser",
+        "--json",
+    ]
+}
+
+/// V-1: a note sent while a `run` holds the lock is queued, recorded
+/// `pending` by the supervisor and then placed (`delivered`), and the gate
+/// returns it as context at the next governed call; the gate log's line is
+/// recorded `acknowledged`, child-attested, and the input is on the attempt.
+#[test]
+fn operator_input_note_is_recorded_pending_delivered_and_returned_at_the_next_governed_call() {
+    use statecraft_run::input::State;
+    let f = Fixture::new();
+    let mut guard = run_until_blocked(&f, "block");
+    let root = f.root();
+
+    let out = f.cli(&note_args(&root, "600"));
+    assert_eq!(code(&out), 0, "{}", text(&out));
+    let queued = json_naming::payload(&json(&out)).clone();
+    assert_eq!(queued["queued"], true, "{queued}");
+    let request = PathBuf::from(queued["file"].as_str().unwrap());
+    assert!(request.starts_with(f.home().join("records")), "{queued}");
+    assert!(!request.starts_with(f.project()));
+
+    wait_for_input(&f, State::Delivered);
+    assert!(!request.exists(), "a taken request is removed");
+    let placed: Vec<_> = std::fs::read_dir(f.exchange_dir(1).join("notes"))
+        .unwrap()
+        .map(|e| e.unwrap().file_name().to_string_lossy().into_owned())
+        .collect();
+    assert_eq!(placed.len(), 1, "{placed:?}");
+    assert!(placed[0].starts_with("input-000001."), "{placed:?}");
+    assert!(
+        !f.order().iter().any(|l| l.contains("sentinel-after")),
+        "no governed call has run yet"
+    );
+
+    release_and_wait(&f, &mut guard);
+    let gate_out = String::from_utf8(f.received("gate-stdout")).unwrap();
+    assert!(gate_out.contains("the fix is in the parser"), "{gate_out}");
+    assert!(gate_out.contains("additionalContext"), "{gate_out}");
+    assert!(f.order().iter().any(|l| l == "gate sentinel-after exit=0"));
+
+    let input = &inputs(&f)[0];
+    assert_eq!(input.submission.author, "alice");
+    assert_eq!(input.submission.reason, "wrong module");
+    let states: Vec<_> = input.history.iter().map(|t| t.state).collect();
+    assert_eq!(
+        states,
+        [State::Pending, State::Delivered, State::Acknowledged]
+    );
+    assert_eq!(
+        input.history[2].attestation.as_deref(),
+        Some(statecraft_run::input::CHILD_ATTESTED)
+    );
+    let entries = halt_entries(&f);
+    let outcome = entry_at(&entries, |e| {
+        e.kind == statecraft_run::record::Kind::Outcome
+            && e.subject == statecraft_run::session::OUTCOME_SUBJECT
+    });
+    assert_eq!(entries[outcome].detail["outcome"], "completed");
+    assert_eq!(
+        entries[outcome].detail["halt"]["inputs"][0]["taken"]["id"],
+        "input-000001"
+    );
+}
+
+/// V-1: a note no governed call reads before its expiry is expired by the
+/// supervisor and withdrawn, so the next call returns nothing.
+#[test]
+fn operator_input_note_no_call_reads_before_its_expiry_expires() {
+    use statecraft_run::input::State;
+    let f = Fixture::new();
+    let mut guard = run_until_blocked(&f, "block");
+    let root = f.root();
+    let out = f.cli(&note_args(&root, "2"));
+    assert_eq!(code(&out), 0, "{}", text(&out));
+
+    wait_for_input(&f, State::Expired);
+    release_and_wait(&f, &mut guard);
+    let gate_out = String::from_utf8(f.received("gate-stdout")).unwrap();
+    assert!(!gate_out.contains("the fix is in the parser"), "{gate_out}");
+    let input = &inputs(&f)[0];
+    let states: Vec<_> = input.history.iter().map(|t| t.state).collect();
+    assert_eq!(states, [State::Pending, State::Delivered, State::Expired]);
+    assert_eq!(
+        input.history[2].why.as_deref(),
+        Some(statecraft_run::input::EXPIRY_PASSED)
+    );
+    assert_eq!(
+        std::fs::read_dir(f.exchange_dir(1).join("notes"))
+            .unwrap()
+            .count(),
+        0,
+        "an expired note is withdrawn"
+    );
+}
+
+/// Section 3.3: the `abort` command during a live attempt is recorded, then
+/// spec 048's abort with the input as its reason, and the attempt ends
+/// cancelled.
+#[test]
+fn operator_input_abort_command_is_recorded_then_cancels_the_attempt_with_the_input_as_reason() {
+    use statecraft_run::record::Kind;
+    let f = Fixture::new();
+    let mut guard = run_until_blocked(&f, "block");
+    let root = f.root();
+    let out = f.cli(&["run", "lease", &root, RUN, "acquire", "ctl", "--json"]);
+    assert_eq!(code(&out), 0, "{}", text(&out));
+    let (lease, version) = wait_for_lease(&f);
+    let (lease, version) = (lease.to_string(), version.to_string());
+    let out = f.cli(&[
+        "input",
+        "command",
+        &root,
+        RUN,
+        "ctl",
+        &lease,
+        "k-input",
+        &version,
+        "bob",
+        "off track",
+        "600",
+        "abort",
+        "--json",
+    ]);
+    assert_eq!(code(&out), 0, "{}", text(&out));
+    assert_eq!(json_naming::payload(&json(&out))["queued"], true);
+    wait_for_launcher(&f, &mut guard);
+
+    let entries = halt_entries(&f);
+    let recorded = entry_at(&entries, |e| {
+        e.subject == statecraft_run::input::INPUT_SUBJECT
+    });
+    let intent = entry_at(&entries, |e| {
+        e.kind == Kind::Intent && e.idempotency_key.as_deref() == Some("k-input")
+    });
+    let outcome = entry_at(&entries, |e| {
+        e.kind == Kind::Outcome && e.subject == statecraft_run::session::OUTCOME_SUBJECT
+    });
+    assert!(recorded < intent && intent < outcome, "{entries:?}");
+    assert_eq!(
+        entries[intent].detail["reason"],
+        "operator input input-000001 from bob: off track"
+    );
+    assert_eq!(entries[outcome].detail["outcome"], "cancelled");
+    let input = &inputs(&f)[0];
+    assert_eq!(input.submission.body, "abort");
+    assert_eq!(input.submission.author, "bob");
+}

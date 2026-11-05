@@ -62,6 +62,39 @@ fn render_with(root: &Path, extra: &[(&str, serde_json::Value)]) {
 
 /// Render `profile` into `root` with the project parameters `extra`.
 fn render_profile(root: &Path, profile: &Profile, extra: &[(&str, serde_json::Value)]) {
+    let plan = plan_profile(root, profile, extra).unwrap();
+    assert!(plan.withheld.is_none(), "{:?}", plan.withheld);
+    let mut manifest = empty_manifest();
+    setup::apply(
+        root,
+        &plan,
+        &mut manifest,
+        "2026-09-24T00:00:00Z",
+        &mut |p, b| {
+            std::fs::create_dir_all(p.parent().unwrap())?;
+            std::fs::write(p, b)
+        },
+    )
+    .unwrap();
+    setup::finish(root).unwrap();
+}
+
+fn empty_manifest() -> Manifest {
+    Manifest::new(Pins {
+        product: "0.0.0".into(),
+        spec_spine: "unpinned".into(),
+        adapters: Default::default(),
+        producer: None,
+    })
+}
+
+/// Plan `profile` for `root` with the project parameters `extra`; `Err` is
+/// the plan's refusal.
+fn plan_profile(
+    root: &Path,
+    profile: &Profile,
+    extra: &[(&str, serde_json::Value)],
+) -> Result<setup::Plan, String> {
     // The local prerequisites, so the profile is not withheld.
     for (rel, text) in [
         ("rust-toolchain.toml", "[toolchain]\nchannel = \"1.96.0\"\n"),
@@ -82,41 +115,20 @@ fn render_profile(root: &Path, profile: &Profile, extra: &[(&str, serde_json::Va
         root,
         &["add", "rust-toolchain.toml", "Cargo.lock", "deny.toml"],
     );
-    let manifest = Manifest::new(Pins {
-        product: "0.0.0".into(),
-        spec_spine: "unpinned".into(),
-        adapters: Default::default(),
-        producer: None,
-    });
     let mut block = BTreeMap::new();
     block.insert("default_branch".to_string(), serde_json::json!("main"));
     for (k, v) in extra {
         block.insert(k.to_string(), v.clone());
     }
-    let plan = setup::plan(&Inputs {
+    setup::plan(&Inputs {
         root,
         profile,
         block: &block,
-        manifest: &manifest,
+        manifest: &empty_manifest(),
         spec_spine_toml: Some(TOML),
         derived_dir: ".statecraft/derived",
         bound: &statecraft_home::setup_input::Bound::with_producer("0.26.0"),
     })
-    .unwrap();
-    assert!(plan.withheld.is_none(), "{:?}", plan.withheld);
-    let mut manifest = manifest;
-    setup::apply(
-        root,
-        &plan,
-        &mut manifest,
-        "2026-09-24T00:00:00Z",
-        &mut |p, b| {
-            std::fs::create_dir_all(p.parent().unwrap())?;
-            std::fs::write(p, b)
-        },
-    )
-    .unwrap();
-    setup::finish(root).unwrap();
 }
 
 /// A reusable workflow a declared extra required job calls (revision 7).
@@ -574,8 +586,10 @@ case "$1 $2" in
       *) echo "gh stub: unsupported $*" >&2; exit 98 ;;
     esac ;;
   api\ repos/*/actions/runs/*/jobs*)
+    if [ -f "$here/gh-jobs-fails" ]; then echo "HTTP 502: Bad Gateway" >&2; exit 1; fi
     cat "$here/gh-jobs" 2> /dev/null || echo '{"jobs": []}' ;;
   api\ repos/*/actions/runs*)
+    if [ -f "$here/gh-runs-fails" ]; then echo "HTTP 502: Bad Gateway" >&2; exit 1; fi
     cat "$here/gh-runs" 2> /dev/null || echo '{"workflow_runs": []}' ;;
   api\ repos/*/commits/*)
     # Revision 4: GitHub's verification of one commit, as `--jq` reads it.
@@ -1432,6 +1446,15 @@ fn inverting_a_blocking_branch_of_ci_gate_is_noticed() {
                 1,
                 "unknown rule",
             )
+        };
+        // Revision 24 (spec 067): the post-merge branches need a required
+        // queue in the base's policy.
+        let noticed = noticed || {
+            let pm = Repo::new_with(&[queue_param()], &[POLICY], &[]);
+            std::fs::write(pm.root().join("scripts/statecraft/ci-gate.sh"), &mutated).unwrap();
+            post_merge_cases(&pm.head)
+                .iter()
+                .any(|c| post_merge_differs(c, &run_post_merge(&pm, "push", c)))
         };
         assert!(
             noticed,
@@ -5874,7 +5897,7 @@ fn run_mutated(repo: &Repo, script: &str, extra: &[(&'static str, &str)]) -> Ran
 /// 058), captured byte for byte from main at 6c6f394.
 fn revision_seventeen() -> Profile {
     let mut p = Profile::registered();
-    assert_eq!(p.revision, 23, "the registered profile is revision 23");
+    assert_eq!(p.revision, 24, "the registered profile is revision 24");
     // Revision 22 (spec 044) added two scripts, and revision 23 (spec 056)
     // the review guide, that revision 17 did not have.
     p.templates.retain(|t| {
@@ -7171,7 +7194,9 @@ fn revision_twenty_two_renders_the_supply_chain_jobs_with_pinned_tools() {
             bound: &statecraft_home::setup_input::Bound::with_producer("0.26.0"),
         })
         .unwrap_err();
-        assert!(err.contains("is not optional in revision 23"), "{err}");
+        // The refusal names the registered revision, whichever it is.
+        let says = format!("is not optional in revision {}", setup::REVISION);
+        assert!(err.contains(&says), "{err}");
     }
 }
 
@@ -7190,12 +7215,13 @@ fn revision_twenty_three_renders_the_review_guide_and_both_default_paths() {
     render(tmp.path());
     let root = tmp.path();
     let guide = std::fs::read_to_string(root.join(setup::GUIDE_PATH)).unwrap();
-    assert!(
-        guide.starts_with(
-            "# Review guide\n\nRendered by Statecraft from profile github-actions-rust revision 23.\n"
-        ),
-        "{guide}"
+    // Revision 23 introduced the guide; its header names the registered
+    // revision, which every later revision advances.
+    let header = format!(
+        "# Review guide\n\nRendered by Statecraft from profile github-actions-rust revision {}.\n",
+        setup::REVISION
     );
+    assert!(guide.starts_with(&header), "{guide}");
     assert!(!guide.contains("{{sc:"), "{guide}");
     for said in [
         "Judge the change against its intent",
@@ -7209,7 +7235,7 @@ fn revision_twenty_three_renders_the_review_guide_and_both_default_paths() {
     }
     let policy: serde_json::Value =
         serde_json::from_str(&std::fs::read_to_string(root.join(POLICY)).unwrap()).unwrap();
-    assert_eq!(policy["revision"], 23);
+    assert_eq!(policy["revision"], setup::REVISION);
     let listed = policy["files"]
         .as_array()
         .unwrap()
@@ -7306,9 +7332,13 @@ fn review_reads_the_guide_and_the_repository_review_from_the_base_only() {
         .unwrap();
     let guide_doc = format!("----- BEGIN DOCUMENT .statecraft/REVIEW.md (blob {guide_blob}, ");
     let review_doc = format!("----- BEGIN DOCUMENT REVIEW.md (blob {review_blob}, ");
+    let rendered = format!(
+        "Rendered by Statecraft from profile github-actions-rust revision {}.",
+        setup::REVISION
+    );
     for want in [
         guide_doc.as_str(),
-        "Rendered by Statecraft from profile github-actions-rust revision 23.",
+        rendered.as_str(),
         "Judge the change against its intent",
         review_doc.as_str(),
         "base repository guide: weigh the ledger first",
@@ -7408,4 +7438,425 @@ fn review_refuses_an_oversized_review_guide_before_the_provider() {
     assert_eq!(ran.exit, 0, "{}", ran.text);
     let input = ran.stub_file("claude-input").unwrap();
     assert!(input.contains("risk surface 0999: needs a ledger witness"));
+}
+
+// ------------------------------------------------------------ revision 24
+
+/// A required merge queue, as spec 012's `remote.merge_queue` declares it.
+fn queue_param() -> (&'static str, serde_json::Value) {
+    (
+        "remote.merge_queue",
+        serde_json::json!({"required": true, "merge_method": "merge", "build_concurrency": 5, "all_entries_must_pass": true}),
+    )
+}
+
+/// A reusable workflow that declares the post-merge input (spec 067 3.4).
+const REUSABLE_POST_MERGE: &str = "on:\n  workflow_call:\n    inputs:\n      post_merge:\n        type: boolean\n        default: false\njobs:\n  check:\n    runs-on: ubuntu-latest\n    steps:\n      - run: true\n";
+
+/// The jobs a post-merge push skips whole (spec 067 section 3.1).
+const POST_MERGE_SKIPPED: [&str; 6] = [
+    "governance",
+    "preflight",
+    "supply-chain",
+    "workflow-lint",
+    "sg-scan",
+    "secret-scan",
+];
+
+const AFTER_PREFLIGHT: &str =
+    "${{ !cancelled() && (needs.preflight.result == 'success' || github.event_name == 'push') }}";
+const POST_MERGE_WITH: &str = "${{ github.event_name == 'push' }}";
+
+fn step_of<'a>(wf: &'a Yaml, job: &str, name: &str) -> &'a Yaml {
+    wf["jobs"][job]["steps"]
+        .as_sequence()
+        .unwrap()
+        .iter()
+        .find(|s| s["name"].as_str() == Some(name))
+        .unwrap_or_else(|| panic!("no step {name} in {job}"))
+}
+
+/// Spec 067 sections 3.1, 3.2 and 3.5, R-1, R-2 and R-5: only a required
+/// queue renders the post-merge push. Every job that judges is skipped on a
+/// push, code keeps its cache steps and builds only to fill a missed key,
+/// and the policy judges the push by the post-merge rule. Without a required
+/// queue nothing of it is rendered and the push rules stay `required`.
+#[test]
+fn revision_twenty_four_renders_a_post_merge_push_only_where_the_queue_is_required() {
+    let judged: Vec<&str> = POST_MERGE_SKIPPED.iter().copied().chain(["code"]).collect();
+    for extra in [
+        vec![],
+        vec![("remote.merge_queue", serde_json::json!({"required": false}))],
+    ] {
+        let tmp = tempfile::tempdir().unwrap();
+        write(tmp.path(), "spec-spine.toml", TOML);
+        render_with(tmp.path(), &extra);
+        let text = std::fs::read_to_string(tmp.path().join(".github/workflows/statecraft-ci.yml"))
+            .unwrap();
+        for absent in [
+            "lookup-only",
+            "post_merge:",
+            "needs.preflight.result",
+            "{{sc:",
+        ] {
+            assert!(!text.contains(absent), "{absent}: {extra:?}");
+        }
+        let wf = workflow(tmp.path(), "statecraft-ci.yml");
+        for job in &judged {
+            assert!(wf["jobs"][*job]["if"].is_null(), "{job}");
+        }
+        assert!(step_of(&wf, "code", "Build, test, clippy, fmt")["if"].is_null());
+        let policy: serde_json::Value =
+            serde_json::from_str(&std::fs::read_to_string(tmp.path().join(POLICY)).unwrap())
+                .unwrap();
+        for job in &judged {
+            assert_eq!(policy["jobs"][*job]["push"], "required", "{job}");
+        }
+        assert!(policy["post_merge_rule"].is_null());
+    }
+
+    let tmp = tempfile::tempdir().unwrap();
+    write(tmp.path(), "spec-spine.toml", TOML);
+    render_with(tmp.path(), &[queue_param()]);
+    let wf = workflow(tmp.path(), "statecraft-ci.yml");
+    for job in POST_MERGE_SKIPPED {
+        assert_eq!(
+            wf["jobs"][job]["if"].as_str(),
+            Some("github.event_name != 'push'"),
+            "{job}"
+        );
+    }
+    assert_eq!(wf["jobs"]["code"]["if"].as_str(), Some(AFTER_PREFLIGHT));
+    // The cache steps run on every event; the cargo key is only looked up on
+    // a push, and the build runs there only to fill a missed key.
+    for name in [
+        READ_GATE,
+        "Read the spec-spine pin",
+        "Cache spec-spine",
+        "Install the pinned spec-spine",
+        "Restore cargo registry, git and target",
+    ] {
+        assert!(step_of(&wf, "code", name)["if"].is_null(), "{name}");
+    }
+    assert_eq!(
+        step_of(&wf, "code", "Restore cargo registry, git and target")["with"]["lookup-only"]
+            .as_str(),
+        Some(POST_MERGE_WITH)
+    );
+    assert_eq!(
+        step_of(&wf, "code", "Build, test, clippy, fmt")["if"].as_str(),
+        Some("github.event_name != 'push' || steps.cargo-cache.outputs.cache-hit != 'true'")
+    );
+    for name in [
+        "Drop the workspace's own artifacts (default branch only)",
+        "Save cargo registry, git and target (default branch only)",
+    ] {
+        assert_eq!(
+            step_of(&wf, "code", name)["if"].as_str(),
+            Some("github.event_name == 'push' && steps.cargo-cache.outputs.cache-hit != 'true'"),
+            "{name}"
+        );
+    }
+    // ci-gate still runs on the push and reports its check run there.
+    assert_eq!(wf["jobs"]["ci-gate"]["if"].as_str(), Some("always()"));
+    assert!(
+        wf["jobs"]["ai-review"]["if"]
+            .as_str()
+            .unwrap()
+            .contains("github.event_name == 'pull_request'")
+    );
+    let policy: serde_json::Value =
+        serde_json::from_str(&std::fs::read_to_string(tmp.path().join(POLICY)).unwrap()).unwrap();
+    for job in &judged {
+        assert_eq!(policy["jobs"][*job]["push"], "post-merge", "{job}");
+        assert_eq!(policy["jobs"][*job]["pull_request"], "required", "{job}");
+        assert_eq!(policy["jobs"][*job]["merge_group"], "required", "{job}");
+    }
+    for job in ["ai-review", "review-exception"] {
+        assert_eq!(policy["jobs"][job]["push"], "inapplicable", "{job}");
+    }
+    assert_eq!(policy["post_merge_rule"]["input"], setup::POST_MERGE_INPUT);
+}
+
+/// Spec 067 section 3.4, R-4: with a required queue every called workflow
+/// (a declared extra job, an external code selection) is called with the
+/// input `post_merge`, true on a push, and runs where preflight is skipped;
+/// the plan refuses a workflow that does not declare the input. Without a
+/// required queue such a workflow is accepted and called as before.
+#[test]
+fn revision_twenty_four_passes_post_merge_to_every_called_workflow() {
+    let extra_wf = ".github/workflows/extra.yml";
+    let jobs = serde_json::json!([{"job": "extra", "workflow": extra_wf}]);
+    let tmp = tempfile::tempdir().unwrap();
+    write(tmp.path(), "spec-spine.toml", TOML);
+    write(tmp.path(), extra_wf, REUSABLE);
+    let err = plan_profile(
+        tmp.path(),
+        &Profile::registered(),
+        &[("ci.extra_required_jobs", jobs.clone()), queue_param()],
+    )
+    .unwrap_err();
+    assert!(
+        err.contains("ci.extra_required_jobs: `.github/workflows/extra.yml` must declare the boolean workflow_call input `post_merge`"),
+        "{err}"
+    );
+    render_with(tmp.path(), &[("ci.extra_required_jobs", jobs.clone())]);
+    let wf = workflow(tmp.path(), "statecraft-ci.yml");
+    assert!(wf["jobs"]["extra"]["with"].is_null());
+    assert!(wf["jobs"]["extra"]["if"].is_null());
+
+    // A fresh target: this harness records no manifest between renders.
+    let tmp = tempfile::tempdir().unwrap();
+    write(tmp.path(), "spec-spine.toml", TOML);
+    write(tmp.path(), extra_wf, REUSABLE_POST_MERGE);
+    render_with(
+        tmp.path(),
+        &[("ci.extra_required_jobs", jobs), queue_param()],
+    );
+    let wf = workflow(tmp.path(), "statecraft-ci.yml");
+    assert_eq!(wf["jobs"]["extra"]["if"].as_str(), Some(AFTER_PREFLIGHT));
+    assert_eq!(
+        wf["jobs"]["extra"]["with"]["post_merge"].as_str(),
+        Some(POST_MERGE_WITH)
+    );
+    let policy: serde_json::Value =
+        serde_json::from_str(&std::fs::read_to_string(tmp.path().join(POLICY)).unwrap()).unwrap();
+    assert_eq!(policy["jobs"]["extra"]["push"], "post-merge");
+
+    // An external code selection's call, the same way.
+    let code_wf = ".github/workflows/project-code.yml";
+    let script = "scripts/project-code.sh";
+    let code = serde_json::json!({"kind": "external", "workflow": code_wf, "script": script});
+    let tmp = tempfile::tempdir().unwrap();
+    write(tmp.path(), "spec-spine.toml", TOML);
+    write(tmp.path(), code_wf, REUSABLE);
+    std::fs::create_dir_all(tmp.path().join("scripts")).unwrap();
+    statecraft_adapter::fixture::install_script(
+        &tmp.path().join(script),
+        "#!/bin/sh\nexit 0\n",
+        0o755,
+    )
+    .unwrap();
+    let err = plan_profile(
+        tmp.path(),
+        &Profile::registered(),
+        &[("ci.code", code.clone()), queue_param()],
+    )
+    .unwrap_err();
+    assert!(
+        err.contains("ci.code.workflow: `.github/workflows/project-code.yml` must declare"),
+        "{err}"
+    );
+    write(tmp.path(), code_wf, REUSABLE_POST_MERGE);
+    // Spec 032: a checkout carries both, so the index tracks them.
+    git(tmp.path(), &["init", "--quiet"]);
+    git(tmp.path(), &["add", code_wf, script]);
+    render_with(tmp.path(), &[("ci.code", code), queue_param()]);
+    let wf = workflow(tmp.path(), "statecraft-ci.yml");
+    assert_eq!(wf["jobs"]["code"]["if"].as_str(), Some(AFTER_PREFLIGHT));
+    assert_eq!(
+        wf["jobs"]["code"]["with"]["post_merge"].as_str(),
+        Some(POST_MERGE_WITH)
+    );
+}
+
+/// One post-merge case: the needs record and what the API answers about the
+/// pushed commit's merge-queue run.
+struct PostMerge {
+    label: &'static str,
+    needs_json: String,
+    runs: serde_json::Value,
+    runs_fail: bool,
+    jobs_fail: bool,
+    gate: &'static str,
+    want: i32,
+    why: &'static str,
+}
+
+/// The push's needs: every judging job skipped, code's cache steps succeeded.
+fn post_merge_needs(over: Option<(&str, &str)>) -> String {
+    let mut entries: Vec<(&str, &str)> =
+        POST_MERGE_SKIPPED.iter().map(|j| (*j, "skipped")).collect();
+    entries.extend([
+        ("code", "success"),
+        ("ai-review", "skipped"),
+        ("review-exception", "skipped"),
+    ]);
+    if let Some((job, result)) = over {
+        entries.retain(|(j, _)| *j != job);
+        if result != "vanished" {
+            entries.push((job, result));
+        }
+    }
+    needs(&entries, None, false)
+}
+
+fn post_merge_cases(head: &str) -> Vec<PostMerge> {
+    let queue_run = |id: u64, name: &str, event: &str, sha: &str| serde_json::json!({"id": id, "name": name, "event": event, "head_sha": sha, "status": "completed"});
+    let runs = serde_json::json!({"workflow_runs": [
+        queue_run(51, "statecraft-ci", "merge_group", head),
+        queue_run(52, "statecraft-ci", "merge_group", head),
+        queue_run(53, "something-else", "merge_group", head),
+    ]});
+    let ok = |label, want, why| PostMerge {
+        label,
+        needs_json: post_merge_needs(None),
+        runs: runs.clone(),
+        runs_fail: false,
+        jobs_fail: false,
+        gate: "success",
+        want,
+        why,
+    };
+    vec![
+        ok("post-merge, judged in the queue", 0, ""),
+        PostMerge {
+            needs_json: needs(
+                &ALL_OK
+                    .iter()
+                    .map(|(j, r)| (*j, if *j == "ai-review" { "skipped" } else { *r }))
+                    .collect::<Vec<_>>(),
+                None,
+                false,
+            ),
+            ..ok("post-merge, every job ran", 0, "")
+        },
+        PostMerge {
+            needs_json: post_merge_needs(Some(("governance", "failure"))),
+            ..ok(
+                "post-merge, governance failed",
+                1,
+                "ended 'failure' on a post-merge push",
+            )
+        },
+        PostMerge {
+            needs_json: post_merge_needs(Some(("code", "cancelled"))),
+            ..ok(
+                "post-merge, code cancelled",
+                1,
+                "ended 'cancelled' on a post-merge push",
+            )
+        },
+        PostMerge {
+            needs_json: post_merge_needs(Some(("secret-scan", "vanished"))),
+            ..ok("post-merge, a job vanished", 1, "vanished")
+        },
+        PostMerge {
+            runs: serde_json::json!({"workflow_runs": [
+                queue_run(51, "statecraft-ci", "merge_group", "1111111111111111111111111111111111111111"),
+                queue_run(52, "statecraft-ci", "push", head),
+                queue_run(53, "something-else", "merge_group", head),
+            ]}),
+            ..ok(
+                "post-merge, the push bypassed the queue",
+                1,
+                "judged nowhere",
+            )
+        },
+        PostMerge {
+            gate: "failure",
+            ..ok(
+                "post-merge, ci-gate failed in the queue",
+                1,
+                "ended 'failure'",
+            )
+        },
+        PostMerge {
+            runs_fail: true,
+            ..ok(
+                "post-merge, the runs cannot be read",
+                1,
+                "cannot read the merge-queue runs",
+            )
+        },
+        PostMerge {
+            jobs_fail: true,
+            ..ok(
+                "post-merge, the queue run's jobs cannot be read",
+                1,
+                "cannot read the jobs of merge-queue run",
+            )
+        },
+    ]
+}
+
+fn run_post_merge(repo: &Repo, event: &str, c: &PostMerge) -> Ran {
+    let wf = workflow(repo.root(), "statecraft-ci.yml");
+    let (run, env) = step(&wf, "ci-gate", "Aggregate");
+    let ctx = gate_ctx(repo, event, &c.needs_json, "");
+    run_step(repo.root(), &run, &env, &ctx, &[], |state| {
+        std::fs::write(state.join("gh-runs"), c.runs.to_string()).unwrap();
+        if c.runs_fail {
+            std::fs::write(state.join("gh-runs-fails"), "").unwrap();
+        }
+        if c.jobs_fail {
+            std::fs::write(state.join("gh-jobs-fails"), "").unwrap();
+        }
+        let jobs = serde_json::json!({"jobs": [
+            {"name": "code", "conclusion": "success"},
+            {"name": "ci-gate", "conclusion": c.gate}
+        ]});
+        std::fs::write(state.join("gh-jobs"), jobs.to_string()).unwrap();
+    })
+}
+
+/// A post-merge case ended differently, or blocked without saying why.
+fn post_merge_differs(c: &PostMerge, ran: &Ran) -> bool {
+    ran.exit != c.want || (c.want != 0 && !ran.text.contains(c.why))
+}
+
+/// Spec 067 section 3.3, R-3 and V-1: ci-gate.sh, run as a program, judges
+/// a post-merge push by the post-merge rule. Skipped and successful jobs are
+/// admitted only when the pushed commit passed ci-gate in a completed
+/// merge-queue run of statecraft-ci; a failed, cancelled or vanished job,
+/// a push that bypassed the queue, a failed queue gate and an unreadable
+/// record each block. The rule applies to a push only, and only where the
+/// queue is required.
+#[test]
+fn ci_gate_judges_a_post_merge_push_by_the_queue_run_at_its_commit() {
+    let repo = Repo::new_with(
+        &[queue_param()],
+        &[POLICY, "scripts/statecraft/ci-gate.sh"],
+        &[],
+    );
+    for c in post_merge_cases(&repo.head) {
+        let ran = run_post_merge(&repo, "push", &c);
+        assert!(!post_merge_differs(&c, &ran), "{}:\n{}", c.label, ran.text);
+        if c.want == 0 {
+            assert!(
+                ran.text.contains("passed ci-gate in merge-queue run 52"),
+                "{}: {}",
+                c.label,
+                ran.text
+            );
+        }
+        let calls = ran.stub_file("gh-calls").unwrap_or_default();
+        assert!(
+            !calls.contains("--method"),
+            "{}: only reads: {calls}",
+            c.label
+        );
+    }
+    // A skipped judging job is still an unexpected skip on a pull request
+    // and in the queue, and on a push where the queue is not required.
+    let first = &post_merge_cases(&repo.head)[0];
+    for event in ["pull_request", "merge_group"] {
+        let ran = run_post_merge(&repo, event, first);
+        assert_eq!(ran.exit, 1, "{event}: {}", ran.text);
+        assert!(
+            ran.text.contains("an unexpected skip"),
+            "{event}: {}",
+            ran.text
+        );
+    }
+    let plain = Repo::new(&[POLICY, "scripts/statecraft/ci-gate.sh"], &[]);
+    let ran = run_post_merge(&plain, "push", &post_merge_cases(&plain.head)[0]);
+    assert_eq!(ran.exit, 1, "{}", ran.text);
+    assert!(
+        ran.text
+            .contains("required job 'governance' was skipped where it applies (push)"),
+        "{}",
+        ran.text
+    );
+    assert!(!ran.text.contains("post-merge"), "{}", ran.text);
 }

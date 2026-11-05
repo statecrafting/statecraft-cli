@@ -159,6 +159,27 @@ while [ ! -f "$dir/admission.json" ]; do
 done
 if grep -q '"decision":"admitted"' "$dir/admission.json" 2>/dev/null; then
   printf 'admitted\n' >> "$dir/gate.log" 2>/dev/null
+  # Spec 053 section 3.3: at most one operator note the supervisor placed,
+  # unexpired and not yet returned, is printed as this call's context. Its
+  # name is <id>.<expires-at>.json.
+  now=$(date +%s 2>/dev/null) || now=
+  for note in "$dir"/notes/*.json; do
+    [ -f "$note" ] && [ -n "$now" ] || continue
+    name=$(basename "$note" .json)
+    id=${name%.*}
+    ends=${name##*.}
+    [ "$now" -lt "$ends" ] 2>/dev/null || continue
+    grep -qx "note $id" "$dir/gate.log" 2>/dev/null && continue
+    # Read the note first, then record the delivery, then print it. Once the
+    # record is written the supervisor may withdraw the file, so the body is
+    # already held; a note whose record cannot be written is withheld, so no
+    # later call can print it a second time. The trailing x keeps the body's
+    # final newlines through the command substitution.
+    body=$(cat "$note" 2>/dev/null && printf x) || continue
+    printf 'note %s\n' "$id" >> "$dir/gate.log" 2>/dev/null || continue
+    printf '%s' "${body%x}"
+    break
+  done
   exit 0
 fi
 printf 'refused\n' >> "$dir/gate.log" 2>/dev/null

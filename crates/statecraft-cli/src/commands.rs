@@ -167,6 +167,10 @@ pub enum Verb {
     Resume,
     /// `admission dry-run --bundle <file> --policy <file>`
     AdmissionDryRun,
+    /// `input note <path> <run-id> <author> <reason> <expires-in-seconds> <body...>`
+    InputNote,
+    /// `input command <path> <run-id> <controller> <lease> <key> <version> <author> <reason> <expires-in-seconds> <body...>`
+    InputCommand,
     /// `--help`, optionally with a group or a verb as its topic.
     ///
     /// Not part of the command tree: [`Verb::all`] lists the operations, and a
@@ -264,6 +268,8 @@ impl Verb {
             Verb::ProposalAcknowledge => "proposal acknowledge",
             Verb::ProposalAdmit => "proposal admit",
             Verb::AdmissionDryRun => "admission dry-run",
+            Verb::InputNote => "input note",
+            Verb::InputCommand => "input command",
             Verb::Help => "--help",
         }
     }
@@ -371,6 +377,9 @@ impl Verb {
             // the bundle reading are the envelope crate's, the verb writes
             // nothing.
             Verb::AdmissionDryRun => "049-admission-dry-run",
+            // Spec 053: operator input, recorded in the run crate and placed
+            // by the home crate, reached through 053's edge on this crate.
+            Verb::InputNote | Verb::InputCommand => "053-operator-input-record",
             Verb::Help => "006-command-surface",
         }
     }
@@ -456,11 +465,13 @@ impl Verb {
             Verb::Halt,
             Verb::Resume,
             Verb::AdmissionDryRun,
+            Verb::InputNote,
+            Verb::InputCommand,
         ]
     }
 
     /// The groups a help topic may name.
-    pub const GROUPS: [&'static str; 25] = [
+    pub const GROUPS: [&'static str; 26] = [
         "project",
         "env",
         "work",
@@ -486,6 +497,7 @@ impl Verb {
         "halt",
         "resume",
         "admission",
+        "input",
     ];
 
     /// Parse a verb from the leading arguments, returning how many it consumed.
@@ -501,6 +513,8 @@ impl Verb {
             ("land", Some("restack")) => Some((Verb::LandRestack, 2)),
             ("review", Some("status")) => Some((Verb::ReviewStatus, 2)),
             ("admission", Some("dry-run")) => Some((Verb::AdmissionDryRun, 2)),
+            ("input", Some("note")) => Some((Verb::InputNote, 2)),
+            ("input", Some("command")) => Some((Verb::InputCommand, 2)),
             ("project", Some("register")) => Some((Verb::ProjectRegister, 2)),
             ("project", Some("list")) => Some((Verb::ProjectList, 2)),
             ("project", Some("arm")) => Some((Verb::ProjectArm, 2)),

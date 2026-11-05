@@ -436,6 +436,8 @@ fn the_grown_command_tree_still_has_no_verb_that_publishes() {
     // 048's `run lease`, `run op` and `run events`, all of which write only the
     // product's own run record; and one more with spec 049's
     // `admission dry-run`, which writes nothing; and one more with spec 052's
-    // `provider capture`, which writes only the directory it is given.
-    assert_eq!(statecraft_cli::commands::Verb::all().len(), 75);
+    // `provider capture`, which writes only the directory it is given; and two
+    // more with spec 053's `input note` and `input command`, which write only
+    // the run record and the attempt's exchange directory.
+    assert_eq!(statecraft_cli::commands::Verb::all().len(), 77);
 }

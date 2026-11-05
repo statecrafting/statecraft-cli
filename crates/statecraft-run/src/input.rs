@@ -37,9 +37,10 @@
 //!
 //! The supervisor holds the repository lock for the whole attempt (spec 003
 //! section 3.1.4 rule 7), so no other process can append while it runs.
-//! [`Desk`] takes submissions from an [`Inbox`]; the owner chose a request
-//! file in the product home, polled by the supervisor (section 5,
-//! 2026-11-02), and that inbox lands with the delivery and the verbs.
+//! A verb that finds the lock held writes its submission as a request file in
+//! the product home ([`queue`]), and the supervisor, at each poll, records it
+//! `pending` ([`apply_pending`]) and only then lets its [`Desk`] place it
+//! (section 5, 2026-11-02). With the lock free, the verb records it itself.
 
 use crate::record::{Chain, Entry, Identity, Kind, RecordError};
 use serde::{Deserialize, Serialize};
@@ -651,8 +652,9 @@ pub trait Inbox {
     fn take(&mut self) -> Vec<Submission>;
 }
 
-/// An inbox that never holds anything: what a supervisor has before the
-/// request-file inbox of section 5 (2026-11-02) is wired to it.
+/// An inbox that never holds anything: what the supervisor's desk is given,
+/// because its queued requests are taken by [`apply_pending`] before each
+/// pass, so each is recorded once by its whole submission.
 pub struct NoInbox;
 
 impl Inbox for NoInbox {
@@ -692,6 +694,19 @@ impl Desk {
             attempt,
             open: true,
         }
+    }
+
+    /// Whether a pass has anything to settle: a note recorded since the
+    /// last pass, or one still `pending` or `delivered`.
+    #[must_use]
+    pub fn is_open(&self) -> bool {
+        self.open
+    }
+
+    /// Say that a submission was recorded `pending` outside [`Desk::tick`],
+    /// by [`apply_pending`], so the next pass settles it.
+    pub fn wake(&mut self) {
+        self.open = true;
     }
 
     /// One pass while the attempt is live.
@@ -803,4 +818,326 @@ impl Desk {
         }
         self.open = open;
     }
+}
+
+// ---------------------------------------------------------------------------
+// Submissions queued while a live run holds the lock (section 5, 2026-11-02).
+// ---------------------------------------------------------------------------
+
+/// The one command that acts on the live attempt (section 3.3): spec 048's
+/// `attempt.abort`. Any other command body is a spec 048 `attempt.continue`.
+pub const ABORT: &str = "abort";
+
+/// What a command presents to spec 048 besides its record: the controller's
+/// lease, the idempotency key and the run version it was decided against, so
+/// it is decided under the same rules as `run op` (section 3.3).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct Operands {
+    /// The controller submitting it.
+    pub controller: String,
+    /// The lease it presents.
+    pub lease: u64,
+    /// Its idempotency key.
+    pub key: String,
+    /// The run version its controller read, before the input's own record.
+    pub version: u64,
+    /// When it was asked, RFC 3339 UTC; the operation's records carry this
+    /// time, as a queued `run op` abort's do.
+    pub at: String,
+}
+
+/// One request: a submission, and for a command the spec 048 operands it
+/// is decided under.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct Request {
+    /// What is recorded `pending`.
+    pub submission: Submission,
+    /// A command's operands; a note has none.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub operation: Option<Operands>,
+}
+
+/// Whether a command body is the abort command.
+#[must_use]
+pub fn is_abort(body: &str) -> bool {
+    body.trim() == ABORT
+}
+
+/// What taking one request came to: the record, and for a command what spec
+/// 048 decided.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Taken {
+    /// The input's identity, once it is recorded `pending`.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub id: Option<String>,
+    /// Whether the record already held this exact submission, applied by a
+    /// writer that could not then remove its file; nothing was appended.
+    pub already_recorded: bool,
+    /// Why the submission was not recorded: [`InputError::reason`] and its
+    /// detail. Nothing else happened.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub refused: Option<Value>,
+    /// A command's spec 048 answer: `accepted` with the abort's
+    /// `stop-requested` outcome, `replayed`, or `refused`.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub operation: Option<Value>,
+}
+
+/// The input reason spec 048 records for a command's operation: the input
+/// is the recorded reason (section 3.3).
+fn operation_reason(id: &str, submission: &Submission) -> String {
+    format!(
+        "operator input {id} from {}: {}",
+        submission.author, submission.reason
+    )
+}
+
+/// Record a request `pending` and, for a command, decide its spec 048
+/// operation, in that order (I-1). The caller holds the repository lock.
+///
+/// The identity of a request is its whole submission, expiry to the second
+/// included: a record that already holds an equal one was written by a
+/// writer that could not remove its file, so nothing is recorded again, and
+/// the command's operation replays under its key (spec 048 rule 2). A
+/// submission the record refuses (no live grant, no such attempt, an expiry
+/// passed) is answered in [`Taken::refused`] and nothing else happens.
+///
+/// # Errors
+///
+/// [`RecordError`] when an append fails; what was appended before stands.
+pub fn take(
+    chain: &mut Chain,
+    request: &Request,
+    now: i64,
+    timestamp: &str,
+) -> Result<Taken, RecordError> {
+    let submission = &request.submission;
+    let mut taken = Taken {
+        id: None,
+        already_recorded: false,
+        refused: None,
+        operation: None,
+    };
+    let recorded = fold(chain)
+        .inputs
+        .into_iter()
+        .find(|i| &i.submission == submission)
+        .map(|i| i.id);
+    let id = match recorded {
+        Some(id) => {
+            taken.already_recorded = true;
+            id
+        }
+        None => match record_pending(chain, submission, now, timestamp) {
+            Ok(id) => id,
+            Err(InputError::Record(e)) => return Err(e),
+            Err(e) => {
+                taken.refused = Some(serde_json::json!({
+                    "reason": e.reason(),
+                    "detail": e.to_string(),
+                }));
+                return Ok(taken);
+            }
+        },
+    };
+    taken.id = Some(id.clone());
+    let (InputKind::Command, Some(ops)) = (submission.kind, &request.operation) else {
+        return Ok(taken);
+    };
+    let reason = operation_reason(&id, submission);
+    // The run version counts every record about the run (spec 048 section
+    // 3.3), the input's own `pending` record included, which this request
+    // appended after its controller read the version. It is decided against
+    // the version that record made, so a change the controller did not see is
+    // still `stale-version`, and taking the request again presents the same
+    // version and replays.
+    let version = ops.version + 1;
+    taken.operation = Some(if is_abort(&submission.body) {
+        crate::operation::apply(
+            chain,
+            &crate::operation::Queued::Abort {
+                run_id: submission.run_id.clone(),
+                controller: ops.controller.clone(),
+                lease: ops.lease,
+                key: ops.key.clone(),
+                version,
+                reason,
+                at: ops.at.clone(),
+            },
+        )?
+    } else {
+        use crate::operation::{Operation, Submitted, submit};
+        let decided = submit(
+            chain,
+            &crate::operation::Request {
+                run_id: &submission.run_id,
+                controller: &ops.controller,
+                lease: ops.lease,
+                key: &ops.key,
+                version,
+                operation: Operation::Continue,
+                reason: &reason,
+                at: &ops.at,
+            },
+        )?;
+        match decided {
+            Submitted::Refused(refusal) => serde_json::json!({ "refused": refusal }),
+            Submitted::Replayed(recorded) => serde_json::json!({ "replayed": recorded }),
+            // spec 048 refuses attempt.continue for every adapter; were one
+            // ever accepted, its intent stands for `run op` to complete.
+            Submitted::Accepted(accepted) => serde_json::json!({ "accepted": accepted }),
+        }
+    });
+    Ok(taken)
+}
+
+/// Where `input note` and `input command` requests wait while a live `run`
+/// holds the repository lock: beside the chain and the halt and operation
+/// queues, in the product home, keyed as the chain is, so outside any target
+/// and the confinement.
+#[must_use]
+pub fn requests_dir(home: &std::path::Path, target: &std::path::Path) -> std::path::PathBuf {
+    crate::record::chain_path(home, target).with_extension("input-requests")
+}
+
+/// Why a request could not be queued, listed or removed.
+#[derive(Debug, thiserror::Error)]
+pub enum QueueError {
+    /// A request file, or its directory, could not be written, read or
+    /// removed.
+    #[error("the input request {path} could not be {what}: {source}")]
+    Io {
+        /// The file or directory.
+        path: String,
+        /// `queued`, `read` or `removed after it was applied`.
+        what: &'static str,
+        /// Why.
+        source: std::io::Error,
+    },
+    /// The record could not be written.
+    #[error(transparent)]
+    Record(#[from] RecordError),
+}
+
+fn io_error(
+    path: &std::path::Path,
+    what: &'static str,
+) -> impl FnOnce(std::io::Error) -> QueueError {
+    let path = path.display().to_string();
+    move |source| QueueError::Io { path, what, source }
+}
+
+/// Queue a request for the supervisor holding the lock. Returns the request's
+/// path once it and its directory entry are durable.
+///
+/// # Errors
+///
+/// [`QueueError::Io`]; nothing is queued.
+pub fn queue(
+    home: &std::path::Path,
+    target: &std::path::Path,
+    request: &Request,
+) -> Result<std::path::PathBuf, QueueError> {
+    let mut bytes = serde_json::to_vec(request).unwrap_or_default();
+    bytes.push(b'\n');
+    crate::halt::publish_request(&requests_dir(home, target), &bytes)
+        .map_err(|(path, e)| io_error(&path, "queued")(e))
+}
+
+/// The queued requests, oldest first, and the files that did not read.
+#[derive(Debug, Default)]
+pub struct Pending {
+    /// Every request that reads, oldest first.
+    pub requests: Vec<(std::path::PathBuf, Request)>,
+    /// Why each file that does not read was skipped. It is left in place and
+    /// stops nothing.
+    pub unreadable: Vec<String>,
+}
+
+/// Every queued request, oldest first. A file that cannot be read or does not
+/// parse is skipped and named in [`Pending::unreadable`]; only a queue
+/// directory that cannot be listed is an error.
+///
+/// # Errors
+///
+/// [`QueueError::Io`] when the directory cannot be listed.
+pub fn pending(home: &std::path::Path, target: &std::path::Path) -> Result<Pending, QueueError> {
+    let dir = requests_dir(home, target);
+    let paths = crate::halt::listed_requests(&dir).map_err(io_error(&dir, "read"))?;
+    let mut out = Pending::default();
+    for path in paths {
+        let read = std::fs::read(&path)
+            .map_err(|e| e.to_string())
+            .and_then(|bytes| serde_json::from_slice::<Request>(&bytes).map_err(|e| e.to_string()));
+        match read {
+            Ok(request) => out.requests.push((path, request)),
+            Err(why) => out.unreadable.push(format!(
+                "the input request {} does not read: {why}",
+                path.display()
+            )),
+        }
+    }
+    Ok(out)
+}
+
+/// One queued request taken, and what it came to.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Applied {
+    /// The request.
+    pub request: Request,
+    /// What it came to.
+    pub taken: Taken,
+}
+
+/// What [`apply_pending`] did.
+#[derive(Debug, Default, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Drained {
+    /// Each request taken, oldest first.
+    pub applied: Vec<Applied>,
+    /// How many were newly recorded `pending`.
+    #[serde(skip)]
+    pub recorded: usize,
+    /// Why each file that does not read was skipped and left in place.
+    pub unreadable: Vec<String>,
+}
+
+/// Take every queued request, oldest first, and remove each file once what it
+/// appended is durable. The caller holds the repository lock: the supervisor
+/// of a live attempt at each poll, or `input note` and `input command` before
+/// their own write, so a request no supervisor lived to apply is not lost. A
+/// file that does not read is skipped, left in place and reported; it stops
+/// nothing.
+///
+/// # Errors
+///
+/// [`QueueError::Record`] when an append fails, and [`QueueError::Io`] when
+/// the directory cannot be listed or a taken file cannot be removed; what was
+/// appended stands, and taking it again appends nothing.
+pub fn apply_pending(
+    chain: &mut Chain,
+    home: &std::path::Path,
+    target: &std::path::Path,
+    now: i64,
+    timestamp: &str,
+) -> Result<Drained, QueueError> {
+    let pending = pending(home, target)?;
+    let mut drained = Drained {
+        unreadable: pending.unreadable,
+        ..Drained::default()
+    };
+    for (path, request) in pending.requests {
+        let taken = take(chain, &request, now, timestamp)?;
+        if taken.id.is_some() && !taken.already_recorded {
+            drained.recorded += 1;
+        }
+        drained.applied.push(Applied { request, taken });
+        crate::halt::remove_request(&path)
+            .map_err(io_error(&path, "removed after it was applied"))?;
+    }
+    Ok(drained)
 }
