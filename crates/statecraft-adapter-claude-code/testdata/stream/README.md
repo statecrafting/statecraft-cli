@@ -98,3 +98,7 @@ installed provider. It **spends provider usage**, so only an operator runs
 it: each scenario's prompt and flags are `capture::SCENARIOS`, and every
 stream passes through `capture::redact`, which applies the rules above,
 before it is written. Its captures are reviewed before they are committed.
+
+A reviewed capture set is committed under `captures/<version>/`, as
+`provider capture` wrote it. `captures/2.1.318/` is the first: every scenario
+`matches` the goldens, so 2.1.318 is qualifiable.

@@ -206,6 +206,13 @@ README's list gains one rule, which `capture::redact` implements:
 a string names it, and `additional_directories` is emptied, so a capture
 committed for 2.1.318 or later carries none of the operator's paths.
 
+**2026-11-04: where a capture set is committed.** The spec names no place
+for a version's captures. They sit under the governed fixtures directory as
+`captures/<version>/`, exactly as `provider capture` wrote them, so
+`provider compare captures/<version> --corpus .` reruns offline from the
+tree. The first is 2.1.318, captured on macOS with the redaction above; every
+scenario `matches`.
+
 ## Verification
 
 Ratified by the owner on 2026-10-31. Acceptance is declared by the
