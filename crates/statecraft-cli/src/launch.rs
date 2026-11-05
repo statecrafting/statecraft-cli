@@ -1459,6 +1459,13 @@ impl<'c> HaltPoller<'c> {
                         self.desk.wake();
                     }
                     self.polled.inputs.extend(drained.applied);
+                    // The second scan can find a file the first read: report
+                    // each unreadable one once.
+                    for why in drained.unreadable {
+                        if !self.polled.input_failures.contains(&why) {
+                            self.polled.input_failures.push(why);
+                        }
+                    }
                 }
                 Err(statecraft_run::input::QueueError::Record(e)) => {
                     self.remember_bytes(&chain_path);

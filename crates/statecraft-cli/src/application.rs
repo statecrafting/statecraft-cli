@@ -1281,7 +1281,12 @@ pub fn input_submit(ctx: &Context<'_>, op: &InputOperands<'_>) -> Result<Respons
         }
         _ => return Err(usage()),
     };
+    // A lifetime past the end of the clock is malformed, not a note that
+    // expired before it was placed.
     let now_unix = ctx.clock.now_unix();
+    let Some(expires_at) = now_unix.checked_add(seconds) else {
+        return Err(usage());
+    };
     let request = |attempt: u32| Request {
         submission: Submission {
             kind: op.kind,
@@ -1290,7 +1295,7 @@ pub fn input_submit(ctx: &Context<'_>, op: &InputOperands<'_>) -> Result<Respons
             reason: op.reason.to_string(),
             run_id: op.run_id.to_string(),
             attempt,
-            expires_at: now_unix + seconds,
+            expires_at,
             origin: op.origin.clone(),
         },
         operation: operation.clone(),

@@ -170,8 +170,14 @@ if grep -q '"decision":"admitted"' "$dir/admission.json" 2>/dev/null; then
     ends=${name##*.}
     [ "$now" -lt "$ends" ] 2>/dev/null || continue
     grep -qx "note $id" "$dir/gate.log" 2>/dev/null && continue
-    cat "$note" 2>/dev/null || continue
-    printf 'note %s\n' "$id" >> "$dir/gate.log" 2>/dev/null
+    # Read the note first, then record the delivery, then print it. Once the
+    # record is written the supervisor may withdraw the file, so the body is
+    # already held; a note whose record cannot be written is withheld, so no
+    # later call can print it a second time. The trailing x keeps the body's
+    # final newlines through the command substitution.
+    body=$(cat "$note" 2>/dev/null && printf x) || continue
+    printf 'note %s\n' "$id" >> "$dir/gate.log" 2>/dev/null || continue
+    printf '%s' "${body%x}"
     break
   done
   exit 0
