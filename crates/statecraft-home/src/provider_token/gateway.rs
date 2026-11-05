@@ -227,6 +227,11 @@ impl Gateway {
         }
         let listener =
             TcpListener::bind(address).map_err(|e| GatewayError::Bind(e.kind().to_string()))?;
+        // The acceptor polls, so stopping never depends on a wake-up
+        // connection reaching it.
+        listener
+            .set_nonblocking(true)
+            .map_err(|e| GatewayError::Bind(e.kind().to_string()))?;
         let address = listener
             .local_addr()
             .map_err(|e| GatewayError::Bind(e.kind().to_string()))?;
@@ -292,8 +297,7 @@ impl Drop for Gateway {
     fn drop(&mut self) {
         self.revoke();
         self.state.stopping.store(true, Ordering::SeqCst);
-        // Wake the acceptor, which then sees `stopping` and returns.
-        let _ = TcpStream::connect_timeout(&self.address, Duration::from_secs(1));
+        // The acceptor sees `stopping` within one poll interval and returns.
         if let Some(acceptor) = self.acceptor.take() {
             let _ = acceptor.join();
         }
@@ -343,14 +347,25 @@ fn write_token_file(path: &Path, token: &str) -> io::Result<()> {
     file.sync_all()
 }
 
+/// How long the acceptor waits between polls of a nonblocking listener.
+const ACCEPT_POLL: Duration = Duration::from_millis(20);
+
 fn accept(listener: &TcpListener, state: &Arc<State>) {
-    for connection in listener.incoming() {
-        if state.stopping.load(Ordering::SeqCst) {
-            return;
-        }
-        let Ok(connection) = connection else {
-            continue;
+    while !state.stopping.load(Ordering::SeqCst) {
+        let connection = match listener.accept() {
+            Ok((connection, _)) => connection,
+            // Nothing waiting, or a transient failure such as no free
+            // descriptor: wait one interval either way, never spin.
+            Err(_) => {
+                std::thread::sleep(ACCEPT_POLL);
+                continue;
+            }
         };
+        // An accepted socket can inherit the listener's nonblocking mode;
+        // a connection is served blocking.
+        if connection.set_nonblocking(false).is_err() {
+            continue;
+        }
         let serving = Arc::clone(state);
         let _ = std::thread::Builder::new()
             .name("statecraft-provider-gateway-connection".into())
