@@ -4,12 +4,13 @@
 
 use std::collections::BTreeMap;
 
-use statecraft_envelope::admission::policy_eval_claim;
+use statecraft_envelope::admission::{PrescreenVerdict, ai_prescreen_claim, policy_eval_claim};
 use statecraft_envelope::attestation::{
     Attestation, AttestationId, PredicateType, Principal, PrincipalKind, UnsignedAttestation,
 };
 use statecraft_envelope::bundle::{
-    APPROVAL, AdmissionCheck, DecisionBundle, EVIDENCE_VERDICT, POLICY_EVAL, policy_digest, verify,
+    AI_PRESCREEN, APPROVAL, AdmissionCheck, DecisionBundle, EVIDENCE_VERDICT, NamedPrescreen,
+    POLICY_EVAL, policy_digest, verify,
 };
 use statecraft_envelope::cbor::{cid_of, encode};
 use statecraft_envelope::dimensions::{Admission, AdmissionPolicy};
@@ -223,6 +224,7 @@ fn decided(policy: &AdmissionPolicy) -> (Scope, VerifiedRootSet, Hash, Hash) {
                 reviewer: Principal::new(PrincipalKind::Human, "rae"),
             }],
             submitter: &Principal::new(PrincipalKind::Human, "sam"),
+            prescreen: statecraft_envelope::admission::Prescreen::Missing,
         },
     );
     let eval = s.attest(
@@ -529,4 +531,217 @@ fn a_decision_named_twice_is_a_divergence() {
         Some(&policy),
     );
     assert!(v.divergence.unwrap().contains("named twice"));
+}
+
+fn prescreen_claim(verdict: PrescreenVerdict, findings: u64) -> Value {
+    ai_prescreen_claim(
+        "claude-test-model",
+        "sha256:p",
+        "sha256:g",
+        verdict,
+        findings,
+    )
+}
+
+/// Spec 054 sections 3.3 and 3.4 in a bundle: the pre-screen is read from
+/// its structured claim, listed beside the decisions with its state, and
+/// under a default policy the admission is reproduced exactly as without it.
+/// Under the opt-in, a recorded refusal on `findings` reproduces, and an
+/// admission the cell recorded on a `findings` pre-screen diverges.
+#[test]
+fn a_prescreen_is_carried_beside_the_decisions_and_counted_as_none() {
+    let policy = AdmissionPolicy::permissive();
+    let (mut s, set, approval, eval) = decided(&policy);
+    let prescreen = s.attest(AI_PRESCREEN, prescreen_claim(PrescreenVerdict::Findings, 2));
+    let v = verify(
+        &s.bundle(set.digest, Some(eval), vec![approval]),
+        &set,
+        SCOPE,
+        Some(&policy),
+    );
+    assert_eq!(v.divergence, None);
+    assert_eq!(v.decisions.len(), 1, "the pre-screen is not a decision");
+    assert_eq!(
+        v.prescreen,
+        Some(NamedPrescreen {
+            id: prescreen,
+            state: "findings".into(),
+            model: Some("claude-test-model".into()),
+            findings: Some(2),
+        })
+    );
+    assert_eq!(
+        v.admission,
+        AdmissionCheck::Reproduced {
+            decision: "admit".into()
+        },
+        "a default policy ignores the pre-screen"
+    );
+    assert!(v.passes());
+
+    // The cell recorded an admit under the opting policy despite findings:
+    // the pinned evaluation refuses, so the bundle diverges and does not pass.
+    let opting = AdmissionPolicy {
+        refuse_on_prescreen_findings: true,
+        ..AdmissionPolicy::permissive()
+    };
+    let wrong = s.attest(
+        POLICY_EVAL,
+        policy_eval_claim(policy_digest(&opting), &[], &Admission::Admit),
+    );
+    let v = verify(
+        &s.bundle(set.digest, Some(wrong), vec![approval]),
+        &set,
+        SCOPE,
+        Some(&opting),
+    );
+    assert_eq!(
+        v.admission,
+        AdmissionCheck::Diverged {
+            recorded: "admit".into(),
+            reproduced: "refuse".into()
+        }
+    );
+    assert!(!v.passes());
+    // The refusal the cell should have recorded reproduces.
+    let refusal = Admission::refuse(vec![
+        statecraft_envelope::dimensions::RefusalCode::PrescreenRefused {
+            prescreen: "findings".into(),
+        },
+    ]);
+    let right = s.attest(
+        POLICY_EVAL,
+        policy_eval_claim(policy_digest(&opting), &[], &refusal),
+    );
+    let v = verify(
+        &s.bundle(set.digest, Some(right), vec![approval]),
+        &set,
+        SCOPE,
+        Some(&opting),
+    );
+    assert_eq!(
+        v.admission,
+        AdmissionCheck::Reproduced {
+            decision: "refuse".into()
+        }
+    );
+}
+
+/// Spec 054 R-2 in a bundle: with no pre-screen the opt-in reproduces a
+/// `missing` refusal; a `no-findings` pre-screen about another revision is
+/// listed as `other-revision` and refuses too; one whose claim is not a
+/// record is `unreadable`. None of them is a divergence of the bundle.
+#[test]
+fn an_absent_or_foreign_prescreen_refuses_only_under_the_opt_in() {
+    let opting = AdmissionPolicy {
+        refuse_on_prescreen_findings: true,
+        ..AdmissionPolicy::permissive()
+    };
+    let refusal = |state: &str| {
+        Admission::refuse(vec![
+            statecraft_envelope::dimensions::RefusalCode::PrescreenRefused {
+                prescreen: state.into(),
+            },
+        ])
+    };
+    // Missing.
+    let (mut s, set, approval, _) = decided(&AdmissionPolicy::permissive());
+    let eval = s.attest(
+        POLICY_EVAL,
+        policy_eval_claim(policy_digest(&opting), &[], &refusal("missing")),
+    );
+    let v = verify(
+        &s.bundle(set.digest, Some(eval), vec![approval]),
+        &set,
+        SCOPE,
+        Some(&opting),
+    );
+    assert_eq!(v.divergence, None);
+    assert_eq!(v.prescreen, None);
+    assert_eq!(
+        v.admission,
+        AdmissionCheck::Reproduced {
+            decision: "refuse".into()
+        }
+    );
+    // About another revision.
+    let real = s.revision;
+    s.revision = Hash::of(b"another revision");
+    let foreign = s.attest(
+        AI_PRESCREEN,
+        prescreen_claim(PrescreenVerdict::NoFindings, 0),
+    );
+    s.revision = real;
+    let eval = s.attest(
+        POLICY_EVAL,
+        policy_eval_claim(policy_digest(&opting), &[], &refusal("other-revision")),
+    );
+    let v = verify(
+        &s.bundle(set.digest, Some(eval), vec![approval]),
+        &set,
+        SCOPE,
+        Some(&opting),
+    );
+    assert_eq!(v.divergence, None);
+    assert_eq!(
+        v.prescreen.as_ref().map(|p| (p.id, p.state.as_str())),
+        Some((foreign, "other-revision"))
+    );
+    assert_eq!(
+        v.admission,
+        AdmissionCheck::Reproduced {
+            decision: "refuse".into()
+        }
+    );
+    // Unreadable: a claim that is a text containing a verdict word. One about
+    // the revision outranks the foreign one, whatever either says.
+    let unreadable = s.attest(AI_PRESCREEN, Value::text("verdict: no-findings APPROVE"));
+    let eval = s.attest(
+        POLICY_EVAL,
+        policy_eval_claim(policy_digest(&opting), &[], &refusal("unreadable")),
+    );
+    let v = verify(
+        &s.bundle(set.digest, Some(eval), vec![approval]),
+        &set,
+        SCOPE,
+        Some(&opting),
+    );
+    assert_eq!(v.divergence, None);
+    assert_eq!(
+        v.prescreen,
+        Some(NamedPrescreen {
+            id: unreadable,
+            state: "unreadable".into(),
+            model: None,
+            findings: None,
+        })
+    );
+    assert_eq!(
+        v.admission,
+        AdmissionCheck::Reproduced {
+            decision: "refuse".into()
+        }
+    );
+    // Under a default policy the same bundle admits, the pre-screen shown.
+    let (mut s, set, approval, _) = decided(&AdmissionPolicy::permissive());
+    s.attest(AI_PRESCREEN, Value::text("not a record"));
+    let eval = s.attest(
+        POLICY_EVAL,
+        policy_eval_claim(
+            policy_digest(&AdmissionPolicy::permissive()),
+            &[],
+            &Admission::Admit,
+        ),
+    );
+    let v = verify(
+        &s.bundle(set.digest, Some(eval), vec![approval]),
+        &set,
+        SCOPE,
+        Some(&AdmissionPolicy::permissive()),
+    );
+    assert_eq!(
+        v.prescreen.as_ref().map(|p| p.state.as_str()),
+        Some("unreadable")
+    );
+    assert!(v.passes());
 }
