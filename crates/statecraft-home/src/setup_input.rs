@@ -229,6 +229,7 @@ pub fn keyed(p: &Parameters) -> BTreeMap<&'static str, serde_json::Value> {
         ),
         ("governance.fail_on_unresolved", json!(p.fail_on_unresolved)),
         ("governance.require_ratified", json!(p.require_ratified)),
+        ("ci.code.free_disk", json!(p.free_disk)),
         (
             "ci.extra_required_jobs",
             json!(

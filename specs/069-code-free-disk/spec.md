@@ -14,6 +14,8 @@ summary: >
 amends:
   - "002-environment-lifecycle"
   - "058-ci-throughput-profile"
+extends:
+  - { spec: "002-environment-lifecycle", unit: { kind: directory, path: "crates/statecraft-home/" }, nature: additive }
 depends_on:
   - "002-environment-lifecycle"
   - "032-external-code-profile"
@@ -40,6 +42,18 @@ obligations:
     kind: requirement
     text: "With ci.code.free_disk absent or false, the rendered workflow is revision 24's, apart from the revision, the identity and the comment describing this revision."
     anchor: "3-5-off-by-default"
+  - id: "V-1"
+    kind: verification
+    text: "Rendering tests show the step only under the parameter, immediately after the cache restore and before the build, with the fixed command between two df lines and the build's condition on a queued project; a non-boolean value and the external combination each refuse the plan."
+    anchor: "verification"
+    inputs:
+      - "crates/statecraft-home/tests/setup_workflows.rs"
+  - id: "V-2"
+    kind: verification
+    text: "A revision-24 project upgrades to revision 25 in one plan, with and without the parameter, queued or not; apart from each file's revision and identity header only the workflow changes, and a second plan writes nothing."
+    anchor: "verification"
+    inputs:
+      - "crates/statecraft-home/tests/setup_upgrade.rs"
 ---
 
 # 069: The managed code job can free runner disk before it builds
@@ -145,8 +159,9 @@ parameter of the profile is under `ci.`. Drafted for the owner to ratify.
 
 ## Verification
 
-Acceptance is declared by the implementing change. It renders the step only
-under the parameter, in the right place and with the post-merge condition
-on a queued project; refuses a non-boolean value and the external
-combination; and upgrades a revision-24 project in one plan, with and
-without the parameter, after which a second plan writes nothing.
+Each line is one command.
+
+```verify:cli
+cargo test -p statecraft-home --test setup_workflows revision_twenty_five
+cargo test -p statecraft-home --test setup_upgrade a_revision_twenty_four_project_upgrades_to_revision_twenty_five
+```

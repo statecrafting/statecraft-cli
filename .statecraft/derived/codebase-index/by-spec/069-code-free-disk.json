@@ -10,10 +10,30 @@
       "058-ci-throughput-profile",
       "067-post-merge-push"
     ],
-    "implementingPaths": [],
+    "implementingPaths": [
+      {
+        "path": "crates/statecraft-home/",
+        "source": "spec-edge"
+      }
+    ],
+    "resolvedUnits": [
+      {
+        "locations": [
+          {
+            "file": "crates/statecraft-home/"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "directory",
+          "path": "crates/statecraft-home/"
+        }
+      }
+    ],
     "specId": "069-code-free-disk",
     "specStatus": "draft"
   },
   "schemaVersion": "1.3.0",
-  "shardHash": "d134f3a4ec6e781d2e87db5106f21ac6fb94f32813bb291f11cb901eb12a48b5"
+  "shardHash": "5b0b1829bc14352784da5c12be2a146ba0544742706d5e520039a6e20e5dbd2e"
 }
