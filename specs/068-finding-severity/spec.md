@@ -7,16 +7,17 @@ created: "2026-11-02"
 summary: >
   Amends spec 024's review and the ci-gate rule of spec 062. Each AI review
   finding carries a severity (`low`, `medium`, `high`) and a category. A
-  head whose findings are all `low`, each answered by a review note naming
-  the head, passes ci-gate without the owner's review exception; a finding of
-  any other severity, and any change that touches correctness, security,
-  authority or ratification, still needs it. Optionally, a project list of
-  known false positives, read at the base, answers a matching finding.
+  head whose findings are all `low`, each answered by a `Review note
+  (<sha8>):` line in the pull request's body, passes ci-gate without the
+  owner's review exception; a finding of any other severity, and any change
+  that touches correctness, security, authority or ratification, still needs
+  it. Known false positives are handled through review.context_paths.
 amends:
   - "024-review-budget-and-ratification"
   - "062-review-verdict-status"
 depends_on:
   - "024-review-budget-and-ratification"
+  - "041-review-authority-context"
   - "062-review-verdict-status"
 obligations:
   - id: "R-1"
@@ -25,11 +26,11 @@ obligations:
     anchor: "3-1-severity-and-category"
   - id: "R-2"
     kind: requirement
-    text: "ci-gate passes a head whose findings are all `low` and `other`, each answered by a review note for that head, without the review exception; any other finding, or one left unanswered, keeps the exception required."
+    text: "ci-gate passes a head whose findings are all `low` and `other`, each answered by a `Review note (<sha8>): <finding id>` line for that head in the pull request's body, where the id is derived from the finding as the review recorded it and the body counts only when its author, or its last editor, is the pull request's author or has write access, without the review exception; any other finding, or one left unanswered, keeps the exception required."
     anchor: "3-2-an-answered-low-finding"
   - id: "R-3"
     kind: requirement
-    text: "A known false positive is answered only by an entry in the project's list as it stands at the base commit, never by the candidate's copy."
+    text: "A known false positive is handled by a document named in review.context_paths, read at the base commit; the candidate's copy never answers its own finding, and no separate list is built."
     anchor: "3-3-known-false-positives"
 ---
 
@@ -66,24 +67,49 @@ The review prompt asks for each finding's severity (`low`, `medium`,
 whose severity or category is missing or not one of these words is read as
 `high`, so a malformed answer never relaxes the gate.
 
+`low` covers wording, style, redundancy and hypothetical misuse: a finding
+that names no input on which the change misbehaves. A finding that names
+such an input is `medium` or `high`, whatever its category.
+
 ### 3.2 An answered low finding
 
-A review note is a pull-request comment whose first line is
-`Review note (<sha8>): <finding path>` followed by the answer, where
+Each finding has an id: the first twelve hex digits of the sha256 of its
+path, line and summary as the evidence record holds them, joined by a
+newline, with a line the record leaves null written as the empty string. The record lists
+the id with the finding, so the id exists only once the review of that head
+has run, and its summary is the reviewer's own words.
+
+A review note is a line of the pull request's body that begins
+`Review note (<sha8>): <finding id>` and goes on with the answer, where
 `<sha8>` is the first eight characters of the reviewed head. ci-gate passes
 a head without the exception when every finding is `low` and `other` and
-each has a review note for that head, by the pull request's author or a
-repository maintainer. A finding of any other severity or category, a
-finding without a note, a note for another head, and any change that spec
-062 already routes to the exception (an authority change, a ratification)
-keep the exception required. The gate records which notes it read.
+each has a review note for that head naming its id. A note cannot be
+written before its finding exists, because the id it must name is derived
+from the review's output; a body prepared ahead of the review answers
+nothing. Only the body's state when ci-gate runs counts, and only when its
+author, or its last editor if it was edited, is the pull request's author or
+has write access to the repository; a body edited by anyone else answers no
+finding.
+
+ci-gate reads the latest evidence record for the head. A rerun of the
+review writes a new record whose summaries, and so whose ids, may differ; a
+note naming an id the latest record does not hold answers nothing, so after
+such a rerun the exception stays required until the notes are rewritten.
+
+A finding of any other severity or category, a finding without a note, a
+note for another head or naming another id, and any change that spec 062
+already routes to the exception (an authority change, a ratification) keep
+the exception required. The gate records which notes it read.
 
 ### 3.3 Known false positives
 
-Optionally, the project keeps a list of known false positives (a path, a
-finding pattern and the reason) in a file the policy names. It is read at
-the base commit only, so a change cannot add the entry that answers its own
-finding; a match answers the finding as a note does.
+Known false positives are handled through `review.context_paths` (spec
+041): the project names a document of them among the context paths, and the
+reviewer reads it at the base commit with the other governance context and
+can recognize the finding as known. The document informs the reviewer and
+relaxes no rule: a finding the reviewer raises anyway is gated as any other. A change cannot add the entry that answers its
+own finding, because the candidate's copy is never read. No separate list
+or matching rule is added.
 
 ## 4. Out of scope
 
@@ -98,14 +124,22 @@ reads, for this item: "For the owner to ratify: findings get a severity. A
 head whose findings are all low and each answered by a Review note (<sha8>)
 passes ci-gate without the exception; correctness, security, authority and
 ratification changes still need it. Optionally, a project list of known
-false positives read at the base." Open questions for the owner: who may
-write a review note (proposed: the author or a maintainer), whether
-`medium` should ever pass, and whether the known-false-positive list is in
-scope now or later.
+false positives read at the base." Open questions for the owner: whether
+`medium` should ever pass.
+
+**2026-11-04: a review note is a body line that names the finding's id.**
+The owner's rustev handoff (m1 2026-11-02, item C) decides three points. A
+note is a `Review note (<sha8>):` line of the pull request's body, not a
+comment. `low` covers wording, style, redundancy and hypothetical misuse.
+Known false positives go through `review.context_paths`, not a separate
+list. A note names the finding's id rather than its path, because an id
+derived from the review's output cannot be written before the review runs,
+which a path or a head can.
 
 ## Verification
 
 Declared by the implementing change once ratified: a rendered workflow
 whose review returns only answered `low` findings passes ci-gate with no
 exception run; one `medium`, an unanswered `low`, a note for another head,
-or a candidate-added false-positive entry each keeps the exception required.
+a note naming another finding's id, or a candidate-added false-positive
+entry each keeps the exception required.
