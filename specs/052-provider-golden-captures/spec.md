@@ -210,8 +210,11 @@ committed for 2.1.318 or later carries none of the operator's paths.
 for a version's captures. They sit under the governed fixtures directory as
 `captures/<version>/`, exactly as `provider capture` wrote them, so
 `provider compare captures/<version> --corpus .` reruns offline from the
-tree. The first is 2.1.318, captured on macOS with the redaction above; every
-scenario `matches`.
+tree. The first is 2.1.318, captured on macOS; every scenario `matches`.
+Its review found one more field 2.1.318 adds, `credential_expires_at`, which
+describes the operator's credential, so the README's list fixes it to the
+capture date's midnight as it does `timestamp`. The provider's request,
+message and tool-use ids stay verbatim, as the goldens keep them.
 
 ## Verification
 

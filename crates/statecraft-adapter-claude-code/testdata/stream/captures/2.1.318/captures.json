@@ -12,7 +12,8 @@
         "fixed values: session_id, uuid, hook_id, timestamp",
         "placeholder path: cwd, memory_paths, messaging_socket_path; plugins emptied",
         "placeholder path: original_cwd, and the scenario's work tree wherever a string names it; additional_directories emptied",
-        "count-preserving placeholders: names in tools, skills, agents, slash_commands, terminal_slash_commands, mcp_servers, except Bash, Read, Edit, Write, Glob, Grep, Task"
+        "count-preserving placeholders: names in tools, skills, agents, slash_commands, terminal_slash_commands, mcp_servers, except Bash, Read, Edit, Write, Glob, Grep, Task",
+        "fixed value: credential_expires_at"
       ],
       "scenario": "success"
     },
@@ -28,7 +29,8 @@
         "fixed values: session_id, uuid, hook_id, timestamp",
         "placeholder path: cwd, memory_paths, messaging_socket_path; plugins emptied",
         "placeholder path: original_cwd, and the scenario's work tree wherever a string names it; additional_directories emptied",
-        "count-preserving placeholders: names in tools, skills, agents, slash_commands, terminal_slash_commands, mcp_servers, except Bash, Read, Edit, Write, Glob, Grep, Task"
+        "count-preserving placeholders: names in tools, skills, agents, slash_commands, terminal_slash_commands, mcp_servers, except Bash, Read, Edit, Write, Glob, Grep, Task",
+        "fixed value: credential_expires_at"
       ],
       "scenario": "denied"
     },
@@ -44,7 +46,8 @@
         "fixed values: session_id, uuid, hook_id, timestamp",
         "placeholder path: cwd, memory_paths, messaging_socket_path; plugins emptied",
         "placeholder path: original_cwd, and the scenario's work tree wherever a string names it; additional_directories emptied",
-        "count-preserving placeholders: names in tools, skills, agents, slash_commands, terminal_slash_commands, mcp_servers, except Bash, Read, Edit, Write, Glob, Grep, Task"
+        "count-preserving placeholders: names in tools, skills, agents, slash_commands, terminal_slash_commands, mcp_servers, except Bash, Read, Edit, Write, Glob, Grep, Task",
+        "fixed value: credential_expires_at"
       ],
       "scenario": "max-turns"
     },
@@ -60,7 +63,8 @@
         "fixed values: session_id, uuid, hook_id, timestamp",
         "placeholder path: cwd, memory_paths, messaging_socket_path; plugins emptied",
         "placeholder path: original_cwd, and the scenario's work tree wherever a string names it; additional_directories emptied",
-        "count-preserving placeholders: names in tools, skills, agents, slash_commands, terminal_slash_commands, mcp_servers, except Bash, Read, Edit, Write, Glob, Grep, Task"
+        "count-preserving placeholders: names in tools, skills, agents, slash_commands, terminal_slash_commands, mcp_servers, except Bash, Read, Edit, Write, Glob, Grep, Task",
+        "fixed value: credential_expires_at"
       ],
       "scenario": "tool-removed"
     },
@@ -76,7 +80,8 @@
         "fixed values: session_id, uuid, hook_id, timestamp",
         "placeholder path: cwd, memory_paths, messaging_socket_path; plugins emptied",
         "placeholder path: original_cwd, and the scenario's work tree wherever a string names it; additional_directories emptied",
-        "count-preserving placeholders: names in tools, skills, agents, slash_commands, terminal_slash_commands, mcp_servers, except Bash, Read, Edit, Write, Glob, Grep, Task"
+        "count-preserving placeholders: names in tools, skills, agents, slash_commands, terminal_slash_commands, mcp_servers, except Bash, Read, Edit, Write, Glob, Grep, Task",
+        "fixed value: credential_expires_at"
       ],
       "scenario": "api-error"
     }

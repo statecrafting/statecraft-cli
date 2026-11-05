@@ -56,12 +56,16 @@ public repository and the operator's machine is not part of the measurement:
   `/private/var/...` or `/var/...`) replaced with it wherever a string names
   it, as a tool's `file_path` does, and `additional_directories` emptied,
   because Claude Code 2.1.318 reports the operator's own directories there;
+- `credential_expires_at` replaced with the capture date's midnight, as
+  `timestamp` is, because it describes the operator's credential;
 - the **names** inside `tools`, `skills`, `agents`, `slash_commands`,
   `terminal_slash_commands` and `mcp_servers` replaced with placeholders that
   **preserve the counts**, except the tool names the measurements rest on
   (`Bash`, `Read`, `Edit`, `Write`, `Glob`, `Grep`, `Task`), which are verbatim.
 
-Everything else is verbatim, including every field spec 004 sections 3.9 to 3.13
+Everything else is verbatim. The provider's `request_id`, message and
+tool-use ids are its own per-request identifiers, not the operator's, and the
+goldens keep them, so a capture does too. Verbatim fields include every field spec 004 sections 3.9 to 3.13
 rest on: `claude_code_version`, `model`, `permissionMode`, `apiKeySource`,
 `subtype`, `is_error`, `terminal_reason`, `stop_reason`, `num_turns`,
 `total_cost_usd`, `usage`, `modelUsage` and `permission_denials`.
