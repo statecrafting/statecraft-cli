@@ -92,7 +92,7 @@
   },
   "files": [
     {
-      "digest": "e1bc2f26d7e6d04a9d2f4ef366f2eb372e10cd637f828e335f3812c4e3c25717",
+      "digest": "059514927333336c4adb89225527912bca9897f46c83012696255f2eac2c5571",
       "path": ".github/workflows/statecraft-ci.yml",
       "role": "workflow"
     },
@@ -137,7 +137,7 @@
       "role": "guide"
     },
     {
-      "digest": "c34651dee810f543de4af09d181f7cb9df951858e13fe94972723f35d796fc4a",
+      "digest": "f8ee67a0e5bff4199cfe48e9f2555c7de0fe65ada74c2d8cb69be54102555d24",
       "path": ".statecraft/setup/github-actions-rust.remote.json",
       "role": "remote-state"
     }
@@ -156,21 +156,21 @@
       "merge_group": "required",
       "optional": false,
       "pull_request": "required",
-      "push": "required",
+      "push": "post-merge",
       "required": true
     },
     "governance": {
       "merge_group": "required",
       "optional": false,
       "pull_request": "required",
-      "push": "required",
+      "push": "post-merge",
       "required": true
     },
     "preflight": {
       "merge_group": "required",
       "optional": false,
       "pull_request": "required",
-      "push": "required",
+      "push": "post-merge",
       "required": true
     },
     "review-exception": {
@@ -184,28 +184,28 @@
       "merge_group": "required",
       "optional": false,
       "pull_request": "required",
-      "push": "required",
+      "push": "post-merge",
       "required": true
     },
     "sg-scan": {
       "merge_group": "required",
       "optional": false,
       "pull_request": "required",
-      "push": "required",
+      "push": "post-merge",
       "required": true
     },
     "supply-chain": {
       "merge_group": "required",
       "optional": false,
       "pull_request": "required",
-      "push": "required",
+      "push": "post-merge",
       "required": true
     },
     "workflow-lint": {
       "merge_group": "required",
       "optional": false,
       "pull_request": "required",
-      "push": "required",
+      "push": "post-merge",
       "required": true
     }
   },
@@ -236,9 +236,22 @@
     "gate_each_commit": true,
     "max_calls": 4,
     "release_branch_pattern": "release/*",
+    "remote": {
+      "mergeQueue": {
+        "allEntriesMustPass": false,
+        "buildConcurrency": 5,
+        "mergeMethod": "merge",
+        "required": true
+      }
+    },
     "require_default_base": true,
     "require_ratified": true,
     "require_signed_commits": true
+  },
+  "post_merge_rule": {
+    "applies": "a push to the default branch while remote.merge_queue.required is true",
+    "input": "post_merge",
+    "requires": "every post-merge job skipped or succeeded, and the pushed commit's completed merge-queue run of statecraft-ci with ci-gate success"
   },
   "prerequisites": {
     "local": [

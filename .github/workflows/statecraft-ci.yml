@@ -47,6 +47,7 @@ permissions:
 jobs:
   governance:
     name: governance
+    if: github.event_name != 'push'
     concurrency:
       group: statecraft-ci-${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.pull_request.number) || github.run_id }}-governance
       cancel-in-progress: ${{ github.event_name == 'pull_request' }}
@@ -238,6 +239,7 @@ jobs:
   # them, and a base gate.sh without the verb (the adoption) judges nothing.
   preflight:
     name: preflight
+    if: github.event_name != 'push'
     concurrency:
       group: statecraft-ci-${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.pull_request.number) || github.run_id }}-preflight
       cancel-in-progress: ${{ github.event_name == 'pull_request' }}
@@ -299,6 +301,7 @@ jobs:
   code:
     name: code
     needs: [preflight]
+    if: ${{ !cancelled() && (needs.preflight.result == 'success' || github.event_name == 'push') }}
     concurrency:
       group: statecraft-ci-${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.pull_request.number) || github.run_id }}-code
       cancel-in-progress: ${{ github.event_name == 'pull_request' }}
@@ -366,7 +369,9 @@ jobs:
           key: cargo-${{ runner.os }}-${{ hashFiles('Cargo.lock', 'rust-toolchain.toml') }}
           restore-keys: |
             cargo-${{ runner.os }}-
+          lookup-only: ${{ github.event_name == 'push' }}
       - name: Build, test, clippy, fmt
+        if: github.event_name != 'push' || steps.cargo-cache.outputs.cache-hit != 'true'
         run: sh "${STATECRAFT_GATE:?}" code
       # Revision 19 (spec 060): Cargo fingerprints a path dependency by its
       # sources' modification times, which a fresh checkout resets, so the
@@ -393,6 +398,7 @@ jobs:
   # policy file is committed and otherwise record not-configured and pass.
   supply-chain:
     name: supply-chain
+    if: github.event_name != 'push'
     concurrency:
       group: statecraft-ci-${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.pull_request.number) || github.run_id }}-supply-chain
       cancel-in-progress: ${{ github.event_name == 'pull_request' }}
@@ -453,6 +459,7 @@ jobs:
   # is (the candidate's copy runs only when the base carries none).
   workflow-lint:
     name: workflow-lint
+    if: github.event_name != 'push'
     concurrency:
       group: statecraft-ci-${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.pull_request.number) || github.run_id }}-workflow-lint
       cancel-in-progress: ${{ github.event_name == 'pull_request' }}
@@ -494,6 +501,7 @@ jobs:
   # when it commits an sgconfig.yml; the profile ships none.
   sg-scan:
     name: sg-scan
+    if: github.event_name != 'push'
     concurrency:
       group: statecraft-ci-${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.pull_request.number) || github.run_id }}-sg-scan
       cancel-in-progress: ${{ github.event_name == 'pull_request' }}
@@ -524,6 +532,7 @@ jobs:
   # committed gitleaks configuration; the profile adds none.
   secret-scan:
     name: secret-scan
+    if: github.event_name != 'push'
     concurrency:
       group: statecraft-ci-${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.pull_request.number) || github.run_id }}-secret-scan
       cancel-in-progress: ${{ github.event_name == 'pull_request' }}

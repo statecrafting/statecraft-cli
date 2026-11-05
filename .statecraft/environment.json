@@ -29,9 +29,9 @@
         "kind": "template",
         "identity": "statecraft-setup:github-actions-rust@26"
       },
-      "digest": "e1bc2f26d7e6d04a9d2f4ef366f2eb372e10cd637f828e335f3812c4e3c25717",
-      "bytes": 35888,
-      "written_at": "2026-11-05T19:15:24Z"
+      "digest": "059514927333336c4adb89225527912bca9897f46c83012696255f2eac2c5571",
+      "bytes": 36351,
+      "written_at": "2026-11-05T22:07:35Z"
     },
     {
       "path": ".statecraft/AGENTS.md",
@@ -62,9 +62,9 @@
         "kind": "template",
         "identity": "statecraft-setup:github-actions-rust@26"
       },
-      "digest": "37bec3a319629a279e055a23915c4d1eebddc1f373786549de8247a426916b6d",
-      "bytes": 21545,
-      "written_at": "2026-11-05T19:15:24Z"
+      "digest": "9c9b2e042a676e6fde2183ba0b0e1b4d16d9d789055dcd57a5c5c07929c531c1",
+      "bytes": 22030,
+      "written_at": "2026-11-05T22:07:35Z"
     },
     {
       "path": ".statecraft/setup/github-actions-rust.remote.json",
@@ -73,9 +73,9 @@
         "kind": "template",
         "identity": "statecraft-setup:github-actions-rust@26"
       },
-      "digest": "c34651dee810f543de4af09d181f7cb9df951858e13fe94972723f35d796fc4a",
-      "bytes": 1445,
-      "written_at": "2026-11-05T19:15:24Z"
+      "digest": "f8ee67a0e5bff4199cfe48e9f2555c7de0fe65ada74c2d8cb69be54102555d24",
+      "bytes": 1577,
+      "written_at": "2026-11-05T22:07:35Z"
     },
     {
       "path": "scripts/statecraft/ai-review.sh",
@@ -237,6 +237,12 @@
         "governance.enforce_coverage": true,
         "governance.gate_each_commit": true,
         "governance.require_signed_commits": true,
+        "remote.merge_queue": {
+          "all_entries_must_pass": false,
+          "build_concurrency": 5,
+          "merge_method": "merge",
+          "required": true
+        },
         "review.code_owners": [
           "@bartekus"
         ],
@@ -247,7 +253,7 @@
       },
       "remoteState": {
         "path": ".statecraft/setup/github-actions-rust.remote.json",
-        "digest": "c34651dee810f543de4af09d181f7cb9df951858e13fe94972723f35d796fc4a",
+        "digest": "f8ee67a0e5bff4199cfe48e9f2555c7de0fe65ada74c2d8cb69be54102555d24",
         "schema": "statecraft/remote-desired-state/1"
       }
     },
