@@ -1,0 +1,89 @@
+{
+  "captures": [
+    {
+      "captured": "2026-11-05",
+      "file": "success.jsonl",
+      "invocation": "claude --print --output-format stream-json --verbose, in a scratch git work tree; plain",
+      "platform": "darwin",
+      "providerVersion": "2.1.318",
+      "redactions": [
+        "dropped: system events of subtype thinking_tokens, and rate_limit_event events",
+        "dropped: assistant events whose only content block is thinking",
+        "fixed values: session_id, uuid, hook_id, timestamp",
+        "placeholder path: cwd, memory_paths, messaging_socket_path; plugins emptied",
+        "placeholder path: original_cwd, and the scenario's work tree wherever a string names it; additional_directories emptied",
+        "count-preserving placeholders: names in tools, skills, agents, slash_commands, terminal_slash_commands, mcp_servers, except Bash, Read, Edit, Write, Glob, Grep, Task",
+        "fixed value: credential_expires_at"
+      ],
+      "scenario": "success"
+    },
+    {
+      "captured": "2026-11-05",
+      "file": "denied.jsonl",
+      "invocation": "claude --print --output-format stream-json --verbose, in a scratch git work tree; settings permissions.deny [\"Bash(echo:*)\"]",
+      "platform": "darwin",
+      "providerVersion": "2.1.318",
+      "redactions": [
+        "dropped: system events of subtype thinking_tokens, and rate_limit_event events",
+        "dropped: assistant events whose only content block is thinking",
+        "fixed values: session_id, uuid, hook_id, timestamp",
+        "placeholder path: cwd, memory_paths, messaging_socket_path; plugins emptied",
+        "placeholder path: original_cwd, and the scenario's work tree wherever a string names it; additional_directories emptied",
+        "count-preserving placeholders: names in tools, skills, agents, slash_commands, terminal_slash_commands, mcp_servers, except Bash, Read, Edit, Write, Glob, Grep, Task",
+        "fixed value: credential_expires_at"
+      ],
+      "scenario": "denied"
+    },
+    {
+      "captured": "2026-11-05",
+      "file": "max-turns.jsonl",
+      "invocation": "claude --print --output-format stream-json --verbose, in a scratch git work tree; --max-turns 1, on a prompt needing three tool calls",
+      "platform": "darwin",
+      "providerVersion": "2.1.318",
+      "redactions": [
+        "dropped: system events of subtype thinking_tokens, and rate_limit_event events",
+        "dropped: assistant events whose only content block is thinking",
+        "fixed values: session_id, uuid, hook_id, timestamp",
+        "placeholder path: cwd, memory_paths, messaging_socket_path; plugins emptied",
+        "placeholder path: original_cwd, and the scenario's work tree wherever a string names it; additional_directories emptied",
+        "count-preserving placeholders: names in tools, skills, agents, slash_commands, terminal_slash_commands, mcp_servers, except Bash, Read, Edit, Write, Glob, Grep, Task",
+        "fixed value: credential_expires_at"
+      ],
+      "scenario": "max-turns"
+    },
+    {
+      "captured": "2026-11-05",
+      "file": "tool-removed.jsonl",
+      "invocation": "claude --print --output-format stream-json --verbose, in a scratch git work tree; --disallowedTools Bash",
+      "platform": "darwin",
+      "providerVersion": "2.1.318",
+      "redactions": [
+        "dropped: system events of subtype thinking_tokens, and rate_limit_event events",
+        "dropped: assistant events whose only content block is thinking",
+        "fixed values: session_id, uuid, hook_id, timestamp",
+        "placeholder path: cwd, memory_paths, messaging_socket_path; plugins emptied",
+        "placeholder path: original_cwd, and the scenario's work tree wherever a string names it; additional_directories emptied",
+        "count-preserving placeholders: names in tools, skills, agents, slash_commands, terminal_slash_commands, mcp_servers, except Bash, Read, Edit, Write, Glob, Grep, Task",
+        "fixed value: credential_expires_at"
+      ],
+      "scenario": "tool-removed"
+    },
+    {
+      "captured": "2026-11-05",
+      "file": "api-error.jsonl",
+      "invocation": "claude --print --output-format stream-json --verbose, in a scratch git work tree; plain, in a constructed environment carrying only PATH",
+      "platform": "darwin",
+      "providerVersion": "2.1.318",
+      "redactions": [
+        "dropped: system events of subtype thinking_tokens, and rate_limit_event events",
+        "dropped: assistant events whose only content block is thinking",
+        "fixed values: session_id, uuid, hook_id, timestamp",
+        "placeholder path: cwd, memory_paths, messaging_socket_path; plugins emptied",
+        "placeholder path: original_cwd, and the scenario's work tree wherever a string names it; additional_directories emptied",
+        "count-preserving placeholders: names in tools, skills, agents, slash_commands, terminal_slash_commands, mcp_servers, except Bash, Read, Edit, Write, Glob, Grep, Task",
+        "fixed value: credential_expires_at"
+      ],
+      "scenario": "api-error"
+    }
+  ]
+}

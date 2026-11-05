@@ -206,6 +206,16 @@ README's list gains one rule, which `capture::redact` implements:
 a string names it, and `additional_directories` is emptied, so a capture
 committed for 2.1.318 or later carries none of the operator's paths.
 
+**2026-11-04: where a capture set is committed.** The spec names no place
+for a version's captures. They sit under the governed fixtures directory as
+`captures/<version>/`, exactly as `provider capture` wrote them, so
+`provider compare captures/<version> --corpus .` reruns offline from the
+tree. The first is 2.1.318, captured on macOS; every scenario `matches`.
+Its review found one more field 2.1.318 adds, `credential_expires_at`, which
+describes the operator's credential, so the README's list fixes it to the
+capture date's midnight as it does `timestamp`. The provider's request,
+message and tool-use ids stay verbatim, as the goldens keep them.
+
 ## Verification
 
 Ratified by the owner on 2026-10-31. Acceptance is declared by the

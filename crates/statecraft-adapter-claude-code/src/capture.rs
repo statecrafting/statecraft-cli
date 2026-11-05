@@ -105,13 +105,14 @@ pub const SCRATCH_FILES: [(&str, &str); 3] = [
 /// What every capture's manifest entry lists as redacted: `corpus.json`'s
 /// list for the five goldens, then the rule Claude Code 2.1.318's `init`
 /// fields made necessary (the stream README).
-pub const REDACTIONS: [&str; 6] = [
+pub const REDACTIONS: [&str; 7] = [
     "dropped: system events of subtype thinking_tokens, and rate_limit_event events",
     "dropped: assistant events whose only content block is thinking",
     "fixed values: session_id, uuid, hook_id, timestamp",
     "placeholder path: cwd, memory_paths, messaging_socket_path; plugins emptied",
     "placeholder path: original_cwd, and the scenario's work tree wherever a string names it; additional_directories emptied",
     "count-preserving placeholders: names in tools, skills, agents, slash_commands, terminal_slash_commands, mcp_servers, except Bash, Read, Edit, Write, Glob, Grep, Task",
+    "fixed value: credential_expires_at",
 ];
 
 /// The fixed `session_id`, as the goldens spell it.
@@ -315,7 +316,9 @@ fn fixed(value: &mut Ordered, timestamp: &str, roots: &[String]) {
                 match key.as_str() {
                     "session_id" => *value = Ordered::String(FIXED_SESSION_ID.into()),
                     "uuid" | "hook_id" => *value = Ordered::String(FIXED_ID.into()),
-                    "timestamp" => *value = Ordered::String(timestamp.into()),
+                    "timestamp" | "credential_expires_at" => {
+                        *value = Ordered::String(timestamp.into());
+                    }
                     "cwd" | "original_cwd" => *value = Ordered::String(PLACEHOLDER_CWD.into()),
                     "messaging_socket_path" => {
                         *value = Ordered::String(PLACEHOLDER_SOCKET.into());
@@ -541,6 +544,15 @@ mod tests {
         // An empty memory_paths stays empty, as the goldens carry it.
         let empty = redact(r#"{"type":"system","memory_paths":{}}"#, DATE).unwrap();
         assert_eq!(lines(&empty)[0]["memory_paths"], json!({}));
+    }
+
+    #[test]
+    fn the_credential_expiry_is_a_fixed_value_and_provider_ids_are_verbatim() {
+        let raw = r#"{"type":"assistant","credential_expires_at":"2026-11-22T17:33:00.925Z","request_id":"req_1","message":{"id":"msg_1"}}"#;
+        let v = &lines(&redact(raw, DATE).unwrap())[0];
+        assert_eq!(v["credential_expires_at"], format!("{DATE}T00:00:00.000Z"));
+        assert_eq!(v["request_id"], "req_1");
+        assert_eq!(v["message"]["id"], "msg_1");
     }
 
     #[test]
