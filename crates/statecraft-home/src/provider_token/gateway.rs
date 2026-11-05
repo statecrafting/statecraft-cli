@@ -387,6 +387,7 @@ impl Request {
             || method == "CONNECT"
             || !target.starts_with('/')
             || target.starts_with("//")
+            || !target.bytes().all(|b| b.is_ascii_graphic())
         {
             return None;
         }
@@ -397,6 +398,12 @@ impl Request {
             }
             let (name, value) = line.split_once(':')?;
             if name.is_empty() || !name.bytes().all(|b| b.is_ascii_graphic()) {
+                return None;
+            }
+            // A field value is never forwarded with a control byte: a bare CR
+            // or LF in it would end the line upstream and add a header the
+            // gateway never read (RFC 9110 section 5.5).
+            if value.bytes().any(|b| (b < 0x20 && b != b'\t') || b == 0x7f) {
                 return None;
             }
             headers.push((name.to_string(), value.trim().to_string()));
@@ -819,6 +826,9 @@ mod tests {
             format!(
                 "POST / HTTP/1.1\r\nAuthorization: Bearer {t}\r\nContent-Length: 1\r\nTransfer-Encoding: chunked\r\n\r\n"
             ),
+            // A bare CR in a value or in the target would split a forwarded line.
+            format!("GET / HTTP/1.1\r\nAuthorization: Bearer {t}\r\nX-A: a\rX-Injected: b\r\n\r\n"),
+            format!("GET /a\rX-Injected:b HTTP/1.1\r\nAuthorization: Bearer {t}\r\n\r\n"),
         ] {
             assert!(
                 exchange(&gateway, &refused).starts_with("HTTP/1.1 400 "),
