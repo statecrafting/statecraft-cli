@@ -159,6 +159,10 @@ pub enum GatewayError {
     /// The attempt token could not be minted or written.
     #[error("the provider gateway's attempt token could not be written: {0}")]
     Token(String),
+    /// The operator's credential is not one header value: it is empty or
+    /// carries a control byte, so forwarding it would end the header line.
+    #[error("the operator's provider credential is not a single header value")]
+    Credential,
 }
 
 struct State {
@@ -221,6 +225,14 @@ impl Gateway {
         configuration: &Path,
         upstream: Arc<dyn Upstream>,
     ) -> Result<Self, GatewayError> {
+        // The credential is written into every forwarded request's head, so
+        // it is checked as the client's header values are (RFC 9110 section
+        // 5.5): a trailing newline from a credential file would otherwise
+        // add a header to each upstream request.
+        let value = operator.expose().as_bytes();
+        if value.is_empty() || value.iter().any(|&b| b < 0x20 || b == 0x7f) {
+            return Err(GatewayError::Credential);
+        }
         let operator = Held::new(operator);
         if !address.ip().is_loopback() {
             return Err(GatewayError::Bind(format!("{address} is not loopback")));
@@ -715,6 +727,17 @@ mod tests {
         let gateway =
             Gateway::open(&ROUTE, OPERATOR.into(), configuration.path(), upstream).unwrap();
         (configuration, gateway)
+    }
+
+    #[test]
+    fn an_operator_credential_that_is_not_one_header_value_opens_nothing() {
+        for bad in ["", "sk-operator\n", "sk-op\rX-Injected: b", "sk-\u{7f}"] {
+            let configuration = tempfile::tempdir().unwrap();
+            let (upstream, _) = recording(b"");
+            let refused = Gateway::open(&ROUTE, bad.into(), configuration.path(), upstream);
+            assert!(matches!(refused, Err(GatewayError::Credential)), "{bad:?}");
+            assert!(!configuration.path().join(TOKEN_FILE).exists(), "{bad:?}");
+        }
     }
 
     #[test]
