@@ -239,6 +239,17 @@ pushed commit and fails closed. A missed cargo key is filled on the push,
 because a save of an unbuilt `target` would hit every later restore and
 never refresh.
 
+**2026-11-05: this repository declares its queue.** statecraft-cli itself now
+sets `remote.merge_queue` to the live queue (merge, HEADGREEN, five builds),
+so its own pushes to main are post-merge pushes. Marking a job `post-merge`
+in the policy does not loosen what reaches main. A push-event run never
+gated a push; it reports after the fact. What gates main is still the
+required `ci-gate` on the queue entry. On a push, `ci-gate.sh` blocks unless
+the pushed commit is the head of a completed merge-queue run of
+statecraft-ci whose `ci-gate` succeeded, so a push that bypassed the queue
+still reports a red `ci-gate` on its commit. `ci_gate_judges_a_post_merge_push_by_the_queue_run_at_its_commit`
+covers the bypass cases.
+
 ## Verification
 
 Each line is one command.

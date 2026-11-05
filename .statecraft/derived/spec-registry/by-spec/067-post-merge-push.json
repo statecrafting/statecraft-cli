@@ -78,7 +78,7 @@
       }
     ],
     "sectionDigests": {
-      "067-a-post-merge-push-runs-only-the-cache-saves-and-the-gate": "bf416e6ceeca16f8a640ff834b94ff52a8f7f9c2f6235622e71fbddaa34a5c00",
+      "067-a-post-merge-push-runs-only-the-cache-saves-and-the-gate": "2e3729cf94dea93322a58a00b54f2123a9da60e842e4c78cfea4171bc0421a8a",
       "1-purpose": "1534cc1764b6680c7a04b7fb1599981719e52a7eff7537527b0b799b2bfe0ebf",
       "2-territory": "2af9cc2605f40efd5c87f9c2b10c313a2a801d22025d55cb0719f3cc99eb70d2",
       "3-1-what-a-post-merge-push-runs": "181249de74b2c9a1936221ef52421107f108c3a974f9b6892b64d113bc960179",
@@ -89,7 +89,7 @@
       "3-6-the-revision": "1ceb836baea3ca396fdcb848cd45d48bb0b39eb7daa20f84934e1655d1d9b5bb",
       "3-behavior": "d998fbc540765baf88a89d01ffcf127f9443ebf053a15e04fd1140ebc7450e67",
       "4-out-of-scope": "8a527fe57929e3618bd88ecd6ec3c5c3c9ea9f5c652086e2056982bdbb18c41b",
-      "5-resolved-decisions": "30019618c60175daf120d7dd076f19993e2b7f057aa7484b3952378e56fd699d",
+      "5-resolved-decisions": "cf1ea932dc8eafed9be816233bcef03c936fcb7ffead928c1d572c5fa66748c7",
       "verification": "f9cd8ab94e3d473b15a1914d4a0fa54e305b4349e46c681eb72af0df101caa00"
     },
     "sectionHeadings": [
@@ -112,6 +112,6 @@
     "summary": "Amends specs 002, 032, 044 and 058. Where the policy records a required merge queue, the queue has already judged the exact commit a push to the default branch carries. github-actions-rust revision 24 skips every job that judges on that push, keeps the cache steps, and has ci-gate admit the skips by an explicit post-merge rule only when the pushed commit passed ci-gate in its merge-queue run. Repo-owned called workflows receive a boolean post_merge input. Without a required queue nothing changes.\n",
     "title": "Setup profile revision 24: where the merge queue is required, a push to the default branch runs only the cache saves and ci-gate"
   },
-  "shardHash": "df825c6727fc82093887cb7c118fa97d17aedd984c1b98956b2424968728a139",
+  "shardHash": "5a2c8be8eeaff5f556653576c33c018ff11a82733692048256d4eb30c438a7d4",
   "specVersion": "1.11.0"
 }
