@@ -411,3 +411,94 @@ fn every_input_is_evidence_on_its_attempt_with_author_and_reason() {
         Some(statecraft_run::Outcome::Completed)
     );
 }
+
+// ---- Section 5, 2026-11-02: the request file a live supervisor takes ----
+
+/// A request queued while the lock is held is recorded `pending` by the next
+/// writer, its file removed once the record is durable; the same request
+/// left behind is taken again and appends nothing.
+#[test]
+fn a_queued_note_is_recorded_once_even_when_its_file_is_left_behind() {
+    let f = Fixture::live();
+    let (home, target) = (f.home.path(), f.target.path());
+    let request = input::Request {
+        submission: note(Origin::Cli, NOW + 60),
+        operation: None,
+    };
+    let file = input::queue(home, target, &request).unwrap();
+    assert!(file.starts_with(home.join("records")), "{}", file.display());
+    assert!(file.starts_with(input::requests_dir(home, target)));
+
+    let mut chain = f.open();
+    let drained = input::apply_pending(&mut chain, home, target, NOW, "t1").unwrap();
+    assert_eq!(drained.recorded, 1);
+    assert_eq!(drained.applied[0].taken.id.as_deref(), Some("input-000001"));
+    assert!(!file.exists(), "a taken request is removed");
+    assert_eq!(states(&f), [(State::Pending, None, None)]);
+
+    // A writer that could not remove the file: it is still queued.
+    let left = input::queue(home, target, &request).unwrap();
+    let before = f.open().records().len();
+    let mut chain = f.open();
+    let drained = input::apply_pending(&mut chain, home, target, NOW + 1, "t2").unwrap();
+    assert_eq!(drained.recorded, 0);
+    assert!(drained.applied[0].taken.already_recorded);
+    assert!(!left.exists());
+    assert_eq!(f.open().records().len(), before, "nothing appended again");
+}
+
+/// A file that does not read is skipped, reported and left in place; the
+/// requests after it are still taken.
+#[test]
+fn an_unreadable_request_is_skipped_reported_and_left_in_place() {
+    let f = Fixture::live();
+    let (home, target) = (f.home.path(), f.target.path());
+    let dir = input::requests_dir(home, target);
+    std::fs::create_dir_all(&dir).unwrap();
+    let junk = dir.join("0-junk.json");
+    std::fs::write(&junk, b"{ not a request").unwrap();
+    input::queue(
+        home,
+        target,
+        &input::Request {
+            submission: note(Origin::Cli, NOW + 60),
+            operation: None,
+        },
+    )
+    .unwrap();
+    let mut chain = f.open();
+    let drained = input::apply_pending(&mut chain, home, target, NOW, "t1").unwrap();
+    assert_eq!(drained.unreadable.len(), 1, "{:?}", drained.unreadable);
+    assert!(drained.unreadable[0].contains("0-junk.json"));
+    assert!(junk.exists(), "left for an operator");
+    assert_eq!(drained.recorded, 1);
+}
+
+/// A queued cockpit note without a live grant is refused by the record and
+/// its file removed: it was decided, and nothing was appended.
+#[test]
+fn a_queued_cockpit_note_without_a_grant_is_refused_and_appends_nothing() {
+    let f = Fixture::live();
+    let (home, target) = (f.home.path(), f.target.path());
+    let file = input::queue(
+        home,
+        target,
+        &input::Request {
+            submission: note(
+                Origin::Cockpit {
+                    session: "s-1".to_string(),
+                },
+                NOW + 60,
+            ),
+            operation: None,
+        },
+    )
+    .unwrap();
+    let before = f.open().records().len();
+    let mut chain = f.open();
+    let drained = input::apply_pending(&mut chain, home, target, NOW, "t1").unwrap();
+    let refused = drained.applied[0].taken.refused.as_ref().unwrap();
+    assert_eq!(refused["reason"], "control-not-granted");
+    assert!(!file.exists());
+    assert_eq!(f.open().records().len(), before);
+}

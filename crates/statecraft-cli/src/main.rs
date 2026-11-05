@@ -528,6 +528,12 @@ fn run(args: &[String]) -> i32 {
         Verb::Halt | Verb::Resume => {
             halt_verb(invocation.verb, &invocation.rest, &registry, &home, format)
         }
+        // Spec 053: operator input to a live attempt, through spec 040's
+        // callable operation. The CLI's operator is the local user, so no
+        // control grant is asked of it.
+        Verb::InputNote | Verb::InputCommand => {
+            input_verb(invocation.verb, &invocation.rest, &registry, &home, format)
+        }
         // Spec 006 section 3.11.7: the transfer verbs of 002 section 3.35. A
         // registered target, as for the environment verbs whose manifest they
         // change; usage is 3, everything else is the library's answer.
@@ -1095,6 +1101,76 @@ fn run_operation_verb(
             _ => return usage(format, shape.to_string()),
         },
     };
+    match answer {
+        Ok(answer) => emit(&answer, format),
+        Err(u) => usage(format, u.0),
+    }
+}
+
+/// `input note` and `input command` (spec 053), through spec 040's callable
+/// operation.
+fn input_verb(
+    verb: Verb,
+    rest: &[String],
+    registry: &Registry,
+    home: &std::path::Path,
+    format: Format,
+) -> i32 {
+    use statecraft_cli::application::{Context, InputOperands, input_submit};
+    use statecraft_run::input::{InputKind, Origin};
+    let (kind, shape) = if verb == Verb::InputNote {
+        (
+            InputKind::Note,
+            "usage: input note <path> <run-id> <author> <reason> <expires-in-seconds> <body...>",
+        )
+    } else {
+        (
+            InputKind::Command,
+            "usage: input command <path> <run-id> <controller> <lease> <key> <version> <author> \
+             <reason> <expires-in-seconds> <body...>",
+        )
+    };
+    let (operation, tail) = match (kind, rest) {
+        (InputKind::Note, [_, _, tail @ ..]) => (None, tail),
+        (InputKind::Command, [_, _, controller, lease, key, version, tail @ ..]) => (
+            Some([
+                controller.as_str(),
+                lease.as_str(),
+                key.as_str(),
+                version.as_str(),
+            ]),
+            tail,
+        ),
+        _ => return usage(format, shape.to_string()),
+    };
+    let [author, reason, expires_in, body @ ..] = tail else {
+        return usage(format, shape.to_string());
+    };
+    if body.is_empty() {
+        return usage(format, shape.to_string());
+    }
+    let path = absolute(&rest[0]);
+    let clock = statecraft_cli::application::process_clock();
+    let ctx = Context {
+        home,
+        registry,
+        clock: clock.as_ref(),
+    };
+    let body = body.join(" ");
+    let answer = input_submit(
+        &ctx,
+        &InputOperands {
+            path: &path,
+            run_id: &rest[1],
+            kind,
+            author,
+            reason,
+            expires_in,
+            body: &body,
+            operation,
+            origin: Origin::Cli,
+        },
+    );
     match answer {
         Ok(answer) => emit(&answer, format),
         Err(u) => usage(format, u.0),
