@@ -22,6 +22,14 @@ on:
 # an Environment is never cancelled by a group, so a group it held would leave
 # the newer run pending behind it. A push to the default branch and a
 # merge-queue entry get groups of their own run, so neither is ever cancelled.
+#
+# Revision 24 (spec 067): where the policy records a required merge queue
+# (remote.merge_queue), a push to the default branch is a post-merge push:
+# the queue already judged that exact commit. Every job that judges is skipped
+# on it; code runs only its cache steps, building only to fill a missed key;
+# a declared extra job is called with the input post_merge true, so it can
+# skip its own expensive steps; and ci-gate admits the skips by the
+# post-merge rule only when the commit passed ci-gate in the merge queue.
 
 permissions:
   contents: read
@@ -29,7 +37,7 @@ permissions:
 jobs:
   governance:
     name: governance
-    concurrency:
+{{sc:ci.post_merge.skip}}    concurrency:
       group: statecraft-ci-${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.pull_request.number) || github.run_id }}-governance
       cancel-in-progress: ${{ github.event_name == 'pull_request' }}
     runs-on: ubuntu-latest
@@ -220,7 +228,7 @@ jobs:
   # them, and a base gate.sh without the verb (the adoption) judges nothing.
   preflight:
     name: preflight
-    concurrency:
+{{sc:ci.post_merge.skip}}    concurrency:
       group: statecraft-ci-${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.pull_request.number) || github.run_id }}-preflight
       cancel-in-progress: ${{ github.event_name == 'pull_request' }}
     runs-on: ubuntu-latest
@@ -281,7 +289,7 @@ jobs:
   code:
     name: code
     needs: [preflight]
-    concurrency:
+{{sc:ci.post_merge.after_preflight}}    concurrency:
       group: statecraft-ci-${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.pull_request.number) || github.run_id }}-code
       cancel-in-progress: ${{ github.event_name == 'pull_request' }}
     runs-on: ubuntu-latest
@@ -348,8 +356,8 @@ jobs:
           key: cargo-${{ runner.os }}-${{ hashFiles('Cargo.lock', 'rust-toolchain.toml') }}
           restore-keys: |
             cargo-${{ runner.os }}-
-      - name: Build, test, clippy, fmt
-        run: sh "${STATECRAFT_GATE:?}" code
+{{sc:ci.post_merge.lookup}}      - name: Build, test, clippy, fmt
+{{sc:ci.post_merge.fill}}        run: sh "${STATECRAFT_GATE:?}" code
       # Revision 19 (spec 060): Cargo fingerprints a path dependency by its
       # sources' modification times, which a fresh checkout resets, so the
       # workspace's own artifacts are rebuilt in every run. Only the
@@ -375,7 +383,7 @@ jobs:
   # policy file is committed and otherwise record not-configured and pass.
   supply-chain:
     name: supply-chain
-    concurrency:
+{{sc:ci.post_merge.skip}}    concurrency:
       group: statecraft-ci-${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.pull_request.number) || github.run_id }}-supply-chain
       cancel-in-progress: ${{ github.event_name == 'pull_request' }}
     runs-on: ubuntu-latest
@@ -435,7 +443,7 @@ jobs:
   # is (the candidate's copy runs only when the base carries none).
   workflow-lint:
     name: workflow-lint
-    concurrency:
+{{sc:ci.post_merge.skip}}    concurrency:
       group: statecraft-ci-${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.pull_request.number) || github.run_id }}-workflow-lint
       cancel-in-progress: ${{ github.event_name == 'pull_request' }}
     runs-on: ubuntu-latest
@@ -476,7 +484,7 @@ jobs:
   # when it commits an sgconfig.yml; the profile ships none.
   sg-scan:
     name: sg-scan
-    concurrency:
+{{sc:ci.post_merge.skip}}    concurrency:
       group: statecraft-ci-${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.pull_request.number) || github.run_id }}-sg-scan
       cancel-in-progress: ${{ github.event_name == 'pull_request' }}
     runs-on: ubuntu-latest
@@ -506,7 +514,7 @@ jobs:
   # committed gitleaks configuration; the profile adds none.
   secret-scan:
     name: secret-scan
-    concurrency:
+{{sc:ci.post_merge.skip}}    concurrency:
       group: statecraft-ci-${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.pull_request.number) || github.run_id }}-secret-scan
       cancel-in-progress: ${{ github.event_name == 'pull_request' }}
     runs-on: ubuntu-latest

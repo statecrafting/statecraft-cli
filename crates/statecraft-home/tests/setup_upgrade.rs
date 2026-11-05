@@ -246,15 +246,65 @@ fn revision_thirteen() -> Profile {
     p
 }
 
+/// Remove `from` up to and including the first `to` after it, once.
+fn cut(body: &mut String, from: &str, to: &str) {
+    assert_eq!(body.matches(from).count(), 1, "{from}");
+    let start = body.find(from).unwrap();
+    let end = start + body[start..].find(to).unwrap() + to.len();
+    body.replace_range(start..end, "");
+}
+
+/// Revision 23 of the registered profile: revision 24 (spec 067) only
+/// inserted text into two templates, so revision 23 is the registered
+/// profile with those insertions cut. Measured once against the templates at
+/// origin/056-impl (3fbc1ea5): both bodies are byte for byte equal.
+fn revision_twenty_three() -> Profile {
+    let mut p = Profile::registered();
+    assert_eq!(p.revision, 24, "the registered profile is revision 24");
+    p.revision = 23;
+    fn body<'a>(p: &'a mut Profile, path: &str) -> &'a mut String {
+        &mut p
+            .templates
+            .iter_mut()
+            .find(|t| t.path == path)
+            .unwrap()
+            .body
+    }
+    let ci = body(&mut p, ".github/workflows/statecraft-ci.yml");
+    cut(
+        ci,
+        "#\n# Revision 24 (spec 067)",
+        "ci-gate in the merge queue.\n",
+    );
+    for token in ["skip", "after_preflight", "lookup", "fill"] {
+        let token = format!("{{{{sc:ci.post_merge.{token}}}}}");
+        assert!(ci.contains(&token), "{token}");
+        *ci = ci.replace(&token, "");
+    }
+    let gate = body(&mut p, "scripts/statecraft/ci-gate.sh");
+    cut(gate, "#   post-merge  ", "at that commit\n");
+    cut(gate, "post_merge=no\n", "\n");
+    cut(gate, "# Revision 24 (spec 067): GitHub", "\n}\n\n");
+    cut(gate, "    post-merge)\n", "      ;;\n");
+    cut(gate, "if [ \"$post_merge\" = yes ]; then\n", "fi\n\n");
+    for t in &p.templates {
+        assert!(
+            !t.body.contains("post-merge") && !t.body.contains("post_merge"),
+            "{}",
+            t.path
+        );
+    }
+    p
+}
+
 /// Revision 22 of the registered profile: revision 23 (spec 056) changed no
 /// template body and added one template, the managed review guide, so
-/// revision 22 is the registered profile without it. The two default
+/// revision 22 is revision 23 without it. The two default
 /// context paths revision 23 added are rendered from the library's constant,
 /// so a reconstructed revision 22 renders them too; its bytes differ from
 /// revision 22 as shipped only there and in the revision header.
 fn revision_twenty_two() -> Profile {
-    let mut p = Profile::registered();
-    assert_eq!(p.revision, 23, "the registered profile is revision 23");
+    let mut p = revision_twenty_three();
     p.revision = 22;
     let before = p.templates.len();
     p.templates.retain(|t| t.path != setup::GUIDE_PATH);
@@ -1659,8 +1709,8 @@ fn revision_fourteen_installer_upgrades_to_the_registered_revision_without_repla
     });
     assert!(plan_and_apply(root, &old, &mut manifest).whole());
     let next = Profile::registered();
-    // Revisions 16 through 23 change no installer byte.
-    assert_eq!(next.revision, 23);
+    // Revisions 16 through 24 change no installer byte.
+    assert_eq!(next.revision, 24);
     let installer = "scripts/statecraft/install-spec-spine.sh";
     let upgraded = plan_and_apply(root, &next, &mut manifest);
     assert_eq!(
@@ -2060,7 +2110,7 @@ fn a_revision_twenty_two_project_upgrades_to_revision_twenty_three() {
     let dir = project();
     let root = dir.path();
     let old = revision_twenty_two();
-    let next = Profile::registered();
+    let next = revision_twenty_three();
     assert_eq!(next.revision, 23);
     assert_ne!(old.identity(), next.identity());
     let mut manifest = Manifest::new(Pins {
@@ -2140,4 +2190,89 @@ fn a_revision_twenty_two_project_upgrades_to_revision_twenty_three() {
     assert!(steps.contains("revision 23: the profile renders .statecraft/REVIEW.md"));
     let again = plan_and_apply(root, &next, &mut manifest);
     assert!(again.files.iter().all(|f| !f.action.writes()));
+}
+
+/// The merge queue a project declares as required (spec 012's parameter).
+fn queue_block() -> BTreeMap<String, serde_json::Value> {
+    [(
+        "remote.merge_queue".to_string(),
+        serde_json::json!({"required": true, "merge_method": "merge", "build_concurrency": 5, "all_entries_must_pass": true}),
+    )]
+    .into()
+}
+
+/// Spec 067 section 3.6 and V-2: a revision-23 project upgrades to revision
+/// 24 in one ordinary plan, with and without a required merge queue. The
+/// workflow and ci-gate.sh are replaced; only a project whose queue is
+/// required gets the post-merge rendering and the post-merge rule in its
+/// policy, and a second identical plan writes nothing.
+#[test]
+fn a_revision_twenty_three_project_upgrades_to_revision_twenty_four() {
+    let judged = [
+        "governance",
+        "preflight",
+        "code",
+        "supply-chain",
+        "workflow-lint",
+        "sg-scan",
+        "secret-scan",
+    ];
+    for queued in [false, true] {
+        let dir = project();
+        let root = dir.path();
+        let block = if queued {
+            queue_block()
+        } else {
+            BTreeMap::new()
+        };
+        let old = revision_twenty_three();
+        let next = Profile::registered();
+        assert_eq!(next.revision, 24);
+        assert_ne!(old.identity(), next.identity());
+        let mut manifest = Manifest::new(Pins {
+            product: "test".into(),
+            spec_spine: "unpinned".into(),
+            adapters: Default::default(),
+            producer: None,
+        });
+        assert!(plan_and_apply_with(root, &old, &mut manifest, &block).whole());
+        let workflow = ".github/workflows/statecraft-ci.yml";
+        let read = |rel: &str| std::fs::read_to_string(root.join(rel)).unwrap();
+        let policy = |root: &Path| -> serde_json::Value {
+            serde_json::from_str(&std::fs::read_to_string(root.join(setup::POLICY_PATH)).unwrap())
+                .unwrap()
+        };
+        // Revision 23 renders no post-merge form, queue or not.
+        assert!(!read(workflow).contains("lookup-only"), "{queued}");
+        assert_eq!(policy(root)["jobs"]["governance"]["push"], "required");
+
+        let upgraded = plan_and_apply_with(root, &next, &mut manifest, &block);
+        assert!(upgraded.whole(), "{:?}", upgraded.withheld);
+        for path in [workflow, "scripts/statecraft/ci-gate.sh"] {
+            let file = upgraded.files.iter().find(|f| f.path == path).unwrap();
+            assert_eq!(file.action, Action::Replace, "{path}");
+        }
+        let after = read(workflow);
+        assert_eq!(after.contains("lookup-only"), queued, "{after}");
+        assert_eq!(
+            after.contains("    if: github.event_name != 'push'\n"),
+            queued,
+            "{after}"
+        );
+        assert!(read("scripts/statecraft/ci-gate.sh").contains("    post-merge)\n"));
+        let p = policy(root);
+        assert_eq!(p["revision"], 24);
+        for job in judged {
+            let want = if queued { "post-merge" } else { "required" };
+            assert_eq!(p["jobs"][job]["push"], want, "{job} {queued}");
+        }
+        assert_eq!(p["post_merge_rule"].is_object(), queued);
+        let again = plan_and_apply_with(root, &next, &mut manifest, &block);
+        assert!(again.files.iter().all(|f| !f.action.writes()));
+    }
+    assert!(
+        setup::remote_obligations()
+            .join("\n")
+            .contains("revision 24: where remote.merge_queue.required is true")
+    );
 }

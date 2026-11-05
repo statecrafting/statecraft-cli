@@ -1,0 +1,117 @@
+{
+  "record": {
+    "amends": [
+      "002-environment-lifecycle",
+      "032-external-code-profile",
+      "044-supply-chain-profile",
+      "058-ci-throughput-profile"
+    ],
+    "created": "2026-11-02",
+    "declaresAcceptance": true,
+    "dependsOn": [
+      "012-remote-desired-state",
+      "032-external-code-profile",
+      "044-supply-chain-profile",
+      "058-ci-throughput-profile",
+      "059-job-level-concurrency"
+    ],
+    "extends": [
+      {
+        "nature": "additive",
+        "spec": "002-environment-lifecycle",
+        "unit": {
+          "kind": "directory",
+          "path": "crates/statecraft-home/"
+        }
+      }
+    ],
+    "id": "067-post-merge-push",
+    "implementation": "complete",
+    "obligations": [
+      {
+        "anchor": "3-1-what-a-post-merge-push-runs",
+        "id": "R-1",
+        "kind": "requirement",
+        "text": "Where remote.merge_queue.required is true, governance, preflight, supply-chain, workflow-lint, sg-scan and secret-scan are skipped on a push, and the policy's push rule for them, code and every declared extra job is post-merge."
+      },
+      {
+        "anchor": "3-2-the-cache-steps",
+        "id": "R-2",
+        "kind": "requirement",
+        "text": "On a post-merge push, code runs its cache steps: the spec-spine cache, a lookup of the cargo key, and only on a miss the build that fills it and the save."
+      },
+      {
+        "anchor": "3-3-ci-gate-s-post-merge-rule",
+        "id": "R-3",
+        "kind": "requirement",
+        "text": "ci-gate runs on the push and admits a post-merge job that succeeded or was skipped only when the pushed commit's latest completed merge-queue run of statecraft-ci has a successful ci-gate job; a failed, cancelled or vanished job, a commit no queue run judged, a failed queue gate and an unreadable record each block."
+      },
+      {
+        "anchor": "3-4-called-workflows",
+        "id": "R-4",
+        "kind": "requirement",
+        "text": "With a required queue, every declared extra job and an external code call receive the boolean input post_merge, true on a push, and run where preflight is skipped; the plan refuses a called workflow that does not declare the input."
+      },
+      {
+        "anchor": "3-5-without-a-required-queue",
+        "id": "R-5",
+        "kind": "requirement",
+        "text": "Without a required queue, the rendered jobs, their conditions and the policy's push rules are those of revision 23."
+      },
+      {
+        "anchor": "verification",
+        "id": "V-1",
+        "inputs": [
+          "crates/statecraft-home/tests/setup_workflows.rs"
+        ],
+        "kind": "verification",
+        "text": "Rendering tests show the post-merge form only under a required queue, the cache steps, the policy rules and the called workflows' input and refusal; ci-gate.sh, run as a program, admits and blocks each post-merge case, and every new blocking branch is noticed when inverted."
+      },
+      {
+        "anchor": "verification",
+        "id": "V-2",
+        "inputs": [
+          "crates/statecraft-home/tests/setup_upgrade.rs"
+        ],
+        "kind": "verification",
+        "text": "A revision-23 project upgrades to revision 24 in one plan, with and without a required queue, and a second plan writes nothing."
+      }
+    ],
+    "sectionDigests": {
+      "067-a-post-merge-push-runs-only-the-cache-saves-and-the-gate": "bf416e6ceeca16f8a640ff834b94ff52a8f7f9c2f6235622e71fbddaa34a5c00",
+      "1-purpose": "1534cc1764b6680c7a04b7fb1599981719e52a7eff7537527b0b799b2bfe0ebf",
+      "2-territory": "2af9cc2605f40efd5c87f9c2b10c313a2a801d22025d55cb0719f3cc99eb70d2",
+      "3-1-what-a-post-merge-push-runs": "181249de74b2c9a1936221ef52421107f108c3a974f9b6892b64d113bc960179",
+      "3-2-the-cache-steps": "7f1ed84bcb15e207a564ea7b033bd568208cc2e1192b0eba5fb56eb8db7ec2ef",
+      "3-3-ci-gate-s-post-merge-rule": "da40afe8d1afd5d41e00e58bb53e4ec7a00cb432b55f5076f462aaa4e443c40e",
+      "3-4-called-workflows": "678aab1997cf43b988f274b8bc473ea8be2795733341e5a8a8fd66f4f4936d3c",
+      "3-5-without-a-required-queue": "a35625a20411e7c77747caef18b4915d1d6b511a441d80c9b27667979f61ebc1",
+      "3-6-the-revision": "1ceb836baea3ca396fdcb848cd45d48bb0b39eb7daa20f84934e1655d1d9b5bb",
+      "3-behavior": "d998fbc540765baf88a89d01ffcf127f9443ebf053a15e04fd1140ebc7450e67",
+      "4-out-of-scope": "8a527fe57929e3618bd88ecd6ec3c5c3c9ea9f5c652086e2056982bdbb18c41b",
+      "5-resolved-decisions": "30019618c60175daf120d7dd076f19993e2b7f057aa7484b3952378e56fd699d",
+      "verification": "f9cd8ab94e3d473b15a1914d4a0fa54e305b4349e46c681eb72af0df101caa00"
+    },
+    "sectionHeadings": [
+      "067: A post-merge push runs only the cache saves and the gate",
+      "1. Purpose",
+      "2. Territory",
+      "3. Behavior",
+      "3.1 What a post-merge push runs",
+      "3.2 The cache steps",
+      "3.3 ci-gate's post-merge rule",
+      "3.4 Called workflows",
+      "3.5 Without a required queue",
+      "3.6 The revision",
+      "4. Out of scope",
+      "5. Resolved decisions",
+      "Verification"
+    ],
+    "specPath": "specs/067-post-merge-push/spec.md",
+    "status": "approved",
+    "summary": "Amends specs 002, 032, 044 and 058. Where the policy records a required merge queue, the queue has already judged the exact commit a push to the default branch carries. github-actions-rust revision 24 skips every job that judges on that push, keeps the cache steps, and has ci-gate admit the skips by an explicit post-merge rule only when the pushed commit passed ci-gate in its merge-queue run. Repo-owned called workflows receive a boolean post_merge input. Without a required queue nothing changes.\n",
+    "title": "Setup profile revision 24: where the merge queue is required, a push to the default branch runs only the cache saves and ci-gate"
+  },
+  "shardHash": "df825c6727fc82093887cb7c118fa97d17aedd984c1b98956b2424968728a139",
+  "specVersion": "1.11.0"
+}
