@@ -1,8 +1,8 @@
 ---
 id: "069-code-free-disk"
 title: "Setup profile revision 25: the managed code job can free runner disk before it builds"
-status: draft
-implementation: pending
+status: approved
+implementation: complete
 created: "2026-11-04"
 summary: >
   Amends spec 002's setup profile and spec 058's code job. A new boolean
@@ -156,6 +156,11 @@ statecraft-cli." Item E asks for "a profile parameter, for example
 fmt\"" with the command in section 3.2 and `df -h /` before and after. The
 parameter is named `ci.code.free_disk`, beside `ci.code`, because every CI
 parameter of the profile is under `ci.`. Drafted for the owner to ratify.
+
+**2026-11-04: ratified by the owner.** The owner, on 2026-11-04, authorized
+setting this spec to `status: approved` on the implementing branch. The
+implementation lands in the same change, so `implementation` is `complete`
+and the verification lines below are its acceptance.
 
 ## Verification
 

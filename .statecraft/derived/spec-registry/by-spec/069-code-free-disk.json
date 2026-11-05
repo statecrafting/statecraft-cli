@@ -23,7 +23,7 @@
       }
     ],
     "id": "069-code-free-disk",
-    "implementation": "pending",
+    "implementation": "complete",
     "obligations": [
       {
         "anchor": "3-1-the-parameter",
@@ -75,7 +75,7 @@
       }
     ],
     "sectionDigests": {
-      "069-the-managed-code-job-can-free-runner-disk-before-it-builds": "a48b5d812ebc78c0b0812abd0732911feee0d3e4de7c1559ee8991f886fb4b8e",
+      "069-the-managed-code-job-can-free-runner-disk-before-it-builds": "a1a14d9a79a770acd99548a80b212f2b33ef4807ac58c9a9132d942d87454137",
       "1-purpose": "c526beb90d100156da9ef670f3cc20f4261a91ee934bd43079150f7b481da0dc",
       "2-territory": "0f028503a73d7e39a8ba59e8242d1e1c744f15377520f2e14ca5193c28c9162e",
       "3-1-the-parameter": "2b23574a8363807d7ed5d297ad10c154ea9b3148b12b21c30edd2fd78a23db53",
@@ -86,7 +86,7 @@
       "3-6-the-revision": "d240c8656bfa7f5104535afebd6126fee6dcf791fce9d5054267ecf634c1317d",
       "3-behavior": "a1cb30c2e69d0c06dc935e8bf09b64230f5b1a306bb0b36fc97c4dab092dc1c1",
       "4-out-of-scope": "85a56925b6780c3e2c61df1810cbdc33d32e0d7a116c2a37dc5e0cdeb333e196",
-      "5-resolved-decisions": "5bfbef53cad1df63a67d79309f94c596d712855d057d02525fa1112eec64c451",
+      "5-resolved-decisions": "254b622a16fe209817ed58d7cda26cf5e4dcdd5c73a92917129077d0df6bb08d",
       "verification": "e6cf1e1566d1171f97ac445ae2245a2cfbf95c35e68393eed44c2798ba432a2b"
     },
     "sectionHeadings": [
@@ -105,10 +105,10 @@
       "Verification"
     ],
     "specPath": "specs/069-code-free-disk/spec.md",
-    "status": "draft",
+    "status": "approved",
     "summary": "Amends spec 002's setup profile and spec 058's code job. A new boolean parameter, ci.code.free_disk, off by default, renders one step in the managed code job before the build: it removes the runner's unused preinstalled toolchains and reports the free space before and after. Off, the rendered workflow is revision 24's. An external code selection refuses the parameter, because its job is the project's own.\n",
     "title": "Setup profile revision 25: the managed code job can free runner disk before it builds"
   },
-  "shardHash": "5b0b1829bc14352784da5c12be2a146ba0544742706d5e520039a6e20e5dbd2e",
+  "shardHash": "ddfca69fb0af2b51997b70fcb2a88db546256bb9f176b6ad25843d0e164264d1",
   "specVersion": "1.11.0"
 }

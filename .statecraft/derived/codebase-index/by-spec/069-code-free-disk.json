@@ -32,8 +32,8 @@
       }
     ],
     "specId": "069-code-free-disk",
-    "specStatus": "draft"
+    "specStatus": "approved"
   },
   "schemaVersion": "1.3.0",
-  "shardHash": "5b0b1829bc14352784da5c12be2a146ba0544742706d5e520039a6e20e5dbd2e"
+  "shardHash": "ddfca69fb0af2b51997b70fcb2a88db546256bb9f176b6ad25843d0e164264d1"
 }
