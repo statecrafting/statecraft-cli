@@ -359,8 +359,15 @@ fn write_token_file(path: &Path, token: &str) -> io::Result<()> {
         .mode(0o600)
         .custom_flags(libc::O_NOFOLLOW)
         .open(path)?;
-    file.write_all(token.as_bytes())?;
-    file.sync_all()
+    // This call created the file (create_new), so a write that fails removes
+    // it: no partial token is left to refuse the next open.
+    let written = file
+        .write_all(token.as_bytes())
+        .and_then(|()| file.sync_all());
+    if written.is_err() {
+        let _ = std::fs::remove_file(path);
+    }
+    written
 }
 
 /// How long the acceptor waits between polls of a nonblocking listener.
