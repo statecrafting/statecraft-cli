@@ -518,6 +518,10 @@ review_text() {
 case "$mode" in
   findings)
     printf 'One finding.\n\n```json\n{"head": "%s", "verdict": "findings", "findings": [{"path": "src/lib.rs", "line": 5, "summary": "two is untested"}]}\n```\n' "$head" ;;
+  low-finding)
+    printf 'One finding.\n\n```json\n{"head": "%s", "verdict": "findings", "findings": [{"path": "src/lib.rs", "line": 5, "severity": "low", "category": "other", "summary": "a comment says two"}]}\n```\n' "$head" ;;
+  low-findings)
+    printf 'Two findings.\n\n```json\n{"head": "%s", "verdict": "findings", "findings": [{"path": "src/lib.rs", "line": 5, "severity": "low", "category": "other", "summary": "a comment says two"}, {"path": "src/lib.rs", "line": null, "severity": "trivial", "category": "other", "summary": "an odd word"}]}\n```\n' "$head" ;;
   no-findings | nomodel)
     printf 'Nothing to report.\n\n```json\n{"head": "%s", "verdict": "no-findings", "findings": []}\n```\n' "$head" ;;
   empty) : ;;
@@ -591,6 +595,17 @@ case "$1 $2" in
   api\ repos/*/actions/runs*)
     if [ -f "$here/gh-runs-fails" ]; then echo "HTTP 502: Bad Gateway" >&2; exit 1; fi
     cat "$here/gh-runs" 2> /dev/null || echo '{"workflow_runs": []}' ;;
+  api\ repos/*/commits/*/check-runs*)
+    # Revision 26 (spec 068): the head's published review verdicts.
+    cat "$here/gh-check-runs" 2> /dev/null || echo '{"check_runs": []}' ;;
+  "api graphql")
+    # Revision 26 (spec 068): the pull request's body, head and editors.
+    if [ ! -f "$here/gh-graphql" ]; then echo "HTTP 502: Bad Gateway" >&2; exit 1; fi
+    cat "$here/gh-graphql" ;;
+  api\ repos/*/collaborators/*/permission)
+    # As `--jq .permission` leaves it.
+    if [ ! -f "$here/gh-permission" ]; then echo "HTTP 404: Not Found" >&2; exit 1; fi
+    cat "$here/gh-permission" ;;
   api\ repos/*/commits/*)
     # Revision 4: GitHub's verification of one commit, as `--jq` reads it.
     sha="${2##*/}"
@@ -776,6 +791,13 @@ fn needs(entries: &[(&str, &str)], review: Option<&str>, rc: bool) -> String {
     serde_json::Value::Object(map).to_string()
 }
 
+/// The review job's `answered` output (revision 26, spec 068).
+fn answered(needs_json: String, value: &str) -> String {
+    let mut v: serde_json::Value = serde_json::from_str(&needs_json).unwrap();
+    v["ai-review"]["outputs"]["answered"] = serde_json::json!(value);
+    v.to_string()
+}
+
 fn gate_ctx(
     repo: &Repo,
     event: &str,
@@ -860,6 +882,22 @@ fn gate_cases() -> Vec<(&'static str, &'static str, String, &'static str, i32)> 
             "pr, findings, no owner exception (R2-1)",
             "pull_request",
             needs(&ALL_OK, Some("findings"), false),
+            "topic",
+            1,
+        ),
+        // Revision 26 (spec 068): every finding low and other and answered
+        // by a review note for this head needs no exception.
+        (
+            "pr, findings, every one answered (spec 068)",
+            "pull_request",
+            answered(needs(&ALL_OK, Some("findings"), false), "true"),
+            "topic",
+            0,
+        ),
+        (
+            "pr, findings, not answered (spec 068)",
+            "pull_request",
+            answered(needs(&ALL_OK, Some("findings"), false), "false"),
             "topic",
             1,
         ),
@@ -1053,7 +1091,10 @@ fn reason(label: &str) -> &'static str {
     if let Some(why) = queue_reason(label) {
         return why;
     }
-    if label.contains("findings, no owner exception") || label.contains("exception rejected") {
+    if label.contains("findings, no owner exception")
+        || label.contains("exception rejected")
+        || label.contains("not answered")
+    {
         "returned findings"
     } else if label.ends_with("vanished") {
         "vanished"
@@ -1482,6 +1523,8 @@ struct Queue {
     run: bool,
     record: Option<serde_json::Value>,
     exception: &'static str,
+    /// Revision 26 (spec 068): the recorded run's own ci-gate conclusion.
+    gate: &'static str,
     want: i32,
 }
 
@@ -1526,6 +1569,7 @@ fn queue(label: &'static str, want: i32) -> Queue {
         run: true,
         record: Some(record("no-findings", 7, PR_HEAD)),
         exception: "skipped",
+        gate: "absent",
         want,
     }
 }
@@ -1579,6 +1623,25 @@ fn queue_cases() -> Vec<Queue> {
         Queue {
             record: Some(record("findings", 7, PR_HEAD)),
             ..queue("queue, recorded findings, no owner exception", 1)
+        },
+        // Revision 26 (spec 068): the pull request's ci-gate passed with the
+        // exception skipped, which it does only when every finding was
+        // answered; a failed ci-gate admits nothing.
+        Queue {
+            record: Some(record("findings", 7, PR_HEAD)),
+            gate: "success",
+            ..queue(
+                "queue, recorded findings answered when its ci-gate passed",
+                0,
+            )
+        },
+        Queue {
+            record: Some(record("findings", 7, PR_HEAD)),
+            gate: "failure",
+            ..queue(
+                "queue, recorded findings, exception skipped, ci-gate failed",
+                1,
+            )
         },
         Queue {
             record: Some(record("findings", 7, PR_HEAD)),
@@ -1667,7 +1730,8 @@ fn run_queue(repo: &Repo, q: &Queue) -> Ran {
         std::fs::write(state.join("gh-runs"), runs.to_string()).unwrap();
         let jobs = serde_json::json!({"jobs": [
             {"name": "ai-review / review", "conclusion": "success"},
-            {"name": "review-exception", "conclusion": q.exception}
+            {"name": "review-exception", "conclusion": q.exception},
+            {"name": "ci-gate", "conclusion": q.gate}
         ]});
         std::fs::write(state.join("gh-jobs"), jobs.to_string()).unwrap();
         if let Some(r) = &q.record {
@@ -1849,6 +1913,9 @@ fn review_ctx(repo: &Repo) -> BTreeMap<String, String> {
         ("github.head_ref", "topic"),
         ("github.actor", "someone"),
         ("github.event.pull_request.draft", "false"),
+        // Revision 26 (spec 068): an opened or synchronized pull request
+        // unless a case edits it.
+        ("github.event.action == 'edited'", "false"),
     ] {
         ctx.insert(k.to_string(), v.to_string());
     }
@@ -5897,7 +5964,7 @@ fn run_mutated(repo: &Repo, script: &str, extra: &[(&'static str, &str)]) -> Ran
 /// 058), captured byte for byte from main at 6c6f394.
 fn revision_seventeen() -> Profile {
     let mut p = Profile::registered();
-    assert_eq!(p.revision, 25, "the registered profile is revision 25");
+    assert_eq!(p.revision, 26, "the registered profile is revision 26");
     // Revision 22 (spec 044) added two scripts, and revision 23 (spec 056)
     // the review guide, that revision 17 did not have.
     p.templates.retain(|t| {
@@ -7970,4 +8037,263 @@ fn revision_twenty_five_refuses_a_non_boolean_and_an_external_code_selection() {
         err.contains("ci.code.free_disk") && err.contains("external ci.code"),
         "{err}"
     );
+}
+
+// ------------------------------------------------------------ revision 26
+
+/// Spec 068 section 3.2: the first twelve hex digits of the sha256 of the
+/// path, the line (empty when null) and the summary, joined by a newline.
+fn finding_id(path: &str, line: Option<u64>, summary: &str) -> String {
+    use sha2::{Digest, Sha256};
+    let line = line.map(|l| l.to_string()).unwrap_or_default();
+    let digest = Sha256::digest(format!("{path}\n{line}\n{summary}").as_bytes());
+    digest
+        .iter()
+        .map(|b| format!("{b:02x}"))
+        .collect::<String>()[..12]
+        .to_string()
+}
+
+fn reviewed(repo: &Repo, mode: &'static str) -> Ran {
+    let mut case = review_cases().remove(1);
+    case.mode = mode;
+    let ran = run_review(repo, &case);
+    assert_eq!(ran.exit, 0, "{mode}: {}", ran.text);
+    ran
+}
+
+/// Spec 068 section 3.1: the prompt asks for a severity and a category, the
+/// record keeps them, an unknown or missing one is read as high, and every
+/// finding carries its id.
+#[test]
+fn revision_twenty_six_records_a_severity_a_category_and_an_id() {
+    let repo = Repo::new(&["scripts/statecraft/ai-review.sh"], &[]);
+    let ran = reviewed(&repo, "findings");
+    let args = ran.stub_file("claude-args").unwrap_or_default()
+        + &ran.stub_file("claude-input").unwrap_or_default();
+    assert!(
+        args.contains(r#""severity": "low" or "medium" or "high""#),
+        "{args}"
+    );
+    let f = review_record(&ran)["findings"].clone();
+    assert_eq!(f[0]["severity"], "high");
+    assert_eq!(f[0]["category"], "other");
+    assert_eq!(
+        f[0]["id"],
+        finding_id("src/lib.rs", Some(5), "two is untested")
+    );
+
+    let ran = reviewed(&repo, "low-findings");
+    let f = review_record(&ran)["findings"].clone();
+    assert_eq!(f[0]["severity"], "low");
+    assert_eq!(f[0]["category"], "other");
+    assert_eq!(
+        f[0]["id"],
+        finding_id("src/lib.rs", Some(5), "a comment says two")
+    );
+    // "trivial" is not a severity, so the finding is read as high.
+    assert_eq!(f[1]["severity"], "high");
+    assert_eq!(f[1]["id"], finding_id("src/lib.rs", None, "an odd word"));
+}
+
+fn pull(head: &str, body: &str, author: &str, editor: Option<&str>) -> String {
+    serde_json::json!({"data": {"repository": {"pullRequest": {
+        "body": body,
+        "headRefOid": head,
+        "author": {"login": author},
+        "editor": editor.map(|e| serde_json::json!({"login": e})),
+    }}}})
+    .to_string()
+}
+
+fn read_notes(repo: &Repo, review: &Ran, graphql: Option<String>, permission: Option<&str>) -> Ran {
+    let wf = workflow(repo.root(), "statecraft-ai-review.yml");
+    let (run, env) = step(&wf, "review", "Read the review notes");
+    let mut ctx = review_ctx(repo);
+    ctx.insert(
+        "steps.review.outputs.evidence".into(),
+        review.output("evidence").into(),
+    );
+    let temp = review.runner.path().join("temp");
+    run_step(
+        repo.root(),
+        &run,
+        &env,
+        &ctx,
+        &[("RUNNER_TEMP", temp.to_str().unwrap())],
+        |stubs| {
+            if let Some(g) = &graphql {
+                std::fs::write(stubs.join("gh-graphql"), g).unwrap();
+            }
+            if let Some(p) = permission {
+                std::fs::write(stubs.join("gh-permission"), format!("{p}\n")).unwrap();
+            }
+        },
+    )
+}
+
+/// Spec 068 section 3.2: only a body whose last editor is the author or has
+/// write access, holding a note for this head naming every finding's id, each
+/// low and other, answers the review; anything else answers nothing.
+#[test]
+fn revision_twenty_six_reads_review_notes_for_this_head_only() {
+    let repo = Repo::new(&["scripts/statecraft/ai-review.sh"], &[]);
+    let low = reviewed(&repo, "low-finding");
+    let id = finding_id("src/lib.rs", Some(5), "a comment says two");
+    let sha8 = &repo.head[..8];
+    let note = format!("Context.\r\nReview note ({sha8}): {id} the comment is right\r\n");
+    let other = "2222222222222222222222222222222222222222";
+    for (label, review, graphql, permission, want) in [
+        (
+            "answered",
+            &low,
+            Some(pull(&repo.head, &note, "author", None)),
+            None,
+            "true",
+        ),
+        (
+            "edited by a writer",
+            &low,
+            Some(pull(&repo.head, &note, "author", Some("maintainer"))),
+            Some("write"),
+            "true",
+        ),
+        (
+            "edited by a reader",
+            &low,
+            Some(pull(&repo.head, &note, "author", Some("passer-by"))),
+            Some("read"),
+            "false",
+        ),
+        (
+            "editor's access unreadable",
+            &low,
+            Some(pull(&repo.head, &note, "author", Some("passer-by"))),
+            None,
+            "false",
+        ),
+        (
+            "no note",
+            &low,
+            Some(pull(&repo.head, "Nothing.", "author", None)),
+            None,
+            "false",
+        ),
+        (
+            "a note for another head",
+            &low,
+            Some(pull(
+                &repo.head,
+                &format!("Review note (22222222): {id} x"),
+                "author",
+                None,
+            )),
+            None,
+            "false",
+        ),
+        (
+            "a note naming another id",
+            &low,
+            Some(pull(
+                &repo.head,
+                &format!("Review note ({sha8}): 0123456789ab x"),
+                "author",
+                None,
+            )),
+            None,
+            "false",
+        ),
+        (
+            "an id inside a longer word",
+            &low,
+            Some(pull(
+                &repo.head,
+                &format!("Review note ({sha8}): {id}ff x"),
+                "author",
+                None,
+            )),
+            None,
+            "false",
+        ),
+        (
+            "the head moved",
+            &low,
+            Some(pull(other, &note, "author", None)),
+            None,
+            "false",
+        ),
+        ("the body unreadable", &low, None, None, "false"),
+    ] {
+        let ran = read_notes(&repo, review, graphql, permission);
+        assert_eq!(ran.exit, 0, "{label}: {}", ran.text);
+        assert_eq!(ran.output("answered"), want, "{label}: {}", ran.text);
+    }
+    // A high finding is never answered, whatever the body says.
+    let high = reviewed(&repo, "findings");
+    let hid = finding_id("src/lib.rs", Some(5), "two is untested");
+    let ran = read_notes(
+        &repo,
+        &high,
+        Some(pull(
+            &repo.head,
+            &format!("Review note ({sha8}): {hid} x"),
+            "author",
+            None,
+        )),
+        None,
+    );
+    assert_eq!(ran.output("answered"), "false", "{}", ran.text);
+    assert!(ran.text.contains("not low and other"), "{}", ran.text);
+}
+
+/// Spec 068 section 3.2: an edited pull request keeps the review recorded for
+/// its head, base and pull request, without a call or a comment; a record for
+/// another base is not kept, and the head is reviewed again.
+#[test]
+fn revision_twenty_six_keeps_the_recorded_review_of_an_edited_pull_request() {
+    let repo = Repo::new(&["scripts/statecraft/ai-review.sh"], &[]);
+    let first = reviewed(&repo, "low-finding");
+    let record = std::fs::read_to_string(
+        Path::new(first.output("evidence")).join("ai-review-evidence.json"),
+    )
+    .unwrap();
+    let runs = |text: &str| {
+        serde_json::json!({"check_runs": [
+            {"id": 1, "status": "completed", "app": {"slug": "someone-else"},
+             "output": {"text": "```json\n{}\n```"}},
+            {"id": 2, "status": "completed", "app": {"slug": "github-actions"},
+             "output": {"text": format!("```json\n{text}\n```")}}
+        ]})
+        .to_string()
+    };
+    let edited = |check_runs: String| {
+        let wf = workflow(repo.root(), "statecraft-ai-review.yml");
+        let (run, env) = step(&wf, "review", "Review");
+        let mut ctx = review_ctx(&repo);
+        ctx.insert("github.event.action == 'edited'".into(), "true".into());
+        run_step(repo.root(), &run, &env, &ctx, &[], |stubs| {
+            std::fs::write(stubs.join("claude-mode"), "no-findings").unwrap();
+            std::fs::write(stubs.join("gh-comment-exit"), "0").unwrap();
+            std::fs::write(stubs.join("gh-head"), format!("{}\n", repo.head)).unwrap();
+            std::fs::write(stubs.join("npm-exit"), "0").unwrap();
+            std::fs::write(stubs.join("gh-check-runs"), &check_runs).unwrap();
+        })
+    };
+    let kept = edited(runs(&record));
+    assert_eq!(kept.exit, 0, "{}", kept.text);
+    assert_eq!(kept.output("result"), "findings", "{}", kept.text);
+    assert!(kept.stub_file("claude-called").is_none(), "{}", kept.text);
+    let calls = kept.stub_file("gh-calls").unwrap_or_default();
+    assert!(!calls.contains("pr comment"), "{calls}");
+    assert_eq!(
+        review_record(&kept),
+        serde_json::from_str::<serde_json::Value>(&record).unwrap()
+    );
+
+    let mut moved: serde_json::Value = serde_json::from_str(&record).unwrap();
+    moved["subject"]["base"] = serde_json::json!("3333333333333333333333333333333333333333");
+    let again = edited(runs(&moved.to_string()));
+    assert_eq!(again.exit, 0, "{}", again.text);
+    assert_eq!(again.output("result"), "no-findings", "{}", again.text);
+    assert!(again.stub_file("claude-called").is_some(), "{}", again.text);
 }

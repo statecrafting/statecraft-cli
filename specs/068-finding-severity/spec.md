@@ -2,7 +2,7 @@
 id: "068-finding-severity"
 title: "AI review findings carry a severity, and an answered low finding passes ci-gate without the owner exception"
 status: approved
-implementation: pending
+implementation: complete
 created: "2026-11-02"
 summary: >
   Amends spec 024's review and the ci-gate rule of spec 062. Each AI review
@@ -15,6 +15,8 @@ summary: >
 amends:
   - "024-review-budget-and-ratification"
   - "062-review-verdict-status"
+extends:
+  - { spec: "002-environment-lifecycle", unit: { kind: directory, path: "crates/statecraft-home/" }, nature: additive }
 depends_on:
   - "024-review-budget-and-ratification"
   - "041-review-authority-context"
@@ -141,11 +143,43 @@ ratifying this spec as drafted. The open question of section 5 is answered
 by the text as ratified: a `medium` finding never passes without the
 exception.
 
+**2026-11-05: how revision 26 builds it.** The spec names the rules, not
+where each is read. The review script normalizes and identifies every
+finding before the record is written: a severity or category that is
+missing or not one of the words makes the severity `high`, and an unknown
+category is recorded as `other`. The answer is read in the review job, by a
+step after publication that writes `answered`; `review-exception` runs for
+findings only when `answered` is not `true`, and ci-gate admits findings
+without the exception only on that output. The body's last editor, when
+not the author, must hold `admin`, `maintain` or `write` by the
+collaborator-permission read; a read that fails answers nothing. So that a
+note written after the review can take effect, statecraft-ci also runs on
+an `edited` pull request, and on that event the review job keeps the
+latest record GitHub Actions published as the `statecraft-ai-review` check
+run when it names this head, base and pull request; otherwise the head is
+reviewed again. A fork's head publishes no check run, so it is reviewed
+again and its notes answer only that review. An edit runs the whole
+workflow, which costs one run per edit. In the merge queue, the review
+recorded for a pull request with findings is admitted when that run's
+`review-exception` was skipped and its own ci-gate passed, which happens
+only when every finding was answered.
+
 ## Verification
 
-Ratified by the owner on 2026-11-04. Acceptance is declared by the
-implementing change: a rendered workflow
-whose review returns only answered `low` findings passes ci-gate with no
-exception run; one `medium`, an unanswered `low`, a note for another head,
-a note naming another finding's id, or a candidate-added false-positive
-entry each keeps the exception required.
+Ratified by the owner on 2026-11-04. Each line is one command.
+
+```verify:cli
+cargo test -p statecraft-home --locked --test setup_workflows revision_twenty_six
+cargo test -p statecraft-home --locked --test setup_workflows ci_gate_blocks_exactly_what_the_policy_says
+cargo test -p statecraft-home --locked --test setup_workflows a_queue_entry_is_judged_by_the_review_recorded_for_its_pull_request
+cargo test -p statecraft-home --locked --test setup_upgrade a_revision_twenty_five_project_upgrades_to_revision_twenty_six
+```
+
+The first records a severity, a category and an id, reads review notes for
+the reviewed head only (another head, another id, an editor without write
+access, a moved head and an unreadable body each answer nothing, and a
+`high` finding is never answered), and keeps the recorded review of an
+edited pull request. The second passes a head whose findings are all
+answered without the exception and blocks one whose are not; the third
+admits a queued entry whose own ci-gate passed with the exception skipped
+and refuses one whose ci-gate failed.

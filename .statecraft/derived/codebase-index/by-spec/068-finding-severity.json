@@ -9,10 +9,30 @@
       "041-review-authority-context",
       "062-review-verdict-status"
     ],
-    "implementingPaths": [],
+    "implementingPaths": [
+      {
+        "path": "crates/statecraft-home/",
+        "source": "spec-edge"
+      }
+    ],
+    "resolvedUnits": [
+      {
+        "locations": [
+          {
+            "file": "crates/statecraft-home/"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "directory",
+          "path": "crates/statecraft-home/"
+        }
+      }
+    ],
     "specId": "068-finding-severity",
     "specStatus": "approved"
   },
   "schemaVersion": "1.3.0",
-  "shardHash": "376487a071cd1664feafffbca9b75ea2451a82c872a6e86a6dc25ee823b18f14"
+  "shardHash": "3b34340b7dfad1be43e1f089e6cb80425884abec68658d34be5a75a9a4d59ef4"
 }

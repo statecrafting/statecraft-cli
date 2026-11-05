@@ -67,6 +67,58 @@ if [ "${1:-}" = publish-check ]; then
   exit 0
 fi
 
+# Spec 068 section 3.2: whether every finding of the review recorded for this
+# head is low and other and answered by a `Review note (<sha8>): <id>` line of
+# the pull request's body, read now. The body counts only when its last editor,
+# or its author if nobody edited it, is the pull request's author or has write
+# access. Writes answered=true or answered=false and the notes it read; any
+# read that fails answers nothing.
+# statecraft-ai-review: answered
+if [ "${1:-}" = answered ]; then
+  for input in REPO PR_NUMBER HEAD_SHA EVIDENCE_DIR; do
+    if [ -z "${!input:-}" ]; then
+      echo "ai-review.sh answered needs ${input}" >&2
+      exit 3
+    fi
+  done
+  GITHUB_OUTPUT="${GITHUB_OUTPUT:-/dev/null}"
+  record="$EVIDENCE_DIR/ai-review-evidence.json"
+  unanswered() {
+    echo "review notes: $1; the owner exception stays required"
+    printf 'answered=false\n' >> "$GITHUB_OUTPUT"
+    exit 0
+  }
+  jq -e --arg h "$HEAD_SHA" '.result == "findings" and .subject.head == $h' "$record" > /dev/null 2>&1 \
+    || unanswered "the record is not a findings review of ${HEAD_SHA}"
+  jq -e '.findings | all(.severity == "low" and .category == "other" and ((.id // "") | test("^[0-9a-f]{12}$")))' "$record" > /dev/null 2>&1 \
+    || unanswered "a finding is not low and other, or carries no id"
+  # shellcheck disable=SC2016
+  query='query($owner: String!, $name: String!, $number: Int!) { repository(owner: $owner, name: $name) { pullRequest(number: $number) { body headRefOid author { login } editor { login } } } }'
+  pr_json="$(gh api graphql -f query="$query" -f owner="${REPO%%/*}" -f name="${REPO#*/}" -F number="$PR_NUMBER" 2> /dev/null)" \
+    || unanswered "the pull request's body could not be read"
+  pr_head="$(printf '%s' "$pr_json" | jq -r '.data.repository.pullRequest.headRefOid // ""')"
+  [ "$pr_head" = "$HEAD_SHA" ] || unanswered "the head moved to ${pr_head}"
+  author="$(printf '%s' "$pr_json" | jq -r '.data.repository.pullRequest.author.login // ""')"
+  editor="$(printf '%s' "$pr_json" | jq -r '.data.repository.pullRequest.editor.login // ""')"
+  [ -n "$author" ] || unanswered "the pull request names no author"
+  if [ -n "$editor" ] && [ "$editor" != "$author" ]; then
+    permission="$(gh api "repos/${REPO}/collaborators/${editor}/permission" --jq .permission 2> /dev/null || true)"
+    case "$permission" in
+      admin | maintain | write) ;;
+      *) unanswered "the body was last edited by ${editor}, who is not the author and has no write access (${permission:-unreadable})" ;;
+    esac
+  fi
+  printf '%s' "$pr_json" | jq -r '.data.repository.pullRequest.body // ""' | tr -d '\r' \
+    | sed -n "s/^Review note (${HEAD_SHA:0:8}): \([0-9a-f]\{12\}\)\([^0-9a-f].*\)\{0,1\}$/\1/p" | LC_ALL=C sort -u > "${RUNNER_TEMP:-/tmp}/review-notes"
+  echo "review notes read for ${HEAD_SHA:0:8}: $(paste -sd, - < "${RUNNER_TEMP:-/tmp}/review-notes")"
+  while IFS= read -r id; do
+    grep -qxF -- "$id" "${RUNNER_TEMP:-/tmp}/review-notes" || unanswered "finding ${id} has no review note for ${HEAD_SHA:0:8}"
+  done < <(jq -r '.findings[].id' "$record")
+  echo "review notes: every finding is low and other and answered for ${HEAD_SHA:0:8}"
+  printf 'answered=true\n' >> "$GITHUB_OUTPUT"
+  exit 0
+fi
+
 for input in BASE_SHA HEAD_SHA PR_NUMBER REPO DIFF_CAP CONTEXT_TOKENS MAX_CALLS DELETION_CAP CLAUDE_CLI_VERSION PROFILE_IDENTITY; do
   if [ -z "${!input:-}" ]; then
     echo "ai-review.sh needs ${input}" >&2
@@ -115,6 +167,30 @@ if [ -n "$RELEASE_PATTERN" ] && [ -n "$HEAD_REF" ]; then
   if [[ "$HEAD_REF" == $RELEASE_PATTERN ]]; then release_candidate=true; fi
 fi
 out release_candidate "$release_candidate"
+
+# Spec 068 section 3.2: a pull request whose body was edited keeps the review
+# recorded for this head, base and pull request, so the ids its notes name
+# stay the ids the gate reads. The record is the latest statecraft-ai-review
+# check run GitHub Actions published on the head; without one, the head is
+# reviewed as on any other event.
+if [ "${REUSE_RECORDED:-false}" = true ] && [ "$HEAD_REPO" = "$REPO" ]; then
+  mkdir -p "$EVIDENCE_DIR"
+  if gh api "repos/${REPO}/commits/${HEAD_SHA}/check-runs?check_name=statecraft-ai-review&per_page=100" 2> /dev/null \
+      | jq -e '[.check_runs[]? | select(.status == "completed" and .app.slug == "github-actions")] | max_by(.id) | .output.text | ltrimstr("```json\n") | rtrimstr("```") | fromjson' \
+      > "$EVIDENCE_DIR/ai-review-evidence.json" 2> /dev/null \
+    && jq -e --arg b "$BASE_SHA" --arg h "$HEAD_SHA" --arg n "$PR_NUMBER" \
+      '.subject.base == $b and .subject.head == $h and (.subject.pullRequest | tostring) == $n and (.result == "findings" or .result == "no-findings")' \
+      "$EVIDENCE_DIR/ai-review-evidence.json" > /dev/null 2>&1; then
+    reused="$(jq -r .result "$EVIDENCE_DIR/ai-review-evidence.json")"
+    jq -c '.prescreen // empty' "$EVIDENCE_DIR/ai-review-evidence.json" > "$EVIDENCE_DIR/ai-prescreen.json"
+    [ -s "$EVIDENCE_DIR/ai-prescreen.json" ] || rm -f "$EVIDENCE_DIR/ai-prescreen.json"
+    out evidence "$EVIDENCE_DIR"
+    out result "$reused"
+    note "AI review: ${reused} (the review recorded for ${HEAD_SHA} is kept: the pull request was edited, not its head)"
+    exit 0
+  fi
+  rm -f "$EVIDENCE_DIR/ai-review-evidence.json"
+fi
 
 # The evidence record, for a review and for a visible skip alike.
 evidence() {
@@ -437,9 +513,9 @@ PROMPT='You are reviewing a pull request. Stdin carries GOVERNANCE CONTEXT, REPO
 
 End your answer with exactly one fenced block tagged json, as the last thing you write:
 ```json
-{"head": "<the head sha from SUBJECT>", "verdict": "findings" or "no-findings", "findings": [{"path": "<a changed path>", "line": <number or null>, "summary": "<one sentence>"}]}
+{"head": "<the head sha from SUBJECT>", "verdict": "findings" or "no-findings", "findings": [{"path": "<a changed path>", "line": <number or null>, "severity": "low" or "medium" or "high", "category": "correctness" or "security" or "authority" or "ratification" or "other", "summary": "<one sentence>"}]}
 ```
-Use "no-findings" with an empty list when you found nothing. Every path must be one of the changed paths.'
+Use "no-findings" with an empty list when you found nothing. Every path must be one of the changed paths. Give every finding a severity and a category. "low" is wording, style, redundancy or hypothetical misuse: a finding that names no input on which the change misbehaves. A finding that names such an input is "medium" or "high", whatever its category. "authority" is a change to who or what approves; "ratification" is a change to a spec'"'"'s lifecycle.'
 
 # The input of one call: the governance context and the path inventory, both
 # read from the base commit only, the subject, what is left out and why, and
@@ -696,6 +772,28 @@ while [ "$g" -le "$calls" ]; do
   } >> "$TMPD/review.md"
   g=$(( g + 1 ))
 done
+
+# Spec 068 section 3.1: a finding whose severity or category is missing or
+# not one of the words is read as high, so a malformed answer never relaxes
+# the gate. Section 3.2: each finding's id is the first twelve hex digits of
+# the sha256 of its path, line and summary as the record holds them, joined
+# by a newline, a null line written as the empty string.
+jq -c '[.[] | . as $f
+  | ((["low", "medium", "high"] | index([$f.severity])) != null) as $severity
+  | ((["correctness", "security", "authority", "ratification", "other"] | index([$f.category])) != null) as $category
+  | $f + {severity: (if $severity and $category then $f.severity else "high" end),
+          category: (if $category then $f.category else "other" end)}]' \
+  "$TMPD/merged-findings.json" > "$TMPD/merged.next"
+echo '[]' > "$TMPD/identified.json"
+count="$(jq 'length' "$TMPD/merged.next")"
+i=0
+while [ "$i" -lt "$count" ]; do
+  id="$(jq -j --argjson i "$i" '.[$i] | "\(.path)\n\(if .line == null then "" else (.line | tostring) end)\n\(.summary | tostring)"' "$TMPD/merged.next" | sha256sum | cut -c1-12)"
+  jq -c --argjson i "$i" --arg id "$id" --slurpfile all "$TMPD/merged.next" '. + [$all[0][$i] + {id: $id}]' "$TMPD/identified.json" > "$TMPD/identified.next"
+  mv "$TMPD/identified.next" "$TMPD/identified.json"
+  i=$(( i + 1 ))
+done
+mv "$TMPD/identified.json" "$TMPD/merged-findings.json"
 
 verdict=no-findings
 if jq -e 'length > 0' "$TMPD/merged-findings.json" > /dev/null; then verdict=findings; fi
