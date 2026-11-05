@@ -381,3 +381,172 @@ fn a_reconnecting_cursor_reads_exactly_the_records_after_it() {
     let (exit, bad) = f.json(&["run", "events", f.root(), RUN, "--after", "x"]);
     assert_eq!(exit, 3, "{bad}");
 }
+
+// ---- Spec 053: operator input with the repository lock free ----
+
+fn inputs(f: &Fixture) -> Vec<statecraft_run::input::Input> {
+    statecraft_run::input::fold(&f.chain()).inputs
+}
+
+/// With no run holding the lock, `input note` records the note `pending`
+/// itself; `input command` records the command and then decides it by spec
+/// 048: any command but `abort` is `attempt.continue`, refused
+/// `capability-undeclared`, and `abort` is `attempt.abort` with the input as
+/// its reason.
+#[test]
+fn operator_input_with_the_lock_free_is_recorded_then_a_command_decided_by_spec_048() {
+    use statecraft_run::input::{InputKind, State};
+    let f = Fixture::new();
+    f.attempt(1, None);
+    let (exit, v) = f.json(&[
+        "input",
+        "note",
+        f.root(),
+        RUN,
+        "alice",
+        "wrong module",
+        "600",
+        "look",
+        "at",
+        "the",
+        "parser",
+    ]);
+    assert_eq!(exit, 0, "{v}");
+    assert_eq!(v["report"]["queued"], false, "{v}");
+    assert_eq!(v["report"]["input"]["id"], "input-000001", "{v}");
+    let found = inputs(&f);
+    assert_eq!(found[0].state, State::Pending);
+    assert_eq!(found[0].submission.body, "look at the parser");
+    assert_eq!(found[0].submission.author, "alice");
+    assert_eq!(found[0].submission.reason, "wrong module");
+
+    let (lease, version) = f.lease("ctl");
+    let version = version.to_string();
+    let (exit, v) = f.json(&[
+        "input",
+        "command",
+        f.root(),
+        RUN,
+        "ctl",
+        lease.as_str(),
+        "k-continue",
+        version.as_str(),
+        "alice",
+        "keep going",
+        "600",
+        "now",
+        "fix",
+        "the",
+        "tests",
+    ]);
+    assert_eq!(exit, 2, "{v}");
+    assert_eq!(v["error"]["kind"], "refused", "{v}");
+    assert_eq!(payload(&v)["reason"], "capability-undeclared", "{v}");
+    assert_eq!(payload(&v)["input"]["id"], "input-000002", "{v}");
+    let found = inputs(&f);
+    assert_eq!(found[1].submission.kind, InputKind::Command);
+    assert_eq!(found[1].state, State::Pending, "the input stays recorded");
+
+    let version = (version.parse::<u64>().unwrap() + 1).to_string();
+    let (exit, v) = f.json(&[
+        "input",
+        "command",
+        f.root(),
+        RUN,
+        "ctl",
+        lease.as_str(),
+        "k-abort",
+        version.as_str(),
+        "bob",
+        "off track",
+        "600",
+        "abort",
+    ]);
+    assert_eq!(exit, 0, "{v}");
+    assert_eq!(
+        v["report"]["operation"]["outcome"]["result"], "stop-requested",
+        "{v}"
+    );
+    let intent = f
+        .chain()
+        .entries()
+        .into_iter()
+        .find(|e| e.kind == Kind::Intent && e.idempotency_key.as_deref() == Some("k-abort"))
+        .expect("the abort's intent");
+    assert_eq!(
+        intent.detail["reason"],
+        "operator input input-000003 from bob: off track"
+    );
+}
+
+/// R-2 at the operation: a cockpit session's input is refused
+/// `control-not-granted` until an operator grants it control, and appends
+/// nothing; under a live grant it is recorded. The CLI never needs one.
+#[test]
+fn operator_input_from_a_cockpit_without_a_live_grant_is_refused_control_not_granted() {
+    use statecraft_cli::application::{Context, InputOperands, input_submit};
+    use statecraft_run::input::{Grant, InputKind, Origin};
+    let f = Fixture::new();
+    f.attempt(1, None);
+    let (lease, version) = f.lease("ctl");
+    let version = version.to_string();
+    let registry = statecraft_environment::registry::Registry::read(f.home.path()).unwrap();
+    let clock = statecraft_environment::time::SystemClock;
+    let ctx = Context {
+        home: f.home.path(),
+        registry: &registry,
+        clock: &clock,
+    };
+    let submit = |kind, body: &str| {
+        let operation = (kind == InputKind::Command).then_some([
+            "ctl",
+            lease.as_str(),
+            "k-cockpit",
+            version.as_str(),
+        ]);
+        input_submit(
+            &ctx,
+            &InputOperands {
+                path: f.target.path(),
+                run_id: RUN,
+                kind,
+                author: "carol",
+                reason: "from the cockpit",
+                expires_in: "600",
+                body,
+                operation,
+                origin: Origin::Cockpit {
+                    session: "cockpit-1".to_string(),
+                },
+            },
+        )
+        .unwrap()
+    };
+    let before = f.records();
+    for (kind, body) in [(InputKind::Note, "a note"), (InputKind::Command, "abort")] {
+        let answer = submit(kind, body);
+        assert_eq!(answer.exit.code(), 2, "{:?}", answer.value);
+        assert_eq!(answer.value["reason"], "control-not-granted");
+    }
+    assert_eq!(f.records(), before, "nothing is appended without a grant");
+
+    let now = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap()
+        .as_secs() as i64;
+    statecraft_run::input::grant(
+        &mut f.chain(),
+        &Grant {
+            session: "cockpit-1".to_string(),
+            operator: "fixture-operator".to_string(),
+            reason: "pairing".to_string(),
+            granted_at: now - 1,
+            until: now + 600,
+        },
+        "2026-11-02T00:00:00Z",
+    )
+    .unwrap();
+    let answer = submit(InputKind::Note, "a note");
+    assert_eq!(answer.exit.code(), 0, "{:?}", answer.value);
+    assert_eq!(inputs(&f).len(), 1);
+}
