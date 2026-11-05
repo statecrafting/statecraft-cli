@@ -1,0 +1,85 @@
+{
+  "record": {
+    "amends": [
+      "002-environment-lifecycle",
+      "058-ci-throughput-profile"
+    ],
+    "created": "2026-11-04",
+    "dependsOn": [
+      "002-environment-lifecycle",
+      "032-external-code-profile",
+      "058-ci-throughput-profile",
+      "067-post-merge-push"
+    ],
+    "id": "069-code-free-disk",
+    "implementation": "pending",
+    "obligations": [
+      {
+        "anchor": "3-1-the-parameter",
+        "id": "R-1",
+        "kind": "requirement",
+        "text": "The setup parameter ci.code.free_disk is a boolean, false by default; any other value refuses the plan."
+      },
+      {
+        "anchor": "3-2-the-step",
+        "id": "R-2",
+        "kind": "requirement",
+        "text": "With ci.code.free_disk true, the managed code job runs one step before Build, test, clippy, fmt that prints df -h / and removes exactly the listed preinstalled directories with sudo rm -rf, then prints df -h / again; the step never fails the job."
+      },
+      {
+        "anchor": "3-3-on-a-post-merge-push",
+        "id": "R-3",
+        "kind": "requirement",
+        "text": "On a post-merge push (spec 067) the step carries the build's condition, so it runs only when the cargo key missed and the build fills it."
+      },
+      {
+        "anchor": "3-4-an-external-code-selection",
+        "id": "R-4",
+        "kind": "requirement",
+        "text": "ci.code.free_disk true together with an external code selection refuses the plan, naming both parameters."
+      },
+      {
+        "anchor": "3-5-off-by-default",
+        "id": "R-5",
+        "kind": "requirement",
+        "text": "With ci.code.free_disk absent or false, the rendered workflow is revision 24's, apart from the revision, the identity and the comment describing this revision."
+      }
+    ],
+    "sectionDigests": {
+      "069-the-managed-code-job-can-free-runner-disk-before-it-builds": "3a0e5d76c5dc956c41d49050e3226f6bc40a7255a75acc649604d88a69ee6654",
+      "1-purpose": "c526beb90d100156da9ef670f3cc20f4261a91ee934bd43079150f7b481da0dc",
+      "2-territory": "0f028503a73d7e39a8ba59e8242d1e1c744f15377520f2e14ca5193c28c9162e",
+      "3-1-the-parameter": "2b23574a8363807d7ed5d297ad10c154ea9b3148b12b21c30edd2fd78a23db53",
+      "3-2-the-step": "00db6ef2e1eeec53f019c6a69a9958214d88048e4b0a960b8dfde3e1425c61f0",
+      "3-3-on-a-post-merge-push": "bbdc4bf95abbe1a1b09542cb0662c571b65a1ea5f7fbee8a13ac59d638847d99",
+      "3-4-an-external-code-selection": "6ee4e4a8df99cc8dfcaf5ade1d176863210710d4e4649bc15db1a15085db28a3",
+      "3-5-off-by-default": "1884a282662a7ad24c18505c91fc5517fb6ee90e3e704f20756e941831480304",
+      "3-6-the-revision": "d240c8656bfa7f5104535afebd6126fee6dcf791fce9d5054267ecf634c1317d",
+      "3-behavior": "a1cb30c2e69d0c06dc935e8bf09b64230f5b1a306bb0b36fc97c4dab092dc1c1",
+      "4-out-of-scope": "85a56925b6780c3e2c61df1810cbdc33d32e0d7a116c2a37dc5e0cdeb333e196",
+      "5-resolved-decisions": "5bfbef53cad1df63a67d79309f94c596d712855d057d02525fa1112eec64c451",
+      "verification": "eb25035e2647e96e9a6d6b1cd187180628c474865743590b028817056a6d163c"
+    },
+    "sectionHeadings": [
+      "069: The managed code job can free runner disk before it builds",
+      "1. Purpose",
+      "2. Territory",
+      "3. Behavior",
+      "3.1 The parameter",
+      "3.2 The step",
+      "3.3 On a post-merge push",
+      "3.4 An external code selection",
+      "3.5 Off by default",
+      "3.6 The revision",
+      "4. Out of scope",
+      "5. Resolved decisions",
+      "Verification"
+    ],
+    "specPath": "specs/069-code-free-disk/spec.md",
+    "status": "draft",
+    "summary": "Amends spec 002's setup profile and spec 058's code job. A new boolean parameter, ci.code.free_disk, off by default, renders one step in the managed code job before the build: it removes the runner's unused preinstalled toolchains and reports the free space before and after. Off, the rendered workflow is revision 24's. An external code selection refuses the parameter, because its job is the project's own.\n",
+    "title": "Setup profile revision 25: the managed code job can free runner disk before it builds"
+  },
+  "shardHash": "d134f3a4ec6e781d2e87db5106f21ac6fb94f32813bb291f11cb901eb12a48b5",
+  "specVersion": "1.11.0"
+}
