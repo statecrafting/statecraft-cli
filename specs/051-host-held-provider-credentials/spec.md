@@ -2,7 +2,7 @@
 id: "051-host-held-provider-credentials"
 title: "The supervisor holds the provider token behind a loopback gateway; the child holds only a per-attempt token"
 status: approved
-implementation: pending
+implementation: complete
 created: "2026-10-21"
 summary: >
   Replaces spec 042's delivery of the operator's provider token in the
@@ -183,6 +183,24 @@ versions and features spec 033's hosted client already resolves through
 `ureq`, so the lockfile gains no package and no system trust store or native
 TLS is linked. It landed as its own dependency change before the gateway,
 because spec 044's guard keeps a dependency change out of a feature.
+
+**2026-11-04: the measurement under confinement, on macOS and Linux.** The
+owner authorized the live run on 2026-11-04. Each platform ran
+`scripts/acceptance/managed-session.sh` from `main` at 9e6cfebd: the
+preflight, then one `managed-startup` session through `run`, with the
+operator's provisioned token copied into the fixture home. Claude Code
+2.1.318 on both.
+
+| Platform | Confinement | Result |
+|---|---|---|
+| macOS 26 (Apple silicon) | `seatbelt` | **ESTABLISHED**; outcome `completed`, two turns, `end_turn`; record names `gatewayEndpoint` `127.0.0.1:63388`; every self-test key true |
+| Linux (Docker Desktop, kernel 7.0.14-linuxkit, `rust:1.96-bookworm`, container seccomp off) | `landlock-and-seccomp` | **ESTABLISHED**; outcome `completed`, two turns; record names `gatewayEndpoint` `127.0.0.1:45543`; every self-test key true |
+
+On both, a scan of every file the fixture left found the token's bytes only
+in the owner-only credential copy: the child held only its attempt token,
+and the session completed, so the gateway swapped and forwarded it. With the
+verification lines passing, the acceptance is met and `implementation` is
+`complete`.
 
 ## Verification
 
