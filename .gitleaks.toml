@@ -1,0 +1,16 @@
+# The project's gitleaks configuration (spec 044 section 3.6): the default
+# rules, with one allowlist. spec-spine's compiled shards under
+# .statecraft/derived/ map each section id to its sha256 digest, and a
+# section id that ends in a word such as "credentials" makes the digest read
+# as a generic API key. The allowlist covers only that rule, only those
+# shards, and only a value that is exactly 64 lowercase hex digits.
+[extend]
+useDefault = true
+
+[[allowlists]]
+description = "spec-spine section digests in compiled shards"
+targetRules = ["generic-api-key"]
+condition = "AND"
+paths = ['''^\.statecraft/derived/''']
+regexTarget = "secret"
+regexes = ['''^[0-9a-f]{64}$''']

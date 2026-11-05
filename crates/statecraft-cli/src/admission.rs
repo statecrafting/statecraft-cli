@@ -98,6 +98,7 @@ pub fn dry_run(rest: &[String]) -> Outcome {
             verdicts: &inputs.verdicts,
             decisions: &counted,
             submitter: &submitter,
+            prescreen: inputs.prescreen.clone(),
         },
     );
 

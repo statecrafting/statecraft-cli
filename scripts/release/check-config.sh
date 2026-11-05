@@ -6,11 +6,6 @@
 # `[workspace.metadata.dist]` table of the root Cargo.toml and
 # .github/workflows/release.yml.
 #
-# Both files land in the two changes after this one (spec 057 section 5,
-# 2026-11-02). Until then this check, and its self-test, which copies them,
-# refuse, and neither is in the spec's verification; the change that adds the
-# workflow adds both lines there.
-#
 # Usage: check-config.sh [<root>]
 #        check-config.sh --self-test
 set -eu

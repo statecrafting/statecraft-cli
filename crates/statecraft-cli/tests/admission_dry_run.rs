@@ -16,7 +16,9 @@
 mod json_naming;
 
 use serde_json::{Value, json};
-use statecraft_envelope::admission::{AdmissionInput, Decision, evaluate, policy_eval_claim};
+use statecraft_envelope::admission::{
+    AdmissionInput, Decision, Prescreen, evaluate, policy_eval_claim,
+};
 use statecraft_envelope::attestation::{
     Attestation, AttestationId, PredicateType, Principal, PrincipalKind, UnsignedAttestation,
 };
@@ -193,6 +195,7 @@ fn fixture(
                 verdicts: &verdicts,
                 decisions: &decisions,
                 submitter: &Principal::new(PrincipalKind::Human, "sam"),
+                prescreen: Prescreen::Missing,
             },
         );
         s.attest(
@@ -222,6 +225,7 @@ fn expected(
             verdicts,
             decisions,
             submitter: &Principal::new(PrincipalKind::Human, "sam"),
+            prescreen: Prescreen::Missing,
         },
     )
 }
