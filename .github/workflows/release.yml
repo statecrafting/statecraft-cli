@@ -129,9 +129,9 @@ jobs:
         include:
           - { target: x86_64-unknown-linux-gnu,  os: ubuntu-22.04,     host: x86_64-unknown-linux-gnu }
           - { target: aarch64-unknown-linux-gnu, os: ubuntu-22.04-arm, host: aarch64-unknown-linux-gnu }
-          - { target: aarch64-apple-darwin,      os: macos-14,         host: aarch64-apple-darwin }
+          - { target: aarch64-apple-darwin,      os: macos-15,         host: aarch64-apple-darwin }
           # Cross-compiled on the Apple Silicon runner; Xcode ships the x86_64 SDK.
-          - { target: x86_64-apple-darwin,       os: macos-14,         host: aarch64-apple-darwin }
+          - { target: x86_64-apple-darwin,       os: macos-15,         host: aarch64-apple-darwin }
     runs-on: ${{ matrix.os }}
     # id-token and attestations are for the build-provenance attestation only;
     # nothing in this job writes repository contents.
