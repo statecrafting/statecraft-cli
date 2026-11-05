@@ -251,7 +251,11 @@ impl Gateway {
         let acceptor = std::thread::Builder::new()
             .name("statecraft-provider-gateway".into())
             .spawn(move || accept(&listener, &accepting))
-            .map_err(|e| GatewayError::Bind(e.kind().to_string()))?;
+            .map_err(|e| {
+                // No gateway will serve this token: its file goes with it.
+                let _ = std::fs::remove_file(&token_file);
+                GatewayError::Bind(e.kind().to_string())
+            })?;
         Ok(Self {
             address,
             attempt_token,

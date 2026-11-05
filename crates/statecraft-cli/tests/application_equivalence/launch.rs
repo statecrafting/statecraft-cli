@@ -270,6 +270,10 @@ impl Fixture {
         let f = Fixture {
             dir,
             aside: tempfile::tempdir().unwrap(),
+            // A free port, released at once: the binary under test binds it,
+            // once per side and in turn, so no listener here may hold it. A
+            // process that took it in between makes the launch fail to bind,
+            // which fails the test loudly rather than passing it wrongly.
             gateway_port: std::net::TcpListener::bind("127.0.0.1:0")
                 .and_then(|l| l.local_addr())
                 .map(|a| a.port())
