@@ -1,0 +1,64 @@
+{
+  "record": {
+    "amends": [
+      "004-execution-adapter"
+    ],
+    "created": "2026-11-06",
+    "declaresAcceptance": true,
+    "dependsOn": [
+      "004-execution-adapter"
+    ],
+    "id": "070-writable-alias-scan",
+    "implementation": "pending",
+    "obligations": [
+      {
+        "anchor": "3-1-what-the-alias-scan-refuses",
+        "id": "R-1",
+        "kind": "requirement",
+        "text": "A multiply linked file under an inaccessible root refuses the launch at the hardlink step, as before."
+      },
+      {
+        "anchor": "3-1-what-the-alias-scan-refuses",
+        "id": "R-2",
+        "kind": "requirement",
+        "text": "A multiply linked file under a read-only root refuses the launch at the hardlink step when it shares its device and inode with a file under a writable directory, a writable file, or (macOS) an existing file an adjacent configuration prefix grants; otherwise it does not refuse."
+      },
+      {
+        "anchor": "3-2-what-the-child-may-write",
+        "id": "R-3",
+        "kind": "requirement",
+        "text": "When no file the child may write has more than one link, the read-only roots are not walked."
+      }
+    ],
+    "sectionDigests": {
+      "070-a-read-only-root-refuses-only-a-link-the-child-could-write": "e616e1662ac8cba457c1c2d01dbca75839bc46ee0785067078feaab71c2cd42a",
+      "1-purpose": "d8759c48ce787349cc68786309618c68061dfe8cd91769f55b4b4ef9b643e1d1",
+      "2-territory": "d4c386a2ff60319266ac16b55f9ef49c0848414e78c67b5092b0606b6aff985c",
+      "3-1-what-the-alias-scan-refuses": "9b9b6b951d49e7624c87357e83b42fc33458e8412c423a8335605ab2a885b669",
+      "3-2-what-the-child-may-write": "359920344a1843bcd8f7d2e1e959341fec2450b283cf7211250d47481c14102d",
+      "3-3-what-does-not-change": "4caa9f2cf1d53b6019429c1c0cc1fcefa4f5463244fc27b5ceb161a19a218864",
+      "3-behavior": "92d89c999e022a3e16e54ecdc90a95dede2139b523716b59cac3cf1be5d44ae5",
+      "4-out-of-scope": "128c278c4d36c351b977fb6340cc84d3b98cfb7aa8b02080bf7a0359cdbab2f1",
+      "5-resolved-decisions": "000953cd72926d9f373335a822de814a63afc2d8c7c13975af06a4b455f40d04",
+      "verification": "e9b83f59e911a92d0035427f5581140b8589eb64199331f64b3efc23a0f5064c"
+    },
+    "sectionHeadings": [
+      "070: A read-only root refuses only a link the child could write",
+      "1. Purpose",
+      "2. Territory",
+      "3. Behavior",
+      "3.1 What the alias scan refuses",
+      "3.2 What the child may write",
+      "3.3 What does not change",
+      "4. Out of scope",
+      "5. Resolved decisions",
+      "Verification"
+    ],
+    "specPath": "specs/070-writable-alias-scan/spec.md",
+    "status": "draft",
+    "summary": "Amends spec 004 section 3.18 rule 2's alias scan. An inaccessible root still refuses any multiply linked file. A read-only root (the target's working tree, its Git directory, another attempt's workspace) refuses a multiply linked file only when another of its names lies where the child may write. Cargo's build output in a checkout and Git objects shared with a local clone no longer refuse every launch.\n",
+    "title": "A read-only root refuses only a link the child could write"
+  },
+  "shardHash": "3b2d8a2c47624dc8975b0aaa2ac13349be5f3582c94b5c690a87daca1155587e",
+  "specVersion": "1.11.0"
+}
