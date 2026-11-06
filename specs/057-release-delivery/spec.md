@@ -222,15 +222,10 @@ downloads; the verify and publish jobs download the archives and the
 installers by name, so a manifest is never part of the verified set or the
 release.
 
-**2026-11-06: V-1 is met; 057 complete.** The fourth dry run,
-`dry-run/v0.0.0` at `3dc0252a`, passed every job and skipped publish. Its
-set, checked again from the downloaded artifacts: four archives, each
-matching its SHA-256 sidecar and accepted by `gh attestation verify` for this
-repository; four CycloneDX SBOMs of 161 components each; the hardened shell
-installer with its sidecar and the Homebrew formula, each carrying all four
-archives' digests. No release exists and nothing was published. The first
-release is the owner's signed `v0.1.0` tag (O-3), after the commit that sets
-the workspace version.
+**2026-11-06: V-1 is met; 057 complete.** A dry run of the release
+workflow at `3dc0252a` built, attested and verified the full set and
+published nothing, so the dry run stays V-1's acceptance and the first
+release is the owner's signed `v0.1.0` tag (O-3).
 
 ## Verification
 
