@@ -171,6 +171,9 @@ jobs:
           archive="target/distrib/statecraft-cli-$TARGET.tar.xz"
           [ -s "$archive" ] || { echo "::error::cargo-dist made no $archive"; ls -la target/distrib; exit 1; }
           [ -s "$archive.sha256" ] || { echo "::error::no SHA-256 sidecar for $archive"; exit 1; }
+          # The installers job's cargo-dist embeds each archive's SHA-256 from
+          # this target's manifest, read as target/distrib/*-dist-manifest.json.
+          cp "dist-manifest-$TARGET.json" "target/distrib/$TARGET-dist-manifest.json"
           echo "ARCHIVE=$archive" >> "$GITHUB_ENV"
           echo "SBOM=target/distrib/statecraft-cli-$TARGET.cdx.json" >> "$GITHUB_ENV"
       - name: Generate the CycloneDX SBOM from the committed Cargo.lock
@@ -214,6 +217,12 @@ jobs:
             target/distrib/statecraft-cli-${{ matrix.target }}.tar.xz.intoto.jsonl
             target/distrib/statecraft-cli-${{ matrix.target }}.cdx.json
           if-no-files-found: error
+      # Apart from the archive, so the verified set and the release never carry it.
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: manifest-${{ matrix.target }}
+          path: target/distrib/${{ matrix.target }}-dist-manifest.json
+          if-no-files-found: error
 
   # Section 3.3: the shell installer and the formula, from the four archives,
   # so each carries their checksums.
@@ -235,6 +244,11 @@ jobs:
         with:
           path: target/distrib
           pattern: archive-*
+          merge-multiple: true
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          path: target/distrib
+          pattern: manifest-*
           merge-multiple: true
       # cargo-dist reads the workspace through cargo metadata, which resolves
       # every package; offline, that needs the registry the build jobs fetch.
@@ -282,7 +296,12 @@ jobs:
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           path: release
+          pattern: archive-*
           merge-multiple: true
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          path: release
+          name: installers
       - name: Verify every asset
         run: scripts/release/verify-set.sh release "$REPO"
 
@@ -301,7 +320,12 @@ jobs:
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           path: release
+          pattern: archive-*
           merge-multiple: true
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          path: release
+          name: installers
       - name: Create the release from the verified set
         # --verify-tag refuses to create a tag: the owner's signed tag is the
         # only one, and nothing is pushed back to the repository.
