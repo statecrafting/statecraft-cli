@@ -203,6 +203,14 @@ Silicon label; both macOS targets build there, `x86_64-apple-darwin`
 cross-compiled with the x86_64 SDK Xcode ships, as before. No archive,
 target or check changes.
 
+**2026-11-05: the installers job fetches before cargo-dist reads the
+workspace.** The second dry run (`dry-run/v0.0.0` at `6cfc8d89`, run
+42137868564) built all four archives, and the installers job failed: with
+`CARGO_NET_OFFLINE` set and nothing fetched on that runner, cargo-dist's
+`cargo metadata` found no `serde` in the registry. The job now runs the same
+`cargo fetch --locked` as the build jobs before it, so it too resolves only
+what the committed lockfile names.
+
 ## Verification
 
 Ratified by the owner on 2026-10-31. Acceptance is declared by the

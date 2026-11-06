@@ -236,6 +236,10 @@ jobs:
           path: target/distrib
           pattern: archive-*
           merge-multiple: true
+      # cargo-dist reads the workspace through cargo metadata, which resolves
+      # every package; offline, that needs the registry the build jobs fetch.
+      - name: Fetch dependencies from the committed lockfile (--locked)
+        run: cargo fetch --locked
       - name: Generate the installer and the formula with cargo-dist
         env:
           CARGO_NET_OFFLINE: "true"
