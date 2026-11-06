@@ -59,7 +59,7 @@
       }
     ],
     "sectionDigests": {
-      "057-release-delivery": "8b2e2f8ad78abe90544e1e974eae0b7b742d492792d755411e8c2baa51e51f44",
+      "057-release-delivery": "2d0e6b1ccf0f660a80801e3fb95c2b5482c9be16613d6d7292abbbe07e7f8d40",
       "1-purpose": "54a39c53634ec7febdd011d7c3e5089ed9a9ce738370ab48e4eba68e797fa967",
       "2-territory": "6ff5ca9ac7365e4b7ffd69cf55982a06d549efcff2b531743069893be9fb0257",
       "3-1-what-starts-a-release": "dd5cf8cf99617d3e7cc4f9debcceedadcec2d17233ea0d05a1ff2738b2969100",
@@ -69,7 +69,7 @@
       "3-5-what-is-not-published": "8ef4d74e4dca8919b19bad700556ffaeb1465a81f5b33d32fb9c02822a10f4a2",
       "3-behavior": "2beed41f2404504d948f3d98470f6ab82e0713a84383bf925baefb632745ca62",
       "4-out-of-scope": "234bc4451c369a83fc1d96407af6ac26830abe5b7625a5f8e28e478ea49ca6d8",
-      "5-resolved-decisions": "138f822a7b328adbc0a5324bf52105d971efbbf58e7ea61499421736edd50b3b",
+      "5-resolved-decisions": "a08bbcf30a47e62ae5064c53c244c8534d9afc83c1913f0174c324a564aa10b7",
       "verification": "03463fe4b6a187b5a955907bffdb9fd4f34b6e658c60de0db4e62c4def15146d"
     },
     "sectionHeadings": [
@@ -91,6 +91,6 @@
     "summary": "Specifies how this repository delivers its own binaries, under the F-02 narrowing of 2026-10-20: a tag the owner pushes builds macOS and Linux archives for aarch64 and x86_64 with cargo-dist at an exact version, a shell installer and a Homebrew formula, a CycloneDX SBOM per archive that refuses to ship empty, and a keyless build-provenance attestation per archive. It adds no verb, and no verb in this corpus publishes. The binary's name, the Homebrew tap and the version scheme are the owner's decisions.\n",
     "title": "Releasing this repository's binaries is repository delivery: cargo-dist archives, installers, SBOM and build provenance"
   },
-  "shardHash": "55929194ae31221b69a34c16981775d832eaf5b841c50f9f5cf9ce90d508ccb1",
+  "shardHash": "016e86b2aadfd37b41599f43198083286b965aec7c1525d14f4d1ebb064f152c",
   "specVersion": "1.11.0"
 }
