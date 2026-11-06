@@ -1,0 +1,15 @@
+{
+  "mapping": {
+    "amends": [
+      "004-execution-adapter"
+    ],
+    "dependsOn": [
+      "004-execution-adapter"
+    ],
+    "implementingPaths": [],
+    "specId": "070-writable-alias-scan",
+    "specStatus": "draft"
+  },
+  "schemaVersion": "1.3.0",
+  "shardHash": "3b2d8a2c47624dc8975b0aaa2ac13349be5f3582c94b5c690a87daca1155587e"
+}
