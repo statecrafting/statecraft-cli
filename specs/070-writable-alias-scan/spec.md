@@ -2,7 +2,7 @@
 id: "070-writable-alias-scan"
 title: "A read-only root refuses only a link the child could write"
 status: approved
-implementation: pending
+implementation: complete
 created: "2026-11-06"
 summary: >
   Amends spec 004 section 3.18 rule 2's alias scan. An inaccessible root
@@ -13,6 +13,9 @@ summary: >
   a local clone no longer refuse every launch.
 amends:
   - "004-execution-adapter"
+extends:
+  - { spec: "004-execution-adapter", unit: { kind: directory, path: "crates/statecraft-adapter/" }, nature: additive }
+  - { spec: "006-command-surface", unit: { kind: directory, path: "crates/statecraft-cli/" }, nature: additive }
 depends_on:
   - "004-execution-adapter"
 obligations:
