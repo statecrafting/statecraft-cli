@@ -211,6 +211,17 @@ archives, and the installers job failed: with
 `cargo fetch --locked` as the build jobs before it, so it too resolves only
 what the committed lockfile names.
 
+**2026-11-06: each build hands its manifest to the installers job.** The
+third dry run built and attested all four archives and generated the
+installer and the formula, and the verify job refused the set: neither
+carried any archive's SHA-256. cargo-dist's global build takes those digests
+from the per-target manifests it finds as `target/distrib/*-dist-manifest.json`,
+and the build jobs uploaded none. Each build now stages its manifest under
+that name and uploads it as its own artifact, which only the installers job
+downloads; the verify and publish jobs download the archives and the
+installers by name, so a manifest is never part of the verified set or the
+release.
+
 ## Verification
 
 Ratified by the owner on 2026-10-31. Acceptance is declared by the
