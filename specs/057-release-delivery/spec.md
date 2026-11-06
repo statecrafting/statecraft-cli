@@ -194,6 +194,15 @@ release workflow, which also adds `check-config.sh`, over the committed tree
 and under `--self-test`, to the verification below: both read the files the
 last two changes add. Nothing is released until the owner pushes a tag.
 
+**2026-11-05: the macOS builds run on `macos-15`.** The first V-1 dry run
+(`dry-run/v0.0.0` at `373d41d3`, run 42126655360) was admitted and built
+both Linux archives, but GitHub cancelled both macOS jobs at once: "The
+configuration 'macos-14-arm64-us-default' is not supported", because the
+`macos-14` image is deprecated. `macos-15` is the oldest supported Apple
+Silicon label; both macOS targets build there, `x86_64-apple-darwin`
+cross-compiled with the x86_64 SDK Xcode ships, as before. No archive,
+target or check changes.
+
 ## Verification
 
 Ratified by the owner on 2026-10-31. Acceptance is declared by the
