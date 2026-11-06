@@ -13,6 +13,9 @@ summary: >
   a local clone no longer refuse every launch.
 amends:
   - "004-execution-adapter"
+extends:
+  - { spec: "004-execution-adapter", unit: { kind: directory, path: "crates/statecraft-adapter/" }, nature: additive }
+  - { spec: "006-command-surface", unit: { kind: directory, path: "crates/statecraft-cli/" }, nature: additive }
 depends_on:
   - "004-execution-adapter"
 obligations:

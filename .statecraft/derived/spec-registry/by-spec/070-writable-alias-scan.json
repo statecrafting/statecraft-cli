@@ -8,6 +8,24 @@
     "dependsOn": [
       "004-execution-adapter"
     ],
+    "extends": [
+      {
+        "nature": "additive",
+        "spec": "004-execution-adapter",
+        "unit": {
+          "kind": "directory",
+          "path": "crates/statecraft-adapter/"
+        }
+      },
+      {
+        "nature": "additive",
+        "spec": "006-command-surface",
+        "unit": {
+          "kind": "directory",
+          "path": "crates/statecraft-cli/"
+        }
+      }
+    ],
     "id": "070-writable-alias-scan",
     "implementation": "pending",
     "obligations": [
@@ -59,6 +77,6 @@
     "summary": "Amends spec 004 section 3.18 rule 2's alias scan. An inaccessible root still refuses any multiply linked file. A read-only root (the target's working tree, its Git directory, another attempt's workspace) refuses a multiply linked file only when another of its names lies where the child may write. Cargo's build output in a checkout and Git objects shared with a local clone no longer refuse every launch.\n",
     "title": "A read-only root refuses only a link the child could write"
   },
-  "shardHash": "3b2d8a2c47624dc8975b0aaa2ac13349be5f3582c94b5c690a87daca1155587e",
+  "shardHash": "22bfcc0c8a34a977d2256eb2ec384a1cef919b927a850d7c156b42072c57ced6",
   "specVersion": "1.11.0"
 }
