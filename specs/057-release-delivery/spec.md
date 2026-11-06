@@ -2,7 +2,7 @@
 id: "057-release-delivery"
 title: "Releasing this repository's binaries is repository delivery: cargo-dist archives, installers, SBOM and build provenance"
 status: approved
-implementation: pending
+implementation: complete
 created: "2026-10-21"
 summary: >
   Specifies how this repository delivers its own binaries, under the F-02
@@ -221,6 +221,11 @@ that name and uploads it as its own artifact, which only the installers job
 downloads; the verify and publish jobs download the archives and the
 installers by name, so a manifest is never part of the verified set or the
 release.
+
+**2026-11-06: V-1 is met; 057 complete.** A dry run of the release
+workflow at `3dc0252a` built, attested and verified the full set and
+published nothing, so the dry run stays V-1's acceptance and the first
+release is the owner's signed `v0.1.0` tag (O-3).
 
 ## Verification
 
