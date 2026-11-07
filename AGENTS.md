@@ -241,8 +241,10 @@ spec-spine's codes by the release `spec-spine.toml` pins.
 
 ## The merge queue
 
-The queue is enabled on `main` (2026-09-24, merge method: merge commit, up to
-five entries built, all green required). It preserves the invariant above
+The queue is enabled on `main` (2026-09-24; since 2026-11-07 squash, up to five
+entries built, groups of at most five, all entries green, linear history, no
+up-to-date requirement because the queue tests each entry on the latest base).
+It preserves the invariant above
 because the three properties it needs were made true in the same authority
 change that documented them:
 
@@ -276,32 +278,27 @@ judged without its waiver, by construction; queue it alone.
 
 ## How a pull request is merged
 
-Two methods are allowed; the choice is not arbitrary. Rebase merging is disabled
-in the repository settings (owner, 2026-09-24): it rewrites SHAs and adds
-nothing merge commits do not already give.
+Squash through the merge queue, the one method (owner, 2026-11-07, the same
+setting in rustev and spec-spine). `main` requires linear history, so merge
+commits and rebase merges are refused. One pull request is one commit on
+`main`: one reviewed diff that reverts and bisects as a unit.
 
-- **Merge commit, the default**, and always when a record cites a branch SHA
-  (a waiver's head, "tested on X", an evidence commit) or the pull request is
-  stacked on another. The judged heads stay in `main`'s history, and
-  `git branch --merged` answers correctly.
-- **Squash** only when the branch carries fixup or red intermediate commits and
-  no record cites their SHAs.
+Every commit of the branch is still signed and passes `make gate`: on
+`pull_request` and `merge_group` the `governance` job gates every commit in the
+change at its own tree (`gate.sh governance` and `cargo fmt --check`, with the
+pin that commit names), refuses one GitHub does not verify as signed, and
+applies the authored-content rules to each commit message and to the pull
+request's title and body. The squash commit GitHub writes is signed by GitHub,
+and its message is the pull-request title and body, so the authored-content
+rules bind the body as history.
 
-Every commit that reaches `main` is signed and passes `make gate`; with merge
-commits the branch's commits land too, so this binds each one, not only the
-head. CI enforces it: on `pull_request` and `merge_group` the `governance` job
-gates every commit in the change at its own tree (`gate.sh governance` and
-`cargo fmt --check`, with the pin that commit names), refuses one GitHub does not verify as signed,
-and applies the authored-content rules to each commit message and to the pull
-request's title and body. A branch with a red or unsigned commit is therefore
-rebuilt before review, not squashed at merge, so squash is left for branches
-nobody cites. **A pull request whose base is not `main` fails `governance`**: stack
-by opening each branch off `main` with a depends-on note, or wait for GitHub to
-retarget the upper one when the lower one merges. The merge commit's message is
-the pull-request title and body, so the authored-content rules bind the body as
-history. Read history first-parent (`git log --first-parent`, `git bisect
---first-parent`): the first-parent chain is the sequence of integration
-candidates the gate judged.
+Branch SHAs do not survive the squash. A record cites the pull request number
+or the squash commit on `main`, never a branch SHA ("tested on X" names the
+squash commit once it lands). **A pull request whose base is not `main` fails
+`governance`**. Stack at most one level: open the dependent branch off `main`
+with a depends-on note, and after the lower one lands rebase the upper one onto
+`main` (`git rebase --onto origin/main <lower-branch-tip>`), because its
+parent's commits are no longer `main`'s ancestors.
 
 `spec-spine couple` is **CI-only, and deliberately not in `make gate`**. It
 compares two commits, so it cannot see a change being staged and is useless as a
