@@ -227,6 +227,15 @@ workflow at `3dc0252a` built, attested and verified the full set and
 published nothing, so the dry run stays V-1's acceptance and the first
 release is the owner's signed `v0.1.0` tag (O-3).
 
+**2026-11-07: why section 3.5 publishes nothing yet.** The owner's standard
+for every package statecrafting releases is that a registry version carries
+provenance from CI, published through trusted publishing first, and that a
+version public without provenance is a failed release (rustev A-87,
+spec-spine spec 209). The archives here already carry build provenance
+(section 3.4); a registry channel does not until it is specified to that
+standard. So 3.5 stays as written, and publishing to npm or crates.io is a
+new spec that amends it, decided by the owner, not a change to this one.
+
 ## Verification
 
 Ratified by the owner on 2026-10-31. Acceptance is declared by the
