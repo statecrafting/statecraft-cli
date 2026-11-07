@@ -107,8 +107,10 @@ The exits, the merge-base comparison and the absence of renames are spec
 
 **2026-11-07: owner direction.** The owner directed that a version bump no
 longer need an admin merge, that a release cycle bump the version when it
-opens, and pre-approved this amendment of spec 044 ("I also pre-approve the
-draft of spec 044"). That approval is this spec's ratification. A target
+opens, and pre-approved the spec that amends spec 044 to do so ("I also
+pre-approve the draft of spec 044"); this spec is that amendment. Its
+ratification takes effect only with the owner's approval of this change's
+`statecraft-review-exception`, as for any spec filed `approved`. A target
 upgrades to revision 27 by `statecraft-cli init plan|apply` as for any
 revision; this repository's own adoption is a separate change.
 
