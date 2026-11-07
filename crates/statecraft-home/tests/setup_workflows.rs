@@ -5964,7 +5964,7 @@ fn run_mutated(repo: &Repo, script: &str, extra: &[(&'static str, &str)]) -> Ran
 /// 058), captured byte for byte from main at 6c6f394.
 fn revision_seventeen() -> Profile {
     let mut p = Profile::registered();
-    assert_eq!(p.revision, 26, "the registered profile is revision 26");
+    assert_eq!(p.revision, 27, "the registered profile is revision 27");
     // Revision 22 (spec 044) added two scripts, and revision 23 (spec 056)
     // the review guide, that revision 17 did not have.
     p.templates.retain(|t| {
@@ -6852,6 +6852,97 @@ fn run_script(root: &Path, script: &str, args: &[&str]) -> (i32, String) {
 /// histories. A dependency change beside a source change must be split; a
 /// dependency change with its regenerated shards, and a `D-06` adoption, is
 /// one change; an undecidable comparison fails closed with 2.
+/// A workspace at `version`, with one registry dependency at `dep`.
+fn workspace_files(version: &str, dep: &str) -> [(&'static str, String); 3] {
+    [
+        (
+            "Cargo.toml",
+            format!(
+                "[workspace]\nmembers = [\"crates/a\"]\n\n[workspace.package]\nversion = \"{version}\"\n\n[workspace.dependencies]\na = {{ path = \"crates/a\", version = \"{version}\" }}\nserde = {{ version = \"{dep}\" }}\n"
+            ),
+        ),
+        (
+            "crates/a/Cargo.toml",
+            format!(
+                "[package]\nname = \"a\"\nversion = \"{version}\"\n\n[dependencies]\nserde.workspace = true\n"
+            ),
+        ),
+        (
+            "Cargo.lock",
+            format!(
+                "version = 4\n\n[[package]]\nname = \"a\"\nversion = \"{version}\"\ndependencies = [\n \"serde\",\n]\n\n[[package]]\nname = \"serde\"\nversion = \"{dep}\"\nsource = \"registry+https://github.com/rust-lang/crates.io-index\"\n"
+            ),
+        ),
+    ]
+}
+
+#[test]
+fn the_policy_guard_ignores_a_workspace_version_bump() {
+    // Spec 071: revision 27's fourth class.
+    let guard = "guard-policy-files.sh";
+    let repo = guard_repo();
+    let root = repo.path();
+    let files = |v: &str, d: &str, extra: &[(&'static str, &'static str)]| {
+        let mut all: Vec<(&str, String)> = workspace_files(v, d).into_iter().collect();
+        all.extend(extra.iter().map(|(p, t)| (*p, t.to_string())));
+        all
+    };
+    let commit = |root: &Path, all: &[(&str, String)]| {
+        let refs: Vec<(&str, &str)> = all.iter().map(|(p, t)| (*p, t.as_str())).collect();
+        commit_files(root, &refs);
+    };
+    commit(root, &files("0.5.0", "1.0.200", &[]));
+
+    // The release bump beside its changelog: version-only, exit 0.
+    git(root, &["checkout", "--quiet", "-b", "bump", "main"]);
+    commit(
+        root,
+        &files("0.6.0", "1.0.200", &[("CHANGELOG.md", "0.6.0\n")]),
+    );
+    let (code, out) = run_script(root, guard, &["main", "bump"]);
+    assert_eq!(code, 0, "{out}");
+    assert!(
+        out.contains("0 policy, 0 generated (ignored), 1 other, 3 version-only (ignored)"),
+        "{out}"
+    );
+
+    // A registry dependency moves with it: policy, exit 1.
+    git(root, &["checkout", "--quiet", "-b", "dep", "main"]);
+    commit(
+        root,
+        &files("0.6.0", "1.0.201", &[("CHANGELOG.md", "0.6.0\n")]),
+    );
+    let (code, out) = run_script(root, guard, &["main", "dep"]);
+    assert_eq!(code, 1, "{out}");
+    assert!(
+        out.contains("policy:\n  Cargo.lock\n  Cargo.toml\n"),
+        "{out}"
+    );
+    assert!(out.contains("1 version-only (ignored)"), "{out}");
+
+    // The lockfile format changes: policy, exit 1.
+    git(root, &["checkout", "--quiet", "-b", "format", "main"]);
+    let mut all = files("0.5.0", "1.0.200", &[("src/x.rs", "\n")]);
+    all[2].1 = all[2].1.replacen("version = 4", "version = 5", 1);
+    commit(root, &all);
+    let (code, out) = run_script(root, guard, &["main", "format"]);
+    assert_eq!(code, 1, "{out}");
+    assert!(out.contains("policy:\n  Cargo.lock\n"), "{out}");
+
+    // A new crate's Cargo.toml is not a bump: policy, exit 1.
+    git(root, &["checkout", "--quiet", "-b", "added", "main"]);
+    commit_files(
+        root,
+        &[
+            ("crates/b/Cargo.toml", "[package]\nname = \"b\"\n"),
+            ("src/y.rs", "\n"),
+        ],
+    );
+    let (code, out) = run_script(root, guard, &["main", "added"]);
+    assert_eq!(code, 1, "{out}");
+    assert!(out.contains("policy:\n  crates/b/Cargo.toml\n"), "{out}");
+}
+
 #[test]
 fn the_policy_guard_exits_by_its_three_classes() {
     let guard = "guard-policy-files.sh";

@@ -1,0 +1,77 @@
+{
+  "record": {
+    "amends": [
+      "002-environment-lifecycle",
+      "044-supply-chain-profile"
+    ],
+    "created": "2026-11-07",
+    "declaresAcceptance": true,
+    "dependsOn": [
+      "002-environment-lifecycle",
+      "044-supply-chain-profile",
+      "068-finding-severity"
+    ],
+    "extends": [
+      {
+        "nature": "additive",
+        "spec": "002-environment-lifecycle",
+        "unit": {
+          "kind": "directory",
+          "path": "crates/statecraft-home/"
+        }
+      }
+    ],
+    "id": "071-version-only-cargo-class",
+    "implementation": "complete",
+    "obligations": [
+      {
+        "anchor": "3-1-the-version-only-class",
+        "id": "R-1",
+        "kind": "requirement",
+        "text": "A Cargo.toml or Cargo.lock that both the merge base and the head hold, and whose two copies are equal once every workspace package's version is masked, is version-only; the guard counts it in neither policy nor other."
+      },
+      {
+        "anchor": "3-2-what-stays-policy",
+        "id": "R-2",
+        "kind": "requirement",
+        "text": "Any other change to a Cargo.toml or Cargo.lock keeps it policy: a registry dependency's version, a source, the lockfile format, an added or deleted file, or a path git quotes."
+      },
+      {
+        "anchor": "3-3-exits-and-report",
+        "id": "R-3",
+        "kind": "requirement",
+        "text": "The guard's exits and its merge-base comparison are spec 044's; its summary line also counts the version-only paths."
+      }
+    ],
+    "sectionDigests": {
+      "071-setup-profile-revision-27-the-policy-isolation-guard-ignores-a-workspace-version-bump": "faf94e87b8777d6a94bc79c8fbc03b7ec9146a27dfb5f2fad77e5d1d91c800b8",
+      "1-purpose": "ac870be7eb29c8a761f26a644ee3fdb2e8366012c64e5e2477a7178f69a2d87e",
+      "2-territory": "1dc36e94f8257d6f70e1a7caecea87f66ce33b5cfd660a772238258c2aa69e01",
+      "3-1-the-version-only-class": "77aeffcfb43943fd497ea444fb7ac72fc07794b1c77b4efa6243b63f4f95a9dd",
+      "3-2-what-stays-policy": "f755a3c6b2b789f27bd73d3801f0c207cec2e0e4aefd000927d80648f258975d",
+      "3-3-exits-and-report": "3a6e5c8e35083e390a1843d1024e2a1194964e9e76dd447acff56c780f9b2e55",
+      "3-behavior": "7c61b3ece84dcca3a2d11921a738df1fbf713a650f89efd95e5a431c4003b016",
+      "4-observable-cases": "d31ad52a919cd06fe09e9a2e29c8e8cf85c2b23b0428dc3bbd3efd22bdcadcd3",
+      "5-resolved-decisions": "d107d567820705111fdb7aeefda45b4e5c81f556a2c1f38cdeb2d4a505e39638",
+      "verification": "b90622d420448c93d47073c13f1df93befd467f1cbacd9d9ab0221799403424d"
+    },
+    "sectionHeadings": [
+      "071: Setup profile revision 27: the policy-isolation guard ignores a workspace version bump",
+      "1. Purpose",
+      "2. Territory",
+      "3. Behavior",
+      "3.1 The version-only class",
+      "3.2 What stays policy",
+      "3.3 Exits and report",
+      "4. Observable cases",
+      "5. Resolved decisions",
+      "Verification"
+    ],
+    "specPath": "specs/071-version-only-cargo-class/spec.md",
+    "status": "approved",
+    "summary": "Amends spec 044 section 3.3 and spec 002's setup profile. The policy-isolation guard classes any Cargo.toml or Cargo.lock as policy, so a release bump, which moves the workspace version in both beside its changelog and re-blessed fixtures, always reads as mixed and has needed an admin merge. Revision 27 adds a fourth class, version-only: a Cargo file present at both revisions that is unchanged once every workspace package's version is masked. Like generated paths it is ignored. A dependency, source, lockfile-format or new-file change keeps the file policy.\n",
+    "title": "Setup profile revision 27: the policy-isolation guard ignores a workspace version bump"
+  },
+  "shardHash": "cb15fd5f8ea79982a5063bb5e8dca375ccc71f75c8169b87e023ba57d0c0d9c9",
+  "specVersion": "1.11.0"
+}
