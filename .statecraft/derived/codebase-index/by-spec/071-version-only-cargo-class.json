@@ -1,0 +1,38 @@
+{
+  "mapping": {
+    "amends": [
+      "002-environment-lifecycle",
+      "044-supply-chain-profile"
+    ],
+    "dependsOn": [
+      "002-environment-lifecycle",
+      "044-supply-chain-profile",
+      "068-finding-severity"
+    ],
+    "implementingPaths": [
+      {
+        "path": "crates/statecraft-home/",
+        "source": "spec-edge"
+      }
+    ],
+    "resolvedUnits": [
+      {
+        "locations": [
+          {
+            "file": "crates/statecraft-home/"
+          }
+        ],
+        "ownership": true,
+        "sourceField": "extends",
+        "unit": {
+          "kind": "directory",
+          "path": "crates/statecraft-home/"
+        }
+      }
+    ],
+    "specId": "071-version-only-cargo-class",
+    "specStatus": "approved"
+  },
+  "schemaVersion": "1.3.0",
+  "shardHash": "21d18ff924e0cf99aacbb66d7294f6f273871003f7a838e13f3c9ebab98c07ee"
+}

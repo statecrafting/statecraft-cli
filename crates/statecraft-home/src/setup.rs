@@ -36,7 +36,7 @@ use std::path::Path;
 /// The one registered profile.
 pub const PROFILE_ID: &str = "github-actions-rust";
 /// Its revision.
-pub const REVISION: u32 = 26;
+pub const REVISION: u32 = 27;
 /// Where the rendered policy document lives in the target.
 pub const POLICY_PATH: &str = ".statecraft/setup/github-actions-rust.json";
 /// The resume record, under the project's runtime state.
@@ -133,6 +133,9 @@ pub const FREE_DISK_SINCE: u32 = 25;
 /// The revision whose review findings carry a severity, a category and an id,
 /// and whose answered low findings need no owner exception (spec 068).
 pub const ANSWERED_SINCE: u32 = 26;
+/// The revision whose policy-isolation guard ignores a Cargo.toml or
+/// Cargo.lock that changes only workspace package versions (spec 071).
+pub const VERSION_ONLY_SINCE: u32 = 27;
 /// What `ci.code.free_disk` removes: preinstalled toolchains a Rust build
 /// never reads (spec 069 section 3.2). Fixed by the profile.
 pub const FREE_DISK_COMMAND: &str = "sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /usr/local/.ghcup /opt/hostedtoolcache/CodeQL || true";
@@ -493,6 +496,7 @@ pub fn remote_obligations() -> Vec<String> {
         format!("revision 24: where remote.merge_queue.required is true, a push to the default branch is a post-merge push, because the queue already judged that exact commit and GitHub fast-forwards the branch to it: governance, preflight, supply-chain, workflow-lint, sg-scan and secret-scan are skipped, code runs only its cache steps (the spec-spine cache, a lookup of the cargo key, and on a miss the build that fills it and the save), and ci-gate admits them by the policy's post-merge rule only when the pushed commit passed ci-gate in a completed merge-queue run of statecraft-ci, so a push that bypassed the queue blocks and ci-gate still reports a check run on the pushed commit. A declared extra job's workflow, and an external code selection's, must declare the boolean workflow_call input {POST_MERGE_INPUT}, which the profile passes as true on such a push so it can skip its expensive steps; the plan refuses a workflow that does not declare it. The push of the upgrade's own merge commit is judged by the base's revision-23 rules and blocks once; without a required queue, push behaviour is unchanged (spec 067)"),
         format!("revision 25: the setup parameter ci.code.free_disk, a boolean and false by default, renders one step in the managed code job before the build that prints df -h /, runs `{FREE_DISK_COMMAND}` and prints df -h / again, never failing the job; on a post-merge push it runs only when the cargo key missed; beside an external ci.code it refuses the plan, and off, the workflow is revision 24's (spec 069)"),
         "revision 26: every finding of the AI review carries a severity (low, medium or high) and a category (correctness, security, authority, ratification or other), a missing or unknown one read as high, and an id, the first twelve hex digits of the sha256 of its path, line and summary; a pull request whose findings are all low and other, each answered by a `Review note (<sha8>): <id>` line of its body for that head, last edited by its author or by someone with write access, needs no owner exception, in the pull request and in the merge queue; statecraft-ci also runs on an edited pull request, and keeps the review recorded for that head, base and pull request rather than reviewing again (spec 068)".to_string(),
+        "revision 27: the policy-isolation guard gives a Cargo.toml or Cargo.lock a fourth class, version-only, when both revisions hold it and it is unchanged once every workspace package's version is masked (Cargo.toml's [package] or [workspace.package] version and the version of an inline table that also names a path; Cargo.lock's version of a [[package]] without a source); like generated paths it is ignored, so a release bump beside its changelog and re-blessed fixtures is one pull request, while any dependency, source or lockfile-format change keeps the file policy (spec 071)".to_string(),
         "a repository that already runs these checks by hand keeps them by setting governance.enforce_coverage (index coverage --fail-on-untraced), governance.authored_content (the script's path; absent or not executable refuses), governance.authored_content_text (the title, the body and every commit message), governance.gate_each_commit (each commit's tree passes the gate and cargo fmt) and governance.require_signed_commits (each commit verified as signed by GitHub) (revision 4)".to_string(),
     ]
 }
