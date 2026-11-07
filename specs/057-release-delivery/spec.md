@@ -227,6 +227,30 @@ workflow at `3dc0252a` built, attested and verified the full set and
 published nothing, so the dry run stays V-1's acceptance and the first
 release is the owner's signed `v0.1.0` tag (O-3).
 
+**2026-11-07: a registry publication, when one is specified, carries
+provenance from CI.** Section 3.5 stands: this release publishes to no
+registry. It is silent on how a later one would, and the owner set the
+standard for every package statecrafting releases (rustev A-87, spec-spine
+spec 209). A spec that amends 3.5 to publish to npm or crates.io specifies,
+before its first registry version:
+
+- each publish job runs in its own Environment (`npm-publish`,
+  `crates-publish`) whose deployment is restricted to `v*` tags, with
+  `id-token: write` granted to that job alone;
+- authentication is trusted publishing (OIDC) first; a stored token is a
+  fallback only where the registry refuses the exchange, and is read only
+  when the secret exists;
+- every `npm publish` passes `--provenance`; crates.io records no
+  attestation, so the GitHub build-provenance attestation of section 3.4
+  stays the crate's evidence;
+- a version already public without provenance fails the run rather than
+  being skipped, and a version public without provenance is a failed
+  release.
+
+This entry builds nothing and changes no requirement of this spec. The
+timing of `v0.1.0` and whether it publishes to any registry stay the
+owner's.
+
 ## Verification
 
 Ratified by the owner on 2026-10-31. Acceptance is declared by the
