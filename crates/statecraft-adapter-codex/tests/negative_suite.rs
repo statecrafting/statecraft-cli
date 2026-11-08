@@ -114,17 +114,22 @@ fn suite_2_a_required_token_or_field_it_lacks_is_refused_before_spawn() {
     assert!(
         matches!(refused, Err(SpawnRefusal::MissingRequired { token, .. }) if token == "turn-limit")
     );
-    // Spec 047: every `run` launch requires two fields this adapter does not
-    // yet declare, so `run` refuses it before spawn, naming them.
-    let f = fit(
+    // Spec 047: a plain `run` launch requires the two fields the 2026-11-08
+    // probes measured, so it fits; a managed launch also requires
+    // `print_mode_hooks`, which Codex does not report, so it is refused
+    // before spawn, naming that field.
+    let plain = fit(
         &codex::declared(),
         &Needs::launch(Requirement::DEFAULT, false),
     );
-    assert_eq!(
-        f.missing_required,
-        [Field::PerRunConfigDir, Field::SettingsFileTransport]
+    assert!(plain.missing_required.is_empty());
+    assert!(plain.refusal(codex::ADAPTER_NAME).is_none());
+    let managed = fit(
+        &codex::declared(),
+        &Needs::launch(Requirement::DEFAULT, true),
     );
-    assert!(f.refusal(codex::ADAPTER_NAME).is_some());
+    assert_eq!(managed.missing_required, [Field::PrintModeHooks]);
+    assert!(managed.refusal(codex::ADAPTER_NAME).is_some());
 }
 
 #[test]
